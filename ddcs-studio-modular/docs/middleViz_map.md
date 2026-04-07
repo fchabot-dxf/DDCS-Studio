@@ -1,0 +1,271 @@
+# SVG Group Hierarchy Map
+
+  - <span style="color:#1976d2">quad</span>
+    - <span style="color:#388e3c">QUADXZ</span>
+      - <span style="color:#fbc02d">quadXZ</span>
+        - frontXZ
+        - XZorientation
+          - right
+            - XZ_right
+              - XZ_right_text
+          - left
+            - XZ_left
+              - XZ_left_text
+    - <span style="color:#388e3c">QUADYZ</span>
+      - <span style="color:#fbc02d">quadYZ</span>
+        - sideYZ
+        - YZorientation
+          - back
+            - YZ_back
+              - YZ_back_text
+          - front
+            - YZ_front
+              - YZ_front_text
+    - <span style="color:#388e3c">QUADALT</span>
+    - <span style="color:#388e3c">QUADXY</span>
+      - <span style="color:#fbc02d">quadXY</span>
+        - topXY
+        - XYorientation
+          - XY_right
+            - XY_right_inner
+              - XY_right_text
+          - XY_left
+            - XY_left_inner
+              - XY_left_text
+          - XY_back
+            - XY_back_inner
+          - XY_front
+            - XY_front_inner
+  - <span style="color:#1976d2">middle_probe_pocket</span>
+    - <span style="color:#388e3c">middle_probe_pocket_stock</span>
+      - <span style="color:#fbc02d">workpocketYZ</span>
+        - workpiece-rect-u-shape
+          - g37
+      - <span style="color:#fbc02d">workpocketALT</span>
+        - iso
+          - pocket-floor
+      - <span style="color:#fbc02d">workpocketXZ</span>
+        - workpiece-rect-u-shape3
+          - g69
+      - <span style="color:#fbc02d">WorkpocketXY</span>
+    - <span style="color:#388e3c">middle_probe_pocket_X_pos</span>
+      - <span style="color:#fbc02d">middle_probe_pocket_X_pos_1axis</span>
+        - middle_probe_pocket_X_pos_1axis_XZ
+          - middle_probe_pocket_X_pos_1axis_XZ_spindle
+        - middle_probe_pocket_X_pos_1axis_XY
+          - middle_probe_pocket_X_pos_1axis_XY_miniprobe
+        - middle_probe_pocket_X_pos_1axis_YZ
+      - <span style="color:#fbc02d">middle_probe_pocket_X_pos_2axis</span>
+        - middle_probe_pocket_X_pos_2axis_XtoY_neg
+          - middle_probe_pocket_X_pos_2axis_XtoY_neg_nextaxisjog
+          - middle_probe_pocket_X_pos_2axis_XtoY_neg_jogpath_g
+          - middle_probe_pocket_X_pos_2axis_XtoY_neg_XY
+            - middle_probe_pocket_X_pos_2axis_XtoY_neg_XY_miniprobe
+        - middle_probe_pocket_X_pos_2axis_XtoY_pos
+          - middle_probe_pocket_X_pos_2axis_XtoY_pos_nextaxisjog
+          - middle_probe_pocket_X_pos_2axis_XtoY_pos_jogpath_g
+          - middle_probe_pocket_X_pos_2axis_XtoY_pos_XY
+            - middle_probe_pocket_X_pos_2axis_XtoY_pos_XY_miniprobe
+    - <span style="color:#388e3c">middle_probe_pocket_Y_pos</span>
+      - <span style="color:#fbc02d">middle_probe_pocket_Y_pos_1axis</span>
+        - middle_probe_pocket_Y_pos_1axis_YZ
+          - middle_probe_pocket_Y_pos_1axis_YZ_spindle
+        - middle_probe_pocket_Y_pos_1axis_XY
+          - middle_probe_pocket_Y_pos_1axis_XY_miniprobe
+        - middle_probe_pocket_Y_pos_1axis_XZ
+          - middle_probe_pocket_Y_pos_1axis_XZ_spindleghost
+      - <span style="color:#fbc02d">middle_probe_pocket_Y_pos_2axis</span>
+        - middle_probe_pocket_Y_pos_2axis_YtoX_neg
+          - middle_probe_pocket_Y_pos_2axis_YtoX_neg_nextaxisjog
+          - middle_probe_pocket_Y_pos_2axis_YtoX_neg_jogpath
+          - middle_probe_pocket_X_neg_1axis_XZ
+            - middle_probe_pocket_X_neg_1axis_XZ_spindle
+          - middle_probe_pocket_Y_pos_2axis_YtoX_neg_XY
+            - middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_miniprobe
+        - middle_probe_pocket_Y_pos_2axis_YtoX_pos
+          - middle_probe_pocket_Y_pos_2axis_YtoX_pos_nextaxisjog
+          - middle_probe_pocket_Y_pos_2axis_YtoX_pos_jogpath_g
+          - middle_probe_pocket_Y_pos_2axis_YtoX_pos_XZ
+            - middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XZ_spindle
+          - middle_probe_pocket_Y_pos_2axis_YtoX_pos_XY
+            - middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_miniprobe1
+    - <span style="color:#388e3c">middle_probe_pocket_Y_neg</span>
+      - <span style="color:#fbc02d">middle_probe_pocket_Y_neg_1axis</span>
+        - middle_probe_pocket_Y_neg_1axis_YZ
+          - middle_probe_pocket_Y_neg_1axis_YZ_spindle
+        - middle_probe_pocket_Y_neg_1axis_XY
+          - middle_probe_pocket_Y_neg_1axis_XY_miniprobe
+        - middle_probe_pocket_Y_neg_1axis_XZ
+      - <span style="color:#fbc02d">middle_probe_pocket_Y_neg_2axis</span>
+        - middle_probe_pocket_Y_neg_2axis_YtoX_neg
+          - middle_probe_pocket_Y_neg_2axis_YtoX_neg_nextaxisjog
+          - middle_probe_pocket_Y_neg_2axis_YtoX_neg_jogpath_g
+          - middle_probe_pocket_Y_neg_2axis_YtoX_neg_XZ_2
+            - middle_probe_pocket_Y_neg_2axis_YtoX_neg_XZ_2_spindle_2
+          - middle_probe_pocket_Y_neg_2axis_YtoX_neg_XY
+            - middle_probe_pocket_Y_neg_2axis_YtoX_neg_XY_miniprobe
+        - middle_probe_pocket_Y_neg_2axis_YtoX_pos
+          - middle_probe_pocket_Y_neg_2axis_YtoX_pos_nextaxisjog
+          - middle_probe_pocket_Y_neg_2axis_YtoX_pos_jogpath_g
+          - middle_probe_pocket_Y_neg_2axis_YtoX_pos_XZ
+            - middle_probe_pocket_Y_neg_2axis_YtoX_pos_XZ_spindle
+          - middle_probe_pocket_Y_neg_2axis_YtoX_pos_XY
+            - middle_probe_pocket_Y_neg_2axis_YtoX_pos_XY_miniprobe
+    - <span style="color:#388e3c">middle_probe_pocket_X_neg</span>
+      - <span style="color:#fbc02d">middle_probe_pocket_X_neg_1axis</span>
+        - middle_probe_pocket_X_neg_1axis_YZ
+        - middle_probe_pocket_X_neg_1axis_XZ_b
+          - middle_probe_pocket_X_neg_1axis_XZ_2_spindle
+        - middle_probe_pocket_X_neg_1axis_XY
+          - middle_probe_pocket_X_neg_1axis_XY_miniprobe
+      - <span style="color:#fbc02d">middle_probe_pocket_X_neg_2axis</span>
+        - middle_probe_pocket_X_neg_2axis_XtoY_neg
+          - middle_probe_pocket_X_neg_2axis_XtoY_neg_nextaxisjog
+          - middle_probe_pocket_X_neg_2axis_XtoY_neg_jogpath_g
+          - middle_probe_pocket_X_neg_2axis_XtoY_neg_YZ
+            - middle_probe_pocket_X_neg_2axis_XtoY_neg_YZ_spindle
+          - middle_probe_pocket_X_neg_2axis_XtoY_neg_XY
+            - middle_probe_pocket_X_neg_2axis_XtoY_neg_XY_miniprobe
+        - middle_probe_pocket_X_neg_2axis_XtoY_pos
+          - middle_probe_pocket_X_neg_2axis_XtoY_pos_nextaxisjog
+          - middle_probe_pocket_X_neg_2axis_XtoY_pos_jogpath_g
+          - middle_probe_pocket_X_neg_2axis_XtoY_pos_YZ
+            - middle_probe_pocket_X_neg_2axis_XtoY_pos_YZ_spindle
+          - middle_probe_pocket_X_neg_2axis_XtoY_pos_XY
+            - middle_probe_pocket_X_neg_2axis_XtoY_pos_XY_miniprobe
+  - <span style="color:#1976d2">middle_probe_boss</span>
+    - <span style="color:#388e3c">middle_probe_boss_stock</span>
+      - <span style="color:#fbc02d">workbossALT</span>
+      - <span style="color:#fbc02d">workbossXZ</span>
+      - <span style="color:#fbc02d">workbossYZ</span>
+      - <span style="color:#fbc02d">workbossXY</span>
+    - <span style="color:#388e3c">middle_probe_boss_X_neg</span>
+      - <span style="color:#fbc02d">middle_probe_boss_X_neg_1axis</span>
+        - middle_probe_boss_X_neg_1axis_XZ
+          - middle_probe_boss_X_neg_1axis_XZ_spindle
+        - middle_probe_boss_X_neg_1axis_XY
+          - middle_probe_boss_X_neg_1axis_XY_probepath1_g
+          - middle_probe_boss_X_neg_1axis_XY_retract_g
+          - middle_probe_boss_X_neg_1axis_XY_retractpath_g
+          - middle_probe_boss_X_neg_1axis_XY_probepath2_g
+          - middle_probe_boss_X_neg_1axis_XY_startarrow
+          - middle_probe_boss_X_neg_1axis_XY_endarrow
+          - middle_probe_boss_X_neg_1axis_XY_miniprobe
+        - middle_probe_boss_X_neg_1axis_YZ
+      - <span style="color:#fbc02d">middle_probe_boss_X_neg_2axis</span>
+        - middle_probe_boss_X_neg_2axis_XtoY_neg
+          - middle_probe_boss_X_neg_2axis_XtoY_neg_jog
+          - middle_probe_boss_X_neg_2axis_XtoY_neg_XY
+            - middle_probe_boss_X_neg_2axis_XtoY_neg_XY_miniprobe
+            - middle_probe_boss_Y_pos_jog
+          - middle_probe_boss_X_neg_2axis_XtoY_neg_YZ
+            - middle_probe_boss_X_neg_2axis_XtoY_neg_YZ_spindle
+          - middle_probe_boss_X_neg_2axis_XtoY_neg_XZ
+        - middle_probe_boss_X_neg_2axis_XtoY_pos
+          - middle_probe_boss_X_neg_2axis_XtoY_pos_jog
+          - middle_probe_boss_X_neg_2axis_XtoY_pos_XY
+            - middle_probe_boss_X_neg_2axis_XtoY_pos_XY_miniprobe
+            - middle_probe_boss_X_neg_2axis_XtoY_pos_XY_Y_pos_jog
+          - middle_probe_boss_X_neg_2axis_XtoY_pos_YZ
+            - middle_probe_boss_X_neg_2axis_XtoY_pos_YZ_spindle
+          - middle_probe_boss_X_neg_2axis_XtoY_pos_XZ
+    - <span style="color:#388e3c">middle_probe_boss_X_pos</span>
+      - <span style="color:#fbc02d">middle_probe_boss_X_pos_1axis</span>
+        - middle_probe_boss_X_pos_1axis_XZ
+          - middle_probe_boss_X_pos_1axis_XZ_spindle
+        - middle_probe_boss_X_pos_1axis_XY
+          - middle_probe_boss_X_pos_1axis_XY_probepath1_g
+          - middle_probe_boss_X_pos_1axis_XY_retract_g
+          - middle_probe_boss_X_pos_1axis_XY_retractpath_g
+          - middle_probe_boss_X_pos_1axis_XY_probepath2_g
+          - middle_probe_boss_X_pos_1axis_XY_jog
+          - middle_probe_boss_X_pos_1axis_XY_jogpath_g
+          - middle_probe_boss_X_pos_1axis_XY_startarrow
+          - middle_probe_boss_X_pos_1axis_XY_endarrow
+          - middle_probe_boss_X_pos_1axis_XY_miniprobe
+        - middle_probe_boss_X_pos_1axis_YZ
+      - <span style="color:#fbc02d">middle_probe_boss_X_pos_2axis</span>
+        - middle_probe_boss_X_pos_2axis_XtoY_neg
+          - middle_probe_boss_X_pos_2axis_XtoY_neg_jog
+          - middle_probe_boss_Y_neg_1axis_YZ
+            - middle_probe_boss_Y_neg_1axis_YZ_spindle
+          - middle_probe_boss_Y_neg_1axis_XY
+            - middle_probe_boss_Y_neg_1axis_XY_miniprobe
+          - middle_probe_boss_Y_neg_1axis_XZ
+        - middle_probe_boss_X_pos_2axis_XtoY_pos
+          - middle_probe_boss_X_pos_2axis_XtoY_pos_jog
+          - middle_probe_boss_X_pos_2axis_XtoY_pos_Y_pos_1axis_XY
+            - middle_probe_boss_X_pos_2axis_XtoY_pos_Y_pos_1axis_XY_miniprobe
+            - middle_probe_boss_X_pos_2axis_XtoY_pos_Y_pos_1axis_XY_Y_pos_jog
+          - middle_probe_boss_X_pos_2axis_XtoY_pos_Y_pos_1axis_YZ
+            - middle_probe_boss_X_pos_2axis_XtoY_pos_Y_pos_1axis_YZ_spindle
+          - middle_probe_boss_X_pos_2axis_XtoY_pos_Y_pos_1axis_XZ
+    - <span style="color:#388e3c">middle_probe_boss_Y_neg</span>
+      - <span style="color:#fbc02d">middle_probe_boss_Y_neg_2axis</span>
+        - middle_probe_boss_Y_neg_2axis_YtoX_neg
+          - middle_probe_boss_Y_pos_2axis_YtoX_neg_jog
+          - middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_XZ
+          - middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_XY
+            - middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_XY_probepath1_g
+            - middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_XY_retract_g
+            - middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_XY_retractpath_g
+            - middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_XY_probepath2_g
+            - middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_XY_startarrow
+            - middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_XY_endarrow
+            - middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_XY_miniprobe
+          - middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_YZ
+        - middle_probe_boss_Y_neg_2axis_YtoX_pos
+          - middle_probe_boss_Y_neg_2axis_YtoX_pos_jog
+          - middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_XZ
+          - middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_XY
+            - middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_XY_probepath1_g
+            - middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_XY_retract_g
+            - middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_XY_retractpath_g
+            - middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_XY_probepath2_g
+            - middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_XY_startarrow
+            - middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_XY_endarrow
+            - middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_XY_miniprobe
+          - middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_YZ
+      - <span style="color:#fbc02d">middle_probe_boss_Y_neg_1axis</span>
+        - middle_probe_boss_Y_neg_1axis_YZ_2
+          - middle_probe_boss_Y_neg_1axis_YZ_2_spindle
+        - middle_probe_boss_Y_neg_1axis_XY_2
+          - middle_probe_boss_Y_neg_1axis_XY_2_miniprobe
+        - middle_probe_boss_Y_neg_1axis_XZ_2
+    - <span style="color:#388e3c">middle_probe_boss_Y_pos</span>
+      - <span style="color:#fbc02d">middle_probe_boss_Y_pos_1axis</span>
+        - middle_probe_boss_Y_pos_1axis_XY
+          - middle_probe_boss_Y_pos_1axis_XY_miniprobe
+          - middle_probe_boss_Y_pos_1axis_XY_Y_pos_jog
+        - middle_probe_boss_Y_pos_1axis_YZ
+          - middle_probe_boss_Y_pos_1axis_YZ_spindle
+        - middle_probe_boss_Y_pos_1axis_XZ
+      - <span style="color:#fbc02d">middle_probe_boss_Y_pos_2axis</span>
+        - middle_probe_boss_Y_pos_2axis_YtoX_neg
+          - middle_probe_boss_Y_pos_2axis_YtoX_neg_jog_2
+          - middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XZ
+            - middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XZ_spindle
+          - middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XY
+            - middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XY_probepath1_g
+            - middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XY_retract_g
+            - middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XY_retractpath_g
+            - middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XY_probepath2_g
+            - middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XY_startarrow
+            - middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XY_endarrow
+            - middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XY_miniprobe
+          - middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_YZ
+        - middle_probe_boss_Y_pos_2axis_YtoX_pos
+          - middle_probe_boss_Y_pos_2axis_YtoX_pos_2
+            - middle_probe_boss_Y_pos_2axis_YtoX_pos_jog
+            - middle_probe_boss_Y_pos_2axis_YtoX_pos_probe
+              - middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XZ
+                - middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XZ_spindle
+              - middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XY
+                - middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XY_probepath1_g
+                - middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XY_retract_g
+                - middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XY_retractpath_g
+                - middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XY_probepath2_g
+                - middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XY_startarrow
+                - middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XY_endarrow
+                - middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XY_miniprobe
+              - middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_YZ

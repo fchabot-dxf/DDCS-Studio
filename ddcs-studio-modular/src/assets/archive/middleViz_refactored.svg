@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 953 956" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;">
+    <rect x="0" y="0" width="953" height="956" style="fill-opacity:0;"/>
+    
+    <!-- Main middle finder visualization -->
+    <g id="middle_finder">
+        
+        <!-- Quadrant views container -->
+        <g id="quad">
+            
+            <!-- FRONT VIEW (XZ Plane) -->
+            <g id="quad_xz">
+                <g id="quad_xz_content">
+                    <text id="quad_xz_label" x="12.484px" y="507.684px" style="font-family:'Consolas', monospace;font-size:14.296px;fill:#fff;">FRONT (XZ)</text>
+                    <path id="quad_xz_shape" d="M464.635,491.365L464.635,956L0,956L0,491.365L464.635,491.365ZM463.444,492.557L1.192,492.557L1.192,954.809L463.444,954.809L463.444,492.557Z" style="fill:#c9c9ff;"/>
+                    <g id="quad_xz_orientation">
+                        <g id="quad_xz_orientation_right">
+                            <g id="quad_xz_orientation_right_group">
+                                <g id="quad_xz_orientation_right_text">
+                                    <g transform="matrix(0,-1,1,0,-319.08318,1236.4762)">
+                                        <text x="458.697px" y="777.78px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Right X+</text>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                        <g id="quad_xz_orientation_left">
+                            <g id="quad_xz_orientation_left_group">
+                                <g id="quad_xz_orientation_left_text">
+                                    <g transform="matrix(0,-1,1,0,-757.61852,788.5105)">
+                                        <text x="15.446px" y="773.065px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Left X-</text>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                    </g>
+                </g>
+            </g>
+            
+            <!-- SIDE VIEW (YZ Plane) -->
+            <g id="quad_yz">
+                <g id="quad_yz_content">
+                    <text id="quad_yz_label" x="505.205px" y="509.3px" style="font-family:'Consolas', monospace;font-size:14.296px;fill:#fff;">SIDE (YZ)</text>
+                    <path id="quad_yz_shape" d="M953.098,491.462L953.098,956.097L488.463,956.097L488.463,491.462L953.098,491.462ZM951.906,492.653L489.654,492.653L489.654,954.905L951.906,954.905L951.906,492.653Z" style="fill:#c9c9ff;"/>
+                    <g id="quad_yz_orientation">
+                        <g id="quad_yz_orientation_back">
+                            <g id="quad_yz_orientation_back_group">
+                                <g id="quad_yz_orientation_back_text">
+                                    <g transform="matrix(0,-1,1,0,169.24602,1722.00862)">
+                                        <text x="945.627px" y="776.381px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Back Y+</text>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                        <g id="quad_yz_orientation_front">
+                            <g id="quad_yz_orientation_front_group">
+                                <g id="quad_yz_orientation_front_text">
+                                    <g transform="matrix(0,-1,1,0,-271.11708,1281.64568)">
+                                        <text x="505.264px" y="776.381px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Front Y-</text>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                    </g>
+                </g>
+            </g>
+            
+            <!-- ALTERNATE VIEW (3D ISO) -->
+            <g id="quad_alt">
+                <path id="quad_alt_shape" d="M953.098,0L953.098,464.635L488.463,464.635L488.463,0L953.098,0ZM951.906,1.191L489.654,1.191L489.654,463.443L951.906,463.443L951.906,1.191Z" style="fill:#c9c9ff;"/>
+            </g>
+            
+            <!-- TOP VIEW (XY Plane) -->
+            <g id="quad_xy">
+                <g id="quad_xy_content">
+                    <text id="quad_xy_label" x="13.315px" y="18.026px" style="font-family:'Consolas', monospace;font-size:14.296px;fill:#fff;">TOP (XY)</text>
+                    <path id="quad_xy_shape" d="M464.635,0L464.635,464.635L0,464.635L0,0L464.635,0ZM463.444,1.191L1.192,1.191L1.192,463.443L463.444,463.443L463.444,1.191Z" style="fill:#c9c9ff;"/>
+                    <g id="quad_xy_orientation">
+                        <g id="quad_xy_orientation_right">
+                            <g id="quad_xy_orientation_right_group">
+                                <g id="quad_xy_orientation_right_text">
+                                    <g transform="matrix(0,-1,1,0,188.36894,724.95338)">
+                                        <text x="456.661px" y="268.292px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Right X+</text>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                        <g id="quad_xy_orientation_left">
+                            <g id="quad_xy_orientation_left_group">
+                                <g id="quad_xy_orientation_left_text">
+                                    <g transform="matrix(0,-1,1,0,-250.16652,280.98656)">
+                                        <text x="13.427px" y="263.739px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Left X-</text>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                        <g id="quad_xy_orientation_back">
+                            <text x="199.866px" y="455.133px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Back Y+</text>
+                        </g>
+                        <g id="quad_xy_orientation_front">
+                            <text x="194.252px" y="18.026px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Front Y-</text>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+        
+        <!-- Middle probe operations -->
+        <g id="middle">
+            <g id="middle_probe">
+                <g id="middle_probe_pocket">
+                    
+                    <!-- Stock/workpiece visualization -->
+                    <g id="middle_probe_pocket_stock">
+                        
+                        <!-- Workpiece YZ view -->
+                        <g id="stock_yz">
+                            <g id="stock_yz_shape">
+                                <g id="stock_yz_shape_outer">
+                                    <g id="stock_yz_shape_inner">
+                                        <g transform="matrix(1,0,0,1,476.463,476.462)">
+                                            <path d="M0,231.318L0,463.636L463.636,463.636L463.636,0L231.318,0L0,231.318ZM3.365,233.682L233.682,3.365L460.271,3.365L460.271,460.271L3.365,460.271L3.365,233.682Z" style="fill:#f59e0b;fill-opacity:0.3;"/>
+                                        </g>
+                                    </g>
+                                </g>
+                            </g>
+                            <g id="stock_yz_dimensions">
+                                <path d="M721.853,950L721.853,956" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M488.463,953L953.098,953" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;stroke-dasharray:2,2;"/>
+                                <g transform="matrix(1,0,0,1,476.463,476.462)">
+                                    <path d="M463.636,476.636L469.636,476.636" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                </g>
+                                <path d="M950.098,476.462L950.098,956.097" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;stroke-dasharray:2,2;"/>
+                                <path d="M953.098,722.547L956.098,722.547" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M953.098,707.78L956.098,707.78" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M955.098,708.78L955.098,721.547" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <g transform="matrix(6.12323e-17,-1,1,6.12323e-17,238.93421,1670.26078)">
+                                    <text x="955.098px" y="715.163px" style="font-family:'Consolas', monospace;font-size:10px;fill:#94a3b8;">Y</text>
+                                </g>
+                                <path d="M488.463,953L488.463,956" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M489.463,955L720.853,955" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M700.516,953L700.516,956" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M701.516,955L720.853,955" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M709.8,953L709.8,956" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <g transform="matrix(1,0,0,1,476.463,476.462)">
+                                    <text x="222.837px" y="484.636px" style="font-family:'Consolas', monospace;font-size:10px;fill:#94a3b8;">Z</text>
+                                </g>
+                            </g>
+                            <use id="stock_yz_logo" xlink:href="#_Image2" x="838.598" y="888.598"/>
+                        </g>
+                        
+                        <!-- Workpiece ALT (ISO) view -->
+                        <g id="stock_alt">
+                            <g id="stock_alt_iso">
+                                <path d="M720.78,0L720.78,231.318L489.462,231.318L489.462,0L720.78,0ZM717.415,3.365L492.827,3.365L492.827,227.953L717.415,227.953L717.415,3.365Z" style="fill:#f59e0b;fill-opacity:0.3;"/>
+                                <g transform="matrix(0.707107,0.707107,-0.707107,0.707107,719.574976,-183.746552)">
+                                    <path d="M720.78,0L720.78,231.318L489.462,231.318L489.462,0L720.78,0ZM717.415,3.365L492.827,3.365L492.827,227.953L717.415,227.953L717.415,3.365Z" style="fill:#f59e0b;fill-opacity:0.3;"/>
+                                </g>
+                            </g>
+                            <use id="stock_alt_logo" xlink:href="#_Image2" x="605.098" y="390.598"/>
+                        </g>
+                        
+                        <!-- Workpiece XZ view -->
+                        <g id="stock_xz">
+                            <g id="stock_xz_shape">
+                                <g id="stock_xz_shape_outer">
+                                    <g id="stock_xz_shape_inner">
+                                        <g transform="matrix(1,0,0,1,0,476.462)">
+                                            <path d="M0,231.318L0,463.636L463.636,463.636L463.636,0L231.318,0L0,231.318ZM3.365,233.682L233.682,3.365L460.271,3.365L460.271,460.271L3.365,460.271L3.365,233.682Z" style="fill:#f59e0b;fill-opacity:0.3;"/>
+                                        </g>
+                                    </g>
+                                </g>
+                            </g>
+                            <g id="stock_xz_dimensions">
+                                <path d="M245.39,950L245.39,956" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M0,953L464.635,953" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;stroke-dasharray:2,2;"/>
+                                <g transform="matrix(1,0,0,1,0,476.462)">
+                                    <path d="M463.636,476.636L469.636,476.636" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                </g>
+                                <path d="M467.635,476.462L467.635,956.097" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;stroke-dasharray:2,2;"/>
+                                <path d="M467.635,722.547L470.635,722.547" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M467.635,707.78L470.635,707.78" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M469.635,708.78L469.635,721.547" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <g transform="matrix(6.12323e-17,-1,1,6.12323e-17,-237.701193,1185.79808)">
+                                    <text x="469.635px" y="715.163px" style="font-family:'Consolas', monospace;font-size:10px;fill:#94a3b8;">X</text>
+                                </g>
+                                <path d="M0,953L0,956" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M1,955L244.39,955" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M224.053,953L224.053,956" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M225.053,955L244.39,955" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <path d="M233.337,953L233.337,956" style="fill:none;fill-rule:nonzero;stroke:#94a3b8;stroke-width:1px;"/>
+                                <g transform="matrix(1,0,0,1,0,476.462)">
+                                    <text x="222.837px" y="484.636px" style="font-family:'Consolas', monospace;font-size:10px;fill:#94a3b8;">Z</text>
+                                </g>
+                            </g>
+                            <use id="stock_xz_logo" xlink:href="#_Image2" x="350.598" y="888.598"/>
+                        </g>
+                        
+                        <!-- Workpiece XY view -->
+                        <g id="stock_xy">
+                            <path d="M0,231.318L0,463.636L463.636,463.636L463.636,0L231.318,0L0,231.318ZM3.365,233.682L233.682,3.365L460.271,3.365L460.271,460.271L3.365,460.271L3.365,233.682Z" style="fill:#f59e0b;fill-opacity:0.3;"/>
+                        </g>
+                    </g>
+                    
+                    <!-- X Positive direction probing -->
+                    <g id="middle_probe_pocket_x_pos">
+                        
+                        <!-- First axis probe (X+) -->
+                        <g id="middle_probe_x_pos_1axis">
+                            
+                            <!-- X+ probe in XZ view -->
+                            <g id="middle_probe_x_pos_1axis_xz">
+                                <path id="x_pos_xz_probe_path" d="M253.813,717.699L253.813,717.699L253.813,717.699L253.813,717.699L253.813,717.699L255.313,717.699L255.313,720.984L252.313,720.984L252.313,717.699L253.813,717.699ZM252.313,722.484L255.313,722.484L255.313,725.769L252.313,725.769L252.313,722.484ZM252.313,727.269L255.313,727.269L255.313,730.554L252.313,730.554L252.313,727.269ZM252.313,732.054L255.313,732.054L255.313,735.339L252.313,735.339L252.313,732.054ZM252.313,736.839L255.313,736.839L255.313,737.339L253.313,739.352L252.313,737.339L252.313,736.839Z" style="fill:#3b82f6;"/>
+                                <path id="x_pos_xz_probe_line" d="M185.076,720.521L253.813,720.521" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                                <path id="x_pos_xz_retract" d="M255.63,719.021L254.13,720.521L255.63,722.021" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                                <path id="x_pos_xz_retract_line" d="M263.312,720.521L254.13,720.521" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                                <path id="x_pos_xz_start_arrow" d="M248.193,714.901L253.636,720.345L248.206,725.776L248.193,714.901Z" style="fill:#f00;"/>
+                                <path id="x_pos_xz_end_arrow" d="M185.708,724.937L182.36,721.589L185.699,718.249L185.708,724.937Z" style="fill:#f00;"/>
+                                <g id="x_pos_xz_spindle">
+                                    <rect x="233.089" y="661.551" width="40" height="58.333" style="fill:url(#_Linear4);"/>
+                                    <rect x="236.422" y="658.217" width="33.333" height="6.667" style="fill:#475569;"/>
+                                    <path d="M236.422,719.884L269.755,719.884L263.089,744.884L243.089,744.884L236.422,719.884Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                                    <path d="M253.089,744.884L253.089,764.884" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                                    <circle cx="253.089" cy="769.884" r="6.667" style="fill:#ef4444;"/>
+                                    <circle cx="254.755" cy="766.551" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                                </g>
+                            </g>
+                            
+                            <!-- X+ probe in XY view -->
+                            <g id="middle_probe_x_pos_1axis_xy">
+                                <path id="x_pos_xy_probe_path" d="M253.813,227.059L253.813,227.059L253.813,227.059L253.813,227.059L253.813,227.059L255.313,227.059L255.313,230.344L252.313,230.344L252.313,227.059L253.813,227.059ZM252.313,231.844L255.313,231.844L255.313,235.129L252.313,235.129L252.313,231.844ZM252.313,236.629L255.313,236.629L255.313,239.914L252.313,239.914L252.313,236.629ZM252.313,241.414L255.313,241.414L255.313,244.699L252.313,244.699L252.313,241.414ZM252.313,246.199L255.313,246.199L255.313,246.699L253.313,248.712L252.313,246.699L252.313,246.199Z" style="fill:#3b82f6;"/>
+                                <path id="x_pos_xy_probe_line" d="M185.076,230.881L253.813,230.881" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                                <path id="x_pos_xy_retract" d="M255.63,229.381L254.13,230.881L255.63,232.381" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                                <path id="x_pos_xy_retract_line" d="M263.312,230.881L254.13,230.881" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                                <path id="x_pos_xy_start_arrow" d="M248.193,225.261L253.636,230.705L248.206,236.136L248.193,225.261Z" style="fill:#f00;"/>
+                                <path id="x_pos_xy_end_arrow" d="M185.708,235.297L182.36,231.949L185.699,228.609L185.708,235.297Z" style="fill:#f00;"/>
+                                <g id="x_pos_xy_miniprobe">
+                                    <circle cx="253.813" cy="230.881" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                                    <circle cx="253.813" cy="230.881" r="7.698" style="fill:url(#_Radial5);"/>
+                                    <circle cx="251.503" cy="233.19" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                                </g>
+                            </g>
+                            
+                            <!-- X+ probe spindle in YZ view (X negative shown for reference) -->
+                            <g id="middle_probe_x_pos_1axis_yz_spindle" opacity="0.59">
+                                <rect x="701.853" y="661.529" width="40" height="58.333" style="fill:url(#_Linear6);"/>
+                                <rect x="705.186" y="658.196" width="33.333" height="6.667" style="fill:#475569;"/>
+                                <path d="M705.186,719.862L738.519,719.862L731.853,744.862L711.853,744.862L705.186,719.862Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                                <path d="M721.853,744.862L721.853,764.862" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                                <circle cx="721.853" cy="769.862" r="6.667" style="fill:#ef4444;"/>
+                                <circle cx="720.186" cy="766.529" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                            </g>
+                        </g>
+                        
+                        <!-- Second axis probe (X+ then Y-) -->
+                        <g id="middle_probe_x_pos_2axis">
+                            <g id="middle_probe_x_pos_2axis_to_y_neg">
+                                <path id="x_pos_to_y_neg_jog_arrow" d="M210.604,269.796L224.759,268.342L212.562,261.011L210.604,269.796Z" style="fill:#ff9a0d;"/>
+                                <path id="x_pos_to_y_neg_jog_path" d="M211.483,264.445C199.734,261.694 199.43,258.696 195.972,252.245C192.494,245.759 197.97,232.744 197.366,233.328" style="fill:none;stroke:#ff9a0d;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,4,0,0,0,0;"/>
+                                
+                                <!-- Y Negative probe (after X+) -->
+                                <g id="middle_probe_y_neg_1axis">
+                                    
+                                    <!-- Y- probe in YZ view -->
+                                    <g id="middle_probe_y_neg_1axis_yz">
+                                        <path id="y_neg_yz_probe_path" d="M695.5,773.114L694.467,773.114L694.467,769.114L695.488,769.114L695.5,773.114ZM693.433,769.114L693.433,773.114L691.367,773.114L691.367,769.114L693.433,769.114ZM690.334,769.114L690.334,773.114L688.267,773.114L688.267,769.114L690.334,769.114ZM687.234,769.114L687.234,773.114L685.167,773.114L685.167,769.114L687.234,769.114ZM684.134,769.114L684.134,773.114L683.101,773.114L683.112,769.114L684.134,769.114Z" style="fill:#3b82f6;"/>
+                                        <path id="y_neg_yz_probe_line" d="M759.978,771.297L692.678,771.297" style="fill:none;stroke:#3b82f6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                                        <path id="y_neg_yz_retract" d="M696.115,769.797L697.615,771.297L696.115,772.797" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                                        <path id="y_neg_yz_retract_line" d="M681.436,771.297L697.615,771.297" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                                        <path id="y_neg_yz_start_arrow" d="M685.822,765.677L680.379,771.12L685.809,776.551L685.822,765.677Z" style="fill:#f00;"/>
+                                        <path id="y_neg_yz_end_arrow" d="M759.978,774.713L763.327,771.365L759.986,768.025L759.978,774.713Z" style="fill:#f00;"/>
+                                        <g id="y_neg_yz_spindle">
+                                            <rect x="681.436" y="661.551" width="40" height="58.333" style="fill:url(#_Linear7);"/>
+                                            <rect x="684.769" y="658.217" width="33.333" height="6.667" style="fill:#475569;"/>
+                                            <path d="M718.102,719.884L684.769,719.884L691.436,744.884L711.436,744.884L718.102,719.884Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                                            <path d="M701.436,744.884L701.436,764.884" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                                            <circle cx="701.436" cy="769.884" r="6.667" style="fill:#ef4444;"/>
+                                            <circle cx="703.102" cy="766.551" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                                        </g>
+                                    </g>
+                                    
+                                    <!-- Y- probe in XY view -->
+                                    <g id="middle_probe_y_neg_1axis_xy">
+                                        <path id="y_neg_xy_probe_path" d="M233.317,259.035L235.043,259.035L234.18,259.892L233.317,259.035ZM235.043,259.035L236.18,257.905L236.18,259.035L235.043,259.035ZM233.317,259.035L232.18,259.035L232.18,257.905L233.317,259.035ZM232.18,260.177L236.18,260.177L236.18,262.462L232.18,262.462L232.18,260.177ZM232.18,263.605L236.18,263.605L236.18,265.89L232.18,265.89L232.18,263.605ZM232.18,267.032L236.18,267.032L236.18,269.317L232.18,269.317L232.18,267.032ZM232.18,270.46L236.18,270.46L236.18,271.59L234.18,273.603L232.18,271.59L232.18,270.46Z" style="fill:#3b82f6;"/>
+                                        <path id="y_neg_xy_retract" d="M232.497,260.1L233.997,258.6L235.497,260.1" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                                        <path id="y_neg_xy_retract_line" d="M233.997,269.134L233.997,258.6" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                                        <path id="y_neg_xy_probe_line" d="M233.997,189.96L233.997,257.892" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                                        <path id="y_neg_xy_start_arrow" d="M239.617,268.881L234.173,274.324L228.743,268.894L239.617,268.881Z" style="fill:#f00;"/>
+                                        <path id="y_neg_xy_end_arrow" d="M230.58,190.592L233.928,187.243L237.269,190.583L230.58,190.592Z" style="fill:#f00;"/>
+                                        <g id="y_neg_xy_miniprobe">
+                                            <circle cx="233.997" cy="248.655" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                                            <circle cx="233.997" cy="248.655" r="7.698" style="fill:url(#_Radial8);"/>
+                                            <circle cx="231.687" cy="246.345" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                                        </g>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+    
+    <!-- Gradient and image definitions -->
+    <defs>
+        <image id="_Image2" width="108px" height="39px" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGwAAAAnCAYAAADq+a1iAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAB4UlEQVR4nO3bvUrDUBiH8Se2tIXWDxwFqbgIehuCg7OLd+AV9SI6OFXo5gU4id6AqItTP0Q7xSG2FF+TNmnOeU/L+6wh8Ke/pJlORCBdXN3UgEvgFKgqzwmtCfAE3FW0l8AM6xo4AbaU54RYFTgAvtR/nDmstvaWNWhfFcywcveo9q3Iwvocj5lMvjPvj6LI0TK9avU6zWYr7XKv3+28qYBlYQ0HA95fX4jj2P8wxeqNBu2j47TLvX638wDg/TE1LNkUq1L99/2ZYYFnMMOS5cECj2CGJcuLBZ7ADEtWBAs8gBmWrCgWOAYzLNkqWOAQzLBkq2KBIzDDkpWBBQ7ADEtWFhaUDGZYsjKxoEQww5KVjQUlgRmWzAUWlABmWDJXWLAimGHJXGLBCmCGJXONBQXBDEvmAwsKgBmWzBcW5AQzLJlPLMgBZlgy31iwJJhhybSwYAkww5JpYcECMMOSaWJBBphhybSxIAXMsGQhYME/YIYlCwUL/oAZliwkLJgDMyxZaFjwC2ZYshCxAKIsrDiOGQ0HC7A27xQJQGu7RaUSFhYkJ/vOSTmfFUURO7t7fheFnSoWJMdTzzQHrFHqWJCAfWiPWIOCwILkL/GW5PT+IZv6QSreCLjvdzvP2kOm/QCz18ulmkBl0AAAAABJRU5ErkJggg=="/>
+        <linearGradient id="_Linear4" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(40,0,0,40,233.08875,661.55075)">
+            <stop offset="0" style="stop-color:#64748b;stop-opacity:1"/>
+            <stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/>
+            <stop offset="1" style="stop-color:#64748b;stop-opacity:1"/>
+        </linearGradient>
+        <radialGradient id="_Radial5" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(7.698123,0,0,-7.698123,252.27336,232.060054)">
+            <stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/>
+            <stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/>
+            <stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/>
+        </radialGradient>
+        <linearGradient id="_Linear6" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(40,0,0,40,701.85255,661.52892)">
+            <stop offset="0" style="stop-color:#64748b;stop-opacity:1"/>
+            <stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/>
+            <stop offset="1" style="stop-color:#64748b;stop-opacity:1"/>
+        </linearGradient>
+        <linearGradient id="_Linear7" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-40,0,-0,-40,721.43578,661.55075)">
+            <stop offset="0" style="stop-color:#64748b;stop-opacity:1"/>
+            <stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/>
+            <stop offset="1" style="stop-color:#64748b;stop-opacity:1"/>
+        </linearGradient>
+        <radialGradient id="_Radial8" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,7.698123,7.698123,0,232.45754,247.11514)">
+            <stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/>
+            <stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/>
+            <stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/>
+        </radialGradient>
+    </defs>
+</svg>

@@ -1,0 +1,51 @@
+{
+  "name": "ddcs-studio",
+  "version": "9.49.78",
+  "description": "Modular G-code Generator for DDCS Expert M350 CNC Controller",
+  "type": "module",
+  "main": "app.js",
+  "scripts": {
+    "start": "npx http-server ./src -p 3000 --silent",
+    "generate-vars": "node src/import_vars.js",
+    "svg:rename-gradients": "python \"src/assets/svg/rename_gradients.py\" --dir \"src/assets/svg\"",
+    "prebundle": "npm run svg:rename-gradients",
+    "bundle": "node scripts/bundle.cjs --src src",
+    "build": "npm run bump-version && npm run generate-vars && npm run bundle",
+    "bump-version": "node scripts/bump-version.cjs",
+    "deploy:pages": "npm run build && wrangler pages deploy ./output --project-name=ddcsexpertstudio",
+    "publish:pages-node": "npm run build && node scripts/publish-pages.cjs --dir=./output --project-name=ddcsexpertstudio",
+    "test:e2e": "playwright test"
+  },
+  "keywords": [
+    "cnc",
+    "gcode",
+    "ddcs",
+    "m350",
+    "probe",
+    "ultimate-bee"
+  ],
+  "author": "Frédéric",
+  "license": "MIT",
+  "files": [
+    "src/app.js",
+    "src/themes.js",
+    "src/scaleManager.js",
+    "src/variableDB.js",
+    "src/editorManager.js",
+    "src/searchManager.js",
+    "src/wizardManager.js",
+    "src/uiUtils.js",
+    "src/snippets.js",
+    "src/wizards/cornerWizard.js",
+    "src/wizards/middleWizard.js",
+    "src/wizards/edgeWizard.js",
+    "src/wizards/communicationWizard.js",
+    "src/wizards/wcsWizard.js"
+  ],
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  },
+  "dependencies": {
+    "xmldom": "^0.6.0"
+  }
+}

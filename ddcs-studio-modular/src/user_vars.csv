@@ -1,0 +1,3 @@
+# Example user_vars.csv — replace with your exported CSV (same format as Variables-ENG)
+300,U,My custom user var,This is an example user-provided variable
+301,U,Custom offset value,Used for example

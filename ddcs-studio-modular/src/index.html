@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+    <title>DDCS Studio V9.49.78 - Modular</title>
+    
+    <!-- Ensure project stylesheet is applied after inline legacy rules -->
+    <link rel="stylesheet" href="styles.css">
+    <!-- App favicon (X/Y + chevron) -->
+    <link rel="icon" href="assets/svg/favicon.svg" type="image/svg+xml">
+</head>
+<body data-theme="ddcs">
+
+    <header class="app-header">
+        <div class="hdr-title" style="display:flex;align-items:center;gap:12px">
+            <span class="hdr-icon">⚙</span>
+            <span class="hdr-text">DDCS STUDIO V9.49.78</span>
+        </div>
+            <div class="hdr-controls" style="display:flex;gap:10px;align-items:center">
+            <button onclick="(window.toggleStyle && window.toggleStyle())" id="styleBtn" class="op-btn" title="Switch Theme">🎨 NORMAL</button>
+            <button onclick="(window.toggleScale && window.toggleScale())" id="scaleBtn" class="op-btn" title="Toggle Zoom (AUTO)" class="scale-btn">🔍 AUTO</button>
+            <button onclick="(window.saveDefaults && window.saveDefaults())" class="op-btn" title="Download app with new defaults">💾 DOWNLOAD</button>
+            <button onclick="(function(){const code=(document.getElementById('editor')||{}).value||'';const body='Version: V9.49.77\n\nDescribe your feedback or bug below:\n\n'+(code?'--- Editor Code ---\n'+code:'(editor empty)');window.location.href='mailto:dansemur@gmail.com?subject='+encodeURIComponent('DDCS Studio Feedback / Bug Report')+'&body='+encodeURIComponent(body);})()" class="op-btn" id="feedbackBtn" title="Send feedback or report a bug to dansemur@gmail.com">🐛 REPORT BUG</button>
+        </div>
+    </header>
+
+    <div class="app-shell">
+        <div class="secondary-toolbar raised-seam">
+            <div class="secondary-toolbar-row">
+                <div class="toolbar-left">
+                    <label class="toolbar-btn" title="Import variables CSV">
+                        📂 <input type="file" id="csvInput" style="display:none">
+                    </label>
+                    <button id="csvExportBtn" class="toolbar-btn" title="Export variables CSV"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 16l-6-6h4V4h4v6h4l-6 6zm-7 2h14v2H5v-2z"/></svg></button>
+                    <input id="search" placeholder="Search..." />
+                    <button id="clearBtn" style="display:none" class="btn">Clear</button>
+                </div>
+                <div class="toolbar-right">
+                    <button id="filterbarBtn" class="toolbar-btn" aria-haspopup="true" aria-expanded="false">Filters</button>
+                    <div id="varList" class="var-list"></div>
+                </div>
+            </div>
+            <div id="filterbarMenu" class="filterbar-menu hidden">
+                <div class="filters-inner">
+                    <label><input type="checkbox" data-filter="user"><span>User</span></label>
+                    <label><input type="checkbox" data-filter="hasDesc"><span>Has Desc</span></label>
+                    <label><input type="checkbox" data-filter="probeG31"><span>Probe</span></label>
+                    <label><input type="checkbox" data-filter="wcs"><span>WCS</span></label>
+                    <label><input type="checkbox" data-filter="axis"><span>Axis</span></label>
+                    <label><input type="checkbox" data-filter="signal"><span>Signal</span></label>
+                    <label><input type="checkbox" data-filter="offset"><span>Offset</span></label>
+                    <label><input type="checkbox" data-filter="tool"><span>Tool</span></label>
+                    <label><input type="checkbox" data-filter="port"><span>Port</span></label>
+                    <label><input type="checkbox" data-filter="status"><span>Status</span></label>
+                    <label><input type="checkbox" data-filter="input"><span>Input</span></label>
+                    <label><input type="checkbox" data-filter="output"><span>Output</span></label>
+                    <label><input type="checkbox" data-filter="func"><span>Func</span></label>
+                    <label><input type="checkbox" data-filter="key"><span>Key</span></label>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: EDITOR (Fills remaining width, same height) -->
+        <main class="main">
+            <div class="editor-container">
+                <pre id="editor-highlight" class="editor-layer" aria-hidden="true"></pre>
+                <textarea id="editor" class="editor-layer" spellcheck="false" inputmode="none" placeholder="( System Ready )"></textarea>
+            </div>
+            <div class="statusbar" id="status"></div>
+        </main>
+
+        <div id="controller-dock" class="controller-dock">
+            <div class="dock-header">
+                <div class="header-controls">
+                    <div class="header-left" aria-label="Dock left controls"></div>
+                    <div class="header-center" aria-label="Dock center wizards"></div>
+                    <div class="header-right" aria-label="Dock right controls"></div>
+                </div>
+                <div class="header-handle" role="button" tabindex="0" aria-label="Toggle Dock" aria-expanded="false"><span class="chevron">▲</span></div>
+            </div>
+            <div class="dock-body">
+                <div id="deck-panel" class="deck-panel"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wizard overlay -->
+    <div id="wizard" class="overlay">
+        <div class="wiz-box">
+            <!-- HEADER: Blue bar with title and close button -->
+            <div class="wiz-head">
+                <span id="wizTitle">GENERATOR</span>
+                <span style="cursor:pointer" onclick="closeWiz()">✕</span>
+            </div>
+
+            <!-- WIZARD BODIES: One per wizard type, only one visible at a time -->
+            <div id="wiz_corner" class="wiz-body" style="display:none">
+                <span class="section-label">VISUALIZATION</span>
+                <!-- Visualization container -->
+                <div class="viz-container">
+                    <div id="cornerVizStatus" class="viz-status"></div>
+                    <div id="cornerVizContainer" class="viz-canvas"></div>
+                </div>
+                
+                <!-- Viz Legend -->
+                <div class="viz-legend">
+                    <div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
+                </div>
+
+                <!-- Animation toggle -->
+                <div style="margin: 8px 0; padding: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="c_animate" checked/>
+                        <span class="label" style="margin: 0;">ANIMATE PATHS</span>
+                    </label>
+                </div>
+
+                <div class="wiz-usage">Use for <b>outside corners</b> (boss). Park probe in the open space near the corner at scan depth — clear of both walls. Macro probes each wall and sets WCS X and Y (and optionally Z) to the corner.</div>
+
+                <!-- Form controls in grid layouts -->
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-3">
+                    <div>
+                        <span class="label">CORNER LOCATION</span>
+                        <select id="c_corner" title="Corner to probe. Sets X/Y probe directions.&#10;FL: X+, Y+  FR: X-, Y+  BL: X+, Y-  BR: X-, Y-" value="FL"><option>FL</option><option>FR</option><option>BL</option><option>BR</option></select>
+                    </div>
+                    <div>
+                        <span class="label">PROBE SEQUENCE</span>
+                        <select id="c_probe_seq" title="Probe order. YX: probe Y wall first, travel to X wall. XY: probe X wall first, travel to Y wall." value="YX"><option>YX</option><option>XY</option></select>
+                    </div>
+                    <div>
+                        <span class="label">PROBE Z FIRST</span>
+                        <label style="font-size:12px;" title="Probe Z surface before XY walls. Contact pos saved to #1927, written to #[#70+2] (WCS Z offset)."><input type="checkbox" id="c_probe_z_first"/> Probe Z First</label>
+                    </div>
+                </div>
+
+                <!-- WCS Target -->
+                <div>
+                    <span class="section-label">WCS</span>
+                    <span class="label">WCS TARGET</span>
+                    <select id="c_wcs" title="Target WCS for probe results. Active: reads #578 to get index, computes base address as #70=[805+([#578]-1)*5]. Fixed: #70=805..830 directly." value="active">
+                        <option value="active">Active WCS</option>
+                        <option value="G54">G54</option>
+                        <option value="G55">G55</option>
+                        <option value="G56">G56</option>
+                        <option value="G57">G57</option>
+                        <option value="G58">G58</option>
+                        <option value="G59">G59</option>
+                    </select>
+                </div>
+                
+                <!-- Section groups with headers -->
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-3">
+                        <div><span class="label">MAX PROBE</span><input type="number" id="c_dist" value="500" title="Max probe travel distance (mm). Stored as #1. Used in G31 as #7=[0-#1] (neg) or #8=#1 (pos)."/></div>
+                        <div><span class="label">RETRACT</span><input type="number" id="c_retract" value="5" title="Retract distance after fast probe, before slow pass (mm). Stored as #2. Used as #9=[0-#2] (neg) or #10=#2 (pos)."/></div>
+                        <div><span class="label">PROBE RADIUS</span><input type="number" id="c_radius" value="2.0" step="0.001" title="Radius of the probe stylus ruby tip. Used for coordinate compensation."/></div>
+                        <div><span class="label">SAFE Z</span><input type="number" id="c_safe_z" value="10" title="Z lift distance for moves between walls (mm). Stored as #19. Also used in plunge: #17=safeZ+scanDepth."/></div>
+                        <div><span class="label">TRAVEL</span><input type="number" id="c_travel_dist" value="50" title="Distance to travel along first wall before probing second wall (mm). Stored as #15 (pos) / #16=[0-travel] (neg)."/></div>
+                        <div><span class="label">SCAN DEPTH</span><input type="number" id="c_scan_depth" value="5" title="Extra Z plunge below safeZ before probing a wall (mm). #17=safeZ+scanDepth. #18=[0-#17]."/></div>
+                    </div>
+                </div>
+                
+                <!-- Feed Rates -->
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input type="number" id="c_feed_fast" value="200" title="Fast probe feedrate (mm/min). Stored as #3. Used in first G31 pass."/></div>
+                        <div><span class="label">SLOW FEED</span><input type="number" id="c_feed_slow" value="50" title="Slow probe feedrate (mm/min). Stored as #4. Used in second G31 pass after retract."/></div>
+                    </div>
+                </div>
+
+                <!-- Probe Settings -->
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-3">
+                        <div><span class="label">INPUT PORT (P)</span><input type="number" id="c_port" value="3" title="Probe input port number. Stored as #5. Used as P parameter in G31 (e.g. G31 X#7 F#3 P#5)."/></div>
+                        <div><span class="label">LEVEL (L)</span>
+                            <select id="c_level" title="Probe trigger signal level. L0=active low (NPN/normally-open). L1=active high (PNP/normally-closed). Used as L parameter in G31." value="0">
+                                <option value="0">Low (0)</option>
+                                <option value="1">High (1)</option>
+                            </select>
+                        </div>
+                        <div><span class="label">STOP (Q)</span>
+                            <select id="c_q" title="Probe stop mode. Q1=immediate stop on trigger. Q0=decelerate to stop. Used as Q parameter in G31." value="1">
+                                <option value="1">Immediate (Q1)</option>
+                                <option value="0">Decel (Q0)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Options -->
+                <div>
+                    <span class="section-label">OPTIONS</span>
+                    <div class="grid-3">
+                        <div>
+                            <label style="font-size:12px;" title="Dual gantry only — writes A machine position to WCS slave offset. Disable if A is a rotary axis."><input type="checkbox" id="c_sync_a" checked/> Sync A Axis (Dual Gantry)</label>
+                        </div>
+                        <div>
+                            <span class="label">SLAVE</span>
+                            <select id="c_slave" title="WCS offset index for the slave axis. A=offset 3 (#[#70+3]), B=offset 4 (#[#70+4])."><option value="3">A</option><option value="4">B</option></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview block -->
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_corner_code"></pre>
+                </div>
+            </div>
+
+            <!-- Middle Wizard -->
+            <div id="wiz_middle" class="wiz-body" style="display:none">
+                <span class="section-label">VISUALIZATION</span>
+                <!-- Visualization container -->
+                <div class="viz-container">
+                    <div id="middleVizStatus" class="viz-status"></div>
+                    <div id="middleVizContainer" class="viz-canvas"></div>
+                </div>
+
+                <!-- Viz Legend -->
+                <div class="viz-legend">
+                    <div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
+                </div>
+
+                <!-- Animation toggle -->
+                <div style="margin: 8px 0; padding: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="m_animate" checked/>
+                        <span class="label" style="margin: 0;">ANIMATE PATHS</span>
+                    </label>
+                </div>
+
+                <div id="middle_desc" class="wiz-usage"></div>
+
+
+                <!-- Form controls in grid layouts -->
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">FEATURE TYPE</span>
+                        <select id="m_type" title="Pocket: probe from center outward to both walls. Boss: probe from outside each side (requires manual repositioning between passes)." value="pocket">
+                            <option value="pocket">pocket</option>
+                            <option value="boss">boss</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">AXIS</span>
+                        <select id="m_axis" title="Axis to find center on. Result stored in #53 (primary) or #56 (secondary). Written to #[#70+0] for X or #[#70+1] for Y." value="X">
+                            <option value="X">X</option>
+                            <option value="Y">Y</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div>
+                        <span class="label">DIRECTION</span>
+                        <select id="m_dir" title="First probe direction. Determines which wall is probed first. First edge saved to #51, second edge to #52. Center = (#51+#52)/2 → #53." value="pos">
+                            <option value="pos">pos</option>
+                            <option value="neg">neg</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">PROBE BOTH AXES</span>
+                        <input type="checkbox" id="m_both" title="Find center on both axes. Probes primary axis first (#51/#52 → #53), then secondary axis (#54/#55 → #56). Both written to WCS."/>
+                    </div>
+                </div>
+
+                <!-- Secondary direction shown only when Find Both is checked -->
+                <div id="m_dir2_block" class="hidden" style="margin-top:8px;">
+                    <span class="label">SECOND DIRECTION</span>
+                    <select id="m_dir2" title="First probe direction for the secondary axis (used in 2-axis mode). Secondary edge results: #54 and #55. Center → #56.">
+                        <option value="pos">pos</option>
+                        <option value="neg">neg</option>
+                    </select>
+                </div>
+
+                <div>
+                    <span class="section-label">WCS</span>
+                    <span class="label">WCS TARGET</span>
+                    <select id="m_wcs" title="Target WCS for probe results. Active: reads #578, computes #70=[805+([#578]-1)*5]. Fixed: #70=805..830 directly." value="active">
+                        <option value="active">Active WCS</option>
+                        <option value="G54">G54</option>
+                        <option value="G55">G55</option>
+                        <option value="G56">G56</option>
+                        <option value="G57">G57</option>
+                        <option value="G58">G58</option>
+                        <option value="G59">G59</option>
+                    </select>
+                </div>
+
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-3">
+                        <div><span class="label">MAX PROBE</span><input id="m_dist" value="500" title="Max probe travel distance (mm). Stored as #1. Used as #7=[0-#1] (neg) or #8=#1 (pos) in G31."/></div>
+                        <div><span class="label">RETRACT</span><input id="m_retract" value="2" title="Retract between fast and slow probe passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)."/></div>
+                        <div><span class="label">SAFE Z</span><input id="m_safe_z" value="10" title="Z retract height between probing moves (mm). Stored as #17. Used as G0 Z#17."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input id="m_feed_fast" value="200" title="Fast probe feedrate (mm/min). Stored as #3. Used in first G31 pass."/></div>
+                        <div><span class="label">SLOW FEED</span><input id="m_feed_slow" value="50" title="Slow probe feedrate (mm/min). Stored as #4. Used in second G31 pass after retract."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-3">
+                        <div><span class="label">INPUT PORT (P)</span><input id="m_port" value="3" title="Probe input port number. Stored as #5. Used as P parameter in G31."/></div>
+                        <div><span class="label">LEVEL (L)</span>
+                            <select id="m_level" title="Probe trigger level. L0=active low (NPN). L1=active high (PNP). L parameter in G31." value="0"><option value="0">Low (0)</option><option value="1">High (1)</option></select>
+                        </div>
+                        <div><span class="label">STOP (Q)</span>
+                            <select id="m_q" title="Stop mode on trigger. Q1=immediate. Q0=decelerate. Q parameter in G31." value="1"><option value="1">Immediate (Q1)</option><option value="0">Decel (Q0)</option></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Options -->
+                <div>
+                    <span class="section-label">OPTIONS</span>
+                    <div class="grid-2">
+                        <div>
+                            <label style="font-size:12px;" title="Dual gantry only — writes A machine position to WCS slave offset. Disable if A is a rotary axis."><input type="checkbox" id="m_sync_a" checked/> Sync A Axis (Dual Gantry)</label>
+                        </div>
+                        <div>
+                            <span class="label">SLAVE</span>
+                            <select id="m_slave" title="WCS offset index for slave axis. A=offset 3 (#[#70+3]), B=offset 4 (#[#70+4])."><option value="3">A</option><option value="4">B</option></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview block -->
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_middle_code"></pre>
+                </div>
+            </div>
+
+            <!-- Edge Wizard -->
+            <div id="wiz_edge" class="wiz-body" style="display:none">
+                <span class="section-label">VISUALIZATION</span>
+                <!-- Visualization container -->
+                <div class="viz-container">
+                    <div id="edgeVizStatus" class="viz-status"></div>
+                    <div id="probeVizContainer" class="viz-canvas"><svg id="probeViz" width="100%" height="160" viewBox="0 0 400 140" xmlns="http://www.w3.org/2000/svg"></svg></div>
+                </div>
+
+                <!-- Viz Legend -->
+                <div class="viz-legend">
+                    <div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
+                </div>
+
+                <div style="margin: 8px 0; padding: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="p_animate" checked/>
+                        <span class="label" style="margin: 0;">ANIMATE PATHS</span>
+                    </label>
+                </div>
+
+                <div class="wiz-usage">Position probe touching or just clear of the edge. Macro probes the wall and sets WCS axis to the contact position.</div>
+
+                <!-- Form controls in grid layouts -->
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">AXIS</span>
+                        <select id="p_axis" title="Axis to probe. X: result from #1925 written to #[#70+0]. Y: result from #1926 written to #[#70+1]." value="X">
+                            <option value="X">X</option>
+                            <option value="Y">Y</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">DIRECTION</span>
+                        <select id="p_dir" title="Probe direction toward wall on the selected axis. pos: G31 [axis]#8 (toward +). neg: G31 [axis]#7 (toward -). Retract is opposite direction." value="pos">
+                            <option value="pos">pos</option>
+                            <option value="neg">neg</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">WCS</span>
+                    <span class="label">WCS TARGET</span>
+                    <select id="p_wcs" title="Target WCS for probe result. Active: reads #578, computes #70=[805+([#578]-1)*5]. Fixed: #70=805..830 directly." value="active">
+                        <option value="active">Active WCS</option>
+                        <option value="G54">G54</option>
+                        <option value="G55">G55</option>
+                        <option value="G56">G56</option>
+                        <option value="G57">G57</option>
+                        <option value="G58">G58</option>
+                        <option value="G59">G59</option>
+                    </select>
+                </div>
+
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-2">
+                        <div><span class="label">MAX PROBE</span><input id="p_dist" value="500" title="Max probe travel distance (mm). Stored as #1. #7=[0-#1] (neg), #8=#1 (pos)."/></div>
+                        <div><span class="label">RETRACT</span><input id="p_retract" value="2" title="Retract between fast and slow passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)."/></div>
+                    </div>
+
+                </div>
+
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input id="p_feed_fast" value="200" title="Fast probe feedrate (mm/min). Stored as #3. First G31 pass."/></div>
+                        <div><span class="label">SLOW FEED</span><input id="p_feed_slow" value="50" title="Slow probe feedrate (mm/min). Stored as #4. Second G31 pass after retract."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-3">
+                        <div><span class="label">INPUT PORT (P)</span><input id="p_port" value="3" title="Probe input port. Stored as #5. P parameter in G31."/></div>
+                        <div><span class="label">LEVEL (L)</span>
+                            <select id="p_level" title="Trigger level. L0=active low (NPN). L1=active high (PNP). L parameter in G31." value="0"><option value="0">Low (0)</option><option value="1">High (1)</option></select>
+                        </div>
+                        <div><span class="label">STOP (Q)</span>
+                            <select id="p_q" title="Stop mode on trigger. Q1=immediate. Q0=decelerate. Q parameter in G31." value="1"><option value="1">Immediate (Q1)</option><option value="0">Decel (Q0)</option></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Options -->
+                <div>
+                    <span class="section-label">OPTIONS</span>
+                    <div class="grid-2">
+                        <div>
+                            <label style="font-size:12px;" title="Dual gantry only — writes A machine position to WCS slave offset. Disable if A is a rotary axis."><input type="checkbox" id="p_sync_a" checked/> Sync A Axis (Dual Gantry)</label>
+                        </div>
+                        <div>
+                            <span class="label">SLAVE</span>
+                            <select id="p_slave" title="WCS offset index for slave axis. A=offset 3 (#[#70+3]), B=offset 4 (#[#70+4])."><option value="3">A</option><option value="4">B</option></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview block -->
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_edge_code"></pre>
+                </div>
+            </div>
+
+            <!-- Alignment Wizard -->
+            <div id="wiz_alignment" class="wiz-body" style="display:none">
+
+                <span class="section-label">VISUALIZATION</span>
+
+                <!-- Viz placeholder -->
+                <div class="viz-container">
+                    <div id="alignmentVizStatus" class="viz-status"></div>
+                    <div id="alignmentVizContainer" class="viz-canvas">
+                        <!-- Alignment viz — SVG to be added in a future pass -->
+                    </div>
+                </div>
+
+                <!-- Viz Legend -->
+                <div class="viz-legend">
+                    <div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
+                </div>
+
+                <div style="margin: 8px 0; padding: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="al_animate" checked/>
+                        <span class="label" style="margin: 0;">ANIMATE PATHS</span>
+                    </label>
+                </div>
+
+                <div class="wiz-usage">Jog probe to <b>point A</b> along the fence at probe height → Enter. Macro probes fence, lifts Z, pauses. Jog to <b>point B</b> along same fence → Enter. Macro probes again and reports drift, span and angle.</div>
+
+
+                <!-- Axis and probe geometry -->
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">CHECK AXIS</span>
+                        <select id="al_check_axis" title="Axis being checked for squareness. Two probe points are taken along this axis to measure drift between them.">
+                            <option value="X">X</option>
+                            <option value="Y">Y</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">PROBE DIRECTION</span>
+                        <select id="al_probe_dir" title="Direction to probe the fence from. Probe moves toward the fence wall: pos=G31 axis#8, neg=G31 axis#7.">
+                            <option value="pos">pos</option>
+                            <option value="neg">neg</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Probe distances -->
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-3">
+                        <div><span class="label">MAX PROBE</span><input id="al_dist" type="number" value="20" title="Max probe travel toward fence (mm). Stored as #1. #7=[0-#1], #8=#1."/></div>
+                        <div><span class="label">RETRACT</span><input id="al_retract" type="number" value="2" title="Retract after each probe pass (mm). Stored as #2. #9=[0-#2], #10=#2."/></div>
+                        <div><span class="label">SAFE Z</span><input id="al_safe_z" type="number" value="10" title="Z lift between point A and point B (mm). Stored as #17. Used as G0 Z#17."/></div>
+                    </div>
+                </div>
+
+                <!-- Tolerance -->
+                <div>
+                    <span class="label">TOLERANCE (mm)</span>
+                    <input id="al_tolerance" type="number" value="0.2" step="0.05" title="Expected max drift between two probe points (mm). Reference only — stored as #20 and reported in output comment. Does not affect motion."/>
+                    <span class="hint">Reference only — shown in output comments</span>
+                </div>
+
+                <!-- Feed rates -->
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input id="al_feed_fast" type="number" value="200" title="Fast probe feedrate (mm/min). Stored as #3. First G31 pass."/></div>
+                        <div><span class="label">SLOW FEED</span><input id="al_feed_slow" type="number" value="50" title="Slow probe feedrate (mm/min). Stored as #4. Second G31 pass after retract."/></div>
+                    </div>
+                </div>
+
+                <!-- Advanced -->
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-3">
+                        <div><span class="label">INPUT PORT (P)</span><input id="al_port" type="number" value="3" title="Probe input port. Stored as #5. P parameter in G31."/></div>
+                        <div>
+                            <span class="label">LEVEL (L)</span>
+                            <select id="al_level" title="Trigger level. L0=active low (NPN). L1=active high (PNP). L parameter in G31.">
+                                <option value="0">Low (0)</option>
+                                <option value="1">High (1)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="label">STOP (Q)</span>
+                            <select id="al_q" title="Stop mode on trigger. Q1=immediate. Q0=decelerate. Q parameter in G31.">
+                                <option value="1">Immediate (Q1)</option>
+                                <option value="0">Decel (Q0)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview -->
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_alignment_code"></pre>
+                </div>
+
+            </div>
+
+            <!-- Communication Wizard -->
+            <div id="wiz_comm" class="wiz-body" style="display:none">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-container comm-screen-pixwrap">
+                    <div class="viz-canvas comm-screen" id="comm_screen_preview"></div>
+                </div>
+
+                <div id="comm_desc" class="wiz-usage"></div>
+
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">TYPE</span>
+                        <select id="c_type">
+                            <option value="popup">Popup</option>
+                            <option value="status">Status</option>
+                            <option value="input">Numeric Input</option>
+                            <option value="beep">Beep</option>
+                            <option value="dwell">Dwell</option>
+                        </select>
+                    </div>
+                    <div id="c_mode_block">
+                        <span class="label" id="c_mode_label">MODE</span>
+                        <select id="c_popup_mode">
+                            <option value="-5000">Toast — no wait (-5000)</option>
+                            <option value="1">OK/Cancel — branching (1)</option>
+                            <option value="3">Binary Choice — branching (3)</option>
+                        </select>
+                        <select id="c_status_mode">
+                            <option value="1">Standard (1)</option>
+                            <option value="-3000">Persistent — stays after macro (-3000)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <span class="section-label">GEOMETRY</span>
+                <div class="grid-2" id="c_val_block">
+                    <div>
+                        <span class="label" id="c_val_label">VALUE</span>
+                        <input id="c_val" />
+                        <span class="hint" id="c_val_hint"></span>
+                    </div>
+                    <div id="c_cycle_block">
+                        <span class="label">CYCLE</span>
+                        <input id="c_cycle" placeholder="0 = single beep" />
+                        <span class="hint">#2043 pulse width ms — ON=cycle, OFF=cycle (100 =&gt; 100ms on, 100ms off)</span>
+                    </div>
+                </div>
+
+                <div id="c_msg_block">
+                    <span class="label">MESSAGE</span>
+                    <input id="c_msg" placeholder="Enter message..." />
+                    <span class="hint">Use <b>/</b> for line breaks in DDCS popup messages (#1505).</span>
+                </div>
+
+                <span class="section-label">ADVANCED</span>
+
+                <div class="grid-2" id="c_var_block">
+                    <div><span class="label">TARGET ID</span><input id="c_id" value="100" /></div>
+                    <div><span class="label">DEST VAR</span><input id="c_dest" placeholder="#200" /></div>
+                </div>
+
+                <div class="grid-2" id="c_color_block">
+                    <div>
+                        <span class="label">STATUS COLOR</span>
+                        <select id="c_status_color">
+                            <option value="-1" selected>Default (green)</option>
+                            <option value="16711680">Blue</option>
+                            <option value="65280">Green</option>
+                            <option value="255">Red</option>
+                            <option value="16776960">Cyan</option>
+                            <option value="16711935">Magenta</option>
+                            <option value="65535">Yellow</option>
+                            <option value="16744576">Light Blue</option>
+                            <option value="8454016">Light Green</option>
+                            <option value="8421631">Light Red</option>
+                            <option value="16777088">Light Cyan</option>
+                            <option value="16744703">Light Magenta</option>
+                            <option value="8454143">Light Yellow</option>
+                            <option value="8388608">Dark Blue</option>
+                            <option value="32768">Dark Green</option>
+                            <option value="128">Dark Red</option>
+                            <option value="8421376">Dark Cyan</option>
+                            <option value="8388736">Dark Magenta</option>
+                            <option value="32896">Dark Yellow</option>
+                            <option value="16777215">White</option>
+                            <option value="13882323">Light Gray</option>
+                            <option value="8421504">Gray</option>
+                            <option value="4210752">Dark Gray</option>
+                            <option value="0">Black</option>
+                        </select>
+                    </div>
+                    <div></div>
+                </div>
+
+                <div id="c_dwell_block" class="grid-2">
+                    <div>
+                        <span class="label">DWELL AFTER</span>
+                        <input id="c_status_dwell" placeholder="0 = no dwell" />
+                        <span class="hint" id="c_status_dwell_hint">milliseconds — e.g. 3000 = 3s</span>
+                    </div>
+                    <div></div>
+                </div>
+
+                <div id="c_slots_block" class="grid-4" style="grid-template-columns:repeat(4,1fr)">
+                    <div><span class="label">SLOT #1510</span><input id="c_slot1" /></div>
+                    <div><span class="label">SLOT #1511</span><input id="c_slot2" /></div>
+                    <div><span class="label">SLOT #1512</span><input id="c_slot3" /></div>
+                    <div><span class="label">SLOT #1513</span><input id="c_slot4" /></div>
+                </div>
+
+                <div class="preview-block" id="comm_preview_block">
+                    <span class="label">CODE PREVIEW</span>
+                    <pre id="wiz_comm_code"></pre>
+                </div>
+            </div>
+
+            <!-- WCS Wizard -->
+            <div id="wiz_wcs" class="wiz-body" style="display:none">
+                <div class="wiz-usage">Zero one or more axes in the selected WCS to the current machine position. Use <b>Active WCS</b> to always target whichever WCS is loaded on the controller.</div>
+
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-3" style="margin-top:10px;">
+                    <div><label><input type="checkbox" id="w_x" /> Zero X</label></div>
+                    <div><label><input type="checkbox" id="w_y" /> Zero Y</label></div>
+                    <div><label><input type="checkbox" id="w_z" /> Zero Z</label></div>
+                </div>
+
+                <div class="grid-2">
+                    <div>
+                        <span class="section-label">WCS</span>
+                        <span class="label">WCS SYSTEM</span>
+                        <select id="w_sys">
+                            <option value="0">Active WCS (Auto)</option>
+                            <option value="54">G54</option>
+                            <option value="55">G55</option>
+                            <option value="56">G56</option>
+                            <option value="57">G57</option>
+                            <option value="58">G58</option>
+                            <option value="59">G59</option>
+                        </select>
+                    </div>
+                </div>
+
+                <span class="section-label">OPTIONS</span>
+                <div class="grid-2" style="margin-top:8px;">
+                    <div>
+                        <label class="checkbox-inline" title="Dual gantry only — writes A machine position to WCS slave offset. Disable if A is a rotary axis."><input type="checkbox" id="w_sync" checked /> Sync A Axis (Dual Gantry)</label>
+                    </div>
+                    <div>
+                        <span class="label">SLAVE</span>
+                        <select id="w_slave"><option value="3">A</option><option value="4">B</option></select>
+                    </div>
+                </div>
+
+                <div class="preview-block" id="wcs_preview_block">
+                    <span class="label">CODE PREVIEW <span id="wcsStatus" class="compliant-tag"></span></span>
+                    <pre id="wiz_wcs_code"></pre>
+                </div>
+            </div>
+
+            <!-- FOOTER: Action buttons -->
+            <div class="wiz-foot">
+                <button onclick="closeWiz()">CANCEL</button>
+                <button onclick="insertWiz()" class="primary">INSERT</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Global tooltip -->
+    <div id="global-tooltip" style="display:none;"></div>
+
+    <!-- IMPORTANT: Load the modular JavaScript with diagnostic logging -->
+    <script type="module">
+        (async () => {
+            try {
+                const mod = await import('./app.js');
+                console.log('Imported app.js', mod);
+            } catch (err) {
+                console.error('Failed to import app.js', err);
+            }
+        })();
+    </script>
+    
+
+    <!-- 
+    Optional: Keep any standalone visualization functions here
+    that manipulate SVG elements (drawCornerViz, drawMiddleViz, etc.)
+    These can remain as regular <script> tags since they work with
+    existing DOM elements.
+    
+    The modular app will call these through window.drawCornerViz() etc.
+    -->
+    <script>
+        // Simple SVG visualization functions (no external libs)
+        function clearSVG(svg) {
+            while (svg.firstChild) svg.removeChild(svg.firstChild);
+        }
+
+        // Prevent SVG defs ID collisions across multiple injected SVGs (gradients, masks, markers, etc.)
+        function namespaceSvgDefs(svgRoot, namespacePrefix) {
+            if (!svgRoot || !svgRoot.querySelectorAll) return;
+            const defsNodes = svgRoot.querySelectorAll('defs [id], linearGradient[id], radialGradient[id], pattern[id], marker[id], clipPath[id], mask[id], filter[id]');
+            if (!defsNodes.length) return;
+
+            const idMap = new Map();
+            defsNodes.forEach((node, idx) => {
+                const oldId = node.getAttribute('id');
+                if (!oldId) return;
+                if (idMap.has(oldId)) return;
+                const safePrefix = (namespacePrefix || 'svg').replace(/[^a-zA-Z0-9_-]/g, '_');
+                idMap.set(oldId, `${safePrefix}__${oldId}__${idx}`);
+            });
+
+            if (!idMap.size) return;
+
+            defsNodes.forEach((node) => {
+                const oldId = node.getAttribute('id');
+                const newId = oldId ? idMap.get(oldId) : null;
+                if (newId) node.setAttribute('id', newId);
+            });
+
+            const attrNames = ['fill', 'stroke', 'filter', 'mask', 'clip-path', 'marker-start', 'marker-mid', 'marker-end', 'href', 'xlink:href', 'style'];
+            const all = svgRoot.querySelectorAll('*');
+            all.forEach((el) => {
+                attrNames.forEach((attr) => {
+                    const val = el.getAttribute(attr);
+                    if (!val) return;
+                    let next = val;
+                    idMap.forEach((newId, oldId) => {
+                        next = next.replace(new RegExp(`url\\(#${oldId}\\)`, 'g'), `url(#${newId})`);
+                        if ((attr === 'href' || attr === 'xlink:href') && next === `#${oldId}`) {
+                            next = `#${newId}`;
+                        }
+                    });
+                    if (next !== val) el.setAttribute(attr, next);
+                });
+            });
+        }
+
+        let cornerSvgLoaded = false;
+        let middleSvgLoaded = false;
+
+        // Load SVG from inlined assets (standalone bundle) or network fetch for dev server.
+        async function fetchSvg(tryPaths, assetKeys) {
+            for (const key of assetKeys) {
+                const val = window.__ASSETS && window.__ASSETS[key];
+                if (val) return val;
+            }
+            // Dev server fallback: fetch and validate it's actually SVG not an HTML redirect
+            for (const p of tryPaths) {
+                try {
+                    const r = await fetch(p);
+                    if (!r || !r.ok) continue;
+                    const text = await r.text();
+                    if (text.trimStart().startsWith('<svg') || text.trimStart().startsWith('<?xml')) return text;
+                } catch (e) { /* ignore */ }
+            }
+            return null;
+        }
+
+        window.drawCornerViz = async function(probeZ) {
+            const container = document.getElementById('cornerVizContainer');
+            if (!container) return;
+
+            // Load SVG once on first call
+            if (!cornerSvgLoaded) {
+                const svgText = await fetchSvg(
+                    ['./assets/svg/cornerViz.svg', './assets/cornerViz.svg'],
+                    ['svg/cornerViz.svg', 'cornerViz.svg']
+                );
+                if (!svgText) {
+                    console.error('drawCornerViz: failed to load cornerViz.svg');
+                    throw new Error('Unable to load cornerViz.svg');
+                }
+                container.innerHTML = svgText;
+                const svgRoot = container.querySelector('svg');
+                namespaceSvgDefs(svgRoot, 'cornerViz');
+                console.debug('drawCornerViz: SVG injected; svgExists=', !!container.querySelector('svg'));
+                cornerSvgLoaded = true;
+            }
+
+            // Get current form values
+            const corner = document.getElementById('c_corner')?.value || 'FL';
+            const probeSeq = document.getElementById('c_probe_seq')?.value || 'YX';
+
+            // Determine probeZ: if argument provided use it, otherwise read checkbox
+            probeZ = (typeof probeZ === 'boolean') ? probeZ : (document.getElementById('c_probe_z_first')?.checked || false);
+
+            // Hide all corner groups
+            ['corner_FL', 'corner_FR', 'corner_BL', 'corner_BR'].forEach(id => {
+                const elem = document.getElementById(id);
+                if (elem) elem.style.display = 'none';
+            });
+
+            // Show selected corner group
+            const cornerElem = document.getElementById('corner_' + corner);
+            if (cornerElem) cornerElem.style.display = 'block';
+
+            // Get sequence groups for active corner
+            const yxSeq = document.getElementById(`corner_${corner}_YX`);
+            const xySeq = document.getElementById(`corner_${corner}_XY`);
+
+            // Show only the selected sequence
+            if (probeSeq === 'YX') {
+                if (yxSeq) yxSeq.style.display = 'block';
+                if (xySeq) xySeq.style.display = 'none';
+            } else {
+                if (xySeq) xySeq.style.display = 'block';
+                if (yxSeq) yxSeq.style.display = 'none';
+            }
+
+            // Toggle Zfirst group within active corner+sequence
+            const zfirstElem = document.getElementById(`corner_${corner}_${probeSeq}_Zfirst`);
+            if (zfirstElem) zfirstElem.style.display = probeZ ? 'block' : 'none';
+
+        };
+
+        window.drawMiddleViz = async function() {
+            console.debug('drawMiddleViz: start');
+            try {
+                const container = document.getElementById('middleVizContainer');
+                if (!container) { console.debug('drawMiddleViz: no container'); return; }
+
+            // Ensure SVG is present — reload if DOM lost the SVG (robustness for HMR / accidental DOM edits)
+            async function ensureSvgLoaded() {
+                console.debug('drawMiddleViz: ensureSvgLoaded — checking existing SVG');
+                const hasSvg = !!container.querySelector('svg');
+                if (!hasSvg) {
+                    const svgText = await fetchSvg(
+                        ['./assets/svg/middleViz.svg', './assets/middleViz.svg'],
+                        ['svg/middleViz.svg', 'middleViz.svg']
+                    );
+                    if (!svgText) {
+                        console.error('drawMiddleViz: failed to load middleViz.svg');
+                        const statusEl = document.getElementById('middleVizStatus');
+                        if (statusEl) statusEl.textContent = 'SVG load failed';
+                        throw new Error('Unable to load middleViz.svg');
+                    }
+                    container.innerHTML = svgText;
+                    namespaceSvgDefs(container.querySelector('svg'), 'middleViz');
+                    middleSvgLoaded = true;
+                    // Wait for next frame to ensure DOM has parsed the SVG
+                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                    console.debug('drawMiddleViz.ensureSvgLoaded: SVG injected; svgRootPresent=', !!container.querySelector('svg'));
+                }
+            }
+            await ensureSvgLoaded();
+
+            // Read current controls (ids: m_type, m_axis, m_dir, m_dir2, m_both)
+            const type = document.getElementById('m_type')?.value || 'pocket';
+            const axis = document.getElementById('m_axis')?.value || 'X';
+            const dir = document.getElementById('m_dir')?.value || 'pos';
+            const findBoth = document.getElementById('m_both')?.checked || false;
+            const dir2ctrl = document.getElementById('m_dir2');
+            const dir2 = dir2ctrl ? (dir2ctrl.value || (dir === 'pos' ? 'neg' : 'pos')) : (dir === 'pos' ? 'neg' : 'pos');
+
+            // Update status label with current config
+            const statusEl = document.getElementById('middleVizStatus');
+            if (statusEl) {
+                const oAxis = axis === 'X' ? 'Y' : 'X';
+                const dirLabel = dir === 'pos' ? '+' : '-';
+                const dir2Label = dir2 === 'pos' ? '+' : '-';
+                statusEl.textContent = findBoth
+                    ? `${type} · ${axis}${dirLabel} → ${oAxis}${dir2Label}`
+                    : `${type} · ${axis}${dirLabel}`;
+            }
+
+            // Feature-level groups in the SVG
+            const pocketGroupId = 'middle_probe_pocket';
+            const bossGroupId = 'middle_probe_boss';
+
+            // Scope hiding to groups inside the SVG only (avoid accidentally hiding unrelated DOM)
+            const svgRoot = container.querySelector('svg') || container;
+            svgRoot.querySelectorAll('[id^="middle_probe_pocket"], [id^="middle_probe_boss"]').forEach(e => e.style.display = 'none');
+
+            // Hide both top-level feature groups, then show only the selected one
+            [pocketGroupId, bossGroupId].forEach(id => {
+                const el = svgRoot.querySelector('#' + id);
+                if (el) el.style.display = 'none';
+            });
+            const activeFeature = svgRoot.querySelector('#' + (type === 'pocket' ? pocketGroupId : bossGroupId));
+            if (activeFeature) {
+                // remove any inline 'display' hiding applied earlier and ensure children are shown
+                activeFeature.style.display = '';
+                activeFeature.style.visibility = 'visible';
+                activeFeature.style.opacity = '1';
+                // also clear display:none on descendants in case they were hidden by previous runs
+                activeFeature.querySelectorAll('[style]').forEach(el => {
+                    if (el.style && el.style.display === 'none') el.style.display = '';
+                });
+            }
+
+            // Hide all axis-direction groups first
+            const axisDirIds = [
+                'middle_probe_pocket_X_pos','middle_probe_pocket_X_neg','middle_probe_pocket_Y_pos','middle_probe_pocket_Y_neg',
+                'middle_probe_boss_X_pos','middle_probe_boss_X_neg','middle_probe_boss_Y_pos','middle_probe_boss_Y_neg'
+            ];
+            axisDirIds.forEach(id => {
+                const el = svgRoot.querySelector('#' + id);
+                if (el) el.style.display = 'none';
+            });
+
+            // Helper: Show axis group
+            const showAxisGroup = (axisEl) => {
+                if (!axisEl) return;
+                axisEl.style.display = 'block';
+                // Show all children (paths, groups, etc.)
+                axisEl.querySelectorAll(':scope > *').forEach(child => {
+                    if (child.style) child.style.display = '';
+                    // Also show nested children
+                    child.querySelectorAll('*').forEach(el => {
+                        if (el.style) el.style.display = '';
+                    });
+                });
+                console.debug(`drawMiddleViz: showing axis group ${axisEl.id}`);
+            };
+
+            // Show primary axis group
+            const selectedAxisDirId = `middle_probe_${type}_${axis}_${dir}`;
+            console.debug('drawMiddleViz: selectedAxisDirId', selectedAxisDirId);
+            const primaryAxisEl = svgRoot.querySelector('#' + selectedAxisDirId);
+            if (primaryAxisEl) {
+                showAxisGroup(primaryAxisEl);
+
+                // Hide all jogpaths by default (shown only when findBoth is checked)
+                // traversepath_step3 stays visible (doesn't match jogpath filter)
+                primaryAxisEl.querySelectorAll('[id*="jogpath"]').forEach(jp => {
+                    if (jp.style) jp.style.display = 'none';
+                });
+            }
+
+            // If "Find Both" is active: show jogpath + opposite axis
+            if (findBoth) {
+                const oppositeAxis = axis === 'X' ? 'Y' : 'X';
+
+                // Show the specific jogpath that matches dir2
+                if (primaryAxisEl) {
+                    // Both pocket and boss: middle_probe_{type}_jogpath_{axis}_{dir}_to_{oppositeAxis}_{dir2}
+                    const jogpathPatterns = [
+                        `middle_probe_${type}_jogpath_${axis}_${dir}_to_${oppositeAxis}_${dir2}`
+                    ];
+
+                    let jogpathFound = false;
+                    for (const pattern of jogpathPatterns) {
+                        const jogpath = svgRoot.querySelector('#' + pattern);
+                        if (jogpath) {
+                            jogpath.style.display = '';
+                            console.debug(`drawMiddleViz: showing ${type} jogpath`, pattern);
+                            jogpathFound = true;
+                            break;
+                        }
+                    }
+                    if (!jogpathFound) {
+                        console.warn(`drawMiddleViz: No matching ${type} jogpath found, tried:`, jogpathPatterns);
+                    }
+                }
+
+                // Show opposite axis group
+                const oppositeAxisId = `middle_probe_${type}_${oppositeAxis}_${dir2}`;
+                const oppositeAxisEl = svgRoot.querySelector('#' + oppositeAxisId);
+                if (oppositeAxisEl) {
+                    showAxisGroup(oppositeAxisEl);
+
+                    // Hide miniprobe in opposite axis (only first sequence shows miniprobe)
+                    const miniprobe = oppositeAxisEl.querySelector('[id*="miniprobe"]');
+                    if (miniprobe) {
+                        miniprobe.style.display = 'none';
+                        console.debug('drawMiddleViz: hiding miniprobe in opposite axis');
+                    }
+
+                    // Hide all jogpaths in opposite axis (not used for transitions)
+                    // traversepath_step3 stays visible (doesn't match jogpath filter)
+                    oppositeAxisEl.querySelectorAll('[id*="jogpath"]').forEach(jp => {
+                        if (jp.style) jp.style.display = 'none';
+                    });
+                }
+            }
+
+            // RECOVERY: if nothing visible inside the SVG (unexpected), unhide the activeFeature top-level group so user sees something
+            const anyVisible = Array.from(svgRoot.querySelectorAll('[id^="middle_probe_"]')).some(el => {
+                const s = el.style.display || '';
+                return s !== 'none';
+            });
+            if (!anyVisible) {
+                console.warn('drawMiddleViz: no middle_probe_* group is visible — falling back to pocket view');
+                const fallback = svgRoot.querySelector('#' + pocketGroupId);
+                if (fallback) fallback.style.display = 'block';
+            }
+
+            // Animation is handled by PathAnimator (via wizardManager).
+            // Clear any leftover inline animation styles so PathAnimator starts clean.
+            if (window.__middleStepTimer) { clearTimeout(window.__middleStepTimer); window.__middleStepTimer = null; }
+
+            const clearAnimStyles = (axisEl) => {
+                if (!axisEl) return;
+                axisEl.querySelectorAll('path').forEach(p => {
+                    p.style.transition = '';
+                    p.style.strokeDasharray = '';
+                    p.style.strokeDashoffset = '';
+                    p.classList.remove('path-draw', 'path-reset');
+                });
+            };
+            clearAnimStyles(primaryAxisEl);
+            if (findBoth) {
+                const oAxis = axis === 'X' ? 'Y' : 'X';
+                clearAnimStyles(svgRoot.querySelector(`#middle_probe_${type}_${oAxis}_${dir2}`));
+                const jp = svgRoot.querySelector(`#middle_probe_${type}_jogpath_${axis}_${dir}_to_${oAxis}_${dir2}`);
+                if (jp) { jp.style.transition = ''; jp.style.strokeDasharray = ''; jp.style.strokeDashoffset = ''; jp.classList.remove('path-draw', 'path-reset'); }
+            }
+            } catch (err) {
+                console.error('drawMiddleViz: unexpected error', err);
+            }
+        };
+
+        window.drawProbeViz = function() {
+            const axis = document.getElementById('p_axis')?.value || 'X';
+            const dir = document.getElementById('p_dir')?.value || 'pos';
+            const clearance = document.getElementById('p_edge_clear')?.value || '';
+            const svg = document.getElementById('probeViz');
+            if (!svg) return;
+            clearSVG(svg);
+            const ns = 'http://www.w3.org/2000/svg';
+
+            // baseline
+            const line = document.createElementNS(ns, 'line');
+            if (axis === 'X') {
+                line.setAttribute('x1', 20); line.setAttribute('y1', 70); line.setAttribute('x2', 380); line.setAttribute('y2', 70);
+            } else {
+                line.setAttribute('x1', 200); line.setAttribute('y1', 10); line.setAttribute('x2', 200); line.setAttribute('y2', 130);
+            }
+            line.setAttribute('stroke', '#60a5fa');
+            line.setAttribute('stroke-width', 3);
+            svg.appendChild(line);
+
+            // arrow for probe direction (red triangle)
+            const arrow = document.createElementNS(ns, 'polygon');
+            if (axis === 'X') {
+                if (dir === 'pos') arrow.setAttribute('points', '360,70 345,62 345,78');
+                else arrow.setAttribute('points', '40,70 55,62 55,78');
+            } else {
+                if (dir === 'pos') arrow.setAttribute('points', '200,20 192,35 208,35');
+                else arrow.setAttribute('points', '200,120 192,105 208,105');
+            }
+            // replace green arrow with yellow for explicit contact/direction
+            arrow.setAttribute('fill', '#facc15');
+            svg.appendChild(arrow);
+
+            // Edge marker (red line) at the contact side — uses SVG templates when available
+            function addEdgeMarker(x, y, rot = 0, id = 'edgeMarker') {
+                const cornerRoot = document.getElementById('cornerVizCorner');
+                // Try to clone a template line from corner SVG if present
+                if (cornerRoot) {
+                    const tpl = cornerRoot.querySelector('[id*="retract"]') || cornerRoot.querySelector('[id*="retractX"]') || cornerRoot.querySelector('[id*="retractY"]');
+                    // fallback to drawing a simple line
+                    if (tpl) {
+                        const clone = tpl.cloneNode(true);
+                        // remove id attributes to avoid duplicates
+                        clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+                        const g = document.createElementNS(ns, 'g');
+                        g.setAttribute('id', id);
+                        g.setAttribute('transform', `translate(${x},${y}) rotate(${rot})`);
+                        g.appendChild(clone);
+                        svg.appendChild(g);
+                        return;
+                    }
+                }
+                // fallback: draw simple line + dot
+                const g = document.createElementNS(ns, 'g');
+                g.setAttribute('id', id);
+                const ln = document.createElementNS(ns, 'line');
+                ln.setAttribute('x1', -10);
+                ln.setAttribute('y1', 0);
+                ln.setAttribute('x2', 10);
+                ln.setAttribute('y2', 0);
+                ln.setAttribute('stroke', '#facc15');
+                ln.setAttribute('stroke-width', 4);
+                ln.setAttribute('transform', `translate(${x},${y}) rotate(${rot})`);
+                g.appendChild(ln);
+                const dot = document.createElementNS(ns, 'circle');
+                dot.setAttribute('cx', x);
+                dot.setAttribute('cy', y);
+                dot.setAttribute('r', 3);
+                dot.setAttribute('fill', '#fff');
+                g.appendChild(dot);
+                svg.appendChild(g);
+            }
+
+            // Mini probe: self-contained circles — no dependency on corner SVG or its gradients
+            function addMiniProbe(x, y, id = 'miniProbe') {
+                const g = document.createElementNS(ns, 'g');
+                g.setAttribute('id', id);
+                const outer = document.createElementNS(ns, 'circle');
+                outer.setAttribute('cx', x);
+                outer.setAttribute('cy', y);
+                outer.setAttribute('r', 14);
+                outer.setAttribute('fill', '#ef4444');
+                outer.setAttribute('fill-opacity', '0.18');
+                g.appendChild(outer);
+                const body = document.createElementNS(ns, 'circle');
+                body.setAttribute('cx', x);
+                body.setAttribute('cy', y);
+                body.setAttribute('r', 9);
+                body.setAttribute('fill', '#ef4444');
+                g.appendChild(body);
+                const eye = document.createElementNS(ns, 'circle');
+                eye.setAttribute('cx', x+3);
+                eye.setAttribute('cy', y-3);
+                eye.setAttribute('r', 2.5);
+                eye.setAttribute('fill', '#fff');
+                g.appendChild(eye);
+                svg.appendChild(g);
+            }
+
+            // place primary edge and probe approach marker (edge oriented perpendicular to probe travel)
+            let probeX = 120, probeY = 70, edgeX = 360, edgeY = 70, edgeRot = 90;
+            if (axis === 'X') {
+                if (dir === 'pos') {
+                    edgeX = 360; edgeY = 70; edgeRot = 90; probeX = 120; probeY = 70;
+                } else {
+                    edgeX = 40; edgeY = 70; edgeRot = 90; probeX = 280; probeY = 70;
+                }
+            } else {
+                if (dir === 'pos') {
+                    edgeX = 200; edgeY = 20; edgeRot = 0; probeX = 200; probeY = 100;
+                } else {
+                    edgeX = 200; edgeY = 120; edgeRot = 0; probeX = 200; probeY = 40;
+                }
+            }
+            addEdgeMarker(edgeX, edgeY, edgeRot, 'edgePrimary');
+            addMiniProbe(probeX, probeY, 'probePrimary');
+
+
+
+            // Blue dashed line for probe move (probe -> edge)
+            const probeLine = document.createElementNS(ns, 'line');
+            probeLine.setAttribute('x1', probeX);
+            probeLine.setAttribute('y1', probeY);
+            probeLine.setAttribute('x2', edgeX);
+            probeLine.setAttribute('y2', edgeY);
+            probeLine.setAttribute('stroke', '#60a5fa');
+            probeLine.setAttribute('stroke-dasharray', '6 4');
+            probeLine.setAttribute('stroke-width', 2);
+            probeLine.setAttribute('opacity', '0.9');
+            probeLine.setAttribute('id', 'probeMoveLine');
+            svg.appendChild(probeLine);
+
+            // Try to use a triangle probe contact graphic from corner SVG, otherwise draw one
+            function addContactTriangle(x, y, id = 'contactTip') {
+                const cornerRoot = document.getElementById('cornerVizCorner');
+                if (cornerRoot) {
+                    const tpl = cornerRoot.querySelector('[id*="triangle"]');
+                    if (tpl) {
+                        const clone = tpl.cloneNode(true);
+                        clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+                        const g = document.createElementNS(ns, 'g');
+                        g.setAttribute('id', id);
+                        // find a reference point in the triangle (use bounding box center)
+                        const ref = clone.querySelector('polygon');
+                        let refX = 0, refY = 0;
+                        if (ref) {
+                            // attempt to compute centroid from points
+                            const pts = ref.getAttribute('points').trim().split(/\s+/).map(p => {
+                                const [px,py] = p.split(',').map(Number);
+                                return {px,py};
+                            });
+                            if (pts.length > 0) {
+                                const avgx = pts.reduce((s,p)=>s+p.px,0)/pts.length;
+                                const avgy = pts.reduce((s,p)=>s+p.py,0)/pts.length;
+                                refX = avgx;
+                                refY = avgy;
+                            }
+                        }
+                        g.setAttribute('transform', `translate(${x - refX}, ${y - refY})`);
+                        g.appendChild(clone);
+                        svg.appendChild(g);
+                        return;
+                    }
+                }
+                // fallback: small red triangle
+                const poly = document.createElementNS(ns, 'polygon');
+                poly.setAttribute('points', `${x},${y-8} ${x+8},${y+8} ${x-8},${y+8}`);
+                poly.setAttribute('fill', '#ef4444');
+                poly.setAttribute('id', id);
+                svg.appendChild(poly);
+            }
+
+            // place contact triangle at primary edge
+            addContactTriangle(edgeX, edgeY, 'contactPrimary');
+
+
+            // Subtitle
+            const t = document.createElementNS(ns, 'text');
+            t.setAttribute('x', 12);
+            t.setAttribute('y', 15);
+            t.setAttribute('fill', '#dbeafe');
+            t.setAttribute('font-size', '12');
+            t.textContent = `Edge | Axis: ${axis} | Dir: ${dir}` + (findBoth ? ' | Find Opposite' : '');
+            svg.appendChild(t);
+
+            if (findBoth) {
+                const note = document.createElementNS(ns, 'text');
+                note.setAttribute('x', 12);
+                note.setAttribute('y', 30);
+                note.setAttribute('fill', '#9ae6b4');
+                note.setAttribute('font-size', '10');
+                note.textContent = `Clearance: ${clearance}`;
+                svg.appendChild(note);
+
+                // draw travel dashed line
+                const travel = document.createElementNS(ns, 'line');
+                if (axis === 'X') {
+                    if (dir === 'pos') {
+                        travel.setAttribute('x1', 80); travel.setAttribute('y1', 70);
+                        travel.setAttribute('x2', 320); travel.setAttribute('y2', 70);
+                        // use perpendicular rotations (90 = vertical)
+                        addEdgeMarker(80,70,90,'edgeOpp');
+                        addEdgeMarker(320,70,90,'edgeOpp2');
+                    } else {
+                        travel.setAttribute('x1', 320); travel.setAttribute('y1', 70);
+                        travel.setAttribute('x2', 80); travel.setAttribute('y2', 70);
+                        addEdgeMarker(320,70,90,'edgeOpp');
+                        addEdgeMarker(80,70,90,'edgeOpp2');
+                    }
+                } else {
+                    if (dir === 'pos') {
+                        travel.setAttribute('x1', 200); travel.setAttribute('y1', 30);
+                        travel.setAttribute('x2', 200); travel.setAttribute('y2', 110);
+                        // horizontal edge markers for Y axis
+                        addEdgeMarker(200,30,0,'edgeOpp');
+                        addEdgeMarker(200,110,0,'edgeOpp2');
+                    } else {
+                        travel.setAttribute('x1', 200); travel.setAttribute('y1', 110);
+                        travel.setAttribute('x2', 200); travel.setAttribute('y2', 30);
+                        addEdgeMarker(200,110,0,'edgeOpp');
+                        addEdgeMarker(200,30,0,'edgeOpp2');
+                    }
+                }
+                travel.setAttribute('stroke', '#fff59e');
+                travel.setAttribute('stroke-dasharray', '4 4');
+                travel.setAttribute('stroke-width', 2);
+                svg.appendChild(travel);
+
+                // width arrow and label
+                const arrowW = document.createElementNS(ns, 'line');
+                if (axis === 'X') {
+                    arrowW.setAttribute('x1', 100); arrowW.setAttribute('y1', 55);
+                    arrowW.setAttribute('x2', 300); arrowW.setAttribute('y2', 55);
+                } else {
+                    arrowW.setAttribute('x1', 220); arrowW.setAttribute('y1', 40);
+                    arrowW.setAttribute('x2', 220); arrowW.setAttribute('y2', 100);
+                }
+                arrowW.setAttribute('stroke', '#60a5fa');
+                // Ensure a red arrow marker exists in this SVG for width arrowheads
+                if (!svg.querySelector('#arrowRed')) {
+                    const defs = document.createElementNS(ns, 'defs');
+                    const marker = document.createElementNS(ns, 'marker');
+                    marker.setAttribute('id', 'arrowRed');
+                    marker.setAttribute('viewBox', '0 0 10 10');
+                    marker.setAttribute('refX', '9');
+                    marker.setAttribute('refY', '5');
+                    marker.setAttribute('markerWidth', '6');
+                    marker.setAttribute('markerHeight', '6');
+                    marker.setAttribute('orient', 'auto-start-reverse');
+                    const mpoly = document.createElementNS(ns, 'polygon');
+                    mpoly.setAttribute('points', '0,0 10,5 0,10');
+                    mpoly.setAttribute('fill', '#facc15');
+                    marker.appendChild(mpoly);
+                    defs.appendChild(marker);
+                    svg.appendChild(defs);
+                }
+                arrowW.setAttribute('marker-end', 'url(#arrowRed)');
+                svg.appendChild(arrowW);
+
+                const label = document.createElementNS(ns, 'text');
+                label.setAttribute('x', 12);
+                label.setAttribute('y', 45);
+                label.setAttribute('fill', '#60a5fa');
+                label.setAttribute('font-size', '10');
+                label.textContent = `Width: (#51 - #50) => #54`;
+                svg.appendChild(label);
+            }
+        };
+
+        let edgeSvgLoaded = false;
+        window.drawEdgeViz = async function() {
+            const container = document.getElementById('probeVizContainer');
+            if (!container) return;
+
+            if (!edgeSvgLoaded) {
+                const svgText = await fetchSvg(
+                    ['./assets/svg/edgeViz.svg', './assets/edgeViz.svg'],
+                    ['svg/edgeViz.svg', 'edgeViz.svg']
+                );
+                if (!svgText) { console.error('drawEdgeViz: failed to load edgeViz.svg'); return; }
+                container.innerHTML = svgText;
+                namespaceSvgDefs(container.querySelector('svg'), 'edgeViz');
+                edgeSvgLoaded = true;
+            }
+
+            // Show the correct edge group for current config
+            const axis = document.getElementById('p_axis')?.value || 'X';
+            const dir = document.getElementById('p_dir')?.value || 'pos';
+
+            // Hide all possible edge groups first
+            ['edge_X_pos','edge_X_neg','edge_Y_pos','edge_Y_neg'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+
+            // Show selected group
+            const selGroup = document.getElementById(`edge_${axis}_${dir}`);
+            if (selGroup) selGroup.style.display = 'block';
+
+            // Ensure the workpiece shape for this group is visible (ids end with _work)
+            try {
+                const workEl = document.getElementById(`edge_${axis}_${dir}_work`);
+                if (workEl) workEl.style.display = '';
+                // Also reveal probe/retract paths in static mode when animation disabled
+                const animate = document.getElementById('p_animate')?.checked !== false;
+                if (!animate) {
+                    const probe = document.getElementById(`edge_${axis}_${dir}_probepath`);
+                    const retract = document.getElementById(`edge_${axis}_${dir}_retractpath`);
+                    if (probe) {
+                        probe.classList.add('path-draw');
+                        const pParent = probe.closest('g'); if (pParent) pParent.classList.add('is-probing');
+                    }
+                    if (retract) {
+                        retract.classList.add('path-draw');
+                        const rParent = retract.closest('g'); if (rParent) rParent.classList.add('is-retracting');
+                    }
+                }
+            } catch (e) { /* noop */ }
+        };
+
+        let alignmentSvgLoaded = false;
+        window.drawAlignmentViz = async function() {
+            const container = document.getElementById('alignmentVizContainer');
+            if (!container) return;
+
+            if (!alignmentSvgLoaded) {
+                const svgText = await fetchSvg(
+                    ['./assets/svg/alignViz.svg', './assets/alignViz.svg'],
+                    ['svg/alignViz.svg', 'alignViz.svg']
+                );
+                if (!svgText) { console.error('drawAlignmentViz: failed to load alignViz.svg'); return; }
+                container.innerHTML = svgText;
+                namespaceSvgDefs(container.querySelector('svg'), 'alignViz');
+                alignmentSvgLoaded = true;
+            }
+
+            const checkAxis = document.getElementById('al_check_axis')?.value || 'X';
+            const probeDir = document.getElementById('al_probe_dir')?.value || 'pos';
+
+            ['align_X_Yneg', 'align_X_Ypos', 'align_Y_Xneg', 'align_Y_Xpos'].forEach(id => {
+                const group = document.getElementById(id);
+                if (group) group.style.display = 'none';
+            });
+
+            const probeAxis = checkAxis === 'X' ? 'Y' : 'X';
+            const groupId = `align_${checkAxis}_${probeAxis}${probeDir}`;
+
+            ['align_X_Yneg', 'align_X_Ypos', 'align_Y_Xneg', 'align_Y_Xpos'].forEach(id => {
+                const group = document.getElementById(id);
+                if (!group) return;
+                group.classList.remove('is-probing', 'is-retracting', 'is-jogging');
+                group.querySelectorAll('[id*="probepath"], [id*="retractpath"], [id*="jogpath"]').forEach(path => {
+                    path.classList.remove('path-draw');
+                });
+            });
+
+            const activeGroup = document.getElementById(groupId);
+            if (activeGroup) activeGroup.style.display = 'block';
+
+            const probe1 = document.getElementById(`${groupId}_probepath1`);
+            const retract1 = document.getElementById(`${groupId}_retractpath1`);
+            const probe2 = document.getElementById(`${groupId}_probepath2`);
+            const retract2 = document.getElementById(`${groupId}_retractpath2`);
+            const jog = document.getElementById(`${groupId}_jogpath`);
+
+            const animate = document.getElementById('al_animate')?.checked !== false;
+            if (!animate) {
+                [probe1, probe2].forEach(path => {
+                    if (!path) return;
+                    path.classList.add('path-draw');
+                    const parent = path.closest('g');
+                    if (parent) parent.classList.add('is-probing');
+                });
+
+                [retract1, retract2].forEach(path => {
+                    if (!path) return;
+                    path.classList.add('path-draw');
+                    const parent = path.closest('g');
+                    if (parent) parent.classList.add('is-retracting');
+                });
+
+                if (jog) {
+                    jog.classList.add('path-draw');
+                    const parent = jog.closest('g');
+                    if (parent) parent.classList.add('is-jogging');
+                }
+            }
+        };
+    </script>
+    <!-- Fallback: expose simple wizard controls if module failed to initialize -->
+    <script>
+    (function(){
+        if (typeof window.openCornerWiz !== 'undefined') return;
+
+        function showWizardPanel(type){
+            const w = document.getElementById('wizard');
+            if (!w) return console.warn('Fallback wizard: no #wizard in DOM');
+            const box = w.querySelector('.wiz-box');
+            w.style.display = 'flex';
+            w.classList.add('active');
+            ['wiz_comm','wiz_wcs','wiz_corner','wiz_middle','wiz_edge','wiz_alignment'].forEach(id=>{
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+            const panel = document.getElementById('wiz_' + type);
+            if (panel) panel.style.display = 'block';
+        }
+
+        window.openWiz = (type) => showWizardPanel(type);
+        window.openCornerWiz = () => {
+            showWizardPanel('corner');
+            const startAnim = async () => {
+                try {
+                    if (window.drawCornerViz) await window.drawCornerViz();
+                    const corner   = document.getElementById('c_corner')?.value || 'FL';
+                    const seq      = document.getElementById('c_probe_seq')?.value || 'YX';
+                    const zfirst   = document.getElementById('c_probe_z_first')?.checked || false;
+                    if (window.__cornerAnimator) { try { window.__cornerAnimator.stop(); } catch(e){} }
+                    if (!window.__cornerAnimator && window.CornerVizAnimator) {
+                        window.__cornerAnimator = new window.CornerVizAnimator();
+                    }
+                    if (window.__cornerAnimator) {
+                        setTimeout(() => window.__cornerAnimator.play(corner, seq, zfirst), 60);
+                    }
+                } catch(err) { console.warn('openCornerWiz anim failed', err); }
+            };
+            startAnim();
+        };
+        // Enhanced fallback: show the middle panel and attempt autoplay if animator exists
+        window.openMiddleWiz = () => {
+            showWizardPanel('middle');
+            // draw SVG and start animation — drawMiddleViz is awaited before animator starts
+            if (window.__middleAnimTimeout) { clearTimeout(window.__middleAnimTimeout); window.__middleAnimTimeout = null; }
+            const startAnim = async () => {
+                try {
+                    if (window.drawMiddleViz) await window.drawMiddleViz();
+
+                    const featureType = document.getElementById('m_type')?.value || 'pocket';
+                    const axis = document.getElementById('m_axis')?.value || 'X';
+                    const dir1 = document.getElementById('m_dir')?.value || 'pos';
+                    const twoAxis = !!document.getElementById('m_both')?.checked;
+                    const animate = document.getElementById('m_animate')?.checked !== false;
+
+                    if (window.discoverAnimSteps && window.PathAnimator) {
+                        const dir2 = document.getElementById('m_dir2')?.value || (dir1 === 'pos' ? 'neg' : 'pos');
+                        const animInput = window.discoverAnimSteps({ featureType, axis, dir1, twoAxis, dir2 });
+
+                        if (window.__middleAnimator) {
+                            try { window.__middleAnimator.stop(); } catch (e) { /* ignore */ }
+                        }
+
+                        if (animate) {
+                            if (!window.__middleAnimator) {
+                                window.__middleAnimator = new window.PathAnimator({ loop: true });
+                            }
+                            window.__middleAnimTimeout = setTimeout(() => {
+                                window.__middleAnimTimeout = null;
+                                const wcsId = `middle_probe_${featureType}_${axis}_${dir1}_wcs`;
+                                animInput.wcsEls = [document.getElementById(wcsId)].filter(Boolean);
+                                window.__middleAnimator.playSequence(animInput).catch(() => {});
+                            }, 60);
+                        } else {
+                            // Static mode - show all paths immediately
+                            const allSteps = [
+                                ...(animInput.axis1Steps || []),
+                                ...(animInput.jogPath ? [animInput.jogPath] : []),
+                                ...(animInput.axis2Steps || [])
+                            ];
+                            allSteps.forEach(step => {
+                                if (!step || !step.selector) return;
+                                const el = document.querySelector(step.selector);
+                                if (el) {
+                                    el.classList.add('path-draw');
+                                    const parent = el.closest('g');
+                                    if (parent) {
+                                        if (step.type === 'probe') parent.classList.add('is-probing');
+                                        else if (step.type === 'retract') parent.classList.add('is-retracting');
+                                        else if (step.type === 'jog') parent.classList.add('is-jogging');
+                                    }
+                                }
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.warn('fallback openMiddleWiz autoplay failed', err);
+                }
+            };
+            startAnim();
+        };
+        window.openEdgeWiz = () => showWizardPanel('edge');
+        window.openAlignmentWiz = () => showWizardPanel('alignment');
+        window.closeWiz = () => {
+            const w = document.getElementById('wizard');
+            if (w) { w.style.display = 'none'; w.classList.remove('active'); }
+        };
+        window.insertWiz = () => {
+            // append current visible pre text to editor as a simple fallback
+            const editor = document.getElementById('editor');
+            if (!editor) return;
+            const pre = document.querySelector('#wizard pre:not(:empty)');
+            if (pre) {
+                editor.value = editor.value + '\n' + pre.textContent + '\n';
+            }
+            window.closeWiz();
+        };
+        console.info('Fallback wizard controls installed');
+    })();
+    </script>
+
+</body>
+</html>

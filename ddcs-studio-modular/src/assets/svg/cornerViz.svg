@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 465 465" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g id="corner_quad">
+        <path id="corner_quad_shape" d="M465,0.183L465,464.817L0.365,464.817L0.365,0.183L465,0.183ZM463.809,1.374L1.557,1.374L1.557,463.625L463.809,463.625L463.809,1.374Z" style="fill:#c9c9ff;"/>
+        <text id="corner_quad_right" x="397.286px" y="235.935px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Right X+</text>
+        <text id="corner_quad_left" x="5.369px" y="237.309px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Left X-</text>
+        <text id="corner_quad_back" x="206.599px" y="19.593px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Back Y+</text>
+        <text id="corner_quad_front" x="206.599px" y="454.019px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Front Y-</text>
+        <text id="corner_quad_topXY" x="13.68px" y="18.209px" style="font-family:'Consolas', monospace;font-size:14.296px;fill:#fff;">TOP (XY)</text>
+        <rect id="corner_quad_workpiece" x="138.832" y="135.358" width="190.047" height="190.047" style="fill:#1e293b;stroke:#475569;stroke-width:4px;"/>
+    </g>
+    <g id="corner">
+        <g id="corner_BL">
+            <g id="corner_BL_XY">
+                <path id="corner_BL_XY_X_probepath" d="M46.27,162.479L137.663,162.479" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_BL_XY_Y_probepath" d="M167.663,41.686L167.663,132.69" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_BL_XY_X_retractpath" d="M137.358,162.69L109.421,162.69" style="fill:none;stroke:#ff0;stroke-width:2.57px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_BL_XY_travelpath" d="M105.229,160.503L105.229,41.686L166.852,41.686" style="fill:none;stroke:#0f0;stroke-width:2.61px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_BL_XY_Y_retractpath" d="M167.663,133.377L167.663,104.951" style="fill:none;stroke:#ff0;stroke-width:2.6px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <g id="corner_BL_XY_Zfirst">
+                    <path id="corner_BL_XY_Zfirst_travel" d="M165.486,169.801L143.72,191.567L17.15,191.567L46.507,162.21" style="fill:none;stroke:#0f0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                    <g id="corner_BL_XY_Zfirst_miniprobe">
+                        <circle id="corner_BL_XY_Zfirst_miniprobe_circle1" cx="168.661" cy="164.452" r="11.5" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle id="corner_BL_XY_Zfirst_miniprobe_circle2" cx="168.661" cy="164.452" r="9.583" style="fill:url(#cornerViz___Radial1);"/>
+                        <circle id="corner_BL_XY_Zfirst_miniprobe_circle3" cx="165.786" cy="167.328" r="3.354" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                </g>
+                <g id="corner_BL_XY_miniprobe">
+                    <circle id="corner_BL_XY_miniprobe_circle1" cx="47.658" cy="162.69" r="11.5" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle id="corner_BL_XY_miniprobe_circle2" cx="47.658" cy="162.69" r="9.583" style="fill:url(#cornerViz___Radial2);"/>
+                    <circle id="corner_BL_XY_miniprobe_circle3" cx="44.783" cy="165.565" r="3.354" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="corner_BL_XY_wcs">
+                    <path id="corner_BL_XY_wcs_path1" d="M129.858,129.589L129.858,126.384L133.063,126.384" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_XY_wcs_path2" d="M144.601,126.384L147.806,126.384L147.806,129.589" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_XY_wcs_path3" d="M147.806,141.127L147.806,144.332L144.601,144.332" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_XY_wcs_path4" d="M133.063,144.332L129.858,144.332L129.858,141.127" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_XY_wcs_path5" d="M138.832,126.384L138.832,132.794" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_XY_wcs_path6" d="M138.832,137.922L138.832,144.332" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_XY_wcs_path7" d="M129.858,135.358L136.268,135.358" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_XY_wcs_path8" d="M141.396,135.358L147.806,135.358" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <circle id="corner_BL_XY_wcs_circle1" cx="138.832" cy="135.358" r="0.962" style="fill:#ef4444;"/>
+                    <path id="corner_BL_XY_wcs_path9" d="M138.832,125.743L137.39,122.858L140.274,122.858L138.832,125.743Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_BL_XY_wcs_path10" d="M138.832,144.973L140.274,147.858L137.39,147.858L138.832,144.973Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_BL_XY_wcs_path11" d="M129.217,135.358L126.332,133.916L126.332,136.8L129.217,135.358Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_BL_XY_wcs_path12" d="M148.447,135.358L151.332,136.8L151.332,133.916L148.447,135.358Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                </g>
+            </g>
+            <g id="corner_BL_YX">
+                <path id="corner_BL_YX_Y_probepath" d="M166.641,43.852L166.641,133.377" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_BL_YX_X_probepath" d="M46.27,163.377L136.852,163.377" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_BL_YX_Y_retractpath" d="M166.852,133.378L166.852,105.135" style="fill:none;stroke:#ff0;stroke-width:2.59px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_BL_YX_travelpath" d="M164.513,100.914L46.27,100.914L46.27,161.329" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_BL_YX_X_retractpath" d="M137.358,163.377L109.114,163.377" style="fill:none;stroke:#ff0;stroke-width:2.59px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <g id="corner_BL_YX_Zfirst">
+                    <path id="corner_BL_YX_Zfirst_travel" d="M173.963,161.201L195.729,139.435L195.729,12.865L166.909,41.686" style="fill:none;stroke:#0f0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                    <g id="corner_BL_YX_Zfirst_miniprobe">
+                        <path id="corner_BL_YX_Zfirst_miniprobe_path1" d="M157.161,164.452C157.161,170.799 162.314,175.952 168.661,175.952C175.008,175.952 180.161,170.799 180.161,164.452C180.161,158.105 175.008,152.952 168.661,152.952C162.314,152.952 157.161,158.105 157.161,164.452Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <path id="corner_BL_YX_Zfirst_miniprobe_path2" d="M159.077,164.452C159.077,169.741 163.371,174.036 168.661,174.036C173.95,174.036 178.244,169.741 178.244,164.452C178.244,159.163 173.95,154.869 168.661,154.869C163.371,154.869 159.077,159.163 159.077,164.452Z" style="fill:url(#cornerViz___Radial3);"/>
+                        <path id="corner_BL_YX_Zfirst_miniprobe_path3" d="M168.182,161.577C168.182,163.428 169.685,164.931 171.536,164.931C173.387,164.931 174.89,163.428 174.89,161.577C174.89,159.726 173.387,158.223 171.536,158.223C169.685,158.223 168.182,159.726 168.182,161.577Z" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                </g>
+                <g id="corner_BL_YX_miniprobe">
+                    <path id="corner_BL_YX_miniprobe_path1" d="M155.352,43.373C155.352,49.72 160.505,54.873 166.852,54.873C173.199,54.873 178.352,49.72 178.352,43.373C178.352,37.026 173.199,31.873 166.852,31.873C160.505,31.873 155.352,37.026 155.352,43.373Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <path id="corner_BL_YX_miniprobe_path2" d="M157.269,43.373C157.269,48.662 161.563,52.956 166.852,52.956C172.141,52.956 176.435,48.662 176.435,43.373C176.435,38.084 172.141,33.789 166.852,33.789C161.563,33.789 157.269,38.084 157.269,43.373Z" style="fill:url(#cornerViz___Radial4);"/>
+                    <path id="corner_BL_YX_miniprobe_path3" d="M166.372,40.498C166.372,42.349 167.875,43.852 169.727,43.852C171.578,43.852 173.081,42.349 173.081,40.498C173.081,38.647 171.578,37.144 169.727,37.144C167.875,37.144 166.372,38.647 166.372,40.498Z" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="corner_BL_YX_wcs">
+                    <path id="corner_BL_YX_wcs_path1" d="M129.858,129.589L129.858,126.384L133.063,126.384" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_YX_wcs_path2" d="M144.601,126.384L147.806,126.384L147.806,129.589" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_YX_wcs_path3" d="M147.806,141.127L147.806,144.332L144.601,144.332" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_YX_wcs_path4" d="M133.063,144.332L129.858,144.332L129.858,141.127" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_YX_wcs_path5" d="M138.832,126.384L138.832,132.794" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_YX_wcs_path6" d="M138.832,137.922L138.832,144.332" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_YX_wcs_path7" d="M129.858,135.358L136.268,135.358" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BL_YX_wcs_path8" d="M141.396,135.358L147.806,135.358" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <circle id="corner_BL_YX_wcs_circle1" cx="138.832" cy="135.358" r="0.962" style="fill:#ef4444;"/>
+                    <path id="corner_BL_YX_wcs_path9" d="M138.832,125.743L137.39,122.858L140.274,122.858L138.832,125.743Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_BL_YX_wcs_path10" d="M138.832,144.973L140.274,147.858L137.39,147.858L138.832,144.973Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_BL_YX_wcs_path11" d="M129.217,135.358L126.332,133.916L126.332,136.8L129.217,135.358Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_BL_YX_wcs_path12" d="M148.447,135.358L151.332,136.8L151.332,133.916L148.447,135.358Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                </g>
+            </g>
+        </g>
+        <g id="corner_BR">
+            <g id="corner_BR_XY">
+                <path id="corner_BR_XY_X_probepath" d="M421.981,162.479L329.642,162.479" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_BR_XY_Y_probepath" d="M299.642,41.686L299.642,132.69" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_BR_XY_X_retractpath" d="M330.141,162.69L357.884,162.69" style="fill:none;stroke:#ff0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_BR_XY_travelpath" d="M363.597,160.503L363.597,43.852L300.932,43.852" style="fill:none;stroke:#0f0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_BR_XY_Y_retractpath" d="M299.642,133.377L299.642,104.951" style="fill:none;stroke:#ff0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <g id="corner_BR_XY_Zfirst">
+                    <path id="corner_BR_XY_Zfirst_travel" d="M301.818,169.801L323.584,191.567L450.154,191.567L421.964,163.377" style="fill:none;stroke:#0f0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                    <g id="corner_BR_XY_Zfirst_miniprobe">
+                        <circle id="corner_BR_XY_Zfirst_miniprobe_circle1" cx="299.644" cy="163.452" r="11.5" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle id="corner_BR_XY_Zfirst_miniprobe_circle2" cx="299.644" cy="163.452" r="9.583" style="fill:url(#cornerViz___Radial5);"/>
+                        <circle id="corner_BR_XY_Zfirst_miniprobe_circle3" cx="302.518" cy="166.328" r="3.354" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                </g>
+                <g id="corner_BR_XY_miniprobe">
+                    <circle id="corner_BR_XY_miniprobe_circle1" cx="419.646" cy="162.69" r="11.5" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle id="corner_BR_XY_miniprobe_circle2" cx="419.646" cy="162.69" r="9.583" style="fill:url(#cornerViz___Radial6);"/>
+                    <circle id="corner_BR_XY_miniprobe_circle3" cx="422.521" cy="165.565" r="3.354" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="corner_BR_XY_wcs">
+                    <path id="corner_BR_XY_wcs_path1" d="M319.905,129.589L319.905,126.384L323.11,126.384" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_XY_wcs_path2" d="M334.648,126.384L337.853,126.384L337.853,129.589" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_XY_wcs_path3" d="M337.853,141.127L337.853,144.332L334.648,144.332" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_XY_wcs_path4" d="M323.11,144.332L319.905,144.332L319.905,141.127" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_XY_wcs_path5" d="M328.879,126.384L328.879,132.794" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_XY_wcs_path6" d="M328.879,137.922L328.879,144.332" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_XY_wcs_path7" d="M319.905,135.358L326.315,135.358" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_XY_wcs_path8" d="M331.443,135.358L337.853,135.358" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <circle id="corner_BR_XY_wcs_circle1" cx="328.879" cy="135.358" r="0.962" style="fill:#ef4444;"/>
+                    <path id="corner_BR_XY_wcs_path9" d="M328.879,125.743L327.437,122.858L330.321,122.858L328.879,125.743Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_BR_XY_wcs_path10" d="M328.879,144.973L330.321,147.858L327.437,147.858L328.879,144.973Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_BR_XY_wcs_path11" d="M319.264,135.358L316.379,133.916L316.379,136.8L319.264,135.358Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_BR_XY_wcs_path12" d="M338.494,135.358L341.379,136.8L341.379,133.916L338.494,135.358Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                </g>
+            </g>
+            <g id="corner_BR_YX">
+                <path id="corner_BR_YX_Y_probepath" d="M300.663,40.498L300.663,133.377" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_BR_YX_X_probepath" d="M421.981,163.377L330.452,163.377" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_BR_YX_Y_retractpath" d="M300.452,133.378L300.452,105.135" style="fill:none;stroke:#ff0;stroke-width:2.59px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_BR_YX_travelpath" d="M302.815,100.914L420.372,100.914L420.372,161.329" style="fill:none;stroke:#0f0;stroke-width:2.72px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_BR_YX_X_retractpath" d="M330.141,163.377L358.191,163.377" style="fill:none;stroke:#ff0;stroke-width:2.58px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <g id="corner_BR_YX_Zfirst">
+                    <path id="corner_BR_YX_Zfirst_travel" d="M293.341,161.201L271.575,139.435L271.575,12.865L300.452,41.742" style="fill:none;stroke:#0f0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                    <g id="corner_BR_YX_Zfirst_miniprobe">
+                        <path id="corner_BR_YX_Zfirst_miniprobe_path1" d="M311.19,163.375C311.19,169.722 306.037,174.875 299.69,174.875C293.343,174.875 288.19,169.722 288.19,163.375C288.19,157.028 293.343,151.875 299.69,151.875C306.037,151.875 311.19,157.028 311.19,163.375Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <path id="corner_BR_YX_Zfirst_miniprobe_path2" d="M309.273,163.375C309.273,168.665 304.979,172.959 299.69,172.959C294.401,172.959 290.106,168.665 290.106,163.375C290.106,158.086 294.401,153.792 299.69,153.792C304.979,153.792 309.273,158.086 309.273,163.375Z" style="fill:url(#cornerViz___Radial7);"/>
+                        <path id="corner_BR_YX_Zfirst_miniprobe_path3" d="M300.168,160.501C300.168,162.352 298.666,163.855 296.814,163.855C294.963,163.855 293.46,162.352 293.46,160.501C293.46,158.649 294.963,157.147 296.814,157.147C298.666,157.147 300.168,158.649 300.168,160.501Z" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                </g>
+                <g id="corner_BR_YX_miniprobe">
+                    <path id="corner_BR_YX_miniprobe_path1" d="M311.952,43.373C311.952,49.72 306.799,54.873 300.452,54.873C294.105,54.873 288.952,49.72 288.952,43.373C288.952,37.026 294.105,31.873 300.452,31.873C306.799,31.873 311.952,37.026 311.952,43.373Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <path id="corner_BR_YX_miniprobe_path2" d="M310.035,43.373C310.035,48.662 305.741,52.956 300.452,52.956C295.163,52.956 290.869,48.662 290.869,43.373C290.869,38.084 295.163,33.789 300.452,33.789C305.741,33.789 310.035,38.084 310.035,43.373Z" style="fill:url(#cornerViz___Radial8);"/>
+                    <path id="corner_BR_YX_miniprobe_path3" d="M300.932,40.498C300.932,42.349 299.429,43.852 297.577,43.852C295.726,43.852 294.223,42.349 294.223,40.498C294.223,38.647 295.726,37.144 297.577,37.144C299.429,37.144 300.932,38.647 300.932,40.498Z" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="corner_BR_YX_wcs">
+                    <path id="corner_BR_YX_wcs_path1" d="M319.905,129.589L319.905,126.384L323.11,126.384" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_YX_wcs_path2" d="M334.648,126.384L337.853,126.384L337.853,129.589" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_YX_wcs_path3" d="M337.853,141.127L337.853,144.332L334.648,144.332" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_YX_wcs_path4" d="M323.11,144.332L319.905,144.332L319.905,141.127" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_YX_wcs_path5" d="M328.879,126.384L328.879,132.794" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_YX_wcs_path6" d="M328.879,137.922L328.879,144.332" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_YX_wcs_path7" d="M319.905,135.358L326.315,135.358" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_BR_YX_wcs_path8" d="M331.443,135.358L337.853,135.358" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <circle id="corner_BR_YX_wcs_circle1" cx="328.879" cy="135.358" r="0.962" style="fill:#ef4444;"/>
+                    <path id="corner_BR_YX_wcs_path9" d="M328.879,125.743L327.437,122.858L330.321,122.858L328.879,125.743Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_BR_YX_wcs_path10" d="M328.879,144.973L330.321,147.858L327.437,147.858L328.879,144.973Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_BR_YX_wcs_path11" d="M319.264,135.358L316.379,133.916L316.379,136.8L319.264,135.358Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_BR_YX_wcs_path12" d="M338.494,135.358L341.379,136.8L341.379,133.916L338.494,135.358Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                </g>
+            </g>
+        </g>
+        <g id="corner_FR">
+            <g id="corner_FR_XY">
+                <path id="corner_FR_XY_X_probepath" d="M421.981,298.55L330.642,298.55" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_FR_XY_Y_probepath" d="M300.642,419.339L300.642,328.339" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_FR_XY_X_retractpath" d="M331.452,298.339L358.884,298.339" style="fill:none;stroke:#ff0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_FR_XY_travelpath" d="M365.929,300.494L365.929,420.531L301.663,420.531" style="fill:none;stroke:#0f0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_FR_XY_Y_retractpath" d="M300.642,327.726L300.642,356.077" style="fill:none;stroke:#ff0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <g id="corner_FR_XY_Zfirst">
+                    <path id="corner_FR_XY_Zfirst_travel" d="M302.818,291.228L324.584,269.462L451.154,269.462L422.277,298.339" style="fill:none;stroke:#0f0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                    <g id="corner_FR_XY_Zfirst_miniprobe">
+                        <circle id="corner_FR_XY_Zfirst_miniprobe_circle1" cx="300.644" cy="297.577" r="11.5" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle id="corner_FR_XY_Zfirst_miniprobe_circle2" cx="300.644" cy="297.577" r="9.583" style="fill:url(#cornerViz___Radial9);"/>
+                        <circle id="corner_FR_XY_Zfirst_miniprobe_circle3" cx="303.518" cy="294.701" r="3.354" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                </g>
+                <g id="corner_FR_XY_miniprobe">
+                    <circle id="corner_FR_XY_miniprobe_circle1" cx="420.646" cy="298.339" r="11.5" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle id="corner_FR_XY_miniprobe_circle2" cx="420.646" cy="298.339" r="9.583" style="fill:url(#cornerViz___Radial10);"/>
+                    <circle id="corner_FR_XY_miniprobe_circle3" cx="423.521" cy="295.464" r="3.354" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="corner_FR_XY_wcs">
+                    <path id="corner_FR_XY_wcs_path1" d="M319.905,319.636L319.905,316.431L323.11,316.431" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_XY_wcs_path2" d="M334.648,316.431L337.853,316.431L337.853,319.636" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_XY_wcs_path3" d="M337.853,331.174L337.853,334.379L334.648,334.379" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_XY_wcs_path4" d="M323.11,334.379L319.905,334.379L319.905,331.174" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_XY_wcs_path5" d="M328.879,316.431L328.879,322.841" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_XY_wcs_path6" d="M328.879,327.969L328.879,334.379" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_XY_wcs_path7" d="M319.905,325.405L326.315,325.405" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_XY_wcs_path8" d="M331.443,325.405L337.853,325.405" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <circle id="corner_FR_XY_wcs_circle1" cx="328.879" cy="325.405" r="0.962" style="fill:#ef4444;"/>
+                    <path id="corner_FR_XY_wcs_path9" d="M328.879,315.79L327.437,312.905L330.321,312.905L328.879,315.79Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_FR_XY_wcs_path10" d="M328.879,335.02L330.321,337.905L327.437,337.905L328.879,335.02Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_FR_XY_wcs_path11" d="M319.264,325.405L316.379,323.963L316.379,326.847L319.264,325.405Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_FR_XY_wcs_path12" d="M338.494,325.405L341.379,326.847L341.379,323.963L338.494,325.405Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                </g>
+            </g>
+            <g id="corner_FR_YX">
+                <path id="corner_FR_YX_Y_probepath" d="M301.663,419.339L301.663,327.651" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_FR_YX_X_probepath" d="M421.981,297.651L331.452,297.651" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_FR_YX_Y_retractpath" d="M301.452,327.726L301.452,355.893" style="fill:none;stroke:#ff0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_FR_YX_travelpath" d="M303.618,359.778L421.981,359.778L421.981,298.818" style="fill:none;stroke:#0f0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_FR_YX_X_retractpath" d="M331.452,297.651L359.191,297.651" style="fill:none;stroke:#ff0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <g id="corner_FR_YX_Zfirst">
+                    <path id="corner_FR_YX_Zfirst_travel" d="M294.341,299.827L272.575,321.593L272.575,448.163L301.4,419.339" style="fill:none;stroke:#0f0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                    <g id="corner_FR_YX_Zfirst_miniprobe">
+                        <path id="corner_FR_YX_Zfirst_miniprobe_path1" d="M312.19,297.653C312.19,291.306 307.037,286.153 300.69,286.153C294.343,286.153 289.19,291.306 289.19,297.653C289.19,304 294.343,309.153 300.69,309.153C307.037,309.153 312.19,304 312.19,297.653Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <path id="corner_FR_YX_Zfirst_miniprobe_path2" d="M310.273,297.653C310.273,292.364 305.979,288.07 300.69,288.07C295.401,288.07 291.106,292.364 291.106,297.653C291.106,302.942 295.401,307.237 300.69,307.237C305.979,307.237 310.273,302.942 310.273,297.653Z" style="fill:url(#cornerViz___Radial11);"/>
+                        <path id="corner_FR_YX_Zfirst_miniprobe_path3" d="M301.168,300.528C301.168,298.677 299.666,297.174 297.814,297.174C295.963,297.174 294.46,298.677 294.46,300.528C294.46,302.379 295.963,303.882 297.814,303.882C299.666,303.882 301.168,302.379 301.168,300.528Z" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                </g>
+                <g id="corner_FR_YX_miniprobe">
+                    <path id="corner_FR_YX_miniprobe_path1" d="M312.952,417.656C312.952,411.309 307.799,406.156 301.452,406.156C295.105,406.156 289.952,411.309 289.952,417.656C289.952,424.003 295.105,429.156 301.452,429.156C307.799,429.156 312.952,424.003 312.952,417.656Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <path id="corner_FR_YX_miniprobe_path2" d="M311.035,417.656C311.035,412.367 306.741,408.073 301.452,408.073C296.163,408.073 291.869,412.367 291.869,417.656C291.869,422.945 296.163,427.239 301.452,427.239C306.741,427.239 311.035,422.945 311.035,417.656Z" style="fill:url(#cornerViz___Radial12);"/>
+                    <path id="corner_FR_YX_miniprobe_path3" d="M301.932,420.531C301.932,418.679 300.429,417.176 298.577,417.176C296.726,417.176 295.223,418.679 295.223,420.531C295.223,422.382 296.726,423.885 298.577,423.885C300.429,423.885 301.932,422.382 301.932,420.531Z" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="corner_FR_YX_wcs">
+                    <path id="corner_FR_YX_wcs_path1" d="M319.905,319.636L319.905,316.431L323.11,316.431" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_YX_wcs_path2" d="M334.648,316.431L337.853,316.431L337.853,319.636" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_YX_wcs_path3" d="M337.853,331.174L337.853,334.379L334.648,334.379" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_YX_wcs_path4" d="M323.11,334.379L319.905,334.379L319.905,331.174" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_YX_wcs_path5" d="M328.879,316.431L328.879,322.841" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_YX_wcs_path6" d="M328.879,327.969L328.879,334.379" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_YX_wcs_path7" d="M319.905,325.405L326.315,325.405" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FR_YX_wcs_path8" d="M331.443,325.405L337.853,325.405" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <circle id="corner_FR_YX_wcs_circle1" cx="328.879" cy="325.405" r="0.962" style="fill:#ef4444;"/>
+                    <path id="corner_FR_YX_wcs_path9" d="M328.879,315.79L327.437,312.905L330.321,312.905L328.879,315.79Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_FR_YX_wcs_path10" d="M328.879,335.02L330.321,337.905L327.437,337.905L328.879,335.02Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_FR_YX_wcs_path11" d="M319.264,325.405L316.379,323.963L316.379,326.847L319.264,325.405Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_FR_YX_wcs_path12" d="M338.494,325.405L341.379,326.847L341.379,323.963L338.494,325.405Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                </g>
+            </g>
+        </g>
+        <g id="corner_FL">
+            <g id="corner_FL_XY">
+                <path id="corner_FL_XY_X_probepath" d="M44.602,298.55L136.825,298.55" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_FL_XY_Y_probepath" d="M166.825,421.338L166.825,328.339" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_FL_XY_X_retractpath" d="M136.825,298.339L108.583,298.339" style="fill:none;stroke:#ff0;stroke-width:2.59px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_FL_XY_travelpath" d="M104.513,300.451L104.513,423.031L164.897,423.031" style="fill:none;stroke:#0f0;stroke-width:2.65px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_FL_XY_Y_retractpath" d="M166.825,328.339L166.825,356.077" style="fill:none;stroke:#ff0;stroke-width:2.56px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <g id="corner_FL_XY_Zfirst">
+                    <path id="corner_FL_XY_Zfirst_travel" d="M164.649,291.228L142.883,269.462L16.313,269.462L44.391,297.54" style="fill:none;stroke:#0f0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                    <g id="corner_FL_XY_Zfirst_miniprobe">
+                        <circle id="corner_FL_XY_Zfirst_miniprobe_circle1" cx="165.777" cy="294.826" r="11.5" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle id="corner_FL_XY_Zfirst_miniprobe_circle2" cx="165.777" cy="294.826" r="9.583" style="fill:url(#cornerViz___Radial13);"/>
+                        <circle id="corner_FL_XY_Zfirst_miniprobe_circle3" cx="162.902" cy="291.951" r="3.354" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                </g>
+                <g id="corner_FL_XY_miniprobe">
+                    <circle id="corner_FL_XY_miniprobe_circle1" cx="46.531" cy="298.201" r="11.5" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle id="corner_FL_XY_miniprobe_circle2" cx="46.531" cy="298.201" r="9.583" style="fill:url(#cornerViz___Radial14);"/>
+                    <circle id="corner_FL_XY_miniprobe_circle3" cx="43.657" cy="295.326" r="3.354" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="corner_FL_XY_wcs">
+                    <path id="corner_FL_XY_wcs_path1" d="M129.858,319.636L129.858,316.431L133.063,316.431" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_XY_wcs_path2" d="M144.601,316.431L147.806,316.431L147.806,319.636" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_XY_wcs_path3" d="M147.806,331.174L147.806,334.379L144.601,334.379" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_XY_wcs_path4" d="M133.063,334.379L129.858,334.379L129.858,331.174" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_XY_wcs_path5" d="M138.832,316.431L138.832,322.841" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_XY_wcs_path6" d="M138.832,327.969L138.832,334.379" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_XY_wcs_path7" d="M129.858,325.405L136.268,325.405" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_XY_wcs_path8" d="M141.396,325.405L147.806,325.405" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <circle id="corner_FL_XY_wcs_circle1" cx="138.832" cy="325.405" r="0.962" style="fill:#ef4444;"/>
+                    <path id="corner_FL_XY_wcs_path9" d="M138.832,315.79L137.39,312.905L140.274,312.905L138.832,315.79Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_FL_XY_wcs_path10" d="M138.832,335.02L140.274,337.905L137.39,337.905L138.832,335.02Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_FL_XY_wcs_path11" d="M129.217,325.405L126.332,323.963L126.332,326.847L129.217,325.405Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_FL_XY_wcs_path12" d="M148.447,325.405L151.332,326.847L151.332,323.963L148.447,325.405Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                </g>
+            </g>
+            <g id="corner_FL_YX">
+                <path id="corner_FL_YX_Y_probepath" d="M165.804,419.7L165.804,327.651" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_FL_YX_X_probepath" d="M43.657,297.651L136.015,297.651" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                <path id="corner_FL_YX_Y_retractpath" d="M166.015,327.651L166.015,355.893" style="fill:none;stroke:#ff0;stroke-width:2.59px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_FL_YX_travelpath" d="M163.828,359.607L42.725,359.607L43.657,299.588" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <path id="corner_FL_YX_X_retractpath" d="M136.831,297.651L108.276,297.651" style="fill:none;stroke:#ff0;stroke-width:2.6px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                <g id="corner_FL_YX_Zfirst">
+                    <path id="corner_FL_YX_Zfirst_travel" d="M173.126,299.827L194.892,321.593L194.892,448.163L166.405,419.676" style="fill:none;stroke:#0f0;stroke-width:2.5px;stroke-linejoin:miter;stroke-miterlimit:1.5;"/>
+                    <g id="corner_FL_YX_Zfirst_miniprobe">
+                        <path id="corner_FL_YX_Zfirst_miniprobe_path1" d="M154.277,294.826C154.277,288.479 159.43,283.326 165.777,283.326C172.124,283.326 177.277,288.479 177.277,294.826C177.277,301.173 172.124,306.326 165.777,306.326C159.43,306.326 154.277,301.173 154.277,294.826Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <path id="corner_FL_YX_Zfirst_miniprobe_path2" d="M156.194,294.826C156.194,289.537 160.488,285.243 165.777,285.243C171.066,285.243 175.361,289.537 175.361,294.826C175.361,300.115 171.066,304.409 165.777,304.409C160.488,304.409 156.194,300.115 156.194,294.826Z" style="fill:url(#cornerViz___Radial15);"/>
+                        <path id="corner_FL_YX_Zfirst_miniprobe_path3" d="M165.299,297.701C165.299,295.85 166.801,294.347 168.653,294.347C170.504,294.347 172.007,295.85 172.007,297.701C172.007,299.552 170.504,301.055 168.653,301.055C166.801,301.055 165.299,299.552 165.299,297.701Z" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                </g>
+                <g id="corner_FL_YX_miniprobe">
+                    <path id="corner_FL_YX_miniprobe_path1" d="M154.277,420.156C154.277,413.809 159.43,408.656 165.777,408.656C172.124,408.656 177.277,413.809 177.277,420.156C177.277,426.503 172.124,431.656 165.777,431.656C159.43,431.656 154.277,426.503 154.277,420.156Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <path id="corner_FL_YX_miniprobe_path2" d="M156.194,420.156C156.194,414.867 160.488,410.573 165.777,410.573C171.066,410.573 175.36,414.867 175.36,420.156C175.36,425.445 171.066,429.739 165.777,429.739C160.488,429.739 156.194,425.445 156.194,420.156Z" style="fill:url(#cornerViz___Radial16);"/>
+                    <path id="corner_FL_YX_miniprobe_path3" d="M165.298,423.031C165.298,421.179 166.801,419.676 168.652,419.676C170.503,419.676 172.006,421.179 172.006,423.031C172.006,424.882 170.503,426.385 168.652,426.385C166.801,426.385 165.298,424.882 165.298,423.031Z" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="corner_FL_YX_wcs">
+                    <path id="corner_FL_YX_wcs_path1" d="M129.858,319.636L129.858,316.431L133.063,316.431" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_YX_wcs_path2" d="M144.601,316.431L147.806,316.431L147.806,319.636" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_YX_wcs_path3" d="M147.806,331.174L147.806,334.379L144.601,334.379" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_YX_wcs_path4" d="M133.063,334.379L129.858,334.379L129.858,331.174" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_YX_wcs_path5" d="M138.832,316.431L138.832,322.841" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_YX_wcs_path6" d="M138.832,327.969L138.832,334.379" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_YX_wcs_path7" d="M129.858,325.405L136.268,325.405" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <path id="corner_FL_YX_wcs_path8" d="M141.396,325.405L147.806,325.405" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;stroke-linejoin:miter;stroke-miterlimit:4;"/>
+                    <circle id="corner_FL_YX_wcs_circle1" cx="138.832" cy="325.405" r="0.962" style="fill:#ef4444;"/>
+                    <path id="corner_FL_YX_wcs_path9" d="M138.832,315.79L137.39,312.905L140.274,312.905L138.832,315.79Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_FL_YX_wcs_path10" d="M138.832,335.02L140.274,337.905L137.39,337.905L138.832,335.02Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_FL_YX_wcs_path11" d="M129.217,325.405L126.332,323.963L126.332,326.847L129.217,325.405Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                    <path id="corner_FL_YX_wcs_path12" d="M148.447,325.405L151.332,326.847L151.332,323.963L148.447,325.405Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                </g>
+            </g>
+        </g>
+    </g>
+    <defs>
+        <radialGradient id="cornerViz___Radial1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(9.583373,0,0,-9.583373,166.743765,166.368818)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(9.583486,0,0,-9.583486,45.741119,164.606241)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial3" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,9.583373,-9.583373,0,170.577393,162.53545)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial4" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,9.583486,-9.583486,0,168.768437,41.456074)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial5" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-9.583373,0,-0,-9.583373,301.560327,165.368818)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial6" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-9.583486,0,-0,-9.583486,421.562974,164.606241)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial7" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,9.583373,9.583373,0,297.773079,161.458721)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial8" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,9.583486,9.583486,0,298.535656,41.456074)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial9" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-9.583373,0,0,9.583373,302.560327,295.659857)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial10" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-9.583486,0,0,9.583486,422.562974,296.422433)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial11" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-9.583373,9.583373,0,298.773079,299.569954)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial12" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-9.583486,9.583486,0,299.535656,419.572601)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial13" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(9.583373,0,0,9.583373,163.860341,292.909272)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial14" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(9.583486,0,0,9.583486,44.614842,296.28437)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial15" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-9.583373,-9.583373,-0,167.693839,296.74277)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="cornerViz___Radial16" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-9.583486,-9.583486,-0,167.693514,422.072601)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+    </defs>
+</svg>

@@ -1,0 +1,163 @@
+# SVG Cleanup Log
+
+## Removed Empty Groups (43)
+
+- middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_YZ
+- middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XZ
+- middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_YZ
+- middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XZ
+- middle_probe_boss_Y_pos_1axis_XZ
+- middle_probe_boss_Y_pos_1axis_YZ
+- middle_probe_boss_Y_neg_1axis_XZ
+- middle_probe_boss_Y_neg_1axis_YZ
+- middle_probe_boss_X_pos_2axis_XtoY_pos_Y_pos_1axis_XZ
+- middle_probe_boss_X_pos_2axis_XtoY_pos_Y_pos_1axis_YZ
+- middle_probe_boss_X_pos_2axis_XtoY_neg_ref_Y_neg_XZ
+- middle_probe_boss_X_pos_2axis_XtoY_neg_ref_Y_neg_YZ
+- middle_probe_boss_X_pos_1axis_YZ
+- middle_probe_boss_X_pos_1axis_XZ
+- middle_probe_boss_X_neg_2axis_XtoY_pos_XZ
+- middle_probe_boss_X_neg_2axis_XtoY_pos_YZ
+- middle_probe_boss_X_neg_2axis_XtoY_neg_XZ
+- middle_probe_boss_X_neg_2axis_XtoY_neg_YZ
+- middle_probe_boss_X_neg_1axis_YZ
+- middle_probe_boss_X_neg_1axis_XZ
+- workbossYZ
+- workbossXZ
+- workbossALT
+- middle_probe_pocket_X_neg_2axis_XtoY_pos_YZ
+- middle_probe_pocket_X_neg_2axis_XtoY_neg_YZ
+- middle_probe_pocket_X_neg_1axis_XZ_b
+- middle_probe_pocket_X_neg_1axis_YZ
+- middle_probe_pocket_Y_neg_2axis_YtoX_pos_XZ
+- middle_probe_pocket_Y_neg_2axis_YtoX_neg_XZ
+- middle_probe_pocket_Y_neg_1axis_XZ
+- middle_probe_pocket_Y_neg_1axis_YZ
+- middle_probe_pocket_Y_pos_2axis_YtoX_pos_XZ
+- middle_probe_pocket_X_neg_1axis_XZ
+- middle_probe_pocket_Y_pos_1axis_XZ
+- middle_probe_pocket_Y_pos_1axis_YZ
+- middle_probe_pocket_X_pos_1axis_YZ
+- middle_probe_pocket_X_pos_1axis_XZ
+- workpocketXZ
+- workpocketALT
+- workpocketYZ
+- QUADALT
+- QUADYZ
+- QUADXZ
+
+## Removed Arrow Elements (76)
+
+All elements with IDs containing "arrow" were removed, including:
+- startarrow elements (direction indicators)
+- endarrow elements (direction indicators)
+- retractarrowneg elements (retraction path indicators)
+- retractarrowpos elements (retraction path indicators)
+
+### Pocket Arrow Elements (36)
+- middle_probe_pocket_X_pos_1axis_XY_startarrow
+- middle_probe_pocket_X_pos_1axis_XY_endarrow
+- middle_probe_pocket_X_pos_1axis_XY_retractarrowneg
+- middle_probe_pocket_X_pos_2axis_XtoY_neg_XY_retractarrowneg
+- middle_probe_pocket_X_pos_2axis_XtoY_neg_XY_startarrow
+- middle_probe_pocket_X_pos_2axis_XtoY_neg_XY_endarrow
+- middle_probe_pocket_X_pos_2axis_XtoY_pos_XY_startarrow
+- middle_probe_pocket_X_pos_2axis_XtoY_pos_XY_endarrow
+- middle_probe_pocket_X_pos_2axis_XtoY_pos_XY_retractarrowpos
+- middle_probe_pocket_Y_pos_1axis_XY_startarrow
+- middle_probe_pocket_Y_pos_1axis_XY_endarrow
+- middle_probe_pocket_Y_pos_1axis_XY_retractarrowpos
+- middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_startarrow
+- middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_endarrow
+- middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_retractarrowneg
+- middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_startarrow1
+- middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_endarrow1
+- middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_retractarrowneg1
+- middle_probe_pocket_Y_neg_1axis_XY_retractarrowneg
+- middle_probe_pocket_Y_neg_1axis_XY_startarrow
+- middle_probe_pocket_Y_neg_1axis_XY_endarrow
+- middle_probe_pocket_Y_neg_2axis_YtoX_neg_XY_startarrow
+- middle_probe_pocket_Y_neg_2axis_YtoX_neg_XY_endarrow
+- middle_probe_pocket_Y_neg_2axis_YtoX_neg_XY_retractarrowpos
+- middle_probe_pocket_Y_neg_2axis_YtoX_pos_XY_startarrow
+- middle_probe_pocket_Y_neg_2axis_YtoX_pos_XY_endarrow
+- middle_probe_pocket_Y_neg_2axis_YtoX_pos_XY_retractarrowneg
+- middle_probe_pocket_X_neg_1axis_XY_startarrow
+- middle_probe_pocket_X_neg_1axis_XY_endarrow
+- middle_probe_pocket_X_neg_1axis_XY_retractarrowpos
+- middle_probe_pocket_X_neg_2axis_XtoY_neg_XY_retractarrowneg
+- middle_probe_pocket_X_neg_2axis_XtoY_neg_XY_startarrow
+- middle_probe_pocket_X_neg_2axis_XtoY_neg_XY_endarrow
+- middle_probe_pocket_X_neg_2axis_XtoY_pos_XY_startarrow
+- middle_probe_pocket_X_neg_2axis_XtoY_pos_XY_endarrow
+- middle_probe_pocket_X_neg_2axis_XtoY_pos_XY_retractarrowpos
+
+### Boss Arrow Elements (40)
+- middle_probe_boss_X_neg_1axis_XY_retractarrowneg
+- middle_probe_boss_X_neg_1axis_XY_startarrow (group)
+- middle_probe_boss_X_neg_1axis_XY_endarrow (group)
+- middle_probe_boss_X_neg_2axis_XtoY_neg_XY_startarrow
+- middle_probe_boss_X_neg_2axis_XtoY_neg_XY_endarrow
+- middle_probe_boss_X_neg_2axis_XtoY_neg_XY_retractarrowpos
+- middle_probe_boss_X_neg_2axis_XtoY_neg_XY_retractarrowneg
+- middle_probe_boss_X_neg_2axis_XtoY_pos_XY_startarrow
+- middle_probe_boss_X_neg_2axis_XtoY_pos_XY_endarrow
+- middle_probe_boss_X_neg_2axis_XtoY_pos_XY_retractarrowpos
+- middle_probe_boss_X_neg_2axis_XtoY_pos_XY_retractarrowneg
+- middle_probe_boss_X_pos_1axis_XY_retractarrowpos
+- middle_probe_boss_X_pos_1axis_XY_startarrow (group)
+- middle_probe_boss_X_pos_1axis_XY_endarrow (group)
+- middle_probe_boss_X_pos_2axis_XtoY_neg_XY_retractarrowneg_ref_Y_neg_XY
+- middle_probe_boss_X_pos_2axis_XtoY_neg_XY_startarrow_ref_Y_neg_XY
+- middle_probe_boss_X_pos_2axis_XtoY_neg_XY_endarrow_ref_Y_neg_XY
+- middle_probe_boss_X_pos_2axis_XtoY_pos_Y_pos_1axis_XY_startarrow
+- middle_probe_boss_X_pos_2axis_XtoY_pos_Y_pos_1axis_XY_endarrow
+- middle_probe_boss_X_pos_2axis_XtoY_pos_Y_pos_1axis_XY_retractarrowpos
+- middle_probe_boss_X_pos_2axis_XtoY_pos_Y_pos_1axis_XY_retractarrowneg
+- middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_XY_retractarrowneg
+- middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_XY_startarrow (group)
+- middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_XY_endarrow (group)
+- middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_XY_retractarrowpos
+- middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_XY_startarrow (group)
+- middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_XY_endarrow (group)
+- middle_probe_boss_Y_neg_1axis_XY_retractarrowneg
+- middle_probe_boss_Y_neg_1axis_XY_startarrow
+- middle_probe_boss_Y_neg_1axis_XY_endarrow
+- middle_probe_boss_Y_pos_1axis_XY_startarrow
+- middle_probe_boss_Y_pos_1axis_XY_endarrow
+- middle_probe_boss_Y_pos_1axis_XY_retractarrowpos
+- middle_probe_boss_Y_pos_1axis_XY_retractarrowneg
+- middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XY_retractarrowneg
+- middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XY_startarrow (group)
+- middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XY_endarrow (group)
+- middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XY_retractarrowpos
+- middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XY_startarrow (group)
+- middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XY_endarrow (group)
+
+## Removed Orange Triangle Elements (28)
+
+Orange triangles (jog indicators with solid fill) were removed while keeping the dashed orange jogpath lines:
+
+- 8 pocket triangle elements (NO_ID triangles in nextaxisjog groups)
+- 20 boss triangle elements:
+  - middle_probe_boss_X_neg_1axis_XY_jog
+  - middle_probe_boss_X_neg_2axis_XtoY_neg_jog_nextaxisjog
+  - middle_probe_boss_Y_pos_jog_jog
+  - middle_probe_boss_X_neg_2axis_XtoY_pos_jog_nextaxisjog
+  - middle_probe_boss_X_neg_2axis_XtoY_pos_XY_Y_pos_jog_jog
+  - middle_probe_boss_X_pos_2axis_XtoY_neg_jog_nextaxisjog
+  - middle_probe_boss_X_pos_2axis_XtoY_neg_XY_jog_ref_Y_neg_XY
+  - middle_probe_boss_X_pos_2axis_XtoY_pos_jog_nextaxisjog
+  - middle_probe_boss_X_pos_2axis_XtoY_pos_Y_pos_1axis_XY_Y_pos_jog_jog
+  - middle_probe_boss_Y_pos_2axis_YtoX_neg_jog_nextaxisjog
+  - middle_probe_boss_Y_neg_2axis_YtoX_neg_X_neg_1axis_XY_jog
+  - middle_probe_boss_Y_neg_2axis_YtoX_pos_jog_nextaxisjog
+  - middle_probe_boss_Y_neg_2axis_YtoX_pos_X_pos_1axis_XY_jog
+  - middle_probe_boss_Y_neg_1axis_XY_jog
+  - middle_probe_boss_Y_pos_1axis_XY_Y_pos_jog_jog
+  - middle_probe_boss_Y_pos_2axis_YtoX_neg_jog_nextaxisjog_renamed1
+  - middle_probe_boss_Y_pos_2axis_YtoX_neg_X_neg_1axis_XY_jog
+  - middle_probe_boss_Y_pos_2axis_YtoX_pos_jog_nextaxisjog
+  - middle_probe_boss_Y_pos_2axis_YtoX_pos_probe_X_pos_1axis_XY_jog
+
+**Kept:** 28 dashed orange jogpath lines (fill:none, stroke:#ff9a0d)

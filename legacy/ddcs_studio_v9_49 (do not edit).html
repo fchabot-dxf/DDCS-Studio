@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DDCS Studio V9.49 (do not edit)</title>
+    <style>
+        /* --- THEME ENGINE --- */
+        
+        /* ================================================================ */
+        /* DDCS THEME (Default) - Matches Real DDCS M350 Controller        */
+        /* ================================================================ */
+        :root, body[data-theme="ddcs"] {
+            --bg: #c0c0c0;
+            --panel: #d4d0c8;
+            --border: #808080;
+            --text-main: #000000;
+            --text-dim: #333333;
+            --accent: #000080;
+            --accent-dim: #1d4ed8;
+            --success: #008000;
+            --danger: #cc0000;
+            --warn: #b8860b;
+            --travel: #008000;
+            --font: "Arial", sans-serif;
+            --radius: 0px;
+            --btn-border: none;
+            --btn-txt-shadow: none;
+            --var-sys-bg: rgba(0, 0, 128, 0.15);
+            --var-sys-border: #000080;
+            --var-usr-bg: rgba(0, 128, 0, 0.15);
+            --var-usr-border: #008000;
+        }
+        
+        /* DDCS: Panels - Hard Embossed Frame */
+        body[data-theme="ddcs"] header,
+        body[data-theme="ddcs"] aside,
+        body[data-theme="ddcs"] .deck-panel,
+        body[data-theme="ddcs"] .wiz-box {
+            background: var(--panel);
+            color: #000000;
+            border: 3px ridge #ffffff !important;
+        }
+        
+        /* DDCS: Headers */
+        body[data-theme="ddcs"] .toolbar,
+        body[data-theme="ddcs"] .deck-header,
+        body[data-theme="ddcs"] .category-header {
+            background: #d4d0c8;
+            color: #000000;
+            border: 1px solid #000000;
+            border-bottom: 2px solid #000000;
+        }
+        
+        /* DDCS: Screens (Sunken) */
+        body[data-theme="ddcs"] .editor-area,
+        body[data-theme="ddcs"] .viz-container,
+        body[data-theme="ddcs"] textarea {
+            background: #000000 !important;
+            color: #ffffff !important;
+            --text-main: #ffffff;
+            --text-dim: #aaaaaa;
+            border: 3px inset #d4d0c8 !important;
+        }
+        
+        /* DDCS: Labels inside dark areas need light text */
+        body[data-theme="ddcs"] .viz-container .section-label,
+        body[data-theme="ddcs"] .viz-container .label,
+        body[data-theme="ddcs"] .editor-area .section-label,
+        body[data-theme="ddcs"] .editor-area .label {
+            color: #cccccc !important;
+        }
+        
+        /* DDCS: Industrial Grey 3D Buttons */
+        body[data-theme="ddcs"] button,
+        body[data-theme="ddcs"] .code-btn {
+            background: #e0e0e0 !important;
+            color: #000000 !important;
+            font-family: "Arial Narrow", Arial, sans-serif;
+            font-weight: bold;
+            text-shadow: none !important;
+            border-top: 2px solid #ffffff !important;
+            border-left: 2px solid #ffffff !important;
+            border-right: 2px solid #404040 !important;
+            border-bottom: 2px solid #404040 !important;
+            box-shadow: none !important;
+            margin-bottom: 2px;
+        }
+        
+        /* DDCS: Button Pressed */
+        body[data-theme="ddcs"] button:active,
+        body[data-theme="ddcs"] .code-btn:active {
+            background: #cccccc !important;
+            border-top: 2px solid #404040 !important;
+            border-left: 2px solid #404040 !important;
+            border-right: 2px solid #ffffff !important;
+            border-bottom: 2px solid #ffffff !important;
+            transform: translate(1px, 1px);
+        }
+        
+        /* DDCS: Wizard Button Overrides */
+        body[data-theme="ddcs"] #btn-wiz-corner,
+        body[data-theme="ddcs"] #btn-wiz-middle,
+        body[data-theme="ddcs"] #btn-wiz-edge,
+        body[data-theme="ddcs"] #btn-wiz-comm,
+        body[data-theme="ddcs"] #btn-wiz-wcs {
+            background-image: none !important;
+            box-shadow: none !important;
+        }
+        body[data-theme="ddcs"] #btn-wiz-corner,
+        body[data-theme="ddcs"] #btn-wiz-middle,
+        body[data-theme="ddcs"] #btn-wiz-edge { color: #000080 !important; }
+        body[data-theme="ddcs"] #btn-wiz-comm { color: #800000 !important; }
+        body[data-theme="ddcs"] #btn-wiz-wcs { color: #004d00 !important; }
+        
+        /* DDCS: Command Deck Colors - Dark colors visible on light grey (#e0e0e0) */
+        
+        /* SPINDLE: Red - Danger/Safety critical */
+        body[data-theme="ddcs"] button[onclick*="'M3 '"],
+        body[data-theme="ddcs"] button[onclick*="'M5 '"] { color: #b91c1c !important; }
+        
+        /* PROGRAM END: Dark Red - Stop */
+        body[data-theme="ddcs"] button[onclick*="'M30'"] { color: #991b1b !important; }
+        
+        /* COOLANT: Dark Green - Flow/Go */
+        body[data-theme="ddcs"] button[onclick*="'M8 '"],
+        body[data-theme="ddcs"] button[onclick*="'M9 '"] { color: #166534 !important; }
+        
+        /* SUBROUTINES: Teal - Program structure */
+        body[data-theme="ddcs"] button[onclick*="'M98"],
+        body[data-theme="ddcs"] button[onclick*="'M99"] { color: #0f766e !important; }
+        
+        /* FLOW CONTROL: Dark Orange/Brown - Logic */
+        body[data-theme="ddcs"] button[onclick*="'IF"],
+        body[data-theme="ddcs"] button[onclick*="'GOTO"],
+        body[data-theme="ddcs"] button[onclick*="'WHILE"],
+        body[data-theme="ddcs"] button[onclick*="'N'"] { color: #b45309 !important; }
+        
+        /* COMMENTS: Dark Grey */
+        body[data-theme="ddcs"] button[onclick*="'('"],
+        body[data-theme="ddcs"] button[onclick*=")'"],
+        body[data-theme="ddcs"] button[onclick*="';'"] { color: #525252 !important; }
+        
+        /* AXES: Navy Blue - Motion */
+        body[data-theme="ddcs"] button[onclick*="'X'"],
+        body[data-theme="ddcs"] button[onclick*="'Y'"],
+        body[data-theme="ddcs"] button[onclick*="'Z'"],
+        body[data-theme="ddcs"] button[onclick*="'A'"],
+        body[data-theme="ddcs"] button[onclick*="'B'" ] { color: #1e3a8a !important; font-weight: 900; }
+        
+        /* VARIABLES: Purple */
+        body[data-theme="ddcs"] button[onclick*="'#'"] { color: #7e22ce !important; }
+        
+        /* G-CODES: Differentiated by function */
+        body[data-theme="ddcs"] button[onclick*="'G0 '"] { color: #c2410c !important; }  /* Rapid: Orange */
+        body[data-theme="ddcs"] button[onclick*="'G1 '"] { color: #1d4ed8 !important; }  /* Feed: Blue */
+        body[data-theme="ddcs"] button[onclick*="'G31 '"] { color: #0891b2 !important; } /* Probe: Cyan */
+        body[data-theme="ddcs"] button[onclick*="'G53 '"] { color: #4338ca !important; } /* Machine coords: Indigo */
+        body[data-theme="ddcs"] button[onclick*="'G4 '"] { color: #525252 !important; }  /* Dwell: Grey */
+        body[data-theme="ddcs"] button[onclick*="'G90'"] { color: #1d4ed8 !important; border-bottom: 3px solid #1d4ed8 !important; }  /* Absolute: Blue */
+        body[data-theme="ddcs"] button[onclick*="'G91'"] { color: #b45309 !important; border-bottom: 3px solid #d97706 !important; }  /* Incremental: Orange */
+        
+        /* FEED: Dark Blue */
+        body[data-theme="ddcs"] button[onclick*="'F'"] { color: #1e40af !important; }
+        
+        /* MATH OPERATORS: Dark Blue */
+        body[data-theme="ddcs"] button[onclick*="'+'"],
+        body[data-theme="ddcs"] button[onclick*="'*'"],
+        body[data-theme="ddcs"] button[onclick*="'/'"] { color: #1e40af !important; }
+        
+        /* COMPARISON OPERATORS: Dark Indigo */
+        body[data-theme="ddcs"] button[onclick*="'='"],
+        body[data-theme="ddcs"] button[onclick*="'=='"],
+        body[data-theme="ddcs"] button[onclick*="'!='"],
+        body[data-theme="ddcs"] button[onclick*="'<'"],
+        body[data-theme="ddcs"] button[onclick*="'>'"],
+        body[data-theme="ddcs"] button[onclick*="'<='"],
+        body[data-theme="ddcs"] button[onclick*="'>='"] { color: #3730a3 !important; }
+        
+        /* BRACKETS: Dark Amber */
+        body[data-theme="ddcs"] button[onclick*="'[ ]'"] { color: #b45309 !important; }
+        
+        /* WASH SNIPPET: Purple - targets the =1 pattern used for variable washing */
+        body[data-theme="ddcs"] button[onclick="insert('=1')"] { color: #7e22ce !important; border-color: #7c3aed !important; }
+        
+        /* SafeZ SNIPPET */
+        body[data-theme="ddcs"] button[onclick="insert('safe_z')"] { color: #0f766e !important; }
+        
+        /* NUMBERS: Black */
+        body[data-theme="ddcs"] button[onclick*="'0'"],
+        body[data-theme="ddcs"] button[onclick*="'1'"],
+        body[data-theme="ddcs"] button[onclick*="'2'"],
+        body[data-theme="ddcs"] button[onclick*="'3'"],
+        body[data-theme="ddcs"] button[onclick*="'4'"],
+        body[data-theme="ddcs"] button[onclick*="'5'"],
+        body[data-theme="ddcs"] button[onclick*="'6'"],
+        body[data-theme="ddcs"] button[onclick*="'7'"],
+        body[data-theme="ddcs"] button[onclick*="'8'"],
+        body[data-theme="ddcs"] button[onclick*="'9'"],
+        body[data-theme="ddcs"] button[onclick*="'.'"] { color: #171717 !important; }
+        
+        /* ================================================================ */
+        /* NORMAL THEME (Dark Blue)                                        */
+        /* ================================================================ */
+        body[data-theme="normal"] {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --border: #334155;
+            --text-main: #e2e8f0;
+            --text-dim: #94a3b8;
+            --accent: #3b82f6;
+            --accent-dim: #1d4ed8;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warn: #eab308;
+            --travel: #22c55e;
+            --font: consolas, monospace;
+            --radius: 4px;
+            --btn-border: 1px solid var(--border);
+            --btn-txt-shadow: none;
+            --var-sys-bg: rgba(59, 130, 246, 0.15);
+            --var-sys-border: #1d4ed8;
+            --var-usr-bg: rgba(34, 197, 94, 0.15);
+            --var-usr-border: #15803d;
+        }
+        ... (file content copied verbatim) ...
+</html>

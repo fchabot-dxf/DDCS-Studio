@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 465 465" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;">
+    <g id="middle_probe_quad">
+        <text id="middle_probe_quad_top" x="13.315px" y="18.026px" style="font-family:'Consolas', monospace;font-size:14.296px;fill:#fff;">TOP (XY)</text>
+        <path id="middle_probe_quad_shape" d="M464.635,0L464.635,464.635L0,464.635L0,0L464.635,0ZM463.444,1.191L1.192,1.191L1.192,463.443L463.444,463.443L463.444,1.191Z" style="fill:#c9c9ff;"/>
+        <g id="middle_probe_quad_right">
+            <text x="402.526px" y="240.644px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Right X+</text>
+        </g>
+        <g id="middle_probe_quad_left">
+            <text x="1.568px" y="246.267px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Left X-</text>
+        </g>
+        <text id="middle_probe_quad_back" x="206.234px" y="19.41px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Back Y+</text>
+        <text id="middle_probe_quad_front" x="206.234px" y="453.836px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Front Y-</text>
+    </g>
+    <g id="middle_probe_pocket">
+        <path id="middle_probe_pocket_stock" d="M112.357,110.322L353.384,110.322L353.384,351.35L112.357,351.35L112.357,110.322ZM175.124,173.089L290.616,173.089L290.616,288.582L175.124,288.582L175.124,173.089Z" style="fill:#1e293b;stroke:#475569;stroke-width:5.02px;"/>
+        <g id="middle_probe_pocket_X_pos">
+            <path id="middle_probe_pocket_X_pos_probepath_step1" d="M265.95,231.241L288.112,231.241" style="fill:none;stroke:#3b82f6;stroke-width:4.11px;stroke-linejoin:round;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_X_pos_probepath_step3" d="M265.95,231.241L177.092,231.241" style="fill:none;stroke:#3b82f6;stroke-width:2.48px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_X_pos_retractpath_step2" d="M288.112,231.241L265.95,231.241" style="fill:none;stroke:#ff0;stroke-width:2.1px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_X_pos_retractpath_step4" d="M177.092,231.241L200.118,231.241" style="fill:none;stroke:#ff0;stroke-width:2px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_X_pos_to_Y_neg_jogpath" d="M200.118,231.241C209.725,232.02 219.118,236.261 223.162,241.502C228.014,247.789 232.783,256.31 233.001,262.097" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_X_pos_to_Y_pos_jogpath" d="M200.118,231.241C209.782,230.149 220.116,225.829 225.024,220.071C230.499,213.647 232.98,201.554 233.001,198.849" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <g id="middle_probe_pocket_X_pos_miniprobe">
+                <circle id="middle_probe_pocket_X_pos_miniprobe_circle1" cx="265.95" cy="231.504" r="11.716" style="fill:#ef4444;fill-opacity:0.3;"/>
+                <circle id="middle_probe_pocket_X_pos_miniprobe_circle2" cx="265.95" cy="231.504" r="9.763" style="fill:url(#middleViz___Radial1);"/>
+                <circle id="middle_probe_pocket_X_pos_miniprobe_circle3" cx="268.879" cy="228.576" r="3.418" style="fill:#fff;fill-opacity:0.5;"/>
+            </g>
+            <g id="middle_probe_pocket_X_pos_wcs">
+                <path id="middle_probe_pocket_X_pos_wcs_path1" d="M223.526,226.731L223.526,223.526L226.731,223.526" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_X_pos_wcs_path2" d="M238.269,223.526L241.474,223.526L241.474,226.731" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_X_pos_wcs_path3" d="M241.474,238.269L241.474,241.474L238.269,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_X_pos_wcs_path4" d="M226.731,241.474L223.526,241.474L223.526,238.269" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_X_pos_wcs_path5" d="M232.5,223.526L232.5,229.936" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_pocket_X_pos_wcs_path6" d="M232.5,235.064L232.5,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_pocket_X_pos_wcs_path7" d="M223.526,232.5L229.936,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_pocket_X_pos_wcs_path8" d="M235.064,232.5L241.474,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <circle id="middle_probe_pocket_X_pos_wcs_circle1" cx="232.5" cy="232.5" r="0.962" style="fill:#ef4444;"/>
+                <path id="middle_probe_pocket_X_pos_wcs_path9" d="M232.5,222.885L231.058,220L233.942,220L232.5,222.885Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_pocket_X_pos_wcs_path10" d="M232.5,242.115L233.942,245L231.058,245L232.5,242.115Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_pocket_X_pos_wcs_path11" d="M222.885,232.5L220,231.058L220,233.942L222.885,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_pocket_X_pos_wcs_path12" d="M242.115,232.5L245,233.942L245,231.058L242.115,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+            </g>
+        </g>
+        <g id="middle_probe_pocket_Y_pos">
+            <path id="middle_probe_pocket_Y_pos_probepath_step1" d="M233,198.849L233,175.601" style="fill:none;stroke:#3b82f6;stroke-width:3.98px;stroke-linejoin:round;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_Y_pos_probepath_step3" d="M233,198.849L233,286.086" style="fill:none;stroke:#3b82f6;stroke-width:2.5px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_Y_pos_retractpath_step2" d="M233,176.387L233,198.849" style="fill:none;stroke:#ff0;stroke-width:2px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_Y_pos_retractpath_step4" d="M233,286.086L233,262.096" style="fill:none;stroke:#ff0;stroke-width:2.04px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_Y_pos_to_X_neg_jogpath" d="M233.001,262.097C232.854,253.995 225.79,242.104 220.366,237.685C213.859,232.384 208.476,231.652 205.928,231.629" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_Y_pos_to_X_pos_jogpath" d="M233.001,262.097C233.015,253.831 238.218,242.601 243.036,238.595C248.816,233.789 256.673,231.629 265.95,231.629" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <g id="middle_probe_pocket_Y_pos_miniprobe">
+                <path id="middle_probe_pocket_Y_pos_miniprobe_circle731" d="M243.961,200.188C243.961,206.654 238.712,211.904 232.245,211.904C225.779,211.904 220.529,206.654 220.529,200.188C220.529,193.722 225.779,188.472 232.245,188.472C238.712,188.472 243.961,193.722 243.961,200.188Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                <path id="middle_probe_pocket_Y_pos_miniprobe_circle741" d="M242.008,200.188C242.008,205.576 237.634,209.951 232.245,209.951C226.857,209.951 222.482,205.576 222.482,200.188C222.482,194.8 226.857,190.425 232.245,190.425C237.634,190.425 242.008,194.8 242.008,200.188Z" style="fill:url(#middleViz___Radial2);"/>
+                <path id="middle_probe_pocket_Y_pos_miniprobe_circle751" d="M232.735,197.258C232.735,199.145 231.203,200.676 229.317,200.676C227.431,200.676 225.899,199.145 225.899,197.258C225.899,195.372 227.431,193.84 229.317,193.84C231.203,193.84 232.735,195.372 232.735,197.258Z" style="fill:#fff;fill-opacity:0.5;"/>
+            </g>
+            <g id="middle_probe_pocket_Y_pos_wcs">
+                <path id="middle_probe_pocket_Y_pos_wcs_path1" d="M223.526,226.731L223.526,223.526L226.731,223.526" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_Y_pos_wcs_path2" d="M238.269,223.526L241.474,223.526L241.474,226.731" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_Y_pos_wcs_path3" d="M241.474,238.269L241.474,241.474L238.269,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_Y_pos_wcs_path4" d="M226.731,241.474L223.526,241.474L223.526,238.269" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_Y_pos_wcs_path5" d="M232.5,223.526L232.5,229.936" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_pocket_Y_pos_wcs_path6" d="M232.5,235.064L232.5,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_pocket_Y_pos_wcs_path7" d="M223.526,232.5L229.936,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_pocket_Y_pos_wcs_path8" d="M235.064,232.5L241.474,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <circle id="middle_probe_pocket_Y_pos_wcs_circle1" cx="232.5" cy="232.5" r="0.962" style="fill:#ef4444;"/>
+                <path id="middle_probe_pocket_Y_pos_wcs_path9" d="M232.5,222.885L231.058,220L233.942,220L232.5,222.885Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_pocket_Y_pos_wcs_path10" d="M232.5,242.115L233.942,245L231.058,245L232.5,242.115Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_pocket_Y_pos_wcs_path11" d="M222.885,232.5L220,231.058L220,233.942L222.885,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_pocket_Y_pos_wcs_path12" d="M242.115,232.5L245,233.942L245,231.058L242.115,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+            </g>
+        </g>
+        <g id="middle_probe_pocket_X_neg">
+            <path id="middle_probe_pocket_X_neg_probepath_step1" d="M200.118,231.477L177.092,231.477" style="fill:none;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:round;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_X_neg_probepath_step3" d="M200.118,231.477L288.252,231.477" style="fill:none;stroke:#3b82f6;stroke-width:2.48px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_X_neg_retractpath_step2" d="M177.092,231.477L200.118,231.477" style="fill:none;stroke:#ff0;stroke-width:1.93px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_X_neg_retractpath_step4" d="M288.252,231.477L265.95,231.477" style="fill:none;stroke:#ff0;stroke-width:2px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_X_neg_to_Y_pos_jogpath" d="M265.95,231.572C257.495,231.572 244.447,225.117 240.109,219.612C234.904,213.008 232.507,202.499 232.5,200.188" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_X_neg_to_Y_neg_jogpath" d="M265.95,231.629C255.14,233.049 244.048,237.016 240.086,242.168C234.634,249.258 232.331,257.629 232.344,261.544" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <g id="middle_probe_pocket_X_neg_miniprobe">
+                <circle id="middle_probe_pocket_X_neg_miniprobe_circle731" cx="200.118" cy="231.245" r="11.716" style="fill:#ef4444;fill-opacity:0.3;"/>
+                <circle id="middle_probe_pocket_X_neg_miniprobe_circle741" cx="200.118" cy="231.245" r="9.763" style="fill:url(#middleViz___Radial3);"/>
+                <circle id="middle_probe_pocket_X_neg_miniprobe_circle751" cx="197.188" cy="234.174" r="3.418" style="fill:#fff;fill-opacity:0.5;"/>
+            </g>
+            <g id="middle_probe_pocket_X_neg_wcs">
+                <path id="middle_probe_pocket_X_neg_wcs_path1" d="M223.526,226.731L223.526,223.526L226.731,223.526" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_X_neg_wcs_path2" d="M238.269,223.526L241.474,223.526L241.474,226.731" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_X_neg_wcs_path3" d="M241.474,238.269L241.474,241.474L238.269,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_X_neg_wcs_path4" d="M226.731,241.474L223.526,241.474L223.526,238.269" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_X_neg_wcs_path5" d="M232.5,223.526L232.5,229.936" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_pocket_X_neg_wcs_path6" d="M232.5,235.064L232.5,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_pocket_X_neg_wcs_path7" d="M223.526,232.5L229.936,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_pocket_X_neg_wcs_path8" d="M235.064,232.5L241.474,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <circle id="middle_probe_pocket_X_neg_wcs_circle1" cx="232.5" cy="232.5" r="0.962" style="fill:#ef4444;"/>
+                <path id="middle_probe_pocket_X_neg_wcs_path9" d="M232.5,222.885L231.058,220L233.942,220L232.5,222.885Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_pocket_X_neg_wcs_path10" d="M232.5,242.115L233.942,245L231.058,245L232.5,242.115Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_pocket_X_neg_wcs_path11" d="M222.885,232.5L220,231.058L220,233.942L222.885,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_pocket_X_neg_wcs_path12" d="M242.115,232.5L245,233.942L245,231.058L242.115,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+            </g>
+        </g>
+        <g id="middle_probe_pocket_Y_neg">
+            <path id="middle_probe_pocket_Y_neg_probepath_step1" d="M232.344,261.544L232.344,285.385" style="fill:none;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:round;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_Y_neg_probepath_step3" d="M232.344,261.544L232.344,175.823" style="fill:none;stroke:#3b82f6;stroke-width:2.39px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_Y_neg_retractpath_step2" d="M232.344,285.385L232.344,261.544" style="fill:none;stroke:#ff0;stroke-width:2.04px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_Y_neg_retractpath_step4" d="M232.344,175.823L232.344,198.849" style="fill:none;stroke:#ff0;stroke-width:2px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_Y_neg_to_X_neg_jogpath" d="M232.5,198.849C231.194,213.896 228.589,216.651 223.566,221.853C218.795,226.795 212.293,230.95 205.928,231.477" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_pocket_Y_neg_to_X_pos_jogpath" d="M232.5,198.849C232.5,207.098 238.16,218.623 243.451,222.825C249.418,227.563 258.331,231.629 265.95,231.629" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <g id="middle_probe_pocket_Y_neg_miniprobe">
+                <path id="middle_probe_pocket_Y_neg_miniprobe_circle731" d="M220.628,261.544C220.628,255.078 225.878,249.828 232.344,249.828C238.811,249.828 244.06,255.078 244.06,261.544C244.06,268.011 238.811,273.26 232.344,273.26C225.878,273.26 220.628,268.011 220.628,261.544Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                <path id="middle_probe_pocket_Y_neg_miniprobe_circle741" d="M222.581,261.544C222.581,256.156 226.956,251.781 232.344,251.781C237.733,251.781 242.107,256.156 242.107,261.544C242.107,266.933 237.733,271.307 232.344,271.307C226.956,271.307 222.581,266.933 222.581,261.544Z" style="fill:url(#middleViz___Radial4);"/>
+                <path id="middle_probe_pocket_Y_neg_miniprobe_circle751" d="M231.855,264.474C231.855,262.588 233.386,261.056 235.273,261.056C237.159,261.056 238.691,262.588 238.691,264.474C238.691,266.36 237.159,267.892 235.273,267.892C233.386,267.892 231.855,266.36 231.855,264.474Z" style="fill:#fff;fill-opacity:0.5;"/>
+            </g>
+            <g id="middle_probe_pocket_Y_neg_wcs">
+                <path id="middle_probe_pocket_Y_neg_wcs_path1" d="M223.526,226.731L223.526,223.526L226.731,223.526" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_Y_neg_wcs_path2" d="M238.269,223.526L241.474,223.526L241.474,226.731" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_Y_neg_wcs_path3" d="M241.474,238.269L241.474,241.474L238.269,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_Y_neg_wcs_path4" d="M226.731,241.474L223.526,241.474L223.526,238.269" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_pocket_Y_neg_wcs_path5" d="M232.5,223.526L232.5,229.936" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_pocket_Y_neg_wcs_path6" d="M232.5,235.064L232.5,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_pocket_Y_neg_wcs_path7" d="M223.526,232.5L229.936,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_pocket_Y_neg_wcs_path8" d="M235.064,232.5L241.474,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <circle id="middle_probe_pocket_Y_neg_wcs_circle1" cx="232.5" cy="232.5" r="0.962" style="fill:#ef4444;"/>
+                <path id="middle_probe_pocket_Y_neg_wcs_path9" d="M232.5,222.885L231.058,220L233.942,220L232.5,222.885Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_pocket_Y_neg_wcs_path10" d="M232.5,242.115L233.942,245L231.058,245L232.5,242.115Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_pocket_Y_neg_wcs_path11" d="M222.885,232.5L220,231.058L220,233.942L222.885,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_pocket_Y_neg_wcs_path12" d="M242.115,232.5L245,233.942L245,231.058L242.115,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+            </g>
+        </g>
+    </g>
+    <g id="middle_probe_boss">
+        <rect id="middle_probe_boss_stock" x="115.357" y="112.322" width="241.028" height="241.028" style="fill:#1e293b;stroke:#475569;stroke-width:5.07px;"/>
+        <g id="middle_probe_boss_Y_pos">
+            <path id="middle_probe_boss_Y_pos_probepath_step4" d="M233.5,74.45L233.5,107.594" style="fill:none;stroke:#3b82f6;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_Y_pos_traversepath_step3" d="M232.5,395.154C260.955,395.154 300.123,379.494 307.854,361.186C320.866,330.371 323.645,143.044 304.335,107.217C293.923,87.898 258.431,71.634 234.001,71.614" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_Y_pos_probepath_step1" d="M233.5,389.698L233.5,357.084" style="fill:none;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:round;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_Y_pos_retractpath_step2" d="M233.5,357.084L233.5,391.074" style="fill:none;stroke:#ff0;stroke-width:2px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_Y_pos_retractpath_step5" d="M233.5,110.874L233.5,84.851" style="fill:none;stroke:#ff0;stroke-width:2px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_Y_pos_to_X_pos_jogpath" d="M232.5,83.935C215.177,51.395 132.495,31.246 101.168,82.705C87.18,105.681 72.299,197.304 72.299,231.293" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_Y_pos_to_X_neg_jogpath" d="M234.299,83.965C251.622,51.425 335.076,31.246 366.403,82.705C380.391,105.681 396.872,197.304 396.872,231.293" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <g id="middle_probe_boss_Y_pos_miniprobe">
+                <path id="middle_probe_boss_Y_pos_miniprobe_circle347" d="M221.797,395.642C221.797,389.177 227.046,383.926 233.513,383.926C239.978,383.926 245.228,389.177 245.228,395.642C245.228,402.109 239.978,407.358 233.513,407.358C227.046,407.358 221.797,402.109 221.797,395.642Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                <path id="middle_probe_boss_Y_pos_miniprobe_circle344" d="M223.75,395.642C223.75,390.255 228.124,385.881 233.513,385.881C238.9,385.881 243.274,390.255 243.274,395.642C243.274,401.031 238.9,405.405 233.513,405.405C228.124,405.405 223.75,401.031 223.75,395.642Z" style="fill:url(#middleViz___Radial5);"/>
+                <path id="middle_probe_boss_Y_pos_miniprobe_circle34" d="M227.165,398.572C227.165,396.685 228.697,395.154 230.583,395.154C232.469,395.154 234.001,396.685 234.001,398.572C234.001,400.458 232.469,401.989 230.583,401.989C228.697,401.989 227.165,400.458 227.165,398.572Z" style="fill:#fff;fill-opacity:0.5;"/>
+            </g>
+            <g id="middle_probe_boss_Y_pos_wcs">
+                <path id="middle_probe_boss_Y_pos_wcs_path1" d="M223.526,226.731L223.526,223.526L226.731,223.526" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_Y_pos_wcs_path2" d="M238.269,223.526L241.474,223.526L241.474,226.731" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_Y_pos_wcs_path3" d="M241.474,238.269L241.474,241.474L238.269,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_Y_pos_wcs_path4" d="M226.731,241.474L223.526,241.474L223.526,238.269" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_Y_pos_wcs_path5" d="M232.5,223.526L232.5,229.936" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_boss_Y_pos_wcs_path6" d="M232.5,235.064L232.5,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_boss_Y_pos_wcs_path7" d="M223.526,232.5L229.936,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_boss_Y_pos_wcs_path8" d="M235.064,232.5L241.474,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <circle id="middle_probe_boss_Y_pos_wcs_circle1" cx="232.5" cy="232.5" r="0.962" style="fill:#ef4444;"/>
+                <path id="middle_probe_boss_Y_pos_wcs_path9" d="M232.5,222.885L231.058,220L233.942,220L232.5,222.885Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_boss_Y_pos_wcs_path10" d="M232.5,242.115L233.942,245L231.058,245L232.5,242.115Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_boss_Y_pos_wcs_path11" d="M222.885,232.5L220,231.058L220,233.942L222.885,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_boss_Y_pos_wcs_path12" d="M242.115,232.5L245,233.942L245,231.058L242.115,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+            </g>
+        </g>
+        <g id="middle_probe_boss_Y_neg">
+            <path id="middle_probe_boss_Y_neg_probepath_step4" d="M233.5,390.55L233.5,357.406" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_Y_neg_traversepath_step3" d="M233.5,68.742C261.955,68.742 296.259,87.674 307.854,103.814C327.143,130.665 331.312,326.446 305.656,359.434C287.165,383.211 257.93,391.545 233.5,391.565" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_Y_neg_probepath_step1" d="M233.5,75.302L233.5,107.916" style="fill:none;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:round;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_Y_neg_retractpath_step5" d="M233.5,354.126L233.5,388.116" style="fill:none;stroke:#ff0;stroke-width:2px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_Y_neg_retractpath_step2" d="M233.5,107.916L233.5,73.926" style="fill:none;stroke:#ff0;stroke-width:2px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_Y_neg_to_X_pos_jogpath" d="M233.5,384.038C216.177,416.578 132.495,433.251 101.168,381.792C87.18,358.815 72.299,265.281 72.299,231.293" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_Y_neg_to_X_neg_jogpath" d="M233.5,384.51C250.823,417.05 335.076,433.251 366.403,381.792C380.391,358.815 395.554,265.281 395.554,231.293" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <g id="middle_probe_boss_Y_neg_miniprobe">
+                <path id="middle_probe_boss_Y_neg_miniprobe_circle16" d="M221.797,66.831C221.797,73.297 227.046,78.546 233.513,78.546C239.978,78.546 245.228,73.297 245.228,66.831C245.228,60.365 239.978,55.115 233.513,55.115C227.046,55.115 221.797,60.365 221.797,66.831Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                <path id="middle_probe_boss_Y_neg_miniprobe_circle12" d="M223.75,66.831C223.75,72.219 228.124,76.593 233.513,76.593C238.9,76.593 243.274,72.219 243.274,66.831C243.274,61.443 238.9,57.068 233.513,57.068C228.124,57.068 223.75,61.443 223.75,66.831Z" style="fill:url(#middleViz___Radial6);"/>
+                <path id="middle_probe_boss_Y_neg_miniprobe_circle1" d="M227.165,63.902C227.165,65.789 228.697,67.32 230.583,67.32C232.469,67.32 234.001,65.789 234.001,63.902C234.001,62.016 232.469,60.484 230.583,60.484C228.697,60.484 227.165,62.016 227.165,63.902Z" style="fill:#fff;fill-opacity:0.5;"/>
+            </g>
+            <g id="middle_probe_boss_Y_neg_wcs">
+                <path id="middle_probe_boss_Y_neg_wcs_path1" d="M223.526,226.731L223.526,223.526L226.731,223.526" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_Y_neg_wcs_path2" d="M238.269,223.526L241.474,223.526L241.474,226.731" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_Y_neg_wcs_path3" d="M241.474,238.269L241.474,241.474L238.269,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_Y_neg_wcs_path4" d="M226.731,241.474L223.526,241.474L223.526,238.269" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_Y_neg_wcs_path5" d="M232.5,223.526L232.5,229.936" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_boss_Y_neg_wcs_path6" d="M232.5,235.064L232.5,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_boss_Y_neg_wcs_path7" d="M223.526,232.5L229.936,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_boss_Y_neg_wcs_path8" d="M235.064,232.5L241.474,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <circle id="middle_probe_boss_Y_neg_wcs_circle1" cx="232.5" cy="232.5" r="0.962" style="fill:#ef4444;"/>
+                <path id="middle_probe_boss_Y_neg_wcs_path9" d="M232.5,222.885L231.058,220L233.942,220L232.5,222.885Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_boss_Y_neg_wcs_path10" d="M232.5,242.115L233.942,245L231.058,245L232.5,242.115Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_boss_Y_neg_wcs_path11" d="M222.885,232.5L220,231.058L220,233.942L222.885,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_boss_Y_neg_wcs_path12" d="M242.115,232.5L245,233.942L245,231.058L242.115,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+            </g>
+        </g>
+        <g id="middle_probe_boss_X_pos">
+            <path id="middle_probe_boss_X_pos_probepath_step4" d="M392.507,231.293L359.363,231.293" style="fill:none;stroke:#3b82f6;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_X_pos_traversepath_step3" d="M72.351,230.805C72.351,202.351 89.631,168.534 105.771,156.94C132.622,137.651 346.707,130.578 376.257,160.128C391.775,175.646 396.852,206.375 396.872,230.805" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_X_pos_probepath_step1" d="M77.259,231.293L109.873,231.293" style="fill:none;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:round;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_X_pos_retractpath_step2" d="M109.873,231.293L75.883,231.293" style="fill:none;stroke:#ff0;stroke-width:2px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_X_pos_retractpath_step5" d="M356.083,231.293L379.925,231.293" style="fill:none;stroke:#ff0;stroke-width:2px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_X_pos_to_Y_neg_jogpath" d="M375.126,231.293C407.665,213.97 436.843,129.719 385.384,98.392C362.408,84.404 267.489,69.485 233.5,69.485" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_X_pos_to_Y_pos_jogpath" d="M375.126,231.293C407.665,248.616 436.843,332.3 385.384,363.627C362.408,377.615 267.99,395.154 234.001,395.154" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <g id="middle_probe_boss_X_pos_miniprobe">
+                <circle id="middle_probe_boss_X_pos_miniprobe_circle1" cx="67.733" cy="231.293" r="11.716" style="fill:#ef4444;fill-opacity:0.3;"/>
+                <circle id="middle_probe_boss_X_pos_miniprobe_circle2" cx="67.733" cy="231.293" r="9.763" style="fill:url(#middleViz___Radial7);"/>
+                <circle id="middle_probe_boss_X_pos_miniprobe_circle3" cx="64.803" cy="234.223" r="3.418" style="fill:#fff;fill-opacity:0.5;"/>
+            </g>
+            <g id="middle_probe_boss_X_pos_wcs">
+                <path id="middle_probe_boss_X_pos_wcs_path1" d="M223.526,226.731L223.526,223.526L226.731,223.526" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_X_pos_wcs_path2" d="M238.269,223.526L241.474,223.526L241.474,226.731" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_X_pos_wcs_path3" d="M241.474,238.269L241.474,241.474L238.269,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_X_pos_wcs_path4" d="M226.731,241.474L223.526,241.474L223.526,238.269" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_X_pos_wcs_path5" d="M232.5,223.526L232.5,229.936" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_boss_X_pos_wcs_path6" d="M232.5,235.064L232.5,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_boss_X_pos_wcs_path7" d="M223.526,232.5L229.936,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_boss_X_pos_wcs_path8" d="M235.064,232.5L241.474,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <circle id="middle_probe_boss_X_pos_wcs_circle1" cx="232.5" cy="232.5" r="0.962" style="fill:#ef4444;"/>
+                <path id="middle_probe_boss_X_pos_wcs_path9" d="M232.5,222.885L231.058,220L233.942,220L232.5,222.885Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_boss_X_pos_wcs_path10" d="M232.5,242.115L233.942,245L231.058,245L232.5,242.115Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_boss_X_pos_wcs_path11" d="M222.885,232.5L220,231.058L220,233.942L222.885,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_boss_X_pos_wcs_path12" d="M242.115,232.5L245,233.942L245,231.058L242.115,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+            </g>
+        </g>
+        <g id="middle_probe_boss_X_neg">
+            <path id="middle_probe_boss_X_neg_probepath_step4" d="M76.407,231.293L109.551,231.293" style="fill:none;stroke:#3b82f6;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_X_neg_traversepath_step3" d="M396.872,230.836C396.872,202.382 379.283,168.534 363.143,156.94C336.292,137.651 122.207,130.578 92.657,160.128C77.138,175.646 72.32,206.863 72.299,231.293" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_X_neg_probepath_step1" d="M391.655,231.293L359.041,231.293" style="fill:none;stroke:#3b82f6;stroke-width:4px;stroke-linejoin:round;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_X_neg_retractpath_step2" d="M359.041,231.293L393.031,231.293" style="fill:none;stroke:#ff0;stroke-width:2px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_X_neg_retractpath_step5" d="M112.831,231.293L89.26,231.293" style="fill:none;stroke:#ff0;stroke-width:2px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_X_neg_to_Y_pos_jogpath" d="M87.456,231.293C54.916,248.616 30.347,332.356 81.806,363.684C104.783,377.671 199.512,391.565 233.5,391.565" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <path id="middle_probe_boss_X_neg_to_Y_neg_jogpath" d="M87.126,231.293C54.586,213.97 30.347,129.775 81.806,98.448C104.783,84.461 199.512,69.485 233.5,69.485" style="fill:none;stroke:#ff9a0d;stroke-width:2.54px;stroke-miterlimit:1.5;"/>
+            <g id="middle_probe_boss_X_neg_miniprobe">
+                <circle id="middle_probe_boss_X_neg_miniprobe_circle1" cx="397.361" cy="231.293" r="11.716" style="fill:#ef4444;fill-opacity:0.3;"/>
+                <circle id="middle_probe_boss_X_neg_miniprobe_circle2" cx="397.361" cy="231.293" r="9.763" style="fill:url(#middleViz___Radial8);"/>
+                <circle id="middle_probe_boss_X_neg_miniprobe_circle3" cx="400.29" cy="234.223" r="3.418" style="fill:#fff;fill-opacity:0.5;"/>
+            </g>
+            <g id="middle_probe_boss_X_neg_wcs">
+                <path id="middle_probe_boss_X_neg_wcs_path1" d="M223.526,226.731L223.526,223.526L226.731,223.526" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_X_neg_wcs_path2" d="M238.269,223.526L241.474,223.526L241.474,226.731" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_X_neg_wcs_path3" d="M241.474,238.269L241.474,241.474L238.269,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_X_neg_wcs_path4" d="M226.731,241.474L223.526,241.474L223.526,238.269" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:2px;"/>
+                <path id="middle_probe_boss_X_neg_wcs_path5" d="M232.5,223.526L232.5,229.936" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_boss_X_neg_wcs_path6" d="M232.5,235.064L232.5,241.474" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_boss_X_neg_wcs_path7" d="M223.526,232.5L229.936,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <path id="middle_probe_boss_X_neg_wcs_path8" d="M235.064,232.5L241.474,232.5" style="fill:none;fill-rule:nonzero;stroke:#ef4444;stroke-width:1.15px;"/>
+                <circle id="middle_probe_boss_X_neg_wcs_circle1" cx="232.5" cy="232.5" r="0.962" style="fill:#ef4444;"/>
+                <path id="middle_probe_boss_X_neg_wcs_path9" d="M232.5,222.885L231.058,220L233.942,220L232.5,222.885Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_boss_X_neg_wcs_path10" d="M232.5,242.115L233.942,245L231.058,245L232.5,242.115Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_boss_X_neg_wcs_path11" d="M222.885,232.5L220,231.058L220,233.942L222.885,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+                <path id="middle_probe_boss_X_neg_wcs_path12" d="M242.115,232.5L245,233.942L245,231.058L242.115,232.5Z" style="fill:#ef4444;fill-rule:nonzero;"/>
+            </g>
+        </g>
+    </g>
+    <defs>
+        <radialGradient id="middleViz___Radial1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-9.763162,0,0,9.763162,267.902038,229.552353)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="middleViz___Radial2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,9.763162,9.763162,0,230.293523,198.234826)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="middleViz___Radial3" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(9.763162,0,0,-9.763162,198.165054,233.196943)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="middleViz___Radial4" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-9.763162,-9.763162,-0,234.296018,263.497506)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="middleViz___Radial5" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-9.763162,9.763162,0,231.560268,397.594518)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="middleViz___Radial6" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,9.763162,9.763162,0,231.560268,64.878502)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="middleViz___Radial7" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(9.763162,0,0,-9.763162,65.780695,233.245842)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="middleViz___Radial8" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-9.763162,0,-0,-9.763162,399.314136,233.245842)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+    </defs>
+</svg>

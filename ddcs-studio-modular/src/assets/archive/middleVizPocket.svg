@@ -1,0 +1,700 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 954 957" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;">
+    <g id="middle_probe_pocket">
+        <g id="middle_probe_pocket_stock">
+            <g id="workpocketYZ">
+                <g id="workpiece-rect-u-shape">
+                    <path id="workpiece-rect-u-shape_2" d="M625.757,749.97L677.24,749.97L677.24,809.36L764.321,809.36L764.321,749.97L815.804,749.97L815.804,841.035L625.757,841.035L625.757,749.97Z" style="fill:#0e4d2a;fill-rule:nonzero;"/>
+                    <g id="g37">
+                        <g>
+                            <g>
+                                <clipPath id="_clip1">
+                                    <path d="M625.757,749.97L677.24,749.97L677.24,809.36L764.321,809.36L764.321,749.97L815.804,749.97L815.804,841.035L625.757,841.035L625.757,749.97Z"/>
+                                </clipPath>
+                                <g clip-path="url(#_clip1)">
+                                    <path id="path7" d="M766.62,749.47L674.556,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path8" d="M775.953,749.47L683.889,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path9" d="M785.286,749.47L693.222,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path10" d="M794.619,749.47L702.555,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path11" d="M803.952,749.47L711.888,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path12" d="M813.285,749.47L721.221,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path13" d="M816.304,755.784L730.554,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path14" d="M816.304,765.117L739.887,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path15" d="M816.304,774.45L749.22,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path16" d="M816.304,783.783L758.553,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path17" d="M816.304,793.116L767.886,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path18" d="M816.304,802.449L777.219,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path19" d="M816.304,811.783L786.552,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path20" d="M816.304,821.116L795.885,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path21" d="M816.304,830.449L805.218,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path22" d="M816.304,839.782L814.551,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path23" d="M757.287,749.47L665.223,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path24" d="M747.954,749.47L655.889,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path25" d="M738.621,749.47L646.556,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path26" d="M729.288,749.47L637.223,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path27" d="M719.955,749.47L627.89,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path28" d="M710.621,749.47L625.257,834.835" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path29" d="M701.288,749.47L625.257,825.502" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path30" d="M691.955,749.47L625.257,816.169" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path31" d="M682.622,749.47L625.257,806.836" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path32" d="M673.289,749.47L625.257,797.503" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path33" d="M663.956,749.47L625.257,788.17" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path34" d="M654.623,749.47L625.257,778.837" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path35" d="M645.29,749.47L625.257,769.504" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path36" d="M635.957,749.47L625.257,760.171" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path37" d="M626.624,749.47L625.257,750.837" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                </g>
+                            </g>
+                        </g>
+                    </g>
+                    <path id="workpiece-rect-u-shape2" d="M625.757,749.97L677.24,749.97L677.24,809.36L764.321,809.36L764.321,749.97L815.804,749.97L815.804,841.035L625.757,841.035L625.757,749.97Z" style="fill:none;fill-rule:nonzero;stroke:#475569;stroke-width:3.96px;"/>
+                </g>
+            </g>
+            <g id="workpocketALT">
+                <g id="iso">
+                    <rect id="pocket-back-wall" x="699.704" y="163.874" width="89.772" height="40.015" style="fill:#5f293b;stroke:#475569;stroke-width:4.58px;"/>
+                    <path id="pocket-left-wall" d="M665.345,198.233L699.704,163.874L699.704,203.889L665.345,238.249L665.345,198.233Z" style="fill:#0e4c2a;fill-rule:nonzero;stroke:#475569;stroke-width:4.58px;"/>
+                    <g id="pocket-floor" transform="matrix(1,0,0,1,663.05402,202.88)">
+                        <use id="_Image2_" serif:id="_Image2" xlink:href="#_Image2" x="0" y="0" width="108px" height="39px"/>
+                    </g>
+                    <path id="face-top-pocket" d="M573.721,216.623L642.439,147.905L871.499,147.905L802.781,216.623L573.721,216.623ZM665.345,198.873L699.704,164.514L789.059,164.514L754.7,198.873L665.345,198.873Z" style="fill:#334155;stroke:#475569;stroke-width:4.58px;"/>
+                    <path id="face-side" d="M802.781,216.623L871.499,147.905L871.499,262.435L802.781,331.153L802.781,216.623Z" style="fill:#0e4c2a;fill-rule:nonzero;stroke:#475569;stroke-width:4.58px;"/>
+                    <rect id="face-front-solid" x="573.721" y="216.623" width="229.06" height="114.53" style="fill:#5f293b;stroke:#475569;stroke-width:4.58px;"/>
+                </g>
+            </g>
+            <g id="workpocketXZ">
+                <g id="workpiece-rect-u-shape3">
+                    <path id="workpiece-rect-u-shape4" d="M137.294,749.97L188.777,749.97L188.777,809.36L275.858,809.36L275.858,749.97L327.341,749.97L327.341,841.035L137.294,841.035L137.294,749.97Z" style="fill:#5f293b;fill-rule:nonzero;"/>
+                    <g id="g69">
+                        <g>
+                            <g>
+                                <clipPath id="_clip3">
+                                    <path d="M137.294,749.97L188.777,749.97L188.777,809.36L275.858,809.36L275.858,749.97L327.341,749.97L327.341,841.035L137.294,841.035L137.294,749.97Z"/>
+                                </clipPath>
+                                <g clip-path="url(#_clip3)">
+                                    <path id="path39" d="M278.157,749.47L186.093,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path40" d="M287.49,749.47L195.426,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path41" d="M296.823,749.47L204.759,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path42" d="M306.156,749.47L214.092,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path43" d="M315.489,749.47L223.425,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path44" d="M324.822,749.47L232.758,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path45" d="M327.841,755.784L242.091,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path46" d="M327.841,765.117L251.424,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path47" d="M327.841,774.45L260.757,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path48" d="M327.841,783.783L270.09,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path49" d="M327.841,793.116L279.423,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path50" d="M327.841,802.449L288.756,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path51" d="M327.841,811.783L298.089,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path52" d="M327.841,821.116L307.422,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path53" d="M327.841,830.449L316.755,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path54" d="M327.841,839.782L326.088,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path55" d="M268.824,749.47L176.76,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path56" d="M259.491,749.47L167.426,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path57" d="M250.158,749.47L158.093,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path58" d="M240.825,749.47L148.76,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path59" d="M231.492,749.47L139.427,841.535" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path60" d="M222.158,749.47L136.794,834.835" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path61" d="M212.825,749.47L136.794,825.502" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path62" d="M203.492,749.47L136.794,816.169" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path63" d="M194.159,749.47L136.794,806.836" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path64" d="M184.826,749.47L136.794,797.503" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path65" d="M175.493,749.47L136.794,788.17" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path66" d="M166.16,749.47L136.794,778.837" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path67" d="M156.827,749.47L136.794,769.504" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path68" d="M147.494,749.47L136.794,760.171" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                    <path id="path69" d="M138.161,749.47L136.794,750.837" style="fill:none;fill-rule:nonzero;stroke:#000;stroke-width:1px;"/>
+                                </g>
+                            </g>
+                        </g>
+                    </g>
+                    <path id="workpiece-rect-u-shape5" d="M137.294,749.97L188.777,749.97L188.777,809.36L275.858,809.36L275.858,749.97L327.341,749.97L327.341,841.035L137.294,841.035L137.294,749.97Z" style="fill:none;fill-rule:nonzero;stroke:#475569;stroke-width:3.96px;"/>
+                </g>
+            </g>
+            <g id="WorkpocketXY">
+                <path id="workpiece-square-pocket" d="M138.467,135.175L328.514,135.175L328.514,325.222L138.467,325.222L138.467,135.175ZM187.958,184.666L279.022,184.666L279.022,275.73L187.958,275.73L187.958,184.666Z" style="fill:#1e293b;stroke:#475569;stroke-width:3.96px;"/>
+            </g>
+        </g>
+        <g id="middle_probe_pocket_X_pos">
+            <g id="middle_probe_pocket_X_pos_1axis">
+                <g id="middle_probe_pocket_X_pos_1axis_XZ">
+                    <path id="middle_probe_pocket_X_pos_1axis_XZ_probepath1" d="M259.025,773.114L259.036,769.114L260.058,769.114L260.058,773.114L259.025,773.114ZM261.091,773.114L261.091,769.114L263.158,769.114L263.158,773.114L261.091,773.114ZM264.191,773.114L264.191,769.114L266.258,769.114L266.258,773.114L264.191,773.114ZM267.291,773.114L267.291,769.114L269.357,769.114L269.357,773.114L267.291,773.114ZM270.391,773.114L270.391,769.114L271.412,769.114L271.424,773.114L270.391,773.114Z" style="fill:#3b82f6;"/>
+                    <path id="middle_probe_pocket_X_pos_1axis_XZ_probepath2" d="M194.546,771.297L261.847,771.297" style="fill:none;stroke:#3b82f6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                    <path id="middle_probe_pocket_X_pos_1axis_XZ_retractarrowneg" d="M258.409,772.797L256.909,771.297L258.409,769.797" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                    <path id="middle_probe_pocket_X_pos_1axis_XZ_retractpathneg" d="M273.089,771.297L256.909,771.297" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                    <path id="path90" d="M268.702,765.677L274.146,771.12L268.716,776.551L268.702,765.677Z" style="fill:#f00;"/>
+                    <path id="path91" d="M194.546,774.713L191.198,771.365L194.538,768.025L194.546,774.713Z" style="fill:#f00;"/>
+                    <g id="middle_probe_pocket_X_pos_1axis_XZ_spindle">
+                        <rect id="rect91" x="233.089" y="661.551" width="40" height="58.333" style="fill:url(#_Linear4);"/>
+                        <rect id="rect92" x="236.422" y="658.217" width="33.333" height="6.667" style="fill:#475569;"/>
+                        <path id="path92" d="M236.422,719.884L269.755,719.884L263.089,744.884L243.089,744.884L236.422,719.884Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                        <path id="path93" d="M253.089,744.884L253.089,764.884" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                        <circle id="circle93" cx="253.089" cy="769.884" r="6.667" style="fill:#ef4444;"/>
+                        <circle id="circle94" cx="251.422" cy="766.551" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                    </g>
+                </g>
+                <g id="middle_probe_pocket_X_pos_1axis_XY" transform="matrix(1,0,0,1,0,3.739414)">
+                    <path id="middle_probe_pocket_X_pos_1axis_XY_probepath1" d="M261.105,228.599L261.118,224.599L262.248,224.599L262.248,228.599L261.105,228.599ZM263.39,228.599L263.39,224.599L265.675,224.599L265.675,228.599L263.39,228.599ZM266.818,228.599L266.818,224.599L269.103,224.599L269.103,228.599L266.818,228.599ZM270.245,228.599L270.245,224.599L272.53,224.599L272.53,228.599L270.245,228.599ZM273.673,228.599L273.673,224.599L274.802,224.599L274.815,228.599L273.673,228.599Z" style="fill:#3b82f6;"/>
+                    <path id="middle_probe_pocket_X_pos_1axis_XY_probepath2" d="M193.173,226.782L261.105,226.782" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                    <path id="middle_probe_pocket_X_pos_1axis_XY_startarrow" d="M272.093,221.161L277.537,226.605L272.107,232.036L272.093,221.161Z" style="fill:#f00;"/>
+                    <path id="middle_probe_pocket_X_pos_1axis_XY_endarrow" d="M193.805,230.198L190.456,226.85L193.796,223.51L193.805,230.198Z" style="fill:#f00;"/>
+                    <path id="middle_probe_pocket_X_pos_1axis_XY_retractarrowneg" d="M263.312,228.282L261.812,226.782L263.312,225.282" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                    <path id="middle_probe_pocket_X_pos_1axis_XY_retractpathneg" d="M272.347,226.782L261.812,226.782" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                    <g id="middle_probe_pocket_X_pos_1axis_XY_miniprobe">
+                        <circle id="circle76" cx="253.813" cy="226.782" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle id="circle77" cx="253.813" cy="226.782" r="7.698" style="fill:url(#_Radial5);"/>
+                        <circle id="circle78" cx="251.503" cy="229.091" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                </g>
+                <g id="middle_probe_pocket_X_pos_1axis_YZ" opacity="0.59">
+                    <rect id="rect69" x="701.853" y="661.529" width="40" height="58.333" style="fill:url(#_Linear6);"/>
+                    <rect id="rect70" x="705.186" y="658.196" width="33.333" height="6.667" style="fill:#475569;"/>
+                    <path id="path70" d="M705.186,719.862L738.519,719.862L731.853,744.862L711.853,744.862L705.186,719.862Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                    <path id="path71" d="M721.853,744.862L721.853,764.862" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                    <circle id="circle71" cx="721.853" cy="769.862" r="6.667" style="fill:#ef4444;"/>
+                    <circle id="circle72" cx="720.186" cy="766.529" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                </g>
+            </g>
+            <g id="middle_probe_pocket_X_pos_2axis">
+                <g id="middle_probe_pocket_X_pos_2axis_XtoY_neg" transform="matrix(-1,0,0,1,472.248763,2.787695)">
+                    <g id="middle_probe_pocket_X_pos_2axis_XtoY_neg_nextaxisjog" transform="matrix(-0.894251,0.447566,-0.447566,-0.894251,448.126896,422.557347)">
+                        <path d="M97.143,222.563L109.151,230.198L94.963,231.295L97.143,222.563Z" style="fill:#ff9a0d;"/>
+                    </g>
+                    <g id="middle_probe_pocket_X_pos_2axis_XtoY_neg_jogpath_g" transform="matrix(-1,0,0,-1,478.884526,455.467439)">
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_neg_jogpath" d="M218.118,193.811C206.37,196.561 206.066,199.559 202.608,206.01C199.13,212.497 204.606,225.511 204.002,224.927" style="fill:none;stroke:#ff9a0d;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,4,0,0,0,0;"/>
+                    </g>
+                    <g id="middle_probe_pocket_X_pos_2axis_XtoY_neg_YZ">
+                    </g>
+                    <g id="middle_probe_pocket_X_pos_2axis_XtoY_neg_XY" transform="matrix(1,0,0,1,6.950833,0)">
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_neg_XY_probepath1" d="M233.317,259.035L235.043,259.035L234.18,259.892L233.317,259.035ZM235.043,259.035L236.18,257.905L236.18,259.035L235.043,259.035ZM233.317,259.035L232.18,259.035L232.18,257.905L233.317,259.035ZM232.18,260.177L236.18,260.177L236.18,262.462L232.18,262.462L232.18,260.177ZM232.18,263.605L236.18,263.605L236.18,265.89L232.18,265.89L232.18,263.605ZM232.18,267.032L236.18,267.032L236.18,269.317L232.18,269.317L232.18,267.032ZM232.18,270.46L236.18,270.46L236.18,271.59L234.18,273.603L232.18,271.59L232.18,270.46Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_neg_XY_retractarrowneg" d="M232.497,260.1L233.997,258.6L235.497,260.1" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_neg_XY_retractpathneg" d="M233.997,269.134L233.997,258.6" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_neg_XY_probepath2" d="M233.997,189.96L233.997,257.892" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_neg_XY_startarrow" d="M239.617,268.881L234.173,274.324L228.743,268.894L239.617,268.881Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_neg_XY_endarrow" d="M230.58,190.592L233.928,187.243L237.269,190.583L230.58,190.592Z" style="fill:#f00;"/>
+                        <g id="middle_probe_pocket_X_pos_2axis_XtoY_neg_XY_miniprobe">
+                            <path id="path102" d="M224.759,248.655C224.759,253.753 228.898,257.892 233.997,257.892C239.095,257.892 243.234,253.753 243.234,248.655C243.234,243.556 239.095,239.417 233.997,239.417C228.898,239.417 224.759,243.556 224.759,248.655Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                            <path id="path103" d="M226.299,248.655C226.299,252.903 229.748,256.352 233.997,256.352C238.245,256.352 241.694,252.903 241.694,248.655C241.694,244.406 238.245,240.957 233.997,240.957C229.748,240.957 226.299,244.406 226.299,248.655Z" style="fill:url(#_Radial7);"/>
+                            <path id="path104" d="M228.992,246.345C228.992,247.833 230.2,249.04 231.687,249.04C233.174,249.04 234.382,247.833 234.382,246.345C234.382,244.858 233.174,243.65 231.687,243.65C230.2,243.65 228.992,244.858 228.992,246.345Z" style="fill:#fff;fill-opacity:0.5;"/>
+                        </g>
+                    </g>
+                </g>
+                <g id="middle_probe_pocket_X_pos_2axis_XtoY_pos" transform="matrix(-1,0,0,1,472.248763,2.787695)">
+                    <g id="middle_probe_pocket_X_pos_2axis_XtoY_pos_nextaxisjog" transform="matrix(-0.894251,-0.447566,-0.447566,0.894251,448.126896,32.910092)">
+                        <path d="M97.143,222.563L109.151,230.198L94.963,231.295L97.143,222.563Z" style="fill:#ff9a0d;"/>
+                    </g>
+                    <g id="middle_probe_pocket_X_pos_2axis_XtoY_pos_jogpath_g" transform="matrix(-1,0,0,1,478.884526,0)">
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_pos_jogpath" d="M218.118,193.811C206.37,196.561 206.066,199.559 202.608,206.01C199.13,212.497 204.606,225.511 204.002,224.927" style="fill:none;stroke:#ff9a0d;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,4,0,0,0,0;"/>
+                    </g>
+                    <g id="middle_probe_pocket_X_pos_2axis_XtoY_pos_YZ">
+                    </g>
+                    <g id="middle_probe_pocket_X_pos_2axis_XtoY_pos_XY" transform="matrix(1,0,0,1,6.950833,0)">
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_pos_XY_probepath1" d="M234.604,190.522L235.741,189.392L235.741,190.522L234.604,190.522ZM232.878,190.522L234.604,190.522L233.741,191.38L232.878,190.522ZM232.878,190.522L231.741,190.522L231.741,189.392L232.878,190.522ZM233.741,205.09L231.741,203.077L231.741,201.947L235.741,201.947L235.741,203.077L233.741,205.09ZM235.741,200.805L231.741,200.805L231.741,198.52L235.741,198.52L235.741,200.805ZM235.741,197.377L231.741,197.377L231.741,195.092L235.741,195.092L235.741,197.377ZM235.741,193.95L231.741,193.95L231.741,191.665L235.741,191.665L235.741,193.95Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_pos_XY_probepath2" d="M233.924,271.022L233.924,203.09" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_pos_XY_startarrow" d="M228.304,192.102L233.748,186.658L239.178,192.088L228.304,192.102Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_pos_XY_endarrow" d="M237.341,270.39L233.992,273.739L230.652,270.399L237.341,270.39Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_pos_XY_retractarrowpos" d="M235.424,200.883L233.924,202.383L232.424,200.883" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_X_pos_2axis_XtoY_pos_XY_retractpathpos" d="M233.924,187.859L233.924,202.383" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <g id="middle_probe_pocket_X_pos_2axis_XtoY_pos_XY_miniprobe">
+                            <path id="path98" d="M243.234,210.71C243.234,205.612 239.095,201.472 233.997,201.472C228.898,201.472 224.759,205.612 224.759,210.71C224.759,215.808 228.898,219.948 233.997,219.948C239.095,219.948 243.234,215.808 243.234,210.71Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                            <path id="path99" d="M241.694,210.71C241.694,206.462 238.245,203.012 233.997,203.012C229.748,203.012 226.299,206.462 226.299,210.71C226.299,214.958 229.748,218.408 233.997,218.408C238.245,218.408 241.694,214.958 241.694,210.71Z" style="fill:url(#_Radial8);"/>
+                            <path id="path100" d="M239.001,213.019C239.001,211.532 237.793,210.325 236.306,210.325C234.819,210.325 233.611,211.532 233.611,213.019C233.611,214.507 234.819,215.714 236.306,215.714C237.793,215.714 239.001,214.507 239.001,213.019Z" style="fill:#fff;fill-opacity:0.5;"/>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+        <g id="middle_probe_pocket_Y_pos">
+            <g id="middle_probe_pocket_Y_pos_1axis">
+                <g id="middle_probe_pocket_Y_pos_1axis_YZ_2">
+                    <path id="middle_probe_pocket_Y_pos_1axis_YZ_probepath1_2" d="M748.205,773.114L748.217,769.114L749.238,769.114L749.238,773.114L748.205,773.114ZM750.272,773.114L750.272,769.114L752.338,769.114L752.338,773.114L750.272,773.114ZM753.372,773.114L753.372,769.114L755.438,769.114L755.438,773.114L753.372,773.114ZM756.471,773.114L756.471,769.114L758.538,769.114L758.538,773.114L756.471,773.114ZM759.571,773.114L759.571,769.114L760.593,769.114L760.605,773.114L759.571,773.114Z" style="fill:#3b82f6;"/>
+                    <path id="middle_probe_pocket_Y_pos_1axis_YZ_probepath2_2" d="M683.727,771.297L751.028,771.297" style="fill:none;stroke:#3b82f6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                    <path id="middle_probe_pocket_Y_pos_1axis_YZ_2_retractarrowneg" d="M747.59,772.797L746.09,771.297L747.59,769.797" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                    <path id="middle_probe_pocket_Y_pos_1axis_YZ_2_retractpathneg" d="M762.269,771.297L746.09,771.297" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                    <path id="path1091" d="M757.883,765.677L763.327,771.12L757.896,776.551L757.883,765.677Z" style="fill:#f00;"/>
+                    <path id="path1101" d="M683.727,774.713L680.379,771.365L683.719,768.025L683.727,774.713Z" style="fill:#f00;"/>
+                    <g id="middle_probe_pocket_Y_pos_1axis_YZ_2_spindle">
+                        <rect id="rect1101" x="722.269" y="661.551" width="40" height="58.333" style="fill:url(#_Linear9);"/>
+                        <rect id="rect1111" x="725.603" y="658.217" width="33.333" height="6.667" style="fill:#475569;"/>
+                        <path id="path1111" d="M725.603,719.884L758.936,719.884L752.269,744.884L732.269,744.884L725.603,719.884Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                        <path id="path1121" d="M742.269,744.884L742.269,764.884" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                        <circle id="circle1121" cx="742.269" cy="769.884" r="6.667" style="fill:#ef4444;"/>
+                        <circle id="circle1131" cx="740.603" cy="766.551" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                    </g>
+                </g>
+                <g id="middle_probe_pocket_Y_pos_1axis_XY_2">
+                    <path id="middle_probe_pocket_Y_pos_1axis_XY_probepath1_2" d="M234.604,190.522L235.741,189.392L235.741,190.522L234.604,190.522ZM232.878,190.522L234.604,190.522L233.741,191.38L232.878,190.522ZM232.878,190.522L231.741,190.522L231.741,189.392L232.878,190.522ZM233.741,205.09L231.741,203.077L231.741,201.947L235.741,201.947L235.741,203.077L233.741,205.09ZM235.741,200.805L231.741,200.805L231.741,198.52L235.741,198.52L235.741,200.805ZM235.741,197.377L231.741,197.377L231.741,195.092L235.741,195.092L235.741,197.377ZM235.741,193.95L231.741,193.95L231.741,191.665L235.741,191.665L235.741,193.95Z" style="fill:#3b82f6;"/>
+                    <path id="middle_probe_pocket_Y_pos_1axis_XY_probepath2_2" d="M233.924,271.022L233.924,203.09" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                    <path id="middle_probe_pocket_Y_pos_1axis_XY_2_startarrow" d="M228.304,192.102L233.748,186.658L239.178,192.088L228.304,192.102Z" style="fill:#f00;"/>
+                    <path id="middle_probe_pocket_Y_pos_1axis_XY_2_endarrow" d="M237.341,270.39L233.992,273.739L230.652,270.399L237.341,270.39Z" style="fill:#f00;"/>
+                    <path id="middle_probe_pocket_Y_pos_1axis_XY_2_retractarrowpos" d="M235.424,200.883L233.924,202.383L232.424,200.883" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                    <path id="middle_probe_pocket_Y_pos_1axis_XY_2_retractpathpos" d="M233.924,187.859L233.924,202.383" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                    <g id="middle_probe_pocket_Y_pos_1axis_XY_2_miniprobe">
+                        <path id="path981" d="M243.234,210.71C243.234,205.612 239.095,201.472 233.997,201.472C228.898,201.472 224.759,205.612 224.759,210.71C224.759,215.808 228.898,219.948 233.997,219.948C239.095,219.948 243.234,215.808 243.234,210.71Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <path id="path991" d="M241.694,210.71C241.694,206.462 238.245,203.012 233.997,203.012C229.748,203.012 226.299,206.462 226.299,210.71C226.299,214.958 229.748,218.408 233.997,218.408C238.245,218.408 241.694,214.958 241.694,210.71Z" style="fill:url(#_Radial10);"/>
+                        <path id="path1001" d="M239.001,213.019C239.001,211.532 237.793,210.325 236.306,210.325C234.819,210.325 233.611,211.532 233.611,213.019C233.611,214.507 234.819,215.714 236.306,215.714C237.793,215.714 239.001,214.507 239.001,213.019Z" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                </g>
+                <g id="middle_probe_pocket_Y_pos_1axis_XZ">
+                    <g id="middle_probe_pocket_Y_pos_1axis_XZ_spindleghost" opacity="0.59">
+                        <rect id="rect94" x="212.672" y="661.529" width="40" height="58.333" style="fill:url(#_Linear11);"/>
+                        <rect id="rect95" x="216.005" y="658.196" width="33.333" height="6.667" style="fill:#475569;"/>
+                        <path id="path95" d="M216.005,719.862L249.339,719.862L242.672,744.862L222.672,744.862L216.005,719.862Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                        <path id="path96" d="M232.672,744.862L232.672,764.862" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                        <circle id="circle96" cx="232.672" cy="769.862" r="6.667" style="fill:#ef4444;"/>
+                        <circle id="circle97" cx="231.005" cy="766.529" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                    </g>
+                </g>
+            </g>
+            <g id="middle_probe_pocket_Y_pos_2axis" transform="matrix(0,1,-1,0,464.858146,-3.815317)">
+                <g id="middle_probe_pocket_Y_pos_2axis_YtoX_neg" transform="matrix(1,0,0,1,-3.560832,2.787695)">
+                    <g id="middle_probe_pocket_Y_pos_2axis_YtoX_neg_nextaxisjog" transform="matrix(-0.894251,0.447566,-0.447566,-0.894251,446.079826,420.109874)">
+                        <path d="M97.143,222.563L109.151,230.198L94.963,231.295L97.143,222.563Z" style="fill:#ff9a0d;"/>
+                    </g>
+                    <g id="middle_probe_pocket_Y_pos_2axis_YtoX_neg_jogpath" transform="matrix(-1,0,0,-1,476.837456,453.019966)">
+                        <path d="M218.118,193.811C206.37,196.561 206.066,199.559 202.608,206.01C199.13,212.497 204.606,225.511 204.002,224.927" style="fill:none;stroke:#ff9a0d;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,4,0,0,0,0;"/>
+                    </g>
+                    <g id="middle_probe_pocket_X_neg_1axis_YZ" transform="matrix(0,-1,1,0,7.37615,462.070451)">
+                        <g opacity="0.59">
+                            <rect id="rect691" x="701.853" y="661.529" width="40" height="58.333" style="fill:url(#_Linear12);"/>
+                            <rect id="rect701" x="705.186" y="658.196" width="33.333" height="6.667" style="fill:#475569;"/>
+                            <path id="path701" d="M705.186,719.862L738.519,719.862L731.853,744.862L711.853,744.862L705.186,719.862Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                            <path id="path711" d="M721.853,744.862L721.853,764.862" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                            <circle id="circle711" cx="721.853" cy="769.862" r="6.667" style="fill:#ef4444;"/>
+                            <circle id="circle721" cx="720.186" cy="766.529" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                        </g>
+                    </g>
+                    <g id="middle_probe_pocket_X_neg_1axis_XZ" transform="matrix(0,-1,1,0,7.37615,462.070451)">
+                        <path id="middle_probe_pocket_X_neg_1axis_XZ_probepath1" d="M206.319,773.114L205.286,773.114L205.286,769.114L206.308,769.114L206.319,773.114ZM204.253,769.114L204.253,773.114L202.186,773.114L202.186,769.114L204.253,769.114ZM201.153,769.114L201.153,773.114L199.086,773.114L199.086,769.114L201.153,769.114ZM198.053,769.114L198.053,773.114L195.987,773.114L195.987,769.114L198.053,769.114ZM194.953,769.114L194.953,773.114L193.92,773.114L193.932,769.114L194.953,769.114Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_X_neg_1axis_XZ_probepath2" d="M270.798,771.297L203.497,771.297" style="fill:none;stroke:#3b82f6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_X_neg_1axis_XZ_retractarrowpos" d="M206.935,769.797L208.435,771.297L206.935,772.797" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_X_neg_1axis_XZ_retractpathpos" d="M192.255,771.297L208.435,771.297" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <path id="path82" d="M196.642,765.677L191.198,771.12L196.628,776.551L196.642,765.677Z" style="fill:#f00;"/>
+                        <path id="path83" d="M270.798,774.713L274.146,771.365L270.806,768.025L270.798,774.713Z" style="fill:#f00;"/>
+                        <g id="middle_probe_pocket_X_neg_1axis_XZ_spindle">
+                            <rect id="rect83" x="192.255" y="661.551" width="40" height="58.333" style="fill:url(#_Linear13);"/>
+                            <rect id="rect84" x="195.589" y="658.217" width="33.333" height="6.667" style="fill:#475569;"/>
+                            <path id="path84" d="M228.922,719.884L195.589,719.884L202.255,744.884L222.255,744.884L228.922,719.884Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                            <path id="path85" d="M212.255,744.884L212.255,764.884" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                            <circle id="circle85" cx="212.255" cy="769.884" r="6.667" style="fill:#ef4444;"/>
+                            <circle id="circle86" cx="213.922" cy="766.551" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                        </g>
+                    </g>
+                    <g id="middle_probe_pocket_Y_pos_2axis_YtoX_neg_XY" transform="matrix(0,1,1,0,11.115564,-5.922549)">
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_probepath1" d="M261.105,228.599L261.118,224.599L262.248,224.599L262.248,228.599L261.105,228.599ZM263.39,228.599L263.39,224.599L265.675,224.599L265.675,228.599L263.39,228.599ZM266.818,228.599L266.818,224.599L269.103,224.599L269.103,228.599L266.818,228.599ZM270.245,228.599L270.245,224.599L272.53,224.599L272.53,228.599L270.245,228.599ZM273.673,228.599L273.673,224.599L274.802,224.599L274.815,228.599L273.673,228.599Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_probepath2" d="M193.173,226.782L261.105,226.782" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_startarrow" d="M272.093,221.161L277.537,226.605L272.107,232.036L272.093,221.161Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_endarrow" d="M193.805,230.198L190.456,226.85L193.796,223.51L193.805,230.198Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_retractarrowneg" d="M263.312,228.282L261.812,226.782L263.312,225.282" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_retractpathneg" d="M272.347,226.782L261.812,226.782" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <g id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_miniprobe">
+                            <circle id="circle761" cx="253.813" cy="226.782" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                            <circle id="circle771" cx="253.813" cy="226.782" r="7.698" style="fill:url(#_Radial14);"/>
+                            <circle id="circle781" cx="251.503" cy="229.091" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                        </g>
+                    </g>
+                </g>
+                <g id="middle_probe_pocket_Y_pos_2axis_YtoX_pos" transform="matrix(1,0,0,1,-3.560832,2.787695)">
+                    <g id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_nextaxisjog" transform="matrix(-0.894251,-0.447566,-0.447566,0.894251,446.079826,36.038028)">
+                        <path d="M97.143,222.563L109.151,230.198L94.963,231.295L97.143,222.563Z" style="fill:#ff9a0d;"/>
+                    </g>
+                    <g id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_jogpath_g" transform="matrix(-1,0,0,1,476.837456,3.127936)">
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_jogpath" d="M218.118,193.811C206.37,196.561 206.066,199.559 202.608,206.01C199.13,212.497 204.606,225.511 204.002,224.927" style="fill:none;stroke:#ff9a0d;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,4,0,0,0,0;"/>
+                    </g>
+                    <g id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_XZ" transform="matrix(0,-1,1,0,7.37615,462.070451)">
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XZ_probepath1" d="M259.025,773.114L259.036,769.114L260.058,769.114L260.058,773.114L259.025,773.114ZM261.091,773.114L261.091,769.114L263.158,769.114L263.158,773.114L261.091,773.114ZM264.191,773.114L264.191,769.114L266.258,769.114L266.258,773.114L264.191,773.114ZM267.291,773.114L267.291,769.114L269.357,769.114L269.357,773.114L267.291,773.114ZM270.391,773.114L270.391,769.114L271.412,769.114L271.424,773.114L270.391,773.114Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XZ_probepath2" d="M194.546,771.297L261.847,771.297" style="fill:none;stroke:#3b82f6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XZ_retractarrowneg" d="M258.409,772.797L256.909,771.297L258.409,769.797" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XZ_retractpathneg" d="M273.089,771.297L256.909,771.297" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <path id="path901" d="M268.702,765.677L274.146,771.12L268.716,776.551L268.702,765.677Z" style="fill:#f00;"/>
+                        <path id="path911" d="M194.546,774.713L191.198,771.365L194.538,768.025L194.546,774.713Z" style="fill:#f00;"/>
+                        <g id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XZ_spindle">
+                            <rect id="rect911" x="233.089" y="661.551" width="40" height="58.333" style="fill:url(#_Linear15);"/>
+                            <rect id="rect921" x="236.422" y="658.217" width="33.333" height="6.667" style="fill:#475569;"/>
+                            <path id="path921" d="M236.422,719.884L269.755,719.884L263.089,744.884L243.089,744.884L236.422,719.884Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                            <path id="path931" d="M253.089,744.884L253.089,764.884" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                            <circle id="circle931" cx="253.089" cy="769.884" r="6.667" style="fill:#ef4444;"/>
+                            <circle id="circle941" cx="251.422" cy="766.551" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                        </g>
+                    </g>
+                    <g id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_XY" transform="matrix(0,-1,1,0,11.115564,462.070451)">
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_probepath11" serif:id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_probepath1" d="M261.105,228.599L261.118,224.599L262.248,224.599L262.248,228.599L261.105,228.599ZM263.39,228.599L263.39,224.599L265.675,224.599L265.675,228.599L263.39,228.599ZM266.818,228.599L266.818,224.599L269.103,224.599L269.103,228.599L266.818,228.599ZM270.245,228.599L270.245,224.599L272.53,224.599L272.53,228.599L270.245,228.599ZM273.673,228.599L273.673,224.599L274.802,224.599L274.815,228.599L273.673,228.599Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_probepath21" serif:id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_probepath2" d="M193.173,226.782L261.105,226.782" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_startarrow1" serif:id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_startarrow" d="M272.093,221.161L277.537,226.605L272.107,232.036L272.093,221.161Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_endarrow1" serif:id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_endarrow" d="M193.805,230.198L190.456,226.85L193.796,223.51L193.805,230.198Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_retractarrowneg1" serif:id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_retractarrowneg" d="M263.312,228.282L261.812,226.782L263.312,225.282" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_retractpathneg1" serif:id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_retractpathneg" d="M272.347,226.782L261.812,226.782" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <g id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_miniprobe1" serif:id="middle_probe_pocket_Y_pos_2axis_YtoX_pos_X_pos_1axis_XY_miniprobe">
+                            <circle id="circle7611" serif:id="circle761" cx="253.813" cy="226.782" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                            <circle id="circle7711" serif:id="circle771" cx="253.813" cy="226.782" r="7.698" style="fill:url(#_Radial16);"/>
+                            <circle id="circle7811" serif:id="circle781" cx="251.503" cy="229.091" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+        <g id="middle_probe_pocket_Y_neg">
+            <g id="middle_probe_pocket_Y_neg_1axis">
+                <g id="middle_probe_pocket_Y_neg_1axis_YZ_2">
+                    <path id="middle_probe_pocket_Y_neg_1axis_YZ_probepath1_2" d="M695.5,773.114L694.467,773.114L694.467,769.114L695.488,769.114L695.5,773.114ZM693.433,769.114L693.433,773.114L691.367,773.114L691.367,769.114L693.433,769.114ZM690.334,769.114L690.334,773.114L688.267,773.114L688.267,769.114L690.334,769.114ZM687.234,769.114L687.234,773.114L685.167,773.114L685.167,769.114L687.234,769.114ZM684.134,769.114L684.134,773.114L683.101,773.114L683.112,769.114L684.134,769.114Z" style="fill:#3b82f6;"/>
+                    <path id="middle_probe_pocket_Y_neg_1axis_YZ_probepath2_2" d="M759.978,771.297L692.678,771.297" style="fill:none;stroke:#3b82f6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                    <path id="middle_probe_pocket_Y_neg_1axis_YZ_2_retractarrowpos" d="M696.115,769.797L697.615,771.297L696.115,772.797" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                    <path id="middle_probe_pocket_Y_neg_1axis_YZ_2_retractpathpos" d="M681.436,771.297L697.615,771.297" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                    <path id="path1171" d="M685.822,765.677L680.379,771.12L685.809,776.551L685.822,765.677Z" style="fill:#f00;"/>
+                    <path id="path1181" d="M759.978,774.713L763.327,771.365L759.986,768.025L759.978,774.713Z" style="fill:#f00;"/>
+                    <g id="middle_probe_pocket_Y_neg_1axis_YZ_2_spindle">
+                        <rect id="rect1181" x="681.436" y="661.551" width="40" height="58.333" style="fill:url(#_Linear17);"/>
+                        <rect id="rect1191" x="684.769" y="658.217" width="33.333" height="6.667" style="fill:#475569;"/>
+                        <path id="path1191" d="M718.102,719.884L684.769,719.884L691.436,744.884L711.436,744.884L718.102,719.884Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                        <path id="path1201" d="M701.436,744.884L701.436,764.884" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                        <circle id="circle1201" cx="701.436" cy="769.884" r="6.667" style="fill:#ef4444;"/>
+                        <circle id="circle1211" cx="703.102" cy="766.551" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                    </g>
+                </g>
+                <g id="middle_probe_pocket_Y_neg_1axis_XY_2">
+                    <path id="middle_probe_pocket_Y_neg_1axis_XY_probepath1_2" d="M233.317,259.035L235.043,259.035L234.18,259.892L233.317,259.035ZM235.043,259.035L236.18,257.905L236.18,259.035L235.043,259.035ZM233.317,259.035L232.18,259.035L232.18,257.905L233.317,259.035ZM232.18,260.177L236.18,260.177L236.18,262.462L232.18,262.462L232.18,260.177ZM232.18,263.605L236.18,263.605L236.18,265.89L232.18,265.89L232.18,263.605ZM232.18,267.032L236.18,267.032L236.18,269.317L232.18,269.317L232.18,267.032ZM232.18,270.46L236.18,270.46L236.18,271.59L234.18,273.603L232.18,271.59L232.18,270.46Z" style="fill:#3b82f6;"/>
+                    <path id="middle_probe_pocket_Y_neg_1axis_XY_2_retractarrowneg" d="M232.497,260.1L233.997,258.6L235.497,260.1" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                    <path id="middle_probe_pocket_Y_neg_1axis_XY_2_retractpathneg" d="M233.997,269.134L233.997,258.6" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                    <path id="middle_probe_pocket_Y_neg_1axis_XY_probepath2_2" d="M233.997,189.96L233.997,257.892" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                    <path id="middle_probe_pocket_Y_neg_1axis_XY_2_startarrow" d="M239.617,268.881L234.173,274.324L228.743,268.894L239.617,268.881Z" style="fill:#f00;"/>
+                    <path id="middle_probe_pocket_Y_neg_1axis_XY_2_endarrow" d="M230.58,190.592L233.928,187.243L237.269,190.583L230.58,190.592Z" style="fill:#f00;"/>
+                    <g id="middle_probe_pocket_Y_neg_1axis_XY_2_miniprobe">
+                        <path id="path1021" d="M224.759,248.655C224.759,253.753 228.898,257.892 233.997,257.892C239.095,257.892 243.234,253.753 243.234,248.655C243.234,243.556 239.095,239.417 233.997,239.417C228.898,239.417 224.759,243.556 224.759,248.655Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <path id="path1031" d="M226.299,248.655C226.299,252.903 229.748,256.352 233.997,256.352C238.245,256.352 241.694,252.903 241.694,248.655C241.694,244.406 238.245,240.957 233.997,240.957C229.748,240.957 226.299,244.406 226.299,248.655Z" style="fill:url(#_Radial18);"/>
+                        <path id="path1041" d="M228.992,246.345C228.992,247.833 230.2,249.04 231.687,249.04C233.174,249.04 234.382,247.833 234.382,246.345C234.382,244.858 233.174,243.65 231.687,243.65C230.2,243.65 228.992,244.858 228.992,246.345Z" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                </g>
+                <g id="middle_probe_pocket_Y_neg_1axis_XZ" opacity="0.59">
+                    <rect id="rect941" x="212.672" y="661.529" width="40" height="58.333" style="fill:url(#_Linear19);"/>
+                    <rect id="rect951" x="216.005" y="658.196" width="33.333" height="6.667" style="fill:#475569;"/>
+                    <path id="path951" d="M216.005,719.862L249.339,719.862L242.672,744.862L222.672,744.862L216.005,719.862Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                    <path id="path961" d="M232.672,744.862L232.672,764.862" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                    <circle id="circle961" cx="232.672" cy="769.862" r="6.667" style="fill:#ef4444;"/>
+                    <circle id="circle971" cx="231.005" cy="766.529" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                </g>
+            </g>
+            <g id="middle_probe_pocket_Y_neg_2axis" transform="matrix(1,0,-0,1,3.054832,0.716376)">
+                <g id="middle_probe_pocket_Y_neg_2axis_YtoX_neg" transform="matrix(1,0,0,1,-3.560832,2.787695)">
+                    <g id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_nextaxisjog" transform="matrix(-0.447566,0.894251,0.894251,0.447566,42.965004,18.522002)">
+                        <path d="M97.143,222.563L109.151,230.198L94.963,231.295L97.143,222.563Z" style="fill:#ff9a0d;"/>
+                    </g>
+                    <g id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_jogpath_g" transform="matrix(-0,1,1,0,10.054913,-12.235628)">
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_jogpath" d="M218.118,193.811C206.37,196.561 206.066,199.559 202.608,206.01C199.13,212.497 204.606,225.511 204.002,224.927" style="fill:none;stroke:#ff9a0d;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,4,0,0,0,0;"/>
+                    </g>
+                    <g id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XZ_2">
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XZ_probepath1_2" d="M206.319,773.114L205.286,773.114L205.286,769.114L206.308,769.114L206.319,773.114ZM204.253,769.114L204.253,773.114L202.186,773.114L202.186,769.114L204.253,769.114ZM201.153,769.114L201.153,773.114L199.086,773.114L199.086,769.114L201.153,769.114ZM198.053,769.114L198.053,773.114L195.987,773.114L195.987,769.114L198.053,769.114ZM194.953,769.114L194.953,773.114L193.92,773.114L193.932,769.114L194.953,769.114Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XZ_probepath2_2" d="M270.798,771.297L203.497,771.297" style="fill:none;stroke:#3b82f6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XZ_2_retractarrowpos" d="M206.935,769.797L208.435,771.297L206.935,772.797" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XZ_2_retractpathpos" d="M192.255,771.297L208.435,771.297" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <path id="path821" d="M196.642,765.677L191.198,771.12L196.628,776.551L196.642,765.677Z" style="fill:#f00;"/>
+                        <path id="path831" d="M270.798,774.713L274.146,771.365L270.806,768.025L270.798,774.713Z" style="fill:#f00;"/>
+                        <g id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XZ_2_spindle_2">
+                            <rect id="rect831" x="192.255" y="661.551" width="40" height="58.333" style="fill:url(#_Linear20);"/>
+                            <rect id="rect841" x="195.589" y="658.217" width="33.333" height="6.667" style="fill:#475569;"/>
+                            <path id="path841" d="M228.922,719.884L195.589,719.884L202.255,744.884L222.255,744.884L228.922,719.884Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                            <path id="path851" d="M212.255,744.884L212.255,764.884" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                            <circle id="circle851" cx="212.255" cy="769.884" r="6.667" style="fill:#ef4444;"/>
+                            <circle id="circle861" cx="213.922" cy="766.551" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                        </g>
+                    </g>
+                    <g id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XY" transform="matrix(1,0,0,1,0,3.922414)">
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XY_probepath1" d="M206.888,228.599L205.746,228.599L205.746,224.599L206.875,224.599L206.888,228.599ZM204.603,224.599L204.603,228.599L202.318,228.599L202.318,224.599L204.603,224.599ZM201.176,224.599L201.176,228.599L198.891,228.599L198.891,224.599L201.176,224.599ZM197.748,224.599L197.748,228.599L195.463,228.599L195.463,224.599L197.748,224.599ZM194.321,224.599L194.321,228.599L193.178,228.599L193.191,224.599L194.321,224.599Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XY_probepath2" d="M274.82,226.782L206.888,226.782" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XY_startarrow" d="M195.9,221.161L190.456,226.605L195.886,232.036L195.9,221.161Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XY_endarrow" d="M274.189,230.198L277.537,226.85L274.197,223.51L274.189,230.198Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XY_retractarrowpos" d="M204.681,225.282L206.181,226.782L204.681,228.282" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XY_retractpathpos" d="M195.646,226.782L206.181,226.782" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <g id="middle_probe_pocket_Y_neg_2axis_YtoX_neg_XY_miniprobe">
+                            <circle id="circle73" cx="216.126" cy="226.599" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                            <circle id="circle74" cx="216.126" cy="226.599" r="7.698" style="fill:url(#_Radial21);"/>
+                            <circle id="circle75" cx="213.816" cy="228.908" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                        </g>
+                    </g>
+                </g>
+                <g id="middle_probe_pocket_Y_neg_2axis_YtoX_pos" transform="matrix(1,0,0,1,-3.560832,2.787695)">
+                    <g id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_nextaxisjog" transform="matrix(0.447566,0.894251,-0.894251,0.447566,425.027995,18.522002)">
+                        <path d="M97.143,222.563L109.151,230.198L94.963,231.295L97.143,222.563Z" style="fill:#ff9a0d;"/>
+                    </g>
+                    <g id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_jogpath_g" transform="matrix(-0,1,-1,-0,457.938087,-12.235628)">
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_jogpath" d="M218.118,193.811C206.37,196.561 206.066,199.559 202.608,206.01C199.13,212.497 204.606,225.511 204.002,224.927" style="fill:none;stroke:#ff9a0d;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,4,0,0,0,0;"/>
+                    </g>
+                    <g id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XZ">
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XZ_probepath1" d="M259.025,773.114L259.036,769.114L260.058,769.114L260.058,773.114L259.025,773.114ZM261.091,773.114L261.091,769.114L263.158,769.114L263.158,773.114L261.091,773.114ZM264.191,773.114L264.191,769.114L266.258,769.114L266.258,773.114L264.191,773.114ZM267.291,773.114L267.291,769.114L269.357,769.114L269.357,773.114L267.291,773.114ZM270.391,773.114L270.391,769.114L271.412,769.114L271.424,773.114L270.391,773.114Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XZ_probepath2" d="M194.546,771.297L261.847,771.297" style="fill:none;stroke:#3b82f6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XZ_retractarrowneg" d="M258.409,772.797L256.909,771.297L258.409,769.797" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XZ_retractpathneg" d="M273.089,771.297L256.909,771.297" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <path id="path902" d="M268.702,765.677L274.146,771.12L268.716,776.551L268.702,765.677Z" style="fill:#f00;"/>
+                        <path id="path912" d="M194.546,774.713L191.198,771.365L194.538,768.025L194.546,774.713Z" style="fill:#f00;"/>
+                        <g id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XZ_spindle">
+                            <rect id="rect912" x="233.089" y="661.551" width="40" height="58.333" style="fill:url(#_Linear22);"/>
+                            <rect id="rect922" x="236.422" y="658.217" width="33.333" height="6.667" style="fill:#475569;"/>
+                            <path id="path922" d="M236.422,719.884L269.755,719.884L263.089,744.884L243.089,744.884L236.422,719.884Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                            <path id="path932" d="M253.089,744.884L253.089,764.884" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                            <circle id="circle932" cx="253.089" cy="769.884" r="6.667" style="fill:#ef4444;"/>
+                            <circle id="circle942" cx="251.422" cy="766.551" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                        </g>
+                    </g>
+                    <g id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XY" transform="matrix(1,0,0,1,0,3.739414)">
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XY_probepath1" d="M261.105,228.599L261.118,224.599L262.248,224.599L262.248,228.599L261.105,228.599ZM263.39,228.599L263.39,224.599L265.675,224.599L265.675,228.599L263.39,228.599ZM266.818,228.599L266.818,224.599L269.103,224.599L269.103,228.599L266.818,228.599ZM270.245,228.599L270.245,224.599L272.53,224.599L272.53,228.599L270.245,228.599ZM273.673,228.599L273.673,224.599L274.802,224.599L274.815,228.599L273.673,228.599Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XY_probepath2" d="M193.173,226.782L261.105,226.782" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XY_startarrow" d="M272.093,221.161L277.537,226.605L272.107,232.036L272.093,221.161Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XY_endarrow" d="M193.805,230.198L190.456,226.85L193.796,223.51L193.805,230.198Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XY_retractarrowneg" d="M263.312,228.282L261.812,226.782L263.312,225.282" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XY_retractpathneg" d="M272.347,226.782L261.812,226.782" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <g id="middle_probe_pocket_Y_neg_2axis_YtoX_pos_XY_miniprobe">
+                            <circle id="circle762" cx="253.813" cy="226.782" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                            <circle id="circle772" cx="253.813" cy="226.782" r="7.698" style="fill:url(#_Radial23);"/>
+                            <circle id="circle782" cx="251.503" cy="229.091" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+        <g id="middle_probe_pocket_X_neg">
+            <g id="middle_probe_pocket_X_neg_1axis">
+                <g id="middle_probe_pocket_X_neg_1axis_YZ_2" opacity="0.59">
+                    <rect id="rect692" x="701.853" y="661.529" width="40" height="58.333" style="fill:url(#_Linear24);"/>
+                    <rect id="rect702" x="705.186" y="658.196" width="33.333" height="6.667" style="fill:#475569;"/>
+                    <path id="path702" d="M705.186,719.862L738.519,719.862L731.853,744.862L711.853,744.862L705.186,719.862Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                    <path id="path712" d="M721.853,744.862L721.853,764.862" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                    <circle id="circle712" cx="721.853" cy="769.862" r="6.667" style="fill:#ef4444;"/>
+                    <circle id="circle722" cx="720.186" cy="766.529" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                </g>
+                <g id="middle_probe_pocket_X_neg_1axis_XZ_2_b">
+                    <path id="middle_probe_pocket_X_neg_1axis_XZ_2_probepath1" d="M206.319,773.114L205.286,773.114L205.286,769.114L206.308,769.114L206.319,773.114ZM204.253,769.114L204.253,773.114L202.186,773.114L202.186,769.114L204.253,769.114ZM201.153,769.114L201.153,773.114L199.086,773.114L199.086,769.114L201.153,769.114ZM198.053,769.114L198.053,773.114L195.987,773.114L195.987,769.114L198.053,769.114ZM194.953,769.114L194.953,773.114L193.92,773.114L193.932,769.114L194.953,769.114Z" style="fill:#3b82f6;"/>
+                    <path id="middle_probe_pocket_X_neg_1axis_XZ_2_probepath2" d="M270.798,771.297L203.497,771.297" style="fill:none;stroke:#3b82f6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                    <path id="middle_probe_pocket_X_neg_1axis_XZ_2_retractarrowpos_b" d="M206.935,769.797L208.435,771.297L206.935,772.797" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                    <path id="middle_probe_pocket_X_neg_1axis_XZ_2_retractpathpos_b" d="M192.255,771.297L208.435,771.297" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                    <path id="path822" d="M196.642,765.677L191.198,771.12L196.628,776.551L196.642,765.677Z" style="fill:#f00;"/>
+                    <path id="path832" d="M270.798,774.713L274.146,771.365L270.806,768.025L270.798,774.713Z" style="fill:#f00;"/>
+                    <g id="middle_probe_pocket_X_neg_1axis_XZ_2_spindle">
+                        <rect id="rect832" x="192.255" y="661.551" width="40" height="58.333" style="fill:url(#_Linear25);"/>
+                        <rect id="rect842" x="195.589" y="658.217" width="33.333" height="6.667" style="fill:#475569;"/>
+                        <path id="path842" d="M228.922,719.884L195.589,719.884L202.255,744.884L222.255,744.884L228.922,719.884Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                        <path id="path852" d="M212.255,744.884L212.255,764.884" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                        <circle id="circle852" cx="212.255" cy="769.884" r="6.667" style="fill:#ef4444;"/>
+                        <circle id="circle862" cx="213.922" cy="766.551" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                    </g>
+                </g>
+                <g id="middle_probe_pocket_X_neg_1axis_XY_2" transform="matrix(1,0,0,1,0,3.922414)">
+                    <path id="middle_probe_pocket_X_neg_1axis_XY_probepath1_2" d="M206.888,228.599L205.746,228.599L205.746,224.599L206.875,224.599L206.888,228.599ZM204.603,224.599L204.603,228.599L202.318,228.599L202.318,224.599L204.603,224.599ZM201.176,224.599L201.176,228.599L198.891,228.599L198.891,224.599L201.176,224.599ZM197.748,224.599L197.748,228.599L195.463,228.599L195.463,224.599L197.748,224.599ZM194.321,224.599L194.321,228.599L193.178,228.599L193.191,224.599L194.321,224.599Z" style="fill:#3b82f6;"/>
+                    <path id="middle_probe_pocket_X_neg_1axis_XY_probepath2_2" d="M274.82,226.782L206.888,226.782" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                    <path id="middle_probe_pocket_X_neg_1axis_XY_2_startarrow" d="M195.9,221.161L190.456,226.605L195.886,232.036L195.9,221.161Z" style="fill:#f00;"/>
+                    <path id="middle_probe_pocket_X_neg_1axis_XY_2_endarrow" d="M274.189,230.198L277.537,226.85L274.197,223.51L274.189,230.198Z" style="fill:#f00;"/>
+                    <path id="middle_probe_pocket_X_neg_1axis_XY_2_retractarrowpos" d="M204.681,225.282L206.181,226.782L204.681,228.282" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                    <path id="middle_probe_pocket_X_neg_1axis_XY_2_retractpathpos" d="M195.646,226.782L206.181,226.782" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                    <g id="middle_probe_pocket_X_neg_1axis_XY_2_miniprobe">
+                        <circle id="circle731" cx="216.126" cy="226.599" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle id="circle741" cx="216.126" cy="226.599" r="7.698" style="fill:url(#_Radial26);"/>
+                        <circle id="circle751" cx="213.816" cy="228.908" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                </g>
+            </g>
+            <g id="middle_probe_pocket_X_neg_2axis">
+                <g id="middle_probe_pocket_X_neg_2axis_XtoY_neg" transform="matrix(1,0,0,1,-3.560832,2.787695)">
+                    <g id="middle_probe_pocket_X_neg_2axis_XtoY_neg_nextaxisjog" transform="matrix(-0.894251,0.447566,-0.447566,-0.894251,444.736951,420.619117)">
+                        <path d="M97.143,222.563L109.151,230.198L94.963,231.295L97.143,222.563Z" style="fill:#ff9a0d;"/>
+                    </g>
+                    <g id="middle_probe_pocket_X_neg_2axis_XtoY_neg_jogpath_g" transform="matrix(-1,0,0,-1,475.494581,453.529209)">
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_neg_jogpath" d="M218.118,193.811C206.37,196.561 206.066,199.559 202.608,206.01C199.13,212.497 204.606,225.511 204.002,224.927" style="fill:none;stroke:#ff9a0d;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,4,0,0,0,0;"/>
+                    </g>
+                    <g id="middle_probe_pocket_X_neg_2axis_XtoY_neg_YZ">
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_neg_YZ_probepath1" d="M695.5,773.114L694.467,773.114L694.467,769.114L695.488,769.114L695.5,773.114ZM693.433,769.114L693.433,773.114L691.367,773.114L691.367,769.114L693.433,769.114ZM690.334,769.114L690.334,773.114L688.267,773.114L688.267,769.114L690.334,769.114ZM687.234,769.114L687.234,773.114L685.167,773.114L685.167,769.114L687.234,769.114ZM684.134,769.114L684.134,773.114L683.101,773.114L683.112,769.114L684.134,769.114Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_neg_YZ_probepath2" d="M759.978,771.297L692.678,771.297" style="fill:none;stroke:#3b82f6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_neg_YZ_retractarrowpos" d="M696.115,769.797L697.615,771.297L696.115,772.797" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_neg_YZ_retractpathpos" d="M681.436,771.297L697.615,771.297" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <path id="path1172" d="M685.822,765.677L680.379,771.12L685.809,776.551L685.822,765.677Z" style="fill:#f00;"/>
+                        <path id="path1182" d="M759.978,774.713L763.327,771.365L759.986,768.025L759.978,774.713Z" style="fill:#f00;"/>
+                        <g id="middle_probe_pocket_X_neg_2axis_XtoY_neg_YZ_spindle">
+                            <rect id="rect1182" x="681.436" y="661.551" width="40" height="58.333" style="fill:url(#_Linear27);"/>
+                            <rect id="rect1192" x="684.769" y="658.217" width="33.333" height="6.667" style="fill:#475569;"/>
+                            <path id="path1192" d="M718.102,719.884L684.769,719.884L691.436,744.884L711.436,744.884L718.102,719.884Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                            <path id="path1202" d="M701.436,744.884L701.436,764.884" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                            <circle id="circle1202" cx="701.436" cy="769.884" r="6.667" style="fill:#ef4444;"/>
+                            <circle id="circle1212" cx="703.102" cy="766.551" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                        </g>
+                    </g>
+                    <g id="middle_probe_pocket_X_neg_2axis_XtoY_neg_XY" transform="matrix(1,0,0,1,2.405762,0)">
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_neg_XY_probepath1" d="M233.317,259.035L235.043,259.035L234.18,259.892L233.317,259.035ZM235.043,259.035L236.18,257.905L236.18,259.035L235.043,259.035ZM233.317,259.035L232.18,259.035L232.18,257.905L233.317,259.035ZM232.18,260.177L236.18,260.177L236.18,262.462L232.18,262.462L232.18,260.177ZM232.18,263.605L236.18,263.605L236.18,265.89L232.18,265.89L232.18,263.605ZM232.18,267.032L236.18,267.032L236.18,269.317L232.18,269.317L232.18,267.032ZM232.18,270.46L236.18,270.46L236.18,271.59L234.18,273.603L232.18,271.59L232.18,270.46Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_neg_XY_retractarrowneg" d="M232.497,260.1L233.997,258.6L235.497,260.1" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_neg_XY_retractpathneg" d="M233.997,269.134L233.997,258.6" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_neg_XY_probepath2" d="M233.997,189.96L233.997,257.892" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_neg_XY_startarrow" d="M239.617,268.881L234.173,274.324L228.743,268.894L239.617,268.881Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_neg_XY_endarrow" d="M230.58,190.592L233.928,187.243L237.269,190.583L230.58,190.592Z" style="fill:#f00;"/>
+                        <g id="middle_probe_pocket_X_neg_2axis_XtoY_neg_XY_miniprobe">
+                            <path id="path1022" d="M224.759,248.655C224.759,253.753 228.898,257.892 233.997,257.892C239.095,257.892 243.234,253.753 243.234,248.655C243.234,243.556 239.095,239.417 233.997,239.417C228.898,239.417 224.759,243.556 224.759,248.655Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                            <path id="path1032" d="M226.299,248.655C226.299,252.903 229.748,256.352 233.997,256.352C238.245,256.352 241.694,252.903 241.694,248.655C241.694,244.406 238.245,240.957 233.997,240.957C229.748,240.957 226.299,244.406 226.299,248.655Z" style="fill:url(#_Radial28);"/>
+                            <path id="path1042" d="M228.992,246.345C228.992,247.833 230.2,249.04 231.687,249.04C233.174,249.04 234.382,247.833 234.382,246.345C234.382,244.858 233.174,243.65 231.687,243.65C230.2,243.65 228.992,244.858 228.992,246.345Z" style="fill:#fff;fill-opacity:0.5;"/>
+                        </g>
+                    </g>
+                </g>
+                <g id="middle_probe_pocket_X_neg_2axis_XtoY_pos" transform="matrix(1,0,0,1,-3.560832,2.787695)">
+                    <g id="middle_probe_pocket_X_neg_2axis_XtoY_pos_nextaxisjog" transform="matrix(-0.894251,-0.447566,-0.447566,0.894251,444.736951,35.262749)">
+                        <path d="M97.143,222.563L109.151,230.198L94.963,231.295L97.143,222.563Z" style="fill:#ff9a0d;"/>
+                    </g>
+                    <g id="middle_probe_pocket_X_neg_2axis_XtoY_pos_jogpath_g" transform="matrix(-1,0,0,1,475.494581,2.352658)">
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_pos_jogpath" d="M218.118,193.811C206.37,196.561 206.066,199.559 202.608,206.01C199.13,212.497 204.606,225.511 204.002,224.927" style="fill:none;stroke:#ff9a0d;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,4,0,0,0,0;"/>
+                    </g>
+                    <g id="middle_probe_pocket_X_neg_2axis_XtoY_pos_YZ">
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_pos_YZ_probepath1" d="M748.205,773.114L748.217,769.114L749.238,769.114L749.238,773.114L748.205,773.114ZM750.272,773.114L750.272,769.114L752.338,769.114L752.338,773.114L750.272,773.114ZM753.372,773.114L753.372,769.114L755.438,769.114L755.438,773.114L753.372,773.114ZM756.471,773.114L756.471,769.114L758.538,769.114L758.538,773.114L756.471,773.114ZM759.571,773.114L759.571,769.114L760.593,769.114L760.605,773.114L759.571,773.114Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_pos_YZ_probepath2" d="M683.727,771.297L751.028,771.297" style="fill:none;stroke:#3b82f6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_pos_YZ_retractarrowneg" d="M747.59,772.797L746.09,771.297L747.59,769.797" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_pos_YZ_retractpathneg" d="M762.269,771.297L746.09,771.297" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <path id="path1092" d="M757.883,765.677L763.327,771.12L757.896,776.551L757.883,765.677Z" style="fill:#f00;"/>
+                        <path id="path1102" d="M683.727,774.713L680.379,771.365L683.719,768.025L683.727,774.713Z" style="fill:#f00;"/>
+                        <g id="middle_probe_pocket_X_neg_2axis_XtoY_pos_YZ_spindle">
+                            <rect id="rect1102" x="722.269" y="661.551" width="40" height="58.333" style="fill:url(#_Linear29);"/>
+                            <rect id="rect1112" x="725.603" y="658.217" width="33.333" height="6.667" style="fill:#475569;"/>
+                            <path id="path1112" d="M725.603,719.884L758.936,719.884L752.269,744.884L732.269,744.884L725.603,719.884Z" style="fill:#94a3b8;fill-rule:nonzero;"/>
+                            <path id="path1122" d="M742.269,744.884L742.269,764.884" style="fill:none;fill-rule:nonzero;stroke:#cbd5e1;stroke-width:3.33px;"/>
+                            <circle id="circle1122" cx="742.269" cy="769.884" r="6.667" style="fill:#ef4444;"/>
+                            <circle id="circle1132" cx="740.603" cy="766.551" r="2.5" style="fill:#fff;fill-opacity:0.4;"/>
+                        </g>
+                    </g>
+                    <g id="middle_probe_pocket_X_neg_2axis_XtoY_pos_XY" transform="matrix(1,0,0,1,2.405762,0)">
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_pos_XY_probepath1" d="M234.604,190.522L235.741,189.392L235.741,190.522L234.604,190.522ZM232.878,190.522L234.604,190.522L233.741,191.38L232.878,190.522ZM232.878,190.522L231.741,190.522L231.741,189.392L232.878,190.522ZM233.741,205.09L231.741,203.077L231.741,201.947L235.741,201.947L235.741,203.077L233.741,205.09ZM235.741,200.805L231.741,200.805L231.741,198.52L235.741,198.52L235.741,200.805ZM235.741,197.377L231.741,197.377L231.741,195.092L235.741,195.092L235.741,197.377ZM235.741,193.95L231.741,193.95L231.741,191.665L235.741,191.665L235.741,193.95Z" style="fill:#3b82f6;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_pos_XY_probepath2" d="M233.924,271.022L233.924,203.09" style="fill:none;stroke:#3b82f6;stroke-opacity:0.6;stroke-width:2px;stroke-miterlimit:1.5;stroke-dasharray:2,1,0,0,0,0;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_pos_XY_startarrow" d="M228.304,192.102L233.748,186.658L239.178,192.088L228.304,192.102Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_pos_XY_endarrow" d="M237.341,270.39L233.992,273.739L230.652,270.399L237.341,270.39Z" style="fill:#f00;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_pos_XY_retractarrowpos" d="M235.424,200.883L233.924,202.383L232.424,200.883" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:10;"/>
+                        <path id="middle_probe_pocket_X_neg_2axis_XtoY_pos_XY_retractpathpos" d="M233.924,187.859L233.924,202.383" style="fill:none;stroke:#ff0;stroke-width:1px;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                        <g id="middle_probe_pocket_X_neg_2axis_XtoY_pos_XY_miniprobe">
+                            <path id="path982" d="M243.234,210.71C243.234,205.612 239.095,201.472 233.997,201.472C228.898,201.472 224.759,205.612 224.759,210.71C224.759,215.808 228.898,219.948 233.997,219.948C239.095,219.948 243.234,215.808 243.234,210.71Z" style="fill:#ef4444;fill-opacity:0.3;"/>
+                            <path id="path992" d="M241.694,210.71C241.694,206.462 238.245,203.012 233.997,203.012C229.748,203.012 226.299,206.462 226.299,210.71C226.299,214.958 229.748,218.408 233.997,218.408C238.245,218.408 241.694,214.958 241.694,210.71Z" style="fill:url(#_Radial30);"/>
+                            <path id="path1002" d="M239.001,213.019C239.001,211.532 237.793,210.325 236.306,210.325C234.819,210.325 233.611,211.532 233.611,213.019C233.611,214.507 234.819,215.714 236.306,215.714C237.793,215.714 239.001,214.507 239.001,213.019Z" style="fill:#fff;fill-opacity:0.5;"/>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+        <g id="quad">
+            <g id="QUADXZ" transform="matrix(1,0,0,1,0,1.384)">
+                <g id="quadXZ">
+                    <g id="frontXZ" transform="matrix(1,0,0,1,12.484,506.3)">
+                        <text x="0px" y="0px" style="font-family:'Consolas', monospace;font-size:14.296px;fill:#fff;">FRONT (XZ)</text>
+                    </g>
+                    <path id="quadshape" d="M464.635,489.981L464.635,954.616L0,954.616L0,489.981L464.635,489.981ZM463.444,491.173L1.192,491.173L1.192,953.425L463.444,953.425L463.444,491.173Z" style="fill:#c9c9ff;"/>
+                    <g id="XZorientation">
+                        <g id="right">
+                            <g id="XZ_right">
+                                <g id="XZ_right_text" transform="matrix(0,-1,1,0,-317.69949,1235.09269)">
+                                    <g transform="matrix(1,0,0,1,458.697,776.396)">
+                                        <text x="0px" y="0px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Right X+</text>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                        <g id="left">
+                            <g id="XZ_left">
+                                <g id="XZ_left_text" transform="matrix(0,-1,1,0,-756.23501,787.12651)">
+                                    <g transform="matrix(1,0,0,1,15.446,771.681)">
+                                        <text x="0px" y="0px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Left X-</text>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                    </g>
+                </g>
+            </g>
+            <g id="QUADYZ" transform="matrix(1,0,0,1,0,3)">
+                <g id="quadYZ">
+                    <g id="sideYZ" transform="matrix(1,0,0,1,505.205,506.3)">
+                        <text x="0px" y="0px" style="font-family:'Consolas', monospace;font-size:14.296px;fill:#fff;">SIDE (YZ)</text>
+                    </g>
+                    <path id="quadshape1" d="M953.098,488.462L953.098,953.097L488.463,953.097L488.463,488.462L953.098,488.462ZM951.906,489.653L489.654,489.653L489.654,951.905L951.906,951.905L951.906,489.653Z" style="fill:#c9c9ff;"/>
+                    <g id="YZorientation">
+                        <g id="back">
+                            <g id="YZ_back">
+                                <g id="YZ_back_text" transform="matrix(0,-1,1,0,172.24632,1719.0093)">
+                                    <g transform="matrix(1,0,0,1,945.628,773.381)">
+                                        <text x="0px" y="0px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Back Y+</text>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                        <g id="front">
+                            <g id="YZ_front">
+                                <g id="YZ_front_text" transform="matrix(0,-1,1,0,-268.1167,1278.64538)">
+                                    <g transform="matrix(1,0,0,1,505.264,773.381)">
+                                        <text x="0px" y="0px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Front Y-</text>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                    </g>
+                </g>
+            </g>
+            <g id="QUADALT">
+                <path id="quadshape2" d="M953.098,0L953.098,464.635L488.463,464.635L488.463,0L953.098,0ZM951.906,1.191L489.654,1.191L489.654,463.443L951.906,463.443L951.906,1.191Z" style="fill:#c9c9ff;"/>
+            </g>
+            <g id="QUADXY">
+                <g id="quadXY">
+                    <g id="topXY" transform="matrix(1,0,0,1,13.315,18.026)">
+                        <text x="0px" y="0px" style="font-family:'Consolas', monospace;font-size:14.296px;fill:#fff;">TOP (XY)</text>
+                    </g>
+                    <path id="quadshape3" d="M464.635,0L464.635,464.635L0,464.635L0,0L464.635,0ZM463.444,1.191L1.192,1.191L1.192,463.443L463.444,463.443L463.444,1.191Z" style="fill:#c9c9ff;"/>
+                    <g id="XYorientation">
+                        <g id="XY_right">
+                            <g id="XY_right_inner">
+                                <g id="XY_right_text" transform="matrix(0,-1,1,0,188.36816,724.95322)">
+                                    <g transform="matrix(1,0,0,1,456.661,268.293)">
+                                        <text x="0px" y="0px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Right X+</text>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                        <g id="XY_left">
+                            <g id="XY_left_inner">
+                                <g id="XY_left_text" transform="matrix(0,-1,1,0,-252.84685,283.73751)">
+                                    <g transform="matrix(1,0,0,1,15.445,268.292)">
+                                        <text x="0px" y="0px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Left X-</text>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                        <g id="XY_back">
+                            <g id="XY_back_inner" transform="matrix(1,0,0,1,206.234,19.41)">
+                                <text x="0px" y="0px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Back Y+</text>
+                            </g>
+                        </g>
+                        <g id="XY_front">
+                            <g id="XY_front_inner" transform="matrix(1,0,0,1,206.234,453.836)">
+                                <text x="0px" y="0px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Front Y-</text>
+                            </g>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+    <defs>
+        <image id="_Image2" width="108px" height="39px" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGwAAAAnCAYAAADq+a1iAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAB4UlEQVR4nO3bvUrDUBiH8Se2tIXWDxwFqbgIehuCg7OLd+AV9SI6OFXo5gU4id6AqItTP0Q7xSG2FF+TNmnOeU/L+6wh8Ke/pJlORCBdXN3UgEvgFKgqzwmtCfAE3FW0l8AM6xo4AbaU54RYFTgAvtR/nDmstvaWNWhfFcywcveo9q3Iwvocj5lMvjPvj6LI0TK9avU6zWYr7XKv3+28qYBlYQ0HA95fX4jj2P8wxeqNBu2j47TLvX638wDg/TE1LNkUq1L99/2ZYYFnMMOS5cECj2CGJcuLBZ7ADEtWBAs8gBmWrCgWOAYzLNkqWOAQzLBkq2KBIzDDkpWBBQ7ADEtWFhaUDGZYsjKxoEQww5KVjQUlgRmWzAUWlABmWDJXWLAimGHJXGLBCmCGJXONBQXBDEvmAwsKgBmWzBcW5AQzLJlPLMgBZlgy31iwJJhhyTSwYAkww5JpYcECMMOSaWJBBphhybSxIAXMsGQhYME/YIYlCwUL/oAZliwkLJgDMyxZaFjwC2ZYshCxAKIsrDiOGQ0HC7A27xQJQGu7RaUSFhYkJ/vOSTmfFUURO7t7fheFnSoWJMdTzzQHrFHqWJCAfWiPWIOCwILkL/GW5PT+IZv6QSreCLjvdzvP2kOm/QCz18ulmkBl0AAAAABJRU5ErkJggg=="/>
+        <linearGradient id="_Linear4" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(40,0,0,40,233.08875,661.55075)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <radialGradient id="_Radial5" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(7.698123,0,0,-7.698123,252.27336,228.32064)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <linearGradient id="_Linear6" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(40,0,0,40,701.85255,661.52892)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <radialGradient id="_Radial7" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,7.698123,7.698123,0,232.45754,247.11514)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial8" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-7.698123,-7.698123,0,235.53565,212.24954)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <linearGradient id="_Linear9" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(40,0,0,40,722.26932,661.55075)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <radialGradient id="_Radial10" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-7.698123,-7.698123,0,235.53565,212.24954)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <linearGradient id="_Linear11" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(40,0,0,40,212.67199,661.52892)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <linearGradient id="_Linear12" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(40,0,0,40,701.85255,661.52892)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <linearGradient id="_Linear13" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-40,0,-0,-40,232.25522,661.55075)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <radialGradient id="_Radial14" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(7.698123,0,0,-7.698123,252.27336,228.32064)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <linearGradient id="_Linear15" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(40,0,0,40,233.08875,661.55075)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <radialGradient id="_Radial16" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(7.698123,0,0,-7.698123,252.27336,228.32064)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <linearGradient id="_Linear17" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-40,0,-0,-40,721.43578,661.55075)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <radialGradient id="_Radial18" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,7.698123,7.698123,0,232.45754,247.11514)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <linearGradient id="_Linear19" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(40,0,0,40,212.67199,661.52892)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <linearGradient id="_Linear20" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-40,0,-0,-40,232.25522,661.55075)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <radialGradient id="_Radial21" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(7.698123,0,0,-7.698123,214.58632,228.13756)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <linearGradient id="_Linear22" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(40,0,0,40,233.08875,661.55075)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <radialGradient id="_Radial23" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(7.698123,0,0,-7.698123,252.27336,228.32064)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <linearGradient id="_Linear24" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(40,0,0,40,701.85255,661.52892)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <linearGradient id="_Linear25" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-40,0,-0,-40,232.25522,661.55075)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <radialGradient id="_Radial26" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(7.698123,0,0,-7.698123,214.58632,228.13756)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <linearGradient id="_Linear27" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-40,0,-0,-40,721.43578,661.55075)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <radialGradient id="_Radial28" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,7.698123,7.698123,0,232.45754,247.11514)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <linearGradient id="_Linear29" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(40,0,0,40,722.26932,661.55075)"><stop offset="0" style="stop-color:#64748b;stop-opacity:1"/><stop offset="0.5" style="stop-color:#94a3b8;stop-opacity:1"/><stop offset="1" style="stop-color:#64748b;stop-opacity:1"/></linearGradient>
+        <radialGradient id="_Radial30" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-7.698123,-7.698123,0,235.53565,212.24954)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+    </defs>
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="favicon__g" x1="0" x2="1">
+      <stop offset="0" stop-color="#0B6E6B"/>
+      <stop offset="1" stop-color="#FFD166"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="10" fill="#0B6E6B" />
+  <g transform="translate(8,8) scale(0.75)">
+    <!-- Chevron (direction) -->
+    <path d="M34 4 L46 16 L34 28" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+    <!-- Axis letters X and Y stylized -->
+    <text x="4" y="40" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="white">X</text>
+    <text x="34" y="40" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#FFD166">Y</text>
+    <!-- Small g-code token dot -->
+    <circle cx="58" cy="8" r="4" fill="#FFD166" />
+  </g>
+</svg>

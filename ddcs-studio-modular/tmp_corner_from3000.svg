@@ -1,0 +1,553 @@
+                <svg id="cornerVizCorner" width="100%" height="100%" viewBox="0 0 954 465" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd; max-height: 500px;">
+    <g id="CORNER_FINDER">
+        <g id="QUAD">
+            <g id="quadALT">
+                <path id="quadshape" d="M953.098,0L953.098,464.635L488.463,464.635L488.463,0L953.098,0ZM951.906,1.191L489.654,1.191L489.654,463.443L951.906,463.443L951.906,1.191Z" style="fill:#c9c9ff;"/>
+                <g id="workbossALT">
+                    <path id="face-top-pocket" d="M573.721,216.623L642.439,147.905L871.499,147.905L802.781,216.623L573.721,216.623Z" style="fill:#334155;stroke:#475569;stroke-width:4.58px;"/>
+                    <path id="face-side" d="M802.781,216.623L871.499,147.905L871.499,262.435L802.781,331.153L802.781,216.623Z" style="fill:#0f172a;fill-rule:nonzero;stroke:#475569;stroke-width:4.58px;"/>
+                    <rect id="face-front-solid" x="573.721" y="216.623" width="229.06" height="114.53" style="fill:#1e293b;stroke:#475569;stroke-width:4.58px;"/>
+                </g>
+            </g>
+            <g id="quadXY">
+                <path id="quadshape1" serif:id="quadshape" d="M464.635,0L464.635,464.635L0,464.635L0,0L464.635,0ZM463.444,1.191L1.192,1.191L1.192,463.443L463.444,463.443L463.444,1.191Z" style="fill:#c9c9ff;"/>
+                <g id="XYorientation">
+                    <g id="right">
+                        <g id="right1" serif:id="right" transform="matrix(0,-1,1,0,-1163.210309,452.048531)">
+                            <text x="183.756px" y="1619.871px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Right X+</text>
+                        </g>
+                    </g>
+                    <g id="left">
+                        <g id="left1" serif:id="left" transform="matrix(0,-1,1,0,-1604.42567,10.833169)">
+                            <text x="-257.459px" y="1619.871px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Left X-</text>
+                        </g>
+                    </g>
+                    <g id="back">
+                        <text id="back1" serif:id="back" x="206.234px" y="19.41px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Back Y+</text>
+                    </g>
+                    <g id="front">
+                        <text id="front1" serif:id="front" x="206.234px" y="453.836px" style="font-family:'Consolas', monospace;font-size:14px;fill:#fff;">Front Y-</text>
+                    </g>
+                </g>
+                <text id="topXY" x="13.315px" y="18.026px" style="font-family:'Consolas', monospace;font-size:14.296px;fill:#fff;">TOP (XY)</text>
+                <g id="workXY">
+                    <rect id="workpiece-square" x="138.467" y="135.175" width="190.047" height="190.047" style="fill:#1e293b;"/>
+                    <path id="outline" d="M330.493,327.201L136.487,327.201L136.487,133.195L330.493,133.195L330.493,327.201ZM326.534,137.154L140.446,137.154L140.446,323.242L326.534,323.242L326.534,137.154Z" style="fill:#475569;"/>
+                </g>
+            </g>
+        </g>
+        <g id="cornerFL">
+            <g id="probeYXFL">
+                <g id="probeY">
+                    <path id="line" d="M165.161,412.091L165.161,336.903" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.13px;stroke-linejoin:miter;stroke-dasharray:7.129,3.564,0,0,0,0;"/>
+                    <path id="triangle" d="M165.161,327.201L176.663,346.604L153.659,346.604L165.161,327.201Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="probeX">
+                    <path id="line1" serif:id="line" d="M52.982,306.251L128.451,306.251" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.14px;stroke-linejoin:miter;stroke-dasharray:7.142,3.571,0,0,0,0;"/>
+                    <path id="triangle1" serif:id="triangle" d="M136.41,306.102L117.009,317.604L117.009,294.6L136.41,306.102Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="miniprobe">
+                    <circle cx="45.851" cy="306.189" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="45.851" cy="306.189" r="7.698" style="fill:url(#_Radial1);"/>
+                    <circle cx="43.542" cy="303.88" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="travelX">
+                    <path id="line2" serif:id="line" d="M164.975,359.636L49.77,359.636" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="travelY">
+                    <path id="line3" serif:id="line" d="M46.089,355.019L46.089,311.216" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="retractX">
+                    <path id="line4" serif:id="line" d="M135.228,306.04L110.704,306.04" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="retractY">
+                    <path id="line5" serif:id="line" d="M165.161,328.629L165.161,355.772" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="probetipYfirst">
+                    <circle cx="165.16" cy="419.305" r="23.094" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="165.16" cy="419.305" r="19.245" style="fill:url(#_Radial2);"/>
+                    <circle cx="159.386" cy="413.532" r="6.736" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="labelYXFL">
+                    <text id="label6YXFL" x="121.138px" y="318.531px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">6</text>
+                    <text id="label5YXFL" x="87.409px" y="297.493px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">5</text>
+                    <text id="label4YXFL" x="32.569px" y="343.639px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">4</text>
+                    <text id="label3YXFL" x="92.93px" y="372.66px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">3</text>
+                    <text id="label2YXFL" x="153.351px" y="342.12px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">2</text>
+                    <text id="label1YXFL" x="172.409px" y="381.193px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">1</text>
+                </g>
+                <g id="probetipZfirst">
+                    <g id="miniprobe1" serif:id="miniprobe">
+                        <circle cx="165.16" cy="415.821" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="165.16" cy="415.821" r="7.698" style="fill:url(#_Radial3);"/>
+                        <circle cx="167.469" cy="418.13" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="probetip">
+                        <circle cx="162.506" cy="300.956" r="19.249" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="162.506" cy="300.956" r="16.041" style="fill:url(#_Radial4);"/>
+                        <circle cx="157.694" cy="305.769" r="5.614" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="z">
+                        <g id="z1" serif:id="z" transform="matrix(30,0,0,30,171.701439,311.373136)">
+                        </g>
+                        <text x="153.376px" y="311.373px" style="font-family:'Arial-BoldMT', 'Arial', sans-serif;font-weight:700;font-size:30px;fill:#fff;">Z</text>
+                    </g>
+                    <path id="zmove" d="M166.293,303.749L190.807,328.263L190.807,445.93L166.599,421.721" style="fill:none;stroke:#0f0;stroke-width:1px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                </g>
+            </g>
+            <g id="probeXYFL">
+                <g id="probeX1" serif:id="probeX">
+                    <path id="line6" serif:id="line" d="M53.828,306.251L128.451,306.251" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.1px;stroke-linejoin:miter;stroke-dasharray:7.101,3.55,0,0,0,0;"/>
+                    <path id="triangle2" serif:id="triangle" d="M136.41,306.102L117.009,317.604L117.009,294.6L136.41,306.102Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="probeY1" serif:id="probeY">
+                    <path id="line7" serif:id="line" d="M165.161,412.159L165.161,337.534" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.1px;stroke-linejoin:miter;stroke-dasharray:7.101,3.55,0,0,0,0;"/>
+                    <path id="triangle3" serif:id="triangle" d="M165.161,327.201L176.663,346.604L153.659,346.604L165.161,327.201Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="miniprobe2" serif:id="miniprobe">
+                    <circle cx="165.16" cy="419.305" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="165.16" cy="419.305" r="7.698" style="fill:url(#_Radial5);"/>
+                    <circle cx="162.85" cy="416.996" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="travelX1" serif:id="travelX">
+                    <path id="line8" serif:id="line" d="M107.458,419.468L163.212,419.468" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="retractX1" serif:id="retractX">
+                    <path id="line9" serif:id="line" d="M135.228,306.04L108.838,306.04" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="travelY1" serif:id="travelY">
+                    <path id="line10" serif:id="line" d="M104.604,307.017L104.604,414.246" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="retractY1" serif:id="retractY">
+                    <path id="line11" serif:id="line" d="M165.161,328.629L165.161,355.019" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="probetipXfirst">
+                    <circle cx="46.68" cy="306.744" r="23.094" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="46.68" cy="306.744" r="19.245" style="fill:url(#_Radial6);"/>
+                    <circle cx="40.907" cy="300.97" r="6.736" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="probetipZfirst1" serif:id="probetipZfirst">
+                    <g id="miniprobe3" serif:id="miniprobe">
+                        <circle cx="46.68" cy="303.749" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="46.68" cy="303.749" r="7.698" style="fill:url(#_Radial7);"/>
+                        <circle cx="48.99" cy="306.058" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="probetip1" serif:id="probetip">
+                        <circle cx="162.506" cy="300.956" r="19.249" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="162.506" cy="300.956" r="16.041" style="fill:url(#_Radial8);"/>
+                        <circle cx="157.694" cy="305.769" r="5.614" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="z2" serif:id="z">
+                        <g id="z3" serif:id="z" transform="matrix(30,0,0,30,171.701439,311.373136)">
+                        </g>
+                        <text x="153.376px" y="311.373px" style="font-family:'Arial-BoldMT', 'Arial', sans-serif;font-weight:700;font-size:30px;fill:#fff;">Z</text>
+                    </g>
+                    <path id="zmove1" serif:id="zmove" d="M161.958,299.346L136.966,274.353L16.624,274.353L46.019,303.749" style="fill:none;stroke:#0f0;stroke-width:1px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                </g>
+                <g id="labelXYFL">
+                    <text id="label6XYFL" x="153.26px" y="342.12px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">6</text>
+                    <text id="label5XYFL" x="172.409px" y="381.431px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">5</text>
+                    <text id="label4XYFL" x="129.336px" y="433.939px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">4</text>
+                    <text id="label3XYFL" x="92.93px" y="372.66px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">3</text>
+                    <text id="label2XYFL" x="121.236px" y="318.531px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">2</text>
+                    <text id="label1XYFL" x="87.409px" y="297.493px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">1</text>
+                </g>
+            </g>
+        </g>
+        <g id="cornerFR">
+            <g id="probeYXFR">
+                <g id="probeY2" serif:id="probeY">
+                    <path id="line12" serif:id="line" d="M302.279,412.091L302.279,336.903" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.13px;stroke-linejoin:miter;stroke-dasharray:7.129,3.564,0,0,0,0;"/>
+                    <path id="triangle4" serif:id="triangle" d="M302.279,327.201L290.777,346.604L313.781,346.604L302.279,327.201Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="probeX2" serif:id="probeX">
+                    <path id="line13" serif:id="line" d="M414.458,306.251L338.989,306.251" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.14px;stroke-linejoin:miter;stroke-dasharray:7.142,3.571,0,0,0,0;"/>
+                    <path id="triangle5" serif:id="triangle" d="M331.03,306.102L350.432,317.604L350.432,294.6L331.03,306.102Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="miniprobe4" serif:id="miniprobe">
+                    <circle cx="421.589" cy="306.189" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="421.589" cy="306.189" r="7.698" style="fill:url(#_Radial9);"/>
+                    <circle cx="423.898" cy="303.88" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="travelX2" serif:id="travelX">
+                    <path id="line14" serif:id="line" d="M302.465,359.636L417.67,359.636" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="travelY2" serif:id="travelY">
+                    <path id="line15" serif:id="line" d="M421.351,355.019L421.351,311.216" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="retractX2" serif:id="retractX">
+                    <path id="line16" serif:id="line" d="M332.212,306.04L356.736,306.04" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="retractY2" serif:id="retractY">
+                    <path id="line17" serif:id="line" d="M302.279,328.629L302.279,355.772" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="probetipYfirst1" serif:id="probetipYfirst">
+                    <circle cx="302.28" cy="419.305" r="23.094" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="302.28" cy="419.305" r="19.245" style="fill:url(#_Radial10);"/>
+                    <circle cx="308.054" cy="413.532" r="6.736" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="probetipZfirst2" serif:id="probetipZfirst">
+                    <path id="zmove2" serif:id="zmove" d="M293.33,312.054L271.564,333.82L271.564,451.486L294.507,428.543" style="fill:none;stroke:#0f0;stroke-width:1px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                    <g id="miniprobe5" serif:id="miniprobe">
+                        <circle cx="302.315" cy="419.305" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="302.315" cy="419.305" r="7.698" style="fill:url(#_Radial11);"/>
+                        <circle cx="304.624" cy="421.615" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="probetip2" serif:id="probetip">
+                        <circle cx="302.315" cy="300.956" r="19.249" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="302.315" cy="300.956" r="16.041" style="fill:url(#_Radial12);"/>
+                        <circle cx="297.503" cy="305.769" r="5.614" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="z4" serif:id="z">
+                        <g id="z5" serif:id="z" transform="matrix(30,0,0,30,311.510102,311.373136)">
+                        </g>
+                        <text x="293.185px" y="311.373px" style="font-family:'Arial-BoldMT', 'Arial', sans-serif;font-weight:700;font-size:30px;fill:#fff;">Z</text>
+                    </g>
+                </g>
+                <g id="labelYXFR">
+                    <text id="label6YXFR" x="340.111px" y="319.326px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">6</text>
+                    <text id="label5YXFR" x="380.648px" y="299.142px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">5</text>
+                    <text id="label4YXFR" x="430.017px" y="338.869px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">4</text>
+                    <text id="label3YXFR" x="369.02px" y="375.853px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">3</text>
+                    <text id="label2YXFR" x="306.936px" y="341.504px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">2</text>
+                    <text id="label1YXFR" x="287.963px" y="377.561px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">1</text>
+                </g>
+            </g>
+            <g id="probeXYFR">
+                <g id="probeX3" serif:id="probeX">
+                    <path id="line18" serif:id="line" d="M413.612,306.251L338.989,306.251" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.1px;stroke-linejoin:miter;stroke-dasharray:7.101,3.55,0,0,0,0;"/>
+                    <path id="triangle6" serif:id="triangle" d="M331.03,306.102L350.432,317.604L350.432,294.6L331.03,306.102Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="probeY3" serif:id="probeY">
+                    <path id="line19" serif:id="line" d="M302.279,412.159L302.279,337.534" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.1px;stroke-linejoin:miter;stroke-dasharray:7.101,3.55,0,0,0,0;"/>
+                    <path id="triangle7" serif:id="triangle" d="M302.279,327.201L290.777,346.604L313.781,346.604L302.279,327.201Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="miniprobe6" serif:id="miniprobe">
+                    <circle cx="302.28" cy="419.305" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="302.28" cy="419.305" r="7.698" style="fill:url(#_Radial13);"/>
+                    <circle cx="304.59" cy="416.996" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="travelX3" serif:id="travelX">
+                    <path id="line20" serif:id="line" d="M359.982,419.468L304.228,419.468" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="retractX3" serif:id="retractX">
+                    <path id="line21" serif:id="line" d="M332.212,306.04L358.602,306.04" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="travelY3" serif:id="travelY">
+                    <path id="line22" serif:id="line" d="M362.837,307.017L362.837,414.246" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="retractY3" serif:id="retractY">
+                    <path id="line23" serif:id="line" d="M302.279,328.629L302.279,355.019" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="probetipXfirst1" serif:id="probetipXfirst">
+                    <circle cx="420.76" cy="306.744" r="23.094" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="420.76" cy="306.744" r="19.245" style="fill:url(#_Radial14);"/>
+                    <circle cx="426.533" cy="300.97" r="6.736" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="probetipZfirst3" serif:id="probetipZfirst">
+                    <g id="miniprobe7" serif:id="miniprobe">
+                        <circle cx="420.76" cy="306.744" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="420.76" cy="306.744" r="7.698" style="fill:url(#_Radial15);"/>
+                        <circle cx="423.069" cy="309.053" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="probetip3" serif:id="probetip">
+                        <circle cx="302.315" cy="300.956" r="19.249" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="302.315" cy="300.956" r="16.041" style="fill:url(#_Radial16);"/>
+                        <circle cx="297.503" cy="305.769" r="5.614" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="z6" serif:id="z">
+                        <g id="z7" serif:id="z" transform="matrix(30,0,0,30,311.510102,311.373136)">
+                        </g>
+                        <text x="293.185px" y="311.373px" style="font-family:'Arial-BoldMT', 'Arial', sans-serif;font-weight:700;font-size:30px;fill:#fff;">Z</text>
+                    </g>
+                    <path id="zmove3" serif:id="zmove" d="M307.879,297.808L329.645,276.042L450.121,276.042L427.178,298.985" style="fill:none;stroke:#0f0;stroke-width:1px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                </g>
+                <g id="labelXYFR">
+                    <text id="label6XYFR" x="306.846px" y="340.884px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">6</text>
+                    <text id="label5XYFR" x="287.498px" y="380.599px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">5</text>
+                    <text id="label4XYFR" x="330.37px" y="435.339px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">4</text>
+                    <text id="label3XYFR" x="369.02px" y="375.853px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">3</text>
+                    <text id="label2XYFR" x="340.201px" y="319.326px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">2</text>
+                    <text id="label1XYFR" x="377.989px" y="299.026px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">1</text>
+                </g>
+            </g>
+        </g>
+        <g id="cornerBR">
+            <g id="probeYXBR">
+                <g id="probeY4" serif:id="probeY">
+                    <path id="line24" serif:id="line" d="M302.221,48.567L302.221,123.754" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.13px;stroke-linejoin:miter;stroke-dasharray:7.129,3.564,0,0,0,0;"/>
+                    <path id="triangle8" serif:id="triangle" d="M302.221,133.456L290.719,114.053L313.723,114.053L302.221,133.456Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="probeX4" serif:id="probeX">
+                    <path id="line25" serif:id="line" d="M414.4,154.406L338.931,154.406" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.14px;stroke-linejoin:miter;stroke-dasharray:7.142,3.571,0,0,0,0;"/>
+                    <path id="triangle9" serif:id="triangle" d="M330.972,154.555L350.373,143.053L350.373,166.058L330.972,154.555Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="miniprobe8" serif:id="miniprobe">
+                    <circle cx="421.53" cy="154.468" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="421.53" cy="154.468" r="7.698" style="fill:url(#_Radial17);"/>
+                    <circle cx="423.84" cy="156.778" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="travelX4" serif:id="travelX">
+                    <path id="line26" serif:id="line" d="M302.407,101.021L417.612,101.021" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="travelY4" serif:id="travelY">
+                    <path id="line27" serif:id="line" d="M421.293,105.639L421.293,149.441" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="retractX4" serif:id="retractX">
+                    <path id="line28" serif:id="line" d="M332.154,154.617L356.678,154.617" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="retractY4" serif:id="retractY">
+                    <path id="line29" serif:id="line" d="M302.221,132.028L302.221,104.885" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="probetipYfirst2" serif:id="probetipYfirst">
+                    <circle cx="302.222" cy="41.352" r="23.094" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="302.222" cy="41.352" r="19.245" style="fill:url(#_Radial18);"/>
+                    <circle cx="307.996" cy="47.125" r="6.736" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="probetipZfirst4" serif:id="probetipZfirst">
+                    <g id="miniprobe9" serif:id="miniprobe">
+                        <circle cx="302.315" cy="41.352" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="302.315" cy="41.352" r="7.698" style="fill:url(#_Radial19);"/>
+                        <circle cx="304.624" cy="43.661" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="probetip4" serif:id="probetip">
+                        <circle cx="302.315" cy="158.51" r="19.249" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="302.315" cy="158.51" r="16.041" style="fill:url(#_Radial20);"/>
+                        <circle cx="297.503" cy="163.322" r="5.614" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="z8" serif:id="z">
+                        <g id="z9" serif:id="z" transform="matrix(30,0,0,30,311.510102,168.926652)">
+                        </g>
+                        <text x="293.185px" y="168.927px" style="font-family:'Arial-BoldMT', 'Arial', sans-serif;font-weight:700;font-size:30px;fill:#fff;">Z</text>
+                    </g>
+                    <path id="zmove4" serif:id="zmove" d="M302.476,155.768L273.827,127.119L273.827,14.193L296.77,37.135" style="fill:none;stroke:#0f0;stroke-width:1px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                </g>
+                <g id="labelYXBR">
+                    <text id="label6YXBR" x="338.749px" y="170.72px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">6</text>
+                    <text id="label5YXBR" x="378.396px" y="170.157px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">5</text>
+                    <text id="label4YXBR" x="426.58px" y="129.974px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">4</text>
+                    <text id="label3YXBR" x="367.4px" y="95.042px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">3</text>
+                    <text id="label2YXBR" x="290.492px" y="123.538px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">2</text>
+                    <text id="label1YXBR" x="289.096px" y="89.394px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">1</text>
+                </g>
+            </g>
+            <g id="probeXYBR">
+                <g id="probeX5" serif:id="probeX">
+                    <path id="line30" serif:id="line" d="M413.554,154.406L338.931,154.406" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.1px;stroke-linejoin:miter;stroke-dasharray:7.101,3.55,0,0,0,0;"/>
+                    <path id="triangle10" serif:id="triangle" d="M330.972,154.555L350.373,143.053L350.373,166.058L330.972,154.555Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="probeY5" serif:id="probeY">
+                    <path id="line31" serif:id="line" d="M302.221,48.498L302.221,123.123" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.1px;stroke-linejoin:miter;stroke-dasharray:7.101,3.55,0,0,0,0;"/>
+                    <path id="triangle11" serif:id="triangle" d="M302.221,133.456L290.719,114.053L313.723,114.053L302.221,133.456Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="miniprobe10" serif:id="miniprobe">
+                    <circle cx="302.222" cy="41.352" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="302.222" cy="41.352" r="7.698" style="fill:url(#_Radial21);"/>
+                    <circle cx="304.532" cy="43.661" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="travelX5" serif:id="travelX">
+                    <path id="line32" serif:id="line" d="M359.924,41.19L304.17,41.19" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="retractX5" serif:id="retractX">
+                    <path id="line33" serif:id="line" d="M332.154,154.617L358.544,154.617" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="travelY5" serif:id="travelY">
+                    <path id="line34" serif:id="line" d="M362.778,153.641L362.778,46.412" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="retractY5" serif:id="retractY">
+                    <path id="line35" serif:id="line" d="M302.221,132.028L302.221,105.639" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="probetipXfirst2" serif:id="probetipXfirst">
+                    <circle cx="420.702" cy="153.914" r="23.094" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="420.702" cy="153.914" r="19.245" style="fill:url(#_Radial22);"/>
+                    <circle cx="426.475" cy="159.687" r="6.736" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="probetipZfirst5" serif:id="probetipZfirst">
+                    <g id="miniprobe11" serif:id="miniprobe">
+                        <circle cx="419.74" cy="154.617" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="419.74" cy="154.617" r="7.698" style="fill:url(#_Radial23);"/>
+                        <circle cx="422.049" cy="156.927" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="probetip5" serif:id="probetip">
+                        <circle cx="302.315" cy="158.51" r="19.249" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="302.315" cy="158.51" r="16.041" style="fill:url(#_Radial24);"/>
+                        <circle cx="297.503" cy="163.322" r="5.614" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="z10" serif:id="z">
+                        <g id="z11" serif:id="z" transform="matrix(30,0,0,30,311.510102,168.926652)">
+                        </g>
+                        <text x="293.185px" y="168.927px" style="font-family:'Arial-BoldMT', 'Arial', sans-serif;font-weight:700;font-size:30px;fill:#fff;">Z</text>
+                    </g>
+                    <path id="zmove5" serif:id="zmove" d="M307.739,159.502L329.505,181.268L447.453,181.268L424.51,158.325" style="fill:none;stroke:#0f0;stroke-width:1px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                </g>
+                <g id="labelXYBR">
+                    <text id="label6XYBR" x="290.402px" y="123.377px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">6</text>
+                    <text id="label5XYBR" x="288.594px" y="89.233px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">5</text>
+                    <text id="label4XYBR" x="335.792px" y="36.512px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">4</text>
+                    <text id="label3XYBR" x="367.4px" y="95.042px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">3</text>
+                    <text id="label2XYBR" x="338.972px" y="170.68px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">2</text>
+                    <text id="label1XYBR" x="375.297px" y="170.265px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">1</text>
+                </g>
+            </g>
+        </g>
+        <g id="cornerBL">
+            <g id="probeYXBL">
+                <g id="probeY6" serif:id="probeY">
+                    <path id="line36" serif:id="line" d="M164.932,48.567L164.932,123.754" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.13px;stroke-linejoin:miter;stroke-dasharray:7.129,3.564,0,0,0,0;"/>
+                    <path id="triangle12" serif:id="triangle" d="M164.932,133.456L176.434,114.053L153.43,114.053L164.932,133.456Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="probeX6" serif:id="probeX">
+                    <path id="line37" serif:id="line" d="M52.753,154.406L128.223,154.406" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.14px;stroke-linejoin:miter;stroke-dasharray:7.142,3.571,0,0,0,0;"/>
+                    <path id="triangle13" serif:id="triangle" d="M136.182,154.555L116.78,143.053L116.78,166.058L136.182,154.555Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="miniprobe12" serif:id="miniprobe">
+                    <circle cx="45.623" cy="154.468" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="45.623" cy="154.468" r="7.698" style="fill:url(#_Radial25);"/>
+                    <circle cx="43.313" cy="156.778" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="travelX6" serif:id="travelX">
+                    <path id="line38" serif:id="line" d="M164.746,101.021L49.541,101.021" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="travelY6" serif:id="travelY">
+                    <path id="line39" serif:id="line" d="M45.86,105.639L45.86,149.441" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="retractX6" serif:id="retractX">
+                    <path id="line40" serif:id="line" d="M134.999,154.617L110.476,154.617" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="retractY6" serif:id="retractY">
+                    <path id="line41" serif:id="line" d="M164.932,132.028L164.932,104.885" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="probetipYfirst3" serif:id="probetipYfirst">
+                    <circle cx="164.931" cy="41.352" r="23.094" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="164.931" cy="41.352" r="19.245" style="fill:url(#_Radial26);"/>
+                    <circle cx="159.157" cy="47.125" r="6.736" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="probetipZfirst6" serif:id="probetipZfirst">
+                    <g id="miniprobe13" serif:id="miniprobe">
+                        <circle cx="165.446" cy="43.628" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="165.446" cy="43.628" r="7.698" style="fill:url(#_Radial27);"/>
+                        <circle cx="167.755" cy="45.937" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="probetip6" serif:id="probetip">
+                        <circle cx="163.139" cy="161.213" r="19.249" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="163.139" cy="161.213" r="16.041" style="fill:url(#_Radial28);"/>
+                        <circle cx="158.326" cy="166.025" r="5.614" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="z12" serif:id="z">
+                        <g id="z13" serif:id="z" transform="matrix(30,0,0,30,172.674643,171.461375)">
+                        </g>
+                        <text x="154.349px" y="171.461px" style="font-family:'Arial-BoldMT', 'Arial', sans-serif;font-weight:700;font-size:30px;fill:#fff;">Z</text>
+                    </g>
+                    <path id="zmove6" serif:id="zmove" d="M169.873,156.95L196.008,130.815L196.008,13.149L169.658,39.498" style="fill:none;stroke:#0f0;stroke-width:1px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                </g>
+                <g id="labelYXBL">
+                    <text id="label6YXBL" x="120.658px" y="149.279px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">6</text>
+                    <text id="label5YXBL" x="87.077px" y="168.608px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">5</text>
+                    <text id="label4YXBL" x="33.049px" y="130.964px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">4</text>
+                    <text id="label3YXBL" x="93.046px" y="95.137px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">3</text>
+                    <text id="label2YXBL" x="154.309px" y="123.352px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">2</text>
+                    <text id="label1YXBL" x="170.943px" y="88.405px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">1</text>
+                </g>
+            </g>
+            <g id="probeXYBL">
+                <g id="probeX7" serif:id="probeX">
+                    <path id="line42" serif:id="line" d="M53.599,154.406L128.223,154.406" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.1px;stroke-linejoin:miter;stroke-dasharray:7.101,3.55,0,0,0,0;"/>
+                    <path id="triangle14" serif:id="triangle" d="M136.182,154.555L116.78,143.053L116.78,166.058L136.182,154.555Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="probeY7" serif:id="probeY">
+                    <path id="line43" serif:id="line" d="M164.932,48.498L164.932,123.123" style="fill:none;fill-rule:nonzero;stroke:#3b82f6;stroke-width:7.1px;stroke-linejoin:miter;stroke-dasharray:7.101,3.55,0,0,0,0;"/>
+                    <path id="triangle15" serif:id="triangle" d="M164.932,133.456L176.434,114.053L153.43,114.053L164.932,133.456Z" style="fill:#ff0b00;"/>
+                </g>
+                <g id="miniprobe14" serif:id="miniprobe">
+                    <circle cx="164.931" cy="41.352" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="164.931" cy="41.352" r="7.698" style="fill:url(#_Radial29);"/>
+                    <circle cx="162.621" cy="43.661" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="travelX7" serif:id="travelX">
+                    <path id="line44" serif:id="line" d="M107.229,41.19L162.983,41.19" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="retractX7" serif:id="retractX">
+                    <path id="line45" serif:id="line" d="M134.999,154.617L108.61,154.617" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="travelY7" serif:id="travelY">
+                    <path id="line46" serif:id="line" d="M104.375,153.641L104.375,46.412" style="fill:none;stroke:#0f0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowGreen)"/>
+                </g>
+                <g id="retractY7" serif:id="retractY">
+                    <path id="line47" serif:id="line" d="M164.932,132.028L164.932,105.639" style="fill:none;stroke:#ff0;stroke-width:2.64px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:2.639,5.279,0,0,2.639,0;" marker-end="url(#arrowYellow)"/>
+                </g>
+                <g id="probetipXfirst3" serif:id="probetipXfirst">
+                    <circle cx="46.451" cy="153.914" r="23.094" style="fill:#ef4444;fill-opacity:0.3;"/>
+                    <circle cx="46.451" cy="153.914" r="19.245" style="fill:url(#_Radial30);"/>
+                    <circle cx="40.678" cy="159.687" r="6.736" style="fill:#fff;fill-opacity:0.5;"/>
+                </g>
+                <g id="probetipZfirst7" serif:id="probetipZfirst">
+                    <g id="miniprobe15" serif:id="miniprobe">
+                        <circle cx="46.451" cy="154.567" r="9.238" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="46.451" cy="154.567" r="7.698" style="fill:url(#_Radial31);"/>
+                        <circle cx="48.761" cy="156.876" r="2.695" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="probetip7" serif:id="probetip">
+                        <circle cx="163.106" cy="160.345" r="19.249" style="fill:#ef4444;fill-opacity:0.3;"/>
+                        <circle cx="163.106" cy="160.345" r="16.041" style="fill:url(#_Radial32);"/>
+                        <circle cx="158.294" cy="165.158" r="5.614" style="fill:#fff;fill-opacity:0.5;"/>
+                    </g>
+                    <g id="z14" serif:id="z">
+                        <g id="z15" serif:id="z" transform="matrix(30,0,0,30,172.301396,170.762087)">
+                        </g>
+                        <text x="153.976px" y="170.762px" style="font-family:'Arial-BoldMT', 'Arial', sans-serif;font-weight:700;font-size:30px;fill:#fff;">Z</text>
+                    </g>
+                    <path id="zmove7" serif:id="zmove" d="M162.85,161.489L141.084,183.255L14.514,183.255L37.457,160.312" style="fill:none;stroke:#0f0;stroke-width:1px;stroke-linecap:round;stroke-miterlimit:1.5;stroke-dasharray:1,2,0,0,0,0;"/>
+                </g>
+                <g id="labelXYBL">
+                    <text id="label6XYBL" x="152.934px" y="123.593px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">6</text>
+                    <text id="label5XYBL" x="171.203px" y="85.226px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">5</text>
+                    <text id="label4XYBL" x="131.838px" y="35.83px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">4</text>
+                    <text id="label3XYBL" x="93.046px" y="95.137px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">3</text>
+                    <text id="label2XYBL" x="120.748px" y="149.279px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">2</text>
+                    <text id="label1XYBL" x="90.711px" y="168.769px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:13.197px;fill:#fff;">1</text>
+                </g>
+            </g>
+        </g>
+    </g>
+    <defs>
+        <!-- Arrow markers for travel (green) and retract (yellow) lines -->
+        <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f0"/>
+        </marker>
+        <marker id="arrowYellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff0"/>
+        </marker>
+        <radialGradient id="_Radial1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(7.698123,0,0,7.698123,44.311858,304.649204)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(19.245307,0,0,19.245307,161.310634,415.457004)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial3" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-7.698123,0,0,-7.698123,166.699207,417.360737)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial4" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(16.0409,0,0,-16.0409,159.29776,304.164375)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial5" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(7.698123,0,0,7.698123,163.62007,417.76644)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial6" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(19.245307,0,0,19.245307,42.830859,302.894837)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial7" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-7.698123,0,0,-7.698123,48.219816,305.288633)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial8" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(16.0409,0,0,-16.0409,159.29776,304.164375)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial9" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-7.698123,0,0,7.698123,423.128211,304.649204)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial10" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-19.245307,0,0,19.245307,306.129436,415.457004)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial11" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-7.698123,0,-0,-7.698123,303.854451,420.845568)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial12" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(16.0409,0,0,-16.0409,299.106424,304.164375)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial13" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-7.698123,0,0,7.698123,303.819999,417.76644)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial14" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-19.245307,0,0,19.245307,424.609211,302.894837)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial15" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-7.698123,0,-0,-7.698123,422.299453,308.283614)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial16" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(16.0409,0,0,-16.0409,299.106424,304.164375)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial17" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-7.698123,0,0,-7.698123,423.070089,156.008172)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial18" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-19.245307,0,0,-19.245307,306.071313,45.200372)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial19" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-7.698123,0,0,-7.698123,303.854451,42.891953)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial20" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(16.0409,0,0,-16.0409,299.106424,161.717892)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial21" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-7.698123,0,0,-7.698123,303.761877,42.890936)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial22" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-19.245307,0,0,-19.245307,424.551088,157.762539)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial23" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-7.698123,0,0,-7.698123,421.279285,156.157295)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial24" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(16.0409,0,0,-16.0409,299.106424,161.717892)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial25" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(7.698123,0,0,-7.698123,44.083021,156.008172)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial26" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(19.245307,0,0,-19.245307,161.081796,45.200372)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial27" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-7.698123,-0,0,-7.698123,166.985212,45.167897)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial28" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(16.0409,0,0,-16.0409,159.930411,164.42075)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial29" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(7.698123,0,0,-7.698123,163.391233,42.890936)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial30" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(19.245307,0,0,-19.245307,42.602021,157.762539)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial31" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-7.698123,-0,0,-7.698123,47.990979,156.107124)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+        <radialGradient id="_Radial32" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(16.0409,0,0,-16.0409,159.897717,163.553326)"><stop offset="0" style="stop-color:#ff7e7e;stop-opacity:1"/><stop offset="0.7" style="stop-color:#ef4444;stop-opacity:1"/><stop offset="1" style="stop-color:#8a1c1c;stop-opacity:1"/></radialGradient>
+    </defs>
+                </svg>

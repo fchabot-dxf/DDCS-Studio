@@ -1,0 +1,2508 @@
+/**
+ * DDCS Studio - Refactored Stylesheet
+ * Architecture: Neutral Base → Theme Definitions
+ * Base provides structure, themes provide personality
+ */
+
+@keyframes marchingAnts {
+    to { stroke-dashoffset: -20; }
+}
+
+.jogpath-animated {
+    animation: marchingAnts 0.6s linear infinite;
+}
+
+/* Default dashed/dotted appearance for guide paths (jogpath & traversepath)
+   Scoped to `path` elements only to avoid applying inherited stroke properties to
+   <g> containers which can cause unexpected side-effects in some browsers. */
+path[id*="jogpath"], path[id*="traversepath"] {
+    stroke-dasharray: 4 4;
+    stroke-linecap: round;
+}
+
+/* Animation helpers required by PathAnimator */
+svg [id*="probepath"],
+svg [id*="retractpath"],
+svg [id*="jogpath"],
+svg [id*="traversepath"],
+svg [id*="travelpath"],
+svg [id*="Zfirst_travel"] {
+    fill: transparent !important;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    transition-property: stroke-dashoffset, stroke, stroke-width;
+    transition-timing-function: linear;
+    transition-duration: 1s, 0.3s, 0.3s;
+}
+
+/* "draw" toggle — animates dashoffset to 0, stroke draws along path direction */
+.path-draw {
+    stroke-dashoffset: 0 !important;
+}
+
+/* Instant reset — no reverse-draw when clearing between loops */
+.path-reset {
+    transition: none !important;
+}
+
+/* fade out class for smooth removal */
+.path-fadeout {
+    stroke-dashoffset: 0 !important;
+    opacity: 0 !important;
+    transition: opacity 0.5s ease-out !important;
+}
+
+/* Probe — duration set per-element by JS for uniform pace */
+.is-probing [id*="probepath"] {
+    stroke: #3b82f6 !important; /* blue */
+    stroke-width: 4px !important;
+}
+
+/* Show probe direction arrows during animation */
+.is-probing .viz-start-arrow,
+.is-probing .viz-end-arrow {
+    opacity: 1 !important;
+    fill: #3b82f6 !important;
+}
+
+/* Retract — duration set per-element by JS for uniform pace */
+.is-retracting [id*="retractpath"] {
+    stroke: #facc15 !important; /* bright yellow */
+    stroke-width: 3px !important;
+}
+
+/* Jog/traverse — dashed orange */
+.is-jogging [id*="jogpath"],
+.is-jogging [id*="traversepath"] {
+    stroke: #ff9a0d !important; /* orange */
+    stroke-width: 3px !important;
+}
+
+/* Travel (automated) — dashed green, same mask-reveal as jog */
+.is-jogging [id*="travelpath"],
+.is-jogging [id*="Zfirst_travel"] {
+    stroke: #0f0 !important;
+    stroke-width: 3px !important;
+}
+
+
+/* ============================================
+   CSS VARIABLES (Neutral Fallback)
+   All themes define their own colors
+   ============================================ */
+:root {
+    --bg: #e0e0e0;
+    --panel: #f0f0f0;
+    --accent: #666666;
+    --text: #000000;
+    --text-main: #000000;
+    --text-dim: #666666;
+    --border: #999999;
+    --radius: 0;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --warn: #eab308;
+}
+
+/* ============================================
+   RESET & BASE
+   ============================================ */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+}
+
+/* ============================================
+   LAYOUT STRUCTURE (Position & Size Only)
+   ============================================ */
+
+/* Header */
+.app-header {
+    height: 54px;
+    padding: 0 15px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+}
+
+.hdr-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: bold;
+}
+
+.hdr-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Main Layout */
+.app-shell {
+    display: flex;
+    flex-direction: column; /* stacked: toolbar -> main -> dock */
+    /* Occupy full viewport minus header */
+    position: absolute;
+    top: 54px; bottom: 0; left: 0; right: 0;
+    overflow: hidden; /* Prevent body scroll */
+}
+
+/* Main content area — flexible editor region */
+.main {
+    flex: 1;          /* Grow to fill available space */
+    min-height: 0;    /* CRITICAL: Allows shrinking when dock expands */
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 1;
+    padding: 0; /* Let internal containers manage spacing */
+}
+
+/* Ensure the scrollbar lives inside the editor layer */
+.editor-container {
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+    border: none;
+}
+.editor-layer {
+    height: 100%;
+    overflow-y: auto; /* The actual scrollbar appears here */
+}
+
+/* Bright green caret/selection for the editor as requested (plus fallbacks) */
+#editor-container::selection { background: #00ff00; color: #000; }
+.editor-container::selection { background: #00ff00; color: #000; }
+textarea#editor::selection, #editor::selection { background: #00ff00; color: #000; }
+
+/* ============================================
+   SECONDARY TOOLBAR - CLEAN CONSOLIDATED
+   ============================================ */
+.secondary-toolbar {
+    display: flex;
+    flex-direction: column;
+    /* Raised to fit stacked chips */
+    min-height: 76px; /* fits two-line var chips comfortably */
+    height: auto;
+    padding: 0;
+    margin: 0;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    z-index: 100;
+}  
+
+.secondary-toolbar.raised-seam {
+    box-sizing: border-box;
+}
+
+.secondary-toolbar-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 76px; /* increased to match min-height */
+    width: 100%;
+} 
+
+/* Left controls */
+.secondary-toolbar .toolbar-left {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    border-right: 1px solid var(--border);
+}
+
+/* CSV import button: adhere to global .toolbar-btn for consistent sizing */
+.secondary-toolbar .toolbar-left label.toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* Do not override width/font/padding - inherit from .toolbar-btn */
+    min-width: auto;
+    /* overflow: hidden removed — would clip the ::before double-border groove */
+}
+
+/* Force all 3 toolbar-left buttons to the same height */
+.secondary-toolbar .toolbar-left .toolbar-btn {
+    height: 28px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Compact search input */
+.secondary-toolbar #search {
+    width: 70px;
+    min-width: 50px;
+    padding: 4px 6px;
+    font-size: 11px;
+    transition: width 0.2s ease;
+}
+
+.secondary-toolbar #search:focus {
+    width: 120px;
+}
+
+/* Right controls */
+.secondary-toolbar .toolbar-right {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 0 10px;
+    scrollbar-width: thin; /* subtle by default */
+    scrollbar-color: rgba(0,0,0,0.06) transparent; /* more visible thumb */
+}
+
+/* WebKit: transparent thin scrollbar with subtle thumb on hover */
+.secondary-toolbar .toolbar-right::-webkit-scrollbar {
+    height: 6px;
+    background: transparent;
+}
+.secondary-toolbar .toolbar-right::-webkit-scrollbar-track {
+    background: transparent;
+}
+.secondary-toolbar .toolbar-right::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.06);
+    border-radius: 3px;
+    transition: background-color 160ms ease;
+}
+.secondary-toolbar .toolbar-right:hover::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.14);
+}
+
+/* Filterbar dropdown - full width, pushes content down */
+.filterbar-menu {
+    width: 100%;
+    display: none;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding: 6px 12px;
+}
+
+.filterbar-menu:not(.hidden) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+}
+
+.filterbar-menu .filters-inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    font-size: 11px;
+    align-items: center;
+}
+
+.filterbar-menu .filters-inner label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.03);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.filterbar-menu .filters-inner label:hover {
+    background: rgba(0,0,0,0.07);
+}
+
+.filterbar-menu .filters-inner label span {
+    font-size: 10px;
+}
+
+.filterbar-menu .panel-actions {
+    margin-left: auto;
+}
+
+#filterbarClear {
+    font-size: 10px;
+    padding: 4px 8px;
+}
+
+/* ============================================================================
+   DESIGN 2: HORIZONTAL LAYOUT - Number | Description side-by-side
+   ============================================================================ */
+
+/* Container - white background with subtle scrollbar (stacked chips) */
+.secondary-toolbar .var-list {
+    margin-left: 8px;
+    background: #ffffff;
+    border-radius: 6px;
+    padding: 6px 6px; /* more padding to fit stacked text */
+    max-height: 56px; /* increased to allow two-line chips */
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    position: relative;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* WebKit scrollbar - nearly invisible */
+.secondary-toolbar .var-list::-webkit-scrollbar {
+    height: 4px;
+    background: transparent;
+}
+
+.secondary-toolbar .var-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* Firefox scrollbar - subtle but visible */
+.secondary-toolbar .var-list {
+    scrollbar-color: rgba(0,0,0,0.12) transparent; /* More visible thumb */
+}
+
+/* Scrollbar thumb - subtle but noticeable */
+.secondary-toolbar .var-list::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.12); /* Default thumb opacity */
+    border-radius: 2px;
+    transition: background-color 160ms ease;
+}
+
+/* On hover - more visible */
+.secondary-toolbar .var-list:hover::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.20);
+}
+
+/* Stacked chip - number on top, description below */
+.secondary-toolbar .var-list .var-item {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 44px;
+    max-width: 88px;
+    height: auto; /* flexible to fit two lines */
+    padding: 6px 8px;
+    margin-right: 6px;
+    border-radius: 6px;
+    background: #f8fafc;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    cursor: pointer;
+    transition: all 120ms ease;
+}
+
+/* Hover effect - light blue background with lift */
+.secondary-toolbar .var-list .var-item:hover {
+    background: #e0f2fe;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.06);
+    transform: translateY(-1px);
+}
+
+/* Variable number - top, bold, dark blue */
+.secondary-toolbar .var-list .var-item .var-id {
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    color: #0c4a6e;
+    text-align: center;
+    margin: 0;
+    padding: 0;
+}
+
+/* Description - below number, slightly smaller, centered and truncated */
+.secondary-toolbar .var-list .var-item .var-desc {
+    font-size: 9px;
+    color: #475569;
+    opacity: 0.95;
+    line-height: 1.1;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+/* Hover increases description contrast */
+.secondary-toolbar .var-list .var-item:hover .var-desc {
+    opacity: 1;
+    color: #334155;
+}
+
+/* Global tooltip styling (used by UIUtils.showTooltip) */
+#global-tooltip {
+    display: none;
+    position: fixed;
+    z-index: 12000;
+    max-width: 320px;
+    width: auto;
+    white-space: pre-line;
+    padding: 8px 10px;
+    background: rgba(0,0,0,0.9);
+    color: #ffffff;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+    line-height: 1.3;
+    font-size: 12px;
+    transform: translateY(100px);
+    pointer-events: none;
+}
+
+/* Maintain some compatibility for .search-box children */
+.secondary-toolbar .search-box { display: none; }
+
+/* Controller Dock - adaptive flow item (was overlay) */
+#controller-dock.controller-dock {
+    position: relative; /* sits in document flow */
+    z-index: 50;
+    flex: 0 0 auto;
+    width: 100%;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+
+    /* MATH: 48px (Header controls) + 36px (Handle) = 84px total
+       FIX: set safe default collapsed height to 84px */
+    /* animation via height so the editor is pushed up */
+    height: 84px; /* collapsed header height */
+
+    /* Force column stacking so header controls + handle occupy the top area
+       and the dock body sits below (consistent math: 48 + 36 = 84) */
+    display: flex;
+    flex-direction: column;
+
+    transition: height 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    overflow: hidden;
+    transform: none !important;
+}
+
+/* EXPANDED STATE */
+#controller-dock.is-expanded {
+    /* FIX: 300px Body + 80px Header */
+    height: 380px; 
+}    
+/* --- DOCK HEADER (Grid Layout for Centering) --- */
+.dock-header {
+    display: flex;
+    flex-direction: column;
+    background: var(--accent);
+    color: #fff;
+}
+
+.dock-header .header-controls {
+    display: grid !important; /* Grid is required for true centering */
+    grid-template-columns: 1fr auto 1fr; /* Left(flex) Center(auto) Right(flex) */
+    align-items: center;
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+
+    /* FIX: Force header controls to an explicit height so header fills the area */
+    height: 50px;
+    flex: 0 0 50px;
+    box-sizing: border-box;
+} 
+
+/* Force Grid Alignments */
+.dock-header .header-left {
+    justify-self: start;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+.dock-header .header-center {
+    justify-self: center; /* Perfect Center */
+    display: flex;
+    gap: 6px;
+    width: auto;
+}
+.dock-header .header-right {
+    justify-self: end;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+} 
+
+/* Button sizing */
+.dock-header .header-left .toolbar-btn,
+.dock-header .header-right .toolbar-btn { padding: 6px 8px; font-size: 13px; }
+.dock-header .header-center button { flex-grow: 1; min-width: 80px; max-width: 140px; font-weight: 700; padding: 8px 10px; }
+
+/* Editor Keys (top row) - make BACK / SPACE / ENTER fill three equal slots and be touch-friendly */
+.editor-keys-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.editor-keys-row .toolbar-btn { width: 100%; min-height: 50px; }
+
+/* Header handle (bottom row) *//* Handle Styling */
+.header-handle {
+    width: 100%;
+    /* Increased touch target to 60px for better thumb grip */
+    height: 60px;
+    flex: 0 0 60px;
+    /* subtle 3D hardware look: silver gradient + crisp top/bottom edges */
+    background: linear-gradient(to bottom, #f5f5f5 0%, #d9d9d9 50%, #c4c4c4 100%);
+    border-top: 2px solid #ffffff;
+    border-bottom: 2px solid #808080;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;    /* ensure it can sit above header controls */
+    z-index: 2;            /* sit above header-controls to avoid visual overlap */
+    box-shadow: 0 -1px 0 rgba(0,0,0,0.06) inset; /* subtle separation */
+    touch-action: none; /* prevents browser gesture interference while dragging */
+}
+.header-handle:hover { filter: brightness(0.98); }
+.header-handle:focus { outline: 2px solid rgba(0,0,0,0.12); }
+
+.header-handle .chevron {
+    color: var(--text-main); /* high-contrast chevron color */
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 60px; /* center vertically inside the 60px handle */
+    display: inline-block;
+    transition: transform 0.3s ease;
+    transform: rotate(0deg);
+}  
+
+/* Targeted fix for the Command Deck Grab Handle */
+.command-deck-handle {
+    height: 60px !important; /* Increased height for better thumb grip */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(to bottom, #f7f7f7 0%, #e0e0e0 50%, #cfcfcf 100%);
+    border-top: 2px solid #ffffff;
+    border-bottom: 2px solid #808080;
+    cursor: pointer;
+    touch-action: none; /* Prevents browser scrolling while dragging */
+}
+
+/* Make the arrow icon itself a bit more prominent */
+.command-deck-handle i, 
+.command-deck-handle svg {
+    transform: scale(1.5); 
+    color: #333;
+} 
+
+#controller-dock.is-expanded .header-handle .chevron {
+    transform: rotate(180deg);
+}
+
+/* --- DOCK BODY (Vertical Stack) --- */
+.dock-body {
+    display: flex;
+    flex-direction: column !important; /* Forces distinct rows */
+    gap: 12px;
+    padding: 12px;
+    background: var(--panel);
+    height: 300px; /* fixed visible body when expanded */
+    min-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden; /* Prevent horizontal overflow */
+
+    /* Hide body when collapsed to prevent visual bleed */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.18s ease;
+}
+
+/* Ensure body becomes visible only when dock is expanded */
+#controller-dock.is-expanded .dock-body {
+    opacity: 1;
+    visibility: visible;
+} 
+
+/* Row 1: Editor Keys */
+.editor-keys-row {
+    flex: 0 0 auto; /* Don't shrink */
+    width: 100%;
+    display: flex;
+    gap: 8px;
+    max-width: 900px;    /* Prevent crazy stretching on wide monitors */
+    margin: 0 auto;      /* Center the keys */
+}
+.editor-keys-row button {
+    flex: 1;             /* Stretch to fill the constrained width */
+    min-width: 120px;    /* Ensure buttons remain usable on small viewports */
+    max-width: 320px;    /* Prevent one button from being huge on wide screens */
+    height: 44px;
+    font-weight: bold;
+    font-size: 16px;
+    border-bottom: 3px solid rgba(0,0,0,0.15);
+}
+
+/* --- Dock Header: allow horizontal scrolling on narrow screens --- */
+.dock-header .header-controls {
+    display: grid !important; /* keep perfect centering behavior */
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+
+    overflow-x: auto;      /* enable horizontal scroll when needed */
+    white-space: nowrap;   /* prevent wrapping of header buttons */
+
+    /* Mobile safety */
+    min-width: 0;          /* allow shrink */
+    scrollbar-width: none; /* hide scrollbar in Firefox when possible */
+} 
+.dock-header .header-center {
+    justify-self: center;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    min-width: max-content; /* keep center content intrinsic and allow scroll */
+}
+.dock-header .header-left,
+.dock-header .header-right { display:flex; gap:6px; align-items:center; }
+
+/* Small-screen tweak: make header buttons not wrap and stay accessible */
+@media (max-width: 520px) {
+    .dock-header .header-controls { padding: 6px 6px; }
+    .dock-header .header-left, .dock-header .header-center, .dock-header .header-right { flex: 0 0 auto; }
+}
+
+/* Row 2: Macro Grid */
+.macro-grid-area {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap; /* Flow buttons nicely */
+    align-content: flex-start;
+    gap: 10px;
+    justify-content: center; /* Center groups on wide screens */
+}  
+
+.dock-body .deck-panel {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    align-content: flex-start;
+    gap: 10px;
+    padding: 4px;
+}
+/* Ensure top editor keys row buttons stretch full width */
+.deck-group.editor-keys .grid-3 > button,
+.deck-group.editor-keys .grid-3 > .toolbar-btn { width: 100%; display: block; }
+
+/* Deck group as vertical block so groups sit side-by-side */
+.deck-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    min-width: 140px;
+    background: transparent;
+}
+
+.deck-group .group-header { font-size: 12px; font-weight: 700; color: var(--text-dim); }
+
+/* Grid sizing for internal buttons */
+.deck-group .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap:8px; }
+.deck-group .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap:8px; }
+
+.dock-row { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-start; }
+
+
+/* Sidebar */
+.sidebar {
+    width: 280px;
+    padding: 12px;
+    overflow-y: auto;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    z-index: 2;
+}
+
+/* ============================================
+   COMPACT SEARCH INPUT (END-APPENDED)
+   ============================================ */
+.secondary-toolbar #search {
+    width: 70px;
+    min-width: 50px;
+    padding: 4px 6px;
+    font-size: 11px;
+    transition: width 0.2s ease;
+}
+
+.secondary-toolbar #search:focus {
+    width: 120px;
+}
+
+/* Tighter toolbar-left spacing */
+.secondary-toolbar .toolbar-left {
+    gap: 6px;
+    padding: 0 8px;
+}
+
+/* ============================================
+   MORE COMPACT VARIABLE CHIPS (END-APPENDED)
+   ============================================ */
+.secondary-toolbar .var-list .var-item {
+    min-width: 40px !important;
+    max-width: 52px !important;
+    height: 36px !important;
+    padding: 3px 5px !important;
+    margin-right: 4px !important;
+    border-radius: 4px;
+}
+
+.secondary-toolbar .var-list .var-item .var-id {
+    font-size: calc(11px * .85) !important;
+}
+
+.secondary-toolbar .var-list .var-item .var-desc {
+    font-size: calc(8px * .85) !important;
+    margin-top: 0 !important;
+}
+
+/* Search Panel */
+.search-box {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-direction: column;
+}
+
+.search-box input {
+    flex: 1;
+    padding: 8px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: white; /* Changed background to white */
+    color: var(--text-main);
+    outline: none;
+}
+
+.search-box input:focus {
+    border-color: var(--accent);
+}
+
+/* Variable List */
+.var-list {
+    background: transparent;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+/* Secondary toolbar: make variable list horizontal and scrollable */
+.secondary-toolbar .var-list {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+/* DDCS Industrial Theme for Variable Chips */
+.variable-chip {
+    background: linear-gradient(180deg, #e0e0e0 0%, #b0b0b0 100%); /* Silver metallic gradient */
+    border: 2px solid #808080;
+    border-top-color: #ffffff; /* Highlight for 3D effect */
+    border-left-color: #ffffff;
+    border-radius: 2px; /* Square/slightly rounded industrial look */
+    color: #1a1a1a; /* Dark text for high contrast on silver */
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-weight: bold;
+    font-size: 12px;
+    padding: 4px 8px;
+    margin: 2px;
+    box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+}
+
+/* Change color when a chip is active or hovered */
+.variable-chip:active {
+    background: #d0d0d0;
+    border: 2px solid #ffffff;
+    border-top-color: #606060;
+    border-left-color: #606060;
+    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4);
+    transform: translateY(1px);
+}
+
+/* Styling the variable number (#0, #1, etc.) */
+.variable-chip-label {
+    color: #0055aa; /* Classic blue numbering used in DDCS hardware */
+    margin-right: 4px;
+}
+.secondary-toolbar .var-list .category-content {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+}
+.secondary-toolbar .var-list .category-header {
+    display: none; /* compact toolbar: hide category header */
+}
+.secondary-toolbar .var-list .var-item {
+    flex: 0 0 auto; /* prevent auto-stretching */
+}
+
+/* Maintain backward compat with .sidebar.search-mode */
+.sidebar.search-mode .var-list {
+    display: block;
+}
+.sidebar.search-mode .deck-panel {
+    display: none;
+}
+
+/* New toolbar/dock search-mode behavior */
+.secondary-toolbar.search-mode .var-list { display: block; }
+#controller-dock.search-mode .deck-panel { display: none; }
+
+
+.var-item {
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.var-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.var-id {
+    font-family: monospace;
+    font-weight: bold;
+    color: var(--accent);
+}
+
+.var-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.category-header {
+    padding: 8px;
+    font-size: 11px;
+    font-weight: bold;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    background: var(--bg);
+}
+
+.category-content {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Command Deck */
+.deck-panel {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    gap: 8px;
+    min-height: 0;
+}
+
+.deck-header {
+    padding: 4px 0; /* Match GENERATORS label style */
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    margin-top: 12px;
+}
+
+.deck-header.no-box {
+    background: transparent;
+    border: none;
+    padding: 4px 0;
+    margin-top: 12px;
+}
+
+.deck-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.section-label {
+    padding: 4px 0;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    margin-top: 12px;
+}
+
+/* Button Grids */
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+}
+
+.grid-4 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 6px;
+}
+
+/* Main Editor Area */
+.main {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    min-width: 0;
+    overflow: auto;
+    z-index: 1;
+}
+
+/* Old .editor-toolbar removed as part of layout refactor; toolbar controls moved to .secondary-toolbar */
+
+.editor {
+    flex: 1;
+    min-height: 200px;
+    background: #000000;
+    color: #ffffff;
+    border: 1px solid var(--border);
+    padding: 12px;
+    border-radius: var(--radius);
+    font-family: "Courier New", Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre;
+    resize: vertical;
+    outline: none;
+}
+
+/* ============================================
+   BUTTONS (Structure & Uniform Sizing)
+   All buttons use same base padding
+   Themes override ONLY visual styling (colors, borders, gradients)
+   ============================================ */
+button,
+.btn,
+.op-btn,
+.toolbar-btn {
+    padding: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: inherit;
+    transition: all 0.15s ease;
+    min-height: 24px;
+    line-height: 1.2;
+}
+
+button:hover,
+.btn:hover,
+.op-btn:hover,
+.toolbar-btn:hover {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+button.primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+button.primary:hover {
+    opacity: 0.9;
+}
+
+/* ============================================
+   WIZARDS (Structure)
+   ============================================ */
+.wizard {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000; /* CHANGED: Was 99 */
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.75);
+}
+
+.wizard.active {
+    display: flex;
+}
+
+.wiz-box {
+    width: 520px !important;    /* FORCE compact width */
+    min-width: 520px !important;
+    max-width: 90vw;            /* Safety for mobile */
+    max-height: 95vh;           /* fallback for older browsers */
+    max-height: 95dvh;          /* dynamic viewport-aware height (Chrome mobile fix) */
+    margin-bottom: env(safe-area-inset-bottom);
+    
+    padding: 0 !important;      /* CRITICAL: No padding so header touches edges */
+    
+    display: flex;
+    flex-direction: column;
+    
+    /* Theme Defaults */
+    background: var(--panel);
+    border: 2px solid var(--accent);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+/* --- HEADER (Flush Fit) --- */
+.wiz-head {
+    margin: 0 !important;       /* No gaps */
+    width: 100%;                /* Fill the 520px box */
+    padding: 10px 15px;
+    
+    flex-shrink: 0;             /* Don't shrink */
+    background: var(--accent);
+    color: #000;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* --- FOOTER (Flush Fit) --- */
+.wiz-foot {
+    margin: 0 !important;       /* No gaps */
+    width: 100%;                /* Fill the 520px box */
+    padding: 15px;
+
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+}
+
+/* Grid Layouts */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+/* Labels */
+.label { 
+    font-size: 9px; 
+    color: var(--text-dim); 
+    margin-bottom: 4px; 
+    display: block; 
+    text-transform: uppercase; 
+    font-weight: bold; 
+    letter-spacing: 0.5px; 
+}
+
+.section-label { 
+    font-size: 10px; 
+    color: var(--text-dim); 
+    margin-bottom: 5px; 
+    text-transform: uppercase; 
+    font-weight: bold; 
+    display: block; 
+}
+
+.compliant-tag { color: var(--success); font-size: 8px; }
+
+/* Visualization Container */
+.viz-container { 
+    position: relative; 
+    background: var(--bg); 
+    border: 1px solid var(--border); 
+    border-radius: var(--radius); 
+    padding: 12px; 
+    display: flex; 
+    flex-direction: column; /* Title on top, canvas below */
+    align-items: stretch; /* children span width */
+    min-height: 240px; /* reserve space for title + svg */
+}
+
+.viz-status {
+    font-family: 'PixelArial', 'Arial', sans-serif;
+    position: static;
+    display: block;
+    width: 100%;
+    text-align: center;
+    background: rgba(0,0,0,0.9);
+    padding: 6px 10px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    color: #00ff00;
+    margin-bottom: 10px;
+}
+
+/* Canvas area inside viz-container that hosts the SVG */
+.viz-canvas {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    flex: 1;
+    min-height: 160px;
+    overflow: auto;
+}
+
+/* Preview Block */
+.preview-block { margin-top: 15px; }
+
+.preview-block pre {
+    font-size: 10px;
+    padding: 8px;
+    background: #000;
+    border: 1px solid var(--border);
+    color: #ffffff; /* Default: White */
+    white-space: pre-wrap;
+    border-radius: var(--radius);
+    min-height: 100px;
+    max-height: none !important;  /* Remove height limit */
+    overflow: visible !important; /* Remove internal scrollbar */
+    height: auto !important;      /* Force full expansion */
+    white-space: pre-wrap;        /* Wrap long lines */
+    width: 100%;
+    margin: 0;
+}
+
+/* Utility: hide blocks when toggle is off */
+.hidden { display: none !important; }
+
+.g-comment {
+    color: var(--success); /* Comments: Green */
+}
+
+/* Checkboxes */
+.checkbox-inline {
+    font-size: 10px; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center;
+}
+
+.checkbox-panel {
+    background: rgba(0,0,0,0.2); 
+    padding: 12px; 
+    border-radius: var(--radius); 
+    border: 1px dashed var(--border);
+}
+
+/* DDCS Theme Overrides */
+body[data-theme="ddcs"] .wiz-box {
+    border: 3px ridge #ffffff !important;
+}
+
+body[data-theme="ddcs"] .wiz-head {
+    background: #d4d0c8;
+    color: #000;
+    border-bottom: 2px solid #000;
+}
+
+body[data-theme="ddcs"] .wiz_comm .viz-container {
+    image-rendering: pixelated;
+}
+.viz-container {
+    background: #000 !important;
+    border: 3px inset #d4d0c8 !important;
+}
+
+body[data-theme="ddcs"] .wiz-foot button {
+    background: #e0e0e0 !important;
+    color: #000 !important;
+    border-top: 2px solid #fff !important;
+    border-left: 2px solid #fff !important;
+    border-right: 2px solid #404040 !important;
+    border-bottom: 2px solid #404040 !important;
+    /* Keep theme-specific sizing consistent */
+    flex: 1;
+    height: 55px;
+    font-size: 16px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Overlay & Box */
+.overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    /* Raised well above toolbars so wizards are always on top */
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(3px);
+}
+.overlay.active { display: flex; }
+
+/* Ensure the wizard box itself creates a high stacking context */
+.wiz-box {
+    position: relative;
+    z-index: 10001;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 1024px) {
+    .wiz-box {
+        width: calc(100% - 24px);
+    }
+
+    .sidebar {
+        width: 240px;
+    }
+
+    /* Mobile-only safe-area padding for wizard footer */
+    .wiz-foot {
+        padding-bottom: calc(45px + env(safe-area-inset-bottom));
+    }
+
+    /* When mobile keyboard is active, pin the editor to a thin strip so
+       the rest of the UI (command deck) remains usable beneath it. */
+    body.keyboard-active .editor-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 60px !important;
+        z-index: 10000;
+        background: #1a1a1a;
+        border-bottom: 2px solid #00ff00;
+    }
+
+    /* Ensure the controller dock / deck panel starts below the pinned editor */
+    body.keyboard-active #controller-dock,
+    body.keyboard-active .deck-panel {
+        padding-top: 60px;
+    }
+}
+
+/* ============================================
+   THEME: DDCS (Windows 95 Retro)
+   ============================================ */
+[data-theme="ddcs"] {
+    --bg: #c0c0c0;
+    --panel: #c0c0c0;
+    --accent: #000080;
+    --text: #000000;
+    --text-main: #000000;
+    --text-dim: #808080;
+    --border: #808080;
+    --radius: 0;
+
+    /* Shared DDCS plate color variables so header and dock match */
+    --ddcs-hdr-top: #2a4f82; /* header/dock top gradient tone */
+    --ddcs-hdr-btm: #123a66; /* header/dock bottom gradient tone */
+    --ddcs-border-top: #a2c3e7;   /* very light blue (highlight) */
+    --ddcs-border-left: #3f669e;  /* light blue */
+    --ddcs-border-right: #305681; /* mid blue */
+    --ddcs-border-bottom: #06131e;/* deep blue (shadow) */
+}
+
+[data-theme="ddcs"] .app-header {
+    /* Use the shared DDCS plate tones for a raised blue header plate */
+    background: linear-gradient(180deg, var(--ddcs-hdr-top), var(--ddcs-hdr-btm)) !important;
+    color: #e6eef3;
+    box-sizing: border-box !important;
+    border-top: 4px solid var(--ddcs-border-top) !important;
+    border-left: 4px solid var(--ddcs-border-left) !important;
+    border-right: 4px solid var(--ddcs-border-right) !important;
+    border-bottom: 4px solid var(--ddcs-border-bottom) !important;
+} 
+
+[data-theme="ddcs"] .sidebar {
+    border-top: 4px solid #e0e0e0; /* Very light grey for top border */
+    border-left: 4px solid #909090; /* Less dark grey for left border */
+    border-right: 4px solid #808080; /* Medium dark grey for right border */
+    border-bottom: 4px solid #404040; /* Dark grey for bottom border */
+    box-shadow: none; /* Removed outer border */
+    border-radius: 0;
+}
+
+/* Main Sidebar Containers */
+.sidebar .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.sidebar .grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 15px;
+}
+
+/* Button Styling for Mobile */
+.sidebar button {
+    min-height: 48px; /* Standard Apple/Google touch target */
+    font-size: 15px;
+    font-weight: bold;
+    text-shadow: 1px 1px 0px rgba(255,255,255,0.5); /* Retro 95 look */
+    border: 2px solid;
+    border-color: #fff #808080 #808080 #fff; /* Classic 3D border */
+    background: #c0c0c0;
+}
+
+.sidebar button:active {
+    border-color: #808080 #fff #fff #808080;
+    padding-top: 2px;
+}
+
+[data-theme="ddcs"] .deck-header {
+    padding: 4px 0; /* Match GENERATORS label style */
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    margin-top: 12px;
+}
+
+[data-theme="ddcs"] .deck-header.no-box {
+    background: transparent;
+    border: none;
+    padding: 4px 0;
+    margin-top: 12px;
+}
+
+/* --- UPDATED BUTTON STYLE --- */
+[data-theme="ddcs"] .toolbar-btn,
+[data-theme="ddcs"] label.toolbar-btn,
+[data-theme="ddcs"] button {
+    position: relative; /* Context for pseudo-element */
+    z-index: 2;         /* Ensure button sits above the outer border plane */
+    
+    /* Layer 1: Inner Border (The Button) */
+    /* Updated Palette for High Contrast Mid-Greys */
+    border-top: 4px solid #f0f0f0;    /* Highlight (Very Light) */
+    border-left: 4px solid #a8a8a8;   /* Light-Mid (Distinct from dark) */
+    border-right: 4px solid #585858;  /* Dark-Mid (Distinct from light) */
+    border-bottom: 4px solid #202020; /* Shadow (Very Dark) */
+    
+    background: linear-gradient(180deg, #f0eee9, #dcd8d1);
+    color: #000;
+    border-radius: 0;
+    box-shadow: none;
+    
+    /* Ensure no margin interference with the absolute pseudo-element */
+    /* If you need spacing between buttons, apply it to the grid container gap instead */
+}
+
+/* --- Layer 2: Outer Border (The Groove) --- */
+[data-theme="ddcs"] .toolbar-btn::before,
+[data-theme="ddcs"] label.toolbar-btn::before,
+[data-theme="ddcs"] button::before {
+    content: "";
+    position: absolute;
+    z-index: -1; /* Sit behind the button content border */
+    
+    /* Positioning & Sizing - Fixed Gap Issue */
+    /* Instead of anchoring all 4 sides, we anchor Top-Left and set explicit size */
+    /* This prevents sub-pixel rounding errors that cause gaps on the right/bottom */
+    top: -7px;
+    left: -7px;
+    width: calc(100% + 14px);  /* 100% + 4px inner L + 4px inner R + 3px outer L + 3px outer R */
+    height: calc(100% + 14px);
+    
+    border-width: 3px;
+    border-style: solid;
+    box-sizing: border-box;
+    pointer-events: none;
+
+    /* RECESSED GROOVE SCHEME (Inverted Palette) */
+    /* Top/Left gets Dark colors (Shadow) */
+    /* Bottom/Right gets Light colors (Highlight) */
+    border-top-color: #202020;    /* Top: Shadow */
+    border-left-color: #585858;   /* Left: Dark-Mid */
+    border-right-color: #a8a8a8;  /* Right: Light-Mid */
+    border-bottom-color: #f0f0f0; /* Bottom: Highlight */
+}
+
+/* --- Active State --- */
+[data-theme="ddcs"] .toolbar-btn:active,
+[data-theme="ddcs"] label.toolbar-btn:active,
+[data-theme="ddcs"] button:active {
+    /* Pressing inverts the INNER border to "sink" the button */
+    border-top-color: #202020;
+    border-left-color: #585858;
+    border-right-color: #a8a8a8;
+    border-bottom-color: #f0f0f0;
+    
+    /* Physical movement */
+    transform: translate(1px, 1px);
+}
+
+/* --- Hover State --- */
+[data-theme="ddcs"] .toolbar-btn:hover,
+[data-theme="ddcs"] label.toolbar-btn:hover,
+[data-theme="ddcs"] button:hover {
+    background: linear-gradient(180deg, #dcd8d1, #c0bab3);
+}
+
+/* --- Active State --- */
+[data-theme="ddcs"] .toolbar-btn:active,
+[data-theme="ddcs"] label.toolbar-btn:active,
+[data-theme="ddcs"] button:active {
+    border-style: inset;
+}
+
+/* --- DDCS BUTTON OVERRIDES --- */
+[data-theme="ddcs"] .toolbar-btn,
+[data-theme="ddcs"] label.toolbar-btn,
+[data-theme="ddcs"] button {
+    /* keep existing border/color rules above; only adjust padding/height here */
+    padding: 3px 8px !important; /* 4px Border + 3px Padding = 7px (Same as Standard Theme) */
+    line-height: 1.2; /* ensure vertical centering */
+    min-height: 24px;
+}
+
+/* Optional: Tweak the Wizards/Header buttons specifically if needed */
+[data-theme="ddcs"] .dock-header .toolbar-btn {
+    padding: 3px 8px !important;
+}
+
+/* --- DDCS DOCK HEADER CLEANUP: reset wrapper then apply high-specificity 3D plate borders --- */
+body[data-theme="ddcs"] .dock-header {
+    /* Keep wrapper invisible so per-plate borders are visually single */
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* --- 3D Plates: Top (controls), Middle (handle), Bottom (body) --- */
+body[data-theme="ddcs"] .dock-header .header-controls {
+    /* Top Plate: raised look with 4-color blueish shaded border (top/left/right/bottom)
+       Using CSS variables so the tones are easy to tweak */
+    --ddcs-hdr-top: #2a4f82; /* header top gradient tone */
+    --ddcs-hdr-btm: #123a66; /* header bottom gradient tone */
+    --ddcs-border-top: #a2c3e7;   /* very light blue (highlight) */
+    --ddcs-border-left: #3f669e;  /* light blue */
+    --ddcs-border-right: #305681; /* mid blue */
+    --ddcs-border-bottom: #06131e;/* deep blue (shadow) */
+
+    background: linear-gradient(180deg, var(--ddcs-hdr-top), var(--ddcs-hdr-btm)) !important;
+    height: 50px;
+    flex: 0 0 50px;
+    box-sizing: border-box !important;
+    border-top: 4px solid var(--ddcs-border-top) !important;
+    border-left: 4px solid var(--ddcs-border-left) !important;
+    border-right: 4px solid var(--ddcs-border-right) !important;
+    border-bottom: 4px solid var(--ddcs-border-bottom) !important;
+}
+
+body[data-theme="ddcs"] .header-handle {
+    /* Middle Plate: the chevron handle - distinct raised appearance */
+    height: 30px !important;
+    flex: 0 0 30px !important;
+    box-sizing: border-box !important;
+    background: #b0b0b0 !important;
+    border-top: 4px solid #ffffff !important;
+    border-left: 4px solid #ffffff73 !important;
+    border-right: 4px solid #606060 !important;
+    border-bottom: 4px solid #606060 !important;
+}
+
+body[data-theme="ddcs"] .dock-body {
+    /* Bottom Plate: make raised to match other plates (light top/left, dark bottom/right) */
+    box-sizing: border-box !important;
+    border-top: 4px solid #f0f0f0 !important;
+    border-left: 4px solid #a8a8a8 !important;
+    border-right: 4px solid #585858 !important;
+    border-bottom: 4px solid #202020 !important;
+    background: var(--panel) !important;
+}
+
+/* Secondary toolbar seam in DDCS: make it a full raised plate (left/right included) */
+body[data-theme="ddcs"] .secondary-toolbar.raised-seam {
+    box-sizing: border-box !important;
+    border-top: 4px solid #f0f0f0 !important;
+    border-left: 4px solid #a8a8a8 !important;
+    border-right: 4px solid #585858 !important;
+    border-bottom: 4px solid #202020 !important;
+}
+
+/* Editor container sunken border belongs to DDCS theme (not global) */
+body[data-theme="ddcs"] .editor-container {
+    border: 3px inset #d4d0c8 !important;
+}
+
+
+[data-theme="ddcs"] .hdr-controls .op-btn {
+    font-size: 12px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, #f6f3f0, #e6e0d8);
+    border-top: 2px solid #fff;
+    border-left: 2px solid #fff;
+    border-right: 2px solid #606060;
+    border-bottom: 2px solid #606060;
+}
+
+[data-theme="ddcs"] .hdr-controls .primary {
+    background: linear-gradient(180deg, #6b7cff, #4d63e6);
+    color: #fff;
+    border-color: #2a3fbf;
+}
+
+[data-theme="ddcs"] .editor {
+    border: none !important; /* Remove the default border */
+    border-top: 4px solid #404040 !important; /* Dark grey for top border */
+    border-left: 4px solid #808080 !important; /* Medium dark grey for left border */
+    border-right: 4px solid #909090 !important; /* Less dark grey for right border */
+    border-bottom: 4px solid #e0e0e0 !important; /* Very light grey for bottom border */
+    box-shadow: none; /* Removed outer border */
+    border-radius: 0;
+}
+
+[data-theme="ddcs"] .main {
+    border-left: 6px solid rgba(0, 0, 0, 0.04);
+    border-top: 4px solid #f0f0f0;    /* Highlight (Very Light) */
+    border-left: 4px solid #a8a8a8;   /* Light-Mid (Distinct from dark) */
+    border-right: 4px solid #585858;  /* Dark-Mid (Distinct from light) */
+    border-bottom: 4px solid #202020; /* Shadow (Very Dark) */
+}
+
+[data-theme="ddcs"] .wizard {
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(3px);
+}
+
+[data-theme="ddcs"] .wiz-box {
+    background: #c0c0c0;
+    border: 3px ridge #ffffff !important;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+[data-theme="ddcs"] .var-item {
+    /* Higher-contrast DDCS chips — restored metallic 3D borders */
+    background: linear-gradient(180deg, #e7f3ff, #cfe6ff) !important;
+    padding: 10px 8px;
+    margin: 0 0 6px 0;
+    border: 2px solid #808080 !important;
+    border-top-color: #ffffff !important;
+    border-left-color: #ffffff !important;
+    border-right-color: #585858 !important;
+    border-bottom-color: #202020 !important;
+    border-radius: 2px !important;
+    color: #062b4a !important;
+    box-shadow: 1px 1px 2px rgba(0,0,0,0.45) !important;
+}
+
+/* Pressed/active look to match 3D chips */
+[data-theme="ddcs"] .var-item:active {
+    background: linear-gradient(180deg, #dfefff, #c0dbff) !important;
+    border-top-color: #606060 !important;
+    border-left-color: #606060 !important;
+    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4) !important;
+    transform: translateY(1px) !important;
+}
+
+
+/* Theme-specific override so .variable-chip retains its metallic 3D look under the DDCS theme */
+[data-theme="ddcs"] .variable-chip {
+    background: linear-gradient(180deg, #e0e0e0 0%, #b0b0b0 100%) !important; /* metallic */
+    border: 2px solid #808080 !important;
+    border-top-color: #ffffff !important; /* highlight */
+    border-left-color: #ffffff !important;
+    border-radius: 2px !important;
+    color: #1a1a1a !important;
+    font-family: 'Consolas', 'Monaco', monospace !important;
+    font-weight: bold !important;
+    font-size: 12px !important;
+    padding: 4px 8px !important;
+    margin: 2px !important;
+    box-shadow: 1px 1px 2px rgba(0,0,0,0.5) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    cursor: pointer !important;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.5) !important;
+}
+
+[data-theme="ddcs"] .variable-chip:active {
+    background: #d0d0d0 !important;
+    border: 2px solid #ffffff !important;
+    border-top-color: #606060 !important;
+    border-left-color: #606060 !important;
+    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4) !important;
+    transform: translateY(1px) !important;
+}
+
+/* Var-list uses transparent background so the row gradient shows through */
+[data-theme="ddcs"] .secondary-toolbar .var-list {
+    background: transparent;
+    border-radius: 6px;
+    padding: 6px;
+    border: none;
+    box-shadow: none;
+}
+
+/* DDCS Silver toolbar container (applies the silver gradient + hardware-style bottom border) */
+[data-theme="ddcs"] .secondary-toolbar {
+    background: linear-gradient(180deg, #dcdcdc 0%, #b0b0b0 100%);
+    border-bottom: 2px solid #808080;
+}
+
+/* Container row holding search and chips: gradient + hardware borders */
+[data-theme="ddcs"] .secondary-toolbar .secondary-toolbar-row {
+    background: linear-gradient(180deg, #dcdcdc 0%, #b0b0b0 100%);
+    border-top: 1px solid #ffffff;
+    border-bottom: 2px solid #808080;
+    border-radius: 8px;
+    padding: 6px;
+} 
+
+/* Scrollbar styling for DDCS theme */
+[data-theme="ddcs"] .sidebar::-webkit-scrollbar {
+    width: 16px;
+}
+
+[data-theme="ddcs"] .sidebar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #cfc7bb, #bfb6a8);
+    border-top: 4px solid #f0f0f0;    /* Highlight (Very Light) */
+    border-left: 4px solid #a8a8a8;   /* Light-Mid (Distinct from dark) */
+    border-right: 4px solid #585858;  /* Dark-Mid (Distinct from light) */
+    border-bottom: 4px solid #202020; /* Shadow (Very Dark) */
+    box-shadow: none; /* Removed outer border */
+    border-radius: 0;
+}
+
+/* Button color accents for DDCS */
+[data-theme="ddcs"] .toolbar-btn.m-red {
+    background: linear-gradient(180deg, #ffd6d6, #ffb4b4);
+    color: #7a0303;
+}
+
+[data-theme="ddcs"] .toolbar-btn.m-green {
+    background: linear-gradient(180deg, #e6fbec, #bff3c7);
+    color: #044a22;
+}
+
+[data-theme="ddcs"] .toolbar-btn.axis-blue {
+    background: linear-gradient(180deg, #e7f0ff, #cfe6ff);
+    color: #0b3a66;
+}
+
+/* ============================================
+   THEME: NORMAL (Clean Modern)
+   ============================================ */
+[data-theme="normal"] {
+    --bg: #f5f5f5;
+    --panel: #ffffff;
+    --accent: #4a90e2;
+    --text: #333333;
+    --text-main: #000000;
+    --text-dim: #666666;
+    --border: #dddddd;
+    --radius: 6px;
+}
+
+[data-theme="normal"] .toolbar-btn {
+    border-radius: 6px;
+}
+
+[data-theme="normal"] .wiz-box {
+    border: 2px solid var(--accent);
+}
+
+/* ============================================
+   THEME: STEAMPUNK (Brass & Copper)
+   ============================================ */
+[data-theme="steampunk"] {
+    --bg: #2a1810;
+    --panel: #3d2817;
+    --accent: #8b6914;
+    --text: #d4a574;
+    --text-main: #f5d7a8;
+    --text-dim: #8b7355;
+    --border: #6b5329;
+    --radius: 4px;
+}
+
+[data-theme="steampunk"] .wizard {
+    background: rgba(40, 20, 0, 0.85);
+}
+
+[data-theme="steampunk"] .wiz-box {
+    border: 2px solid #8b6914;
+    box-shadow: 0 0 20px rgba(139, 105, 20, 0.5);
+}
+
+[data-theme="steampunk"] .toolbar-btn,
+[data-theme="steampunk"] button {
+    background: linear-gradient(180deg, #6b5329, #4a3819);
+    border: 1px solid #8b6914;
+    color: #d4a574;
+}
+
+[data-theme="steampunk"] .toolbar-btn:hover,
+[data-theme="steampunk"] button:hover {
+    background: linear-gradient(180deg, #8b6914, #6b5329);
+    box-shadow: 0 0 10px rgba(139, 105, 20, 0.5);
+}
+
+/* ============================================
+   THEME: FUTURISTIC (Neon Cyan)
+   ============================================ */
+[data-theme="futuristic"] {
+    --bg: #0a0e1a;
+    --panel: #111827;
+    --accent: #00ffff;
+    --text: #e0e7ff;
+    --text-main: #ffffff;
+    --text-dim: #8892b0;
+    --border: #1e293b;
+    --radius: 8px;
+}
+
+[data-theme="futuristic"] .wizard {
+    background: rgba(10, 14, 26, 0.9);
+}
+
+[data-theme="futuristic"] .wiz-box {
+    border: 2px solid #00ffff;
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+}
+
+[data-theme="futuristic"] .toolbar-btn,
+[data-theme="futuristic"] button {
+    background: linear-gradient(180deg, #1e293b, #0f172a);
+    border: 1px solid #00ffff;
+    color: #00ffff;
+}
+
+[data-theme="futuristic"] .toolbar-btn:hover,
+[data-theme="futuristic"] button:hover {
+    background: #00ffff;
+    color: #0a0e1a;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+}
+
+/* ============================================
+   THEME: ORGANIC (Earth Tones)
+   ============================================ */
+[data-theme="organic"] {
+    --bg: #f4f1e8;
+    --panel: #faf8f3;
+    --accent: #6b8e23;
+    --text: #3d3d2f;
+    --text-main: #2d2d20;
+    --text-dim: #7d7d6f;
+    --border: #d4d1c8;
+    --radius: 12px;
+}
+
+[data-theme="organic"] .wizard {
+    background: rgba(100, 100, 80, 0.75);
+}
+
+[data-theme="organic"] .wiz-box {
+    border: 2px solid #6b8e23;
+    box-shadow: 0 4px 24px rgba(107, 142, 35, 0.2);
+}
+
+[data-theme="organic"] .toolbar-btn,
+[data-theme="organic"] button {
+    background: linear-gradient(180deg, #e8e5dc, #d4d1c8);
+    border: 1px solid #a0a090;
+    color: #3d3d2f;
+    border-radius: 12px;
+}
+
+[data-theme="organic"] .toolbar-btn:hover,
+[data-theme="organic"] button:hover {
+    background: linear-gradient(180deg, #6b8e23, #556b1c);
+    color: white;
+}
+
+/* Added classes to replace inline styles in commandDeck.js */
+
+.spacer-8 {
+    height: 8px;
+}
+
+.spacer-12 {
+    height: 4px;
+}
+
+.margin-top-6 {
+    margin-top: 6px;
+}
+
+.toolbar-btn.m-red {
+    color: #fca5a5;
+}
+
+.toolbar-btn.m-green {
+    color: #86efac;
+}
+
+/* Set the width of the spacebar button to 48px */
+#btn-spacebar {
+    width: 48px;
+    text-align: center;
+}
+
+/* Wizard - Raised panels */
+[data-theme="ddcs"] .wiz-box,
+[data-theme="ddcs"] .wiz-head,
+[data-theme="ddcs"] .wiz-foot {
+    border-top: 4px solid #f0f0f0;
+    border-left: 4px solid #a8a8a8;
+    border-right: 4px solid #585858;
+    border-bottom: 4px solid #202020;
+    border-radius: 0;
+}
+
+/* Wizard - Sunken panels */
+[data-theme="ddcs"] .viz-container,
+[data-theme="ddcs"] .preview-block pre,
+[data-theme="ddcs"] .checkbox-panel {
+    border-top: 4px solid #202020;
+    border-left: 4px solid #585858;
+    border-right: 4px solid #a8a8a8;
+    border-bottom: 4px solid #f0f0f0;
+    border-radius: 0;
+}
+
+/* Wizard Body - Add Scroll */
+.wiz-body {
+    padding: 12px;
+    gap: 8px;
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(95vh - 120px); /* Account for header + footer */
+}
+
+/* Grid Layouts - Reduce Gap */
+.grid-2 { gap: 8px; margin-bottom: 6px; }
+.grid-3 { gap: 6px; margin-bottom: 6px; }
+.grid-4 { gap: 6px; margin-bottom: 6px; }
+.row-2 { gap: 8px; }
+
+/* Form Inputs - Compact Padding */
+.wiz-body input[type="text"],
+.wiz-body input[type="number"],
+.wiz-body select {
+    padding: 4px 6px;
+    font-size: 11px;
+}
+
+.wiz-body input[type="text"],
+.wiz-body input[type="number"] {
+    width: 100%;
+    max-width: 60px !important; /* Force small inputs */
+    padding: 4px;
+    font-size: 11px;
+    box-sizing: border-box;
+}
+.wiz-body select { width: 100%; box-sizing: border-box; }
+
+/* Labels - Tighter Spacing */
+.label {
+    font-size: 8px;
+    margin-bottom: 2px;
+}
+
+.section-label {
+    font-size: 9px;
+    margin-bottom: 4px;
+    margin-top: 4px;
+}
+
+/* Checkbox Labels - Compact */
+.checkbox-inline {
+    font-size: 9px;
+    padding: 2px 0;
+}
+
+/* Preview Block - Smaller */
+.preview-block {
+    margin-top: 8px;
+}
+
+.preview-block pre {
+    font-size: 10px;
+    padding: 8px;
+    background: #000;
+    border: 1px solid var(--border);
+    color: #ffffff; /* Default: White */
+    white-space: pre-wrap;
+    border-radius: var(--radius);
+    min-height: 100px;
+    max-height: none !important;  /* Remove height limit */
+    overflow: visible !important; /* Remove internal scrollbar */
+    height: auto !important;      /* Force full expansion */
+    white-space: pre-wrap;        /* Wrap long lines */
+    width: 100%;
+    margin: 0;
+}
+
+.g-comment {
+    color: var(--success); /* Comments: Green */
+}
+
+/* Viz Container - Reduce Padding */
+.viz-container {
+    padding: 10px;
+}
+
+.viz-svg {
+    max-height: 180px;
+}
+
+/* Footer - Compact Buttons */
+.wiz-foot {
+    padding: 8px 12px;
+    display: flex;
+    gap: 15px;
+}
+
+.wiz-foot button {
+    flex: 1;              /* Force both buttons to split width 50/50 */
+    height: 55px;         /* Taller height growing UPWARD */
+    font-size: 16px;      /* Larger, readable text */
+    font-weight: bold;    /* Bold text */
+    display: flex;        /* Center the text vertically */
+    align-items: center;
+    justify-content: center;
+}
+
+/* Header - Slimmer */
+.wiz-head {
+    padding: 8px 12px;
+    font-size: 12px;
+}
+
+/* DDCS Theme Scrollbar */
+[data-theme="ddcs"] .wiz-body::-webkit-scrollbar {
+    width: 16px;
+}
+
+[data-theme="ddcs"] .wiz-body::-webkit-scrollbar-track {
+    background: #c0c0c0;
+    border: 2px inset #808080;
+}
+
+[data-theme="ddcs"] .wiz-body::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #f0f0f0, #c0c0c0);
+    border-top: 2px solid #fff;
+    border-left: 2px solid #fff;
+    border-right: 2px solid #404040;
+    border-bottom: 2px solid #404040;
+}
+
+/* --- SYNTAX HIGHLIGHTING OVERRIDES --- */
+/* Force the top editor layer to be transparent so highlights show through */
+body[data-theme="ddcs"] #editor.editor-layer,
+body #editor.editor-layer {
+    background: transparent !important;
+    color: transparent !important;
+    caret-color: white !important;
+    z-index: 2;
+}
+
+/* Ensure the bottom highlight layer is visible */
+#editor-highlight {
+    background-color: #000000 !important; /* The real background color */
+    color: #ffffff; /* Code color */
+    z-index: 1;
+}
+
+/* Comment Color */
+.g-comment { color: var(--success) !important; font-weight: bold; }
+
+/* === EDITOR HIGHLIGHTING ENGINE === */
+.editor-container {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: #000; /* Background is on the container now */
+    overflow: hidden;
+}
+
+.editor-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+    margin: 0;
+    border: none !important;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    box-sizing: border-box;
+    overflow: auto;
+}
+
+/* Bottom Layer: The Colors */
+#editor-highlight {
+    z-index: 1;
+    color: #ffffff;
+    background-color: #000000;
+    pointer-events: none;
+}
+
+/* Top Layer: The Input */
+/* We use specific selectors to override the 'ddcs' theme defaults */
+body[data-theme="ddcs"] #editor.editor-layer,
+#editor.editor-layer {
+    z-index: 2;
+    color: transparent !important; /* Hide raw text */
+    background: transparent !important; /* See through to highlights */
+    caret-color: white; /* Keep cursor visible */
+}
+
+/* Comment Color */
+.g-comment { color: var(--success) !important; font-weight: bold; }
+
+/* ============================================================================
+   GLOBAL SCALE SYSTEM - FIXED VERSION
+   Uses CSS zoom instead of transform for proper layout behavior
+   ============================================================================ */
+
+/* Remove the transform-based scaling and use zoom instead */
+body {
+    /* Remove: transform-origin: top left; */
+    /* Remove: transition: transform 0.2s ease; */
+}
+
+/* Scale using zoom (better layout preservation) */
+body[data-scale="75"] {
+    zoom: 0.75;
+}
+
+body[data-scale="100"] {
+    zoom: 1.0;
+}
+
+body[data-scale="auto"] {
+    /* inline computed zoom by ScaleManager (e.g., 112%) */
+}
+
+body[data-scale="125"] {
+    zoom: 1.25;
+}
+
+body[data-scale="150"] {
+    zoom: 1.5;
+}
+
+body[data-scale="175"] {
+    zoom: 1.75;
+}
+
+body[data-scale="200"] {
+    zoom: 2.0;
+}
+
+body[data-scale="250"] {
+    zoom: 2.5;
+}
+
+/* Ensure wizards still constrained to viewport when large */
+.overlay {
+    position: fixed;
+    inset: 0;
+}
+
+/* Base styles for viz paths - hidden via stroke-dashoffset
+   dasharray/dashoffset are set per-element by JS to match actual path length */
+svg [id*="probepath"],
+svg [id*="retractpath"],
+svg [id*="jogpath"],
+svg [id*="traversepath"],
+svg [id*="travelpath"],
+svg [id*="Zfirst_travel"] {
+  fill: transparent !important;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  transition-property: stroke-dashoffset, stroke, stroke-width;
+  transition-timing-function: linear;
+  transition-duration: 1s, 0.3s, 0.3s;
+}
+
+/* "draw" toggle — animates dashoffset to 0, stroke draws along path direction */
+.path-draw {
+  stroke-dashoffset: 0 !important;
+}
+
+/* Instant reset — no reverse-draw when clearing between loops */
+.path-reset {
+  transition: none !important;
+}
+
+/* fade out class for smooth removal */
+.path-fadeout {
+  stroke-dashoffset: 0 !important;
+  opacity: 0 !important;
+  transition: opacity 0.5s ease-out !important;
+}
+
+/* Probe — duration set per-element by JS for uniform pace */
+.is-probing [id*="probepath"] {
+  stroke: #3b82f6 !important; /* blue */
+  stroke-width: 4px !important;
+}
+
+/* Show probe direction arrows during animation */
+.is-probing .viz-start-arrow,
+.is-probing .viz-end-arrow {
+  opacity: 1 !important;
+  fill: #3b82f6 !important;
+}
+
+/* Retract — duration set per-element by JS for uniform pace */
+.is-retracting [id*="retractpath"] {
+  stroke: #facc15 !important; /* bright yellow */
+  stroke-width: 3px !important;
+}
+
+/* Jog/traverse — dashed orange */
+.is-jogging [id*="jogpath"],
+.is-jogging [id*="traversepath"] {
+  stroke: #ff9a0d !important; /* orange */
+  stroke-width: 3px !important;
+}
+
+/* Travel (automated) — dashed green, same mask-reveal as jog */
+.is-jogging [id*="travelpath"],
+.is-jogging [id*="Zfirst_travel"] {
+  stroke: #0f0 !important;
+  stroke-width: 3px !important;
+}
+
+/* Viz Legend */
+.viz-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    padding: 5px 8px;
+    margin-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+.viz-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.viz-legend-line {
+    width: 22px;
+    height: 3px;
+    border-radius: 1px;
+    flex-shrink: 0;
+}
+.viz-legend-line.probe   { background: #3b82f6; }
+.viz-legend-line.retract { background: #facc15; }
+.viz-legend-line.jog     { background: #ff9a0d; border-top: 3px dashed #ff9a0d; background: transparent; height: 0; }
+.viz-legend-line.travel  { background: #00ff00; border-top: 3px dashed #00ff00; background: transparent; height: 0; }
+
+/* Hint text below inputs */
+.hint { font-size: 9px; color: var(--text-dim); margin-top: 3px; display: block; font-style: italic; }
+
+/* WCS crosshair groups in SVG — hidden by default, revealed by animator */
+svg [id$="_wcs"] { display: none; }
+
+@font-face {
+    font-family: 'FSEX';
+    src: url('assets/font/FSEX300.ttf') format('truetype');
+}
+@font-face {
+    font-family: 'PixelArial';
+    src: url('assets/font/Pixelated Arial Regular 11 Regular.ttf') format('truetype');
+}
+
+/* Comm wizard slots — force 4 equal columns */
+#c_slots_block {
+    grid-template-columns: repeat(4, 1fr) !important;
+}
+#c_slots_block > div {
+    min-width: 0;
+}
+#c_slots_block input {
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+/* Comm wizard — DDCS screen preview */
+.comm-screen-wrap {
+    margin: 8px 0 4px;
+    background: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 2px;
+    padding: 8px;
+}
+.comm-screen-label {
+    font-size: 9px;
+    color: #888;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    display: block;
+}
+.comm-screen {
+    background: #111 url('assets/png/ddcsscreenblur.png') center/cover no-repeat !important;
+    -webkit-font-smoothing: none;
+    font-family: 'PixelArial', 'Arial', sans-serif;
+    font-size: 11px;
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
+    aspect-ratio: 16 / 9;
+    display: block;
+    overflow: hidden;
+    padding: 0 !important;
+    filter: none;
+}
+
+.comm-screen-inner {
+    position: absolute;
+    top: 0; left: 0;
+    width: 200%;
+    height: 200%;
+    transform: scale(0.5);
+    transform-origin: top left;
+    image-rendering: pixelated;
+}
+/* Centered dialog overlay — positioned over the screen image */
+.comm-dialog-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+/* popup / input dialog */
+.comm-dialog {
+    background: #a8a8a8;
+    border-top: 2px solid #d0d0d0;
+    border-left: 2px solid #d0d0d0;
+    border-right: 2px solid #333;
+    border-bottom: 2px solid #333;
+    width: 68%;
+    min-height: 112px;
+    box-shadow: 2px 2px 0 #000;
+    font-family: 'Arial', sans-serif;
+}
+.comm-dialog.input-dialog {
+    min-height: 126px;
+}
+.comm-dialog.popup-dialog {
+    background: #efefef;
+    border-top: 2px solid #fdfdfd;
+    border-left: 2px solid #fdfdfd;
+    border-right: 2px solid #5c5c5c;
+    border-bottom: 2px solid #5c5c5c;
+}
+.comm-dialog-title {
+    background: #00008b;
+    color: #fff;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 6px;
+    font-family: 'Arial', sans-serif;
+}
+.comm-dialog-body {
+    padding: 8px 10px 6px;
+    color: #000;
+    font-size: 11px;
+    font-family: 'Arial', sans-serif;
+}
+.comm-dialog.popup-dialog .comm-dialog-body,
+.comm-dialog.input-dialog .comm-dialog-body {
+    min-height: 86px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+.comm-dialog.popup-dialog .comm-dialog-btns {
+    margin-top: auto;
+}
+.comm-dialog.input-dialog .comm-dialog-btns {
+    margin-top: 14px;
+}
+.comm-dialog.popup-dialog .comm-dialog-msg {
+    margin-bottom: 0;
+}
+.comm-dialog.input-dialog .comm-dialog-msg {
+    margin-bottom: 8px;
+}
+.comm-dialog-msg {
+    margin-bottom: 8px;
+    font-weight: bold;
+    min-height: 14px;
+    word-break: break-word;
+}
+.comm-dialog-input {
+    background: #0000cd;
+    color: #fff;
+    padding: 3px 6px;
+    margin: 0 auto;
+    font-size: 11px;
+    font-family: 'Arial', sans-serif;
+    min-height: 20px;
+    width: 56%;
+    max-width: 180px;
+    display: block;
+    text-align: left;
+    border-top: 2px solid #707070;
+    border-left: 2px solid #707070;
+    border-right: 2px solid #c8c8c8;
+    border-bottom: 2px solid #c8c8c8;
+    box-sizing: border-box;
+}
+.comm-dialog-hint {
+    font-size: 9px;
+    color: #555;
+    margin-bottom: 6px;
+    font-family: 'Arial', sans-serif;
+}
+.comm-dialog-btns {
+    display: flex;
+    justify-content: space-between;
+    width: 72%;
+    max-width: 260px;
+    gap: 0;
+    margin: 0 auto;
+    padding: 2px 0 4px;
+}
+.comm-dialog-btns.popup {
+    margin-top: 0;
+}
+.comm-dialog-btns.single {
+    justify-content: center;
+}
+.comm-dialog-btn {
+    background: #c0c0c0;
+    border-top: 2px solid #fff;
+    border-left: 2px solid #fff;
+    border-right: 2px solid #444;
+    border-bottom: 2px solid #444;
+    font-size: 10px;
+    padding: 2px 10px;
+    font-family: 'Arial', sans-serif;
+    color: #000;
+    cursor: default;
+}
+/* status bar — absolute positioned over the screen image */
+.comm-status-bar {
+    position: absolute;
+    left: 0; right: 0;
+    top: 87.2%;
+    height: 5.7%;  /* 92.9 - 87.2 */
+    padding: 0 8px;
+    font-size: clamp(8px, 0.9vw, 11px);
+    font-family: 'PixelArial', 'Arial', sans-serif;
+    font-weight: normal;
+    color: #000;
+    font-smooth: never;
+    -webkit-font-smoothing: none;
+    display: flex;
+    align-items: center;
+    word-break: break-word;
+}
+/* beep / dwell — centered over screen */
+.comm-simple-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+/* beep / dwell */
+.comm-simple-note {
+    color: #f2f2f2;
+    font-size: 15px;
+    font-family: 'Arial', sans-serif;
+    font-weight: 700;
+    line-height: 1.35;
+    text-align: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 4px;
+}
+.comm-simple-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+.comm-simple-sub {
+    display: inline-block;
+    margin-top: 4px;
+    color: #d6d6d6;
+    font-size: 12px;
+    font-weight: 600;
+}
+.comm-beep-preview-btn {
+    cursor: pointer;
+    min-width: 88px;
+}
+
+/* Wizard usage instructions */
+.wiz-usage { font-size: 10px; color: var(--text-dim); padding: 6px 8px; margin: 4px 0 6px; border-left: 2px solid var(--accent); background: rgba(255,255,255,0.03); line-height: 1.5; }
+
+/* Prevent wizard overflow at larger scales */
+body[data-scale="125"] .wiz-box,
+body[data-scale="150"] .wiz-box,
+body[data-scale="175"] .wiz-box,
+body[data-scale="200"] .wiz-box,
+body[data-scale="250"] .wiz-box {
+    max-width: 80vw;
+    max-height: 80vh;
+}
+
+/* Keep scrollbars functional for larger scale modes */
+body[data-scale="125"],
+body[data-scale="150"],
+body[data-scale="175"],
+body[data-scale="200"],
+body[data-scale="250"] {
+    overflow: auto;
+}
