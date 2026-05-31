@@ -9,7 +9,15 @@
  *
  * Probe trigger positions (machine coords):
  *   #1925=X  #1926=Y  #1927=Z
+ *
+ * G-code construct lines are emitted through the words.js "post" (line/comment/
+ * word builders), so spacing/padding/EOL are controlled from one place. The
+ * static variable-declaration blocks (generateMotionVariables / *Precalc* /
+ * generateHeader / generateWCSCode) remain literal strings for now — they carry
+ * cosmetic alignment padding and the WCS-addressing rules headed for dialect.js.
+ * Raw IF/GOTO are wrapped in raw() to flag them as dialect-layer candidates.
  */
+import { w, G, M, N, Z, F, P, L, Q, set, raw, line, comment } from './words.js';
 
 export class MiddleWizard {
     constructor() {}
@@ -38,13 +46,13 @@ export class MiddleWizard {
 
         let gcode = '';
         gcode += this.generateHeader(axis, typeLabel, wcsLabel, dir1Sign, dir2Sign, dist, retract, f_fast, f_slow, doTwoAxis);
-        if (doTwoAxis) gcode += `( 2-Axis mode: ${axis} then ${secondAxis} )\n`;
+        if (doTwoAxis) gcode += comment(`2-Axis mode: ${axis} then ${secondAxis}`) + '\n';
 
         gcode += this.generateMotionVariables(dist, retract, f_fast, f_slow, port, clearance, safeZ);
         gcode += this.generatePrecalcMotionVariables(safeZ);
         gcode += wcsCode;
         gcode += this.generateConfirmStart();
-        gcode += `G91 ( Incremental mode )\n\n`;
+        gcode += line([G(91)], 'Incremental mode') + '\n\n';
 
         // --- Primary axis sequence ---
         if (featureType === 'pocket') {
@@ -58,11 +66,11 @@ export class MiddleWizard {
 
         if (doTwoAxis) {
             // Safe Z and user reposition before secondary axis
-            gcode += `#57=#882 ( Save current Z machine position )\n`;
-            gcode += `G0 Z#17 ( Retract to safe Z )\n\n`;
-            gcode += `( Reposition for secondary axis )\n`;
-            gcode += `#1505=1 ( Press Enter when repositioned )\n\n`;
-            gcode += `G53 G0 Z#57 ( Restore Z to saved height )\n\n`;
+            gcode += line([set('#57', '#882')], 'Save current Z machine position') + '\n';
+            gcode += line([G(0), Z('#17')], 'Retract to safe Z') + '\n\n';
+            gcode += comment('Reposition for secondary axis') + '\n';
+            gcode += line([set('#1505', '1')], 'Press Enter when repositioned') + '\n\n';
+            gcode += line([G(53), G(0), Z('#57')], 'Restore Z to saved height') + '\n\n';
 
             const secAxisStatus = secondAxis === 'X' ? '#1920' : '#1921';
             const secAxisResult = secondAxis === 'X' ? '#1925' : '#1926';
@@ -71,7 +79,7 @@ export class MiddleWizard {
             const secDir2Sign = dir2Sign === '+' ? '-' : '+';
 
             const axisDirKey = axis === 'X' ? 'XtoY' : 'YtoX';
-            gcode += `( 2axis_${axisDirKey}_${resolvedDir2} )\n\n`;
+            gcode += comment(`2axis_${axisDirKey}_${resolvedDir2}`) + '\n\n';
 
             if (featureType === 'pocket') {
                 gcode += this.generatePocketSequence(secondAxis, secDir1Sign, secDir2Sign, secAxisStatus, secAxisResult, level, qStop, 54);
@@ -95,9 +103,9 @@ export class MiddleWizard {
 
         if (syncA && (axis === 'Y' || doTwoAxis)) {
             const s = slave || '3';
-            gcode += `( Dual Gantry Sync )\n`;
-            gcode += `#74=[#70+${s}] ( Base WCS + Slave Offset )\n`;
-            gcode += `#[#74]=#883 ( Write A machine pos to WCS slave offset )\n\n`;
+            gcode += comment('Dual Gantry Sync') + '\n';
+            gcode += line([set('#74', `[#70+${s}]`)], 'Base WCS + Slave Offset') + '\n';
+            gcode += line([set('#[#74]', '#883')], 'Write A machine pos to WCS slave offset') + '\n\n';
         }
 
         gcode += this.generateFooter(doTwoAxis ? '#53 / #56' : '#53');
@@ -109,13 +117,13 @@ export class MiddleWizard {
         const probeVar   = dirSign === '+' ? '#8' : '#7';
         const retractVar = dirSign === '+' ? '#9' : '#10'; // away from wall
         let c = '';
-        c += `G31 ${axis}${probeVar} F#3 P#5 L${level} Q${qStop} ( Fast probe )\n`;
-        c += `IF ${axisStatus}!=2 GOTO1\n`;
-        c += `G0 ${axis}${retractVar} ( Retract )\n`;
-        c += `G31 ${axis}${probeVar} F#4 P#5 L${level} Q${qStop} ( Slow probe )\n`;
-        c += `IF ${axisStatus}!=2 GOTO1\n`;
-        c += `${resultVar}=${axisResult} ( Save edge )\n`;
-        c += `G0 ${axis}${retractVar} ( Retract from wall )\n\n`;
+        c += line([G(31), w(axis, probeVar), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe') + '\n';
+        c += line([raw(`IF ${axisStatus}!=2 GOTO1`)]) + '\n';
+        c += line([G(0), w(axis, retractVar)], 'Retract') + '\n';
+        c += line([G(31), w(axis, probeVar), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe') + '\n';
+        c += line([raw(`IF ${axisStatus}!=2 GOTO1`)]) + '\n';
+        c += line([set(resultVar, axisResult)], 'Save edge') + '\n';
+        c += line([G(0), w(axis, retractVar)], 'Retract from wall') + '\n\n';
         return c;
     }
 
@@ -125,14 +133,14 @@ export class MiddleWizard {
         // Opposite probe direction (toward far wall from center)
         const oppSign    = dir2Sign;
 
-        let c = `( === POCKET: Probe from center toward each wall === )\n\n`;
+        let c = comment('=== POCKET: Probe from center toward each wall ===') + '\n\n';
 
         // Probe dir1 wall
-        c += `( Probe ${dir1Sign === '+' ? 'pos' : 'neg'} ${axis} wall )\n`;
+        c += comment(`Probe ${dir1Sign === '+' ? 'pos' : 'neg'} ${axis} wall`) + '\n';
         c += this.generateTwoPassProbe(axis, dir1Sign, axisStatus, axisResult, firstEdge, level, qStop);
 
         // Probe opposite wall (dir2Sign)
-        c += `( Probe ${oppSign === '+' ? 'pos' : 'neg'} ${axis} wall )\n`;
+        c += comment(`Probe ${oppSign === '+' ? 'pos' : 'neg'} ${axis} wall`) + '\n';
         c += this.generateTwoPassProbe(axis, oppSign, axisStatus, axisResult, secondEdge, level, qStop);
 
         return c;
@@ -144,36 +152,39 @@ export class MiddleWizard {
         // Boss always probes second edge from opposite side (requires repositioning)
         const oppSign    = dir1Sign === '+' ? '-' : '+';
 
-        let c = `( === BOSS: Probe from outside each side === )\n\n`;
+        let c = comment('=== BOSS: Probe from outside each side ===') + '\n\n';
 
         // Probe first side
-        c += `( Probe ${dir1Sign === '+' ? 'pos' : 'neg'} ${axis} side )\n`;
+        c += comment(`Probe ${dir1Sign === '+' ? 'pos' : 'neg'} ${axis} side`) + '\n';
         c += this.generateTwoPassProbe(axis, dir1Sign, axisStatus, axisResult, firstEdge, level, qStop);
 
         // Retract to safe Z and wait for user reposition
-        c += `#57=#882 ( Save current Z machine position )\n`;
-        c += `G0 Z#17 ( Retract to safe Z )\n\n`;
-        c += `( MANUAL REPOSITION - move to opposite side of boss )\n`;
-        c += `#1505=1 ( Press Enter when repositioned )\n\n`;
-        c += `G53 G0 Z#57 ( Restore to saved probe height )\n\n`;
+        c += line([set('#57', '#882')], 'Save current Z machine position') + '\n';
+        c += line([G(0), Z('#17')], 'Retract to safe Z') + '\n\n';
+        c += comment('MANUAL REPOSITION - move to opposite side of boss') + '\n';
+        c += line([set('#1505', '1')], 'Press Enter when repositioned') + '\n\n';
+        c += line([G(53), G(0), Z('#57')], 'Restore to saved probe height') + '\n\n';
 
         // Probe opposite side
-        c += `( Probe ${oppSign === '+' ? 'pos' : 'neg'} ${axis} side )\n`;
+        c += comment(`Probe ${oppSign === '+' ? 'pos' : 'neg'} ${axis} side`) + '\n';
         c += this.generateTwoPassProbe(axis, oppSign, axisStatus, axisResult, secondEdge, level, qStop);
 
         return c;
     }
 
     generateCenterCalculation(edgeA, edgeB, center) {
-        return `( Calculate Center )\n#${center}=[#${edgeA}+#${edgeB}]/2 ( Average of two edges )\n\n`;
+        return comment('Calculate Center') + '\n'
+            + line([set(`#${center}`, `[#${edgeA}+#${edgeB}]/2`)], 'Average of two edges') + '\n\n';
     }
 
     generateWCSWrite(wcsLabel, axis, axisOffset, valueVar) {
-        return `( Write ${axis} to WCS )\n#[#70+${axisOffset}]=${valueVar} ( Set ${wcsLabel} ${axis} to center )\n\n`;
+        return comment(`Write ${axis} to WCS`) + '\n'
+            + line([set(`#[#70+${axisOffset}]`, valueVar)], `Set ${wcsLabel} ${axis} to center`) + '\n\n';
     }
 
     generateFinalRetract() {
-        return `( Final retract )\nG0 Z#17 ( Retract to safe Z )\n\n`;
+        return comment('Final retract') + '\n'
+            + line([G(0), Z('#17')], 'Retract to safe Z') + '\n\n';
     }
 
     generateWCSCode(wcs) {
@@ -238,17 +249,18 @@ export class MiddleWizard {
     }
 
     generateConfirmStart() {
-        return `( Confirm Start )\n#1505=1 ( Press Enter to probe )\n\n`;
+        return comment('Confirm Start') + '\n'
+            + line([set('#1505', '1')], 'Press Enter to probe') + '\n\n';
     }
 
     generateFooter(centerLabel = '#53') {
-        let f = `G90 ( Back to absolute )\n`;
-        f += `#1505=-5000 ( Center found at ${centerLabel} )\n`;
-        f += `GOTO2\n\n`;
-        f += `N1\n`;
-        f += `G90\n`;
-        f += `#1505=1 ( Probe failed - no contact )\n\n`;
-        f += `N2\nM30\n`;
+        let f = line([G(90)], 'Back to absolute') + '\n';
+        f += line([set('#1505', '-5000')], `Center found at ${centerLabel}`) + '\n';
+        f += line([raw('GOTO2')]) + '\n\n';
+        f += line([N(1)]) + '\n';
+        f += line([G(90)]) + '\n';
+        f += line([set('#1505', '1')], 'Probe failed - no contact') + '\n\n';
+        f += line([N(2)]) + '\n' + line([M(30)]) + '\n';
         return f;
     }
 }

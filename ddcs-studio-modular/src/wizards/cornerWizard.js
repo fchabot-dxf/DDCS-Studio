@@ -9,7 +9,11 @@
  *
  * Probe trigger positions (machine coords):
  *   #1925=X  #1926=Y  #1927=Z
+ *
+ * G-code construct lines are emitted through the words.js "post"; static
+ * declaration/header/WCS-read blocks remain literal (see middleWizard.js note).
  */
+import { w, G, M, N, A, Z, F, P, L, Q, set, raw, line, comment } from './words.js';
 
 export class CornerWizard {
     constructor() {}
@@ -72,7 +76,7 @@ export class CornerWizard {
         gcode += this.generatePrecalcMotionVariables(_safeZ, _travelDist, _scanDepth);
         gcode += wcsCode;
         gcode += this.generateConfirmStart(corner, probeZ);
-        gcode += `G91 ( INCREMENTAL MODE )\n\n`;
+        gcode += line([G(91)], 'INCREMENTAL MODE') + '\n\n';
 
         const firstAxis      = probeSeq === 'YX' ? 'Y' : 'X';
         const firstAxisDir   = probeSeq === 'YX' ? yDir : xDir;
@@ -93,12 +97,12 @@ export class CornerWizard {
 
         if (syncA) {
             const s = slave || '3';
-            gcode += `( Dual Gantry Sync )\n`;
-            gcode += `G90 ( Absolute for sync move )\n`;
-            gcode += `G1 A0 F#3 ( Square A axis )\n`;
-            gcode += `G91 ( Back to incremental )\n`;
-            gcode += `#74=[#70+${s}] ( Base WCS + Slave Offset )\n`;
-            gcode += `#[#74]=#883 ( Sync A offset with Y )\n\n`;
+            gcode += comment('Dual Gantry Sync') + '\n';
+            gcode += line([G(90)], 'Absolute for sync move') + '\n';
+            gcode += line([G(1), A('0'), F('#3')], 'Square A axis') + '\n';
+            gcode += line([G(91)], 'Back to incremental') + '\n';
+            gcode += line([set('#74', `[#70+${s}]`)], 'Base WCS + Slave Offset') + '\n';
+            gcode += line([set('#[#74]', '#883')], 'Sync A offset with Y') + '\n\n';
         }
 
         gcode += this.generateFooter(corner);
@@ -149,17 +153,17 @@ export class CornerWizard {
     }
 
     generateZProbe(step, level, qStop, wcsLabel, firstAxis, firstTravelVar, travelDist) {
-        let c = `( Step ${step}: Z Surface Probe )\n`;
-        c += `G31 Z#7 F#3 P#5 L${level} Q${qStop} ( Fast probe down )\n`;
-        c += `IF #1922==0 GOTO1\n`;
-        c += `G0 Z#10 ( Retract up )\n`;
-        c += `G31 Z#7 F#4 P#5 L${level} Q${qStop} ( Slow probe )\n`;
-        c += `IF #1922==0 GOTO1\n`;
-        c += `#73=[#70+2] ( WCS Z Address )\n`;
-        c += `#[#73]=#1927 ( Save ${wcsLabel} Z offset - machine coord )\n`;
-        c += `G0 Z#19 ( Retract to safe Z )\n`;
+        let c = comment(`Step ${step}: Z Surface Probe`) + '\n';
+        c += line([G(31), Z('#7'), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe down') + '\n';
+        c += line([raw('IF #1922==0 GOTO1')]) + '\n';
+        c += line([G(0), Z('#10')], 'Retract up') + '\n';
+        c += line([G(31), Z('#7'), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe') + '\n';
+        c += line([raw('IF #1922==0 GOTO1')]) + '\n';
+        c += line([set('#73', '[#70+2]')], 'WCS Z Address') + '\n';
+        c += line([set('#[#73]', '#1927')], `Save ${wcsLabel} Z offset - machine coord`) + '\n';
+        c += line([G(0), Z('#19')], 'Retract to safe Z') + '\n';
         if (firstAxis && firstTravelVar) {
-            c += `G0 ${firstAxis}${firstTravelVar} ( Travel ${travelDist}mm toward first wall )\n`;
+            c += line([G(0), w(firstAxis, firstTravelVar)], `Travel ${travelDist}mm toward first wall`) + '\n';
         }
         c += `\n`;
         return c;
@@ -182,39 +186,39 @@ export class CornerWizard {
         let c = '';
 
         // Step: Y Probe
-        c += `( Step ${step}: Y Probe )\n`;
-        c += `G0 Z#18 ( Plunge to scan depth )\n`;
-        c += `G31 Y${yProbe} F#3 P#5 L${level} Q${qStop} ( Fast probe Y )\n`;
-        c += `IF #1921==0 GOTO1\n`;
-        c += `G0 Y${yRetract} ( Retract from Y wall )\n\n`;
-        c += `G31 Y${yProbe} F#4 P#5 L${level} Q${qStop} ( Slow probe Y )\n`;
-        c += `IF #1921==0 GOTO1\n\n`;
-        c += `( Apply Y WCS with Radius Comp )\n`;
-        c += `#101=[#1926 ${yCompOp} #6] ( Trigger Pos ${yCompOp} Radius )\n`;
-        c += `#73=[#70+1] ( WCS Y Address )\n`;
-        c += `#[#73]=#101 ( Save to ${wcsLabel} Y )\n\n`;
-        c += `G0 Y${yRetract} ( Retract from Y wall )\n`;
-        c += `G0 Z#17 ( SAFELY retract exact plunge distance )\n\n`;
+        c += comment(`Step ${step}: Y Probe`) + '\n';
+        c += line([G(0), Z('#18')], 'Plunge to scan depth') + '\n';
+        c += line([G(31), w('Y', yProbe), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe Y') + '\n';
+        c += line([raw('IF #1921==0 GOTO1')]) + '\n';
+        c += line([G(0), w('Y', yRetract)], 'Retract from Y wall') + '\n\n';
+        c += line([G(31), w('Y', yProbe), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe Y') + '\n';
+        c += line([raw('IF #1921==0 GOTO1')]) + '\n\n';
+        c += comment('Apply Y WCS with Radius Comp') + '\n';
+        c += line([set('#101', `[#1926 ${yCompOp} #6]`)], `Trigger Pos ${yCompOp} Radius`) + '\n';
+        c += line([set('#73', '[#70+1]')], 'WCS Y Address') + '\n';
+        c += line([set('#[#73]', '#101')], `Save to ${wcsLabel} Y`) + '\n\n';
+        c += line([G(0), w('Y', yRetract)], 'Retract from Y wall') + '\n';
+        c += line([G(0), Z('#17')], 'SAFELY retract exact plunge distance') + '\n\n';
         step++;
 
         // Step: Travel toward X wall
-        c += `( Step ${step}: Travel past corner and set up for X )\n`;
-        c += `G0 Y${yTravel} X${xTravelOpp} ( Move Y past edge, X far off side )\n`;
-        c += `G0 Z#18 ( Plunge to scan depth )\n\n`;
+        c += comment(`Step ${step}: Travel past corner and set up for X`) + '\n';
+        c += line([G(0), w('Y', yTravel), w('X', xTravelOpp)], 'Move Y past edge, X far off side') + '\n';
+        c += line([G(0), Z('#18')], 'Plunge to scan depth') + '\n\n';
         step++;
 
         // Step: X Probe
-        c += `( Step ${step}: X Probe )\n`;
-        c += `G31 X${xProbe} F#3 P#5 L${level} Q${qStop} ( Fast probe X )\n`;
-        c += `IF #1920==0 GOTO1\n`;
-        c += `G0 X${xRetract} ( Retract from X wall )\n\n`;
-        c += `G31 X${xProbe} F#4 P#5 L${level} Q${qStop} ( Slow probe X )\n`;
-        c += `IF #1920==0 GOTO1\n\n`;
-        c += `( Apply X WCS with Radius Comp )\n`;
-        c += `#102=[#1925 ${xCompOp} #6] ( Trigger Pos ${xCompOp} Radius )\n`;
-        c += `#[#70]=#102 ( Save to ${wcsLabel} X )\n\n`;
-        c += `G0 X${xRetract} ( Retract from X wall )\n`;
-        c += `G0 Z#17 ( SAFELY retract exact plunge distance )\n\n`;
+        c += comment(`Step ${step}: X Probe`) + '\n';
+        c += line([G(31), w('X', xProbe), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe X') + '\n';
+        c += line([raw('IF #1920==0 GOTO1')]) + '\n';
+        c += line([G(0), w('X', xRetract)], 'Retract from X wall') + '\n\n';
+        c += line([G(31), w('X', xProbe), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe X') + '\n';
+        c += line([raw('IF #1920==0 GOTO1')]) + '\n\n';
+        c += comment('Apply X WCS with Radius Comp') + '\n';
+        c += line([set('#102', `[#1925 ${xCompOp} #6]`)], `Trigger Pos ${xCompOp} Radius`) + '\n';
+        c += line([set('#[#70]', '#102')], `Save to ${wcsLabel} X`) + '\n\n';
+        c += line([G(0), w('X', xRetract)], 'Retract from X wall') + '\n';
+        c += line([G(0), Z('#17')], 'SAFELY retract exact plunge distance') + '\n\n';
 
         return c;
     }
@@ -234,53 +238,53 @@ export class CornerWizard {
         let c = '';
 
         // Step: X Probe
-        c += `( Step ${step}: X Probe )\n`;
-        c += `G0 Z#18 ( Plunge to scan depth )\n`;
-        c += `G31 X${xProbe} F#3 P#5 L${level} Q${qStop} ( Fast probe X )\n`;
-        c += `IF #1920==0 GOTO1\n`;
-        c += `G0 X${xRetract} ( Retract from X wall )\n\n`;
-        c += `G31 X${xProbe} F#4 P#5 L${level} Q${qStop} ( Slow probe X )\n`;
-        c += `IF #1920==0 GOTO1\n\n`;
-        c += `( Apply X WCS with Radius Comp )\n`;
-        c += `#102=[#1925 ${xCompOp} #6] ( Trigger Pos ${xCompOp} Radius )\n`;
-        c += `#[#70]=#102 ( Save to ${wcsLabel} X )\n\n`;
-        c += `G0 X${xRetract} ( Retract from X wall )\n`;
-        c += `G0 Z#17 ( SAFELY retract exact plunge distance )\n\n`;
+        c += comment(`Step ${step}: X Probe`) + '\n';
+        c += line([G(0), Z('#18')], 'Plunge to scan depth') + '\n';
+        c += line([G(31), w('X', xProbe), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe X') + '\n';
+        c += line([raw('IF #1920==0 GOTO1')]) + '\n';
+        c += line([G(0), w('X', xRetract)], 'Retract from X wall') + '\n\n';
+        c += line([G(31), w('X', xProbe), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe X') + '\n';
+        c += line([raw('IF #1920==0 GOTO1')]) + '\n\n';
+        c += comment('Apply X WCS with Radius Comp') + '\n';
+        c += line([set('#102', `[#1925 ${xCompOp} #6]`)], `Trigger Pos ${xCompOp} Radius`) + '\n';
+        c += line([set('#[#70]', '#102')], `Save to ${wcsLabel} X`) + '\n\n';
+        c += line([G(0), w('X', xRetract)], 'Retract from X wall') + '\n';
+        c += line([G(0), Z('#17')], 'SAFELY retract exact plunge distance') + '\n\n';
         step++;
 
         // Step: Travel toward Y wall
-        c += `( Step ${step}: Travel past corner and set up for Y )\n`;
-        c += `G0 X${xTravel} Y${yTravelOpp} ( Move X past edge, Y far off side )\n`;
-        c += `G0 Z#18 ( Plunge to scan depth )\n\n`;
+        c += comment(`Step ${step}: Travel past corner and set up for Y`) + '\n';
+        c += line([G(0), w('X', xTravel), w('Y', yTravelOpp)], 'Move X past edge, Y far off side') + '\n';
+        c += line([G(0), Z('#18')], 'Plunge to scan depth') + '\n\n';
         step++;
 
         // Step: Y Probe
-        c += `( Step ${step}: Y Probe )\n`;
-        c += `G31 Y${yProbe} F#3 P#5 L${level} Q${qStop} ( Fast probe Y )\n`;
-        c += `IF #1921==0 GOTO1\n`;
-        c += `G0 Y${yRetract} ( Retract from Y wall )\n\n`;
-        c += `G31 Y${yProbe} F#4 P#5 L${level} Q${qStop} ( Slow probe Y )\n`;
-        c += `IF #1921==0 GOTO1\n\n`;
-        c += `( Apply Y WCS with Radius Comp )\n`;
-        c += `#101=[#1926 ${yCompOp} #6] ( Trigger Pos ${yCompOp} Radius )\n`;
-        c += `#73=[#70+1] ( WCS Y Address )\n`;
-        c += `#[#73]=#101 ( Save to ${wcsLabel} Y )\n\n`;
-        c += `G0 Y${yRetract} ( Retract from Y wall )\n`;
-        c += `G0 Z#17 ( SAFELY retract exact plunge distance )\n\n`;
+        c += comment(`Step ${step}: Y Probe`) + '\n';
+        c += line([G(31), w('Y', yProbe), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe Y') + '\n';
+        c += line([raw('IF #1921==0 GOTO1')]) + '\n';
+        c += line([G(0), w('Y', yRetract)], 'Retract from Y wall') + '\n\n';
+        c += line([G(31), w('Y', yProbe), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe Y') + '\n';
+        c += line([raw('IF #1921==0 GOTO1')]) + '\n\n';
+        c += comment('Apply Y WCS with Radius Comp') + '\n';
+        c += line([set('#101', `[#1926 ${yCompOp} #6]`)], `Trigger Pos ${yCompOp} Radius`) + '\n';
+        c += line([set('#73', '[#70+1]')], 'WCS Y Address') + '\n';
+        c += line([set('#[#73]', '#101')], `Save to ${wcsLabel} Y`) + '\n\n';
+        c += line([G(0), w('Y', yRetract)], 'Retract from Y wall') + '\n';
+        c += line([G(0), Z('#17')], 'SAFELY retract exact plunge distance') + '\n\n';
 
         return c;
     }
 
     generateFooter(corner) {
-        let f = `G90 ( Back to absolute )\n`;
-        f += `#1505=-5000 ( Corner ${corner} found )\n`;
-        f += `GOTO2\n\n`;
-        f += `( === ERROR HANDLER === )\n`;
-        f += `N1\n`;
-        f += `G91 G0 Z#17 ( Safe Z on failure )\n`;
-        f += `G90\n`;
-        f += `#1505=1 ( ERROR: Probe failed to trigger )\n\n`;
-        f += `N2\nM30\n`;
+        let f = line([G(90)], 'Back to absolute') + '\n';
+        f += line([set('#1505', '-5000')], `Corner ${corner} found`) + '\n';
+        f += line([raw('GOTO2')]) + '\n\n';
+        f += comment('=== ERROR HANDLER ===') + '\n';
+        f += line([N(1)]) + '\n';
+        f += line([G(91), G(0), Z('#17')], 'Safe Z on failure') + '\n';
+        f += line([G(90)]) + '\n';
+        f += line([set('#1505', '1')], 'ERROR: Probe failed to trigger') + '\n\n';
+        f += line([N(2)]) + '\n' + line([M(30)]) + '\n';
         return f;
     }
 }

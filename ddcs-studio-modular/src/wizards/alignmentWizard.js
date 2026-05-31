@@ -17,7 +17,11 @@
  *
  * Probe trigger positions (machine coords):
  *   #1925=X  #1926=Y  #1927=Z
+ *
+ * G-code construct lines are emitted through the words.js "post". Padded compute
+ * lines and the no-space #1505 popup are kept literal (see middleWizard.js note).
  */
+import { w, G, M, N, Z, F, P, L, Q, set, raw, line, comment } from './words.js';
 
 export class AlignmentWizard {
     constructor() {}
@@ -63,40 +67,41 @@ export class AlignmentWizard {
         gcode += this.generateMotionVariables(_dist, _retract, _f_fast, _f_slow, _port, _safeZ);
 
         // ===== POINT A =====
-        gcode += `( ===== POINT A: First probe along ${checkAxis} fence ===== )\n`;
-        gcode += `( Position probe at point A along the fence, at probing height )\n`;
-        gcode += `#1505=1 ( Press Enter when in position at point A )\n\n`;
+        gcode += comment(`===== POINT A: First probe along ${checkAxis} fence =====`) + '\n';
+        gcode += comment('Position probe at point A along the fence, at probing height') + '\n';
+        gcode += line([set('#1505', '1')], 'Press Enter when in position at point A') + '\n\n';
 
         // Capture checkAxis machine coordinate at A
-        gcode += `#70=${coordVar} ( Record point A ${checkAxis} machine coord )\n\n`;
+        gcode += line([set('#70', coordVar)], `Record point A ${checkAxis} machine coord`) + '\n\n';
 
         // Probe in G91 incremental
-        gcode += `G91 ( Incremental mode )\n\n`;
+        gcode += line([G(91)], 'Incremental mode') + '\n\n';
         gcode += this.generateTwoPassProbe(probeAxis, dirSign, retractSign, axisStatus, axisResult, '#50', _level, _qStop);
 
         // Lift Z safely (in G91 incremental) before user jogs to point B
-        gcode += `G0 Z#19 ( Lift ${_safeZ}mm to clear workpiece for jogging )\n\n`;
-        gcode += `G90 ( Absolute mode )\n\n`;
+        gcode += line([G(0), Z('#19')], `Lift ${_safeZ}mm to clear workpiece for jogging`) + '\n\n';
+        gcode += line([G(90)], 'Absolute mode') + '\n\n';
 
         // ===== POINT B =====
-        gcode += `( ===== POINT B: Second probe along ${checkAxis} fence ===== )\n`;
-        gcode += `( Jog along the ${checkAxis} fence to point B — keep same Y/Z position )\n`;
-        gcode += `#1505=1 ( Press Enter when in position at point B )\n\n`;
+        gcode += comment(`===== POINT B: Second probe along ${checkAxis} fence =====`) + '\n';
+        gcode += comment(`Jog along the ${checkAxis} fence to point B — keep same Y/Z position`) + '\n';
+        gcode += line([set('#1505', '1')], 'Press Enter when in position at point B') + '\n\n';
 
         // Capture checkAxis machine coordinate at B and compute span
-        gcode += `#71=${coordVar} ( Record point B ${checkAxis} machine coord )\n`;
-        gcode += `#72=[#71-#70]  ( Span = B - A along ${checkAxis} )\n\n`;
+        gcode += line([set('#71', coordVar)], `Record point B ${checkAxis} machine coord`) + '\n';
+        gcode += `#72=[#71-#70]  ( Span = B - A along ${checkAxis} )\n\n`; // padded compute → literal
 
         // Descend back to probing height (G91 — move DOWN by same safeZ lift amount)
-        gcode += `G91 ( Incremental mode )\n`;
-        gcode += `G0 Z#20 ( Descend back to probe height )\n\n`;
+        gcode += line([G(91)], 'Incremental mode') + '\n';
+        gcode += line([G(0), Z('#20')], 'Descend back to probe height') + '\n\n';
 
         gcode += this.generateTwoPassProbe(probeAxis, dirSign, retractSign, axisStatus, axisResult, '#51', _level, _qStop);
 
-        gcode += `G90 ( Absolute mode )\n\n`;
+        gcode += line([G(90)], 'Absolute mode') + '\n\n';
 
         // ===== COMPUTE RESULTS =====
-        gcode += `( ===== COMPUTE ALIGNMENT ===== )\n`;
+        gcode += comment('===== COMPUTE ALIGNMENT =====') + '\n';
+        // Padded compute lines kept literal (hand-aligned comment columns)
         gcode += `#52=[#51-#50]         ( Delta: fence wander in ${probeAxis} from A to B )\n`;
         gcode += `#53=ABS[#72]          ( Absolute span along ${checkAxis} )\n`;
         // Guard against zero span to avoid division by zero
@@ -104,16 +109,16 @@ export class AlignmentWizard {
         gcode += `#54=ATAN[#52/#53]     ( Misalignment angle in degrees )\n\n`;
 
         // Lift Z before displaying results
-        gcode += `G0 Z#19 ( Lift to safe height before display )\n\n`;
-        gcode += `G90 ( Absolute mode )\n\n`;
+        gcode += line([G(0), Z('#19')], 'Lift to safe height before display') + '\n\n';
+        gcode += line([G(90)], 'Absolute mode') + '\n\n';
 
         // Single result dialog showing all three values using #1510-#1512 format vars
-        gcode += `( ===== RESULTS ===== )\n`;
-        gcode += `#1510=#52 ( Delta: fence wander in probe axis )\n`;
-        gcode += `#1511=#53 ( Span: absolute distance along check axis )\n`;
-        gcode += `#1512=#54 ( Angle: misalignment in degrees )\n`;
-        gcode += `#1505=-5000(Drift=%.3fmm Span=%.1fmm Angle=%.3fdeg)\n`;
-        gcode += `IF #1505==1 GOTO2\n\n`;
+        gcode += comment('===== RESULTS =====') + '\n';
+        gcode += line([set('#1510', '#52')], 'Delta: fence wander in probe axis') + '\n';
+        gcode += line([set('#1511', '#53')], 'Span: absolute distance along check axis') + '\n';
+        gcode += line([set('#1512', '#54')], 'Angle: misalignment in degrees') + '\n';
+        gcode += `#1505=-5000(Drift=%.3fmm Span=%.1fmm Angle=%.3fdeg)\n`; // no-space popup → literal
+        gcode += line([raw('IF #1505==1 GOTO2')]) + '\n\n';
 
         gcode += this.generateFooter();
         return gcode;
@@ -124,15 +129,15 @@ export class AlignmentWizard {
         const probeVar   = dirSign   === '+' ? '#8' : '#7';
         const retractVar = retractSign === '+' ? '#10' : '#9';
         let c = '';
-        c += `( Fast probe toward fence )\n`;
-        c += `G31 ${probeAxis}${probeVar} F#3 P#5 L${level} Q${qStop}\n`;
-        c += `IF ${axisStatus}!=2 GOTO1\n`;
-        c += `G0 ${probeAxis}${retractVar} ( Retract )\n\n`;
-        c += `( Slow probe for precision )\n`;
-        c += `G31 ${probeAxis}${probeVar} F#4 P#5 L${level} Q${qStop}\n`;
-        c += `IF ${axisStatus}!=2 GOTO1\n`;
-        c += `${resultVar}=${axisResult} ( Save contact position - machine coord )\n`;
-        c += `G0 ${probeAxis}${retractVar} ( Retract from fence )\n\n`;
+        c += comment('Fast probe toward fence') + '\n';
+        c += line([G(31), w(probeAxis, probeVar), F('#3'), P('#5'), L(level), Q(qStop)]) + '\n';
+        c += line([raw(`IF ${axisStatus}!=2 GOTO1`)]) + '\n';
+        c += line([G(0), w(probeAxis, retractVar)], 'Retract') + '\n\n';
+        c += comment('Slow probe for precision') + '\n';
+        c += line([G(31), w(probeAxis, probeVar), F('#4'), P('#5'), L(level), Q(qStop)]) + '\n';
+        c += line([raw(`IF ${axisStatus}!=2 GOTO1`)]) + '\n';
+        c += line([set(resultVar, axisResult)], 'Save contact position - machine coord') + '\n';
+        c += line([G(0), w(probeAxis, retractVar)], 'Retract from fence') + '\n\n';
         return c;
     }
 
@@ -171,11 +176,11 @@ export class AlignmentWizard {
     }
 
     generateFooter() {
-        let f = `GOTO2\n\n`;
-        f += `N1\n`;
-        f += `G90\n`;
-        f += `#1505=1 ( Probe failed or zero span - check position )\n\n`;
-        f += `N2\nM30\n`;
+        let f = line([raw('GOTO2')]) + '\n\n';
+        f += line([N(1)]) + '\n';
+        f += line([G(90)]) + '\n';
+        f += line([set('#1505', '1')], 'Probe failed or zero span - check position') + '\n\n';
+        f += line([N(2)]) + '\n' + line([M(30)]) + '\n';
         return f;
     }
 }

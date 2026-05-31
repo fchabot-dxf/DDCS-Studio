@@ -10,7 +10,11 @@
  *
  * Probe trigger positions (machine coords):
  *   #1925=X  #1926=Y  #1927=Z
+ *
+ * G-code construct lines are emitted through the words.js "post"; static
+ * declaration/header/WCS-read blocks remain literal (see middleWizard.js note).
  */
+import { w, G, M, N, F, P, L, Q, set, raw, line, comment } from './words.js';
 
 export class EdgeWizard {
     constructor() {}
@@ -39,21 +43,21 @@ export class EdgeWizard {
         gcode += this.generatePrecalcMotionVariables();
         gcode += wcsCode;
         gcode += this.generateConfirmStart(axis, dirSign);
-        gcode += `G91 ( Incremental mode )\n\n`;
+        gcode += line([G(91)], 'Incremental mode') + '\n\n';
 
         // Probe the edge
-        gcode += `( Probe ${axis} ${dirSign === '+' ? 'pos' : 'neg'} )\n`;
+        gcode += comment(`Probe ${axis} ${dirSign === '+' ? 'pos' : 'neg'}`) + '\n';
         gcode += this.generateTwoPassProbe(axis, dirSign, retractSign, axisStatus, axisResult, '#50', level, qStop);
 
         // Write edge position to WCS
-        gcode += `( Write to WCS )\n`;
-        gcode += `#[#70+${axisOffset}]=#50 ( Set ${wcsLabel} ${axis} to edge )\n\n`;
+        gcode += comment('Write to WCS') + '\n';
+        gcode += line([set(`#[#70+${axisOffset}]`, '#50')], `Set ${wcsLabel} ${axis} to edge`) + '\n\n';
 
         if (syncA) {
             const s = slave || '3';
-            gcode += `( Dual Gantry Sync )\n`;
-            gcode += `#74=[#70+${s}] ( Base WCS + Slave Offset )\n`;
-            gcode += `#[#74]=#883 ( Write sync result to slave offset )\n\n`;
+            gcode += comment('Dual Gantry Sync') + '\n';
+            gcode += line([set('#74', `[#70+${s}]`)], 'Base WCS + Slave Offset') + '\n';
+            gcode += line([set('#[#74]', '#883')], 'Write sync result to slave offset') + '\n\n';
         }
 
         gcode += this.generateFooter();
@@ -64,13 +68,13 @@ export class EdgeWizard {
         const probeVar   = dirSign   === '+' ? '#8' : '#7';
         const retractVar = retractSign === '+' ? '#10' : '#9';
         let c = '';
-        c += `G31 ${axis}${probeVar} F#3 P#5 L${level} Q${qStop} ( Fast probe )\n`;
-        c += `IF ${axisStatus}!=2 GOTO1\n`;
-        c += `G0 ${axis}${retractVar} ( Retract )\n`;
-        c += `G31 ${axis}${probeVar} F#4 P#5 L${level} Q${qStop} ( Slow probe )\n`;
-        c += `IF ${axisStatus}!=2 GOTO1\n`;
-        c += `${resultVar}=${axisResult} ( Save edge position )\n`;
-        c += `G0 ${axis}${retractVar} ( Retract from wall )\n\n`;
+        c += line([G(31), w(axis, probeVar), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe') + '\n';
+        c += line([raw(`IF ${axisStatus}!=2 GOTO1`)]) + '\n';
+        c += line([G(0), w(axis, retractVar)], 'Retract') + '\n';
+        c += line([G(31), w(axis, probeVar), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe') + '\n';
+        c += line([raw(`IF ${axisStatus}!=2 GOTO1`)]) + '\n';
+        c += line([set(resultVar, axisResult)], 'Save edge position') + '\n';
+        c += line([G(0), w(axis, retractVar)], 'Retract from wall') + '\n\n';
         return c;
     }
 
@@ -126,13 +130,13 @@ export class EdgeWizard {
     }
 
     generateFooter() {
-        let f = `G90 ( Back to absolute )\n`;
-        f += `#1505=-5000 ( Edge found )\n`;
-        f += `GOTO2\n\n`;
-        f += `N1\n`;
-        f += `G90\n`;
-        f += `#1505=1 ( Probe failed - no contact )\n\n`;
-        f += `N2\nM30\n`;
+        let f = line([G(90)], 'Back to absolute') + '\n';
+        f += line([set('#1505', '-5000')], 'Edge found') + '\n';
+        f += line([raw('GOTO2')]) + '\n\n';
+        f += line([N(1)]) + '\n';
+        f += line([G(90)]) + '\n';
+        f += line([set('#1505', '1')], 'Probe failed - no contact') + '\n\n';
+        f += line([N(2)]) + '\n' + line([M(30)]) + '\n';
         return f;
     }
 }

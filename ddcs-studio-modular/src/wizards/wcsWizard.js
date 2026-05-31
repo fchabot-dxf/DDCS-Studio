@@ -2,7 +2,11 @@
  * DDCS Studio - WCS (Work Coordinate System) Wizard
  * Generates G-code for zeroing WCS offsets
  * V9.20 - DDCS Compliant (Direct #805+ writes, NO G10)
+ *
+ * Lines are emitted through the words.js "post" (comments + assignments), so
+ * comment/EOL formatting is controlled centrally (see middleWizard.js note).
  */
+import { set, line, comment } from './words.js';
 
 // WCSWizard: Generates WCS zeroing G-code. No runtime verifier invoked here to keep generation deterministic.
 export class WCSWizard {
@@ -54,19 +58,19 @@ export class WCSWizard {
     }
 
     generateHeader() {
-        let header = `( WCS | Direct #805+ writes )\n`;
-        header += `( M350 Ready - G10 not used )\n\n`;
+        let header = comment('WCS | Direct #805+ writes') + '\n';
+        header += comment('M350 Ready - G10 not used') + '\n\n';
         return header;
     }
 
     generateAutoWCS(axes) {
-        let gcode = `( Auto-detect active WCS from #578 )\n`;
-        gcode += `#150=#578\n`;
-        gcode += `#151=805+[#150-1]*5\n\n`;
-        gcode += `( Zero selected axes )\n`;
-        
+        let gcode = comment('Auto-detect active WCS from #578') + '\n';
+        gcode += line([set('#150', '#578')]) + '\n';
+        gcode += line([set('#151', '805+[#150-1]*5')]) + '\n\n';
+        gcode += comment('Zero selected axes') + '\n';
+
         axes.forEach(a => {
-            gcode += `#[#151+${a.offset}]=${a.var}\n`;
+            gcode += line([set(`#[#151+${a.offset}]`, a.var)]) + '\n';
         });
 
         return gcode;
@@ -75,12 +79,12 @@ export class WCSWizard {
     generateFixedWCS(sys, axes) {
         const wcsIndex = parseInt(sys) - 53;
         const base = 805 + (wcsIndex - 1) * 5;
-        
-        let gcode = `( Fixed WCS: G${sys} - Base address #${base} )\n`;
-        gcode += `( Zero selected axes )\n`;
-        
+
+        let gcode = comment(`Fixed WCS: G${sys} - Base address #${base}`) + '\n';
+        gcode += comment('Zero selected axes') + '\n';
+
         axes.forEach(a => {
-            gcode += `#${base + a.offset}=${a.var}\n`;
+            gcode += line([set(`#${base + a.offset}`, a.var)]) + '\n';
         });
 
         return gcode;
@@ -90,15 +94,15 @@ export class WCSWizard {
         const slaveOffset = (slave === "3") ? 3 : 4;
         const slaveChar = (slave === "3") ? "A" : "B";
 
-        let gcode = `\n( Dual Gantry Sync - Slave ${slaveChar} )\n`;
-        
+        let gcode = '\n' + comment(`Dual Gantry Sync - Slave ${slaveChar}`) + '\n';
+
         if (auto) {
-            gcode += `#152=[#151+${slaveOffset}] ( Base WCS + Slave Offset )\n`;
-            gcode += `#[#152]=#88${slave}\n`;
+            gcode += line([set('#152', `[#151+${slaveOffset}]`)], 'Base WCS + Slave Offset') + '\n';
+            gcode += line([set('#[#152]', `#88${slave}`)]) + '\n';
         } else {
             const wcsIndex = parseInt(sys) - 53;
             const base = 805 + (wcsIndex - 1) * 5;
-            gcode += `#${base + slaveOffset}=#88${slave}\n`;
+            gcode += line([set(`#${base + slaveOffset}`, `#88${slave}`)]) + '\n';
         }
 
         return gcode;
