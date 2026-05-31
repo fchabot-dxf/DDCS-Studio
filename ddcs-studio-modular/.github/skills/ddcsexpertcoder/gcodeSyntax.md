@@ -516,6 +516,12 @@ IF #1922!=2 GOTO1
 
 ### 7.3 Popup Dialog (#1505)
 
+**Line breaks**: use `/` inside message text to break lines on controller popups.
+
+```gcode
+#1505=1(Hello! First row /second row /third row)
+```
+
 ```gcode
 ( Simple confirmation - waits for CYCLE START )
 #1505=1(Press CYCLE START to begin)
@@ -540,6 +546,8 @@ M0
 | 1 | Standard popup, wait for input |
 | 3 | Binary choice (Enter/Esc) |
 | -5000 | Success message (no wait) |
+
+**Controller note**: `#0245=line` enables controller simulation mode; useful operationally, but not part of macro message syntax.
 
 ### 7.5 Numeric Input (#2070)
 

@@ -15,7 +15,6 @@ ddcs-studio-modular/
 ├── scaleManager.js        # Viewport scaling and zoom
 ├── variableDB.js          # DDCS variable database management
 ├── editorManager.js       # G-code editor functionality
-├── searchManager.js       # Variable search and filtering
 ├── wizardManager.js       # Wizard dialog coordinator
 ├── uiUtils.js            # DOM helpers and utilities
 ├── snippets.js           # Pre-defined G-code templates
@@ -78,15 +77,6 @@ Main G-code text editor functionality.
 - `clearCode()` - Clear editor with confirmation
 - `downloadFile()` - Download as .nc file
 - Handles backspace button with repeat
-
-#### `searchManager.js`
-Variable search sidebar with live filtering.
-
-**Key Class:** `SearchManager`
-- `renderResults(term)` - Display search matches
-- `clear()` - Reset search
-- Multi-term AND search support
-- Integrates with VariableDatabase
 
 #### `wizardManager.js`
 Coordinates all wizard dialogs and G-code generation.
@@ -343,8 +333,6 @@ Tested on: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
 
 ## Future Enhancements
 
-- [ ] Complete middle wizard implementation
-- [ ] Complete edge wizard implementation  
 - [ ] Add TypeScript definitions
 - [ ] Create automated tests
 - [ ] Add build system for minification

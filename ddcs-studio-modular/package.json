@@ -32,7 +32,6 @@
     "src/scaleManager.js",
     "src/variableDB.js",
     "src/editorManager.js",
-    "src/searchManager.js",
     "src/wizardManager.js",
     "src/uiUtils.js",
     "src/snippets.js",

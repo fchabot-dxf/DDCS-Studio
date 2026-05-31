@@ -1,0 +1,20 @@
+# OS / editor cruft
+desktop.ini
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# Wrangler / Cloudflare cache
+.wrangler/
+
+# Dependencies / build output
+node_modules/
+output/
+.venv/
+.env
+
+# Generated/temp build artifacts
+**/scripts/tmp_bundle_check.js
+**/tmp_commandDeck_transformed.js
