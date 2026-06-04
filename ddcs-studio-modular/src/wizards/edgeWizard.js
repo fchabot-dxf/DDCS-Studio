@@ -14,7 +14,8 @@
  * G-code construct lines are emitted through the words.js "post"; static
  * declaration/header/WCS-read blocks remain literal (see middleWizard.js note).
  */
-import { w, G, M, N, F, P, L, Q, set, raw, line, comment } from './words.js';
+import { w, G, M, N, F, P, L, Q, set, line, comment } from './words.js';
+import { ifGoto, goto } from './dialect.js';
 
 export class EdgeWizard {
     constructor() {}
@@ -69,10 +70,10 @@ export class EdgeWizard {
         const retractVar = retractSign === '+' ? '#10' : '#9';
         let c = '';
         c += line([G(31), w(axis, probeVar), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe') + '\n';
-        c += line([raw(`IF ${axisStatus}!=2 GOTO1`)]) + '\n';
+        c += ifGoto(axisStatus, '!=', '2', 1) + '\n';
         c += line([G(0), w(axis, retractVar)], 'Retract') + '\n';
         c += line([G(31), w(axis, probeVar), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe') + '\n';
-        c += line([raw(`IF ${axisStatus}!=2 GOTO1`)]) + '\n';
+        c += ifGoto(axisStatus, '!=', '2', 1) + '\n';
         c += line([set(resultVar, axisResult)], 'Save edge position') + '\n';
         c += line([G(0), w(axis, retractVar)], 'Retract from wall') + '\n\n';
         return c;
@@ -132,7 +133,7 @@ export class EdgeWizard {
     generateFooter() {
         let f = line([G(90)], 'Back to absolute') + '\n';
         f += line([set('#1505', '-5000')], 'Edge found') + '\n';
-        f += line([raw('GOTO2')]) + '\n\n';
+        f += goto(2) + '\n\n';
         f += line([N(1)]) + '\n';
         f += line([G(90)]) + '\n';
         f += line([set('#1505', '1')], 'Probe failed - no contact') + '\n\n';

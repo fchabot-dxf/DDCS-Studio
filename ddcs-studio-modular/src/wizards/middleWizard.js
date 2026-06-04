@@ -15,9 +15,10 @@
  * static variable-declaration blocks (generateMotionVariables / *Precalc* /
  * generateHeader / generateWCSCode) remain literal strings for now — they carry
  * cosmetic alignment padding and the WCS-addressing rules headed for dialect.js.
- * Raw IF/GOTO are wrapped in raw() to flag them as dialect-layer candidates.
+ * IF/GOTO and the G53 move go through dialect.js (the grammatical post layer).
  */
-import { w, G, M, N, Z, F, P, L, Q, set, raw, line, comment } from './words.js';
+import { w, G, M, N, Z, F, P, L, Q, set, line, comment } from './words.js';
+import { ifGoto, goto, g53 } from './dialect.js';
 
 export class MiddleWizard {
     constructor() {}
@@ -70,7 +71,7 @@ export class MiddleWizard {
             gcode += line([G(0), Z('#17')], 'Retract to safe Z') + '\n\n';
             gcode += comment('Reposition for secondary axis') + '\n';
             gcode += line([set('#1505', '1')], 'Press Enter when repositioned') + '\n\n';
-            gcode += line([G(53), G(0), Z('#57')], 'Restore Z to saved height') + '\n\n';
+            gcode += g53('Z', '#57', 'Restore Z to saved height') + '\n\n';
 
             const secAxisStatus = secondAxis === 'X' ? '#1920' : '#1921';
             const secAxisResult = secondAxis === 'X' ? '#1925' : '#1926';
@@ -118,10 +119,10 @@ export class MiddleWizard {
         const retractVar = dirSign === '+' ? '#9' : '#10'; // away from wall
         let c = '';
         c += line([G(31), w(axis, probeVar), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe') + '\n';
-        c += line([raw(`IF ${axisStatus}!=2 GOTO1`)]) + '\n';
+        c += ifGoto(axisStatus, '!=', '2', 1) + '\n';
         c += line([G(0), w(axis, retractVar)], 'Retract') + '\n';
         c += line([G(31), w(axis, probeVar), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe') + '\n';
-        c += line([raw(`IF ${axisStatus}!=2 GOTO1`)]) + '\n';
+        c += ifGoto(axisStatus, '!=', '2', 1) + '\n';
         c += line([set(resultVar, axisResult)], 'Save edge') + '\n';
         c += line([G(0), w(axis, retractVar)], 'Retract from wall') + '\n\n';
         return c;
@@ -163,7 +164,7 @@ export class MiddleWizard {
         c += line([G(0), Z('#17')], 'Retract to safe Z') + '\n\n';
         c += comment('MANUAL REPOSITION - move to opposite side of boss') + '\n';
         c += line([set('#1505', '1')], 'Press Enter when repositioned') + '\n\n';
-        c += line([G(53), G(0), Z('#57')], 'Restore to saved probe height') + '\n\n';
+        c += g53('Z', '#57', 'Restore to saved probe height') + '\n\n';
 
         // Probe opposite side
         c += comment(`Probe ${oppSign === '+' ? 'pos' : 'neg'} ${axis} side`) + '\n';
@@ -256,7 +257,7 @@ export class MiddleWizard {
     generateFooter(centerLabel = '#53') {
         let f = line([G(90)], 'Back to absolute') + '\n';
         f += line([set('#1505', '-5000')], `Center found at ${centerLabel}`) + '\n';
-        f += line([raw('GOTO2')]) + '\n\n';
+        f += goto(2) + '\n\n';
         f += line([N(1)]) + '\n';
         f += line([G(90)]) + '\n';
         f += line([set('#1505', '1')], 'Probe failed - no contact') + '\n\n';

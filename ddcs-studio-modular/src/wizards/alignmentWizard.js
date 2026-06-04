@@ -21,7 +21,8 @@
  * G-code construct lines are emitted through the words.js "post". Padded compute
  * lines and the no-space #1505 popup are kept literal (see middleWizard.js note).
  */
-import { w, G, M, N, Z, F, P, L, Q, set, raw, line, comment } from './words.js';
+import { w, G, M, N, Z, F, P, L, Q, set, line, comment } from './words.js';
+import { ifGoto, goto } from './dialect.js';
 
 export class AlignmentWizard {
     constructor() {}
@@ -118,7 +119,7 @@ export class AlignmentWizard {
         gcode += line([set('#1511', '#53')], 'Span: absolute distance along check axis') + '\n';
         gcode += line([set('#1512', '#54')], 'Angle: misalignment in degrees') + '\n';
         gcode += `#1505=-5000(Drift=%.3fmm Span=%.1fmm Angle=%.3fdeg)\n`; // no-space popup → literal
-        gcode += line([raw('IF #1505==1 GOTO2')]) + '\n\n';
+        gcode += ifGoto('#1505', '==', '1', 2) + '\n\n';
 
         gcode += this.generateFooter();
         return gcode;
@@ -131,11 +132,11 @@ export class AlignmentWizard {
         let c = '';
         c += comment('Fast probe toward fence') + '\n';
         c += line([G(31), w(probeAxis, probeVar), F('#3'), P('#5'), L(level), Q(qStop)]) + '\n';
-        c += line([raw(`IF ${axisStatus}!=2 GOTO1`)]) + '\n';
+        c += ifGoto(axisStatus, '!=', '2', 1) + '\n';
         c += line([G(0), w(probeAxis, retractVar)], 'Retract') + '\n\n';
         c += comment('Slow probe for precision') + '\n';
         c += line([G(31), w(probeAxis, probeVar), F('#4'), P('#5'), L(level), Q(qStop)]) + '\n';
-        c += line([raw(`IF ${axisStatus}!=2 GOTO1`)]) + '\n';
+        c += ifGoto(axisStatus, '!=', '2', 1) + '\n';
         c += line([set(resultVar, axisResult)], 'Save contact position - machine coord') + '\n';
         c += line([G(0), w(probeAxis, retractVar)], 'Retract from fence') + '\n\n';
         return c;
@@ -176,7 +177,7 @@ export class AlignmentWizard {
     }
 
     generateFooter() {
-        let f = line([raw('GOTO2')]) + '\n\n';
+        let f = goto(2) + '\n\n';
         f += line([N(1)]) + '\n';
         f += line([G(90)]) + '\n';
         f += line([set('#1505', '1')], 'Probe failed or zero span - check position') + '\n\n';
