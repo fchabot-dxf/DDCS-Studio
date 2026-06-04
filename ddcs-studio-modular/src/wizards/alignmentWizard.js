@@ -70,7 +70,8 @@ export class AlignmentWizard {
         // ===== POINT A =====
         gcode += comment(`===== POINT A: First probe along ${checkAxis} fence =====`) + '\n';
         gcode += comment('Position probe at point A along the fence, at probing height') + '\n';
-        gcode += line([set('#1505', '1')], 'Press Enter when in position at point A') + '\n\n';
+        gcode += line([set('#1505', '1')], 'Press Enter when in position at point A - ESC=cancel') + '\n';
+        gcode += ifGoto('#1505', '==', '0', 2) + '\n\n';
 
         // Capture checkAxis machine coordinate at A
         gcode += line([set('#70', coordVar)], `Record point A ${checkAxis} machine coord`) + '\n\n';
@@ -86,7 +87,8 @@ export class AlignmentWizard {
         // ===== POINT B =====
         gcode += comment(`===== POINT B: Second probe along ${checkAxis} fence =====`) + '\n';
         gcode += comment(`Jog along the ${checkAxis} fence to point B — keep same Y/Z position`) + '\n';
-        gcode += line([set('#1505', '1')], 'Press Enter when in position at point B') + '\n\n';
+        gcode += line([set('#1505', '1')], 'Press Enter when in position at point B - ESC=cancel') + '\n';
+        gcode += ifGoto('#1505', '==', '0', 2) + '\n\n';
 
         // Capture checkAxis machine coordinate at B and compute span
         gcode += line([set('#71', coordVar)], `Record point B ${checkAxis} machine coord`) + '\n';
@@ -129,7 +131,12 @@ export class AlignmentWizard {
     generateTwoPassProbe(probeAxis, dirSign, retractSign, axisStatus, axisResult, resultVar, level, qStop) {
         const probeVar   = dirSign   === '+' ? '#8' : '#7';
         const retractVar = retractSign === '+' ? '#10' : '#9';
+        // Probe safety: decelerate-stop + enable limit protection in the probe direction
+        const stopVar  = probeAxis === 'X' ? '#1905' : '#1906';
+        const limitVar = probeAxis === 'X' ? '#1915' : '#1916';
         let c = '';
+        c += line([set(stopVar, '0')], 'Stop mode: decelerate') + '\n';
+        c += line([set(limitVar, dirSign === '+' ? '2' : '1')], `Limit protect: ${dirSign === '+' ? 'positive' : 'negative'}`) + '\n';
         c += comment('Fast probe toward fence') + '\n';
         c += line([G(31), w(probeAxis, probeVar), F('#3'), P('#5'), L(level), Q(qStop)]) + '\n';
         c += ifGoto(axisStatus, '!=', '2', 1) + '\n';

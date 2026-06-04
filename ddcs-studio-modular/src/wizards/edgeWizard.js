@@ -15,7 +15,7 @@
  * declaration/header/WCS-read blocks remain literal (see middleWizard.js note).
  */
 import { w, G, M, N, F, P, L, Q, set, line, comment } from './words.js';
-import { ifGoto, goto } from './dialect.js';
+import { ifGoto, goto, wcsBase } from './dialect.js';
 
 export class EdgeWizard {
     constructor() {}
@@ -68,7 +68,12 @@ export class EdgeWizard {
     generateTwoPassProbe(axis, dirSign, retractSign, axisStatus, axisResult, resultVar, level, qStop) {
         const probeVar   = dirSign   === '+' ? '#8' : '#7';
         const retractVar = retractSign === '+' ? '#10' : '#9';
+        // Probe safety: decelerate-stop + enable limit protection in the probe direction
+        const stopVar  = axis === 'X' ? '#1905' : '#1906';
+        const limitVar = axis === 'X' ? '#1915' : '#1916';
         let c = '';
+        c += line([set(stopVar, '0')], 'Stop mode: decelerate') + '\n';
+        c += line([set(limitVar, dirSign === '+' ? '2' : '1')], `Limit protect: ${dirSign === '+' ? 'positive' : 'negative'}`) + '\n';
         c += line([G(31), w(axis, probeVar), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe') + '\n';
         c += ifGoto(axisStatus, '!=', '2', 1) + '\n';
         c += line([G(0), w(axis, retractVar)], 'Retract') + '\n';
@@ -80,20 +85,8 @@ export class EdgeWizard {
     }
 
     generateWCSCode(wcs) {
-        let wcsCode = '', wcsLabel = '';
-        if (wcs === 'active') {
-            wcsCode  = `( Read Active WCS )\n`;
-            wcsCode += `#71=#578 ( Active WCS index: 1=G54 2=G55 etc )\n`;
-            wcsCode += `#72=[#71-1] ( Zero-based index )\n`;
-            wcsCode += `#70=[805+[#72*5]] ( Base WCS address )\n\n`;
-            wcsLabel = 'Active WCS';
-        } else {
-            const wcsMap = { 'G54': 805, 'G55': 810, 'G56': 815, 'G57': 820, 'G58': 825, 'G59': 830 };
-            wcsCode  = `( Target: ${wcs} )\n`;
-            wcsCode += `#70=${wcsMap[wcs]} ( Base WCS address )\n\n`;
-            wcsLabel = wcs;
-        }
-        return { wcsCode, wcsLabel };
+        const { code, label } = wcsBase(wcs);
+        return { wcsCode: code, wcsLabel: label };
     }
 
     generateHeader(axis, dirSign, wcsLabel, dist, retract, f_fast, f_slow) {
@@ -127,7 +120,9 @@ export class EdgeWizard {
 
     generateConfirmStart(axis, dirSign) {
         const dirLabel = dirSign === '+' ? 'pos' : 'neg';
-        return `( Confirm Start )\n#1505=1 ( Press Enter to probe ${axis} ${dirLabel} )\n\n`;
+        return comment('Confirm Start') + '\n'
+            + line([set('#1505', '1')], `Press Enter to probe ${axis} ${dirLabel} - ESC=cancel`) + '\n'
+            + ifGoto('#1505', '==', '0', 2) + '\n\n';
     }
 
     generateFooter() {

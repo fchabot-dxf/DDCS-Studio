@@ -18,7 +18,7 @@
  * IF/GOTO and the G53 move go through dialect.js (the grammatical post layer).
  */
 import { w, G, M, N, Z, F, P, L, Q, set, line, comment } from './words.js';
-import { ifGoto, goto, g53 } from './dialect.js';
+import { ifGoto, goto, g53, wcsBase } from './dialect.js';
 
 export class MiddleWizard {
     constructor() {}
@@ -26,7 +26,7 @@ export class MiddleWizard {
     generate(params) {
         const {
             featureType, axis, dir1, dir2, twoAxis, syncA, slave,
-            wcs, dist, retract, safeZ, clearance,
+            wcs, dist, retract, safeZ,
             f_fast, f_slow, port, level, qStop, findBoth
         } = params;
 
@@ -49,7 +49,7 @@ export class MiddleWizard {
         gcode += this.generateHeader(axis, typeLabel, wcsLabel, dir1Sign, dir2Sign, dist, retract, f_fast, f_slow, doTwoAxis);
         if (doTwoAxis) gcode += comment(`2-Axis mode: ${axis} then ${secondAxis}`) + '\n';
 
-        gcode += this.generateMotionVariables(dist, retract, f_fast, f_slow, port, clearance, safeZ);
+        gcode += this.generateMotionVariables(dist, retract, f_fast, f_slow, port, safeZ);
         gcode += this.generatePrecalcMotionVariables(safeZ);
         gcode += wcsCode;
         gcode += this.generateConfirmStart();
@@ -196,20 +196,8 @@ export class MiddleWizard {
     }
 
     generateWCSCode(wcs) {
-        let wcsCode = '', wcsLabel = '';
-        if (wcs === 'active') {
-            wcsCode  = `( Read Active WCS )\n`;
-            wcsCode += `#71=#578 ( Active WCS index: 1=G54 2=G55 etc )\n`;
-            wcsCode += `#72=[#71-1] ( Zero-based index )\n`;
-            wcsCode += `#70=[805+[#72*5]] ( Base WCS address )\n\n`;
-            wcsLabel = 'Active WCS';
-        } else {
-            const wcsMap = { 'G54': 805, 'G55': 810, 'G56': 815, 'G57': 820, 'G58': 825, 'G59': 830 };
-            wcsCode  = `( Target: ${wcs} )\n`;
-            wcsCode += `#70=${wcsMap[wcs]} ( Base WCS address )\n\n`;
-            wcsLabel = wcs;
-        }
-        return { wcsCode, wcsLabel };
+        const { code, label } = wcsBase(wcs);
+        return { wcsCode: code, wcsLabel: label };
     }
 
     generateHeader(axis, typeLabel, wcsLabel, dir1Sign, dir2Sign, dist, retract, f_fast, f_slow, doTwoAxis) {
@@ -225,14 +213,13 @@ export class MiddleWizard {
         return h;
     }
 
-    generateMotionVariables(dist, retract, f_fast, f_slow, port, clearance, safeZ) {
+    generateMotionVariables(dist, retract, f_fast, f_slow, port, safeZ) {
         let v = `( Motion Variables )\n`;
         v += `#1=${dist}           ( Max probe distance )\n`;
         v += `#2=${retract}        ( Retract distance )\n`;
         v += `#3=${f_fast}         ( Fast feedrate )\n`;
         v += `#4=${f_slow}         ( Slow feedrate )\n`;
         v += `#5=${port}           ( Probe port )\n`;
-        v += `#6=${clearance || 2} ( Clearance distance )\n`;
         v += `( Result storage )\n`;
         v += `#51=0 ( Primary axis edge 1 )\n`;
         v += `#52=0 ( Primary axis edge 2 )\n`;
@@ -250,8 +237,6 @@ export class MiddleWizard {
         v += `#8=#1        ( Positive max probe )\n`;
         v += `#9=[0-#2]   ( Negative retract )\n`;
         v += `#10=#2       ( Positive retract )\n`;
-        v += `#13=#6       ( Positive clearance )\n`;
-        v += `#14=[0-#6]   ( Negative clearance )\n`;
         v += `#17=${sz}    ( Safe Z distance )\n\n`;
         return v;
     }
@@ -267,6 +252,7 @@ export class MiddleWizard {
         f += line([set('#1505', '-5000')], `Center found at ${centerLabel}`) + '\n';
         f += goto(2) + '\n\n';
         f += line([N(1)]) + '\n';
+        f += line([G(91), G(0), Z('#17')], 'Safe Z on failure') + '\n';
         f += line([G(90)]) + '\n';
         f += line([set('#1505', '1')], 'Probe failed - no contact') + '\n\n';
         f += line([N(2)]) + '\n' + line([M(30)]) + '\n';

@@ -14,7 +14,7 @@
  * declaration/header/WCS-read blocks remain literal (see middleWizard.js note).
  */
 import { w, G, M, N, A, Z, F, P, L, Q, set, line, comment } from './words.js';
-import { ifGoto, goto } from './dialect.js';
+import { ifGoto, goto, wcsBase } from './dialect.js';
 
 export class CornerWizard {
     constructor() {}
@@ -55,21 +55,8 @@ export class CornerWizard {
         else if (corner === 'BL') { xDir = '+'; yDir = '-'; }
         else if (corner === 'BR') { xDir = '-'; yDir = '-'; }
 
-        // WCS variable setup — split calculation to avoid nested bracket parse errors
-        let wcsCode = '';
-        let wcsLabel = '';
-        if (wcs === 'active') {
-            wcsCode += `( Read Active WCS )\n`;
-            wcsCode += `#71=#578 ( Active WCS index: 1=G54 2=G55 etc )\n`;
-            wcsCode += `#72=[#71-1] ( Zero-based index )\n`;
-            wcsCode += `#70=[805+[#72*5]] ( Base WCS address )\n\n`;
-            wcsLabel = 'Active WCS';
-        } else {
-            const wcsMap = { 'G54': 805, 'G55': 810, 'G56': 815, 'G57': 820, 'G58': 825, 'G59': 830 };
-            wcsCode += `( Target: ${wcs} )\n`;
-            wcsCode += `#70=${wcsMap[wcs]} ( Base WCS address )\n\n`;
-            wcsLabel = wcs;
-        }
+        // WCS variable setup (stride-5 addressing lives in dialect.js)
+        const { code: wcsCode, label: wcsLabel } = wcsBase(wcs);
 
         let gcode = '';
         gcode += this.generateHeader(corner, xDir, yDir, probeZ, wcsLabel, _dist, _retract, _travelDist, _f_fast, _f_slow, _safeZ, _scanDepth);

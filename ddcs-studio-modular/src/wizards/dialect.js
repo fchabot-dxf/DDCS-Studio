@@ -11,7 +11,7 @@
  * proves a rule wrong. Together, words.fmt (lexical) + dialect.rules
  * (grammatical) are the editable "post profile".
  */
-import { w, G, line, raw } from './words.js';
+import { w, G, line, raw, comment, set } from './words.js';
 
 /** The grammatical back door. Defaults = current output. */
 export const rules = {
@@ -47,4 +47,25 @@ export function ifGoto(lhs, op, rhs, label, r = rules) {
 export function g53(axis, value, comment, r = rules) {
   const words = r.g53Rapid ? [G(53), G(0), w(axis, value)] : [G(53), w(axis, value)];
   return line(words, comment);
+}
+
+/** WCS base addresses (stride 5, the DDCS rule — not FANUC stride 20). */
+const WCS_BASE = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
+
+/**
+ * WCS base-address setup for a probe sequence.
+ * wcsBase('active') reads #578 → #70 = 805+[index-1]*5 ; wcsBase('G55') → #70=810.
+ * Returns { code, label } (code ends in a blank line, matching wizard blocks).
+ */
+export function wcsBase(wcs) {
+  if (wcs === 'active') {
+    const code = comment('Read Active WCS') + '\n'
+      + line([set('#71', '#578')], 'Active WCS index: 1=G54 2=G55 etc') + '\n'
+      + line([set('#72', '[#71-1]')], 'Zero-based index') + '\n'
+      + line([set('#70', '[805+[#72*5]]')], 'Base WCS address') + '\n\n';
+    return { code, label: 'Active WCS' };
+  }
+  const code = comment(`Target: ${wcs}`) + '\n'
+    + line([set('#70', String(WCS_BASE[wcs]))], 'Base WCS address') + '\n\n';
+  return { code, label: wcs };
 }
