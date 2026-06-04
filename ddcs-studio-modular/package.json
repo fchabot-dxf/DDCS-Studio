@@ -12,8 +12,6 @@
     "bundle": "node scripts/bundle.cjs --src src",
     "build": "npm run bump-version && npm run generate-vars && npm run bundle",
     "bump-version": "node scripts/bump-version.cjs",
-    "deploy:pages": "npm run build && wrangler pages deploy ./output --project-name=ddcsexpertstudio",
-    "publish:pages-node": "npm run build && node scripts/publish-pages.cjs --dir=./output --project-name=ddcsexpertstudio",
     "test:e2e": "playwright test"
   },
   "keywords": [

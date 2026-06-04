@@ -348,21 +348,19 @@ Tested on: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
 - **Variable washing** (#var = +0) is DDCS M350 specific requirement
 - **Incremental mode** (G91) is preferred for DDCS M350 probe sequences
 
-## Deployment — Cloudflare Pages (wrangler) 🔧
+## Deployment — Cloudflare Pages
 
-This repository supports easy deployment to **Cloudflare Pages** (recommended) by publishing the built `output/` directory.
+**Live site:** https://ddcs-studio.pages.dev
 
-**Source of truth:** all deployment paths must target `output/` (never `src/`) so the standalone HTML and generated `.nc` files are included.
+Cloudflare Pages serves `ddcs-studio-modular/src/` directly (Git integration, no
+build step) and **redeploys automatically on every push to `main`**. The modular
+ES6 app loads its `src/` modules at runtime, so pushing source *is* the deploy.
 
-### Automatic (recommended): GitHub Actions → Cloudflare Pages ✅
+```bash
+git push origin main   # Cloudflare auto-serves src/ at ddcs-studio.pages.dev
+```
 
-- I added a workflow at `.github/workflows/deploy-pages.yml` that can publish `output/` on push to `main`/`master`/`release/**`.
-- Required repository secrets (set in GitHub > Settings > Secrets):
-  - `CF_PAGES_API_TOKEN` — a Pages API Token (scoped for Pages deployment)
-  - `CF_ACCOUNT_ID` — your Cloudflare account id
-- The workflow uses project name `ddcsexpertstudio` and should publish the `output/` directory.
-
-Example: push to `main` → GitHub Actions deploys to your Pages project.
+(The repo-root `release.py` commits and pushes for you.)
 
 ### Auto-loading a site-level user variable table ✅
 
@@ -371,48 +369,11 @@ You can ship a site-wide variable table that automatically loads for *new visito
 - Behavior: on first load (when no saved DB in browser storage) the app will load `default_vars.js` (system vars) **and then** merge `user_vars.csv` as user variables.
 - To include your personal table in the published site, replace `src/user_vars.csv` with your CSV — it will be merged at startup for fresh visitors.
 
-### Local (one-off) using `wrangler` 🖥️
+### Optional: standalone single-file build
 
-If you prefer to publish locally with Wrangler (you mentioned using it), run:
-
-```bash
-# install wrangler if you don't have it
-npm i -g wrangler
-
-# login (opens browser)
-wrangler login
-
-# publish the built site (output/)
-wrangler pages deploy ./output --project-name=ddcsexpertstudio
-```
-
-You can also run the convenience npm script:
-
-```bash
-npm run deploy:pages
-```
-
-Node helper script (no extra CI action required)
-
-```bash
-# run the Node helper (wrangler must be installed or available via npx)
-node scripts/publish-pages.cjs --dir=./output --project-name=ddcsexpertstudio
-
-# or using the npm convenience script
-npm run publish:pages-node
-
-# optionally build before publish
-node scripts/publish-pages.cjs --build --dir=./output --project-name=ddcsexpertstudio
-```
-
-### Build artifact details
-
-- Build first: `npm run build` (produces `output/ddcs-studio-standalone.html` and generated `.nc` files under `output/*`).
-- Publish `output/` with either the GitHub workflow or locally:
-
-```bash
-wrangler pages deploy ./output --project-name=ddcsexpertstudio
-```
+`npm run build` bundles the whole app into one `output/ddcs-studio-standalone.html`
+(all modules + assets inlined) for offline/portable use. This is **not** part of the
+live deploy — the live site runs the modular `src/`.
 
 ---
 
