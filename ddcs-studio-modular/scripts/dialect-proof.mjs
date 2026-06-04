@@ -20,14 +20,14 @@ console.log('── Defaults: reproduce current forms ──');
 eq('ifGoto !=',     ifGoto('#1920', '!=', '2', 1),            'IF #1920!=2 GOTO1');
 eq('ifGoto ==',     ifGoto('#1922', '==', '0', 1),            'IF #1922==0 GOTO1');
 eq('goto',          goto(2),                                   'GOTO2');
-eq('g53 (G0 form)', g53('Z', '#57', 'Restore to saved probe height'),
-                                                               'G53 G0 Z#57 ( Restore to saved probe height )');
+eq('g53 (DDCS form, default)', g53('Z', '#57', 'Restore to saved probe height'),
+                                                               'G53 Z#57 ( Restore to saved probe height )');
 
 console.log('\n── Back door: flip the flaky rules ──');
-rules.g53Rapid = false;
-eq('g53 FIX (drop G0)', g53('Z', '#57', 'Restore to saved probe height'),
-                                                               'G53 Z#57 ( Restore to saved probe height )');
 rules.g53Rapid = true;
+eq('g53 → FANUC G0 form', g53('Z', '#57', 'Restore to saved probe height'),
+                                                               'G53 G0 Z#57 ( Restore to saved probe height )');
+rules.g53Rapid = false;
 
 rules.gotoSpace = true;
 eq('goto spaced',       goto(2),                               'GOTO 2');

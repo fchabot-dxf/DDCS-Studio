@@ -17,7 +17,7 @@ import { w, G, line, raw } from './words.js';
 export const rules = {
   ifBracket: false, // false: "IF #x!=2 GOTO1" (current) | true: "IF [#x!=2] GOTO1"
   gotoSpace: false, // false: "GOTO1" (current)          | true: "GOTO 1"
-  g53Rapid: true,   // true: "G53 G0 Z#v" (current)      | false: "G53 Z#v"  ← the boss-macro fix
+  g53Rapid: false,  // false: "G53 Z#v" (DDCS-correct)    | true: "G53 G0 Z#v" (FANUC form, fails on M350)
 };
 
 /** "GOTO" + label, honoring the spacing rule. Internal string helper. */

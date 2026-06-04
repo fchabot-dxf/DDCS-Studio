@@ -70,7 +70,8 @@ export class MiddleWizard {
             gcode += line([set('#57', '#882')], 'Save current Z machine position') + '\n';
             gcode += line([G(0), Z('#17')], 'Retract to safe Z') + '\n\n';
             gcode += comment('Reposition for secondary axis') + '\n';
-            gcode += line([set('#1505', '1')], 'Press Enter when repositioned') + '\n\n';
+            gcode += line([set('#1505', '1')], 'Press Enter when repositioned - ESC=cancel') + '\n';
+            gcode += ifGoto('#1505', '==', '0', 2) + '\n\n';
             gcode += g53('Z', '#57', 'Restore Z to saved height') + '\n\n';
 
             const secAxisStatus = secondAxis === 'X' ? '#1920' : '#1921';
@@ -117,7 +118,12 @@ export class MiddleWizard {
     generateTwoPassProbe(axis, dirSign, axisStatus, axisResult, resultVar, level, qStop) {
         const probeVar   = dirSign === '+' ? '#8' : '#7';
         const retractVar = dirSign === '+' ? '#9' : '#10'; // away from wall
+        // Probe safety: decelerate-stop + enable limit protection in the probe direction
+        const stopVar  = axis === 'X' ? '#1905' : '#1906';
+        const limitVar = axis === 'X' ? '#1915' : '#1916';
         let c = '';
+        c += line([set(stopVar, '0')], 'Stop mode: decelerate') + '\n';
+        c += line([set(limitVar, dirSign === '+' ? '2' : '1')], `Limit protect: ${dirSign === '+' ? 'positive' : 'negative'}`) + '\n';
         c += line([G(31), w(axis, probeVar), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe') + '\n';
         c += ifGoto(axisStatus, '!=', '2', 1) + '\n';
         c += line([G(0), w(axis, retractVar)], 'Retract') + '\n';
@@ -163,7 +169,8 @@ export class MiddleWizard {
         c += line([set('#57', '#882')], 'Save current Z machine position') + '\n';
         c += line([G(0), Z('#17')], 'Retract to safe Z') + '\n\n';
         c += comment('MANUAL REPOSITION - move to opposite side of boss') + '\n';
-        c += line([set('#1505', '1')], 'Press Enter when repositioned') + '\n\n';
+        c += line([set('#1505', '1')], 'Press Enter when repositioned - ESC=cancel') + '\n';
+        c += ifGoto('#1505', '==', '0', 2) + '\n\n';
         c += g53('Z', '#57', 'Restore to saved probe height') + '\n\n';
 
         // Probe opposite side
@@ -251,7 +258,8 @@ export class MiddleWizard {
 
     generateConfirmStart() {
         return comment('Confirm Start') + '\n'
-            + line([set('#1505', '1')], 'Press Enter to probe') + '\n\n';
+            + line([set('#1505', '1')], 'Press Enter to probe - ESC=cancel') + '\n'
+            + ifGoto('#1505', '==', '0', 2) + '\n\n';
     }
 
     generateFooter(centerLabel = '#53') {
