@@ -245,10 +245,6 @@ def generate_bundle(src_dir, index_html_text):
         first_line = txt.splitlines()[0] if txt.splitlines() else ''
         print('  file preview:', f, first_line[:120])
         transformed, exports = transform_module(txt)
-        # debug: dump transformed text for commandDeck.js to inspect any accidental edits
-        if f.name == 'commandDeck.js':
-            with open(Path(src_dir) / 'scripts' / 'tmp_commandDeck_transformed.js', 'w', encoding='utf-8') as _f:
-                _f.write(transformed)
         bundle_parts.append(f"// --- {f.name} ---\n{transformed}\n")
         exported_all.extend(exports)
 
