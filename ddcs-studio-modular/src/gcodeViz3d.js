@@ -212,6 +212,22 @@ export class GcodeViz3D {
         }
     }
 
+    // Keep each gizmo a constant on-screen size (independent of zoom): world size ∝ the
+    // world-per-pixel at the marker (camera distance for perspective, frustum for ortho).
+    _scaleMarkers() {
+        if (!this.spindleMarkers.length) return;
+        const H = this.container.clientHeight || 1;
+        const targetPx = 90, base = 26; // ~90 px tall; base = the arrow length at scale 1
+        const ortho = this.camera.isOrthographicCamera;
+        const tanHalf = Math.tan((this.persp.fov * Math.PI / 180) / 2);
+        for (const m of this.spindleMarkers) {
+            const worldPerPx = ortho
+                ? (this.camera.top - this.camera.bottom) / H
+                : (2 * this.camera.position.distanceTo(m.position) * tanHalf) / H;
+            m.scale.setScalar(Math.max(1e-4, (targetPx * worldPerPx) / base));
+        }
+    }
+
     // Highlight one axis handle (hover/active) — pass (null, null) to clear
     _setHighlight(pass, axis) {
         const key = (pass != null && axis) ? pass + ':' + axis : null;
@@ -268,7 +284,7 @@ export class GcodeViz3D {
             new THREE.SphereGeometry(2.5, 16, 16),
             new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })
         );
-        this._animTool.renderOrder = 14;
+        this._animTool.renderOrder = 25; // above the toolpath (20) so the dot stays visible
         this._animTool.visible = false;
         this.scene.add(this._animTool);
     }
@@ -507,7 +523,9 @@ export class GcodeViz3D {
             const op = opt.opacity != null ? opt.opacity : 1;
             mat = new THREE.LineBasicMaterial({ color: opt.color, transparent: op < 1, opacity: op });
         }
+        mat.depthTest = false;            // draw the toolpath on top of the gizmo / stock
         const lines = new THREE.LineSegments(g, mat);
+        lines.renderOrder = 20;           // above the gizmo (11–13); the anim tool (25) stays on top
         if (opt.dashed) lines.computeLineDistances();
         this.pathGroup.add(lines);
         return lines;
@@ -815,6 +833,7 @@ export class GcodeViz3D {
     render() {
         const r = this.renderer;
         const w = this.container.clientWidth || 1, h = this.container.clientHeight || 1;
+        this._scaleMarkers();
         r.setScissorTest(false);
         r.setViewport(0, 0, w, h);
         r.render(this.scene, this.camera);
