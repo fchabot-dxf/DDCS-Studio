@@ -114,18 +114,6 @@ function gpInit() {
     document.querySelectorAll('#gcodeViz3dContainer .viz3d-views button').forEach((btn) => {
         btn.addEventListener('click', () => { if (gpViz) gpViz.setView(btn.dataset.view); });
     });
-    // ViewCube nav helpers (home + rotate arrows)
-    document.querySelectorAll('#gcodeViz3dContainer .viz3d-cube-nav button').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            if (!gpViz) return;
-            const n = btn.dataset.nav, H = Math.PI / 2;
-            if (n === 'home') gpViz.home();
-            else if (n === 'up') gpViz.nudgeView(0, -H);
-            else if (n === 'down') gpViz.nudgeView(0, H);
-            else if (n === 'left') gpViz.nudgeView(H, 0);
-            else if (n === 'right') gpViz.nudgeView(-H, 0);
-        });
-    });
     // Animate (play) toggle
     const animBtn = document.getElementById('viz3dAnimate');
     if (animBtn) {

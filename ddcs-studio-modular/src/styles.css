@@ -2727,22 +2727,6 @@ body[data-theme="ddcs"] .ddcs-tab.active {
 }
 .viz3d-controls button { cursor: pointer; }
 .viz3d-controls button.on { background: rgba(40, 120, 80, 0.8); border-color: #4dff7a; color: #eaffea; }
-/* ViewCube navigation helpers — arrows + home framing the cube (top-right) */
-.viz3d-cube-nav { position: absolute; top: 0; right: 0; width: 146px; height: 146px; z-index: 4; pointer-events: none; }
-.viz3d-cube-nav button {
-    position: absolute; pointer-events: auto; cursor: pointer;
-    width: 20px; height: 20px; padding: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 12px; line-height: 1;
-    background: rgba(0, 0, 0, 0.4); color: #cfe6ff;
-    border: 1px solid rgba(120, 190, 255, 0.35); border-radius: 4px;
-}
-.viz3d-cube-nav button:hover { background: rgba(40, 120, 190, 0.9); }
-.viz3d-cube-nav .cn-home { top: 6px; left: 6px; }
-.viz3d-cube-nav .cn-up { top: 6px; left: 73px; transform: translateX(-50%); }
-.viz3d-cube-nav .cn-down { top: 120px; left: 73px; transform: translateX(-50%); }
-.viz3d-cube-nav .cn-left { top: 73px; left: 6px; transform: translateY(-50%); }
-.viz3d-cube-nav .cn-right { top: 73px; left: 120px; transform: translateY(-50%); }
 .viz3d-legend { position: absolute; bottom: 6px; left: 8px; z-index: 3; display: flex; flex-wrap: wrap; gap: 9px; font-size: 10px; color: #9aa8b8; }
 .viz3d-legend span { display: flex; align-items: center; gap: 4px; }
 .viz3d-legend i { width: 11px; height: 3px; border-radius: 2px; display: inline-block; }
