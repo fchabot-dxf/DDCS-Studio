@@ -457,6 +457,31 @@ export class GcodeViz3D {
         }
     }
 
+    // Re-pivot the orbit on the point under the cursor (the stock surface if hovered,
+    // otherwise the point at that screen location on the focus plane). Camera stays put.
+    _setPivotFromCursor(e) {
+        const THREE = this.THREE;
+        this.raycaster.setFromCamera(this._ndc(e), this.camera);
+        let pivot = null;
+        if (this.stockMesh) {
+            const hit = this.raycaster.intersectObject(this.stockMesh, false)[0];
+            if (hit) pivot = hit.point.clone();
+        }
+        if (!pivot) {
+            const camDir = new THREE.Vector3();
+            this.camera.getWorldDirection(camDir);
+            const plane = new THREE.Plane(camDir, -camDir.dot(this.target));
+            const pt = new THREE.Vector3();
+            if (this.raycaster.ray.intersectPlane(plane, pt)) pivot = pt;
+        }
+        if (!pivot) return;
+        const off = this.camera.position.clone().sub(pivot);
+        this.radius = Math.max(1, off.length());
+        this.phi = Math.acos(Math.max(-1, Math.min(1, off.z / this.radius)));
+        this.theta = Math.atan2(off.y, off.x);
+        this.target.copy(pivot);
+    }
+
     _applyCamera() {
         this.phi = Math.max(0.05, Math.min(Math.PI - 0.05, this.phi));
         const sinPhi = Math.sin(this.phi);
@@ -525,6 +550,7 @@ export class GcodeViz3D {
                 this.renderer.domElement.style.cursor = 'grabbing';
             } else {
                 mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot';
+                if (mode === 'rot') this._setPivotFromCursor(e); // orbit around the cursor / stock
             }
             px = e.clientX; py = e.clientY;
             window.addEventListener('pointermove', onMove);
