@@ -1814,7 +1814,6 @@ body[data-theme="ddcs"] .editor-container {
 }
 [data-theme="studio"] .hdr-title { display: flex; align-items: center; gap: 12px; }
 [data-theme="studio"] .hdr-text {
-    font-family: var(--sans); font-weight: 800; letter-spacing: 1px;
     color: var(--phosphor); background: none; padding: 0; border: none;
     text-shadow: 0 0 6px rgba(21,224,0,0.45);
 }
@@ -1825,9 +1824,9 @@ body[data-theme="ddcs"] .editor-container {
 [data-theme="studio"] .toolbar-btn,
 [data-theme="studio"] label.toolbar-btn,
 [data-theme="studio"] .op-btn {
-    font-family: var(--sans); font-weight: 700; font-size: 13px;
+    font-family: var(--sans); font-weight: 700; font-size: 12px;
     color: var(--text); cursor: pointer; border-radius: 0;
-    padding: 7px 12px; min-height: 32px; line-height: 1.2;
+    padding: 6px; min-height: 24px; line-height: 1.2;
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     background: linear-gradient(180deg, var(--sv-1), var(--sv-2) 60%, var(--sv-3));
     border-top: 2px solid var(--bv-lite);
