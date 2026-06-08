@@ -114,9 +114,11 @@ function gpInit() {
     document.querySelectorAll('#gcodeViz3dContainer .viz3d-views button').forEach((btn) => {
         btn.addEventListener('click', () => { if (gpViz) gpViz.setView(btn.dataset.view); });
     });
-    // Animate (play) toggle
+    // Animate (play) toggle — on by default (the viewer plays automatically)
     const animBtn = document.getElementById('viz3dAnimate');
     if (animBtn) {
+        animBtn.classList.add('on');
+        animBtn.textContent = '⏸ Stop';
         animBtn.addEventListener('click', () => {
             if (!gpViz) return;
             const on = !animBtn.classList.contains('on');

@@ -66,7 +66,8 @@ export class GcodeViz3D {
         this.raycaster = new THREE.Raycaster();
         this.onStartChange = null; // optional callback(starts)
         this.showRapids = true;
-        this._animOn = false;
+        this._animOn = true;   // play by default
+        this._animPaused = false;
         this._animRaf = null;
         this._animDist = 0;
         this._animLast = 0;
@@ -296,8 +297,16 @@ export class GcodeViz3D {
             const dt = this._animLast ? Math.min(0.1, (now - this._animLast) / 1000) : 0;
             this._animLast = now;
             const total = this._animLen || 1;
-            this._animDist = (this._animDist + (total / 5) * dt) % total; // whole path ~5s
-            let d = this._animDist;
+            if (!this._animPaused) {
+                this._animDist += (total / 5) * dt; // whole path ~5s
+                if (this._animDist >= total) {       // reached the end → hold 1s + beep, then loop
+                    this._animDist = total;
+                    this._animPaused = true;
+                    this._beep();
+                    setTimeout(() => { this._animDist = 0; this._animPaused = false; this._animLast = 0; }, 1000);
+                }
+            }
+            let d = Math.min(this._animDist, total);
             for (let i = 0; i + 5 < pts.length; i += 3) {
                 const ax = pts[i], ay = pts[i + 1], az = pts[i + 2];
                 const bx = pts[i + 3], by = pts[i + 4], bz = pts[i + 5];
@@ -312,6 +321,22 @@ export class GcodeViz3D {
             this.render();
         }
         this._animRaf = requestAnimationFrame(() => this._animTick());
+    }
+
+    // Short beep at the end of each animation loop (Web Audio; silent until a user gesture)
+    _beep() {
+        try {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return;
+            if (!this._audio) this._audio = new Ctx();
+            const ctx = this._audio;
+            if (ctx.state === 'suspended') ctx.resume();
+            const o = ctx.createOscillator(), g = ctx.createGain();
+            o.type = 'square'; o.frequency.value = 880;
+            g.gain.value = 0.04;
+            o.connect(g); g.connect(ctx.destination);
+            o.start(); o.stop(ctx.currentTime + 0.12);
+        } catch (_) { /* ignore */ }
     }
 
     _ndc(e) {
@@ -372,9 +397,17 @@ export class GcodeViz3D {
         this.lineGroups = {};
 
         const st = this._stock;
-        const box = (st && st.show && st.x > 0 && st.y > 0 && st.z > 0)
-            ? { min: { x: 0, y: 0, z: -st.z }, max: { x: st.x, y: st.y, z: 0 } } : null;
         const pocket = !!(st && st.shape === 'pocket');
+        let box = null;
+        if (st && st.show && st.x > 0 && st.y > 0 && st.z > 0) {
+            if (pocket) {
+                // probe cavity = the inset hole (matches the rendered pocket)
+                const w = Math.max(8, Math.min(st.x, st.y) * 0.25);
+                box = { min: { x: w, y: w, z: -st.z }, max: { x: st.x - w, y: st.y - w, z: 0 } };
+            } else {
+                box = { min: { x: 0, y: 0, z: -st.z }, max: { x: st.x, y: st.y, z: 0 } };
+            }
+        }
         const CAP = 20; // fallback probe length when it never contacts the stock
 
         const byPass = [];
@@ -561,15 +594,16 @@ export class GcodeViz3D {
             if (pocket) {
                 // Square donut: a frame of material around the cavity. The cavity (the hole,
                 // = stock X×Y) is the probe area; the frame walls are the surrounding stock.
-                const w = Math.max(8, Math.min(stock.x, stock.y) * 0.25); // frame wall thickness (visual)
+                // Outer block = the stock dimensions (same as a boss); the cavity is inset by w.
+                const w = Math.max(8, Math.min(stock.x, stock.y) * 0.25); // wall thickness (cavity inset)
                 const shape = new THREE.Shape();
-                shape.moveTo(-w, -w);
-                shape.lineTo(stock.x + w, -w);
-                shape.lineTo(stock.x + w, stock.y + w);
-                shape.lineTo(-w, stock.y + w);
-                shape.lineTo(-w, -w);
+                shape.moveTo(0, 0);
+                shape.lineTo(stock.x, 0);
+                shape.lineTo(stock.x, stock.y);
+                shape.lineTo(0, stock.y);
+                shape.lineTo(0, 0);
                 const hole = new THREE.Path();
-                hole.moveTo(0, 0); hole.lineTo(stock.x, 0); hole.lineTo(stock.x, stock.y); hole.lineTo(0, stock.y); hole.lineTo(0, 0);
+                hole.moveTo(w, w); hole.lineTo(stock.x - w, w); hole.lineTo(stock.x - w, stock.y - w); hole.lineTo(w, stock.y - w); hole.lineTo(w, w);
                 shape.holes.push(hole);
                 geo = new THREE.ExtrudeGeometry(shape, { depth: stock.z, bevelEnabled: false });
                 mesh.position.set(0, 0, -stock.z); // extrude [0,z] → world [-z,0], top at the table
@@ -767,7 +801,11 @@ export class GcodeViz3D {
         this.active = on;
         if (on) {
             this._resize();
-            if (this._animOn && !this._animRaf) { this._animLast = 0; this._animTick(); }
+            if (this._animOn) {
+                this._ensureAnimTool();
+                this._animTool.visible = true;
+                if (!this._animRaf) { this._animLast = 0; this._animTick(); }
+            }
         } else if (this._animRaf) {
             cancelAnimationFrame(this._animRaf);
             this._animRaf = null;
