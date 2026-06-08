@@ -94,6 +94,26 @@ export class GcodeViz3D {
         const axes = new THREE.AxesHelper(25); // X red, Y green, Z blue
         this.axes = axes;
         this.scene.add(axes);
+        // Direction labels on the grid edges (repositioned to the footprint in setSegments)
+        this._gridLabels = {
+            xp: this._makeTextSprite('X POS'), xn: this._makeTextSprite('X NEG'),
+            yp: this._makeTextSprite('Y POS'), yn: this._makeTextSprite('Y NEG'),
+        };
+        for (const k in this._gridLabels) this.scene.add(this._gridLabels[k]);
+    }
+
+    _makeTextSprite(text) {
+        const THREE = this.THREE;
+        const c = document.createElement('canvas');
+        c.width = 256; c.height = 64;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#7fa8cc';
+        ctx.font = 'bold 40px sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(text, 128, 36);
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+        sp.renderOrder = 1;
+        return sp;
     }
 
     // Interactive ViewCube: a small labelled cube in the corner that mirrors the camera
@@ -577,6 +597,13 @@ export class GcodeViz3D {
             this.grid.position.set(cx, cy, b.minZ);
         }
         if (this.axes) this.axes.scale.setScalar(Math.max(1, span / 200));
+        if (this._gridLabels) {
+            const half = span / 2, off = span * 0.09, lw = span * 0.22, z = b.minZ;
+            const L = this._gridLabels;
+            L.xp.position.set(cx + half + off, cy, z); L.xn.position.set(cx - half - off, cy, z);
+            L.yp.position.set(cx, cy + half + off, z); L.yn.position.set(cx, cy - half - off, z);
+            for (const k in L) L[k].scale.set(lw, lw / 4, 1);
+        }
 
         this._applyCamera();
     }
