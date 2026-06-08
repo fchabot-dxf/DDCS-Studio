@@ -184,6 +184,18 @@ export class VariableDatabase {
         return this.activeDB;
     }
 
+    // Merge user-variable entries (e.g. from an imported profile JSON); keeps system vars
+    importUserVars(entries) {
+        if (!Array.isArray(entries) || entries.length === 0) return;
+        const map = new Map(this.activeDB.map(e => [e.i, e]));
+        for (const e of entries) {
+            if (!e || !e.i) continue;
+            map.set(e.i, { i: e.i, t: e.t || '', d: e.d || '', n: e.n || '', isSys: false });
+        }
+        this.activeDB = Array.from(map.values());
+        this.saveToStorage();
+    }
+
     exportCSV() {
         const lines = this.activeDB.map(e => {
             const id = e.i.replace(/^#/, '');

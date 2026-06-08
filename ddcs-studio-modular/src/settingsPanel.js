@@ -40,6 +40,17 @@ function saveSettings() {
 
 export function getSettings() { return _ddcsSettings; }
 
+let _fillSettingsInputs = null;
+
+// Merge incoming settings (e.g. from an imported profile), persist, and refresh the panel
+export function applySettings(incoming) {
+    if (!incoming || typeof incoming !== 'object') return;
+    if (incoming.stock) _ddcsSettings.stock = { ...SETTINGS_DEFAULTS.stock, ..._ddcsSettings.stock, ...incoming.stock };
+    if (incoming.machine) _ddcsSettings.machine = { ...SETTINGS_DEFAULTS.machine, ..._ddcsSettings.machine, ...incoming.machine };
+    saveSettings();
+    if (_fillSettingsInputs) _fillSettingsInputs();
+}
+
 function buildSettingsOverlay() {
     if (document.getElementById('settings-overlay')) return;
     const ov = document.createElement('div');
@@ -52,6 +63,15 @@ function buildSettingsOverlay() {
                 <span class="settings-close" title="Close">✕</span>
             </div>
             <div class="settings-body">
+                <div class="settings-section">
+                    <div class="settings-section-title">PROFILE (settings + variables)</div>
+                    <div class="settings-row">
+                        <button class="toolbar-btn settings-io" id="set_profile_export">⬇ Export profile</button>
+                        <button class="toolbar-btn settings-io" id="set_profile_import">⬆ Import profile</button>
+                    </div>
+                    <div class="settings-hint">One JSON with your machine/stock/limits + user variables. The desktop app saves it to a local file automatically.</div>
+                </div>
+
                 <div class="settings-section">
                     <div class="settings-section-title">VARIABLES (CSV)</div>
                     <div class="settings-row">
@@ -131,6 +151,7 @@ function wireSettingsOverlay(ov) {
         updateVarCount();
     }
     fill();
+    _fillSettingsInputs = fill;
 
     const onInput = () => {
         const s = _ddcsSettings;
@@ -177,6 +198,10 @@ function wireSettingsOverlay(ov) {
         const body = 'Version: V9.49.78\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
+
+    // Profile import/export (JSON = settings + user variables)
+    q('set_profile_export').addEventListener('click', () => { if (window.ddcsExportProfile) window.ddcsExportProfile(); });
+    q('set_profile_import').addEventListener('click', () => { if (window.ddcsImportProfile) window.ddcsImportProfile(); });
 
     q('set_reset').addEventListener('click', () => {
         _ddcsSettings = JSON.parse(JSON.stringify(SETTINGS_DEFAULTS));

@@ -478,10 +478,9 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     border-top: 1px solid var(--border);
     box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
 
-    /* MATH: 48px (Header controls) + 36px (Handle) = 84px total
-       FIX: set safe default collapsed height to 84px */
+    /* Collapsed = a thin lip; the tabs poke UP onto the editor border (see handle margin-top). */
     /* animation via height so the editor is pushed up */
-    height: 84px; /* collapsed header height */
+    height: 22px; /* collapsed = thin tab lip */
 
     /* Force column stacking so header controls + handle occupy the top area
        and the dock body sits below (consistent math: 48 + 36 = 84) */
@@ -489,15 +488,14 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     flex-direction: column;
 
     transition: height 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    overflow: hidden;
+    overflow: visible; /* let the tabs rise above the dock onto the editor border */
     transform: none !important;
 }
 
-/* EXPANDED STATE */
+/* EXPANDED STATE — size to the body content (header is just the tab lip) */
 #controller-dock.is-expanded {
-    /* FIX: 300px Body + 80px Header */
-    height: 380px; 
-}    
+    height: auto;
+}
 /* --- DOCK HEADER (Grid Layout for Centering) --- */
 .dock-header {
     display: flex;
@@ -611,8 +609,8 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     gap: 12px;
     padding: 12px;
     background: var(--panel);
-    height: 300px; /* fixed visible body when expanded */
-    min-height: 300px;
+    height: auto;            /* fit the content — no empty space below the keyboard */
+    max-height: 56vh;        /* but cap + scroll if the content is very tall */
     overflow-y: auto;
     overflow-x: hidden; /* Prevent horizontal overflow */
     opacity: 0;
@@ -2565,6 +2563,7 @@ body[data-scale="250"] {
     height: auto !important;
     min-height: 30px;
     padding: 0 !important;
+    margin-top: -22px;             /* lift the tabs up to straddle the editor's bottom border */
     margin-bottom: -3px;            /* active tab overlaps the panel edge → connects */
     background: transparent !important;
     border: none !important;        /* clear the theme "middle plate" bevel border (the stray line) */

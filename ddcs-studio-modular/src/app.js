@@ -30,6 +30,9 @@ import './gcodePreviewTab.js';
 // Settings panel (header ⚙ → CSV import/export + stock + machine envelope)
 import './settingsPanel.js';
 
+// Profile store (one JSON = settings + user variables; pywebview file-I/O ready)
+import './profileStore.js';
+
 class DDCSStudio {
     constructor() {
         this.themeManager = new ThemeManager();
