@@ -137,8 +137,9 @@ export class MiddleWizard {
     generatePocketSequence(axis, dir1Sign, dir2Sign, axisStatus, axisResult, level, qStop, resultBase) {
         const firstEdge  = `#${resultBase}`;
         const secondEdge = `#${resultBase + 1}`;
-        // Opposite probe direction (toward far wall from center)
-        const oppSign    = dir2Sign;
+        // The two walls of a pocket are always opposite on this axis (centre = their midpoint),
+        // regardless of dir2 (which carries the *secondary* axis direction in 2-axis mode).
+        const oppSign    = dir1Sign === '+' ? '-' : '+';
 
         let c = comment('=== POCKET: Probe from center toward each wall ===') + '\n\n';
 
@@ -208,7 +209,7 @@ export class MiddleWizard {
             : `${axis} ${s(dir1Sign)}`;
         let h = `( Middle | ${axisLabel} | ${wcsLabel} )\n`;
         h += `( DDCS M350 - Two-pass probe )\n`;
-        h += `( First: ${axis} ${s(dir1Sign)}, Second: ${axis} ${s(dir2Sign)} )\n`;
+        h += `( First: ${axis} ${s(dir1Sign)}, Second: ${axis} ${s(dir1Sign === '+' ? '-' : '+')} )\n`;
         h += `( Distance: ${dist}mm | Retract: ${retract}mm | Fast: ${f_fast} | Slow: ${f_slow} )\n\n`;
         return h;
     }
