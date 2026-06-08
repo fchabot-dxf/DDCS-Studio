@@ -96,8 +96,8 @@ export class GcodeViz3D {
         this.scene.add(axes);
         // Direction labels on the grid edges (repositioned to the footprint in setSegments)
         this._gridLabels = {
-            xp: this._makeTextSprite('X POS'), xn: this._makeTextSprite('X NEG'),
-            yp: this._makeTextSprite('Y POS'), yn: this._makeTextSprite('Y NEG'),
+            xp: this._makeTextSprite('+X'), xn: this._makeTextSprite('-X'),
+            yp: this._makeTextSprite('+Y'), yn: this._makeTextSprite('-Y'),
         };
         for (const k in this._gridLabels) this.scene.add(this._gridLabels[k]);
     }
@@ -105,12 +105,12 @@ export class GcodeViz3D {
     _makeTextSprite(text) {
         const THREE = this.THREE;
         const c = document.createElement('canvas');
-        c.width = 256; c.height = 64;
+        c.width = 128; c.height = 64;
         const ctx = c.getContext('2d');
         ctx.fillStyle = '#7fa8cc';
-        ctx.font = 'bold 40px sans-serif';
+        ctx.font = 'bold 48px sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(text, 128, 36);
+        ctx.fillText(text, 64, 36);
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
         sp.renderOrder = 1;
         return sp;
@@ -286,7 +286,7 @@ export class GcodeViz3D {
     setView(name) {
         const H = Math.PI / 2;
         const views = {
-            top: [-H, 0.05], bottom: [-H, Math.PI - 0.05], front: [-H, H], back: [H, H],
+            top: [-H, 0], bottom: [-H, Math.PI], front: [-H, H], back: [H, H],
             right: [0, H], left: [Math.PI, H], iso: [Math.PI / 4, Math.PI / 3],
         };
         const v = views[name] || views.iso;
@@ -598,11 +598,11 @@ export class GcodeViz3D {
         }
         if (this.axes) this.axes.scale.setScalar(Math.max(1, span / 200));
         if (this._gridLabels) {
-            const half = span / 2, off = span * 0.09, lw = span * 0.22, z = b.minZ;
+            const half = span / 2, off = span * 0.07, lw = span * 0.14, z = b.minZ;
             const L = this._gridLabels;
             L.xp.position.set(cx + half + off, cy, z); L.xn.position.set(cx - half - off, cy, z);
             L.yp.position.set(cx, cy + half + off, z); L.yn.position.set(cx, cy - half - off, z);
-            for (const k in L) L[k].scale.set(lw, lw / 4, 1);
+            for (const k in L) L[k].scale.set(lw, lw / 2, 1);
         }
 
         this._applyCamera();
@@ -715,11 +715,14 @@ export class GcodeViz3D {
     }
 
     _applyCamera() {
-        this.phi = Math.max(0.05, Math.min(Math.PI - 0.05, this.phi));
+        this.phi = Math.max(0.0005, Math.min(Math.PI - 0.0005, this.phi));
         const sinPhi = Math.sin(this.phi);
         const x = this.radius * sinPhi * Math.cos(this.theta);
         const y = this.radius * sinPhi * Math.sin(this.theta);
         const z = this.radius * Math.cos(this.phi);
+        // Up tangent to the meridian: identical to Z-up away from the poles, but stays valid AT
+        // a pole, so a true top/bottom view has no gimbal tilt (stock top/bottom edges align).
+        this.camera.up.set(-Math.cos(this.phi) * Math.cos(this.theta), -Math.cos(this.phi) * Math.sin(this.theta), sinPhi);
         this.camera.position.set(this.target.x + x, this.target.y + y, this.target.z + z);
         this.camera.lookAt(this.target);
         if (this.camera.isOrthographicCamera) {
