@@ -3,7 +3,7 @@
  * Contains all theme definitions and theme switching logic
  */
 
-export const THEMES = ['ddcs', 'normal', 'steampunk', 'futuristic', 'organic'];
+export const THEMES = ['ddcs', 'studio', 'normal', 'steampunk', 'futuristic', 'organic'];
 
 export class ThemeManager {
     constructor() {

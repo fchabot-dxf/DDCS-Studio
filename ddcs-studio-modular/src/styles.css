@@ -1740,6 +1740,25 @@ body[data-theme="ddcs"] .editor-container {
 }
 
 /* ============================================
+   THEME: STUDIO (new — being built to replace DDCS)
+   Neutral scaffold; real styling comes from the reference mockups + CSS.
+   ============================================ */
+[data-theme="studio"] {
+    --bg: #eef1f5;
+    --panel: #ffffff;
+    --accent: #2d7ff9;
+    --text: #1f2733;
+    --text-main: #0d1117;
+    --text-dim: #6b7785;
+    --border: #d4dae3;
+    --radius: 8px;
+}
+[data-theme="studio"] .toolbar-btn,
+[data-theme="studio"] button {
+    border-radius: var(--radius);
+}
+
+/* ============================================
    THEME: STEAMPUNK (Brass & Copper)
    ============================================ */
 [data-theme="steampunk"] {
