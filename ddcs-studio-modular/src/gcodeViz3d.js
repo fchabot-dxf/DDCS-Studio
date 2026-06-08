@@ -656,6 +656,8 @@ export class GcodeViz3D {
     _bindControls() {
         const THREE = this.THREE;
         const el = this.renderer.domElement;
+        el.style.touchAction = 'none';   // stop the browser turning a drag into scroll / "look"
+        el.style.userSelect = 'none';
         let mode = null, px = 0, py = 0;
 
         const onMove = (e) => {
@@ -688,6 +690,8 @@ export class GcodeViz3D {
         };
         const onUp = () => {
             mode = null;
+            try { if (this._pid != null) el.releasePointerCapture(this._pid); } catch (_) {}
+            this._pid = null;
             if (this.renderer) this.renderer.domElement.style.cursor = 'default';
             this._setHighlight(null, null);
             window.removeEventListener('pointermove', onMove);
@@ -711,9 +715,10 @@ export class GcodeViz3D {
                 this.renderer.domElement.style.cursor = 'grabbing';
             } else {
                 mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot';
-                if (mode === 'rot') { this._toPerspective(); this._setPivotFromCursor(e); } // orbit → perspective, around the cursor / stock
+                if (mode === 'rot') this._toPerspective(); // orbit around the framed centre (predictable); pan to recentre
             }
             px = e.clientX; py = e.clientY;
+            try { el.setPointerCapture(e.pointerId); this._pid = e.pointerId; } catch (_) {}
             window.addEventListener('pointermove', onMove);
             window.addEventListener('pointerup', onUp);
         });
