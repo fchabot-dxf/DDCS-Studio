@@ -80,47 +80,38 @@ export class CommandDeck {
         varPanel.style.display = 'none';
         this.buildVariablesPanel(varPanel);
 
-        // 4. Assemble panels into the dock body
+        // 4. Assemble the dock body: KEYBOARD/VARIABLES tab strip at the top, then panels.
+        //    The tabs live inside the body, so they're hidden when the dock is collapsed.
         body.innerHTML = '';
+        body.appendChild(this._buildTabStrip());
         body.appendChild(kbPanel);
         body.appendChild(varPanel);
 
-        // 5. Tabs live on the dock handle (replacing the chevron); clicking opens the dock
-        this.renderHandleTabs();
+        // 5. The handle is a plain chevron toggle (expand/collapse wired by DockManager).
+        this.renderHandle();
     }
 
-    // Put the KEYBOARD/VARIABLES tabs on the dock handle (replaces the up/down chevron)
-    renderHandleTabs() {
+    // Restore the chevron handle (DockManager handles the expand/collapse click).
+    renderHandle() {
         const handle = document.querySelector('#controller-dock .header-handle');
         if (!handle) return;
-        handle.innerHTML = `
+        handle.innerHTML = '<span class="chevron">▲</span>';
+        handle.setAttribute('aria-label', 'Toggle keyboard dock');
+    }
+
+    // KEYBOARD / VARIABLES tab strip for the top of the dock body
+    _buildTabStrip() {
+        const strip = document.createElement('div');
+        strip.className = 'deck-tabs';
+        strip.innerHTML = `
             <button class="deck-tab ddcs-tab active" data-deck-tab="keyboard">⌨ KEYBOARD</button>
             <button class="deck-tab ddcs-tab" data-deck-tab="variables"># VARIABLES</button>
         `;
-        handle.setAttribute('aria-label', 'Keyboard / Variables tabs');
-        handle.querySelectorAll('.deck-tab').forEach(t => {
+        strip.querySelectorAll('.deck-tab').forEach(t => {
             t.addEventListener('pointerdown', (e) => { e.preventDefault(); }, { passive: false });
-            // stopPropagation so the dock's own handle-toggle listener doesn't double-fire
-            t.addEventListener('click', (e) => { e.stopPropagation(); this.onHandleTabClick(t.dataset.deckTab); });
+            t.addEventListener('click', (e) => { e.stopPropagation(); this.switchTab(t.dataset.deckTab); });
         });
-    }
-
-    // Ergonomic: collapsed → open to that tab; open+other → switch; open+same → close
-    onHandleTabClick(name) {
-        const dock = document.getElementById('controller-dock');
-        if (!dock) return;
-        const expanded = dock.classList.contains('is-expanded');
-        const isActive = this._activeTab === name;
-        if (!expanded) {
-            dock.classList.add('is-expanded');
-            this.switchTab(name);
-        } else if (isActive) {
-            dock.classList.remove('is-expanded');
-        } else {
-            this.switchTab(name);
-        }
-        const handle = document.querySelector('#controller-dock .header-handle');
-        if (handle) handle.setAttribute('aria-expanded', dock.classList.contains('is-expanded') ? 'true' : 'false');
+        return strip;
     }
 
     switchTab(name) {

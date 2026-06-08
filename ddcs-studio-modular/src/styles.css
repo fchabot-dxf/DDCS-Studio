@@ -183,6 +183,24 @@ body {
     overflow-y: auto; /* The actual scrollbar appears here */
 }
 
+/* Status / readout bar under the editor — info display.
+   A prominent accent band in every theme (studio re-skins it to the green DRO bar). */
+.statusbar {
+    flex: 0 0 auto;
+    min-height: 26px;
+    padding: 5px 12px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font-family: "Consolas", ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--accent);
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+    border-top: 1px solid var(--border);
+}
+
 /* Bright green caret/selection for the editor as requested (plus fallbacks) */
 #editor-container::selection { background: #00ff00; color: #000; }
 .editor-container::selection { background: #00ff00; color: #000; }
@@ -478,9 +496,8 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     border-top: 1px solid var(--border);
     box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
 
-    /* Collapsed = a thin lip; the tabs poke UP onto the editor border (see handle margin-top). */
-    /* animation via height so the editor is pushed up */
-    height: 22px; /* collapsed = thin tab lip */
+    /* Sizes to the chevron handle when collapsed, or handle + body when expanded. */
+    height: auto;
 
     /* Force column stacking so header controls + handle occupy the top area
        and the dock body sits below (consistent math: 48 + 36 = 84) */
@@ -1865,11 +1882,10 @@ body[data-theme="ddcs"] .editor-container {
 [data-theme="studio"] .header-right { justify-self: end;    display: flex; gap: 6px; align-items: center; }
 [data-theme="studio"] .header-center button { min-width: 92px; font-weight: 700; }
 
-/* --- Editor → the phosphor screen --- */
+/* --- Editor → the phosphor screen (no frame) --- */
 [data-theme="studio"] .editor-container {
     background: #000;
-    border-top: 3px solid var(--bv-dark); border-left: 3px solid var(--bv-mid-dark);
-    border-right: 3px solid var(--bv-mid-lite); border-bottom: 3px solid var(--bv-lite-2);
+    border: none;
 }
 [data-theme="studio"] #editor-highlight,
 [data-theme="studio"] #editor,
@@ -2817,75 +2833,52 @@ body[data-scale="250"] {
 .editor-container .viz3d-handle:active { transform: translateY(-50%) !important; }
 .viz3d-handle-cube { display: block; }
 
-/* ===== Keyboard tabs on the dock handle — Chrome-style connected tabs ===== */
+/* ===== Dock: chevron handle (all themes) + KEYBOARD/VARIABLES tabs inside the body ===== */
 #controller-dock .header-handle {
-    display: flex;
-    justify-content: center;        /* tabs centered in the handle */
-    align-items: flex-end;
-    gap: 0;
-    flex: 0 0 auto !important;      /* size to the tabs in ALL themes (base was flex 0 0 60px) */
-    height: auto !important;
-    min-height: 30px;
+    flex: 0 0 auto !important;
+    height: 28px !important;
+    min-height: 28px;
+    margin: 0 !important;
     padding: 0 !important;
-    margin-top: -22px;             /* lift the tabs up to straddle the editor's bottom border */
-    margin-bottom: -3px;            /* active tab overlaps the panel edge → connects */
-    background: transparent !important;
-    border: none !important;        /* clear the theme "middle plate" bevel border (the stray line) */
-    box-shadow: none !important;
+    display: flex; align-items: center; justify-content: center;
     overflow: visible;
 }
-#controller-dock .header-handle .chevron { display: none; }
+#controller-dock .header-handle .chevron { display: inline-block; line-height: 1; font-size: 14px; }
 
-/* Generic tab (all themes) — theme-aware colors so the active tab merges into the panel */
-.dock-header .deck-tab {
+/* Tab strip at the top of the dock body — hidden with the body when collapsed, spaced (no overlap) */
+.dock-body .deck-tabs { display: flex; gap: 6px; align-items: flex-end; margin-bottom: 8px; }
+.dock-body .deck-tab {
     position: relative;
-    z-index: 1;
-    padding: 6px 26px !important;
+    padding: 6px 20px !important;
     min-height: 0 !important;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
     color: var(--text-dim) !important;
     background: var(--bg) !important;
     border: 1px solid var(--border) !important;
-    border-radius: 8px 8px 0 0 !important;
+    border-radius: 6px 6px 0 0 !important;
     box-shadow: none !important;
     cursor: pointer;
 }
-.dock-header .deck-tab::before { display: none !important; }       /* no theme bevel groove */
-.dock-header .deck-tab:hover { color: var(--text-main) !important; }
-.dock-header .deck-tab.active {
-    z-index: 3;                                   /* current tab sits in front */
-    color: var(--text-main) !important;
-    background: var(--panel) !important;          /* same fill as the panel → merges */
-    border-bottom-color: var(--panel) !important;
+.dock-body .deck-tab::before { display: none !important; }
+.dock-body .deck-tab:hover { color: var(--text-main) !important; }
+.dock-body .deck-tab.active { color: var(--text-main) !important; background: var(--panel) !important; }
+.dock-body .deck-tab + .deck-tab { margin-left: 0 !important; }
+
+/* DDCS / Studio flavour — silver bevel tabs */
+body[data-theme="ddcs"] .dock-body .ddcs-tab,
+body[data-theme="studio"] .dock-body .ddcs-tab {
+    color: #000 !important; border-radius: 0 !important;
+    background: linear-gradient(180deg, #cfcbc4, #b6b1a9) !important;
+    border-top: 2px solid #f0f0f0 !important; border-left: 2px solid #a8a8a8 !important;
+    border-right: 2px solid #585858 !important; border-bottom: 2px solid #202020 !important;
+}
+body[data-theme="ddcs"] .dock-body .ddcs-tab.active,
+body[data-theme="studio"] .dock-body .ddcs-tab.active {
+    background: linear-gradient(180deg, #f4f2ee, var(--panel)) !important;
 }
 
-/* DDCS flavour — single grey bevel layered on the generic tab (ddcs only) */
-body[data-theme="ddcs"] .ddcs-tab {
-    color: #000 !important;
-    border-radius: 0 !important;
-    background: linear-gradient(180deg, #cfcbc4, #b6b1a9) !important; /* inactive: dimmer face */
-    border-top: 3px solid #f0f0f0 !important;     /* highlight */
-    border-left: 3px solid #a8a8a8 !important;    /* light-mid */
-    border-right: 3px solid #585858 !important;   /* dark-mid */
-    border-bottom: 3px solid #202020 !important;  /* shadow */
-}
-body[data-theme="ddcs"] .ddcs-tab:hover { background: linear-gradient(180deg, #ddd9d2, #c4bfb7) !important; }
-body[data-theme="ddcs"] .ddcs-tab.active {
-    background: linear-gradient(180deg, #f4f2ee, var(--panel)) !important; /* bottom = panel → merge */
-    border-bottom-color: var(--panel) !important;
-}
-
-/* overlap: tuck each following tab ~half behind its neighbour (active rides on top) */
-#controller-dock .deck-tab + .deck-tab { margin-left: -58px; }
-
-/* The panel the active tab connects to (theme-aware fill, seamless) */
-#controller-dock .dock-body {
-    background: var(--panel);
-    border-top: none;
-}
-.deck-tab-panel { padding: 10px; }
+#controller-dock .dock-body { background: var(--panel); border-top: none; }
+.deck-tab-panel { padding: 0; }
 
 /* Variables tab — search row + Filters button */
 .deck-var-searchrow { display: flex; gap: 6px; align-items: center; padding: 2px 0 6px; }
