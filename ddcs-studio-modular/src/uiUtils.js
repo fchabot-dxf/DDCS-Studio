@@ -9,17 +9,29 @@ export class UIUtils {
     static showTooltip(element, content, xOffset = 10) {
         const tooltip = el('global-tooltip');
         if (!tooltip) return;
-        
+
         const rect = element.getBoundingClientRect();
-        tooltip.style.display = 'block';
-        tooltip.style.left = (rect.right + xOffset) + 'px';
-        tooltip.style.top = rect.top + 'px';
+        const margin = 8;
+
+        // Set content + show first so we can measure the rendered size
         tooltip.textContent = content;
-        
-        // Check if tooltip goes off-screen
-        if (rect.right + 310 > window.innerWidth) {
-            tooltip.style.left = (rect.left - 310) + 'px';
-        }
+        tooltip.style.display = 'block';
+        const tw = tooltip.offsetWidth || 300;
+        const th = tooltip.offsetHeight || 60;
+
+        // Horizontal: prefer to the right of the element, flip left if it won't fit
+        let left = rect.right + xOffset;
+        if (left + tw > window.innerWidth - margin) left = rect.left - tw - xOffset;
+        if (left < margin) left = margin;
+
+        // Vertical: align with the element top, but clamp into the viewport so it
+        // never runs off the bottom (e.g. chips in the bottom keyboard dock)
+        let top = rect.top;
+        if (top + th > window.innerHeight - margin) top = window.innerHeight - th - margin;
+        if (top < margin) top = margin;
+
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
     }
 
     static hideTooltip() {

@@ -18,7 +18,7 @@ export class DockManager {
         this.toolbar = document.querySelector('.secondary-toolbar');
         this.controllerDock = document.getElementById('controller-dock');
         this.varListPanel = new VarListPanel(variableDB, editorManager);
-        this.commandDeck = new CommandDeck(editorManager);
+        this.commandDeck = new CommandDeck(editorManager, variableDB);
 
         this.varListPanel.onSearchChange = (hasText) => {
             if (hasText) {

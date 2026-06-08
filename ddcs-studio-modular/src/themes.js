@@ -35,7 +35,7 @@ export class ThemeManager {
         document.body.setAttribute('data-theme', themeName);
         const styleBtn = document.getElementById('styleBtn');
         if (styleBtn) {
-            styleBtn.innerText = '🎨 ' + themeName.toUpperCase();
+            styleBtn.innerHTML = '<span class="op-icon">🎨</span><span class="op-label">' + themeName.toUpperCase() + '</span>';
         }
     }
 }

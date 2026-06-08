@@ -36,8 +36,10 @@ def read_text(path):
 
 def find_js_files(src_dir):
     p = Path(src_dir)
-    # include JS files recursively, but ignore virtualenv, node_modules and CLI/tooling folders
-    exclude_dirs = {'scripts', 'legacy', 'tools', 'tests', 'verification'}
+    # include JS files recursively, but ignore virtualenv, node_modules and CLI/tooling folders.
+    # 'assets' is excluded so vendored libraries (e.g. assets/vendor/three.min.js) are NOT
+    # concatenated into the module bundle — they are inlined separately as <script> tags.
+    exclude_dirs = {'scripts', 'legacy', 'tools', 'tests', 'verification', 'assets'}
     files = [f for f in p.rglob('*.js') if ('.venv' not in f.parts and 'node_modules' not in f.parts and f.name != Path(__file__).name and not any(part in exclude_dirs for part in f.parts))]
     # filter out files that are CLI utilities (start with a shebang) and any explicitly non-app modules
     safe_files = []

@@ -1,122 +1,305 @@
-import { el } from './uiUtils.js';
+import { el, UIUtils } from './uiUtils.js';
+
+// Variable filter categories — heuristic predicates over the DB (description keywords + flags).
+const VAR_FILTERS = [
+    { key: 'user', label: 'User', test: v => !v.isSys },
+    { key: 'hasDesc', label: 'Has Desc', test: v => (v.d || '').trim().length > 0 },
+    { key: 'probe', label: 'Probe', test: v => /probe|g31/i.test((v.d || '') + ' ' + v.i) },
+    { key: 'wcs', label: 'WCS', test: v => /wcs|work offset|g5[4-9]/i.test(v.d || '') },
+    { key: 'axis', label: 'Axis', test: v => /axis/i.test(v.d || '') },
+    { key: 'signal', label: 'Signal', test: v => /signal/i.test(v.d || '') },
+    { key: 'offset', label: 'Offset', test: v => /offset/i.test(v.d || '') },
+    { key: 'tool', label: 'Tool', test: v => /tool/i.test(v.d || '') },
+    { key: 'port', label: 'Port', test: v => /port/i.test(v.d || '') },
+    { key: 'status', label: 'Status', test: v => /status/i.test(v.d || '') },
+    { key: 'input', label: 'Input', test: v => /input/i.test(v.d || '') },
+    { key: 'output', label: 'Output', test: v => /output/i.test(v.d || '') },
+    { key: 'func', label: 'Func', test: v => /func/i.test(v.d || '') },
+    { key: 'key', label: 'Key', test: v => /\bkey\b/i.test(v.d || '') },
+];
 
 export class CommandDeck {
-    constructor(editorManager) {
+    constructor(editorManager, variableDB = null) {
         this.editorManager = editorManager;
+        this.variableDB = variableDB;
         this.panel = el('deck-panel');
-        this.build(); 
+        this._varGrid = null;
+        this._varSearch = null;
+        this._activeTab = 'keyboard';
+        this._activeFilters = new Set();
+        this.build();
+        // Let other modules (e.g. a CSV import) refresh the keyboard's variable buttons
+        window.refreshDeckVariables = () => this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : '');
+        // The variable DB loads asynchronously (default_vars.js + user_vars.csv); re-render when ready
+        window.addEventListener('variableDB:ready', () => {
+            this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : '');
+        });
     }
 
     build() {
-        // 1. Populate Header Zones
+        // 1. Header zones (wizards / comm / wcs / copy / clear / export)
         this.renderHeader();
 
-        // 2. Populate Body
         const body = document.querySelector('.dock-body');
-        if (body) {
-            // prefer using existing #deck-panel if present to remain backwards compatible
-            const deckPanel = document.getElementById('deck-panel');
+        if (!body) return;
+        const deckPanel = document.getElementById('deck-panel'); // existing macro-groups container
 
-            // ROW 1: Editor Keys Container (3 equal slots: BACK / SPACE / ENTER)
-            const editorRow = document.createElement('div');
-            editorRow.className = 'dock-row editor-keys-row grid-3';
-            editorRow.innerHTML = `
-                <button class="toolbar-btn" data-ddcs-role="back">⌫ BACK</button>
-                <button class="toolbar-btn" data-ddcs-role="space">␣ SPACE</button>
-                <button class="toolbar-btn" data-ddcs-role="enter">↵ ENTER</button>
-            `;
-            // Use pointerdown for editor-row actions (prevents system keyboard on mobile and avoids click races)
-            const backBtn = editorRow.querySelector('[data-ddcs-role="back"]');
-            const spaceBtn = editorRow.querySelector('[data-ddcs-role="space"]');
-            const enterBtn = editorRow.querySelector('[data-ddcs-role="enter"]');
+        // 2. KEYBOARD panel — editor keys row + macro groups
+        const kbPanel = document.createElement('div');
+        kbPanel.className = 'deck-tab-panel';
+        kbPanel.id = 'deck-tab-keyboard';
 
-            if (backBtn) backBtn.addEventListener('pointerdown', (e) => {
-                e.preventDefault();
-                backBtn.dataset.__ddcs_handled = '1';
-                // SILENT EDIT: modify the editor value directly and update caret without focusing
-                const ed = document.getElementById('editor');
-                if (ed) {
-                    const start = ed.selectionStart;
-                    const end = ed.selectionEnd;
-                    if (start !== end) {
-                        // delete selection
-                        ed.value = ed.value.slice(0, start) + ed.value.slice(end);
-                        // tiny visible selection at deletion point
-                        ed.setSelectionRange(start, Math.min(ed.value.length, start + 1));
-                    } else if (start > 0) {
-                        // delete single char before caret
-                        ed.value = ed.value.slice(0, start - 1) + ed.value.slice(start);
-                        const newPos = start - 1;
-                        ed.setSelectionRange(newPos, Math.min(ed.value.length, newPos + 1));
-                    }
-                    // update syntax highlight / listeners without focusing
-                    ed.dispatchEvent(new Event('input'));
-                    // keep keyboard suppressed
-                    ed.setAttribute('inputmode','none');
-                    ed.blur();
-                }
-            }, { passive: false });
+        const editorRow = document.createElement('div');
+        editorRow.className = 'dock-row editor-keys-row grid-3';
+        editorRow.innerHTML = `
+            <button class="toolbar-btn" data-ddcs-role="back">⌫ BACK</button>
+            <button class="toolbar-btn" data-ddcs-role="space">␣ SPACE</button>
+            <button class="toolbar-btn" data-ddcs-role="enter">↵ ENTER</button>
+        `;
+        this._wireEditorRow(editorRow);
+        kbPanel.appendChild(editorRow);
 
-            if (spaceBtn) spaceBtn.addEventListener('pointerdown', (e) => {
-                e.preventDefault();
-                spaceBtn.dataset.__ddcs_handled = '1';
-                window.insert && window.insert(' ');
-                const ed = document.getElementById('editor'); if (ed) { ed.setAttribute('inputmode','none'); ed.blur(); }
-            }, { passive: false });
-
-            if (enterBtn) enterBtn.addEventListener('pointerdown', (e) => {
-                e.preventDefault();
-                enterBtn.dataset.__ddcs_handled = '1';
-                window.insert && window.insert('\n');
-                const ed = document.getElementById('editor'); if (ed) { ed.setAttribute('inputmode','none'); ed.blur(); }
-            }, { passive: false });
-
-
-            // If #deck-panel exists, clear and use it as macro container; otherwise create a fallback
-            if (deckPanel) {
-                // ensure deckPanel is emptied then inserted at the top so editorRow appears above it
-                deckPanel.innerHTML = '';
-                body.insertBefore(editorRow, deckPanel);
-                this.buildMacroGroups(deckPanel);
-
-                // Prevent buttons inside the deck panel stealing focus and handle insertion via pointerdown
-                deckPanel.querySelectorAll('button').forEach(btn => {
-                    btn.addEventListener('pointerdown', (e) => {
-                        e.preventDefault();
-                        try {
-                            // mark handled so the subsequent click is swallowed by the capture guard
-                            btn.dataset.__ddcs_handled = '1';
-                            // Execute the existing inline handler (if any) without triggering native focus behavior
-                            if (typeof btn.onclick === 'function') { btn.onclick.call(btn, e); }
-                        } catch (err) { /* noop */ }
-                        // After any insertion, ensure editor stays in 'no-keyboard' mode
-                        const ed = document.getElementById('editor');
-                        if (ed) { ed.setAttribute('inputmode', 'none'); ed.blur(); }
-                    }, { passive: false });
-                });
-            } else {
-                // fallback: create a macroGrid and append
-                body.innerHTML = '';
-                body.appendChild(editorRow);
-                const macroGrid = document.createElement('div');
-                macroGrid.className = 'dock-row macro-grid-area';
-                this.buildMacroGroups(macroGrid);
-
-                // Prevent buttons inside fallback macroGrid from stealing focus and handle insertion via pointerdown
-                macroGrid.querySelectorAll('button').forEach(btn => {
-                    btn.addEventListener('pointerdown', (e) => {
-                        e.preventDefault();
-                        try {
-                            btn.dataset.__ddcs_handled = '1';
-                            if (typeof btn.onclick === 'function') btn.onclick.call(btn, e);
-                        } catch (err) { /* noop */ }
-                        const ed = document.getElementById('editor'); if (ed) { ed.setAttribute('inputmode', 'none'); ed.blur(); }
-                    }, { passive: false });
-                });
-
-                body.appendChild(macroGrid);
-            }
+        if (deckPanel) {
+            deckPanel.innerHTML = '';
+            kbPanel.appendChild(deckPanel);
+            this.buildMacroGroups(deckPanel);
+            this._wireDeckButtons(deckPanel);
+        } else {
+            const macroGrid = document.createElement('div');
+            macroGrid.className = 'dock-row macro-grid-area';
+            macroGrid.id = 'deck-panel';
+            this.buildMacroGroups(macroGrid);
+            this._wireDeckButtons(macroGrid);
+            kbPanel.appendChild(macroGrid);
         }
+
+        // 3. VARIABLES panel — search + filters + scrollable chips
+        const varPanel = document.createElement('div');
+        varPanel.className = 'deck-tab-panel';
+        varPanel.id = 'deck-tab-variables';
+        varPanel.style.display = 'none';
+        this.buildVariablesPanel(varPanel);
+
+        // 4. Assemble panels into the dock body
+        body.innerHTML = '';
+        body.appendChild(kbPanel);
+        body.appendChild(varPanel);
+
+        // 5. Tabs live on the dock handle (replacing the chevron); clicking opens the dock
+        this.renderHandleTabs();
+    }
+
+    // Put the KEYBOARD/VARIABLES tabs on the dock handle (replaces the up/down chevron)
+    renderHandleTabs() {
+        const handle = document.querySelector('#controller-dock .header-handle');
+        if (!handle) return;
+        handle.innerHTML = `
+            <button class="deck-tab ddcs-tab active" data-deck-tab="keyboard">⌨ KEYBOARD</button>
+            <button class="deck-tab ddcs-tab" data-deck-tab="variables"># VARIABLES</button>
+        `;
+        handle.setAttribute('aria-label', 'Keyboard / Variables tabs');
+        handle.querySelectorAll('.deck-tab').forEach(t => {
+            t.addEventListener('pointerdown', (e) => { e.preventDefault(); }, { passive: false });
+            // stopPropagation so the dock's own handle-toggle listener doesn't double-fire
+            t.addEventListener('click', (e) => { e.stopPropagation(); this.onHandleTabClick(t.dataset.deckTab); });
+        });
+    }
+
+    // Ergonomic: collapsed → open to that tab; open+other → switch; open+same → close
+    onHandleTabClick(name) {
+        const dock = document.getElementById('controller-dock');
+        if (!dock) return;
+        const expanded = dock.classList.contains('is-expanded');
+        const isActive = this._activeTab === name;
+        if (!expanded) {
+            dock.classList.add('is-expanded');
+            this.switchTab(name);
+        } else if (isActive) {
+            dock.classList.remove('is-expanded');
+        } else {
+            this.switchTab(name);
+        }
+        const handle = document.querySelector('#controller-dock .header-handle');
+        if (handle) handle.setAttribute('aria-expanded', dock.classList.contains('is-expanded') ? 'true' : 'false');
+    }
+
+    switchTab(name) {
+        this._activeTab = name;
+        const kb = document.getElementById('deck-tab-keyboard');
+        const vp = document.getElementById('deck-tab-variables');
+        if (kb) kb.style.display = name === 'keyboard' ? '' : 'none';
+        if (vp) vp.style.display = name === 'variables' ? '' : 'none';
+        document.querySelectorAll('#controller-dock .deck-tab').forEach(t => {
+            t.classList.toggle('active', t.dataset.deckTab === name);
+        });
+        if (name === 'variables') {
+            this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : '');
+        }
+    }
+
+    _wireEditorRow(editorRow) {
+        const backBtn = editorRow.querySelector('[data-ddcs-role="back"]');
+        const spaceBtn = editorRow.querySelector('[data-ddcs-role="space"]');
+        const enterBtn = editorRow.querySelector('[data-ddcs-role="enter"]');
+
+        if (backBtn) backBtn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            backBtn.dataset.__ddcs_handled = '1';
+            const ed = document.getElementById('editor');
+            if (ed) {
+                const start = ed.selectionStart;
+                const end = ed.selectionEnd;
+                if (start !== end) {
+                    ed.value = ed.value.slice(0, start) + ed.value.slice(end);
+                    ed.setSelectionRange(start, Math.min(ed.value.length, start + 1));
+                } else if (start > 0) {
+                    ed.value = ed.value.slice(0, start - 1) + ed.value.slice(start);
+                    const newPos = start - 1;
+                    ed.setSelectionRange(newPos, Math.min(ed.value.length, newPos + 1));
+                }
+                ed.dispatchEvent(new Event('input'));
+                ed.setAttribute('inputmode', 'none');
+                ed.blur();
+            }
+        }, { passive: false });
+
+        if (spaceBtn) spaceBtn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            spaceBtn.dataset.__ddcs_handled = '1';
+            window.insert && window.insert(' ');
+            const ed = document.getElementById('editor'); if (ed) { ed.setAttribute('inputmode', 'none'); ed.blur(); }
+        }, { passive: false });
+
+        if (enterBtn) enterBtn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            enterBtn.dataset.__ddcs_handled = '1';
+            window.insert && window.insert('\n');
+            const ed = document.getElementById('editor'); if (ed) { ed.setAttribute('inputmode', 'none'); ed.blur(); }
+        }, { passive: false });
+    }
+
+    _wireDeckButtons(container) {
+        container.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                try {
+                    btn.dataset.__ddcs_handled = '1';
+                    if (typeof btn.onclick === 'function') { btn.onclick.call(btn, e); }
+                } catch (err) { /* noop */ }
+                const ed = document.getElementById('editor');
+                if (ed) { ed.setAttribute('inputmode', 'none'); ed.blur(); }
+            }, { passive: false });
+        });
+    }
+
+    // VARIABLES tab: search + filters + a scrollable box of key-styled chips
+    buildVariablesPanel(panel) {
+        panel.innerHTML = '';
+        this._activeFilters = new Set();
+
+        const searchRow = document.createElement('div');
+        searchRow.className = 'deck-var-searchrow';
+        const search = document.createElement('input');
+        search.type = 'text';
+        search.className = 'deck-var-search';
+        search.placeholder = 'Search variables…';
+        search.setAttribute('autocomplete', 'off');
+        const filterBtn = document.createElement('button');
+        filterBtn.className = 'deck-var-filterbtn';
+        filterBtn.textContent = 'Filters';
+        searchRow.appendChild(search);
+        searchRow.appendChild(filterBtn);
+        panel.appendChild(searchRow);
+
+        const filterRow = document.createElement('div');
+        filterRow.className = 'deck-var-filters';
+        filterRow.style.display = 'none';
+        VAR_FILTERS.forEach(f => {
+            const chip = document.createElement('button');
+            chip.className = 'deck-var-filterchip';
+            chip.textContent = f.label;
+            chip.dataset.filterKey = f.key;
+            chip.addEventListener('pointerdown', (e) => { e.preventDefault(); }, { passive: false });
+            chip.addEventListener('click', () => {
+                if (this._activeFilters.has(f.key)) { this._activeFilters.delete(f.key); chip.classList.remove('active'); }
+                else { this._activeFilters.add(f.key); chip.classList.add('active'); }
+                this.renderVariables(this._varSearch.value.trim().toLowerCase());
+            });
+            filterRow.appendChild(chip);
+        });
+        panel.appendChild(filterRow);
+
+        filterBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); }, { passive: false });
+        filterBtn.addEventListener('click', () => {
+            const show = filterRow.style.display === 'none';
+            filterRow.style.display = show ? 'flex' : 'none';
+            filterBtn.classList.toggle('active', show);
+        });
+
+        const scroll = document.createElement('div');
+        scroll.className = 'deck-var-scroll';
+        const grid = document.createElement('div');
+        grid.className = 'deck-var-grid';
+        scroll.appendChild(grid);
+        panel.appendChild(scroll);
+
+        this._varGrid = grid;
+        this._varSearch = search;
+        search.addEventListener('input', () => this.renderVariables(search.value.trim().toLowerCase()));
+        this.renderVariables();
+    }
+
+    renderVariables(filter = '') {
+        const grid = this._varGrid;
+        if (!grid || !this.variableDB) return;
+        grid.innerHTML = '';
+
+        // Mirror the top toolbar: full variable set (system + user)
+        let vars = this.variableDB.getAll();
+        if (filter) {
+            vars = vars.filter(v => (String(v.i) + ' ' + (v.d || '')).toLowerCase().includes(filter));
+        }
+        const active = this._activeFilters;
+        if (active && active.size) {
+            // Exclusive (AND): a variable must match EVERY selected category
+            const tests = VAR_FILTERS.filter(f => active.has(f.key));
+            vars = vars.filter(v => tests.every(f => f.test(v)));
+        }
+        if (vars.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'deck-var-empty';
+            empty.textContent = (filter || (active && active.size)) ? 'No matching variables' : 'No variables loaded';
+            grid.appendChild(empty);
+            return;
+        }
+
+        const frag = document.createDocumentFragment();
+        vars.forEach(v => {
+            const id = String(v.i).split('-')[0];
+            const desc = v.d || 'User Variable';
+            const btn = document.createElement('button');
+            btn.className = 'toolbar-btn deck-var-chip';
+            const idEl = document.createElement('span');
+            idEl.className = 'var-id';
+            idEl.textContent = id;
+            const descEl = document.createElement('span');
+            descEl.className = 'var-desc';
+            descEl.textContent = desc;
+            btn.appendChild(idEl);
+            btn.appendChild(descEl);
+            btn.addEventListener('mouseenter', () => UIUtils.showTooltip(btn, `${desc}\n\nID: ${v.i}\nType: ${v.t || ''}`));
+            btn.addEventListener('mouseleave', () => UIUtils.hideTooltip());
+            btn.onclick = () => { if (this.editorManager) this.editorManager.insert(null, id); };
+            btn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                btn.dataset.__ddcs_handled = '1';
+                if (typeof btn.onclick === 'function') btn.onclick.call(btn, e);
+                const ed = document.getElementById('editor');
+                if (ed) { ed.setAttribute('inputmode', 'none'); ed.blur(); }
+            }, { passive: false });
+            frag.appendChild(btn);
+        });
+        grid.appendChild(frag);
     }
 
     // Helper: Render header left/center/right
@@ -154,21 +337,16 @@ export class CommandDeck {
             `;
         }
 
-        // Prevent header buttons from stealing focus (keep editor caret/keyboard state)
         document.querySelectorAll('.dock-header .header-left button, .dock-header .header-center button, .dock-header .header-right button')
             .forEach(btn => btn.addEventListener('pointerdown', (e) => { e.preventDefault(); }, { passive: false }));
-        // Also ensure the header 'peeker' handle never summons the system keyboard on pointerdown
-        const headerHandle = document.querySelector('#controller-dock .header-handle');
-        if (headerHandle) headerHandle.addEventListener('pointerdown', (e) => { e.preventDefault(); }, { passive: false });
-        // Global click-capture guard: if a button was handled on pointerdown (dataset flag),
-        // swallow the following click to avoid duplicate insertions on iOS/Android.
         document.addEventListener('click', (ev) => {
             const t = ev.target;
             if (t && t.dataset && t.dataset.__ddcs_handled) {
                 try { ev.stopImmediatePropagation(); ev.preventDefault(); } catch (e) { /* noop */ }
                 try { delete t.dataset.__ddcs_handled; } catch (e) { /* noop */ }
             }
-        }, true);    }
+        }, true);
+    }
 
     // Helper: build macro groups into provided container
     buildMacroGroups(container) {

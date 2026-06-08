@@ -606,7 +606,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 
 /* --- DOCK BODY (Vertical Stack) --- */
 .dock-body {
-    display: flex;
+    display: none;  /* collapsed: take NO space (no white strip below the tabs) */
     flex-direction: column !important; /* Forces distinct rows */
     gap: 12px;
     padding: 12px;
@@ -615,8 +615,6 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     min-height: 300px;
     overflow-y: auto;
     overflow-x: hidden; /* Prevent horizontal overflow */
-
-    /* Hide body when collapsed to prevent visual bleed */
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.18s ease;
@@ -624,9 +622,10 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 
 /* Ensure body becomes visible only when dock is expanded */
 #controller-dock.is-expanded .dock-body {
+    display: flex;
     opacity: 1;
     visibility: visible;
-} 
+}
 
 /* Row 1: Editor Keys */
 .editor-keys-row {
@@ -1522,6 +1521,16 @@ body[data-theme="ddcs"] .dock-header .header-controls {
     border-left: 4px solid var(--ddcs-border-left) !important;
     border-right: 4px solid var(--ddcs-border-right) !important;
     border-bottom: 4px solid var(--ddcs-border-bottom) !important;
+}
+
+/* Top action bar in DDCS: grey plate instead of blue (override the tones above) */
+body[data-theme="ddcs"] .top-dock-header .header-controls {
+    --ddcs-hdr-top: #d8d4cd;      /* grey gradient top */
+    --ddcs-hdr-btm: #c2bdb5;      /* grey gradient bottom */
+    --ddcs-border-top: #f0f0f0;   /* highlight */
+    --ddcs-border-left: #a8a8a8;  /* light-mid */
+    --ddcs-border-right: #585858; /* dark-mid */
+    --ddcs-border-bottom: #202020;/* shadow */
 }
 
 body[data-theme="ddcs"] .header-handle {
@@ -2505,4 +2514,289 @@ body[data-scale="175"],
 body[data-scale="200"],
 body[data-scale="250"] {
     overflow: auto;
+}
+
+/* ============================================
+   VIEW TOGGLE FAB  (3D / CODE)  +  3D PREVIEW
+   ============================================ */
+/* The editor textarea must not be user-resizable (kills the default drag handle) */
+#editor { resize: none !important; }
+
+/* 3D drawer pull-tab — a small vertically-centred handle on the right edge that
+   slides the drawer open/closed (like the dock handle, but on the side).
+   Scoped under .editor-container + !important to out-rank the heavy [data-theme]
+   button rules (which force position:relative + a beveled ::before). */
+.editor-container .viz3d-handle {
+    position: absolute !important;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    z-index: 6;
+    width: 28px !important;
+    min-width: 0 !important;
+    height: 72px;
+    min-height: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 !important;
+    color: #eaf4ff !important;
+    background: rgba(28, 86, 140, 0.95) !important;
+    border: 1px solid rgba(130, 195, 255, 0.65) !important;
+    border-right: none !important;
+    border-radius: 8px 0 0 8px !important;
+    box-shadow: -3px 0 10px rgba(0, 0, 0, 0.45) !important;
+    cursor: pointer;
+    transition: right 0.22s ease, background 0.12s ease;
+}
+.editor-container .viz3d-handle::before { display: none !important; } /* kill theme bevel */
+.editor-container .viz3d-handle.open { right: 50% !important; } /* ride the drawer edge */
+.editor-container .viz3d-handle:hover { background: rgba(42, 120, 190, 0.98) !important; }
+.editor-container .viz3d-handle:active { transform: translateY(-50%) !important; }
+.viz3d-handle-cube { display: block; }
+
+/* ===== Keyboard tabs on the dock handle — Chrome-style connected tabs ===== */
+#controller-dock .header-handle {
+    display: flex;
+    justify-content: center;        /* tabs centered in the handle */
+    align-items: flex-end;
+    gap: 0;
+    flex: 0 0 auto !important;      /* size to the tabs in ALL themes (base was flex 0 0 60px) */
+    height: auto !important;
+    min-height: 30px;
+    padding: 0 !important;
+    margin-bottom: -3px;            /* active tab overlaps the panel edge → connects */
+    background: transparent !important;
+    border: none !important;        /* clear the theme "middle plate" bevel border (the stray line) */
+    box-shadow: none !important;
+    overflow: visible;
+}
+#controller-dock .header-handle .chevron { display: none; }
+
+/* Generic tab (all themes) — theme-aware colors so the active tab merges into the panel */
+.dock-header .deck-tab {
+    position: relative;
+    z-index: 1;
+    padding: 6px 26px !important;
+    min-height: 0 !important;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--text-dim) !important;
+    background: var(--bg) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px 8px 0 0 !important;
+    box-shadow: none !important;
+    cursor: pointer;
+}
+.dock-header .deck-tab::before { display: none !important; }       /* no theme bevel groove */
+.dock-header .deck-tab:hover { color: var(--text-main) !important; }
+.dock-header .deck-tab.active {
+    z-index: 3;                                   /* current tab sits in front */
+    color: var(--text-main) !important;
+    background: var(--panel) !important;          /* same fill as the panel → merges */
+    border-bottom-color: var(--panel) !important;
+}
+
+/* DDCS flavour — single grey bevel layered on the generic tab (ddcs only) */
+body[data-theme="ddcs"] .ddcs-tab {
+    color: #000 !important;
+    border-radius: 0 !important;
+    background: linear-gradient(180deg, #cfcbc4, #b6b1a9) !important; /* inactive: dimmer face */
+    border-top: 3px solid #f0f0f0 !important;     /* highlight */
+    border-left: 3px solid #a8a8a8 !important;    /* light-mid */
+    border-right: 3px solid #585858 !important;   /* dark-mid */
+    border-bottom: 3px solid #202020 !important;  /* shadow */
+}
+body[data-theme="ddcs"] .ddcs-tab:hover { background: linear-gradient(180deg, #ddd9d2, #c4bfb7) !important; }
+body[data-theme="ddcs"] .ddcs-tab.active {
+    background: linear-gradient(180deg, #f4f2ee, var(--panel)) !important; /* bottom = panel → merge */
+    border-bottom-color: var(--panel) !important;
+}
+
+/* overlap: tuck each following tab ~half behind its neighbour (active rides on top) */
+#controller-dock .deck-tab + .deck-tab { margin-left: -58px; }
+
+/* The panel the active tab connects to (theme-aware fill, seamless) */
+#controller-dock .dock-body {
+    background: var(--panel);
+    border-top: none;
+}
+.deck-tab-panel { padding: 10px; }
+
+/* Variables tab — search row + Filters button */
+.deck-var-searchrow { display: flex; gap: 6px; align-items: center; padding: 2px 0 6px; }
+.deck-var-search {
+    flex: 1 1 auto;
+    box-sizing: border-box;
+    padding: 6px 10px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
+}
+.dock-body .deck-var-filterbtn {
+    flex: 0 0 auto;
+    padding: 6px 16px !important;
+    min-height: 0 !important;
+    font-size: 12px;
+    font-weight: 700;
+}
+.dock-body .deck-var-filterbtn::before { display: none !important; }
+.dock-body .deck-var-filterbtn.active { box-shadow: 0 0 0 2px var(--accent) inset !important; }
+.deck-var-filters { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 0 8px; }
+.dock-body .deck-var-filterchip {
+    padding: 3px 11px !important;
+    min-height: 0 !important;
+    font-size: 11px;
+    font-weight: 600;
+}
+.dock-body .deck-var-filterchip::before { display: none !important; }
+.dock-body .deck-var-filterchip.active { background: var(--accent) !important; color: #fff !important; }
+.deck-var-scroll {
+    max-height: 230px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+}
+.deck-var-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 5px;
+}
+/* Horizontal variable chip: id + truncated descriptor on one line */
+.deck-var-grid .deck-var-chip {
+    display: flex !important;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px !important;
+    height: auto;
+    line-height: 1.2;
+    text-align: left;
+    overflow: hidden;
+}
+.deck-var-chip .var-id { font-weight: 700; font-size: 12px; flex: 0 0 auto; }
+.deck-var-chip .var-desc {
+    font-size: 10px;
+    color: inherit !important;  /* override the global .var-desc grey → chip's black text */
+    opacity: 1;
+    flex: 1 1 auto;
+    min-width: 0;               /* allow ellipsis inside a flex row */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.deck-var-empty { opacity: 0.5; font-size: 12px; padding: 10px; }
+
+/* 3D preview drawer — slides in over the right half of the editor; code stays visible */
+.viz3d-drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 50%;
+    background: #05070a;
+    border-left: 1px solid rgba(120, 190, 255, 0.45);
+    box-shadow: -6px 0 18px rgba(0, 0, 0, 0.55);
+    transform: translateX(105%);
+    transition: transform 0.22s ease;
+    z-index: 4;
+    overflow: hidden;
+}
+.viz3d-drawer.open { transform: translateX(0); }
+.viz3d-status,
+.viz3d-hint {
+    position: absolute;
+    font-family: monospace;
+    font-size: 11px;
+    color: #7fd0ff;
+    background: rgba(0, 0, 0, 0.55);
+    padding: 3px 7px;
+    border-radius: 3px;
+    pointer-events: none;
+    z-index: 2;
+    white-space: nowrap;
+}
+.viz3d-status { top: 6px; left: 8px; }
+.viz3d-hint { bottom: 6px; right: 8px; color: #6f8aa0; }
+
+/* ===== Settings overlay ===== */
+.settings-overlay { z-index: 1000; align-items: center; justify-content: center; }
+.settings-box {
+    width: min(560px, 94vw);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+.settings-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: var(--accent);
+    color: #fff;
+}
+.settings-close { cursor: pointer; padding: 0 4px; }
+.settings-body { padding: 12px 14px; overflow-y: auto; }
+.settings-section { padding: 10px 0; border-top: 1px solid var(--border); }
+.settings-section:first-child { border-top: none; padding-top: 0; }
+.settings-section-title { font-size: 12px; font-weight: 700; letter-spacing: 0.6px; color: var(--text-dim); margin-bottom: 6px; }
+.settings-section-title.sub { margin-top: 10px; font-size: 11px; }
+.settings-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.settings-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--text-dim); }
+.settings-grid input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font-size: 13px; }
+.settings-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.settings-check { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; cursor: pointer; }
+.settings-hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+.settings-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); }
+.settings-io { cursor: pointer; }
+
+/* Header op-buttons: never wrap labels to 2 lines; collapse to icon-only when narrow */
+.op-btn { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+@media (max-width: 820px) {
+    .app-header .op-btn .op-label { display: none; }
+    .app-header .op-btn { gap: 0; }
+}
+
+/* ===== Portrait / mobile: 3D drawer pulls UP from the bottom of the editor ===== */
+@media (orientation: portrait) {
+    .viz3d-drawer {
+        top: auto;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 50%;
+        border-left: none;
+        border-top: 1px solid rgba(120, 190, 255, 0.45);
+        box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.55);
+        transform: translateY(105%);
+    }
+    .viz3d-drawer.open { transform: translateY(0); }
+
+    /* Cube pull-tab on the bottom edge, horizontally centred */
+    .editor-container .viz3d-handle {
+        top: auto !important;
+        bottom: 0 !important;
+        left: 50% !important;
+        right: auto !important;
+        transform: translateX(-50%) !important;
+        width: 72px !important;
+        height: 28px !important;
+        border: 1px solid rgba(130, 195, 255, 0.65) !important;
+        border-bottom: none !important;
+        border-radius: 8px 8px 0 0 !important;
+    }
+    .editor-container .viz3d-handle.open { bottom: 50% !important; right: auto !important; }
+    .editor-container .viz3d-handle:active { transform: translateX(-50%) !important; }
 }

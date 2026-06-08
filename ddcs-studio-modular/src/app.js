@@ -24,6 +24,12 @@ import './middleVizUtils.js';
 import './middleVizAnimator.js';
 import './middleVizManager.js';
 
+// EDITOR / 3D toolpath preview tab (self-registers window.setGcodeView on DOM ready)
+import './gcodePreviewTab.js';
+
+// Settings panel (header ⚙ → CSV import/export + stock + machine envelope)
+import './settingsPanel.js';
+
 class DDCSStudio {
     constructor() {
         this.themeManager = new ThemeManager();
@@ -254,6 +260,8 @@ class DDCSStudio {
             const reader = new FileReader();
             reader.onload = (e) => {
                 this.variableDB.loadFromCSV(e.target.result);
+                // Refresh the keyboard's VARIABLES tab (the top strip that used to refresh is gone)
+                if (window.refreshDeckVariables) window.refreshDeckVariables();
             };
             reader.readAsText(file);
         });

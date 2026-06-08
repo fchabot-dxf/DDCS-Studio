@@ -114,13 +114,13 @@ export class ScaleManager {
         try { btn.dataset.__ddcs_updating = '1'; } catch (e) { /* noop */ }
 
         if (scale === 'auto') {
-            btn.textContent = `🔍 AUTO (${autoValue}%)`;
+            btn.innerHTML = `<span class="op-icon">🔍</span><span class="op-label">AUTO (${autoValue}%)</span>`;
             btn.setAttribute('title', `Current Zoom: AUTO (${autoValue}%) - Click to change`);
             // Clear the updating flag shortly after to allow external syncs
             setTimeout(() => { try { delete btn.dataset.__ddcs_updating; } catch (e) { /* noop */ } }, 40);
             return;
         }
-        btn.textContent = `🔍 ${scale}%`;
+        btn.innerHTML = `<span class="op-icon">🔍</span><span class="op-label">${scale}%</span>`;
         btn.setAttribute('title', `Current Zoom: ${scale}% - Click to change`);
         setTimeout(() => { try { delete btn.dataset.__ddcs_updating; } catch (e) { /* noop */ } }, 40);
     }

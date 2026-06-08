@@ -11,56 +11,33 @@
     <!-- App favicon (X/Y + chevron) -->
     <link rel="icon" href="assets/svg/favicon.svg" type="image/svg+xml">
     <script src="https://apploader.pages.dev/fred-host.js" defer></script>
+    <!-- three.js (global window.THREE) for the 3D toolpath preview. Vendored locally so
+         the standalone download / future pywebview .exe works fully offline. -->
+    <script defer src="assets/vendor/three.min.js"></script>
 </head>
 <body data-theme="ddcs">
 
     <header class="app-header">
         <span data-fred-home-mount></span>
         <div class="hdr-title" style="display:flex;align-items:center;gap:12px">
-            <span class="hdr-icon">⚙</span>
             <span class="hdr-text">DDCS STUDIO V9.49.78</span>
         </div>
             <div class="hdr-controls" style="display:flex;gap:10px;align-items:center">
-            <button onclick="(window.toggleStyle && window.toggleStyle())" id="styleBtn" class="op-btn" title="Switch Theme">🎨 NORMAL</button>
-            <button onclick="(window.toggleScale && window.toggleScale())" id="scaleBtn" class="op-btn" title="Toggle Zoom (AUTO)" class="scale-btn">🔍 AUTO</button>
-            <button onclick="(window.saveDefaults && window.saveDefaults())" class="op-btn" title="Download app with new defaults">💾 DOWNLOAD</button>
-            <button onclick="(function(){const code=(document.getElementById('editor')||{}).value||'';const body='Version: V9.49.77\n\nDescribe your feedback or bug below:\n\n'+(code?'--- Editor Code ---\n'+code:'(editor empty)');window.location.href='mailto:dansemur@gmail.com?subject='+encodeURIComponent('DDCS Studio Feedback / Bug Report')+'&body='+encodeURIComponent(body);})()" class="op-btn" id="feedbackBtn" title="Send feedback or report a bug to dansemur@gmail.com">🐛 REPORT BUG</button>
+            <button onclick="(window.toggleStyle && window.toggleStyle())" id="styleBtn" class="op-btn" title="Switch Theme"><span class="op-icon">🎨</span><span class="op-label">NORMAL</span></button>
+            <button onclick="(window.toggleScale && window.toggleScale())" id="scaleBtn" class="op-btn scale-btn" title="Toggle Zoom (AUTO)"><span class="op-icon">🔍</span><span class="op-label">AUTO</span></button>
+            <button onclick="(window.openSettings && window.openSettings())" class="op-btn" id="settingsBtn" title="Settings — stock, machine envelope, variable CSV"><span class="op-icon">⚙</span><span class="op-label">SETTINGS</span></button>
+            <button onclick="(window.saveDefaults && window.saveDefaults())" class="op-btn" title="Download app with new defaults"><span class="op-icon">💾</span><span class="op-label">DOWNLOAD</span></button>
         </div>
     </header>
 
     <div class="app-shell">
-        <div class="secondary-toolbar raised-seam">
-            <div class="secondary-toolbar-row">
-                <div class="toolbar-left">
-                    <label class="toolbar-btn" title="Import variables CSV">
-                        📂 <input type="file" id="csvInput" style="display:none">
-                    </label>
-                    <button id="csvExportBtn" class="toolbar-btn" title="Export variables CSV"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 16l-6-6h4V4h4v6h4l-6 6zm-7 2h14v2H5v-2z"/></svg></button>
-                    <input id="search" placeholder="Search..." />
-                    <button id="clearBtn" style="display:none" class="btn">Clear</button>
-                </div>
-                <div class="toolbar-right">
-                    <button id="filterbarBtn" class="toolbar-btn" aria-haspopup="true" aria-expanded="false">Filters</button>
-                    <div id="varList" class="var-list"></div>
-                </div>
-            </div>
-            <div id="filterbarMenu" class="filterbar-menu hidden">
-                <div class="filters-inner">
-                    <label><input type="checkbox" data-filter="user"><span>User</span></label>
-                    <label><input type="checkbox" data-filter="hasDesc"><span>Has Desc</span></label>
-                    <label><input type="checkbox" data-filter="probeG31"><span>Probe</span></label>
-                    <label><input type="checkbox" data-filter="wcs"><span>WCS</span></label>
-                    <label><input type="checkbox" data-filter="axis"><span>Axis</span></label>
-                    <label><input type="checkbox" data-filter="signal"><span>Signal</span></label>
-                    <label><input type="checkbox" data-filter="offset"><span>Offset</span></label>
-                    <label><input type="checkbox" data-filter="tool"><span>Tool</span></label>
-                    <label><input type="checkbox" data-filter="port"><span>Port</span></label>
-                    <label><input type="checkbox" data-filter="status"><span>Status</span></label>
-                    <label><input type="checkbox" data-filter="input"><span>Input</span></label>
-                    <label><input type="checkbox" data-filter="output"><span>Output</span></label>
-                    <label><input type="checkbox" data-filter="func"><span>Func</span></label>
-                    <label><input type="checkbox" data-filter="key"><span>Key</span></label>
-                </div>
+        <!-- Top action bar: program + wizard buttons (moved up from the dock header).
+             Wrapped in .dock-header so the existing .dock-header .header-controls CSS still applies. -->
+        <div class="dock-header top-dock-header">
+            <div class="header-controls">
+                <div class="header-left" aria-label="Left controls"></div>
+                <div class="header-center" aria-label="Center wizards"></div>
+                <div class="header-right" aria-label="Right controls"></div>
             </div>
         </div>
 
@@ -69,17 +46,24 @@
             <div class="editor-container">
                 <pre id="editor-highlight" class="editor-layer" aria-hidden="true"></pre>
                 <textarea id="editor" class="editor-layer" spellcheck="false" inputmode="none" placeholder="( System Ready )"></textarea>
+                <!-- 3D toolpath preview — slides in as a drawer from the right; the editor stays visible -->
+                <aside id="gcodeViz3dContainer" class="viz3d-drawer">
+                    <div id="viz3dStatus" class="viz3d-status"></div>
+                    <div class="viz3d-hint">drag orbit · wheel zoom · right-drag pan</div>
+                </aside>
+                <!-- Side pull-tab on the right edge: slides the 3D drawer open/closed -->
+                <button id="view-toggle" class="viz3d-handle" title="Toggle 3D toolpath preview" aria-label="Toggle 3D toolpath preview">
+                    <svg class="viz3d-handle-cube" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                        <path d="M12 2 21 7 21 17 12 22 3 17 3 7Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                        <path d="M3 7 12 12 21 7 M12 12 12 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                    </svg>
+                </button>
             </div>
             <div class="statusbar" id="status"></div>
         </main>
 
         <div id="controller-dock" class="controller-dock">
             <div class="dock-header">
-                <div class="header-controls">
-                    <div class="header-left" aria-label="Dock left controls"></div>
-                    <div class="header-center" aria-label="Dock center wizards"></div>
-                    <div class="header-right" aria-label="Dock right controls"></div>
-                </div>
                 <div class="header-handle" role="button" tabindex="0" aria-label="Toggle Dock" aria-expanded="false"><span class="chevron">▲</span></div>
             </div>
             <div class="dock-body">
