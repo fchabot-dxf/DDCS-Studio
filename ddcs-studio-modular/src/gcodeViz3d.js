@@ -68,7 +68,7 @@ export class GcodeViz3D {
         this.showRapids = true;
         this._animOn = true;   // play by default
         this._animPaused = false;
-        this._gizmoPx = 90;    // on-screen gizmo size (smaller in the compact wizard preview)
+        this._gizmoPx = 60;    // on-screen gizmo size (smaller still in the compact wizard preview)
         this._animRaf = null;
         this._animDist = 0;
         this._animLast = 0;
