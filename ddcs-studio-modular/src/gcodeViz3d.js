@@ -25,7 +25,12 @@ export class GcodeViz3D {
 
         const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 1e6);
         camera.up.set(0, 0, 1); // Z up
-        this.camera = camera;
+        this.persp = camera;
+        const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, -1e6, 1e6);
+        ortho.up.set(0, 0, 1);
+        this.ortho = ortho;
+        this._ortho = false;
+        this.camera = camera; // active camera — perspective normally, parallel on ViewCube faces
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio || 1);
@@ -69,6 +74,7 @@ export class GcodeViz3D {
         this._animLen = 0;
 
         this._initStaticScene();
+        this._initCube();
         this._bindControls();
         this._applyCamera();
 
@@ -86,6 +92,48 @@ export class GcodeViz3D {
         const axes = new THREE.AxesHelper(25); // X red, Y green, Z blue
         this.axes = axes;
         this.scene.add(axes);
+    }
+
+    // Interactive ViewCube: a small labelled cube in the corner that mirrors the camera
+    // orientation; clicking a face snaps the main camera to that view.
+    _initCube() {
+        const THREE = this.THREE;
+        this._cubeScene = new THREE.Scene();
+        this._cubeCam = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+        this._cubeCam.up.set(0, 0, 1);
+        // BoxGeometry material order: +X, -X, +Y, -Y, +Z, -Z
+        const labels = ['RIGHT', 'LEFT', 'BACK', 'FRONT', 'TOP', 'BOTTOM'];
+        this._cubeViews = ['right', 'left', 'back', 'front', 'top', 'bottom'];
+        const mats = labels.map((label) => {
+            const c = document.createElement('canvas'); c.width = c.height = 128;
+            const x = c.getContext('2d');
+            x.fillStyle = '#cdd5df'; x.fillRect(0, 0, 128, 128);
+            x.strokeStyle = '#7e8a9a'; x.lineWidth = 7; x.strokeRect(4, 4, 120, 120);
+            x.fillStyle = '#2b3340'; x.font = 'bold 19px sans-serif';
+            x.textAlign = 'center'; x.textBaseline = 'middle';
+            x.fillText(label, 64, 66);
+            return new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c) });
+        });
+        this._cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mats);
+        this._cubeScene.add(this._cube);
+        this._cubeScene.add(new THREE.LineSegments(new THREE.EdgesGeometry(this._cube.geometry), new THREE.LineBasicMaterial({ color: 0x55606e })));
+        this._cubeScene.add(new THREE.AxesHelper(0.95));
+    }
+
+    // Hit-test a click against the ViewCube viewport; snaps the view if a face is hit.
+    // Returns true when the click landed inside the cube box (so it shouldn't orbit).
+    _pickCube(e) {
+        if (!this._cubeScene || !this._cubeRect) return false;
+        const r = this.renderer.domElement.getBoundingClientRect();
+        const { size, m } = this._cubeRect;
+        const cx = e.clientX - r.left, cy = e.clientY - r.top;
+        const left = r.width - size - m, top = m; // top-right corner
+        if (cx < left || cx > left + size || cy < top || cy > top + size) return false;
+        const ndc = new this.THREE.Vector2(((cx - left) / size) * 2 - 1, -(((cy - top) / size) * 2 - 1));
+        this.raycaster.setFromCamera(ndc, this._cubeCam);
+        const hit = this.raycaster.intersectObject(this._cube, false)[0];
+        if (hit && hit.face) { const v = this._cubeViews[hit.face.materialIndex]; if (v) this.setView(v); }
+        return true;
     }
 
     // A draggable start marker for one pass: ruby probe tip + X/Y/Z translate gizmo
@@ -200,12 +248,13 @@ export class GcodeViz3D {
     setView(name) {
         const H = Math.PI / 2;
         const views = {
-            top: [-H, 0.05], front: [-H, H], back: [H, H],
+            top: [-H, 0.05], bottom: [-H, Math.PI - 0.05], front: [-H, H], back: [H, H],
             right: [0, H], left: [Math.PI, H], iso: [Math.PI / 4, Math.PI / 3],
         };
         const v = views[name] || views.iso;
         this.theta = v[0];
         this.phi = v[1];
+        this.camera = this.ortho; this._ortho = true; // standard views are parallel/orthographic
         this._applyCamera();
         this.render();
     }
@@ -585,7 +634,22 @@ export class GcodeViz3D {
         const z = this.radius * Math.cos(this.phi);
         this.camera.position.set(this.target.x + x, this.target.y + y, this.target.z + z);
         this.camera.lookAt(this.target);
+        if (this.camera.isOrthographicCamera) {
+            // match the perspective framing at the target distance, so zoom (radius) still works
+            const halfH = this.radius * Math.tan((this.persp.fov * Math.PI / 180) / 2);
+            const aspect = (this.container.clientWidth || 1) / (this.container.clientHeight || 1);
+            this.camera.left = -halfH * aspect; this.camera.right = halfH * aspect;
+            this.camera.top = halfH; this.camera.bottom = -halfH;
+            this.camera.updateProjectionMatrix();
+        }
         this.camera.updateMatrixWorld();
+    }
+
+    _toPerspective() {
+        if (!this._ortho) return;
+        this._ortho = false;
+        this.camera = this.persp;
+        this._applyCamera();
     }
 
     _bindControls() {
@@ -630,6 +694,7 @@ export class GcodeViz3D {
         };
         el.addEventListener('pointerdown', (e) => {
             e.preventDefault();
+            if (e.button === 0 && this._pickCube(e)) return; // ViewCube click → snap view
             const g = (e.button === 0 && !e.shiftKey) ? this._pickGizmo(e) : null;
             if (g) {
                 mode = 'gizmo';
@@ -645,7 +710,7 @@ export class GcodeViz3D {
                 this.renderer.domElement.style.cursor = 'grabbing';
             } else {
                 mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot';
-                if (mode === 'rot') this._setPivotFromCursor(e); // orbit around the cursor / stock
+                if (mode === 'rot') { this._toPerspective(); this._setPivotFromCursor(e); } // orbit → perspective, around the cursor / stock
             }
             px = e.clientX; py = e.clientY;
             window.addEventListener('pointermove', onMove);
@@ -684,8 +749,9 @@ export class GcodeViz3D {
         const w = this.container.clientWidth || 1;
         const h = this.container.clientHeight || 1;
         this.renderer.setSize(w, h, false);
-        this.camera.aspect = w / h;
-        this.camera.updateProjectionMatrix();
+        this.persp.aspect = w / h;
+        this.persp.updateProjectionMatrix();
+        this._applyCamera(); // re-derives the ortho frustum when it's the active camera
         this.render();
     }
 
@@ -703,7 +769,29 @@ export class GcodeViz3D {
     }
 
     render() {
-        this.renderer.render(this.scene, this.camera);
+        const r = this.renderer;
+        const w = this.container.clientWidth || 1, h = this.container.clientHeight || 1;
+        r.setScissorTest(false);
+        r.setViewport(0, 0, w, h);
+        r.render(this.scene, this.camera);
+        if (this._cubeScene) {
+            const size = Math.max(64, Math.min(96, w * 0.16)), m = 10;
+            const sp = Math.sin(this.phi);
+            this._cubeCam.position.set(sp * Math.cos(this.theta), sp * Math.sin(this.theta), Math.cos(this.phi)).multiplyScalar(3.4);
+            this._cubeCam.lookAt(0, 0, 0);
+            this._cubeCam.updateMatrixWorld();
+            const vx = w - size - m, vy = h - size - m; // top-right (gl viewport y is from the bottom)
+            r.setViewport(vx, vy, size, size);
+            r.setScissor(vx, vy, size, size);
+            r.setScissorTest(true);
+            r.autoClear = false;  // float the cube over the scene (no opaque background box)
+            r.clearDepth();       // but draw it on top
+            r.render(this._cubeScene, this._cubeCam);
+            r.autoClear = true;
+            r.setScissorTest(false);
+            r.setViewport(0, 0, w, h);
+            this._cubeRect = { size, m };
+        }
     }
 
     dispose() {
