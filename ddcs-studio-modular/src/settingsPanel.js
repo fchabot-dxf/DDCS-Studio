@@ -13,7 +13,7 @@ import { UIUtils } from './uiUtils.js';
 
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 const SETTINGS_DEFAULTS = {
-    stock:   { x: 100, y: 80, z: 20, show: true },
+    stock:   { x: 100, y: 80, z: 20, shape: 'boss', show: true },
     machine: { x: 300, y: 300, z: 120, ox: 0, oy: 0, oz: 0, show: true },
 };
 
@@ -88,6 +88,12 @@ function buildSettingsOverlay() {
                         <label>Y<input type="number" id="set_stock_y" min="0" step="1"></label>
                         <label>Z<input type="number" id="set_stock_z" min="0" step="1"></label>
                     </div>
+                    <label class="settings-field">SHAPE
+                        <select id="set_stock_shape">
+                            <option value="boss">Boss — probe the outside</option>
+                            <option value="pocket">Pocket — probe the inside</option>
+                        </select>
+                    </label>
                     <label class="settings-check"><input type="checkbox" id="set_stock_show"> Show stock in 3D</label>
                     <div class="settings-hint">WCS zero at the top, min XY corner: X[0..X] · Y[0..Y] · Z[-Z..0].</div>
                 </div>
@@ -140,6 +146,7 @@ function wireSettingsOverlay(ov) {
         q('set_stock_x').value = s.stock.x;
         q('set_stock_y').value = s.stock.y;
         q('set_stock_z').value = s.stock.z;
+        q('set_stock_shape').value = s.stock.shape || 'boss';
         q('set_stock_show').checked = !!s.stock.show;
         q('set_mach_x').value = s.machine.x;
         q('set_mach_y').value = s.machine.y;
@@ -158,6 +165,7 @@ function wireSettingsOverlay(ov) {
         s.stock.x = num(q('set_stock_x').value, s.stock.x);
         s.stock.y = num(q('set_stock_y').value, s.stock.y);
         s.stock.z = num(q('set_stock_z').value, s.stock.z);
+        s.stock.shape = q('set_stock_shape').value;
         s.stock.show = q('set_stock_show').checked;
         s.machine.x = num(q('set_mach_x').value, s.machine.x);
         s.machine.y = num(q('set_mach_y').value, s.machine.y);
@@ -168,7 +176,7 @@ function wireSettingsOverlay(ov) {
         s.machine.show = q('set_mach_show').checked;
         saveSettings();
     };
-    ov.querySelectorAll('input[type="number"], input[type="checkbox"]').forEach(el => {
+    ov.querySelectorAll('input[type="number"], input[type="checkbox"], select').forEach(el => {
         el.addEventListener('input', onInput);
         el.addEventListener('change', onInput);
     });

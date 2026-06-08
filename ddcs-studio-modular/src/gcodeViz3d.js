@@ -261,8 +261,18 @@ export class GcodeViz3D {
                 // collide in WORLD (program + start) vs the stock (program coords = world)
                 const Aw = { x: A.x + s.x, y: A.y + s.y, z: A.z + s.z };
                 const Bw = { x: B.x + s.x, y: B.y + s.y, z: B.z + s.z };
-                const hit = this._clampToBox(Aw, Bw, box.min, box.max);
-                if (hit) B = { x: hit.x - s.x, y: hit.y - s.y, z: hit.z - s.z };
+                const r = this._boxRange(Aw, Bw, box.min, box.max);
+                if (r.hit) {
+                    let t = null;
+                    if (st.shape === 'pocket') {
+                        // probe starts inside the cavity → stop at the inner wall (exit)
+                        if (r.tEnter <= 1e-6 && r.tExit > 1e-6 && r.tExit < 1 - 1e-6) t = r.tExit;
+                    } else {
+                        // boss/block: probe from outside → stop at the outer wall (entry)
+                        if (r.tEnter > 1e-6 && r.tEnter < 1 - 1e-6) t = r.tEnter;
+                    }
+                    if (t != null) B = { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t, z: A.z + (B.z - A.z) * t };
+                }
             }
             pos.push(A.x, A.y, A.z, B.x, B.y, B.z);
         }
@@ -275,13 +285,13 @@ export class GcodeViz3D {
         }
     }
 
-    // Where segment A→B first enters an axis-aligned box; null if it never enters.
-    _clampToBox(A, B, boxMin, boxMax) {
+    // Parametric range [tEnter, tExit] where the line A→B crosses an axis-aligned box.
+    _boxRange(A, B, boxMin, boxMax) {
         const d = { x: B.x - A.x, y: B.y - A.y, z: B.z - A.z };
-        let tEnter = 0, tExit = 1;
+        let tEnter = -Infinity, tExit = Infinity;
         for (const ax of ['x', 'y', 'z']) {
             if (Math.abs(d[ax]) < 1e-9) {
-                if (A[ax] < boxMin[ax] - 1e-6 || A[ax] > boxMax[ax] + 1e-6) return null;
+                if (A[ax] < boxMin[ax] - 1e-6 || A[ax] > boxMax[ax] + 1e-6) return { hit: false };
             } else {
                 let t1 = (boxMin[ax] - A[ax]) / d[ax];
                 let t2 = (boxMax[ax] - A[ax]) / d[ax];
@@ -290,8 +300,7 @@ export class GcodeViz3D {
                 if (t2 < tExit) tExit = t2;
             }
         }
-        if (tEnter > tExit || tEnter <= 1e-6 || tEnter >= 1) return null;
-        return { x: A.x + d.x * tEnter, y: A.y + d.y * tEnter, z: A.z + d.z * tEnter };
+        return { hit: tEnter <= tExit, tEnter, tExit };
     }
 
     fit(b) {
@@ -351,11 +360,14 @@ export class GcodeViz3D {
         if (this.stockMesh) { this.scene.remove(this.stockMesh); this.stockMesh.geometry.dispose(); this.stockMesh.material.dispose(); this.stockMesh = null; }
         if (this.stockEdges) { this.scene.remove(this.stockEdges); this.stockEdges.geometry.dispose(); this.stockEdges.material.dispose(); this.stockEdges = null; }
         if (stock && stock.show && stock.x > 0 && stock.y > 0 && stock.z > 0) {
+            const pocket = stock.shape === 'pocket';
+            const fillCol = pocket ? 0x6a8fbe : 0x8fae6a;  // pocket = blue, boss = green
+            const edgeCol = pocket ? 0x86b6ff : 0xa6d77c;
             const geo = new THREE.BoxGeometry(stock.x, stock.y, stock.z);
-            const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x8fae6a, transparent: true, opacity: 0.12, depthWrite: false }));
+            const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: fillCol, transparent: true, opacity: 0.12, depthWrite: false }));
             mesh.position.set(stock.x / 2, stock.y / 2, -stock.z / 2);
             this.stockMesh = mesh; this.scene.add(mesh);
-            const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xa6d77c, transparent: true, opacity: 0.55 }));
+            const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: edgeCol, transparent: true, opacity: 0.55 }));
             edges.position.copy(mesh.position);
             this.stockEdges = edges; this.scene.add(edges);
         }

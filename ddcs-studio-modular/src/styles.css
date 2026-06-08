@@ -2754,6 +2754,8 @@ body[data-theme="ddcs"] .ddcs-tab.active {
 .settings-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .settings-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--text-dim); }
 .settings-grid input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font-size: 13px; }
+.settings-field { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--text-dim); margin-top: 8px; max-width: 240px; }
+.settings-field select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font-size: 13px; }
 .settings-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .settings-check { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; cursor: pointer; }
 .settings-hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
