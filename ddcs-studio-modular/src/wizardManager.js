@@ -11,6 +11,8 @@ import { CommunicationWizard } from './wizards/communicationWizard.js';
 import { WCSWizard } from './wizards/wcsWizard.js';
 import { AlignmentWizard } from './wizards/alignmentWizard.js';
 import { playClick, playClickReverse } from './sound.js';  // audio helper for click sounds
+import { GcodeViz3D } from './gcodeViz3d.js';
+import { parseGcode } from './gcodeParser.js';
 
 export class WizardManager {
     constructor(editorManager) {
@@ -459,6 +461,7 @@ export class WizardManager {
 
         const gcode = this.cornerWizard.generate(params);
         el('wiz_corner_code').innerHTML = UIUtils.formatGCode(gcode);
+        this._preview3D(gcode, 'cornerVizContainer');
 
         // Debug: indicate whether generated gcode contains Z probe sequence
         const containsZ = /(Step \d+: Z Surface Probe|G31 Z)/.test(gcode);
@@ -522,6 +525,7 @@ export class WizardManager {
 
         const gcode = this.middleWizard.generate(params);
         el('wiz_middle_code').innerHTML = UIUtils.formatGCode(gcode);
+        this._preview3D(gcode, 'middleVizContainer');
 
         // Update middle status label
         const middleStatus = el('middleVizStatus');
@@ -649,6 +653,7 @@ export class WizardManager {
 
         const gcode = this.alignmentWizard.generate(params);
         el('wiz_alignment_code').innerHTML = UIUtils.formatGCode(gcode);
+        this._preview3D(gcode, 'alignmentVizContainer');
 
         const probeAxis = params.checkAxis === 'X' ? 'Y' : 'X';
         const status = el('alignmentVizStatus');
@@ -689,6 +694,7 @@ export class WizardManager {
 
         console.debug('updateEdgeWizard', params);
         const gcode = this.edgeWizard.generate(params);
+        this._preview3D(gcode, 'probeVizContainer');
         console.debug('edge generate => containsG31=', /G31/.test(gcode));
         el('wiz_edge_code').innerHTML = UIUtils.formatGCode(gcode);
 
@@ -738,6 +744,57 @@ export class WizardManager {
         
         // do not fire reverse sound when closing as part of insertion
         this.close(false);
+    }
+
+    // Render the generated G-code as a live 3D toolpath in the active wizard's viz area
+    // (a shared GcodeViz3D moved between wizards; replaces the SVG schematic).
+    _preview3D(gcode, containerId) {
+        const svgCont = document.getElementById(containerId);
+        if (!svgCont || !svgCont.parentElement) return;
+        const parent = svgCont.parentElement; // .viz-container
+        // Dedicated host beside the SVG (the SVG is injected via innerHTML and would wipe a
+        // canvas placed inside it). Hide the SVG schematic in favour of the 3D view.
+        let host = parent.querySelector('.wiz-viz3d');
+        if (!host) {
+            host = document.createElement('div');
+            host.className = 'wiz-viz3d';
+            host.style.cssText = 'position:relative; width:100%; height:220px;';
+            parent.insertBefore(host, svgCont);
+            // Controls cloned from the main 3D viewer: stock shape + Play/Stop (default play)
+            const ctrls = document.createElement('div');
+            ctrls.className = 'viz3d-controls';
+            ctrls.innerHTML =
+                '<label>Stock <select class="wiz-shape"><option value="boss">Boss</option><option value="pocket">Pocket</option></select></label>' +
+                '<button type="button" class="wiz-play on">⏸ Stop</button>';
+            host.appendChild(ctrls);
+            ctrls.querySelector('.wiz-shape').addEventListener('change', (e) => {
+                if (window.ddcsApplySettings) window.ddcsApplySettings({ stock: { shape: e.target.value } });
+                this._refresh3DStock();
+            });
+            ctrls.querySelector('.wiz-play').addEventListener('click', (e) => {
+                if (!this._wizViz) return;
+                const on = !this._wizViz._animOn;
+                this._wizViz.setAnimate(on);
+                e.target.classList.toggle('on', on);
+                e.target.textContent = on ? '⏸ Stop' : '▶ Play';
+            });
+        }
+        svgCont.style.display = 'none';
+        try {
+            if (!this._wizViz) { this._wizViz = new GcodeViz3D(host); this._wizViz._gizmoPx = 32; }
+            this._wizViz.attach(host);
+            this._wizViz.setActive(true);
+            this._refresh3DStock();
+            this._wizViz.setSegments(parseGcode(gcode || ''));
+            const sel = host.querySelector('.wiz-shape');
+            if (sel && window.ddcsGetSettings) sel.value = (window.ddcsGetSettings().stock || {}).shape || 'boss';
+        } catch (e) { console.warn('wizard 3D preview failed', e); }
+    }
+
+    _refresh3DStock() {
+        if (this._wizViz && window.ddcsGetSettings) {
+            try { this._wizViz.setStock(window.ddcsGetSettings().stock); } catch (e) { /* ignore */ }
+        }
     }
 
     togglePreview() {

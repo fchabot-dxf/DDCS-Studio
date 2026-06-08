@@ -22,6 +22,7 @@ export function parseGcode(text) {
     let absolute = true;   // G90 / G91
     let unitScale = 1;     // G20 inch = 25.4, G21 mm = 1 (stored in mm)
     let plane = 17;        // G17 XY, G18 ZX, G19 YZ
+    let feedVal = 0;       // modal feed (F); used to tell fast vs slow probes apart
     let started = false;
     let pass = 0;          // increments at each manual REPOSITION (one draggable start per pass)
 
@@ -106,6 +107,7 @@ export function parseGcode(text) {
         }
 
         const has = (k) => Object.prototype.hasOwnProperty.call(wm, k);
+        if (has('F') && wm.F != null) feedVal = wm.F;  // track modal feed
         const hasAxis = has('X') || has('Y') || has('Z');
         const hasArcOff = has('I') || has('J') || has('K') || has('R');
         if (!hasAxis && !hasArcOff) continue;          // modal-only / non-motion line
@@ -131,7 +133,7 @@ export function parseGcode(text) {
             segments.push({
                 x1: pos.x, y1: pos.y, z1: pos.z,
                 x2: target.x, y2: target.y, z2: target.z,
-                rapid: effMotion === 0, probe: isProbe, type, pass,
+                rapid: effMotion === 0, probe: isProbe, type, pass, feed: feedVal,
             });
             if (isProbe) probeCount++;
             else if (effMotion === 0) { if (isRetract) retractCount++; else rapidCount++; }

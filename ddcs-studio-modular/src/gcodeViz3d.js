@@ -68,6 +68,7 @@ export class GcodeViz3D {
         this.showRapids = true;
         this._animOn = true;   // play by default
         this._animPaused = false;
+        this._gizmoPx = 90;    // on-screen gizmo size (smaller in the compact wizard preview)
         this._animRaf = null;
         this._animDist = 0;
         this._animLast = 0;
@@ -217,7 +218,7 @@ export class GcodeViz3D {
     _scaleMarkers() {
         if (!this.spindleMarkers.length) return;
         const H = this.container.clientHeight || 1;
-        const targetPx = 90, base = 26; // ~90 px tall; base = the arrow length at scale 1
+        const targetPx = this._gizmoPx || 90, base = 26; // base = the arrow length at scale 1
         const ortho = this.camera.isOrthographicCamera;
         const tanHalf = Math.tan((this.persp.fov * Math.PI / 180) / 2);
         for (const m of this.spindleMarkers) {
@@ -429,7 +430,10 @@ export class GcodeViz3D {
         const byPass = [];
         for (const s of this._segs) { const p = s.pass | 0; (byPass[p] || (byPass[p] = [])).push(s); }
 
-        const feedPos = [], rapidPos = [], retractPos = [], probePos = [], jogPos = [];
+        const feedPos = [], rapidPos = [], retractPos = [], probeFastPos = [], probeSlowPos = [], jogPos = [];
+        // The highest probe feed = fast approach; anything slower = the precise re-probe.
+        let maxProbeFeed = 0;
+        for (const s of this._segs) { if ((s.type === 'probe' || s.probe) && (s.feed || 0) > maxProbeFeed) maxProbeFeed = s.feed; }
         const animPts = []; // ordered world points along the whole path (for the play animation)
         const pushPt = (x, y, z) => {
             const n = animPts.length;
@@ -473,7 +477,10 @@ export class GcodeViz3D {
                 const ax = start.x + mk.x, ay = start.y + mk.y, az = start.z + mk.z;
                 const bx = end.x + mk.x, by = end.y + mk.y, bz = end.z + mk.z;
                 grow(ax, ay, az); grow(bx, by, bz);
-                const arr = type === 'rapid' ? rapidPos : type === 'retract' ? retractPos : type === 'probe' ? probePos : feedPos;
+                const arr = type === 'rapid' ? rapidPos
+                    : type === 'retract' ? retractPos
+                    : type === 'probe' ? (((s.feed || 0) > 0 && (s.feed || 0) < maxProbeFeed) ? probeSlowPos : probeFastPos)
+                    : feedPos;
                 arr.push(ax, ay, az, bx, by, bz);
                 pushPt(ax, ay, az); pushPt(bx, by, bz);
                 cur = end;
@@ -500,7 +507,8 @@ export class GcodeViz3D {
         this.lineGroups.rapid = this._addLine(rapidPos, { color: 0x00cc00, opacity: 0.55 });
         if (this.lineGroups.rapid) this.lineGroups.rapid.visible = this.showRapids;
         this.lineGroups.retract = this._addLine(retractPos, { color: 0xfacc15, opacity: 0.85 });
-        this.lineGroups.probe = this._addLine(probePos, { color: 0x3b82f6 });
+        this.lineGroups.probe = this._addLine(probeFastPos, { color: 0x3b82f6 });      // fast probe (blue)
+        this.lineGroups.probeSlow = this._addLine(probeSlowPos, { color: 0x93c5fd });  // slow re-probe (light blue)
         this.lineGroups.jog = this._addLine(jogPos, { color: 0xff9a0d, opacity: 0.95, dashed: true });
 
         this._positionMarkers();
@@ -815,6 +823,22 @@ export class GcodeViz3D {
 
     // Called when the 3D tab becomes visible — the container had zero size while
     // hidden, so re-measure and re-render.
+    // Re-parent the viewer's canvas into another container (used for the wizard previews).
+    attach(container) {
+        if (!container) return;
+        const cv = this.renderer.domElement;
+        container.style.position = 'relative';
+        cv.style.position = 'absolute';
+        cv.style.inset = '0';
+        cv.style.zIndex = '2';
+        if (this.container !== container) {
+            this.container = container;
+            container.appendChild(cv);
+            if (this._ro) { this._ro.disconnect(); this._ro.observe(container); }
+        }
+        this._resize();
+    }
+
     setActive(on) {
         this.active = on;
         if (on) {
