@@ -1813,9 +1813,7 @@ body[data-theme="ddcs"] .editor-container {
 [data-theme="studio"] .hdr-title { display: flex; align-items: center; gap: 12px; }
 [data-theme="studio"] .hdr-text {
     font-family: var(--sans); font-weight: 800; letter-spacing: 1px;
-    color: var(--phosphor); background: #000; padding: 4px 12px;
-    border-top: 2px solid var(--bv-dark); border-left: 2px solid var(--bv-mid-dark);
-    border-right: 2px solid var(--bv-mid-lite); border-bottom: 2px solid var(--bv-lite-2);
+    color: var(--phosphor); background: none; padding: 0; border: none;
     text-shadow: 0 0 6px rgba(21,224,0,0.45);
 }
 [data-theme="studio"] .hdr-controls { display: flex; gap: 8px; align-items: center; }
