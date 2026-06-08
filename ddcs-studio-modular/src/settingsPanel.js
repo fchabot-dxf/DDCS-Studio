@@ -15,6 +15,7 @@ const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 const SETTINGS_DEFAULTS = {
     stock:   { x: 100, y: 80, z: 20, shape: 'boss', show: true },
     machine: { x: 300, y: 300, z: 120, ox: 0, oy: 0, oz: 0, show: true },
+    view:    { theta: -1.5708, phi: 1.0472 }, // 3D preview start orientation (front: +X right, +Y back)
 };
 
 let _ddcsSettings = loadSettings();
@@ -27,6 +28,7 @@ function loadSettings() {
             return {
                 stock: { ...SETTINGS_DEFAULTS.stock, ...(p.stock || {}) },
                 machine: { ...SETTINGS_DEFAULTS.machine, ...(p.machine || {}) },
+                view: { ...SETTINGS_DEFAULTS.view, ...(p.view || {}) },
             };
         }
     } catch (e) { /* ignore */ }
@@ -203,7 +205,7 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V9.62\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V9.63\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 

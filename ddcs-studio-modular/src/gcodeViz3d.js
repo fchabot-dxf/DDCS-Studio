@@ -43,7 +43,7 @@ export class GcodeViz3D {
         // Orbit state (Z-up spherical around target)
         this.target = new THREE.Vector3(0, 0, 0);
         this.radius = 200;
-        this.theta = Math.PI / 4;   // azimuth in XY
+        this.theta = -Math.PI / 2;  // azimuth in XY (front view: +X right, +Y back)
         this.phi = Math.PI / 3;     // polar from +Z
 
         this.lineGroups = {};      // type -> LineSegments (world coords)
@@ -136,6 +136,7 @@ export class GcodeViz3D {
             x.fillText(label, 64, 66);
             return new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c) });
         });
+        this._cubeMats = mats; // kept for hover highlighting
         this._cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mats);
         this._cubeScene.add(this._cube);
         this._cubeScene.add(new THREE.LineSegments(new THREE.EdgesGeometry(this._cube.geometry), new THREE.LineBasicMaterial({ color: 0x55606e })));
@@ -144,17 +145,38 @@ export class GcodeViz3D {
 
     // Hit-test a click against the ViewCube viewport; snaps the view if a face is hit.
     // Returns true when the click landed inside the cube box (so it shouldn't orbit).
-    _pickCube(e) {
-        if (!this._cubeScene || !this._cubeRect) return false;
+    // Cube face material index under the cursor; -1 if in the cube region but off a face,
+    // -2 if the cursor is outside the cube viewport.
+    _cubeFaceAt(e) {
+        if (!this._cubeScene || !this._cubeRect) return -2;
         const r = this.renderer.domElement.getBoundingClientRect();
         const { size, m } = this._cubeRect;
         const cx = e.clientX - r.left, cy = e.clientY - r.top;
         const left = r.width - size - m, top = m; // top-right corner
-        if (cx < left || cx > left + size || cy < top || cy > top + size) return false;
+        if (cx < left || cx > left + size || cy < top || cy > top + size) return -2;
         const ndc = new this.THREE.Vector2(((cx - left) / size) * 2 - 1, -(((cy - top) / size) * 2 - 1));
         this.raycaster.setFromCamera(ndc, this._cubeCam);
         const hit = this.raycaster.intersectObject(this._cube, false)[0];
-        if (hit && hit.face) { const v = this._cubeViews[hit.face.materialIndex]; if (v) this.setView(v); }
+        return (hit && hit.face) ? hit.face.materialIndex : -1;
+    }
+
+    // Tint the hovered cube face (idx 0-5); idx < 0 clears. Re-renders only on a change.
+    _highlightCubeFace(idx) {
+        if (!this._cubeMats) return;
+        let changed = false;
+        for (let i = 0; i < this._cubeMats.length; i++) {
+            const hex = i === idx ? 0x66aaff : 0xffffff;
+            if (this._cubeMats[i].color.getHex() !== hex) { this._cubeMats[i].color.setHex(hex); changed = true; }
+        }
+        if (changed) this.render();
+    }
+
+    // Hit-test a click against the ViewCube; snaps the view if a face is hit.
+    // Returns true when the click landed inside the cube viewport (so it shouldn't orbit).
+    _pickCube(e) {
+        const idx = this._cubeFaceAt(e);
+        if (idx === -2) return false;
+        if (idx >= 0) { const v = this._cubeViews[idx]; if (v) this.setView(v); }
         return true;
     }
 
@@ -587,8 +609,10 @@ export class GcodeViz3D {
         const radius = Math.max(1, 0.5 * Math.hypot(sx, sy, sz));
         const fov = this.camera.fov * Math.PI / 180;
         this.radius = (radius / Math.sin(fov / 2)) * 1.25;
-        this.theta = Math.PI / 4;
-        this.phi = Math.PI / 3;
+        // Start orientation from the saved JSON settings (defaults to the front view)
+        const sv = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().view) || {};
+        this.theta = (typeof sv.theta === 'number') ? sv.theta : -Math.PI / 2;
+        this.phi = (typeof sv.phi === 'number') ? sv.phi : Math.PI / 3;
 
         // Rescale the floor grid to roughly match the part footprint
         const span = Math.max(sx, sy, 10);
@@ -848,13 +872,21 @@ export class GcodeViz3D {
         el.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false }); // no page scroll on touch-drag
         el.addEventListener('contextmenu', (e) => e.preventDefault());
         el.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); }); // no middle-click autoscroll
-        // Hover feedback: highlight the axis handle under the cursor when not dragging
+        // Hover feedback: highlight the ViewCube face or the axis handle under the cursor
         el.addEventListener('pointermove', (e) => {
             if (mode) return;
+            const faceIdx = this._cubeFaceAt(e);
+            if (faceIdx !== -2) { // over the ViewCube
+                this._highlightCubeFace(faceIdx);
+                el.style.cursor = faceIdx >= 0 ? 'pointer' : 'default';
+                this._setHighlight(null, null);
+                return;
+            }
+            this._highlightCubeFace(-1);
             const g = this._pickGizmo(e);
             this._setHighlight(g ? g.pass : null, g ? g.axis : null);
         });
-        el.addEventListener('pointerleave', () => { if (!mode) this._setHighlight(null, null); });
+        el.addEventListener('pointerleave', () => { if (!mode) { this._setHighlight(null, null); this._highlightCubeFace(-1); } });
         el.addEventListener('wheel', (e) => {
             e.preventDefault();
             const old = this.radius;
