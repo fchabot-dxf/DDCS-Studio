@@ -974,7 +974,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     flex: 1 1 auto;
     display: flex;
     flex-direction: column;
-    padding: 12px;
+    padding: 0;
     min-width: 0;
     overflow: auto;
     z-index: 1;
@@ -1564,7 +1564,7 @@ body[data-theme="ddcs"] .secondary-toolbar.raised-seam {
 
 /* Editor container sunken border belongs to DDCS theme (not global) */
 body[data-theme="ddcs"] .editor-container {
-    border: 3px inset #d4d0c8 !important;
+    border: none !important;
 }
 
 
@@ -1585,21 +1585,13 @@ body[data-theme="ddcs"] .editor-container {
 }
 
 [data-theme="ddcs"] .editor {
-    border: none !important; /* Remove the default border */
-    border-top: 4px solid #404040 !important; /* Dark grey for top border */
-    border-left: 4px solid #808080 !important; /* Medium dark grey for left border */
-    border-right: 4px solid #909090 !important; /* Less dark grey for right border */
-    border-bottom: 4px solid #e0e0e0 !important; /* Very light grey for bottom border */
-    box-shadow: none; /* Removed outer border */
+    border: none !important;
+    box-shadow: none;
     border-radius: 0;
 }
 
 [data-theme="ddcs"] .main {
-    border-left: 6px solid rgba(0, 0, 0, 0.04);
-    border-top: 4px solid #f0f0f0;    /* Highlight (Very Light) */
-    border-left: 4px solid #a8a8a8;   /* Light-Mid (Distinct from dark) */
-    border-right: 4px solid #585858;  /* Dark-Mid (Distinct from light) */
-    border-bottom: 4px solid #202020; /* Shadow (Very Dark) */
+    border: none;
 }
 
 [data-theme="ddcs"] .wizard {
