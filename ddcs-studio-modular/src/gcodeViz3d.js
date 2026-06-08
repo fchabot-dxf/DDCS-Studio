@@ -61,6 +61,12 @@ export class GcodeViz3D {
         this.raycaster = new THREE.Raycaster();
         this.onStartChange = null; // optional callback(starts)
         this.showRapids = true;
+        this._animOn = false;
+        this._animRaf = null;
+        this._animDist = 0;
+        this._animLast = 0;
+        this._animPts = [];
+        this._animLen = 0;
 
         this._initStaticScene();
         this._bindControls();
@@ -204,6 +210,60 @@ export class GcodeViz3D {
         this.render();
     }
 
+    _ensureAnimTool() {
+        if (this._animTool) return;
+        const THREE = this.THREE;
+        this._animTool = new THREE.Mesh(
+            new THREE.SphereGeometry(2.5, 16, 16),
+            new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })
+        );
+        this._animTool.renderOrder = 14;
+        this._animTool.visible = false;
+        this.scene.add(this._animTool);
+    }
+
+    // Toggle a tool dot that travels the whole path in execution order (~5s loop)
+    setAnimate(on) {
+        this._animOn = !!on;
+        this._ensureAnimTool();
+        this._animTool.visible = this._animOn;
+        if (this._animOn) {
+            this._animDist = 0;
+            this._animLast = 0;
+            if (!this._animRaf) this._animTick();
+        } else {
+            if (this._animRaf) cancelAnimationFrame(this._animRaf);
+            this._animRaf = null;
+            this.render();
+        }
+    }
+
+    _animTick() {
+        if (!this._animOn || !this.active) { this._animRaf = null; return; }
+        const pts = this._animPts;
+        if (pts && pts.length >= 6) {
+            const now = (typeof performance !== 'undefined' ? performance.now() : 0);
+            const dt = this._animLast ? Math.min(0.1, (now - this._animLast) / 1000) : 0;
+            this._animLast = now;
+            const total = this._animLen || 1;
+            this._animDist = (this._animDist + (total / 5) * dt) % total; // whole path ~5s
+            let d = this._animDist;
+            for (let i = 0; i + 5 < pts.length; i += 3) {
+                const ax = pts[i], ay = pts[i + 1], az = pts[i + 2];
+                const bx = pts[i + 3], by = pts[i + 4], bz = pts[i + 5];
+                const segLen = Math.hypot(bx - ax, by - ay, bz - az);
+                if (d <= segLen || i + 6 >= pts.length) {
+                    const t = segLen > 0 ? d / segLen : 0;
+                    this._animTool.position.set(ax + (bx - ax) * t, ay + (by - ay) * t, az + (bz - az) * t);
+                    break;
+                }
+                d -= segLen;
+            }
+            this.render();
+        }
+        this._animRaf = requestAnimationFrame(() => this._animTick());
+    }
+
     _ndc(e) {
         const r = this.renderer.domElement.getBoundingClientRect();
         return new this.THREE.Vector2(
@@ -271,6 +331,12 @@ export class GcodeViz3D {
         for (const s of this._segs) { const p = s.pass | 0; (byPass[p] || (byPass[p] = [])).push(s); }
 
         const feedPos = [], rapidPos = [], retractPos = [], probePos = [], jogPos = [];
+        const animPts = []; // ordered world points along the whole path (for the play animation)
+        const pushPt = (x, y, z) => {
+            const n = animPts.length;
+            if (n >= 3 && animPts[n - 3] === x && animPts[n - 2] === y && animPts[n - 1] === z) return;
+            animPts.push(x, y, z);
+        };
         let bounds = null;
         const grow = (x, y, z) => { bounds = this._growBounds(bounds, x, y, z, x, y, z); };
 
@@ -279,7 +345,7 @@ export class GcodeViz3D {
             const segs = byPass[p] || [];
             const mk = this.starts[p] || { x: 0, y: 0, z: 0 };
             // manual jog from the previous pass's end to this pass's start marker
-            if (prevEnd) { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(mk.x, mk.y, mk.z); }
+            if (prevEnd) { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(mk.x, mk.y, mk.z); pushPt(prevEnd.x, prevEnd.y, prevEnd.z); pushPt(mk.x, mk.y, mk.z); }
             let cur = { x: 0, y: 0, z: 0 }; // pass-local, relative to the marker
             for (const s of segs) {
                 const dx = s.x2 - s.x1, dy = s.y2 - s.y1, dz = s.z2 - s.z1;
@@ -310,10 +376,17 @@ export class GcodeViz3D {
                 grow(ax, ay, az); grow(bx, by, bz);
                 const arr = type === 'rapid' ? rapidPos : type === 'retract' ? retractPos : type === 'probe' ? probePos : feedPos;
                 arr.push(ax, ay, az, bx, by, bz);
+                pushPt(ax, ay, az); pushPt(bx, by, bz);
                 cur = end;
             }
             prevEnd = { x: cur.x + mk.x, y: cur.y + mk.y, z: cur.z + mk.z };
         }
+
+        // Ordered path + total length for the play animation
+        this._animPts = animPts;
+        let alen = 0;
+        for (let i = 0; i + 5 < animPts.length; i += 3) alen += Math.hypot(animPts[i + 3] - animPts[i], animPts[i + 4] - animPts[i + 1], animPts[i + 5] - animPts[i + 2]);
+        this._animLen = alen;
 
         // Cuts: blue→cyan gradient by depth across the whole scene
         let feedCol = null;
@@ -620,7 +693,13 @@ export class GcodeViz3D {
     // hidden, so re-measure and re-render.
     setActive(on) {
         this.active = on;
-        if (on) this._resize();
+        if (on) {
+            this._resize();
+            if (this._animOn && !this._animRaf) { this._animLast = 0; this._animTick(); }
+        } else if (this._animRaf) {
+            cancelAnimationFrame(this._animRaf);
+            this._animRaf = null;
+        }
     }
 
     render() {

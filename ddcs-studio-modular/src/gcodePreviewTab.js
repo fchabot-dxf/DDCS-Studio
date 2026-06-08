@@ -114,6 +114,17 @@ function gpInit() {
     document.querySelectorAll('#gcodeViz3dContainer .viz3d-views button').forEach((btn) => {
         btn.addEventListener('click', () => { if (gpViz) gpViz.setView(btn.dataset.view); });
     });
+    // Animate (play) toggle
+    const animBtn = document.getElementById('viz3dAnimate');
+    if (animBtn) {
+        animBtn.addEventListener('click', () => {
+            if (!gpViz) return;
+            const on = !animBtn.classList.contains('on');
+            animBtn.classList.toggle('on', on);
+            animBtn.textContent = on ? '⏸ Stop' : '▶ Play';
+            gpViz.setAnimate(on);
+        });
+    }
     gpSyncControls();
     // Stock / machine settings changed → redraw if the 3D drawer is open
     window.addEventListener('ddcs:settings-changed', () => {
