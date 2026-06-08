@@ -83,23 +83,51 @@ export class GcodeViz3D {
     _initSpindle() {
         const THREE = this.THREE;
         const grp = new THREE.Group();
-        // Cone body pointing down, tip at the start point (z = 0 of the group)
-        const cone = new THREE.Mesh(
-            new THREE.ConeGeometry(4, 16, 18),
-            new THREE.MeshBasicMaterial({ color: 0xff5577, transparent: true, opacity: 0.85, depthTest: false })
+        // Ruby probe tip: a red sphere at the start point
+        const ruby = new THREE.Mesh(
+            new THREE.SphereGeometry(3, 20, 20),
+            new THREE.MeshBasicMaterial({ color: 0xc4122e, depthTest: false })
         );
-        cone.rotation.x = Math.PI / 2; // +Y apex → -Z (downward)
-        cone.position.set(0, 0, 8);    // apex at z = 0, base at z = 16
-        cone.renderOrder = 10;
-        grp.add(cone);
-        const tip = new THREE.Mesh(
-            new THREE.SphereGeometry(1.8, 14, 14),
-            new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })
-        );
-        tip.renderOrder = 11;
-        grp.add(tip);
+        ruby.renderOrder = 11;
+        grp.add(ruby);
+        // Three translate handles (X red, Y green, Z blue)
+        this._axisMat = {};
+        grp.add(this._makeAxisArrow(new THREE.Vector3(1, 0, 0), 0xff4d4d, 'x'));
+        grp.add(this._makeAxisArrow(new THREE.Vector3(0, 1, 0), 0x4dff7a, 'y'));
+        grp.add(this._makeAxisArrow(new THREE.Vector3(0, 0, 1), 0x4da6ff, 'z'));
         this.spindleMarker = grp;
         this.scene.add(grp);
+    }
+
+    _makeAxisArrow(dir, color, axisName) {
+        const THREE = this.THREE;
+        const len = 26, headLen = 7, shaftR = 1.0, headR = 2.8;
+        const g = new THREE.Group();
+        const mat = new THREE.MeshBasicMaterial({ color, depthTest: false });
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(shaftR, shaftR, len - headLen, 10), mat);
+        shaft.position.y = (len - headLen) / 2;
+        const head = new THREE.Mesh(new THREE.ConeGeometry(headR, headLen, 12), mat);
+        head.position.y = len - headLen / 2;
+        g.add(shaft); g.add(head);
+        g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); // orient +Y → dir
+        g.traverse((o) => { o.renderOrder = 12; if (o.userData) o.userData.gizmoAxis = axisName; });
+        this._axisMat[axisName] = { mat, base: color };
+        return g;
+    }
+
+    // Highlight one axis handle (hover/active) — pass null to clear
+    _setHighlight(axis) {
+        if (this._hoverAxis === axis) return;
+        this._hoverAxis = axis;
+        const HL = 0xffe24a; // amber highlight
+        for (const k of ['x', 'y', 'z']) {
+            const h = this._axisMat && this._axisMat[k];
+            if (h) h.mat.color.setHex(axis === k ? HL : h.base);
+        }
+        if (this.renderer && this.renderer.domElement) {
+            this.renderer.domElement.style.cursor = axis ? 'grab' : 'default';
+        }
+        this.render();
     }
 
     // Position the toolpath group + spindle marker at the current start
@@ -107,6 +135,7 @@ export class GcodeViz3D {
         const s = this.start;
         if (this.pathGroup) this.pathGroup.position.set(s.x, s.y, s.z);
         if (this.spindleMarker) this.spindleMarker.position.set(s.x, s.y, s.z);
+        this._buildProbe(); // re-clamp G31 moves to the stock at the new start
         if (typeof this.onStartChange === 'function') this.onStartChange({ ...s });
     }
 
@@ -125,16 +154,36 @@ export class GcodeViz3D {
         );
     }
 
-    // Is the pointer over the spindle marker?
-    _pickSpindle(e) {
-        if (!this.spindleMarker) return false;
+    // Returns the gizmo axis ('x'|'y'|'z') under the pointer, or null
+    _pickGizmo(e) {
+        if (!this.spindleMarker) return null;
         this.raycaster.setFromCamera(this._ndc(e), this.camera);
-        return this.raycaster.intersectObject(this.spindleMarker, true).length > 0;
+        const hits = this.raycaster.intersectObject(this.spindleMarker, true);
+        for (const h of hits) {
+            let o = h.object;
+            while (o && o !== this.spindleMarker) {
+                if (o.userData && o.userData.gizmoAxis) return o.userData.gizmoAxis;
+                o = o.parent;
+            }
+        }
+        return null;
+    }
+
+    // t along axisDir (unit) from lineOrigin to the point closest to the pointer ray
+    _closestAxisT(ray, lineOrigin, axisDir) {
+        const w0 = lineOrigin.clone().sub(ray.origin);
+        const b = axisDir.dot(ray.direction);
+        const c = ray.direction.dot(ray.direction);
+        const d = axisDir.dot(w0);
+        const e = ray.direction.dot(w0);
+        const denom = c - b * b; // a = axisDir·axisDir = 1
+        if (Math.abs(denom) < 1e-9) return 0;
+        return (b * e - c * d) / denom;
     }
 
     setSegments(parsed) {
         const THREE = this.THREE;
-        for (const key of ['feedLines', 'rapidLines', 'probeLines']) {
+        for (const key of ['feedLines', 'rapidLines']) {
             const obj = this[key];
             if (obj) {
                 this.pathGroup.remove(obj);
@@ -145,19 +194,19 @@ export class GcodeViz3D {
         }
 
         const segs = (parsed && parsed.segments) || [];
+        this._segs = segs;
         const b = parsed && parsed.bounds;
         const zMin = b ? b.minZ : 0;
         const zRange = b ? (b.maxZ - b.minZ) || 1 : 1;
 
-        const feedPos = [], feedCol = [], rapidPos = [], probePos = [];
+        const feedPos = [], feedCol = [], rapidPos = [];
         const cLow = new THREE.Color(0x0a4fd0);   // deepest Z
         const cHigh = new THREE.Color(0x35ffd0);  // highest Z
         const tmp = new THREE.Color();
 
         for (const s of segs) {
-            if (s.probe) {
-                probePos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
-            } else if (s.rapid) {
+            if (s.probe) continue; // probe lines are built + clamped to the stock in _buildProbe
+            if (s.rapid) {
                 rapidPos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
             } else {
                 feedPos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
@@ -181,17 +230,68 @@ export class GcodeViz3D {
             this.rapidLines = new THREE.LineSegments(g, mat);
             this.pathGroup.add(this.rapidLines);
         }
-        if (probePos.length) {
+        this._dataBounds = b || null;
+        this._applyStart();
+        this.fitAll();
+    }
+
+    // Build the probe (G31) lines, clamping each to where it first hits the stock
+    // ("collision") at the current spindle start. Re-run on start / stock change.
+    _buildProbe() {
+        const THREE = this.THREE;
+        if (this.probeLines) {
+            this.pathGroup.remove(this.probeLines);
+            this.probeLines.geometry.dispose();
+            this.probeLines.material.dispose();
+            this.probeLines = null;
+        }
+        if (!this._segs) return;
+        const s = this.start;
+        const st = this._stock;
+        let box = null;
+        if (st && st.show && st.x > 0 && st.y > 0 && st.z > 0) {
+            box = { min: { x: 0, y: 0, z: -st.z }, max: { x: st.x, y: st.y, z: 0 } };
+        }
+        const pos = [];
+        for (const seg of this._segs) {
+            if (!seg.probe) continue;
+            const A = { x: seg.x1, y: seg.y1, z: seg.z1 };       // program coords
+            let B = { x: seg.x2, y: seg.y2, z: seg.z2 };
+            if (box) {
+                // collide in WORLD (program + start) vs the stock (program coords = world)
+                const Aw = { x: A.x + s.x, y: A.y + s.y, z: A.z + s.z };
+                const Bw = { x: B.x + s.x, y: B.y + s.y, z: B.z + s.z };
+                const hit = this._clampToBox(Aw, Bw, box.min, box.max);
+                if (hit) B = { x: hit.x - s.x, y: hit.y - s.y, z: hit.z - s.z };
+            }
+            pos.push(A.x, A.y, A.z, B.x, B.y, B.z);
+        }
+        if (pos.length) {
             const g = new THREE.BufferGeometry();
-            g.setAttribute('position', new THREE.Float32BufferAttribute(probePos, 3));
+            g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
             const mat = new THREE.LineBasicMaterial({ color: 0xffcc33 }); // probe (G31) = amber
             this.probeLines = new THREE.LineSegments(g, mat);
             this.pathGroup.add(this.probeLines);
         }
+    }
 
-        this._dataBounds = b || null;
-        this._applyStart();
-        this.fitAll();
+    // Where segment A→B first enters an axis-aligned box; null if it never enters.
+    _clampToBox(A, B, boxMin, boxMax) {
+        const d = { x: B.x - A.x, y: B.y - A.y, z: B.z - A.z };
+        let tEnter = 0, tExit = 1;
+        for (const ax of ['x', 'y', 'z']) {
+            if (Math.abs(d[ax]) < 1e-9) {
+                if (A[ax] < boxMin[ax] - 1e-6 || A[ax] > boxMax[ax] + 1e-6) return null;
+            } else {
+                let t1 = (boxMin[ax] - A[ax]) / d[ax];
+                let t2 = (boxMax[ax] - A[ax]) / d[ax];
+                if (t1 > t2) { const t = t1; t1 = t2; t2 = t; }
+                if (t1 > tEnter) tEnter = t1;
+                if (t2 < tExit) tExit = t2;
+            }
+        }
+        if (tEnter > tExit || tEnter <= 1e-6 || tEnter >= 1) return null;
+        return { x: A.x + d.x * tEnter, y: A.y + d.y * tEnter, z: A.z + d.z * tEnter };
     }
 
     fit(b) {
@@ -294,15 +394,15 @@ export class GcodeViz3D {
         let mode = null, px = 0, py = 0;
 
         const onMove = (e) => {
-            if (mode === 'spindle') {
+            if (mode === 'gizmo') {
                 this.raycaster.setFromCamera(this._ndc(e), this.camera);
-                const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -this.start.z);
-                const pt = new THREE.Vector3();
-                if (this.raycaster.ray.intersectPlane(plane, pt)) {
-                    this.start.x = pt.x; this.start.y = pt.y;
-                    this._applyStart();
-                    this.render();
-                }
+                const t1 = this._closestAxisT(this.raycaster.ray, this._dragStart0, this._dragDir);
+                const delta = t1 - this._dragT0;
+                this.start.x = this._dragStart0.x + this._dragDir.x * delta;
+                this.start.y = this._dragStart0.y + this._dragDir.y * delta;
+                this.start.z = this._dragStart0.z + this._dragDir.z * delta;
+                this._applyStart();
+                this.render();
                 return;
             }
             const dx = e.clientX - px, dy = e.clientY - py;
@@ -322,21 +422,44 @@ export class GcodeViz3D {
         };
         const onUp = () => {
             mode = null;
+            if (this.renderer) this.renderer.domElement.style.cursor = 'default';
+            this._setHighlight(null);
             window.removeEventListener('pointermove', onMove);
             window.removeEventListener('pointerup', onUp);
         };
         el.addEventListener('pointerdown', (e) => {
             e.preventDefault();
-            if (e.button !== 2 && !e.shiftKey && this._pickSpindle(e)) mode = 'spindle';
-            else mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot';
+            const axis = (e.button === 0 && !e.shiftKey) ? this._pickGizmo(e) : null;
+            if (axis) {
+                mode = 'gizmo';
+                this._dragDir = axis === 'x' ? new THREE.Vector3(1, 0, 0)
+                    : axis === 'y' ? new THREE.Vector3(0, 1, 0)
+                    : new THREE.Vector3(0, 0, 1);
+                this._dragStart0 = new THREE.Vector3(this.start.x, this.start.y, this.start.z);
+                this.raycaster.setFromCamera(this._ndc(e), this.camera);
+                this._dragT0 = this._closestAxisT(this.raycaster.ray, this._dragStart0, this._dragDir);
+                this._setHighlight(axis);
+                this.renderer.domElement.style.cursor = 'grabbing';
+            } else {
+                mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot';
+            }
             px = e.clientX; py = e.clientY;
             window.addEventListener('pointermove', onMove);
             window.addEventListener('pointerup', onUp);
         });
         el.addEventListener('contextmenu', (e) => e.preventDefault());
+        el.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); }); // no middle-click autoscroll
+        // Hover feedback: highlight the axis handle under the cursor when not dragging
+        el.addEventListener('pointermove', (e) => {
+            if (mode) return;
+            this._setHighlight(this._pickGizmo(e));
+        });
+        el.addEventListener('pointerleave', () => { if (!mode) this._setHighlight(null); });
         el.addEventListener('wheel', (e) => {
             e.preventDefault();
-            this.radius *= (e.deltaY > 0 ? 1.1 : 0.9);
+            // proportional zoom — the step scales with distance, so it eases/decelerates
+            // as you approach the target (and is finer for trackpad pixel-scroll)
+            this.radius *= Math.exp(e.deltaY * 0.0011);
             this.radius = Math.max(0.5, Math.min(5e5, this.radius));
             this._applyCamera();
             this.render();
