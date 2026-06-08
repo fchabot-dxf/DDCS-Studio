@@ -607,7 +607,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     display: none;  /* collapsed: take NO space (no white strip below the tabs) */
     flex-direction: column !important; /* Forces distinct rows */
     gap: 12px;
-    padding: 12px;
+    padding: 2px 12px 12px; /* minimal top gap so the keys sit just under the tabs */
     background: var(--panel);
     height: auto;            /* fit the content — no empty space below the keyboard */
     max-height: 56vh;        /* but cap + scroll if the content is very tall */
