@@ -729,17 +729,17 @@ export class GcodeViz3D {
         el.addEventListener('wheel', (e) => {
             e.preventDefault();
             const old = this.radius;
-            const next = Math.max(1, Math.min(5e5, old * Math.exp(e.deltaY * 0.0015)));
-            // Zoom toward the point under the cursor (dolly-to-cursor) — homes in on what
-            // you're looking at, so it doesn't feel slow/wonky around a fixed centre.
+            const next = Math.max(0.5, Math.min(5e5, old * Math.exp(e.deltaY * 0.002)));
+            // Dolly toward the actual geometry under the cursor (stock / toolpath) so the zoom
+            // keeps closing in on the part itself. Over empty space, just zoom the current
+            // centre — never drift toward an empty point (which feels like it stalls).
             this.raycaster.setFromCamera(this._ndc(e), this.camera);
-            const camDir = new THREE.Vector3();
-            this.camera.getWorldDirection(camDir);
-            const plane = new THREE.Plane(camDir, -camDir.dot(this.target));
-            const cursorPt = new THREE.Vector3();
-            if (this.raycaster.ray.intersectPlane(plane, cursorPt)) {
-                this.target.lerp(cursorPt, 1 - next / old);
-            }
+            this.raycaster.params.Line.threshold = old * 0.02;
+            const objs = [];
+            if (this.stockMesh) objs.push(this.stockMesh);
+            if (this.pathGroup) objs.push(this.pathGroup);
+            const hit = objs.length ? this.raycaster.intersectObjects(objs, true)[0] : null;
+            if (hit) this.target.lerp(hit.point, 1 - next / old);
             this.radius = next;
             this._applyCamera();
             this.render();
