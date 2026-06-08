@@ -234,3 +234,4 @@ export function closeSettings() {
 window.openSettings = openSettings;
 window.closeSettings = closeSettings;
 window.ddcsGetSettings = getSettings;
+window.ddcsApplySettings = applySettings;

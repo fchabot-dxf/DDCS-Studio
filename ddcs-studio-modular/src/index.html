@@ -49,6 +49,14 @@
                 <!-- 3D toolpath preview — slides in as a drawer from the right; the editor stays visible -->
                 <aside id="gcodeViz3dContainer" class="viz3d-drawer">
                     <div id="viz3dStatus" class="viz3d-status"></div>
+                    <div class="viz3d-controls">
+                        <label>Stock
+                            <select id="viz3dStockShape" title="Stock shape">
+                                <option value="boss">Boss</option>
+                                <option value="pocket">Pocket</option>
+                            </select>
+                        </label>
+                    </div>
                     <div class="viz3d-hint">drag orbit · wheel zoom · right-drag pan · drag the spindle to set the start</div>
                 </aside>
                 <!-- Side pull-tab on the right edge: slides the 3D drawer open/closed -->

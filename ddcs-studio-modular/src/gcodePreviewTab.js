@@ -22,6 +22,13 @@ function gpEls() {
     };
 }
 
+// Keep the in-canvas stock controls in sync with settings
+function gpSyncControls() {
+    const sel = document.getElementById('viz3dStockShape');
+    const s = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
+    if (sel && s && s.stock) sel.value = s.stock.shape || 'boss';
+}
+
 function gpRenderFromEditor() {
     const { editor, status } = gpEls();
     if (!gpViz || !editor) return;
@@ -63,6 +70,7 @@ export function setGcodeView(view) {
     if (!gpViz) {
         try {
             gpViz = new GcodeViz3D(els.vizContainer);
+            window.__gpViz = gpViz; // debug accessor
             // Spindle / program-zero start (draggable in the view; also settable programmatically)
             window.ddcsSetSpindleStart = (x, y, z) => { if (gpViz) gpViz.setStart(x, y, z); };
             window.ddcsGetSpindleStart = () => (gpViz ? { ...gpViz.start } : null);
@@ -74,6 +82,7 @@ export function setGcodeView(view) {
     }
     gpViz.setActive(true);
     gpRenderFromEditor();
+    gpSyncControls();
 }
 
 function gpInit() {
@@ -88,8 +97,17 @@ function gpInit() {
             gpDebounce = setTimeout(gpRenderFromEditor, 300);
         });
     }
+    // Stock-shape selector that lives in the 3D canvas
+    const shapeSel = document.getElementById('viz3dStockShape');
+    if (shapeSel) {
+        shapeSel.addEventListener('change', () => {
+            if (window.ddcsApplySettings) window.ddcsApplySettings({ stock: { shape: shapeSel.value } });
+        });
+    }
+    gpSyncControls();
     // Stock / machine settings changed → redraw if the 3D drawer is open
     window.addEventListener('ddcs:settings-changed', () => {
+        gpSyncControls();
         if (gpView === '3d' && gpViz) gpRenderFromEditor();
     });
     window.setGcodeView = setGcodeView;

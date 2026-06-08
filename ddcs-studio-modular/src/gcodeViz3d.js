@@ -363,9 +363,30 @@ export class GcodeViz3D {
             const pocket = stock.shape === 'pocket';
             const fillCol = pocket ? 0x6a8fbe : 0x8fae6a;  // pocket = blue, boss = green
             const edgeCol = pocket ? 0x86b6ff : 0xa6d77c;
-            const geo = new THREE.BoxGeometry(stock.x, stock.y, stock.z);
-            const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: fillCol, transparent: true, opacity: 0.12, depthWrite: false }));
-            mesh.position.set(stock.x / 2, stock.y / 2, -stock.z / 2);
+            let geo;
+            const mat = new THREE.MeshBasicMaterial({ color: fillCol, transparent: true, opacity: 0.12, depthWrite: false });
+            const mesh = new THREE.Mesh();
+            if (pocket) {
+                // Square donut: a frame of material around the cavity. The cavity (the hole,
+                // = stock X×Y) is the probe area; the frame walls are the surrounding stock.
+                const w = Math.max(8, Math.min(stock.x, stock.y) * 0.25); // frame wall thickness (visual)
+                const shape = new THREE.Shape();
+                shape.moveTo(-w, -w);
+                shape.lineTo(stock.x + w, -w);
+                shape.lineTo(stock.x + w, stock.y + w);
+                shape.lineTo(-w, stock.y + w);
+                shape.lineTo(-w, -w);
+                const hole = new THREE.Path();
+                hole.moveTo(0, 0); hole.lineTo(stock.x, 0); hole.lineTo(stock.x, stock.y); hole.lineTo(0, stock.y); hole.lineTo(0, 0);
+                shape.holes.push(hole);
+                geo = new THREE.ExtrudeGeometry(shape, { depth: stock.z, bevelEnabled: false });
+                mesh.position.set(0, 0, -stock.z); // extrude [0,z] → world [-z,0], top at the table
+            } else {
+                geo = new THREE.BoxGeometry(stock.x, stock.y, stock.z);
+                mesh.position.set(stock.x / 2, stock.y / 2, -stock.z / 2);
+            }
+            mesh.geometry = geo;
+            mesh.material = mat;
             this.stockMesh = mesh; this.scene.add(mesh);
             const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: edgeCol, transparent: true, opacity: 0.55 }));
             edges.position.copy(mesh.position);

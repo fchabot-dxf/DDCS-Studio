@@ -2720,6 +2720,16 @@ body[data-theme="ddcs"] .ddcs-tab.active {
 }
 .viz3d-status { top: 6px; left: 8px; }
 .viz3d-hint { bottom: 6px; right: 8px; color: #6f8aa0; }
+.viz3d-controls { position: absolute; top: 6px; right: 8px; z-index: 3; display: flex; gap: 6px; align-items: center; }
+.viz3d-controls label { font-size: 10px; color: #9fc4e6; display: flex; align-items: center; gap: 4px; }
+.viz3d-controls select {
+    font-size: 11px;
+    padding: 3px 6px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #cfe6ff;
+    border: 1px solid rgba(120, 190, 255, 0.45);
+    border-radius: 4px;
+}
 
 /* ===== Settings overlay ===== */
 .settings-overlay { z-index: 1000; align-items: center; justify-content: center; }
