@@ -719,8 +719,26 @@ export class GcodeViz3D {
         el.style.touchAction = 'none';   // stop the browser turning a drag into scroll / "look"
         el.style.userSelect = 'none';
         let mode = null, px = 0, py = 0;
+        const pointers = new Map(); // active pointers — two fingers = pinch zoom/pan (mobile)
 
         const onMove = (e) => {
+            if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (mode === 'pinch') {
+                if (pointers.size < 2) return;
+                const pts = [...pointers.values()];
+                const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+                const mx = (pts[0].x + pts[1].x) / 2, my = (pts[0].y + pts[1].y) / 2;
+                this.radius = Math.max(0.5, Math.min(5e5, this._pinchRadius * (this._pinchDist / d)));
+                const pdx = mx - this._pinchMid.x, pdy = my - this._pinchMid.y;
+                this._pinchMid = { x: mx, y: my };
+                const ps = this.radius * 0.0015;
+                const r0 = new THREE.Vector3(), u0 = new THREE.Vector3();
+                this.camera.matrixWorld.extractBasis(r0, u0, new THREE.Vector3());
+                this.target.addScaledVector(r0, -pdx * ps);
+                this.target.addScaledVector(u0, pdy * ps);
+                this._applyCamera(); this.render();
+                return;
+            }
             if (mode === 'gizmo') {
                 this.raycaster.setFromCamera(this._ndc(e), this.camera);
                 const t1 = this._closestAxisT(this.raycaster.ray, this._dragStart0, this._dragDir);
@@ -744,11 +762,14 @@ export class GcodeViz3D {
                 this.camera.matrixWorld.extractBasis(right, up, new THREE.Vector3());
                 this.target.addScaledVector(right, -dx * panScale);
                 this.target.addScaledVector(up, dy * panScale);
-            }
+            } else { return; }
             this._applyCamera();
             this.render();
         };
-        const onUp = () => {
+        const onUp = (e) => {
+            if (e) pointers.delete(e.pointerId);
+            if (mode === 'pinch' && pointers.size < 2) mode = null;
+            if (pointers.size > 0) return;   // other fingers still down
             mode = null;
             try { if (this._pid != null) el.releasePointerCapture(this._pid); } catch (_) {}
             this._pid = null;
@@ -756,10 +777,21 @@ export class GcodeViz3D {
             this._setHighlight(null, null);
             window.removeEventListener('pointermove', onMove);
             window.removeEventListener('pointerup', onUp);
+            window.removeEventListener('pointercancel', onUp);
         };
         el.addEventListener('pointerdown', (e) => {
             e.preventDefault();
-            if (e.button === 0 && this._pickCube(e)) return; // ViewCube click → snap view
+            pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (pointers.size === 2) {   // second finger → pinch zoom + pan
+                const pts = [...pointers.values()];
+                this._pinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+                this._pinchRadius = this.radius;
+                this._pinchMid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+                mode = 'pinch'; this._toPerspective();
+                return;
+            }
+            if (pointers.size > 2) return;
+            if (e.button === 0 && this._pickCube(e)) { pointers.delete(e.pointerId); return; } // ViewCube click → snap view
             const g = (e.button === 0 && !e.shiftKey) ? this._pickGizmo(e) : null;
             if (g) {
                 mode = 'gizmo';
@@ -778,10 +810,12 @@ export class GcodeViz3D {
                 if (mode === 'rot') this._toPerspective(); // orbit around the framed centre (predictable); pan to recentre
             }
             px = e.clientX; py = e.clientY;
-            try { el.setPointerCapture(e.pointerId); this._pid = e.pointerId; } catch (_) {}
+            if (e.pointerType !== 'touch') { try { el.setPointerCapture(e.pointerId); this._pid = e.pointerId; } catch (_) {} }
             window.addEventListener('pointermove', onMove);
             window.addEventListener('pointerup', onUp);
+            window.addEventListener('pointercancel', onUp);
         });
+        el.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false }); // no page scroll on touch-drag
         el.addEventListener('contextmenu', (e) => e.preventDefault());
         el.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); }); // no middle-click autoscroll
         // Hover feedback: highlight the axis handle under the cursor when not dragging
