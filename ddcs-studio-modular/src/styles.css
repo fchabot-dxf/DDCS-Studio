@@ -1806,9 +1806,11 @@ body[data-theme="ddcs"] .editor-container {
     border-bottom: 3px solid var(--bv-dark);
 }
 
-/* --- App header → segmented silver status plate --- */
+/* --- App header → blue gradient bar, matching the wizard header --- */
 [data-theme="studio"] .app-header {
-    background: linear-gradient(180deg, var(--sv-1), var(--sv-2) 55%, var(--sv-3));
+    background: linear-gradient(180deg, #2a4f82, #123a66);
+    border: none;
+    border-bottom: 2px solid var(--bv-dark);
 }
 [data-theme="studio"] .hdr-title { display: flex; align-items: center; gap: 12px; }
 [data-theme="studio"] .hdr-text {
