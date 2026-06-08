@@ -133,10 +133,8 @@ export class EditorManager {
     }
 
     clearCode() {
-        if (confirm('Clear Editor?')) {
-            this.editor.value = '';
-            this.editor.dispatchEvent(new Event('input'));
-        }
+        this.editor.value = '';
+        this.editor.dispatchEvent(new Event('input'));
     }
 
     downloadFile() {

@@ -40,7 +40,7 @@ function gpRenderFromEditor() {
     if (!status) return;
     const s = parsed.stats;
     if (!s.drawable) {
-        status.textContent = 'No drawable moves — variable/probe code (#…, G31) is skipped';
+        status.textContent = 'No drawable moves in this program';
     } else {
         const b = (gpViz && gpViz._dataBounds) || parsed.bounds; // clamped render bounds
         const r = (n) => n.toFixed(1).replace(/\.0$/, '');

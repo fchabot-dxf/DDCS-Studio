@@ -92,10 +92,32 @@ export class GcodeViz3D {
         );
         ruby.renderOrder = 11;
         grp.add(ruby);
+        grp.add(this._makeNumberSprite(pass + 1)); // execution order (1-based)
         grp.add(this._makeAxisArrow(new THREE.Vector3(1, 0, 0), 0xff4d4d, 'x', pass));
         grp.add(this._makeAxisArrow(new THREE.Vector3(0, 1, 0), 0x4dff7a, 'y', pass));
         grp.add(this._makeAxisArrow(new THREE.Vector3(0, 0, 1), 0x4da6ff, 'z', pass));
         return grp;
+    }
+
+    // A camera-facing numbered badge floating above the ruby (order of execution)
+    _makeNumberSprite(n) {
+        const THREE = this.THREE;
+        const c = document.createElement('canvas');
+        c.width = c.height = 64;
+        const ctx = c.getContext('2d');
+        ctx.beginPath(); ctx.arc(32, 32, 29, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(18,18,22,0.88)'; ctx.fill();
+        ctx.lineWidth = 4; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 38px sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(n), 32, 35);
+        const tex = new THREE.CanvasTexture(c);
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+        sp.scale.set(11, 11, 1);
+        sp.position.set(0, 0, 11); // float just above the ruby
+        sp.renderOrder = 13;
+        return sp;
     }
 
     _makeAxisArrow(dir, color, axisName, pass) {
