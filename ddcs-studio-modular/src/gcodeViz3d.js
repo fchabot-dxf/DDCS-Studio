@@ -259,6 +259,24 @@ export class GcodeViz3D {
         this.render();
     }
 
+    // Step the view 90° to the adjacent side (ViewCube arrows) — parallel projection
+    nudgeView(dTheta, dPhi) {
+        this.theta += dTheta;
+        this.phi = Math.max(0.05, Math.min(Math.PI - 0.05, this.phi + dPhi));
+        this.camera = this.ortho; this._ortho = true;
+        this._applyCamera();
+        this.render();
+    }
+
+    // Home view: 3/4 isometric, perspective
+    home() {
+        this.theta = Math.PI / 4;
+        this.phi = Math.PI / 3;
+        this.camera = this.persp; this._ortho = false;
+        this._applyCamera();
+        this.render();
+    }
+
     _ensureAnimTool() {
         if (this._animTool) return;
         const THREE = this.THREE;
@@ -775,7 +793,7 @@ export class GcodeViz3D {
         r.setViewport(0, 0, w, h);
         r.render(this.scene, this.camera);
         if (this._cubeScene) {
-            const size = Math.max(64, Math.min(96, w * 0.16)), m = 10;
+            const size = 86, m = 30; // fixed so the HTML nav helpers line up around it
             const sp = Math.sin(this.phi);
             this._cubeCam.position.set(sp * Math.cos(this.theta), sp * Math.sin(this.theta), Math.cos(this.phi)).multiplyScalar(3.4);
             this._cubeCam.lookAt(0, 0, 0);
