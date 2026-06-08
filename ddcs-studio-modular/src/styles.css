@@ -1739,24 +1739,275 @@ body[data-theme="ddcs"] .editor-container {
     border: 2px solid var(--accent);
 }
 
-/* ============================================
-   THEME: STUDIO (new — being built to replace DDCS)
-   Neutral scaffold; real styling comes from the reference mockups + CSS.
-   ============================================ */
+/* ============================================================================
+   THEME: STUDIO — DDCS / FOINNC M350 controller skin
+   Phosphor-green readouts on true black, segmented silver Win95-bevel chassis,
+   electric-blue selection, green function bar. Ported from the reference
+   ddcs-controller.css (re-scoped to "studio"); set to replace the old ddcs theme.
+   ============================================================================ */
 [data-theme="studio"] {
-    --bg: #eef1f5;
-    --panel: #ffffff;
-    --accent: #2d7ff9;
-    --text: #1f2733;
-    --text-main: #0d1117;
-    --text-dim: #6b7785;
-    --border: #d4dae3;
-    --radius: 8px;
+    --bg:            #c4bfb5;   /* silver chassis */
+    --panel:         #cfcabf;   /* silver plate */
+    --screen:        #000000;   /* readout / editor black */
+    --accent:        #1668ff;   /* electric-blue selection */
+    --text:          #101010;
+    --text-main:     #101010;
+    --text-dim:      #4b4843;
+    --border:        #6f6a60;
+    --radius:        0;
+
+    --phosphor:      #15e000;   /* primary CRT green */
+    --phosphor-2:    #00b400;
+    --dro-white:     #f4f4f4;
+    --cyan:          #1fd4d4;
+    --amber:         #ff9e1b;
+    --red:           #ff3838;
+    --maroon:        #7c2a16;
+    --fnbar:         #13c40a;
+    --fnbar-2:       #0a9a06;
+    --select:        #1668ff;
+    --select-hi:     #4f93ff;
+
+    /* silver bevel ramp (Win95 3D) */
+    --sv-1: #e2dfd7; --sv-2: #cfcabf; --sv-3: #b6b1a5;
+    --bv-lite: #ffffff; --bv-lite-2: #f0eee8;
+    --bv-mid-lite: #b8b3a8; --bv-mid-dark: #6f6a60;
+    --bv-dark: #3a362f; --bv-dark-2: #16140f;
+
+    --mono: "DejaVu Sans Mono", "Consolas", "Liberation Mono", ui-monospace, monospace;
+    --sans: Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif;
+    --pixel: var(--sans); /* (Silkscreen omitted — offline build) */
 }
+
+/* reusable bevel helper */
+[data-theme="studio"] .raised,
+[data-theme="studio"] .app-header,
+[data-theme="studio"] .controller-dock {
+    border-top: 3px solid var(--bv-lite);
+    border-left: 3px solid var(--bv-mid-lite);
+    border-right: 3px solid var(--bv-mid-dark);
+    border-bottom: 3px solid var(--bv-dark);
+}
+
+/* --- App header → segmented silver status plate --- */
+[data-theme="studio"] .app-header {
+    background: linear-gradient(180deg, var(--sv-1), var(--sv-2) 55%, var(--sv-3));
+}
+[data-theme="studio"] .hdr-title { display: flex; align-items: center; gap: 12px; }
+[data-theme="studio"] .hdr-text {
+    font-family: var(--sans); font-weight: 800; letter-spacing: 1px;
+    color: var(--phosphor); background: #000; padding: 4px 12px;
+    border-top: 2px solid var(--bv-dark); border-left: 2px solid var(--bv-mid-dark);
+    border-right: 2px solid var(--bv-mid-lite); border-bottom: 2px solid var(--bv-lite-2);
+    text-shadow: 0 0 6px rgba(21,224,0,0.45);
+}
+[data-theme="studio"] .hdr-controls { display: flex; gap: 8px; align-items: center; }
+
+/* --- Buttons → silver hardware keys --- */
+[data-theme="studio"] button,
 [data-theme="studio"] .toolbar-btn,
-[data-theme="studio"] button {
-    border-radius: var(--radius);
+[data-theme="studio"] label.toolbar-btn,
+[data-theme="studio"] .op-btn {
+    font-family: var(--sans); font-weight: 700; font-size: 13px;
+    color: var(--text); cursor: pointer; border-radius: 0;
+    padding: 7px 12px; min-height: 32px; line-height: 1.2;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    background: linear-gradient(180deg, var(--sv-1), var(--sv-2) 60%, var(--sv-3));
+    border-top: 2px solid var(--bv-lite);
+    border-left: 2px solid var(--bv-mid-lite);
+    border-right: 2px solid var(--bv-mid-dark);
+    border-bottom: 2px solid var(--bv-dark);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+    transition: filter 0.1s ease;
 }
+[data-theme="studio"] button:hover,
+[data-theme="studio"] .toolbar-btn:hover,
+[data-theme="studio"] .op-btn:hover { filter: brightness(1.05); }
+[data-theme="studio"] button:active,
+[data-theme="studio"] .toolbar-btn:active,
+[data-theme="studio"] .op-btn:active {
+    border-top: 2px solid var(--bv-dark); border-left: 2px solid var(--bv-mid-dark);
+    border-right: 2px solid var(--bv-mid-lite); border-bottom: 2px solid var(--bv-lite-2);
+    transform: translate(1px, 1px);
+}
+[data-theme="studio"] .op-icon { font-size: 13px; }
+[data-theme="studio"] .op-label { font-weight: 700; }
+
+/* colour-coded keys */
+[data-theme="studio"] .toolbar-btn.m-green,
+[data-theme="studio"] button.green   { color: #044a18; background: linear-gradient(180deg, #d6f7dc, #a7e6b4); }
+[data-theme="studio"] .toolbar-btn.m-red,
+[data-theme="studio"] button.danger,
+[data-theme="studio"] button.red     { color: #6e0606; background: linear-gradient(180deg, #ffd2d2, #ffa9a9); }
+[data-theme="studio"] button.amber   { color: #5e3500; background: linear-gradient(180deg, #ffe4b0, #ffc463); }
+[data-theme="studio"] .toolbar-btn.axis-blue,
+[data-theme="studio"] button.primary,
+[data-theme="studio"] button.blue {
+    color: #fff;
+    background: linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2);
+    border-top-color: #8fbcff; border-left-color: #8fbcff;
+    border-right-color: #0a3a9e; border-bottom-color: #062a72;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.4);
+}
+
+/* --- Top action toolbar → generator/wizard keys --- */
+[data-theme="studio"] .top-dock-header {
+    background: linear-gradient(180deg, var(--sv-2), var(--sv-3));
+    border-bottom: 2px solid var(--bv-dark);
+    border-top: 2px solid var(--bv-lite);
+}
+[data-theme="studio"] .top-dock-header .header-controls {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+    padding: 6px 10px; gap: 8px;
+}
+[data-theme="studio"] .header-left  { justify-self: start;  display: flex; gap: 6px; align-items: center; }
+[data-theme="studio"] .header-center{ justify-self: center; display: flex; gap: 6px; align-items: center; }
+[data-theme="studio"] .header-right { justify-self: end;    display: flex; gap: 6px; align-items: center; }
+[data-theme="studio"] .header-center button { min-width: 92px; font-weight: 700; }
+
+/* --- Editor → the phosphor screen --- */
+[data-theme="studio"] .editor-container {
+    background: #000;
+    border-top: 3px solid var(--bv-dark); border-left: 3px solid var(--bv-mid-dark);
+    border-right: 3px solid var(--bv-mid-lite); border-bottom: 3px solid var(--bv-lite-2);
+}
+[data-theme="studio"] #editor-highlight,
+[data-theme="studio"] #editor,
+[data-theme="studio"] .editor {
+    margin: 0; padding: 14px 16px;
+    font-family: var(--mono); font-size: 15px; line-height: 1.6;
+    background: #000; white-space: pre; tab-size: 4; border: 0;
+}
+[data-theme="studio"] #editor-highlight, [data-theme="studio"] .editor { color: var(--phosphor); }
+[data-theme="studio"] #editor {
+    position: absolute; inset: 0; color: transparent; background: transparent;
+    caret-color: var(--phosphor); resize: none; outline: none;
+}
+[data-theme="studio"] #editor::selection,
+[data-theme="studio"] .editor ::selection { background: #15e000; color: #000; }
+[data-theme="studio"] .editor .g-comment,
+[data-theme="studio"] #editor-highlight .g-comment { color: var(--phosphor-2); }
+[data-theme="studio"] .editor .g-num,
+[data-theme="studio"] #editor-highlight .g-num { color: var(--dro-white); }
+[data-theme="studio"] .editor .g-word,
+[data-theme="studio"] #editor-highlight .g-word { color: var(--cyan); }
+[data-theme="studio"] .editor .g-ln,
+[data-theme="studio"] #editor-highlight .g-ln { color: var(--red); }
+[data-theme="studio"] .editor .sel-line { background: linear-gradient(180deg, var(--select-hi), var(--select)); color: #fff; display: block; }
+
+/* status strip → green readout band */
+[data-theme="studio"] .statusbar {
+    font-family: var(--mono); font-size: 12px; font-weight: 700;
+    color: #000; padding: 5px 12px;
+    background: linear-gradient(180deg, var(--fnbar), var(--fnbar-2));
+    border-top: 2px solid #5bf04f; border-bottom: 2px solid #066b03;
+    min-height: 28px; display: flex; align-items: center; gap: 18px;
+}
+
+/* 3D toolpath drawer + handle */
+[data-theme="studio"] .viz3d-drawer {
+    background: #000; color: var(--cyan);
+    border-left: 3px solid var(--bv-mid-dark); font-family: var(--mono); font-size: 12px;
+}
+[data-theme="studio"] .viz3d-handle {
+    background: linear-gradient(180deg, var(--sv-1), var(--sv-3));
+    color: #101010; border-top: 2px solid var(--bv-lite); border-left: 2px solid var(--bv-lite);
+    border-right: 2px solid var(--bv-dark); border-bottom: 2px solid var(--bv-dark);
+}
+
+/* --- Controller dock → silver command-deck plate --- */
+[data-theme="studio"] .controller-dock {
+    background: linear-gradient(180deg, var(--sv-2), var(--sv-3));
+    border-top: 3px solid var(--bv-lite);
+}
+[data-theme="studio"] .dock-header { background: transparent; }
+[data-theme="studio"] .header-handle {
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    background: repeating-linear-gradient(180deg, #e6e2d9 0 2px, #cfcabf 2px 4px);
+    border-top: 2px solid var(--bv-lite); border-bottom: 2px solid var(--bv-dark);
+}
+[data-theme="studio"] .chevron { color: #101010; font-weight: 700; font-size: 14px; }
+[data-theme="studio"] .dock-body {
+    background: var(--panel);
+    border-left: 3px solid var(--bv-mid-lite); border-right: 3px solid var(--bv-mid-dark);
+    border-bottom: 3px solid var(--bv-dark);
+    padding: 10px 12px 14px;
+}
+[data-theme="studio"] .deck-panel { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+[data-theme="studio"] .deck-group { display: flex; flex-direction: column; gap: 8px; min-width: 150px; padding: 4px; }
+[data-theme="studio"] .deck-group .group-header,
+[data-theme="studio"] .deck-header,
+[data-theme="studio"] .section-label {
+    font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--text-dim);
+    border-bottom: 1px solid var(--bv-mid-dark); padding-bottom: 3px;
+}
+[data-theme="studio"] .editor-keys-row,
+[data-theme="studio"] .editor-keys .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+[data-theme="studio"] .editor-keys-row button,
+[data-theme="studio"] .editor-keys button { min-height: 48px; font-size: 16px; font-weight: 800; width: 100%; }
+
+/* --- Variable chips → black info chips --- */
+[data-theme="studio"] .var-item {
+    background: #000;
+    border-top: 2px solid var(--bv-dark); border-left: 2px solid var(--bv-mid-dark);
+    border-right: 2px solid var(--bv-mid-lite); border-bottom: 2px solid var(--bv-lite-2);
+}
+[data-theme="studio"] .var-item:hover { background: #061206; }
+[data-theme="studio"] .var-item .var-id { font-family: var(--mono); font-weight: 800; color: var(--phosphor); }
+[data-theme="studio"] .var-item .var-desc { font-family: var(--sans); color: var(--cyan); }
+
+/* --- Wizard / modal → silver dialog --- */
+[data-theme="studio"] .wiz-box {
+    padding: 3px; background: var(--sv-2);
+    border-top: 3px solid var(--bv-lite); border-left: 3px solid var(--bv-mid-lite);
+    border-right: 3px solid var(--bv-mid-dark); border-bottom: 3px solid var(--bv-dark);
+}
+[data-theme="studio"] .wiz-head {
+    color: #eef4fb; background: linear-gradient(180deg, #2a4f82, #123a66);
+}
+[data-theme="studio"] .wiz-foot { border-top: 1px solid var(--bv-mid-dark); }
+[data-theme="studio"] .label {
+    font-family: var(--sans); font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+    text-transform: uppercase; color: var(--text-dim); display: block; margin-bottom: 3px;
+}
+[data-theme="studio"] .hint { font-family: var(--sans); font-size: 10px; color: var(--text-dim); }
+[data-theme="studio"] .wiz-body input,
+[data-theme="studio"] .wiz-body select {
+    font-family: var(--mono); font-size: 13px; color: var(--text); background: #fff; width: 100%;
+    padding: 6px 8px; border-radius: 0; outline: none;
+    border-top: 2px solid var(--bv-dark); border-left: 2px solid var(--bv-mid-dark);
+    border-right: 2px solid var(--bv-mid-lite); border-bottom: 2px solid var(--bv-lite-2);
+}
+[data-theme="studio"] .wiz-body input[type="checkbox"] { width: auto; }
+
+/* wizard visualization (black + green vector) */
+[data-theme="studio"] .viz-container {
+    background: #000;
+    border-top: 2px solid var(--bv-dark); border-left: 2px solid var(--bv-mid-dark);
+    border-right: 2px solid var(--bv-mid-lite); border-bottom: 2px solid var(--bv-lite-2);
+}
+[data-theme="studio"] .viz-status {
+    font-family: var(--pixel); font-size: 12px; color: var(--phosphor);
+    background: rgba(0,0,0,0.9); text-align: center; padding: 6px 10px; letter-spacing: 1px;
+}
+[data-theme="studio"] .preview-block pre {
+    font-family: var(--mono); color: var(--dro-white); background: #000;
+    border-top: 2px solid var(--bv-dark); border-left: 2px solid var(--bv-mid-dark);
+    border-right: 2px solid var(--bv-mid-lite); border-bottom: 2px solid var(--bv-lite-2);
+}
+[data-theme="studio"] .preview-block pre .g-comment { color: var(--phosphor-2); }
+
+/* --- Virtual numpad (comm wizard) → electric-blue keys --- */
+[data-theme="studio"] .numpad .key,
+[data-theme="studio"] .vbtn {
+    font-family: var(--sans); font-weight: 800; color: #fff; text-align: center; cursor: pointer;
+    background: linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2);
+    border-top: 2px solid #8fbcff; border-left: 2px solid #5f97ff;
+    border-right: 2px solid #0a3a9e; border-bottom: 2px solid #062a72;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.4);
+}
+[data-theme="studio"] .numpad .key:active, [data-theme="studio"] .vbtn:active { transform: translate(1px,1px); }
 
 /* ============================================
    THEME: STEAMPUNK (Brass & Copper)
