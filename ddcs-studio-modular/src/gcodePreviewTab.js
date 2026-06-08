@@ -44,9 +44,14 @@ function gpRenderFromEditor() {
     } else {
         const b = parsed.bounds;
         const r = (n) => n.toFixed(1).replace(/\.0$/, '');
-        status.textContent =
-            `${s.feed} cuts` + (s.probe ? ` · ${s.probe} probes` : '') + ` · ${s.rapid} rapids` +
-            (s.skipped ? ` · ${s.skipped} skipped` : '') +
+        const parts = [];
+        if (s.feed) parts.push(`${s.feed} cuts`);
+        if (s.probe) parts.push(`${s.probe} probes`);
+        if (s.rapid) parts.push(`${s.rapid} rapids`);
+        if (s.retract) parts.push(`${s.retract} retracts`);
+        if (s.jog) parts.push(`${s.jog} jogs`);
+        if (s.skipped) parts.push(`${s.skipped} skipped`);
+        status.textContent = parts.join(' · ') +
             `   X[${r(b.minX)} ${r(b.maxX)}] Y[${r(b.minY)} ${r(b.maxY)}] Z[${r(b.minZ)} ${r(b.maxZ)}] mm`;
     }
 }

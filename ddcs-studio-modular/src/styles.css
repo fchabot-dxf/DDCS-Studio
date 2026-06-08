@@ -2730,6 +2730,9 @@ body[data-theme="ddcs"] .ddcs-tab.active {
     border: 1px solid rgba(120, 190, 255, 0.45);
     border-radius: 4px;
 }
+.viz3d-legend { position: absolute; bottom: 6px; left: 8px; z-index: 3; display: flex; flex-wrap: wrap; gap: 9px; font-size: 10px; color: #9aa8b8; }
+.viz3d-legend span { display: flex; align-items: center; gap: 4px; }
+.viz3d-legend i { width: 11px; height: 3px; border-radius: 2px; display: inline-block; }
 
 /* ===== Settings overlay ===== */
 .settings-overlay { z-index: 1000; align-items: center; justify-content: center; }

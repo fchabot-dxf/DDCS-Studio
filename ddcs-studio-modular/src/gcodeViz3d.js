@@ -58,6 +58,7 @@ export class GcodeViz3D {
         this.scene.add(this.pathGroup);
         this.raycaster = new THREE.Raycaster();
         this.onStartChange = null; // optional callback(start)
+        this.showRapids = true;
 
         this._initStaticScene();
         this._initSpindle();
@@ -146,6 +147,12 @@ export class GcodeViz3D {
         this.render();
     }
 
+    setShowRapids(on) {
+        this.showRapids = !!on;
+        if (this.rapidLines) this.rapidLines.visible = this.showRapids;
+        this.render();
+    }
+
     _ndc(e) {
         const r = this.renderer.domElement.getBoundingClientRect();
         return new this.THREE.Vector2(
@@ -183,7 +190,7 @@ export class GcodeViz3D {
 
     setSegments(parsed) {
         const THREE = this.THREE;
-        for (const key of ['feedLines', 'rapidLines']) {
+        for (const key of ['feedLines', 'rapidLines', 'retractLines', 'jogLines']) {
             const obj = this[key];
             if (obj) {
                 this.pathGroup.remove(obj);
@@ -199,40 +206,57 @@ export class GcodeViz3D {
         const zMin = b ? b.minZ : 0;
         const zRange = b ? (b.maxZ - b.minZ) || 1 : 1;
 
-        const feedPos = [], feedCol = [], rapidPos = [];
+        const feedPos = [], feedCol = [], rapidPos = [], retractPos = [], jogPos = [];
         const cLow = new THREE.Color(0x0a4fd0);   // deepest Z
         const cHigh = new THREE.Color(0x35ffd0);  // highest Z
         const tmp = new THREE.Color();
 
         for (const s of segs) {
-            if (s.probe) continue; // probe lines are built + clamped to the stock in _buildProbe
-            if (s.rapid) {
-                rapidPos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
-            } else {
+            const t = s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed');
+            if (t === 'probe') continue;       // built + clamped to the stock in _buildProbe
+            else if (t === 'rapid') rapidPos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
+            else if (t === 'retract') retractPos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
+            else if (t === 'jog') jogPos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
+            else {
                 feedPos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
                 tmp.copy(cLow).lerp(cHigh, (s.z1 - zMin) / zRange); feedCol.push(tmp.r, tmp.g, tmp.b);
                 tmp.copy(cLow).lerp(cHigh, (s.z2 - zMin) / zRange); feedCol.push(tmp.r, tmp.g, tmp.b);
             }
         }
 
+        // Cuts (G1): blue→cyan gradient by depth
         if (feedPos.length) {
             const g = new THREE.BufferGeometry();
             g.setAttribute('position', new THREE.Float32BufferAttribute(feedPos, 3));
             g.setAttribute('color', new THREE.Float32BufferAttribute(feedCol, 3));
-            const mat = new THREE.LineBasicMaterial({ vertexColors: true });
-            this.feedLines = new THREE.LineSegments(g, mat);
+            this.feedLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true }));
             this.pathGroup.add(this.feedLines);
         }
-        if (rapidPos.length) {
-            const g = new THREE.BufferGeometry();
-            g.setAttribute('position', new THREE.Float32BufferAttribute(rapidPos, 3));
-            const mat = new THREE.LineBasicMaterial({ color: 0x7a3030, transparent: true, opacity: 0.55 });
-            this.rapidLines = new THREE.LineSegments(g, mat);
-            this.pathGroup.add(this.rapidLines);
-        }
+        // Colour-coded to match the wizard visualiser:
+        // rapid/travel = green, retract = yellow, manual jog = orange dashed, probe = blue
+        this.rapidLines = this._buildLines(rapidPos, 0x00cc00, 0.55, false);
+        if (this.rapidLines) this.rapidLines.visible = this.showRapids;
+        this.retractLines = this._buildLines(retractPos, 0xfacc15, 0.85, false);
+        this.jogLines = this._buildLines(jogPos, 0xff9a0d, 0.95, true);
+
         this._dataBounds = b || null;
         this._applyStart();
         this.fitAll();
+    }
+
+    // Build a solid (or dashed) LineSegments from a flat positions array; null if empty.
+    _buildLines(pos, color, opacity, dashed) {
+        if (!pos.length) return null;
+        const THREE = this.THREE;
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        const mat = dashed
+            ? new THREE.LineDashedMaterial({ color, transparent: opacity < 1, opacity, dashSize: 3, gapSize: 2 })
+            : new THREE.LineBasicMaterial({ color, transparent: opacity < 1, opacity });
+        const lines = new THREE.LineSegments(g, mat);
+        if (dashed) lines.computeLineDistances();
+        this.pathGroup.add(lines);
+        return lines;
     }
 
     // Build the probe (G31) lines, clamping each to where it first hits the stock
@@ -279,7 +303,7 @@ export class GcodeViz3D {
         if (pos.length) {
             const g = new THREE.BufferGeometry();
             g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-            const mat = new THREE.LineBasicMaterial({ color: 0xffcc33 }); // probe (G31) = amber
+            const mat = new THREE.LineBasicMaterial({ color: 0x3b82f6 }); // probe (G31) = blue
             this.probeLines = new THREE.LineSegments(g, mat);
             this.pathGroup.add(this.probeLines);
         }
@@ -490,10 +514,19 @@ export class GcodeViz3D {
         el.addEventListener('pointerleave', () => { if (!mode) this._setHighlight(null); });
         el.addEventListener('wheel', (e) => {
             e.preventDefault();
-            // proportional zoom — the step scales with distance, so it eases/decelerates
-            // as you approach the target (and is finer for trackpad pixel-scroll)
-            this.radius *= Math.exp(e.deltaY * 0.0011);
-            this.radius = Math.max(0.5, Math.min(5e5, this.radius));
+            const old = this.radius;
+            const next = Math.max(1, Math.min(5e5, old * Math.exp(e.deltaY * 0.0015)));
+            // Zoom toward the point under the cursor (dolly-to-cursor) — homes in on what
+            // you're looking at, so it doesn't feel slow/wonky around a fixed centre.
+            this.raycaster.setFromCamera(this._ndc(e), this.camera);
+            const camDir = new THREE.Vector3();
+            this.camera.getWorldDirection(camDir);
+            const plane = new THREE.Plane(camDir, -camDir.dot(this.target));
+            const cursorPt = new THREE.Vector3();
+            if (this.raycaster.ray.intersectPlane(plane, cursorPt)) {
+                this.target.lerp(cursorPt, 1 - next / old);
+            }
+            this.radius = next;
             this._applyCamera();
             this.render();
         }, { passive: false });

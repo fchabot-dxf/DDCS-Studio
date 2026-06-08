@@ -28,7 +28,7 @@ export function parseGcode(text) {
         minX: Infinity, minY: Infinity, minZ: Infinity,
         maxX: -Infinity, maxY: -Infinity, maxZ: -Infinity,
     };
-    let feedCount = 0, rapidCount = 0, probeCount = 0, skipped = 0;
+    let feedCount = 0, rapidCount = 0, retractCount = 0, probeCount = 0, jogCount = 0, skipped = 0;
 
     const grow = (p) => {
         if (p.x < bounds.minX) bounds.minX = p.x;
@@ -42,6 +42,20 @@ export function parseGcode(text) {
     const lines = String(text || '').split(/\r?\n/);
 
     for (const raw of lines) {
+        // Manual reposition pause — the operator re-parks the probe by hand. Draw the move
+        // back to the program origin (the spindle) as a "manual jog", then restart there.
+        if (/reposition/i.test(raw)) {
+            if (started && (pos.x || pos.y || pos.z)) {
+                segments.push({ x1: pos.x, y1: pos.y, z1: pos.z, x2: 0, y2: 0, z2: 0, rapid: false, probe: false, type: 'jog' });
+                jogCount++;
+            }
+            pos = { x: 0, y: 0, z: 0 };
+        }
+        // Unconditional GOTO = end of the success path; skip failure handlers under N-labels.
+        if (raw.trim().toUpperCase().startsWith('GOTO')) break;
+        // Retract moves are G0 moves the wizard comments as "Retract"
+        const isRetract = /retract/i.test(raw);
+
         // Strip comments: ( ... ) and ; trailing
         const line = raw.replace(/\([^)]*\)/g, ' ').replace(/;.*$/, ' ');
         if (!line.trim()) continue;
@@ -114,13 +128,14 @@ export function parseGcode(text) {
         if (!started) { grow(pos); started = true; }
 
         if (effMotion === 0 || effMotion === 1) {
+            const type = isProbe ? 'probe' : (effMotion === 0 ? (isRetract ? 'retract' : 'rapid') : 'feed');
             segments.push({
                 x1: pos.x, y1: pos.y, z1: pos.z,
                 x2: target.x, y2: target.y, z2: target.z,
-                rapid: effMotion === 0, probe: isProbe,
+                rapid: effMotion === 0, probe: isProbe, type,
             });
             if (isProbe) probeCount++;
-            else if (effMotion === 0) rapidCount++;
+            else if (effMotion === 0) { if (isRetract) retractCount++; else rapidCount++; }
             else feedCount++;
             grow(target);
             pos = target;
@@ -133,7 +148,7 @@ export function parseGcode(text) {
             let prev = pos;
             for (let i = 1; i < pts.length; i++) {
                 const p = pts[i];
-                segments.push({ x1: prev.x, y1: prev.y, z1: prev.z, x2: p.x, y2: p.y, z2: p.z, rapid: false, probe: false });
+                segments.push({ x1: prev.x, y1: prev.y, z1: prev.z, x2: p.x, y2: p.y, z2: p.z, rapid: false, probe: false, type: 'feed' });
                 grow(p);
                 prev = p;
             }
@@ -145,7 +160,7 @@ export function parseGcode(text) {
     return {
         segments,
         bounds: started ? bounds : null,
-        stats: { feed: feedCount, rapid: rapidCount, probe: probeCount, skipped, drawable: segments.length > 0 },
+        stats: { feed: feedCount, rapid: rapidCount, retract: retractCount, probe: probeCount, jog: jogCount, skipped, drawable: segments.length > 0 },
     };
 }
 
