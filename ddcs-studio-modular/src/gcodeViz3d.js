@@ -43,6 +43,7 @@ export class GcodeViz3D {
 
         this.feedLines = null;
         this.rapidLines = null;
+        this.probeLines = null;
         this._dataBounds = null;
         this._stock = null;
         this._machine = null;
@@ -50,7 +51,16 @@ export class GcodeViz3D {
         this.stockEdges = null;
         this.machineBox = null;
 
+        // Spindle / program-zero position — the toolpath is offset by this, and you can
+        // drag the marker in the 3D view to place a relative program over the stock.
+        this.start = { x: 0, y: 0, z: 0 };
+        this.pathGroup = new THREE.Group();
+        this.scene.add(this.pathGroup);
+        this.raycaster = new THREE.Raycaster();
+        this.onStartChange = null; // optional callback(start)
+
         this._initStaticScene();
+        this._initSpindle();
         this._bindControls();
         this._applyCamera();
 
@@ -70,12 +80,64 @@ export class GcodeViz3D {
         this.scene.add(axes);
     }
 
+    _initSpindle() {
+        const THREE = this.THREE;
+        const grp = new THREE.Group();
+        // Cone body pointing down, tip at the start point (z = 0 of the group)
+        const cone = new THREE.Mesh(
+            new THREE.ConeGeometry(4, 16, 18),
+            new THREE.MeshBasicMaterial({ color: 0xff5577, transparent: true, opacity: 0.85, depthTest: false })
+        );
+        cone.rotation.x = Math.PI / 2; // +Y apex → -Z (downward)
+        cone.position.set(0, 0, 8);    // apex at z = 0, base at z = 16
+        cone.renderOrder = 10;
+        grp.add(cone);
+        const tip = new THREE.Mesh(
+            new THREE.SphereGeometry(1.8, 14, 14),
+            new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })
+        );
+        tip.renderOrder = 11;
+        grp.add(tip);
+        this.spindleMarker = grp;
+        this.scene.add(grp);
+    }
+
+    // Position the toolpath group + spindle marker at the current start
+    _applyStart() {
+        const s = this.start;
+        if (this.pathGroup) this.pathGroup.position.set(s.x, s.y, s.z);
+        if (this.spindleMarker) this.spindleMarker.position.set(s.x, s.y, s.z);
+        if (typeof this.onStartChange === 'function') this.onStartChange({ ...s });
+    }
+
+    setStart(x, y, z) {
+        this.start.x = x; this.start.y = y;
+        if (typeof z === 'number') this.start.z = z;
+        this._applyStart();
+        this.render();
+    }
+
+    _ndc(e) {
+        const r = this.renderer.domElement.getBoundingClientRect();
+        return new this.THREE.Vector2(
+            ((e.clientX - r.left) / r.width) * 2 - 1,
+            -(((e.clientY - r.top) / r.height) * 2 - 1)
+        );
+    }
+
+    // Is the pointer over the spindle marker?
+    _pickSpindle(e) {
+        if (!this.spindleMarker) return false;
+        this.raycaster.setFromCamera(this._ndc(e), this.camera);
+        return this.raycaster.intersectObject(this.spindleMarker, true).length > 0;
+    }
+
     setSegments(parsed) {
         const THREE = this.THREE;
-        for (const key of ['feedLines', 'rapidLines']) {
+        for (const key of ['feedLines', 'rapidLines', 'probeLines']) {
             const obj = this[key];
             if (obj) {
-                this.scene.remove(obj);
+                this.pathGroup.remove(obj);
                 obj.geometry.dispose();
                 obj.material.dispose();
                 this[key] = null;
@@ -87,13 +149,15 @@ export class GcodeViz3D {
         const zMin = b ? b.minZ : 0;
         const zRange = b ? (b.maxZ - b.minZ) || 1 : 1;
 
-        const feedPos = [], feedCol = [], rapidPos = [];
+        const feedPos = [], feedCol = [], rapidPos = [], probePos = [];
         const cLow = new THREE.Color(0x0a4fd0);   // deepest Z
         const cHigh = new THREE.Color(0x35ffd0);  // highest Z
         const tmp = new THREE.Color();
 
         for (const s of segs) {
-            if (s.rapid) {
+            if (s.probe) {
+                probePos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
+            } else if (s.rapid) {
                 rapidPos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
             } else {
                 feedPos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
@@ -108,17 +172,25 @@ export class GcodeViz3D {
             g.setAttribute('color', new THREE.Float32BufferAttribute(feedCol, 3));
             const mat = new THREE.LineBasicMaterial({ vertexColors: true });
             this.feedLines = new THREE.LineSegments(g, mat);
-            this.scene.add(this.feedLines);
+            this.pathGroup.add(this.feedLines);
         }
         if (rapidPos.length) {
             const g = new THREE.BufferGeometry();
             g.setAttribute('position', new THREE.Float32BufferAttribute(rapidPos, 3));
             const mat = new THREE.LineBasicMaterial({ color: 0x7a3030, transparent: true, opacity: 0.55 });
             this.rapidLines = new THREE.LineSegments(g, mat);
-            this.scene.add(this.rapidLines);
+            this.pathGroup.add(this.rapidLines);
+        }
+        if (probePos.length) {
+            const g = new THREE.BufferGeometry();
+            g.setAttribute('position', new THREE.Float32BufferAttribute(probePos, 3));
+            const mat = new THREE.LineBasicMaterial({ color: 0xffcc33 }); // probe (G31) = amber
+            this.probeLines = new THREE.LineSegments(g, mat);
+            this.pathGroup.add(this.probeLines);
         }
 
         this._dataBounds = b || null;
+        this._applyStart();
         this.fitAll();
     }
 
@@ -157,7 +229,10 @@ export class GcodeViz3D {
     fitAll() {
         let b = null;
         const d = this._dataBounds;
-        if (d) b = this._growBounds(b, d.minX, d.minY, d.minZ, d.maxX, d.maxY, d.maxZ);
+        if (d) {
+            const sx = this.start.x, sy = this.start.y, sz = this.start.z;
+            b = this._growBounds(b, d.minX + sx, d.minY + sy, d.minZ + sz, d.maxX + sx, d.maxY + sy, d.maxZ + sz);
+        }
         const s = this._stock;
         if (s && s.show && s.x > 0 && s.y > 0 && s.z > 0) b = this._growBounds(b, 0, 0, -s.z, s.x, s.y, 0);
         const m = this._machine;
@@ -219,6 +294,17 @@ export class GcodeViz3D {
         let mode = null, px = 0, py = 0;
 
         const onMove = (e) => {
+            if (mode === 'spindle') {
+                this.raycaster.setFromCamera(this._ndc(e), this.camera);
+                const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -this.start.z);
+                const pt = new THREE.Vector3();
+                if (this.raycaster.ray.intersectPlane(plane, pt)) {
+                    this.start.x = pt.x; this.start.y = pt.y;
+                    this._applyStart();
+                    this.render();
+                }
+                return;
+            }
             const dx = e.clientX - px, dy = e.clientY - py;
             px = e.clientX; py = e.clientY;
             if (mode === 'rot') {
@@ -240,9 +326,10 @@ export class GcodeViz3D {
             window.removeEventListener('pointerup', onUp);
         };
         el.addEventListener('pointerdown', (e) => {
-            mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot';
-            px = e.clientX; py = e.clientY;
             e.preventDefault();
+            if (e.button !== 2 && !e.shiftKey && this._pickSpindle(e)) mode = 'spindle';
+            else mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot';
+            px = e.clientX; py = e.clientY;
             window.addEventListener('pointermove', onMove);
             window.addEventListener('pointerup', onUp);
         });

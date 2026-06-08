@@ -38,7 +38,8 @@ function gpRenderFromEditor() {
         const b = parsed.bounds;
         const r = (n) => n.toFixed(1).replace(/\.0$/, '');
         status.textContent =
-            `${s.feed} cuts · ${s.rapid} rapids` + (s.skipped ? ` · ${s.skipped} skipped` : '') +
+            `${s.feed} cuts` + (s.probe ? ` · ${s.probe} probes` : '') + ` · ${s.rapid} rapids` +
+            (s.skipped ? ` · ${s.skipped} skipped` : '') +
             `   X[${r(b.minX)} ${r(b.maxX)}] Y[${r(b.minY)} ${r(b.maxY)}] Z[${r(b.minZ)} ${r(b.maxZ)}] mm`;
     }
 }
@@ -62,6 +63,9 @@ export function setGcodeView(view) {
     if (!gpViz) {
         try {
             gpViz = new GcodeViz3D(els.vizContainer);
+            // Spindle / program-zero start (draggable in the view; also settable programmatically)
+            window.ddcsSetSpindleStart = (x, y, z) => { if (gpViz) gpViz.setStart(x, y, z); };
+            window.ddcsGetSpindleStart = () => (gpViz ? { ...gpViz.start } : null);
         } catch (err) {
             console.error('3D preview init failed', err);
             if (els.status) els.status.textContent = '3D unavailable: ' + err.message;

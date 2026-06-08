@@ -1,25 +1,26 @@
 /**
- * DDCS Studio — G-code toolpath parser
+ * DDCS Studio — G-code toolpath parser (with macro #variable evaluator)
  *
- * Parses LITERAL coordinate motion (G0/G1/G2/G3) from the editor into 3D line
- * segments for the preview. It silently skips anything it cannot resolve to a
- * real coordinate: lines containing #variables, G31 probing, or pure comments.
+ * Parses motion (G0/G1/G2/G3 + G31 probe) into 3D line segments for the preview.
+ * It now evaluates the DDCS macro variables the wizards emit, so probe macros
+ * render too:
+ *   - tracks `#N = expr` assignments (incl. indirect `#[expr] = …`)
+ *   - evaluates `[ ]` arithmetic with + - * / and direct/indirect `#` refs
+ *   - resolves `#`-based word values (e.g. `G31 X#8`, `G0 Z#18`)
  *
- * Scope note: this app mostly generates variable-driven probe macros — those
- * cannot be plotted because the numbers aren't known until the machine runs.
- * This parser is for CAM-generated .nc files and hand-written cutting code.
+ * Scope: straight-line motion in program order. It does NOT follow IF/GOTO or
+ * loops. Moves it still can't resolve (unknown system vars like #578/#1925, or
+ * G53 machine-coordinate moves) are skipped.
  */
 
-// Matches a single letter address + numeric value, e.g. "X-12.5", "G1", "F200".
-const GP_TOKEN_RE = /([A-Za-z])\s*([-+]?\d*\.?\d+)/g;
-
 export function parseGcode(text) {
-    const segments = []; // { x1,y1,z1, x2,y2,z2, rapid }
+    const segments = []; // { x1,y1,z1, x2,y2,z2, rapid, probe }
+    const vars = new Map();
 
     let pos = { x: 0, y: 0, z: 0 };
-    let motion = 0;        // modal motion: 0 rapid, 1 feed, 2 CW arc, 3 CCW arc
-    let absolute = true;   // G90 abs / G91 incremental
-    let unitScale = 1;     // G21 mm = 1, G20 inch = 25.4 (everything stored in mm)
+    let motion = 0;        // 0 rapid, 1 feed, 2 CW arc, 3 CCW arc
+    let absolute = true;   // G90 / G91
+    let unitScale = 1;     // G20 inch = 25.4, G21 mm = 1 (stored in mm)
     let plane = 17;        // G17 XY, G18 ZX, G19 YZ
     let started = false;
 
@@ -27,7 +28,7 @@ export function parseGcode(text) {
         minX: Infinity, minY: Infinity, minZ: Infinity,
         maxX: -Infinity, maxY: -Infinity, maxZ: -Infinity,
     };
-    let feedCount = 0, rapidCount = 0, skipped = 0;
+    let feedCount = 0, rapidCount = 0, probeCount = 0, skipped = 0;
 
     const grow = (p) => {
         if (p.x < bounds.minX) bounds.minX = p.x;
@@ -41,27 +42,45 @@ export function parseGcode(text) {
     const lines = String(text || '').split(/\r?\n/);
 
     for (const raw of lines) {
-        // Strip comments: ( ... ) parenthetical and ; trailing
-        let line = raw.replace(/\([^)]*\)/g, ' ').replace(/;.*$/, ' ');
+        // Strip comments: ( ... ) and ; trailing
+        const line = raw.replace(/\([^)]*\)/g, ' ').replace(/;.*$/, ' ');
         if (!line.trim()) continue;
-        // Unresolvable lines: variables (#) — skip whole line
-        if (line.indexOf('#') !== -1) { skipped++; continue; }
+        const trimmed = line.trim();
 
-        const words = {};   // address -> value (last wins), except G (collected)
-        const gcodes = [];
-        let m;
-        GP_TOKEN_RE.lastIndex = 0;
-        while ((m = GP_TOKEN_RE.exec(line)) !== null) {
-            const letter = m[1].toUpperCase();
-            const value = parseFloat(m[2]);
-            if (letter === 'G') gcodes.push(value);
-            else words[letter] = value;
+        // --- Variable assignment: #N = expr  (or  #[expr] = expr) ---
+        if (trimmed[0] === '#') {
+            const eq = trimmed.indexOf('=');
+            if (eq > 0 && trimmed[eq + 1] !== '=') { // single '=' (not '==')
+                const lhs = trimmed.slice(1, eq).trim();
+                const rhs = trimmed.slice(eq + 1).trim();
+                const idx = lhs[0] === '[' ? gpEvalExpr(lhs, vars) : parseInt(lhs, 10);
+                const val = gpEvalExpr(rhs, vars);
+                if (idx != null && Number.isFinite(idx) && val != null) vars.set(Math.round(idx), val);
+                continue;
+            }
+            // A '#' line that isn't an assignment (e.g. a comparison) — nothing to draw
+            skipped++;
+            continue;
         }
 
-        // G31 (probe) — coordinates aren't deterministic; skip
-        if (gcodes.indexOf(31) !== -1) { skipped++; continue; }
+        // --- Motion / modal line ---
+        const words = gpTokenizeWords(line);
+        if (words.length === 0) continue;
 
-        // Apply modal settings present on this line
+        const gcodes = [];
+        const wm = {}; // letter -> evaluated number (or null if unresolvable)
+        for (const w of words) {
+            if (w.letter === 'G') {
+                const g = parseFloat(w.value);
+                if (Number.isFinite(g)) gcodes.push(g);
+            } else {
+                wm[w.letter] = gpEvalExpr(w.value, vars);
+            }
+        }
+
+        // Apply modal settings (G31 does NOT change the modal motion)
+        const isProbe = gcodes.indexOf(31) !== -1;
+        const isMachine = gcodes.indexOf(53) !== -1; // machine coords — unknown origin
         for (const g of gcodes) {
             if (g === 20) unitScale = 25.4;
             else if (g === 21) unitScale = 1;
@@ -73,39 +92,48 @@ export function parseGcode(text) {
             else if (g === 0 || g === 1 || g === 2 || g === 3) motion = g;
         }
 
-        const has = (k) => Object.prototype.hasOwnProperty.call(words, k);
+        const has = (k) => Object.prototype.hasOwnProperty.call(wm, k);
         const hasAxis = has('X') || has('Y') || has('Z');
         const hasArcOff = has('I') || has('J') || has('K') || has('R');
-        if (!hasAxis && !hasArcOff) continue; // modal-only / non-motion line
+        if (!hasAxis && !hasArcOff) continue;          // modal-only / non-motion line
+        if (isMachine) { skipped++; continue; }        // G53 machine-coord move — skip
 
-        // Resolve target position (carry current value for omitted axes)
+        // Resolve target; if any present axis is unresolvable, skip the move
         const target = { x: pos.x, y: pos.y, z: pos.z };
-        if (has('X')) target.x = absolute ? words.X * unitScale : pos.x + words.X * unitScale;
-        if (has('Y')) target.y = absolute ? words.Y * unitScale : pos.y + words.Y * unitScale;
-        if (has('Z')) target.z = absolute ? words.Z * unitScale : pos.z + words.Z * unitScale;
+        let bad = false;
+        const axis = (k, lk) => {
+            if (!has(k)) return;
+            const v = wm[k];
+            if (v === null || v === undefined) { bad = true; return; }
+            target[lk] = absolute ? v * unitScale : pos[lk] + v * unitScale;
+        };
+        axis('X', 'x'); axis('Y', 'y'); axis('Z', 'z');
+        if (bad) { skipped++; continue; }
 
+        const effMotion = isProbe ? 1 : motion;        // a probe draws like a feed line
         if (!started) { grow(pos); started = true; }
 
-        if (motion === 0 || motion === 1) {
+        if (effMotion === 0 || effMotion === 1) {
             segments.push({
                 x1: pos.x, y1: pos.y, z1: pos.z,
                 x2: target.x, y2: target.y, z2: target.z,
-                rapid: motion === 0,
+                rapid: effMotion === 0, probe: isProbe,
             });
-            if (motion === 0) rapidCount++; else feedCount++;
+            if (isProbe) probeCount++;
+            else if (effMotion === 0) rapidCount++;
+            else feedCount++;
             grow(target);
             pos = target;
         } else {
-            // Arc G2/G3 — interpolate into short segments
-            const pts = gpArcPoints(pos, target, words, motion, plane, unitScale);
+            // Arc G2/G3 — need resolvable I/J/K or R
+            const off = { I: wm.I, J: wm.J, K: wm.K, R: wm.R };
+            const anyArcNull = ['I', 'J', 'K', 'R'].some(k => has(k) && (wm[k] === null || wm[k] === undefined));
+            if (anyArcNull) { skipped++; continue; }
+            const pts = gpArcPoints(pos, target, off, effMotion, plane, unitScale);
             let prev = pos;
             for (let i = 1; i < pts.length; i++) {
                 const p = pts[i];
-                segments.push({
-                    x1: prev.x, y1: prev.y, z1: prev.z,
-                    x2: p.x, y2: p.y, z2: p.z,
-                    rapid: false,
-                });
+                segments.push({ x1: prev.x, y1: prev.y, z1: prev.z, x2: p.x, y2: p.y, z2: p.z, rapid: false, probe: false });
                 grow(p);
                 prev = p;
             }
@@ -117,13 +145,105 @@ export function parseGcode(text) {
     return {
         segments,
         bounds: started ? bounds : null,
-        stats: { feed: feedCount, rapid: rapidCount, skipped, drawable: segments.length > 0 },
+        stats: { feed: feedCount, rapid: rapidCount, probe: probeCount, skipped, drawable: segments.length > 0 },
     };
 }
 
-// Interpolate a G2/G3 arc into points. Center from I/J/K offsets (incremental
-// from start) or an R radius. Linear interpolation of the plane-normal axis
-// gives helical (ramping) arcs. G17 is exact; G18/G19 are best-effort.
+// ---- Word tokenizer: letter + value, where value may be a number, #ref, or [expr] ----
+function gpTokenizeWords(line) {
+    const words = [];
+    let i = 0;
+    const n = line.length;
+    const isLetter = (c) => (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+    while (i < n) {
+        const ch = line[i];
+        if (isLetter(ch)) {
+            const letter = ch.toUpperCase();
+            i++;
+            let val = '';
+            while (i < n && !isLetter(line[i])) { val += line[i]; i++; }
+            words.push({ letter, value: val.trim() });
+        } else {
+            i++;
+        }
+    }
+    return words;
+}
+
+// ---- Expression evaluator: numbers, [ ] grouping, + - * /, direct #N / indirect #[expr] ----
+// Returns a number, or null if it cannot be resolved (unknown var / bad syntax).
+function gpEvalExpr(str, vars) {
+    if (str == null) return null;
+    const s = String(str).trim();
+    if (s === '') return null;
+
+    const toks = [];
+    let i = 0;
+    while (i < s.length) {
+        const c = s[i];
+        if (c === ' ' || c === '\t') { i++; continue; }
+        if ((c >= '0' && c <= '9') || c === '.') {
+            let num = '';
+            while (i < s.length && ((s[i] >= '0' && s[i] <= '9') || s[i] === '.')) { num += s[i]; i++; }
+            toks.push(parseFloat(num));
+        } else if (c === '#' || c === '[' || c === ']' || c === '+' || c === '-' || c === '*' || c === '/') {
+            toks.push(c); i++;
+        } else {
+            return null; // unexpected character → unresolvable
+        }
+    }
+
+    let p = 0;
+    const peek = () => toks[p];
+
+    function parseExpr() {
+        let v = parseTerm();
+        while (v !== null && (peek() === '+' || peek() === '-')) {
+            const op = toks[p++];
+            const r = parseTerm();
+            if (r === null) return null;
+            v = op === '+' ? v + r : v - r;
+        }
+        return v;
+    }
+    function parseTerm() {
+        let v = parseFactor();
+        while (v !== null && (peek() === '*' || peek() === '/')) {
+            const op = toks[p++];
+            const r = parseFactor();
+            if (r === null) return null;
+            v = op === '*' ? v * r : (r !== 0 ? v / r : null);
+        }
+        return v;
+    }
+    function parseFactor() {
+        const t = peek();
+        if (t === '+') { p++; return parseFactor(); }
+        if (t === '-') { p++; const f = parseFactor(); return f === null ? null : -f; }
+        if (t === '[') {
+            p++;
+            const v = parseExpr();
+            if (peek() === ']') p++;
+            return v;
+        }
+        if (t === '#') {
+            p++;
+            let idx;
+            if (peek() === '[') { p++; idx = parseExpr(); if (peek() === ']') p++; }
+            else if (typeof peek() === 'number') { idx = toks[p++]; }
+            else return null;
+            if (idx === null || !Number.isFinite(idx)) return null;
+            const v = vars.get(Math.round(idx));
+            return (v === undefined || v === null) ? null : v;
+        }
+        if (typeof t === 'number') { p++; return t; }
+        return null;
+    }
+
+    return parseExpr();
+}
+
+// Interpolate a G2/G3 arc into points (center from I/J/K offsets or R radius).
 function gpArcPoints(start, end, w, motion, plane, scale) {
     let a, b, lin;
     if (plane === 18) { a = 'x'; b = 'z'; lin = 'y'; }
@@ -136,17 +256,17 @@ function gpArcPoints(start, end, w, motion, plane, scale) {
     const offFor = (axis) => (axis === 'x' ? w.I : axis === 'y' ? w.J : w.K);
 
     let cx, cy;
-    if (offFor(a) !== undefined || offFor(b) !== undefined) {
-        cx = sa + (offFor(a) || 0) * scale;
-        cy = sb + (offFor(b) || 0) * scale;
-    } else if (w.R !== undefined) {
+    if (offFor(a) !== undefined && offFor(a) !== null || offFor(b) !== undefined && offFor(b) !== null) {
+        cx = sa + ((offFor(a) || 0)) * scale;
+        cy = sb + ((offFor(b) || 0)) * scale;
+    } else if (w.R !== undefined && w.R !== null) {
         const R = w.R * scale;
         const mx = (sa + ea) / 2, my = (sb + eb) / 2;
         const dx = ea - sa, dy = eb - sb;
         const d = Math.hypot(dx, dy);
-        if (d === 0 || Math.abs(R) < d / 2 - 1e-6) return [start, end]; // invalid → line
+        if (d === 0 || Math.abs(R) < d / 2 - 1e-6) return [start, end];
         const h = Math.sqrt(Math.max(0, R * R - (d * d) / 4));
-        const ux = -dy / d, uy = dx / d; // unit perpendicular
+        const ux = -dy / d, uy = dx / d;
         const sign = (motion === 2 ? -1 : 1) * (R >= 0 ? 1 : -1);
         cx = mx + sign * h * ux;
         cy = my + sign * h * uy;
@@ -156,14 +276,13 @@ function gpArcPoints(start, end, w, motion, plane, scale) {
 
     const r = Math.hypot(sa - cx, sb - cy);
     let a0 = Math.atan2(sb - cy, sa - cx);
-    const a1raw = Math.atan2(eb - cy, ea - cx);
-    let a1 = a1raw;
-    if (motion === 3) { if (a1 <= a0) a1 += Math.PI * 2; }       // CCW
-    else { if (a1 >= a0) a1 -= Math.PI * 2; }                    // CW
+    let a1 = Math.atan2(eb - cy, ea - cx);
+    if (motion === 3) { if (a1 <= a0) a1 += Math.PI * 2; }
+    else { if (a1 >= a0) a1 -= Math.PI * 2; }
     let sweep = a1 - a0;
-    if (Math.abs(sweep) < 1e-9) sweep = (motion === 3 ? 1 : -1) * Math.PI * 2; // full circle
+    if (Math.abs(sweep) < 1e-9) sweep = (motion === 3 ? 1 : -1) * Math.PI * 2;
 
-    const steps = Math.max(2, Math.ceil(Math.abs(sweep) / (Math.PI / 36))); // ~5° chords
+    const steps = Math.max(2, Math.ceil(Math.abs(sweep) / (Math.PI / 36)));
     const pts = [];
     for (let i = 0; i <= steps; i++) {
         const t = i / steps;
