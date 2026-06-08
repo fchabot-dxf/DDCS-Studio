@@ -110,6 +110,10 @@ function gpInit() {
             if (window.ddcsApplySettings) window.ddcsApplySettings({ stock: { shape: shapeSel.value } });
         });
     }
+    // View-snap buttons (Top / Front / Right / Iso)
+    document.querySelectorAll('#gcodeViz3dContainer .viz3d-views button').forEach((btn) => {
+        btn.addEventListener('click', () => { if (gpViz) gpViz.setView(btn.dataset.view); });
+    });
     gpSyncControls();
     // Stock / machine settings changed → redraw if the 3D drawer is open
     window.addEventListener('ddcs:settings-changed', () => {

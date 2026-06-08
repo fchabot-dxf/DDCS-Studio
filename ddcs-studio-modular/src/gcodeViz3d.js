@@ -168,6 +168,20 @@ export class GcodeViz3D {
         this.render();
     }
 
+    // Snap the camera to a standard view (keeps the current target + radius)
+    setView(name) {
+        const H = Math.PI / 2;
+        const views = {
+            top: [-H, 0.05], front: [-H, H], back: [H, H],
+            right: [0, H], left: [Math.PI, H], iso: [Math.PI / 4, Math.PI / 3],
+        };
+        const v = views[name] || views.iso;
+        this.theta = v[0];
+        this.phi = v[1];
+        this._applyCamera();
+        this.render();
+    }
+
     _ndc(e) {
         const r = this.renderer.domElement.getBoundingClientRect();
         return new this.THREE.Vector2(
