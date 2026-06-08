@@ -23,6 +23,7 @@ export function parseGcode(text) {
     let unitScale = 1;     // G20 inch = 25.4, G21 mm = 1 (stored in mm)
     let plane = 17;        // G17 XY, G18 ZX, G19 YZ
     let started = false;
+    let pass = 0;          // increments at each manual REPOSITION (one draggable start per pass)
 
     const bounds = {
         minX: Infinity, minY: Infinity, minZ: Infinity,
@@ -42,13 +43,11 @@ export function parseGcode(text) {
     const lines = String(text || '').split(/\r?\n/);
 
     for (const raw of lines) {
-        // Manual reposition pause — the operator re-parks the probe by hand. Draw the move
-        // back to the program origin (the spindle) as a "manual jog", then restart there.
-        if (/reposition/i.test(raw)) {
-            if (started && (pos.x || pos.y || pos.z)) {
-                segments.push({ x1: pos.x, y1: pos.y, z1: pos.z, x2: 0, y2: 0, z2: 0, rapid: false, probe: false, type: 'jog' });
-                jogCount++;
-            }
+        // Manual reposition flag (uniform "REPOSITION:" comment emitted by the wizards).
+        // The operator re-parks the probe by hand → start a new pass at the program origin;
+        // the 3D viewer gives each pass its own draggable ruby so it can be placed.
+        if (/reposition:/i.test(raw)) {
+            pass++;
             pos = { x: 0, y: 0, z: 0 };
         }
         // Unconditional GOTO = end of the success path; skip failure handlers under N-labels.
@@ -132,7 +131,7 @@ export function parseGcode(text) {
             segments.push({
                 x1: pos.x, y1: pos.y, z1: pos.z,
                 x2: target.x, y2: target.y, z2: target.z,
-                rapid: effMotion === 0, probe: isProbe, type,
+                rapid: effMotion === 0, probe: isProbe, type, pass,
             });
             if (isProbe) probeCount++;
             else if (effMotion === 0) { if (isRetract) retractCount++; else rapidCount++; }
@@ -148,7 +147,7 @@ export function parseGcode(text) {
             let prev = pos;
             for (let i = 1; i < pts.length; i++) {
                 const p = pts[i];
-                segments.push({ x1: prev.x, y1: prev.y, z1: prev.z, x2: p.x, y2: p.y, z2: p.z, rapid: false, probe: false, type: 'feed' });
+                segments.push({ x1: prev.x, y1: prev.y, z1: prev.z, x2: p.x, y2: p.y, z2: p.z, rapid: false, probe: false, type: 'feed', pass });
                 grow(p);
                 prev = p;
             }
@@ -160,7 +159,7 @@ export function parseGcode(text) {
     return {
         segments,
         bounds: started ? bounds : null,
-        stats: { feed: feedCount, rapid: rapidCount, retract: retractCount, probe: probeCount, jog: jogCount, skipped, drawable: segments.length > 0 },
+        stats: { feed: feedCount, rapid: rapidCount, retract: retractCount, probe: probeCount, jog: jogCount, passes: pass + 1, skipped, drawable: segments.length > 0 },
     };
 }
 

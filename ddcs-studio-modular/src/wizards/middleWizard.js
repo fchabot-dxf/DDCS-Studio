@@ -69,7 +69,7 @@ export class MiddleWizard {
             // Safe Z and user reposition before secondary axis
             gcode += line([set('#57', '#882')], 'Save current Z machine position') + '\n';
             gcode += line([G(0), Z('#17')], 'Retract to safe Z') + '\n\n';
-            gcode += comment('Reposition for secondary axis') + '\n';
+            gcode += comment('REPOSITION: secondary axis') + '\n';
             gcode += line([set('#1505', '1')], 'Press Enter when repositioned - ESC=cancel') + '\n';
             gcode += ifGoto('#1505', '==', '0', 2) + '\n\n';
             gcode += g53('Z', '#57', 'Restore Z to saved height') + '\n\n';
@@ -168,7 +168,7 @@ export class MiddleWizard {
         // Retract to safe Z and wait for user reposition
         c += line([set('#57', '#882')], 'Save current Z machine position') + '\n';
         c += line([G(0), Z('#17')], 'Retract to safe Z') + '\n\n';
-        c += comment('MANUAL REPOSITION - move to opposite side of boss') + '\n';
+        c += comment('REPOSITION: move to opposite side of boss') + '\n';
         c += line([set('#1505', '1')], 'Press Enter when repositioned - ESC=cancel') + '\n';
         c += ifGoto('#1505', '==', '0', 2) + '\n\n';
         c += g53('Z', '#57', 'Restore to saved probe height') + '\n\n';

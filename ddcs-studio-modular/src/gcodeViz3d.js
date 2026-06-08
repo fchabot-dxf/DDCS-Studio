@@ -41,27 +41,28 @@ export class GcodeViz3D {
         this.theta = Math.PI / 4;   // azimuth in XY
         this.phi = Math.PI / 3;     // polar from +Z
 
-        this.feedLines = null;
-        this.rapidLines = null;
-        this.probeLines = null;
+        this.lineGroups = {};      // type -> LineSegments (world coords)
         this._dataBounds = null;
         this._stock = null;
         this._machine = null;
         this.stockMesh = null;
         this.stockEdges = null;
         this.machineBox = null;
+        this._segs = [];
+        this._passCount = 1;
 
-        // Spindle / program-zero position — the toolpath is offset by this, and you can
-        // drag the marker in the 3D view to place a relative program over the stock.
-        this.start = { x: 0, y: 0, z: 0 };
+        // One draggable start (ruby + X/Y/Z gizmo) per pass. Each manual REPOSITION in the
+        // macro begins a new pass, placed relative to its own start so you can park it.
+        this.starts = [{ x: 0, y: 0, z: 0 }];
+        this.spindleMarkers = [];
+        this._axisMat = {};        // `${pass}:${axis}` -> { mat, base }
         this.pathGroup = new THREE.Group();
         this.scene.add(this.pathGroup);
         this.raycaster = new THREE.Raycaster();
-        this.onStartChange = null; // optional callback(start)
+        this.onStartChange = null; // optional callback(starts)
         this.showRapids = true;
 
         this._initStaticScene();
-        this._initSpindle();
         this._bindControls();
         this._applyCamera();
 
@@ -81,26 +82,23 @@ export class GcodeViz3D {
         this.scene.add(axes);
     }
 
-    _initSpindle() {
+    // A draggable start marker for one pass: ruby probe tip + X/Y/Z translate gizmo
+    _makeMarker(pass) {
         const THREE = this.THREE;
         const grp = new THREE.Group();
-        // Ruby probe tip: a red sphere at the start point
         const ruby = new THREE.Mesh(
             new THREE.SphereGeometry(3, 20, 20),
             new THREE.MeshBasicMaterial({ color: 0xc4122e, depthTest: false })
         );
         ruby.renderOrder = 11;
         grp.add(ruby);
-        // Three translate handles (X red, Y green, Z blue)
-        this._axisMat = {};
-        grp.add(this._makeAxisArrow(new THREE.Vector3(1, 0, 0), 0xff4d4d, 'x'));
-        grp.add(this._makeAxisArrow(new THREE.Vector3(0, 1, 0), 0x4dff7a, 'y'));
-        grp.add(this._makeAxisArrow(new THREE.Vector3(0, 0, 1), 0x4da6ff, 'z'));
-        this.spindleMarker = grp;
-        this.scene.add(grp);
+        grp.add(this._makeAxisArrow(new THREE.Vector3(1, 0, 0), 0xff4d4d, 'x', pass));
+        grp.add(this._makeAxisArrow(new THREE.Vector3(0, 1, 0), 0x4dff7a, 'y', pass));
+        grp.add(this._makeAxisArrow(new THREE.Vector3(0, 0, 1), 0x4da6ff, 'z', pass));
+        return grp;
     }
 
-    _makeAxisArrow(dir, color, axisName) {
+    _makeAxisArrow(dir, color, axisName, pass) {
         const THREE = this.THREE;
         const len = 26, headLen = 7, shaftR = 1.0, headR = 2.8;
         const g = new THREE.Group();
@@ -111,45 +109,62 @@ export class GcodeViz3D {
         head.position.y = len - headLen / 2;
         g.add(shaft); g.add(head);
         g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); // orient +Y → dir
-        g.traverse((o) => { o.renderOrder = 12; if (o.userData) o.userData.gizmoAxis = axisName; });
-        this._axisMat[axisName] = { mat, base: color };
+        g.traverse((o) => { o.renderOrder = 12; if (o.userData) { o.userData.gizmoAxis = axisName; o.userData.gizmoPass = pass; } });
+        this._axisMat[pass + ':' + axisName] = { mat, base: color };
         return g;
     }
 
-    // Highlight one axis handle (hover/active) — pass null to clear
-    _setHighlight(axis) {
-        if (this._hoverAxis === axis) return;
-        this._hoverAxis = axis;
+    // Recreate markers only when the pass count changes
+    _ensureMarkers() {
+        if (this.spindleMarkers.length === this._passCount) return;
+        for (const m of this.spindleMarkers) this.scene.remove(m);
+        this.spindleMarkers = [];
+        this._axisMat = {};
+        this._hoverKey = undefined;
+        for (let p = 0; p < this._passCount; p++) {
+            const m = this._makeMarker(p);
+            this.spindleMarkers.push(m);
+            this.scene.add(m);
+        }
+    }
+
+    _positionMarkers() {
+        for (let p = 0; p < this.spindleMarkers.length; p++) {
+            const s = this.starts[p] || { x: 0, y: 0, z: 0 };
+            this.spindleMarkers[p].position.set(s.x, s.y, s.z);
+        }
+    }
+
+    // Highlight one axis handle (hover/active) — pass (null, null) to clear
+    _setHighlight(pass, axis) {
+        const key = (pass != null && axis) ? pass + ':' + axis : null;
+        if (this._hoverKey === key) return;
+        this._hoverKey = key;
         const HL = 0xffe24a; // amber highlight
-        for (const k of ['x', 'y', 'z']) {
-            const h = this._axisMat && this._axisMat[k];
-            if (h) h.mat.color.setHex(axis === k ? HL : h.base);
+        for (const k in this._axisMat) {
+            const h = this._axisMat[k];
+            if (h) h.mat.color.setHex(k === key ? HL : h.base);
         }
         if (this.renderer && this.renderer.domElement) {
-            this.renderer.domElement.style.cursor = axis ? 'grab' : 'default';
+            this.renderer.domElement.style.cursor = key ? 'grab' : 'default';
         }
         this.render();
     }
 
-    // Position the toolpath group + spindle marker at the current start
-    _applyStart() {
-        const s = this.start;
-        if (this.pathGroup) this.pathGroup.position.set(s.x, s.y, s.z);
-        if (this.spindleMarker) this.spindleMarker.position.set(s.x, s.y, s.z);
-        this._buildProbe(); // re-clamp G31 moves to the stock at the new start
-        if (typeof this.onStartChange === 'function') this.onStartChange({ ...s });
-    }
-
-    setStart(x, y, z) {
-        this.start.x = x; this.start.y = y;
-        if (typeof z === 'number') this.start.z = z;
-        this._applyStart();
+    // Set a pass's start programmatically (pass defaults to 0)
+    setStart(x, y, z, pass) {
+        const p = pass | 0;
+        if (!this.starts[p]) this.starts[p] = { x: 0, y: 0, z: 0 };
+        this.starts[p].x = x; this.starts[p].y = y;
+        if (typeof z === 'number') this.starts[p].z = z;
+        this._rebuild();
         this.render();
+        if (typeof this.onStartChange === 'function') this.onStartChange(this.starts);
     }
 
     setShowRapids(on) {
         this.showRapids = !!on;
-        if (this.rapidLines) this.rapidLines.visible = this.showRapids;
+        if (this.lineGroups.rapid) this.lineGroups.rapid.visible = this.showRapids;
         this.render();
     }
 
@@ -161,15 +176,15 @@ export class GcodeViz3D {
         );
     }
 
-    // Returns the gizmo axis ('x'|'y'|'z') under the pointer, or null
+    // Returns { pass, axis } of the gizmo handle under the pointer, or null
     _pickGizmo(e) {
-        if (!this.spindleMarker) return null;
+        if (!this.spindleMarkers.length) return null;
         this.raycaster.setFromCamera(this._ndc(e), this.camera);
-        const hits = this.raycaster.intersectObject(this.spindleMarker, true);
+        const hits = this.raycaster.intersectObjects(this.spindleMarkers, true);
         for (const h of hits) {
             let o = h.object;
-            while (o && o !== this.spindleMarker) {
-                if (o.userData && o.userData.gizmoAxis) return o.userData.gizmoAxis;
+            while (o) {
+                if (o.userData && o.userData.gizmoAxis) return { pass: o.userData.gizmoPass | 0, axis: o.userData.gizmoAxis };
                 o = o.parent;
             }
         }
@@ -189,124 +204,121 @@ export class GcodeViz3D {
     }
 
     setSegments(parsed) {
-        const THREE = this.THREE;
-        for (const key of ['feedLines', 'rapidLines', 'retractLines', 'jogLines']) {
-            const obj = this[key];
-            if (obj) {
-                this.pathGroup.remove(obj);
-                obj.geometry.dispose();
-                obj.material.dispose();
-                this[key] = null;
-            }
-        }
-
-        const segs = (parsed && parsed.segments) || [];
-        this._segs = segs;
-        const b = parsed && parsed.bounds;
-        const zMin = b ? b.minZ : 0;
-        const zRange = b ? (b.maxZ - b.minZ) || 1 : 1;
-
-        const feedPos = [], feedCol = [], rapidPos = [], retractPos = [], jogPos = [];
-        const cLow = new THREE.Color(0x0a4fd0);   // deepest Z
-        const cHigh = new THREE.Color(0x35ffd0);  // highest Z
-        const tmp = new THREE.Color();
-
-        for (const s of segs) {
-            const t = s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed');
-            if (t === 'probe') continue;       // built + clamped to the stock in _buildProbe
-            else if (t === 'rapid') rapidPos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
-            else if (t === 'retract') retractPos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
-            else if (t === 'jog') jogPos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
-            else {
-                feedPos.push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
-                tmp.copy(cLow).lerp(cHigh, (s.z1 - zMin) / zRange); feedCol.push(tmp.r, tmp.g, tmp.b);
-                tmp.copy(cLow).lerp(cHigh, (s.z2 - zMin) / zRange); feedCol.push(tmp.r, tmp.g, tmp.b);
-            }
-        }
-
-        // Cuts (G1): blue→cyan gradient by depth
-        if (feedPos.length) {
-            const g = new THREE.BufferGeometry();
-            g.setAttribute('position', new THREE.Float32BufferAttribute(feedPos, 3));
-            g.setAttribute('color', new THREE.Float32BufferAttribute(feedCol, 3));
-            this.feedLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true }));
-            this.pathGroup.add(this.feedLines);
-        }
-        // Colour-coded to match the wizard visualiser:
-        // rapid/travel = green, retract = yellow, manual jog = orange dashed, probe = blue
-        this.rapidLines = this._buildLines(rapidPos, 0x00cc00, 0.55, false);
-        if (this.rapidLines) this.rapidLines.visible = this.showRapids;
-        this.retractLines = this._buildLines(retractPos, 0xfacc15, 0.85, false);
-        this.jogLines = this._buildLines(jogPos, 0xff9a0d, 0.95, true);
-
-        this._dataBounds = b || null;
-        this._applyStart();
+        this._segs = (parsed && parsed.segments) || [];
+        this._passCount = Math.max(1, (parsed && parsed.stats && parsed.stats.passes) || 1);
+        // one draggable start per pass (keep existing positions; new passes default to origin)
+        while (this.starts.length < this._passCount) this.starts.push({ x: 0, y: 0, z: 0 });
+        this.starts.length = this._passCount;
+        this._ensureMarkers();
+        this._rebuild();
         this.fitAll();
     }
 
-    // Build a solid (or dashed) LineSegments from a flat positions array; null if empty.
-    _buildLines(pos, color, opacity, dashed) {
-        if (!pos.length) return null;
+    // Walk each pass, clamping probes to the stock so they stop at the wall instead of
+    // running the full search distance (which would drift the path off into space).
+    // Emits world-coordinate line groups (one per move type) and positions the markers.
+    _rebuild() {
+        const THREE = this.THREE;
+        for (const k in this.lineGroups) {
+            const o = this.lineGroups[k];
+            if (o) { this.pathGroup.remove(o); o.geometry.dispose(); o.material.dispose(); }
+        }
+        this.lineGroups = {};
+
+        const st = this._stock;
+        const box = (st && st.show && st.x > 0 && st.y > 0 && st.z > 0)
+            ? { min: { x: 0, y: 0, z: -st.z }, max: { x: st.x, y: st.y, z: 0 } } : null;
+        const pocket = !!(st && st.shape === 'pocket');
+        const CAP = 20; // fallback probe length when it never contacts the stock
+
+        const byPass = [];
+        for (const s of this._segs) { const p = s.pass | 0; (byPass[p] || (byPass[p] = [])).push(s); }
+
+        const feedPos = [], rapidPos = [], retractPos = [], probePos = [], jogPos = [];
+        let bounds = null;
+        const grow = (x, y, z) => { bounds = this._growBounds(bounds, x, y, z, x, y, z); };
+
+        let prevEnd = null;
+        for (let p = 0; p < this._passCount; p++) {
+            const segs = byPass[p] || [];
+            const mk = this.starts[p] || { x: 0, y: 0, z: 0 };
+            // manual jog from the previous pass's end to this pass's start marker
+            if (prevEnd) { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(mk.x, mk.y, mk.z); }
+            let cur = { x: 0, y: 0, z: 0 }; // pass-local, relative to the marker
+            for (const s of segs) {
+                const dx = s.x2 - s.x1, dy = s.y2 - s.y1, dz = s.z2 - s.z1;
+                const type = s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed');
+                const start = cur;
+                let end = { x: start.x + dx, y: start.y + dy, z: start.z + dz };
+                if (type === 'probe') {
+                    let hit = false;
+                    if (box) {
+                        const Aw = { x: start.x + mk.x, y: start.y + mk.y, z: start.z + mk.z };
+                        const Bw = { x: end.x + mk.x, y: end.y + mk.y, z: end.z + mk.z };
+                        const r = this._boxRange(Aw, Bw, box.min, box.max);
+                        if (r.hit) {
+                            let tt = null;
+                            if (pocket) { if (r.tEnter <= 1e-6 && r.tExit > 1e-6 && r.tExit < 1 - 1e-6) tt = r.tExit; }
+                            else { if (r.tEnter > 1e-6 && r.tEnter < 1 - 1e-6) tt = r.tEnter; }
+                            if (tt != null) { end = { x: start.x + dx * tt, y: start.y + dy * tt, z: start.z + dz * tt }; hit = true; }
+                        }
+                    }
+                    if (!hit) { // no contact → cap so the path can't run away
+                        const len = Math.hypot(dx, dy, dz) || 1;
+                        const f = Math.min(1, CAP / len);
+                        end = { x: start.x + dx * f, y: start.y + dy * f, z: start.z + dz * f };
+                    }
+                }
+                const ax = start.x + mk.x, ay = start.y + mk.y, az = start.z + mk.z;
+                const bx = end.x + mk.x, by = end.y + mk.y, bz = end.z + mk.z;
+                grow(ax, ay, az); grow(bx, by, bz);
+                const arr = type === 'rapid' ? rapidPos : type === 'retract' ? retractPos : type === 'probe' ? probePos : feedPos;
+                arr.push(ax, ay, az, bx, by, bz);
+                cur = end;
+            }
+            prevEnd = { x: cur.x + mk.x, y: cur.y + mk.y, z: cur.z + mk.z };
+        }
+
+        // Cuts: blue→cyan gradient by depth across the whole scene
+        let feedCol = null;
+        if (feedPos.length) {
+            const zMin = bounds ? bounds.minZ : 0, zRange = bounds ? (bounds.maxZ - bounds.minZ) || 1 : 1;
+            const cLow = new THREE.Color(0x0a4fd0), cHigh = new THREE.Color(0x35ffd0), tmp = new THREE.Color();
+            feedCol = [];
+            for (let i = 0; i < feedPos.length; i += 3) { tmp.copy(cLow).lerp(cHigh, (feedPos[i + 2] - zMin) / zRange); feedCol.push(tmp.r, tmp.g, tmp.b); }
+        }
+        // Colours match the wizard visualiser
+        this.lineGroups.feed = this._addLine(feedPos, { vertexColors: feedCol });
+        this.lineGroups.rapid = this._addLine(rapidPos, { color: 0x00cc00, opacity: 0.55 });
+        if (this.lineGroups.rapid) this.lineGroups.rapid.visible = this.showRapids;
+        this.lineGroups.retract = this._addLine(retractPos, { color: 0xfacc15, opacity: 0.85 });
+        this.lineGroups.probe = this._addLine(probePos, { color: 0x3b82f6 });
+        this.lineGroups.jog = this._addLine(jogPos, { color: 0xff9a0d, opacity: 0.95, dashed: true });
+
+        this._positionMarkers();
+        this._dataBounds = bounds;
+    }
+
+    // Build a LineSegments from a flat positions array; null if empty.
+    _addLine(pos, opt) {
+        if (!pos || !pos.length) return null;
         const THREE = this.THREE;
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-        const mat = dashed
-            ? new THREE.LineDashedMaterial({ color, transparent: opacity < 1, opacity, dashSize: 3, gapSize: 2 })
-            : new THREE.LineBasicMaterial({ color, transparent: opacity < 1, opacity });
+        let mat;
+        if (opt.vertexColors) {
+            g.setAttribute('color', new THREE.Float32BufferAttribute(opt.vertexColors, 3));
+            mat = new THREE.LineBasicMaterial({ vertexColors: true });
+        } else if (opt.dashed) {
+            mat = new THREE.LineDashedMaterial({ color: opt.color, transparent: opt.opacity < 1, opacity: opt.opacity, dashSize: 3, gapSize: 2 });
+        } else {
+            const op = opt.opacity != null ? opt.opacity : 1;
+            mat = new THREE.LineBasicMaterial({ color: opt.color, transparent: op < 1, opacity: op });
+        }
         const lines = new THREE.LineSegments(g, mat);
-        if (dashed) lines.computeLineDistances();
+        if (opt.dashed) lines.computeLineDistances();
         this.pathGroup.add(lines);
         return lines;
-    }
-
-    // Build the probe (G31) lines, clamping each to where it first hits the stock
-    // ("collision") at the current spindle start. Re-run on start / stock change.
-    _buildProbe() {
-        const THREE = this.THREE;
-        if (this.probeLines) {
-            this.pathGroup.remove(this.probeLines);
-            this.probeLines.geometry.dispose();
-            this.probeLines.material.dispose();
-            this.probeLines = null;
-        }
-        if (!this._segs) return;
-        const s = this.start;
-        const st = this._stock;
-        let box = null;
-        if (st && st.show && st.x > 0 && st.y > 0 && st.z > 0) {
-            box = { min: { x: 0, y: 0, z: -st.z }, max: { x: st.x, y: st.y, z: 0 } };
-        }
-        const pos = [];
-        for (const seg of this._segs) {
-            if (!seg.probe) continue;
-            const A = { x: seg.x1, y: seg.y1, z: seg.z1 };       // program coords
-            let B = { x: seg.x2, y: seg.y2, z: seg.z2 };
-            if (box) {
-                // collide in WORLD (program + start) vs the stock (program coords = world)
-                const Aw = { x: A.x + s.x, y: A.y + s.y, z: A.z + s.z };
-                const Bw = { x: B.x + s.x, y: B.y + s.y, z: B.z + s.z };
-                const r = this._boxRange(Aw, Bw, box.min, box.max);
-                if (r.hit) {
-                    let t = null;
-                    if (st.shape === 'pocket') {
-                        // probe starts inside the cavity → stop at the inner wall (exit)
-                        if (r.tEnter <= 1e-6 && r.tExit > 1e-6 && r.tExit < 1 - 1e-6) t = r.tExit;
-                    } else {
-                        // boss/block: probe from outside → stop at the outer wall (entry)
-                        if (r.tEnter > 1e-6 && r.tEnter < 1 - 1e-6) t = r.tEnter;
-                    }
-                    if (t != null) B = { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t, z: A.z + (B.z - A.z) * t };
-                }
-            }
-            pos.push(A.x, A.y, A.z, B.x, B.y, B.z);
-        }
-        if (pos.length) {
-            const g = new THREE.BufferGeometry();
-            g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-            const mat = new THREE.LineBasicMaterial({ color: 0x3b82f6 }); // probe (G31) = blue
-            this.probeLines = new THREE.LineSegments(g, mat);
-            this.pathGroup.add(this.probeLines);
-        }
     }
 
     // Parametric range [tEnter, tExit] where the line A→B crosses an axis-aligned box.
@@ -362,10 +374,7 @@ export class GcodeViz3D {
     fitAll() {
         let b = null;
         const d = this._dataBounds;
-        if (d) {
-            const sx = this.start.x, sy = this.start.y, sz = this.start.z;
-            b = this._growBounds(b, d.minX + sx, d.minY + sy, d.minZ + sz, d.maxX + sx, d.maxY + sy, d.maxZ + sz);
-        }
+        if (d) b = this._growBounds(b, d.minX, d.minY, d.minZ, d.maxX, d.maxY, d.maxZ);
         const s = this._stock;
         if (s && s.show && s.x > 0 && s.y > 0 && s.z > 0) b = this._growBounds(b, 0, 0, -s.z, s.x, s.y, 0);
         const m = this._machine;
@@ -455,10 +464,11 @@ export class GcodeViz3D {
                 this.raycaster.setFromCamera(this._ndc(e), this.camera);
                 const t1 = this._closestAxisT(this.raycaster.ray, this._dragStart0, this._dragDir);
                 const delta = t1 - this._dragT0;
-                this.start.x = this._dragStart0.x + this._dragDir.x * delta;
-                this.start.y = this._dragStart0.y + this._dragDir.y * delta;
-                this.start.z = this._dragStart0.z + this._dragDir.z * delta;
-                this._applyStart();
+                const s = this.starts[this._dragPass] || (this.starts[this._dragPass] = { x: 0, y: 0, z: 0 });
+                s.x = this._dragStart0.x + this._dragDir.x * delta;
+                s.y = this._dragStart0.y + this._dragDir.y * delta;
+                s.z = this._dragStart0.z + this._dragDir.z * delta;
+                this._rebuild();
                 this.render();
                 return;
             }
@@ -480,22 +490,24 @@ export class GcodeViz3D {
         const onUp = () => {
             mode = null;
             if (this.renderer) this.renderer.domElement.style.cursor = 'default';
-            this._setHighlight(null);
+            this._setHighlight(null, null);
             window.removeEventListener('pointermove', onMove);
             window.removeEventListener('pointerup', onUp);
         };
         el.addEventListener('pointerdown', (e) => {
             e.preventDefault();
-            const axis = (e.button === 0 && !e.shiftKey) ? this._pickGizmo(e) : null;
-            if (axis) {
+            const g = (e.button === 0 && !e.shiftKey) ? this._pickGizmo(e) : null;
+            if (g) {
                 mode = 'gizmo';
-                this._dragDir = axis === 'x' ? new THREE.Vector3(1, 0, 0)
-                    : axis === 'y' ? new THREE.Vector3(0, 1, 0)
+                this._dragPass = g.pass;
+                this._dragDir = g.axis === 'x' ? new THREE.Vector3(1, 0, 0)
+                    : g.axis === 'y' ? new THREE.Vector3(0, 1, 0)
                     : new THREE.Vector3(0, 0, 1);
-                this._dragStart0 = new THREE.Vector3(this.start.x, this.start.y, this.start.z);
+                const s = this.starts[g.pass] || { x: 0, y: 0, z: 0 };
+                this._dragStart0 = new THREE.Vector3(s.x, s.y, s.z);
                 this.raycaster.setFromCamera(this._ndc(e), this.camera);
                 this._dragT0 = this._closestAxisT(this.raycaster.ray, this._dragStart0, this._dragDir);
-                this._setHighlight(axis);
+                this._setHighlight(g.pass, g.axis);
                 this.renderer.domElement.style.cursor = 'grabbing';
             } else {
                 mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot';
@@ -509,9 +521,10 @@ export class GcodeViz3D {
         // Hover feedback: highlight the axis handle under the cursor when not dragging
         el.addEventListener('pointermove', (e) => {
             if (mode) return;
-            this._setHighlight(this._pickGizmo(e));
+            const g = this._pickGizmo(e);
+            this._setHighlight(g ? g.pass : null, g ? g.axis : null);
         });
-        el.addEventListener('pointerleave', () => { if (!mode) this._setHighlight(null); });
+        el.addEventListener('pointerleave', () => { if (!mode) this._setHighlight(null, null); });
         el.addEventListener('wheel', (e) => {
             e.preventDefault();
             const old = this.radius;

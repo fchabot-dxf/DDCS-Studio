@@ -42,14 +42,14 @@ function gpRenderFromEditor() {
     if (!s.drawable) {
         status.textContent = 'No drawable moves — variable/probe code (#…, G31) is skipped';
     } else {
-        const b = parsed.bounds;
+        const b = (gpViz && gpViz._dataBounds) || parsed.bounds; // clamped render bounds
         const r = (n) => n.toFixed(1).replace(/\.0$/, '');
         const parts = [];
         if (s.feed) parts.push(`${s.feed} cuts`);
         if (s.probe) parts.push(`${s.probe} probes`);
         if (s.rapid) parts.push(`${s.rapid} rapids`);
         if (s.retract) parts.push(`${s.retract} retracts`);
-        if (s.jog) parts.push(`${s.jog} jogs`);
+        if (s.passes > 1) parts.push(`${s.passes} passes`);
         if (s.skipped) parts.push(`${s.skipped} skipped`);
         status.textContent = parts.join(' · ') +
             `   X[${r(b.minX)} ${r(b.maxX)}] Y[${r(b.minY)} ${r(b.maxY)}] Z[${r(b.minZ)} ${r(b.maxZ)}] mm`;
@@ -77,8 +77,9 @@ export function setGcodeView(view) {
             gpViz = new GcodeViz3D(els.vizContainer);
             window.__gpViz = gpViz; // debug accessor
             // Spindle / program-zero start (draggable in the view; also settable programmatically)
-            window.ddcsSetSpindleStart = (x, y, z) => { if (gpViz) gpViz.setStart(x, y, z); };
-            window.ddcsGetSpindleStart = () => (gpViz ? { ...gpViz.start } : null);
+            window.ddcsSetSpindleStart = (x, y, z, pass) => { if (gpViz) gpViz.setStart(x, y, z, pass || 0); };
+            window.ddcsGetSpindleStart = () => (gpViz && gpViz.starts[0] ? { ...gpViz.starts[0] } : null);
+            window.ddcsGetStarts = () => (gpViz ? gpViz.starts.map((s) => ({ ...s })) : null);
         } catch (err) {
             console.error('3D preview init failed', err);
             if (els.status) els.status.textContent = '3D unavailable: ' + err.message;

@@ -86,7 +86,7 @@ export class AlignmentWizard {
 
         // ===== POINT B =====
         gcode += comment(`===== POINT B: Second probe along ${checkAxis} fence =====`) + '\n';
-        gcode += comment(`Jog along the ${checkAxis} fence to point B — keep same Y/Z position`) + '\n';
+        gcode += comment(`REPOSITION: jog to point B along the ${checkAxis} fence — keep same Y/Z`) + '\n';
         gcode += line([set('#1505', '1')], 'Press Enter when in position at point B - ESC=cancel') + '\n';
         gcode += ifGoto('#1505', '==', '0', 2) + '\n\n';
 
