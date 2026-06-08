@@ -267,8 +267,8 @@
 
                 <div class="grid-2">
                     <div>
-                        <span class="label">DIRECTION</span>
-                        <select id="m_dir" title="First probe direction. Determines which wall is probed first. First edge saved to #51, second edge to #52. Center = (#51+#52)/2 → #53." value="pos">
+                        <span class="label">1ST AXIS DIR</span>
+                        <select id="m_dir" title="Probe direction for the first axis (the AXIS selected above). The opposite wall is probed automatically. First edge → #51, second → #52, center → #53." value="pos">
                             <option value="pos">pos</option>
                             <option value="neg">neg</option>
                         </select>
@@ -279,10 +279,10 @@
                     </div>
                 </div>
 
-                <!-- Secondary direction shown only when Find Both is checked -->
+                <!-- Second-axis direction shown only when Probe Both Axes is checked -->
                 <div id="m_dir2_block" class="hidden" style="margin-top:8px;">
-                    <span class="label">SECOND DIRECTION</span>
-                    <select id="m_dir2" title="First probe direction for the secondary axis (used in 2-axis mode). Secondary edge results: #54 and #55. Center → #56.">
+                    <span class="label">2ND AXIS DIR</span>
+                    <select id="m_dir2" title="Probe direction for the second axis (2-axis mode). Its opposite wall is probed automatically. Edges → #54 and #55, center → #56.">
                         <option value="pos">pos</option>
                         <option value="neg">neg</option>
                     </select>
