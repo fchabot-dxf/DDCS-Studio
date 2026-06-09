@@ -291,6 +291,89 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     scrollbar-color: rgba(0,0,0,0.06) transparent; /* more visible thumb */
 }
 
+/* Toolbar dropdowns used in the dock header */
+.toolbar-dropdown {
+    position: relative; /* anchor for absolute dropdown content */
+    display: inline-block;
+}
+
+.toolbar-dropdown > button.toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+
+.toolbar-dropdown-content {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    background: transparent;
+    padding: 0;
+    z-index: 2000; /* higher to ensure visibility */
+    white-space: nowrap;
+    display: flex;
+    flex-direction: column;
+}
+
+.toolbar-dropdown-content button {
+    display: block !important;
+    width: 100% !important;
+    text-align: left;
+    padding: 6px 10px;
+    background: var(--panel) !important;
+    color: var(--text) !important;
+    border: none !important;
+    border-top: 1px solid rgba(0,0,0,0.06) !important;
+    cursor: pointer !important;
+    font-size: 13px !important;
+}
+
+.toolbar-dropdown-content button:first-child { border-top: none; }
+
+..toolbar-dropdown-content button:hover {
+    background: rgba(0,0,0,0.12) !important;
+    color: var(--text) !important;
+    filter: none !important;
+}
+
+/* Ensure header dropdown trigger keeps its panel look on hover (fix transparency issue) */
+.dock-header .header-center .toolbar-dropdown > button.toolbar-btn {
+    background: linear-gradient(180deg, var(--sv-1, #e2dfd7), var(--sv-2, #cfcabf) 60%, var(--sv-3, #b6b1a5));
+    border-top: 2px solid var(--bv-lite, #ffffff);
+    border-left: 2px solid var(--bv-mid-lite, #b8b3a8);
+    border-right: 2px solid var(--bv-mid-dark, #6f6a60);
+    border-bottom: 2px solid var(--bv-dark, #3a362f);
+    color: var(--text);
+}
+.dock-header .header-center .toolbar-dropdown > button.toolbar-btn:hover {
+    filter: brightness(1.05);
+}
+
+/* Stronger hover rule to prevent transparency from other generic hover rules */
+.dock-header .header-center .toolbar-dropdown > button.toolbar-btn:hover,
+.dock-header .header-center .toolbar-dropdown > button.toolbar-btn:focus {
+    background: linear-gradient(180deg, var(--sv-1, #e2dfd7), var(--sv-2, #cfcabf) 60%, var(--sv-3, #b6b1a5)) !important;
+    border-top: 2px solid var(--bv-lite, #ffffff) !important;
+    border-left: 2px solid var(--bv-mid-lite, #b8b3a8) !important;
+    border-right: 2px solid var(--bv-mid-dark, #6f6a60) !important;
+    border-bottom: 2px solid var(--bv-dark, #3a362f) !important;
+    color: var(--text) !important;
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+..toolbar-dropdown.active .toolbar-dropdown-content {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Ensure dropdowns don't push layout when opened on small viewports */
+.dock-header .header-center .toolbar-dropdown {
+    margin-right: 6px;
+}
+
 /* WebKit: transparent thin scrollbar with subtle thumb on hover */
 .secondary-toolbar .toolbar-right::-webkit-scrollbar {
     height: 6px;
@@ -559,7 +642,12 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 /* Button sizing */
 .dock-header .header-left .toolbar-btn,
 .dock-header .header-right .toolbar-btn { padding: 6px 8px; font-size: 13px; }
-.dock-header .header-center button { flex-grow: 1; min-width: 80px; max-width: 140px; font-weight: 700; padding: 8px 10px; }
+.dock-header .header-center > button { flex-grow: 1; min-width: 80px; max-width: 140px; font-weight: 700; padding: 8px 10px; }
+
+/* Buttons that live inside toolbar-dropdowns should not flex-grow */
+.dock-header .header-center .toolbar-btn {
+    flex: 0 0 auto;
+}
 
 /* Editor Keys (top row) - make BACK / SPACE / ENTER fill three equal slots and be touch-friendly */
 .editor-keys-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -1924,6 +2012,14 @@ body #editor.editor-layer {
     color: #ffffff;
     background-color: #000000;
     pointer-events: none;
+}
+
+#editor-highlight .g-line {
+    display: block;
+}
+
+#editor-highlight .g-line.active-line {
+    background: rgba(64, 110, 171, 0.22);
 }
 
 #editor.editor-layer {

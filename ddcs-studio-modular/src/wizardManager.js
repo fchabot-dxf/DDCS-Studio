@@ -10,6 +10,7 @@ import { EdgeWizard } from './wizards/edgeWizard.js';
 import { CommunicationWizard } from './wizards/communicationWizard.js';
 import { WCSWizard } from './wizards/wcsWizard.js';
 import { AlignmentWizard } from './wizards/alignmentWizard.js';
+import { AtcLengthWizard } from './wizards/atcLengthWizard.js';
 import { playClick, playClickReverse } from './sound.js';  // audio helper for click sounds
 import { GcodeViz3D } from './gcodeViz3d.js';
 import { parseGcode } from './gcodeParser.js';
@@ -23,6 +24,7 @@ export class WizardManager {
         this.communicationWizard = new CommunicationWizard();
         this.wcsWizard = new WCSWizard();
         this.alignmentWizard = new AlignmentWizard();
+        this.atcLengthWizard = new AtcLengthWizard();
         this.wizardElement = el('wizard');
         console.debug('WizardManager: constructor - created wizards, wizardElement=', !!this.wizardElement);
         // Defensive: only setup listeners if wizard container is present
@@ -75,7 +77,9 @@ export class WizardManager {
             'm_feed_fast', 'm_feed_slow', 'm_port', 'm_level', 'm_q',
             'al_check_axis', 'al_probe_dir', 'al_animate',
             'al_tolerance', 'al_dist', 'al_retract', 'al_safe_z',
-            'al_feed_fast', 'al_feed_slow', 'al_port', 'al_level', 'al_q'
+            'al_feed_fast', 'al_feed_slow', 'al_port', 'al_level', 'al_q',
+            'atc_block_height', 'atc_safe_z', 'atc_max_dist', 'atc_retract',
+            'atc_q', 'atc_feed_fast', 'atc_feed_slow', 'atc_port', 'atc_level'
         ];
 
         wizInputs.forEach(id => {
@@ -104,7 +108,7 @@ export class WizardManager {
             return;
         }
         
-        if (type === 'probe' || type === 'corner' || type === 'middle' || type === 'edge' || type === 'alignment') {
+        if (type === 'probe' || type === 'corner' || type === 'middle' || type === 'edge' || type === 'alignment' || type === 'atc_length') {
             box.classList.add('large');
         } else {
             box.classList.remove('large');
@@ -115,7 +119,7 @@ export class WizardManager {
         this.wizardElement.classList.add('active');
         
         // Hide all wizard panels
-        ['wiz_comm', 'wiz_wcs', 'wiz_corner', 'wiz_middle', 'wiz_edge', 'wiz_alignment'].forEach(id => {
+        ['wiz_comm', 'wiz_wcs', 'wiz_corner', 'wiz_middle', 'wiz_edge', 'wiz_alignment', 'wiz_atc_length'].forEach(id => {
             const elem = el(id);
             if (elem) elem.style.display = 'none';
         });
@@ -293,6 +297,7 @@ export class WizardManager {
         const wizMiddle = wizVisible('wiz_middle');
         const wizEdge = wizVisible('wiz_edge');
         const wizAlignment = wizVisible('wiz_alignment');
+        const wizAtcLength = wizVisible('wiz_atc_length');
 
         if (wizComm) {
             this.updateCommunicationWizard();
@@ -306,6 +311,8 @@ export class WizardManager {
             this.updateEdgeWizard();
         } else if (wizAlignment) {
             this.updateAlignmentWizard();
+        } else if (wizAtcLength) {
+            this.updateAtcLengthWizard();
         }
     }
 
@@ -449,10 +456,10 @@ export class WizardManager {
             dist: el('c_dist').value,
             retract: el('c_retract').value,
             f_fast: el('c_feed_fast').value,
-            f_slow: el('c_feed_slow').value,
-            port: el('c_port').value,
-            level: el('c_level').value,
-            qStop: el('c_q').value,
+            f_slow: el('c_feed_slow')?.value || '50',
+            qStop: el('c_q')?.value || '1',
+            port: window.ddcsGetSettings().probes.probePin,
+            level: window.ddcsGetSettings().probes.probeLevel,
             safeZ: el('c_safe_z').value,
             travelDist: el('c_travel_dist').value,
             scanDepth: el('c_scan_depth')?.value || '5',
@@ -498,9 +505,9 @@ export class WizardManager {
             clearance: '2',
             f_fast: el('m_feed_fast')?.value || '200',
             f_slow: el('m_feed_slow')?.value || '50',
-            port: el('m_port')?.value || '3',
-            level: el('m_level')?.value || '0',
-            qStop: el('m_q')?.value || '1'
+            qStop: el('m_q')?.value || '1',
+            port: window.ddcsGetSettings().probes.probePin,
+            level: window.ddcsGetSettings().probes.probeLevel
         };
 
         const middleDesc = el('middle_desc');
@@ -646,9 +653,9 @@ export class WizardManager {
             safeZ:      el('al_safe_z')?.value       || '10',
             f_fast:     el('al_feed_fast')?.value    || '200',
             f_slow:     el('al_feed_slow')?.value    || '50',
-            port:       el('al_port')?.value         || '3',
-            level:      el('al_level')?.value        || '0',
-            qStop:      el('al_q')?.value            || '1'
+            qStop:      el('al_q')?.value            || '1',
+            port:       window.ddcsGetSettings().probes.probePin,
+            level:      window.ddcsGetSettings().probes.probeLevel
         };
 
         const gcode = this.alignmentWizard.generate(params);
@@ -687,9 +694,9 @@ export class WizardManager {
             slave: el('p_slave')?.value || '3',
             f_fast: el('p_feed_fast')?.value || '200',
             f_slow: el('p_feed_slow')?.value || '50',
-            port: el('p_port')?.value || '3',
-            level: el('p_level')?.value || '0',
-            qStop: el('p_q')?.value || '1'
+            qStop: el('p_q')?.value || '1',
+            port: window.ddcsGetSettings().probes.probePin,
+            level: window.ddcsGetSettings().probes.probeLevel
         };
 
         console.debug('updateEdgeWizard', params);
@@ -708,6 +715,23 @@ export class WizardManager {
         } else if (window.drawProbeViz) {
             window.drawProbeViz();
         }
+    }
+
+    updateAtcLengthWizard() {
+        const params = {
+            blockHeight: el('atc_block_height')?.value || '50',
+            safeZ: el('atc_safe_z')?.value || '10',
+            maxDist: el('atc_max_dist')?.value || '200',
+            retract: el('atc_retract')?.value || '3',
+            qStop: el('atc_q')?.value || '1',
+            f_fast: el('atc_feed_fast')?.value || '300',
+            f_slow: el('atc_feed_slow')?.value || '50',
+            port: window.ddcsGetSettings().probes.setterPin,
+            level: window.ddcsGetSettings().probes.setterLevel
+        };
+
+        const gcode = this.atcLengthWizard.generate(params);
+        el('wiz_atc_length_code').innerHTML = UIUtils.formatGCode(gcode);
     }
 
     insert() {
@@ -732,6 +756,8 @@ export class WizardManager {
             code = el('wiz_edge_code')?.textContent;
         } else if (isVisible('wiz_alignment')) {
             code = el('wiz_alignment_code')?.textContent;
+        } else if (isVisible('wiz_atc_length')) {
+            code = el('wiz_atc_length_code')?.textContent;
         }
 
         if (code) {
@@ -794,6 +820,7 @@ export class WizardManager {
     _refresh3DStock() {
         if (this._wizViz && window.ddcsGetSettings) {
             try { this._wizViz.setStock(window.ddcsGetSettings().stock); } catch (e) { /* ignore */ }
+            try { this._wizViz.setProbes(window.ddcsGetSettings().probes); } catch (e) { /* ignore */ }
         }
     }
 

@@ -79,26 +79,19 @@ export class UIUtils {
         // 4. AXIS LETTERS (Yellow) - STRICTLY X, Y, Z, A, B.
         // 5. DEFAULT - G0, G1, Numbers, Keywords, Vars -> White.
 
-        return safeCode.replace(
+        const formatLine = (line) => line.replace(
             /(\([^\)]*\)|;[^\n]*)|(\b[Gg]31\b)|([Mm]\d+)|([XYZABxyzab])/g,
-            
             (match, comment, g31, mcode, axis) => {
-                
-                // 1. Comments -> Green
                 if (comment) return `<span class="g-comment">${match}</span>`;
-                
-                // 2. G31 Only -> Blue
-                if (g31)     return `<span style="color:#60a5fa; font-weight:bold;">${match}</span>`;
-
-                // 3. M-Codes -> Red
-                if (mcode)   return `<span style="color:#fca5a5">${match}</span>`; 
-                
-                // 4. Axis Letters -> Yellow
-                if (axis)    return `<span style="color:#facc15">${match}</span>`; 
-
-                // Default -> White
-                return match; 
+                if (g31) return `<span style="color:#60a5fa; font-weight:bold;">${match}</span>`;
+                if (mcode) return `<span style="color:#fca5a5">${match}</span>`;
+                if (axis) return `<span style="color:#facc15">${match}</span>`;
+                return match;
             }
         );
+
+        return safeCode.split(/\r?\n/).map((line, index) =>
+            `<span class="g-line" data-line-index="${index}">${formatLine(line)}</span>`
+        ).join('\n');
     }
 }

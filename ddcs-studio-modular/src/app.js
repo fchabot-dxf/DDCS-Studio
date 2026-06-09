@@ -33,6 +33,15 @@ import './settingsPanel.js';
 // Profile store (one JSON = settings + user variables; pywebview file-I/O ready)
 import './profileStore.js';
 
+// Virtual I/O simulation — browser-only mock of hardware handshakes (ATC, drawbar, etc.)
+// Used by the Studio's G-code simulation/preview engine to animate full macro cycles
+// without a real controller. No network or serial connections — pure JS + setTimeout.
+// See src/virtualIO.js for the truth table and integration API.
+import { resetVirtualIO, setVirtualOutput, getVirtualInput } from './virtualIO.js';
+
+// IO Settings & Diagnostics
+import './ioTab.js';
+
 class DDCSStudio {
     constructor() {
         this.themeManager = new ThemeManager();
@@ -158,6 +167,7 @@ class DDCSStudio {
         window.clearSearch = () => this.dockManager.clear();
         window.insert = (key, text) => this.editorManager.insert(key, text);
         window.backspace = () => this.editorManager.backspace();
+        window.editorManager = this.editorManager;
 
         // Wizard functions
         window.openWiz = (type) => this.wizardManager.open(type);
@@ -170,6 +180,20 @@ class DDCSStudio {
         window.insertWiz = () => this.wizardManager.insert();
         window.togglePreview = () => this.wizardManager.togglePreview();
         window.updateWiz = () => this.wizardManager.update();
+
+        // ----------------------------------------------------------------
+        // Virtual I/O simulation hooks
+        // Integration point for the future G-code simulation/execution engine:
+        // When the engine evaluates a macro output assignment (e.g. MSETDATA
+        // that maps to OUT_SPINDLE_UNCLAMP), call:
+        //   setVirtualOutput('OUT_SPINDLE_UNCLAMP', true);
+        // The truth table in virtualIO.js will simulate the sensor handshake.
+        // On new program / simulation reset, call:
+        //   resetVirtualIO();
+        // ----------------------------------------------------------------
+        window.virtualIO_setOutput  = setVirtualOutput;
+        window.virtualIO_getInput   = getVirtualInput;
+        window.virtualIO_reset      = resetVirtualIO;
 
         // Communication wizard: audible beep preview (Web Audio)
         window.playCommBeepPreview = async (durationMs = 500, cycleMs = 0) => {

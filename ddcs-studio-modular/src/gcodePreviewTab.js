@@ -8,10 +8,13 @@
  */
 import { parseGcode } from './gcodeParser.js';
 import { GcodeViz3D } from './gcodeViz3d.js';
+import { GcodeExecutionEngine } from './engine/index.js';
 
 let gpViz = null;
+let gpEngine = null;
 let gpView = 'editor';
 let gpDebounce = null;
+let gpRunButton = null;
 
 function gpEls() {
     return {
@@ -35,7 +38,7 @@ function gpRenderFromEditor() {
     const parsed = parseGcode(editor.value);
     // Stock + machine envelope from Settings (set before setSegments so the fit includes them)
     const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
-    if (cfg) { gpViz.setStock(cfg.stock); gpViz.setMachine(cfg.machine); }
+    if (cfg) { gpViz.setStock(cfg.stock); gpViz.setMachine(cfg.machine); gpViz.setProbes(cfg.probes); }
     gpViz.setSegments(parsed);
     if (!status) return;
     const s = parsed.stats;
@@ -114,20 +117,72 @@ function gpInit() {
     document.querySelectorAll('#gcodeViz3dContainer .viz3d-views button').forEach((btn) => {
         btn.addEventListener('click', () => { if (gpViz) gpViz.setView(btn.dataset.view); });
     });
-    // Animate (play) toggle — on by default (the viewer plays automatically)
-    const animBtn = document.getElementById('viz3dAnimate');
-    if (animBtn) {
-        animBtn.classList.add('on');
-        animBtn.textContent = '⏸ Stop';
-        animBtn.addEventListener('click', () => {
-            if (!gpViz) return;
-            const on = !animBtn.classList.contains('on');
-            animBtn.classList.toggle('on', on);
-            animBtn.textContent = on ? '⏸ Stop' : '▶ Play';
-            gpViz.setAnimate(on);
+    // Run/stop button for the execution engine
+    const runBtn = document.getElementById('viz3dAnimate');
+    gpRunButton = runBtn;
+    if (runBtn) {
+        runBtn.classList.remove('on');
+        runBtn.textContent = '▶ Run';
+        runBtn.title = 'Run the program through the execution engine';
+        runBtn.addEventListener('click', () => {
+            const code = els.editor ? els.editor.value : '';
+            if (!gpEngine) {
+                const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
+                gpEngine = new GcodeExecutionEngine({
+                    stock: cfg && cfg.stock ? cfg.stock : null,
+                    onLineChange: ({ lineIndex, raw }) => {
+                        if (window.editorManager && typeof window.editorManager.setActiveLine === 'function') {
+                            window.editorManager.setActiveLine(lineIndex);
+                        }
+                        if (els.status) {
+                            els.status.textContent = `Executing line ${lineIndex + 1}/${gpEngine.totalLines}: ${raw.trim()}`;
+                        }
+                    },
+                    onPositionChange: (pos) => {
+                        if (gpViz && typeof gpViz.setToolPosition === 'function') {
+                            gpViz.setToolPosition(pos);
+                        }
+                    },
+                    onStatus: ({ message }) => {
+                        if (els.status) els.status.textContent = message;
+                    },
+                    onFinish: () => {
+                        gpUpdateRunButton(false);
+                        if (window.editorManager && typeof window.editorManager.clearActiveLine === 'function') {
+                            window.editorManager.clearActiveLine();
+                        }
+                    },
+                });
+            }
+
+            if (gpEngine.running) {
+                gpEngine.stop();
+                gpUpdateRunButton(false);
+                return;
+            }
+
+            const validation = gpEngine.verifySyntax(code);
+            if (!validation.valid) {
+                if (els.status) {
+                    els.status.textContent = validation.errors.map((err) => `Ln ${err.lineIndex + 1}: ${err.message}`).join(' | ');
+                }
+                return;
+            }
+
+            // Disable the independent animation loop; engine drives tool position instead
+            if (gpViz) gpViz.setAnimate(false);
+            gpEngine.run(code);
+            gpUpdateRunButton(true);
         });
     }
     gpSyncControls();
+
+    function gpUpdateRunButton(running) {
+        if (!gpRunButton) return;
+        gpRunButton.classList.toggle('on', running);
+        gpRunButton.textContent = running ? '⏸ Stop' : '▶ Run';
+        gpRunButton.title = running ? 'Stop execution' : 'Run the program through the execution engine';
+    }
     // Stock / machine settings changed → redraw if the 3D drawer is open
     window.addEventListener('ddcs:settings-changed', () => {
         gpSyncControls();

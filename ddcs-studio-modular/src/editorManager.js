@@ -9,11 +9,12 @@ import { SNIPPETS } from './snippets.js';
 export class EditorManager {
     constructor() {
         this.editor = el('editor');
-        this.highlight = el('editor-highlight'); // NEW
+        this.highlight = el('editor-highlight');
+        this.activeLineIndex = null;
         this.backTimer = null;
         this.backInterval = null;
 
-        this.setupSync(); // NEW
+        this.setupSync();
         this.setupBackspaceButton();
         this.setupSpacebarButton();
     }
@@ -24,8 +25,9 @@ export class EditorManager {
         const syncText = () => {
             let code = this.editor.value;
             // Critical: Add space if ends in newline to prevent cursor disappearance
-            if (code.endsWith('\n')) code += ' '; 
+            if (code.endsWith('\n')) code += ' ';
             this.highlight.innerHTML = UIUtils.formatGCode(code);
+            this._restoreActiveLine();
         };
 
         const syncScroll = () => {
@@ -177,4 +179,40 @@ export class EditorManager {
         this.editor.value = value;
         this.editor.dispatchEvent(new Event('input'));
     }
+
+    setActiveLine(lineIndex) {
+        if (!this.highlight) return;
+        const previous = this.highlight.querySelector('.g-line.active-line');
+        if (previous) previous.classList.remove('active-line');
+        if (lineIndex == null || lineIndex < 0) {
+            this.activeLineIndex = null;
+            return;
+        }
+        const next = this.highlight.querySelector(`.g-line[data-line-index="${lineIndex}"]`);
+        if (next) next.classList.add('active-line');
+        this.activeLineIndex = lineIndex;
+        this._scrollToLine(lineIndex);
+    }
+
+    clearActiveLine() {
+        this.setActiveLine(null);
+    }
+
+    _restoreActiveLine() {
+        if (this.activeLineIndex == null) return;
+        const next = this.highlight.querySelector(`.g-line[data-line-index="${this.activeLineIndex}"]`);
+        if (next) next.classList.add('active-line');
+    }
+
+    _scrollToLine(index) {
+        if (!this.editor) return;
+        const cs = getComputedStyle(this.editor);
+        let lineHeight = parseFloat(cs.lineHeight);
+        if (Number.isNaN(lineHeight) || lineHeight <= 0) {
+            lineHeight = parseFloat(cs.fontSize) * 1.6 || 22;
+        }
+        const target = Math.max(0, Math.round(index * lineHeight - (this.editor.clientHeight / 2)));
+        this.editor.scrollTop = target;
+    }
 }
+

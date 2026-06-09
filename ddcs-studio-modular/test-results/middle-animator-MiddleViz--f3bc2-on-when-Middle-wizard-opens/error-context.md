@@ -1,0 +1,243 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - button "Back to Loader" [ref=e4] [cursor=pointer]:
+      - img [ref=e5]
+    - generic [ref=e8]: DDCS STUDIO V9.63
+    - generic [ref=e9]:
+      - button "🎨" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: 🎨
+      - button "🔍" [ref=e12] [cursor=pointer]:
+        - generic [ref=e13]: 🔍
+      - button "⚙" [ref=e14] [cursor=pointer]:
+        - generic [ref=e15]: ⚙
+      - button "💾" [ref=e16] [cursor=pointer]:
+        - generic [ref=e17]: 💾
+  - generic [ref=e18]:
+    - generic [ref=e20]:
+      - generic "Left controls" [ref=e21]:
+        - generic [ref=e22]:
+          - button "💬 Comm" [ref=e23] [cursor=pointer]
+          - button "🔧 WCS" [ref=e24] [cursor=pointer]
+      - generic "Center wizards" [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - button "🎯 Probe ▼" [ref=e28] [cursor=pointer]
+            - generic [ref=e29]:
+              - button "📐 Corner" [ref=e30] [cursor=pointer]
+              - button "🎯 Middle" [ref=e31] [cursor=pointer]
+              - button "📏 Edge" [ref=e32] [cursor=pointer]
+              - button "🧭 Align" [ref=e33] [cursor=pointer]
+          - generic [ref=e34]:
+            - button "🔄 ATC ▼" [ref=e35] [cursor=pointer]
+            - generic [ref=e36]:
+              - button "📏 Tool Length" [ref=e37] [cursor=pointer]
+              - button "⚙️ Carousel Align" [ref=e38] [cursor=pointer]
+              - button "🔥 Warm-up" [ref=e39] [cursor=pointer]
+      - generic "Right controls" [ref=e40]:
+        - generic [ref=e41]:
+          - button "COPY" [ref=e42] [cursor=pointer]
+          - button "CLEAR" [ref=e43] [cursor=pointer]
+          - button "EXPORT" [ref=e44] [cursor=pointer]
+    - main [ref=e45]:
+      - generic [ref=e46]:
+        - textbox "( System Ready )" [ref=e47]
+        - complementary [ref=e48]:
+          - generic [ref=e49]:
+            - generic [ref=e50]:
+              - text: Stock
+              - combobox "Stock" [ref=e51]:
+                - option "Boss" [selected]
+                - option "Pocket"
+            - button "▶ Run" [ref=e52] [cursor=pointer]
+          - generic [ref=e53]:
+            - generic [ref=e54]: Probe
+            - generic [ref=e56]: Probe slow
+            - generic [ref=e58]: Retract
+            - generic [ref=e60]: Jog
+            - generic [ref=e62]: Rapid
+          - generic: drag orbit · wheel zoom · right-drag pan
+        - button "Toggle 3D toolpath preview" [ref=e64] [cursor=pointer]:
+          - img [ref=e65]
+    - button "Toggle keyboard dock" [ref=e71] [cursor=pointer]:
+      - generic [ref=e72]: ▲
+  - generic [ref=e74]:
+    - generic [ref=e75]:
+      - generic [ref=e76]: GENERATOR
+      - generic [ref=e77] [cursor=pointer]: ✕
+    - generic [ref=e78]:
+      - generic [ref=e79]: VISUALIZATION
+      - generic [ref=e80]:
+        - generic [ref=e81]: ( Middle | X pos | Active WCS )
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - text: Stock
+            - combobox "Stock" [ref=e85]:
+              - option "Boss" [selected]
+              - option "Pocket"
+          - button "⏸ Stop" [ref=e86] [cursor=pointer]
+      - generic [ref=e88]:
+        - generic [ref=e89]: Probe
+        - generic [ref=e91]: Retract
+        - generic [ref=e93]: Jog
+        - generic [ref=e95]: Travel
+      - generic [ref=e98] [cursor=pointer]:
+        - checkbox "ANIMATE PATHS" [checked] [ref=e99]
+        - generic [ref=e100]: ANIMATE PATHS
+      - generic [ref=e101]: "Pocket (inside feature): Start near the pocket center so there is travel room in both directions on the chosen axis. The macro performs internal wall touches and retract moves to establish center/offset safely. With Probe Both Axes disabled, it still probes two opposite edges on the selected axis and calculates the midpoint on that axis."
+      - generic [ref=e102]: FEATURE CONTEXT
+      - generic [ref=e103]:
+        - generic [ref=e104]:
+          - generic [ref=e105]: FEATURE TYPE
+          - 'combobox "Pocket: probe from center outward to both walls. Boss: probe from outside each side (requires manual repositioning between passes)." [ref=e106]':
+            - option "pocket" [selected]
+            - option "boss"
+        - generic [ref=e107]:
+          - generic [ref=e108]: AXIS
+          - 'combobox "Axis to find center on. Result stored in #53 (primary) or #56 (secondary). Written to #[#70+0] for X or #[#70+1] for Y." [ref=e109]':
+            - option "X" [selected]
+            - option "Y"
+      - generic [ref=e110]:
+        - generic [ref=e111]:
+          - generic [ref=e112]: 1ST AXIS DIR
+          - 'combobox "Probe direction for the first axis (the AXIS selected above). The opposite wall is probed automatically. First edge → #51, second → #52, center → #53." [ref=e113]':
+            - option "pos" [selected]
+            - option "neg"
+        - generic [ref=e114]:
+          - generic [ref=e115]: PROBE BOTH AXES
+          - 'checkbox "Find center on both axes. Probes primary axis first (#51/#52 → #53), then secondary axis (#54/#55 → #56). Both written to WCS." [ref=e116]'
+      - generic [ref=e117]:
+        - generic [ref=e118]: WCS
+        - generic [ref=e119]: WCS TARGET
+        - 'combobox "Target WCS for probe results. Active: reads #578, computes #70=[805+([#578]-1)*5]. Fixed: #70=805..830 directly." [ref=e120]':
+          - option "Active WCS" [selected]
+          - option "G54"
+          - option "G55"
+          - option "G56"
+          - option "G57"
+          - option "G58"
+          - option "G59"
+      - generic [ref=e121]:
+        - generic [ref=e122]: GEOMETRY
+        - generic [ref=e123]:
+          - generic [ref=e124]:
+            - generic [ref=e125]: MAX PROBE
+            - 'textbox "Max probe travel distance (mm). Stored as #1. Used as #7=[0-#1] (neg) or #8=#1 (pos) in G31." [ref=e126]': "500"
+          - generic [ref=e127]:
+            - generic [ref=e128]: RETRACT
+            - 'textbox "Retract between fast and slow probe passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)." [ref=e129]': "2"
+          - generic [ref=e130]:
+            - generic [ref=e131]: SAFE Z
+            - 'textbox "Z retract height between probing moves (mm). Stored as #17. Used as G0 Z#17." [ref=e132]': "10"
+      - generic [ref=e133]:
+        - generic [ref=e134]: FEED RATES
+        - generic [ref=e135]:
+          - generic [ref=e136]:
+            - generic [ref=e137]: FAST FEED
+            - 'textbox "Fast probe feedrate (mm/min). Stored as #3. Used in first G31 pass." [ref=e138]': "200"
+          - generic [ref=e139]:
+            - generic [ref=e140]: SLOW FEED
+            - 'textbox "Slow probe feedrate (mm/min). Stored as #4. Used in second G31 pass after retract." [ref=e141]': "50"
+      - generic [ref=e142]:
+        - generic [ref=e143]: ADVANCED
+        - generic [ref=e144]:
+          - generic [ref=e145]:
+            - generic [ref=e146]: INPUT PORT (P)
+            - 'textbox "Probe input port number. Stored as #5. Used as P parameter in G31." [ref=e147]': "3"
+          - generic [ref=e148]:
+            - generic [ref=e149]: LEVEL (L)
+            - combobox "Probe trigger level. L0=active low (NPN). L1=active high (PNP). L parameter in G31." [ref=e150]:
+              - option "Low (0)" [selected]
+              - option "High (1)"
+          - generic [ref=e151]:
+            - generic [ref=e152]: STOP (Q)
+            - combobox "Stop mode on trigger. Q1=immediate. Q0=decelerate. Q parameter in G31." [ref=e153]:
+              - option "Immediate (Q1)" [selected]
+              - option "Decel (Q0)"
+      - generic [ref=e154]:
+        - generic [ref=e155]: OPTIONS
+        - generic [ref=e156]:
+          - generic "Dual gantry only — writes A machine position to WCS slave offset. Disable if A is a rotary axis." [ref=e158]:
+            - checkbox "Sync A Axis (Dual Gantry)" [checked] [ref=e159]
+            - text: Sync A Axis (Dual Gantry)
+          - generic [ref=e160]:
+            - generic [ref=e161]: SLAVE
+            - combobox "WCS offset index for slave axis. A=offset 3 (#[#70+3]), B=offset 4 (#[#70+4])." [ref=e162]:
+              - option "A" [selected]
+              - option "B"
+      - generic [ref=e163]:
+        - generic [ref=e164]: CODE PREVIEW (DDCS M350 COMPLIANT)
+        - generic [ref=e165]:
+          - generic [ref=e166]: ( Middle | X pos | Active WCS )
+          - generic [ref=e167]: ( DDCS M350 - Two-pass probe )
+          - generic [ref=e168]: "( First: X pos, Second: X neg )"
+          - generic [ref=e169]: "( Distance: 500mm | Retract: 2mm | Fast: 200 | Slow: 50 )"
+          - generic [ref=e170]: ( Motion Variables )
+          - generic [ref=e171]: "#1=500 ( Max probe distance )"
+          - generic [ref=e172]: "#2=2 ( Retract distance )"
+          - generic [ref=e173]: "#3=200 ( Fast feedrate )"
+          - generic [ref=e174]: "#4=50 ( Slow feedrate )"
+          - generic [ref=e175]: "#5=3 ( Probe port )"
+          - generic [ref=e176]: ( Result storage )
+          - generic [ref=e177]: "#51=0 ( Primary axis edge 1 )"
+          - generic [ref=e178]: "#52=0 ( Primary axis edge 2 )"
+          - generic [ref=e179]: "#53=0 ( Primary axis center )"
+          - generic [ref=e180]: "#54=0 ( Secondary axis edge 1 )"
+          - generic [ref=e181]: "#55=0 ( Secondary axis edge 2 )"
+          - generic [ref=e182]: "#56=0 ( Secondary axis center )"
+          - generic [ref=e183]: ( Pre-calculated motion values )
+          - generic [ref=e184]: "#7=[0-#1] ( Negative max probe )"
+          - generic [ref=e185]: "#8=#1 ( Positive max probe )"
+          - generic [ref=e186]: "#9=[0-#2] ( Negative retract )"
+          - generic [ref=e187]: "#10=#2 ( Positive retract )"
+          - generic [ref=e188]: "#17=10 ( Safe Z distance )"
+          - generic [ref=e189]: ( Read Active WCS )
+          - generic [ref=e190]: "#71=#578 ( Active WCS index: 1=G54 2=G55 etc )"
+          - generic [ref=e191]: "#72=[#71-1] ( Zero-based index )"
+          - generic [ref=e192]: "#70=[805+[#72*5]] ( Base WCS address )"
+          - generic [ref=e193]: ( Confirm Start )
+          - generic [ref=e194]: "#1505=1 ( Press Enter to probe - ESC=cancel )"
+          - text: "IF #1505==0 GOTO2"
+          - generic [ref=e195]: G91 ( Incremental mode )
+          - generic [ref=e196]: "( === POCKET: Probe from center toward each wall === )"
+          - generic [ref=e197]: ( Probe pos X wall )
+          - generic [ref=e198]: "#1905=0 ( Stop mode: decelerate )"
+          - generic [ref=e199]: "#1915=2 ( Limit protect: positive )"
+          - generic [ref=e200]: G31 X#8 F#3 P#5 L0 Q1 ( Fast probe )
+          - text: "IF #1920!=2 GOTO1"
+          - generic [ref=e201]: G0 X#9 ( Retract )
+          - generic [ref=e202]: G31 X#8 F#4 P#5 L0 Q1 ( Slow probe )
+          - text: "IF #1920!=2 GOTO1"
+          - generic [ref=e203]: "#51=#1925 ( Save edge )"
+          - generic [ref=e204]: G0 X#9 ( Retract from wall )
+          - generic [ref=e205]: ( Probe neg X wall )
+          - generic [ref=e206]: "#1905=0 ( Stop mode: decelerate )"
+          - generic [ref=e207]: "#1915=1 ( Limit protect: negative )"
+          - generic [ref=e208]: G31 X#7 F#3 P#5 L0 Q1 ( Fast probe )
+          - text: "IF #1920!=2 GOTO1"
+          - generic [ref=e209]: G0 X#10 ( Retract )
+          - generic [ref=e210]: G31 X#7 F#4 P#5 L0 Q1 ( Slow probe )
+          - text: "IF #1920!=2 GOTO1"
+          - generic [ref=e211]: "#52=#1925 ( Save edge )"
+          - generic [ref=e212]: G0 X#10 ( Retract from wall )
+          - generic [ref=e213]: ( Calculate Center )
+          - generic [ref=e214]: "#53=[#51+#52]/2 ( Average of two edges )"
+          - generic [ref=e215]: ( Final retract )
+          - generic [ref=e216]: G0 Z#17 ( Retract to safe Z )
+          - generic [ref=e217]: ( Write X to WCS )
+          - generic [ref=e218]: "#[#70+0]=#53 ( Set Active WCS X to center )"
+          - generic [ref=e219]: G90 ( Back to absolute )
+          - generic [ref=e220]: "#1505=-5000 ( Center found at #53 )"
+          - text: GOTO2
+          - text: N1
+          - generic [ref=e221]: G91 G0 Z#17 ( Safe Z on failure )
+          - text: G90
+          - generic [ref=e222]: "#1505=1 ( Probe failed - no contact )"
+          - text: N2
+          - generic [ref=e223]: M30
+    - generic [ref=e224]:
+      - button "CANCEL" [ref=e225] [cursor=pointer]
+      - button "INSERT" [ref=e226] [cursor=pointer]
+```

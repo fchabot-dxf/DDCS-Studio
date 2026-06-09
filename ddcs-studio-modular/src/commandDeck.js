@@ -309,12 +309,86 @@ export class CommandDeck {
         if (centerTarget) {
             centerTarget.innerHTML = `
                 <div style="display:flex; gap:6px; width:auto; align-items:center;">
-                    <button class="toolbar-btn wizard-btn" onclick="openCornerWiz && openCornerWiz()">📐 Corner</button>
-                    <button class="toolbar-btn wizard-btn" onclick="openMiddleWiz && openMiddleWiz()">🎯 Middle</button>
-                    <button class="toolbar-btn wizard-btn" onclick="openEdgeWiz && openEdgeWiz()">📏 Edge</button>
-                    <button class="toolbar-btn wizard-btn" onclick="openAlignmentWiz && openAlignmentWiz()">🧭 Align</button>
+                    <div class="toolbar-dropdown">
+                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;">🎯 Probe ▼</button>
+                        <div class="toolbar-dropdown-content">
+                            <button onclick="openCornerWiz && openCornerWiz()">📐 Corner</button>
+                            <button onclick="openMiddleWiz && openMiddleWiz()">🎯 Middle</button>
+                            <button onclick="openEdgeWiz && openEdgeWiz()">📏 Edge</button>
+                            <button onclick="openAlignmentWiz && openAlignmentWiz()">🧭 Align</button>
+                        </div>
+                    </div>
+                    
+                    <div class="toolbar-dropdown">
+                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;">🔄 ATC ▼</button>
+                        <div class="toolbar-dropdown-content">
+                            <button onclick="openWiz && openWiz('atc_length')">📏 Tool Length</button>
+                            <button onclick="alert('Carousel Align Wizard coming soon!')">⚙️ Carousel Align</button>
+                            <button onclick="alert('Warm-up Wizard coming soon!')">🔥 Warm-up</button>
+                        </div>
+                    </div>
+
+                    <!-- Comm and WCS buttons are provided in the left header; avoid duplicates here -->
                 </div>
             `;
+            
+            // Add click-to-toggle support for mobile/touch
+            centerTarget.querySelectorAll('.toolbar-dropdown > button').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const parent = btn.parentElement;
+                    // close all others
+                    centerTarget.querySelectorAll('.toolbar-dropdown').forEach(d => {
+                        if (d !== parent) {
+                            d.classList.remove('active');
+                            const cc = d.querySelector('.toolbar-dropdown-content');
+                            if (cc) {
+                                cc.style.position = '';
+                                cc.style.left = '';
+                                cc.style.top = '';
+                                cc.style.minWidth = '';
+                            }
+                        }
+                    });
+
+                    const content = parent.querySelector('.toolbar-dropdown-content');
+                    const willOpen = !parent.classList.contains('active');
+                    parent.classList.toggle('active');
+
+                    // Position dropdown using fixed positioning so it won't be clipped
+                    if (content && willOpen) {
+                        try {
+                            const rect = btn.getBoundingClientRect();
+                            content.style.position = 'fixed';
+                            content.style.left = `${Math.max(6, Math.round(rect.left))}px`;
+                            content.style.top = `${Math.round(rect.bottom + 6)}px`;
+                            // Use the button width as the dropdown width for a compact vertical list
+                            content.style.minWidth = `${Math.max(btn.offsetWidth, 0)}px`;
+                        } catch (err) {
+                            // fallback: leave it absolute
+                            content.style.position = '';
+                        }
+                    } else if (content) {
+                        content.style.position = '';
+                        content.style.left = '';
+                        content.style.top = '';
+                        content.style.minWidth = '';
+                    }
+                });
+            });
+            // close dropdowns on outside click and clear inline positioning
+            document.addEventListener('click', () => {
+                centerTarget.querySelectorAll('.toolbar-dropdown').forEach(d => {
+                    d.classList.remove('active');
+                    const cc = d.querySelector('.toolbar-dropdown-content');
+                    if (cc) {
+                        cc.style.position = '';
+                        cc.style.left = '';
+                        cc.style.top = '';
+                        cc.style.minWidth = '';
+                    }
+                });
+            });
         }
 
         const rightTarget = document.querySelector('.dock-header .header-right');
