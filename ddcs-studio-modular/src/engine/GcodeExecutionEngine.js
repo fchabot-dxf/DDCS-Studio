@@ -7,7 +7,7 @@
  * handshake simulation and probe collision detection.
  */
 
-import { resetVirtualIO, setVirtualOutput, triggerProbeCollision } from '../virtualIO.js';
+import { resetVirtualIO, setVirtualOutput, getVirtualInput, triggerProbeCollision, resolveVirtualPin } from '../virtualIO.js';
 
 const MSETDATA_OUTPUT_MAP = {
     // Placeholder mappings for common DDCS macro output codes.
@@ -440,13 +440,49 @@ export class GcodeExecutionEngine {
 
         const wm = {};
         const gcodes = [];
+        const mcodes = [];
         for (const word of words) {
             if (word.letter === 'G') {
                 const value = Number.parseFloat(word.value);
                 if (Number.isFinite(value)) gcodes.push(value);
+            } else if (word.letter === 'M') {
+                const value = Number.parseFloat(word.value);
+                if (Number.isFinite(value)) mcodes.push(value);
             } else if (word.letter !== 'N') {
                 wm[word.letter] = this._evaluateExpression(word.value);
             }
+        }
+
+        // --- Custom I/O M-Codes ---
+        let waiting = false;
+        for (const m of mcodes) {
+            if (m === 10 || m === 11) {
+                // Output control
+                if (wm.P != null) {
+                    const pinName = resolveVirtualPin(wm.P, 'OUT');
+                    setVirtualOutput(pinName, m === 10);
+                    this._setStatus(`M${m} → ${pinName} = ${m === 10 ? 'ON' : 'OFF'}`, true);
+                }
+            } else if (m === 31 || m === 33) {
+                // Input polling
+                if (wm.P != null) {
+                    const pinName = resolveVirtualPin(wm.P, 'IN');
+                    const targetState = m === 31; // M31 = wait for ON, M33 = wait for OFF
+                    const currentState = getVirtualInput(pinName);
+                    
+                    if (currentState !== targetState) {
+                        this._setStatus(`M${m} waiting for ${pinName} to be ${targetState ? 'ON' : 'OFF'}...`, true);
+                        waiting = true;
+                    } else {
+                        this._setStatus(`M${m} ${pinName} is ${targetState ? 'ON' : 'OFF'} (cleared)`, true);
+                    }
+                }
+            }
+        }
+        
+        // If we're waiting on an input, do NOT advance IP and return immediately to pause execution
+        if (waiting) {
+            return false;
         }
 
         for (const g of gcodes) {

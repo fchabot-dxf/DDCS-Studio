@@ -56,6 +56,33 @@ export const ioState = {
 };
 
 // ---------------------------------------------------------------------------
+// Hardware Pin Mapping
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps raw physical pin numbers (e.g. from M10 P4 or M31 P5) to the semantic
+ * virtual I/O names used in the truth table.
+ */
+export const HARDWARE_PIN_MAP = {
+    OUT_4: 'OUT_SPINDLE_UNCLAMP',
+    OUT_5: 'OUT_SPINDLE_CLAMP',
+    IN_4: 'IN_PROBE',          // Standard probe input
+    IN_5: 'IN_DRAWBAR_CLOSED', // Clamp sensor (Wizard default)
+    IN_6: 'IN_DRAWBAR_OPEN',   // Unclamp sensor
+};
+
+/**
+ * Helper to resolve a raw pin number and mode to a virtual pin name.
+ * @param {number} port - The P argument from M-codes
+ * @param {'IN'|'OUT'} mode - Whether this is an input or output port
+ * @returns {string} The semantic pin name, or a fallback (e.g. "OUT_99")
+ */
+export function resolveVirtualPin(port, mode) {
+    const key = `${mode}_${port}`;
+    return HARDWARE_PIN_MAP[key] || key;
+}
+
+// ---------------------------------------------------------------------------
 // Truth Table
 // ---------------------------------------------------------------------------
 
@@ -83,6 +110,20 @@ const M3K_TRUTH_TABLE = {
         delayMs: 450,            // [HYPOTHESIS] pneumatic travel time ~450 ms
         setState: true,
         description: 'Spindle unclamp solenoid → drawbar-open proximity sensor',
+        sideEffects: [
+            { pin: 'IN_DRAWBAR_CLOSED', state: false },
+        ],
+    },
+
+    /** Unclamp solenoid turns off (single acting) → drawbar closed sensor confirms */
+    OUT_SPINDLE_UNCLAMP_OFF: {
+        targetInput: 'IN_DRAWBAR_CLOSED',
+        delayMs: 400,            // [HYPOTHESIS] pneumatic travel time
+        setState: true,
+        description: 'Spindle unclamp solenoid OFF → drawbar-closed proximity sensor',
+        sideEffects: [
+            { pin: 'IN_DRAWBAR_OPEN', state: false },
+        ],
     },
 
     /** Clamp solenoid fires → drawbar closed sensor confirms */
@@ -173,9 +214,7 @@ export function setVirtualOutput(pin, value) {
         console.log(`[VIRTUAL IO] Output ${pin}: ${prev ?? 'undefined'} → ${value}`);
     }
 
-    if (value === true) {
-        triggerVirtualHandshake(pin);
-    }
+    triggerVirtualHandshake(pin, value);
 }
 
 /**
@@ -215,27 +254,28 @@ export function injectVirtualInput(pin, state) {
  *      can unblock any wait loops that are watching for this input.
  *
  * @param {string} outputPin - The output pin that just changed to true
+ * @param {boolean} state - The new state of the output pin
  */
-export function triggerVirtualHandshake(outputPin) {
-    const rule = M3K_TRUTH_TABLE[outputPin];
+export function triggerVirtualHandshake(outputPin, state = true) {
+    // Check for a rule specific to the state (e.g., 'OUT_SPINDLE_UNCLAMP_OFF')
+    const stateRuleKey = `${outputPin}_${state ? 'ON' : 'OFF'}`;
+    const rule = M3K_TRUTH_TABLE[stateRuleKey] || (state === true ? M3K_TRUTH_TABLE[outputPin] : null);
+
     if (!rule) {
-        // No simulation rule — this output has no modelled response yet.
-        console.debug(`[VIRTUAL IO] No truth-table rule for output ${outputPin} — no handshake simulated.`);
+        // No simulation rule for this transition.
         return;
     }
 
     console.log(
-        `[VIRTUAL IO] Output ${outputPin} asserted. ` +
+        `[VIRTUAL IO] Output ${outputPin} (${state ? 'ON' : 'OFF'}). ` +
         `Simulating ${rule.description} with ${rule.delayMs} ms delay…`
     );
 
     setTimeout(() => {
-        // Set the primary responding input
         ioState.inputs.set(rule.targetInput, rule.setState);
         console.log(`[VIRTUAL IO] Input ${rule.targetInput} → ${rule.setState} (handshake complete)`);
         _dispatchIoChange(rule.targetInput, rule.setState);
 
-        // Apply any declared side-effects (e.g. clamp also de-asserts open sensor)
         if (rule.sideEffects) {
             for (const fx of rule.sideEffects) {
                 ioState.inputs.set(fx.pin, fx.state);

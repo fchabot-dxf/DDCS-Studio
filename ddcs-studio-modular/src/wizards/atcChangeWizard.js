@@ -45,15 +45,15 @@ export class AtcChangeWizard {
 
         gcode += `( Release Tool )\n`;
         gcode += line([M(10), P('#4')], 'Drawbar Release ON') + '\n';
-        gcode += line([M(33), P('#5')], 'Wait for Clamp Sensor OFF (Tool Released)') + '\n\n';
+        gcode += line([M(33), P('#5')], 'Wait for Clamp Sensor OFF - Tool Released') + '\n\n';
 
         gcode += `( Wait for Operator )\n`;
         gcode += line([set('#1505', '1')], 'Swap Tool. Press Enter to Clamp') + '\n';
         gcode += ifGoto('#1505', '==', '0', 999) + '\n\n';
 
         gcode += `( Clamp Tool )\n`;
-        gcode += line([M(11), P('#4')], 'Drawbar Release OFF (Clamp)') + '\n';
-        gcode += line([M(31), P('#5')], 'Wait for Clamp Sensor ON (Tool Secured)') + '\n\n';
+        gcode += line([M(11), P('#4')], 'Drawbar Release OFF - Clamp') + '\n';
+        gcode += line([M(31), P('#5')], 'Wait for Clamp Sensor ON - Tool Secured') + '\n\n';
 
         gcode += `( Complete )\n`;
         gcode += line([set('#1505', '-5000')], 'Tool Swap Complete!') + '\n\n';
