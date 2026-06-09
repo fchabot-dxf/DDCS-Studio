@@ -75,6 +75,7 @@ export class GcodeViz3D {
         this._animPts = [];
         this._animLen = 0;
 
+        this._setupJogPendant();
         this._initStaticScene();
         this._initCube();
         this._bindControls();
@@ -180,7 +181,7 @@ export class GcodeViz3D {
         return true;
     }
 
-    // A draggable start marker for one pass: ruby probe tip + X/Y/Z translate gizmo
+    // A draggable start marker for one pass: ruby probe tip
     _makeMarker(pass) {
         const THREE = this.THREE;
         const grp = new THREE.Group();
@@ -191,9 +192,6 @@ export class GcodeViz3D {
         ruby.renderOrder = 11;
         grp.add(ruby);
         grp.add(this._makeNumberSprite(pass + 1)); // execution order (1-based)
-        grp.add(this._makeAxisArrow(new THREE.Vector3(1, 0, 0), 0xff4d4d, 'x', pass));
-        grp.add(this._makeAxisArrow(new THREE.Vector3(0, 1, 0), 0x4dff7a, 'y', pass));
-        grp.add(this._makeAxisArrow(new THREE.Vector3(0, 0, 1), 0x4da6ff, 'z', pass));
         return grp;
     }
 
@@ -218,20 +216,65 @@ export class GcodeViz3D {
         return sp;
     }
 
-    _makeAxisArrow(dir, color, axisName, pass) {
-        const THREE = this.THREE;
-        const len = 26, headLen = 7, shaftR = 1.0, headR = 2.8;
-        const g = new THREE.Group();
-        const mat = new THREE.MeshBasicMaterial({ color, depthTest: false });
-        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(shaftR, shaftR, len - headLen, 10), mat);
-        shaft.position.y = (len - headLen) / 2;
-        const head = new THREE.Mesh(new THREE.ConeGeometry(headR, headLen, 12), mat);
-        head.position.y = len - headLen / 2;
-        g.add(shaft); g.add(head);
-        g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); // orient +Y → dir
-        g.traverse((o) => { o.renderOrder = 12; if (o.userData) { o.userData.gizmoAxis = axisName; o.userData.gizmoPass = pass; } });
-        this._axisMat[pass + ':' + axisName] = { mat, base: color };
-        return g;
+    _setupJogPendant() {
+        const div = document.createElement('div');
+        div.className = 'viz3d-jog-pendant';
+        div.style.cssText = 'position: absolute; bottom: 16px; right: 16px; background: rgba(18, 18, 22, 0.85); border: 1px solid #333; border-radius: 8px; padding: 12px; color: #fff; z-index: 100; font-size: 11px; display: none; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.5); user-select: none;';
+        div.innerHTML = `
+            <div style="text-align: center; margin-bottom: 8px; font-weight: bold; color: #aaa; letter-spacing: 1px;">START POSITION</div>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <div style="display: grid; grid-template-columns: 36px 36px 36px; gap: 4px;">
+                    <div></div>
+                    <button class="toolbar-btn" data-axis="y" data-dir="1" style="width:100%; height:32px; padding:0; font-weight:bold;">Y+</button>
+                    <div></div>
+                    <button class="toolbar-btn" data-axis="x" data-dir="-1" style="width:100%; height:32px; padding:0; font-weight:bold;">X-</button>
+                    <button class="toolbar-btn" data-axis="xy" data-dir="0" style="width:100%; height:32px; padding:0; background:#2b3340; border-color:#555;" title="Reset X/Y to 0">0</button>
+                    <button class="toolbar-btn" data-axis="x" data-dir="1" style="width:100%; height:32px; padding:0; font-weight:bold;">X+</button>
+                    <div></div>
+                    <button class="toolbar-btn" data-axis="y" data-dir="-1" style="width:100%; height:32px; padding:0; font-weight:bold;">Y-</button>
+                    <div></div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px; border-left: 1px solid #444; padding-left: 12px;">
+                    <button class="toolbar-btn" data-axis="z" data-dir="1" style="width:36px; height:32px; padding:0; font-weight:bold;">Z+</button>
+                    <button class="toolbar-btn" data-axis="z" data-dir="0" style="width:36px; height:32px; padding:0; background:#2b3340; border-color:#555;" title="Reset Z to 0">0</button>
+                    <button class="toolbar-btn" data-axis="z" data-dir="-1" style="width:36px; height:32px; padding:0; font-weight:bold;">Z-</button>
+                </div>
+            </div>
+            <div style="margin-top: 12px; display: flex; justify-content: center; gap: 8px; align-items: center; border-top: 1px solid #333; padding-top: 8px;">
+                <span style="color:#888;">Step (mm):</span>
+                <label style="cursor:pointer;"><input type="radio" name="jogStep" value="0.1"> 0.1</label>
+                <label style="cursor:pointer;"><input type="radio" name="jogStep" value="1" checked> 1</label>
+                <label style="cursor:pointer;"><input type="radio" name="jogStep" value="10"> 10</label>
+                <label style="cursor:pointer;"><input type="radio" name="jogStep" value="100"> 100</label>
+            </div>
+        `;
+        this.container.appendChild(div);
+        this.jogPendant = div;
+        
+        // Prevent touches on the jog panel from rotating the view
+        div.addEventListener('pointerdown', e => e.stopPropagation());
+        
+        div.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const axis = btn.getAttribute('data-axis');
+                const dir = parseFloat(btn.getAttribute('data-dir'));
+                const stepInput = div.querySelector('input[type="radio"]:checked');
+                const step = stepInput ? parseFloat(stepInput.value) : 1;
+                
+                if (this.starts && this.starts.length > 0) {
+                    const s = this.starts[0]; // Jog the primary start position
+                    if (axis === 'x') s.x += dir * step;
+                    if (axis === 'y') s.y += dir * step;
+                    if (axis === 'z') s.z += dir * step;
+                    if (axis === 'xy' && dir === 0) { s.x = 0; s.y = 0; }
+                    if (axis === 'z' && dir === 0) { s.z = 0; }
+                    
+                    this._positionMarkers();
+                    this.render();
+                    if (typeof this.onStartChange === 'function') this.onStartChange(this.starts);
+                }
+            });
+        });
     }
 
     // Recreate markers only when the pass count changes
@@ -239,7 +282,6 @@ export class GcodeViz3D {
         if (this.spindleMarkers.length === this._passCount) return;
         for (const m of this.spindleMarkers) this.scene.remove(m);
         this.spindleMarkers = [];
-        this._axisMat = {};
         this._hoverKey = undefined;
         for (let p = 0; p < this._passCount; p++) {
             const m = this._makeMarker(p);
@@ -269,22 +311,9 @@ export class GcodeViz3D {
                 : (2 * this.camera.position.distanceTo(m.position) * tanHalf) / H;
             m.scale.setScalar(Math.max(1e-4, (targetPx * worldPerPx) / base));
         }
-    }
-
-    // Highlight one axis handle (hover/active) — pass (null, null) to clear
-    _setHighlight(pass, axis) {
-        const key = (pass != null && axis) ? pass + ':' + axis : null;
-        if (this._hoverKey === key) return;
-        this._hoverKey = key;
-        const HL = 0xffe24a; // amber highlight
-        for (const k in this._axisMat) {
-            const h = this._axisMat[k];
-            if (h) h.mat.color.setHex(k === key ? HL : h.base);
+        if (this.jogPendant) {
+            this.jogPendant.style.display = (this.starts && this.starts.length > 0) ? 'block' : 'none';
         }
-        if (this.renderer && this.renderer.domElement) {
-            this.renderer.domElement.style.cursor = key ? 'grab' : 'default';
-        }
-        this.render();
     }
 
     // Set a pass's start programmatically (pass defaults to 0)
@@ -348,6 +377,15 @@ export class GcodeViz3D {
         }
     }
 
+    // Called by execution engine to update tool position during execution
+    setToolPosition(pos) {
+        if (!pos || (!Number.isFinite(pos.x) && !Number.isFinite(pos.y) && !Number.isFinite(pos.z))) return;
+        this._ensureAnimTool();
+        this._animTool.visible = true;
+        this._animTool.position.set(pos.x || 0, pos.y || 0, pos.z || 0);
+        this.render();
+    }
+
     _animTick() {
         if (!this._animOn || !this.active) { this._animRaf = null; return; }
         const pts = this._animPts;
@@ -406,26 +444,13 @@ export class GcodeViz3D {
         );
     }
 
-    // Returns { pass, axis } of the gizmo handle under the pointer, or null
+    // Disabled gizmo picking
     _pickGizmo(e) {
-        if (!this.spindleMarkers.length) return null;
-        this.raycaster.setFromCamera(this._ndc(e), this.camera);
-        const hits = this.raycaster.intersectObjects(this.spindleMarkers, true);
-        for (const h of hits) {
-            let o = h.object;
-            while (o) {
-                if (o.userData && o.userData.gizmoAxis) return { pass: o.userData.gizmoPass | 0, axis: o.userData.gizmoAxis };
-                o = o.parent;
-            }
-        }
         return null;
     }
 
     // t along axisDir (unit) from lineOrigin to the point closest to the pointer ray
     _closestAxisT(ray, lineOrigin, axisDir) {
-        const w0 = lineOrigin.clone().sub(ray.origin);
-        const b = axisDir.dot(ray.direction);
-        const c = ray.direction.dot(ray.direction);
         const d = axisDir.dot(w0);
         const e = ray.direction.dot(w0);
         const denom = c - b * b; // a = axisDir·axisDir = 1
@@ -497,25 +522,7 @@ export class GcodeViz3D {
                 const type = s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed');
                 const start = cur;
                 let end = { x: start.x + dx, y: start.y + dy, z: start.z + dz };
-                if (type === 'probe') {
-                    let hit = false;
-                    if (box) {
-                        const Aw = { x: start.x + mk.x, y: start.y + mk.y, z: start.z + mk.z };
-                        const Bw = { x: end.x + mk.x, y: end.y + mk.y, z: end.z + mk.z };
-                        const r = this._boxRange(Aw, Bw, box.min, box.max);
-                        if (r.hit) {
-                            let tt = null;
-                            if (pocket) { if (r.tEnter <= 1e-6 && r.tExit > 1e-6 && r.tExit < 1 - 1e-6) tt = r.tExit; }
-                            else { if (r.tEnter > 1e-6 && r.tEnter < 1 - 1e-6) tt = r.tEnter; }
-                            if (tt != null) { end = { x: start.x + dx * tt, y: start.y + dy * tt, z: start.z + dz * tt }; hit = true; }
-                        }
-                    }
-                    if (!hit) { // no contact → cap so the path can't run away
-                        const len = Math.hypot(dx, dy, dz) || 1;
-                        const f = Math.min(1, CAP / len);
-                        end = { x: start.x + dx * f, y: start.y + dy * f, z: start.z + dz * f };
-                    }
-                }
+                // (Removed clamping: Probe moves now show the full programmed travel distance)
                 const ax = start.x + mk.x, ay = start.y + mk.y, az = start.z + mk.z;
                 const bx = end.x + mk.x, by = end.y + mk.y, bz = end.z + mk.z;
                 grow(ax, ay, az); grow(bx, by, bz);
@@ -697,6 +704,29 @@ export class GcodeViz3D {
         }
     }
 
+    // Tool Setter Block
+    setProbes(probes) {
+        const THREE = this.THREE;
+        if (this.setterMesh) { this.scene.remove(this.setterMesh); this.setterMesh.geometry.dispose(); this.setterMesh.material.dispose(); this.setterMesh = null; }
+        if (this.setterEdges) { this.scene.remove(this.setterEdges); this.setterEdges.geometry.dispose(); this.setterEdges.material.dispose(); this.setterEdges = null; }
+        if (probes && probes.setterW > 0 && probes.setterH > 0) {
+            const fillCol = 0xff00ff; // Magenta
+            const edgeCol = 0xff66ff;
+            const mat = new THREE.MeshBasicMaterial({ color: fillCol, transparent: true, opacity: 0.25, depthWrite: false });
+            // Cylinder: radiusTop, radiusBottom, height, radialSegments
+            // Rotate it so it points up along Z axis
+            const geo = new THREE.CylinderGeometry(probes.setterW / 2, probes.setterW / 2, probes.setterH, 16);
+            geo.rotateX(Math.PI / 2); // align with Z axis
+            const mesh = new THREE.Mesh(geo, mat);
+            // Center is at X, Y, Z - H/2 (since setterZ is the top surface)
+            mesh.position.set(probes.setterX, probes.setterY, probes.setterZ - (probes.setterH / 2));
+            this.setterMesh = mesh; this.scene.add(mesh);
+            const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: edgeCol, transparent: true, opacity: 0.6 }));
+            edges.position.copy(mesh.position);
+            this.setterEdges = edges; this.scene.add(edges);
+        }
+    }
+
     // Wireframe machine envelope — origin = program-zero offset from the envelope's min corner
     setMachine(machine) {
         const THREE = this.THREE;
@@ -824,6 +854,9 @@ export class GcodeViz3D {
             if (e) pointers.delete(e.pointerId);
             if (mode === 'pinch' && pointers.size < 2) mode = null;
             if (pointers.size > 0) return;   // other fingers still down
+            if (mode === 'gizmo' && typeof this.onStartChange === 'function') {
+                this.onStartChange(this.starts);
+            }
             mode = null;
             try { if (this._pid != null) el.releasePointerCapture(this._pid); } catch (_) {}
             this._pid = null;
