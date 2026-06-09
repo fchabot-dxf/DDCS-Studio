@@ -270,6 +270,7 @@ export class GcodeViz3D {
                     if (axis === 'z' && dir === 0) { s.z = 0; }
                     
                     this._positionMarkers();
+                    this._rebuild();
                     this.render();
                     if (typeof this.onStartChange === 'function') this.onStartChange(this.starts);
                 }
