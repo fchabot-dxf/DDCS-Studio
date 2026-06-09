@@ -522,7 +522,20 @@ export class GcodeViz3D {
                 const type = s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed');
                 const start = cur;
                 let end = { x: start.x + dx, y: start.y + dy, z: start.z + dz };
-                // (Removed clamping: Probe moves now show the full programmed travel distance)
+
+                // Probe collision with stock bounds
+                if (type === 'probe' && box) {
+                    const Aw = { x: start.x + mk.x, y: start.y + mk.y, z: start.z + mk.z };
+                    const Bw = { x: end.x + mk.x, y: end.y + mk.y, z: end.z + mk.z };
+                    const r = this._boxRange(Aw, Bw, box.min, box.max);
+                    if (r.hit) {
+                        let tt = null;
+                        if (pocket) { if (r.tEnter <= 1e-6 && r.tExit > 1e-6 && r.tExit < 1 - 1e-6) tt = r.tExit; }
+                        else { if (r.tEnter > 1e-6 && r.tEnter < 1 - 1e-6) tt = r.tEnter; }
+                        if (tt != null) { end = { x: start.x + dx * tt, y: start.y + dy * tt, z: start.z + dz * tt }; }
+                    }
+                }
+
                 const ax = start.x + mk.x, ay = start.y + mk.y, az = start.z + mk.z;
                 const bx = end.x + mk.x, by = end.y + mk.y, bz = end.z + mk.z;
                 grow(ax, ay, az); grow(bx, by, bz);
