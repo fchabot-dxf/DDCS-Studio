@@ -11,6 +11,9 @@
  * The scene renders on demand (after data/camera/resize changes) — no animation
  * loop — so it costs nothing while idle or when the EDITOR tab is showing.
  */
+import { initCube, cubeFaceAt, highlightCubeFace, pickCube } from './navCube.js';
+import { setupJogPendant } from './jogPendant.js';
+
 export class GcodeViz3D {
     constructor(container) {
         const THREE = window.THREE;
@@ -117,69 +120,11 @@ export class GcodeViz3D {
         return sp;
     }
 
-    // Interactive ViewCube: a small labelled cube in the corner that mirrors the camera
-    // orientation; clicking a face snaps the main camera to that view.
-    _initCube() {
-        const THREE = this.THREE;
-        this._cubeScene = new THREE.Scene();
-        this._cubeCam = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-        this._cubeCam.up.set(0, 0, 1);
-        // BoxGeometry material order: +X, -X, +Y, -Y, +Z, -Z
-        const labels = ['RIGHT', 'LEFT', 'BACK', 'FRONT', 'TOP', 'BOTTOM'];
-        this._cubeViews = ['right', 'left', 'back', 'front', 'top', 'bottom'];
-        const mats = labels.map((label) => {
-            const c = document.createElement('canvas'); c.width = c.height = 128;
-            const x = c.getContext('2d');
-            x.fillStyle = '#cdd5df'; x.fillRect(0, 0, 128, 128);
-            x.strokeStyle = '#7e8a9a'; x.lineWidth = 7; x.strokeRect(4, 4, 120, 120);
-            x.fillStyle = '#2b3340'; x.font = 'bold 19px sans-serif';
-            x.textAlign = 'center'; x.textBaseline = 'middle';
-            x.fillText(label, 64, 66);
-            return new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c) });
-        });
-        this._cubeMats = mats; // kept for hover highlighting
-        this._cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mats);
-        this._cubeScene.add(this._cube);
-        this._cubeScene.add(new THREE.LineSegments(new THREE.EdgesGeometry(this._cube.geometry), new THREE.LineBasicMaterial({ color: 0x55606e })));
-        this._cubeScene.add(new THREE.AxesHelper(0.95));
-    }
-
-    // Hit-test a click against the ViewCube viewport; snaps the view if a face is hit.
-    // Returns true when the click landed inside the cube box (so it shouldn't orbit).
-    // Cube face material index under the cursor; -1 if in the cube region but off a face,
-    // -2 if the cursor is outside the cube viewport.
-    _cubeFaceAt(e) {
-        if (!this._cubeScene || !this._cubeRect) return -2;
-        const r = this.renderer.domElement.getBoundingClientRect();
-        const { size, m } = this._cubeRect;
-        const cx = e.clientX - r.left, cy = e.clientY - r.top;
-        const left = r.width - size - m, top = m; // top-right corner
-        if (cx < left || cx > left + size || cy < top || cy > top + size) return -2;
-        const ndc = new this.THREE.Vector2(((cx - left) / size) * 2 - 1, -(((cy - top) / size) * 2 - 1));
-        this.raycaster.setFromCamera(ndc, this._cubeCam);
-        const hit = this.raycaster.intersectObject(this._cube, false)[0];
-        return (hit && hit.face) ? hit.face.materialIndex : -1;
-    }
-
-    // Tint the hovered cube face (idx 0-5); idx < 0 clears. Re-renders only on a change.
-    _highlightCubeFace(idx) {
-        if (!this._cubeMats) return;
-        let changed = false;
-        for (let i = 0; i < this._cubeMats.length; i++) {
-            const hex = i === idx ? 0x66aaff : 0xffffff;
-            if (this._cubeMats[i].color.getHex() !== hex) { this._cubeMats[i].color.setHex(hex); changed = true; }
-        }
-        if (changed) this.render();
-    }
-
-    // Hit-test a click against the ViewCube; snaps the view if a face is hit.
-    // Returns true when the click landed inside the cube viewport (so it shouldn't orbit).
-    _pickCube(e) {
-        const idx = this._cubeFaceAt(e);
-        if (idx === -2) return false;
-        if (idx >= 0) { const v = this._cubeViews[idx]; if (v) this.setView(v); }
-        return true;
-    }
+    // Interactive ViewCube — implementation in viz/navCube.js
+    _initCube() { initCube(this); }
+    _cubeFaceAt(e) { return cubeFaceAt(this, e); }
+    _highlightCubeFace(idx) { highlightCubeFace(this, idx); }
+    _pickCube(e) { return pickCube(this, e); }
 
     // A draggable start marker for one pass: ruby probe tip
     _makeMarker(pass) {
@@ -216,63 +161,8 @@ export class GcodeViz3D {
         return sp;
     }
 
-    _setupJogPendant() {
-        const div = document.createElement('div');
-        div.className = 'viz3d-jog-pendant';
-        div.style.cssText = 'background: rgba(18, 18, 22, 0.95); border-top: 1px solid rgba(255,255,255,0.08); padding: 8px 12px 12px; color: #fff; z-index: 100; font-size: 11px; display: none; user-select: none; width: 100%; box-sizing: border-box;';
-        div.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 0 4px;">
-                <span style="font-weight: bold; color: #aaa; letter-spacing: 1px;">JOG START</span>
-                <span style="display: flex; gap: 8px; align-items: center; color: #888;">
-                    Step:
-                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="0.1"> 0.1</label>
-                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="1" checked> 1.0</label>
-                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="10"> 10</label>
-                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="100"> 100</label>
-                </span>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 32px 32px; gap: 6px;">
-                <button class="toolbar-btn" data-axis="x" data-dir="-1" style="font-weight:bold; padding:0;">X-</button>
-                <button class="toolbar-btn" data-axis="y" data-dir="1" style="font-weight:bold; padding:0;">Y+</button>
-                <button class="toolbar-btn" data-axis="z" data-dir="1" style="font-weight:bold; padding:0;">Z+</button>
-                <button class="toolbar-btn" data-axis="x" data-dir="1" style="font-weight:bold; padding:0;">X+</button>
-                <button class="toolbar-btn" data-axis="y" data-dir="-1" style="font-weight:bold; padding:0;">Y-</button>
-                <button class="toolbar-btn" data-axis="z" data-dir="-1" style="font-weight:bold; padding:0;">Z-</button>
-            </div>
-            <div style="display: flex; gap: 6px; margin-top: 6px;">
-                <button class="toolbar-btn" data-axis="xy" data-dir="0" style="flex:1; height:24px; padding:0; background:#2b3340; border-color:#555;" title="Reset X/Y to 0">0 XY</button>
-                <button class="toolbar-btn" data-axis="z" data-dir="0" style="flex:1; height:24px; padding:0; background:#2b3340; border-color:#555;" title="Reset Z to 0">0 Z</button>
-            </div>
-        `;
-        this.container.appendChild(div);
-        this.jogPendant = div;
-        
-        // Prevent touches on the jog panel from rotating the view
-        div.addEventListener('pointerdown', e => e.stopPropagation());
-        
-        div.querySelectorAll('button').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const axis = btn.getAttribute('data-axis');
-                const dir = parseFloat(btn.getAttribute('data-dir'));
-                const stepInput = div.querySelector('input[type="radio"]:checked');
-                const step = stepInput ? parseFloat(stepInput.value) : 1;
-                
-                if (this.starts && this.starts.length > 0) {
-                    const s = this.starts[0]; // Jog the primary start position
-                    if (axis === 'x') s.x += dir * step;
-                    if (axis === 'y') s.y += dir * step;
-                    if (axis === 'z') s.z += dir * step;
-                    if (axis === 'xy' && dir === 0) { s.x = 0; s.y = 0; }
-                    if (axis === 'z' && dir === 0) { s.z = 0; }
-                    
-                    this._positionMarkers();
-                    this._rebuild();
-                    this.render();
-                    if (typeof this.onStartChange === 'function') this.onStartChange(this.starts);
-                }
-            });
-        });
-    }
+    // JOG START pendant — implementation in viz/jogPendant.js
+    _setupJogPendant() { setupJogPendant(this); }
 
     // Recreate markers only when the pass count changes
     _ensureMarkers() {

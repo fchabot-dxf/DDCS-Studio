@@ -4,14 +4,13 @@
  */
 import { w, G, M, N, S, P, set, line, comment } from './words.js';
 import { ifGoto, goto } from './dialect.js';
+import { toNum as toNumShared } from './probeBlocks.js';
 
 export class AtcWarmupWizard {
     constructor() {}
 
     toNum(v, def = 0) {
-        if (v === undefined || v === null) return def;
-        const n = Number(v);
-        return Number.isFinite(n) ? n : def;
+        return toNumShared(v, def);
     }
 
     generate(params) {

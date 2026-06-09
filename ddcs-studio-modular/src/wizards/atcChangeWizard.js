@@ -5,14 +5,13 @@
  */
 import { w, G, M, N, X, Y, Z, P, set, line, comment } from './words.js';
 import { ifGoto, goto } from './dialect.js';
+import { toNum as toNumShared } from './probeBlocks.js';
 
 export class AtcChangeWizard {
     constructor() {}
 
     toNum(v, def = 0) {
-        if (v === undefined || v === null) return def;
-        const n = Number(v);
-        return Number.isFinite(n) ? n : def;
+        return toNumShared(v, def);
     }
 
     generate(params) {

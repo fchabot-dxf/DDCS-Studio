@@ -13,6 +13,9 @@
  * G53 machine-coordinate moves) are skipped.
  */
 
+import { tokenizeWords } from './engine/core/tokenizer.js';
+import { evalExpr } from './engine/core/expression.js';
+
 export function parseGcode(text) {
     const segments = []; // { x1,y1,z1, x2,y2,z2, rapid, probe }
     const vars = new Map();
@@ -67,8 +70,8 @@ export function parseGcode(text) {
             if (eq > 0 && trimmed[eq + 1] !== '=') { // single '=' (not '==')
                 const lhs = trimmed.slice(1, eq).trim();
                 const rhs = trimmed.slice(eq + 1).trim();
-                const idx = lhs[0] === '[' ? gpEvalExpr(lhs, vars) : parseInt(lhs, 10);
-                const val = gpEvalExpr(rhs, vars);
+                const idx = lhs[0] === '[' ? evalExpr(lhs, vars) : parseInt(lhs, 10);
+                const val = evalExpr(rhs, vars);
                 if (idx != null && Number.isFinite(idx) && val != null) vars.set(Math.round(idx), val);
                 continue;
             }
@@ -78,7 +81,7 @@ export function parseGcode(text) {
         }
 
         // --- Motion / modal line ---
-        const words = gpTokenizeWords(line);
+        const words = tokenizeWords(line);
         if (words.length === 0) continue;
 
         const gcodes = [];
@@ -88,7 +91,7 @@ export function parseGcode(text) {
                 const g = parseFloat(w.value);
                 if (Number.isFinite(g)) gcodes.push(g);
             } else {
-                wm[w.letter] = gpEvalExpr(w.value, vars);
+                wm[w.letter] = evalExpr(w.value, vars);
             }
         }
 
@@ -163,100 +166,6 @@ export function parseGcode(text) {
         bounds: started ? bounds : null,
         stats: { feed: feedCount, rapid: rapidCount, retract: retractCount, probe: probeCount, jog: jogCount, passes: pass + 1, skipped, drawable: segments.length > 0 },
     };
-}
-
-// ---- Word tokenizer: letter + value, where value may be a number, #ref, or [expr] ----
-function gpTokenizeWords(line) {
-    const words = [];
-    let i = 0;
-    const n = line.length;
-    const isLetter = (c) => (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
-    while (i < n) {
-        const ch = line[i];
-        if (isLetter(ch)) {
-            const letter = ch.toUpperCase();
-            i++;
-            let val = '';
-            while (i < n && !isLetter(line[i])) { val += line[i]; i++; }
-            words.push({ letter, value: val.trim() });
-        } else {
-            i++;
-        }
-    }
-    return words;
-}
-
-// ---- Expression evaluator: numbers, [ ] grouping, + - * /, direct #N / indirect #[expr] ----
-// Returns a number, or null if it cannot be resolved (unknown var / bad syntax).
-function gpEvalExpr(str, vars) {
-    if (str == null) return null;
-    const s = String(str).trim();
-    if (s === '') return null;
-
-    const toks = [];
-    let i = 0;
-    while (i < s.length) {
-        const c = s[i];
-        if (c === ' ' || c === '\t') { i++; continue; }
-        if ((c >= '0' && c <= '9') || c === '.') {
-            let num = '';
-            while (i < s.length && ((s[i] >= '0' && s[i] <= '9') || s[i] === '.')) { num += s[i]; i++; }
-            toks.push(parseFloat(num));
-        } else if (c === '#' || c === '[' || c === ']' || c === '+' || c === '-' || c === '*' || c === '/') {
-            toks.push(c); i++;
-        } else {
-            return null; // unexpected character → unresolvable
-        }
-    }
-
-    let p = 0;
-    const peek = () => toks[p];
-
-    function parseExpr() {
-        let v = parseTerm();
-        while (v !== null && (peek() === '+' || peek() === '-')) {
-            const op = toks[p++];
-            const r = parseTerm();
-            if (r === null) return null;
-            v = op === '+' ? v + r : v - r;
-        }
-        return v;
-    }
-    function parseTerm() {
-        let v = parseFactor();
-        while (v !== null && (peek() === '*' || peek() === '/')) {
-            const op = toks[p++];
-            const r = parseFactor();
-            if (r === null) return null;
-            v = op === '*' ? v * r : (r !== 0 ? v / r : null);
-        }
-        return v;
-    }
-    function parseFactor() {
-        const t = peek();
-        if (t === '+') { p++; return parseFactor(); }
-        if (t === '-') { p++; const f = parseFactor(); return f === null ? null : -f; }
-        if (t === '[') {
-            p++;
-            const v = parseExpr();
-            if (peek() === ']') p++;
-            return v;
-        }
-        if (t === '#') {
-            p++;
-            let idx;
-            if (peek() === '[') { p++; idx = parseExpr(); if (peek() === ']') p++; }
-            else if (typeof peek() === 'number') { idx = toks[p++]; }
-            else return null;
-            if (idx === null || !Number.isFinite(idx)) return null;
-            const v = vars.get(Math.round(idx));
-            return (v === undefined || v === null) ? null : v;
-        }
-        if (typeof t === 'number') { p++; return t; }
-        return null;
-    }
-
-    return parseExpr();
 }
 
 // Interpolate a G2/G3 arc into points (center from I/J/K offsets or R radius).

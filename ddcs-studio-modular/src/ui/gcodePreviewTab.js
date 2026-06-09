@@ -6,9 +6,9 @@
  * live (debounced) while that tab is active. The 3D viewer is created lazily on
  * first use so the cost is only paid when the user opens it.
  */
-import { parseGcode } from './gcodeParser.js';
-import { GcodeViz3D } from './gcodeViz3d.js';
-import { GcodeExecutionEngine } from './engine/index.js';
+import { parseGcode } from '../gcodeParser.js';
+import { GcodeViz3D } from '../viz/gcodeViz3d.js';
+import { GcodeExecutionEngine } from '../engine/index.js';
 
 let gpViz = null;
 let gpEngine = null;

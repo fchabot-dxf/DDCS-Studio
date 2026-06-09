@@ -1,5 +1,5 @@
 import { el } from './uiUtils.js';
-import { injectVirtualInput, getVirtualInput, ioState } from './virtualIO.js';
+import { injectVirtualInput, getVirtualInput, ioState } from '../engine/virtualIO.js';
 
 class IOTabManager {
     constructor() {

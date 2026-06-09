@@ -6,7 +6,7 @@
  * pywebview .exe, the same calls read/write a local `ddcs-profile.json` through
  * window.pywebview.api, so persistence carries over with no rework.
  */
-import { getSettings, applySettings } from './settingsPanel.js';
+import { getSettings, applySettings } from '../ui/settingsPanel.js';
 
 const PROFILE_VERSION = 1;
 

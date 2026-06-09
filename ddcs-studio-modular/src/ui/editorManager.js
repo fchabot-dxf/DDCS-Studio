@@ -4,7 +4,7 @@
  */
 
 import { el, UIUtils } from './uiUtils.js';
-import { SNIPPETS } from './snippets.js';
+import { SNIPPETS } from '../data/snippets.js';
 
 export class EditorManager {
     constructor() {

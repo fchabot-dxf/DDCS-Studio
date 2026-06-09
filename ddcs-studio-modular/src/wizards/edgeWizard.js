@@ -16,6 +16,7 @@
  */
 import { w, G, M, N, F, P, L, Q, set, line, comment } from './words.js';
 import { ifGoto, goto, wcsBase } from './dialect.js';
+import { twoPassProbe, toNum as toNumShared } from './probeBlocks.js';
 
 export class EdgeWizard {
     constructor() {}
@@ -23,10 +24,16 @@ export class EdgeWizard {
     generate(params) {
         const {
             axis, dir, wcs,
-            dist, retract, clearance,
             syncA, slave,
-            f_fast, f_slow, port, level, qStop
+            level, qStop
         } = params;
+
+        // Defensive numeric coercion (defaults match the wizard UI)
+        const dist    = toNumShared(params.dist, 15);
+        const retract = toNumShared(params.retract, 2);
+        const f_fast  = toNumShared(params.f_fast, 200);
+        const f_slow  = toNumShared(params.f_slow, 50);
+        const port    = toNumShared(params.port, 3);
 
         const axisStatus = axis === 'X' ? '#1920' : '#1921';
         const axisResult = axis === 'X' ? '#1925' : '#1926';
@@ -66,22 +73,11 @@ export class EdgeWizard {
     }
 
     generateTwoPassProbe(axis, dirSign, retractSign, axisStatus, axisResult, resultVar, level, qStop) {
-        const probeVar   = dirSign   === '+' ? '#8' : '#7';
-        const retractVar = retractSign === '+' ? '#10' : '#9';
-        // Probe safety: decelerate-stop + enable limit protection in the probe direction
-        const stopVar  = axis === 'X' ? '#1905' : '#1906';
-        const limitVar = axis === 'X' ? '#1915' : '#1916';
-        let c = '';
-        c += line([set(stopVar, '0')], 'Stop mode: decelerate') + '\n';
-        c += line([set(limitVar, dirSign === '+' ? '2' : '1')], `Limit protect: ${dirSign === '+' ? 'positive' : 'negative'}`) + '\n';
-        c += line([G(31), w(axis, probeVar), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe') + '\n';
-        c += ifGoto(axisStatus, '!=', '2', 1) + '\n';
-        c += line([G(0), w(axis, retractVar)], 'Retract') + '\n';
-        c += line([G(31), w(axis, probeVar), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe') + '\n';
-        c += ifGoto(axisStatus, '!=', '2', 1) + '\n';
-        c += line([set(resultVar, axisResult)], 'Save edge position') + '\n';
-        c += line([G(0), w(axis, retractVar)], 'Retract from wall') + '\n\n';
-        return c;
+        return twoPassProbe({
+            axis, dirSign, resultVar, level, qStop,
+            retractVar: retractSign === '+' ? '#10' : '#9',
+            comments: { save: 'Save edge position' },
+        });
     }
 
     generateWCSCode(wcs) {

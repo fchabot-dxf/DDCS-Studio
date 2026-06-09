@@ -1,5 +1,9 @@
 import { parseGcode } from '../gcodeParser.js';
-import { resetVirtualIO, setVirtualOutput } from '../virtualIO.js';
+import { resetVirtualIO, setVirtualOutput } from './virtualIO.js';
+import { tokenizeWords } from './core/tokenizer.js';
+import { evalExpr } from './core/expression.js';
+import { evaluateCondition } from './core/condition.js';
+import { loadProgram } from './core/program.js';
 
 export function simulateGcode(text, options = {}) {
     const mode = (options.mode || 'virtual').toLowerCase();
@@ -39,26 +43,7 @@ export function executeGcode(text) {
         if (p.z > bounds.maxZ) bounds.maxZ = p.z;
     };
 
-    const lines = String(text || '').split(/\r?\n/);
-    const program = [];
-    const labels = new Map();
-
-    for (const rawLine of lines) {
-        if (/reposition:/i.test(rawLine)) {
-            program.push({ raw: rawLine, type: 'reposition' });
-            continue;
-        }
-        const stripped = rawLine.replace(/\([^)]*\)/g, ' ').replace(/;.*$/, ' ').trim();
-        if (!stripped) continue;
-        const tokens = gpTokenizeWords(stripped);
-        const labelToken = tokens.find((t) => t.letter === 'N' && t.value != null);
-        const label = labelToken ? parseInt(labelToken.value, 10) : null;
-        const programIndex = program.length;
-        if (label != null && Number.isFinite(label)) {
-            labels.set(label, programIndex);
-        }
-        program.push({ raw: stripped, tokens, label, original: rawLine });
-    }
+    const { program, labels } = loadProgram(text, { repositionMarkers: true });
 
     let ip = 0;
     const maxSteps = Math.max(program.length * 10, 1000);
@@ -72,7 +57,7 @@ export function executeGcode(text) {
             continue;
         }
 
-        const line = step.raw;
+        const line = step.stripped;
         if (!line) continue;
 
         // IF conditions and GOTO control flow
@@ -108,11 +93,11 @@ export function executeGcode(text) {
                 const rhs = assignMatch[2].trim();
                 let idx = null;
                 if (lhs.startsWith('[') && lhs.endsWith(']')) {
-                    idx = gpEvalExpr(lhs.slice(1, -1), vars);
+                    idx = evalExpr(lhs.slice(1, -1), vars);
                 } else {
                     idx = parseInt(lhs, 10);
                 }
-                const value = gpEvalExpr(rhs, vars);
+                const value = evalExpr(rhs, vars);
                 if (idx != null && Number.isFinite(idx) && value != null) {
                     vars.set(Math.round(idx), value);
                 }
@@ -122,7 +107,7 @@ export function executeGcode(text) {
             continue;
         }
 
-        const words = gpTokenizeWords(line);
+        const words = tokenizeWords(line);
         if (words.length === 0) continue;
 
         // Label-only lines don't affect execution beyond the label map.
@@ -139,7 +124,7 @@ export function executeGcode(text) {
                 const value = parseFloat(word.value);
                 if (Number.isFinite(value)) mcodes.push(value);
             } else if (word.letter !== 'N') {
-                wm[word.letter] = gpEvalExpr(word.value, vars);
+                wm[word.letter] = evalExpr(word.value, vars);
             }
         }
 
@@ -231,128 +216,4 @@ export function executeGcode(text) {
             drawable: segments.length > 0,
         },
     };
-}
-
-function evaluateCondition(text, vars) {
-    const expr = text.trim();
-    const match = expr.match(/^(.*?)(==|!=|<=|>=|<|>)(.*)$/);
-    if (!match) return false;
-    const left = gpEvalExpr(match[1].trim(), vars);
-    const op = match[2];
-    const right = gpEvalExpr(match[3].trim(), vars);
-    if (left == null || right == null) return false;
-    switch (op) {
-        case '==': return left === right;
-        case '!=': return left !== right;
-        case '<=': return left <= right;
-        case '>=': return left >= right;
-        case '<': return left < right;
-        case '>': return left > right;
-        default: return false;
-    }
-}
-
-function gpTokenizeWords(line) {
-    const words = [];
-    let i = 0;
-    const n = line.length;
-    const isLetter = (c) => /[A-Za-z]/.test(c);
-    while (i < n) {
-        const ch = line[i];
-        if (isLetter(ch)) {
-            const letter = ch.toUpperCase();
-            i += 1;
-            let value = '';
-            while (i < n && !isLetter(line[i])) {
-                value += line[i];
-                i += 1;
-            }
-            words.push({ letter, value: value.trim() });
-        } else {
-            i += 1;
-        }
-    }
-    return words;
-}
-
-function gpEvalExpr(str, vars) {
-    if (str == null) return null;
-    const s = String(str).trim();
-    if (s === '') return null;
-
-    const toks = [];
-    let i = 0;
-    while (i < s.length) {
-        const c = s[i];
-        if (c === ' ' || c === '\t') { i += 1; continue; }
-        if ((c >= '0' && c <= '9') || c === '.') {
-            let num = '';
-            while (i < s.length && ((s[i] >= '0' && s[i] <= '9') || s[i] === '.')) {
-                num += s[i]; i += 1;
-            }
-            toks.push(parseFloat(num));
-            continue;
-        }
-        if (c === '#' || c === '[' || c === ']' || c === '+' || c === '-' || c === '*' || c === '/') {
-            toks.push(c);
-            i += 1;
-            continue;
-        }
-        return null;
-    }
-
-    let p = 0;
-    const peek = () => toks[p];
-
-    function parseExpr() {
-        let v = parseTerm();
-        while (v !== null && (peek() === '+' || peek() === '-')) {
-            const op = toks[p++];
-            const r = parseTerm();
-            if (r === null) return null;
-            v = op === '+' ? v + r : v - r;
-        }
-        return v;
-    }
-    function parseTerm() {
-        let v = parseFactor();
-        while (v !== null && (peek() === '*' || peek() === '/')) {
-            const op = toks[p++];
-            const r = parseFactor();
-            if (r === null) return null;
-            v = op === '*' ? v * r : (r !== 0 ? v / r : null);
-        }
-        return v;
-    }
-    function parseFactor() {
-        const t = peek();
-        if (t === '+') { p += 1; return parseFactor(); }
-        if (t === '-') { p += 1; const f = parseFactor(); return f === null ? null : -f; }
-        if (t === '[') {
-            p += 1;
-            const v = parseExpr();
-            if (peek() === ']') p += 1;
-            return v;
-        }
-        if (t === '#') {
-            p += 1;
-            let idx;
-            if (peek() === '[') {
-                p += 1;
-                idx = parseExpr();
-                if (peek() === ']') p += 1;
-            } else if (typeof peek() === 'number') {
-                idx = toks[p++];
-            } else {
-                return null;
-            }
-            if (idx == null || !Number.isFinite(idx)) return null;
-            const v = vars.get(Math.round(idx));
-            return v == null ? null : v;
-        }
-        if (typeof t === 'number') { p += 1; return t; }
-        return null;
-    }
-
-    return parseExpr();
 }

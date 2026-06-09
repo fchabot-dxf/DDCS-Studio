@@ -6,7 +6,7 @@
   "main": "app.js",
   "scripts": {
     "start": "npx http-server ./src -p 3000 --silent",
-    "generate-vars": "node src/import_vars.js",
+    "generate-vars": "node src/data/import_vars.js --input \"Variables-ENG 01-04-2025.csv\" --output src/data/default_vars.js",
     "svg:rename-gradients": "python \"src/assets/svg/rename_gradients.py\" --dir \"src/assets/svg\"",
     "prebundle": "npm run svg:rename-gradients",
     "bundle": "node scripts/bundle.cjs --src src",
@@ -22,22 +22,17 @@
     "probe",
     "ultimate-bee"
   ],
-  "author": "Frédéric",
+  "author": "Fr\u00e9d\u00e9ric",
   "license": "MIT",
   "files": [
     "src/app.js",
-    "src/themes.js",
-    "src/scaleManager.js",
-    "src/variableDB.js",
-    "src/editorManager.js",
+    "src/gcodeParser.js",
     "src/wizardManager.js",
-    "src/uiUtils.js",
-    "src/snippets.js",
-    "src/wizards/cornerWizard.js",
-    "src/wizards/middleWizard.js",
-    "src/wizards/edgeWizard.js",
-    "src/wizards/communicationWizard.js",
-    "src/wizards/wcsWizard.js"
+    "src/ui/",
+    "src/viz/",
+    "src/data/",
+    "src/engine/",
+    "src/wizards/"
   ],
   "devDependencies": {
     "@playwright/test": "^1.58.2"

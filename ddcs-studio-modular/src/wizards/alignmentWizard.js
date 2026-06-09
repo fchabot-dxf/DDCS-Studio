@@ -23,6 +23,7 @@
  */
 import { w, G, M, N, Z, F, P, L, Q, set, line, comment } from './words.js';
 import { ifGoto, goto } from './dialect.js';
+import { twoPassProbe } from './probeBlocks.js';
 
 export class AlignmentWizard {
     constructor() {}
@@ -128,25 +129,17 @@ export class AlignmentWizard {
     }
 
     // Two-pass probe: fast → retract → slow → save → retract
+    // Two-pass probe: fast → retract → slow → save → retract
     generateTwoPassProbe(probeAxis, dirSign, retractSign, axisStatus, axisResult, resultVar, level, qStop) {
-        const probeVar   = dirSign   === '+' ? '#8' : '#7';
-        const retractVar = retractSign === '+' ? '#10' : '#9';
-        // Probe safety: decelerate-stop + enable limit protection in the probe direction
-        const stopVar  = probeAxis === 'X' ? '#1905' : '#1906';
-        const limitVar = probeAxis === 'X' ? '#1915' : '#1916';
-        let c = '';
-        c += line([set(stopVar, '0')], 'Stop mode: decelerate') + '\n';
-        c += line([set(limitVar, dirSign === '+' ? '2' : '1')], `Limit protect: ${dirSign === '+' ? 'positive' : 'negative'}`) + '\n';
-        c += comment('Fast probe toward fence') + '\n';
-        c += line([G(31), w(probeAxis, probeVar), F('#3'), P('#5'), L(level), Q(qStop)]) + '\n';
-        c += ifGoto(axisStatus, '!=', '2', 1) + '\n';
-        c += line([G(0), w(probeAxis, retractVar)], 'Retract') + '\n\n';
-        c += comment('Slow probe for precision') + '\n';
-        c += line([G(31), w(probeAxis, probeVar), F('#4'), P('#5'), L(level), Q(qStop)]) + '\n';
-        c += ifGoto(axisStatus, '!=', '2', 1) + '\n';
-        c += line([set(resultVar, axisResult)], 'Save contact position - machine coord') + '\n';
-        c += line([G(0), w(probeAxis, retractVar)], 'Retract from fence') + '\n\n';
-        return c;
+        return twoPassProbe({
+            axis: probeAxis, dirSign, resultVar, level, qStop,
+            retractVar: retractSign === '+' ? '#10' : '#9',
+            comments: {
+                fast: 'Fast probe toward fence',
+                slow: 'Slow probe for precision',
+                finalRetract: 'Retract from fence',
+            },
+        });
     }
 
     generateHeader(checkAxis, probeAxis, dirSign, tolerance, f_fast, f_slow, dist, retract, safeZ) {

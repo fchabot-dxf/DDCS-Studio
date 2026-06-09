@@ -2642,7 +2642,7 @@ body[data-theme="studio"] .dock-body .ddcs-tab.active {
 /* Jog pendant context styling */
 .viz3d-drawer .viz3d-jog-pendant {
     position: absolute;
-    bottom: 0;
+    bottom: 34px;
     left: 0;
     right: 0;
     z-index: 100;

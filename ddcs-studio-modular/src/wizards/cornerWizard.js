@@ -15,14 +15,13 @@
  */
 import { w, G, M, N, A, Z, F, P, L, Q, set, line, comment } from './words.js';
 import { ifGoto, goto, wcsBase } from './dialect.js';
+import { toNum as toNumShared } from './probeBlocks.js';
 
 export class CornerWizard {
     constructor() {}
 
     toNum(v, def = 0) {
-        if (v === undefined || v === null) return def;
-        const n = Number(v);
-        return Number.isFinite(n) ? n : def;
+        return toNumShared(v, def);
     }
 
     generate(params) {
@@ -143,10 +142,10 @@ export class CornerWizard {
     generateZProbe(step, level, qStop, wcsLabel, firstAxis, firstTravelVar, travelDist) {
         let c = comment(`Step ${step}: Z Surface Probe`) + '\n';
         c += line([G(31), Z('#7'), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe down') + '\n';
-        c += ifGoto('#1922', '==', '0', 1) + '\n';
+        c += ifGoto('#1922', '!=', '2', 1) + '\n';
         c += line([G(0), Z('#10')], 'Retract up') + '\n';
         c += line([G(31), Z('#7'), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe') + '\n';
-        c += ifGoto('#1922', '==', '0', 1) + '\n';
+        c += ifGoto('#1922', '!=', '2', 1) + '\n';
         c += line([set('#73', '[#70+2]')], 'WCS Z Address') + '\n';
         c += line([set('#[#73]', '#1927')], `Save ${wcsLabel} Z offset - machine coord`) + '\n';
         c += line([G(0), Z('#19')], 'Retract to safe Z') + '\n';
@@ -177,10 +176,10 @@ export class CornerWizard {
         c += comment(`Step ${step}: Y Probe`) + '\n';
         c += line([G(0), Z('#18')], 'Plunge to scan depth') + '\n';
         c += line([G(31), w('Y', yProbe), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe Y') + '\n';
-        c += ifGoto('#1921', '==', '0', 1) + '\n';
+        c += ifGoto('#1921', '!=', '2', 1) + '\n';
         c += line([G(0), w('Y', yRetract)], 'Retract from Y wall') + '\n\n';
         c += line([G(31), w('Y', yProbe), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe Y') + '\n';
-        c += ifGoto('#1921', '==', '0', 1) + '\n\n';
+        c += ifGoto('#1921', '!=', '2', 1) + '\n\n';
         c += comment('Apply Y WCS with Radius Comp') + '\n';
         c += line([set('#101', `[#1926 ${yCompOp} #6]`)], `Trigger Pos ${yCompOp} Radius`) + '\n';
         c += line([set('#73', '[#70+1]')], 'WCS Y Address') + '\n';
@@ -198,10 +197,10 @@ export class CornerWizard {
         // Step: X Probe
         c += comment(`Step ${step}: X Probe`) + '\n';
         c += line([G(31), w('X', xProbe), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe X') + '\n';
-        c += ifGoto('#1920', '==', '0', 1) + '\n';
+        c += ifGoto('#1920', '!=', '2', 1) + '\n';
         c += line([G(0), w('X', xRetract)], 'Retract from X wall') + '\n\n';
         c += line([G(31), w('X', xProbe), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe X') + '\n';
-        c += ifGoto('#1920', '==', '0', 1) + '\n\n';
+        c += ifGoto('#1920', '!=', '2', 1) + '\n\n';
         c += comment('Apply X WCS with Radius Comp') + '\n';
         c += line([set('#102', `[#1925 ${xCompOp} #6]`)], `Trigger Pos ${xCompOp} Radius`) + '\n';
         c += line([set('#[#70]', '#102')], `Save to ${wcsLabel} X`) + '\n\n';
@@ -229,10 +228,10 @@ export class CornerWizard {
         c += comment(`Step ${step}: X Probe`) + '\n';
         c += line([G(0), Z('#18')], 'Plunge to scan depth') + '\n';
         c += line([G(31), w('X', xProbe), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe X') + '\n';
-        c += ifGoto('#1920', '==', '0', 1) + '\n';
+        c += ifGoto('#1920', '!=', '2', 1) + '\n';
         c += line([G(0), w('X', xRetract)], 'Retract from X wall') + '\n\n';
         c += line([G(31), w('X', xProbe), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe X') + '\n';
-        c += ifGoto('#1920', '==', '0', 1) + '\n\n';
+        c += ifGoto('#1920', '!=', '2', 1) + '\n\n';
         c += comment('Apply X WCS with Radius Comp') + '\n';
         c += line([set('#102', `[#1925 ${xCompOp} #6]`)], `Trigger Pos ${xCompOp} Radius`) + '\n';
         c += line([set('#[#70]', '#102')], `Save to ${wcsLabel} X`) + '\n\n';
@@ -249,10 +248,10 @@ export class CornerWizard {
         // Step: Y Probe
         c += comment(`Step ${step}: Y Probe`) + '\n';
         c += line([G(31), w('Y', yProbe), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe Y') + '\n';
-        c += ifGoto('#1921', '==', '0', 1) + '\n';
+        c += ifGoto('#1921', '!=', '2', 1) + '\n';
         c += line([G(0), w('Y', yRetract)], 'Retract from Y wall') + '\n\n';
         c += line([G(31), w('Y', yProbe), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe Y') + '\n';
-        c += ifGoto('#1921', '==', '0', 1) + '\n\n';
+        c += ifGoto('#1921', '!=', '2', 1) + '\n\n';
         c += comment('Apply Y WCS with Radius Comp') + '\n';
         c += line([set('#101', `[#1926 ${yCompOp} #6]`)], `Trigger Pos ${yCompOp} Radius`) + '\n';
         c += line([set('#73', '[#70+1]')], 'WCS Y Address') + '\n';

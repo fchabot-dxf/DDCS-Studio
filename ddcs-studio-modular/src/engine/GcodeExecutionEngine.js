@@ -7,7 +7,11 @@
  * handshake simulation and probe collision detection.
  */
 
-import { resetVirtualIO, setVirtualOutput, getVirtualInput, triggerProbeCollision, resolveVirtualPin } from '../virtualIO.js';
+import { resetVirtualIO, setVirtualOutput, getVirtualInput, triggerProbeCollision, resolveVirtualPin } from './virtualIO.js';
+import { tokenizeWords } from './core/tokenizer.js';
+import { evalExpr, validateExpression } from './core/expression.js';
+import { evaluateCondition, validateCondition } from './core/condition.js';
+import { loadProgram as loadProgramText } from './core/program.js';
 
 const MSETDATA_OUTPUT_MAP = {
     // Placeholder mappings for common DDCS macro output codes.
@@ -20,8 +24,13 @@ const MSETDATA_OUTPUT_MAP = {
 };
 
 export class GcodeExecutionEngine {
-    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, stock = null, syntaxValidator = null } = {}) {
+    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, stock = null, syntaxValidator = null, createVarStore = null } = {}) {
         this.stepDelay = Number.isFinite(stepDelay) ? stepDelay : 250;
+        // Variable-store seam: anything Map-like with get(num)/set(num, val).
+        // Default is an in-memory Map (pure simulation). A DDCS PC-bridge can
+        // inject a store that proxies system variables (#880, #1920-1929, ...)
+        // to a real controller while keeping user vars local.
+        this.createVarStore = typeof createVarStore === 'function' ? createVarStore : () => new Map();
         this.onLineChange = onLineChange;
         this.onStatus = onStatus;
         this.onFinish = onFinish;
@@ -56,7 +65,7 @@ export class GcodeExecutionEngine {
                 const condition = ifMatch[1].trim();
                 if (!condition) {
                     reportError(lineIndex, 'Empty IF condition');
-                } else if (!GcodeExecutionEngine._validateConditionSyntax(condition)) {
+                } else if (!validateCondition(condition)) {
                     reportError(lineIndex, 'Invalid IF condition syntax');
                 }
                 return;
@@ -80,16 +89,16 @@ export class GcodeExecutionEngine {
                 const lhs = assignMatch[1].trim();
                 const rhs = assignMatch[2].trim();
                 const indexExpr = lhs.startsWith('[') ? lhs.slice(1, -1) : lhs;
-                if (!GcodeExecutionEngine._validateExpressionSyntax(indexExpr)) {
+                if (!validateExpression(indexExpr)) {
                     reportError(lineIndex, 'Invalid assignment target');
                 }
-                if (!GcodeExecutionEngine._validateExpressionSyntax(rhs)) {
+                if (!validateExpression(rhs)) {
                     reportError(lineIndex, 'Invalid assignment expression');
                 }
                 return;
             }
 
-            const words = GcodeExecutionEngine._tokenizeWords(stripped);
+            const words = tokenizeWords(stripped);
             if (words.length === 0) {
                 reportError(lineIndex, 'Unrecognizable G-code line');
                 return;
@@ -102,7 +111,7 @@ export class GcodeExecutionEngine {
                         reportError(lineIndex, `Invalid G-code word value: ${word.value}`);
                     }
                 } else if (word.letter !== 'N') {
-                    if (!GcodeExecutionEngine._validateExpressionSyntax(word.value)) {
+                    if (!validateExpression(word.value)) {
                         reportError(lineIndex, `Invalid expression for ${word.letter}`);
                     }
                 }
@@ -112,149 +121,9 @@ export class GcodeExecutionEngine {
         return { valid: errors.length === 0, errors };
     }
 
-    static _validateExpressionSyntax(expr) {
-        if (expr == null) return false;
-        const s = String(expr).trim();
-        if (s === '') return false;
-
-        const toks = [];
-        let i = 0;
-        const n = s.length;
-
-        while (i < n) {
-            const ch = s[i];
-            if (ch === ' ' || ch === '\t') { i += 1; continue; }
-            if ((ch >= '0' && ch <= '9') || ch === '.') {
-                let num = '';
-                while (i < n && ((s[i] >= '0' && s[i] <= '9') || s[i] === '.')) { num += s[i]; i += 1; }
-                if (num === '.' || num.length === 0) return false;
-                toks.push(Number.parseFloat(num));
-                continue;
-            }
-            if (ch === '#' || ch === '[' || ch === ']' || ch === '+' || ch === '-' || ch === '*' || ch === '/') {
-                toks.push(ch);
-                i += 1;
-                continue;
-            }
-            return false;
-        }
-
-        let p = 0;
-        const peek = () => toks[p];
-
-        const parseExpr = () => {
-            let value = parseTerm();
-            while (value !== null && (peek() === '+' || peek() === '-')) {
-                p += 1;
-                const right = parseTerm();
-                if (right === null) return null;
-                value = 0;
-            }
-            return value;
-        };
-
-        const parseTerm = () => {
-            let value = parseFactor();
-            while (value !== null && (peek() === '*' || peek() === '/')) {
-                p += 1;
-                const right = parseFactor();
-                if (right === null) return null;
-                value = 0;
-            }
-            return value;
-        };
-
-        const parseFactor = () => {
-            const token = peek();
-            if (token === '+' || token === '-') {
-                p += 1;
-                return parseFactor();
-            }
-            if (token === '[') {
-                p += 1;
-                const inner = parseExpr();
-                if (inner === null) return null;
-                if (peek() !== ']') return null;
-                p += 1;
-                return 0;
-            }
-            if (token === '#') {
-                p += 1;
-                if (peek() === '[') {
-                    p += 1;
-                    const inner = parseExpr();
-                    if (inner === null) return null;
-                    if (peek() !== ']') return null;
-                    p += 1;
-                    return 0;
-                }
-                if (typeof peek() === 'number') {
-                    p += 1;
-                    return 0;
-                }
-                return null;
-            }
-            if (typeof token === 'number') {
-                p += 1;
-                return 0;
-            }
-            return null;
-        };
-
-        const result = parseExpr();
-        return result !== null && p >= toks.length;
-    }
-
-    static _normalizeConditionExpression(expr) {
-        if (expr == null) return '';
-        return String(expr)
-            .trim()
-            .replace(/\bEQ\b/gi, '==')
-            .replace(/\bNE\b/gi, '!=')
-            .replace(/\bGT\b/gi, '>')
-            .replace(/\bLT\b/gi, '<')
-            .replace(/\bGE\b/gi, '>=')
-            .replace(/\bLE\b/gi, '<=')
-            .replace(/\b<>\b/g, '!=')
-            .replace(/(?<![<>!=])=(?![<>!=])/g, '==');
-    }
-
-    static _validateConditionSyntax(expr) {
-        if (expr == null) return false;
-        const normalized = GcodeExecutionEngine._normalizeConditionExpression(expr);
-        const match = normalized.match(/^(.*?)(==|!=|<=|>=|<|>)(.*)$/);
-        if (!match) return false;
-        return GcodeExecutionEngine._validateExpressionSyntax(match[1].trim()) && GcodeExecutionEngine._validateExpressionSyntax(match[3].trim());
-    }
-
-    static _tokenizeWords(line) {
-        const words = [];
-        let i = 0;
-        const n = line.length;
-        const isLetter = (c) => /[A-Za-z]/.test(c);
-
-        while (i < n) {
-            const ch = line[i];
-            if (isLetter(ch)) {
-                const letter = ch.toUpperCase();
-                i += 1;
-                let value = '';
-                while (i < n && !isLetter(line[i])) {
-                    value += line[i];
-                    i += 1;
-                }
-                words.push({ letter, value: value.trim() });
-            } else {
-                i += 1;
-            }
-        }
-
-        return words;
-    }
-
     resetState() {
         resetVirtualIO();
-        this.vars = new Map();
+        this.vars = this.createVarStore();
         this.pos = { x: 0, y: 0, z: 0 };
         this.absolute = true;
         this.unitScale = 1;
@@ -279,22 +148,10 @@ export class GcodeExecutionEngine {
     }
 
     loadProgram(text) {
-        const lines = String(text || '').split(/\r?\n/);
-        this.totalLines = lines.length;
-        this.program = [];
-        this.labels = new Map();
-
-        lines.forEach((raw, lineIndex) => {
-            const stripped = raw.replace(/\([^)]*\)/g, ' ').replace(/;.*$/, ' ').trim();
-            const tokens = this._tokenizeWords(stripped);
-            const labelToken = tokens.find((t) => t.letter === 'N' && t.value != null);
-            const label = labelToken ? Number.parseInt(labelToken.value, 10) : null;
-            const step = { raw, stripped, tokens, label, lineIndex };
-            if (label != null && Number.isFinite(label)) {
-                this.labels.set(label, this.program.length);
-            }
-            this.program.push(step);
-        });
+        const { program, labels, totalLines } = loadProgramText(text, { keepEmpty: true });
+        this.program = program;
+        this.labels = labels;
+        this.totalLines = totalLines;
     }
 
     run(text) {
@@ -427,7 +284,7 @@ export class GcodeExecutionEngine {
             return false;
         }
 
-        const words = this._tokenizeWords(line);
+        const words = tokenizeWords(line);
         if (words.length === 0) {
             this.ip += 1;
             return false;
@@ -540,7 +397,17 @@ export class GcodeExecutionEngine {
         if (effMotion === 0 || effMotion === 1) {
             if (isProbe) {
                 this.stats.probe += 1;
-                
+
+                // DDCS G31 semantics: per-axis status vars #1920(X) #1921(Y) #1922(Z).
+                // 1 = probe started, no trigger yet. Stays 1 on a miss (full travel,
+                // no alarm) - it is the macro's job to check !=2 and branch.
+                const PROBE_STATUS_VAR = { x: 1920, y: 1921, z: 1922 };
+                const scannedAxes = [];
+                if (wm.X != null) scannedAxes.push('x');
+                if (wm.Y != null) scannedAxes.push('y');
+                if (wm.Z != null) scannedAxes.push('z');
+                for (const a of scannedAxes) this.vars.set(PROBE_STATUS_VAR[a], 1);
+
                 // Determine collision target based on P argument
                 const probePort = wm.P;
                 const probes = typeof window !== 'undefined' && window.ddcsGetSettings ? window.ddcsGetSettings().probes : null;
@@ -583,10 +450,13 @@ export class GcodeExecutionEngine {
                         target.y = start.y + dir.y * tmin;
                         target.z = start.z + dir.z * tmin;
                         triggerProbeCollision();
-                        
-                        this.vars.set(5061, target.x);
-                        this.vars.set(5062, target.y);
-                        this.vars.set(5063, target.z);
+
+                        // DDCS: 2 = detected the signal; #1925-1927 = trigger
+                        // position in machine coordinates.
+                        for (const a of scannedAxes) this.vars.set(PROBE_STATUS_VAR[a], 2);
+                        this.vars.set(1925, target.x);
+                        this.vars.set(1926, target.y);
+                        this.vars.set(1927, target.z);
                     }
                 }
             } else if (effMotion === 0) {
@@ -644,144 +514,12 @@ export class GcodeExecutionEngine {
     }
 
     _evaluateCondition(expression) {
-        const expr = GcodeExecutionEngine._normalizeConditionExpression(expression);
-        const match = expr.match(/^(.*?)(==|!=|<=|>=|<|>)(.*)$/);
-        if (!match) return false;
-
-        const left = this._evaluateExpression(match[1].trim());
-        const op = match[2];
-        const right = this._evaluateExpression(match[3].trim());
-        if (left == null || right == null) return false;
-
-        switch (op) {
-            case '==': return left === right;
-            case '!=': return left !== right;
-            case '<=': return left <= right;
-            case '>=': return left >= right;
-            case '<': return left < right;
-            case '>': return left > right;
-            default: return false;
-        }
-    }
-
-    _tokenizeWords(line) {
-        const words = [];
-        let i = 0;
-        const n = line.length;
-        const isLetter = (c) => /[A-Za-z]/.test(c);
-
-        while (i < n) {
-            const ch = line[i];
-            if (isLetter(ch)) {
-                const letter = ch.toUpperCase();
-                i += 1;
-                let value = '';
-                while (i < n && !isLetter(line[i])) {
-                    value += line[i];
-                    i += 1;
-                }
-                words.push({ letter, value: value.trim() });
-            } else {
-                i += 1;
-            }
-        }
-
-        return words;
+        // DDCS-emulator behavior: unset variables read as 0
+        return evaluateCondition(expression, this.vars, { unsetValue: 0 });
     }
 
     _evaluateExpression(str) {
-        if (str == null) return null;
-        const s = String(str).trim();
-        if (s === '') return null;
-
-        const toks = [];
-        let i = 0;
-
-        while (i < s.length) {
-            const c = s[i];
-            if (c === ' ' || c === '\t') { i += 1; continue; }
-            if ((c >= '0' && c <= '9') || c === '.') {
-                let num = '';
-                while (i < s.length && ((s[i] >= '0' && s[i] <= '9') || s[i] === '.')) {
-                    num += s[i];
-                    i += 1;
-                }
-                toks.push(Number.parseFloat(num));
-                continue;
-            }
-            if (c === '#' || c === '[' || c === ']' || c === '+' || c === '-' || c === '*' || c === '/') {
-                toks.push(c);
-                i += 1;
-                continue;
-            }
-            return null;
-        }
-
-        let p = 0;
-        const peek = () => toks[p];
-
-        const parseExpr = () => {
-            let value = parseTerm();
-            while (value !== null && (peek() === '+' || peek() === '-')) {
-                const op = toks[p++];
-                const right = parseTerm();
-                if (right === null) return null;
-                value = op === '+' ? value + right : value - right;
-            }
-            return value;
-        };
-
-        const parseTerm = () => {
-            let value = parseFactor();
-            while (value !== null && (peek() === '*' || peek() === '/')) {
-                const op = toks[p++];
-                const right = parseFactor();
-                if (right === null) return null;
-                value = op === '*' ? value * right : (right !== 0 ? value / right : null);
-            }
-            return value;
-        };
-
-        const parseFactor = () => {
-            const token = peek();
-            if (token === '+') {
-                p += 1;
-                return parseFactor();
-            }
-            if (token === '-') {
-                p += 1;
-                const factor = parseFactor();
-                return factor === null ? null : -factor;
-            }
-            if (token === '[') {
-                p += 1;
-                const inner = parseExpr();
-                if (peek() === ']') p += 1;
-                return inner;
-            }
-            if (token === '#') {
-                p += 1;
-                let idx = null;
-                if (peek() === '[') {
-                    p += 1;
-                    idx = parseExpr();
-                    if (peek() === ']') p += 1;
-                } else if (typeof peek() === 'number') {
-                    idx = toks[p++];
-                } else {
-                    return null;
-                }
-                if (idx == null || !Number.isFinite(idx)) return null;
-                const value = this.vars.get(Math.round(idx));
-                return value == null ? 0 : value;
-            }
-            if (typeof token === 'number') {
-                p += 1;
-                return token;
-            }
-            return null;
-        };
-
-        return parseExpr();
+        // DDCS-emulator behavior: unset variables read as 0
+        return evalExpr(str, this.vars, { unsetValue: 0 });
     }
 }

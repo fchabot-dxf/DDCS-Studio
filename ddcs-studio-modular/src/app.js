@@ -5,42 +5,42 @@
  * CNC G-code Generator for DDCS Expert M350 Controller
  */
 
-import { ThemeManager } from './themes.js';
-import { ScaleManager } from './scaleManager.js';
-import { VariableDatabase } from './variableDB.js';
-import { EditorManager } from './editorManager.js';
-import { DockManager } from './dockManager.js';
+import { ThemeManager } from './ui/themes.js';
+import { ScaleManager } from './ui/scaleManager.js';
+import { VariableDatabase } from './data/variableDB.js';
+import { EditorManager } from './ui/editorManager.js';
+import { DockManager } from './ui/dockManager.js';
 import { WizardManager } from './wizardManager.js';
-import { el } from './uiUtils.js';
-import { CornerVizAnimator } from './cornerVizAnimator.js';
-import { playClick } from './sound.js';  // click feedback sound
+import { el } from './ui/uiUtils.js';
+import { setupGlobalFunctions } from './ui/globalFunctions.js';
+import { setupNumericInputGuards as setupNumericInputGuardsImpl } from './ui/numericInputGuards.js';
+import { playClick } from './ui/sound.js';  // click feedback sound
 // Edge viz animator (registers `window.EdgeVizAnimator`)
-import './edgeVizAnimator.js';
+import './viz/edgeVizAnimator.js';
 // Alignment viz animator (registers `window.AlignVizAnimator`)
-import './alignVizAnimator.js';
+import './viz/alignVizAnimator.js';
 
 // MiddleViz helpers (animation, id mapping, visibility controller)
-import './middleVizUtils.js';
-import './middleVizAnimator.js';
-import './middleVizManager.js';
+import './viz/middleVizUtils.js';
+import './viz/middleVizAnimator.js';
+import './viz/middleVizManager.js';
 
 // EDITOR / 3D toolpath preview tab (self-registers window.setGcodeView on DOM ready)
-import './gcodePreviewTab.js';
+import './ui/gcodePreviewTab.js';
 
 // Settings panel (header ⚙ → CSV import/export + stock + machine envelope)
-import './settingsPanel.js';
+import './ui/settingsPanel.js';
 
 // Profile store (one JSON = settings + user variables; pywebview file-I/O ready)
-import './profileStore.js';
+import './data/profileStore.js';
 
 // Virtual I/O simulation — browser-only mock of hardware handshakes (ATC, drawbar, etc.)
 // Used by the Studio's G-code simulation/preview engine to animate full macro cycles
 // without a real controller. No network or serial connections — pure JS + setTimeout.
 // See src/virtualIO.js for the truth table and integration API.
-import { resetVirtualIO, setVirtualOutput, getVirtualInput } from './virtualIO.js';
 
 // IO Settings & Diagnostics
-import './ioTab.js';
+import './ui/ioTab.js';
 
 class DDCSStudio {
     constructor() {
@@ -157,123 +157,7 @@ class DDCSStudio {
     }
 
     setupGlobalFunctions() {
-        // Expose key functions to global scope for HTML onclick handlers
-        window.toggleStyle = () => this.themeManager.toggle();
-        window.toggleScale = () => this.scaleManager.toggle();
-        window.saveDefaults = () => this.saveDefaults();
-        window.copyCode = () => this.editorManager.copyCode();
-        window.clearCode = () => this.editorManager.clearCode();
-        window.downloadFile = () => this.editorManager.downloadFile();
-        window.clearSearch = () => this.dockManager.clear();
-        window.insert = (key, text) => this.editorManager.insert(key, text);
-        window.backspace = () => this.editorManager.backspace();
-        window.editorManager = this.editorManager;
-
-        // Wizard functions
-        window.openWiz = (type) => this.wizardManager.open(type);
-        window.openCornerWiz = () => this.wizardManager.openCorner();
-        window.openMiddleWiz = () => this.wizardManager.openMiddle();
-        window.CornerVizAnimator = CornerVizAnimator;
-        window.openEdgeWiz = () => this.wizardManager.openEdge();
-        window.openAlignmentWiz = () => this.wizardManager.openAlignment();
-        window.closeWiz = () => this.wizardManager.close();
-        window.insertWiz = () => this.wizardManager.insert();
-        window.togglePreview = () => this.wizardManager.togglePreview();
-        window.updateWiz = () => this.wizardManager.update();
-
-        // ----------------------------------------------------------------
-        // Virtual I/O simulation hooks
-        // Integration point for the future G-code simulation/execution engine:
-        // When the engine evaluates a macro output assignment (e.g. MSETDATA
-        // that maps to OUT_SPINDLE_UNCLAMP), call:
-        //   setVirtualOutput('OUT_SPINDLE_UNCLAMP', true);
-        // The truth table in virtualIO.js will simulate the sensor handshake.
-        // On new program / simulation reset, call:
-        //   resetVirtualIO();
-        // ----------------------------------------------------------------
-        window.virtualIO_setOutput  = setVirtualOutput;
-        window.virtualIO_getInput   = getVirtualInput;
-        window.virtualIO_reset      = resetVirtualIO;
-
-        // Communication wizard: audible beep preview (Web Audio)
-        window.playCommBeepPreview = async (durationMs = 500, cycleMs = 0) => {
-            try {
-                const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                if (!AudioCtx) return;
-
-                const parsedDur = Number(durationMs);
-                const parsedCycle = Number(cycleMs);
-                const dur = Number.isFinite(parsedDur) && parsedDur > 0 ? parsedDur : 500;
-                const cycle = Number.isFinite(parsedCycle) && parsedCycle > 0 ? parsedCycle : 0;
-
-                if (!window.__commBeepAudioCtx) {
-                    window.__commBeepAudioCtx = new AudioCtx();
-                }
-                const ctx = window.__commBeepAudioCtx;
-                if (ctx.state === 'suspended') await ctx.resume();
-
-                // Stop any currently playing preview tone before starting a new one
-                if (window.__commBeepNodes) {
-                    try { window.__commBeepNodes.oscillator.stop(); } catch (e) { /* noop */ }
-                    try { window.__commBeepNodes.oscillator.disconnect(); } catch (e) { /* noop */ }
-                    try { window.__commBeepNodes.gainNode.disconnect(); } catch (e) { /* noop */ }
-                    window.__commBeepNodes = null;
-                }
-
-                const oscillator = ctx.createOscillator();
-                const gainNode = ctx.createGain();
-                oscillator.type = 'square';
-                oscillator.frequency.value = 850;
-
-                oscillator.connect(gainNode);
-                gainNode.connect(ctx.destination);
-
-                const start = ctx.currentTime + 0.01;
-                const end = start + (dur / 1000);
-                gainNode.gain.cancelScheduledValues(start);
-                gainNode.gain.setValueAtTime(0, start);
-
-                if (cycle > 0) {
-                    const pulse = cycle / 1000;
-                    let time = start;
-                    while (time < end) {
-                        const onStart = time;
-                        const onEnd = Math.min(onStart + pulse, end);
-                        gainNode.gain.setValueAtTime(0.16, onStart);
-                        gainNode.gain.setValueAtTime(0.16, onEnd);
-                        gainNode.gain.setValueAtTime(0, onEnd);
-                        time += pulse * 2;
-                    }
-                } else {
-                    gainNode.gain.setValueAtTime(0.16, start);
-                    gainNode.gain.setValueAtTime(0, end);
-                }
-
-                window.__commBeepNodes = { oscillator, gainNode };
-                oscillator.onended = () => {
-                    try { oscillator.disconnect(); } catch (e) { /* noop */ }
-                    try { gainNode.disconnect(); } catch (e) { /* noop */ }
-                    if (window.__commBeepNodes && window.__commBeepNodes.oscillator === oscillator) {
-                        window.__commBeepNodes = null;
-                    }
-                };
-
-                oscillator.start(start);
-                oscillator.stop(end);
-            } catch (err) {
-                console.warn('Beep preview failed', err);
-            }
-        };
-
-        // Insert in message function for wizards
-        window.insertInMsg = (t) => {
-            const i = el('c_msg');
-            if (i) {
-                i.value = i.value.slice(0, i.selectionStart) + t + i.value.slice(i.selectionEnd);
-                this.wizardManager.update();
-                i.focus();
-            }
-        };
+        setupGlobalFunctions(this);
     }
 
     setupFileUpload() {
@@ -295,121 +179,7 @@ class DDCSStudio {
     }
 
     setupNumericInputGuards() {
-        const ALLOWED_INTEGER_CHARS = new Set('0123456789'.split(''));
-        const ALLOWED_DECIMAL_CHARS = new Set('0123456789.'.split(''));
-        const CONTROL_KEYS = new Set([
-            'Backspace', 'Delete', 'Tab', 'Enter', 'Escape',
-            'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-            'Home', 'End'
-        ]);
-
-        // Numeric input policy table (single source of truth)
-        // - integer: digits only (0-9)
-        // - decimal: digits + one decimal point (0-9 and .)
-        // - signed variants can be added later if needed
-        const NUMERIC_INPUT_POLICY = {
-            integer: [
-                'c_dist', 'c_retract', 'c_safe_z', 'c_travel_dist', 'c_port',
-                'm_port', 'p_port', 'al_port',
-                'c_cycle', 'c_id', 'c_status_dwell',
-                'c_slot1', 'c_slot2', 'c_slot3', 'c_slot4'
-            ],
-            decimal: [
-                'c_feed_fast', 'c_feed_slow',
-                'm_dist', 'm_retract', 'm_safe_z', 'm_feed_fast', 'm_feed_slow',
-                'p_dist', 'p_retract', 'p_feed_fast', 'p_feed_slow',
-                'al_dist', 'al_retract', 'al_safe_z', 'al_tolerance', 'al_feed_fast', 'al_feed_slow',
-                'c_val'
-            ]
-        };
-
-        const integerFieldIds = NUMERIC_INPUT_POLICY.integer;
-        const decimalFieldIds = NUMERIC_INPUT_POLICY.decimal;
-
-        const numericFieldIds = [...integerFieldIds, ...decimalFieldIds];
-
-        const sanitizeNumeric = (value, allowDecimal, allowNegative) => {
-            let text = String(value ?? '');
-            text = text.replace(/[^\d.\-]/g, '');
-
-            if (allowNegative) {
-                text = text.replace(/(?!^)-/g, '');
-            } else {
-                text = text.replace(/-/g, '');
-            }
-
-            if (allowDecimal) {
-                const firstDot = text.indexOf('.');
-                if (firstDot !== -1) {
-                    text = text.slice(0, firstDot + 1) + text.slice(firstDot + 1).replace(/\./g, '');
-                }
-            } else {
-                text = text.replace(/\./g, '');
-            }
-
-            return text;
-        };
-
-        numericFieldIds.forEach((id) => {
-            const input = el(id);
-            if (!input) return;
-
-            const allowDecimal = decimalFieldIds.includes(id);
-            const allowNegative = false;
-            const allowedChars = allowDecimal ? ALLOWED_DECIMAL_CHARS : ALLOWED_INTEGER_CHARS;
-
-            input.setAttribute('inputmode', allowDecimal ? 'decimal' : 'numeric');
-            input.setAttribute('autocomplete', 'off');
-
-            const currentType = (input.getAttribute('type') || '').toLowerCase();
-            if (!currentType) input.setAttribute('type', 'text');
-
-            if (input.dataset.numericGuardBound === 'true') return;
-            input.dataset.numericGuardBound = 'true';
-
-            input.addEventListener('keydown', (e) => {
-                if (!e.key) return;
-                if (e.ctrlKey || e.metaKey || e.altKey) return;
-                if (CONTROL_KEYS.has(e.key)) return;
-                if (e.key.length !== 1) return;
-
-                if (!allowedChars.has(e.key)) {
-                    e.preventDefault();
-                    return;
-                }
-
-                if (e.key === '.') {
-                    if (!allowDecimal) {
-                        e.preventDefault();
-                        return;
-                    }
-                    const start = input.selectionStart ?? 0;
-                    const end = input.selectionEnd ?? 0;
-                    const nextValue = input.value.slice(0, start) + e.key + input.value.slice(end);
-                    if ((nextValue.match(/\./g) || []).length > 1) {
-                        e.preventDefault();
-                        return;
-                    }
-                }
-
-                if (e.key === '-') {
-                    if (!allowNegative) {
-                        e.preventDefault();
-                        return;
-                    }
-                }
-            });
-
-            input.addEventListener('input', () => {
-                const cleaned = sanitizeNumeric(input.value, allowDecimal, allowNegative);
-                if (cleaned !== input.value) {
-                    input.value = cleaned;
-                }
-            });
-
-            // Sanitize initial values too
-            input.value = sanitizeNumeric(input.value, allowDecimal, allowNegative);
-        });
+        setupNumericInputGuardsImpl();
     }
 
     initializeCornerVisualization() {

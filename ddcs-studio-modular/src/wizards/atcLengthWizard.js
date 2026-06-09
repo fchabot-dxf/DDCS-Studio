@@ -1,18 +1,17 @@
 /**
  * DDCS Studio - ATC Tool Length Setter Wizard
  * Generates G-code for touching off a tool on a fixed tool setter block
- * and calculating the length offset into the H register.
+ * and saving the length offset into the DDCS tool table (#1430 + T-1).
  */
 import { w, G, M, N, Z, F, P, L, Q, set, line, comment } from './words.js';
 import { ifGoto, goto } from './dialect.js';
+import { toNum as toNumShared } from './probeBlocks.js';
 
 export class AtcLengthWizard {
     constructor() {}
 
     toNum(v, def = 0) {
-        if (v === undefined || v === null) return def;
-        const n = Number(v);
-        return Number.isFinite(n) ? n : def;
+        return toNumShared(v, def);
     }
 
     generate(params) {
@@ -51,28 +50,36 @@ export class AtcLengthWizard {
 
         gcode += comment('Step 1: Fast Probe Down') + '\n';
         gcode += line([G(31), Z('#7'), F('#3'), P('#5'), L(_level), Q(_qStop)], 'Fast plunge') + '\n';
-        gcode += ifGoto('#1922', '==', '0', 1) + '\n';
+        gcode += ifGoto('#1922', '!=', '2', 1) + '\n';
         gcode += line([G(0), Z('#10')], 'Retract up') + '\n\n';
 
         gcode += comment('Step 2: Slow Precision Touch') + '\n';
         gcode += line([G(31), Z('#7'), F('#4'), P('#5'), L(_level), Q(_qStop)], 'Slow probe') + '\n';
-        gcode += ifGoto('#1922', '==', '0', 1) + '\n\n';
+        gcode += ifGoto('#1922', '!=', '2', 1) + '\n\n';
 
         gcode += line([G(90)], 'Absolute mode') + '\n\n';
 
         gcode += comment('Calculate and Store Tool Length Offset') + '\n';
         gcode += line([set('#101', '#1927')], 'Read Machine Z trigger pos') + '\n';
         gcode += line([set('#102', '[#101 - #6]')], 'Length = MachineZ - BlockHeight') + '\n';
-        gcode += line([set('#574', '#102')], 'Save to Current Tool H Offset') + '\n\n';
+        gcode += line([set('#103', '#1300')], 'Read current tool number') + '\n';
+        gcode += ifGoto('#103', '<', '1', 3) + '\n';
+        gcode += line([set('#104', '[1430 + #103 - 1]')], 'Tool table address 1430 plus T minus 1') + '\n';
+        gcode += line([set('#[#104]', '#102')], 'Save length to tool table') + '\n\n';
 
         gcode += line([G(0), Z('#19')], 'Retract to safe Z') + '\n';
         gcode += line([set('#1505', '-5000')], 'Tool length successfully saved') + '\n';
         gcode += goto(2) + '\n\n';
 
-        gcode += comment('=== ERROR HANDLER ===') + '\n';
+        gcode += comment('=== ERROR HANDLERS ===') + '\n';
         gcode += line([N(1)]) + '\n';
         gcode += line([G(90)]) + '\n';
-        gcode += line([set('#1505', '1')], 'ERROR: Tool Setter missed') + '\n\n';
+        gcode += line([set('#1505', '1')], 'ERROR: Tool Setter missed') + '\n';
+        gcode += goto(2) + '\n\n';
+
+        gcode += line([N(3)]) + '\n';
+        gcode += line([G(90)]) + '\n';
+        gcode += line([set('#1505', '1')], 'ERROR: No tool number set - check #1300') + '\n\n';
 
         gcode += line([N(2)]) + '\n';
         gcode += line([M(30)]) + '\n';
