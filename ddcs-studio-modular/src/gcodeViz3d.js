@@ -219,33 +219,29 @@ export class GcodeViz3D {
     _setupJogPendant() {
         const div = document.createElement('div');
         div.className = 'viz3d-jog-pendant';
-        div.style.cssText = 'position: absolute; bottom: 16px; right: 16px; background: rgba(18, 18, 22, 0.85); border: 1px solid #333; border-radius: 8px; padding: 12px; color: #fff; z-index: 100; font-size: 11px; display: none; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.5); user-select: none;';
+        div.style.cssText = 'background: rgba(18, 18, 22, 0.95); border-top: 1px solid rgba(255,255,255,0.08); padding: 8px 12px 12px; color: #fff; z-index: 100; font-size: 11px; display: none; user-select: none; width: 100%; box-sizing: border-box;';
         div.innerHTML = `
-            <div style="text-align: center; margin-bottom: 8px; font-weight: bold; color: #aaa; letter-spacing: 1px;">START POSITION</div>
-            <div style="display: flex; gap: 12px; justify-content: center;">
-                <div style="display: grid; grid-template-columns: 36px 36px 36px; gap: 4px;">
-                    <div></div>
-                    <button class="toolbar-btn" data-axis="y" data-dir="1" style="width:100%; height:32px; padding:0; font-weight:bold;">Y+</button>
-                    <div></div>
-                    <button class="toolbar-btn" data-axis="x" data-dir="-1" style="width:100%; height:32px; padding:0; font-weight:bold;">X-</button>
-                    <button class="toolbar-btn" data-axis="xy" data-dir="0" style="width:100%; height:32px; padding:0; background:#2b3340; border-color:#555;" title="Reset X/Y to 0">0</button>
-                    <button class="toolbar-btn" data-axis="x" data-dir="1" style="width:100%; height:32px; padding:0; font-weight:bold;">X+</button>
-                    <div></div>
-                    <button class="toolbar-btn" data-axis="y" data-dir="-1" style="width:100%; height:32px; padding:0; font-weight:bold;">Y-</button>
-                    <div></div>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 4px; border-left: 1px solid #444; padding-left: 12px;">
-                    <button class="toolbar-btn" data-axis="z" data-dir="1" style="width:36px; height:32px; padding:0; font-weight:bold;">Z+</button>
-                    <button class="toolbar-btn" data-axis="z" data-dir="0" style="width:36px; height:32px; padding:0; background:#2b3340; border-color:#555;" title="Reset Z to 0">0</button>
-                    <button class="toolbar-btn" data-axis="z" data-dir="-1" style="width:36px; height:32px; padding:0; font-weight:bold;">Z-</button>
-                </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 0 4px;">
+                <span style="font-weight: bold; color: #aaa; letter-spacing: 1px;">JOG START</span>
+                <span style="display: flex; gap: 8px; align-items: center; color: #888;">
+                    Step:
+                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="0.1"> 0.1</label>
+                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="1" checked> 1.0</label>
+                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="10"> 10</label>
+                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="100"> 100</label>
+                </span>
             </div>
-            <div style="margin-top: 12px; display: flex; justify-content: center; gap: 8px; align-items: center; border-top: 1px solid #333; padding-top: 8px;">
-                <span style="color:#888;">Step (mm):</span>
-                <label style="cursor:pointer;"><input type="radio" name="jogStep" value="0.1"> 0.1</label>
-                <label style="cursor:pointer;"><input type="radio" name="jogStep" value="1" checked> 1</label>
-                <label style="cursor:pointer;"><input type="radio" name="jogStep" value="10"> 10</label>
-                <label style="cursor:pointer;"><input type="radio" name="jogStep" value="100"> 100</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 32px 32px; gap: 6px;">
+                <button class="toolbar-btn" data-axis="x" data-dir="-1" style="font-weight:bold; padding:0;">X-</button>
+                <button class="toolbar-btn" data-axis="y" data-dir="1" style="font-weight:bold; padding:0;">Y+</button>
+                <button class="toolbar-btn" data-axis="z" data-dir="1" style="font-weight:bold; padding:0;">Z+</button>
+                <button class="toolbar-btn" data-axis="x" data-dir="1" style="font-weight:bold; padding:0;">X+</button>
+                <button class="toolbar-btn" data-axis="y" data-dir="-1" style="font-weight:bold; padding:0;">Y-</button>
+                <button class="toolbar-btn" data-axis="z" data-dir="-1" style="font-weight:bold; padding:0;">Z-</button>
+            </div>
+            <div style="display: flex; gap: 6px; margin-top: 6px;">
+                <button class="toolbar-btn" data-axis="xy" data-dir="0" style="flex:1; height:24px; padding:0; background:#2b3340; border-color:#555;" title="Reset X/Y to 0">0 XY</button>
+                <button class="toolbar-btn" data-axis="z" data-dir="0" style="flex:1; height:24px; padding:0; background:#2b3340; border-color:#555;" title="Reset Z to 0">0 Z</button>
             </div>
         `;
         this.container.appendChild(div);
@@ -979,6 +975,22 @@ export class GcodeViz3D {
             container.appendChild(cv);
             if (this._ro) { this._ro.disconnect(); this._ro.observe(container); }
         }
+        
+        // Move jog pendant
+        if (this.jogPendant) {
+            const wizBody = container.closest('.wiz-body');
+            if (wizBody) {
+                const legend = wizBody.querySelector('.viz-legend');
+                if (legend) {
+                    legend.insertAdjacentElement('afterend', this.jogPendant);
+                } else {
+                    wizBody.appendChild(this.jogPendant);
+                }
+            } else {
+                container.appendChild(this.jogPendant);
+            }
+        }
+        
         this._resize();
     }
 

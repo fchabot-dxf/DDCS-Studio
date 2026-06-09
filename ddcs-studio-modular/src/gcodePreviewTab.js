@@ -22,6 +22,7 @@ function gpEls() {
         vizContainer: document.getElementById('gcodeViz3dContainer'),
         editor: document.getElementById('editor'),
         status: document.getElementById('viz3dStatus'),
+        copyBtn: document.getElementById('viz3dStatusCopy'),
     };
 }
 
@@ -30,6 +31,15 @@ function gpSyncControls() {
     const sel = document.getElementById('viz3dStockShape');
     const s = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
     if (sel && s && s.stock) sel.value = s.stock.shape || 'boss';
+}
+
+/** Set the status bar text, optionally flagging it as an error (red + copy button). */
+function gpSetStatus(statusEl, text, isError = false) {
+    if (!statusEl) return;
+    statusEl.textContent = text;
+    statusEl.classList.toggle('has-error', isError);
+    const copyBtn = document.getElementById('viz3dStatusCopy');
+    if (copyBtn) copyBtn.classList.toggle('visible', !!(text && text.length > 0));
 }
 
 function gpRenderFromEditor() {
@@ -42,21 +52,22 @@ function gpRenderFromEditor() {
     gpViz.setSegments(parsed);
     if (!status) return;
     const s = parsed.stats;
-    if (!s.drawable) {
-        status.textContent = 'No drawable moves in this program';
-    } else {
-        const b = (gpViz && gpViz._dataBounds) || parsed.bounds; // clamped render bounds
-        const r = (n) => n.toFixed(1).replace(/\.0$/, '');
-        const parts = [];
-        if (s.feed) parts.push(`${s.feed} cuts`);
-        if (s.probe) parts.push(`${s.probe} probes`);
-        if (s.rapid) parts.push(`${s.rapid} rapids`);
-        if (s.retract) parts.push(`${s.retract} retracts`);
-        if (s.passes > 1) parts.push(`${s.passes} passes`);
-        if (s.skipped) parts.push(`${s.skipped} skipped`);
-        status.textContent = parts.join(' · ') +
-            `   X[${r(b.minX)} ${r(b.maxX)}] Y[${r(b.minY)} ${r(b.maxY)}] Z[${r(b.minZ)} ${r(b.maxZ)}] mm`;
-    }
+    gpSetStatus(status, !s.drawable
+        ? 'No drawable moves in this program'
+        : (() => {
+            const b = (gpViz && gpViz._dataBounds) || parsed.bounds;
+            const r = (n) => n.toFixed(1).replace(/\.0$/, '');
+            const parts = [];
+            if (s.feed) parts.push(`${s.feed} cuts`);
+            if (s.probe) parts.push(`${s.probe} probes`);
+            if (s.rapid) parts.push(`${s.rapid} rapids`);
+            if (s.retract) parts.push(`${s.retract} retracts`);
+            if (s.passes > 1) parts.push(`${s.passes} passes`);
+            if (s.skipped) parts.push(`${s.skipped} skipped`);
+            return parts.join(' · ') +
+                `   X[${r(b.minX)} ${r(b.maxX)}] Y[${r(b.minY)} ${r(b.maxY)}] Z[${r(b.minZ)} ${r(b.maxZ)}] mm`;
+        })(),
+    false);
 }
 
 export function setGcodeView(view) {
@@ -144,7 +155,7 @@ function gpInit() {
                         }
                     },
                     onStatus: ({ message }) => {
-                        if (els.status) els.status.textContent = message;
+                        gpSetStatus(els.status, message, false);
                     },
                     onFinish: () => {
                         gpUpdateRunButton(false);
@@ -163,9 +174,8 @@ function gpInit() {
 
             const validation = gpEngine.verifySyntax(code);
             if (!validation.valid) {
-                if (els.status) {
-                    els.status.textContent = validation.errors.map((err) => `Ln ${err.lineIndex + 1}: ${err.message}`).join(' | ');
-                }
+                const errText = validation.errors.map((err) => `Ln ${err.lineIndex + 1}: ${err.message}`).join('\n');
+                gpSetStatus(els.status, errText, true);
                 return;
             }
 
@@ -189,6 +199,26 @@ function gpInit() {
         if (gpView === '3d' && gpViz) gpRenderFromEditor();
     });
     window.setGcodeView = setGcodeView;
+
+    // Wire the copy button
+    const copyBtn = gpEls().copyBtn;
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+            const status = gpEls().status;
+            if (!status || !status.textContent) return;
+            navigator.clipboard.writeText(status.textContent).then(() => {
+                copyBtn.textContent = '✓ Copied';
+                setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 1500);
+            }).catch(() => {
+                // Fallback: select the text
+                const range = document.createRange();
+                range.selectNodeContents(status);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            });
+        });
+    }
 }
 
 if (document.readyState === 'loading') {

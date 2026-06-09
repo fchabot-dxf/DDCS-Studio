@@ -40,15 +40,15 @@ export class AtcChangeWizard {
         gcode += line([set('#1156', '#881')], 'Save Tool Change Y') + '\n\n';
 
         gcode += `( Move to safe Z then park position )\n`;
-        gcode += line([G(53), G(0), Z('#3')], 'Retract Z to park') + '\n';
-        gcode += line([G(53), G(0), X('#1'), Y('#2')], 'Move to XY park') + '\n\n';
+        gcode += line([G(53), Z('#3')], 'Retract Z to park') + '\n';
+        gcode += line([G(53), X('#1'), Y('#2')], 'Move to XY park') + '\n\n';
 
         gcode += `( Release Tool )\n`;
         gcode += line([M(10), P('#4')], 'Drawbar Release ON') + '\n';
         gcode += line([M(33), P('#5')], 'Wait for Clamp Sensor OFF (Tool Released)') + '\n\n';
 
         gcode += `( Wait for Operator )\n`;
-        gcode += `#1505=1 ( Swap Tool. Press Enter to Clamp )\n`;
+        gcode += line([set('#1505', '1')], 'Swap Tool. Press Enter to Clamp') + '\n';
         gcode += ifGoto('#1505', '==', '0', 999) + '\n\n';
 
         gcode += `( Clamp Tool )\n`;
@@ -56,7 +56,7 @@ export class AtcChangeWizard {
         gcode += line([M(31), P('#5')], 'Wait for Clamp Sensor ON (Tool Secured)') + '\n\n';
 
         gcode += `( Complete )\n`;
-        gcode += `#1505=-5000 ( Tool Swap Complete! )\n\n`;
+        gcode += line([set('#1505', '-5000')], 'Tool Swap Complete!') + '\n\n';
 
         gcode += `( Normal end )\n`;
         gcode += line([N(999)]) + '\n';

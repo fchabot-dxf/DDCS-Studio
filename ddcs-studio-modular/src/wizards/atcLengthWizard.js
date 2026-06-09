@@ -44,16 +44,16 @@ export class AtcLengthWizard {
         gcode += `#7=[0-#1]  ( Negative plunge )\n`;
         gcode += `#10=#2     ( Positive retract )\n\n`;
 
-        gcode += `( Confirm Start )\n#1505=1 ( Hover tool above setter. Press Enter )\n\n`;
+        gcode += `( Confirm Start )\n`;
+        gcode += line([set('#1505', '1')], 'Hover tool above setter. Press Enter') + '\n\n';
 
         gcode += line([G(91)], 'INCREMENTAL MODE') + '\n\n';
 
         gcode += comment('Step 1: Fast Probe Down') + '\n';
         gcode += line([G(31), Z('#7'), F('#3'), P('#5'), L(_level), Q(_qStop)], 'Fast plunge') + '\n';
         gcode += ifGoto('#1922', '==', '0', 1) + '\n';
-        
         gcode += line([G(0), Z('#10')], 'Retract up') + '\n\n';
-        
+
         gcode += comment('Step 2: Slow Precision Touch') + '\n';
         gcode += line([G(31), Z('#7'), F('#4'), P('#5'), L(_level), Q(_qStop)], 'Slow probe') + '\n';
         gcode += ifGoto('#1922', '==', '0', 1) + '\n\n';
@@ -66,7 +66,6 @@ export class AtcLengthWizard {
         gcode += line([set('#574', '#102')], 'Save to Current Tool H Offset') + '\n\n';
 
         gcode += line([G(0), Z('#19')], 'Retract to safe Z') + '\n';
-        
         gcode += line([set('#1505', '-5000')], 'Tool length successfully saved') + '\n';
         gcode += goto(2) + '\n\n';
 
@@ -74,7 +73,9 @@ export class AtcLengthWizard {
         gcode += line([N(1)]) + '\n';
         gcode += line([G(90)]) + '\n';
         gcode += line([set('#1505', '1')], 'ERROR: Tool Setter missed') + '\n\n';
-        gcode += line([N(2)]) + '\n' + line([M(30)]) + '\n';
+
+        gcode += line([N(2)]) + '\n';
+        gcode += line([M(30)]) + '\n';
 
         return gcode;
     }

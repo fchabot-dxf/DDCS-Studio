@@ -2618,12 +2618,40 @@ body[data-theme="studio"] .dock-body .ddcs-tab.active {
     background: rgba(0, 0, 0, 0.55);
     padding: 3px 7px;
     border-radius: 3px;
-    pointer-events: none;
     z-index: 2;
     white-space: nowrap;
 }
-.viz3d-status { top: 6px; left: 8px; }
-.viz3d-hint { bottom: 6px; left: 50%; transform: translateX(-50%); color: #6f8aa0; }
+.viz3d-status {
+    top: 6px; left: 8px; right: 60px; user-select: text; cursor: text;
+    white-space: pre-wrap; max-height: 120px; overflow-y: auto;
+    transition: background 0.2s, color 0.2s;
+}
+.viz3d-status.has-error {
+    color: #ff6b6b; background: rgba(80, 0, 0, 0.75);
+    border: 1px solid rgba(255, 80, 80, 0.4);
+}
+.viz3d-status-copy {
+    position: absolute; top: 6px; right: 8px; z-index: 4;
+    font-size: 10px; padding: 2px 8px; cursor: pointer;
+    background: rgba(0,0,0,0.55); color: #7fd0ff; border: 1px solid rgba(120,190,255,0.3);
+    border-radius: 3px; display: none; user-select: none;
+}
+.viz3d-status-copy:hover { background: rgba(40,100,160,0.6); }
+.viz3d-status-copy.visible { display: block; }
+
+/* Jog pendant context styling */
+.viz3d-drawer .viz3d-jog-pendant {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+}
+.wiz-body .viz3d-jog-pendant {
+    position: static;
+    margin-top: 8px;
+}
+.viz3d-hint { bottom: 6px; left: 50%; transform: translateX(-50%); color: #6f8aa0; pointer-events: none; }
 .viz3d-controls { position: absolute; bottom: 6px; right: 8px; z-index: 3; display: flex; gap: 6px; align-items: center; }
 .viz3d-controls label { font-size: 10px; color: #9fc4e6; display: flex; align-items: center; gap: 4px; }
 .viz3d-controls select,

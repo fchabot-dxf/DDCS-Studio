@@ -32,7 +32,7 @@ export class AtcWarmupWizard {
         gcode += `#143=${_time2}    ( Stage 2 Duration )\n\n`;
 
         gcode += `( Single confirmation )\n`;
-        gcode += `#1505=1 ( Warm up spindle? Press Enter )\n`;
+        gcode += line([set('#1505', '1')], 'Warm up spindle? Press Enter') + '\n';
         gcode += ifGoto('#1505', '==', '0', 999) + '\n\n';
 
         gcode += `( Initialize - stop spindle if running )\n`;
@@ -40,12 +40,12 @@ export class AtcWarmupWizard {
 
         gcode += `( === WARMUP SEQUENCE === )\n`;
         gcode += line([set('#1510', '#140')], 'Display RPM') + '\n';
-        gcode += `#1505=-5000 ( Starting at %.0f RPM... )\n`;
+        gcode += line([set('#1505', '-5000')], 'Starting at %.0f RPM...') + '\n';
         gcode += line([M(3), S('#140')], 'Start Stage 1') + '\n';
         gcode += line([G(4), P('#141')], 'Wait Stage 1') + '\n\n';
 
         gcode += line([set('#1510', '#142')], 'Display RPM') + '\n';
-        gcode += `#1505=-5000 ( Ramping to %.0f RPM... )\n`;
+        gcode += line([set('#1505', '-5000')], 'Ramping to %.0f RPM...') + '\n';
         gcode += line([M(3), S('#142')], 'Start Stage 2') + '\n';
         gcode += line([G(4), P('#143')], 'Wait Stage 2') + '\n\n';
 
@@ -53,7 +53,7 @@ export class AtcWarmupWizard {
         gcode += line([M(5)], 'Stop Spindle') + '\n\n';
 
         gcode += `( Complete )\n`;
-        gcode += `#1505=-5000 ( Warmup complete - Spindle ready! )\n\n`;
+        gcode += line([set('#1505', '-5000')], 'Warmup complete - Spindle ready!') + '\n\n';
 
         gcode += `( Normal end )\n`;
         gcode += line([N(999)]) + '\n';
