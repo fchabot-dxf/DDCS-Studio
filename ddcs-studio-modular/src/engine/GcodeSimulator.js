@@ -1,5 +1,5 @@
 import { parseGcode } from '../gcodeParser.js';
-import { resetVirtualIO } from '../virtualIO.js';
+import { resetVirtualIO, setVirtualOutput } from '../virtualIO.js';
 
 export function simulateGcode(text, options = {}) {
     const mode = (options.mode || 'virtual').toLowerCase();
@@ -28,6 +28,7 @@ export function executeGcode(text) {
         maxX: -Infinity, maxY: -Infinity, maxZ: -Infinity,
     };
     let feedCount = 0, rapidCount = 0, retractCount = 0, probeCount = 0, skipped = 0;
+    let m10Count = 0, m11Count = 0, m31Count = 0, m33Count = 0;
 
     const grow = (p) => {
         if (p.x < bounds.minX) bounds.minX = p.x;
@@ -128,13 +129,32 @@ export function executeGcode(text) {
         if (words.every((w) => w.letter === 'N')) continue;
 
         const gcodes = [];
+        const mcodes = [];
         const wm = {};
         for (const word of words) {
             if (word.letter === 'G') {
                 const value = parseFloat(word.value);
                 if (Number.isFinite(value)) gcodes.push(value);
+            } else if (word.letter === 'M') {
+                const value = parseFloat(word.value);
+                if (Number.isFinite(value)) mcodes.push(value);
             } else if (word.letter !== 'N') {
                 wm[word.letter] = gpEvalExpr(word.value, vars);
+            }
+        }
+
+        // Handle I/O simulation and tracking
+        for (const m of mcodes) {
+            if (m === 10) {
+                m10Count++;
+                if (wm.P != null) setVirtualOutput(`OUT_${wm.P}`, true);
+            } else if (m === 11) {
+                m11Count++;
+                if (wm.P != null) setVirtualOutput(`OUT_${wm.P}`, false);
+            } else if (m === 31) {
+                m31Count++;
+            } else if (m === 33) {
+                m33Count++;
             }
         }
 
@@ -201,6 +221,10 @@ export function executeGcode(text) {
             rapid: rapidCount,
             retract: retractCount,
             probe: probeCount,
+            m10: m10Count,
+            m11: m11Count,
+            m31: m31Count,
+            m33: m33Count,
             jog: 0,
             passes: pass + 1,
             skipped,

@@ -11,6 +11,8 @@ import { CommunicationWizard } from './wizards/communicationWizard.js';
 import { WCSWizard } from './wizards/wcsWizard.js';
 import { AlignmentWizard } from './wizards/alignmentWizard.js';
 import { AtcLengthWizard } from './wizards/atcLengthWizard.js';
+import { AtcWarmupWizard } from './wizards/atcWarmupWizard.js';
+import { AtcChangeWizard } from './wizards/atcChangeWizard.js';
 import { playClick, playClickReverse } from './sound.js';  // audio helper for click sounds
 import { GcodeViz3D } from './gcodeViz3d.js';
 import { parseGcode } from './gcodeParser.js';
@@ -25,6 +27,8 @@ export class WizardManager {
         this.wcsWizard = new WCSWizard();
         this.alignmentWizard = new AlignmentWizard();
         this.atcLengthWizard = new AtcLengthWizard();
+        this.atcWarmupWizard = new AtcWarmupWizard();
+        this.atcChangeWizard = new AtcChangeWizard();
         this.wizardElement = el('wizard');
         console.debug('WizardManager: constructor - created wizards, wizardElement=', !!this.wizardElement);
         // Defensive: only setup listeners if wizard container is present
@@ -79,7 +83,9 @@ export class WizardManager {
             'al_tolerance', 'al_dist', 'al_retract', 'al_safe_z',
             'al_feed_fast', 'al_feed_slow', 'al_port', 'al_level', 'al_q',
             'atc_block_height', 'atc_safe_z', 'atc_max_dist', 'atc_retract',
-            'atc_q', 'atc_feed_fast', 'atc_feed_slow', 'atc_port', 'atc_level'
+            'atc_q', 'atc_feed_fast', 'atc_feed_slow', 'atc_port', 'atc_level',
+            'atc_warmup_rpm1', 'atc_warmup_time1', 'atc_warmup_rpm2', 'atc_warmup_time2',
+            'atc_change_x', 'atc_change_y', 'atc_change_z', 'atc_change_out_port', 'atc_change_in_port'
         ];
 
         wizInputs.forEach(id => {
@@ -108,7 +114,7 @@ export class WizardManager {
             return;
         }
         
-        if (type === 'probe' || type === 'corner' || type === 'middle' || type === 'edge' || type === 'alignment' || type === 'atc_length') {
+        if (type === 'probe' || type === 'corner' || type === 'middle' || type === 'edge' || type === 'alignment' || type === 'atc_length' || type === 'atc_warmup' || type === 'atc_change') {
             box.classList.add('large');
         } else {
             box.classList.remove('large');
@@ -119,7 +125,7 @@ export class WizardManager {
         this.wizardElement.classList.add('active');
         
         // Hide all wizard panels
-        ['wiz_comm', 'wiz_wcs', 'wiz_corner', 'wiz_middle', 'wiz_edge', 'wiz_alignment', 'wiz_atc_length'].forEach(id => {
+        ['wiz_comm', 'wiz_wcs', 'wiz_corner', 'wiz_middle', 'wiz_edge', 'wiz_alignment', 'wiz_atc_length', 'wiz_atc_warmup', 'wiz_atc_change'].forEach(id => {
             const elem = el(id);
             if (elem) elem.style.display = 'none';
         });
@@ -298,6 +304,8 @@ export class WizardManager {
         const wizEdge = wizVisible('wiz_edge');
         const wizAlignment = wizVisible('wiz_alignment');
         const wizAtcLength = wizVisible('wiz_atc_length');
+        const wizAtcWarmup = wizVisible('wiz_atc_warmup');
+        const wizAtcChange = wizVisible('wiz_atc_change');
 
         if (wizComm) {
             this.updateCommunicationWizard();
@@ -313,6 +321,10 @@ export class WizardManager {
             this.updateAlignmentWizard();
         } else if (wizAtcLength) {
             this.updateAtcLengthWizard();
+        } else if (wizAtcWarmup) {
+            this.updateAtcWarmupWizard();
+        } else if (wizAtcChange) {
+            this.updateAtcChangeWizard();
         }
     }
 
@@ -734,6 +746,31 @@ export class WizardManager {
         el('wiz_atc_length_code').innerHTML = UIUtils.formatGCode(gcode);
     }
 
+    updateAtcWarmupWizard() {
+        const params = {
+            rpm1: el('atc_warmup_rpm1')?.value || '6000',
+            time1: el('atc_warmup_time1')?.value || '30',
+            rpm2: el('atc_warmup_rpm2')?.value || '12000',
+            time2: el('atc_warmup_time2')?.value || '30'
+        };
+
+        const gcode = this.atcWarmupWizard.generate(params);
+        el('wiz_atc_warmup_code').innerHTML = UIUtils.formatGCode(gcode);
+    }
+
+    updateAtcChangeWizard() {
+        const params = {
+            x: el('atc_change_x')?.value || '100',
+            y: el('atc_change_y')?.value || '100',
+            z: el('atc_change_z')?.value || '0',
+            outPort: el('atc_change_out_port')?.value || '4',
+            inPort: el('atc_change_in_port')?.value || '5'
+        };
+
+        const gcode = this.atcChangeWizard.generate(params);
+        el('wiz_atc_change_code').innerHTML = UIUtils.formatGCode(gcode);
+    }
+
     insert() {
         let code = '';
 
@@ -758,6 +795,10 @@ export class WizardManager {
             code = el('wiz_alignment_code')?.textContent;
         } else if (isVisible('wiz_atc_length')) {
             code = el('wiz_atc_length_code')?.textContent;
+        } else if (isVisible('wiz_atc_warmup')) {
+            code = el('wiz_atc_warmup_code')?.textContent;
+        } else if (isVisible('wiz_atc_change')) {
+            code = el('wiz_atc_change_code')?.textContent;
         }
 
         if (code) {

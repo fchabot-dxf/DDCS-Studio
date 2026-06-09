@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -568,6 +568,58 @@
                     <pre id="wiz_alignment_code"></pre>
                 </div>
 
+            </div>
+
+            <!-- ATC Length Wizard -->
+            <div id="wiz_atc_length" class="wiz-body" style="display:none">
+                <span class="section-label">SETTINGS</span>
+                <div class="param-grid">
+                    <label>Block Height (mm)<input type="number" id="atc_block_height" value="50" class="num-input" step="0.01"></label>
+                    <label>Safe Z (mm)<input type="number" id="atc_safe_z" value="10" class="num-input" step="0.1"></label>
+                    <label>Max Dist (mm)<input type="number" id="atc_max_dist" value="200" class="num-input" step="1"></label>
+                    <label>Retract (mm)<input type="number" id="atc_retract" value="3" class="num-input" step="0.1"></label>
+                    <label>Q (Stop Condition)<input type="number" id="atc_q" value="1" class="num-input" title="1=stop at touch, 2=stop when released"></label>
+                </div>
+                <span class="section-label">FEEDS</span>
+                <div class="param-grid">
+                    <label>Fast Feed (F)<input type="number" id="atc_feed_fast" value="300" class="num-input" step="10"></label>
+                    <label>Slow Feed (F)<input type="number" id="atc_feed_slow" value="50" class="num-input" step="5"></label>
+                </div>
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_atc_length_code"></pre>
+                </div>
+            </div>
+
+            <!-- ATC Warm-up Wizard -->
+            <div id="wiz_atc_warmup" class="wiz-body" style="display:none">
+                <span class="section-label">WARM-UP SEQUENCE</span>
+                <div class="param-grid">
+                    <label>Stage 1 RPM<input type="number" id="atc_warmup_rpm1" value="6000" class="num-input" step="1000"></label>
+                    <label>Stage 1 Time (s)<input type="number" id="atc_warmup_time1" value="30" class="num-input" step="5"></label>
+                    <label>Stage 2 RPM<input type="number" id="atc_warmup_rpm2" value="12000" class="num-input" step="1000"></label>
+                    <label>Stage 2 Time (s)<input type="number" id="atc_warmup_time2" value="30" class="num-input" step="5"></label>
+                </div>
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_atc_warmup_code"></pre>
+                </div>
+            </div>
+
+            <!-- ATC Tool Change Wizard -->
+            <div id="wiz_atc_change" class="wiz-body" style="display:none">
+                <span class="section-label">TOOL CHANGE PARK & I/O</span>
+                <div class="param-grid">
+                    <label>Park X (mm)<input type="number" id="atc_change_x" value="100" class="num-input"></label>
+                    <label>Park Y (mm)<input type="number" id="atc_change_y" value="100" class="num-input"></label>
+                    <label>Park Z (mm)<input type="number" id="atc_change_z" value="0" class="num-input"></label>
+                    <label>Drawbar Out Port<input type="number" id="atc_change_out_port" value="4" class="num-input"></label>
+                    <label>Clamp In Port<input type="number" id="atc_change_in_port" value="5" class="num-input"></label>
+                </div>
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_atc_change_code"></pre>
+                </div>
             </div>
 
             <!-- Communication Wizard -->

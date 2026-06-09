@@ -323,8 +323,8 @@ export class CommandDeck {
                         <button class="toolbar-btn wizard-btn" style="min-width: 100px;">🔄 ATC ▼</button>
                         <div class="toolbar-dropdown-content">
                             <button onclick="openWiz && openWiz('atc_length')">📏 Tool Length</button>
-                            <button onclick="alert('Carousel Align Wizard coming soon!')">⚙️ Carousel Align</button>
-                            <button onclick="alert('Warm-up Wizard coming soon!')">🔥 Warm-up</button>
+                            <button onclick="openWiz && openWiz('atc_change')">⚙️ Carousel Align</button>
+                            <button onclick="openWiz && openWiz('atc_warmup')">🔥 Warm-up</button>
                         </div>
                     </div>
 
