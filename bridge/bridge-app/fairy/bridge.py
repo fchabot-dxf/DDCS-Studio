@@ -34,6 +34,26 @@ def _publish_heartbeat(backend, ops, poller):
     backend.put_heartbeat(hb)
 
 
+def _log_profile_validation(ops):
+    """One-line startup summary of whether the connected controller matches the expected profile.
+    Read-only and best-effort — never blocks startup."""
+    try:
+        v = ops.validate_profile()
+    except Exception as e:
+        print(f"[bridge] profile check skipped ({e})")
+        return
+    if v.get("ok") is None:
+        print(f"[bridge] profile check skipped — {v.get('reason', 'controller unreachable')}")
+        return
+    tabs = ", ".join(v.get("detectedTabs") or []) or "none"
+    if v.get("ok"):
+        print(f"[bridge] profile OK — controller matches baseline (tabs: {tabs}, {v.get('paramCount')} params)")
+    else:
+        print(f"[bridge] ⚠ profile MISMATCH — detected tabs: {tabs}")
+        for w in v.get("warnings", []):
+            print(f"[bridge]   • {w}")
+
+
 def build(config, beacons=None):
     backend = make_backend(config)
     transfer = Transfer(config)
@@ -80,6 +100,7 @@ def run_loop(config):
     machine = config.machine_name or config.machine_id or "(unconfigured)"
     slave = f"{config.com_port}@{config.baud}" if config.enable_slave else "off (--no-slave)"
     print(f"[bridge] up — backend={config.backend}  machine={machine}  dest={config.expert_dest}  slave={slave}")
+    _log_profile_validation(ops)
     print("[bridge] polling… (Ctrl+C to stop)")
     last_hb = time.time()
     try:

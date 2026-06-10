@@ -130,6 +130,7 @@ class Ops:
             prof["source"] = "controller"
             prof["paramCount"] = len(params)
             self._map_setting_to_profile(params, prof)
+            prof["validation"] = self.validate_profile(params)   # reuse the read; UI shows match/warnings
         return prof
 
     # `setting` input-signal indices (the `-m16` group in cfg_utf8): each input is a triple
@@ -184,6 +185,55 @@ class Ops:
             "probe": probe, "probeLevel": level(self._PROBE_PORT + 2) if probe else 0,
             "setter": setter, "setterLevel": level(self._SETTER_PORT + 2) if setter else 0,
             "limits": {k: v for k, v in limits.items() if v},
+        }
+
+    # Expected `setting` shape + anchor sanity for the Expert — used to confirm the live file decoded
+    # as aligned f64 params (not garbage / a wrong-controller dump). Anchors are [CONFIRMED] in FINDINGS:
+    # #266/#267 baud code, #279 Modbus 0/1, #284 net-boot 0/1/2, #296 parity, #297 stop.
+    _EXPECTED_PARAM_COUNT = 1000
+    _ANCHOR_RANGES = {266: (0, 10), 267: (0, 10), 279: (0, 1), 284: (0, 2), 296: (0, 2), 297: (0, 1)}
+
+    def validate_profile(self, params=None):
+        """Read-only check: does the connected controller match the expected profile?
+        Returns a dict (never raises). `ok`: True (matches), False (mismatch/garbage), or None (skipped —
+        controller unreachable). Compares the LIVE-derived hardwareTabs against the builtin baseline and
+        sanity-checks the decode via known anchors, so a wrong share / wrong-size dump / ATC-misconfig
+        surfaces (at startup and in the UI) instead of silently feeding Studio bad data. Pass `params`
+        to reuse an already-read `setting` (profile() does this); otherwise it reads once."""
+        if params is None:
+            params = self._read_setting_params()
+        if params is None:
+            return {"ok": None, "reason": "controller unreachable — validation skipped"}
+
+        warnings = []
+        count = len(params)
+        if count != self._EXPECTED_PARAM_COUNT:
+            warnings.append(f"setting has {count} params, expected {self._EXPECTED_PARAM_COUNT} "
+                            f"(wrong share, truncated read, or different controller?)")
+        anchors_ok = True
+        for idx, (lo, hi) in self._ANCHOR_RANGES.items():
+            v = params[idx] if idx < count else None
+            if v is None or not isinstance(v, (int, float)) or v != v or not (lo <= v <= hi):
+                anchors_ok = False
+                warnings.append(f"anchor #{idx}={v} outside expected [{lo},{hi}] — decode may be misaligned")
+
+        # Detected (live) vs builtin baseline for this controller id.
+        detected = {}
+        self._map_setting_to_profile(params, detected)
+        baseline = ["probes", "limits"]              # the M350 builtin baseline (see controllerProfiles.js)
+        det_tabs = detected.get("hardwareTabs", [])
+        missing = [t for t in baseline if t not in det_tabs]     # baseline expects it, controller lacks it
+        extra = [t for t in det_tabs if t not in baseline]       # controller has it, baseline didn't list it
+        if missing:
+            warnings.append(f"baseline expects {missing} but the controller has no such I/O configured")
+        if "atc" in extra:
+            warnings.append("controller has tool-change I/O wired — ATC is OFF in the baseline profile")
+
+        return {
+            "ok": anchors_ok and not warnings,
+            "paramCount": count, "anchorsOk": anchors_ok,
+            "detectedTabs": det_tabs, "baselineTabs": baseline,
+            "missing": missing, "extra": extra, "warnings": warnings,
         }
 
     def _read_setting_params(self):
