@@ -379,5 +379,8 @@ section) — so once indices are known, "push config to the controller" becomes 
       `setting` confirmed on **SYSDISK** (8000 B/1000×f64), anchors re-validated. **Next (desk, no machine):**
       label the probe / tool-setter / limit `setting` indices from the manual, then fill `Ops.profile()`.
 - [ ] Stand up a PC Modbus slave (`pymodbus`); confirm `MSETDATA` pushes #200+ to it.
+- [ ] **`G10 L20 P2` — really broken?** The validator warns "G10 broken", but on-controller macros
+      (`key-5.nc`, `key-6.nc`, `3D PROBE G55.nc`) use `G10 L20 P2` to set G55. Run `key-6` and check it
+      sets G55 with no spurious motion; if OK, narrow the `W-G10` rule. See CONFORMANCE_CORPUS static pass.
 - [ ] Find the system var holding the live alarm code → log *which* error.
 - [ ] Port the V4.1 `M47` dispatcher to `sysstart.nc` here (file-reload trick over SMB) — **safety first** (E-stop).
