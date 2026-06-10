@@ -13,21 +13,21 @@ export const atcLengthView = {
     panelId: 'wiz_atc_length',
     codeElId: 'wiz_atc_length_code',
     large: true,
-    inputIds: [
-        'atc_block_height', 'atc_safe_z', 'atc_max_dist', 'atc_retract',
-        'atc_q', 'atc_feed_fast', 'atc_feed_slow', 'atc_port', 'atc_level',
-    ],
+    inputIds: [],   // no wizard inputs — params come from Settings → ATC (tool-setter pin from Probes)
     update() {
+        const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+        const a = s.atc || {};
+        const p = s.probes || {};
         const params = {
-            blockHeight: el('atc_block_height')?.value || '50',
-            safeZ: el('atc_safe_z')?.value || '10',
-            maxDist: el('atc_max_dist')?.value || '200',
-            retract: el('atc_retract')?.value || '3',
-            qStop: el('atc_q')?.value || '1',
-            f_fast: el('atc_feed_fast')?.value || '300',
-            f_slow: el('atc_feed_slow')?.value || '50',
-            port: window.ddcsGetSettings().probes.setterPin,
-            level: window.ddcsGetSettings().probes.setterLevel
+            blockHeight: a.blockHeight ?? 50,
+            safeZ: a.safeZ ?? 10,
+            maxDist: a.maxDist ?? 200,
+            retract: a.retract ?? 3,
+            qStop: a.qStop ?? 1,
+            f_fast: a.fFast ?? 300,
+            f_slow: a.fSlow ?? 50,
+            port: p.setterPin,
+            level: p.setterLevel,
         };
         el('wiz_atc_length_code').innerHTML = UIUtils.formatGCode(lengthWizard.generate(params));
     },

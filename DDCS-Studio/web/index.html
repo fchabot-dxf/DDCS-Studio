@@ -573,19 +573,7 @@
 
             <!-- ATC Length Wizard -->
             <div id="wiz_atc_length" class="wiz-body" style="display:none">
-                <span class="section-label">SETTINGS</span>
-                <div class="param-grid">
-                    <label>Block Height (mm)<input type="number" id="atc_block_height" value="50" class="num-input" step="0.01"></label>
-                    <label>Safe Z (mm)<input type="number" id="atc_safe_z" value="10" class="num-input" step="0.1"></label>
-                    <label>Max Dist (mm)<input type="number" id="atc_max_dist" value="200" class="num-input" step="1"></label>
-                    <label>Retract (mm)<input type="number" id="atc_retract" value="3" class="num-input" step="0.1"></label>
-                    <label>Q (Stop Condition)<input type="number" id="atc_q" value="1" class="num-input" title="1=stop at touch, 2=stop when released"></label>
-                </div>
-                <span class="section-label">FEEDS</span>
-                <div class="param-grid">
-                    <label>Fast Feed (F)<input type="number" id="atc_feed_fast" value="300" class="num-input" step="10"></label>
-                    <label>Slow Feed (F)<input type="number" id="atc_feed_slow" value="50" class="num-input" step="5"></label>
-                </div>
+                <div class="settings-hint" style="margin-bottom:8px;">Tool-length probe parameters come from <b>Settings → ATC</b> (block height, feeds, max distance, retract, Q) and the tool-setter pin/level from <b>Settings → Probes</b>. The preview below reflects those values — edit them in Settings.</div>
                 <div class="preview-block">
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_atc_length_code"></pre>
