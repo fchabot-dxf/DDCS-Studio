@@ -1,0 +1,25 @@
+# OS / editor cruft
+Thumbs.db
+desktop.ini
+.DS_Store
+*~
+*.tmp
+
+# Claude Code personal/local settings
+.claude/settings.local.json
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Gateway local runtime data (created by START_GATEWAY.bat / the local backend)
+_bridge_data/
+
+# Cloudflare wrangler local state (pages dev / deploy)
+.wrangler/
+node_modules/
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec
