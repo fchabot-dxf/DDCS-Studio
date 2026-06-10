@@ -195,24 +195,27 @@ Rosetta Stone for `setting`: it labels every index, so the profile I/O map is **
 no differential toggling needed.** (`chs`/`msg` are the localized string catalogs; `cfg_utf8` is the schema.)
 
 **Input signals are the `-m16` group (range 0–24 = physical input port #, `0` = unassigned).** Each input
-occupies a **triple of consecutive indices: `[port#, active-level, reserved]`** — every assigned input reads
-level `1`; an unassigned input reads `[0,0,0]`. Output signals are the `-m17` group (range 0–20).
+occupies a **triple of consecutive indices: `[port#, enable, active-level]`** — `enable` reads `1` on every
+assigned input, `active-level` (at **port+2**) is the polarity; an unassigned input reads `[0,0,0]`. The
+**+2 level offset was pinned by a live differential toggle 2026-06-10**: flipping the Fixed-Probe level on the
+panel moved **`#577`** `0→1` (only boolean change; the float noise in that diff was position/WCS state flushed
+to disk by the Save — `setting` is written wholesale). Output signals are the `-m17` group (range 0–20).
 
 ### Confirmed I/O for the studio Expert (Ultimate Bee), decoded from the captured `setting`:
-| Param | Signal (cfg_utf8 label) | port (`#n`) | level (`#n+1`) | Notes |
-|---|---|---|---|---|
-| `#575` | **Fixed Probe** (tool-setter) | **2** | 1 | ⭐ **panel-confirmed = IN02** (matches "IN02 on our rig") |
-| `#578` | **Floating Probe** (3D touch) | **10** | 1 | ⭐ **panel-confirmed = port 10** |
-| `#515` | X− hard limit | 20 | 1 | shares pin 20 with X-zero |
-| `#518` | Y− hard limit | 0 | 0 | unassigned |
-| `#521` | Z− hard limit | 0 | 0 | unassigned |
-| `#530` | X+ hard limit | 0 | 0 | unassigned |
-| `#533` | Y+ hard limit | 23 | 1 | shares pin 23 with Y-zero |
-| `#536` | Z+ hard limit | 21 | 1 | shares pin 21 with Z-zero |
-| `#545` / `#548` / `#551` | X / Y / Z zero (home) | 20 / 23 / 21 | 1 | |
-| `#500` / `#503` / `#506` | X / Y / Z servo alarm | 0 | 0 | unassigned (steppers, no feedback) |
-| `#623` `#626` `#629` `#697` | Tool release/lock/open/close in (M301-304) | 0 | 0 | **all unassigned → no ATC** |
-| `#750` `#753` | Tool release-lock / launch-retract out | 0 | 0 | **all unassigned → no ATC** |
+| Port param | Signal (cfg_utf8 label) | port | enable (`+1`) | level (`+2`) | Notes |
+|---|---|---|---|---|---|
+| `#575` | **Fixed Probe** (tool-setter) | **2** | 1 | `#577` | ⭐ **panel-confirmed = IN02**; level index toggle-confirmed |
+| `#578` | **Floating Probe** (3D touch) | **10** | 1 | `#580` | ⭐ **panel-confirmed = port 10** |
+| `#515` | X− hard limit | 20 | 1 | `#517` | shares pin 20 with X-zero |
+| `#518` | Y− hard limit | 0 | 0 | — | unassigned |
+| `#521` | Z− hard limit | 0 | 0 | — | unassigned |
+| `#530` | X+ hard limit | 0 | 0 | — | unassigned |
+| `#533` | Y+ hard limit | 23 | 1 | `#535` | shares pin 23 with Y-zero |
+| `#536` | Z+ hard limit | 21 | 1 | `#538` | shares pin 21 with Z-zero |
+| `#545` / `#548` / `#551` | X / Y / Z zero (home) | 20 / 23 / 21 | 1 | +2 each | |
+| `#500` / `#503` / `#506` | X / Y / Z servo alarm | 0 | 0 | — | unassigned (steppers, no feedback) |
+| `#623` `#626` `#629` `#697` | Tool release/lock/open/close in (M301-304) | 0 | 0 | — | **all unassigned → no ATC** |
+| `#750` `#753` | Tool release-lock / launch-retract out | 0 | 0 | — | **all unassigned → no ATC** |
 
 ⇒ **`hardwareTabs` for this machine = `["probes","limits"]`, ATC OFF** — confirmed from real I/O, exactly as
 PROFILE_BUILD_TASK predicted (Ultimate Bee = manual tool change). Other useful schema params for the future:

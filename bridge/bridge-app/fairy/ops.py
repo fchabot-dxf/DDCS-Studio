@@ -133,10 +133,12 @@ class Ops:
         return prof
 
     # `setting` input-signal indices (the `-m16` group in cfg_utf8): each input is a triple
-    # [port#, active-level, reserved]; port 0 == unassigned. Param #s are firmware-defined; the
-    # values are this controller's wiring. CONFIRMED 2026-06-10 (see FINDINGS "Profile I/O map").
-    _SETTER_PORT = 575      # Fixed Probe (tool-setter); level at +1
-    _PROBE_PORT = 578       # Floating Probe (3D touch);  level at +1
+    # [port#, enable, active-level]; port 0 == unassigned, enable == 1 when assigned, level at +2.
+    # The level offset (+2, not +1) was pinned by a live differential toggle 2026-06-10: changing the
+    # Fixed-Probe level on the panel moved #577. Param #s are firmware-defined; values are this
+    # controller's wiring. CONFIRMED 2026-06-10 (see FINDINGS "Profile I/O map").
+    _SETTER_PORT = 575      # Fixed Probe (tool-setter); enable at +1, active-level at +2 (#577)
+    _PROBE_PORT = 578       # Floating Probe (3D touch);  enable at +1, active-level at +2 (#580)
     _LIMIT_PORTS = {        # negative + positive hard-limit inputs per axis
         "xMin": 515, "yMin": 518, "zMin": 521,
         "xMax": 530, "yMax": 533, "zMax": 536,
@@ -152,6 +154,13 @@ class Ops:
             except (IndexError, TypeError):
                 return 0
             return int(v) if isinstance(v, (int, float)) and v > 0 else 0
+
+        def level(i):  # active-level (0/1) at port+2; valid as 0, so don't gate on >0 like port()
+            try:
+                v = params[i]
+            except (IndexError, TypeError):
+                return 0
+            return int(v) if isinstance(v, (int, float)) else 0
 
         setter, probe = port(self._SETTER_PORT), port(self._PROBE_PORT)
         limits = {k: port(i) for k, i in self._LIMIT_PORTS.items()}
@@ -169,10 +178,10 @@ class Ops:
         prof["hardwareTabs"] = tabs
 
         # `pins` is an extra block Studio pre-fills user settings from (not part of the tab contract).
-        # Level is the index after the port (1 = active on this rig); only emit a pin when assigned.
+        # Active-level is at port+2 (#577/#580, differential-confirmed); only emit a pin when assigned.
         prof["pins"] = {
-            "probe": probe, "probeLevel": port(self._PROBE_PORT + 1) if probe else 0,
-            "setter": setter, "setterLevel": port(self._SETTER_PORT + 1) if setter else 0,
+            "probe": probe, "probeLevel": level(self._PROBE_PORT + 2) if probe else 0,
+            "setter": setter, "setterLevel": level(self._SETTER_PORT + 2) if setter else 0,
             "limits": {k: v for k, v in limits.items() if v},
         }
 
