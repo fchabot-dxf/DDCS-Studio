@@ -112,13 +112,11 @@ class Ops:
         (see web/shared/js/profiles/controllerProfiles.js): {id, name, source, hardwareTabs, atc}.
 
         The controller's persisted config is the `setting` file (1000 × f64, index = param #) on
-        SYSDISK and decodes over SMB. Reading the bytes is solved. A 2026-06-10 desk pass over the
-        captured `setting` CONFIRMED the baseline for the studio Expert — hardwareTabs [probes, limits],
-        ATC off (manual tool change) — and localized the I-O pins to candidate param regions
-        (#489–579, #670–676); see controllers/expert-m350/FINDINGS.md "Profile build — setting diff
-        analysis". Pinning a specific index → input pin still needs the Phase-2 differential against a
-        live panel, so we return that baseline and only flag whether a live `setting` was read
-        (source = controller vs builtin).
+        SYSDISK and decodes over SMB. The captured `cfg_utf8` (full param schema) localized the I-O
+        indices and a 2026-06-10 panel cross-check CONFIRMED them (Fixed Probe #575 = IN02, Floating
+        Probe #578 = port 10); see controllers/expert-m350/FINDINGS.md "Profile I/O map". So when a live
+        `setting` is read we derive hardwareTabs + a `pins` block from the real I-O config; otherwise we
+        fall back to the builtin baseline (source = builtin).
         """
         prof = {
             "id": "ddcs-expert-m350",
@@ -131,11 +129,52 @@ class Ops:
         if params is not None:
             prof["source"] = "controller"
             prof["paramCount"] = len(params)
-            # TODO(phase2): emit a `pins` block once the I-O indices are differential-confirmed.
-            # Candidates from the 2026-06-10 desk pass (see FINDINGS): I-O assignment region #489–579
-            # (small-int port#+enable pairs) and the tool-setter/probe block #670–676. Don't guess —
-            # baking unconfirmed indices in would mis-detect pins on other machines.
+            self._map_setting_to_profile(params, prof)
         return prof
+
+    # `setting` input-signal indices (the `-m16` group in cfg_utf8): each input is a triple
+    # [port#, active-level, reserved]; port 0 == unassigned. Param #s are firmware-defined; the
+    # values are this controller's wiring. CONFIRMED 2026-06-10 (see FINDINGS "Profile I/O map").
+    _SETTER_PORT = 575      # Fixed Probe (tool-setter); level at +1
+    _PROBE_PORT = 578       # Floating Probe (3D touch);  level at +1
+    _LIMIT_PORTS = {        # negative + positive hard-limit inputs per axis
+        "xMin": 515, "yMin": 518, "zMin": 521,
+        "xMax": 530, "yMax": 533, "zMax": 536,
+    }
+    _ATC_IO_PORTS = (623, 626, 629, 697, 750, 753)  # tool release/lock/open/close in + ATC outputs
+
+    def _map_setting_to_profile(self, params, prof):
+        """Derive hardwareTabs + a `pins` block from a live `setting` array (read-only; never raises).
+        An input is 'configured' when its port index is a nonzero integer (0 == unassigned)."""
+        def port(i):
+            try:
+                v = params[i]
+            except (IndexError, TypeError):
+                return 0
+            return int(v) if isinstance(v, (int, float)) and v > 0 else 0
+
+        setter, probe = port(self._SETTER_PORT), port(self._PROBE_PORT)
+        limits = {k: port(i) for k, i in self._LIMIT_PORTS.items()}
+        has_probe = bool(setter or probe)
+        has_limits = any(limits.values())
+        has_atc = any(port(i) for i in self._ATC_IO_PORTS)
+
+        tabs = []
+        if has_probe:
+            tabs.append("probes")
+        if has_atc:                       # off on a manual machine (all ATC I-O unassigned)
+            tabs.append("atc")
+        if has_limits:
+            tabs.append("limits")
+        prof["hardwareTabs"] = tabs
+
+        # `pins` is an extra block Studio pre-fills user settings from (not part of the tab contract).
+        # Level is the index after the port (1 = active on this rig); only emit a pin when assigned.
+        prof["pins"] = {
+            "probe": probe, "probeLevel": port(self._PROBE_PORT + 1) if probe else 0,
+            "setter": setter, "setterLevel": port(self._SETTER_PORT + 1) if setter else 0,
+            "limits": {k: v for k, v in limits.items() if v},
+        }
 
     def _read_setting_params(self):
         """Decode the controller's `setting` file as little-endian f64 (index = param #).

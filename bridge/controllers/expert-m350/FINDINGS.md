@@ -188,6 +188,44 @@ job-file delivery + `uservar`/`MSETDATA`/`error.nc` for readback. (Modbus blocke
 - `parse.out` (live, 2.99 MB) references `sysstart.nc` + `M30` as strings (boot hook real). `MSETDATA`/
   `MGETDATA` are NOT plain-ASCII in it (wide-char/tokenized?) — revisit when wiring Modbus.
 
+## ⭐⭐ Profile I/O map — the full param dictionary is on the controller (`cfg_utf8`) `[CONFIRMED 2026-06-10]`
+The Phase-1 capture landed **`SYSDISK/cfg_utf8`** (73 KB) — the controller's **complete param schema**: one
+line per param `#<n> -pN -aN -tN -s1"<label>" -s2"<unit>" -mN -min=.. -max=.. -i0".." -i1".."`. This is the
+Rosetta Stone for `setting`: it labels every index, so the profile I/O map is **desk work off the capture,
+no differential toggling needed.** (`chs`/`msg` are the localized string catalogs; `cfg_utf8` is the schema.)
+
+**Input signals are the `-m16` group (range 0–24 = physical input port #, `0` = unassigned).** Each input
+occupies a **triple of consecutive indices: `[port#, active-level, reserved]`** — every assigned input reads
+level `1`; an unassigned input reads `[0,0,0]`. Output signals are the `-m17` group (range 0–20).
+
+### Confirmed I/O for the studio Expert (Ultimate Bee), decoded from the captured `setting`:
+| Param | Signal (cfg_utf8 label) | port (`#n`) | level (`#n+1`) | Notes |
+|---|---|---|---|---|
+| `#575` | **Fixed Probe** (tool-setter) | **2** | 1 | ⭐ **panel-confirmed = IN02** (matches "IN02 on our rig") |
+| `#578` | **Floating Probe** (3D touch) | **10** | 1 | ⭐ **panel-confirmed = port 10** |
+| `#515` | X− hard limit | 20 | 1 | shares pin 20 with X-zero |
+| `#518` | Y− hard limit | 0 | 0 | unassigned |
+| `#521` | Z− hard limit | 0 | 0 | unassigned |
+| `#530` | X+ hard limit | 0 | 0 | unassigned |
+| `#533` | Y+ hard limit | 23 | 1 | shares pin 23 with Y-zero |
+| `#536` | Z+ hard limit | 21 | 1 | shares pin 21 with Z-zero |
+| `#545` / `#548` / `#551` | X / Y / Z zero (home) | 20 / 23 / 21 | 1 | |
+| `#500` / `#503` / `#506` | X / Y / Z servo alarm | 0 | 0 | unassigned (steppers, no feedback) |
+| `#623` `#626` `#629` `#697` | Tool release/lock/open/close in (M301-304) | 0 | 0 | **all unassigned → no ATC** |
+| `#750` `#753` | Tool release-lock / launch-retract out | 0 | 0 | **all unassigned → no ATC** |
+
+⇒ **`hardwareTabs` for this machine = `["probes","limits"]`, ATC OFF** — confirmed from real I/O, exactly as
+PROFILE_BUILD_TASK predicted (Ultimate Bee = manual tool change). Other useful schema params for the future:
+`#133` Probe Tool block thickness, `#135-139` Fixed-probe mach pos X/Y/Z/4/5, `#140` probe retract,
+`#150-154` hard-limit stop mode, `#155` enable soft limits, `#161-168` soft-limit values, `#95` IO input
+filter time. The decision logic is general (these param #s are firmware-defined; the *values* are per-machine
+wiring) — so the gateway can map any same-firmware Expert, and the values here are this machine's truth.
+
+> ⚠️ **Namespace caution:** these are **`setting`-file param indices**, a DIFFERENT address space from the
+> runtime **macro `#` variables**. E.g. `setting#578` = *Floating Probe port*, but macro `#578` = *active WCS
+> number* (below); `setting#576` = *Fixed-Probe level*, but panel Pr76/macro `#576` = *Macro Enable*. Don't
+> cross-read them. The profile map is entirely in the `setting`/`cfg_utf8` (param) space.
+
 ## System / macro variables (read off the operator's live macros 2026-06-06) `[CONFIRMED on machine]`
 From `READ_VAR.nc`, `COPY_WCS.nc`, `SAVE_WCS_XY_AUTO.nc`, `sysstart.nc` on this machine:
 - `#578` = **active WCS number** (1=G54 … 6=G59).
