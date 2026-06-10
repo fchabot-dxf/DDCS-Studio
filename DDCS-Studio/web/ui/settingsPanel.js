@@ -10,7 +10,8 @@
  * 3D preview can redraw. The viewer reads them via window.ddcsGetSettings().
  */
 import { UIUtils } from './uiUtils.js';
-import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile, registerProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { makeClient } from '../shared/js/client.js';
 
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 const SETTINGS_DEFAULTS = {
@@ -370,9 +371,15 @@ function wireSettingsOverlay(ov) {
         });
     }
     const profileSel = q('set_profile');
-    if (profileSel) {
-        profileSel.innerHTML = Object.values(CONTROLLER_PROFILES).map((p) => '<option value="' + p.id + '">' + p.name + '</option>').join('');
+    function fillProfileOptions() {
+        if (!profileSel) return;
+        profileSel.innerHTML = Object.values(CONTROLLER_PROFILES)
+            .map((p) => '<option value="' + p.id + '">' + p.name + (p.source === 'controller' ? ' (from controller)' : '') + '</option>')
+            .join('');
         profileSel.value = getActiveProfile().id;
+    }
+    if (profileSel) {
+        fillProfileOptions();
         profileSel.addEventListener('change', () => {
             const p = setActiveProfile(profileSel.value);   // a profile just PRESETS the toggles
             _ddcsSettings.hardwareTabs = {
@@ -384,6 +391,15 @@ function wireSettingsOverlay(ov) {
             fill();
             applyHardwareTabs();
         });
+        // When Studio is pointed at a gateway (?api= / ddcs_api), fetch the controller's own profile and
+        // offer it in the list (shown as "… (from controller)"). Silently ignored if offline / not bridged.
+        try {
+            if (localStorage.getItem('ddcs_api')) {
+                makeClient().profile().then((p) => {
+                    if (p && p.id && Array.isArray(p.hardwareTabs)) { registerProfile(p); fillProfileOptions(); }
+                }).catch(() => { /* gateway offline / no /api/profile — leave builtins */ });
+            }
+        } catch (e) { /* localStorage blocked — skip */ }
     }
     applyHardwareTabs();
 

@@ -61,3 +61,15 @@ export function setActiveProfile(id) {
 export function profileHasTab(tab, profile = getActiveProfile()) {
     return !!profile && Array.isArray(profile.hardwareTabs) && profile.hardwareTabs.includes(tab);
 }
+
+/**
+ * Register/replace a profile at runtime — e.g. one the gateway built from a live controller
+ * (GET /api/profile). Validated lightly so a bad fetch can't break the selector. Returns it.
+ */
+export function registerProfile(profile) {
+    if (profile && profile.id) {
+        if (!Array.isArray(profile.hardwareTabs)) profile.hardwareTabs = [];
+        CONTROLLER_PROFILES[profile.id] = profile;
+    }
+    return profile;
+}

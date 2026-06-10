@@ -171,11 +171,13 @@ export class GcodeExecutionEngine {
 
     _scheduleTick() {
         if (!this.running) return;
-        this.timer = setTimeout(() => this._tick(), this.stepDelay);
+        // Per-step delay (set by _tick / _executeStep) so playback respects feedrates; else stepDelay.
+        this.timer = setTimeout(() => this._tick(), this._nextDelayMs != null ? this._nextDelayMs : this.stepDelay);
     }
 
     _tick() {
         if (!this.running) return;
+        this._nextDelayMs = 8;   // default: non-motion lines tick fast; motion / input-wait set their own pace
         if (this.ip >= this.program.length) {
             this._finish();
             return;
@@ -336,6 +338,7 @@ export class GcodeExecutionEngine {
         
         // If we're waiting on an input, do NOT advance IP and return immediately to pause execution
         if (waiting) {
+            this._nextDelayMs = 50;   // poll the input gently instead of spinning at the fast-step rate
             return false;
         }
 
@@ -458,6 +461,14 @@ export class GcodeExecutionEngine {
                 }
             } else if (effMotion === 0) {
                 this.stats.feed += 1;
+            }
+            // Pace the next tick by this move's duration so playback respects feedrates: rapids fast,
+            // cuts at feed, probes slow. Clamped so tiny moves still tick and long moves don't stall.
+            {
+                const d = Math.hypot(target.x - this.pos.x, target.y - this.pos.y, target.z - this.pos.z);
+                const rate = (effMotion === 0 && !isProbe) ? 6000 : (this.feedVal > 0 ? this.feedVal : 600);
+                const realMs = rate > 0 ? (d / rate) * 60000 : 0;
+                this._nextDelayMs = Math.max(12, Math.min(1500, realMs * 0.15));
             }
             this.pos = target;
             if (typeof this.onPositionChange === 'function') {
