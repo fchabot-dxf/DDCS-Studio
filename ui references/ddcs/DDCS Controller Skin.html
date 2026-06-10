@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DDCS Studio — Controller Skin</title>
+<link rel="stylesheet" href="ddcs-controller.css">
+<style>
+    html, body { height: 100%; }
+    /* keep textarea overlay aligned with highlight layer */
+    #editor-highlight, #editor {
+        position: absolute; inset: 0; margin: 0;
+    }
+    #editor-highlight { pointer-events: none; }
+    /* give the phosphor screen room; let the deck scroll if tall */
+    .editor-container { min-height: 240px; }
+    .dock-body { max-height: 44vh; overflow: auto; }
+</style>
+</head>
+<body data-theme="ddcs">
+
+    <!-- ===== APP HEADER ===== -->
+    <header class="app-header raised">
+        <div class="hdr-title">
+            <span class="hdr-text">DDCS STUDIO V9.49.78</span>
+        </div>
+        <div class="hdr-controls">
+            <button class="op-btn"><span class="op-icon">🎨</span><span class="op-label">DDCS</span></button>
+            <button class="op-btn"><span class="op-icon">🔍</span><span class="op-label">AUTO</span></button>
+            <button class="op-btn"><span class="op-icon">⚙</span><span class="op-label">SETTINGS</span></button>
+            <button class="op-btn"><span class="op-icon">💾</span><span class="op-label">DOWNLOAD</span></button>
+        </div>
+    </header>
+
+    <div class="app-shell">
+
+        <!-- ===== TOP ACTION TOOLBAR (program ops + generators) ===== -->
+        <div class="dock-header top-dock-header">
+            <div class="header-controls">
+                <div class="header-left">
+                    <button class="toolbar-btn">NEW</button>
+                    <button class="toolbar-btn">OPEN</button>
+                    <button class="toolbar-btn m-green">SAVE</button>
+                </div>
+                <div class="header-center">
+                    <button class="toolbar-btn" onclick="openWiz()">CORNER</button>
+                    <button class="toolbar-btn" onclick="openWiz()">MIDDLE</button>
+                    <button class="toolbar-btn axis-blue" onclick="openWiz()">EDGE</button>
+                    <button class="toolbar-btn" onclick="openWiz()">ALIGN</button>
+                    <button class="toolbar-btn" onclick="openWiz()">WCS</button>
+                    <button class="toolbar-btn" onclick="openWiz()">COMM</button>
+                </div>
+                <div class="header-right">
+                    <button class="toolbar-btn">CHECK</button>
+                    <button class="toolbar-btn m-green">SEND ▶</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== MAIN EDITOR (phosphor screen) ===== -->
+        <main class="main">
+            <div class="editor-container">
+                <pre id="editor-highlight" class="editor-layer" aria-hidden="true"><span class="g-ln">  1</span>  <span class="g-comment">( PROBE — OUTSIDE CORNER  FL  / DDCS M350 COMPLIANT )</span>
+<span class="g-ln">  2</span>  <span class="g-word">G54 G90 G21</span>
+<span class="g-ln">  3</span>  <span class="g-comment">( #1 max travel  #2 retract  #3 fast  #4 slow )</span>
+<span class="g-ln">  4</span>  #1 = <span class="g-num">500</span>   #2 = <span class="g-num">5</span>   #3 = <span class="g-num">200</span>   #4 = <span class="g-num">50</span>
+<span class="g-ln">  5</span>  <span class="g-comment">( --- probe Y wall --- )</span>
+<span class="sel-line"><span class="g-ln">  6</span>  <span class="g-word">G31</span> Y-#1 <span class="g-word">F</span>#3 <span class="g-word">P</span>3 <span class="g-word">L</span>0 <span class="g-word">Q</span>1</span>
+<span class="g-ln">  7</span>  <span class="g-word">G0</span> Y#2
+<span class="g-ln">  8</span>  <span class="g-word">G31</span> Y-#2 <span class="g-word">F</span>#4 <span class="g-word">P</span>3 <span class="g-word">L</span>0 <span class="g-word">Q</span>1
+<span class="g-ln">  9</span>  #51 = #1926
+<span class="g-ln"> 10</span>  <span class="g-comment">( --- travel + probe X wall --- )</span>
+<span class="g-ln"> 11</span>  <span class="g-word">G0</span> Z#19
+<span class="g-ln"> 12</span>  <span class="g-word">G0</span> X<span class="g-num">50</span>
+<span class="g-ln"> 13</span>  <span class="g-word">G31</span> X-#1 <span class="g-word">F</span>#3 <span class="g-word">P</span>3 <span class="g-word">L</span>0 <span class="g-word">Q</span>1
+<span class="g-ln"> 14</span>  #[#70+0] = #1925
+<span class="g-ln"> 15</span>  <span class="g-word">M30</span></pre>
+                <textarea id="editor" class="editor-layer" spellcheck="false" readonly></textarea>
+
+                <button id="view-toggle" class="viz3d-handle" title="Toggle 3D toolpath preview" style="position:absolute;right:0;top:50%;transform:translateY(-50%);width:26px;height:64px;writing-mode:vertical-rl;">3D</button>
+            </div>
+            <div class="statusbar" id="status">
+                <span>X 15.786</span><span>Y -24.380</span><span>Z -36.082</span><span>READY · G31 PROBE LOADED · 15 LINES</span>
+            </div>
+        </main>
+
+        <!-- ===== CONTROLLER DOCK (command deck) ===== -->
+        <div id="controller-dock" class="controller-dock is-expanded">
+            <div class="dock-header">
+                <div class="header-handle" id="dockHandle"><span class="chevron">▼</span></div>
+            </div>
+            <div class="dock-body">
+                <div id="deck-panel" class="deck-panel">
+
+                    <div class="deck-group editor-keys">
+                        <div class="group-header">Editor Keys</div>
+                        <div class="grid-3">
+                            <button class="toolbar-btn">◀ BACK</button>
+                            <button class="toolbar-btn">SPACE</button>
+                            <button class="toolbar-btn axis-blue">ENTER ↵</button>
+                        </div>
+                        <div class="grid-3">
+                            <button class="toolbar-btn">UNDO</button>
+                            <button class="toolbar-btn">REDO</button>
+                            <button class="toolbar-btn m-red">DEL</button>
+                        </div>
+                    </div>
+
+                    <div class="deck-group">
+                        <div class="group-header">Generators</div>
+                        <div class="grid-2">
+                            <button class="toolbar-btn" onclick="openWiz()">Corner</button>
+                            <button class="toolbar-btn" onclick="openWiz()">Middle</button>
+                            <button class="toolbar-btn axis-blue" onclick="openWiz()">Edge</button>
+                            <button class="toolbar-btn" onclick="openWiz()">Align</button>
+                        </div>
+                    </div>
+
+                    <div class="deck-group">
+                        <div class="group-header">WCS / Zero</div>
+                        <div class="grid-3">
+                            <button class="toolbar-btn">G54</button>
+                            <button class="toolbar-btn">G55</button>
+                            <button class="toolbar-btn">G56</button>
+                            <button class="toolbar-btn m-green">ZERO X</button>
+                            <button class="toolbar-btn m-green">ZERO Y</button>
+                            <button class="toolbar-btn m-green">ZERO Z</button>
+                        </div>
+                    </div>
+
+                    <div class="deck-group">
+                        <div class="group-header">Communication</div>
+                        <div class="grid-2">
+                            <button class="toolbar-btn">Popup</button>
+                            <button class="toolbar-btn">Status</button>
+                            <button class="toolbar-btn">Beep</button>
+                            <button class="toolbar-btn">Dwell</button>
+                        </div>
+                    </div>
+
+                    <div class="deck-group" style="min-width:220px">
+                        <div class="group-header">Variables</div>
+                        <div class="var-list">
+                            <div class="var-item"><span class="var-id">#1</span><span class="var-desc">max travel</span></div>
+                            <div class="var-item"><span class="var-id">#2</span><span class="var-desc">retract</span></div>
+                            <div class="var-item"><span class="var-id">#3</span><span class="var-desc">fast feed</span></div>
+                            <div class="var-item"><span class="var-id">#4</span><span class="var-desc">slow feed</span></div>
+                            <div class="var-item"><span class="var-id">#70</span><span class="var-desc">WCS base</span></div>
+                            <div class="var-item"><span class="var-id">#1925</span><span class="var-desc">X result</span></div>
+                            <div class="var-item"><span class="var-id">#1926</span><span class="var-desc">Y result</span></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== WIZARD OVERLAY (Edge generator) ===== -->
+    <div id="wizard" class="overlay">
+        <div class="wiz-box">
+            <div class="wiz-head"><span>EDGE PROBE — GENERATOR</span><span class="x" onclick="closeWiz()">✕</span></div>
+            <div class="wiz-body">
+                <span class="section-label">Visualization</span>
+                <div class="viz-container">
+                    <div class="viz-status">PARK PROBE · CLEAR OF WALL · PRESS START</div>
+                    <div class="viz-canvas">
+                        <svg viewBox="0 0 400 130" preserveAspectRatio="xMidYMid meet">
+                            <line x1="20" y1="100" x2="380" y2="100" stroke="#333" stroke-width="1"/>
+                            <rect x="280" y="22" width="100" height="78" fill="#0d1f0d" stroke="#1f8a1f"/>
+                            <path d="M60 60 L150 60" fill="none" stroke="#ff9a0d" stroke-width="2.5" stroke-dasharray="5 4"/>
+                            <path d="M150 60 L275 60" fill="none" stroke="#3b82f6" stroke-width="3"/>
+                            <polygon points="275,60 263,54 263,66" fill="#3b82f6"/>
+                            <circle cx="60" cy="60" r="10" fill="none" stroke="#15e000" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <div class="viz-legend">
+                        <div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>
+                        <div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>
+                        <div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>
+                        <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
+                    </div>
+                </div>
+
+                <div class="wiz-usage">Position the probe touching or just clear of the edge. Macro probes the wall and sets the WCS axis to the contact position.</div>
+
+                <span class="section-label">Feature Context</span>
+                <div class="grid-2">
+                    <div><span class="label">Axis</span><select><option>X</option><option>Y</option></select></div>
+                    <div><span class="label">Direction</span><select><option>pos</option><option>neg</option></select></div>
+                </div>
+                <div><span class="label">WCS Target</span><select><option>Active WCS</option><option>G54</option><option>G55</option></select></div>
+
+                <span class="section-label">Feed Rates</span>
+                <div class="grid-2">
+                    <div><span class="label">Fast Feed</span><input value="200"></div>
+                    <div><span class="label">Slow Feed</span><input value="50"></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">Code Preview <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre><span class="g-comment">( EDGE PROBE X+ )</span>
+#1 = 500
+G31 X#8 F#3 P#5 L0 Q1
+G0 X#9
+G31 X#8 F#4 P#5 L0 Q1
+#[#70+0] = #1925</pre>
+                </div>
+            </div>
+            <div class="wiz-foot">
+                <button onclick="closeWiz()">CANCEL</button>
+                <button class="primary" onclick="closeWiz()">INSERT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openWiz() { document.getElementById('wizard').classList.add('active'); }
+        function closeWiz() { document.getElementById('wizard').classList.remove('active'); }
+        document.getElementById('dockHandle').addEventListener('click', () => {
+            const d = document.getElementById('controller-dock');
+            d.classList.toggle('is-expanded');
+            document.querySelector('.dock-body').style.display = d.classList.contains('is-expanded') ? '' : 'none';
+            document.querySelector('.chevron').textContent = d.classList.contains('is-expanded') ? '▼' : '▲';
+        });
+    </script>
+
+<template id="__bundler_thumbnail">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="100" fill="#111"/>
+        <rect x="18" y="26" width="64" height="48" fill="#000" stroke="#444"/>
+        <text x="26" y="46" font-family="Arial" font-weight="bold" font-size="12" fill="#15e000">G54</text>
+        <rect x="22" y="60" width="56" height="6" fill="#13c40a"/>
+    </svg>
+</template>
+</body>
+</html>
