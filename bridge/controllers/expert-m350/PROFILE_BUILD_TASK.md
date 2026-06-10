@@ -1,5 +1,15 @@
 # TASK — Build the controller profile from the live Expert (`GET /api/profile`)
 
+> ## ✅ COMPLETE — 2026-06-10 (commits `127d8d5` → `c7b9a60`)
+> Both phases done. **Phase 1:** read-only capture of the live Expert landed in `assets/capture/` (193
+> files; real `setting`/`uservar`/CNCDISK — first raw Expert data in the repo). **Phase 2:** the captured
+> **`SYSDISK/cfg_utf8`** turned out to be the controller's **full param dictionary**, so the I/O map was
+> decoded straight from it (no blind toggling) and cross-checked on the panel. `Ops.profile()` now returns
+> a live profile — `hardwareTabs ["probes","limits"]`, ATC off, and a `pins` block — **verified end-to-end
+> against `192.168.0.99`**. The full I/O map + level encoding (`N`/`P` = active-low/high) is in
+> [`FINDINGS.md`](FINDINGS.md) → "Profile I/O map". Only one differential toggle was needed (to pin the
+> active-level index `port+2`). The detail below is kept as the historical brief.
+
 > **Read [`../../AGENTS.md`](../../AGENTS.md) first.** This task is **DDCS Expert / M350 only** — the
 > real machine at the studio (`\\192.168.0.99\`, Modbus on COM6). Do **not** cross-apply V4.1 findings.
 > Record everything you confirm in [`FINDINGS.md`](FINDINGS.md) with a confidence tag.
@@ -128,14 +138,20 @@ Once Phase 1 has landed `setting`, learning which index is which is mostly **des
 - **I-O pin param numbers** for probe / tool-setter / limits — none are in FINDINGS yet. This is the core unknown.
 - Whether any param encodes a tool changer (expected: none).
 
-## Done when
+## Done when  — ✅ all met (2026-06-10)
 
-- `GET /api/profile` on the live machine returns `source:"controller"` with `hardwareTabs` derived from
-  real I-O config, and (recommended) a `pins` block (`{probe, probeLevel, setter, setterLevel, limits:{…}}`)
-  Studio can pre-fill from.
-- Values are **cross-checked against the panel** and the known anchors.
-- Every confirmed index is recorded in [`FINDINGS.md`](FINDINGS.md) as a small table with `[CONFIRMED]`
-  tags (param # → meaning → observed value), so the next agent doesn’t re-derive it.
+- [x] `GET /api/profile` on the live machine returns `source:"controller"` with `hardwareTabs` derived from
+  real I-O config, and a `pins` block (`{probe, probeLevel, setter, setterLevel, limits:{…}}`) Studio can
+  pre-fill from. **Verified live against `192.168.0.99`** (returns `["probes","limits"]`, ATC off, pins
+  probe=10/setter=2/limits{xMin:20,yMax:23,zMax:21}).
+- [x] Values are **cross-checked against the panel** (Fixed Probe = IN02, Floating = port 10, level `N`)
+  and the known anchors re-validated against the captured `setting`.
+- [x] Every confirmed index is recorded in [`FINDINGS.md`](FINDINGS.md) → "Profile I/O map" as a table with
+  `[CONFIRMED]` tags (param # → meaning → observed value + the `[port, enable, active-level]` triple layout).
+
+> ⚠️ One correction for the next agent: `setting` is on **SYSDISK**, not CNCDISK as the old "Open questions"
+> below assumed — `_read_setting_params()` derives the SYSDISK sibling. The I/O pin params (the "core unknown")
+> are now all known, sourced from `SYSDISK/cfg_utf8` (the full param schema shipped on the controller).
 
 ## Safety (non-negotiable)
 
