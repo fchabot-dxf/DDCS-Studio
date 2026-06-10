@@ -3,3 +3,6 @@ node_modules/
 output/
 .venv/
 .DS_Store
+
+# Playwright test output (regenerated)
+test-results/
