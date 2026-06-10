@@ -25,6 +25,12 @@ const SETTINGS_DEFAULTS = {
         xMinPin: '', xMinLevel: 0, xMaxPin: '', xMaxLevel: 0,
         yMinPin: '', yMinLevel: 0, yMaxPin: '', yMaxLevel: 0,
         zMinPin: '', zMinLevel: 0, zMaxPin: '', zMaxLevel: 0
+    },
+    // ATC: tool-length probe defaults (consumed by the Tool Length wizard) + the tool-offset table.
+    // baseVar = DDCS tool-offset table base (#1430 = tool 1); tools[i] = stored length for tool i+1.
+    atc: {
+        baseVar: 1430, toolCount: 10, tools: [],
+        blockHeight: 50, safeZ: 10, maxDist: 200, retract: 3, fFast: 300, fSlow: 50, qStop: 1
     }
 };
 

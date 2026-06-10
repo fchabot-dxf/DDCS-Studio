@@ -521,15 +521,18 @@ export class GcodeViz3D {
         this.theta = (typeof sv.theta === 'number') ? sv.theta : -Math.PI / 2;
         this.phi = (typeof sv.phi === 'number') ? sv.phi : Math.PI / 3;
 
-        // Rescale the floor grid to roughly match the part footprint
+        // Rescale the floor grid to roughly match the part footprint. Anchor it to the stock bottom
+        // (the table) so the stock always rests on the grid — otherwise a deep move (e.g. Z-first probe
+        // in the corner wizard) drags b.minZ below the stock bottom and the stock appears to float.
         const span = Math.max(sx, sy, 10);
+        const floorZ = (this._stock && this._stock.show && this._stock.z > 0) ? -this._stock.z : b.minZ;
         if (this.grid) {
             this.grid.scale.setScalar(span / 200);
-            this.grid.position.set(cx, cy, b.minZ);
+            this.grid.position.set(cx, cy, floorZ);
         }
         if (this.axes) this.axes.scale.setScalar(Math.max(1, span / 200));
         if (this._gridLabels) {
-            const half = span / 2, off = span * 0.07, lw = span * 0.14, z = b.minZ;
+            const half = span / 2, off = span * 0.07, lw = span * 0.14, z = floorZ;
             const L = this._gridLabels;
             L.xp.position.set(cx + half + off, cy, z); L.xn.position.set(cx - half - off, cy, z);
             L.yp.position.set(cx, cy + half + off, z); L.yn.position.set(cx, cy - half - off, z);
@@ -833,7 +836,18 @@ export class GcodeViz3D {
             if (this.stockMesh) objs.push(this.stockMesh);
             if (this.pathGroup) objs.push(this.pathGroup);
             const hit = objs.length ? this.raycaster.intersectObjects(objs, true)[0] : null;
-            if (hit) this.target.lerp(hit.point, 1 - next / old);
+            let zoomPoint = hit ? hit.point : null;
+            if (!zoomPoint) {
+                // No geometry under the cursor — intersect a camera-facing plane through the target so
+                // zoom still tracks the cursor over empty space (always zoom toward the cursor).
+                const THREE = this.THREE;
+                const camDir = new THREE.Vector3();
+                this.camera.getWorldDirection(camDir);
+                const plane = new THREE.Plane(camDir, -camDir.dot(this.target));
+                const p = new THREE.Vector3();
+                if (this.raycaster.ray.intersectPlane(plane, p)) zoomPoint = p;
+            }
+            if (zoomPoint) this.target.lerp(zoomPoint, 1 - next / old);
             this.radius = next;
             this._applyCamera();
             this.render();
