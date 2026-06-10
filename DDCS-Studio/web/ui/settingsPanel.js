@@ -10,6 +10,7 @@
  * 3D preview can redraw. The viewer reads them via window.ddcsGetSettings().
  */
 import { UIUtils } from './uiUtils.js';
+import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 const SETTINGS_DEFAULTS = {
@@ -26,6 +27,10 @@ const SETTINGS_DEFAULTS = {
         yMinPin: '', yMinLevel: 0, yMaxPin: '', yMaxLevel: 0,
         zMinPin: '', zMinLevel: 0, zMaxPin: '', zMaxLevel: 0
     },
+    // Which hardware tabs are shown (manual toggles, persisted). Defaults match the M350 profile:
+    // Probes + Limits on, ATC off (no clutter unless you have a tool changer). Fully manual so non-bridge
+    // users can configure for accurate simulation; a controller profile just presets these.
+    hardwareTabs: { probes: true, atc: false, limits: true },
     // ATC: tool-length probe defaults (consumed by the Tool Length wizard) + the tool-offset table.
     // baseVar = DDCS tool-offset table base (#1430 = tool 1); tools[i] = stored length for tool i+1.
     atc: {
@@ -91,12 +96,22 @@ function buildSettingsOverlay() {
                         <button class="settings-tab" data-target="set_tab_probes" style="background: transparent; border: 1px solid transparent; color: #aaa; padding: 2px 8px; font-size: 10px; cursor: pointer;">PROBES</button>
                         <button class="settings-tab" data-target="set_tab_io" style="background: transparent; border: 1px solid transparent; color: #aaa; padding: 2px 8px; font-size: 10px; cursor: pointer;">I/O</button>
                     </div>
+                    <select id="set_profile" title="Controller profile — decides which hardware tabs (Probes / ATC / Limits) are shown" style="background:#222; color:#ccc; border:1px solid #555; font-size:10px; padding:2px 4px; margin-left:8px;"></select>
                 </div>
                 <span class="settings-close" title="Close">✕</span>
             </div>
             <div class="settings-body">
                 <!-- GENERAL TAB -->
                 <div id="set_tab_general">
+                    <div class="settings-section">
+                        <div class="settings-section-title">CONTROLLER / HARDWARE TABS</div>
+                        <div class="settings-row">
+                            <label style="margin-right:12px;"><input type="checkbox" id="set_show_probes"> Probes</label>
+                            <label style="margin-right:12px;"><input type="checkbox" id="set_show_atc"> ATC</label>
+                            <label><input type="checkbox" id="set_show_limits"> Limits</label>
+                        </div>
+                        <div class="settings-hint">Show only the tabs your machine has — these drive the simulation, so it works with no controller connected. The controller profile (top-right) presets them; toggle to add/remove.</div>
+                    </div>
                     <div class="settings-section">
                         <div class="settings-section-title">PROFILE (settings + variables)</div>
                         <div class="settings-row">
@@ -216,6 +231,35 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
+                <!-- ATC TAB -->
+                <div id="set_tab_atc" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">TOOL LENGTH PROBE (defaults for the Tool Length wizard)</div>
+                        <div class="settings-grid">
+                            <label>Block height (mm)<input type="number" id="set_atc_blockheight" step="0.1"></label>
+                            <label>Safe Z (mm)<input type="number" id="set_atc_safez" step="0.1"></label>
+                            <label>Max search (mm)<input type="number" id="set_atc_maxdist" step="1"></label>
+                            <label>Retract (mm)<input type="number" id="set_atc_retract" step="0.1"></label>
+                            <label>Fast feed<input type="number" id="set_atc_ffast" step="1"></label>
+                            <label>Slow feed<input type="number" id="set_atc_fslow" step="1"></label>
+                            <label>Q-stop<input type="number" id="set_atc_qstop" step="1"></label>
+                        </div>
+                        <div class="settings-hint">Tool-setter pin &amp; location live in the Probes tab. The Tool Length wizard probes against the setter and writes the result to the tool table below.</div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">TOOL TABLE&nbsp;&nbsp;(#var = base + tool − 1)</div>
+                        <div class="settings-grid">
+                            <label>Base variable<input type="number" id="set_atc_basevar" step="1"></label>
+                            <label>Tool count<input type="number" id="set_atc_toolcount" min="1" max="99" step="1"></label>
+                        </div>
+                        <div id="set_atc_tooltable" class="settings-grid" style="margin-top:8px;"></div>
+                        <div class="settings-row" style="margin-top:8px;">
+                            <button class="toolbar-btn settings-io" id="set_atc_insert">⬇ Insert tool table</button>
+                        </div>
+                        <div class="settings-hint">"Insert tool table" drops the #var = length assignments (non-blank rows) into the editor to push the table to the controller. Probing a tool updates one row live.</div>
+                    </div>
+                </div>
+
                 <!-- IO TAB -->
                 <div id="set_tab_io" style="display:none">
                     <div class="settings-section">
@@ -258,6 +302,21 @@ function wireSettingsOverlay(ov) {
 
     function fill() {
         const s = _ddcsSettings;
+        if (!s.hardwareTabs) s.hardwareTabs = { probes: true, atc: false, limits: true };
+        q('set_show_probes').checked = s.hardwareTabs.probes !== false;
+        q('set_show_atc').checked = s.hardwareTabs.atc === true;
+        q('set_show_limits').checked = s.hardwareTabs.limits !== false;
+        const ad = SETTINGS_DEFAULTS.atc, a = s.atc || (s.atc = {});
+        q('set_atc_blockheight').value = a.blockHeight ?? ad.blockHeight;
+        q('set_atc_safez').value = a.safeZ ?? ad.safeZ;
+        q('set_atc_maxdist').value = a.maxDist ?? ad.maxDist;
+        q('set_atc_retract').value = a.retract ?? ad.retract;
+        q('set_atc_ffast').value = a.fFast ?? ad.fFast;
+        q('set_atc_fslow').value = a.fSlow ?? ad.fSlow;
+        q('set_atc_qstop').value = a.qStop ?? ad.qStop;
+        q('set_atc_basevar').value = a.baseVar ?? ad.baseVar;
+        q('set_atc_toolcount').value = a.toolCount ?? ad.toolCount;
+        renderToolTable();
         q('set_stock_x').value = s.stock.x;
         q('set_stock_y').value = s.stock.y;
         q('set_stock_z').value = s.stock.z;
@@ -299,6 +358,81 @@ function wireSettingsOverlay(ov) {
     fill();
     _fillSettingsInputs = fill;
 
+    // --- Controller profile + manual hardware-tab gating (decides which hardware tabs are shown) ---
+    function applyHardwareTabs() {
+        const ht = _ddcsSettings.hardwareTabs || {};
+        const want = { probes: ht.probes !== false, atc: ht.atc === true, limits: ht.limits !== false };
+        ['probes', 'atc', 'limits'].forEach((tab) => {
+            const btn = ov.querySelector('.settings-tab[data-target="set_tab_' + tab + '"]');
+            const panel = ov.querySelector('#set_tab_' + tab);
+            if (btn) btn.style.display = want[tab] ? '' : 'none';
+            if (panel && !want[tab]) panel.style.display = 'none';   // never leave a hidden tab's panel visible
+        });
+    }
+    const profileSel = q('set_profile');
+    if (profileSel) {
+        profileSel.innerHTML = Object.values(CONTROLLER_PROFILES).map((p) => '<option value="' + p.id + '">' + p.name + '</option>').join('');
+        profileSel.value = getActiveProfile().id;
+        profileSel.addEventListener('change', () => {
+            const p = setActiveProfile(profileSel.value);   // a profile just PRESETS the toggles
+            _ddcsSettings.hardwareTabs = {
+                probes: p.hardwareTabs.includes('probes'),
+                atc: p.hardwareTabs.includes('atc'),
+                limits: p.hardwareTabs.includes('limits'),
+            };
+            saveSettings();
+            fill();
+            applyHardwareTabs();
+        });
+    }
+    applyHardwareTabs();
+
+    // --- ATC tool table: render rows (#var = base + tool-1), live edits, and an "Insert" generator ---
+    function renderToolTable() {
+        const cont = q('set_atc_tooltable');
+        if (!cont) return;
+        const a = _ddcsSettings.atc || {};
+        const base = parseInt(a.baseVar, 10) || 1430;
+        const count = Math.max(1, Math.min(99, parseInt(a.toolCount, 10) || 10));
+        const tools = a.tools || (a.tools = []);
+        let html = '';
+        for (let i = 0; i < count; i++) {
+            const v = (tools[i] != null && tools[i] !== '') ? tools[i] : '';
+            html += '<label>T' + (i + 1) + ' · #' + (base + i) +
+                '<input type="number" step="0.001" class="atc-tool-len" data-tool="' + i + '" value="' + v + '"></label>';
+        }
+        cont.innerHTML = html;
+    }
+    const _toolCont = q('set_atc_tooltable');
+    if (_toolCont) {
+        _toolCont.addEventListener('input', (e) => {   // dynamic rows aren't covered by the global binding
+            if (!e.target.classList || !e.target.classList.contains('atc-tool-len')) return;
+            const i = parseInt(e.target.dataset.tool, 10);
+            const a = _ddcsSettings.atc; a.tools = a.tools || [];
+            a.tools[i] = (e.target.value === '') ? '' : parseFloat(e.target.value);
+            saveSettings();
+        });
+    }
+    const _atcInsert = q('set_atc_insert');
+    if (_atcInsert) {
+        _atcInsert.addEventListener('click', () => {
+            const a = _ddcsSettings.atc || {};
+            const base = parseInt(a.baseVar, 10) || 1430;
+            const tools = a.tools || [];
+            const count = Math.max(1, Math.min(99, parseInt(a.toolCount, 10) || 0));
+            const lines = [];
+            for (let i = 0; i < count; i++) {
+                const v = tools[i];
+                if (v === '' || v == null || !Number.isFinite(Number(v))) continue;
+                lines.push('#' + (base + i) + '=' + Number(v) + ' ( Tool ' + (i + 1) + ' length )');
+            }
+            if (!lines.length) { alert('No tool lengths set in the table.'); return; }
+            const code = '( Tool table )\n' + lines.join('\n') + '\n';
+            const em = (window.ddcsStudio && window.ddcsStudio.editorManager) || window.editorManager;
+            if (em && typeof em.insert === 'function') em.insert(code);
+        });
+    }
+
     const closeOv = () => {
         saveSettings();
         if (window.ioTabManager) window.ioTabManager.stopRefreshLoop();
@@ -308,6 +442,24 @@ function wireSettingsOverlay(ov) {
 
     const onInput = () => {
         const s = _ddcsSettings;
+        if (!s.hardwareTabs) s.hardwareTabs = {};
+        s.hardwareTabs.probes = q('set_show_probes').checked;
+        s.hardwareTabs.atc = q('set_show_atc').checked;
+        s.hardwareTabs.limits = q('set_show_limits').checked;
+        applyHardwareTabs();
+        const a = s.atc || (s.atc = {});
+        a.blockHeight = num(q('set_atc_blockheight').value, a.blockHeight);
+        a.safeZ = num(q('set_atc_safez').value, a.safeZ);
+        a.maxDist = num(q('set_atc_maxdist').value, a.maxDist);
+        a.retract = num(q('set_atc_retract').value, a.retract);
+        a.fFast = num(q('set_atc_ffast').value, a.fFast);
+        a.fSlow = num(q('set_atc_fslow').value, a.fSlow);
+        a.qStop = num(q('set_atc_qstop').value, a.qStop);
+        const _nb = num(q('set_atc_basevar').value, a.baseVar);
+        const _nc = Math.max(1, Math.min(99, num(q('set_atc_toolcount').value, a.toolCount)));
+        const _rerender = (_nb !== a.baseVar || _nc !== a.toolCount);
+        a.baseVar = _nb; a.toolCount = _nc;
+        if (_rerender) renderToolTable();
         s.stock.x = num(q('set_stock_x').value, s.stock.x);
         s.stock.y = num(q('set_stock_y').value, s.stock.y);
         s.stock.z = num(q('set_stock_z').value, s.stock.z);
@@ -409,6 +561,7 @@ function wireSettingsOverlay(ov) {
             ov.querySelector('#set_tab_stock').style.display = 'none';
             ov.querySelector('#set_tab_limits').style.display = 'none';
             ov.querySelector('#set_tab_probes').style.display = 'none';
+            const _atcPanel = ov.querySelector('#set_tab_atc'); if (_atcPanel) _atcPanel.style.display = 'none';
             ov.querySelector('#set_tab_io').style.display = 'none';
             
             const target = e.target.getAttribute('data-target');
