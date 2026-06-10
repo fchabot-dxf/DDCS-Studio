@@ -106,6 +106,52 @@ class Ops:
             "version": __version__,
         }
 
+    # --- controller profile (shared with Studio) ---------------------------
+    def profile(self):
+        """Build a controller profile in the SHARED shape DDCS Studio consumes
+        (see web/shared/js/profiles/controllerProfiles.js): {id, name, source, hardwareTabs, atc}.
+
+        The controller's persisted config is the `setting` file (1000 × f64, index = param #) on
+        CNCDISK and decodes over SMB. Reading the bytes is solved; the param→meaning MAP (which index
+        is the probe pin / limit pins / whether an ATC exists) still has to be confirmed against a live
+        panel — Phase 5. Until then we return the known DDCS Expert M350 baseline and flag whether a
+        live `setting` was actually read, so Studio can show source = controller vs builtin.
+        """
+        prof = {
+            "id": "ddcs-expert-m350",
+            "name": "DDCS Expert M350",
+            "source": "builtin",
+            "hardwareTabs": ["probes", "limits"],
+            "atc": {"toolTableBaseVar": 1430, "defaultToolCount": 10},
+        }
+        params = self._read_setting_params()
+        if params is not None:
+            prof["source"] = "controller"
+            prof["paramCount"] = len(params)
+            # TODO(phase5): map specific indices -> hardwareTabs/pins. e.g. a configured tool-setter
+            # input → add "atc"; limit-pin params → confirm "limits"; read probe pin/level, etc.
+        return prof
+
+    def _read_setting_params(self):
+        """Decode the controller's `setting` file as little-endian f64 (index = param #).
+        Returns list[float], or None if unreachable/unreadable. Read-only; never raises."""
+        import struct
+        if not self.controller_reachable():
+            return None
+        full = os.path.join(self.cfg.expert_dest, "setting")
+        try:
+            with open(full, "rb") as f:
+                raw = f.read()
+        except OSError:
+            return None
+        n = len(raw) // 8
+        if n == 0:
+            return None
+        try:
+            return list(struct.unpack("<%dd" % n, raw[: n * 8]))
+        except struct.error:
+            return None
+
     # --- gateway setup (the Setup UI; local gateway only — the cloud can't reach in) --------
     def get_config(self):
         c = self.cfg

@@ -11,6 +11,7 @@ can also be opened from a separate dev origin during development.
 
 API (all JSON):
   GET  /api/descriptor                 -> gateway descriptor (machine id/name, controller_connected, ...)
+  GET  /api/profile                    -> controller profile in the shared shape (Studio consumes this)
   GET  /api/queue                      -> [ status/queue items ]
   GET  /api/status?id=<jobId>          -> one status object (404 if none)
   GET  /api/files                      -> CNCDISK listing (cncdisk/index shape)
@@ -83,6 +84,8 @@ class _Handler(BaseHTTPRequestHandler):
         path, q = u.path, parse_qs(u.query)
         if path == "/api/descriptor":
             return self._send_json(self.ops.descriptor())
+        if path == "/api/profile":
+            return self._send_json(self.ops.profile())
         if path == "/api/config":
             return self._send_json(self.ops.get_config())
         if path == "/api/queue":
