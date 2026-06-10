@@ -201,6 +201,10 @@ assigned input, `active-level` (at **port+2**) is the polarity; an unassigned in
 panel moved **`#577`** `0→1` (only boolean change; the float noise in that diff was position/WCS state flushed
 to disk by the Save — `setting` is written wholesale). Output signals are the `-m17` group (range 0–20).
 
+**Active-level encoding:** the panel field is the **NO/NC** selector. Value **`0` displays as "N" (Normally
+Open)** — confirmed on the Fixed Probe (its restored level is `0` = "N"), the normal resting state for a touch
+probe (open at rest, closes on contact). `1` is the complementary (NC) state. `[CONFIRMED on machine 2026-06-10]`
+
 ### Confirmed I/O for the studio Expert (Ultimate Bee), decoded from the captured `setting`:
 | Port param | Signal (cfg_utf8 label) | port | enable (`+1`) | level (`+2`) | Notes |
 |---|---|---|---|---|---|

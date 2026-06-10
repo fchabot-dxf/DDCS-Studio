@@ -178,7 +178,8 @@ class Ops:
         prof["hardwareTabs"] = tabs
 
         # `pins` is an extra block Studio pre-fills user settings from (not part of the tab contract).
-        # Active-level is at port+2 (#577/#580, differential-confirmed); only emit a pin when assigned.
+        # Active-level is at port+2 (#577/#580, differential-confirmed); 0 = "N"/Normally-Open on the
+        # panel (1 = NC). Only emit a pin when assigned.
         prof["pins"] = {
             "probe": probe, "probeLevel": level(self._PROBE_PORT + 2) if probe else 0,
             "setter": setter, "setterLevel": level(self._SETTER_PORT + 2) if setter else 0,
