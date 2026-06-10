@@ -50,6 +50,12 @@ function gpRenderFromEditor() {
     const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
     if (cfg) { gpViz.setStock(cfg.stock); gpViz.setMachine(cfg.machine); gpViz.setProbes(cfg.probes); }
     gpViz.setSegments(parsed);
+    // A wizard insert can hand off the start position it was previewing — apply it once, then clear.
+    if (window.__pendingSpindleStart && typeof gpViz.setStart === 'function') {
+        const ps = window.__pendingSpindleStart;
+        gpViz.setStart(ps.x, ps.y, ps.z, 0);
+        window.__pendingSpindleStart = null;
+    }
     if (!status) return;
     const s = parsed.stats;
     gpSetStatus(status, !s.drawable

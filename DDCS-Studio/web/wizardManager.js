@@ -160,6 +160,15 @@ export class WizardManager {
 
         if (code) {
             this.editorManager.insert(code);
+            // Carry the start position the user set in this wizard's 3D preview over to the main preview.
+            // Apply now if the main viz exists; stash it so it's also applied when the main view next renders.
+            try {
+                const ws = (this._wizViz && this._wizViz.starts) ? this._wizViz.starts[0] : null;
+                if (ws) {
+                    window.__pendingSpindleStart = { x: ws.x, y: ws.y, z: ws.z };
+                    if (window.ddcsSetSpindleStart) window.ddcsSetSpindleStart(ws.x, ws.y, ws.z, 0);
+                }
+            } catch (e) { /* preview is optional */ }
             // play click on successful insert
             playClick();
         } else {
