@@ -16,13 +16,13 @@ gateway, cloud Worker, R2, and `PROTOCOL.md` are unchanged: they're the frozen s
 ---
 
 ## 1. Decisions
-- ✅ **Monorepo, rooted in DDCS Studio.** `DDCS-Studio/` is the repo; the bridge lives at
-  `DDCS-Studio/bridge/` beside `ddcs-studio-modular/`. The standalone `ddcs-pc-bridge` repo is frozen.
+- ✅ **Monorepo.** `ddcs-studio-project/` is the repo (remote: `fchabot-dxf/DDCS-Studio`); the Studio app
+  lives at `DDCS-Studio/` beside `bridge/`. The standalone `ddcs-pc-bridge` repo is frozen.
 - ✅ **Two faces.** fairy **local UI** (CNC-FAIRY only) + **Studio** (anywhere).
 - ✅ **Studio gets Submit + Track** (the remote function; replaces the Cloudflare Pages bare console).
 - ✅ **Maximal `shared/js/`** for future flexibility — `client.js` + `instrument/` + tracker view +
-  style tokens, single source at the monorepo root. (Maximal partly *because* fairy-submit is open —
-  see ⬚ below; if fairy ever submits, the instrumenter is already shared.)
+  style tokens, single source at the monorepo root. (Now fully justified: fairy-submit is **DECIDED yes**
+  — see §7 — so the instrumenter is genuinely shared by *both* faces.)
 - ✅ **No build pipeline.** Sharing is solved by **serve config**, not a bundler (§4). The standalone
   HTML / pywebview exe stays an *optional commodity*, not a dependency.
 - 🔶 **Cloud face = Studio.** The bare Pages console is retired; Studio (on Pages) becomes the remote
@@ -39,7 +39,7 @@ gateway, cloud Worker, R2, and `PROTOCOL.md` are unchanged: they're the frozen s
    │ Files (CNCDISK)           │               │ + Submit (instrument→queue)  │
    │ History                   │               │ + Track (mirror progress)    │
    │ Setup / gateway control   │               └──────────────┬───────────────┘
-   │ ⬚ Submit? (maybe)         │                              │
+   │ Submit (local fallback)   │                              │
    └──────────────┬────────────┘                              │
         imports /shared/…       ┌──── shared/js (max) ────────┴── imports ../../shared/…
                   └─────────────►│ client.js · instrument/ · tracker view · tokens │◄──┘
@@ -56,7 +56,7 @@ contract is already built and proven — nothing new to invent in the seam.
 | View | fairy local UI | Studio | Notes |
 |---|:---:|:---:|---|
 | Queue · Tracker | ✅ live, zero-lag | ✅ mirror | both render their own view over the same status JSON |
-| **Submit** (+ instrumenter) | ⬚ **OPEN** | ✅ | Studio is the primary author→submit path; fairy-local submit is undecided |
+| **Submit** (+ instrumenter) | ✅ | ✅ | both submit; Studio is the primary author→submit path, fairy is the at-machine local fallback (run a job from CNC-FAIRY with no Studio) |
 | Files (CNCDISK) | ✅ | ❌ | file ops belong at the machine |
 | History | ✅ | ⬚ open (read-only remote?) | both could show it |
 | Setup / Admin (gateway cfg) | ✅ local-only | ❌ | cloud can't configure the gateway, by design |
@@ -67,7 +67,8 @@ contract is already built and proven — nothing new to invent in the seam.
 ## 4. The shared core + how it's consumed (no build)
 **Location:** `DDCS-Studio/shared/js/` — single source.
 **Contents (maximal):** `client.js` (the `/api` seam) · `instrument/` (`gcode-parse.js`, `instrument.js`,
-`selftest.mjs` — the `checkpoint_insert.py` port) · the tracker/queue **view** · style tokens.
+`selftest.mjs` — the `checkpoint_insert.py` port) · `validate/` (DDCS M350 quirk linter — a JS
+port of `controllers/expert-m350/tools/ddcs_lint.py`, consumed pre-submit by both faces) · the tracker/queue **view** · style tokens.
 
 **Consumption — serve config, not a bundler:**
 - **fairy** — `server.py` is *ours*, so it gains a small **`/shared/` static mount** (a server feature,
@@ -80,22 +81,26 @@ contract is already built and proven — nothing new to invent in the seam.
   download. Not a dependency.
 
 **Single-source discipline:** the JS instrumenter keeps its `selftest.mjs` parity with the Python
-`checkpoint_insert.py` (the existing anti-drift contract).
+`checkpoint_insert.py`, and the JS `validate/` keeps parity with `ddcs_lint.py` (the two anti-drift
+contracts — change the rule in both files, keep the selftests in lockstep).
 
 ---
 
 ## 5. Monorepo layout
 ```
-DDCS-Studio/                      monorepo root (remote: fchabot-dxf/DDCS-Studio)
-  ddcs-studio-modular/            the Studio app (authoring; gains Submit + Track)
-    src/ …                        served from a root that includes ../../shared (no build)
+ddcs-studio-project/              monorepo root (remote: fchabot-dxf/DDCS-Studio)
+  DDCS-Studio/                    the Studio app — its own npm project (authoring; gains Submit + Track)
+    web/                          ← Cloudflare publishes THIS (no build) — the only public part
+      shared/js/                  THE shared ES6 modules (client, instrument, validate, tracker view, tokens)
+      app.js · ui/ · wizards/ · engine/ · …   the app modules
+    scripts/ · tools/ · tests/ · data/ · docs/   Studio's dev tooling (NOT served)
+    package.json                  npm root stays here; web/ is just the deploy folder
   bridge/                         the bridge (imported; source only, no nested .git)
     bridge-app/
-      fairy/                      Python gateway (+ /shared static mount)
-      web/ui/                     fairy LOCAL UI — monitor + control (+ ⬚ submit?)
+      fairy/                      Python gateway (+ /shared mount → DDCS-Studio/web/shared)
+      web/ui/                     fairy LOCAL UI — monitor + control (+ submit)
       shared/PROTOCOL.md          the contract (doc)
     controllers/ …                research + findings
-  shared/js/                      THE shared ES6 modules (client, instrument, tracker view, tokens)
   release.py                      Studio's existing release flow (unchanged)
   MONOREPO_PLAN.md                this file
 ```
@@ -104,11 +109,13 @@ DDCS-Studio/                      monorepo root (remote: fchabot-dxf/DDCS-Studio
 
 ## 6. Migration phases (incremental; nothing breaks mid-way)
 - **P1 — Seam frozen.** `/api` ops + `PROTOCOL.md`. ✅ done.
-- **P2 — Establish `shared/js/`.** Move `client.js` + `instrument/` (+ later tracker view, tokens) to
-  `shared/js/`. Verify `node shared/js/instrument/selftest.mjs` passes. *No UI wired yet.*
-- **P3 — Wire the no-build serving.** Add the `/shared/` mount to `server.py`; re-point the fairy UI's
-  imports to `/shared/…`; set Studio's serve-root to include `shared/`. Both apps still render exactly
-  what they render today — just sourcing shared modules from one place.
+- **P2 — Establish `shared/js/`.** ✅ done. `client.js` + `instrument/` now live only in `shared/js/`
+  (the fairy UI's duplicate copies were removed). `node shared/js/instrument/selftest.mjs` passes.
+- **P3 — Wire the no-build serving.** ✅ done. `server.py` gained a `/shared/` static mount (wired via
+  `Config.shared_dir`, served as `text/javascript`); the fairy UI imports `/shared/js/client.js` +
+  `/shared/js/instrument/instrument.js` (absolute, gateway-served); the exe build bundles `shared/`;
+  Studio gained `npm run start:shared` (repo-root serve so `../../shared/…` resolves) without disturbing
+  the existing `start`/e2e flow. Studio wires its actual imports in P5. Both faces still render as before.
 - **P4 — Slim the fairy local UI.** Monitor + control + Files + History + Setup. Resolve ⬚ submit.
   Lock `server.py` to `127.0.0.1`; bundle into `fairy.exe`.
 - **P5 — Studio Submit + Track.** Studio imports the shared `instrument/` + `client.js` + tracker view;
@@ -119,8 +126,9 @@ DDCS-Studio/                      monorepo root (remote: fchabot-dxf/DDCS-Studio
 ---
 
 ## 7. Open questions (your calls — edit freely)
-- ⬚ **Does the fairy local UI submit?** (e.g. a local fallback to run a job from CNC-FAIRY without
-  Studio.) If yes, fairy also imports the shared `instrument/` — already covered by maximal-shared.
+- ✅ **Does the fairy local UI submit? → YES** (DECIDED). At-machine local fallback: run a job from
+  CNC-FAIRY with no Studio. Already wired — the fairy Submit view imports the shared `instrument/`
+  (covered by maximal-shared); post-P3 it sources it from `/shared/js/instrument/`.
 - ⬚ **Remote History/Files in Studio?** Read-only views, or keep them at-machine only?
 - ⬚ **Tracker view: shared code or per-app render?** One shared view component vs each face renders its
   own over the same status JSON. (Maximal-shared assumes a shared component; easy to back out.)

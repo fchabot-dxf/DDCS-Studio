@@ -1,6 +1,7 @@
 """server.py — the gateway's LOCAL HTTP server (CONFIGS §3 offline/local configs).
 
-Exposes the Ops surface (ops.py) as a small JSON API and serves the static console at `/`.
+Exposes the Ops surface (ops.py) as a small JSON API, serves the static console at `/`, and mounts
+the monorepo `shared/` core at `/shared/` (MONOREPO_PLAN §4 — no-build sharing via serve config).
 This is how the gateway *serves the console* at localhost (offline) or on the LAN (local-network):
 download the gateway, run it, open the browser → the whole local system.
 
@@ -23,6 +24,12 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
+
+# ES modules must be served with a JS MIME type or the browser refuses them. On Windows mimetypes
+# reads the registry, where .js sometimes maps to text/plain — pin .js/.mjs so the console and the
+# /shared/ modules always load as modules.
+mimetypes.add_type("text/javascript", ".js")
+mimetypes.add_type("text/javascript", ".mjs")
 
 _PLACEHOLDER = (
     b"<!doctype html><meta charset=utf-8><title>DDCS Bridge gateway</title>"
@@ -93,6 +100,9 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send_json(self.ops.list_files())
         if path == "/api/file":
             return self._send_json(self.ops.read_file((q.get("name") or [""])[0]))
+        if path.startswith("/shared/"):
+            # the monorepo shared/ core (client.js, instrument/, …) — single source, served as-is (no build)
+            return self._serve_file(self.server.shared_dir, path[len("/shared/"):])
         return self._serve_static(path)
 
     def do_POST(self):
@@ -113,7 +123,12 @@ class _Handler(BaseHTTPRequestHandler):
         root = self.server.console_dir
         if not root:
             return self._send_bytes(_PLACEHOLDER, "text/html")
-        rel = path.lstrip("/") or "index.html"
+        return self._serve_file(root, path.lstrip("/") or "index.html")
+
+    def _serve_file(self, root, rel):
+        """Serve rel under root as a static file (path-traversal guarded). 404 if root unset/missing."""
+        if not root:
+            return self._send_json({"error": "not found"}, 404)
         full = os.path.normpath(os.path.join(root, rel))
         if not full.startswith(os.path.normpath(root)) or not os.path.isfile(full):
             return self._send_json({"error": "not found"}, 404)
@@ -135,5 +150,6 @@ def start_server(config, ops):
     httpd = ThreadingHTTPServer((config.host, config.port), _Handler)
     httpd.ops = ops
     httpd.console_dir = config.console_dir
+    httpd.shared_dir = config.shared_dir
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd

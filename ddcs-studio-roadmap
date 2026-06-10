@@ -37,8 +37,8 @@ A CNC control and authoring system for DDCS controllers that works **offline by 
 |Files on CNCDISK              |✅              |❌                    |
 |Gateway config / setup        |✅              |❌                    |
 |Macro authoring / wizards     |❌              |✅                    |
-|G-code instrumentation        |❌              |✅                    |
-|Job submission                |❌              |✅                    |
+|G-code instrumentation        |✅ fallback     |✅ primary            |
+|Job submission                |✅ fallback     |✅ primary            |
 |Job history (read)            |local          |remote mirror        |
 
 -----
@@ -47,7 +47,7 @@ A CNC control and authoring system for DDCS controllers that works **offline by 
 
 - Monorepo established (`DDCS-Studio/`)
 - `/api` ops surface frozen (`PROTOCOL.md`)
-- `bridge/` imported alongside `ddcs-studio-modular/`
+- `bridge/` imported alongside `DDCS-Studio/`
 - `shared/js/` directory exists
 - Studio wizards working (corner, middle, edge, WCS, communication probes)
 - Cloudflare R2 + Worker transport working for Frédéric’s own setup
@@ -58,13 +58,13 @@ A CNC control and authoring system for DDCS controllers that works **offline by 
 
 **Goal:** one copy of `client.js` and `instrument/` consumed by both faces with no bundler.
 
-- [ ] Move `client.js` → `shared/js/client.js`
-- [ ] Move `instrument/` → `shared/js/instrument/`
-- [ ] Add `/shared/` static mount to `server.py` (fairy serves it at localhost)
-- [ ] Re-point fairy UI imports to `/shared/js/…` (absolute)
-- [ ] Set Studio serve-root one level up so `../../shared/js/…` resolves (relative)
-- [ ] Verify `node shared/js/instrument/selftest.mjs` passes
-- [ ] Both apps still render identically — only the import paths changed
+- [x] Move `client.js` → `shared/js/client.js`
+- [x] Move `instrument/` → `shared/js/instrument/`
+- [x] Add `/shared/` static mount to `server.py` (fairy serves it at localhost)
+- [x] Re-point fairy UI imports to `/shared/js/…` (absolute)
+- [x] Set Studio serve-root one level up so `../../shared/js/…` resolves (relative) — added `npm run start:shared` (serves the repo root on :3001; the default `start` stays on `./src`:3000 so the e2e suite is untouched)
+- [x] Verify `node shared/js/instrument/selftest.mjs` passes
+- [x] Both apps still render identically — only the import paths changed (fairy verified: console + `/shared/` modules served as `text/javascript`; Studio unchanged until it imports shared in Phase 4)
 
 -----
 
@@ -221,7 +221,13 @@ Community can contribute new adapters by implementing the 4-method interface.
 
 **Goal:** make Studio smarter about what it generates.
 
-- [ ] **Program validator** — catch DDCS quirks before submit (G10 broken, WCS stride, etc.)
+- [x] **Program validator** — `shared/js/validate/` (both faces): a faithful **JS port of the
+  machine-validated `bridge/controllers/expert-m350/tools/ddcs_lint.py`** (the anti-drift contract that
+  `instrument/` has with `checkpoint_insert.py`). Catches nested/stray/open comment parens, unbalanced
+  `[]`, `GOTO ` space, **`MSETDATA/MGETDATA` 6-arg** (the real Modbus I/O check), `#1630-1636` analyzer-wedge,
+  `#1620-1626` channel writes, FANUC ops, G10, bare-const G53, `#2070`→persistent, priming-freeze
+  (with prime-first suppression). `selftest.mjs` is a 1:1 port of the Python `--self-test`; **parity
+  verified line-for-line on 8 real M350 macros.** ⬚ remaining: wire it into the submit UI (advisory).
 - [ ] **Run time estimator** — parse feeds + distances → time estimate
 - [ ] **Job templates** — save wizard configs as named presets
 - [ ] **G-code diff view** — compare two versions of a generated macro
@@ -244,7 +250,7 @@ Community can contribute new adapters by implementing the 4-method interface.
 
 |#|Question                                                             |Impact                                                              |
 |-|---------------------------------------------------------------------|--------------------------------------------------------------------|
-|1|Does fairy local UI ever submit jobs? (local fallback without Studio)|If yes, fairy also imports `instrument/` — already covered by shared|
+|1|~~Does fairy local UI ever submit jobs?~~ **RESOLVED: yes** — at-machine local fallback (no Studio)|Submit view already wired; imports the shared `instrument/` — covered by maximal-shared|
 |2|Does Studio show job history read-only, or only fairy-local?         |Affects Track tab scope                                             |
 |3|Tracker view: shared component or per-face render?                   |Affects `shared/js/` scope                                          |
 |4|Keep `bundle_standalone.py` working through the move?                |Low priority but good for distribution                              |

@@ -1,0 +1,44 @@
+{
+  "name": "ddcs-studio",
+  "version": "9.49.78",
+  "description": "Modular G-code Generator for DDCS Expert M350 CNC Controller",
+  "type": "module",
+  "main": "app.js",
+  "scripts": {
+    "start": "npx http-server ./web -p 3000 --silent",
+    "generate-vars": "node web/data/import_vars.js --input \"data/Variables-ENG 01-04-2025.csv\" --output web/data/default_vars.js",
+    "svg:rename-gradients": "python \"web/assets/svg/rename_gradients.py\" --dir \"web/assets/svg\"",
+    "prebundle": "npm run svg:rename-gradients",
+    "bundle": "node scripts/bundle.cjs --src web",
+    "build": "echo \"no build step: Studio is static; Cloudflare serves web/ as-is\"",
+    "build:standalone": "npm run bump-version && npm run generate-vars && npm run bundle",
+    "bump-version": "node scripts/bump-version.cjs",
+    "test:e2e": "playwright test"
+  },
+  "keywords": [
+    "cnc",
+    "gcode",
+    "ddcs",
+    "m350",
+    "probe",
+    "ultimate-bee"
+  ],
+  "author": "Fr\u00e9d\u00e9ric",
+  "license": "MIT",
+  "files": [
+    "web/app.js",
+    "web/gcodeParser.js",
+    "web/wizardManager.js",
+    "web/ui/",
+    "web/viz/",
+    "web/data/",
+    "web/engine/",
+    "web/wizards/"
+  ],
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  },
+  "dependencies": {
+    "xmldom": "^0.6.0"
+  }
+}

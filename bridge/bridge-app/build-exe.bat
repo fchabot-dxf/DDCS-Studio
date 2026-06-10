@@ -7,7 +7,7 @@ REM ============================================================
 cd /d "%~dp0"
 python -m pip install --quiet pywebview pyinstaller
 python -m PyInstaller --noconfirm --name DDCS-Bridge --onefile --windowed ^
-  --add-data "web/ui;web/ui" --collect-all webview desktop.py
+  --add-data "web/ui;web/ui" --add-data "../../DDCS-Studio/web/shared;shared" --collect-all webview desktop.py
 echo.
 echo Built: dist\DDCS-Bridge.exe
 pause

@@ -3,7 +3,7 @@
 **Status: [PLANNED] — blocked on error-readback confirmation (see repo README "Current status").**
 
 ## Idea
-DDCS-Studio's execution engine (`DDCS-Studio/ddcs-studio-modular/src/engine/`) emulates the
+DDCS-Studio's execution engine (`DDCS-Studio/web/engine/`) emulates the
 Expert's G-code/macro semantics. Today it is built from documented ground truth (ddcs-expert
 skill + official Variables-ENG list). The wired bridge lets us replace "as-documented" with
 "as-measured":

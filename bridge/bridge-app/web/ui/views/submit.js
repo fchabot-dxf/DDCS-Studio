@@ -1,7 +1,7 @@
 // submit.js — submit a job. Beacons ON (default) => instrument client-side (tracked, has map);
 // beacons OFF => deliver-only (no map). Settings: count, pacing, var/marker (PROTOCOL §1/§2).
 import { el, toast } from "../util.js";
-import { instrument, DEFAULTS } from "../instrument/instrument.js";
+import { instrument, DEFAULTS } from "/shared/js/instrument/instrument.js";
 
 const field = (labelText, control) => el("div", {}, el("span", { class: "label" }, labelText), control);
 const int = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };

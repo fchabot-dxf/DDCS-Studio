@@ -476,6 +476,7 @@ def main(argv):
     ap.add_argument("--host", help="local server bind address (default 127.0.0.1; 0.0.0.0 for the LAN)")
     ap.add_argument("--http-port", dest="port", type=int, help="local server port (default 8765)")
     ap.add_argument("--console", dest="console_dir", help="static console dir to serve at /")
+    ap.add_argument("--shared", dest="shared_dir", help="monorepo shared/ dir to mount at /shared/")
     ap.add_argument("--ws", dest="enable_ws", action="store_true",
                     help="start the WebSocket Command Center telemetry broadcast (default port 8766)")
     ap.add_argument("--ws-port", dest="ws_port", type=int,
@@ -489,6 +490,7 @@ def main(argv):
         com_port=args.com_port, baud=args.baud, slave_id=args.slave_id,
         stall_seconds=args.stall_seconds, poll_interval_s=args.poll_interval_s,
         serve=args.serve or None, host=args.host, port=args.port, console_dir=args.console_dir,
+        shared_dir=args.shared_dir,
         machine_id=args.machine_id, machine_name=args.machine_name,
         enable_slave=(False if args.no_slave else None),
         open_browser=(True if args.open_browser else None),

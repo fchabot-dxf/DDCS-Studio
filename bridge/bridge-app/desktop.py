@@ -25,6 +25,17 @@ def _bundle_dir():
     return getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 
 
+def _shared_dir():
+    """The shared/ core (mounted at /shared/). It lives in the Studio deploy root so Cloudflare serves
+    it with no build: <repo>/DDCS-Studio/web/shared. Frozen exe: bundled flat at <_MEIPASS>/shared.
+    From source: repo root is two up from bridge-app (bridge-app -> bridge -> repo)."""
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return os.path.join(meipass, "shared")
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.normpath(os.path.join(here, "..", "..", "DDCS-Studio", "web", "shared"))
+
+
 def _overrides():
     """Optional ~/.ddcs-bridge/config.json — per-machine setup without rebuilding the exe. Keys:
     backend, dest, com_port, enable_slave, machine_id, machine_name, port, r2_* (for cloud)."""
@@ -47,6 +58,7 @@ def build_config():
         enable_slave=ov.get("enable_slave", False),      # default off (no Modbus) until configured
         serve=True, host="127.0.0.1", port=int(ov.get("port", 8765)),
         console_dir=os.path.join(_bundle_dir(), "web", "ui"),
+        shared_dir=_shared_dir(),
         config_path=os.path.join(APP_DATA, "config.json"),   # Setup persists here
         open_browser=False,                              # the window IS the UI
     )

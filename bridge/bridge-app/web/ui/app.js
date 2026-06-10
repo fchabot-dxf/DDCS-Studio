@@ -1,7 +1,7 @@
 // app.js — the console shell (CONFIGS §6): view registry, poll loop, connection indicator.
 // One UI, driven by the connection status the client reports. Same code for every config; only the
 // client (and later, what status it derives) changes.
-import { makeClient, deriveStatus } from "./client.js";
+import { makeClient, deriveStatus } from "/shared/js/client.js";
 import { el, clear } from "./util.js";
 import submitView from "./views/submit.js";
 import queueView from "./views/queue.js";

@@ -49,6 +49,7 @@ class Config:
     host: str = "127.0.0.1"                 # bind address (0.0.0.0 to reach from the LAN)
     port: int = 8765
     console_dir: str = ""                   # static console files to serve at / (empty = none yet)
+    shared_dir: str = ""                    # monorepo shared/ dir, mounted at /shared/ (empty = no mount)
     open_browser: bool = False              # --open: pop the console in the default browser on start
     config_path: str = ""                   # where Setup persists config (empty -> ~/.ddcs-bridge/config.json)
 
