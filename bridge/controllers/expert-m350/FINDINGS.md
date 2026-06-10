@@ -248,9 +248,14 @@ From `READ_VAR.nc`, `COPY_WCS.nc`, `SAVE_WCS_XY_AUTO.nc`, `sysstart.nc` on this 
   (0/1/2), `#569` = safe-Z return height, `#624` = G53 Z return. `IF/GOTO/Nlabel` + `G04 P<ms>` dwell.
 
 ## Control
-- `#2037` **virtual buttons** press any of 201 panel functions from a running macro
-  (`#2037 = 65536 + [KeyValue − 1000]`). `[CONFIRMED]` per the `ddcs-expert` skill
-  (`Virtual_button_function_codes_COMPLETE.xlsx`). Subject to the one-program-at-a-time rule.
+- ⭐ `#2037` **virtual buttons** press any of 201 panel functions from a running macro
+  (`#2037 = 65536 + [KeyValue − 1000]`). **`[CONFIRMED ON MACHINE 2026-06-10, fw 2025-06-19-00]`** — a
+  PC-delivered macro (`A7b_BUTTON_ONEWAY.nc`) pressing **MDI page (KeyValue 1348)** switched the live screen
+  to MDI and stayed; the macro ran (`.pos` written). Earlier round-trip (`1373`→`1348`→`1373`, Monitor↔MDI)
+  hid the effect by ending on the start page — use a **one-way** press for an unambiguous test. Codes in the
+  skill's `Virtual_button_function_codes_COMPLETE.xlsx` (1348 MDI, 1373 Monitor verified). Add `G04 P<s>`
+  between presses. Subject to the one-program-at-a-time rule. ⇒ **navigation / file-select / start are now
+  software-drivable on the Expert — no M3K, no ESP32** (the A7 experiment, archived).
 
 ## Autonomy outlook — the Expert is a superset of the V4.1
 The V4.1 bench proved a **software dispatcher**: an `M47` self-loop re-reads its file from disk each

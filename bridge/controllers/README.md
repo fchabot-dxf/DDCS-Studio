@@ -35,7 +35,7 @@ findings and assets separate so a fact proven on one is never silently assumed o
 | Run-state files `.file` / `.<f>.nc.env` / `.pos` on SYSDISK | ✅ `.file`=last file (useful); `.env` idx 148/149 do NOT track status `[REFUTED]` | `.<name>.nc.pos` (60 B) + `.break0/.break1` present `[CONFIRMED present 2026-06-06; semantics TO TEST]` |
 | Serial = **Modbus RTU** (`MSETDATA`/`MGETDATA`) | ❌ `[CONFIRMED]` not in firmware (checked 2 builds) | ✅✅ **LIVE-CONFIRMED 2026-06-06**: `MSETDATA` frame received by PC slave (COM6↔port2), **SABRENT** is the working adapter (ferrule blocker cleared). `#279`=enable **+ reboot** (port silent with `#279`=NO), **115200 8N1**, slave id 1, X5=16→write-HOLDING, little-endian byte pack (`reg=#(n+1)<<8|#n`). pin `pymodbus==3.6.9` |
 | Serial port 1 = **M3K keyboard** | ✅ (listen test was silent — input port) | ✅ port 1 = M3K, port 2 = Modbus data |
-| `#2037` virtual buttons (press panel keys from macro) | `[TO TEST]` | ✅ `[CONFIRMED]` (per ddcs-expert skill) |
+| `#2037` virtual buttons (press panel keys from macro) | `[TO TEST]` | ✅✅ **LIVE-CONFIRMED 2026-06-10** (PC-delivered macro pressed MDI page → screen switched; `[CONFIRMED via skill]` form `65536+[KeyValue−1000]`) |
 | Passwords | Super Admin `888888` | Operator `666666` / Admin `777777` / Super Admin `888888` |
 
 Legend: ✅ confirmed · ❌ confirmed-absent · `[TO TEST]` open · `[HYPOTHESIS]` unverified.

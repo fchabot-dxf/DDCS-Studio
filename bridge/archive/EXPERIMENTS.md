@@ -123,7 +123,11 @@ Watch the screen switch pages.
 **Proves:** software button injection works → navigation/file-select/start all become software (no M3K,
 no ESP32). Formula: `#2037 = 65536 + [KeyValue - 1000]`; codes in
 `Virtual_button_function_codes_COMPLETE.xlsx`. Add `G4 P1` between presses.
-**RESULT (A7):** pages switched? ___
+**RESULT (A7):** ✅ **YES — confirmed live 2026-06-10** (fw 2025-06-19-00). A PC-delivered macro pressing
+**MDI page (KeyValue 1348)** switched the running screen to MDI and stayed; `.pos` confirmed it ran. ⚠️ Use a
+**one-way** press to test — the original round-trip (1373→1348→1373) ended on the start page and *looked* like
+nothing happened. ⇒ navigation/file-select/start are now software (see FINDINGS "Control"). Next: A8 (remote
+trigger without a manual Start) + A9 (dispatcher bootstrap).
 
 ## A8 — MDI auto-execute test ⭐ (does the trigger problem vanish?)
 **Needs:** 🟢 · **Goal:** can the PC trigger execution over Ethernet alone — no panel, no hardware?
