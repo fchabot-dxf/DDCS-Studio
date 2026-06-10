@@ -112,10 +112,13 @@ class Ops:
         (see web/shared/js/profiles/controllerProfiles.js): {id, name, source, hardwareTabs, atc}.
 
         The controller's persisted config is the `setting` file (1000 × f64, index = param #) on
-        CNCDISK and decodes over SMB. Reading the bytes is solved; the param→meaning MAP (which index
-        is the probe pin / limit pins / whether an ATC exists) still has to be confirmed against a live
-        panel — Phase 5. Until then we return the known DDCS Expert M350 baseline and flag whether a
-        live `setting` was actually read, so Studio can show source = controller vs builtin.
+        SYSDISK and decodes over SMB. Reading the bytes is solved. A 2026-06-10 desk pass over the
+        captured `setting` CONFIRMED the baseline for the studio Expert — hardwareTabs [probes, limits],
+        ATC off (manual tool change) — and localized the I-O pins to candidate param regions
+        (#489–579, #670–676); see controllers/expert-m350/FINDINGS.md "Profile build — setting diff
+        analysis". Pinning a specific index → input pin still needs the Phase-2 differential against a
+        live panel, so we return that baseline and only flag whether a live `setting` was read
+        (source = controller vs builtin).
         """
         prof = {
             "id": "ddcs-expert-m350",
@@ -128,29 +131,39 @@ class Ops:
         if params is not None:
             prof["source"] = "controller"
             prof["paramCount"] = len(params)
-            # TODO(phase5): map specific indices -> hardwareTabs/pins. e.g. a configured tool-setter
-            # input → add "atc"; limit-pin params → confirm "limits"; read probe pin/level, etc.
+            # TODO(phase2): emit a `pins` block once the I-O indices are differential-confirmed.
+            # Candidates from the 2026-06-10 desk pass (see FINDINGS): I-O assignment region #489–579
+            # (small-int port#+enable pairs) and the tool-setter/probe block #670–676. Don't guess —
+            # baking unconfirmed indices in would mis-detect pins on other machines.
         return prof
 
     def _read_setting_params(self):
         """Decode the controller's `setting` file as little-endian f64 (index = param #).
-        Returns list[float], or None if unreachable/unreadable. Read-only; never raises."""
+        Returns list[float], or None if unreachable/unreadable. Read-only; never raises.
+
+        `setting` lives on the **SYSDISK** share (not CNCDISK = expert_dest) — confirmed by the Phase-1
+        capture — so try expert_dest first, then the SYSDISK sibling derived by swapping the share name."""
         import struct
         if not self.controller_reachable():
             return None
-        full = os.path.join(self.cfg.expert_dest, "setting")
-        try:
-            with open(full, "rb") as f:
-                raw = f.read()
-        except OSError:
-            return None
-        n = len(raw) // 8
-        if n == 0:
-            return None
-        try:
-            return list(struct.unpack("<%dd" % n, raw[: n * 8]))
-        except struct.error:
-            return None
+        candidates = [os.path.join(self.cfg.expert_dest, "setting")]
+        dest = (self.cfg.expert_dest or "").rstrip("\\/")
+        if dest.upper().endswith("CNCDISK"):
+            candidates.append(os.path.join(dest[: -len("CNCDISK")] + "SYSDISK", "setting"))
+        for full in candidates:
+            try:
+                with open(full, "rb") as f:
+                    raw = f.read()
+            except OSError:
+                continue
+            n = len(raw) // 8
+            if n == 0:
+                continue
+            try:
+                return list(struct.unpack("<%dd" % n, raw[: n * 8]))
+            except struct.error:
+                continue
+        return None
 
     # --- gateway setup (the Setup UI; local gateway only — the cloud can't reach in) --------
     def get_config(self):

@@ -325,6 +325,43 @@ Must be **Open**; machine reads **#576 = 1 (Open)** ✓. Numbering: panel **Pr76
    folder; PC polls it locally. `[VERIFY a macro can write to Net Disk.]`
 3. Re-test the V4.1 findings here (syntax-error sentinel, `.env` line-number field) — `[TO TEST]`.
 
+## Profile build — `setting` diff analysis  `[2026-06-10, desk]`
+
+Off-site pass over the Phase-1 capture (`assets/capture/20260610T163337Z/`): diffed live `setting` vs
+`default_setting` (**160 params changed from factory**) and cross-read the captured NC subprograms.
+
+**Baseline profile CONFIRMED for this machine** → `hardwareTabs: [probes, limits]`, ATC **off**:
+- `probes` — `3D PROBE G55.nc` (bare `G31`, so the probe input is a *configured `setting` param*, not in
+  the G-code) + a fixed **tool setter** (`save_sensor_position.nc` jogs over it, saves `#101/#102`). `[CONFIRMED]`
+- `limits` — travel / soft-limit params are configured (candidates below). `[CONFIRMED present]`
+- **no `atc`** — `save_toolchange_position.nc` is a *manual* park position; no changer actuation in the
+  M-code subprograms. Manual tool change. `[CONFIRMED]`
+
+**`setting` diff structure** (index = param #; 1000×f64). The 160 changed params group as:
+- `#0–#8`, `#50–#63`, `#85`, `#107–#109`, `#285–#288` — axis max vel / accel / jog & feed rates.
+- `#162 / #166 / #167` — candidate **travel / soft-limit** values (#162=−776, #166=756). `[HYPOTHESIS]`
+- `#290–#389` — coordinate blocks in groups of ~5: WCS (G54–G59) + fixture / tool-position tables.
+- `#489–#492`, `#515–#579` — **candidate I-O assignment region**: small ints (1–4, 20–23) in `(value, 1)`
+  pairs that look like `(port#, enable/polarity)`. The **probe / tool-setter / limit input pins** most
+  likely live here. `[HYPOTHESIS — pin exact indices in Phase 2]`
+- `#670–#676` = `1, 50, 5, 10, −5, 400, 20` — **candidate tool-setter / probe config block**
+  (`#671=50` ≈ our default block height, `#675=400` ≈ a probe feed). `[HYPOTHESIS]`
+
+**`uservar` probe/setter slots** (meaning fixed by the captured NC; range #100–#549, slot = #var−100):
+`#101/#102` = saved Sensor X/Y · `#110–#113` = 3D-probe ball-R(Z) / ball-R(XY) / max-search / clearance ·
+`#120–#122` = last-probed Z/X/Y machine pos. **All 0 in this capture** (no sensor pos saved / probe
+unconfigured yet) — so they confirm the *slots*, not live values. `[CONFIRMED slots]`
+
+**Why `Ops.profile()` stays at the baseline (no data-driven pins yet):** mapping a specific `setting`
+index → "probe input pin" can't be done confidently from the capture alone — the candidate regions above
+need the **Phase-2 differential** (operator nudges one I-O param on the panel → re-capture → diff to see
+which index moved). The on-disk DDCS PDF is *network* config only, not the full param list. Baking guessed
+indices into the gateway would mis-detect tabs/pins on other machines, so it's deferred.
+
+`[TO TEST — Phase 2]` differential-confirm the probe-input + one limit-input index in `#489–#579`, then add
+a `pins` block to `GET /api/profile`. Params are **writable** over SMB (edit `setting` + reboot, see SMB
+section) — so once indices are known, "push config to the controller" becomes feasible (attended).
+
 ## Assets in this folder
 - `assets/Modbus_RS232_DDCSE/` — `M350 modbus manual RU.docx`, `Инструкция.txt`, connector pinout
   (`Распиновка разъёма.pdf`), bundled **Termite** terminal (`Termite_1.0.0.6/`, has a Modbus scanner).

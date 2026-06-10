@@ -91,6 +91,11 @@ manual tool change → expect ATC **off**).
 
 ## Building the map (desk work, then Phase 2 to confirm)
 
+> **Status `[2026-06-10]`:** Phase 1 capture done; desk pass done (see FINDINGS *"Profile build — `setting`
+> diff analysis"*). Baseline **confirmed** (`probes` + `limits`, no `atc`); I-O pins **localized** to
+> `#489–579` / `#670–676`. `Ops.profile()` now reads `setting` from **SYSDISK**. **What's left = the
+> Phase-2 differential below** to pin exact indices, then a `pins` block on `/api/profile`.
+
 Once Phase 1 has landed `setting`, learning which index is which is mostly **desk work — no machine**:
 
 1. **Decode + anchor (off-site).** Decode the captured `setting` and confirm the known-good anchors line
