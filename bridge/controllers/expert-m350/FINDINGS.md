@@ -170,6 +170,14 @@ re-reads disk is a **per-cycle Start trigger** (V4.1 confirms Start re-reads the
 job-file delivery + `uservar`/`MSETDATA`/`error.nc` for readback. (Modbus blocked on the ferrule.)
 
 ## Macro / param internals over SMB `[CONFIRMED 2026-06-06]`
+- **`setting` lives on `\\192.168.0.99\SYSDISK\setting`** (= `/mnt/nand1-1/setting`), **NOT on CNCDISK** —
+  resolves the PROFILE_BUILD_TASK `[TO TEST]`. Size **8000 B = 1000×f64** (vs V4.1's 1500×f64), confirming
+  the Expert prediction. `default_setting` (factory baseline, 8000 B) sits beside it — a ready diff anchor.
+  `[CONFIRMED on machine 2026-06-10]` (`_read_setting_params()`'s `<expert_dest>/setting` must point at SYSDISK.)
+- **Phase-1 unattended capture LANDED 2026-06-10** — read-only SMB mirror of both shares (193 files, 15 MB)
+  in `assets/capture/20260610T163337Z/` (`SYSDISK/` + `CNCDISK/`, manifest with sha256). Re-decoding the
+  captured `setting` reproduced every known anchor exactly: `#266/#267`=4 (B115200), `#279`=1 (Modbus on),
+  `#284`=2 (manu net-boot), `#296/#297`=0/0 (8N1) ⇒ decode + indexing trustworthy for new indices.
 - **`setting` file = 1000×f64, index = param #** (8000 B). Decodes over SMB and matches the panel:
   baud code **4 = B115200**; `#284` Net-boot **0=Close / 1=auto / 2=manu**; `#296`=0 (parity None),
   `#297`=0 (1 stop bit) → 8N1. WCS offsets live here too (`#805+[WCS−1]*5`). ⇒ PC can read **all persisted
@@ -329,6 +337,10 @@ Must be **Open**; machine reads **#576 = 1 (Open)** ✓. Numbering: panel **Pr76
       `#267`=Serial-2 baud (115200), `#296`/`#297`=Serial-2 parity/stop (8N1). See param table above.
 - [x] ~~Confirm `uservar` slot layout~~ — **DONE 2026-06-06**: `slot=#var−100`, range **#100–#549** (450×f64). See SMB section.
 - [x] ~~**Serial BLOCKED — needs a proper ferrule**~~ — **CLEARED**: SABRENT wired to port 2 is **live on the real machine** (studio test). Recipe confirmed: `#279`=Modbus enable **+ reboot** required. Still TODO on-site: capture exact COM port + which laptop (`CNC-FAIRY`/`renderranchy`) + the macro/slave log.
+- [x] ~~**Phase-1 capture (PROFILE_BUILD_TASK)**~~ — **DONE 2026-06-10**: read-only mirror of SYSDISK+CNCDISK
+      committed under `assets/capture/`; real Expert `setting`/`uservar`/`default_setting`/CNCDISK landed.
+      `setting` confirmed on **SYSDISK** (8000 B/1000×f64), anchors re-validated. **Next (desk, no machine):**
+      label the probe / tool-setter / limit `setting` indices from the manual, then fill `Ops.profile()`.
 - [ ] Stand up a PC Modbus slave (`pymodbus`); confirm `MSETDATA` pushes #200+ to it.
 - [ ] Find the system var holding the live alarm code → log *which* error.
 - [ ] Port the V4.1 `M47` dispatcher to `sysstart.nc` here (file-reload trick over SMB) — **safety first** (E-stop).

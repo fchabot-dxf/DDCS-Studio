@@ -1,0 +1,977 @@
+{
+  "captured_utc": "20260610T163337Z",
+  "sources": [
+    "\\\\192.168.0.99\\SYSDISK",
+    "\\\\192.168.0.99\\CNCDISK"
+  ],
+  "file_count": 193,
+  "total_bytes": 15353192,
+  "errors": [],
+  "files": [
+    {
+      "path": "SYSDISK/motiondev.ko",
+      "size": 16422,
+      "sha256": "f762e6192097eedf28d82d446b2742089fa87c6d81dbf1b8f01c596b91b955c8"
+    },
+    {
+      "path": "SYSDISK/.minimal.nc.pos",
+      "size": 60,
+      "sha256": "f08e853ddba40c77310fb09329d281b06c89e8b14a863490e38a0ba0de5a4af1"
+    },
+    {
+      "path": "SYSDISK/.corner_finder_FINAL (4).nc.pos",
+      "size": 60,
+      "sha256": "dc2c9c3ce13219508684aed062846ffbe159a183d973fb7566bf37875443c627"
+    },
+    {
+      "path": "SYSDISK/fndY.nc",
+      "size": 278,
+      "sha256": "42719e6d68d705ee6653709af6c69d85c8532e5a5be5238d7c0d85b1161f76f5"
+    },
+    {
+      "path": "SYSDISK/.fence_finder_XY (2).nc.pos",
+      "size": 60,
+      "sha256": "7129e6cc8a212edcde63277eaa11b9b789fc384a5f152c76128f7648dc7500ed"
+    },
+    {
+      "path": "SYSDISK/.save_park_SILENT.nc.pos",
+      "size": 60,
+      "sha256": "1b428f3daad58c32a5a42de29898f70e50f30fc9b30190940d95eb966e7af0c5"
+    },
+    {
+      "path": "SYSDISK/ALL_T.nc",
+      "size": 16,
+      "sha256": "58d3321ef40e30fc84bba54bd5223b7772eee1e2916be03ae27e6c31ce20c862"
+    },
+    {
+      "path": "SYSDISK/.test_persistence_WRITE.nc.pos",
+      "size": 60,
+      "sha256": "1b428f3daad58c32a5a42de29898f70e50f30fc9b30190940d95eb966e7af0c5"
+    },
+    {
+      "path": "SYSDISK/.2nd ruffb back.nc.pos",
+      "size": 60,
+      "sha256": "34f076df9424aa9e6e85d57c99195bc6569aba0aee17ab735cce266131baf783"
+    },
+    {
+      "path": "SYSDISK/msg1",
+      "size": 18835,
+      "sha256": "858d0ccb515f6bf3cafcb56310e9334519c25a9d5f371fa84f8984c89f67a790"
+    },
+    {
+      "path": "SYSDISK/.CHECKPOINT_TEST.nc.pos",
+      "size": 60,
+      "sha256": "db4f427a40de26a7be9b05a8b2c0df8fcf3eeef78227d6bdf15f75df8ca6c85d"
+    },
+    {
+      "path": "SYSDISK/.minimal 100.nc.pos",
+      "size": 60,
+      "sha256": "f08e853ddba40c77310fb09329d281b06c89e8b14a863490e38a0ba0de5a4af1"
+    },
+    {
+      "path": "SYSDISK/mdi.nc",
+      "size": 10,
+      "sha256": "59352743b5771319482d9c267838c0ff9cba2e559a8dfae218249167ef3de6ef"
+    },
+    {
+      "path": "SYSDISK/.show_park_SIMPLE.nc.pos",
+      "size": 60,
+      "sha256": "1b428f3daad58c32a5a42de29898f70e50f30fc9b30190940d95eb966e7af0c5"
+    },
+    {
+      "path": "SYSDISK/fndZ.nc",
+      "size": 19,
+      "sha256": "5d1e41677df7be8a45618fe33814d5f7786f8a3b70ad6d022271d814e357e9f7"
+    },
+    {
+      "path": "SYSDISK/.xy_fence_finder_FIXED34.nc.pos",
+      "size": 60,
+      "sha256": "2e2afb482a062d4bb2d626219f5ad31ac5f87ff6e99d40774c91f79c2782ee75"
+    },
+    {
+      "path": "SYSDISK/rus",
+      "size": 174931,
+      "sha256": "f0bd4ddf29bb91f57e61c0638a8a7d5b4e014fc2655f11fad3734e71b96502c3"
+    },
+    {
+      "path": "SYSDISK/slib-g.nc",
+      "size": 16249,
+      "sha256": "49f6ca1f128c3407103f1b27243fc7630a8cb1528aab1249020f160f0b2e69c6"
+    },
+    {
+      "path": "SYSDISK/.FLOATING_PROBE_linear00.nc.pos",
+      "size": 60,
+      "sha256": "702cc5b05035da5617b1292c225a10656d698a0ff3052cb22adae7bcce8bd139"
+    },
+    {
+      "path": "SYSDISK/.Gring.nc.pos",
+      "size": 60,
+      "sha256": "a0d0c1a33d29ab8b5d9b8f3aacf2ecabf6fda3ca4eff8bc15cdfb06db6a05a2c"
+    },
+    {
+      "path": "SYSDISK/.444444eee.nc.pos",
+      "size": 60,
+      "sha256": "43f83c8915b116bbfec892378bc0b52598aea7666bcad744555233870d60bf75"
+    },
+    {
+      "path": "SYSDISK/network.conf",
+      "size": 35,
+      "sha256": "0fd15e9fee33f66ee44564bf79800da7ac5266626faa5a517ad5f2deb7f6263f"
+    },
+    {
+      "path": "SYSDISK/cam6.bmp",
+      "size": 194454,
+      "sha256": "fd335e75ff30b943ac6466af9ca10d35dd4a067affef32d95c31efb2d1404bb8"
+    },
+    {
+      "path": "SYSDISK/parse.out",
+      "size": 2999980,
+      "sha256": "6f0dd3d92b534fb9fef2deeef07be18c14273f88ff51bc6b7a15e8d6fc03c531"
+    },
+    {
+      "path": "SYSDISK/key-2.nc",
+      "size": 1590,
+      "sha256": "8faa34c1aa60e7c934643eb8d9d2be31c537b0ad1d9735e44eadf8fef5daef56"
+    },
+    {
+      "path": "SYSDISK/mulprobe.nc",
+      "size": 311,
+      "sha256": "7cad0488d50e2c7a877f2d4004363194738f0f85bed60d1bab9d1fa5958e62b5"
+    },
+    {
+      "path": "SYSDISK/.0-toppy22.nc.pos",
+      "size": 60,
+      "sha256": "79746113fe640f3183f19341a82aef291caac0b07b66980abb75facd5ca143af"
+    },
+    {
+      "path": "SYSDISK/.resurfdds hyh.nc.pos",
+      "size": 60,
+      "sha256": "02008025e216d931b560a2e27b4bea297a8acf0e6c4ddeb8588b70effc85374d"
+    },
+    {
+      "path": "SYSDISK/.corner_simple (1).nc.pos",
+      "size": 60,
+      "sha256": "b4907f30946978f94fe9ab08138979ab377ecb30131c3679f9fb594176976ea0"
+    },
+    {
+      "path": "SYSDISK/.rouff back.nc.pos",
+      "size": 60,
+      "sha256": "e81a01495fabf151a35409e03410a39b17fc1542e129ce080e0f14b6d91d8635"
+    },
+    {
+      "path": "SYSDISK/.morp ghfj.nc.pos",
+      "size": 60,
+      "sha256": "8410bf5bba6b13925f266432cad15f596b86751d18a8a91afcfa0ba1431c3ba0"
+    },
+    {
+      "path": "SYSDISK/.test_persistence_CHECK.nc.pos",
+      "size": 60,
+      "sha256": "1b428f3daad58c32a5a42de29898f70e50f30fc9b30190940d95eb966e7af0c5"
+    },
+    {
+      "path": "SYSDISK/.roughing morph2.nc.pos",
+      "size": 60,
+      "sha256": "508d4a1b025dcc5a28c3a671d7927ebf265f6f7b456d72bce614afd2ec4d226e"
+    },
+    {
+      "path": "SYSDISK/3D PROBE G55.nc",
+      "size": 2665,
+      "sha256": "40ae12c804ea4edd99c74c940aab608e1f6a627d6087c3baabcbdbf14526606a"
+    },
+    {
+      "path": "SYSDISK/.PERSISTENCE_READ.nc.pos",
+      "size": 60,
+      "sha256": "b4fe5cdbc6822636f1f6b8034ee2f1f8374b90f2ea3d6ac447469a9d71f0a685"
+    },
+    {
+      "path": "SYSDISK/.corner_simple2.nc.pos",
+      "size": 60,
+      "sha256": "fee0b82eb1bc71b1758447b35d0a683e5c679b79aab0ba0f5d83f1aabb35f5ce"
+    },
+    {
+      "path": "SYSDISK/.morf 11w.nc.pos",
+      "size": 60,
+      "sha256": "a75fc9325a7386d1d1299aa72976f02e1a1ef0d489cc92696b0d8a0312588880"
+    },
+    {
+      "path": "SYSDISK/sysstart.nc",
+      "size": 173,
+      "sha256": "e28107f35f9bc93ea4244996eb6a550e35c77e7637264f37df8d1e701cce1fcf"
+    },
+    {
+      "path": "SYSDISK/save_sensor_position.nc",
+      "size": 289,
+      "sha256": "10f16d12144a29ccb1a4f36dfd50bf55a4b6d1f7f61739832460236fb55a41d1"
+    },
+    {
+      "path": "SYSDISK/.set_probe_config_CORRECT.nc.pos",
+      "size": 60,
+      "sha256": "dc977bcd3bc6a384a53df2632c48ad5068091ec32e3fd6d273134801649837c4"
+    },
+    {
+      "path": "SYSDISK/M19.nc",
+      "size": 5,
+      "sha256": "8f4308c1245f52e0c6a192a1422c6f0b49f801052ca1b4ebc6904e2b99f23979"
+    },
+    {
+      "path": "SYSDISK/.set_probe_config.nc.pos",
+      "size": 60,
+      "sha256": "332576d7b00d8dbbe267fe739e3a9a3063ea0bf403cafa977052561b573f655f"
+    },
+    {
+      "path": "SYSDISK/absA.nc",
+      "size": 4,
+      "sha256": "4844b24ba5898cba64e607e818c9fe184e3d8505ec48bb405c92ddfc836c5836"
+    },
+    {
+      "path": "SYSDISK/M5.nc",
+      "size": 2,
+      "sha256": "25efb20dfe4953e14dbef1bc5ac6bd7ea8dc659c582e4118260b50508c8f5f25"
+    },
+    {
+      "path": "SYSDISK/.test 1x3x.125.nc.pos",
+      "size": 60,
+      "sha256": "d552a294624158684065956eb61470bd9a014a8f04cc21a20d647ea5cba0bb5b"
+    },
+    {
+      "path": "SYSDISK/key-5.nc",
+      "size": 608,
+      "sha256": "a86cfbe52afcae1e2c75baeb15df7039640bf0e2aabdf94846f08284912d7b53"
+    },
+    {
+      "path": "SYSDISK/.corner_finder_FINAL (3).nc.pos",
+      "size": 60,
+      "sha256": "fd7df8e7af064475aee26cfc55f23bd840656862b47ab3add7500401e2dad6eb"
+    },
+    {
+      "path": "SYSDISK/CAM.nc",
+      "size": 9,
+      "sha256": "59d3c24276d3d65ae1506c706d6a5b11c4fbb37e414bdd3dea227a97f3849367"
+    },
+    {
+      "path": "SYSDISK/coordinate",
+      "size": 360,
+      "sha256": "9de2463912db9adba941543df24f56bbd68caeb0c1ae88f2601f06f45bb5d342"
+    },
+    {
+      "path": "SYSDISK/.fine tooth morph.nc.pos",
+      "size": 60,
+      "sha256": "e13678af0cb144c137da8f1915fbaabb2d55003b44aa94628160f6d004f64316"
+    },
+    {
+      "path": "SYSDISK/M11.nc",
+      "size": 5,
+      "sha256": "4b2e755b2a51d561bae77453462a92cb79b360e3c8ce5de9d95df6781aca8eea"
+    },
+    {
+      "path": "SYSDISK/T.nc",
+      "size": 16,
+      "sha256": "b17803b9574997ecf159f6d2d5ca928aab46dfe2081a0f6a5544976bb19b6912"
+    },
+    {
+      "path": "SYSDISK/.fndzero-autosquare-clean.nc.pos",
+      "size": 60,
+      "sha256": "65895c2ddbaf46865b421a5d68c46958d26d371c98b2a6ce6434f5243dc24476"
+    },
+    {
+      "path": "SYSDISK/.resurf priche blocd.nc.pos",
+      "size": 60,
+      "sha256": "32fa5bae6618b0c80858ee8b7d41a6c7b9016483053959cb00524c50f71b825e"
+    },
+    {
+      "path": "SYSDISK/testf5.nc",
+      "size": 1201,
+      "sha256": "4bbacd89e72fd173b8b8acaf81fc6bd13140b8958a923d4025d90a65f4288b6b"
+    },
+    {
+      "path": "SYSDISK/key-6.nc",
+      "size": 2665,
+      "sha256": "40ae12c804ea4edd99c74c940aab608e1f6a627d6087c3baabcbdbf14526606a"
+    },
+    {
+      "path": "SYSDISK/.FLOATING_PROBE_Z.nc.pos",
+      "size": 60,
+      "sha256": "b4fe5cdbc6822636f1f6b8034ee2f1f8374b90f2ea3d6ac447469a9d71f0a685"
+    },
+    {
+      "path": "SYSDISK/msg",
+      "size": 17941,
+      "sha256": "b96e7b35f7f831eaa3a7f67074a366f9ae4d9363510375f880abeb4430a86ff4"
+    },
+    {
+      "path": "SYSDISK/M3.nc",
+      "size": 7,
+      "sha256": "180497511eccd33b9ea6ea1fe044ae686f548706a855a17acbf2d2915e5e6249"
+    },
+    {
+      "path": "SYSDISK/M10.nc",
+      "size": 5,
+      "sha256": "b4673d7dcdafdfa7d008fb540280c501165f3f36b6cda7670529955cc83b6e81"
+    },
+    {
+      "path": "SYSDISK/error.nc",
+      "size": 4,
+      "sha256": "dba5166ad9db9ba648c1032ebbd34dcd0d085b50023b839ef5c68ca1db93a563"
+    },
+    {
+      "path": "SYSDISK/.000034.nc.pos",
+      "size": 60,
+      "sha256": "449f46976130bef475d88a6e98910fe97f51040de6b5f951b1ce7c2f474e8fcd"
+    },
+    {
+      "path": "SYSDISK/.down.nc.pos",
+      "size": 60,
+      "sha256": "d1ff8caf8940a142e6e5af81227566b831f9f92a809c51a36d51ca9185da0a4b"
+    },
+    {
+      "path": "SYSDISK/.resurfe2222.nc.pos",
+      "size": 60,
+      "sha256": "5f3646ffcefb9cef86cf3988f949835418da9bd483dc8c29bd7bd2aaa4372e18"
+    },
+    {
+      "path": "SYSDISK/____\u046d_____\u0534___.nc",
+      "size": 1830394,
+      "sha256": "6ebbe227a41d2fc746f9032cf3cde7052362b93b1d61d2ea0fcaf09fec4d673f"
+    },
+    {
+      "path": "SYSDISK/.break0",
+      "size": 400,
+      "sha256": "0b1af938146eec7314e0e9b64120f18c07270c74316c4898c96c06f7a93b00f7"
+    },
+    {
+      "path": "SYSDISK/.FLOATING PROBE4.nc.pos",
+      "size": 60,
+      "sha256": "1b428f3daad58c32a5a42de29898f70e50f30fc9b30190940d95eb966e7af0c5"
+    },
+    {
+      "path": "SYSDISK/logo.bmp",
+      "size": 1843254,
+      "sha256": "1414d1b8c5816fce7695f8e1139a730b79c9e116bb8976891a01b644d1aec848"
+    },
+    {
+      "path": "SYSDISK/key-7.nc",
+      "size": 762,
+      "sha256": "662f7ec8ab6453f14882a17ca240057a92e8148c08f752756269231f530ba6d9"
+    },
+    {
+      "path": "SYSDISK/.corner_simple.nc.pos",
+      "size": 60,
+      "sha256": "df37b5943735dc06a75b89be97d4ff80002aa1275ff85c84d0823ce945aa6152"
+    },
+    {
+      "path": "SYSDISK/.manual save g55.nc.pos",
+      "size": 60,
+      "sha256": "e71bbb2843c9915deb9c8c200e0583ac6b21d839c11612a3af1ea2a18661e7ff"
+    },
+    {
+      "path": "SYSDISK/ext_button.nc",
+      "size": 16,
+      "sha256": "06faca1d0a5e2dfc9a68e22bb464fb34b8f8e97d8e20ed1921a0de3ccbf61b1d"
+    },
+    {
+      "path": "SYSDISK/abszero.nc",
+      "size": 38,
+      "sha256": "6f87b6b88a149f4c0075c3fa6a06c785cb180e9361e419d1188a59f61fc39666"
+    },
+    {
+      "path": "SYSDISK/cam1.bmp",
+      "size": 194454,
+      "sha256": "5c739fc5c8c2fcf38b373bccee3aa1a3ee56a47c7a1ec7e93047d10e1d3cdc5d"
+    },
+    {
+      "path": "SYSDISK/.rutyrrr.nc.pos",
+      "size": 60,
+      "sha256": "b66725176fdbaee20d501b32a017297bf887d6c7e99d2d5f0ee39de545995ebf"
+    },
+    {
+      "path": "SYSDISK/fndB.nc",
+      "size": 19,
+      "sha256": "4b2b0e45a8a40c7ff1b1b985c83f08b393eda9eb5836f4bdd3d3fef34a77d825"
+    },
+    {
+      "path": "SYSDISK/cam7.bmp",
+      "size": 194454,
+      "sha256": "8a4d7db9fab8934490f24c1938b084ec7781a1765a50fa17039460ce27082e64"
+    },
+    {
+      "path": "SYSDISK/save_park_position.nc",
+      "size": 258,
+      "sha256": "432aa59fbbac01fd1285aa37392463f75fd5ed7e8e450808beca2a66f7dc32f3"
+    },
+    {
+      "path": "SYSDISK/cam39.bmp",
+      "size": 194454,
+      "sha256": "74fa028c9a160c2e601cd540375db5eaa530f4e1fe7a0e22938e28132d32a868"
+    },
+    {
+      "path": "SYSDISK/default_setting",
+      "size": 8000,
+      "sha256": "e1ef5a8449ad1c45a6318610ec7655e3a04f1c86f442d79555dd934a8b9ed06e"
+    },
+    {
+      "path": "SYSDISK/.fence_finder_XY (4).nc.pos",
+      "size": 60,
+      "sha256": "466bd6800c515770f75d41c31692fcc7891f308b1316a290f4ce7573f1a5eff4"
+    },
+    {
+      "path": "SYSDISK/.ayes hug.nc.pos",
+      "size": 60,
+      "sha256": "d1941f000c6b7f77526493d47817629cc904f7392537d210561c2f7cefb41faf"
+    },
+    {
+      "path": "SYSDISK/.xy_fence_finder_FINAL.nc.pos",
+      "size": 60,
+      "sha256": "4d97305556a8b6e1fb62f6d7357f6763a0f60f5ad8cf0f51be7173b2b72eb277"
+    },
+    {
+      "path": "SYSDISK/cam12.bmp",
+      "size": 194454,
+      "sha256": "09d4f232f8b52f1082f71b2d58b857aa343a382b579be005f81dbae98d946d15"
+    },
+    {
+      "path": "SYSDISK/slibuser.nc",
+      "size": 46,
+      "sha256": "99c335329ddd2b98f1ab6017c056b2bcd0b06e7723dded98d84d7d444f896d74"
+    },
+    {
+      "path": "SYSDISK/camsetting",
+      "size": 4000,
+      "sha256": "9c9825ae7e40ab7a1f4b3963035603d0608d8b873eda1aeb126a79e90661c0e8"
+    },
+    {
+      "path": "SYSDISK/.test 1x3.nc.pos",
+      "size": 60,
+      "sha256": "ebc1419c77d11dc96a04654337295f1adc1928cd5bd5606f674b70889c9fa021"
+    },
+    {
+      "path": "SYSDISK/.COPY_WCS.nc.pos",
+      "size": 60,
+      "sha256": "b4fe5cdbc6822636f1f6b8034ee2f1f8374b90f2ea3d6ac447469a9d71f0a685"
+    },
+    {
+      "path": "SYSDISK/key-4.nc",
+      "size": 2200,
+      "sha256": "2bd648716c263fa3179336f1cc9d3163fb2c63a5de35931fdd09acbc548dac84"
+    },
+    {
+      "path": "SYSDISK/pidMonitor.out",
+      "size": 601452,
+      "sha256": "6b091afe1c3aa03a36549e82439ef651d51f7bfa042886aa1e2620d251ace635"
+    },
+    {
+      "path": "SYSDISK/.fence_finder_XY (5).nc.pos",
+      "size": 60,
+      "sha256": "332576d7b00d8dbbe267fe739e3a9a3063ea0bf403cafa977052561b573f655f"
+    },
+    {
+      "path": "SYSDISK/.slot3.nc.pos",
+      "size": 60,
+      "sha256": "bc88ec69d526eb5200cb36754a713c96dc0711a8c0a3c184364e69c32c1e0d26"
+    },
+    {
+      "path": "SYSDISK/cam2.bmp",
+      "size": 194454,
+      "sha256": "71f06d2a107377fc3058c4b81164145efcb08a4c15e53cf4696a3327c9992dda"
+    },
+    {
+      "path": "SYSDISK/cam8.bmp",
+      "size": 194454,
+      "sha256": "9d6c541095eb5819b97b1bbfa48a1707b611035d9c03a29e90c042b507f22a0a"
+    },
+    {
+      "path": "SYSDISK/.KEY-2_ALL_INCREMENTAL.nc.pos",
+      "size": 60,
+      "sha256": "67e7ad5d2e576809141254f6311563351eaeb54440c8d688de994f6beeba80ca"
+    },
+    {
+      "path": "SYSDISK/key-3.nc",
+      "size": 1825,
+      "sha256": "af1c5f6358b3328836aa9bda8f256bc838512e5a1cd4694796a26c86fd916b4e"
+    },
+    {
+      "path": "SYSDISK/smb.conf",
+      "size": 311,
+      "sha256": "f66bacf4163f7bb05a2540ccde6deaa2d0b62339a621c3c03e9900ffe6bc7852"
+    },
+    {
+      "path": "SYSDISK/.Ocorner_finder_fl_x_y_z_surface_g58 (2).nc.pos",
+      "size": 60,
+      "sha256": "2e2afb482a062d4bb2d626219f5ad31ac5f87ff6e99d40774c91f79c2782ee75"
+    },
+    {
+      "path": "SYSDISK/cmdstr",
+      "size": 45,
+      "sha256": "0acb01460a2192b6d3cab33456c31cd33b15f9e6c8790d17986eb9efbef1bf7b"
+    },
+    {
+      "path": "SYSDISK/.rof3.nc.pos",
+      "size": 60,
+      "sha256": "fe9c4079654cdc3e08ff3e9e4c2b08c34fca199bebeba402ef159b964e4c7100"
+    },
+    {
+      "path": "SYSDISK/.borte Fdg.nc.pos",
+      "size": 60,
+      "sha256": "d7094c0b0bcf7f78b4cc4e8536263f582da9c51b23250080b3d2f156d1a79f12"
+    },
+    {
+      "path": "SYSDISK/msg_utf8",
+      "size": 18862,
+      "sha256": "d735d9bd20c153f55f1ca3f5643cebd471face26ad630720eaff403ac830aa94"
+    },
+    {
+      "path": "SYSDISK/fndX.nc",
+      "size": 11,
+      "sha256": "1f8e2956f70d2cb7344ae31b6b99cc56df85168e759f52667521a107ad1267d7"
+    },
+    {
+      "path": "SYSDISK/.fences 2e.nc.pos",
+      "size": 60,
+      "sha256": "ce863d63534b0abe752a341ba7c2e98d1ef5c9960b88401e6bd21e01ff34b3f8"
+    },
+    {
+      "path": "SYSDISK/.test4_write_470.nc.pos",
+      "size": 60,
+      "sha256": "1b428f3daad58c32a5a42de29898f70e50f30fc9b30190940d95eb966e7af0c5"
+    },
+    {
+      "path": "SYSDISK/.0EEEddd.nc.pos",
+      "size": 60,
+      "sha256": "8faa3092de5323a2b674b6545b6fdd34e315ac32a55bb6e7fdbc380a51329542"
+    },
+    {
+      "path": "SYSDISK/cam0.bmp",
+      "size": 194454,
+      "sha256": "edfb3cbcad9ddeed3eb0d4ab771b03e87943d1dc32a701a73299b75e0e19dc25"
+    },
+    {
+      "path": "SYSDISK/fndzero.nc",
+      "size": 483,
+      "sha256": "4b4e91de66537196d58b16b3dee28659869cab0744ee849f888def3f5ec36db2"
+    },
+    {
+      "path": "SYSDISK/.fence_finder_XY (1).nc.pos",
+      "size": 60,
+      "sha256": "4228285652f9c658cb5917b3f97eeaa13a9e29a843e153bc4e0678f4c24e5a9e"
+    },
+    {
+      "path": "SYSDISK/.SAVE_WCS_XY_AUTO.nc.pos",
+      "size": 60,
+      "sha256": "706b80877749f3c59159ee642ed3c07545fb07812fcfa6430f2d120a277cf22f"
+    },
+    {
+      "path": "SYSDISK/absY.nc",
+      "size": 4,
+      "sha256": "331bbe2e28036a02bf7a375c0b02d90198033d72712ff4f7855075e56e2d1124"
+    },
+    {
+      "path": "SYSDISK/.save_park_MINIMAL.nc.pos",
+      "size": 60,
+      "sha256": "1b428f3daad58c32a5a42de29898f70e50f30fc9b30190940d95eb966e7af0c5"
+    },
+    {
+      "path": "SYSDISK/.save_park_PERSISTENT_GAP.nc.pos",
+      "size": 60,
+      "sha256": "1b428f3daad58c32a5a42de29898f70e50f30fc9b30190940d95eb966e7af0c5"
+    },
+    {
+      "path": "SYSDISK/.save_park_position silent.nc.pos",
+      "size": 60,
+      "sha256": "1b428f3daad58c32a5a42de29898f70e50f30fc9b30190940d95eb966e7af0c5"
+    },
+    {
+      "path": "SYSDISK/extnc0-1.nc",
+      "size": 10,
+      "sha256": "d66e717912ebd032e047f59a25e0a05706a826d819f6bda2f14d55044aa7633a"
+    },
+    {
+      "path": "SYSDISK/read me.txt",
+      "size": 80,
+      "sha256": "6a5eab509de050ff1b9ee67635080f7ae9cc9819732e238cc09c2bde9af5b24d"
+    },
+    {
+      "path": "SYSDISK/.freedugf.nc.pos",
+      "size": 60,
+      "sha256": "41bfe178ec6c1521c0fcedb658f315e37f49631f1f1297711ada70c12095c7a2"
+    },
+    {
+      "path": "SYSDISK/absB.nc",
+      "size": 4,
+      "sha256": "9844abf2f394b2734a7fbfc827bef52d9ad2f356b66c4a1af001322a60abeed2"
+    },
+    {
+      "path": "SYSDISK/.ballnose38.nc.pos",
+      "size": 60,
+      "sha256": "0a827998dcb43c1de725764c6abc22fd6550a534c1f9aa10253d31961bbe613e"
+    },
+    {
+      "path": "SYSDISK/slib-m.nc",
+      "size": 31205,
+      "sha256": "d9ce61381e59942216f140ae1e6ccf32717b4eb7080947cff1af50a3418f86cf"
+    },
+    {
+      "path": "SYSDISK/desktop.ini",
+      "size": 246,
+      "sha256": "ff92aace20ac0c99e0584ac2a540c758122699f447d138cbccbd96a1713046b9"
+    },
+    {
+      "path": "SYSDISK/.save_park_position.nc.pos",
+      "size": 60,
+      "sha256": "1b428f3daad58c32a5a42de29898f70e50f30fc9b30190940d95eb966e7af0c5"
+    },
+    {
+      "path": "SYSDISK/probe.nc",
+      "size": 9,
+      "sha256": "e57ba63e5de5c4f5f10a033d11d3403bcd62d97c27322e9b7fd60588c586bac2"
+    },
+    {
+      "path": "SYSDISK/.resurf grbl.nc.pos",
+      "size": 60,
+      "sha256": "3358bc7da9c0770755318904efdffa605f66c37caba72aa634eb43087d4af4db"
+    },
+    {
+      "path": "SYSDISK/key-1.nc",
+      "size": 53,
+      "sha256": "52206d4d8d711697e48442de626e3a5bfea2c2e09a48feb8792767079c3d0c41"
+    },
+    {
+      "path": "SYSDISK/.test1_read_X.nc.pos",
+      "size": 60,
+      "sha256": "1b428f3daad58c32a5a42de29898f70e50f30fc9b30190940d95eb966e7af0c5"
+    },
+    {
+      "path": "SYSDISK/M8.nc",
+      "size": 4,
+      "sha256": "c70b1142adb28a049b86fab6dfd4fb98737925b64818f121a12bff3f995a669b"
+    },
+    {
+      "path": "SYSDISK/.MODBUS_TEST.nc.pos",
+      "size": 60,
+      "sha256": "db4f427a40de26a7be9b05a8b2c0df8fcf3eeef78227d6bdf15f75df8ca6c85d"
+    },
+    {
+      "path": "SYSDISK/cam3.bmp",
+      "size": 194454,
+      "sha256": "737832a251a41512d4cbe7c909198579997137c18d84b735886eb1b21582c002"
+    },
+    {
+      "path": "SYSDISK/cfg_utf8",
+      "size": 73062,
+      "sha256": "b504130865cd1fc2cee4ba956c0cb3eeccd7aac543de67454a76413f12a319b9"
+    },
+    {
+      "path": "SYSDISK/testf4.nc",
+      "size": 1432,
+      "sha256": "59d37656da26362eef56342c4489ca59cfebc8081e8b0eb4bfb9eb365d015aeb"
+    },
+    {
+      "path": "SYSDISK/.corner_simple4.nc.pos",
+      "size": 60,
+      "sha256": "db773d1029360d63edfc8519689033ad86bf49017e63c2670cf7abcb0270e8dc"
+    },
+    {
+      "path": "SYSDISK/msg2",
+      "size": 28252,
+      "sha256": "8cfe226436e7516e51b4977915ce2da6b4b0ef8c83f03699523a6ddd98e12204"
+    },
+    {
+      "path": "SYSDISK/gotozero.nc",
+      "size": 73,
+      "sha256": "777cde1140ed1198aa2d6fdec91de59c23478dd02d69eaf4af339eca930172ea"
+    },
+    {
+      "path": "SYSDISK/.00EE.nc.pos",
+      "size": 60,
+      "sha256": "2bf1bf52e16b7272dfb8e57190dead941394e03831ce9946f4a23ffcc2f2d831"
+    },
+    {
+      "path": "SYSDISK/.KEY-5_NO_COMMENTS.nc.pos",
+      "size": 60,
+      "sha256": "1b428f3daad58c32a5a42de29898f70e50f30fc9b30190940d95eb966e7af0c5"
+    },
+    {
+      "path": "SYSDISK/.FLOATING_PROBE_linear.nc.pos",
+      "size": 60,
+      "sha256": "702cc5b05035da5617b1292c225a10656d698a0ff3052cb22adae7bcce8bd139"
+    },
+    {
+      "path": "SYSDISK/cam11.bmp",
+      "size": 194454,
+      "sha256": "3cb440613d7f4f09956b4b51ebbc535b1741068db57790394a8176e453869db4"
+    },
+    {
+      "path": "SYSDISK/.FLOATING_PROBE_linear (1).nc.pos",
+      "size": 60,
+      "sha256": "702cc5b05035da5617b1292c225a10656d698a0ff3052cb22adae7bcce8bd139"
+    },
+    {
+      "path": "SYSDISK/.lflflflf 000.nc.pos",
+      "size": 60,
+      "sha256": "8ca9edc8e27ce91263c7f15319ec6fe46bc7c9d5c931480ce4a6a8f6a8812ea8"
+    },
+    {
+      "path": "SYSDISK/M9.nc",
+      "size": 4,
+      "sha256": "4f26d9e0f41a7085a625b70b2c9320ed9e291575c4f59e285d55ea6e4f26bb19"
+    },
+    {
+      "path": "SYSDISK/testf2.nc",
+      "size": 73,
+      "sha256": "d4cb19e068ab0396caa2eb725888ecb2095b964e7ea9649c82e44675c145dd8a"
+    },
+    {
+      "path": "SYSDISK/.AUTO SQUARING MACRO v4.nc.pos",
+      "size": 60,
+      "sha256": "65146ecf120801f0b8b035042766a190db3c6d2e6704542703a81171e20f69cb"
+    },
+    {
+      "path": "SYSDISK/.refysr.nc.pos",
+      "size": 60,
+      "sha256": "a876031809e36923873bcbd55df255d5dc1d4f4eed16916fbe4604ed30ebd894"
+    },
+    {
+      "path": "SYSDISK/pause.nc",
+      "size": 10,
+      "sha256": "4fef0edfb35bc5725c70d6fd0875faa1761d4c688868c12bfdf2d82691e88495"
+    },
+    {
+      "path": "SYSDISK/.READ_VAR.nc.pos",
+      "size": 60,
+      "sha256": "8df9cb316a75319b5ee0e91d74f654db0f81c9b55893591438e28171bd19b80d"
+    },
+    {
+      "path": "SYSDISK/.PERSISTENCE_READ 2500-2999.nc.pos",
+      "size": 60,
+      "sha256": "b4fe5cdbc6822636f1f6b8034ee2f1f8374b90f2ea3d6ac447469a9d71f0a685"
+    },
+    {
+      "path": "SYSDISK/.riffffgf.nc.pos",
+      "size": 60,
+      "sha256": "70024ad6bafeb2c6b8bcecd6649e42b3367c9d0c63d384168d160803945a569c"
+    },
+    {
+      "path": "SYSDISK/.test 1x3 x .125 gf.nc.pos",
+      "size": 60,
+      "sha256": "ac0bdac94bff36028018383aec61df037fc7025f15023521bcfd5d831c528d55"
+    },
+    {
+      "path": "SYSDISK/.FLOATING PROBE222ed.nc.pos",
+      "size": 60,
+      "sha256": "1b428f3daad58c32a5a42de29898f70e50f30fc9b30190940d95eb966e7af0c5"
+    },
+    {
+      "path": "SYSDISK/setting",
+      "size": 8000,
+      "sha256": "09f7caaae2df7b6177126931aaae06afdd377e14129f2515ab8b0d37cebe9148"
+    },
+    {
+      "path": "SYSDISK/.59549rig.nc.pos",
+      "size": 60,
+      "sha256": "ab6ed45f23ed3980b58d5fccd81f9b4436affb3bb84b0bbcc700509635885c4c"
+    },
+    {
+      "path": "SYSDISK/save_toolchange_position.nc",
+      "size": 272,
+      "sha256": "6f5a370935a70c480cfaf877dfcab232bd820d400b4dcc16fd36a5f9d106c365"
+    },
+    {
+      "path": "SYSDISK/.set_probe_config_FIXED2.nc.pos",
+      "size": 60,
+      "sha256": "332576d7b00d8dbbe267fe739e3a9a3063ea0bf403cafa977052561b573f655f"
+    },
+    {
+      "path": "SYSDISK/M4.nc",
+      "size": 7,
+      "sha256": "8c8f01265d24baefd3ed77f5d240cd5ca564dec989ec41118294e1f56f5b0962"
+    },
+    {
+      "path": "SYSDISK/processing1",
+      "size": 4,
+      "sha256": "b0ac3b8ed0238aa627291f2d477b089979e8632d4dde1d95e599fe985b56d303"
+    },
+    {
+      "path": "SYSDISK/.(Test G28 Functionality).nc.pos",
+      "size": 60,
+      "sha256": "b4fe5cdbc6822636f1f6b8034ee2f1f8374b90f2ea3d6ac447469a9d71f0a685"
+    },
+    {
+      "path": "SYSDISK/cam10.bmp",
+      "size": 194454,
+      "sha256": "5013be0ef6c47187694a99470d6c3f2efb30e6c6ee03d744880274df5a3a555b"
+    },
+    {
+      "path": "SYSDISK/.corner_finder_FINAL (2).nc.pos",
+      "size": 60,
+      "sha256": "949978e32d3ea5f611ae33db6896973e2d2e6a1de150b5f0a73d3fd83d8e03cf"
+    },
+    {
+      "path": "SYSDISK/.safe park test universal wcs.nc.pos",
+      "size": 60,
+      "sha256": "b4fe5cdbc6822636f1f6b8034ee2f1f8374b90f2ea3d6ac447469a9d71f0a685"
+    },
+    {
+      "path": "SYSDISK/mdiblock",
+      "size": 720,
+      "sha256": "7a5b722015efce89292404e0cb14d550bb0a6cb7bcbe6d68d05f25c667efeeeb"
+    },
+    {
+      "path": "SYSDISK/.frame smsmsm.nc.pos",
+      "size": 60,
+      "sha256": "b86867c450fc8bf00ac48879265a73223bf3ff0ef25ebd63efbe8dd13fa0e21a"
+    },
+    {
+      "path": "SYSDISK/extnc1-1.nc",
+      "size": 6,
+      "sha256": "94eee81f0b63af6fa11e3e3bb55af736c2e0e797dd34741d6633acb3dea62b17"
+    },
+    {
+      "path": "SYSDISK/.PERSISTENCE_WRITE.nc.pos",
+      "size": 60,
+      "sha256": "b4fe5cdbc6822636f1f6b8034ee2f1f8374b90f2ea3d6ac447469a9d71f0a685"
+    },
+    {
+      "path": "SYSDISK/.corner_finder_FINAL2.nc.pos",
+      "size": 60,
+      "sha256": "e86af998e0e2cb916d90a7a7d8e80519e0e32b064ab1001fc31a4ef01ede5b43"
+    },
+    {
+      "path": "SYSDISK/fndy.nc",
+      "size": 278,
+      "sha256": "42719e6d68d705ee6653709af6c69d85c8532e5a5be5238d7c0d85b1161f76f5"
+    },
+    {
+      "path": "SYSDISK/eng",
+      "size": 73245,
+      "sha256": "3bb665e613047b5c4dfe80b181681eeda7e7731ab49567a10b99e1ec37cd423c"
+    },
+    {
+      "path": "SYSDISK/cam5.bmp",
+      "size": 194454,
+      "sha256": "41405b7d21a8a2d2aa02e1f343b157fb5ad028c4268e5fc9baac3d8a82c0d992"
+    },
+    {
+      "path": "SYSDISK/fndA.nc",
+      "size": 19,
+      "sha256": "ad62ff49a5d6d2d97638fbf784c024043edced1c7f19fce39509e8d40e82b9e8"
+    },
+    {
+      "path": "SYSDISK/.xy_fence_finder_FIXED.nc.pos",
+      "size": 60,
+      "sha256": "0b30148192adc2296530cd96045607858d4bd193d3e2052b4e4ffcf299b5249e"
+    },
+    {
+      "path": "SYSDISK/.flater.nc.pos",
+      "size": 60,
+      "sha256": "c18d713a1894f73873b9b23b34a0d792716a80d2a7250e6426e4998ab9f951d8"
+    },
+    {
+      "path": "SYSDISK/.moulure erable.nc.pos",
+      "size": 60,
+      "sha256": "5ffad307b31cf724770191720ffbbdc6df350e0b6d110968ebe7dad02c1c7ddf"
+    },
+    {
+      "path": "SYSDISK/.break1",
+      "size": 440,
+      "sha256": "0a5d7bacdaffb6759e7d4c2c8704f4fab007bcf899c888678481d6449a33444d"
+    },
+    {
+      "path": "SYSDISK/.fence_finder_XY.nc.pos",
+      "size": 60,
+      "sha256": "3b922364da3b5789d22721c0dd60dc4d7cffce02b7f2a5c6c6db1250bc2a8cba"
+    },
+    {
+      "path": "SYSDISK/cam4.bmp",
+      "size": 194454,
+      "sha256": "615d1087c6be91269415b8933531bca0e79f2e9edf338fb9a6727a6fcf4ae76c"
+    },
+    {
+      "path": "SYSDISK/absX.nc",
+      "size": 4,
+      "sha256": "35370b544cec413612168755a6fa7df054e3d96a9710676fc90acb465cc1a499"
+    },
+    {
+      "path": "SYSDISK/chs",
+      "size": 71872,
+      "sha256": "9d90087b8a2b5a7a864d2f45fd4363652c0de8ea1fed9358e9808db1f9f1146f"
+    },
+    {
+      "path": "SYSDISK/.probe_diagnostic.nc.pos",
+      "size": 60,
+      "sha256": "dc977bcd3bc6a384a53df2632c48ad5068091ec32e3fd6d273134801649837c4"
+    },
+    {
+      "path": "SYSDISK/processing",
+      "size": 4800,
+      "sha256": "9ddc9521465667ea612175fef8186d61c86cab48ceb810d73c22eec8f86c23e5"
+    },
+    {
+      "path": "SYSDISK/extnc2-1.nc",
+      "size": 4,
+      "sha256": "1cb44ff8268a86f153009261cac1fd72613d8d5fd060d44bc2a93fd18199af01"
+    },
+    {
+      "path": "SYSDISK/.tppop.nc.pos",
+      "size": 60,
+      "sha256": "1ca36565c0e44b6d598611ff0284723e89ba9f102e2fd03bb6af3507df0e908c"
+    },
+    {
+      "path": "SYSDISK/.PERSISTENCE_WRITE 2500-2999.nc.pos",
+      "size": 60,
+      "sha256": "b4fe5cdbc6822636f1f6b8034ee2f1f8374b90f2ea3d6ac447469a9d71f0a685"
+    },
+    {
+      "path": "SYSDISK/absZ.nc",
+      "size": 4,
+      "sha256": "d507907663a18d746ef7da734d73cf74bc43e0dd8ed273e2cd2db1a69f19db22"
+    },
+    {
+      "path": "SYSDISK/.fence_finder_XY (3).nc.pos",
+      "size": 60,
+      "sha256": "fc91b60e9dbf6e15914f750f10ec574c9636894da586104bb2fded8c00e54116"
+    },
+    {
+      "path": "CNCDISK/roughing morph.nc",
+      "size": 1852576,
+      "sha256": "2cb1979b24dbe670ced8d7ddfbb2e22d097e53edf4465ae799c63b6c473b8183"
+    },
+    {
+      "path": "CNCDISK/uservar",
+      "size": 3601,
+      "sha256": "df0869fd35a6de014678fd9e2c4decbda6edf6b3907dda4476ed1f132c9ddbdf"
+    },
+    {
+      "path": "CNCDISK/READ_VAR.nc",
+      "size": 154,
+      "sha256": "8fed1010bda827e5fcb0cb6f198cc0736d4daebcf9ebf1ba93c3cd730bc620f1"
+    },
+    {
+      "path": "CNCDISK/roughing morph2.nc",
+      "size": 1870167,
+      "sha256": "1502f73f212243d6a1f126b23388c3c195bdb0e4ac2da9bb99d7c765390842d2"
+    },
+    {
+      "path": "CNCDISK/MODBUS_TEST.nc",
+      "size": 830,
+      "sha256": "d95314e33f5540665056f3bd2962181243d37ca3a7fe9c65d259b032495389cb"
+    },
+    {
+      "path": "CNCDISK/COPY_WCS.nc",
+      "size": 847,
+      "sha256": "eb0e5af34c8d25b8efa93c1315710c1e2b607243645122a642cd10d0e0358d13"
+    },
+    {
+      "path": "CNCDISK/BMP0.bmp",
+      "size": 1228854,
+      "sha256": "79ee1c0941356d61ef0a2f9ddde4ad2c52ec467cca1ebd5cc06d6721a924fa6e"
+    },
+    {
+      "path": "CNCDISK/SAVE_WCS_XY_AUTO.nc",
+      "size": 950,
+      "sha256": "e6a3d5548f08ed7441d839c55953e1ec2bc65192b55247ba6ffa68cf9eeb60ef"
+    },
+    {
+      "path": "CNCDISK/CHECKPOINT_TEST.nc",
+      "size": 584,
+      "sha256": "106fcf8d3aa4bcca11b76519e2a9a9ea7dc7d167912074fa8d0b8926110f6e9d"
+    }
+  ]
+}

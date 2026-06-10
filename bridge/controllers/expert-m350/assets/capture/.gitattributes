@@ -1,0 +1,3 @@
+# Forensic controller captures — store byte-exact. No EOL conversion, no diffing.
+# These files must match their manifest.json sha256 on any checkout.
+* -text -diff

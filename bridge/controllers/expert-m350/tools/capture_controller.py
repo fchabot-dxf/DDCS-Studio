@@ -21,9 +21,20 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import sys
 from datetime import datetime, timezone
+
+
+def _safe_print(msg):
+    """Print progress without ever crashing on a non-cp1252 filename (controller files are often
+    Cyrillic/CJK). Falls back to the console's own encoding with replacement."""
+    try:
+        print(msg)
+    except UnicodeEncodeError:
+        enc = sys.stdout.encoding or "utf-8"
+        print(msg.encode(enc, "replace").decode(enc))
 
 
 def _sha256(path, chunk=1 << 20):
@@ -37,7 +48,10 @@ def _sha256(path, chunk=1 << 20):
 def capture_root(src, out_root, manifest, errors):
     """Mirror one source root (read-only) into out_root/<label>/… ; record each file in the manifest."""
     src = os.path.normpath(src)
-    label = os.path.basename(src.rstrip("\\/")) or "root"
+    # os.path.basename of a UNC share root (\\host\SHARE) is '' — derive the label from the last
+    # non-empty path component so each share lands in its own folder (not a merged 'root/').
+    parts = [seg for seg in re.split(r"[\\/]+", src) if seg]
+    label = parts[-1] if parts else "root"
     for dirpath, _dirs, files in os.walk(src):
         rel_dir = os.path.relpath(dirpath, src)
         for name in files:
@@ -49,7 +63,7 @@ def capture_root(src, out_root, manifest, errors):
                 shutil.copy2(srcf, destf)          # reads src, writes the LOCAL copy only (never the share)
                 size = os.path.getsize(destf)
                 manifest.append({"path": rel.replace("\\", "/"), "size": size, "sha256": _sha256(destf)})
-                print(f"  + {rel}  ({size} B)")
+                _safe_print(f"  + {rel}  ({size} B)")
             except OSError as e:
                 errors.append({"path": srcf, "error": str(e)})
                 print(f"  ! skip {srcf}: {e}", file=sys.stderr)
