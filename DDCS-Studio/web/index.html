@@ -95,7 +95,10 @@
             <!-- HEADER: Blue bar with title and close button -->
             <div class="wiz-head">
                 <span id="wizTitle">GENERATOR</span>
-                <span style="cursor:pointer" onclick="closeWiz()">✕</span>
+                <span class="wiz-head-actions" style="display:flex; gap:14px; align-items:center;">
+                    <span style="cursor:pointer" title="Settings — stock, probe, machine (live updates this preview)" onclick="window.openSettings && window.openSettings()">⚙</span>
+                    <span style="cursor:pointer" onclick="closeWiz()">✕</span>
+                </span>
             </div>
 
             <!-- WIZARD BODIES: One per wizard type, only one visible at a time -->

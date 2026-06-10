@@ -72,7 +72,9 @@ export const cornerView = {
 
         const gcode = wizard.generate(params);
         el('wiz_corner_code').innerHTML = UIUtils.formatGCode(gcode);
-        ctx.preview3D(gcode, 'cornerVizContainer');
+        // Infer the spindle start for this corner/config so the preview begins in the right spot.
+        const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
+        ctx.preview3D(gcode, 'cornerVizContainer', wizard.inferStart(params, stock));
 
         // Update corner status label 📌
         const dirMap = { FL: 'X pos, Y pos', FR: 'X neg, Y pos', BL: 'X pos, Y neg', BR: 'X neg, Y neg' };

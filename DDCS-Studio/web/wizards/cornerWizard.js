@@ -96,6 +96,30 @@ export class CornerWizard {
         return gcode;
     }
 
+    /**
+     * Infer where the spindle should START for this corner/config, in the 3D-preview stock frame
+     * (stock spans X[0..x] Y[0..y], top at Z=0). The macro is incremental, so this start positions the
+     * whole probe path at the chosen corner. Uses the SAME corner→direction convention as generate():
+     *   - Z-first ("hover OVER the corner material") → just INSIDE the corner, above the top.
+     *   - otherwise ("hover OUTSIDE the corner")     → just OUTSIDE the corner, within probe reach.
+     * Purely a preview/sim hint — never written to the G-code, never touches the WCS.
+     */
+    inferStart(params, stock) {
+        const n = (v, d) => this.toNum(v, d);
+        const sx = n(stock && stock.x, 100), sy = n(stock && stock.y, 80);
+        const corner = params.corner || 'FL';
+        const zFirst = !!(params.probeZ || params.probeZFirst);
+        const safeZ = n(params.safeZ, 10), radius = n(params.radius, 2);
+        const travel = n(params.travelDist, 50), dist = n(params.dist, 500);
+        // corner XY in the stock frame + the probe direction (matches FL=X+Y+ … BR=X−Y−)
+        const cornerXY = { FL: [0, 0], FR: [sx, 0], BL: [0, sy], BR: [sx, sy] }[corner] || [0, 0];
+        const dir      = { FL: [1, 1], FR: [-1, 1], BL: [1, -1], BR: [-1, -1] }[corner] || [1, 1];
+        const inset  = radius + 5;                                  // Z-first: a touch inside, over material
+        const outset = Math.max(8, Math.min(travel, dist * 0.5));   // else: outside, but inside probe reach
+        const k = zFirst ? inset : -outset;                        // + = toward corner/inside, − = outside
+        return { x: cornerXY[0] + dir[0] * k, y: cornerXY[1] + dir[1] * k, z: safeZ };
+    }
+
     generateHeader(corner, xDir, yDir, probeZ, wcsLabel, dist, retract, travelDist, f_fast, f_slow, safeZ, scanDepth) {
         const dirLabel = d => d === '+' ? 'pos' : 'neg';
         let h = `( Corner | ${corner} OUTSIDE | X ${dirLabel(xDir)} Y ${dirLabel(yDir)}`;

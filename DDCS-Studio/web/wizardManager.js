@@ -36,6 +36,13 @@ export class WizardManager {
             }
         });
 
+        // Settings (stock/probe/machine) changed — if a wizard is open, re-run its update() so the
+        // preview + the inferred spindle start track the new values live (e.g. editing stock size via
+        // the in-wizard ⚙). Read-only re-render; never writes settings, so no loop.
+        window.addEventListener('ddcs:settings-changed', () => {
+            if (this.wizardElement && this.wizardElement.classList.contains('active')) this.update();
+        });
+
         // Escape key to close wizard
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
@@ -181,7 +188,7 @@ export class WizardManager {
 
     // Render the generated G-code as a live 3D toolpath in the active wizard's viz area
     // (a shared GcodeViz3D moved between wizards; replaces the SVG schematic).
-    preview3D(gcode, containerId) {
+    preview3D(gcode, containerId, start) {
         const svgCont = document.getElementById(containerId);
         if (!svgCont || !svgCont.parentElement) return;
         const parent = svgCont.parentElement; // .viz-container
@@ -218,6 +225,10 @@ export class WizardManager {
             this._wizViz.attach(host);
             this._wizViz.setActive(true);
             this._refresh3DStock();
+            // Position the start marker BEFORE setSegments so the incremental probe path is offset to it
+            // (the inferred spindle start for this corner/config). setSegments keeps starts[0]. Preview hint
+            // only — the user can still drag to override. Re-set each render so it tracks the config.
+            if (start && this._wizViz.starts) this._wizViz.starts[0] = { x: +start.x || 0, y: +start.y || 0, z: +start.z || 0 };
             this._wizViz.setSegments(parseGcode(gcode || ''));
             const sel = host.querySelector('.wiz-shape');
             if (sel && window.ddcsGetSettings) sel.value = (window.ddcsGetSettings().stock || {}).shape || 'boss';
