@@ -23,7 +23,7 @@ Hardware         Machine   (single config)
                  [ + Add ▾ ]  →  adds a whole category tab (ATC · future subsystems)
 ```
 
-- **Input and Output are separate tabs.** Inside each, the parts are a **table — one row per part, no drill-down / no third-level tabs.** The **`+ Add`** button opens a **dropdown of preprogrammed types**; choosing one drops a new row **pre-expanded with that type's parameters** (a Probe row shows pin/level/location; a Coolant row shows pin/on-code/off-code). **Only the rows you've added are shown — no empty pin slots.** Each row has a **pin # field (1–24)**, and the Add menu / pin picker is **free-pin-aware** (pins already in use are greyed out) so a pin can't be double-assigned.
+- **Input and Output are separate tabs.** Inside each, the parts are a **table — one row per part, no drill-down / no third-level tabs.** The **`+ Add`** button opens a **dropdown of preprogrammed types**; choosing one drops a new row **pre-expanded with that type's parameters** (a Probe row shows pin/level/location; a Coolant row shows pin/on-code/off-code). **Only the rows you've added are shown — no empty pin slots.** Each row has a **pin # field (inputs 1–24, outputs 1–20)**, and the Add menu / pin picker is **free-pin-aware** (pins already in use are greyed out) so a pin can't be double-assigned. _(DDCS Expert M350 hardware: 24 inputs, 20 outputs — the Virtual I/O panel should match.)_
 - **Two `+Add` scopes:**
   - per-tab **`+Add`** (inside Input / Output) → adds a **row** (a part).
   - L2 **`+Add`** (beside the sub-tabs) → adds a whole **category tab** (ATC today; room for more).
