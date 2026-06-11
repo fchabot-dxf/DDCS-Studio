@@ -20,7 +20,7 @@ export class AtcWarmupWizard {
         const _time2 = this.toNum(params.time2, 30);
 
         let gcode = '';
-        gcode += `( ATC | Spindle Warm-up )\n`;
+        gcode += `( Spindle Warm-up )\n`;
         gcode += `( Stage 1: ${_rpm1} RPM for ${_time1}s )\n`;
         gcode += `( Stage 2: ${_rpm2} RPM for ${_time2}s )\n\n`;
 

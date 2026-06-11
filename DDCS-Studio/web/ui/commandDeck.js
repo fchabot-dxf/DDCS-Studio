@@ -301,6 +301,7 @@ export class CommandDeck {
                 <div style="display:flex; gap:6px; align-items:center;">
                     <button class="toolbar-btn" onclick="openWiz && openWiz('comm')">💬 Comm</button>
                     <button class="toolbar-btn" onclick="openWiz && openWiz('wcs')">🔧 WCS</button>
+                    <button class="toolbar-btn" onclick="openWiz && openWiz('atc_warmup')" title="Spindle warm-up sequence">🔥 Warm-up</button>
                 </div>
             `;
         }
@@ -325,7 +326,6 @@ export class CommandDeck {
                             <button onclick="openWiz && openWiz('atc_length')">📏 Tool Length</button>
                             <button onclick="openWiz && openWiz('atc_change')">🔧 Tool Change</button>
                             <button onclick="openWiz && openWiz('atc_test')">🧪 ATC Test</button>
-                            <button onclick="openWiz && openWiz('atc_warmup')">🔥 Warm-up</button>
                         </div>
                     </div>
 
