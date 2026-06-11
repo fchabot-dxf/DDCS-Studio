@@ -59,7 +59,7 @@ export function renderIoTable(container, kind, list, onChange) {
     list.forEach((row) => {
         const usedByOthers = new Set(list.filter(r => r !== row).map(r => r.pin).filter(p => p !== '' && p != null).map(String));
         const tr = document.createElement('div');
-        tr.style.cssText = 'display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; padding:7px 0; border-bottom:1px solid rgba(0,0,0,0.08);';
+        tr.style.cssText = 'display:flex; align-items:flex-end; gap:8px 12px; flex-wrap:wrap; padding:10px 12px; margin-bottom:9px; border:1px solid rgba(90,75,40,0.22); border-radius:7px; background:rgba(255,255,255,0.4);';
 
         const name = document.createElement('span');
         name.style.cssText = 'min-width:130px; font-weight:600; color:#3a3a3a; padding-bottom:4px;';
