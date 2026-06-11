@@ -12,7 +12,7 @@
 import { UIUtils } from './uiUtils.js';
 import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile, registerProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { makeClient } from '../shared/js/client.js';
-import { renderIoTable } from './ioTable.js';
+import { renderIoTable, renderMagazineTable } from './ioTable.js';
 
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 const SETTINGS_DEFAULTS = {
@@ -37,7 +37,8 @@ const SETTINGS_DEFAULTS = {
     // baseVar = DDCS tool-offset table base (#1430 = tool 1); tools[i] = stored length for tool i+1.
     atc: {
         baseVar: 1430, toolCount: 10, tools: [],
-        blockHeight: 50, safeZ: 10, maxDist: 200, retract: 3, fFast: 300, fSlow: 50, qStop: 1
+        blockHeight: 50, safeZ: 10, maxDist: 200, retract: 3, fFast: 300, fSlow: 50, qStop: 1,
+        magType: 'straight', magazine: []   // magType: straight|disk; magazine[]: {pocket,tool,name,x,y,z}
     },
     // Dynamic machine I/O — the new source of truth; seeded from probes/limits on first load.
     inputs: [],
@@ -344,6 +345,11 @@ function buildSettingsOverlay() {
                 <!-- ATC TAB -->
                 <div id="set_tab_atc" style="display:none">
                     <div class="settings-section">
+                        <div class="settings-section-title">TOOL MAGAZINE</div>
+                        <div class="settings-hint">Straight = each pocket has a park XYZ; disk = one pickup + rotate-to-pocket (auto-adds rotate / index I/O). The drawbar lives in Output.</div>
+                        <div id="atc_magazine"></div>
+                    </div>
+                    <div class="settings-section">
                         <div class="settings-section-title">TOOL LENGTH PROBE (defaults for the Tool Length wizard)</div>
                         <div class="settings-grid">
                             <label>Block height (mm)<input type="number" id="set_atc_blockheight" step="0.1"></label>
@@ -629,7 +635,7 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V9.74\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V9.75\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 
@@ -657,6 +663,7 @@ function wireSettingsOverlay(ov) {
         subTabs.forEach(b => b.classList.toggle('active', b.dataset.target === id));
         if (id === 'set_tab_input') renderIoTable(ov.querySelector('#io_input_table'), 'input', getInputs(), syncIO);
         if (id === 'set_tab_output') renderIoTable(ov.querySelector('#io_output_table'), 'output', getOutputs(), syncIO);
+        if (id === 'set_tab_atc') renderMagazineTable(ov.querySelector('#atc_magazine'), _ddcsSettings.atc, atcOnChange);
     }
     function showGroup(g) {
         mainTabs.forEach(b => b.classList.toggle('active', b.dataset.group === g));
@@ -684,6 +691,20 @@ function wireSettingsOverlay(ov) {
         }
     }
     if (addHwSel) addHwSel.addEventListener('change', () => { if (addHwSel.value) addSubsystem(addHwSel.value); addHwSel.value = ''; });
+
+    // Persist ATC magazine edits; disk auto-adds (and straight removes) the carousel-rotate / index I/O.
+    function atcOnChange() {
+        const atc = _ddcsSettings.atc;
+        const outs = getOutputs(), ins = getInputs();
+        if (atc.magType === 'disk') {
+            if (!outs.some(o => o.id === 'rotate_atc')) outs.push({ id: 'rotate_atc', type: 'rotate', label: 'Carousel rotate (ATC)', pin: '', onCode: '', offCode: '', group: 'atc' });
+            if (!ins.some(i => i.id === 'index_atc')) ins.push({ id: 'index_atc', type: 'sensor', label: 'Pocket index (ATC)', pin: '', level: 0, group: 'atc' });
+        } else {
+            const ro = outs.findIndex(o => o.id === 'rotate_atc'); if (ro >= 0) outs.splice(ro, 1);
+            const ix = ins.findIndex(i => i.id === 'index_atc'); if (ix >= 0) ins.splice(ix, 1);
+        }
+        saveSettings();
+    }
 
     setTimeout(() => ov.classList.add('active'), 10);
     q('set_done').addEventListener('click', closeOv);

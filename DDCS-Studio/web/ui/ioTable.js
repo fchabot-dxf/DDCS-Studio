@@ -141,3 +141,66 @@ export function renderIoTable(container, kind, list, onChange) {
     add.appendChild(sel); add.appendChild(btn);
     container.appendChild(add);
 }
+
+/**
+ * ATC magazine table: magazine type (straight/disk) + pocket count + a row per pocket
+ * (pocket # · tool # · name · park X/Y/Z). Mutates atc.magType / atc.magazine[] and calls onChange()
+ * (settingsPanel handles the disk-only auto-add of rotate output + index sensor).
+ */
+export function renderMagazineTable(container, atc, onChange) {
+    if (!container) return;
+    if (!Array.isArray(atc.magazine)) atc.magazine = [];
+    const rerender = () => renderMagazineTable(container, atc, onChange);
+    container.innerHTML = '';
+
+    const ctl = document.createElement('div');
+    ctl.style.cssText = 'display:flex; gap:16px; align-items:flex-end; margin-bottom:12px; flex-wrap:wrap;';
+    const typeSel = document.createElement('select');
+    [['straight', 'Straight / linear'], ['disk', 'Disk / carousel']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if ((atc.magType || 'straight') === v) o.selected = true; typeSel.appendChild(o); });
+    typeSel.addEventListener('change', () => { atc.magType = typeSel.value; onChange(); rerender(); });
+    ctl.appendChild(field('Magazine type', typeSel, 150));
+    const cnt = document.createElement('input'); cnt.type = 'number'; cnt.min = '0'; cnt.max = '99'; cnt.value = atc.magazine.length;
+    cnt.addEventListener('change', () => {
+        const n = Math.max(0, Math.min(99, parseInt(cnt.value, 10) || 0));
+        while (atc.magazine.length < n) { const k = atc.magazine.length + 1; atc.magazine.push({ pocket: k, tool: k, name: '', x: '', y: '', z: '' }); }
+        atc.magazine.length = n;
+        onChange(); rerender();
+    });
+    ctl.appendChild(field('Pockets', cnt, 60));
+    container.appendChild(ctl);
+
+    if (atc.magType === 'disk') {
+        const note = document.createElement('div'); note.className = 'settings-hint';
+        note.textContent = 'Disk: a carousel-rotate output + pocket-index sensor input were added (Output / Input). One fixed pickup; the magazine rotates each pocket to it.';
+        container.appendChild(note);
+    }
+    if (!atc.magazine.length) {
+        const e = document.createElement('div'); e.className = 'settings-hint'; e.textContent = 'Set the pocket count to build the magazine table.'; container.appendChild(e);
+        return;
+    }
+
+    const COLS = [['Pocket', 46], ['Tool #', 58], ['Name', 130], ['Park X', 66], ['Park Y', 66], ['Park Z', 66]];
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex; gap:8px; font-size:10px; color:#6b6150; font-weight:600; padding:2px;';
+    COLS.forEach(([h, w]) => { const s = document.createElement('span'); s.textContent = h; s.style.width = w + 'px'; head.appendChild(s); });
+    container.appendChild(head);
+
+    atc.magazine.forEach((row, i) => {
+        row.pocket = i + 1;
+        const tr = document.createElement('div');
+        tr.style.cssText = 'display:flex; gap:8px; align-items:center; padding:3px 2px; border-bottom:1px solid rgba(0,0,0,0.08);';
+        const pk = document.createElement('span'); pk.textContent = i + 1; pk.style.cssText = 'width:46px; font-weight:600; color:#3a3a3a;'; tr.appendChild(pk);
+        const cell = (key, w, isNum) => {
+            const inp = document.createElement('input'); inp.type = isNum ? 'number' : 'text'; if (isNum) inp.step = '0.1';
+            inp.value = row[key] ?? ''; inp.style.cssText = INP + ` width:${w}px;`;
+            inp.addEventListener('change', () => { row[key] = isNum ? (inp.value === '' ? '' : Number(inp.value)) : inp.value; onChange(); });
+            return inp;
+        };
+        tr.appendChild(cell('tool', 50, true));
+        tr.appendChild(cell('name', 122, false));
+        tr.appendChild(cell('x', 58, true));
+        tr.appendChild(cell('y', 58, true));
+        tr.appendChild(cell('z', 58, true));
+        container.appendChild(tr);
+    });
+}
