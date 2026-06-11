@@ -332,9 +332,14 @@ From `DDCS_Variables_mapping_2025-01-04.xlsx` (skill), cross-checked against `sl
   `MGETDATA`/`MSETDATA` ~16 s blocking wait can **wedge the channel hard enough to require a reboot**
   (observed 2026-06-06: a bad test macro froze "analysis", Reset would not clear it). `[CONFIRMED]`
 - **NOTE:** no single "last syntax-error code + line" variable was found in the map. The on-screen
-  System Log shows `syntax error: Ln` but is **not** persisted to a readable file (checked SYSDISK/CNCDISK
-  mtimes after a live syntax error — nothing updated). ⇒ exact syntax-error text/line is **not** directly
-  remotely readable; detect via run-state (`#1630`) + checkpoint sentinels + `.pos` (did-it-run) instead.
+  System Log shows `syntax error: Ln` but is **not** persisted to a readable file. ⭐ **Re-proven at the
+  CONTENT level 2026-06-10** (not just mtimes, which this Samba reports as garbage 1969 dates): full
+  **sha256 diff of ALL 193 files on both shares** before/after a live syntax error (`gg55q` via MDI) →
+  the **only** changes were `mdi.nc` (the typed line) + `mdiblock` (its history echo) — i.e. the MDI
+  *input* buffer, **zero error-record output anywhere**. ⇒ exact syntax-error text/line is **definitively
+  not remotely readable via the filesystem**; the error lives only on `/dev/fb0`. Detect failure via
+  checkpoint sentinels + `.pos` (did-it-run); to read the *text/line*, the only path is **D2 (HDMI
+  capture + OCR)**.
 - **`.<name>.nc.pos`** is created/updated only when a program actually RUNS (errored-at-parse programs
   leave none) → a pollable "did it execute" flag over SMB. `[CONFIRMED 2026-06-06]`
 

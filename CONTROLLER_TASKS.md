@@ -45,6 +45,7 @@ Goal: deliver + run jobs on the Expert from the PC with **zero added hardware**.
 | A0 | Reach controller files over SMB | ✅ both | — | V4.1 recipe works on the Expert (guest=root, CNCDISK+SYSDISK) |
 | A1 | Overwrite a program + Start runs the NEW code | 🟡 | V4.1 ✅ / Expert ❌ | V4.1 `M47` self-loop re-reads disk; on the **Expert `M47` ≠ V4.1** — only a per-cycle **Start** re-reads the file |
 | A2 | `error.nc` fault hook fires + leaves a readable flag | 🟡 | Expert ✅(docs) / V4.1 ❌ | fires on a **system alarm**, NOT on a syntax error (syntax errors render to screen only) |
+| A2-syn | Syntax-error text/line readable over SMB? | ❌ **refuted** | Expert 2026-06-10 | sha256 diff of all 193 files around a live error → only the MDI *input* buffer changed; **no error record persists** ⇒ needs **D2 (OCR)** |
 | A2b | *Which* system var holds the live alarm **code** | ⬚ open | both | the key error-readback unknown; ⚠️ runtime-var reads can wedge (`#1630`) |
 | A3 | Port scan for a hidden telnet/FTP/web service | ⬚ open | — | not yet run |
 | A4 | Live file tracks position (software DRO) | ❌/low | — | `.pos` marks *did-it-run*, not live position; position not wanted anyway |
