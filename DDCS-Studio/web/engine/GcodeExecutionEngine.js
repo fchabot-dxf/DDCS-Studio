@@ -450,38 +450,64 @@ export class GcodeExecutionEngine {
             }
         }
 
-        // --- Custom I/O M-Codes ---
+        // --- I/O + ATC M-codes (DDCS dialect) ---
+        // Park on an input until it reaches `target`. pin = numeric port (null for the
+        // DDCS ATC sensors, whose ports are controller params, not program words).
+        const waitForInput = (m, pin, pinName, target) => {
+            if (getVirtualInput(pinName) === target) {
+                this._setStatus(`M${m} ${pinName} is ${target ? 'ON' : 'OFF'} (cleared)`, true);
+                return false;
+            }
+            this._setStatus(`M${m} waiting for ${pinName} to be ${target ? 'ON' : 'OFF'}...`, true);
+            this._setWaitPin({ pin, pinName, target });
+            if (this.autoAnswer) this._scheduleAutoAnswer(pinName, target);
+            return true;
+        };
+        // DDCS ATC sensor waits: M-code -> [semantic pin, wanted state]
+        const ATC_WAITS = {
+            300: ['IN_SPINDLE_STOPPED', true],   // M300 wait spindle stopped
+            302: ['IN_TOOL_LOCKED', true],       // M302 wait tool locked
+            303: ['IN_TOOL_OPEN', true],         // M303 wait tool open (collet released)
+            304: ['IN_TOOL_CLOSED', true],       // M304 wait tool closed
+        };
+
         let waiting = false;
         for (const m of mcodes) {
             if (m === 6) {
-                // Tool change: M6 Tn sets the active tool number (#1300), so tool-length
-                // and offset macros that read #1300 / #[1430+T-1] simulate correctly.
+                // Tool change request: M6 Tn stores the target tool in #1504 (real DDCS
+                // semantics — T.nc performs the change) and, for simple sims, also makes
+                // it the active tool #1300 so offset macros keep working.
                 if (wm.T != null && Number.isFinite(wm.T)) {
+                    this.vars.set(1504, Math.round(wm.T));
                     this.vars.set(1300, Math.round(wm.T));
-                    this._setStatus(`M6 → active tool #1300 = ${Math.round(wm.T)}`, true);
+                    this._setStatus(`M6 → target tool #1504 = ${Math.round(wm.T)}`, true);
                 }
+            } else if (m === 3 || m === 4) {
+                setVirtualOutput('OUT_SPINDLE', true);    // spindle-stopped sensor drops
+            } else if (m === 5) {
+                setVirtualOutput('OUT_SPINDLE', false);   // spin-down → stopped sensor confirms
+            } else if (m === 154 || m === 155) {
+                // Drawbar: M154 release / M155 lock (output port = controller param #1250)
+                setVirtualOutput('OUT_TOOL_RELEASE', m === 154);
+                this._setStatus(`M${m} → drawbar ${m === 154 ? 'RELEASE' : 'LOCK'}`, true);
+            } else if (m === 305 || m === 306) {
+                setVirtualOutput('OUT_DUST_COVER', m === 305);
+                this._setStatus(`M${m} → dust cover ${m === 305 ? 'OPEN' : 'CLOSE'}`, true);
+            } else if (ATC_WAITS[m]) {
+                const [pinName, target] = ATC_WAITS[m];
+                if (waitForInput(m, null, pinName, target)) waiting = true;
             } else if (m === 10 || m === 11) {
-                // Output control
+                // Generic output control by port (NOTE: on real DDCS Expert, M10/M11 is the
+                // LUBRICATION output — param #1233. Kept as a generic out for sim experiments.)
                 if (wm.P != null) {
                     const pinName = resolveVirtualPin(wm.P, 'OUT');
                     setVirtualOutput(pinName, m === 10);
                     this._setStatus(`M${m} → ${pinName} = ${m === 10 ? 'ON' : 'OFF'}`, true);
                 }
             } else if (m === 31 || m === 33) {
-                // Input polling
+                // Input polling by port: M31 = wait for ON, M33 = wait for OFF
                 if (wm.P != null) {
-                    const pinName = resolveVirtualPin(wm.P, 'IN');
-                    const targetState = m === 31; // M31 = wait for ON, M33 = wait for OFF
-                    const currentState = getVirtualInput(pinName);
-
-                    if (currentState !== targetState) {
-                        this._setStatus(`M${m} waiting for ${pinName} to be ${targetState ? 'ON' : 'OFF'}...`, true);
-                        waiting = true;
-                        this._setWaitPin({ pin: wm.P, pinName, target: targetState });
-                        if (this.autoAnswer) this._scheduleAutoAnswer(pinName, targetState);
-                    } else {
-                        this._setStatus(`M${m} ${pinName} is ${targetState ? 'ON' : 'OFF'} (cleared)`, true);
-                    }
+                    if (waitForInput(m, wm.P, resolveVirtualPin(wm.P, 'IN'), m === 31)) waiting = true;
                 }
             }
         }
@@ -492,6 +518,15 @@ export class GcodeExecutionEngine {
             return false;
         }
         this._setWaitPin(null);   // this line is past any input wait
+
+        // G4 dwell — DDCS unit is ms (dispatcher capture: G04 P500). Paced by simSpeed.
+        if (gcodes.includes(4) && wm.P != null && Number.isFinite(wm.P) && wm.P > 0) {
+            const ms = wm.P / (this.simSpeed > 0 ? this.simSpeed : 1);
+            this._nextDelayMs = Math.max(8, Math.min(10000, ms));
+            this._setStatus(`G4 dwell ${wm.P} ms`, true);
+            this.ip += 1;
+            return false;
+        }
 
         for (const g of gcodes) {
             if (g === 20) this.unitScale = 25.4;

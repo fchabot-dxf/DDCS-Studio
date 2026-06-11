@@ -6,3 +6,4 @@ output/
 
 # Playwright test output (regenerated)
 test-results/
+verification/out/

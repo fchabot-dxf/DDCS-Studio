@@ -120,6 +120,17 @@ on top.
   - The looping ▶ Play preview animation is also feedrate-proportional now
     (segment time ∝ length/feed within the ~5 s loop).
 - ☑ **⟳ Loop** toggle — restart the program automatically on completion (Run only).
+- ☑ **ATC generators rebuilt on the real DDCS dialect** (decoded from the variable DB):
+  drawbar = `M154/M155`, sensor waits = `M300/M302/M303/M304`, dust cover `M305/M306`,
+  pockets from controller tables `#1330+/X #1350+/Y #1370+/Z`, target tool `#1504` (M6 Txx).
+  - **Tool Change** wizard: Manual park (no-ATC machines) / **Auto T.nc-style** pick & place.
+  - **ATC Test** wizard (new): drawbar cycle test + pocket dry-run — the commissioning
+    checks a machinist runs before trusting the first automatic change.
+  - Engine simulates the whole dialect (drawbar handshakes in the truth table, `G4` dwell
+    in ms, `M6` → `#1504`), so all generated macros run end-to-end in the sim.
+  - Warmup fix: `G4 P` is **ms** on DDCS — wizard now converts seconds → ms.
+  - Validated: 8-case engine round trip (`verification/atc-gen-test.mjs`) + `ddcs_lint.py`
+    clean on all five generated macros + 2 e2e wizard tests.
 - ☑ Beep fix: the preview loop no longer beeps every cycle; one beep when an
   engine run completes.
 - ☑ Viewer: middle-drag pans, Shift+middle orbits (CAD-style).

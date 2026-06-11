@@ -12,6 +12,8 @@ const BASE = process.env.STUDIO_URL || 'http://localhost:3210';
 
 async function openEditorWith(page, code) {
   await page.goto(BASE);
+  // Wait for the app modules to finish wiring (button listeners, ioPanel, settings)
+  await page.waitForFunction(() => !!window.ioPanel && typeof window.ddcsGetSettings === 'function');
   await page.locator('#editor').fill(code);
 }
 

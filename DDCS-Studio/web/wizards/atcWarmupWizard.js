@@ -26,9 +26,9 @@ export class AtcWarmupWizard {
 
         gcode += `( === CONFIGURATION === )\n`;
         gcode += `#140=${_rpm1}     ( Stage 1 RPM )\n`;
-        gcode += `#141=${_time1}    ( Stage 1 Duration )\n`;
+        gcode += `#141=${_time1 * 1000}    ( Stage 1 Duration: ${_time1} s in ms - DDCS G4 P is ms )\n`;
         gcode += `#142=${_rpm2}    ( Stage 2 RPM )\n`;
-        gcode += `#143=${_time2}    ( Stage 2 Duration )\n\n`;
+        gcode += `#143=${_time2 * 1000}    ( Stage 2 Duration: ${_time2} s in ms )\n\n`;
 
         gcode += `( Single confirmation )\n`;
         gcode += line([set('#1505', '1')], 'Warm up spindle? Press Enter') + '\n';

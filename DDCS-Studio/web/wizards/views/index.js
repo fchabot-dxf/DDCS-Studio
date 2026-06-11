@@ -21,7 +21,7 @@ import { cornerView } from './cornerView.js';
 import { middleView } from './middleView.js';
 import { edgeView } from './edgeView.js';
 import { alignmentView } from './alignmentView.js';
-import { atcLengthView, atcWarmupView, atcChangeView } from './atcViews.js';
+import { atcLengthView, atcWarmupView, atcChangeView, atcTestView } from './atcViews.js';
 
 export const WIZARD_VIEWS = [
     commView,
@@ -33,6 +33,7 @@ export const WIZARD_VIEWS = [
     atcLengthView,
     atcWarmupView,
     atcChangeView,
+    atcTestView,
 ];
 
 export const viewByType = new Map(WIZARD_VIEWS.map((v) => [v.type, v]));

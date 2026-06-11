@@ -612,15 +612,68 @@
 
             <!-- ATC Tool Change Wizard -->
             <div id="wiz_atc_change" class="wiz-body" style="display:none">
-                <span class="section-label">MANUAL TOOL CHANGE PARK</span>
+                <span class="section-label">TOOL CHANGE</span>
                 <div class="param-grid">
+                    <label>Mode
+                        <select id="atc_change_mode">
+                            <option value="manual">Manual — park + swap prompt</option>
+                            <option value="auto">Automatic — ATC pick &amp; place (T.nc)</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="param-grid" id="atc_change_manual_params">
                     <label>Park X (mm)<input type="number" id="atc_change_x" value="100" class="num-input"></label>
                     <label>Park Y (mm)<input type="number" id="atc_change_y" value="100" class="num-input"></label>
                     <label>Park Z (mm)<input type="number" id="atc_change_z" value="0" class="num-input"></label>
                 </div>
+                <div id="atc_change_auto_params" style="display:none">
+                    <div class="param-grid">
+                        <label>Z change height (mach)<input type="number" id="atc_change_zclear" value="0" class="num-input"></label>
+                        <label>Magazine pockets<input type="number" id="atc_change_capacity" value="8" min="1" max="20" class="num-input"></label>
+                        <label title="0 = take the target from #1504 (M6 Txx). Set a tool number to generate a standalone test change.">Fixed test tool (0 = #1504)<input type="number" id="atc_change_fixedt" value="0" min="0" max="20" class="num-input"></label>
+                    </div>
+                    <div class="param-grid">
+                        <label><input type="checkbox" id="atc_change_m300" checked> Wait spindle-stop sensor (M300)</label>
+                        <label><input type="checkbox" id="atc_change_cover"> Dust cover (M305/M306)</label>
+                        <label><input type="checkbox" id="atc_change_confirm"> Confirm prompt before moving</label>
+                    </div>
+                    <div class="wiz-usage">Pocket positions come from the controller tables (#1330+ X · #1350+ Y · #1370+ Z) — teach them on the machine first. Drawbar: M154/M155, sensors: M302/M303. Test in the 3D drawer: ▶ Run with Auto sensors, or drive the I/O panel by hand.</div>
+                </div>
                 <div class="preview-block">
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_atc_change_code"></pre>
+                </div>
+            </div>
+
+            <!-- ATC Commissioning Test Wizard -->
+            <div id="wiz_atc_test" class="wiz-body" style="display:none">
+                <span class="section-label">ATC COMMISSIONING TEST</span>
+                <div class="param-grid">
+                    <label>Test
+                        <select id="atc_test_mode">
+                            <option value="drawbar">Drawbar cycle test</option>
+                            <option value="pockets">Pocket dry-run</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="param-grid" id="atc_test_drawbar_params">
+                    <label>Cycles<input type="number" id="atc_test_cycles" value="10" min="1" max="999" class="num-input"></label>
+                    <label>Dwell (ms)<input type="number" id="atc_test_dwell" value="500" min="0" step="100" class="num-input"></label>
+                </div>
+                <div id="atc_test_pocket_params" style="display:none">
+                    <div class="param-grid">
+                        <label>First pocket<input type="number" id="atc_test_first" value="1" min="1" max="20" class="num-input"></label>
+                        <label>Pockets<input type="number" id="atc_test_count" value="8" min="1" max="20" class="num-input"></label>
+                        <label>Z clearance (mach)<input type="number" id="atc_test_zclear" value="0" class="num-input"></label>
+                    </div>
+                    <div class="param-grid">
+                        <label><input type="checkbox" id="atc_test_descend"> Descend to pocket Z at each stop</label>
+                    </div>
+                </div>
+                <div class="wiz-usage">Run these BEFORE the first automatic change: drawbar cycling proves the pneumatics + sensors; the pocket dry-run proves the taught positions. Both simulate in the 3D drawer (▶ Run · I/O panel).</div>
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_atc_test_code"></pre>
                 </div>
             </div>
 

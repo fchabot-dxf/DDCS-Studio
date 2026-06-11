@@ -159,6 +159,68 @@ const M3K_TRUTH_TABLE = {
     },
 
     // -----------------------------------------------------------------------
+    // DDCS native ATC dialect (M154/M155 drawbar · M300/M302-304 sensors · M305/306 cover)
+    // Ports for these are CONFIGURED ON THE CONTROLLER (params #1120-#1199, #1250-52),
+    // so the sim models them as semantic pins, not numbered ones.
+    // -----------------------------------------------------------------------
+
+    /** M154 — tool release output ON → collet opens */
+    OUT_TOOL_RELEASE: {
+        targetInput: 'IN_TOOL_OPEN',         // M303 waits on this
+        delayMs: 450,
+        setState: true,
+        description: 'M154 tool release → tool-open sensor',
+        sideEffects: [
+            { pin: 'IN_TOOL_LOCKED', state: false },
+            { pin: 'IN_TOOL_CLOSED', state: false },
+        ],
+    },
+
+    /** M155 — tool release output OFF (lock) → collet clamps */
+    OUT_TOOL_RELEASE_OFF: {
+        targetInput: 'IN_TOOL_LOCKED',       // M302 waits on this
+        delayMs: 400,
+        setState: true,
+        description: 'M155 tool lock → tool-locked sensor',
+        sideEffects: [
+            { pin: 'IN_TOOL_OPEN', state: false },
+            { pin: 'IN_TOOL_CLOSED', state: true },   // M304 waits on this
+        ],
+    },
+
+    /** M305 — dust cover open */
+    OUT_DUST_COVER: {
+        targetInput: 'IN_DUST_COVER_OPEN',
+        delayMs: 600,
+        setState: true,
+        description: 'M305 dust cover open → cover sensor',
+    },
+
+    /** M306 — dust cover close */
+    OUT_DUST_COVER_OFF: {
+        targetInput: 'IN_DUST_COVER_OPEN',
+        delayMs: 600,
+        setState: false,
+        description: 'M306 dust cover close → cover sensor releases',
+    },
+
+    /** M3/M4 — spindle running → "stopped" sensor drops */
+    OUT_SPINDLE: {
+        targetInput: 'IN_SPINDLE_STOPPED',
+        delayMs: 100,
+        setState: false,
+        description: 'Spindle start → spindle-stopped sensor clears',
+    },
+
+    /** M5 — spindle off → spins down, then the stopped sensor confirms (M300 waits on it) */
+    OUT_SPINDLE_OFF: {
+        targetInput: 'IN_SPINDLE_STOPPED',
+        delayMs: 800,
+        setState: true,
+        description: 'Spindle stop → spindle-stopped sensor (spin-down)',
+    },
+
+    // -----------------------------------------------------------------------
     // Air blast / coolant
     // -----------------------------------------------------------------------
 

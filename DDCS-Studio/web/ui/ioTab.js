@@ -163,8 +163,11 @@ class IOPanel {
         }
         const msg = this.el.querySelector('#io_panel_wait');
         if (msg) {
+            // Numbered pin (M31 P5) → "IN5 (IN_DRAWBAR_CLOSED)"; DDCS ATC sensor with a
+            // controller-configured port (M302 etc.) → just the semantic name.
+            const label = this.waitPin != null ? `IN${this.waitPin} (${wait && wait.pinName})` : (wait && wait.pinName);
             msg.textContent = wait
-                ? `⚠ Waiting for IN${this.waitPin} (${wait.pinName}) to be ${wait.target ? 'ON' : 'OFF'} — click it to satisfy`
+                ? `⚠ Waiting for ${label} to be ${wait.target ? 'ON' : 'OFF'}${this.waitPin != null ? ' — click it to satisfy' : ' (auto sensor or truth table answers)'}`
                 : '';
             msg.style.display = wait ? 'block' : 'none';
         }
