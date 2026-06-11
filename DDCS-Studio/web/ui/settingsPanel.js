@@ -141,19 +141,31 @@ function buildSettingsOverlay() {
     ov.className = 'overlay settings-overlay';
     ov.innerHTML = `
         <div class="settings-box">
-            <div class="settings-head" style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <span>⚙ SETTINGS</span>
-                    <div class="settings-tabs" style="display: flex; gap: 8px;">
-                        <button class="settings-tab active" data-target="set_tab_general" style="background: rgba(255,255,255,0.1); border: 1px solid #555; color: #fff; padding: 2px 8px; font-size: 10px; cursor: pointer;">GENERAL</button>
-                        <button class="settings-tab" data-target="set_tab_machine" style="background: transparent; border: 1px solid transparent; color: #aaa; padding: 2px 8px; font-size: 10px; cursor: pointer;">MACHINE</button>
-                        <button class="settings-tab" data-target="set_tab_stock" style="background: transparent; border: 1px solid transparent; color: #aaa; padding: 2px 8px; font-size: 10px; cursor: pointer;">STOCK</button>
-                        <button class="settings-tab" data-target="set_tab_limits" style="background: transparent; border: 1px solid transparent; color: #aaa; padding: 2px 8px; font-size: 10px; cursor: pointer;">LIMITS</button>
-                        <button class="settings-tab" data-target="set_tab_probes" style="background: transparent; border: 1px solid transparent; color: #aaa; padding: 2px 8px; font-size: 10px; cursor: pointer;">PROBES</button>
+            <style>
+                .settings-main-tab { background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.45); color: #fff; padding: 3px 14px; font-size: 12px; font-weight: 700; cursor: pointer; border-radius: 5px; }
+                .settings-main-tab:not(.active) { background: transparent; border-color: transparent; color: rgba(255,255,255,0.7); }
+                .settings-subtabs .settings-tab { background: transparent; border: 1px solid transparent; color: rgba(255,255,255,0.65); padding: 2px 10px; font-size: 11px; cursor: pointer; border-radius: 4px; }
+                .settings-subtabs .settings-tab.active { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.45); color: #fff; }
+            </style>
+            <div class="settings-head" style="display: block;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <span>⚙ SETTINGS</span>
+                        <div class="settings-tabs" style="display: flex; gap: 8px;">
+                            <button class="settings-main-tab active" data-group="general">General</button>
+                            <button class="settings-main-tab" data-group="hardware">Hardware</button>
+                        </div>
+                        <select id="set_profile" title="Controller profile — presets the hardware tabs" style="background:#222; color:#ccc; border:1px solid #555; font-size:10px; padding:2px 4px; margin-left:8px;"></select>
                     </div>
-                    <select id="set_profile" title="Controller profile — decides which hardware tabs (Probes / ATC / Limits) are shown" style="background:#222; color:#ccc; border:1px solid #555; font-size:10px; padding:2px 4px; margin-left:8px;"></select>
+                    <span class="settings-close" title="Close">✕</span>
                 </div>
-                <span class="settings-close" title="Close">✕</span>
+                <div class="settings-subtabs" style="display: none; gap: 6px; padding-top: 8px; flex-wrap: wrap;">
+                    <button class="settings-tab active" data-group="hardware" data-target="set_tab_machine">Machine</button>
+                    <button class="settings-tab" data-group="hardware" data-target="set_tab_stock">Stock</button>
+                    <button class="settings-tab" data-group="hardware" data-target="set_tab_limits">Limits</button>
+                    <button class="settings-tab" data-group="hardware" data-target="set_tab_probes">Probes</button>
+                    <button class="settings-tab" data-group="hardware" data-target="set_tab_atc">ATC</button>
+                </div>
             </div>
             <div class="settings-body">
                 <!-- GENERAL TAB -->
@@ -574,7 +586,7 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V9.68\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V9.69\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 
@@ -590,32 +602,26 @@ function wireSettingsOverlay(ov) {
         }
     });
 
-    // Tab logic
-    const tabs = ov.querySelectorAll('.settings-tab');
-    tabs.forEach(t => {
-        t.addEventListener('click', (e) => {
-            tabs.forEach(btn => {
-                btn.classList.remove('active');
-                btn.style.background = 'transparent';
-                btn.style.borderColor = 'transparent';
-                btn.style.color = '#aaa';
-            });
-            e.target.classList.add('active');
-            e.target.style.background = 'rgba(255,255,255,0.1)';
-            e.target.style.borderColor = '#555';
-            e.target.style.color = '#fff';
-            
-            ov.querySelector('#set_tab_general').style.display = 'none';
-            ov.querySelector('#set_tab_machine').style.display = 'none';
-            ov.querySelector('#set_tab_stock').style.display = 'none';
-            ov.querySelector('#set_tab_limits').style.display = 'none';
-            ov.querySelector('#set_tab_probes').style.display = 'none';
-            const _atcPanel = ov.querySelector('#set_tab_atc'); if (_atcPanel) _atcPanel.style.display = 'none';
-
-            const target = e.target.getAttribute('data-target');
-            ov.querySelector('#' + target).style.display = 'block';
-        });
-    });
+    // Two-level tab logic: main (General | Hardware) → Hardware reveals a sub-tab row.
+    const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
+    const subTabs = [...ov.querySelectorAll('.settings-subtabs .settings-tab')];
+    const subRow = ov.querySelector('.settings-subtabs');
+    const HW_IDS = ['set_tab_machine', 'set_tab_stock', 'set_tab_limits', 'set_tab_probes', 'set_tab_atc'];
+    function showPanel(id) {
+        const gen = ov.querySelector('#set_tab_general'); if (gen) gen.style.display = (id === 'set_tab_general') ? 'block' : 'none';
+        HW_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
+        subTabs.forEach(b => b.classList.toggle('active', b.dataset.target === id));
+    }
+    function showGroup(g) {
+        mainTabs.forEach(b => b.classList.toggle('active', b.dataset.group === g));
+        if (g === 'general') { subRow.style.display = 'none'; showPanel('set_tab_general'); return; }
+        subRow.style.display = 'flex';
+        const firstVisible = subTabs.find(b => b.style.display !== 'none') || subTabs[0];
+        if (firstVisible) showPanel(firstVisible.dataset.target);
+    }
+    mainTabs.forEach(t => t.addEventListener('click', () => showGroup(t.dataset.group)));
+    subTabs.forEach(t => t.addEventListener('click', () => showPanel(t.dataset.target)));
+    showGroup('general');
 
     setTimeout(() => ov.classList.add('active'), 10);
     q('set_done').addEventListener('click', closeOv);
