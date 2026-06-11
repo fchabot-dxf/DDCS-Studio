@@ -36,6 +36,7 @@ Hardware         Machine   (single config)
   - **Magazine type: Straight | Disk** — the tool-change wizard branches on it:
     - **Straight / linear — FULL support.** Settings hold the **magazine count (N pockets)** + a **magazine table** — one row per pocket: **pocket # · tool # · name · park X · Y · Z** (editable in Settings). The tool-change macro `G53`-moves to the pocket's park XYZ; the generator can push the positions to the controller (`#1330+`/`#1350+`/`#1370+`). [CONFIRMED path].
     - **Disk/carousel** = one fixed pickup XYZ + rotate-to-pocket, driven by a **rotate output + index-sensor input** (from the I/O list) + pocket count + CW/CCW shortest-path + datum pocket. No hardcoded rotate M-code; validate against the real magazine.
+  - **Wizard output = a complete `T.nc`.** `T.nc` is the DDCS's **fixed tool-change macro filename** — the controller auto-runs it on a tool change (`Tn M6`; `#1504` = target tool). The wizard builds the whole `T.nc` **from the ATC magazine table in Settings** (pocket → tool# → park XYZ) + the drawbar/sensor I/O; the user saves it **as `T.nc`** on the controller (replacing the stub), then programs just call `Tn M6`. _[CONFIRMED from the firmware backup: `T.nc`, `fndX/Y/Z.nc`, `fndzero.nc`, `probe.nc`, `slib-g.nc`/`slib-m.nc`, `key-N.nc` are fixed-name system macros; the stock `T.nc` is just `T#1504`.]_
 
 ### Each row's fields (inline in the list)
 - **Input row:** `type · pin # · active level (NC/NO) · [location x/y/z/w/h for probe & setter] · ×`
