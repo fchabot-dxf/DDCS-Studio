@@ -215,7 +215,7 @@ class DDCSStudio {
         });
 
         // Middle wizard visualization listeners
-        ['m_type', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_animate'].forEach(id => {
+        ['m_type', 'm_axis', 'm_dir', 'm_dir2', 'm_both'].forEach(id => {
             const elem = el(id);
             if (elem) {
                 elem.addEventListener('change', () => {
@@ -232,7 +232,7 @@ class DDCSStudio {
         });
 
         // Edge/probe visualization listeners — wire to actual control IDs
-        ['p_axis', 'p_dir', 'p_animate'].forEach(id => {
+        ['p_axis', 'p_dir'].forEach(id => {
             const elem = el(id);
             if (elem) {
                 elem.addEventListener('change', () => {
@@ -250,7 +250,7 @@ class DDCSStudio {
         });
 
         // Alignment visualization listeners
-        ['al_check_axis', 'al_probe_dir', 'al_animate'].forEach(id => {
+        ['al_check_axis', 'al_probe_dir'].forEach(id => {
             const elem = el(id);
             if (elem) {
                 elem.addEventListener('change', () => {
@@ -306,10 +306,9 @@ class DDCSStudio {
             'c_type'
         ];
         const checkboxIds = [
-            'c_probe_z_first', 'c_sync_a', 'c_animate',
-            'm_both', 'm_sync_a', 'm_animate',
-            'p_sync_a', 'p_animate',
-            'al_animate',
+            'c_probe_z_first', 'c_sync_a',
+            'm_both', 'm_sync_a',
+            'p_sync_a',
             'w_x', 'w_y', 'w_z', 'w_sync'
         ];
 

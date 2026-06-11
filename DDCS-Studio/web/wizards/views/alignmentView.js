@@ -31,7 +31,7 @@ export const alignmentView = {
     codeElId: 'wiz_alignment_code',
     large: true,
     inputIds: [
-        'al_check_axis', 'al_probe_dir', 'al_animate',
+        'al_check_axis', 'al_probe_dir',
         'al_tolerance', 'al_dist', 'al_retract', 'al_safe_z',
         'al_feed_fast', 'al_feed_slow', 'al_port', 'al_level', 'al_q',
     ],

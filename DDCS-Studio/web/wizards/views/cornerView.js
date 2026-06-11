@@ -35,7 +35,7 @@ export const cornerView = {
     codeElId: 'wiz_corner_code',
     large: true,
     inputIds: [
-        'c_corner', 'c_probe_seq', 'c_probe_z_first', 'c_animate', 'c_sync_a', 'c_wcs',
+        'c_corner', 'c_probe_seq', 'c_probe_z_first', 'c_sync_a', 'c_wcs',
         'c_travel_dist', 'c_safe_z', 'c_scan_depth', 'c_radius', 'c_feed_fast', 'c_feed_slow',
         'c_dist', 'c_retract', 'c_port', 'c_level', 'c_q', 'c_slave',
     ],
