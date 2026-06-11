@@ -64,6 +64,12 @@ export function renderIoTable(container, kind, list, onChange) {
         const name = document.createElement('span');
         name.style.cssText = 'min-width:130px; font-weight:600; color:#3a3a3a; padding-bottom:4px;';
         name.textContent = (TYPES.find(t => t.type === row.type) || {}).label || row.type;
+        if (row.group) {
+            const badge = document.createElement('span');
+            badge.textContent = row.group.toUpperCase();
+            badge.style.cssText = 'margin-left:6px; font-size:9px; font-weight:700; background:#6b7b3a; color:#fff; padding:1px 5px; border-radius:3px; vertical-align:middle;';
+            name.appendChild(badge);
+        }
         tr.appendChild(name);
 
         if (isInput && row.type === 'limit') {

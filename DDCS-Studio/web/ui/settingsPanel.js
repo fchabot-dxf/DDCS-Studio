@@ -169,6 +169,11 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_input">Input</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_output">Output</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_atc">ATC</button>
+                    <select id="set_add_hw" title="Add a hardware subsystem" style="display:none; background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.5); border-radius:4px; font-size:11px; padding:2px 6px; cursor:pointer; margin-left:4px;">
+                        <option value="">+ Add ▾</option>
+                        <option value="atc">ATC (tool changer)</option>
+                        <option value="spindle" disabled>Spindle / VFD (soon)</option>
+                    </select>
                 </div>
             </div>
             <div class="settings-body">
@@ -624,7 +629,7 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V9.73\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V9.74\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 
@@ -644,6 +649,7 @@ function wireSettingsOverlay(ov) {
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
     const subTabs = [...ov.querySelectorAll('.settings-subtabs .settings-tab')];
     const subRow = ov.querySelector('.settings-subtabs');
+    const addHwSel = q('set_add_hw');
     const ALL_IDS = ['set_tab_profile', 'set_tab_variables', 'set_tab_feedback', 'set_tab_network',
                      'set_tab_machine', 'set_tab_stock', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     function showPanel(id) {
@@ -656,6 +662,7 @@ function wireSettingsOverlay(ov) {
         mainTabs.forEach(b => b.classList.toggle('active', b.dataset.group === g));
         subRow.style.display = 'flex';
         subTabs.forEach(b => { b.style.display = (b.dataset.group === g) ? '' : 'none'; });
+        if (addHwSel) addHwSel.style.display = (g === 'hardware') ? '' : 'none';
         if (g === 'hardware') applyHardwareTabs();   // re-hide hardware sub-tabs the profile turned off
         const firstVisible = subTabs.find(b => b.dataset.group === g && b.style.display !== 'none');
         if (firstVisible) showPanel(firstVisible.dataset.target);
@@ -663,6 +670,20 @@ function wireSettingsOverlay(ov) {
     mainTabs.forEach(t => t.addEventListener('click', () => showGroup(t.dataset.group)));
     subTabs.forEach(t => t.addEventListener('click', () => showPanel(t.dataset.target)));
     showGroup('general');
+
+    // "+ Add hardware" tool: adds a subsystem category tab + its standard I/O (mirrored + badged).
+    function addSubsystem(kind) {
+        if (kind === 'atc') {
+            _ddcsSettings.hardwareTabs = _ddcsSettings.hardwareTabs || {};
+            _ddcsSettings.hardwareTabs.atc = true;
+            const outs = getOutputs();
+            if (!outs.some(o => o.type === 'drawbar')) outs.push({ id: 'drawbar_atc', type: 'drawbar', label: 'Drawbar (ATC)', pin: '', onCode: 'M154', offCode: 'M155', group: 'atc' });
+            saveSettings();
+            applyHardwareTabs();
+            showPanel('set_tab_atc');
+        }
+    }
+    if (addHwSel) addHwSel.addEventListener('change', () => { if (addHwSel.value) addSubsystem(addHwSel.value); addHwSel.value = ''; });
 
     setTimeout(() => ov.classList.add('active'), 10);
     q('set_done').addEventListener('click', closeOv);
