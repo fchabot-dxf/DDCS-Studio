@@ -158,7 +158,17 @@ Start for a job, the job replaces it — does the job's `M30`/chaining relaunch 
 the PC feed commands by writing the variable's backing file over SMB?
 **Proves:** whether a self-sustaining software dispatcher is possible. **Yes → zero hardware forever.
 No → you need exactly one physical Start trigger** (manual button or $6 ESP32), nothing else.
-**RESULT (A9):** dispatcher survives? bootstrap path: ___
+**RESULT (A9):** *in progress.* **A9-a (PC→running-macro inbound via the `uservar` FILE): NO REACTION
+2026-06-10 — logged INCONCLUSIVE, not refuted.** Method: a standalone looped macro (NOT sysstart —
+operator decision: sysstart homes at boot = auto-motion, keep it untouched; also it prompts for confirm,
+so it's not zero-touch anyway) spun on `IF [#150==88] GOTO…` (motion-free, Reset-to-stop). The PC wrote
+`#150=88` into CNCDISK/`uservar` over SMB mid-loop: the write **stuck in the file** (no clobber for 18 s)
+but the macro **never reacted** (no `#2037` MDI flip, sentinel `#151` unchanged) ⇒ consistent with the
+macro reading #150 from **RAM** (same RAM-vs-disk wall as A8). **Caveat: the `IF [#150==88]` eval syntax
+is unverified live** — next step: operator types `#150=88` on the PANEL while the loop runs; reacts → the
+loop+syntax are good and only file→RAM is dead; no reaction → fix the macro syntax and re-test.
+Remaining A9 paths: **Modbus `MGETDATA`** (the documented inbound pull — needs a proven-responding PC
+slave first; wedge-risk otherwise) or **one physical Start input** (ESP32/C1). Vars + controller cleaned.
 
 ---
 
