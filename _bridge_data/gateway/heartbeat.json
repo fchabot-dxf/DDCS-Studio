@@ -1,0 +1,12 @@
+{
+  "machine_id": "",
+  "machine_name": "",
+  "controller_id": null,
+  "controller_name": null,
+  "controller_connected": false,
+  "dest": "",
+  "backend": "local",
+  "version": "0.1.0",
+  "last_seen": "2026-06-11T00:53:17Z",
+  "active_job": null
+}
