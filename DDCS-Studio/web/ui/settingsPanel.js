@@ -37,8 +37,53 @@ const SETTINGS_DEFAULTS = {
     atc: {
         baseVar: 1430, toolCount: 10, tools: [],
         blockHeight: 50, safeZ: 10, maxDist: 200, retract: 3, fFast: 300, fSlow: 50, qStop: 1
-    }
+    },
+    // Dynamic machine I/O — the new source of truth; seeded from probes/limits on first load.
+    inputs: [],
+    outputs: []
 };
+
+// ── Dynamic I/O model (inputs[] / outputs[]) ────────────────────────────────
+// On first load we seed inputs[] from the legacy flat probes/limits so nothing is lost.
+// syncFlatFromIO() mirrors edits back to the flat fields so the sim + wizards keep working
+// until they read the arrays directly (stage 3). Pin ranges: inputs 1–24, outputs 1–20.
+const LIMIT_AXES = [
+    ['x_min', 'Limit X−', 'xMinPin', 'xMinLevel'], ['x_max', 'Limit X+', 'xMaxPin', 'xMaxLevel'],
+    ['y_min', 'Limit Y−', 'yMinPin', 'yMinLevel'], ['y_max', 'Limit Y+', 'yMaxPin', 'yMaxLevel'],
+    ['z_min', 'Limit Z−', 'zMinPin', 'zMinLevel'], ['z_max', 'Limit Z+', 'zMaxPin', 'zMaxLevel'],
+];
+
+function migrateIO(s) {
+    if (!Array.isArray(s.inputs)) s.inputs = [];
+    if (!Array.isArray(s.outputs)) s.outputs = [];
+    if (s.inputs.length === 0) {
+        const p = s.probes || {};
+        s.inputs.push({ id: 'probe', type: 'probe', label: '3D Probe', pin: p.probePin ?? '', level: p.probeLevel ?? 0 });
+        s.inputs.push({ id: 'setter', type: 'setter', label: 'Tool Setter', pin: p.setterPin ?? '', level: p.setterLevel ?? 0,
+            x: p.setterX, y: p.setterY, z: p.setterZ, w: p.setterW, h: p.setterH });
+        const L = s.limits || {};
+        for (const [axis, label, pinK, lvlK] of LIMIT_AXES) {
+            if (L[pinK] !== '' && L[pinK] != null) s.inputs.push({ id: 'limit_' + axis, type: 'limit', axis, label, pin: L[pinK], level: L[lvlK] || 0 });
+        }
+    }
+    return s;
+}
+
+// Mirror inputs[] back into the flat probes/limits the sim + wizards still read (stage-2 interim).
+function syncFlatFromIO(s) {
+    const first = (t) => (s.inputs || []).find(i => i.type === t);
+    const probe = first('probe'), setter = first('setter');
+    s.probes = s.probes || {};
+    if (probe) { s.probes.probePin = probe.pin; s.probes.probeLevel = probe.level; }
+    if (setter) Object.assign(s.probes, { setterPin: setter.pin, setterLevel: setter.level, setterX: setter.x, setterY: setter.y, setterZ: setter.z, setterW: setter.w, setterH: setter.h });
+    s.limits = s.limits || {};
+    for (const [, , pinK, lvlK] of LIMIT_AXES) { s.limits[pinK] = ''; s.limits[lvlK] = 0; }
+    for (const inp of (s.inputs || [])) {
+        if (inp.type !== 'limit') continue;
+        const row = LIMIT_AXES.find(a => a[0] === inp.axis);
+        if (row) { s.limits[row[2]] = inp.pin; s.limits[row[3]] = inp.level || 0; }
+    }
+}
 
 let _ddcsSettings = loadSettings();
 
@@ -47,16 +92,20 @@ function loadSettings() {
         const raw = localStorage.getItem(DDCS_SETTINGS_KEY);
         if (raw) {
             const p = JSON.parse(raw);
-            return {
+            return migrateIO({
                 stock: { ...SETTINGS_DEFAULTS.stock, ...(p.stock || {}) },
                 machine: { ...SETTINGS_DEFAULTS.machine, ...(p.machine || {}) },
                 view: { ...SETTINGS_DEFAULTS.view, ...(p.view || {}) },
                 probes: { ...SETTINGS_DEFAULTS.probes, ...(p.probes || {}) },
                 limits: { ...SETTINGS_DEFAULTS.limits, ...(p.limits || {}) },
-            };
+                hardwareTabs: { ...SETTINGS_DEFAULTS.hardwareTabs, ...(p.hardwareTabs || {}) },
+                atc: { ...SETTINGS_DEFAULTS.atc, ...(p.atc || {}) },
+                inputs: Array.isArray(p.inputs) ? p.inputs : [],
+                outputs: Array.isArray(p.outputs) ? p.outputs : [],
+            });
         }
     } catch (e) { /* ignore */ }
-    return JSON.parse(JSON.stringify(SETTINGS_DEFAULTS));
+    return migrateIO(JSON.parse(JSON.stringify(SETTINGS_DEFAULTS)));
 }
 
 function saveSettings() {
@@ -65,6 +114,10 @@ function saveSettings() {
 }
 
 export function getSettings() { return _ddcsSettings; }
+export function getInputs() { return _ddcsSettings.inputs || []; }
+export function getOutputs() { return _ddcsSettings.outputs || []; }
+// Push inputs[] edits back into the flat probes/limits the sim + wizards still read (stage-2 interim).
+export function syncIO() { syncFlatFromIO(_ddcsSettings); saveSettings(); }
 
 let _fillSettingsInputs = null;
 
@@ -75,6 +128,8 @@ export function applySettings(incoming) {
     if (incoming.machine) _ddcsSettings.machine = { ...SETTINGS_DEFAULTS.machine, ..._ddcsSettings.machine, ...incoming.machine };
     if (incoming.probes) _ddcsSettings.probes = { ...SETTINGS_DEFAULTS.probes, ..._ddcsSettings.probes, ...incoming.probes };
     if (incoming.limits) _ddcsSettings.limits = { ...SETTINGS_DEFAULTS.limits, ..._ddcsSettings.limits, ...incoming.limits };
+    if (Array.isArray(incoming.inputs)) { _ddcsSettings.inputs = incoming.inputs; syncFlatFromIO(_ddcsSettings); }
+    if (Array.isArray(incoming.outputs)) _ddcsSettings.outputs = incoming.outputs;
     saveSettings();
     if (_fillSettingsInputs) _fillSettingsInputs();
 }
@@ -519,7 +574,7 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V9.67\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V9.68\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 
