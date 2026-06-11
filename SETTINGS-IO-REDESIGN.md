@@ -29,7 +29,7 @@ Hardware         Machine   (single config)
   - L2 **`+Add`** (beside the sub-tabs) → adds a whole **category tab** (ATC today; room for more).
 - Machine + Stock stay single-config. ATC is an added L2 category (pockets / tool-table / drawbar / sensors).
   - **Magazine type: Straight | Disk** — the tool-change wizard branches on it:
-    - **Straight** = per-pocket XYZ (G53 to `#1330+/#1350+/#1370+`) — today's path, [CONFIRMED].
+    - **Straight / linear — FULL support.** Settings hold the **magazine count (N pockets)** + a **magazine table** — one row per pocket: **pocket # · tool # · name · park X · Y · Z** (editable in Settings). The tool-change macro `G53`-moves to the pocket's park XYZ; the generator can push the positions to the controller (`#1330+`/`#1350+`/`#1370+`). [CONFIRMED path].
     - **Disk/carousel** = one fixed pickup XYZ + rotate-to-pocket, driven by a **rotate output + index-sensor input** (from the I/O list) + pocket count + CW/CCW shortest-path + datum pocket. No hardcoded rotate M-code; validate against the real magazine.
 
 ### Each row's fields (inline in the list)
