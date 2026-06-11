@@ -79,8 +79,11 @@ export class UIUtils {
         // 4. AXIS LETTERS (Yellow) - STRICTLY X, Y, Z, A, B.
         // 5. DEFAULT - G0, G1, Numbers, Keywords, Vars -> White.
 
+        // NOTE: code is already HTML-escaped above, so `<`/`>`/`&` are now `&lt;`/`&gt;`/`&amp;`.
+        // The `;`-comment alternative must NOT match the `;` that terminates one of those
+        // entities (a lookbehind guards it), otherwise `<=`/`>=` get split and read back as `<;=`.
         const formatLine = (line) => line.replace(
-            /(\([^\)]*\)|;[^\n]*)|(\b[Gg]31\b)|([Mm]\d+)|([XYZABxyzab])/g,
+            /(\([^\)]*\)|(?<!&(?:lt|gt|amp));[^\n]*)|(\b[Gg]31\b)|([Mm]\d+)|([XYZABxyzab])/g,
             (match, comment, g31, mcode, axis) => {
                 if (comment) return `<span class="g-comment">${match}</span>`;
                 if (g31) return `<span style="color:#60a5fa; font-weight:bold;">${match}</span>`;
