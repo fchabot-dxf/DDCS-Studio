@@ -13,6 +13,7 @@ import { UIUtils } from './uiUtils.js';
 import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile, registerProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { makeClient } from '../shared/js/client.js';
 import { renderIoTable, renderMagazineTable } from './ioTable.js';
+import { generateToolChangeNc } from '../data/atcGenerator.js';
 
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 const SETTINGS_DEFAULTS = {
@@ -349,6 +350,12 @@ function buildSettingsOverlay() {
                         <div class="settings-section-title">TOOL MAGAZINE</div>
                         <div class="settings-hint">Straight = each pocket has a park XYZ; disk = one pickup + rotate-to-pocket (auto-adds rotate / index I/O). The drawbar lives in Output.</div>
                         <div id="atc_magazine"></div>
+                        <div class="settings-row" style="margin-top:12px;">
+                            <button class="toolbar-btn settings-io" id="atc_gen_tnc">⚙ Generate T.nc</button>
+                            <button class="toolbar-btn settings-io" id="atc_dl_tnc" style="display:none">⬇ Download T.nc</button>
+                        </div>
+                        <div class="settings-hint">Builds the tool-change macro from the table above. Save it as <b>T.nc</b> on the controller — review &amp; dry-run first (generated template).</div>
+                        <textarea id="atc_tnc_out" readonly spellcheck="false" style="display:none; width:100%; height:240px; margin-top:8px; font:12px/1.45 monospace; background:#1a1a1a; color:#d8d8d8; border:1px solid #888; border-radius:4px; padding:8px; box-sizing:border-box;"></textarea>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">TOOL LENGTH PROBE (defaults for the Tool Length wizard)</div>
@@ -683,13 +690,25 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V9.78\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V9.79\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 
     // Profile import/export (JSON = settings + user variables)
     q('set_profile_export').addEventListener('click', () => { if (window.ddcsExportProfile) window.ddcsExportProfile(); });
     q('set_profile_import').addEventListener('click', () => { if (window.ddcsImportProfile) window.ddcsImportProfile(); });
+
+    // ATC: generate a T.nc tool-change macro from the magazine table (client-side; review before running).
+    const genTnc = q('atc_gen_tnc');
+    if (genTnc) genTnc.addEventListener('click', () => {
+        const nc = generateToolChangeNc(_ddcsSettings.atc, getOutputs());
+        const out = q('atc_tnc_out'); if (out) { out.value = nc; out.style.display = 'block'; }
+        const dl = q('atc_dl_tnc'); if (dl) dl.style.display = '';
+    });
+    const dlTnc = q('atc_dl_tnc');
+    if (dlTnc) dlTnc.addEventListener('click', () => {
+        const out = q('atc_tnc_out'); if (out && out.value) UIUtils.downloadFile('T.nc', out.value);
+    });
 
     q('set_reset').addEventListener('click', () => {
         if (confirm('Reset machine and stock dimensions to defaults?')) {
