@@ -24,3 +24,6 @@ output/
 /dist/
 /fairy.exe
 *.spec
+
+# fairy local-backend runtime data (created when the gateway runs with --backend local)
+/_bridge_data/
