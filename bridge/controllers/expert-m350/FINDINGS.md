@@ -20,16 +20,16 @@ bench-proven. **Do not assume V4.1 findings carry over** — see [`../README.md`
   - Args: X1=start var, X2=slave#, X3=start **register address**, X4=length in **bytes** (reg=2 bytes),
     **X5 = Modbus function code** (16=write-multiple per the MSETDATA example; 1=read in the MGETDATA
     example), X6=var receiving the **exception code** (0=OK). Controller pauses ~16 s for a reply.
-  - ⚠️⚠️⚠️ **`MGETDATA` (inbound pull) HARD-WEDGES the controller — REQUIRED A REBOOT** (live `mgetdata.nc`
-    test, studio 2026-06-06). The screen **froze** and did **not** recover on its own (not a 16 s timeout) —
-    a full reboot was needed, **same severity class as the `#1630` analyzer wedge.** `[CONFIRMED 2026-06-06]`
-    ⇒ **`MGETDATA` is the dangerous direction; `MSETDATA` (outbound push) is the proven-safe one.** Likely
-    cause: the PC slave did not answer the request (wrong register address `X3` / function code `X5` /
-    slave-id `X2`, or not serving that address), so the controller blocked forever instead of timing out.
-    **Do NOT run `MGETDATA` live** until the PC slave is proven to answer the exact registers with the
-    matching read function code (`X5`=1 coils / 3 holding / 4 input) for that slave — ideally validated
-    against a bench Modbus master first. Treat like `#1630`: each bad test = a reboot. **The linter should
-    flag live `MGETDATA` without a confirmed-responding slave.**
+  - ⚠️⚠️⚠️ **`MGETDATA` = REFUTED on this firmware — it wedges the ANALYZER, not the serial link.
+    `[CONFIRMED 2026-06-10, fw 2025-06-19-00 — A9-b]`** Re-tested with every excuse removed: pymodbus
+    3.6.9 slave on COM6 **bench-validated answering fc 1/3/4/16**, registers seeded, **cable confirmed
+    plugged**, motion-free macro. The controller froze at **"analysis10..."** and the slave received
+    **ZERO frames** — the request is never sent; the hang is in the **analysis phase before any serial
+    I/O**. ⇒ no slave configuration can ever fix it; **do not run `MGETDATA` on this firmware, period**
+    (each attempt = a reboot). This corrects the 06-06 diagnosis ("slave didn't answer" — same zero-frame
+    analysis-freeze, so the slave was never the variable). `MSETDATA` (outbound push) passes analysis and
+    transacts fine — it remains the proven-safe direction. **Inbound-while-running has NO working channel
+    on the Expert** (see A8/A9 in EXPERIMENTS): the dispatcher needs **one physical Start input (C1)**.
   - ⭐ **Each var #50–#499 carries exactly ONE byte (decimal 0–255)** — `MSETDATA` byte-packs them
     two-per-register. To move a value >255 (e.g. an error code), split/join with **`MDATA2BYTE`** /
     **`MBYTE2DATA`** across consecutive vars. `[CONFIRMED via RU manual `Инструкция.txt` 2026-06-06]`
@@ -142,6 +142,19 @@ client + `EnableInsecureGuestLogons $true` + `BlockNTLM $false` (admin + reboot)
   state by decoding this file as little-endian f64 — `[CONFIRMED readback 2026-06-06]`. Slot 0 = byte 0 (no header).
 - Run-state hidden files exist on SYSDISK: per-program **`.<name>.nc.pos`** (60 B each) and **`.break0/.break1`**
   (breakpoint-resume) — same family as the V4.1 run-state files. `[TO TEST what they track]`
+- ⚠️ **`uservar` file ↔ RAM is TWO-WAY ISOLATED while running (A9-a `[CONFIRMED 2026-06-10]`):**
+  (1) a PC SMB-write into `uservar` (e.g. `#150=88` mid-loop) **never reaches a running macro's RAM** —
+  the macro keeps seeing the old value (loop + `IF [#150==88] GOTO` syntax independently proven via a
+  self-priming check that flipped to MDI instantly); (2) a macro's own var write (`#151=1`) was **still
+  absent from the file after `M30`** — the disk file is a **lazy snapshot** (flush trigger unknown,
+  `[TO TEST]` reboot/shutdown/periodic). ⇒ qualifies the 06-06 readback finding: uservar-over-SMB is
+  fine for *eventually-persisted* state but is **NOT live readback** (use `MSETDATA` checkpoints) and is
+  **NOT an inbound command channel** (remaining inbound: `MGETDATA` with a proven slave, or a physical input).
+- **MDI buffer is RAM, not the file (A8 `[CONFIRMED 2026-06-10]`):** the live MDI line is **`SYSDISK/mdi.nc`**
+  (10 B, one block; `SYSDISK/mdiblock` = a 720 B fixed-slot MDI *history*). Overwriting `mdi.nc` over SMB does
+  **not** change what the panel runs — navigating to the MDI page still shows the panel's RAM line, and it
+  never auto-runs. ⇒ **`mdi.nc` is panel OUTPUT, not input** (on navigation); MDI-file injection is **not** a
+  remote-trigger channel (same RAM-vs-disk lesson as the dispatcher note below). *Untested:* read-at-boot.
 
 ## ⚠️ Dispatcher: Expert `M47` ≠ V4.1 `M47` — the V4.1 loop trick does NOT port `[CONFIRMED 2026-06-06]`
 The V4.1 software dispatcher relies on `M47` = **"restart program from top"** (firmware built-in) so an
@@ -188,6 +201,52 @@ job-file delivery + `uservar`/`MSETDATA`/`error.nc` for readback. (Modbus blocke
 - `parse.out` (live, 2.99 MB) references `sysstart.nc` + `M30` as strings (boot hook real). `MSETDATA`/
   `MGETDATA` are NOT plain-ASCII in it (wide-char/tokenized?) — revisit when wiring Modbus.
 
+## ⭐⭐ Profile I/O map — the full param dictionary is on the controller (`cfg_utf8`) `[CONFIRMED 2026-06-10]`
+The Phase-1 capture landed **`SYSDISK/cfg_utf8`** (73 KB) — the controller's **complete param schema**: one
+line per param `#<n> -pN -aN -tN -s1"<label>" -s2"<unit>" -mN -min=.. -max=.. -i0".." -i1".."`. This is the
+Rosetta Stone for `setting`: it labels every index, so the profile I/O map is **desk work off the capture,
+no differential toggling needed.** (`chs`/`msg` are the localized string catalogs; `cfg_utf8` is the schema.)
+
+**Input signals are the `-m16` group (range 0–24 = physical input port #, `0` = unassigned).** Each input
+occupies a **triple of consecutive indices: `[port#, enable, active-level]`** — `enable` reads `1` on every
+assigned input, `active-level` (at **port+2**) is the polarity; an unassigned input reads `[0,0,0]`. The
+**+2 level offset was pinned by a live differential toggle 2026-06-10**: flipping the Fixed-Probe level on the
+panel moved **`#577`** `0→1` (only boolean change; the float noise in that diff was position/WCS state flushed
+to disk by the Save — `setting` is written wholesale). Output signals are the `-m17` group (range 0–20).
+
+**Active-level encoding:** the panel field toggles **"N" / "P"** = **Negative / Positive electric level**
+(active-low vs active-high — same sense as the `#12-21` "...port electric level" params). Value **`0` = "N"
+(negative / active-low)**, **`1` = "P" (positive / active-high)** — confirmed on the Fixed Probe (restored
+level `0` = "N"). `[CONFIRMED on machine 2026-06-10]`
+
+### Confirmed I/O for the studio Expert (Ultimate Bee), decoded from the captured `setting`:
+| Port param | Signal (cfg_utf8 label) | port | enable (`+1`) | level (`+2`) | Notes |
+|---|---|---|---|---|---|
+| `#575` | **Fixed Probe** (tool-setter) | **2** | 1 | `#577` | ⭐ **panel-confirmed = IN02**; level index toggle-confirmed |
+| `#578` | **Floating Probe** (3D touch) | **10** | 1 | `#580` | ⭐ **panel-confirmed = port 10** |
+| `#515` | X− hard limit | 20 | 1 | `#517` | shares pin 20 with X-zero |
+| `#518` | Y− hard limit | 0 | 0 | — | unassigned |
+| `#521` | Z− hard limit | 0 | 0 | — | unassigned |
+| `#530` | X+ hard limit | 0 | 0 | — | unassigned |
+| `#533` | Y+ hard limit | 23 | 1 | `#535` | shares pin 23 with Y-zero |
+| `#536` | Z+ hard limit | 21 | 1 | `#538` | shares pin 21 with Z-zero |
+| `#545` / `#548` / `#551` | X / Y / Z zero (home) | 20 / 23 / 21 | 1 | +2 each | |
+| `#500` / `#503` / `#506` | X / Y / Z servo alarm | 0 | 0 | — | unassigned (steppers, no feedback) |
+| `#623` `#626` `#629` `#697` | Tool release/lock/open/close in (M301-304) | 0 | 0 | — | **all unassigned → no ATC** |
+| `#750` `#753` | Tool release-lock / launch-retract out | 0 | 0 | — | **all unassigned → no ATC** |
+
+⇒ **`hardwareTabs` for this machine = `["probes","limits"]`, ATC OFF** — confirmed from real I/O, exactly as
+PROFILE_BUILD_TASK predicted (Ultimate Bee = manual tool change). Other useful schema params for the future:
+`#133` Probe Tool block thickness, `#135-139` Fixed-probe mach pos X/Y/Z/4/5, `#140` probe retract,
+`#150-154` hard-limit stop mode, `#155` enable soft limits, `#161-168` soft-limit values, `#95` IO input
+filter time. The decision logic is general (these param #s are firmware-defined; the *values* are per-machine
+wiring) — so the gateway can map any same-firmware Expert, and the values here are this machine's truth.
+
+> ⚠️ **Namespace caution:** these are **`setting`-file param indices**, a DIFFERENT address space from the
+> runtime **macro `#` variables**. E.g. `setting#578` = *Floating Probe port*, but macro `#578` = *active WCS
+> number* (below); `setting#576` = *Fixed-Probe level*, but panel Pr76/macro `#576` = *Macro Enable*. Don't
+> cross-read them. The profile map is entirely in the `setting`/`cfg_utf8` (param) space.
+
 ## System / macro variables (read off the operator's live macros 2026-06-06) `[CONFIRMED on machine]`
 From `READ_VAR.nc`, `COPY_WCS.nc`, `SAVE_WCS_XY_AUTO.nc`, `sysstart.nc` on this machine:
 - `#578` = **active WCS number** (1=G54 … 6=G59).
@@ -202,9 +261,14 @@ From `READ_VAR.nc`, `COPY_WCS.nc`, `SAVE_WCS_XY_AUTO.nc`, `sysstart.nc` on this 
   (0/1/2), `#569` = safe-Z return height, `#624` = G53 Z return. `IF/GOTO/Nlabel` + `G04 P<ms>` dwell.
 
 ## Control
-- `#2037` **virtual buttons** press any of 201 panel functions from a running macro
-  (`#2037 = 65536 + [KeyValue − 1000]`). `[CONFIRMED]` per the `ddcs-expert` skill
-  (`Virtual_button_function_codes_COMPLETE.xlsx`). Subject to the one-program-at-a-time rule.
+- ⭐ `#2037` **virtual buttons** press any of 201 panel functions from a running macro
+  (`#2037 = 65536 + [KeyValue − 1000]`). **`[CONFIRMED ON MACHINE 2026-06-10, fw 2025-06-19-00]`** — a
+  PC-delivered macro (`A7b_BUTTON_ONEWAY.nc`) pressing **MDI page (KeyValue 1348)** switched the live screen
+  to MDI and stayed; the macro ran (`.pos` written). Earlier round-trip (`1373`→`1348`→`1373`, Monitor↔MDI)
+  hid the effect by ending on the start page — use a **one-way** press for an unambiguous test. Codes in the
+  skill's `Virtual_button_function_codes_COMPLETE.xlsx` (1348 MDI, 1373 Monitor verified). Add `G04 P<s>`
+  between presses. Subject to the one-program-at-a-time rule. ⇒ **navigation / file-select / start are now
+  software-drivable on the Expert — no M3K, no ESP32** (the A7 experiment, archived).
 
 ## Autonomy outlook — the Expert is a superset of the V4.1
 The V4.1 bench proved a **software dispatcher**: an `M47` self-loop re-reads its file from disk each
@@ -268,9 +332,14 @@ From `DDCS_Variables_mapping_2025-01-04.xlsx` (skill), cross-checked against `sl
   `MGETDATA`/`MSETDATA` ~16 s blocking wait can **wedge the channel hard enough to require a reboot**
   (observed 2026-06-06: a bad test macro froze "analysis", Reset would not clear it). `[CONFIRMED]`
 - **NOTE:** no single "last syntax-error code + line" variable was found in the map. The on-screen
-  System Log shows `syntax error: Ln` but is **not** persisted to a readable file (checked SYSDISK/CNCDISK
-  mtimes after a live syntax error — nothing updated). ⇒ exact syntax-error text/line is **not** directly
-  remotely readable; detect via run-state (`#1630`) + checkpoint sentinels + `.pos` (did-it-run) instead.
+  System Log shows `syntax error: Ln` but is **not** persisted to a readable file. ⭐ **Re-proven at the
+  CONTENT level 2026-06-10** (not just mtimes, which this Samba reports as garbage 1969 dates): full
+  **sha256 diff of ALL 193 files on both shares** before/after a live syntax error (`gg55q` via MDI) →
+  the **only** changes were `mdi.nc` (the typed line) + `mdiblock` (its history echo) — i.e. the MDI
+  *input* buffer, **zero error-record output anywhere**. ⇒ exact syntax-error text/line is **definitively
+  not remotely readable via the filesystem**; the error lives only on `/dev/fb0`. Detect failure via
+  checkpoint sentinels + `.pos` (did-it-run); to read the *text/line*, the only path is **D2 (HDMI
+  capture + OCR)**.
 - **`.<name>.nc.pos`** is created/updated only when a program actually RUNS (errored-at-parse programs
   leave none) → a pollable "did it execute" flag over SMB. `[CONFIRMED 2026-06-06]`
 

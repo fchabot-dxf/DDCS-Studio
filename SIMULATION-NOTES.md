@@ -98,7 +98,39 @@ on top.
 
 ## Status / decision
 
-- ☐ **Decision pending:** build the Machine-frame toggle now, or stay program-centric for now.
+- ☑ **Decided (June 2026):** stay program-centric for now — machine frame deferred.
 - ☑ Preview is program-centric (active WCS at origin) — works for cuts + probes.
-- ☐ Machine frame (envelope + origin + `G53` + limit check).
-- ☐ I/O state-stepping (sensor-wait / output simulation).
+- ☐ Machine frame (envelope + origin + `G53` + limit check) — **deferred**.
+- ☑ **I/O state-stepping (sensor-wait / output simulation) — built.**
+  - Floating **Virtual I/O panel** (draggable, resizable; `I/O` button in the 3D drawer):
+    24 inputs (click-to-toggle) + 24 outputs, replaces the Settings I/O tab.
+  - **⏭ Step** button runs one line at a time; **▶ Run / Resume / ⏸ Stop** for continuous.
+  - `M31/M33` waits park execution, auto-show the panel and pulse the waited pin.
+  - **Auto sensors** (default ON): any waited input is answered by a virtual sensor
+    (~0.8 s) — truth-table handshakes still fire with realistic delays. Turn OFF to
+    hand-drive sensors and exercise `IF`/`GOTO` failure branches.
+  - `G31` probe contact now flips the actual probe input pin on the panel (fired at
+    the moment the paced move reaches the contact point).
+  - Tests: `verification/io-sim-test.mjs` (engine, 5 cases) + `tests/io-sim.spec.js` (e2e, 5 pass).
+- ☑ **Feedrate-true playback.**
+  - Engine Run interpolates each move in real time: distance ÷ programmed `F`
+    (rapids at 6000 mm/min) — slow probes crawl, rapids zip. **Speed** selector in
+    the drawer (1× / 2× / 5× / 10× / MAX), changeable mid-move.
+  - Status shows the move: `G31 probe 10.0 mm at F50 — 12.0 s`.
+  - The looping ▶ Play preview animation is also feedrate-proportional now
+    (segment time ∝ length/feed within the ~5 s loop).
+- ☑ **⟳ Loop** toggle — restart the program automatically on completion (Run only).
+- ☑ **ATC generators rebuilt on the real DDCS dialect** (decoded from the variable DB):
+  drawbar = `M154/M155`, sensor waits = `M300/M302/M303/M304`, dust cover `M305/M306`,
+  pockets from controller tables `#1330+/X #1350+/Y #1370+/Z`, target tool `#1504` (M6 Txx).
+  - **Tool Change** wizard: Manual park (no-ATC machines) / **Auto T.nc-style** pick & place.
+  - **ATC Test** wizard (new): drawbar cycle test + pocket dry-run — the commissioning
+    checks a machinist runs before trusting the first automatic change.
+  - Engine simulates the whole dialect (drawbar handshakes in the truth table, `G4` dwell
+    in ms, `M6` → `#1504`), so all generated macros run end-to-end in the sim.
+  - Warmup fix: `G4 P` is **ms** on DDCS — wizard now converts seconds → ms.
+  - Validated: 8-case engine round trip (`verification/atc-gen-test.mjs`) + `ddcs_lint.py`
+    clean on all five generated macros + 2 e2e wizard tests.
+- ☑ Beep fix: the preview loop no longer beeps every cycle; one beep when an
+  engine run completes.
+- ☑ Viewer: middle-drag pans, Shift+middle orbits (CAD-style).

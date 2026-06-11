@@ -123,7 +123,11 @@ Watch the screen switch pages.
 **Proves:** software button injection works → navigation/file-select/start all become software (no M3K,
 no ESP32). Formula: `#2037 = 65536 + [KeyValue - 1000]`; codes in
 `Virtual_button_function_codes_COMPLETE.xlsx`. Add `G4 P1` between presses.
-**RESULT (A7):** pages switched? ___
+**RESULT (A7):** ✅ **YES — confirmed live 2026-06-10** (fw 2025-06-19-00). A PC-delivered macro pressing
+**MDI page (KeyValue 1348)** switched the running screen to MDI and stayed; `.pos` confirmed it ran. ⚠️ Use a
+**one-way** press to test — the original round-trip (1373→1348→1373) ended on the start page and *looked* like
+nothing happened. ⇒ navigation/file-select/start are now software (see FINDINGS "Control"). Next: A8 (remote
+trigger without a manual Start) + A9 (dispatcher bootstrap).
 
 ## A8 — MDI auto-execute test ⭐ (does the trigger problem vanish?)
 **Needs:** 🟢 · **Goal:** can the PC trigger execution over Ethernet alone — no panel, no hardware?
@@ -133,7 +137,18 @@ no ESP32). Formula: `#2037 = 65536 + [KeyValue - 1000]`; codes in
 (`sysstart.nc`) press the MDI-run virtual button (`#2037`) to fire it?
 **Proves:** if any of these execute `mdiblock` without a manual press → **fully hardware-free remote
 command channel.** This is the single most important unknown in the project.
-**RESULT (A8):** mdiblock executed remotely? how? ___
+**RESULT (A8):** ❌ **NO via file-overwrite — REFUTED 2026-06-10** (fw 2025-06-19-00). The live MDI line is
+**`mdi.nc`** (10 B; `mdiblock` = a 720 B fixed-slot *history* buffer — don't touch). Tested by overwriting
+`mdi.nc` (SYSDISK) with a motion-free SMB-readable sentinel `#150 = 77`:
+(a) **no auto-run** — sentinel unchanged (111) after 20 s untouched;
+(b) **navigating to the MDI page did NOT re-read the file** — the panel still showed the old RAM line
+`g53 z#100`, so the overwrite never reached the live buffer (test gated here — running would have moved Z);
+(c) not run (would have executed the stale RAM line, not ours).
+⇒ **`mdi.nc` is an OUTPUT the panel WRITES, not an input it reads on navigation** — same RAM-vs-disk pattern
+as the V4.1 file-overwrite/self-loop finding. **MDI-file injection is not a remote-trigger channel.** File
+restored to original; sentinel never executed. *Untested:* whether the panel reads `mdi.nc` at **boot**
+(would need a reboot). ⇒ the real remote-trigger path is **A9** — a `sysstart` dispatcher loop using the
+now-confirmed `#2037` to file-select + Start a PC-delivered `.nc` (SMB delivery + `#2037` both proven).
 
 ## A9 — Dispatcher bootstrap + survival (the one wall)
 **Needs:** 🟢 · **Goal:** beat the one-program-at-a-time rule without hardware.
@@ -143,7 +158,31 @@ Start for a job, the job replaces it — does the job's `M30`/chaining relaunch 
 the PC feed commands by writing the variable's backing file over SMB?
 **Proves:** whether a self-sustaining software dispatcher is possible. **Yes → zero hardware forever.
 No → you need exactly one physical Start trigger** (manual button or $6 ESP32), nothing else.
-**RESULT (A9):** dispatcher survives? bootstrap path: ___
+**RESULT (A9):** *in progress.* **A9-a (PC→running-macro inbound via the `uservar` FILE): ❌ REFUTED
+2026-06-10 — clean negative.** Method: a standalone looped macro (NOT sysstart — operator decision:
+sysstart homes at boot = auto-motion, keep it untouched; also it prompts for confirm, so it's not
+zero-touch anyway) spun on `IF [#150==88] GOTO…` (motion-free, Reset-to-stop). The PC wrote `#150=88`
+into CNCDISK/`uservar` over SMB mid-loop: the write **stuck in the file** (no clobber for 18 s) but the
+macro **never reacted**. The syntax caveat was then eliminated by a **self-priming check** (same loop,
+`#150=88` set by the macro itself) → **instant MDI flip** = the `IF [#150==88] GOTO` form works. ⇒ PC
+file-writes genuinely don't reach a running macro's RAM.
+**Bonus finding: the isolation is TWO-WAY** — the check macro's own `#151=1` write was still absent from
+the `uservar` file afterwards (file kept the old 222). ⇒ **`uservar` on disk is a LAZY snapshot, not a
+live mirror** (flush trigger unknown — `[TO TEST]` reboot/shutdown/periodic?). So uservar-over-SMB is
+**not real-time readback** either; live readback stays `MSETDATA` push (checkpoint sentinels).
+**A9-b (Modbus `MGETDATA` inbound pull): ❌ REFUTED 2026-06-10 — the wedge is in the ANALYZER, not the
+serial link.** Method: pymodbus 3.6.9 slave on CNC-FAIRY COM6, **bench-validated answering fc 1/3/4/16**
+(TCP-loopback proof of the same datastore), HOLDING 10-11 seeded; cable **confirmed plugged**; motion-free
+macro `MGETDATA[150,1,10,4,3,300]` + `MSETDATA` echo. Result: controller froze at **"analysis10..."** and
+the slave received **ZERO frames** — the request never reached the wire. ⇒ `MGETDATA` hangs the analysis
+phase *before any serial I/O* on fw 2025-06-19-00; **no slave configuration can fix a request that is never
+sent.** This also corrects the 06-06 diagnosis (same zero-frame analysis-freeze; "slave didn't answer" was
+not the root cause). `MSETDATA` (outbound) still passes analysis + transacts fine.
+**A9 VERDICT: hardware-free inbound-while-running is REFUTED on every path** (program-file reload ✗ Expert
+`M47`; MDI file ✗ A8; uservar file ✗ A9-a; `MGETDATA` ✗ A9-b analyzer wedge). **The dispatcher architecture
+is therefore settled: ONE physical input (C1 — ESP32/opto pulses External Start, ~$6) + everything else
+software** — PC overwrites the selected job file over SMB (Start re-reads disk per-cycle), `MSETDATA`
+checkpoints for readback, `#2037` for panel nav. Cost of the test: one reboot (known wedge class, briefed).
 
 ---
 

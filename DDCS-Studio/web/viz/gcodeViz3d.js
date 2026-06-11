@@ -73,10 +73,10 @@ export class GcodeViz3D {
         this._animPaused = false;
         this._gizmoPx = 60;    // on-screen gizmo size (smaller still in the compact wizard preview)
         this._animRaf = null;
-        this._animDist = 0;
+        this._animDist = 0;   // elapsed program-time (ms) along the animated path
         this._animLast = 0;
-        this._animPts = [];
-        this._animLen = 0;
+        this._animSegs = [];
+        this._animMs = 0;
 
         this._setupJogPendant();
         this._initStaticScene();
@@ -275,32 +275,31 @@ export class GcodeViz3D {
 
     _animTick() {
         if (!this._animOn || !this.active) { this._animRaf = null; return; }
-        const pts = this._animPts;
-        if (pts && pts.length >= 6) {
+        const segs = this._animSegs;
+        if (segs && segs.length) {
             const now = (typeof performance !== 'undefined' ? performance.now() : 0);
             const dt = this._animLast ? Math.min(0.1, (now - this._animLast) / 1000) : 0;
             this._animLast = now;
-            const total = this._animLen || 1;
+            // Advance in program time: the whole path loops in ~5 s, but each segment's
+            // share of it ∝ length/feedrate — slow probes crawl, rapids zip.
+            const total = this._animMs || 1;
             if (!this._animPaused) {
-                this._animDist += (total / 5) * dt; // whole path ~5s
-                if (this._animDist >= total) {       // reached the end → hold 1s + beep, then loop
+                this._animDist += (total / 5) * dt;
+                if (this._animDist >= total) {       // reached the end → hold 1s, then loop (no beep — it loops forever)
                     this._animDist = total;
                     this._animPaused = true;
-                    this._beep();
                     setTimeout(() => { this._animDist = 0; this._animPaused = false; this._animLast = 0; }, 1000);
                 }
             }
             let d = Math.min(this._animDist, total);
-            for (let i = 0; i + 5 < pts.length; i += 3) {
-                const ax = pts[i], ay = pts[i + 1], az = pts[i + 2];
-                const bx = pts[i + 3], by = pts[i + 4], bz = pts[i + 5];
-                const segLen = Math.hypot(bx - ax, by - ay, bz - az);
-                if (d <= segLen || i + 6 >= pts.length) {
-                    const t = segLen > 0 ? d / segLen : 0;
-                    this._animTool.position.set(ax + (bx - ax) * t, ay + (by - ay) * t, az + (bz - az) * t);
+            for (let i = 0; i < segs.length; i++) {
+                const sg = segs[i];
+                if (d <= sg.ms || i === segs.length - 1) {
+                    const t = sg.ms > 0 ? Math.min(1, d / sg.ms) : 1;
+                    this._animTool.position.set(sg.ax + (sg.bx - sg.ax) * t, sg.ay + (sg.by - sg.ay) * t, sg.az + (sg.bz - sg.az) * t);
                     break;
                 }
-                d -= segLen;
+                d -= sg.ms;
             }
             this.render();
         }
@@ -390,11 +389,14 @@ export class GcodeViz3D {
         // The highest probe feed = fast approach; anything slower = the precise re-probe.
         let maxProbeFeed = 0;
         for (const s of this._segs) { if ((s.type === 'probe' || s.probe) && (s.feed || 0) > maxProbeFeed) maxProbeFeed = s.feed; }
-        const animPts = []; // ordered world points along the whole path (for the play animation)
-        const pushPt = (x, y, z) => {
-            const n = animPts.length;
-            if (n >= 3 && animPts[n - 3] === x && animPts[n - 2] === y && animPts[n - 1] === z) return;
-            animPts.push(x, y, z);
+        // Ordered world segments for the play animation, each with its real duration
+        // (length / programmed feedrate) so the loop shows slow probes crawling and
+        // rapids zipping — relative speeds match the program.
+        const animSegs = [];
+        const pushSeg = (ax, ay, az, bx, by, bz, rate) => {
+            const len = Math.hypot(bx - ax, by - ay, bz - az);
+            if (len < 1e-9) return;
+            animSegs.push({ ax, ay, az, bx, by, bz, ms: (len / (rate > 0 ? rate : 600)) * 60000 });
         };
         let bounds = null;
         const grow = (x, y, z) => { bounds = this._growBounds(bounds, x, y, z, x, y, z); };
@@ -404,7 +406,7 @@ export class GcodeViz3D {
             const segs = byPass[p] || [];
             const mk = this.starts[p] || { x: 0, y: 0, z: 0 };
             // manual jog from the previous pass's end to this pass's start marker
-            if (prevEnd) { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(mk.x, mk.y, mk.z); pushPt(prevEnd.x, prevEnd.y, prevEnd.z); pushPt(mk.x, mk.y, mk.z); }
+            if (prevEnd) { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(mk.x, mk.y, mk.z); pushSeg(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z, 6000); }
             let cur = { x: 0, y: 0, z: 0 }; // pass-local, relative to the marker
             for (const s of segs) {
                 const dx = s.x2 - s.x1, dy = s.y2 - s.y1, dz = s.z2 - s.z1;
@@ -433,17 +435,15 @@ export class GcodeViz3D {
                     : type === 'probe' ? (((s.feed || 0) > 0 && (s.feed || 0) < maxProbeFeed) ? probeSlowPos : probeFastPos)
                     : feedPos;
                 arr.push(ax, ay, az, bx, by, bz);
-                pushPt(ax, ay, az); pushPt(bx, by, bz);
+                pushSeg(ax, ay, az, bx, by, bz, (type === 'rapid' || type === 'retract') ? 6000 : (s.feed > 0 ? s.feed : 600));
                 cur = end;
             }
             prevEnd = { x: cur.x + mk.x, y: cur.y + mk.y, z: cur.z + mk.z };
         }
 
-        // Ordered path + total length for the play animation
-        this._animPts = animPts;
-        let alen = 0;
-        for (let i = 0; i + 5 < animPts.length; i += 3) alen += Math.hypot(animPts[i + 3] - animPts[i], animPts[i + 4] - animPts[i + 1], animPts[i + 5] - animPts[i + 2]);
-        this._animLen = alen;
+        // Ordered segments + total program time for the play animation
+        this._animSegs = animSegs;
+        this._animMs = animSegs.reduce((t, s) => t + s.ms, 0);
 
         // Cuts: blue→cyan gradient by depth across the whole scene
         let feedCol = null;
@@ -798,7 +798,9 @@ export class GcodeViz3D {
                 this._setHighlight(g.pass, g.axis);
                 this.renderer.domElement.style.cursor = 'grabbing';
             } else {
-                mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot';
+                // CAD-style: middle = pan, Shift+middle = orbit; left = orbit, right/Shift+left = pan
+                if (e.button === 1) mode = e.shiftKey ? 'rot' : 'pan';
+                else mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot';
                 if (mode === 'rot') this._toPerspective(); // orbit around the framed centre (predictable); pan to recentre
             }
             px = e.clientX; py = e.clientY;

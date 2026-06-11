@@ -18,3 +18,12 @@ output/
 # Generated/temp build artifacts
 **/scripts/tmp_bundle_check.js
 **/tmp_commandDeck_transformed.js
+
+# fairy.exe gateway build (PyInstaller) — artifacts only; build_fairy.ps1 + fairy_gateway.py are tracked
+/build/
+/dist/
+/fairy.exe
+*.spec
+
+# fairy local-backend runtime data (created when the gateway runs with --backend local)
+/_bridge_data/

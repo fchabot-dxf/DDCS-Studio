@@ -323,7 +323,8 @@ export class CommandDeck {
                         <button class="toolbar-btn wizard-btn" style="min-width: 100px;">🔄 ATC ▼</button>
                         <div class="toolbar-dropdown-content">
                             <button onclick="openWiz && openWiz('atc_length')">📏 Tool Length</button>
-                            <button onclick="openWiz && openWiz('atc_change')">⚙️ Carousel Align</button>
+                            <button onclick="openWiz && openWiz('atc_change')">🔧 Tool Change</button>
+                            <button onclick="openWiz && openWiz('atc_test')">🧪 ATC Test</button>
                             <button onclick="openWiz && openWiz('atc_warmup')">🔥 Warm-up</button>
                         </div>
                     </div>

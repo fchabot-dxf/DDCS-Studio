@@ -20,7 +20,9 @@ export default {
     if ("online" in d) return this.renderCloud(d);          // cloud console: read-only
     let cfg = {};
     try { cfg = await ctx.client.getConfig(); } catch { /* keep defaults */ }
-    this.renderSetup(ctx, d, cfg);
+    let prof = null;
+    try { prof = await ctx.client.profile(); } catch { /* controller may be offline */ }
+    this.renderSetup(ctx, d, cfg, prof);
   },
 
   renderCloud(d) {
@@ -41,7 +43,58 @@ export default {
         + "Set it up in the Setup tab of the gateway's own console, on the machine PC."));
   },
 
-  renderSetup(ctx, d, cfg) {
+  // Controller-profile card: what hardware the connected controller actually reports, and whether it
+  // matches the expected baseline. Source "controller" = read live off the machine; "builtin" = the
+  // fallback baseline (controller not read). Validation surfaces a wrong share / decode / ATC-misconfig.
+  profileBlock(prof) {
+    const wrap = el("section", { style: "margin-top:18px" },
+      el("div", { class: "section-label" }, "Controller profile"));
+    if (!prof) {
+      wrap.append(el("div", { class: "muted" }, "controller not read — connect the controller to detect its hardware"));
+      return wrap;
+    }
+    const live = prof.source === "controller";
+    wrap.append(el("div", { class: "row", style: "gap:8px;align-items:center" },
+      el("span", {}, prof.name || prof.id || "—"),
+      el("span", { class: "mono muted", style: "font-size:11px;border:1px solid #3a3a3a;border-radius:4px;padding:1px 6px" },
+        live ? "from controller" : "builtin baseline")));
+
+    const tabs = prof.hardwareTabs || [];
+    const chips = el("div", { class: "row", style: "gap:6px;margin-top:8px;flex-wrap:wrap" },
+      el("span", { class: "muted", style: "font-size:12px" }, "tabs:"));
+    if (tabs.length) {
+      for (const t of tabs) chips.append(el("span",
+        { style: "font-size:11px;background:#26331f;color:#9fd17a;border-radius:4px;padding:1px 7px" }, t));
+    } else chips.append(el("span", { class: "muted", style: "font-size:12px" }, "none"));
+    wrap.append(chips);
+
+    const p = prof.pins;
+    if (p) {
+      const lvl = (n) => (n === 1 ? "P" : "N");
+      const parts = [];
+      if (p.probe) parts.push(`probe IN${p.probe} (${lvl(p.probeLevel)})`);
+      if (p.setter) parts.push(`setter IN${p.setter} (${lvl(p.setterLevel)})`);
+      const lim = Object.keys(p.limits || {}).length;
+      if (lim) parts.push(`${lim} limit input${lim > 1 ? "s" : ""}`);
+      if (parts.length) wrap.append(el("div", { class: "muted mono", style: "font-size:12px;margin-top:6px" }, parts.join("  ·  ")));
+    }
+
+    const v = prof.validation;
+    if (live && v) {
+      if (v.ok) {
+        wrap.append(el("div", { class: "row", style: "gap:6px;margin-top:10px" },
+          el("span", { class: "dot ok" }), el("span", { style: "font-size:12px" },
+            `matches baseline (${v.paramCount} params, anchors OK)`)));
+      } else {
+        wrap.append(el("div", { class: "row", style: "gap:6px;margin-top:10px" },
+          el("span", { class: "dot warn" }), el("span", { style: "font-size:12px" }, "profile mismatch")));
+        for (const w of v.warnings || []) wrap.append(el("div", { class: "hint", style: "color:#d1a35a" }, "• " + w));
+      }
+    }
+    return wrap;
+  },
+
+  renderSetup(ctx, d, cfg, prof) {
     const dest = (cfg.dest || "");
     const isRemote = dest.startsWith("\\\\") || dest.startsWith("//");
     const statusText = !dest ? "no controller set — enter the controller disk below"
@@ -86,6 +139,8 @@ export default {
       el("label", { class: "row", style: "margin-top:12px;gap:6px;cursor:pointer" },
         beacons, "Beacons (Modbus progress — Expert only; leave off for V4.1)"),
       el("div", { class: "row", style: "margin-top:14px" }, save), info,
+
+      this.profileBlock(prof),
       el("div", { class: "wiz-usage" }, `gateway v${d.version || "?"} · backend ${d.backend || "?"}`));
   },
 };
