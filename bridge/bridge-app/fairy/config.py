@@ -3,6 +3,7 @@
 Defaults match the confirmed studio rig (COM6 @ 115200, Expert CNCDISK at 192.168.0.99).
 R2 credentials are read from the environment so secrets never live in the repo.
 """
+import json
 import os
 from dataclasses import dataclass
 
@@ -57,14 +58,36 @@ class Config:
     enable_ws: bool = False                 # --ws: start the WebSocket telemetry server
     ws_port: int = 8766                     # WebSocket bind port (separate from the HTTP port 8765)
 
+    # config.json key (what the Setup UI / set_config writes) -> Config attribute it restores.
+    _PERSIST_KEYS = {
+        "dest": "expert_dest", "machine_name": "machine_name", "machine_id": "machine_id",
+        "com_port": "com_port", "backend": "backend", "enable_slave": "enable_slave",
+    }
+
+    @staticmethod
+    def default_config_path():
+        return os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "config.json")
+
     @classmethod
     def from_env(cls, **overrides):
-        """Build a Config, layering env vars (for secrets) then explicit overrides."""
+        """Build a Config: defaults < env (secrets) < persisted Setup config.json < explicit CLI overrides.
+        Loading the persisted file is what makes Setup survive a relaunch (the gateway reads back what the
+        Setup UI saved); explicit CLI args still win over it."""
         c = cls()
         c.r2_endpoint = os.environ.get("R2_ENDPOINT", c.r2_endpoint)
         c.r2_bucket = os.environ.get("R2_BUCKET", c.r2_bucket)
         c.r2_access_key = os.environ.get("R2_ACCESS_KEY", c.r2_access_key)
         c.r2_secret_key = os.environ.get("R2_SECRET_KEY", c.r2_secret_key)
+        cfg_path = overrides.get("config_path") or cls.default_config_path()
+        try:
+            with open(cfg_path, encoding="utf-8") as f:
+                persisted = json.load(f)
+            for jk, attr in cls._PERSIST_KEYS.items():
+                if persisted.get(jk) is not None:
+                    setattr(c, attr, persisted[jk])
+        except (OSError, ValueError):
+            pass
+        c.config_path = cfg_path
         for k, v in overrides.items():
             if v is not None:
                 setattr(c, k, v)

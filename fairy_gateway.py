@@ -13,6 +13,7 @@ Run (dev):  python fairy_gateway.py            (boots to Setup; configure the
 Extra args pass straight through to the gateway, e.g.:
             python fairy_gateway.py --dest \\\\192.168.0.99\\CNCDISK --port COM6
 """
+import datetime
 import os
 import sys
 import threading
@@ -22,6 +23,42 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOST, PORT = "127.0.0.1", 8765
 TITLE = "CNC-FAIRY Gateway"
+LOG_PATH = os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "fairy.log")
+
+
+class _Tee:
+    """Write to several streams at once (console + log file), tolerating None/closed streams."""
+    def __init__(self, *streams):
+        self.streams = [s for s in streams if s is not None]
+
+    def write(self, data):
+        for s in self.streams:
+            try:
+                s.write(data)
+                s.flush()
+            except Exception:
+                pass
+
+    def flush(self):
+        for s in self.streams:
+            try:
+                s.flush()
+            except Exception:
+                pass
+
+
+def _setup_logging():
+    """Tee stdout/stderr to ~/.ddcs-bridge/fairy.log so the gateway's [bridge] lines are visible even
+    though the pywebview window hides the console. Returns the log path (also exposed in the UI title)."""
+    try:
+        os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+        f = open(LOG_PATH, "a", buffering=1, encoding="utf-8")
+        sys.stdout = _Tee(sys.__stdout__, f)
+        sys.stderr = _Tee(sys.__stderr__, f)
+        print(f"\n=== fairy gateway started {datetime.datetime.now():%Y-%m-%d %H:%M:%S} (pid {os.getpid()}) ===")
+    except Exception as e:
+        print(f"[fairy] could not open log file {LOG_PATH}: {e}", file=sys.stderr)
+    return LOG_PATH
 
 
 def _asset(name):
@@ -45,12 +82,23 @@ def _run_gateway(user_args):
         "--host", HOST, "--http-port", str(PORT),
         "--console", _asset("console"), "--shared", _asset("shared"),
     ]
-    # First-boot safe default: no serial slave unless the user explicitly wires it (avoids a COM-port
-    # open failure on a machine with no SABRENT). Beacons are toggled on later in the Setup tab.
-    if not any(a in user_args for a in ("--port", "--no-slave")):
+    # Safe default: no serial slave unless the user wired it — avoids a COM-port open failure on a box
+    # with no SABRENT. But respect a persisted Beacons=on (Setup), so the saved choice survives relaunch.
+    forced_flags = any(a in user_args for a in ("--port", "--no-slave"))
+    if not forced_flags and not _persisted_beacons_on():
         argv.append("--no-slave")
     argv += user_args
     main(argv)
+
+
+def _persisted_beacons_on():
+    """True if the saved Setup config has Beacons enabled — so we don't force --no-slave over it."""
+    try:
+        import json
+        with open(os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "config.json"), encoding="utf-8") as f:
+            return bool(json.load(f).get("enable_slave"))
+    except Exception:
+        return False
 
 
 def _wait_up(timeout=20):
@@ -66,6 +114,7 @@ def _wait_up(timeout=20):
 
 
 def main():
+    _setup_logging()
     user_args = sys.argv[1:]
     threading.Thread(target=_run_gateway, args=(user_args,), daemon=True).start()
     if not _wait_up():
