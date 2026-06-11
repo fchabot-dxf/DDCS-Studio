@@ -88,14 +88,18 @@ pin = writing a controller parameter** — which is exactly what Studio's Input/
 
 ---
 
-## 6. Profiles — who builds them, and the 4.1 gap
+## 6. Profiles — who builds them (3 controllers, 3 sources)
 
-**Two ways a profile is built (both produce the same shared JSON shape):**
-- **Studio, standalone** — the user builds/edits a profile by hand (the Hardware tabs *are* the editor) and
-  **imports / exports** it as a file. No controller needed. _(This is the no-bridge path.)_
-- **Pulled from the controller (the bridge's job)** — when Studio is bridged, the gateway reads the live
-  controller and hands Studio a profile via `GET /api/profile`. Studio offers it as "… (from controller)".
-  **The bridge is the only thing that talks to the controller**; Studio just consumes/edits the result.
+| Controller | Connectivity | How its profile is built |
+|---|---|---|
+| **Expert / M350** | Modbus + SMB | **bridge pulls it live** (`GET /api/profile`) — DONE |
+| **V4.1** | SMB (bench) | bridge pulls it (once `cfg_utf8` is grabbed) |
+| **3.1** | **offline — no network** | **owner exports settings → Studio parses the export → profile** |
+
+**All three produce the same shared JSON shape.** Three *sources*:
+- **Studio, standalone** — build/edit by hand (the Hardware tabs *are* the editor) and **import / export** as a file. No controller needed.
+- **Pulled from the controller (the bridge's job)** — when Studio is bridged, the gateway reads the live controller and hands Studio a profile. **The bridge is the only thing that talks to the controller.**
+- **Built from an offline controller's settings export (the DDCS 3.1 path)** — the **3.1 has no network**, so it can't be pulled. The owner uses the controller's *export settings* feature to produce a file; Studio (or a desk tool) **parses that export → a profile + a reusable profile template**. **Needs a sample 3.1 export to map its format** (we have no 3.1) — the 3.1's analogue of the Expert's `cfg_utf8`. Distinct from importing a Studio-JSON profile: this parses the *controller's native* dump.
 
 **Expert profile = DONE** (gateway `Ops.profile()`, verified live): `hardwareTabs ["probes","limits"]`, ATC off,
 pins probe=10 / setter=2 / limits{xMin:20, yMax:23, zMax:21}, level `N`/`P` = active-low/high. Decoded from the
