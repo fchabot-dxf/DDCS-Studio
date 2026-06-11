@@ -170,70 +170,150 @@ function gpInit() {
     document.querySelectorAll('#gcodeViz3dContainer .viz3d-views button').forEach((btn) => {
         btn.addEventListener('click', () => { if (gpViz) gpViz.setView(btn.dataset.view); });
     });
-    // Run/stop button for the execution engine
+    // Run / Step / Loop / I/O controls for the execution engine
     const runBtn = document.getElementById('viz3dAnimate');
+    const stepBtn = document.getElementById('viz3dStep');
+    const loopBtn = document.getElementById('viz3dLoop');
+    const ioBtn = document.getElementById('viz3dIO');
     gpRunButton = runBtn;
+    let gpLoopTimer = null;
+    let gpLastRunCode = null;   // code of the last continuous Run (loop restarts this, never a stepped run)
+    const gpCancelLoop = () => { if (gpLoopTimer) { clearTimeout(gpLoopTimer); gpLoopTimer = null; } };
+
+    const speedSel = document.getElementById('viz3dSpeed');
+    const gpSimSpeed = () => {
+        const v = speedSel ? parseFloat(speedSel.value) : 1;
+        return Number.isFinite(v) && v > 0 ? v : 1;
+    };
+
+    function ensureEngine() {
+        if (gpEngine) return gpEngine;
+        const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
+        gpEngine = new GcodeExecutionEngine({
+            stock: cfg && cfg.stock ? cfg.stock : null,
+            autoAnswer: window.ioPanel ? window.ioPanel.isAutoSensors() : true,
+            simSpeed: gpSimSpeed(),
+            onLineChange: ({ lineIndex, raw }) => {
+                if (window.editorManager && typeof window.editorManager.setActiveLine === 'function') {
+                    window.editorManager.setActiveLine(lineIndex);
+                }
+                if (els.status) {
+                    els.status.textContent = `Executing line ${lineIndex + 1}/${gpEngine.totalLines}: ${raw.trim()}`;
+                }
+            },
+            onPositionChange: (pos) => {
+                if (gpViz && typeof gpViz.setToolPosition === 'function') {
+                    gpViz.setToolPosition(pos);
+                }
+            },
+            onStatus: ({ message }) => {
+                gpSetStatus(els.status, message, false);
+            },
+            onWait: (wait) => {
+                // Parked on a sensor wait → surface the I/O panel and pulse the pin
+                if (window.ioPanel) {
+                    if (wait) window.ioPanel.show();
+                    window.ioPanel.setWait(wait);
+                }
+            },
+            onFinish: ({ stats }) => {
+                gpUpdateRunButton();
+                if (window.editorManager && typeof window.editorManager.clearActiveLine === 'function') {
+                    window.editorManager.clearActiveLine();
+                }
+                // One "program done" beep — only if it actually executed something
+                if (stats && stats.steps > 1 && gpViz && typeof gpViz._beep === 'function') gpViz._beep();
+                // Loop: restart the last continuous Run after a short pause
+                if (loopBtn && loopBtn.classList.contains('on') && gpLastRunCode != null) {
+                    gpCancelLoop();
+                    gpLoopTimer = setTimeout(() => {
+                        gpLoopTimer = null;
+                        gpEngine.run(gpLastRunCode);
+                        gpUpdateRunButton();
+                    }, 800);
+                }
+            },
+        });
+        return gpEngine;
+    }
+
+    // Validate before any run/step; show errors in the status bar
+    function gpValidate(code) {
+        const validation = ensureEngine().verifySyntax(code);
+        if (!validation.valid) {
+            const errText = validation.errors.map((err) => `Ln ${err.lineIndex + 1}: ${err.message}`).join('\n');
+            gpSetStatus(els.status, errText, true);
+            return false;
+        }
+        return true;
+    }
+
     if (runBtn) {
         runBtn.classList.remove('on');
         runBtn.textContent = '▶ Run';
         runBtn.title = 'Run the program through the execution engine';
         runBtn.addEventListener('click', () => {
             const code = els.editor ? els.editor.value : '';
-            if (!gpEngine) {
-                const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
-                gpEngine = new GcodeExecutionEngine({
-                    stock: cfg && cfg.stock ? cfg.stock : null,
-                    onLineChange: ({ lineIndex, raw }) => {
-                        if (window.editorManager && typeof window.editorManager.setActiveLine === 'function') {
-                            window.editorManager.setActiveLine(lineIndex);
-                        }
-                        if (els.status) {
-                            els.status.textContent = `Executing line ${lineIndex + 1}/${gpEngine.totalLines}: ${raw.trim()}`;
-                        }
-                    },
-                    onPositionChange: (pos) => {
-                        if (gpViz && typeof gpViz.setToolPosition === 'function') {
-                            gpViz.setToolPosition(pos);
-                        }
-                    },
-                    onStatus: ({ message }) => {
-                        gpSetStatus(els.status, message, false);
-                    },
-                    onFinish: () => {
-                        gpUpdateRunButton(false);
-                        if (window.editorManager && typeof window.editorManager.clearActiveLine === 'function') {
-                            window.editorManager.clearActiveLine();
-                        }
-                    },
-                });
+            const eng = ensureEngine();
+            if (eng.running && !eng.paused) {
+                gpCancelLoop();
+                gpLastRunCode = null;   // explicit stop also stops looping
+                eng.stop();
+            } else if (eng.running && eng.paused) {
+                eng.resume();
+            } else {
+                if (!gpValidate(code)) return;
+                // Disable the independent animation loop; engine drives tool position instead
+                if (gpViz) gpViz.setAnimate(false);
+                gpLastRunCode = code;
+                eng.run(code);
             }
-
-            if (gpEngine.running) {
-                gpEngine.stop();
-                gpUpdateRunButton(false);
-                return;
-            }
-
-            const validation = gpEngine.verifySyntax(code);
-            if (!validation.valid) {
-                const errText = validation.errors.map((err) => `Ln ${err.lineIndex + 1}: ${err.message}`).join('\n');
-                gpSetStatus(els.status, errText, true);
-                return;
-            }
-
-            // Disable the independent animation loop; engine drives tool position instead
-            if (gpViz) gpViz.setAnimate(false);
-            gpEngine.run(code);
-            gpUpdateRunButton(true);
+            gpUpdateRunButton();
+        });
+    }
+    if (stepBtn) {
+        stepBtn.addEventListener('click', () => {
+            const code = els.editor ? els.editor.value : '';
+            const eng = ensureEngine();
+            gpCancelLoop();
+            gpLastRunCode = null;       // stepping is interactive — don't loop it
+            if (!eng.running && !gpValidate(code)) return;
+            if (!eng.running && gpViz) gpViz.setAnimate(false);
+            eng.step(code);   // starts paused from the top, or pauses a continuous run
+            gpUpdateRunButton();
+        });
+    }
+    if (loopBtn) {
+        loopBtn.addEventListener('click', () => {
+            loopBtn.classList.toggle('on');
+            if (!loopBtn.classList.contains('on')) gpCancelLoop();
+        });
+    }
+    if (ioBtn) {
+        ioBtn.addEventListener('click', () => {
+            if (window.ioPanel) window.ioPanel.toggle();
+        });
+    }
+    // The I/O panel's "Auto sensors" checkbox drives the engine's virtual-sensor answers
+    window.addEventListener('ddcs:auto-sensors-changed', (e) => {
+        if (gpEngine) gpEngine.autoAnswer = !!(e.detail && e.detail.on);
+    });
+    // Speed multiplier — takes effect immediately, even mid-move
+    if (speedSel) {
+        speedSel.addEventListener('change', () => {
+            if (gpEngine) gpEngine.simSpeed = gpSimSpeed();
         });
     }
     gpSyncControls();
 
-    function gpUpdateRunButton(running) {
+    function gpUpdateRunButton() {
         if (!gpRunButton) return;
-        gpRunButton.classList.toggle('on', running);
-        gpRunButton.textContent = running ? '⏸ Stop' : '▶ Run';
-        gpRunButton.title = running ? 'Stop execution' : 'Run the program through the execution engine';
+        const running = !!(gpEngine && gpEngine.running);
+        const paused = !!(gpEngine && gpEngine.paused);
+        gpRunButton.classList.toggle('on', running && !paused);
+        gpRunButton.textContent = !running ? '▶ Run' : (paused ? '▶ Resume' : '⏸ Stop');
+        gpRunButton.title = !running ? 'Run the program through the execution engine'
+            : (paused ? 'Resume continuous execution' : 'Stop execution');
     }
     // Stock / machine settings changed → redraw if the 3D drawer is open
     window.addEventListener('ddcs:settings-changed', () => {

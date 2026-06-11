@@ -95,7 +95,6 @@ function buildSettingsOverlay() {
                         <button class="settings-tab" data-target="set_tab_stock" style="background: transparent; border: 1px solid transparent; color: #aaa; padding: 2px 8px; font-size: 10px; cursor: pointer;">STOCK</button>
                         <button class="settings-tab" data-target="set_tab_limits" style="background: transparent; border: 1px solid transparent; color: #aaa; padding: 2px 8px; font-size: 10px; cursor: pointer;">LIMITS</button>
                         <button class="settings-tab" data-target="set_tab_probes" style="background: transparent; border: 1px solid transparent; color: #aaa; padding: 2px 8px; font-size: 10px; cursor: pointer;">PROBES</button>
-                        <button class="settings-tab" data-target="set_tab_io" style="background: transparent; border: 1px solid transparent; color: #aaa; padding: 2px 8px; font-size: 10px; cursor: pointer;">I/O</button>
                     </div>
                     <select id="set_profile" title="Controller profile — decides which hardware tabs (Probes / ATC / Limits) are shown" style="background:#222; color:#ccc; border:1px solid #555; font-size:10px; padding:2px 4px; margin-left:8px;"></select>
                 </div>
@@ -261,26 +260,6 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
-                <!-- IO TAB -->
-                <div id="set_tab_io" style="display:none">
-                    <div class="settings-section">
-                        <div class="settings-section-title">LIVE I/O DIAGNOSTICS</div>
-                        <div class="io-grid-wrapper" style="display:flex; gap: 16px;">
-                            <div class="io-half" style="flex: 1;">
-                                <div class="settings-section-title sub">INPUTS (CLICK TO TRIGGER)</div>
-                                <div class="io-led-grid" id="set_inputs_grid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px;">
-                                    <!-- JS populated -->
-                                </div>
-                            </div>
-                            <div class="io-half" style="flex: 1;">
-                                <div class="settings-section-title sub">OUTPUTS</div>
-                                <div class="io-led-grid" id="set_outputs_grid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px;">
-                                    <!-- JS populated -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
             <div class="settings-foot">
                 <button class="toolbar-btn" id="set_reset">Reset defaults</button>
@@ -451,7 +430,6 @@ function wireSettingsOverlay(ov) {
 
     const closeOv = () => {
         saveSettings();
-        if (window.ioTabManager) window.ioTabManager.stopRefreshLoop();
         ov.classList.remove('active');
         setTimeout(() => { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 300);
     };
@@ -578,17 +556,9 @@ function wireSettingsOverlay(ov) {
             ov.querySelector('#set_tab_limits').style.display = 'none';
             ov.querySelector('#set_tab_probes').style.display = 'none';
             const _atcPanel = ov.querySelector('#set_tab_atc'); if (_atcPanel) _atcPanel.style.display = 'none';
-            ov.querySelector('#set_tab_io').style.display = 'none';
-            
+
             const target = e.target.getAttribute('data-target');
             ov.querySelector('#' + target).style.display = 'block';
-            
-            if (target === 'set_tab_io' && window.ioTabManager) {
-                window.ioTabManager.initSettingsDOM(ov);
-                window.ioTabManager.startRefreshLoop();
-            } else if (window.ioTabManager) {
-                window.ioTabManager.stopRefreshLoop();
-            }
         });
     });
 

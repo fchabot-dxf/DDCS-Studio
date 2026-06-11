@@ -187,11 +187,17 @@ const M3K_TRUTH_TABLE = {
 // Public API
 // ---------------------------------------------------------------------------
 
+/** Pending handshake timers — cancelled on reset so a previous run's in-flight
+ *  pneumatic delay can't flip a sensor in the middle of the next run. */
+const _pendingHandshakes = new Set();
+
 /**
  * Reset all virtual I/O state. Call this at the start of every new program run
  * to avoid stale sensor states from a previous execution bleeding into the next.
  */
 export function resetVirtualIO() {
+    for (const id of _pendingHandshakes) clearTimeout(id);
+    _pendingHandshakes.clear();
     ioState.outputs.clear();
     ioState.inputs.clear();
     console.log('[VIRTUAL IO] State reset — all pins cleared.');
@@ -271,7 +277,8 @@ export function triggerVirtualHandshake(outputPin, state = true) {
         `Simulating ${rule.description} with ${rule.delayMs} ms delay…`
     );
 
-    setTimeout(() => {
+    const id = setTimeout(() => {
+        _pendingHandshakes.delete(id);
         ioState.inputs.set(rule.targetInput, rule.setState);
         console.log(`[VIRTUAL IO] Input ${rule.targetInput} → ${rule.setState} (handshake complete)`);
         _dispatchIoChange(rule.targetInput, rule.setState);
@@ -284,6 +291,7 @@ export function triggerVirtualHandshake(outputPin, state = true) {
             }
         }
     }, rule.delayMs);
+    _pendingHandshakes.add(id);
 }
 
 /**

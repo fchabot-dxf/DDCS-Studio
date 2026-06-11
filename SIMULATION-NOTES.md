@@ -98,7 +98,28 @@ on top.
 
 ## Status / decision
 
-- ☐ **Decision pending:** build the Machine-frame toggle now, or stay program-centric for now.
+- ☑ **Decided (June 2026):** stay program-centric for now — machine frame deferred.
 - ☑ Preview is program-centric (active WCS at origin) — works for cuts + probes.
-- ☐ Machine frame (envelope + origin + `G53` + limit check).
-- ☐ I/O state-stepping (sensor-wait / output simulation).
+- ☐ Machine frame (envelope + origin + `G53` + limit check) — **deferred**.
+- ☑ **I/O state-stepping (sensor-wait / output simulation) — built.**
+  - Floating **Virtual I/O panel** (draggable, resizable; `I/O` button in the 3D drawer):
+    24 inputs (click-to-toggle) + 24 outputs, replaces the Settings I/O tab.
+  - **⏭ Step** button runs one line at a time; **▶ Run / Resume / ⏸ Stop** for continuous.
+  - `M31/M33` waits park execution, auto-show the panel and pulse the waited pin.
+  - **Auto sensors** (default ON): any waited input is answered by a virtual sensor
+    (~0.8 s) — truth-table handshakes still fire with realistic delays. Turn OFF to
+    hand-drive sensors and exercise `IF`/`GOTO` failure branches.
+  - `G31` probe contact now flips the actual probe input pin on the panel (fired at
+    the moment the paced move reaches the contact point).
+  - Tests: `verification/io-sim-test.mjs` (engine, 5 cases) + `tests/io-sim.spec.js` (e2e, 5 pass).
+- ☑ **Feedrate-true playback.**
+  - Engine Run interpolates each move in real time: distance ÷ programmed `F`
+    (rapids at 6000 mm/min) — slow probes crawl, rapids zip. **Speed** selector in
+    the drawer (1× / 2× / 5× / 10× / MAX), changeable mid-move.
+  - Status shows the move: `G31 probe 10.0 mm at F50 — 12.0 s`.
+  - The looping ▶ Play preview animation is also feedrate-proportional now
+    (segment time ∝ length/feed within the ~5 s loop).
+- ☑ **⟳ Loop** toggle — restart the program automatically on completion (Run only).
+- ☑ Beep fix: the preview loop no longer beeps every cycle; one beep when an
+  engine run completes.
+- ☑ Viewer: middle-drag pans, Shift+middle orbits (CAD-style).
