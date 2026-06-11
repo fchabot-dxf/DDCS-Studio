@@ -12,6 +12,7 @@
 import { UIUtils } from './uiUtils.js';
 import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile, registerProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { makeClient } from '../shared/js/client.js';
+import { renderIoTable } from './ioTable.js';
 
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 const SETTINGS_DEFAULTS = {
@@ -165,8 +166,8 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="general" data-target="set_tab_network">Network</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_machine">Machine</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_stock">Stock</button>
-                    <button class="settings-tab" data-group="hardware" data-target="set_tab_limits">Limits</button>
-                    <button class="settings-tab" data-group="hardware" data-target="set_tab_probes">Probes</button>
+                    <button class="settings-tab" data-group="hardware" data-target="set_tab_input">Input</button>
+                    <button class="settings-tab" data-group="hardware" data-target="set_tab_output">Output</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_atc">ATC</button>
                 </div>
             </div>
@@ -314,6 +315,24 @@ function buildSettingsOverlay() {
                             <label>Height<input type="number" id="set_setter_h" step="0.1" min="1"></label>
                         </div>
                         <div class="settings-hint">Used by generators for G31 commands, and by engine to simulate physical collisions accurately.</div>
+                    </div>
+                </div>
+
+                <!-- HARDWARE: INPUT -->
+                <div id="set_tab_input" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">INPUTS</div>
+                        <div class="settings-hint">Add the inputs your machine has — probes, limit switches, sensors. Pins 1–24, one use each. Wizards read probe pins from here.</div>
+                        <div id="io_input_table"></div>
+                    </div>
+                </div>
+
+                <!-- HARDWARE: OUTPUT -->
+                <div id="set_tab_output" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">OUTPUTS</div>
+                        <div class="settings-hint">Coolant, drawbar, dust cover, etc. Pins 1–20. The ATC tab adds its drawbar / dust-cover / carousel-rotate here.</div>
+                        <div id="io_output_table"></div>
                     </div>
                 </div>
 
@@ -605,7 +624,7 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V9.70\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V9.71\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 
@@ -626,10 +645,12 @@ function wireSettingsOverlay(ov) {
     const subTabs = [...ov.querySelectorAll('.settings-subtabs .settings-tab')];
     const subRow = ov.querySelector('.settings-subtabs');
     const ALL_IDS = ['set_tab_profile', 'set_tab_variables', 'set_tab_feedback', 'set_tab_network',
-                     'set_tab_machine', 'set_tab_stock', 'set_tab_limits', 'set_tab_probes', 'set_tab_atc'];
+                     'set_tab_machine', 'set_tab_stock', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
         subTabs.forEach(b => b.classList.toggle('active', b.dataset.target === id));
+        if (id === 'set_tab_input') renderIoTable(ov.querySelector('#io_input_table'), 'input', getInputs(), syncIO);
+        if (id === 'set_tab_output') renderIoTable(ov.querySelector('#io_output_table'), 'output', getOutputs(), syncIO);
     }
     function showGroup(g) {
         mainTabs.forEach(b => b.classList.toggle('active', b.dataset.group === g));

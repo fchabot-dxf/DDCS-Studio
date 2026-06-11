@@ -27,7 +27,12 @@ Hardware         Machine   (single config)
 - **Two `+Add` scopes:**
   - per-tab **`+Add`** (inside Input / Output) → adds a **row** (a part).
   - L2 **`+Add`** (beside the sub-tabs) → adds a whole **category tab** (ATC today; room for more).
-- Machine + Stock stay single-config. ATC is an added L2 category (pockets / tool-table / drawbar / sensors).
+- Machine + Stock stay single-config. **ATC is a subsystem (its own L2 category tab), not an input or output.** Only *some* of its parts are I/O.
+  - **Adding the ATC category auto-adds only the standard, non-optional parts** — **drawbar** output (M154/M155) always; **+ carousel-rotate output + pocket/index sensor input** when the magazine type is **disk** (both required for it to run) — with **pins blank**, all **removable**. **Optional parts (tool-present sensor, dust cover, …) are added manually** via the ATC tab's Add.
+  - **The ATC tab also has its own "+ Add input / + Add output"** for extras. Rows (auto or manual) are tagged **`group:'atc'`** and **mirrored into the global Input/Output tables** — same underlying row in `inputs[]`/`outputs[]`, editable from either place, one pin map (a small "ATC" badge marks them in the global tables).
+  - **Outputs:** drawbar (lock/unlock) · dust cover · (disk) carousel rotate.
+  - **Inputs:** tool-present sensor · drawbar-clamped sensor · (disk) pocket/index sensor.
+  - **ATC tab only (neither):** magazine type · magazine table (pocket·tool#·name·park XYZ) · tool-offset table · tool-length-probe defaults.
   - **Magazine type: Straight | Disk** — the tool-change wizard branches on it:
     - **Straight / linear — FULL support.** Settings hold the **magazine count (N pockets)** + a **magazine table** — one row per pocket: **pocket # · tool # · name · park X · Y · Z** (editable in Settings). The tool-change macro `G53`-moves to the pocket's park XYZ; the generator can push the positions to the controller (`#1330+`/`#1350+`/`#1370+`). [CONFIRMED path].
     - **Disk/carousel** = one fixed pickup XYZ + rotate-to-pocket, driven by a **rotate output + index-sensor input** (from the I/O list) + pocket count + CW/CCW shortest-path + datum pocket. No hardcoded rotate M-code; validate against the real magazine.
