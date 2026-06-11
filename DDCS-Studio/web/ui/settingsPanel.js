@@ -155,12 +155,15 @@ function buildSettingsOverlay() {
                             <button class="settings-main-tab active" data-group="general">General</button>
                             <button class="settings-main-tab" data-group="hardware">Hardware</button>
                         </div>
-                        <select id="set_profile" title="Controller profile — presets the hardware tabs" style="background:#222; color:#ccc; border:1px solid #555; font-size:10px; padding:2px 4px; margin-left:8px;"></select>
                     </div>
                     <span class="settings-close" title="Close">✕</span>
                 </div>
                 <div class="settings-subtabs" style="display: none; gap: 6px; padding-top: 8px; flex-wrap: wrap;">
-                    <button class="settings-tab active" data-group="hardware" data-target="set_tab_machine">Machine</button>
+                    <button class="settings-tab active" data-group="general" data-target="set_tab_profile">Profile</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_network">Network</button>
+                    <button class="settings-tab" data-group="hardware" data-target="set_tab_machine">Machine</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_stock">Stock</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_limits">Limits</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_probes">Probes</button>
@@ -168,16 +171,14 @@ function buildSettingsOverlay() {
                 </div>
             </div>
             <div class="settings-body">
-                <!-- GENERAL TAB -->
-                <div id="set_tab_general">
+                <!-- GENERAL: PROFILE -->
+                <div id="set_tab_profile">
                     <div class="settings-section">
-                        <div class="settings-section-title">CONTROLLER / HARDWARE TABS</div>
+                        <div class="settings-section-title">CONTROLLER PROFILE</div>
                         <div class="settings-row">
-                            <label style="margin-right:12px;"><input type="checkbox" id="set_show_probes"> Probes</label>
-                            <label style="margin-right:12px;"><input type="checkbox" id="set_show_atc"> ATC</label>
-                            <label><input type="checkbox" id="set_show_limits"> Limits</label>
+                            <select id="set_profile" title="Controller profile — presets the hardware your machine has" style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
                         </div>
-                        <div class="settings-hint">Show only the tabs your machine has — these drive the simulation, so it works with no controller connected. The controller profile (top-right) presets them; toggle to add/remove.</div>
+                        <div class="settings-hint">Presets which hardware your machine has (DDCS Expert, 4.1, …). You still add/remove inputs &amp; outputs in the Hardware tabs.</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">PROFILE (settings + variables)</div>
@@ -187,7 +188,14 @@ function buildSettingsOverlay() {
                         </div>
                         <div class="settings-hint">One JSON with your machine/stock/limits + user variables. The desktop app saves it to a local file automatically.</div>
                     </div>
+                    <!-- legacy hardware-tab toggles kept hidden so profile gating still works (replaced by the Input/Output tables) -->
+                    <div style="display:none">
+                        <input type="checkbox" id="set_show_probes"><input type="checkbox" id="set_show_atc"><input type="checkbox" id="set_show_limits">
+                    </div>
+                </div>
 
+                <!-- GENERAL: VARIABLES -->
+                <div id="set_tab_variables" style="display:none">
                     <div class="settings-section">
                         <div class="settings-section-title">VARIABLES (CSV)</div>
                         <div class="settings-row">
@@ -196,12 +204,23 @@ function buildSettingsOverlay() {
                             <span class="settings-hint" id="set_var_count"></span>
                         </div>
                     </div>
+                </div>
 
+                <!-- GENERAL: FEEDBACK -->
+                <div id="set_tab_feedback" style="display:none">
                     <div class="settings-section">
                         <div class="settings-section-title">FEEDBACK</div>
                         <div class="settings-row">
                             <button class="toolbar-btn settings-io" id="set_report">🐛 Report a bug</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- GENERAL: NETWORK (stub) -->
+                <div id="set_tab_network" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">NETWORK</div>
+                        <div class="settings-hint">Coming soon — controller connection (IP / port), live DRO, and program upload over the network.</div>
                     </div>
                 </div>
 
@@ -586,7 +605,7 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V9.69\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V9.70\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 
@@ -606,17 +625,18 @@ function wireSettingsOverlay(ov) {
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
     const subTabs = [...ov.querySelectorAll('.settings-subtabs .settings-tab')];
     const subRow = ov.querySelector('.settings-subtabs');
-    const HW_IDS = ['set_tab_machine', 'set_tab_stock', 'set_tab_limits', 'set_tab_probes', 'set_tab_atc'];
+    const ALL_IDS = ['set_tab_profile', 'set_tab_variables', 'set_tab_feedback', 'set_tab_network',
+                     'set_tab_machine', 'set_tab_stock', 'set_tab_limits', 'set_tab_probes', 'set_tab_atc'];
     function showPanel(id) {
-        const gen = ov.querySelector('#set_tab_general'); if (gen) gen.style.display = (id === 'set_tab_general') ? 'block' : 'none';
-        HW_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
+        ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
         subTabs.forEach(b => b.classList.toggle('active', b.dataset.target === id));
     }
     function showGroup(g) {
         mainTabs.forEach(b => b.classList.toggle('active', b.dataset.group === g));
-        if (g === 'general') { subRow.style.display = 'none'; showPanel('set_tab_general'); return; }
         subRow.style.display = 'flex';
-        const firstVisible = subTabs.find(b => b.style.display !== 'none') || subTabs[0];
+        subTabs.forEach(b => { b.style.display = (b.dataset.group === g) ? '' : 'none'; });
+        if (g === 'hardware') applyHardwareTabs();   // re-hide hardware sub-tabs the profile turned off
+        const firstVisible = subTabs.find(b => b.dataset.group === g && b.style.display !== 'none');
         if (firstVisible) showPanel(firstVisible.dataset.target);
     }
     mainTabs.forEach(t => t.addEventListener('click', () => showGroup(t.dataset.group)));
