@@ -29,9 +29,13 @@ Goal: deliver + run jobs on the Expert from the PC with **zero added hardware**.
 | Read back machine state | SMB decode of `uservar`/`setting`; Modbus `MSETDATA` push | ✅ `[CONFIRMED]` (checkpoint sentinels, no wedge) |
 | Press panel keys from a macro | `#2037` virtual buttons (`65536+[KeyValue−1000]`) | ✅ **`[CONFIRMED LIVE 2026-06-10]`** (A7) |
 | Trigger a run with **no** panel touch | overwrite `mdi.nc` | ❌ **REFUTED 2026-06-10** (A8 — MDI line is RAM) |
-| Keep an executor alive to press Start | `sysstart.nc` dispatcher loop + `#2037` | ⬚ **OPEN — next: A9** |
+| Feed a command to a *running* macro | PC write into `uservar` file | ❌ **REFUTED 2026-06-10** (A9-a — RAM/file isolated both ways) |
+| Controller pulls commands from the PC | Modbus `MGETDATA` | ❌ **REFUTED 2026-06-10** (A9-b — wedges the *analyzer*, zero frames sent) |
+| Pulse External Start from the PC | ESP32 + opto on a Start input (C1) | ⬚ **THE PATH** — ~$6, the one physical link |
 
-⇒ delivery + readback + button-injection are proven; the **one remaining wall is the run trigger** (A9).
+⇒ **A9 verdict: hardware-free inbound is refuted on every path.** The dispatcher architecture is settled:
+**one physical Start input (C1)** + everything else software — PC overwrites the selected job over SMB
+(Start re-reads disk per-cycle), `MSETDATA` checkpoints back, `#2037` for panel nav.
 
 ---
 
@@ -47,7 +51,7 @@ Goal: deliver + run jobs on the Expert from the PC with **zero added hardware**.
 | A5/A8 | Inject a single line via `mdi.nc`/`mdiblock` + trigger MDI | ❌ refuted | Expert | `mdi.nc` is panel **output** (RAM line); overwrite doesn't reach the live buffer |
 | A6 | Macro-hook survey (`error/pause/key-1..7/ext_button/probe/fnd*`) | 🟡 | Expert | hooks catalogued in FINDINGS "Macro hooks"; signal-out per hook still partial |
 | **A7** | **`#2037` virtual buttons press panel keys** | ✅ **LIVE** | **Expert 2026-06-10** | nav/file-select/start are software now (MDI page 1348, Monitor 1373) |
-| **A9** | **`sysstart.nc` dispatcher loop survives + bootstraps runs** | ⬚ **next** | Expert | ⚠️ motion-capable — the one wall; does a job's `M30` relaunch the dispatcher? |
+| **A9** | **Hardware-free dispatcher (inbound to a running macro)** | ❌ **refuted** | **Expert 2026-06-10** | a: `uservar` file ↔ RAM isolated 2-way · b: `MGETDATA` wedges the analyzer (zero frames, cable+slave proven) ⇒ **C1 is the path** |
 
 ## Track B — Desk research / firmware mining 🟢 (no machine)
 | # | Test | Status | Note |
@@ -60,7 +64,7 @@ Goal: deliver + run jobs on the Expert from the PC with **zero added hardware**.
 ## Track C — Control bridge 🔵 (ESP32 ~$6) — *mostly obviated by A7*
 | # | Test | Status | Note |
 |---|---|---|---|
-| C1 | Run control via External Start/Pause/Estop inputs | 🔵 fallback | the $6 physical-Start path **if A9 fails** |
+| C1 | Run control via External Start/Pause/Estop inputs | 🔵 **THE PATH** | A9 refuted hardware-free inbound ⇒ this is the dispatcher's one physical link (ESP32 + PC817 optos, ~$6) |
 | C2 | Full navigation via M3K serial emulation | ~~obsolete~~ | superseded by `#2037` (A7) — no ESP32/serial needed |
 | C3 | Hardware error readback (spare output → ESP32) | 🔵 optional | low-latency fault line vs SMB polling |
 | C4 | Variable-to-button high-level macro triggers | 🟡 | overlaps `#2037` + `key-1..7.nc` hooks |
@@ -82,16 +86,24 @@ Goal: deliver + run jobs on the Expert from the PC with **zero added hardware**.
 ---
 
 ## Next up (prioritized)
-1. **A9 — dispatcher bootstrap** (⚠️ motion; needs an E-stop story) — the last autonomy wall.
+1. **C1 — buy + wire the physical-input link** (the dispatcher's one hardware piece). Options, by budget:
+   - *Easiest (~$20–35):* USB relay+opto-input board on CNC-FAIRY — Python-driven, zero firmware.
+   - *Best stack-fit (~$25–40):* **Modbus-RTU DIN I/O module + USB-RS485 dongle** — driven by the same
+     pymodbus stack just bench-proven; isolated 24V inputs ready for C3 (error line). ← preferred
+   - *Most powerful (~$40–70):* ESP32 DIN I/O w/ Ethernet (ESPHome) — network API + can host the E4
+     **hardware watchdog** (NC relay in the hold/E-stop chain, drops if the PC dies).
+   Wiring (any tier): relay contact shorts the mapped External-Start input to `COM-` for ~150 ms.
 2. **A2b / B4 — alarm-code variable** (⚠️ wedge-prone) — completes error readback.
-3. **Desk wins (safe):** linter G/M-landmine scan + flag live `MGETDATA`; conformance corpus vs the ~70
-   captured macros; ship the V4.1 builtin profile + `schema.json`.
+3. **Desk wins (safe):** linter G/M-landmine scan + **hard-error on any `MGETDATA`** (refuted primitive);
+   conformance corpus vs the ~70 captured macros; ship the V4.1 builtin profile + `schema.json`.
 4. **Untested, 🟢:** does the panel read `mdi.nc` at **boot**? (the one A8 path left open — needs a reboot).
 
 ## Recently done
 - **Controller profiles (Phase 5)** — `Ops.profile()` returns a live profile (tabs + `pins`) + startup/UI
   validation. [`PROFILE_BUILD_TASK.md`](bridge/controllers/expert-m350/PROFILE_BUILD_TASK.md) complete.
-- **A7** `#2037` confirmed live. · **A8** MDI file-injection refuted.
+- **A7** `#2037` confirmed live. · **A8** MDI file-injection refuted. · **A9-a/b** hardware-free inbound
+  refuted (uservar 2-way RAM/file isolation; `MGETDATA` = analyzer wedge, zero frames) → **C1 settled as
+  the architecture**. Bonus: `uservar` disk file is a lazy snapshot (not live readback).
 
 ## Safety (non-negotiable, any machine-side test)
 - **Read-only by default.** SMB reads are safe; **param changes are made by the human on the panel**, then

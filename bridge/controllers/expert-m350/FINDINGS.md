@@ -20,16 +20,16 @@ bench-proven. **Do not assume V4.1 findings carry over** — see [`../README.md`
   - Args: X1=start var, X2=slave#, X3=start **register address**, X4=length in **bytes** (reg=2 bytes),
     **X5 = Modbus function code** (16=write-multiple per the MSETDATA example; 1=read in the MGETDATA
     example), X6=var receiving the **exception code** (0=OK). Controller pauses ~16 s for a reply.
-  - ⚠️⚠️⚠️ **`MGETDATA` (inbound pull) HARD-WEDGES the controller — REQUIRED A REBOOT** (live `mgetdata.nc`
-    test, studio 2026-06-06). The screen **froze** and did **not** recover on its own (not a 16 s timeout) —
-    a full reboot was needed, **same severity class as the `#1630` analyzer wedge.** `[CONFIRMED 2026-06-06]`
-    ⇒ **`MGETDATA` is the dangerous direction; `MSETDATA` (outbound push) is the proven-safe one.** Likely
-    cause: the PC slave did not answer the request (wrong register address `X3` / function code `X5` /
-    slave-id `X2`, or not serving that address), so the controller blocked forever instead of timing out.
-    **Do NOT run `MGETDATA` live** until the PC slave is proven to answer the exact registers with the
-    matching read function code (`X5`=1 coils / 3 holding / 4 input) for that slave — ideally validated
-    against a bench Modbus master first. Treat like `#1630`: each bad test = a reboot. **The linter should
-    flag live `MGETDATA` without a confirmed-responding slave.**
+  - ⚠️⚠️⚠️ **`MGETDATA` = REFUTED on this firmware — it wedges the ANALYZER, not the serial link.
+    `[CONFIRMED 2026-06-10, fw 2025-06-19-00 — A9-b]`** Re-tested with every excuse removed: pymodbus
+    3.6.9 slave on COM6 **bench-validated answering fc 1/3/4/16**, registers seeded, **cable confirmed
+    plugged**, motion-free macro. The controller froze at **"analysis10..."** and the slave received
+    **ZERO frames** — the request is never sent; the hang is in the **analysis phase before any serial
+    I/O**. ⇒ no slave configuration can ever fix it; **do not run `MGETDATA` on this firmware, period**
+    (each attempt = a reboot). This corrects the 06-06 diagnosis ("slave didn't answer" — same zero-frame
+    analysis-freeze, so the slave was never the variable). `MSETDATA` (outbound push) passes analysis and
+    transacts fine — it remains the proven-safe direction. **Inbound-while-running has NO working channel
+    on the Expert** (see A8/A9 in EXPERIMENTS): the dispatcher needs **one physical Start input (C1)**.
   - ⭐ **Each var #50–#499 carries exactly ONE byte (decimal 0–255)** — `MSETDATA` byte-packs them
     two-per-register. To move a value >255 (e.g. an error code), split/join with **`MDATA2BYTE`** /
     **`MBYTE2DATA`** across consecutive vars. `[CONFIRMED via RU manual `Инструкция.txt` 2026-06-06]`

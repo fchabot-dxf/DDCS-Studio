@@ -170,8 +170,19 @@ file-writes genuinely don't reach a running macro's RAM.
 the `uservar` file afterwards (file kept the old 222). ⇒ **`uservar` on disk is a LAZY snapshot, not a
 live mirror** (flush trigger unknown — `[TO TEST]` reboot/shutdown/periodic?). So uservar-over-SMB is
 **not real-time readback** either; live readback stays `MSETDATA` push (checkpoint sentinels).
-Remaining A9 inbound paths: **Modbus `MGETDATA`** (the documented pull — needs a proven-responding PC
-slave first; wedge-risk otherwise) or **one physical Start input** (ESP32/C1). Vars + controller cleaned.
+**A9-b (Modbus `MGETDATA` inbound pull): ❌ REFUTED 2026-06-10 — the wedge is in the ANALYZER, not the
+serial link.** Method: pymodbus 3.6.9 slave on CNC-FAIRY COM6, **bench-validated answering fc 1/3/4/16**
+(TCP-loopback proof of the same datastore), HOLDING 10-11 seeded; cable **confirmed plugged**; motion-free
+macro `MGETDATA[150,1,10,4,3,300]` + `MSETDATA` echo. Result: controller froze at **"analysis10..."** and
+the slave received **ZERO frames** — the request never reached the wire. ⇒ `MGETDATA` hangs the analysis
+phase *before any serial I/O* on fw 2025-06-19-00; **no slave configuration can fix a request that is never
+sent.** This also corrects the 06-06 diagnosis (same zero-frame analysis-freeze; "slave didn't answer" was
+not the root cause). `MSETDATA` (outbound) still passes analysis + transacts fine.
+**A9 VERDICT: hardware-free inbound-while-running is REFUTED on every path** (program-file reload ✗ Expert
+`M47`; MDI file ✗ A8; uservar file ✗ A9-a; `MGETDATA` ✗ A9-b analyzer wedge). **The dispatcher architecture
+is therefore settled: ONE physical input (C1 — ESP32/opto pulses External Start, ~$6) + everything else
+software** — PC overwrites the selected job file over SMB (Start re-reads disk per-cycle), `MSETDATA`
+checkpoints for readback, `#2037` for panel nav. Cost of the test: one reboot (known wedge class, briefed).
 
 ---
 
