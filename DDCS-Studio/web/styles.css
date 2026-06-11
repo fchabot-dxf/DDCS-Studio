@@ -1563,7 +1563,7 @@ Middle (handle) {
 [data-theme="studio"] #editor-highlight,
 [data-theme="studio"] #editor,
 [data-theme="studio"] .editor {
-    margin: 0; padding: 14px 16px;
+    margin: 0; padding: 14px 16px 14px 52px;   /* left clears the line-number gutter */
     font-family: var(--mono); font-size: 15px; line-height: 1.6;
     background: #000; white-space: pre; tab-size: 4; border: 0;
 }
@@ -1970,7 +1970,7 @@ body #editor.editor-layer {
     left: 0;
     width: 100%;
     height: 100%;
-    padding: 20px;
+    padding: 20px 20px 20px 52px;   /* left padding clears the line-number gutter */
     margin: 0;
     border: none !important;
     font-family: monospace;
@@ -1992,11 +1992,35 @@ body #editor.editor-layer {
 
 #editor-highlight .g-line {
     display: block;
+    min-height: 1.6em;   /* empty lines stay one row tall so the highlight matches the textarea */
 }
 
 #editor-highlight .g-line.active-line {
     background: rgba(64, 110, 171, 0.22);
 }
+
+/* Line-number gutter — dark grey, left, scroll-synced with the editor */
+#editor-gutter {
+    position: absolute;
+    top: 0; left: 0;
+    width: 44px;
+    height: 100%;
+    padding: 20px 8px 20px 0;
+    margin: 0;
+    box-sizing: border-box;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    text-align: right;
+    color: #5a5a5a;
+    background: #000;
+    white-space: pre;
+    overflow: hidden;
+    pointer-events: none;
+    user-select: none;
+    z-index: 3;
+}
+[data-theme="studio"] #editor-gutter { font-size: 15px; padding: 14px 8px 14px 0; }
 
 #editor.editor-layer {
     z-index: 2;
@@ -2641,8 +2665,13 @@ body[data-theme="studio"] .dock-body .ddcs-tab.active {
     position: static;
     margin-top: 8px;
 }
-.viz3d-hint { bottom: 6px; left: 50%; transform: translateX(-50%); color: #6f8aa0; pointer-events: none; }
-.viz3d-controls { position: absolute; bottom: 6px; right: 8px; z-index: 3; display: flex; gap: 6px; align-items: center; }
+.viz3d-hint { display: none; } /* was a long central line that overlapped the legend + controls */
+.viz3d-controls {
+    position: absolute; bottom: 6px; right: 8px; z-index: 6;
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end;
+    max-width: 64%;
+    background: rgba(0, 0, 0, 0.62); padding: 4px 6px; border-radius: 8px;  /* float over the canvas */
+}
 .viz3d-controls label { font-size: 10px; color: #9fc4e6; display: flex; align-items: center; gap: 4px; }
 .viz3d-controls select,
 .viz3d-controls button,
@@ -2665,7 +2694,7 @@ body[data-theme="studio"] .dock-body .ddcs-tab.active {
     border-radius: 4px !important;
 }
 .wiz-viz3d .viz3d-controls button.on { background: rgba(40, 120, 80, 0.8) !important; border-color: #4dff7a !important; color: #eaffea !important; }
-.viz3d-legend { position: absolute; bottom: 6px; left: 8px; z-index: 3; display: flex; flex-wrap: wrap; gap: 9px; font-size: 10px; color: #9aa8b8; }
+.viz3d-legend { position: absolute; bottom: 6px; left: 8px; z-index: 3; display: flex; flex-wrap: wrap; gap: 9px; font-size: 10px; color: #9aa8b8; max-width: 32%; }
 .viz3d-legend span { display: flex; align-items: center; gap: 4px; }
 .viz3d-legend i { width: 11px; height: 3px; border-radius: 2px; display: inline-block; }
 .viz3d-views { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 3; display: flex; gap: 4px; }

@@ -22,17 +22,31 @@ export class EditorManager {
     setupSync() {
         if (!this.editor || !this.highlight) return;
 
+        // Line-number gutter (dark grey, left), scroll-synced with the editor.
+        this.gutter = el('editor-gutter');
+        if (!this.gutter && this.editor.parentElement) {
+            this.gutter = document.createElement('div');
+            this.gutter.id = 'editor-gutter';
+            this.gutter.setAttribute('aria-hidden', 'true');
+            this.editor.parentElement.insertBefore(this.gutter, this.editor);
+        }
+
         const syncText = () => {
             let code = this.editor.value;
             // Critical: Add space if ends in newline to prevent cursor disappearance
             if (code.endsWith('\n')) code += ' ';
-            this.highlight.innerHTML = UIUtils.formatGCode(code);
+            // .g-line is display:block, so drop formatGCode's inter-line "\n" — otherwise each
+            // line breaks twice (block + newline) and the highlight no longer aligns with the
+            // single-spaced textarea (the click→cursor mapping drifts).
+            this.highlight.innerHTML = UIUtils.formatGCode(code).replace(/\n/g, '');
+            this._updateGutter();
             this._restoreActiveLine();
         };
 
         const syncScroll = () => {
             this.highlight.scrollTop = this.editor.scrollTop;
             this.highlight.scrollLeft = this.editor.scrollLeft;
+            if (this.gutter) this.gutter.scrollTop = this.editor.scrollTop;
         };
 
         this.editor.addEventListener('input', syncText);
@@ -40,6 +54,12 @@ export class EditorManager {
 
         // Initial sync
         syncText();
+    }
+
+    _updateGutter() {
+        if (!this.gutter) return;
+        const n = Math.max(1, this.editor.value.split('\n').length);
+        this.gutter.textContent = Array.from({ length: n }, (_, i) => i + 1).join('\n');
     }
 
     setupBackspaceButton() {
