@@ -184,6 +184,7 @@ function buildSettingsOverlay() {
                         <div class="settings-section-title">CONTROLLER PROFILE</div>
                         <div class="settings-row">
                             <select id="set_profile" title="Controller profile — presets the hardware your machine has" style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
+                            <button class="toolbar-btn settings-io" id="set_profile_pull" title="Fetch this machine's profile (tabs + pins) from the bridged controller. Offline controllers like the DDCS 3.1: use Import profile.">↧ Pull from controller</button>
                         </div>
                         <div class="settings-hint">Presets which hardware your machine has (DDCS Expert, 4.1, …). You still add/remove inputs &amp; outputs in the Hardware tabs.</div>
                     </div>
@@ -495,6 +496,53 @@ function wireSettingsOverlay(ov) {
                 }).catch(() => { /* gateway offline / no /api/profile — leave builtins */ });
             }
         } catch (e) { /* localStorage blocked — skip */ }
+
+        // Explicit "Pull from controller" — fetch /api/profile and apply its tabs + pin map → inputs[].
+        const pullBtn = q('set_profile_pull');
+        if (pullBtn) pullBtn.addEventListener('click', async () => {
+            if (!localStorage.getItem('ddcs_api')) { alert('Not bridged to a controller. Set the gateway URL (?api=) to pull a live profile. Offline controllers like the DDCS 3.1: use Import profile with the exported settings.'); return; }
+            const orig = pullBtn.textContent; pullBtn.disabled = true; pullBtn.textContent = 'Pulling…';
+            try {
+                const p = await makeClient().profile();
+                if (!p || !p.id) { alert('The gateway returned no profile.'); return; }
+                if (!confirm('Pull "' + p.name + '" from the controller? This replaces the current hardware tabs and Input/Output list with the controller values.')) return;
+                registerProfile(p); setActiveProfile(p.id);
+                applyControllerProfile(p);
+                fillProfileOptions();
+                const it = ov.querySelector('#io_input_table'); if (it) renderIoTable(it, 'input', getInputs(), syncIO);
+                const ot = ov.querySelector('#io_output_table'); if (ot) renderIoTable(ot, 'output', getOutputs(), syncIO);
+                alert('Pulled "' + p.name + '": ' + getInputs().length + ' inputs configured.');
+            } catch (e) { alert('Pull failed: ' + (e && e.message ? e.message : e)); }
+            finally { pullBtn.disabled = false; pullBtn.textContent = orig; }
+        });
+    }
+
+    // Apply a controller-sourced profile (from the gateway): set hardware tabs + rebuild inputs[] from its pin map.
+    function applyControllerProfile(p) {
+        if (!p) return;
+        if (Array.isArray(p.hardwareTabs)) {
+            _ddcsSettings.hardwareTabs = {
+                probes: p.hardwareTabs.includes('probes'),
+                atc: p.hardwareTabs.includes('atc'),
+                limits: p.hardwareTabs.includes('limits'),
+            };
+        }
+        const pn = p.pins;
+        if (pn) {
+            const ins = [];
+            if (pn.probe !== '' && pn.probe != null) ins.push({ id: 'probe', type: 'probe', label: '3D Probe', pin: pn.probe, level: pn.probeLevel || 0 });
+            if (pn.setter !== '' && pn.setter != null) ins.push({ id: 'setter', type: 'setter', label: 'Tool Setter', pin: pn.setter, level: pn.setterLevel || 0, x: 10, y: 10, z: -50, w: 20, h: 20 });
+            const lim = pn.limits || {};
+            const LMAP = [['xMin', 'x_min', 'Limit X−'], ['xMax', 'x_max', 'Limit X+'], ['yMin', 'y_min', 'Limit Y−'], ['yMax', 'y_max', 'Limit Y+'], ['zMin', 'z_min', 'Limit Z−'], ['zMax', 'z_max', 'Limit Z+']];
+            for (const [k, axis, label] of LMAP) {
+                if (lim[k] !== '' && lim[k] != null) ins.push({ id: 'limit_' + axis, type: 'limit', axis, label, pin: lim[k], level: lim[k + 'Level'] || 0 });
+            }
+            _ddcsSettings.inputs = ins;
+            syncFlatFromIO(_ddcsSettings);
+        }
+        saveSettings();
+        fill();
+        applyHardwareTabs();
     }
     applyHardwareTabs();
 
@@ -635,7 +683,7 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V9.76\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V9.77\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 
