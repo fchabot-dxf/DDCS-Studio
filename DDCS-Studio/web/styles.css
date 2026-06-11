@@ -142,6 +142,17 @@ body {
     font-weight: bold;
 }
 
+/* Live-gateway status LED (hidden unless Studio is bridged to a reachable gateway). */
+.gateway-led {
+    display: none;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #888;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+}
+.gateway-led.led-ok   { background: #36c45a; box-shadow: 0 0 7px #36c45a, 0 0 0 1px rgba(0,0,0,0.35); }
+.gateway-led.led-warn { background: #e0b020; box-shadow: 0 0 6px #e0b020, 0 0 0 1px rgba(0,0,0,0.35); }
+.gateway-led.led-bad  { background: #d04545; box-shadow: 0 0 6px #d04545, 0 0 0 1px rgba(0,0,0,0.35); }
+
 .hdr-controls {
     display: flex;
     gap: 10px;
