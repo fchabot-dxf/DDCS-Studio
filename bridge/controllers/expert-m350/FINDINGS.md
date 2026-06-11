@@ -142,6 +142,11 @@ client + `EnableInsecureGuestLogons $true` + `BlockNTLM $false` (admin + reboot)
   state by decoding this file as little-endian f64 — `[CONFIRMED readback 2026-06-06]`. Slot 0 = byte 0 (no header).
 - Run-state hidden files exist on SYSDISK: per-program **`.<name>.nc.pos`** (60 B each) and **`.break0/.break1`**
   (breakpoint-resume) — same family as the V4.1 run-state files. `[TO TEST what they track]`
+- **MDI buffer is RAM, not the file (A8 `[CONFIRMED 2026-06-10]`):** the live MDI line is **`SYSDISK/mdi.nc`**
+  (10 B, one block; `SYSDISK/mdiblock` = a 720 B fixed-slot MDI *history*). Overwriting `mdi.nc` over SMB does
+  **not** change what the panel runs — navigating to the MDI page still shows the panel's RAM line, and it
+  never auto-runs. ⇒ **`mdi.nc` is panel OUTPUT, not input** (on navigation); MDI-file injection is **not** a
+  remote-trigger channel (same RAM-vs-disk lesson as the dispatcher note below). *Untested:* read-at-boot.
 
 ## ⚠️ Dispatcher: Expert `M47` ≠ V4.1 `M47` — the V4.1 loop trick does NOT port `[CONFIRMED 2026-06-06]`
 The V4.1 software dispatcher relies on `M47` = **"restart program from top"** (firmware built-in) so an

@@ -137,7 +137,18 @@ trigger without a manual Start) + A9 (dispatcher bootstrap).
 (`sysstart.nc`) press the MDI-run virtual button (`#2037`) to fire it?
 **Proves:** if any of these execute `mdiblock` without a manual press → **fully hardware-free remote
 command channel.** This is the single most important unknown in the project.
-**RESULT (A8):** mdiblock executed remotely? how? ___
+**RESULT (A8):** ❌ **NO via file-overwrite — REFUTED 2026-06-10** (fw 2025-06-19-00). The live MDI line is
+**`mdi.nc`** (10 B; `mdiblock` = a 720 B fixed-slot *history* buffer — don't touch). Tested by overwriting
+`mdi.nc` (SYSDISK) with a motion-free SMB-readable sentinel `#150 = 77`:
+(a) **no auto-run** — sentinel unchanged (111) after 20 s untouched;
+(b) **navigating to the MDI page did NOT re-read the file** — the panel still showed the old RAM line
+`g53 z#100`, so the overwrite never reached the live buffer (test gated here — running would have moved Z);
+(c) not run (would have executed the stale RAM line, not ours).
+⇒ **`mdi.nc` is an OUTPUT the panel WRITES, not an input it reads on navigation** — same RAM-vs-disk pattern
+as the V4.1 file-overwrite/self-loop finding. **MDI-file injection is not a remote-trigger channel.** File
+restored to original; sentinel never executed. *Untested:* whether the panel reads `mdi.nc` at **boot**
+(would need a reboot). ⇒ the real remote-trigger path is **A9** — a `sysstart` dispatcher loop using the
+now-confirmed `#2037` to file-select + Start a PC-delivered `.nc` (SMB delivery + `#2037` both proven).
 
 ## A9 — Dispatcher bootstrap + survival (the one wall)
 **Needs:** 🟢 · **Goal:** beat the one-program-at-a-time rule without hardware.
