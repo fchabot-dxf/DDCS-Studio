@@ -37,8 +37,16 @@ Hardware         Machine   (single config)
 - **Output row:** `type · pin # · ON M-code · OFF M-code · ×`  (e.g. coolant M8/M9, drawbar M154/M155)
 
 ### Preprogrammed types (the `+Add` menu)
-- **Input:** Probe · Tool-setter · Limit X− / X+ / Y− / Y+ / Z− / Z+ · E-stop · Sensor
+- **Input:** **3D touch probe** (pin·level — radius is a calibration macro, `#1200`, not a pin setting) · **Touch-plate / floating probe (ground)** (pin·level) · **Tool-setter** (pin·level·location) · Limit X−/X+/Y−/Y+/Z−/Z+ · E-stop · Sensor
 - **Output:** Coolant · Drawbar · Dust-cover · Mist · Custom
+- _Probe is split because the sensors behave differently in macros: the 3D probe gives XYZ + radius comp; the touch-plate is a ground-completed touch (Z/tool-length)._
+
+## Controller profiles (must stay flexible)
+
+A **profile** = a preset I/O template **+ capability flags** that *seeds* the lists; the user edits from there.
+- Capability flags: pin ranges (Expert: 24 in / 20 out; **DDCS 4.1** may differ), dialect (M-codes / variable addresses), and **which types are allowed / how many** (e.g. a single-fixed-probe controller caps `probe` at 1).
+- **DDCS Expert** and **DDCS 4.1** are two profiles with different seeds + ranges + dialect.
+- Two physical probes are **two input rows on two pins** (this machine: 3D probe = IN03, tool-setter/floating-ground = IN02).
 
 ---
 
@@ -46,7 +54,7 @@ Hardware         Machine   (single config)
 
 - Controller-profile dropdown moves into **General → Profile** (out of the header).
 - The **"Controller / Hardware Tabs" checkboxes are removed** — you add the inputs your machine has.
-- Wizards **read probe pin + level from the Input list** (single source of truth); drop their `INPUT PORT (P)` / `LEVEL (L)` fields. **Keep `STOP (Q)`** as a per-operation choice in the wizard.
+- Wizards **pick which probe input** from the Input list via a **"Probe input" dropdown** (auto-selected when there's only one probe-type input), then read that input's **pin + level**. Drop the wizard's `INPUT PORT (P)` / `LEVEL (L)` fields. **Keep `STOP (Q)`** as a per-operation choice. → multiple probes (3D + touch-plate + setter) are all supported; the user just chooses per operation.
 - **Outputs get the same Add tool** (full pin map lives in Hardware).
 - The wizard **"Animate paths"** toggle is removed (the engine Run/Step manages playback).
 
