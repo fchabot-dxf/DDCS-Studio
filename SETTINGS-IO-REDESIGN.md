@@ -1,0 +1,85 @@
+# Settings + Machine-I/O Redesign — spec
+
+_Locked design for the Settings overlay rework. Build target; not yet implemented. June 2026._
+
+---
+
+## Structure — 2-level nav + inline part lists
+
+```
+L1 (header)      L2 (sub-tabs)
+───────────      ──────────────────────────────────────────────────────────
+General          Profile (+ controller dropdown ▾) · Variables · Feedback · Network (stub)
+
+Hardware         Machine   (single config)
+                 Stock     (single config)
+                 Input     [ + Add input ▾ ]   list of ONLY the inputs you've added; each row carries a pin # field
+                              Probe          pin [ 3 ]   level [NC]
+                              Tool-setter    pin [ 2 ]   level [NC]  loc 10,10,-50
+                              Limit X−       pin [ 5 ]   level [NC]
+                 Output    [ + Add output ▾ ]  list of ONLY the outputs you've added
+                              Coolant        pin [ 1 ]   M8 / M9
+                              Drawbar        pin [ 2 ]   M154 / M155
+                 [ + Add ▾ ]  →  adds a whole category tab (ATC · future subsystems)
+```
+
+- **Input and Output are separate tabs.** Inside each, the parts are a **table — one row per part, no drill-down / no third-level tabs.** The **`+ Add`** button opens a **dropdown of preprogrammed types**; choosing one drops a new row **pre-expanded with that type's parameters** (a Probe row shows pin/level/location; a Coolant row shows pin/on-code/off-code). **Only the rows you've added are shown — no empty pin slots.** Each row has a **pin # field (1–24)**, and the Add menu / pin picker is **free-pin-aware** (pins already in use are greyed out) so a pin can't be double-assigned.
+- **Two `+Add` scopes:**
+  - per-tab **`+Add`** (inside Input / Output) → adds a **row** (a part).
+  - L2 **`+Add`** (beside the sub-tabs) → adds a whole **category tab** (ATC today; room for more).
+- Machine + Stock stay single-config. ATC is an added L2 category (pockets / tool-table / drawbar / sensors).
+
+### Each row's fields (inline in the list)
+- **Input row:** `type · pin # · active level (NC/NO) · [location x/y/z/w/h for probe & setter] · ×`
+- **Output row:** `type · pin # · ON M-code · OFF M-code · ×`  (e.g. coolant M8/M9, drawbar M154/M155)
+
+### Preprogrammed types (the `+Add` menu)
+- **Input:** Probe · Tool-setter · Limit X− / X+ / Y− / Y+ / Z− / Z+ · E-stop · Sensor
+- **Output:** Coolant · Drawbar · Dust-cover · Mist · Custom
+
+---
+
+## Decisions (confirmed)
+
+- Controller-profile dropdown moves into **General → Profile** (out of the header).
+- The **"Controller / Hardware Tabs" checkboxes are removed** — you add the inputs your machine has.
+- Wizards **read probe pin + level from the Input list** (single source of truth); drop their `INPUT PORT (P)` / `LEVEL (L)` fields. **Keep `STOP (Q)`** as a per-operation choice in the wizard.
+- **Outputs get the same Add tool** (full pin map lives in Hardware).
+- The wizard **"Animate paths"** toggle is removed (the engine Run/Step manages playback).
+
+---
+
+## Data model
+
+Each row = one entry in an array — the list *is* the data.
+
+### Today (flat — read directly by sim + wizards)
+```js
+probes:  { probePin:3, probeLevel:0, setterPin:2, setterLevel:0, setterX,Y,Z,W,H },
+limits:  { xMinPin:'', xMinLevel:0, … zMaxLevel },
+hardwareTabs: { probes:true, atc:false, limits:true },   // ← removed
+atc:     { baseVar:1430, toolCount:10, tools:[], … },
+```
+
+### Target
+```js
+inputs:  [ { id, type:'probe'|'setter'|'limit'|'estop'|'sensor', label, pin, level, …loc } ],
+outputs: [ { id, type:'coolant'|'drawbar'|'dustcover'|'mist'|'custom', label, pin, onCode, offCode } ],
+// atc stays its own object; its sensors / drawbar reference input / output ids
+```
+
+---
+
+## Staged build plan
+
+1. **Data model + migration** — add `inputs[]` / `outputs[]`; on load, seed them from the existing `probes` / `limits` so nothing is lost. Accessor helpers (`getInput('probe')`, `getLimit('x_min')`).
+2. **UI** — General/Hardware header; Machine·Stock·Input·Output sub-tabs + L2 `+Add` (ATC); the Input/Output row lists with their `+Add` menus + inline editing; controller dropdown → Profile; Network stub; remove the checkbox section.
+3. **Rewire** — sim + wizards read pins via the accessors; drop the wizard P/L; remove the Animate-paths toggle.
+   - Lower-risk interim: keep flat `probes`/`limits` synced from the list so the sim/wizards keep working before the full rewire.
+
+---
+
+## Status
+- ☐ Stage 1 — data model + migration
+- ☐ Stage 2 — UI (2-level nav + Input/Output row lists)
+- ☐ Stage 3 — rewire sim + wizards, drop wizard P/L, remove animate-paths
