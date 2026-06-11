@@ -142,6 +142,14 @@ client + `EnableInsecureGuestLogons $true` + `BlockNTLM $false` (admin + reboot)
   state by decoding this file as little-endian f64 — `[CONFIRMED readback 2026-06-06]`. Slot 0 = byte 0 (no header).
 - Run-state hidden files exist on SYSDISK: per-program **`.<name>.nc.pos`** (60 B each) and **`.break0/.break1`**
   (breakpoint-resume) — same family as the V4.1 run-state files. `[TO TEST what they track]`
+- ⚠️ **`uservar` file ↔ RAM is TWO-WAY ISOLATED while running (A9-a `[CONFIRMED 2026-06-10]`):**
+  (1) a PC SMB-write into `uservar` (e.g. `#150=88` mid-loop) **never reaches a running macro's RAM** —
+  the macro keeps seeing the old value (loop + `IF [#150==88] GOTO` syntax independently proven via a
+  self-priming check that flipped to MDI instantly); (2) a macro's own var write (`#151=1`) was **still
+  absent from the file after `M30`** — the disk file is a **lazy snapshot** (flush trigger unknown,
+  `[TO TEST]` reboot/shutdown/periodic). ⇒ qualifies the 06-06 readback finding: uservar-over-SMB is
+  fine for *eventually-persisted* state but is **NOT live readback** (use `MSETDATA` checkpoints) and is
+  **NOT an inbound command channel** (remaining inbound: `MGETDATA` with a proven slave, or a physical input).
 - **MDI buffer is RAM, not the file (A8 `[CONFIRMED 2026-06-10]`):** the live MDI line is **`SYSDISK/mdi.nc`**
   (10 B, one block; `SYSDISK/mdiblock` = a 720 B fixed-slot MDI *history*). Overwriting `mdi.nc` over SMB does
   **not** change what the panel runs — navigating to the MDI page still shows the panel's RAM line, and it
