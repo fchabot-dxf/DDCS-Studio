@@ -2657,7 +2657,7 @@ body[data-theme="studio"] .dock-body .ddcs-tab.active {
 .viz3d-drawer .viz3d-jog-pendant {
     position: absolute;
     bottom: 34px;
-    left: 0;
+    left: 12px;   /* clear the 10px left resize strip so the pendant doesn't cover the border */
     right: 0;
     z-index: 100;
 }
