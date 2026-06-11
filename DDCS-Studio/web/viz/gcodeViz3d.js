@@ -345,7 +345,7 @@ export class GcodeViz3D {
         return (b * e - c * d) / denom;
     }
 
-    setSegments(parsed) {
+    setSegments(parsed, fit = true) {
         this._segs = (parsed && parsed.segments) || [];
         this._passCount = Math.max(1, (parsed && parsed.stats && parsed.stats.passes) || 1);
         // one draggable start per pass (keep existing positions; new passes default to origin)
@@ -353,7 +353,9 @@ export class GcodeViz3D {
         this.starts.length = this._passCount;
         this._ensureMarkers();
         this._rebuild();
-        this.fitAll();
+        // fit re-frames the camera; skip it on live re-renders (e.g. wizard input changes) so the
+        // user's orbit/zoom is preserved — just redraw the new path with the current camera.
+        if (fit) this.fitAll(); else this.render();
     }
 
     // Walk each pass, clamping probes to the stock so they stop at the wall instead of

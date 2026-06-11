@@ -2681,7 +2681,7 @@ body[data-theme="studio"] .dock-body .ddcs-tab.active {
 .viz3d-views button:hover { background: rgba(40, 80, 120, 0.7); }
 
 /* ===== Settings overlay ===== */
-.settings-overlay { z-index: 1000; align-items: center; justify-content: center; }
+.settings-overlay { z-index: 12000; align-items: center; justify-content: center; } /* above the wizard (10001) so the in-wizard ⚙ opens on top */
 .settings-box {
     width: min(560px, 94vw);
     max-height: 88vh;

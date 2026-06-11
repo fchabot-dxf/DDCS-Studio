@@ -89,6 +89,7 @@ export class WizardManager {
 
         const view = viewByType.get(type) || null;
         const box = document.querySelector('.wiz-box');
+        this._wizNeedsFit = true;   // frame the 3D preview once on open; input-change re-renders keep the camera
         console.debug('WizardManager.open()', type, 'view=', !!view, 'wizardElement=', this.wizardElement);
         if (!this.wizardElement) {
             console.warn('WizardManager.open(): no wizard container available');
@@ -229,7 +230,8 @@ export class WizardManager {
             // (the inferred spindle start for this corner/config). setSegments keeps starts[0]. Preview hint
             // only — the user can still drag to override. Re-set each render so it tracks the config.
             if (start && this._wizViz.starts) this._wizViz.starts[0] = { x: +start.x || 0, y: +start.y || 0, z: +start.z || 0 };
-            this._wizViz.setSegments(parseGcode(gcode || ''));
+            this._wizViz.setSegments(parseGcode(gcode || ''), this._wizNeedsFit !== false);
+            this._wizNeedsFit = false;   // subsequent input-change re-renders keep the camera
             const sel = host.querySelector('.wiz-shape');
             if (sel && window.ddcsGetSettings) sel.value = (window.ddcsGetSettings().stock || {}).shape || 'boss';
         } catch (e) { console.warn('wizard 3D preview failed', e); }

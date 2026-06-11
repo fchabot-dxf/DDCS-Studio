@@ -65,7 +65,9 @@ export const middleView = {
 
         const gcode = wizard.generate(params);
         el('wiz_middle_code').innerHTML = UIUtils.formatGCode(gcode);
-        ctx.preview3D(gcode, 'middleVizContainer');
+        // Infer the spindle start (pocket → centre; boss → outside the first side) so the preview begins right.
+        const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
+        ctx.preview3D(gcode, 'middleVizContainer', wizard.inferStart(params, stock));
 
         // Update middle status label
         const middleStatus = el('middleVizStatus');

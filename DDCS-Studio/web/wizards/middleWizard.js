@@ -24,6 +24,29 @@ import { twoPassProbe, toNum as toNumShared } from './probeBlocks.js';
 export class MiddleWizard {
     constructor() {}
 
+    /**
+     * Infer the spindle start for the centre probe, in the 3D-preview stock frame (stock spans
+     * X[0..x] Y[0..y], top at Z=0). Incremental macro, so this positions the whole path.
+     *   - Pocket: start at the CENTRE, a few mm below the top (inside the cavity) — probes outward both ways.
+     *   - Boss:   start just OUTSIDE the first-probed side (axis + dir1), perpendicular axis centred.
+     * Preview hint only — never written to the G-code, never touches the WCS.
+     */
+    inferStart(params, stock) {
+        const n = (v, d) => toNumShared(v, d);
+        const sx = n(stock && stock.x, 100), sy = n(stock && stock.y, 80), sz = n(stock && stock.z, 20);
+        const cx = sx / 2, cy = sy / 2;
+        const probeZ = -Math.min(5, sz * 0.5);                  // probe height: a few mm below the top
+        if ((params.featureType || 'pocket') !== 'boss') {
+            return { x: cx, y: cy, z: probeZ };                 // pocket → centre, inside the cavity
+        }
+        const dist = n(params.dist, 20);
+        const outset = Math.max(6, Math.min(dist * 0.6, 15));   // boss → open space just outside the first wall
+        const pos = (params.dir1 || 'pos') === 'pos';
+        return ((params.axis || 'X') === 'X')
+            ? { x: pos ? -outset : sx + outset, y: cy, z: probeZ }
+            : { x: cx, y: pos ? -outset : sy + outset, z: probeZ };
+    }
+
     generate(params) {
         const {
             featureType, axis, dir1, dir2, twoAxis, syncA, slave,
