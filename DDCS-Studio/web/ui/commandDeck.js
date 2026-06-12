@@ -593,6 +593,17 @@ export class CommandDeck {
                 </div>
             </div>
 
+            <div class="deck-group control-flow">
+                <div class="group-header">CONTROL FLOW</div>
+                <div class="grid-3">
+                    <button class="toolbar-btn axis-blue" title="Conditional — C-style, no brackets on a simple IF (e.g. IF #1920!=2 GOTO1)" onclick="window.insert && window.insert('IF ')">IF</button>
+                    <button class="toolbar-btn axis-blue" title="Jump to an N-label — NO space before the number (GOTO1)" onclick="window.insert && window.insert('GOTO')">GOTO</button>
+                    <button class="toolbar-btn axis-blue" title="Label target — N1, N2 ... (success path jumps past the error handlers)" onclick="window.insert && window.insert('N')">N</button>
+                    <button class="toolbar-btn" title="Open comment / operator message — ( text )" onclick="window.insert && window.insert('(')">(</button>
+                    <button class="toolbar-btn" title="Close comment / operator message" onclick="window.insert && window.insert(')')">)</button>
+                </div>
+            </div>
+
             <div class="deck-group g-codes">
                 <div class="group-header">G-CODES</div>
                 <div class="grid-2">
@@ -612,7 +623,9 @@ export class CommandDeck {
                 <div class="grid-3">
                     <button class="toolbar-btn axis-blue" title="G-code address" onclick="window.insert && window.insert('G')">G</button>
                     <button class="toolbar-btn axis-blue" title="M-code address" onclick="window.insert && window.insert('M')">M</button>
-                    <button class="toolbar-btn axis-blue" title="Parameter word" onclick="window.insert && window.insert('P')">P</button>
+                    <button class="toolbar-btn axis-blue" title="Parameter word (G31 probe input port)" onclick="window.insert && window.insert('P')">P</button>
+                    <button class="toolbar-btn axis-blue" title="Probe trigger level — G31 L0 (NPN) / L1 (PNP)" onclick="window.insert && window.insert('L')">L</button>
+                    <button class="toolbar-btn axis-blue" title="Probe stop mode — G31 Q1 (immediate) / Q0 (decelerate)" onclick="window.insert && window.insert('Q')">Q</button>
                     <button class="toolbar-btn axis-blue" title="Arc radius or parameter" onclick="window.insert && window.insert('R')">R</button>
                     <button class="toolbar-btn m-green" title="Spindle ON clockwise" onclick="window.insert && window.insert('M3 ')">M3</button>
                     <button class="toolbar-btn m-red" title="Spindle OFF" onclick="window.insert && window.insert('M5 ')">M5</button>
