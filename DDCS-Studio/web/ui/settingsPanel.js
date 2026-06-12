@@ -16,8 +16,18 @@ import { renderIoTable, renderMagazineTable } from './ioTable.js';
 import { generateToolChangeNc } from '../data/atcGenerator.js';
 
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
+// Built-in stock presets. Shape ∈ boss|pocket|cylinder; dimensions are separate (mm).
+// A flat board suits 3-axis work; rotary stock is a 3" block or Ø3" cylinder. Users can
+// save their own (any shape) on top of these — see stockTemplates in settings.
+const STOCK_TEMPLATES = [
+    { name: '3-axis plate (small)', x: 150, y: 100, z: 20, shape: 'boss' },
+    { name: '3-axis board (large)', x: 400, y: 300, z: 18, shape: 'boss' },
+    { name: 'Rotary block 3″', x: 150, y: 76.2, z: 76.2, shape: 'boss' },
+    { name: 'Rotary cylinder Ø3″', x: 150, y: 76.2, z: 76.2, shape: 'cylinder' },
+];
 const SETTINGS_DEFAULTS = {
     stock:   { x: 100, y: 80, z: 20, shape: 'boss', show: true },
+    stockTemplates: [],   // user-saved presets: { name, x, y, z, shape }
     machine: { x: 300, y: 300, z: 120, ox: 0, oy: 0, oz: 0, show: true },
     view:    { theta: -1.5708, phi: 1.0472 }, // 3D preview start orientation (front: +X right, +Y back)
     probes:  { 
@@ -104,6 +114,7 @@ function loadSettings() {
             const p = JSON.parse(raw);
             return migrateIO({
                 stock: { ...SETTINGS_DEFAULTS.stock, ...(p.stock || {}) },
+                stockTemplates: Array.isArray(p.stockTemplates) ? p.stockTemplates : [],
                 machine: { ...SETTINGS_DEFAULTS.machine, ...(p.machine || {}) },
                 view: { ...SETTINGS_DEFAULTS.view, ...(p.view || {}) },
                 probes: { ...SETTINGS_DEFAULTS.probes, ...(p.probes || {}) },
@@ -283,6 +294,9 @@ function buildSettingsOverlay() {
                 <div id="set_tab_stock" style="display:none">
                     <div class="settings-section">
                         <div class="settings-section-title">STOCK (mm)</div>
+                        <label class="settings-field">TEMPLATE
+                            <select id="set_stock_tpl"><option value="">— template —</option></select>
+                        </label>
                         <div class="settings-grid">
                             <label>X<input type="number" id="set_stock_x" min="0" step="1"></label>
                             <label>Y<input type="number" id="set_stock_y" min="0" step="1"></label>
@@ -292,10 +306,15 @@ function buildSettingsOverlay() {
                             <select id="set_stock_shape">
                                 <option value="boss">Boss — probe the outside</option>
                                 <option value="pocket">Pocket — probe the inside</option>
+                                <option value="cylinder">Cylinder — rotary stock</option>
                             </select>
                         </label>
                         <label class="settings-check"><input type="checkbox" id="set_stock_show"> Show stock in 3D</label>
-                        <div class="settings-hint">WCS zero at the top, min XY corner: X[0..X] · Y[0..Y] · Z[-Z..0].</div>
+                        <div class="settings-actions">
+                            <button class="toolbar-btn settings-io" id="set_stock_tpl_save">⭐ Save as template…</button>
+                            <button class="toolbar-btn settings-io" id="set_stock_tpl_del" style="display:none">🗑 Delete template</button>
+                        </div>
+                        <div class="settings-hint">WCS zero at the top, min XY corner: X[0..X] · Y[0..Y] · Z[-Z..0]. For a cylinder, Y is the diameter and X the length along the rotary axis.</div>
                     </div>
                 </div>
 
@@ -452,6 +471,7 @@ function wireSettingsOverlay(ov) {
         q('set_stock_z').value = s.stock.z;
         q('set_stock_shape').value = s.stock.shape || 'boss';
         q('set_stock_show').checked = !!s.stock.show;
+        rebuildStockTplDropdown();
         q('set_mach_x').value = s.machine.x;
         q('set_mach_y').value = s.machine.y;
         q('set_mach_z').value = s.machine.z;
@@ -699,6 +719,71 @@ function wireSettingsOverlay(ov) {
         el.addEventListener('change', onInput);
     });
 
+    // ── Stock templates: built-in presets + user-saved (any shape) ───────────────
+    function allStockTpls() {
+        const user = Array.isArray(_ddcsSettings.stockTemplates) ? _ddcsSettings.stockTemplates : [];
+        return STOCK_TEMPLATES.map(t => ({ t, builtin: true })).concat(user.map(t => ({ t, builtin: false })));
+    }
+    function stockTplLabel(t) {
+        const esc = (v) => String(v).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+        const dims = t.shape === 'cylinder' ? `Ø${t.y}×${t.x}` : `${t.x}×${t.y}×${t.z}`;
+        return `${esc(t.name)} — ${dims}`;
+    }
+    function rebuildStockTplDropdown(selIdx) {
+        const sel = q('set_stock_tpl');
+        if (!sel) return;
+        const list = allStockTpls();
+        sel.innerHTML = '<option value="">— template —</option>' +
+            list.map((e, i) => `<option value="${i}">${e.builtin ? '' : '⭐ '}${stockTplLabel(e.t)}</option>`).join('');
+        sel.value = selIdx != null ? String(selIdx) : '';
+        updateStockTplDel();
+    }
+    function updateStockTplDel() {
+        const sel = q('set_stock_tpl'), del = q('set_stock_tpl_del');
+        if (!sel || !del) return;
+        const i = sel.value === '' ? -1 : parseInt(sel.value, 10);
+        const list = allStockTpls();
+        del.style.display = (i >= 0 && list[i] && !list[i].builtin) ? '' : 'none';
+    }
+    const _stockTplSel = q('set_stock_tpl');
+    if (_stockTplSel) _stockTplSel.addEventListener('change', () => {
+        const i = _stockTplSel.value === '' ? -1 : parseInt(_stockTplSel.value, 10);
+        const list = allStockTpls();
+        updateStockTplDel();
+        if (i < 0 || !list[i]) return;
+        const t = list[i].t;
+        q('set_stock_x').value = t.x;
+        q('set_stock_y').value = t.y;
+        q('set_stock_z').value = t.z;
+        q('set_stock_shape').value = t.shape || 'boss';
+        onInput(); // commit to the model + persist + re-render the 3D view
+    });
+    const _stockTplSave = q('set_stock_tpl_save');
+    if (_stockTplSave) _stockTplSave.addEventListener('click', () => {
+        const name = (prompt('Save current stock as a template — name?') || '').trim();
+        if (!name) return;
+        if (!Array.isArray(_ddcsSettings.stockTemplates)) _ddcsSettings.stockTemplates = [];
+        _ddcsSettings.stockTemplates.push({
+            name,
+            x: num(q('set_stock_x').value, 0),
+            y: num(q('set_stock_y').value, 0),
+            z: num(q('set_stock_z').value, 0),
+            shape: q('set_stock_shape').value || 'boss',
+        });
+        saveSettings();
+        rebuildStockTplDropdown(STOCK_TEMPLATES.length + _ddcsSettings.stockTemplates.length - 1);
+    });
+    const _stockTplDel = q('set_stock_tpl_del');
+    if (_stockTplDel) _stockTplDel.addEventListener('click', () => {
+        const sel = q('set_stock_tpl');
+        const i = sel.value === '' ? -1 : parseInt(sel.value, 10);
+        const list = allStockTpls();
+        if (i < 0 || !list[i] || list[i].builtin) return;
+        _ddcsSettings.stockTemplates.splice(i - STOCK_TEMPLATES.length, 1);
+        saveSettings();
+        rebuildStockTplDropdown();
+    });
+
     // CSV import
     q('set_csv_input').addEventListener('change', (e) => {
         const f = e.target.files && e.target.files[0];
@@ -721,7 +806,7 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V9.84\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V9.85\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 
