@@ -43,7 +43,7 @@ export function openStockEditor(anchor) {
             .stock-editor-pop label.col { display:flex; flex-direction:column; gap:2px; }
         </style>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <span style="font-weight:bold; letter-spacing:1px; color:#9fb4cc;">📦 STOCK</span>
+            <span style="font-weight:bold; letter-spacing:1px; color:#9fb4cc;">STOCK</span>
             <button id="se_close" class="toolbar-btn" style="padding:1px 8px;" title="Close">✕</button>
         </div>
         <label class="col" style="margin-bottom:10px;">Template
