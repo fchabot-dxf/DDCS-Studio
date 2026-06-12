@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
-    <title>DDCS Studio V9.94 - Modular</title>
+    <title>DDCS Studio V9.95 - Modular</title>
     
     <!-- Ensure project stylesheet is applied after inline legacy rules -->
     <link rel="stylesheet" href="styles.css">
@@ -92,7 +92,7 @@
             <svg class="logo logo-futuristic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-futuristic"/></svg>
             <svg class="logo logo-organic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-organic"/></svg>
             <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
-            <span class="ver">V9.94</span>
+            <span class="ver">V9.95</span>
         </div>
         <!-- App-switcher: STUDIO ↔ GATEWAY (machine-side views). Wired by ui/gatewayStatus.js —
              greyed when no gateway answers (click = download the desktop exe). -->
@@ -575,6 +575,83 @@
                 <div class="preview-block">
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_rotary_center_code"></pre>
+                </div>
+            </div>
+
+            <!-- Rotary Clock (A0 to a feature) Wizard -->
+            <div id="wiz_rotary_clock" class="wiz-body" style="display:none">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-container">
+                    <div id="rotaryClockVizStatus" class="viz-status"></div>
+                    <div id="rotaryClockVizContainer" class="viz-canvas"></div>
+                </div>
+
+                <div id="rcl_desc" class="wiz-usage"></div>
+
+                <span class="section-label">CLOCK</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">ACTION</span>
+                        <select id="rcl_action" title="Set A0: datum A to the reference without moving. Report: measure tilt only. Rotate to 0: spin the part to the reference, then zero A.">
+                            <option value="set">set A0 (no rotate)</option>
+                            <option value="report">measure / report only</option>
+                            <option value="rotate">rotate to 0</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">REFERENCE (A0 AT)</span>
+                        <select id="rcl_reference" title="Where clock-zero points. Top: flat faces +Z (12 o'clock). +Y side: flat faces +Y (3 o'clock).">
+                            <option value="top">top (+Z)</option>
+                            <option value="side">+Y side (3 o’clock)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div>
+                        <span class="label">FLAT SPAN (mm)</span>
+                        <input id="rcl_span" value="20" title="Y distance between the two probe points across the flat. Bigger span = more accurate tilt. #6; sign sets the +Y direction."/>
+                    </div>
+                    <div>
+                        <span class="label">WCS TARGET</span>
+                        <select id="rcl_wcs" title="Target WCS for the A datum (#[#70+3]).">
+                            <option value="active">Active WCS</option>
+                            <option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option>
+                            <option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-3">
+                        <div><span class="label">MAX PROBE</span><input id="rcl_dist" value="30" title="Max Z probe travel per touch (mm). Must exceed Safe Z. #1."/></div>
+                        <div><span class="label">RETRACT</span><input id="rcl_retract" value="2" title="Retract between passes (mm). #2."/></div>
+                        <div><span class="label">SAFE Z</span><input id="rcl_safe_z" value="10" title="Z clearance for the cross-flat move (mm). #17."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input id="rcl_feed_fast" value="200" title="Fast probe feedrate. #3."/></div>
+                        <div><span class="label">SLOW FEED</span><input id="rcl_feed_slow" value="50" title="Slow probe feedrate. #4."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-2">
+                        <div><span class="label">STOP (Q)</span>
+                            <select id="rcl_q" title="G31 stop mode. Q1=immediate, Q0=decelerate."><option value="1">Immediate (Q1)</option><option value="0">Decel (Q0)</option></select>
+                        </div>
+                        <div><span class="label" style="opacity:.7;">PROBE PORT/LEVEL</span><div class="wiz-usage" style="margin:0;">from Settings → probe input</div></div>
+                    </div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_rotary_clock_code"></pre>
                 </div>
             </div>
 

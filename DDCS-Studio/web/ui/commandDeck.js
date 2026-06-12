@@ -348,6 +348,7 @@ export class CommandDeck {
                             <button onclick="openAlignmentWiz && openAlignmentWiz()">🧭 Align</button>
                             <div style="padding:4px 12px; font-size:10px; opacity:.55; text-transform:uppercase; letter-spacing:1px;">Rotary</div>
                             <button onclick="openWiz && openWiz('rotary_center')">🔄 Centreline</button>
+                            <button onclick="openWiz && openWiz('rotary_clock')">🕒 Clock A0</button>
                         </div>
                     </div>
                     
