@@ -114,6 +114,21 @@ export class CommandDeck {
         this._activeTab = 'basic';
         this._activeFilters = new Set();
         this.build();
+        // Deck buttons fire their action on pointerdown (touch-immediate) and mark themselves
+        // __ddcs_handled — swallow the trailing native click here (capture phase, before the
+        // button's own onclick) so a mouse click can't run the action twice. Fixes the
+        // double-insert on variable chips (one click typed "#0#0").
+        const dock = document.getElementById('controller-dock') || this.panel;
+        if (dock) {
+            dock.addEventListener('click', (e) => {
+                const b = e.target && e.target.closest ? e.target.closest('button') : null;
+                if (b && b.dataset.__ddcs_handled === '1') {
+                    delete b.dataset.__ddcs_handled;
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }, true);
+        }
         // Let other modules (e.g. a CSV import) refresh the keyboard's variable buttons
         window.refreshDeckVariables = () => this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : '');
         // The variable DB loads asynchronously (default_vars.js + user_vars.csv); re-render when ready
