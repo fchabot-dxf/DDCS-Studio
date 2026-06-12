@@ -224,6 +224,11 @@ function buildSettingsOverlay() {
                         </div>
                         <div class="settings-hint">One JSON with your machine/stock/limits + user variables. The desktop app saves it to a local file automatically.</div>
                     </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">EDITOR</div>
+                        <label class="settings-check"><input type="checkbox" id="set_suggest_on"> Smart suggestion bar (predictive keys above the keyboard)</label>
+                        <div class="settings-hint">A phone-style row suggesting the likely next G-code / macro token. Turning it off hides the row and reclaims the space.</div>
+                    </div>
                     <!-- legacy hardware-tab toggles kept hidden so profile gating still works (replaced by the Input/Output tables) -->
                     <div style="display:none">
                         <input type="checkbox" id="set_show_probes"><input type="checkbox" id="set_show_atc"><input type="checkbox" id="set_show_limits">
@@ -719,6 +724,16 @@ function wireSettingsOverlay(ov) {
         el.addEventListener('change', onInput);
     });
 
+    // Smart suggestion bar toggle (not part of the settings model — just localStorage + an event the bar listens for).
+    const _sg = q('set_suggest_on');
+    if (_sg) {
+        _sg.checked = localStorage.getItem('ddcs_suggest_on') !== 'off';
+        _sg.addEventListener('change', () => {
+            try { localStorage.setItem('ddcs_suggest_on', _sg.checked ? 'on' : 'off'); } catch (e) { /* ignore */ }
+            window.dispatchEvent(new CustomEvent('ddcs:suggest-changed'));
+        });
+    }
+
     // ── Stock templates: built-in presets + user-saved (any shape) ───────────────
     function allStockTpls() {
         const user = Array.isArray(_ddcsSettings.stockTemplates) ? _ddcsSettings.stockTemplates : [];
@@ -806,7 +821,7 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V10.4\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V10.5\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 

@@ -112,7 +112,6 @@ export class CommandDeck {
         const basicPanel = document.createElement('div');
         basicPanel.className = 'deck-tab-panel';
         basicPanel.id = 'deck-tab-basic';
-        basicPanel.appendChild(this._makeEditorRow());
         const basicGroups = deckPanel || document.createElement('div');
         basicGroups.id = 'deck-panel';
         if (!basicGroups.className) basicGroups.className = 'dock-row macro-grid-area';
@@ -127,7 +126,6 @@ export class CommandDeck {
         macroPanel.className = 'deck-tab-panel';
         macroPanel.id = 'deck-tab-macro';
         macroPanel.style.display = 'none';
-        macroPanel.appendChild(this._makeEditorRow());
         const macroGroups = document.createElement('div');
         macroGroups.className = 'dock-row macro-grid-area';
         macroGroups.id = 'deck-panel-macro';
@@ -148,6 +146,7 @@ export class CommandDeck {
         //    strip, then the panels. The suggestion bar sits on top (phone-style), always visible.
         body.innerHTML = '';
         body.appendChild(initSuggestBar());
+        body.appendChild(this._makeEditorRow());   // BACK/SPACE/ENTER — persistent, above the tabs
         body.appendChild(this._buildTabStrip());
         body.appendChild(basicPanel);
         body.appendChild(macroPanel);

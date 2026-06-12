@@ -44,12 +44,7 @@ export function initSuggestBar() {
     row.style.cssText = 'display:flex; gap:6px; align-items:center; overflow:hidden; padding:4px 8px; min-height:30px; border-bottom:1px solid rgba(255,255,255,0.06);';
     const chips = document.createElement('div');
     chips.style.cssText = 'display:flex; gap:6px; flex:1 1 auto; overflow:hidden; flex-wrap:nowrap;';
-    const tgl = document.createElement('button');
-    tgl.className = 'toolbar-btn'; tgl.style.cssText = 'padding:1px 7px; font-size:11px; flex:0 0 auto;';
-    tgl.textContent = '💡'; tgl.title = 'Toggle smart suggestions';
-    tgl.addEventListener('click', () => { setSuggestEnabled(!suggestEnabled()); render(); });
     row.appendChild(chips);
-    row.appendChild(tgl);
 
     const lineBeforeCursor = () => {
         const ed = document.getElementById('editor');
@@ -70,14 +65,10 @@ export function initSuggestBar() {
     }
 
     function render() {
-        const on = suggestEnabled();
-        row.style.opacity = on ? '1' : '0.55';
+        // Off => hide the whole bar so the keyboard reclaims the vertical space. Re-enable in Settings.
+        if (!suggestEnabled()) { row.style.display = 'none'; return; }
+        row.style.display = 'flex';
         chips.innerHTML = '';
-        if (!on) {
-            const s = document.createElement('span');
-            s.style.cssText = 'font-size:11px; opacity:.6;'; s.textContent = 'suggestions off';
-            chips.appendChild(s); return;
-        }
         for (const s of suggestFor(lineBeforeCursor())) {
             const b = document.createElement('button');
             b.className = 'toolbar-btn ddcs-suggest-chip';
@@ -95,6 +86,7 @@ export function initSuggestBar() {
 
     const ed = document.getElementById('editor');
     if (ed) ['input', 'keyup', 'click', 'focus'].forEach((ev) => ed.addEventListener(ev, render));
+    window.addEventListener('ddcs:suggest-changed', render);   // the Settings toggle fires this
     if (window.ResizeObserver) new ResizeObserver(fit).observe(chips);
     window.addEventListener('resize', fit);
     render();
