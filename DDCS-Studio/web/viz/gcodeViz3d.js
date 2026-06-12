@@ -599,9 +599,10 @@ export class GcodeViz3D {
                 mesh.position.set(0, 0, -stock.z); // extrude [0,z] → world [-z,0], top at the table
             } else if (stock.shape === 'cylinder') {
                 // Rotary cylinder — lies along the declared rotary axis (around X = horizontal
-                // 4th axis, around Z = vertical table); defaults to vertical (Z) when no rotary
-                // axis is declared. Diameter = the smaller of the two cross-section dims.
-                const axis = Object.values(getRotaryAxes())[0] || 'z';
+                // 4th axis, around Z = vertical table). Defaults to X (horizontal) when no rotary
+                // axis is declared: the templates store length in X, and a 4th axis is typically
+                // along X. Diameter = the smaller of the two cross-section dims.
+                const axis = Object.values(getRotaryAxes())[0] || 'x';
                 const dims = { x: stock.x, y: stock.y, z: stock.z };
                 const cross = axis === 'x' ? [dims.y, dims.z] : axis === 'y' ? [dims.x, dims.z] : [dims.x, dims.y];
                 const r = Math.min(cross[0], cross[1]) / 2;
