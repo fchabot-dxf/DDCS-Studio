@@ -5,18 +5,23 @@ import { initSuggestBar } from './suggestBar.js';
 // inherit the theme via currentColor, stay crisp at any size, and give each button an icon to
 // collapse to on narrow screens. Drawn in the spirit of each tool: bubble, wrench, flame, target,
 // recycle, folder, file+, copy, trash, download. 24×24 stroke grid, rendered at 16px.
-const _svg = (body) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+// Each icon carries its own accent colour (the user wants colour per icon). Drawn at a 24×24 stroke
+// grid, rendered at 16px. Filled accents (origin dot, ruby ball) override fill/stroke inline.
+const _svg = (body, color = 'currentColor') => `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 const HEADER_ICONS = {
-    comm:   _svg('<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>'),
-    wcs:    _svg('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'),
-    warmup: _svg('<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>'),
-    probe:  _svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>'),
-    atc:    _svg('<polyline points="22 5 22 10.5 16.5 10.5"/><polyline points="2 19 2 13.5 7.5 13.5"/><path d="M4.06 9.5A8 8 0 0 1 18 6.6l4 3.9M2 13.5l4 3.9A8 8 0 0 0 19.94 14.5"/>'),
-    load:   _svg('<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'),
-    insert: _svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>'),
-    copy:   _svg('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'),
-    clear:  _svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>'),
-    export: _svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'),
+    comm:   _svg('<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>', '#3b82f6'),
+    // WCS = work origin: Y-up / X-right axes meeting at a filled origin dot
+    wcs:    _svg('<path d="M5 3V19H21"/><polyline points="2.5 6 5 3 7.5 6"/><polyline points="18 16.5 21 19 18 21.5"/><circle cx="5" cy="19" r="1.7" fill="#10b981" stroke="none"/>', '#10b981'),
+    warmup: _svg('<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>', '#f97316'),
+    // Probe = ruby touch sensor: steel body + shaft, a solid ruby ball touching a surface line
+    probe:  _svg('<path d="M9 3h6v3l-1.5 2h-3L9 6z"/><line x1="12" y1="10" x2="12" y2="14.8"/><line x1="5" y1="21" x2="19" y2="21"/><circle cx="12" cy="17.3" r="2.4" fill="#e11d48" stroke="#e11d48"/>', '#64748b'),
+    atc:    _svg('<polyline points="22 5 22 10.5 16.5 10.5"/><polyline points="2 19 2 13.5 7.5 13.5"/><path d="M4.06 9.5A8 8 0 0 1 18 6.6l4 3.9M2 13.5l4 3.9A8 8 0 0 0 19.94 14.5"/>', '#8b5cf6'),
+    load:   _svg('<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>', '#f59e0b'),
+    insert: _svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>', '#14b8a6'),
+    copy:   _svg('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>', '#6366f1'),
+    clear:  _svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>', '#ef4444'),
+    // Export = share / upload: open-top box with an up arrow rising out (per the supplied glyph)
+    export: _svg('<path d="M16 9h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2"/><line x1="12" y1="14" x2="12" y2="3"/><polyline points="8 7 12 3 16 7"/>', '#0ea5e9'),
 };
 
 // Load a G-code / .nc file from disk into the editor, then trigger a re-parse + preview — for
@@ -571,6 +576,30 @@ export class CommandDeck {
                 try { delete t.dataset.__ddcs_handled; } catch (e) { /* noop */ }
             }
         }, true);
+
+        // One-line toolbar: collapse labels→icons the instant the labelled bar wouldn't fit, so it
+        // never wraps (wrapping clipped the 2nd row) and the page never scrolls. Re-measure on
+        // resize + theme change (studio buttons are larger than normal-theme ones).
+        requestAnimationFrame(() => this._fitHeader());
+        if (!this._headerFitInit) {
+            this._headerFitInit = true;
+            const fit = () => requestAnimationFrame(() => this._fitHeader());
+            window.addEventListener('resize', fit);
+            if (window.MutationObserver) {
+                const mo = new MutationObserver(fit);
+                mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+                if (document.body) mo.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+            }
+        }
+    }
+
+    // Measure the labelled toolbar; if it wouldn't fit on one line, collapse it to icon-only.
+    // remove→measure→add is synchronous so there's no visible flicker.
+    _fitHeader() {
+        const hc = document.querySelector('.dock-header .header-controls');
+        if (!hc) return;
+        hc.classList.remove('is-compact');
+        if (hc.scrollWidth > hc.clientWidth + 2) hc.classList.add('is-compact');
     }
 
     // Helper: build macro groups into provided container

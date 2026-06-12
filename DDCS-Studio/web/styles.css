@@ -1043,39 +1043,38 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     border-bottom: 3px solid rgba(0,0,0,0.15);
 }
 
-/* --- Dock Header: WRAP the toolbar groups instead of overflowing the page on narrow screens --- */
+/* --- Top toolbar: ONE line, never wrap (wrapping is what clipped the 2nd row). JS adds .is-compact
+   to collapse labels→icons the moment the labelled bar wouldn't fit; internal scroll only as a last
+   resort so the PAGE never scrolls and rows never clip. --- */
 .dock-header .header-controls {
     display: flex !important;
-    flex-wrap: wrap;          /* groups drop to a new row rather than growing the page */
+    flex-wrap: nowrap;
     justify-content: center;
     align-items: center;
     gap: 6px;
     padding: 6px 10px;
     border-bottom: 1px solid rgba(0,0,0,0.1);
     min-width: 0;
-    max-width: 100%;          /* never push the page wider than the viewport */
+    max-width: 100%;
+    overflow-x: auto;          /* last resort if even icons don't fit — header scrolls, page never does */
+    scrollbar-width: none;
 }
-.dock-header .header-center {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-}
+.dock-header .header-controls::-webkit-scrollbar { height: 0; }
+.dock-header .header-center { display: flex; gap: 6px; align-items: center; flex: 0 0 auto; }
 .dock-header .header-left,
-.dock-header .header-right { display:flex; gap:6px; align-items:center; flex-wrap: wrap; }
+.dock-header .header-right { display:flex; gap:6px; align-items:center; flex-wrap: nowrap; flex: 0 0 auto; }
 
 /* Icon + label spans so the bar can collapse to icon-only when space is tight */
 .dock-header .toolbar-btn { display: inline-flex; align-items: center; }
 .dock-header .toolbar-btn .btn-ico { display: inline-flex; flex: 0 0 auto; }
 .dock-header .toolbar-btn .btn-ico svg { width: 16px; height: 16px; display: block; }
-.dock-header .toolbar-btn .btn-tx { margin-left: 6px; }
+.dock-header .toolbar-btn .btn-tx { margin-left: 6px; white-space: nowrap; }
 .dock-header .toolbar-btn .btn-caret { margin-left: 6px; font-size: 10px; opacity: .75; }
 
-/* Narrow: hide the text labels, keep the icons (buttons collapse to icon chips) */
-@media (max-width: 760px) {
-    .dock-header .header-controls .btn-tx { display: none; }
-    .dock-header .header-controls .toolbar-btn { min-width: 0 !important; padding-left: 9px; padding-right: 9px; }
-    .dock-header .header-controls .btn-caret { margin-left: 4px; }
-}
+/* Collapsed (JS sets .is-compact when the labelled bar wouldn't fit on one line) → icon-only */
+.dock-header .header-controls.is-compact .btn-tx { display: none; }
+.dock-header .header-controls.is-compact .toolbar-btn { min-width: 0 !important; padding-left: 9px; padding-right: 9px; }
+.dock-header .header-controls.is-compact .btn-caret { margin-left: 4px; }
 @media (max-width: 520px) {
     .dock-header .header-controls { padding: 6px 6px; gap: 4px; }
 }
