@@ -36,6 +36,20 @@ class Ops:
     def __init__(self, backend, config):
         self.backend = backend
         self.cfg = config
+        self._detect_cache = None  # (dest, result): the fingerprint is stable per connected controller
+
+    # Per-controller baseline profiles (the shared shape Studio consumes). detect_controller() picks
+    # which one; the live `setting` derivation below refines the Expert. The V4.1 `setting` schema
+    # differs (1500 params, different I/O indices — see controllers/v4.1), so its live derivation is a
+    # separate, not-yet-mapped step; for now V4.1 serves its builtin baseline.
+    _CONTROLLERS = {
+        "expert-m350": {"id": "ddcs-expert-m350", "name": "DDCS Expert M350", "source": "builtin",
+                        "hardwareTabs": ["probes", "limits"],
+                        "atc": {"toolTableBaseVar": 1430, "defaultToolCount": 10}},
+        "v4.1": {"id": "ddcs-v4.1", "name": "DDCS V4.1", "source": "builtin",
+                 "hardwareTabs": ["probes", "limits"], "atc": None},
+    }
+    _FW_KEYS = ("DDCSV4", "DDCSE", "Expert", "M350", "MSETDATA", "MGETDATA", "Modbus")
 
     # --- jobs ---------------------------------------------------------------
     def submit_job(self, name, nc, mapping=None):
@@ -95,36 +109,87 @@ class Ops:
     def descriptor(self):
         """Who this gateway is + its live-ish state. Basis for the heartbeat and the Admin view."""
         found = identity.read(self.cfg.expert_dest, self.cfg.identity_filename)
+        det = self.detect_controller()
         return {
             "machine_id": self.cfg.machine_id,
             "machine_name": self.cfg.machine_name,
             "controller_id": found.get("id") if found else None,
             "controller_name": found.get("name") if found else None,
             "controller_connected": self.controller_reachable(),
+            "controller_family": det.get("family"),       # v4.1 | expert-m350 | unknown (read-only fingerprint)
+            "controller_firmware": det.get("firmware"),
             "dest": self.cfg.expert_dest,            # which controller disk this gateway is pointed at
             "backend": self.cfg.backend,
             "version": __version__,
         }
+
+    # --- controller detection (V4.1 vs Expert) -----------------------------
+    def _sysdisk_path(self):
+        """The SYSDISK share for the connected controller (holds the firmware + `setting`). expert_dest
+        is normally the CNCDISK share; swap the trailing share name to reach SYSDISK. None if no dest."""
+        dest = (self.cfg.expert_dest or "").rstrip("\\/")
+        if not dest:
+            return None
+        if dest.upper().endswith("CNCDISK"):
+            return dest[: -len("CNCDISK")] + "SYSDISK"
+        return dest  # already SYSDISK, or an unknown share name — try as-is
+
+    def detect_controller(self):
+        """Read-only fingerprint of the connected controller (V4.1 vs Expert), from its firmware `.out`
+        on the SYSDISK share — the Python port of controllers/identify-controller.ps1. The filename is
+        decisive in the common case (`ddcsv4.out` = V4.1); only an ambiguous name triggers a string
+        scan of the binary (Modbus is Expert-only). Cached per dest. Read-only; never raises."""
+        dest = self.cfg.expert_dest or ""
+        if self._detect_cache and self._detect_cache[0] == dest:
+            return self._detect_cache[1]
+        result = {"family": "unknown", "firmware": None, "signals": {}}
+        sysdisk = self._sysdisk_path()
+        if sysdisk and os.path.isdir(sysdisk):
+            fw = None
+            try:
+                outs = [n for n in sorted(os.listdir(sysdisk)) if n.lower().endswith(".out")]
+                fw = outs[0] if outs else None
+            except OSError:
+                fw = None
+            name = (fw or "").lower()
+            family, sig = "unknown", {}
+            if name == "ddcsv4.out":
+                family = "v4.1"
+            elif any(t in name for t in ("ddcse", "expert", "m350")):
+                family = "expert-m350"
+            elif fw:  # ambiguous filename — scan the firmware strings as a tiebreaker (read-only)
+                try:
+                    with open(os.path.join(sysdisk, fw), "rb") as f:
+                        text = f.read().decode("ascii", "ignore").lower()
+                except OSError:
+                    text = ""
+                sig = {k: (k.lower() in text) for k in self._FW_KEYS}
+                is_v4 = sig.get("DDCSV4", False)
+                is_exp = any(sig.get(k, False) for k in ("DDCSE", "Expert", "M350", "MSETDATA", "MGETDATA", "Modbus"))
+                family = "v4.1" if (is_v4 and not is_exp) else "expert-m350" if (is_exp and not is_v4) else "unknown"
+            result = {"family": family, "firmware": fw, "signals": sig}
+        self._detect_cache = (dest, result)
+        return result
 
     # --- controller profile (shared with Studio) ---------------------------
     def profile(self):
         """Build a controller profile in the SHARED shape DDCS Studio consumes
         (see web/shared/js/profiles/controllerProfiles.js): {id, name, source, hardwareTabs, atc}.
 
-        The controller's persisted config is the `setting` file (1000 × f64, index = param #) on
-        SYSDISK and decodes over SMB. The captured `cfg_utf8` (full param schema) localized the I-O
-        indices and a 2026-06-10 panel cross-check CONFIRMED them (Fixed Probe #575 = IN02, Floating
-        Probe #578 = port 10); see controllers/expert-m350/FINDINGS.md "Profile I/O map". So when a live
-        `setting` is read we derive hardwareTabs + a `pins` block from the real I-O config; otherwise we
-        fall back to the builtin baseline (source = builtin).
+        We FINGERPRINT the connected controller first (detect_controller) and serve the matching
+        baseline. For an Expert we then refine it from the live `setting` file (1000 × f64 on SYSDISK,
+        index = param #): the captured `cfg_utf8` localized the I-O indices and a 2026-06-10 panel
+        cross-check CONFIRMED them (Fixed Probe #575 = IN02, Floating Probe #578 = port 10; see
+        controllers/expert-m350/FINDINGS.md). A V4.1's `setting` schema differs (1500 params, different
+        indices) so its live derivation is not mapped yet — it serves its builtin baseline.
         """
-        prof = {
-            "id": "ddcs-expert-m350",
-            "name": "DDCS Expert M350",
-            "source": "builtin",
-            "hardwareTabs": ["probes", "limits"],
-            "atc": {"toolTableBaseVar": 1430, "defaultToolCount": 10},
-        }
+        det = self.detect_controller()
+        family = det.get("family")
+        if family == "v4.1":
+            prof = {**self._CONTROLLERS["v4.1"], "detected": det}
+            return prof
+        # Expert M350, or unknown → default to the Expert baseline + live-setting refinement (as before).
+        prof = {**self._CONTROLLERS["expert-m350"], "detected": det}
         params = self._read_setting_params()
         if params is not None:
             prof["source"] = "controller"
