@@ -580,10 +580,10 @@ export class CommandDeck {
         // One-line toolbar: collapse labels→icons the instant the labelled bar wouldn't fit, so it
         // never wraps (wrapping clipped the 2nd row) and the page never scrolls. Re-measure on
         // resize + theme change (studio buttons are larger than normal-theme ones).
-        requestAnimationFrame(() => this._fitHeader());
+        requestAnimationFrame(() => { this._fitHeader(); this._fitAppHeader(); });
         if (!this._headerFitInit) {
             this._headerFitInit = true;
-            const fit = () => requestAnimationFrame(() => this._fitHeader());
+            const fit = () => requestAnimationFrame(() => { this._fitHeader(); this._fitAppHeader(); });
             window.addEventListener('resize', fit);
             if (window.MutationObserver) {
                 const mo = new MutationObserver(fit);
@@ -600,6 +600,21 @@ export class CommandDeck {
         if (!hc) return;
         hc.classList.remove('is-compact');
         if (hc.scrollWidth > hc.clientWidth + 2) hc.classList.add('is-compact');
+    }
+
+    // Top app-header: staged so the right-edge icons never overflow the window. Stage 1 drops the
+    // op-button labels (.is-compact); if it still overflows, stage 2 drops STUDIO/GATEWAY labels +
+    // version (.is-mini). Measured each call (load + resize + theme change) — no fixed breakpoints.
+    _fitAppHeader() {
+        const h = document.querySelector('.app-header');
+        if (!h) return;
+        h.classList.remove('is-compact', 'is-mini');
+        // Strict (no tolerance): the app-header has no internal scroll, so ANY overflow is page
+        // overflow. Collapse on the first pixel over so the right-edge icons never leave the window.
+        if (h.scrollWidth > h.clientWidth) {
+            h.classList.add('is-compact');
+            if (h.scrollWidth > h.clientWidth) h.classList.add('is-mini');
+        }
     }
 
     // Helper: build macro groups into provided container
