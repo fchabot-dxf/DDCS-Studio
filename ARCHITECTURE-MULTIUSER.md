@@ -39,10 +39,15 @@ the user takes the output to *their* machine. Host exposure = "the generated cod
 ## Two faces of Studio (same codebase, different config)
 
 - **Hosted Studio (Cloudflare)** = the **simulator / profile-builder**. No gateway — the status LED stays
-  hidden and "Pull from controller" is inert. This is the multi-user, zero-liability face.
-- **Studio `.exe` (pywebview) or gateway-served Studio** = the **bridged** face. Local app → reaches
-  `127.0.0.1` / the LAN gateway with no mixed-content problem. This is where the LED lights, Pull works,
-  and live status appears. **Connects to the LOCAL gateway only.**
+  unlit (always visible, grey when off), "Pull from controller" is inert, and the GATEWAY tab greys
+  out into a desktop-download link. This is the multi-user, zero-liability face. It may
+  **import a controller profile** (file, later account sync) — data flowing *up* is fine; only control
+  flowing *down* is forbidden.
+- **The one local exe** (DECIDED June 2026 — see `COMBINED-APP-PLAN.md`) = the **bridged** face:
+  embedded gateway + Studio UI in one process; window close = full clean shutdown. A Setup toggle can
+  serve Studio over the user's **LAN** (the "personal cloud") — any browser on their wifi gets the full
+  bridged Studio, no install. This is where the LED lights, Pull works, and live status appears.
+  **Talks to the user's own controller only; the host is never in the path.**
 
 The `client.js` seam (Local / Direct / Cloud clients) self-selects: features light up only when a gateway
 actually answers — so the same build is safe hosted *and* useful as the `.exe`. No hosted-vs-exe branching.
@@ -52,7 +57,8 @@ actually answers — so the same build is safe hosted *and* useful as the `.exe`
 Because control never touches the cloud, everything about the gateway is **local**:
 - **Setup** (controller type Expert/4.1/3.1 + dest + **port** + host/binding + Modbus/COM + identity),
 - **"what if I run two"** (a same-box port clash — fix with a configurable port),
-- **security** (binds `127.0.0.1`; identity-verifies the controller so a job can't land on the wrong machine).
+- **security** (binds `127.0.0.1` by default; the LAN "personal cloud" binding is an explicit, off-by-default
+  Setup toggle — see `COMBINED-APP-PLAN.md`; identity-verifies the controller so a job can't land on the wrong machine).
 
 None of those are cloud questions.
 
