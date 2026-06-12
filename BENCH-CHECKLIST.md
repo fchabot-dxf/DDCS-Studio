@@ -36,7 +36,16 @@ offline-confirmable parts are already done + pushed. Bench V4.1 @ `10.0.0.50`; E
 - [ ] **Rotary clock:** verify the **A-axis direction** — does "set A0" datum the flat level the *right* way? If reversed, flip the span sign. Test all 3 actions (set / report / rotate).
 - [ ] **Tool check:** run with a known tool → OK; break/shorten the tool → confirm the abort + deviation report.
 
-## 5. Optional
+## 5. CAM menu — dynamic deployment probes (Expert only; ⚠️ manual SYSDISK writes)
+Context: `CAM-MENU-RESEARCH.md` §5c. These are **attended, manual** file writes over SMB —
+outside the "Studio never writes" rule, so: **snapshot every file before replacing it**, and
+keep the firmware backup current (malformed `eng` could plausibly break boot).
+- [ ] **Macro hot-reload:** edit a comment/message in an installed `macro_camN.nc` over SMB → press Start (no reboot) → confirm the change ran. Expected: works (read-at-launch).
+- [ ] **BMP reload:** replace a `camN.bmp` over SMB → exit + re-enter the CAM page → icon updated? If not, reboot and re-check (boot cache).
+- [ ] **eng reload:** edit one `-s1` label over SMB → (a) re-enter CAM form, (b) toggle language eng↔chs↔eng, (c) reboot — note which step picks it up.
+- [ ] Log results in `CAM-MENU-RESEARCH.md` §5c table.
+
+## 6. Optional
 - [ ] Surface `controller_family` in the gateway Setup tab UI (data is already in the descriptor).
 
 ---
