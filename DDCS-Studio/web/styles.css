@@ -234,18 +234,23 @@ body[data-theme="organic"]    .app-header .tab.active { background: #6b8e23 !imp
    the top + sides — not the button bevel — plus the coloured top accent. Fill = the bar surface. */
 body[data-theme="studio"] .app-header .tab {
     color: #2a2a2a !important;
-    background: var(--panel) !important;
+    background: var(--sv-3, #b6b1a5) !important;                /* inactive = the (darker) header surface → recedes */
     border: 1px solid var(--bv-mid-lite, #b8b3a8) !important;
     border-bottom: none !important;
 }
 body[data-theme="studio"] .app-header .tab.active {
     color: #1c1c1c !important;
-    background: var(--panel) !important;
+    background: var(--sv-1, #e2dfd7) !important;                 /* = the (lighter, raised) toolbar surface below */
     border: 1px solid var(--bv-mid-lite, #b8b3a8) !important;   /* subtle metallic sides */
     border-top: 2px solid var(--bv-lite, #ffffff) !important;   /* white highlight on the TOP edge ONLY */
     border-bottom: none !important;
     box-shadow: inset 0 3px 0 0 var(--tab-accent) !important;   /* keep the coloured top */
 }
+/* Studio depth: the toolbar's bevel is RAISED (light top edge), so it sits ABOVE the header in the
+   colour hierarchy — toolbar lightest (sv-1), header darker (sv-3). Active tab = toolbar colour,
+   inactive tab = header colour. */
+body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !important; }
+body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !important; }
 
 /* GATEWAY tab when no gateway is reachable (hosted / standalone): greyed but clickable —
    clicking offers the desktop exe download (see ui/gatewayStatus.js). */
