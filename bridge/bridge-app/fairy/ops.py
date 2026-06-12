@@ -369,6 +369,12 @@ class Ops:
                 return {"available": True, "value": uservar[slot], "source": "uservar"}
         if not self.controller_reachable():
             return {"available": False, "reason": "controller unreachable"}
+        # Known system ranges we can't read yet — say which kind, and that the per-controller disk-slot
+        # mapping needs one bench confirmation (read the file, change a known value, see which slot moves).
+        if 500 <= n <= 1499:
+            return {"available": False, "source": "setting", "reason": "system parameter - bench-map pending"}
+        if n >= 1500:
+            return {"available": False, "source": "runtime", "reason": "position/runtime var - bench-map pending"}
         return {"available": False, "source": "tbd", "reason": "mapping pending bench verification"}
 
     def read_vars(self, nums):
