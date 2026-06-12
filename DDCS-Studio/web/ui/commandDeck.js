@@ -343,6 +343,7 @@ export class CommandDeck {
                         <div class="toolbar-dropdown-content">
                             <button onclick="openCornerWiz && openCornerWiz()">📐 Corner</button>
                             <button onclick="openMiddleWiz && openMiddleWiz()">🎯 Middle</button>
+                            <button onclick="openWiz && openWiz('circular')">⭕ Bore/Boss</button>
                             <button onclick="openEdgeWiz && openEdgeWiz()">📏 Edge</button>
                             <button onclick="openAlignmentWiz && openAlignmentWiz()">🧭 Align</button>
                         </div>
