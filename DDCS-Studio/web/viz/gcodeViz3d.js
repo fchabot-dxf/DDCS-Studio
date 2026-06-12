@@ -261,6 +261,7 @@ export class GcodeViz3D {
         } else {
             if (this._animRaf) cancelAnimationFrame(this._animRaf);
             this._animRaf = null;
+            this._applyPartRotation(0, 0); // return the part to rest when the play stops
             this.render();
         }
     }
@@ -298,6 +299,7 @@ export class GcodeViz3D {
                 if (d <= sg.ms || i === segs.length - 1) {
                     const t = sg.ms > 0 ? Math.min(1, d / sg.ms) : 1;
                     this._animTool.position.set(sg.ax + (sg.bx - sg.ax) * t, sg.ay + (sg.by - sg.ay) * t, sg.az + (sg.bz - sg.az) * t);
+                    this._applyPartRotation(sg.a1 + (sg.a2 - sg.a1) * t, sg.b1 + (sg.b2 - sg.b1) * t);
                     break;
                 }
                 d -= sg.ms;
@@ -305,6 +307,18 @@ export class GcodeViz3D {
             this.render();
         }
         this._animRaf = requestAnimationFrame(() => this._animTick());
+    }
+
+    // Spin the part group to the given rotary angles (degrees). A spins around its declared
+    // Cartesian axis (getRotaryAxes), defaulting to X; B around its declared axis, if any.
+    _applyPartRotation(a, b) {
+        const pg = this._partGroup;
+        if (!pg) return;
+        const rax = this._rotaryAxes || {};
+        const deg = Math.PI / 180;
+        pg.rotation.set(0, 0, 0);
+        pg.rotation[rax.a || 'x'] = (a || 0) * deg;
+        if (rax.b) pg.rotation[rax.b] = (b || 0) * deg;
     }
 
     // Short beep at the end of each animation loop (Web Audio; silent until a user gesture)
@@ -394,10 +408,15 @@ export class GcodeViz3D {
         // (length / programmed feedrate) so the loop shows slow probes crawling and
         // rapids zipping — relative speeds match the program.
         const animSegs = [];
-        const pushSeg = (ax, ay, az, bx, by, bz, rate) => {
+        const ROT_DEG_PER_MIN = 3600; // nominal rotary speed for sim timing of a rotary-only move (60°/s)
+        const pushSeg = (ax, ay, az, bx, by, bz, rate, a1, b1, a2, b2) => {
+            a1 = a1 || 0; b1 = b1 || 0; a2 = a2 || 0; b2 = b2 || 0;
             const len = Math.hypot(bx - ax, by - ay, bz - az);
-            if (len < 1e-9) return;
-            animSegs.push({ ax, ay, az, bx, by, bz, ms: (len / (rate > 0 ? rate : 600)) * 60000 });
+            const da = Math.abs(a2 - a1) + Math.abs(b2 - b1);
+            if (len < 1e-9 && da < 1e-9) return;   // truly stationary → skip
+            // A rotary-only move has no XYZ length: time it by its angle so the spin actually plays.
+            const ms = len >= 1e-9 ? (len / (rate > 0 ? rate : 600)) * 60000 : (da / ROT_DEG_PER_MIN) * 60000;
+            animSegs.push({ ax, ay, az, bx, by, bz, ms, a1, b1, a2, b2 });
         };
         let bounds = null;
         const grow = (x, y, z) => { bounds = this._growBounds(bounds, x, y, z, x, y, z); };
@@ -436,7 +455,7 @@ export class GcodeViz3D {
                     : type === 'probe' ? (((s.feed || 0) > 0 && (s.feed || 0) < maxProbeFeed) ? probeSlowPos : probeFastPos)
                     : feedPos;
                 arr.push(ax, ay, az, bx, by, bz);
-                pushSeg(ax, ay, az, bx, by, bz, (type === 'rapid' || type === 'retract') ? 6000 : (s.feed > 0 ? s.feed : 600));
+                pushSeg(ax, ay, az, bx, by, bz, (type === 'rapid' || type === 'retract') ? 6000 : (s.feed > 0 ? s.feed : 600), s.a1, s.b1, s.a2, s.b2);
                 cur = end;
             }
             prevEnd = { x: cur.x + mk.x, y: cur.y + mk.y, z: cur.z + mk.z };
@@ -445,6 +464,7 @@ export class GcodeViz3D {
         // Ordered segments + total program time for the play animation
         this._animSegs = animSegs;
         this._animMs = animSegs.reduce((t, s) => t + s.ms, 0);
+        this._rotaryAxes = getRotaryAxes(); // which Cartesian axis each rotary axis (a/b) spins around
 
         // Cuts: blue→cyan gradient by depth across the whole scene
         let feedCol = null;
@@ -572,8 +592,12 @@ export class GcodeViz3D {
     setStock(stock) {
         const THREE = this.THREE;
         this._stock = stock || null;
-        if (this.stockMesh) { this.scene.remove(this.stockMesh); this.stockMesh.geometry.dispose(); this.stockMesh.material.dispose(); this.stockMesh = null; }
-        if (this.stockEdges) { this.scene.remove(this.stockEdges); this.stockEdges.geometry.dispose(); this.stockEdges.material.dispose(); this.stockEdges = null; }
+        // The stock lives in a part group so a rotary move can spin it about its own axis.
+        if (!this._partGroup) { this._partGroup = new THREE.Group(); this.scene.add(this._partGroup); }
+        const pg = this._partGroup;
+        pg.rotation.set(0, 0, 0); // at rest; the play loop re-applies the angle each frame
+        if (this.stockMesh) { pg.remove(this.stockMesh); this.stockMesh.geometry.dispose(); this.stockMesh.material.dispose(); this.stockMesh = null; }
+        if (this.stockEdges) { pg.remove(this.stockEdges); this.stockEdges.geometry.dispose(); this.stockEdges.material.dispose(); this.stockEdges = null; }
         if (stock && stock.show && stock.x > 0 && stock.y > 0 && stock.z > 0) {
             const pocket = stock.shape === 'pocket';
             const fillCol = pocket ? 0x6a8fbe : 0x8fae6a;  // pocket = blue, boss = green
@@ -616,10 +640,16 @@ export class GcodeViz3D {
             }
             mesh.geometry = geo;
             mesh.material = mat;
-            this.stockMesh = mesh; this.scene.add(mesh);
             const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: edgeCol, transparent: true, opacity: 0.55 }));
             edges.position.copy(mesh.position);
-            this.stockEdges = edges; this.scene.add(edges);
+            // Pivot the part group on the stock centre, then offset the meshes into its local
+            // space, so partGroup.rotation spins the stock about its own centre axis.
+            const C = new THREE.Vector3(stock.x / 2, stock.y / 2, -stock.z / 2);
+            pg.position.copy(C);
+            mesh.position.sub(C);
+            edges.position.sub(C);
+            this.stockMesh = mesh; pg.add(mesh);
+            this.stockEdges = edges; pg.add(edges);
         }
     }
 
