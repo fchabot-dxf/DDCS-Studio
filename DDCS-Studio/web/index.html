@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
-    <title>DDCS Studio V9.85 - Modular</title>
+    <title>DDCS Studio V9.86 - Modular</title>
     
     <!-- Ensure project stylesheet is applied after inline legacy rules -->
     <link rel="stylesheet" href="styles.css">
@@ -92,7 +92,7 @@
             <svg class="logo logo-futuristic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-futuristic"/></svg>
             <svg class="logo logo-organic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-organic"/></svg>
             <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
-            <span class="ver">V9.85</span>
+            <span class="ver">V9.86</span>
         </div>
         <!-- App-switcher: STUDIO ↔ GATEWAY (machine-side views). Wired by ui/gatewayStatus.js —
              greyed when no gateway answers (click = download the desktop exe). -->
@@ -135,12 +135,6 @@
                     <div id="viz3dStatus" class="viz3d-status"></div>
                     <button id="viz3dStatusCopy" class="viz3d-status-copy" title="Copy status to clipboard">📋 Copy</button>
                     <div class="viz3d-controls">
-                        <label>Stock
-                            <select id="viz3dStockShape" title="Stock shape">
-                                <option value="boss">Boss</option>
-                                <option value="pocket">Pocket</option>
-                            </select>
-                        </label>
                         <label>Speed
                             <select id="viz3dSpeed" title="Simulation speed — 1× plays at the programmed feedrates (slow probes crawl, rapids zip)">
                                 <option value="1" selected>1×</option>
@@ -153,7 +147,6 @@
                         <button id="viz3dAnimate" type="button" title="Animate the toolpath in execution order">▶ Play</button>
                         <button id="viz3dStep" type="button" title="Execute one line at a time (pauses a running program)">⏭ Step</button>
                         <button id="viz3dLoop" type="button" title="Loop: restart the program automatically when it completes">⟳ Loop</button>
-                        <button id="viz3dIO" type="button" title="Show/hide the virtual I/O panel (sensors and outputs)">I/O</button>
                     </div>
                     <div class="viz3d-legend">
                         <span><i style="background:#3b82f6"></i>Probe</span>

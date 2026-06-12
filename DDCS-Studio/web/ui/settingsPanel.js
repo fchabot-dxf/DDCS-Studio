@@ -19,7 +19,7 @@ const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 // Built-in stock presets. Shape ∈ boss|pocket|cylinder; dimensions are separate (mm).
 // A flat board suits 3-axis work; rotary stock is a 3" block or Ø3" cylinder. Users can
 // save their own (any shape) on top of these — see stockTemplates in settings.
-const STOCK_TEMPLATES = [
+export const STOCK_TEMPLATES = [
     { name: '3-axis plate (small)', x: 150, y: 100, z: 20, shape: 'boss' },
     { name: '3-axis board (large)', x: 400, y: 300, z: 18, shape: 'boss' },
     { name: 'Rotary block 3″', x: 150, y: 76.2, z: 76.2, shape: 'boss' },
@@ -806,7 +806,7 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V9.85\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V9.86\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 

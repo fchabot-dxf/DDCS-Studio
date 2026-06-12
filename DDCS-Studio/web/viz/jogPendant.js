@@ -1,21 +1,25 @@
 /**
- * viz/jogPendant.js — the JOG START panel (step jog buttons for the
- * draggable start marker). Extracted from GcodeViz3D.
+ * viz/jogPendant.js — the bottom action bar of the 3D preview: a Stock launcher
+ * + virtual-I/O toggle in the header, over the step-jog buttons for the draggable
+ * start marker. Extracted from GcodeViz3D.
  */
+import { toggleStockEditor } from '../ui/stockEditor.js';
+
 export function setupJogPendant(viz) {
         const div = document.createElement('div');
         div.className = 'viz3d-jog-pendant';
         div.style.cssText = 'background: rgba(18, 18, 22, 0.95); border-top: 1px solid rgba(255,255,255,0.08); padding: 8px 12px 12px; color: #fff; z-index: 100; font-size: 11px; display: none; user-select: none; width: 100%; box-sizing: border-box;';
         div.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 0 4px;">
-                <span style="font-weight: bold; color: #aaa; letter-spacing: 1px;">JOG START</span>
-                <span style="display: flex; gap: 8px; align-items: center; color: #888;">
-                    Step:
-                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="0.1"> 0.1</label>
-                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="1"> 1.0</label>
-                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="10" checked> 10</label>
-                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="100"> 100</label>
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; padding: 0 4px;">
+                <span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <button id="jogStockBtn" class="toolbar-btn" style="padding:3px 12px; font-weight:bold;" title="Stock setup — shape, size, templates (updates the 3D view live)">📦 Stock</button>
+                    <span id="jogPlayControls" style="display: flex; align-items: center; gap: 6px;"></span>
+                    <span style="display: flex; align-items: center; gap: 8px; color: #888;">
+                        <label style="cursor:pointer;"><input type="radio" name="jogStep" value="1"> 1.0</label>
+                        <label style="cursor:pointer;"><input type="radio" name="jogStep" value="10" checked> 10</label>
+                    </span>
                 </span>
+                <button id="jogIOBtn" class="toolbar-btn" style="padding:3px 12px;" title="Show/hide the virtual I/O panel (sensors and outputs)">I/O</button>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 32px 32px; gap: 6px;">
                 <button class="toolbar-btn" data-axis="z" data-dir="-1" style="font-weight:bold; padding:0;">Z-</button>
@@ -36,7 +40,12 @@ export function setupJogPendant(viz) {
         // Prevent touches on the jog panel from rotating the view
         div.addEventListener('pointerdown', e => e.stopPropagation());
         
-        div.querySelectorAll('button').forEach(btn => {
+        const stockBtn = div.querySelector('#jogStockBtn');
+        if (stockBtn) stockBtn.addEventListener('click', () => toggleStockEditor(stockBtn));
+        const ioBtn = div.querySelector('#jogIOBtn');
+        if (ioBtn) ioBtn.addEventListener('click', () => { if (window.ioPanel) window.ioPanel.toggle(); });
+
+        div.querySelectorAll('button[data-axis]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const axis = btn.getAttribute('data-axis');
                 const dir = parseFloat(btn.getAttribute('data-dir'));

@@ -26,11 +26,18 @@ function gpEls() {
     };
 }
 
-// Keep the in-canvas stock controls in sync with settings
-function gpSyncControls() {
-    const sel = document.getElementById('viz3dStockShape');
-    const s = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
-    if (sel && s && s.stock) sel.value = s.stock.shape || 'boss';
+// Move the play controls (Speed/Run/Step/Loop) out of the static toolbar into the floating
+// jog bar above the jog buttons, so every preview control shares one bar over the canvas.
+function gpRelocatePlayControls() {
+    const host = gpViz && gpViz.jogPendant && gpViz.jogPendant.querySelector('#jogPlayControls');
+    if (!host) return;
+    ['viz3dSpeed', 'viz3dAnimate', 'viz3dStep', 'viz3dLoop'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        host.appendChild(id === 'viz3dSpeed' ? (el.closest('label') || el) : el);
+    });
+    const bar = document.querySelector('.viz3d-controls');
+    if (bar && !bar.children.length) bar.style.display = 'none';
 }
 
 /** Set the status bar text, optionally flagging it as an error (red + copy button). */
@@ -100,6 +107,7 @@ export function setGcodeView(view) {
             window.ddcsSetSpindleStart = (x, y, z, pass) => { if (gpViz) gpViz.setStart(x, y, z, pass || 0); };
             window.ddcsGetSpindleStart = () => (gpViz && gpViz.starts[0] ? { ...gpViz.starts[0] } : null);
             window.ddcsGetStarts = () => (gpViz ? gpViz.starts.map((s) => ({ ...s })) : null);
+            gpRelocatePlayControls(); // pull Speed/Run/Step/Loop into the floating jog bar
         } catch (err) {
             console.error('3D preview init failed', err);
             if (els.status) els.status.textContent = '3D unavailable: ' + err.message;
@@ -108,7 +116,6 @@ export function setGcodeView(view) {
     }
     gpViz.setActive(true);
     gpRenderFromEditor();
-    gpSyncControls();
 }
 
 function gpInit() {
@@ -159,22 +166,14 @@ function gpInit() {
             gpDebounce = setTimeout(gpRenderFromEditor, 300);
         });
     }
-    // Stock-shape selector that lives in the 3D canvas
-    const shapeSel = document.getElementById('viz3dStockShape');
-    if (shapeSel) {
-        shapeSel.addEventListener('change', () => {
-            if (window.ddcsApplySettings) window.ddcsApplySettings({ stock: { shape: shapeSel.value } });
-        });
-    }
     // View-snap buttons (Top / Front / Right / Iso)
     document.querySelectorAll('#gcodeViz3dContainer .viz3d-views button').forEach((btn) => {
         btn.addEventListener('click', () => { if (gpViz) gpViz.setView(btn.dataset.view); });
     });
-    // Run / Step / Loop / I/O controls for the execution engine
+    // Run / Step / Loop controls for the execution engine (I/O toggle now lives in the jog bar)
     const runBtn = document.getElementById('viz3dAnimate');
     const stepBtn = document.getElementById('viz3dStep');
     const loopBtn = document.getElementById('viz3dLoop');
-    const ioBtn = document.getElementById('viz3dIO');
     gpRunButton = runBtn;
     let gpLoopTimer = null;
     let gpLastRunCode = null;   // code of the last continuous Run (loop restarts this, never a stepped run)
@@ -289,11 +288,6 @@ function gpInit() {
             if (!loopBtn.classList.contains('on')) gpCancelLoop();
         });
     }
-    if (ioBtn) {
-        ioBtn.addEventListener('click', () => {
-            if (window.ioPanel) window.ioPanel.toggle();
-        });
-    }
     // The I/O panel's "Auto sensors" checkbox drives the engine's virtual-sensor answers
     window.addEventListener('ddcs:auto-sensors-changed', (e) => {
         if (gpEngine) gpEngine.autoAnswer = !!(e.detail && e.detail.on);
@@ -304,7 +298,6 @@ function gpInit() {
             if (gpEngine) gpEngine.simSpeed = gpSimSpeed();
         });
     }
-    gpSyncControls();
 
     function gpUpdateRunButton() {
         if (!gpRunButton) return;
@@ -317,7 +310,6 @@ function gpInit() {
     }
     // Stock / machine settings changed → redraw if the 3D drawer is open
     window.addEventListener('ddcs:settings-changed', () => {
-        gpSyncControls();
         if (gpView === '3d' && gpViz) gpRenderFromEditor();
     });
     window.setGcodeView = setGcodeView;
