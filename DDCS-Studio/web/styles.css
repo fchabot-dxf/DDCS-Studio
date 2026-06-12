@@ -1087,7 +1087,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 .dock-header .header-controls {
     display: flex !important;
     flex-wrap: nowrap;
-    justify-content: center;
+    justify-content: space-between;   /* spread the 3 groups apart: left / center / right */
     align-items: center;
     gap: 6px;
     padding: 6px 10px;
@@ -3351,7 +3351,8 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .app-header.is-compact .hdr-controls { gap: 6px; }
 .app-header.is-mini .hdr-tabs .tab .app-tx { display: none; }
 .app-header.is-mini .hdr-tabs .tab .app-ico { margin-left: 0; }
-.app-header.is-mini .hdr-tabs .tab { padding: 0 11px; letter-spacing: 0; }
+.app-header.is-mini .hdr-tabs .tab { padding: 13px 17px; letter-spacing: 0; }   /* keep real height + width when icon-only */
+.app-header.is-mini .hdr-tabs .tab .app-ico svg { width: 19px; height: 19px; }  /* bigger icon to match the other icon buttons */
 .app-header.is-mini .ver { display: none; }
 @media (max-width: 520px) {
     .app-header .brand { padding: 0 8px; gap: 6px; }
