@@ -2974,7 +2974,7 @@ body[data-scale="250"] {
 /* Tab strip at the top of the dock body — hidden with the body when collapsed, spaced (no overlap) */
 /* margin-bottom cancels the dock-body's 12px flex gap (+2px) so the tab strip sits ON the panel
    and the active tab merges into it — no floating gap between tab and panel body. */
-.dock-body .deck-tabs { display: flex; gap: 4px; align-items: flex-end; margin: 0 0 -14px; padding: 0 8px; position: relative; z-index: 2; }
+.dock-body .deck-tabs { display: flex; gap: 4px; align-items: flex-end; margin: 0 0 -12px; padding: 0; position: relative; z-index: 2; }
 .dock-body .deck-tab {
     position: relative;
     padding: 7px 18px 8px !important;
@@ -2988,13 +2988,14 @@ body[data-scale="250"] {
     border-radius: 9px 9px 0 0 !important;
     box-shadow: none !important;
     cursor: pointer;
-    margin-bottom: -2px;                                /* sit ON the panel — cover its coloured top border */
-    opacity: .7;
+    margin-bottom: 0;                                   /* inactive tabs sit ON the panel's top edge (visible seam) */
+    opacity: .62;
     transition: opacity .12s ease, color .12s ease;
 }
 .dock-body .deck-tab::before { display: none !important; }
-.dock-body .deck-tab:hover { color: var(--text-main) !important; opacity: .92; }
-.dock-body .deck-tab.active { color: var(--text-main) !important; opacity: 1; z-index: 3; }
+.dock-body .deck-tab:hover { color: var(--text-main) !important; opacity: .9; }
+/* active overlaps the panel's 1px top border → its body flows into the panel with no line */
+.dock-body .deck-tab.active { color: var(--text-main) !important; opacity: 1; z-index: 3; margin-bottom: -1px; }
 .dock-body .deck-tab + .deck-tab { margin-left: 0 !important; }
 /* per-tab accent colours. Active tab tint uses LITERAL colours (matching its panel exactly) so the
    colour-mix can't fall through to transparent — the active tab + its panel are one tinted surface. */
@@ -3023,7 +3024,6 @@ body[data-theme="studio"] .dock-body .ddcs-tab.active {
 .dock-body .deck-tab-panel {
     padding: 10px;
     border: 1px solid var(--border);
-    border-top: 2px solid var(--tab-color, var(--border));
     border-radius: 0 10px 10px 10px;
     position: relative; z-index: 1;
 }
@@ -3366,17 +3366,20 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
     .editor-container .viz3d-handle:active { transform: translateX(-50%) !important; }
 }
 
-/* ── Probe-config source chip (PROBE-CONFIG-SOURCE.md) ──────────────────────
-   Controller glyph inside controller-backed wizard inputs: dim = Studio value,
-   lit = field reads the controller's parameter at runtime (input shows the var). */
-.psrc-wrap { position: relative; display: inline-flex; align-items: center; }
-.psrc-wrap > input { padding-right: 22px; }
+/* ── Probe-config source dot (PROBE-CONFIG-SOURCE.md) ───────────────────────
+   Radio-style dot BESIDE controller-backed wizard inputs: hollow ring = Studio
+   value; filled dot = field reads the controller's parameter at runtime
+   (input shows the var, e.g. #632). */
+.psrc-wrap { display: inline-flex; align-items: center; gap: 3px; }
 .psrc-glyph {
-    position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
+    flex: 0 0 auto; appearance: none;
     display: inline-flex; align-items: center; justify-content: center;
-    width: 17px; height: 17px; padding: 0; border: none; border-radius: 3px;
-    background: transparent; color: #5a6472; cursor: pointer; opacity: 0.55;
+    width: 13px; height: 13px; min-height: 0; min-width: 0;   /* beat the global button min-height */
+    padding: 0; border: none; border-radius: 50%;
+    background: transparent; color: #5d6a78; cursor: pointer; opacity: 0.85;
 }
-.psrc-glyph:hover { opacity: 1; background: rgba(255, 255, 255, 0.07); }
-.psrc-glyph.psrc-lit { color: #4fc3f7; opacity: 1; }
-input.psrc-ctrl { color: #4fc3f7; font-style: italic; }
+.psrc-glyph:hover { opacity: 1; color: #0277bd; background: transparent; border: none; }
+.psrc-glyph .psrc-dot { opacity: 0; }              /* hollow ring = Studio value */
+.psrc-glyph.psrc-lit { color: #0277bd; opacity: 1; }
+.psrc-glyph.psrc-lit .psrc-dot { opacity: 1; }     /* filled dot = controller */
+input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
