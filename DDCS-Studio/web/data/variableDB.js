@@ -184,6 +184,38 @@ export class VariableDatabase {
         return this.activeDB;
     }
 
+    // --- controller variable-list switch (Expert <-> V4.1) --------------------
+    // The two controllers have completely different variable maps. We keep one merged DB but can swap
+    // the SYSTEM vars for the selected controller while preserving the user's own entries. Persisted
+    // (ddcs_var_profile) so offline users keep their choice across reloads.
+    getControllerVars() {
+        try { return localStorage.getItem('ddcs_var_profile') === 'v4.1' ? 'v4.1' : 'expert'; }
+        catch (e) { return 'expert'; }
+    }
+
+    async _loadDefaultCsv(family) {
+        if (family === 'v4.1') return (await import('./default_vars_v41.js')).DEFAULT_VAR_CSV_V41;
+        return (await import('./default_vars.js')).DEFAULT_VAR_CSV;
+    }
+
+    async setControllerVars(family) {
+        const fam = family === 'v4.1' ? 'v4.1' : 'expert';
+        try { localStorage.setItem('ddcs_var_profile', fam); } catch (e) { /* ignore */ }
+        const userVars = (this.activeDB || []).filter(e => !e.isSys);   // keep the user's own variables
+        this.activeDB = [];
+        let csv = '';
+        try { csv = await this._loadDefaultCsv(fam); } catch (e) { console.warn('variable list load failed', e); }
+        if (csv) this.loadFromCSV(csv, true);                            // the chosen controller's system vars
+        if (userVars.length) {                                          // re-merge the user vars on top
+            const map = new Map(this.activeDB.map(e => [e.i, e]));
+            for (const e of userVars) map.set(e.i, e);
+            this.activeDB = Array.from(map.values());
+            this.saveToStorage();
+        }
+        try { window.dispatchEvent(new CustomEvent('variableDB:ready', { detail: { count: this.activeDB.length, family: fam } })); } catch (e) { /* ignore */ }
+        return fam;
+    }
+
     // Merge user-variable entries (e.g. from an imported profile JSON); keeps system vars
     importUserVars(entries) {
         if (!Array.isArray(entries) || entries.length === 0) return;

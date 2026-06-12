@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
-    <title>DDCS Studio V9.96 - Modular</title>
+    <title>DDCS Studio V9.97 - Modular</title>
     
     <!-- Ensure project stylesheet is applied after inline legacy rules -->
     <link rel="stylesheet" href="styles.css">
@@ -86,14 +86,15 @@
 
     <header class="app-header">
         <span data-fred-home-mount></span>
-        <div class="brand">
+        <a class="brand" href="https://ddcs-studio.pages.dev" target="_blank" rel="noopener"
+           title="Open DDCS Studio online — ddcs-studio.pages.dev">
             <svg class="logo logo-normal" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-normal"/></svg>
             <svg class="logo logo-studio" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-studio"/></svg>
             <svg class="logo logo-futuristic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-futuristic"/></svg>
             <svg class="logo logo-organic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-organic"/></svg>
             <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
-            <span class="ver">V9.96</span>
-        </div>
+            <span class="ver">V9.97</span>
+        </a>
         <!-- App-switcher: STUDIO ↔ GATEWAY (machine-side views). Wired by ui/gatewayStatus.js —
              greyed when no gateway answers (click = download the desktop exe). -->
         <nav class="hdr-tabs" aria-label="App switcher">
@@ -188,8 +189,8 @@
             <div class="wiz-head">
                 <span id="wizTitle">GENERATOR</span>
                 <span class="wiz-head-actions" style="display:flex; gap:14px; align-items:center;">
-                    <span style="cursor:pointer" title="Settings — stock, probe, machine (live updates this preview)" onclick="window.openSettings && window.openSettings()">⚙</span>
-                    <span style="cursor:pointer" onclick="closeWiz()">✕</span>
+                    <span class="wiz-gear" title="Settings — stock, probe, machine (live updates this preview)" onclick="window.openSettings && window.openSettings()">⚙</span>
+                    <span class="wiz-close" onclick="closeWiz()" title="Close">✕</span>
                 </span>
             </div>
 

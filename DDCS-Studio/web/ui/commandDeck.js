@@ -215,6 +215,34 @@ export class CommandDeck {
         panel.innerHTML = '';
         this._activeFilters = new Set();
 
+        // Controller variable-set switch (offline) + pull-from-controller (uses the gateway fingerprint).
+        // The V4.1 and Expert have completely different variable maps; this swaps the system vars.
+        const ctrlRow = document.createElement('div');
+        ctrlRow.className = 'deck-var-ctrlrow';
+        ctrlRow.style.cssText = 'display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;';
+        const ctrlLbl = document.createElement('span');
+        ctrlLbl.textContent = 'Variable set:'; ctrlLbl.style.cssText = 'font-size:11px; opacity:.7;';
+        const ctrlSel = document.createElement('select');
+        ctrlSel.className = 'deck-var-ctrlsel'; ctrlSel.style.cssText = 'font-size:11px;';
+        ctrlSel.innerHTML = '<option value="expert">Expert M350</option><option value="v4.1">DDCS V4.1</option>';
+        ctrlSel.value = this.variableDB ? this.variableDB.getControllerVars() : 'expert';
+        ctrlSel.addEventListener('change', async () => {
+            if (!this.variableDB) return;
+            await this.variableDB.setControllerVars(ctrlSel.value);
+            if (this._varStatus) this._varStatus.textContent = '';
+            this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : '');
+        });
+        const pullBtn = document.createElement('button');
+        pullBtn.className = 'toolbar-btn'; pullBtn.style.cssText = 'padding:2px 8px; font-size:11px;';
+        pullBtn.textContent = '↧ Pull from controller';
+        pullBtn.title = 'Detect the connected controller via the gateway and load its variable set';
+        pullBtn.addEventListener('pointerdown', (e) => e.preventDefault(), { passive: false });
+        pullBtn.addEventListener('click', () => this._pullControllerVars(ctrlSel));
+        const ctrlStatus = document.createElement('span');
+        ctrlStatus.style.cssText = 'font-size:10px; opacity:.7;'; this._varStatus = ctrlStatus;
+        ctrlRow.appendChild(ctrlLbl); ctrlRow.appendChild(ctrlSel); ctrlRow.appendChild(pullBtn); ctrlRow.appendChild(ctrlStatus);
+        panel.appendChild(ctrlRow);
+
         const searchRow = document.createElement('div');
         searchRow.className = 'deck-var-searchrow';
         const search = document.createElement('input');
@@ -265,6 +293,27 @@ export class CommandDeck {
         this._varSearch = search;
         search.addEventListener('input', () => this.renderVariables(search.value.trim().toLowerCase()));
         this.renderVariables();
+    }
+
+    // Pull-from-controller: ask the gateway which controller it's connected to (the read-only
+    // fingerprint) and load that controller's variable set. Falls back to a manual pick if offline.
+    async _pullControllerVars(sel) {
+        if (this._varStatus) this._varStatus.textContent = 'detecting…';
+        let fam = null;
+        try {
+            const { makeClient } = await import('../shared/js/client.js');
+            const d = await makeClient().descriptor();
+            fam = d && d.controller_family;
+        } catch (e) { /* gateway unreachable / offline */ }
+        const target = fam === 'v4.1' ? 'v4.1' : (fam === 'expert-m350' ? 'expert' : null);
+        if (!target) {
+            if (this._varStatus) this._varStatus.textContent = 'no controller detected — pick a set manually';
+            return;
+        }
+        if (this.variableDB) await this.variableDB.setControllerVars(target);
+        if (sel) sel.value = target;
+        this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : '');
+        if (this._varStatus) this._varStatus.textContent = `loaded ${target === 'v4.1' ? 'DDCS V4.1' : 'Expert M350'} (via gateway)`;
     }
 
     renderVariables(filter = '') {
@@ -381,6 +430,7 @@ export class CommandDeck {
                                 cc.style.left = '';
                                 cc.style.top = '';
                                 cc.style.minWidth = '';
+                                cc.style.paddingTop = '';
                             }
                         }
                     });
@@ -393,11 +443,13 @@ export class CommandDeck {
                     if (content && willOpen) {
                         try {
                             const rect = btn.getBoundingClientRect();
+                            const pad = 6; // tray border + padding ring around the trigger
                             content.style.position = 'fixed';
-                            content.style.left = `${Math.max(6, Math.round(rect.left))}px`;
-                            content.style.top = `${Math.round(rect.bottom + 6)}px`;
-                            // Use the button width as the dropdown width for a compact vertical list
-                            content.style.minWidth = `${Math.max(btn.offsetWidth, 0)}px`;
+                            content.style.left = `${Math.max(6, Math.round(rect.left - pad))}px`;
+                            content.style.top = `${Math.round(rect.top - pad)}px`;
+                            content.style.minWidth = `${Math.max(btn.offsetWidth + pad * 2, 0)}px`;
+                            // Tray wraps the trigger, but items start below it (trigger stays visible on top)
+                            content.style.paddingTop = `${btn.offsetHeight + pad + 4}px`;
                         } catch (err) {
                             // fallback: leave it absolute
                             content.style.position = '';
@@ -407,6 +459,7 @@ export class CommandDeck {
                         content.style.left = '';
                         content.style.top = '';
                         content.style.minWidth = '';
+                        content.style.paddingTop = '';
                     }
                 });
             });
@@ -420,6 +473,7 @@ export class CommandDeck {
                         cc.style.left = '';
                         cc.style.top = '';
                         cc.style.minWidth = '';
+                        cc.style.paddingTop = '';
                     }
                 });
             });
