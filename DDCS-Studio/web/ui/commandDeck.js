@@ -1,4 +1,5 @@
 import { el, UIUtils } from './uiUtils.js';
+import { initSuggestBar } from './suggestBar.js';
 
 // Load a G-code / .nc file from disk into the editor, then trigger a re-parse + preview — for
 // simulating an existing program instead of pasting it. Wired to the 📂 Load header button;
@@ -143,8 +144,10 @@ export class CommandDeck {
         varPanel.style.display = 'none';
         this.buildVariablesPanel(varPanel);
 
-        // 5. Assemble the dock body: BASIC / MACRO / VARIABLES tab strip, then the panels.
+        // 5. Assemble the dock body: predictive suggestion row, then the BASIC/MACRO/VARIABLES tab
+        //    strip, then the panels. The suggestion bar sits on top (phone-style), always visible.
         body.innerHTML = '';
+        body.appendChild(initSuggestBar());
         body.appendChild(this._buildTabStrip());
         body.appendChild(basicPanel);
         body.appendChild(macroPanel);
