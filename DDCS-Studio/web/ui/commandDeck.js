@@ -445,8 +445,6 @@ export class CommandDeck {
                         </div>
                     </div>
 
-                    <button class="toolbar-btn" onclick="loadGcodeFile && loadGcodeFile()" title="Load a G-code / .nc file into the editor (replaces the current program)">📂 Load</button>
-                    <button class="toolbar-btn" onclick="insertGcodeFile && insertGcodeFile()" title="Insert a G-code file at the cursor — keeps your current program">➕ Insert</button>
                     <!-- Comm and WCS buttons are provided in the left header; avoid duplicates here -->
                 </div>
             `;
@@ -519,6 +517,8 @@ export class CommandDeck {
         if (rightTarget) {
             rightTarget.innerHTML = `
                 <div style="display:flex; gap:6px; align-items:center;">
+                    <button class="toolbar-btn" onclick="loadGcodeFile && loadGcodeFile()" title="Load a G-code / .nc file into the editor (replaces the current program)">📂 Load</button>
+                    <button class="toolbar-btn" onclick="insertGcodeFile && insertGcodeFile()" title="Insert a G-code file at the cursor — keeps your current program">➕ Insert</button>
                     <button class="toolbar-btn" onclick="copyCode && copyCode()">COPY</button>
                     <button class="toolbar-btn" onclick="clearCode && clearCode()">CLEAR</button>
                     <button class="toolbar-btn" onclick="downloadFile && downloadFile()">EXPORT</button>
