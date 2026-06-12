@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
-    <title>DDCS Studio V10.7 - Modular</title>
+    <title>DDCS Studio V10.8 - Modular</title>
     
     <!-- Ensure project stylesheet is applied after inline legacy rules -->
     <link rel="stylesheet" href="styles.css">
@@ -93,13 +93,13 @@
             <svg class="logo logo-futuristic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-futuristic"/></svg>
             <svg class="logo logo-organic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-organic"/></svg>
             <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
-            <span class="ver">V10.7</span>
+            <span class="ver">V10.8</span>
         </a>
         <!-- App-switcher: STUDIO ↔ GATEWAY (machine-side views). Wired by ui/gatewayStatus.js —
              greyed when no gateway answers (click = download the desktop exe). -->
         <nav class="hdr-tabs" aria-label="App switcher">
-            <button type="button" class="tab active" data-app="studio"><span class="dot"></span>STUDIO</button>
-            <button type="button" class="tab" data-app="gateway" title="Gateway"><span class="dot"></span>GATEWAY<span id="gateway-led" class="gateway-led" title="Gateway status"></span></button>
+            <button type="button" class="tab active" data-app="studio"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span><span class="app-tx">STUDIO</span></button>
+            <button type="button" class="tab" data-app="gateway" title="Gateway"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg></span><span class="app-tx">GATEWAY</span><span id="gateway-led" class="gateway-led" title="Gateway status"></span></button>
         </nav>
             <div class="hdr-controls" style="display:flex;gap:10px;align-items:center">
             <button onclick="(window.toggleStyle && window.toggleStyle())" id="styleBtn" class="op-btn" title="Switch Theme"><span class="op-icon">🎨</span><span class="op-label">NORMAL</span></button>

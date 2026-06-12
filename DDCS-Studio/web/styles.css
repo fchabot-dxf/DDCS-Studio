@@ -167,6 +167,10 @@ body {
 /* App-switcher tabs (STUDIO / GATEWAY) — visual stubs, no navigation yet.
    The :hover/:active resets shield them from the per-theme global `button` skins. */
 .hdr-tabs { display: flex; align-items: stretch; }
+/* Custom app icons so STUDIO / GATEWAY can collapse to icon-only when the header is tight */
+.hdr-tabs .tab .app-ico { display: inline-flex; flex: 0 0 auto; }
+.hdr-tabs .tab .app-ico svg { width: 17px; height: 17px; display: block; }
+.hdr-tabs .tab .app-tx { margin-left: 7px; }
 
 .app-header .tab,
 .app-header .tab:hover,
@@ -2963,23 +2967,36 @@ body[data-scale="250"] {
 #controller-dock .header-handle .chevron { display: inline-block; line-height: 1; font-size: 14px; }
 
 /* Tab strip at the top of the dock body — hidden with the body when collapsed, spaced (no overlap) */
-.dock-body .deck-tabs { display: flex; gap: 6px; align-items: flex-end; margin-bottom: 8px; }
+.dock-body .deck-tabs { display: flex; gap: 4px; align-items: flex-end; margin: 0; padding: 0 8px; position: relative; z-index: 2; }
 .dock-body .deck-tab {
     position: relative;
-    padding: 6px 20px !important;
+    padding: 7px 18px 8px !important;
     min-height: 0 !important;
     font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
     color: var(--text-dim) !important;
     background: var(--bg) !important;
     border: 1px solid var(--border) !important;
-    border-radius: 6px 6px 0 0 !important;
+    border-bottom: none !important;
+    border-top: 3px solid transparent !important;       /* room for the colour accent */
+    border-radius: 9px 9px 0 0 !important;
     box-shadow: none !important;
     cursor: pointer;
+    margin-bottom: -2px;                                /* sit ON the panel — cover its coloured top border */
+    opacity: .7;
+    transition: opacity .12s ease, color .12s ease;
 }
 .dock-body .deck-tab::before { display: none !important; }
-.dock-body .deck-tab:hover { color: var(--text-main) !important; }
-.dock-body .deck-tab.active { color: var(--text-main) !important; background: var(--panel) !important; }
+.dock-body .deck-tab:hover { color: var(--text-main) !important; opacity: .92; }
+.dock-body .deck-tab.active { color: var(--text-main) !important; opacity: 1; z-index: 3; }
 .dock-body .deck-tab + .deck-tab { margin-left: 0 !important; }
+/* per-tab accent colours. Active tab tint uses LITERAL colours (matching its panel exactly) so the
+   colour-mix can't fall through to transparent — the active tab + its panel are one tinted surface. */
+.dock-body .deck-tab[data-deck-tab="basic"]     { --tab-color: #3b82f6; }
+.dock-body .deck-tab[data-deck-tab="macro"]     { --tab-color: #a855f7; }
+.dock-body .deck-tab[data-deck-tab="variables"] { --tab-color: #10b981; }
+.dock-body .deck-tab[data-deck-tab="basic"].active     { background: color-mix(in srgb, var(--panel) 90%, #3b82f6) !important; border-top-color: #3b82f6 !important; }
+.dock-body .deck-tab[data-deck-tab="macro"].active     { background: color-mix(in srgb, var(--panel) 90%, #a855f7) !important; border-top-color: #a855f7 !important; }
+.dock-body .deck-tab[data-deck-tab="variables"].active { background: color-mix(in srgb, var(--panel) 90%, #10b981) !important; border-top-color: #10b981 !important; }
 
 body[data-theme="studio"] .dock-body .ddcs-tab {
     color: #000 !important; border-radius: 6px 6px 0 0 !important;
@@ -2995,7 +3012,17 @@ body[data-theme="studio"] .dock-body .ddcs-tab.active {
 }
 
 #controller-dock .dock-body { background: var(--panel); border-top: none; }
-.deck-tab-panel { padding: 0; }
+/* the framed body the tabs merge into; each panel carries a faint tint + a coloured top "shelf" of its tab */
+.dock-body .deck-tab-panel {
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--tab-color, var(--border));
+    border-radius: 0 10px 10px 10px;
+    position: relative; z-index: 1;
+}
+#deck-tab-basic     { --tab-color: #3b82f6; background: color-mix(in srgb, var(--panel) 90%, #3b82f6); }
+#deck-tab-macro     { --tab-color: #a855f7; background: color-mix(in srgb, var(--panel) 90%, #a855f7); }
+#deck-tab-variables { --tab-color: #10b981; background: color-mix(in srgb, var(--panel) 90%, #10b981); }
 
 /* Variables tab — search row + Filters button */
 .deck-var-searchrow { display: flex; gap: 6px; align-items: center; padding: 2px 0 6px; }
@@ -3274,10 +3301,24 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .settings-io { cursor: pointer; }
 
 /* Header op-buttons: never wrap labels to 2 lines; collapse to icon-only when narrow */
+.app-header { flex-wrap: nowrap; }
 .op-btn { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 @media (max-width: 820px) {
     .app-header .op-btn .op-label { display: none; }
     .app-header .op-btn { gap: 0; }
+}
+/* Narrower: the STUDIO/GATEWAY switcher collapses to its icon too + the version hides,
+   so the whole header stays on one line instead of pushing the page wide. */
+@media (max-width: 680px) {
+    .app-header .hdr-tabs .tab .app-tx { display: none; }
+    .app-header .hdr-tabs .tab { padding: 0 11px; letter-spacing: 0; }
+    .app-header .hdr-tabs .tab .app-ico { margin-left: 0; }
+    .app-header .ver { display: none; }
+    .hdr-controls { gap: 6px; }
+}
+@media (max-width: 520px) {
+    .app-header .brand { padding: 0 8px; gap: 6px; }
+    .app-header .logo { height: 26px; }
 }
 
 /* ===== Portrait / mobile: 3D drawer pulls UP from the bottom of the editor ===== */
