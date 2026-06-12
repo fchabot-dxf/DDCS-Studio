@@ -1,5 +1,32 @@
 import { el, UIUtils } from './uiUtils.js';
 
+// Load a G-code / .nc file from disk into the editor, then trigger a re-parse + preview — for
+// simulating an existing program instead of pasting it. Wired to the 📂 Load header button;
+// reuses one hidden <input> so re-loading the same file still fires a change.
+window.loadGcodeFile = function loadGcodeFile() {
+    let input = document.getElementById('gcode-file-input');
+    if (!input) {
+        input = document.createElement('input');
+        input.type = 'file';
+        input.id = 'gcode-file-input';
+        input.accept = '.nc,.gcode,.gco,.g,.ngc,.tap,.cnc,.txt';
+        input.style.display = 'none';
+        input.addEventListener('change', () => {
+            const f = input.files && input.files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = (e) => {
+                const ed = document.getElementById('editor');
+                if (ed) { ed.value = e.target.result || ''; ed.dispatchEvent(new Event('input', { bubbles: true })); }
+            };
+            r.readAsText(f);
+            input.value = ''; // let the same file be picked again
+        });
+        document.body.appendChild(input);
+    }
+    input.click();
+};
+
 // Variable filter categories — heuristic predicates over the DB (description keywords + flags).
 const VAR_FILTERS = [
     { key: 'user', label: 'User', test: v => !v.isSys },
@@ -299,6 +326,7 @@ export class CommandDeck {
         if (leftTarget) {
             leftTarget.innerHTML = `
                 <div style="display:flex; gap:6px; align-items:center;">
+                    <button class="toolbar-btn" onclick="loadGcodeFile && loadGcodeFile()" title="Load a G-code / .nc file into the editor to simulate it">📂 Load</button>
                     <button class="toolbar-btn" onclick="openWiz && openWiz('comm')">💬 Comm</button>
                     <button class="toolbar-btn" onclick="openWiz && openWiz('wcs')">🔧 WCS</button>
                     <button class="toolbar-btn" onclick="openWiz && openWiz('atc_warmup')" title="Spindle warm-up sequence">🔥 Warm-up</button>
