@@ -265,12 +265,26 @@ class Ops:
         return None
 
     # --- gateway setup (the Setup UI; local gateway only — the cloud can't reach in) --------
+    @staticmethod
+    def _lan_ip():
+        """This box's LAN address (for the 'open this on your phone' hint). Best-effort, never raises."""
+        import socket
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))           # no traffic sent — just picks the outbound interface
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except OSError:
+            return ""
+
     def get_config(self):
         c = self.cfg
         return {
             "machine_name": c.machine_name, "machine_id": c.machine_id,
             "dest": c.expert_dest, "com_port": c.com_port,
             "backend": c.backend, "enable_slave": c.enable_slave,
+            "host": c.host, "port": c.port, "lan_ip": self._lan_ip(),
             "is_remote": is_network_share(c.expert_dest),
             "controller_connected": self.controller_reachable(),
         }
@@ -286,12 +300,14 @@ class Ops:
             d = (updates.get("dest") or "").strip()
             if d and not is_network_share(d):
                 return {"ok": False, "error": r"controller disk must be a network share like \\10.0.0.50\cncdisk (not a local folder)"}
+        if "host" in updates and updates["host"] is not None and updates["host"] not in ("127.0.0.1", "0.0.0.0"):
+            return {"ok": False, "error": 'host must be "127.0.0.1" (this PC only) or "0.0.0.0" (LAN)'}
         restart = False
         if "machine_name" in updates: c.machine_name = (updates["machine_name"] or "").strip()
         if "machine_id" in updates: c.machine_id = (updates["machine_id"] or "").strip()
         if "dest" in updates: c.expert_dest = (updates["dest"] or "").strip()
         if updates.get("com_port"): c.com_port = updates["com_port"].strip()
-        for k in ("enable_slave", "backend"):
+        for k in ("enable_slave", "backend", "host"):   # host rebind needs a server restart
             if k in updates and updates[k] is not None and getattr(c, k) != updates[k]:
                 setattr(c, k, updates[k]); restart = True
         path = self._config_file()

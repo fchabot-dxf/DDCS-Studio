@@ -17,6 +17,7 @@ try {
     python -m PyInstaller --noconfirm --clean --onefile --name $Name `
         --paths "bridge/bridge-app" `
         --add-data "bridge/bridge-app/web/ui${sep}console" `
+        --add-data "DDCS-Studio/web${sep}studio" `
         --add-data "DDCS-Studio/web/shared${sep}shared" `
         --collect-submodules fairy `
         --collect-submodules pymodbus `

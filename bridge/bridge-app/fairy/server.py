@@ -1,7 +1,8 @@
 """server.py — the gateway's LOCAL HTTP server (CONFIGS §3 offline/local configs).
 
-Exposes the Ops surface (ops.py) as a small JSON API, serves the static console at `/`, and mounts
-the monorepo `shared/` core at `/shared/` (MONOREPO_PLAN §4 — no-build sharing via serve config).
+Exposes the Ops surface (ops.py) as a small JSON API, serves Studio at `/` (COMBINED-APP-PLAN Step 1
+— the one-app face; the legacy fairy console moves to `/fairy/` until Step 5 retires it), and mounts
+the monorepo `shared/` core at `/shared/` (no-build sharing via serve config).
 This is how the gateway *serves the console* at localhost (offline) or on the LAN (local-network):
 download the gateway, run it, open the browser → the whole local system.
 
@@ -106,6 +107,9 @@ class _Handler(BaseHTTPRequestHandler):
         if path.startswith("/shared/"):
             # the monorepo shared/ core (client.js, instrument/, …) — single source, served as-is (no build)
             return self._serve_file(self.server.shared_dir, path[len("/shared/"):])
+        if self.server.studio_dir and (path == "/fairy" or path.startswith("/fairy/")):
+            # legacy fairy console, kept reachable while Studio owns / (retired at COMBINED-APP-PLAN Step 5)
+            return self._serve_file(self.server.console_dir, path[len("/fairy/"):] or "index.html")
         return self._serve_static(path)
 
     def do_POST(self):
@@ -123,7 +127,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     # -- static console -------------------------------------------------------
     def _serve_static(self, path):
-        root = self.server.console_dir
+        root = self.server.studio_dir or self.server.console_dir
         if not root:
             return self._send_bytes(_PLACEHOLDER, "text/html")
         return self._serve_file(root, path.lstrip("/") or "index.html")
@@ -153,6 +157,7 @@ def start_server(config, ops):
     httpd = ThreadingHTTPServer((config.host, config.port), _Handler)
     httpd.ops = ops
     httpd.console_dir = config.console_dir
+    httpd.studio_dir = config.studio_dir
     httpd.shared_dir = config.shared_dir
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd

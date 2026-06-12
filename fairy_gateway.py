@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """fairy_gateway.py — desktop entry for the CNC-FAIRY gateway (fairy.exe).
 
-Starts the gateway HTTP server + poll loop in a background thread, then opens the
-existing fairy console (web/ui: Queue/Submit/Files/History/Setup) in a native
-pywebview window — no browser. Frozen-aware: when packaged by PyInstaller it serves
-the bundled console + shared/ assets from sys._MEIPASS; in dev it serves them from
-the repo tree.
+Starts the gateway HTTP server + poll loop in a background thread, then opens Studio
+(served at /; the legacy fairy console stays at /fairy/ until COMBINED-APP-PLAN Step 5)
+in a native pywebview window — no browser. Frozen-aware: when packaged by PyInstaller it
+serves the bundled studio + console + shared/ assets from sys._MEIPASS; in dev it serves
+them from the repo tree.
 
 Build:      build_fairy.ps1   ->  ./fairy.exe
 Run (dev):  python fairy_gateway.py            (boots to Setup; configure the
@@ -68,6 +68,7 @@ def _asset(name):
         return os.path.join(base, name)
     return {
         "console": os.path.join(HERE, "bridge", "bridge-app", "web", "ui"),
+        "studio": os.path.join(HERE, "DDCS-Studio", "web"),
         "shared": os.path.join(HERE, "DDCS-Studio", "web", "shared"),
     }[name]
 
@@ -77,11 +78,16 @@ def _run_gateway(user_args):
     if not getattr(sys, "frozen", False):
         sys.path.insert(0, os.path.join(HERE, "bridge", "bridge-app"))
     from fairy.bridge import main
+    # No --host here: the bind address comes from Setup's persisted config (default 127.0.0.1;
+    # "0.0.0.0" when the user enables LAN serving). The window still opens on 127.0.0.1 either way.
     argv = [
         "run", "--serve", "--backend", "local",
-        "--host", HOST, "--http-port", str(PORT),
+        "--http-port", str(PORT),
         "--console", _asset("console"), "--shared", _asset("shared"),
     ]
+    # Studio at / (COMBINED-APP-PLAN Step 1); tolerate an older frozen build without the studio bundle.
+    if os.path.isdir(_asset("studio")):
+        argv += ["--studio", _asset("studio")]
     # Safe default: no serial slave unless the user wired it — avoids a COM-port open failure on a box
     # with no SABRENT. But respect a persisted Beacons=on (Setup), so the saved choice survives relaunch.
     forced_flags = any(a in user_args for a in ("--port", "--no-slave"))
@@ -113,8 +119,47 @@ def _wait_up(timeout=20):
     return False
 
 
+def _msgbox(text, yesno=False):
+    """Native Windows message box (visible even with no console). Returns True for OK/Yes."""
+    try:
+        import ctypes
+        MB_ICONINFORMATION, MB_YESNO_WARN, IDYES, IDOK = 0x40, 0x4 | 0x30, 6, 1
+        r = ctypes.windll.user32.MessageBoxW(None, text, TITLE, MB_YESNO_WARN if yesno else MB_ICONINFORMATION)
+        return r == (IDYES if yesno else IDOK)
+    except Exception:
+        print(f"[fairy] {text}")
+        return True
+
+
+def _gateway_answering(timeout=0.8):
+    """True if something already answers our port — a second copy must not start (COM/port clash)."""
+    try:
+        with urllib.request.urlopen(f"http://{HOST}:{PORT}/api/descriptor", timeout=timeout) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
+def _tracking_active():
+    """True if a job is being tracked right now (queue has running/delivered/stalled items)."""
+    try:
+        import json
+        with urllib.request.urlopen(f"http://{HOST}:{PORT}/api/queue", timeout=2) as r:
+            items = json.load(r)
+        return any(i.get("state") in ("running", "delivered", "stalled") for i in items)
+    except Exception:
+        return False
+
+
 def main():
     _setup_logging()
+    # Single-instance lock (COMBINED-APP-PLAN Step 4): two gateways would silently double-bind the
+    # HTTP port and fight over the serial COM port — refuse politely instead.
+    if _gateway_answering():
+        _msgbox(f"Already running — another gateway is answering on port {PORT}.\n\n"
+                "Use the open window (or close it first); two copies would fight over the COM port.")
+        print(f"[fairy] another instance answers on :{PORT} — exiting.")
+        return
     user_args = sys.argv[1:]
     threading.Thread(target=_run_gateway, args=(user_args,), daemon=True).start()
     if not _wait_up():
@@ -122,8 +167,25 @@ def main():
     url = f"http://{HOST}:{PORT}/"
     try:
         import webview
-        webview.create_window(TITLE, url, width=1180, height=820, min_size=(900, 600))
-        webview.start()                       # blocks until the window closes; then the process exits
+        window = webview.create_window(TITLE, url, width=1180, height=820, min_size=(900, 600))
+
+        def on_closing():
+            # Window close = full shutdown (chosen lifecycle, COMBINED-APP-PLAN). The machine keeps
+            # running its job regardless (the bridge is push-only) — but tracking, the queue and LAN
+            # serving stop with this window, so confirm when a job is live.
+            if _tracking_active():
+                return _msgbox("A job is still being tracked.\n\n"
+                               "The machine keeps running either way, but tracking and LAN serving "
+                               "stop when this window closes.\n\nClose anyway?", yesno=True)
+            return True
+
+        try:
+            window.events.closing += on_closing
+        except Exception as e:
+            print(f"[fairy] close-confirm unavailable ({e}); window closes without asking.")
+        webview.start()                       # blocks until the window closes
+        print("[fairy] window closed — gateway down.")
+        os._exit(0)                           # daemon threads + serial released; guarantee no orphan
     except Exception as e:
         # No webview backend (headless / missing WebView2): fall back to the default browser.
         print(f"[fairy] native window unavailable ({e}); opening {url} in your browser. Ctrl+C to stop.")
@@ -136,7 +198,8 @@ def main():
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
-            pass
+            print("[fairy] stopped.")
+            os._exit(0)
 
 
 if __name__ == "__main__":
