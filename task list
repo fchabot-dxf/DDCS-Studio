@@ -1,6 +1,1 @@
-default jog movement to 10 steps.
-transfer start position from wizard preview to main preview on insert.
-why is the stock floating above grid when i activate probe Z first in corner generator.
-in engine animation respect feedrates speed 
-in probe generator, is it possible that even in a rapid move, the sensor is still listening, and if it collides abort program ?
-zooming should zoom toward cursor
+rotary question, do we need it, is it usefull in some way to support it. 

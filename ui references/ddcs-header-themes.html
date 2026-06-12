@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DDCS Header — All Themes</title>
+<style>
+  body{margin:0;background:#101216;display:flex;flex-direction:column;
+    gap:26px;align-items:center;padding:36px 0;
+    font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;}
+  .label{font-family:'Consolas','Courier New',monospace;font-size:11px;
+    letter-spacing:3px;color:#566270;}
+  .frame{width:390px;}
+
+  /* ── component (theme-agnostic: only uses the app's tokens) ── */
+  .ddcs-header{
+    background:var(--hdr-bg);
+    border-bottom:1px solid var(--border);
+    display:flex;align-items:stretch;height:54px;user-select:none;
+  }
+  .ddcs-header .brand{display:flex;align-items:baseline;gap:7px;
+    padding:0 15px;align-self:center;}
+  .ddcs-header .name{font-weight:900;font-style:italic;font-size:21px;
+    letter-spacing:-0.5px;color:var(--hdr-ink);}
+  .ddcs-header .ver{font-family:'Consolas','Courier New',monospace;
+    font-size:10px;color:var(--hdr-dim);}
+  .ddcs-header nav{margin-left:auto;display:flex;align-items:stretch;}
+  .ddcs-header .tab{display:flex;align-items:center;padding:0 16px;
+    font-size:12.5px;font-weight:700;letter-spacing:2px;
+    color:var(--hdr-dim);border:none;background:transparent;
+    cursor:pointer;position:relative;font-family:inherit;}
+  .ddcs-header .tab.active{color:var(--hdr-ink);}
+  .ddcs-header .tab.active::after{content:'';position:absolute;
+    left:10px;right:10px;bottom:0;height:3px;
+    background:var(--tab-accent);border-radius:var(--radius) var(--radius) 0 0;}
+  .ddcs-header .tab .dot{width:6px;height:6px;border-radius:50%;
+    margin-right:7px;background:currentColor;opacity:.45;}
+  .ddcs-header .tab.active .dot{background:var(--tab-accent);opacity:1;}
+  .ddcs-header .tab[data-app="studio"]{--tab-accent:var(--accent-studio);}
+  .ddcs-header .tab[data-app="gateway"]{--tab-accent:var(--accent-gateway);}
+  .stub{height:88px;font-family:'Consolas','Courier New',monospace;
+    font-size:13px;padding:12px 16px;background:var(--screen);color:var(--screen-ink);}
+  .stub .ln{opacity:.45;margin-right:12px;}
+
+  /* ════════ THEME TOKENS — from styles.css ════════ */
+
+  /* NORMAL  (--bg #f5f5f5, --panel #fff, --accent #4a90e2, radius 6) */
+  .t-normal{
+    --hdr-bg:#ffffff; --hdr-ink:#000000; --hdr-dim:#666666;
+    --border:#dddddd; --radius:6px;
+    --accent-studio:#4a90e2; --accent-gateway:#22a55e;
+    --screen:#f5f5f5; --screen-ink:#333333;
+  }
+
+  /* STUDIO  (silver chassis #c4bfb5, screen black, electric blue #1668ff,
+     phosphor #15e000, mono, radius 0) */
+  .t-studio{
+    --hdr-bg:#cfcabf; --hdr-ink:#101010; --hdr-dim:#4b4843;
+    --border:#6f6a60; --radius:0;
+    --accent-studio:#1668ff; --accent-gateway:#0a9a06;
+    --screen:#000000; --screen-ink:#15e000;
+  }
+  .t-studio .stub{
+    font-family:'DejaVu Sans Mono','Consolas',ui-monospace,monospace;}
+
+  /* FUTURISTIC  (--bg #0a0e1a, panel #111827, accent #00ffff, radius 8) */
+  .t-futuristic{
+    --hdr-bg:#111827; --hdr-ink:#ffffff; --hdr-dim:#8892b0;
+    --border:#1e293b; --radius:8px;
+    --accent-studio:#00ffff; --accent-gateway:#2bd47a;
+    --screen:#0a0e1a; --screen-ink:#e0e7ff;
+  }
+
+  /* ORGANIC  (--bg #f4f1e8, panel #faf8f3, accent #6b8e23, radius 12) */
+  .t-organic{
+    --hdr-bg:#faf8f3; --hdr-ink:#2d2d20; --hdr-dim:#7d7d6f;
+    --border:#d4d1c8; --radius:12px;
+    --accent-studio:#6b8e23; --accent-gateway:#8e6b23;
+    --screen:#f4f1e8; --screen-ink:#3d3d2f;
+  }
+
+  /* STEAMPUNK  (--bg #2a1810, panel #3d2817, accent #8b6914, radius 4) */
+  .t-steampunk{
+    --hdr-bg:#3d2817; --hdr-ink:#f5d7a8; --hdr-dim:#8b7355;
+    --border:#6b5329; --radius:4px;
+    --accent-studio:#c89b2a; --accent-gateway:#7a9a4a;
+    --screen:#2a1810; --screen-ink:#d4a574;
+  }
+
+  .ddcs-header .logo{height:34px;width:auto;display:block;align-self:center;}
+  .ddcs-header .brand{align-items:center;}
+
+</style>
+</head>
+<body>
+
+<!-- ── DDCS marks: one illustrative variant per theme ── -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+
+  <!-- NORMAL: clean wordmark + blue toolpath swoosh through it -->
+  <symbol id="mark-normal" viewBox="0 0 150 36">
+    <text x="0" y="22" font-family="'Arial Black',Arial,sans-serif" font-size="24"
+      font-weight="900" font-style="italic" letter-spacing="0.5" fill="#C7A900">DDCS</text>
+    <polyline points="86,6 100,6 100,14 116,14 116,4 130,4" fill="none"
+      stroke="#4a90e2" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="130" cy="4" r="3" fill="#4a90e2"/>
+    <text x="2" y="33" font-family="Arial,sans-serif" font-size="8" font-weight="600"
+      letter-spacing="1.4" fill="#666666">CNC MACRO STUDIO</text>
+  </symbol>
+
+  <!-- STUDIO: engraved nameplate — stamped into the silver chassis -->
+  <symbol id="mark-studio" viewBox="0 0 150 36">
+    <text x="1" y="23" font-family="'Arial Black',Arial,sans-serif" font-size="24"
+      font-weight="900" font-style="italic" letter-spacing="0.5" fill="#f0eee8">DDCS</text>
+    <text x="0" y="22" font-family="'Arial Black',Arial,sans-serif" font-size="24"
+      font-weight="900" font-style="italic" letter-spacing="0.5" fill="#55514a">DDCS</text>
+    <text x="2.7" y="33.7" font-family="Arial,sans-serif" font-size="8" font-weight="600"
+      letter-spacing="1.4" fill="#f0eee8">CNC MACRO STUDIO</text>
+    <text x="2" y="33" font-family="Arial,sans-serif" font-size="8" font-weight="600"
+      letter-spacing="1.4" fill="#55514a">CNC MACRO STUDIO</text>
+  </symbol>
+
+  <!-- FUTURISTIC: neon glow wordmark + circuit traces -->
+  <symbol id="mark-futuristic" viewBox="0 0 150 36">
+    <defs>
+      <filter id="neon" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="1.6" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <text x="0" y="22" font-family="'Arial Black',Arial,sans-serif" font-size="24"
+      font-weight="900" font-style="italic" letter-spacing="0.5"
+      fill="#FFF100" filter="url(#neon)">DDCS</text>
+    <!-- circuit trace -->
+    <path d="M88 8 h14 l6,-6 h18" fill="none" stroke="#00ffff" stroke-width="1.6" filter="url(#neon)"/>
+    <circle cx="88" cy="8" r="2" fill="none" stroke="#00ffff" stroke-width="1.4"/>
+    <circle cx="126" cy="2" r="2.4" fill="#00ffff" filter="url(#neon)"/>
+    <text x="2" y="33" font-family="Arial,sans-serif" font-size="8" font-weight="600"
+      letter-spacing="1.4" fill="#8892b0">CNC MACRO STUDIO</text>
+  </symbol>
+
+  <!-- ORGANIC: rounded humanist wordmark + leaf/branch flourish -->
+  <symbol id="mark-organic" viewBox="0 0 150 36">
+    <text x="0" y="22" font-family="Georgia,'Times New Roman',serif" font-size="24"
+      font-weight="bold" font-style="italic" letter-spacing="0.5" fill="#A89000">DDCS</text>
+    <!-- branch + two leaves -->
+    <path d="M92 16 q16,-12 34,-10" fill="none" stroke="#6b8e23" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M104 9 q-2,-7 5,-8 q1,7 -5,8 Z" fill="#6b8e23"/>
+    <path d="M117 6.5 q0,-7 7,-7 q0,7 -7,7 Z" fill="#8aa64a"/>
+    <text x="2" y="33" font-family="Georgia,serif" font-size="8" font-weight="600"
+      letter-spacing="1.6" fill="#7d7d6f">CNC MACRO STUDIO</text>
+  </symbol>
+
+  <!-- STEAMPUNK: brass serif wordmark + gear -->
+  <symbol id="mark-steampunk" viewBox="0 0 150 36">
+    <defs>
+      <linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#F0CC3A"/><stop offset="55%" stop-color="#C89B2A"/>
+        <stop offset="100%" stop-color="#8b6914"/>
+      </linearGradient>
+    </defs>
+    <text x="0" y="23" font-family="Georgia,'Times New Roman',serif" font-size="24"
+      font-weight="bold" letter-spacing="1" fill="url(#brass)">DDCS</text>
+    <!-- gear -->
+    <g transform="translate(110,10)">
+      <g fill="#C89B2A">
+        <rect x="-1.7" y="-10" width="3.4" height="20"/>
+        <rect x="-10" y="-1.7" width="20" height="3.4"/>
+        <rect x="-1.7" y="-10" width="3.4" height="20" transform="rotate(45)"/>
+        <rect x="-10" y="-1.7" width="20" height="3.4" transform="rotate(45)"/>
+      </g>
+      <circle r="7" fill="#C89B2A" stroke="#8b6914" stroke-width="1"/>
+      <circle r="3" fill="#3d2817"/>
+    </g>
+    <!-- rivets -->
+    <circle cx="128" cy="3" r="1.4" fill="#8b6914"/>
+    <circle cx="134" cy="17" r="1.4" fill="#8b6914"/>
+    <text x="2" y="33" font-family="Georgia,serif" font-size="8" font-weight="600"
+      letter-spacing="1.6" fill="#8b7355">CNC MACRO STUDIO</text>
+  </symbol>
+
+</svg>
+
+<div class="label">NORMAL</div>
+<div class="frame t-normal">
+  <header class="ddcs-header">
+    <div class="brand"><svg class="logo" viewBox="0 0 132 34" aria-label="DDCS"><use href="#mark-normal"/></svg><span class="ver">V9.81</span></div>
+    <nav>
+      <button class="tab active" data-app="studio"><span class="dot"></span>STUDIO</button>
+      <button class="tab" data-app="gateway"><span class="dot"></span>GATEWAY</button>
+    </nav>
+  </header>
+  <div class="stub"><span class="ln">1</span>( System Ready )</div>
+</div>
+
+<div class="label">STUDIO — M350 CONTROLLER SKIN</div>
+<div class="frame t-studio">
+  <header class="ddcs-header">
+    <div class="brand"><svg class="logo" viewBox="0 0 132 34" aria-label="DDCS"><use href="#mark-studio"/></svg><span class="ver">V9.81</span></div>
+    <nav>
+      <button class="tab active" data-app="studio"><span class="dot"></span>STUDIO</button>
+      <button class="tab" data-app="gateway"><span class="dot"></span>GATEWAY</button>
+    </nav>
+  </header>
+  <div class="stub"><span class="ln">1</span>( System Ready )</div>
+</div>
+
+<div class="label">FUTURISTIC</div>
+<div class="frame t-futuristic">
+  <header class="ddcs-header">
+    <div class="brand"><svg class="logo" viewBox="0 0 132 34" aria-label="DDCS"><use href="#mark-futuristic"/></svg><span class="ver">V9.81</span></div>
+    <nav>
+      <button class="tab active" data-app="studio"><span class="dot"></span>STUDIO</button>
+      <button class="tab" data-app="gateway"><span class="dot"></span>GATEWAY</button>
+    </nav>
+  </header>
+  <div class="stub"><span class="ln">1</span>( System Ready )</div>
+</div>
+
+<div class="label">ORGANIC</div>
+<div class="frame t-organic">
+  <header class="ddcs-header">
+    <div class="brand"><svg class="logo" viewBox="0 0 132 34" aria-label="DDCS"><use href="#mark-organic"/></svg><span class="ver">V9.81</span></div>
+    <nav>
+      <button class="tab active" data-app="studio"><span class="dot"></span>STUDIO</button>
+      <button class="tab" data-app="gateway"><span class="dot"></span>GATEWAY</button>
+    </nav>
+  </header>
+  <div class="stub"><span class="ln">1</span>( System Ready )</div>
+</div>
+
+<div class="label">STEAMPUNK</div>
+<div class="frame t-steampunk">
+  <header class="ddcs-header">
+    <div class="brand"><svg class="logo" viewBox="0 0 132 34" aria-label="DDCS"><use href="#mark-steampunk"/></svg><span class="ver">V9.81</span></div>
+    <nav>
+      <button class="tab active" data-app="studio"><span class="dot"></span>STUDIO</button>
+      <button class="tab" data-app="gateway"><span class="dot"></span>GATEWAY</button>
+    </nav>
+  </header>
+  <div class="stub"><span class="ln">1</span>( System Ready )</div>
+</div>
+
+</body>
+</html>
