@@ -143,7 +143,12 @@ body {
     gap: 10px;
     padding: 0 15px;
     align-self: center;
+    /* the brand is the home link (opens the hosted app — a real browser tab from the exe) */
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
 }
+.app-header .brand:hover .logo { filter: brightness(1.15); }
 
 /* Per-theme logo: all five marks are in the DOM, only the active theme's shows */
 .app-header .logo { height: 34px; width: auto; display: none; }
@@ -554,10 +559,16 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 .toolbar-dropdown-content {
     display: none;
     position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    background: transparent;
-    padding: 0;
+    top: -6px;                 /* fallback mirrors the JS: tray opens over the trigger */
+    left: -6px;
+    min-width: calc(100% + 12px);
+    /* opaque tray in every theme — rounded items no longer leak the editor through the gaps */
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 6px);
+    padding: 4px;
+    gap: 4px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
     z-index: 2000; /* higher to ensure visibility */
     white-space: nowrap;
     flex-direction: column;
@@ -585,35 +596,70 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 /* Studio theme only: force the dropdown trigger's silver panel look (fixes a studio transparency issue).
    Other themes (steampunk/futuristic/…) must fall through to their own button styling so the Probe/ATC
    triggers match the rest of the toolbar. */
-[data-theme="studio"] .dock-header .header-center .toolbar-dropdown > button.toolbar-btn {
-    background: linear-gradient(180deg, var(--sv-1, #e2dfd7), var(--sv-2, #cfcabf) 60%, var(--sv-3, #b6b1a5));
-    border-top: 2px solid var(--bv-lite, #ffffff);
-    border-left: 2px solid var(--bv-mid-lite, #b8b3a8);
-    border-right: 2px solid var(--bv-mid-dark, #6f6a60);
-    border-bottom: 2px solid var(--bv-dark, #3a362f);
-    color: var(--text);
-}
-[data-theme="studio"] .dock-header .header-center .toolbar-dropdown > button.toolbar-btn:hover {
-    filter: brightness(1.05);
-}
-
-/* Studio: stronger hover rule to prevent transparency from other generic hover rules */
+[data-theme="studio"] .dock-header .header-center .toolbar-dropdown > button.toolbar-btn,
 [data-theme="studio"] .dock-header .header-center .toolbar-dropdown > button.toolbar-btn:hover,
 [data-theme="studio"] .dock-header .header-center .toolbar-dropdown > button.toolbar-btn:focus {
-    background: linear-gradient(180deg, var(--sv-1, #e2dfd7), var(--sv-2, #cfcabf) 60%, var(--sv-3, #b6b1a5)) !important;
-    border-top: 2px solid var(--bv-lite, #ffffff) !important;
-    border-left: 2px solid var(--bv-mid-lite, #b8b3a8) !important;
-    border-right: 2px solid var(--bv-mid-dark, #6f6a60) !important;
-    border-bottom: 2px solid var(--bv-dark, #3a362f) !important;
+    border: 2px solid transparent !important;
+    border-radius: 6px !important;
+    background:
+        linear-gradient(180deg, var(--sv-1, #e2dfd7), var(--sv-2, #cfcabf) 60%, var(--sv-3, #b6b1a5)) padding-box,
+        linear-gradient(to bottom right, var(--bv-lite, #ffffff), var(--bv-mid-lite, #b8b3a8) 35%,
+                                         var(--bv-mid-dark, #6f6a60) 65%, var(--bv-dark, #3a362f)) border-box !important;
     color: var(--text) !important;
     opacity: 1 !important;
     filter: none !important;
+}
+
+/* Studio: the open menu is a silver key-tray — same plate-and-rim as the buttons,
+   each item a mini key inside it (closes the see-through gaps between rounded items) */
+[data-theme="studio"] .toolbar-dropdown-content {
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 4px;
+    gap: 4px;
+    background:
+        linear-gradient(180deg, var(--sv-2), var(--sv-3)) padding-box,
+        linear-gradient(to bottom right, var(--bv-lite), var(--bv-mid-lite) 35%,
+                                         var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+}
+[data-theme="studio"] .toolbar-dropdown-content button {
+    border: 2px solid transparent !important;
+    border-radius: 5px !important;
+    background:
+        linear-gradient(180deg, var(--sv-1), var(--sv-2) 60%, var(--sv-3)) padding-box,
+        linear-gradient(to bottom right, var(--bv-lite), var(--bv-mid-lite) 35%,
+                                         var(--bv-mid-dark) 65%, var(--bv-dark)) border-box !important;
+}
+[data-theme="studio"] .toolbar-dropdown-content button:hover { filter: brightness(1.05); }
+
+/* studio: open trigger flips to the electric-blue key (beats the silver !important trigger rule above) */
+[data-theme="studio"] .dock-header .header-center .toolbar-dropdown.active > button.toolbar-btn,
+[data-theme="studio"] .dock-header .header-center .toolbar-dropdown.active > button.toolbar-btn:hover,
+[data-theme="studio"] .dock-header .header-center .toolbar-dropdown.active > button.toolbar-btn:focus {
+    background:
+        linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2) padding-box,
+        linear-gradient(to bottom right, #8fbcff, #4f93ff 35%, #0a3a9e 65%, #062a72) border-box !important;
+    color: #fff !important;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.4);
 }
 
 .toolbar-dropdown.active .toolbar-dropdown-content {
     display: flex;
     flex-direction: column;
 }
+
+/* Open tray wraps the trigger — keep the trigger button painted above it so its label stays visible */
+.toolbar-dropdown.active > button { position: relative; z-index: 2001; }
+
+/* …and make the open trigger read as the tray's header, distinct from the items below it */
+.toolbar-dropdown.active > button {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 800;
+}
+[data-theme="futuristic"] .toolbar-dropdown.active > button { color: #0a0e1a; } /* cyan accent needs dark ink */
 
 /* Ensure dropdowns don't push layout when opened on small viewports */
 .dock-header .header-center .toolbar-dropdown {
@@ -997,35 +1043,41 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     border-bottom: 3px solid rgba(0,0,0,0.15);
 }
 
-/* --- Dock Header: allow horizontal scrolling on narrow screens --- */
+/* --- Dock Header: WRAP the toolbar groups instead of overflowing the page on narrow screens --- */
 .dock-header .header-controls {
-    display: grid !important; /* keep perfect centering behavior */
-    grid-template-columns: 1fr auto 1fr;
+    display: flex !important;
+    flex-wrap: wrap;          /* groups drop to a new row rather than growing the page */
+    justify-content: center;
     align-items: center;
+    gap: 6px;
     padding: 6px 10px;
     border-bottom: 1px solid rgba(0,0,0,0.1);
-
-    overflow-x: auto;      /* enable horizontal scroll when needed */
-    white-space: nowrap;   /* prevent wrapping of header buttons */
-
-    /* Mobile safety */
-    min-width: 0;          /* allow shrink */
-    scrollbar-width: none; /* hide scrollbar in Firefox when possible */
-} 
+    min-width: 0;
+    max-width: 100%;          /* never push the page wider than the viewport */
+}
 .dock-header .header-center {
-    justify-self: center;
     display: flex;
     gap: 6px;
     align-items: center;
-    min-width: max-content; /* keep center content intrinsic and allow scroll */
 }
 .dock-header .header-left,
-.dock-header .header-right { display:flex; gap:6px; align-items:center; }
+.dock-header .header-right { display:flex; gap:6px; align-items:center; flex-wrap: wrap; }
 
-/* Small-screen tweak: make header buttons not wrap and stay accessible */
+/* Icon + label spans so the bar can collapse to icon-only when space is tight */
+.dock-header .toolbar-btn { display: inline-flex; align-items: center; }
+.dock-header .toolbar-btn .btn-ico { display: inline-flex; flex: 0 0 auto; }
+.dock-header .toolbar-btn .btn-ico svg { width: 16px; height: 16px; display: block; }
+.dock-header .toolbar-btn .btn-tx { margin-left: 6px; }
+.dock-header .toolbar-btn .btn-caret { margin-left: 6px; font-size: 10px; opacity: .75; }
+
+/* Narrow: hide the text labels, keep the icons (buttons collapse to icon chips) */
+@media (max-width: 760px) {
+    .dock-header .header-controls .btn-tx { display: none; }
+    .dock-header .header-controls .toolbar-btn { min-width: 0 !important; padding-left: 9px; padding-right: 9px; }
+    .dock-header .header-controls .btn-caret { margin-left: 4px; }
+}
 @media (max-width: 520px) {
-    .dock-header .header-controls { padding: 6px 6px; }
-    .dock-header .header-left, .dock-header .header-center, .dock-header .header-right { flex: 0 0 auto; }
+    .dock-header .header-controls { padding: 6px 6px; gap: 4px; }
 }
 
 /* Row 2: Macro Grid */
@@ -1425,6 +1477,7 @@ button.primary:hover {
     /* Theme Defaults */
     background: var(--panel);
     border: 2px solid var(--accent);
+    border-radius: var(--radius, 6px);   /* corners follow each theme's own radius token */
     box-shadow: 0 8px 24px rgba(0,0,0,0.5);
 }
 
@@ -1441,9 +1494,64 @@ button.primary:hover {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    /* tuck the title bar into the box's rounded corners (2px = box border width) */
+    border-radius: calc(var(--radius, 6px) - 2px) calc(var(--radius, 6px) - 2px) 0 0;
 }
 
 /* --- FOOTER (Flush Fit) --- */
+/* Wizard header keys — glossy boxes, same look across all themes:
+   red ✕ to close, steel-grey ⚙ for settings */
+.wiz-head .wiz-close,
+.wiz-head .wiz-gear {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; cursor: pointer;
+    color: #fff; font-size: 14px; font-weight: 700; line-height: 1;
+    border-radius: 6px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 2px rgba(0,0,0,.35);
+    text-shadow: 0 1px 1px rgba(0,0,0,.35);
+}
+.wiz-head .wiz-close {
+    border: 1px solid #8e1408;
+    background: linear-gradient(180deg, #ff8276 0%, #ef4d33 45%, #d62311 50%, #e6431c 100%);
+}
+.wiz-head .wiz-gear {
+    border: 1px solid #444c55;
+    background: linear-gradient(180deg, #cfd4da 0%, #aab2bb 45%, #8d97a2 50%, #a0a9b3 100%);
+}
+.wiz-head .wiz-close:hover,
+.wiz-head .wiz-gear:hover { filter: brightness(1.08); }
+.wiz-head .wiz-close:active,
+.wiz-head .wiz-gear:active { transform: translateY(1px); box-shadow: inset 0 1px 2px rgba(0,0,0,.3); }
+
+/* per-theme close-key variants — always a red box with a white ✕, dressed to fit */
+[data-theme="normal"] .wiz-head .wiz-close {           /* clean + flat */
+    border: 1px solid #b21505;
+    background: linear-gradient(180deg, #f04634, #d62311);
+    box-shadow: 0 1px 2px rgba(0,0,0,.25); text-shadow: none;
+}
+[data-theme="studio"] .wiz-head .wiz-close {           /* red hardware key, same rim trick as the chassis */
+    border: 2px solid transparent;
+    background:
+        linear-gradient(180deg, #ff6a5a, #d62311 60%, #a31205) padding-box,
+        linear-gradient(to bottom right, #ffb3a8, #f0705e 35%, #8e1408 65%, #4c0a02) border-box;
+    box-shadow: none;
+}
+[data-theme="steampunk"] .wiz-head .wiz-close {        /* oxblood enamel in a brass bezel */
+    border: 1px solid #8b6914; border-radius: 4px;
+    background: linear-gradient(180deg, #9e2b1b, #6e1409);
+    box-shadow: inset 0 1px 0 rgba(255,220,150,.25), 0 1px 2px rgba(0,0,0,.5);
+}
+[data-theme="futuristic"] .wiz-head .wiz-close {       /* neon red */
+    border: 1px solid #ff5252; border-radius: 8px;
+    background: linear-gradient(180deg, #ff4d4d, #c40f0f);
+    box-shadow: 0 0 8px rgba(255,56,56,.55), inset 0 1px 0 rgba(255,255,255,.3);
+}
+[data-theme="organic"] .wiz-head .wiz-close {          /* soft matte tomato */
+    border: 1px solid #b8432f; border-radius: 10px;
+    background: #d9533e;
+    box-shadow: 0 1px 3px rgba(0,0,0,.2); text-shadow: none;
+}
+
 .wiz-foot {
     margin: 0 !important;       /* No gaps */
     width: 100%;                /* Fill the 520px box */
@@ -1697,6 +1805,17 @@ Middle (handle) {
     border-radius: 6px;
 }
 
+/* hover: deep navy instead of the accent blue — the base hover used var(--accent),
+   which is the same colour as the wizard title bar, so hovered buttons melted into it */
+[data-theme="normal"] button:hover,
+[data-theme="normal"] .btn:hover,
+[data-theme="normal"] .op-btn:hover,
+[data-theme="normal"] .toolbar-btn:hover {
+    background: #1f4e8c;
+    border-color: #1f4e8c;
+    color: #fff;
+}
+
 [data-theme="normal"] .wiz-box {
     border: 2px solid var(--accent);
 }
@@ -1716,7 +1835,7 @@ Middle (handle) {
     --text-main:     #101010;
     --text-dim:      #4b4843;
     --border:        #6f6a60;
-    --radius:        0;
+    --radius:        6px;
 
     /* header */
     --hdr-bg:        #cfcabf;
@@ -1765,14 +1884,15 @@ Middle (handle) {
 [data-theme="studio"] label.toolbar-btn,
 [data-theme="studio"] .op-btn {
     font-family: var(--sans); font-weight: 700; font-size: 12px;
-    color: var(--text); cursor: pointer; border-radius: 0;
+    color: var(--text); cursor: pointer; border-radius: 6px;
     padding: 6px; min-height: 24px; line-height: 1.2;
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    background: linear-gradient(180deg, var(--sv-1), var(--sv-2) 60%, var(--sv-3));
-    border-top: 2px solid var(--bv-lite);
-    border-left: 2px solid var(--bv-mid-lite);
-    border-right: 2px solid var(--bv-mid-dark);
-    border-bottom: 2px solid var(--bv-dark);
+    /* bevel = gradient rim in the border ring; light from top-left, wraps the radius */
+    border: 2px solid transparent;
+    background:
+        linear-gradient(180deg, var(--sv-1), var(--sv-2) 60%, var(--sv-3)) padding-box,
+        linear-gradient(to bottom right, var(--bv-lite), var(--bv-mid-lite) 35%,
+                                         var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
     text-shadow: 0 1px 0 rgba(255,255,255,0.5);
     transition: filter 0.1s ease;
 }
@@ -1782,27 +1902,44 @@ Middle (handle) {
 [data-theme="studio"] button:active,
 [data-theme="studio"] .toolbar-btn:active,
 [data-theme="studio"] .op-btn:active {
-    border-top: 2px solid var(--bv-dark); border-left: 2px solid var(--bv-mid-dark);
-    border-right: 2px solid var(--bv-mid-lite); border-bottom: 2px solid var(--bv-lite-2);
+    background:
+        linear-gradient(180deg, var(--sv-3), var(--sv-2) 60%, var(--sv-1)) padding-box,
+        linear-gradient(to top left, var(--bv-lite-2), var(--bv-mid-lite) 35%,
+                                     var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
     transform: translate(1px, 1px);
 }
 [data-theme="studio"] .op-icon { font-size: 13px; }
 [data-theme="studio"] .op-label { font-weight: 700; }
 
-/* colour-coded keys */
+/* colour-coded keys — each carries its own tinted rim in the border-box layer */
 [data-theme="studio"] .toolbar-btn.m-green,
-[data-theme="studio"] button.green   { color: #044a18; background: linear-gradient(180deg, #d6f7dc, #a7e6b4); }
+[data-theme="studio"] button.green {
+    color: #044a18;
+    background:
+        linear-gradient(180deg, #d6f7dc, #a7e6b4) padding-box,
+        linear-gradient(to bottom right, #ffffff, #b9e8c2 35%, #4c8a5b 65%, #1d4527) border-box;
+}
 [data-theme="studio"] .toolbar-btn.m-red,
 [data-theme="studio"] button.danger,
-[data-theme="studio"] button.red     { color: #6e0606; background: linear-gradient(180deg, #ffd2d2, #ffa9a9); }
-[data-theme="studio"] button.amber   { color: #5e3500; background: linear-gradient(180deg, #ffe4b0, #ffc463); }
+[data-theme="studio"] button.red {
+    color: #6e0606;
+    background:
+        linear-gradient(180deg, #ffd2d2, #ffa9a9) padding-box,
+        linear-gradient(to bottom right, #ffffff, #ffc3c3 35%, #a85656 65%, #5c1f1f) border-box;
+}
+[data-theme="studio"] button.amber {
+    color: #5e3500;
+    background:
+        linear-gradient(180deg, #ffe4b0, #ffc463) padding-box,
+        linear-gradient(to bottom right, #fff3d6, #ffd98f 35%, #a86f1d 65%, #5e3a06) border-box;
+}
 [data-theme="studio"] .toolbar-btn.axis-blue,
 [data-theme="studio"] button.primary,
 [data-theme="studio"] button.blue {
     color: #fff;
-    background: linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2);
-    border-top-color: #8fbcff; border-left-color: #8fbcff;
-    border-right-color: #0a3a9e; border-bottom-color: #062a72;
+    background:
+        linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2) padding-box,
+        linear-gradient(to bottom right, #8fbcff, #4f93ff 35%, #0a3a9e 65%, #062a72) border-box;
     text-shadow: 0 1px 1px rgba(0,0,0,0.4);
 }
 
@@ -1897,24 +2034,38 @@ Middle (handle) {
 
 /* --- Variable chips → black info chips --- */
 [data-theme="studio"] .var-item {
-    background: #000;
-    border-top: 2px solid var(--bv-dark); border-left: 2px solid var(--bv-mid-dark);
-    border-right: 2px solid var(--bv-mid-lite); border-bottom: 2px solid var(--bv-lite-2);
+    border: 2px solid transparent; border-radius: 6px;
+    background:
+        linear-gradient(#000, #000) padding-box,
+        linear-gradient(to bottom right, var(--bv-dark), var(--bv-mid-dark) 35%,
+                                         var(--bv-mid-lite) 65%, var(--bv-lite-2)) border-box;
 }
-[data-theme="studio"] .var-item:hover { background: #061206; }
+[data-theme="studio"] .var-item:hover {
+    background:
+        linear-gradient(#061206, #061206) padding-box,
+        linear-gradient(to bottom right, var(--bv-dark), var(--bv-mid-dark) 35%,
+                                         var(--bv-mid-lite) 65%, var(--bv-lite-2)) border-box;
+}
 [data-theme="studio"] .var-item .var-id { font-family: var(--mono); font-weight: 800; color: var(--phosphor); }
 [data-theme="studio"] .var-item .var-desc { font-family: var(--sans); color: var(--cyan); }
 
 /* --- Wizard / modal → silver dialog --- */
+/* silver key-tray, same recipe as the toolbar dropdown */
 [data-theme="studio"] .wiz-box {
-    padding: 3px; background: var(--sv-2);
-    border-top: 3px solid var(--bv-lite); border-left: 3px solid var(--bv-mid-lite);
-    border-right: 3px solid var(--bv-mid-dark); border-bottom: 3px solid var(--bv-dark);
+    border: 3px solid transparent; border-radius: 10px;
+    background:
+        linear-gradient(180deg, var(--sv-2), var(--sv-3)) padding-box,
+        linear-gradient(to bottom right, var(--bv-lite), var(--bv-mid-lite) 35%,
+                                         var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
 }
 [data-theme="studio"] .wiz-head {
     color: #eef4fb; background: linear-gradient(180deg, #2a4f82, #123a66);
+    border-radius: 7px 7px 0 0;   /* tuck the title bar into the rounded dialog */
 }
 [data-theme="studio"] .wiz-foot { border-top: 1px solid var(--bv-mid-dark); }
+/* footer actions = the big soft keys (C4) — chassis keys stay at 6px */
+[data-theme="studio"] .wiz-foot button { border-radius: 14px; padding: 8px 18px; }
 [data-theme="studio"] .label {
     font-family: var(--sans); font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
     text-transform: uppercase; color: var(--text-dim); display: block; margin-bottom: 3px;
@@ -1922,37 +2073,63 @@ Middle (handle) {
 [data-theme="studio"] .hint { font-family: var(--sans); font-size: 10px; color: var(--text-dim); }
 [data-theme="studio"] .wiz-body input,
 [data-theme="studio"] .wiz-body select {
-    font-family: var(--mono); font-size: 13px; color: var(--text); background: #fff; width: 100%;
-    padding: 6px 8px; border-radius: 0; outline: none;
-    border-top: 2px solid var(--bv-dark); border-left: 2px solid var(--bv-mid-dark);
-    border-right: 2px solid var(--bv-mid-lite); border-bottom: 2px solid var(--bv-lite-2);
+    font-family: var(--mono); font-size: 13px; color: var(--text); width: 100%;
+    padding: 6px 8px; outline: none;
+    /* sunken well: inverted rim (dark top-left → light bottom-right) */
+    border: 2px solid transparent; border-radius: 6px;
+    background:
+        linear-gradient(#fff, #fff) padding-box,
+        linear-gradient(to bottom right, var(--bv-dark), var(--bv-mid-dark) 35%,
+                                         var(--bv-mid-lite) 65%, var(--bv-lite-2)) border-box;
 }
 [data-theme="studio"] .wiz-body input[type="checkbox"] { width: auto; }
 
 /* wizard visualization (black + green vector) */
 [data-theme="studio"] .viz-container {
-    background: #000;
-    border-top: 2px solid var(--bv-dark); border-left: 2px solid var(--bv-mid-dark);
-    border-right: 2px solid var(--bv-mid-lite); border-bottom: 2px solid var(--bv-lite-2);
+    border: 2px solid transparent; border-radius: 6px;
+    background:
+        linear-gradient(#000, #000) padding-box,
+        linear-gradient(to bottom right, var(--bv-dark), var(--bv-mid-dark) 35%,
+                                         var(--bv-mid-lite) 65%, var(--bv-lite-2)) border-box;
 }
 [data-theme="studio"] .viz-status {
     font-family: var(--pixel); font-size: 12px; color: var(--phosphor);
     background: rgba(0,0,0,0.9); text-align: center; padding: 6px 10px; letter-spacing: 1px;
 }
 [data-theme="studio"] .preview-block pre {
-    font-family: var(--mono); color: var(--dro-white); background: #000;
-    border-top: 2px solid var(--bv-dark); border-left: 2px solid var(--bv-mid-dark);
-    border-right: 2px solid var(--bv-mid-lite); border-bottom: 2px solid var(--bv-lite-2);
+    font-family: var(--mono); color: var(--dro-white);
+    border: 2px solid transparent; border-radius: 6px;
+    background:
+        linear-gradient(#000, #000) padding-box,
+        linear-gradient(to bottom right, var(--bv-dark), var(--bv-mid-dark) 35%,
+                                         var(--bv-mid-lite) 65%, var(--bv-lite-2)) border-box;
 }
 [data-theme="studio"] .preview-block pre .g-comment { color: var(--phosphor-2); }
+
+/* Settings tabs: keep the panel's own simple chip selection — opt OUT of the
+   hardware-key skin (the global studio button rule otherwise hijacks the active tab) */
+[data-theme="studio"] button.settings-main-tab,
+[data-theme="studio"] button.settings-main-tab:active,
+[data-theme="studio"] .settings-subtabs button.settings-tab,
+[data-theme="studio"] .settings-subtabs button.settings-tab:active {
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.45);
+    color: #fff; border-radius: 5px;
+    text-shadow: none; box-shadow: none; transform: none;
+}
+[data-theme="studio"] button.settings-main-tab:not(.active),
+[data-theme="studio"] .settings-subtabs button.settings-tab:not(.active) {
+    background: transparent; border-color: transparent; color: rgba(255,255,255,0.7);
+}
 
 /* --- Virtual numpad (comm wizard) → electric-blue keys --- */
 [data-theme="studio"] .numpad .key,
 [data-theme="studio"] .vbtn {
     font-family: var(--sans); font-weight: 800; color: #fff; text-align: center; cursor: pointer;
-    background: linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2);
-    border-top: 2px solid #8fbcff; border-left: 2px solid #5f97ff;
-    border-right: 2px solid #0a3a9e; border-bottom: 2px solid #062a72;
+    border: 2px solid transparent; border-radius: 6px;
+    background:
+        linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2) padding-box,
+        linear-gradient(to bottom right, #8fbcff, #5f97ff 35%, #0a3a9e 65%, #062a72) border-box;
     text-shadow: 0 1px 1px rgba(0,0,0,0.4);
 }
 [data-theme="studio"] .numpad .key:active, [data-theme="studio"] .vbtn:active { transform: translate(1px,1px); }
@@ -2806,13 +2983,16 @@ body[data-scale="250"] {
 .dock-body .deck-tab + .deck-tab { margin-left: 0 !important; }
 
 body[data-theme="studio"] .dock-body .ddcs-tab {
-    color: #000 !important; border-radius: 0 !important;
-    background: linear-gradient(180deg, #cfcbc4, #b6b1a9) !important;
-    border-top: 2px solid #f0f0f0 !important; border-left: 2px solid #a8a8a8 !important;
-    border-right: 2px solid #585858 !important; border-bottom: 2px solid #202020 !important;
+    color: #000 !important; border-radius: 6px 6px 0 0 !important;
+    border: 2px solid transparent !important;
+    background:
+        linear-gradient(180deg, #cfcbc4, #b6b1a9) padding-box,
+        linear-gradient(to bottom right, #f0f0f0, #a8a8a8 35%, #585858 65%, #202020) border-box !important;
 }
 body[data-theme="studio"] .dock-body .ddcs-tab.active {
-    background: linear-gradient(180deg, #f4f2ee, var(--panel)) !important;
+    background:
+        linear-gradient(180deg, #f4f2ee, var(--panel)) padding-box,
+        linear-gradient(to bottom right, #f0f0f0, #a8a8a8 35%, #585858 65%, #202020) border-box !important;
 }
 
 #controller-dock .dock-body { background: var(--panel); border-top: none; }

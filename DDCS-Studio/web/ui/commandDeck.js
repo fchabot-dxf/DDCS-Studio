@@ -1,6 +1,24 @@
 import { el, UIUtils } from './uiUtils.js';
 import { initSuggestBar } from './suggestBar.js';
 
+// Header toolbar icons — inline line-art SVG (not emoji) so they render identically on every OS,
+// inherit the theme via currentColor, stay crisp at any size, and give each button an icon to
+// collapse to on narrow screens. Drawn in the spirit of each tool: bubble, wrench, flame, target,
+// recycle, folder, file+, copy, trash, download. 24×24 stroke grid, rendered at 16px.
+const _svg = (body) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const HEADER_ICONS = {
+    comm:   _svg('<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>'),
+    wcs:    _svg('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'),
+    warmup: _svg('<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>'),
+    probe:  _svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>'),
+    atc:    _svg('<polyline points="22 5 22 10.5 16.5 10.5"/><polyline points="2 19 2 13.5 7.5 13.5"/><path d="M4.06 9.5A8 8 0 0 1 18 6.6l4 3.9M2 13.5l4 3.9A8 8 0 0 0 19.94 14.5"/>'),
+    load:   _svg('<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'),
+    insert: _svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>'),
+    copy:   _svg('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'),
+    clear:  _svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>'),
+    export: _svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'),
+};
+
 // Load a G-code / .nc file from disk into the editor, then trigger a re-parse + preview — for
 // simulating an existing program instead of pasting it. Wired to the 📂 Load header button;
 // reuses one hidden <input> so re-loading the same file still fires a change.
@@ -428,9 +446,9 @@ export class CommandDeck {
         if (leftTarget) {
             leftTarget.innerHTML = `
                 <div style="display:flex; gap:6px; align-items:center;">
-                    <button class="toolbar-btn" onclick="openWiz && openWiz('comm')">💬 Comm</button>
-                    <button class="toolbar-btn" onclick="openWiz && openWiz('wcs')">🔧 WCS</button>
-                    <button class="toolbar-btn" onclick="openWiz && openWiz('atc_warmup')" title="Spindle warm-up sequence">🔥 Warm-up</button>
+                    <button class="toolbar-btn" onclick="openWiz && openWiz('comm')" title="Comm / MDI console"><span class="btn-ico">${HEADER_ICONS.comm}</span><span class="btn-tx">Comm</span></button>
+                    <button class="toolbar-btn" onclick="openWiz && openWiz('wcs')" title="Work coordinate systems"><span class="btn-ico">${HEADER_ICONS.wcs}</span><span class="btn-tx">WCS</span></button>
+                    <button class="toolbar-btn" onclick="openWiz && openWiz('atc_warmup')" title="Spindle warm-up sequence"><span class="btn-ico">${HEADER_ICONS.warmup}</span><span class="btn-tx">Warm-up</span></button>
                 </div>
             `;
         }
@@ -440,7 +458,7 @@ export class CommandDeck {
             centerTarget.innerHTML = `
                 <div style="display:flex; gap:6px; width:auto; align-items:center;">
                     <div class="toolbar-dropdown">
-                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;">🎯 Probe ▼</button>
+                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.probe}</span><span class="btn-tx">Probe</span><span class="btn-caret">▼</span></button>
                         <div class="toolbar-dropdown-content">
                             <button onclick="openCornerWiz && openCornerWiz()">📐 Corner</button>
                             <button onclick="openMiddleWiz && openMiddleWiz()">🎯 Middle</button>
@@ -454,7 +472,7 @@ export class CommandDeck {
                     </div>
                     
                     <div class="toolbar-dropdown">
-                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;">🔄 ATC ▼</button>
+                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.atc}</span><span class="btn-tx">ATC</span><span class="btn-caret">▼</span></button>
                         <div class="toolbar-dropdown-content">
                             <button onclick="openWiz && openWiz('atc_length')">📏 Tool Length</button>
                             <button onclick="openWiz && openWiz('atc_check')">🛡 Tool Check</button>
@@ -535,11 +553,11 @@ export class CommandDeck {
         if (rightTarget) {
             rightTarget.innerHTML = `
                 <div style="display:flex; gap:6px; align-items:center;">
-                    <button class="toolbar-btn" onclick="loadGcodeFile && loadGcodeFile()" title="Load a G-code / .nc file into the editor (replaces the current program)">📂 Load</button>
-                    <button class="toolbar-btn" onclick="insertGcodeFile && insertGcodeFile()" title="Insert a G-code file at the cursor — keeps your current program">➕ Insert</button>
-                    <button class="toolbar-btn" onclick="copyCode && copyCode()">COPY</button>
-                    <button class="toolbar-btn" onclick="clearCode && clearCode()">CLEAR</button>
-                    <button class="toolbar-btn" onclick="downloadFile && downloadFile()">EXPORT</button>
+                    <button class="toolbar-btn" onclick="loadGcodeFile && loadGcodeFile()" title="Load a G-code / .nc file into the editor (replaces the current program)"><span class="btn-ico">${HEADER_ICONS.load}</span><span class="btn-tx">Load</span></button>
+                    <button class="toolbar-btn" onclick="insertGcodeFile && insertGcodeFile()" title="Insert a G-code file at the cursor — keeps your current program"><span class="btn-ico">${HEADER_ICONS.insert}</span><span class="btn-tx">Insert</span></button>
+                    <button class="toolbar-btn" onclick="copyCode && copyCode()" title="Copy editor to clipboard"><span class="btn-ico">${HEADER_ICONS.copy}</span><span class="btn-tx">COPY</span></button>
+                    <button class="toolbar-btn" onclick="clearCode && clearCode()" title="Clear the editor"><span class="btn-ico">${HEADER_ICONS.clear}</span><span class="btn-tx">CLEAR</span></button>
+                    <button class="toolbar-btn" onclick="downloadFile && downloadFile()" title="Export / download the program"><span class="btn-ico">${HEADER_ICONS.export}</span><span class="btn-tx">EXPORT</span></button>
                 </div>
             `;
         }
