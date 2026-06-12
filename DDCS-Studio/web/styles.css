@@ -166,29 +166,29 @@ body {
 
 /* App-switcher tabs (STUDIO / GATEWAY) — visual stubs, no navigation yet.
    The :hover/:active resets shield them from the per-theme global `button` skins. */
-.hdr-tabs { display: flex; align-items: flex-end; gap: 4px; padding-left: 8px; }
+.hdr-tabs { display: flex; align-items: stretch; }
 /* Custom app icons so STUDIO / GATEWAY can collapse to icon-only when the header is tight */
 .hdr-tabs .tab .app-ico { display: inline-flex; flex: 0 0 auto; }
 .hdr-tabs .tab .app-ico svg { width: 17px; height: 17px; display: block; }
 .hdr-tabs .tab .app-tx { margin-left: 7px; }
 .hdr-tabs .tab .dot { display: none; }   /* leading status pip removed — the icon carries identity */
 
+/* Underline-style app-switcher tabs (the original look): flat, transparent, with a coloured accent
+   bar under the active tab. Icons kept so they collapse to icon-only on narrow screens. */
 .app-header .tab,
 .app-header .tab:hover,
 .app-header .tab:active {
     display: flex;
     align-items: center;
-    padding: 6px 16px 7px;
+    padding: 0 16px;
     min-height: 0;
-    margin-bottom: -1px;                 /* sit on the header's bottom border → join the toolbar below */
     font-size: 12.5px;
     font-weight: 700;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
     font-family: inherit;
     color: var(--hdr-dim, var(--text-dim));
-    border: 1px solid var(--border);     /* inactive tabs stay outlined so they read as tabs */
-    border-bottom: none;
-    border-radius: 10px 10px 0 0;
+    border: none;
+    border-radius: 0;
     background: transparent;
     box-shadow: none;
     text-shadow: none;
@@ -196,56 +196,20 @@ body {
     transform: none;
     cursor: pointer;
     position: relative;
-    opacity: .58;
-    transition: opacity .12s ease, color .12s ease, background .12s ease;
 }
-.app-header .tab:hover { color: var(--hdr-ink, var(--text-main)); opacity: .85; }
-/* active tab fills with the toolbar surface below the header → seamless join; app-colour accent on top.
-   margin-bottom reaches DOWN past the header's bottom border AND the wizard-bar's top border so the
-   active tab's body lands in the toolbar with no seam (the classic folder-tab overlap technique). */
-.app-header .tab.active {
-    color: var(--app-tab-ink, var(--hdr-ink, var(--text-main)));
-    background: var(--app-tab-fill, var(--panel));
-    border-color: var(--border);
-    box-shadow: inset 0 3px 0 0 var(--tab-accent);   /* colour accent (inset → no height shift) */
-    opacity: 1;
-    z-index: 3;
-    margin-bottom: -3px;
+.app-header .tab.active,
+.app-header .tab:hover { color: var(--hdr-ink, var(--text-main)); }
+.app-header .tab.active::after {
+    content: '';
+    position: absolute;
+    left: 10px; right: 10px; bottom: 0;
+    height: 3px;
+    background: var(--tab-accent, var(--accent));
+    border-radius: var(--radius, 3px) var(--radius, 3px) 0 0;
 }
-
-.app-header .tab .dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    margin-right: 7px;
-    background: currentColor;
-    opacity: .45;
-}
-.app-header .tab.active .dot { background: var(--tab-accent, var(--accent)); opacity: 1; }
-
 .app-header .tab[data-app="studio"]  { --tab-accent: #f59e0b; }
 .app-header .tab[data-app="gateway"] { --tab-accent: #0ea5e9; }
-/* active app-tab fill = the wizard toolbar surface directly below the header, so the active tab merges
-   into it (Chrome-style); colour = a readable ink on that fill. (body[data-theme] matches the app's
-   theming mechanism — same as the studio tab rules below.) */
-body[data-theme="normal"]     .app-header .tab.active { background: #666666 !important; color: #f2f2f2 !important; }
-body[data-theme="steampunk"]  .app-header .tab.active { background: #8b6914 !important; color: #fbeecb !important; }
-body[data-theme="futuristic"] .app-header .tab.active { background: #00ffff !important; color: #00222b !important; }
-body[data-theme="organic"]    .app-header .tab.active { background: #6b8e23 !important; color: #f3f8e7 !important; }
-/* Studio (metallic) theme: app tabs carry the WIZARD BAR's own white highlight edge (--bv-lite) on
-   the top + sides — not the button bevel — plus the coloured top accent. Fill = the bar surface. */
-body[data-theme="studio"] .app-header .tab {
-    color: #2a2a2a !important;
-    background: var(--sv-3, #b6b1a5) !important;                /* inactive = the (darker) header surface → recedes */
-    border: 1px solid var(--bv-mid-lite, #b8b3a8) !important;
-    border-bottom: none !important;
-}
-body[data-theme="studio"] .app-header .tab.active {
-    color: #1c1c1c !important;
-    background: var(--sv-1, #e2dfd7) !important;                 /* = the (lighter, raised) toolbar surface below */
-    border: 1px solid var(--bv-mid-lite, #b8b3a8) !important;   /* subtle metallic sides */
-    border-top: 2px solid var(--bv-lite, #ffffff) !important;   /* white highlight on the TOP edge ONLY */
-    border-bottom: none !important;
-    box-shadow: inset 0 3px 0 0 var(--tab-accent) !important;   /* keep the coloured top */
-}
+.app-header .tab[data-app="settings"] { --tab-accent: #94a3b8; }
 /* Studio depth: the toolbar's bevel is RAISED (light top edge), so it sits ABOVE the header in the
    colour hierarchy — toolbar lightest (sv-1), header darker (sv-3). Active tab = toolbar colour,
    inactive tab = header colour. */
@@ -3350,8 +3314,7 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .app-header.is-compact .hdr-controls { gap: 6px; }
 .app-header.is-mini .hdr-tabs .tab .app-tx { display: none; }
 .app-header.is-mini .hdr-tabs .tab .app-ico { margin-left: 0; }
-.app-header.is-mini .hdr-tabs .tab { padding: 13px 17px; letter-spacing: 0; }   /* keep real height + width when icon-only */
-.app-header.is-mini .hdr-tabs .tab .app-ico svg { width: 19px; height: 19px; }  /* bigger icon to match the other icon buttons */
+.app-header.is-mini .hdr-tabs .tab { padding: 0 12px; letter-spacing: 0; }   /* icon-only, full header height */
 .app-header.is-mini .ver { display: none; }
 @media (max-width: 520px) {
     .app-header .brand { padding: 0 8px; gap: 6px; }
