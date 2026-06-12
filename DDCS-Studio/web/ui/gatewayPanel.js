@@ -14,8 +14,9 @@ import queueView from './gateway/views/queue.js';
 import filesView from './gateway/views/files.js';
 import historyView from './gateway/views/history.js';
 import adminView from './gateway/views/admin.js';
+import watchView from './gateway/views/watch.js';
 
-const VIEWS = [trackerView, queueView, submitView, filesView, historyView, adminView];
+const VIEWS = [trackerView, watchView, queueView, submitView, filesView, historyView, adminView];
 const POLL_MS = 1500;
 
 let inited = false;

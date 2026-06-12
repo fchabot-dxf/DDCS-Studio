@@ -329,6 +329,57 @@ class Ops:
                 continue
         return None
 
+    # --- live variable values (read-only watch list) -----------------------
+    # Values are read from the controller's disk over SMB. CONFIRMED: #100-499 live in `uservar`
+    # (slot = #var-100), f64 LE — true on both the V4.1 (SYSDISK, 400 slots) and the Expert (CNCDISK,
+    # 450 slots), so we just try both shares. #0-99 are locals (RAM-only, never on disk). #500+ ranges
+    # (setting/coord1/positions) have an unverified macro-address mapping on each controller — we return
+    # available:false rather than show a wrong value off a machine tool. NOTE: values flush only at run
+    # start/end, so this is a snapshot of the last run, not a live tick.
+    def _read_uservar(self):
+        import struct
+        if not self.controller_reachable():
+            return None
+        for base in (self._sysdisk_path(), self.cfg.expert_dest):
+            if not base:
+                continue
+            try:
+                with open(os.path.join(base, "uservar"), "rb") as f:
+                    raw = f.read()
+            except OSError:
+                continue
+            n = len(raw) // 8
+            if n:
+                try:
+                    return list(struct.unpack("<%dd" % n, raw[: n * 8]))
+                except struct.error:
+                    continue
+        return None
+
+    def _var_value(self, n, uservar):
+        try:
+            n = int(n)
+        except (TypeError, ValueError):
+            return {"available": False, "reason": "not a number"}
+        if 0 <= n <= 99:
+            return {"available": False, "source": "local", "reason": "local var - RAM-only, not on disk"}
+        if uservar is not None:
+            slot = n - 100
+            if 0 <= slot < len(uservar):
+                return {"available": True, "value": uservar[slot], "source": "uservar"}
+        if not self.controller_reachable():
+            return {"available": False, "reason": "controller unreachable"}
+        return {"available": False, "source": "tbd", "reason": "mapping pending bench verification"}
+
+    def read_vars(self, nums):
+        """Read a watch list of variable numbers (read-only). Returns {connected, values:{n:{...}}}."""
+        uservar = self._read_uservar()
+        return {
+            "connected": self.controller_reachable(),
+            "snapshot": "last run start/end",
+            "values": {str(n): self._var_value(n, uservar) for n in nums},
+        }
+
     # --- gateway setup (the Setup UI; local gateway only — the cloud can't reach in) --------
     @staticmethod
     def _lan_ip():

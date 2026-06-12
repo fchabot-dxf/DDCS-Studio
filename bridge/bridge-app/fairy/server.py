@@ -87,6 +87,10 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send_json(self.ops.descriptor())
         if path == "/api/profile":
             return self._send_json(self.ops.profile())
+        if path == "/api/vars":
+            raw = (q.get("ns") or [""])[0]
+            nums = [x for x in raw.split(",") if x.strip()]
+            return self._send_json(self.ops.read_vars(nums))
         if path == "/api/config":
             return self._send_json(self.ops.get_config())
         if path == "/api/queue":

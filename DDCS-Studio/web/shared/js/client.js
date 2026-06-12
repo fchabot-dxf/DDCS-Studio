@@ -45,6 +45,7 @@ export function makeClient(opts = {}) {
     mode: base ? "remote" : "local",
     descriptor: () => call("/api/descriptor"),
     profile: () => call("/api/profile"),   // controller profile in the shared shape (controllerProfiles.js)
+    readVars: (ns) => call("/api/vars?ns=" + (ns || []).join(",")),   // live watch-list values (read-only)
     listQueue: () => call("/api/queue"),
     listHistory: (limit = 100) => call("/api/history?limit=" + limit),
     getStatus: (id) => call("/api/status?id=" + encodeURIComponent(id)),
