@@ -111,7 +111,7 @@ export class CommandDeck {
         this.panel = el('deck-panel');
         this._varGrid = null;
         this._varSearch = null;
-        this._activeTab = 'basic';
+        this._activeTab = 'move';
         this._activeFilters = new Set();
         this.build();
         // Deck buttons fire their action on pointerdown (touch-immediate) and mark themselves
@@ -143,54 +143,53 @@ export class CommandDeck {
 
         const body = document.querySelector('.dock-body');
         if (!body) return;
-        const deckPanel = document.getElementById('deck-panel'); // existing macro-groups container
 
-        // 2. BASIC tab — editor keys + the everyday G-code groups. buildMacroGroups builds ALL groups
-        //    into #deck-panel; the macro-logic groups are moved to the MACRO tab below.
-        const basicPanel = document.createElement('div');
-        basicPanel.className = 'deck-tab-panel';
-        basicPanel.id = 'deck-tab-basic';
-        const basicGroups = deckPanel || document.createElement('div');
-        basicGroups.id = 'deck-panel';
-        if (!basicGroups.className) basicGroups.className = 'dock-row macro-grid-area';
-        basicGroups.innerHTML = '';
-        this.buildMacroGroups(basicGroups);
-        this._wireDeckButtons(basicGroups);
-        basicPanel.appendChild(basicGroups);
+        // 2. Build ALL key groups into a scratch container, then distribute them across the tabs.
+        const all = document.getElementById('deck-panel') || document.createElement('div');
+        all.id = 'deck-panel';
+        all.className = 'dock-row macro-grid-area';
+        all.innerHTML = '';
+        this.buildMacroGroups(all);
+        this._wireDeckButtons(all);
 
-        // 3. MACRO tab — move the macro-logic groups (math / functions / control flow / WCS) out of
-        //    BASIC into their own tab. Reparenting keeps the buttons' already-wired handlers.
-        const macroPanel = document.createElement('div');
-        macroPanel.className = 'deck-tab-panel';
-        macroPanel.id = 'deck-tab-macro';
-        macroPanel.style.display = 'none';
-        const macroGroups = document.createElement('div');
-        macroGroups.className = 'dock-row macro-grid-area';
-        macroGroups.id = 'deck-panel-macro';
-        ['math', 'functions', 'control-flow', 'wcs'].forEach((c) => {
-            const g = basicGroups.querySelector('.deck-group.' + c);
-            if (g) macroGroups.appendChild(g);
-        });
-        macroPanel.appendChild(macroGroups);
+        // Helper: a tab panel holding the named groups (reparented out of the scratch container,
+        // which keeps each button's already-wired handlers).
+        const makePanel = (id, groupClasses, hidden) => {
+            const panel = document.createElement('div');
+            panel.className = 'deck-tab-panel';
+            panel.id = id;
+            if (hidden) panel.style.display = 'none';
+            const gc = document.createElement('div');
+            gc.className = 'dock-row macro-grid-area';
+            groupClasses.forEach((c) => { const g = all.querySelector('.deck-group.' + c); if (g) gc.appendChild(g); });
+            panel.appendChild(gc);
+            return panel;
+        };
 
-        // 4. VARIABLES tab — search + filters + scrollable chips
+        // MOVE = numbers + axes you enter · G-M = G-codes + program/machine words · MACRO = logic.
+        const movePanel  = makePanel('deck-tab-move',  ['numpad', 'axes'], false);
+        const gmPanel    = makePanel('deck-tab-gm',    ['g-codes', 'm-codes'], true);
+        const macroPanel = makePanel('deck-tab-macro', ['math', 'functions', 'control-flow', 'wcs'], true);
+
+        // VARIABLES tab — search + filters + scrollable chips
         const varPanel = document.createElement('div');
         varPanel.className = 'deck-tab-panel';
         varPanel.id = 'deck-tab-variables';
         varPanel.style.display = 'none';
         this.buildVariablesPanel(varPanel);
 
-        // 5. Assemble the dock body: predictive suggestion row, then the BASIC/MACRO/VARIABLES tab
-        //    strip, then the panels. The suggestion bar sits on top (phone-style), always visible.
+        // 3. Assemble the dock body: predictive suggestion row, persistent editor keys, the tab
+        //    strip, then the panels (MOVE / G-M / MACRO / VARIABLES).
         body.innerHTML = '';
         body.appendChild(initSuggestBar());
         body.appendChild(this._makeEditorRow());   // BACK/SPACE/ENTER — persistent, above the tabs
         body.appendChild(this._buildTabStrip());
-        body.appendChild(basicPanel);
+        body.appendChild(movePanel);
+        body.appendChild(gmPanel);
         body.appendChild(macroPanel);
         body.appendChild(varPanel);
 
-        // 5. The handle is a plain chevron toggle (expand/collapse wired by DockManager).
+        // 4. The handle is a plain chevron toggle (expand/collapse wired by DockManager).
         this.renderHandle();
     }
 
@@ -207,7 +206,8 @@ export class CommandDeck {
         const strip = document.createElement('div');
         strip.className = 'deck-tabs';
         strip.innerHTML = `
-            <button class="deck-tab ddcs-tab active" data-deck-tab="basic">⌨ BASIC</button>
+            <button class="deck-tab ddcs-tab active" data-deck-tab="move">⌨ MOVE</button>
+            <button class="deck-tab ddcs-tab" data-deck-tab="gm">⌗ G-M</button>
             <button class="deck-tab ddcs-tab" data-deck-tab="macro">∑ MACRO</button>
             <button class="deck-tab ddcs-tab" data-deck-tab="variables"># VARIABLES</button>
         `;
@@ -220,7 +220,7 @@ export class CommandDeck {
 
     switchTab(name) {
         this._activeTab = name;
-        const panels = { basic: 'deck-tab-basic', macro: 'deck-tab-macro', variables: 'deck-tab-variables' };
+        const panels = { move: 'deck-tab-move', gm: 'deck-tab-gm', macro: 'deck-tab-macro', variables: 'deck-tab-variables' };
         for (const [key, id] of Object.entries(panels)) {
             const p = document.getElementById(id);
             if (p) p.style.display = name === key ? '' : 'none';
@@ -763,7 +763,6 @@ export class CommandDeck {
                     <button class="toolbar-btn axis-blue" title="Tool length offset register" onclick="window.insert && window.insert('H')">H</button>
                     <button class="toolbar-btn axis-blue" title="Spindle speed word" onclick="window.insert && window.insert('S')">S</button>
                     <button class="toolbar-btn axis-blue" title="Tool selection word" onclick="window.insert && window.insert('T')">T</button>
-                    <button class="toolbar-btn m-green" title="Set flag to 1" onclick="window.insert && window.insert('=1')">=1</button>
                 </div>
             </div>
         `;

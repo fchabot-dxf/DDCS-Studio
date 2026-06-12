@@ -1080,6 +1080,10 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     font-size: 16px;
     border-bottom: 3px solid rgba(0,0,0,0.15);
 }
+/* Colour the editor keys by role: Back = red (delete), Space = blue, Enter = green (commit). */
+.editor-keys-row [data-ddcs-role="back"]  { color: #dc2626 !important; border-bottom-color: #dc2626 !important; }
+.editor-keys-row [data-ddcs-role="space"] { color: #2563eb !important; border-bottom-color: #2563eb !important; }
+.editor-keys-row [data-ddcs-role="enter"] { color: #16a34a !important; border-bottom-color: #16a34a !important; }
 
 /* --- Top toolbar: ONE line, never wrap (wrapping is what clipped the 2nd row). JS adds .is-compact
    to collapse labels→icons the moment the labelled bar wouldn't fit; internal scroll only as a last
@@ -3032,10 +3036,12 @@ body[data-scale="250"] {
 .dock-body .deck-tab + .deck-tab { margin-left: 0 !important; }
 /* per-tab accent colours. Active tab tint uses LITERAL colours (matching its panel exactly) so the
    colour-mix can't fall through to transparent — the active tab + its panel are one tinted surface. */
-.dock-body .deck-tab[data-deck-tab="basic"]     { --tab-color: #3b82f6; }
+.dock-body .deck-tab[data-deck-tab="move"]      { --tab-color: #3b82f6; }
+.dock-body .deck-tab[data-deck-tab="gm"]        { --tab-color: #f59e0b; }
 .dock-body .deck-tab[data-deck-tab="macro"]     { --tab-color: #a855f7; }
 .dock-body .deck-tab[data-deck-tab="variables"] { --tab-color: #10b981; }
-.dock-body .deck-tab[data-deck-tab="basic"].active     { background: color-mix(in srgb, var(--panel) 90%, #3b82f6) !important; border-top-color: #3b82f6 !important; }
+.dock-body .deck-tab[data-deck-tab="move"].active      { background: color-mix(in srgb, var(--panel) 90%, #3b82f6) !important; border-top-color: #3b82f6 !important; }
+.dock-body .deck-tab[data-deck-tab="gm"].active        { background: color-mix(in srgb, var(--panel) 90%, #f59e0b) !important; border-top-color: #f59e0b !important; }
 .dock-body .deck-tab[data-deck-tab="macro"].active     { background: color-mix(in srgb, var(--panel) 90%, #a855f7) !important; border-top-color: #a855f7 !important; }
 .dock-body .deck-tab[data-deck-tab="variables"].active { background: color-mix(in srgb, var(--panel) 90%, #10b981) !important; border-top-color: #10b981 !important; }
 
@@ -3051,7 +3057,8 @@ body[data-scale="250"] {
     border-radius: 0 10px 10px 10px;
     position: relative; z-index: 1;
 }
-#deck-tab-basic     { --tab-color: #3b82f6; background: color-mix(in srgb, var(--panel) 90%, #3b82f6); }
+#deck-tab-move      { --tab-color: #3b82f6; background: color-mix(in srgb, var(--panel) 90%, #3b82f6); }
+#deck-tab-gm        { --tab-color: #f59e0b; background: color-mix(in srgb, var(--panel) 90%, #f59e0b); }
 #deck-tab-macro     { --tab-color: #a855f7; background: color-mix(in srgb, var(--panel) 90%, #a855f7); }
 #deck-tab-variables { --tab-color: #10b981; background: color-mix(in srgb, var(--panel) 90%, #10b981); }
 
