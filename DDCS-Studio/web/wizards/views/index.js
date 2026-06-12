@@ -24,7 +24,7 @@ import { rotaryCenterView } from './rotaryCenterView.js';
 import { rotaryClockView } from './rotaryClockView.js';
 import { edgeView } from './edgeView.js';
 import { alignmentView } from './alignmentView.js';
-import { atcLengthView, atcWarmupView, atcChangeView, atcTestView } from './atcViews.js';
+import { atcLengthView, atcWarmupView, atcChangeView, atcTestView, atcCheckView } from './atcViews.js';
 
 export const WIZARD_VIEWS = [
     commView,
@@ -37,6 +37,7 @@ export const WIZARD_VIEWS = [
     edgeView,
     alignmentView,
     atcLengthView,
+    atcCheckView,
     atcWarmupView,
     atcChangeView,
     atcTestView,

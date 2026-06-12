@@ -4,11 +4,13 @@ import { AtcLengthWizard } from '../atcLengthWizard.js';
 import { AtcWarmupWizard } from '../atcWarmupWizard.js';
 import { AtcChangeWizard } from '../atcChangeWizard.js';
 import { AtcTestWizard } from '../atcTestWizard.js';
+import { AtcToolCheckWizard } from '../atcToolCheckWizard.js';
 
 const lengthWizard = new AtcLengthWizard();
 const warmupWizard = new AtcWarmupWizard();
 const changeWizard = new AtcChangeWizard();
 const testWizard = new AtcTestWizard();
+const toolCheckWizard = new AtcToolCheckWizard();
 
 export const atcLengthView = {
     type: 'atc_length',
@@ -32,6 +34,32 @@ export const atcLengthView = {
             level: p.setterLevel,
         };
         el('wiz_atc_length_code').innerHTML = UIUtils.formatGCode(lengthWizard.generate(params));
+    },
+};
+
+export const atcCheckView = {
+    type: 'atc_check',
+    panelId: 'wiz_atc_check',
+    codeElId: 'wiz_atc_check_code',
+    large: true,
+    inputIds: ['atc_check_tol'],   // tolerance only — setter + feeds come from Settings → ATC / Probes
+    update() {
+        const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+        const a = s.atc || {};
+        const p = s.probes || {};
+        const params = {
+            blockHeight: a.blockHeight ?? 50,
+            safeZ: a.safeZ ?? 10,
+            maxDist: a.maxDist ?? 200,
+            retract: a.retract ?? 3,
+            qStop: a.qStop ?? 1,
+            f_fast: a.fFast ?? 300,
+            f_slow: a.fSlow ?? 50,
+            port: p.setterPin,
+            level: p.setterLevel,
+            tolerance: el('atc_check_tol')?.value || '0.5',
+        };
+        el('wiz_atc_check_code').innerHTML = UIUtils.formatGCode(toolCheckWizard.generate(params));
     },
 };
 
