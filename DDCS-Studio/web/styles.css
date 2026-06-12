@@ -186,9 +186,8 @@ body {
     letter-spacing: 1px;
     font-family: inherit;
     color: var(--hdr-dim, var(--text-dim));
-    border: 1px solid transparent;
+    border: 1px solid var(--border);     /* inactive tabs stay outlined so they read as tabs */
     border-bottom: none;
-    border-top: 3px solid transparent;   /* room for the app-colour accent */
     border-radius: 10px 10px 0 0;
     background: transparent;
     box-shadow: none;
@@ -201,14 +200,17 @@ body {
     transition: opacity .12s ease, color .12s ease, background .12s ease;
 }
 .app-header .tab:hover { color: var(--hdr-ink, var(--text-main)); opacity: .85; }
-/* active tab fills with the toolbar surface below the header → seamless join; app-colour accent on top */
+/* active tab fills with the toolbar surface below the header → seamless join; app-colour accent on top.
+   margin-bottom reaches DOWN past the header's bottom border AND the wizard-bar's top border so the
+   active tab's body lands in the toolbar with no seam (the classic folder-tab overlap technique). */
 .app-header .tab.active {
     color: var(--app-tab-ink, var(--hdr-ink, var(--text-main)));
     background: var(--app-tab-fill, var(--panel));
     border-color: var(--border);
-    border-top-color: var(--tab-accent);
+    box-shadow: inset 0 3px 0 0 var(--tab-accent);   /* colour accent (inset → no height shift) */
     opacity: 1;
-    z-index: 2;
+    z-index: 3;
+    margin-bottom: -3px;
 }
 
 .app-header .tab .dot {
