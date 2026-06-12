@@ -593,6 +593,18 @@ export class CommandDeck {
                 </div>
             </div>
 
+            <div class="deck-group functions">
+                <div class="group-header">FUNCTIONS</div>
+                <div class="grid-3">
+                    <button class="toolbar-btn" title="Square root — SQRT[expr]" onclick="window.insert && window.insert('SQRT[')">SQRT[</button>
+                    <button class="toolbar-btn" title="Absolute value — ABS[expr]" onclick="window.insert && window.insert('ABS[')">ABS[</button>
+                    <button class="toolbar-btn" title="Sine, degrees — SIN[expr]" onclick="window.insert && window.insert('SIN[')">SIN[</button>
+                    <button class="toolbar-btn" title="Cosine, degrees — COS[expr]" onclick="window.insert && window.insert('COS[')">COS[</button>
+                    <button class="toolbar-btn" title="Arctangent, degrees — ATAN[y]/[x]" onclick="window.insert && window.insert('ATAN[')">ATAN[</button>
+                    <button class="toolbar-btn" title="Modulo — a MOD b" onclick="window.insert && window.insert(' MOD ')">MOD</button>
+                </div>
+            </div>
+
             <div class="deck-group control-flow">
                 <div class="group-header">CONTROL FLOW</div>
                 <div class="grid-3">
@@ -601,6 +613,7 @@ export class CommandDeck {
                     <button class="toolbar-btn axis-blue" title="Label target — N1, N2 ... (success path jumps past the error handlers)" onclick="window.insert && window.insert('N')">N</button>
                     <button class="toolbar-btn" title="Open comment / operator message — ( text )" onclick="window.insert && window.insert('(')">(</button>
                     <button class="toolbar-btn" title="Close comment / operator message" onclick="window.insert && window.insert(')')">)</button>
+                    <button class="toolbar-btn axis-blue" title="Operator message / pass-fail popup — #1505=1(msg) error, #1505=-5000(msg) ok" onclick="window.insert && window.insert('#1505')">#1505</button>
                 </div>
             </div>
 
@@ -609,12 +622,27 @@ export class CommandDeck {
                 <div class="grid-2">
                     <button class="toolbar-btn axis-blue" title="Rapid positioning" onclick="window.insert && window.insert('G0 ')">G0</button>
                     <button class="toolbar-btn axis-blue" title="Linear interpolation" onclick="window.insert && window.insert('G1 ')">G1</button>
+                    <button class="toolbar-btn axis-blue" title="Clockwise arc (I/J/K or R)" onclick="window.insert && window.insert('G2 ')">G2</button>
+                    <button class="toolbar-btn axis-blue" title="Counter-clockwise arc (I/J/K or R)" onclick="window.insert && window.insert('G3 ')">G3</button>
+                    <button class="toolbar-btn axis-blue" title="Dwell — G4 P&lt;seconds&gt;" onclick="window.insert && window.insert('G4 ')">G4</button>
                     <button class="toolbar-btn axis-blue" title="Machine coordinate move" onclick="window.insert && window.insert('G53 ')">G53</button>
                     <button class="toolbar-btn axis-blue" title="Absolute programming mode" onclick="window.insert && window.insert('G90 ')">G90</button>
                     <button class="toolbar-btn axis-blue" title="Incremental programming mode" onclick="window.insert && window.insert('G91 ')">G91</button>
                     <button class="toolbar-btn axis-blue" title="Probe move" onclick="window.insert && window.insert('G31 ')">G31</button>
                     <button class="toolbar-btn m-red" title="Program stop / pause" onclick="window.insert && window.insert('M0 ')">M0</button>
                     <button class="toolbar-btn m-red" title="Program end and rewind" onclick="window.insert && window.insert('M30')">M30</button>
+                </div>
+            </div>
+
+            <div class="deck-group wcs">
+                <div class="group-header">WORK OFFSETS</div>
+                <div class="grid-3">
+                    <button class="toolbar-btn axis-blue" title="Select work coordinate system G54" onclick="window.insert && window.insert('G54 ')">G54</button>
+                    <button class="toolbar-btn axis-blue" title="Select work coordinate system G55" onclick="window.insert && window.insert('G55 ')">G55</button>
+                    <button class="toolbar-btn axis-blue" title="Select work coordinate system G56" onclick="window.insert && window.insert('G56 ')">G56</button>
+                    <button class="toolbar-btn axis-blue" title="Select work coordinate system G57" onclick="window.insert && window.insert('G57 ')">G57</button>
+                    <button class="toolbar-btn axis-blue" title="Select work coordinate system G58" onclick="window.insert && window.insert('G58 ')">G58</button>
+                    <button class="toolbar-btn axis-blue" title="Select work coordinate system G59" onclick="window.insert && window.insert('G59 ')">G59</button>
                 </div>
             </div>
 
