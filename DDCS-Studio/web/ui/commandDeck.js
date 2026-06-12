@@ -87,7 +87,7 @@ export class CommandDeck {
         this.panel = el('deck-panel');
         this._varGrid = null;
         this._varSearch = null;
-        this._activeTab = 'keyboard';
+        this._activeTab = 'basic';
         this._activeFilters = new Set();
         this.build();
         // Let other modules (e.g. a CSV import) refresh the keyboard's variable buttons
@@ -106,47 +106,48 @@ export class CommandDeck {
         if (!body) return;
         const deckPanel = document.getElementById('deck-panel'); // existing macro-groups container
 
-        // 2. KEYBOARD panel — editor keys row + macro groups
-        const kbPanel = document.createElement('div');
-        kbPanel.className = 'deck-tab-panel';
-        kbPanel.id = 'deck-tab-keyboard';
+        // 2. BASIC tab — editor keys + the everyday G-code groups. buildMacroGroups builds ALL groups
+        //    into #deck-panel; the macro-logic groups are moved to the MACRO tab below.
+        const basicPanel = document.createElement('div');
+        basicPanel.className = 'deck-tab-panel';
+        basicPanel.id = 'deck-tab-basic';
+        basicPanel.appendChild(this._makeEditorRow());
+        const basicGroups = deckPanel || document.createElement('div');
+        basicGroups.id = 'deck-panel';
+        if (!basicGroups.className) basicGroups.className = 'dock-row macro-grid-area';
+        basicGroups.innerHTML = '';
+        this.buildMacroGroups(basicGroups);
+        this._wireDeckButtons(basicGroups);
+        basicPanel.appendChild(basicGroups);
 
-        const editorRow = document.createElement('div');
-        editorRow.className = 'dock-row editor-keys-row grid-3';
-        editorRow.innerHTML = `
-            <button class="toolbar-btn" data-ddcs-role="back">⌫ BACK</button>
-            <button class="toolbar-btn" data-ddcs-role="space">␣ SPACE</button>
-            <button class="toolbar-btn" data-ddcs-role="enter">↵ ENTER</button>
-        `;
-        this._wireEditorRow(editorRow);
-        kbPanel.appendChild(editorRow);
+        // 3. MACRO tab — move the macro-logic groups (math / functions / control flow / WCS) out of
+        //    BASIC into their own tab. Reparenting keeps the buttons' already-wired handlers.
+        const macroPanel = document.createElement('div');
+        macroPanel.className = 'deck-tab-panel';
+        macroPanel.id = 'deck-tab-macro';
+        macroPanel.style.display = 'none';
+        macroPanel.appendChild(this._makeEditorRow());
+        const macroGroups = document.createElement('div');
+        macroGroups.className = 'dock-row macro-grid-area';
+        macroGroups.id = 'deck-panel-macro';
+        ['math', 'functions', 'control-flow', 'wcs'].forEach((c) => {
+            const g = basicGroups.querySelector('.deck-group.' + c);
+            if (g) macroGroups.appendChild(g);
+        });
+        macroPanel.appendChild(macroGroups);
 
-        if (deckPanel) {
-            deckPanel.innerHTML = '';
-            kbPanel.appendChild(deckPanel);
-            this.buildMacroGroups(deckPanel);
-            this._wireDeckButtons(deckPanel);
-        } else {
-            const macroGrid = document.createElement('div');
-            macroGrid.className = 'dock-row macro-grid-area';
-            macroGrid.id = 'deck-panel';
-            this.buildMacroGroups(macroGrid);
-            this._wireDeckButtons(macroGrid);
-            kbPanel.appendChild(macroGrid);
-        }
-
-        // 3. VARIABLES panel — search + filters + scrollable chips
+        // 4. VARIABLES tab — search + filters + scrollable chips
         const varPanel = document.createElement('div');
         varPanel.className = 'deck-tab-panel';
         varPanel.id = 'deck-tab-variables';
         varPanel.style.display = 'none';
         this.buildVariablesPanel(varPanel);
 
-        // 4. Assemble the dock body: KEYBOARD/VARIABLES tab strip at the top, then panels.
-        //    The tabs live inside the body, so they're hidden when the dock is collapsed.
+        // 5. Assemble the dock body: BASIC / MACRO / VARIABLES tab strip, then the panels.
         body.innerHTML = '';
         body.appendChild(this._buildTabStrip());
-        body.appendChild(kbPanel);
+        body.appendChild(basicPanel);
+        body.appendChild(macroPanel);
         body.appendChild(varPanel);
 
         // 5. The handle is a plain chevron toggle (expand/collapse wired by DockManager).
@@ -166,7 +167,8 @@ export class CommandDeck {
         const strip = document.createElement('div');
         strip.className = 'deck-tabs';
         strip.innerHTML = `
-            <button class="deck-tab ddcs-tab active" data-deck-tab="keyboard">⌨ KEYBOARD</button>
+            <button class="deck-tab ddcs-tab active" data-deck-tab="basic">⌨ BASIC</button>
+            <button class="deck-tab ddcs-tab" data-deck-tab="macro">∑ MACRO</button>
             <button class="deck-tab ddcs-tab" data-deck-tab="variables"># VARIABLES</button>
         `;
         strip.querySelectorAll('.deck-tab').forEach(t => {
@@ -178,16 +180,30 @@ export class CommandDeck {
 
     switchTab(name) {
         this._activeTab = name;
-        const kb = document.getElementById('deck-tab-keyboard');
-        const vp = document.getElementById('deck-tab-variables');
-        if (kb) kb.style.display = name === 'keyboard' ? '' : 'none';
-        if (vp) vp.style.display = name === 'variables' ? '' : 'none';
+        const panels = { basic: 'deck-tab-basic', macro: 'deck-tab-macro', variables: 'deck-tab-variables' };
+        for (const [key, id] of Object.entries(panels)) {
+            const p = document.getElementById(id);
+            if (p) p.style.display = name === key ? '' : 'none';
+        }
         document.querySelectorAll('#controller-dock .deck-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.deckTab === name);
         });
         if (name === 'variables') {
             this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : '');
         }
+    }
+
+    // Build + wire a BACK/SPACE/ENTER editor-keys row (one per keyboard tab).
+    _makeEditorRow() {
+        const editorRow = document.createElement('div');
+        editorRow.className = 'dock-row editor-keys-row grid-3';
+        editorRow.innerHTML = `
+            <button class="toolbar-btn" data-ddcs-role="back">⌫ BACK</button>
+            <button class="toolbar-btn" data-ddcs-role="space">␣ SPACE</button>
+            <button class="toolbar-btn" data-ddcs-role="enter">↵ ENTER</button>
+        `;
+        this._wireEditorRow(editorRow);
+        return editorRow;
     }
 
     _wireEditorRow(editorRow) {
