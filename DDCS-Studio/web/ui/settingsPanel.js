@@ -43,7 +43,14 @@ const SETTINGS_DEFAULTS = {
     },
     // Dynamic machine I/O — the new source of truth; seeded from probes/limits on first load.
     inputs: [],
-    outputs: []
+    outputs: [],
+    // Axis roles — X/Y/Z linear; A/B optionally rotary. The sim reads this to spin the solid on a
+    // rotary-axis move (around the declared Cartesian axis). Two rotary axes are allowed (A and B).
+    motors: {
+        x: { role: 'linear' }, y: { role: 'linear' }, z: { role: 'linear' },
+        a: { role: 'unused', around: 'x' },
+        b: { role: 'unused', around: 'y' }
+    }
 };
 
 // ── Dynamic I/O model (inputs[] / outputs[]) ────────────────────────────────
@@ -103,6 +110,7 @@ function loadSettings() {
                 limits: { ...SETTINGS_DEFAULTS.limits, ...(p.limits || {}) },
                 hardwareTabs: { ...SETTINGS_DEFAULTS.hardwareTabs, ...(p.hardwareTabs || {}) },
                 atc: { ...SETTINGS_DEFAULTS.atc, ...(p.atc || {}) },
+                motors: { ...SETTINGS_DEFAULTS.motors, ...(p.motors || {}) },
                 inputs: Array.isArray(p.inputs) ? p.inputs : [],
                 outputs: Array.isArray(p.outputs) ? p.outputs : [],
             });
@@ -119,6 +127,14 @@ function saveSettings() {
 export function getSettings() { return _ddcsSettings; }
 export function getInputs() { return _ddcsSettings.inputs || []; }
 export function getOutputs() { return _ddcsSettings.outputs || []; }
+// Rotary axes for the sim: { a: 'x' } = axis A is rotary around X (the 3D view spins on those axes' moves).
+// Extensible toward 5-axis: a future `parent` field per axis adds the nested kinematic chain.
+export function getRotaryAxes() {
+    const m = _ddcsSettings.motors || {};
+    const out = {};
+    for (const ax of ['a', 'b']) { if (m[ax] && m[ax].role === 'rotary') out[ax] = m[ax].around || 'x'; }
+    return out;
+}
 // Push inputs[] edits back into the flat probes/limits the sim + wizards still read (stage-2 interim).
 export function syncIO() { syncFlatFromIO(_ddcsSettings); saveSettings(); }
 
@@ -250,6 +266,16 @@ function buildSettingsOverlay() {
                         </div>
                         <label class="settings-check"><input type="checkbox" id="set_mach_show"> Show machine envelope in 3D</label>
                         <div class="settings-hint">Origin = program zero position within the envelope.</div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">AXES</div>
+                        <div class="settings-hint">X/Y/Z are linear. Set A/B to <b>rotary</b> for a 4th/5th rotary axis — the 3D sim then spins the part on those axes' moves. One machine config covers both 3-axis and rotary jobs (the program decides).</div>
+                        <div class="settings-grid">
+                            <label>A — role<select id="set_axis_a_role"><option value="unused">Unused</option><option value="linear">Linear</option><option value="rotary">Rotary</option></select></label>
+                            <label>A — spins around<select id="set_axis_a_around"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></label>
+                            <label>B — role<select id="set_axis_b_role"><option value="unused">Unused</option><option value="linear">Linear</option><option value="rotary">Rotary</option></select></label>
+                            <label>B — spins around<select id="set_axis_b_around"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></label>
+                        </div>
                     </div>
                 </div>
 
@@ -433,6 +459,13 @@ function wireSettingsOverlay(ov) {
         q('set_mach_oy').value = s.machine.oy;
         q('set_mach_oz').value = s.machine.oz;
         q('set_mach_show').checked = !!s.machine.show;
+        if (q('set_axis_a_role')) {
+            const mo = s.motors || {};
+            q('set_axis_a_role').value = (mo.a && mo.a.role) || 'unused';
+            q('set_axis_a_around').value = (mo.a && mo.a.around) || 'x';
+            q('set_axis_b_role').value = (mo.b && mo.b.role) || 'unused';
+            q('set_axis_b_around').value = (mo.b && mo.b.around) || 'y';
+        }
 
         q('set_probe_pin').value = s.probes.probePin;
         q('set_probe_level').value = s.probes.probeLevel;
@@ -688,7 +721,7 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V9.81\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V9.82\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 
@@ -706,6 +739,14 @@ function wireSettingsOverlay(ov) {
     const dlTnc = q('atc_dl_tnc');
     if (dlTnc) dlTnc.addEventListener('click', () => {
         const out = q('atc_tnc_out'); if (out && out.value) UIUtils.downloadFile('T.nc', out.value);
+    });
+
+    // Machine → AXES: persist axis roles on change so the sim knows which axes are rotary (+ orientation).
+    ['a', 'b'].forEach((ax) => {
+        const role = q('set_axis_' + ax + '_role'), around = q('set_axis_' + ax + '_around');
+        const apply = () => { _ddcsSettings.motors = _ddcsSettings.motors || {}; _ddcsSettings.motors[ax] = { role: role.value, around: around.value }; saveSettings(); };
+        if (role) role.addEventListener('change', apply);
+        if (around) around.addEventListener('change', apply);
     });
 
     q('set_reset').addEventListener('click', () => {
