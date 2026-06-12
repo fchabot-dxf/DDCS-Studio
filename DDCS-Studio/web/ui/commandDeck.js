@@ -27,6 +27,41 @@ window.loadGcodeFile = function loadGcodeFile() {
     input.click();
 };
 
+// Insert a G-code / .nc file AT THE CURSOR (keeps the current program — vs Load, which replaces it).
+// For stitching in already-built code (a probe routine, a sub-macro) without copy-paste.
+window.insertGcodeFile = function insertGcodeFile() {
+    let input = document.getElementById('gcode-insert-input');
+    if (!input) {
+        input = document.createElement('input');
+        input.type = 'file';
+        input.id = 'gcode-insert-input';
+        input.accept = '.nc,.gcode,.gco,.g,.ngc,.tap,.cnc,.txt';
+        input.style.display = 'none';
+        input.addEventListener('change', () => {
+            const f = input.files && input.files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = (e) => {
+                const ed = document.getElementById('editor');
+                if (!ed) return;
+                const text = e.target.result || '';
+                const pos = Number.isInteger(ed.selectionStart) ? ed.selectionStart : ed.value.length;
+                const before = ed.value.slice(0, pos), after = ed.value.slice(pos);
+                const lead = before && !before.endsWith('\n') ? '\n' : '';
+                const tail = text.endsWith('\n') ? '' : '\n';
+                ed.value = before + lead + text + tail + after;
+                const caret = (before + lead + text + tail).length;
+                try { ed.setSelectionRange(caret, caret); } catch (_) { /* ignore */ }
+                ed.dispatchEvent(new Event('input', { bubbles: true }));
+            };
+            r.readAsText(f);
+            input.value = ''; // let the same file be inserted again
+        });
+        document.body.appendChild(input);
+    }
+    input.click();
+};
+
 // Variable filter categories — heuristic predicates over the DB (description keywords + flags).
 const VAR_FILTERS = [
     { key: 'user', label: 'User', test: v => !v.isSys },
@@ -375,7 +410,6 @@ export class CommandDeck {
         if (leftTarget) {
             leftTarget.innerHTML = `
                 <div style="display:flex; gap:6px; align-items:center;">
-                    <button class="toolbar-btn" onclick="loadGcodeFile && loadGcodeFile()" title="Load a G-code / .nc file into the editor to simulate it">📂 Load</button>
                     <button class="toolbar-btn" onclick="openWiz && openWiz('comm')">💬 Comm</button>
                     <button class="toolbar-btn" onclick="openWiz && openWiz('wcs')">🔧 WCS</button>
                     <button class="toolbar-btn" onclick="openWiz && openWiz('atc_warmup')" title="Spindle warm-up sequence">🔥 Warm-up</button>
@@ -411,6 +445,8 @@ export class CommandDeck {
                         </div>
                     </div>
 
+                    <button class="toolbar-btn" onclick="loadGcodeFile && loadGcodeFile()" title="Load a G-code / .nc file into the editor (replaces the current program)">📂 Load</button>
+                    <button class="toolbar-btn" onclick="insertGcodeFile && insertGcodeFile()" title="Insert a G-code file at the cursor — keeps your current program">➕ Insert</button>
                     <!-- Comm and WCS buttons are provided in the left header; avoid duplicates here -->
                 </div>
             `;
