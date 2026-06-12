@@ -93,13 +93,12 @@
             <svg class="logo logo-organic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-organic"/></svg>
             <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
             <span class="ver">V9.81</span>
-            <span id="gateway-led" class="gateway-led" title="Gateway status"></span>
         </div>
         <!-- App-switcher: STUDIO ↔ GATEWAY (machine-side views). Wired by ui/gatewayStatus.js —
              greyed when no gateway answers (click = download the desktop exe). -->
         <nav class="hdr-tabs" aria-label="App switcher">
             <button type="button" class="tab active" data-app="studio"><span class="dot"></span>STUDIO</button>
-            <button type="button" class="tab" data-app="gateway" title="Gateway"><span class="dot"></span>GATEWAY</button>
+            <button type="button" class="tab" data-app="gateway" title="Gateway"><span class="dot"></span>GATEWAY<span id="gateway-led" class="gateway-led" title="Gateway status"></span></button>
         </nav>
             <div class="hdr-controls" style="display:flex;gap:10px;align-items:center">
             <button onclick="(window.toggleStyle && window.toggleStyle())" id="styleBtn" class="op-btn" title="Switch Theme"><span class="op-icon">🎨</span><span class="op-label">NORMAL</span></button>

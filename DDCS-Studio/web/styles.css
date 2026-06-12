@@ -390,10 +390,11 @@ body {
 }
 .toast.bad { border-color: var(--danger, #ef4444); color: var(--danger, #ef4444); }
 
-/* Live-gateway status LED — always visible: unlit (grey) with no gateway, green when one answers,
-   red when it reports a fault. */
+/* Live-gateway status LED (sits inside the GATEWAY tab) — always visible: unlit (grey) with no
+   gateway, green when one answers, red when it reports a fault. */
 .gateway-led {
     display: inline-block;
+    margin-left: 7px;
     width: 9px; height: 9px; border-radius: 50%;
     background: #5a5a5a;
     opacity: .55;
