@@ -23,7 +23,7 @@
  */
 import { w, G, M, N, Z, F, P, L, Q, set, line, comment } from './words.js';
 import { ifGoto, goto } from './dialect.js';
-import { twoPassProbe } from './probeBlocks.js';
+import { twoPassProbe, srcVal, srcNote } from './probeBlocks.js';
 
 export class AlignmentWizard {
     constructor() {}
@@ -51,6 +51,8 @@ export class AlignmentWizard {
         const _port     = Number(port)     || 0;
         const _level    = Number(level)    || 0;
         const _qStop    = Number(qStop)    || 0;
+        const _src      = params.sources || {};   // controller-resident fields (PROBE-CONFIG-SOURCE.md)
+        const _levelOut = _src.level ? _src.level.ctrl : _level;
 
         // probeAxis is perpendicular to checkAxis
         const probeAxis  = checkAxis === 'X' ? 'Y' : 'X';
@@ -66,7 +68,7 @@ export class AlignmentWizard {
 
         let gcode = '';
         gcode += this.generateHeader(checkAxis, probeAxis, dirSign, tolerance, _f_fast, _f_slow, _dist, _retract, _safeZ);
-        gcode += this.generateMotionVariables(_dist, _retract, _f_fast, _f_slow, _port, _safeZ);
+        gcode += this.generateMotionVariables(_dist, _retract, _f_fast, _f_slow, _port, _safeZ, _src);
 
         // ===== POINT A =====
         gcode += comment(`===== POINT A: First probe along ${checkAxis} fence =====`) + '\n';
@@ -79,7 +81,7 @@ export class AlignmentWizard {
 
         // Probe in G91 incremental
         gcode += line([G(91)], 'Incremental mode') + '\n\n';
-        gcode += this.generateTwoPassProbe(probeAxis, dirSign, retractSign, axisStatus, axisResult, '#50', _level, _qStop);
+        gcode += this.generateTwoPassProbe(probeAxis, dirSign, retractSign, axisStatus, axisResult, '#50', _levelOut, _qStop);
 
         // Lift Z safely (in G91 incremental) before user jogs to point B
         gcode += line([G(0), Z('#19')], `Lift ${_safeZ}mm to clear workpiece for jogging`) + '\n\n';
@@ -99,7 +101,7 @@ export class AlignmentWizard {
         gcode += line([G(91)], 'Incremental mode') + '\n';
         gcode += line([G(0), Z('#20')], 'Descend back to probe height') + '\n\n';
 
-        gcode += this.generateTwoPassProbe(probeAxis, dirSign, retractSign, axisStatus, axisResult, '#51', _level, _qStop);
+        gcode += this.generateTwoPassProbe(probeAxis, dirSign, retractSign, axisStatus, axisResult, '#51', _levelOut, _qStop);
 
         gcode += line([G(90)], 'Absolute mode') + '\n\n';
 
@@ -150,13 +152,13 @@ export class AlignmentWizard {
         return h;
     }
 
-    generateMotionVariables(dist, retract, f_fast, f_slow, port, safeZ) {
+    generateMotionVariables(dist, retract, f_fast, f_slow, port, safeZ, src = {}) {
         let v = `( Motion Variables )\n`;
         v += `#1=${dist}    ( Max probe distance )\n`;
-        v += `#2=${retract} ( Retract distance )\n`;
-        v += `#3=${f_fast}  ( Fast feedrate )\n`;
+        v += `#2=${srcVal(src.retract, retract)} ( ${srcNote(src.retract, 'Retract distance')} )\n`;
+        v += `#3=${srcVal(src.fastFeed, f_fast)}  ( ${srcNote(src.fastFeed, 'Fast feedrate')} )\n`;
         v += `#4=${f_slow}  ( Slow feedrate )\n`;
-        v += `#5=${port}    ( Probe port )\n\n`;
+        v += `#5=${srcVal(src.port, port)}    ( ${srcNote(src.port, 'Probe port')} )\n\n`;
         v += `( Pre-calculated motion values )\n`;
         v += `#7=[0-#1]  ( Negative max probe )\n`;
         v += `#8=#1      ( Positive max probe )\n`;

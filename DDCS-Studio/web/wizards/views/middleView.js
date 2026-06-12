@@ -14,6 +14,8 @@ export const middleView = {
         'm_dist', 'm_retract', 'm_safe_z',
         'm_feed_fast', 'm_feed_slow', 'm_port', 'm_level', 'm_q',
     ],
+    // Controller-source chips (PROBE-CONFIG-SOURCE.md)
+    probeSrcFields: { m_port: 'port', m_level: 'level', m_feed_fast: 'fastFeed', m_retract: 'retract' },
 
     onOpen(ctx) {
         setTimeout(() => { ctx.update(); }, 50);
@@ -40,7 +42,8 @@ export const middleView = {
             f_slow: el('m_feed_slow')?.value || '50',
             qStop: el('m_q')?.value || '1',
             port: window.ddcsGetSettings().probes.probePin,
-            level: window.ddcsGetSettings().probes.probeLevel
+            level: window.ddcsGetSettings().probes.probeLevel,
+            sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
         const middleDesc = el('middle_desc');

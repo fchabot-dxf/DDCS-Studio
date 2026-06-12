@@ -5,7 +5,7 @@
  */
 import { w, G, M, N, Z, F, P, L, Q, set, line, comment } from './words.js';
 import { ifGoto, goto } from './dialect.js';
-import { toNum as toNumShared } from './probeBlocks.js';
+import { toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
 export class AtcLengthWizard {
     constructor() {}
@@ -24,6 +24,8 @@ export class AtcLengthWizard {
         const _port        = this.toNum(params.port, 2);   // IN02 = fixed Tool Setter (confirmed hardware)
         const _level       = this.toNum(params.level, 0);
         const _qStop       = this.toNum(params.qStop, 1);
+        const _src         = params.sources || {};   // controller-resident fields (PROBE-CONFIG-SOURCE.md)
+        const _levelOut    = _src.setterLevel ? _src.setterLevel.ctrl : _level;
 
         let gcode = '';
         gcode += `( ATC | Tool Length Setter )\n`;
@@ -35,8 +37,8 @@ export class AtcLengthWizard {
         gcode += `#2=${_retract}    ( Retract distance )\n`;
         gcode += `#3=${_f_fast}   ( Fast approach feedrate )\n`;
         gcode += `#4=${_f_slow}    ( Slow precision touch feedrate )\n`;
-        gcode += `#5=${_port}      ( Probe port )\n`;
-        gcode += `#6=${_blockHeight}   ( Tool setter block height )\n`;
+        gcode += `#5=${srcVal(_src.setterPort, _port)}      ( ${srcNote(_src.setterPort, 'Probe port')} )\n`;
+        gcode += `#6=${srcVal(_src.blockHeight, _blockHeight)}   ( ${srcNote(_src.blockHeight, 'Tool setter block height')} )\n`;
         gcode += `#19=${_safeZ}    ( Safe Z height )\n\n`;
 
         gcode += `( === CALCULATED MOTIONS === )\n`;
@@ -49,12 +51,12 @@ export class AtcLengthWizard {
         gcode += line([G(91)], 'INCREMENTAL MODE') + '\n\n';
 
         gcode += comment('Step 1: Fast Probe Down') + '\n';
-        gcode += line([G(31), Z('#7'), F('#3'), P('#5'), L(_level), Q(_qStop)], 'Fast plunge') + '\n';
+        gcode += line([G(31), Z('#7'), F('#3'), P('#5'), L(_levelOut), Q(_qStop)], 'Fast plunge') + '\n';
         gcode += ifGoto('#1922', '!=', '2', 1) + '\n';
         gcode += line([G(0), Z('#10')], 'Retract up') + '\n\n';
 
         gcode += comment('Step 2: Slow Precision Touch') + '\n';
-        gcode += line([G(31), Z('#7'), F('#4'), P('#5'), L(_level), Q(_qStop)], 'Slow probe') + '\n';
+        gcode += line([G(31), Z('#7'), F('#4'), P('#5'), L(_levelOut), Q(_qStop)], 'Slow probe') + '\n';
         gcode += ifGoto('#1922', '!=', '2', 1) + '\n\n';
 
         gcode += line([G(90)], 'Absolute mode') + '\n\n';

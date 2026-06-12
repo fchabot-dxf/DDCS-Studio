@@ -17,7 +17,7 @@
  */
 import { w, G, M, N, X, Y, Z, F, P, L, Q, set, line, comment, raw } from './words.js';
 import { ifGoto, goto, g53, wcsBase } from './dialect.js';
-import { twoPassProbe, toNum as toNumShared } from './probeBlocks.js';
+import { twoPassProbe, toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
 export class RotaryCenterWizard {
     constructor() {}
@@ -41,6 +41,8 @@ export class RotaryCenterWizard {
         const f_fast = toNumShared(params.f_fast, 200);
         const f_slow = toNumShared(params.f_slow, 50);
         const port = toNumShared(params.port, 3);
+        const src = params.sources || {};   // controller-resident fields (PROBE-CONFIG-SOURCE.md)
+        const levelOut = src.level ? src.level.ctrl : level;
         const { code: wcsCode, label: wcsLabel } = wcsBase(params.wcs || 'active');
 
         let g = '';
@@ -49,8 +51,8 @@ export class RotaryCenterWizard {
         g += `( Max probe ${dist}mm | Retract ${retract}mm | Safe Z ${safeZ}mm | Fast ${f_fast} | Slow ${f_slow} )\n\n`;
 
         g += `( Motion Variables )\n`;
-        g += `#1=${dist}   ( Max probe distance )\n#2=${retract}   ( Retract )\n`;
-        g += `#3=${f_fast}   ( Fast feed )\n#4=${f_slow}   ( Slow feed )\n#5=${port}   ( Probe port )\n`;
+        g += `#1=${dist}   ( Max probe distance )\n#2=${srcVal(src.retract, retract)}   ( ${srcNote(src.retract, 'Retract')} )\n`;
+        g += `#3=${srcVal(src.fastFeed, f_fast)}   ( ${srcNote(src.fastFeed, 'Fast feed')} )\n#4=${f_slow}   ( Slow feed )\n#5=${srcVal(src.port, port)}   ( ${srcNote(src.port, 'Probe port')} )\n`;
         g += `( Results: #50 top  #54 Yc  #55 R  #56 Zc )\n`;
         g += `#7=[0-#1]   ( Neg max )\n#8=#1   ( Pos max )\n#9=[0-#2]   ( Neg retract )\n#10=#2   ( Pos retract )\n#17=${parseInt(safeZ, 10) || 0}   ( Safe Z )\n\n`;
 
@@ -60,7 +62,7 @@ export class RotaryCenterWizard {
             + ifGoto('#1505', '==', '0', 2) + '\n\n';
         g += line([G(91)], 'Incremental mode') + '\n\n';
 
-        const pp = (axis, dirSign, resultVar, save) => twoPassProbe({ axis, dirSign, resultVar, level, qStop, comments: { save } });
+        const pp = (axis, dirSign, resultVar, save) => twoPassProbe({ axis, dirSign, resultVar, level: levelOut, qStop, comments: { save } });
 
         if (method === 'known') {
             g += comment('=== Known diameter: top + two flanks ===') + '\n\n';

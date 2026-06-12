@@ -15,7 +15,7 @@
  */
 import { w, G, M, N, A, Z, F, P, L, Q, set, line, comment } from './words.js';
 import { ifGoto, goto, wcsBase } from './dialect.js';
-import { toNum as toNumShared } from './probeBlocks.js';
+import { toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
 export class CornerWizard {
     constructor() {}
@@ -42,6 +42,8 @@ export class CornerWizard {
         const _safeZ      = this.toNum(safeZ, 10);
         const _travelDist = this.toNum(travelDist, 50);
         const _radius     = this.toNum(radius, 2.0);
+        const _src        = params.sources || {};   // controller-resident fields (PROBE-CONFIG-SOURCE.md)
+        const _levelOut   = _src.level ? _src.level.ctrl : _level;
 
         // Mapping for Outside Corner (Boss):
         // FL (Front-Left):  Probes X+ and Y+ (moves towards corner from bottom-left)
@@ -59,7 +61,7 @@ export class CornerWizard {
 
         let gcode = '';
         gcode += this.generateHeader(corner, xDir, yDir, probeZ, wcsLabel, _dist, _retract, _travelDist, _f_fast, _f_slow, _safeZ, _scanDepth);
-        gcode += this.generateMotionVariables(_dist, _retract, _f_fast, _f_slow, _port, _radius);
+        gcode += this.generateMotionVariables(_dist, _retract, _f_fast, _f_slow, _port, _radius, _src);
         gcode += this.generatePrecalcMotionVariables(_safeZ, _travelDist, _scanDepth);
         gcode += wcsCode;
         gcode += this.generateConfirmStart(corner, probeZ);
@@ -72,14 +74,14 @@ export class CornerWizard {
 
         let step = 1;
         if (probeZ) {
-            gcode += this.generateZProbe(step, _level, _qStop, wcsLabel, firstAxis, firstTravelVar, _travelDist);
+            gcode += this.generateZProbe(step, _levelOut, _qStop, wcsLabel, firstAxis, firstTravelVar, _travelDist);
             step++;
         }
 
         if (probeSeq === 'YX') {
-            gcode += this.generateYXSequence(step, xDir, yDir, probeZ, _level, _qStop, _travelDist, wcsLabel);
+            gcode += this.generateYXSequence(step, xDir, yDir, probeZ, _levelOut, _qStop, _travelDist, wcsLabel);
         } else {
-            gcode += this.generateXYSequence(step, xDir, yDir, probeZ, _level, _qStop, _travelDist, wcsLabel);
+            gcode += this.generateXYSequence(step, xDir, yDir, probeZ, _levelOut, _qStop, _travelDist, wcsLabel);
         }
 
         if (syncA) {
@@ -136,13 +138,13 @@ export class CornerWizard {
         return h;
     }
 
-    generateMotionVariables(dist, retract, f_fast, f_slow, port, radius) {
+    generateMotionVariables(dist, retract, f_fast, f_slow, port, radius, src = {}) {
         let v = `( === CONFIGURATION === )\n`;
         v += `#1=${dist}    ( Max probe distance )\n`;
-        v += `#2=${retract} ( Retract distance )\n`;
-        v += `#3=${f_fast}  ( Fast feedrate )\n`;
+        v += `#2=${srcVal(src.retract, retract)} ( ${srcNote(src.retract, 'Retract distance')} )\n`;
+        v += `#3=${srcVal(src.fastFeed, f_fast)}  ( ${srcNote(src.fastFeed, 'Fast feedrate')} )\n`;
         v += `#4=${f_slow}  ( Slow feedrate )\n`;
-        v += `#5=${port}    ( Probe port )\n`;
+        v += `#5=${srcVal(src.port, port)}    ( ${srcNote(src.port, 'Probe port')} )\n`;
         v += `#6=${radius}   ( Probe stylus radius )\n\n`;
         return v;
     }

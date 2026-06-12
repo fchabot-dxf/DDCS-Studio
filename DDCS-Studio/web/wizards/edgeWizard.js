@@ -16,7 +16,7 @@
  */
 import { w, G, M, N, F, P, L, Q, set, line, comment } from './words.js';
 import { ifGoto, goto, wcsBase } from './dialect.js';
-import { twoPassProbe, toNum as toNumShared } from './probeBlocks.js';
+import { twoPassProbe, toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
 export class EdgeWizard {
     constructor() {}
@@ -34,6 +34,8 @@ export class EdgeWizard {
         const f_fast  = toNumShared(params.f_fast, 200);
         const f_slow  = toNumShared(params.f_slow, 50);
         const port    = toNumShared(params.port, 3);
+        const src     = params.sources || {};   // controller-resident fields (PROBE-CONFIG-SOURCE.md)
+        const levelVal = src.level ? src.level.ctrl : level;
 
         const axisStatus = axis === 'X' ? '#1920' : '#1921';
         const axisResult = axis === 'X' ? '#1925' : '#1926';
@@ -46,8 +48,8 @@ export class EdgeWizard {
         const retractVar = retractSign === '+' ? '#10' : '#9';
 
         let gcode = '';
-        gcode += this.generateHeader(axis, dirSign, wcsLabel, dist, retract, f_fast, f_slow);
-        gcode += this.generateMotionVariables(dist, retract, f_fast, f_slow, port);
+        gcode += this.generateHeader(axis, dirSign, wcsLabel, dist, srcVal(src.retract, retract), srcVal(src.fastFeed, f_fast), f_slow);
+        gcode += this.generateMotionVariables(dist, retract, f_fast, f_slow, port, src);
         gcode += this.generatePrecalcMotionVariables();
         gcode += wcsCode;
         gcode += this.generateConfirmStart(axis, dirSign);
@@ -55,7 +57,7 @@ export class EdgeWizard {
 
         // Probe the edge
         gcode += comment(`Probe ${axis} ${dirSign === '+' ? 'pos' : 'neg'}`) + '\n';
-        gcode += this.generateTwoPassProbe(axis, dirSign, retractSign, axisStatus, axisResult, '#50', level, qStop);
+        gcode += this.generateTwoPassProbe(axis, dirSign, retractSign, axisStatus, axisResult, '#50', levelVal, qStop);
 
         // Write edge position to WCS
         gcode += comment('Write to WCS') + '\n';
@@ -93,13 +95,13 @@ export class EdgeWizard {
         return h;
     }
 
-    generateMotionVariables(dist, retract, f_fast, f_slow, port) {
+    generateMotionVariables(dist, retract, f_fast, f_slow, port, src = {}) {
         let v = `( Motion Variables )\n`;
         v += `#1=${dist}     ( Max probe distance )\n`;
-        v += `#2=${retract}  ( Retract distance )\n`;
-        v += `#3=${f_fast}   ( Fast feedrate )\n`;
+        v += `#2=${srcVal(src.retract, retract)}  ( ${srcNote(src.retract, 'Retract distance')} )\n`;
+        v += `#3=${srcVal(src.fastFeed, f_fast)}   ( ${srcNote(src.fastFeed, 'Fast feedrate')} )\n`;
         v += `#4=${f_slow}   ( Slow feedrate )\n`;
-        v += `#5=${port}     ( Probe port )\n`;
+        v += `#5=${srcVal(src.port, port)}     ( ${srcNote(src.port, 'Probe port')} )\n`;
         v += `( Result storage )\n`;
         v += `#50=0 ( Edge contact position )\n\n`;
         return v;

@@ -39,6 +39,8 @@ export const cornerView = {
         'c_travel_dist', 'c_safe_z', 'c_scan_depth', 'c_radius', 'c_feed_fast', 'c_feed_slow',
         'c_dist', 'c_retract', 'c_port', 'c_level', 'c_q', 'c_slave',
     ],
+    // Controller-source chips (PROBE-CONFIG-SOURCE.md)
+    probeSrcFields: { c_port: 'port', c_level: 'level', c_feed_fast: 'fastFeed', c_retract: 'retract' },
     startAnim: startCornerAnim,
 
     onOpen() {
@@ -67,7 +69,8 @@ export const cornerView = {
             safeZ: el('c_safe_z').value,
             travelDist: el('c_travel_dist').value,
             scanDepth: el('c_scan_depth')?.value || '5',
-            radius: el('c_radius')?.value || '2.0'
+            radius: el('c_radius')?.value || '2.0',
+            sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
         const gcode = wizard.generate(params);

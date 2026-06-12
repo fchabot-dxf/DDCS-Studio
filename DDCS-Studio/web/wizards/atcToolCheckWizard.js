@@ -11,7 +11,7 @@
  */
 import { w, G, M, N, Z, F, P, L, Q, set, line, comment } from './words.js';
 import { ifGoto, goto } from './dialect.js';
-import { toNum as toNumShared } from './probeBlocks.js';
+import { toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
 export class AtcToolCheckWizard {
     constructor() {}
@@ -27,6 +27,8 @@ export class AtcToolCheckWizard {
         const level = toNumShared(params.level, 0);
         const qStop = toNumShared(params.qStop, 1);
         const tol = toNumShared(params.tolerance, 0.5);
+        const src = params.sources || {};   // controller-resident fields (PROBE-CONFIG-SOURCE.md)
+        const levelOut = src.setterLevel ? src.setterLevel.ctrl : level;
 
         let g = '';
         g += `( ATC | Tool Breakage / Length Re-check )\n`;
@@ -35,8 +37,8 @@ export class AtcToolCheckWizard {
 
         g += `( === CONFIGURATION === )\n`;
         g += `#1=${maxDist}   ( Max search distance )\n#2=${retract}   ( Retract )\n`;
-        g += `#3=${f_fast}   ( Fast approach )\n#4=${f_slow}   ( Slow touch )\n#5=${port}   ( Setter port )\n`;
-        g += `#6=${blockHeight}   ( Tool setter block height )\n#19=${safeZ}   ( Safe Z )\n`;
+        g += `#3=${f_fast}   ( Fast approach )\n#4=${f_slow}   ( Slow touch )\n#5=${srcVal(src.setterPort, port)}   ( ${srcNote(src.setterPort, 'Setter port')} )\n`;
+        g += `#6=${srcVal(src.blockHeight, blockHeight)}   ( ${srcNote(src.blockHeight, 'Tool setter block height')} )\n#19=${safeZ}   ( Safe Z )\n`;
         g += `#20=${tol}   ( Tolerance )\n#21=[0-#20]   ( Negative tolerance )\n`;
         g += `#7=[0-#1]   ( Negative plunge )\n#10=#2   ( Positive retract )\n\n`;
 
@@ -46,11 +48,11 @@ export class AtcToolCheckWizard {
 
         g += line([G(91)], 'Incremental mode') + '\n\n';
         g += comment('Fast probe down') + '\n';
-        g += line([G(31), Z('#7'), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast plunge') + '\n';
+        g += line([G(31), Z('#7'), F('#3'), P('#5'), L(levelOut), Q(qStop)], 'Fast plunge') + '\n';
         g += ifGoto('#1922', '!=', '2', 1) + '\n';
         g += line([G(0), Z('#10')], 'Retract up') + '\n\n';
         g += comment('Slow precision touch') + '\n';
-        g += line([G(31), Z('#7'), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe') + '\n';
+        g += line([G(31), Z('#7'), F('#4'), P('#5'), L(levelOut), Q(qStop)], 'Slow probe') + '\n';
         g += ifGoto('#1922', '!=', '2', 1) + '\n\n';
 
         g += line([G(90)], 'Absolute mode') + '\n\n';

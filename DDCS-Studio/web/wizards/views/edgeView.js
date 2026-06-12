@@ -33,6 +33,8 @@ export const edgeView = {
         'p_axis', 'p_dir', 'p_dist', 'p_feed_fast', 'p_feed_slow',
         'p_retract', 'p_port', 'p_level', 'p_q', 'p_sync_a', 'p_wcs', 'p_slave',
     ],
+    // Controller-source chips: which inputs map to which probe-config field (PROBE-CONFIG-SOURCE.md)
+    probeSrcFields: { p_port: 'port', p_level: 'level', p_feed_fast: 'fastFeed', p_retract: 'retract' },
     startAnim: startEdgeAnim,
 
     onOpen(ctx) {
@@ -59,7 +61,8 @@ export const edgeView = {
             f_slow: el('p_feed_slow')?.value || '50',
             qStop: el('p_q')?.value || '1',
             port: window.ddcsGetSettings().probes.probePin,
-            level: window.ddcsGetSettings().probes.probeLevel
+            level: window.ddcsGetSettings().probes.probeLevel,
+            sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
         console.debug('edgeView.update', params);

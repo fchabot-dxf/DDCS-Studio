@@ -186,6 +186,26 @@ function gpInit() {
         return Number.isFinite(v) && v > 0 ? v : 1;
     };
 
+    // Seed the controller's own parameter vars from Studio settings so macros generated in
+    // "read from controller" mode (F#632 P#1078 L#1080 ... — PROBE-CONFIG-SOURCE.md) simulate
+    // as a controller whose parameter page matches the Settings panel. Without this the sim
+    // would run them with feed/port 0.
+    function gpSeededVarStore() {
+        const m = new Map();
+        const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
+        const p = (cfg && cfg.probes) || {};
+        const a = (cfg && cfg.atc) || {};
+        m.set(631, 1);                                  // Pr131 probe detection times
+        m.set(632, Number(a.fFast) || 200);             // Pr132 probing speed
+        m.set(633, Number(a.blockHeight) || 50);        // Pr133 setter block thickness
+        m.set(640, Number(a.retract) || 2);             // Pr140 retraction after probe
+        m.set(1075, Number(p.setterPin) || 0);          // Pr575 fixed probe port
+        m.set(1077, Number(p.setterLevel) || 0);        // Pr577 fixed probe level
+        m.set(1078, Number(p.probePin) || 0);           // Pr578 floating probe port
+        m.set(1080, Number(p.probeLevel) || 0);         // Pr580 floating probe level
+        return m;
+    }
+
     function ensureEngine() {
         if (gpEngine) return gpEngine;
         const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
@@ -193,6 +213,7 @@ function gpInit() {
             stock: cfg && cfg.stock ? cfg.stock : null,
             autoAnswer: window.ioPanel ? window.ioPanel.isAutoSensors() : true,
             simSpeed: gpSimSpeed(),
+            createVarStore: gpSeededVarStore,
             onLineChange: ({ lineIndex, raw }) => {
                 if (window.editorManager && typeof window.editorManager.setActiveLine === 'function') {
                     window.editorManager.setActiveLine(lineIndex);

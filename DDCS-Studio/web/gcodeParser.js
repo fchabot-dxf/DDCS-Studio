@@ -16,9 +16,29 @@
 import { tokenizeWords } from './engine/core/tokenizer.js';
 import { evalExpr } from './engine/core/expression.js';
 
+/**
+ * Controller parameter vars seeded from Studio settings, so code generated in
+ * "read from controller" mode (#632/#640/#1078/... — PROBE-CONFIG-SOURCE.md) previews
+ * with sensible values instead of dropping the moves as unresolvable.
+ */
+function ctrlVarSeed() {
+    const cfg = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings() : null;
+    const p = (cfg && cfg.probes) || {}, a = (cfg && cfg.atc) || {};
+    return [
+        [631, 1],                              // Pr131 probe detection times
+        [632, Number(a.fFast) || 200],         // Pr132 probing speed
+        [633, Number(a.blockHeight) || 50],    // Pr133 setter block thickness
+        [640, Number(a.retract) || 2],         // Pr140 retraction after probe
+        [1075, Number(p.setterPin) || 0],      // Pr575 fixed probe port
+        [1077, Number(p.setterLevel) || 0],    // Pr577 fixed probe level
+        [1078, Number(p.probePin) || 0],       // Pr578 floating probe port
+        [1080, Number(p.probeLevel) || 0],     // Pr580 floating probe level
+    ];
+}
+
 export function parseGcode(text) {
     const segments = []; // { x1,y1,z1, x2,y2,z2, a1,b1,a2,b2, rapid, probe }
-    const vars = new Map();
+    const vars = new Map(ctrlVarSeed());
 
     let pos = { x: 0, y: 0, z: 0, a: 0, b: 0 }; // a/b = rotary axis angles (degrees)
     let motion = 0;        // 0 rapid, 1 feed, 2 CW arc, 3 CCW arc

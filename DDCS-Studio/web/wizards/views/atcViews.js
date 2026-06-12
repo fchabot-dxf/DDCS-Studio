@@ -32,6 +32,7 @@ export const atcLengthView = {
             f_slow: a.fSlow ?? 50,
             port: p.setterPin,
             level: p.setterLevel,
+            sources: window.ddcsResolveProbeSources(['setterPort', 'setterLevel', 'blockHeight']),
         };
         el('wiz_atc_length_code').innerHTML = UIUtils.formatGCode(lengthWizard.generate(params));
     },
@@ -58,6 +59,7 @@ export const atcCheckView = {
             port: p.setterPin,
             level: p.setterLevel,
             tolerance: el('atc_check_tol')?.value || '0.5',
+            sources: window.ddcsResolveProbeSources(['setterPort', 'setterLevel', 'blockHeight']),
         };
         el('wiz_atc_check_code').innerHTML = UIUtils.formatGCode(toolCheckWizard.generate(params));
     },

@@ -35,6 +35,8 @@ export const alignmentView = {
         'al_tolerance', 'al_dist', 'al_retract', 'al_safe_z',
         'al_feed_fast', 'al_feed_slow', 'al_port', 'al_level', 'al_q',
     ],
+    // Controller-source chips (PROBE-CONFIG-SOURCE.md)
+    probeSrcFields: { al_port: 'port', al_level: 'level', al_feed_fast: 'fastFeed', al_retract: 'retract' },
     startAnim: startAlignmentAnim,
 
     onOpen(ctx) {
@@ -56,7 +58,8 @@ export const alignmentView = {
             f_slow:     el('al_feed_slow')?.value    || '50',
             qStop:      el('al_q')?.value            || '1',
             port:       window.ddcsGetSettings().probes.probePin,
-            level:      window.ddcsGetSettings().probes.probeLevel
+            level:      window.ddcsGetSettings().probes.probeLevel,
+            sources:    window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
         const gcode = wizard.generate(params);

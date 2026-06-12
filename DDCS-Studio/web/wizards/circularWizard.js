@@ -16,7 +16,7 @@
  */
 import { w, G, M, N, X, Y, Z, F, P, L, Q, set, line, comment } from './words.js';
 import { ifGoto, goto, g53, wcsBase } from './dialect.js';
-import { twoPassProbe, toNum as toNumShared } from './probeBlocks.js';
+import { twoPassProbe, toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
 export class CircularWizard {
     constructor() {}
@@ -44,6 +44,8 @@ export class CircularWizard {
         const f_fast = toNumShared(params.f_fast, 200);
         const f_slow = toNumShared(params.f_slow, 50);
         const port = toNumShared(params.port, 3);
+        const src = params.sources || {};   // controller-resident fields (PROBE-CONFIG-SOURCE.md)
+        const levelOut = src.level ? src.level.ctrl : level;
 
         const { code: wcsCode, label: wcsLabel } = wcsBase(params.wcs || 'active');
         const inside = featureType === 'bore';
@@ -55,10 +57,10 @@ export class CircularWizard {
 
         g += `( Motion Variables )\n`;
         g += `#1=${dist}   ( Max probe distance )\n`;
-        g += `#2=${retract}   ( Retract distance )\n`;
-        g += `#3=${f_fast}   ( Fast feedrate )\n`;
+        g += `#2=${srcVal(src.retract, retract)}   ( ${srcNote(src.retract, 'Retract distance')} )\n`;
+        g += `#3=${srcVal(src.fastFeed, f_fast)}   ( ${srcNote(src.fastFeed, 'Fast feedrate')} )\n`;
         g += `#4=${f_slow}   ( Slow feedrate )\n`;
-        g += `#5=${port}   ( Probe port )\n`;
+        g += `#5=${srcVal(src.port, port)}   ( ${srcNote(src.port, 'Probe port')} )\n`;
         g += `( Result storage )\n`;
         g += `#51=0 ( +X edge )\n#52=0 ( -X edge )\n#53=0 ( X centre )\n`;
         g += `#54=0 ( +Y edge )\n#55=0 ( -Y edge )\n#56=0 ( Y centre )\n`;
@@ -80,7 +82,7 @@ export class CircularWizard {
         g += line([G(91)], 'Incremental mode') + '\n\n';
 
         const pp = (axis, dirSign, resultVar, save) => twoPassProbe({
-            axis, dirSign, resultVar, level, qStop, comments: { save },
+            axis, dirSign, resultVar, level: levelOut, qStop, comments: { save },
         });
 
         if (inside) {

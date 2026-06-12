@@ -13,6 +13,8 @@ export const rotaryCenterView = {
         'rc_method', 'rc_datum', 'rc_diameter', 'rc_wcs',
         'rc_dist', 'rc_retract', 'rc_safe_z', 'rc_feed_fast', 'rc_feed_slow', 'rc_q',
     ],
+    // Controller-source chips (PROBE-CONFIG-SOURCE.md)
+    probeSrcFields: { rc_feed_fast: 'fastFeed', rc_retract: 'retract' },
 
     onOpen(ctx) {
         setTimeout(() => { ctx.update(); }, 50);
@@ -34,6 +36,7 @@ export const rotaryCenterView = {
             qStop: el('rc_q')?.value || '1',
             port: settings.probes.probePin,
             level: settings.probes.probeLevel,
+            sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
         // Diameter only applies to the known-diameter method

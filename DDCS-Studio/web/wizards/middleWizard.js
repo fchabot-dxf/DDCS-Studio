@@ -19,7 +19,7 @@
  */
 import { w, G, M, N, Z, F, P, L, Q, set, line, comment } from './words.js';
 import { ifGoto, goto, g53, wcsBase } from './dialect.js';
-import { twoPassProbe, toNum as toNumShared } from './probeBlocks.js';
+import { twoPassProbe, toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
 export class MiddleWizard {
     constructor() {}
@@ -60,6 +60,8 @@ export class MiddleWizard {
         const f_fast  = toNumShared(params.f_fast, 200);
         const f_slow  = toNumShared(params.f_slow, 50);
         const port    = toNumShared(params.port, 3);
+        const src     = params.sources || {};   // controller-resident fields (PROBE-CONFIG-SOURCE.md)
+        const levelOut = src.level ? src.level.ctrl : level;
 
         const axisStatus = axis === 'X' ? '#1920' : '#1921';
         const axisResult = axis === 'X' ? '#1925' : '#1926';
@@ -80,7 +82,7 @@ export class MiddleWizard {
         gcode += this.generateHeader(axis, typeLabel, wcsLabel, dir1Sign, dir2Sign, dist, retract, f_fast, f_slow, doTwoAxis);
         if (doTwoAxis) gcode += comment(`2-Axis mode: ${axis} then ${secondAxis}`) + '\n';
 
-        gcode += this.generateMotionVariables(dist, retract, f_fast, f_slow, port, safeZ);
+        gcode += this.generateMotionVariables(dist, retract, f_fast, f_slow, port, safeZ, src);
         gcode += this.generatePrecalcMotionVariables(safeZ);
         gcode += wcsCode;
         gcode += this.generateConfirmStart();
@@ -88,9 +90,9 @@ export class MiddleWizard {
 
         // --- Primary axis sequence ---
         if (featureType === 'pocket') {
-            gcode += this.generatePocketSequence(axis, dir1Sign, dir2Sign, axisStatus, axisResult, level, qStop, 51);
+            gcode += this.generatePocketSequence(axis, dir1Sign, dir2Sign, axisStatus, axisResult, levelOut, qStop, 51);
         } else {
-            gcode += this.generateBossSequence(axis, dir1Sign, axisStatus, axisResult, level, qStop, 51);
+            gcode += this.generateBossSequence(axis, dir1Sign, axisStatus, axisResult, levelOut, qStop, 51);
         }
 
         // Center calculation for primary axis: (#51 + #52) / 2 → #53
@@ -115,9 +117,9 @@ export class MiddleWizard {
             gcode += comment(`2axis_${axisDirKey}_${resolvedDir2}`) + '\n\n';
 
             if (featureType === 'pocket') {
-                gcode += this.generatePocketSequence(secondAxis, secDir1Sign, secDir2Sign, secAxisStatus, secAxisResult, level, qStop, 54);
+                gcode += this.generatePocketSequence(secondAxis, secDir1Sign, secDir2Sign, secAxisStatus, secAxisResult, levelOut, qStop, 54);
             } else {
-                gcode += this.generateBossSequence(secondAxis, secDir1Sign, secAxisStatus, secAxisResult, level, qStop, 54);
+                gcode += this.generateBossSequence(secondAxis, secDir1Sign, secAxisStatus, secAxisResult, levelOut, qStop, 54);
             }
 
             // Center calculation for secondary axis: (#54 + #55) / 2 → #56

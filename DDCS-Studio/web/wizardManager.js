@@ -10,6 +10,7 @@
 import { el } from './ui/uiUtils.js';
 import { WIZARD_VIEWS, viewByType } from './wizards/views/index.js';
 import { playClick, playClickReverse } from './ui/sound.js';  // audio helper for click sounds
+import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
 import { GcodeViz3D } from './viz/gcodeViz3d.js';
 import { parseGcode } from './gcodeParser.js';
 
@@ -117,6 +118,7 @@ export class WizardManager {
         if (wizElem) {
             wizElem.style.display = 'block';
             if (view && typeof view.onShow === 'function') view.onShow(this);
+            decorateProbeSrc(view);   // controller/Studio source chips (before first generate)
             // Ensure fields & preview reflect current defaults immediately
             this.update();
             if (view && typeof view.onOpen === 'function') view.onOpen(this);

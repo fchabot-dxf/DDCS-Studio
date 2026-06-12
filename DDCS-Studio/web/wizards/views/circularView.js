@@ -13,6 +13,8 @@ export const circularView = {
         'circ_type', 'circ_wcs', 'circ_dist', 'circ_retract', 'circ_safe_z',
         'circ_feed_fast', 'circ_feed_slow', 'circ_q',
     ],
+    // Controller-source chips (PROBE-CONFIG-SOURCE.md)
+    probeSrcFields: { circ_feed_fast: 'fastFeed', circ_retract: 'retract' },
 
     onOpen(ctx) {
         setTimeout(() => { ctx.update(); }, 50);
@@ -31,6 +33,7 @@ export const circularView = {
             qStop: el('circ_q')?.value || '1',
             port: settings.probes.probePin,
             level: settings.probes.probeLevel,
+            sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
         const desc = el('circ_desc');

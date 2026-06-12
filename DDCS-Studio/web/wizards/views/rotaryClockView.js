@@ -13,6 +13,8 @@ export const rotaryClockView = {
         'rcl_action', 'rcl_reference', 'rcl_span', 'rcl_wcs',
         'rcl_dist', 'rcl_retract', 'rcl_safe_z', 'rcl_feed_fast', 'rcl_feed_slow', 'rcl_q',
     ],
+    // Controller-source chips (PROBE-CONFIG-SOURCE.md)
+    probeSrcFields: { rcl_feed_fast: 'fastFeed', rcl_retract: 'retract' },
 
     onOpen(ctx) {
         setTimeout(() => { ctx.update(); }, 50);
@@ -34,6 +36,7 @@ export const rotaryClockView = {
             qStop: el('rcl_q')?.value || '1',
             port: settings.probes.probePin,
             level: settings.probes.probeLevel,
+            sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
         const desc = el('rcl_desc');

@@ -17,7 +17,7 @@
  */
 import { w, G, M, N, X, Y, Z, F, P, L, Q, set, line, comment } from './words.js';
 import { ifGoto, goto, g53, wcsBase } from './dialect.js';
-import { twoPassProbe, toNum as toNumShared } from './probeBlocks.js';
+import { twoPassProbe, toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
 export class RotaryClockWizard {
     constructor() {}
@@ -40,6 +40,8 @@ export class RotaryClockWizard {
         const f_fast = toNumShared(params.f_fast, 200);
         const f_slow = toNumShared(params.f_slow, 50);
         const port = toNumShared(params.port, 3);
+        const src = params.sources || {};   // controller-resident fields (PROBE-CONFIG-SOURCE.md)
+        const levelOut = src.level ? src.level.ctrl : level;
         const action = ['set', 'report', 'rotate'].includes(params.action) ? params.action : 'set';
         const refAngle = params.reference === 'side' ? 90 : 0;   // top(+Z)=0, +Y side=90
         const refLabel = refAngle ? '+Y side (3 o’clock)' : 'top (+Z)';
@@ -52,8 +54,8 @@ export class RotaryClockWizard {
         g += `( Max probe ${dist}mm | Retract ${retract}mm | Safe Z ${safeZ}mm | Fast ${f_fast} | Slow ${f_slow} )\n\n`;
 
         g += `( Motion Variables )\n`;
-        g += `#1=${dist}   ( Max probe distance )\n#2=${retract}   ( Retract )\n`;
-        g += `#3=${f_fast}   ( Fast feed )\n#4=${f_slow}   ( Slow feed )\n#5=${port}   ( Probe port )\n`;
+        g += `#1=${dist}   ( Max probe distance )\n#2=${srcVal(src.retract, retract)}   ( ${srcNote(src.retract, 'Retract')} )\n`;
+        g += `#3=${srcVal(src.fastFeed, f_fast)}   ( ${srcNote(src.fastFeed, 'Fast feed')} )\n#4=${f_slow}   ( Slow feed )\n#5=${srcVal(src.port, port)}   ( ${srcNote(src.port, 'Probe port')} )\n`;
         g += `#6=${span}   ( Y span between the two flat touches )\n`;
         g += `( Results: #51 Za  #52 Zb  #53 tilt(deg)  #54 A machine )\n`;
         g += `#7=[0-#1]   ( Neg max )\n#8=#1   ( Pos max )\n#9=[0-#2]   ( Neg retract )\n#10=#2   ( Pos retract )\n#17=${parseInt(safeZ, 10) || 0}   ( Safe Z )\n\n`;
@@ -64,7 +66,7 @@ export class RotaryClockWizard {
             + ifGoto('#1505', '==', '0', 2) + '\n\n';
         g += line([G(91)], 'Incremental mode') + '\n\n';
 
-        const ppZ = (resultVar, save) => twoPassProbe({ axis: 'Z', dirSign: '-', resultVar, level, qStop, comments: { save } });
+        const ppZ = (resultVar, save) => twoPassProbe({ axis: 'Z', dirSign: '-', resultVar, level: levelOut, qStop, comments: { save } });
 
         g += comment('Point A: probe down onto the flat') + '\n' + ppZ('#51', 'Save Za');
         g += line([G(0), Z('#17')], 'Retract clear above the flat') + '\n';
