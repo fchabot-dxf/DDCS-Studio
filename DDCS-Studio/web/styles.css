@@ -1080,10 +1080,11 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     font-size: 16px;
     border-bottom: 3px solid rgba(0,0,0,0.15);
 }
-/* Colour the editor keys by role: Back = red (delete), Space = blue, Enter = green (commit). */
-.editor-keys-row [data-ddcs-role="back"]  { color: #dc2626 !important; border-bottom-color: #dc2626 !important; }
-.editor-keys-row [data-ddcs-role="space"] { color: #2563eb !important; border-bottom-color: #2563eb !important; }
-.editor-keys-row [data-ddcs-role="enter"] { color: #16a34a !important; border-bottom-color: #16a34a !important; }
+/* Editor keys: COLOURED background + black label + a cleaner font (Back red, Space blue, Enter green). */
+.dock-body .editor-keys-row .toolbar-btn { font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif !important; letter-spacing: .4px; }
+.dock-body .editor-keys-row .toolbar-btn[data-ddcs-role="back"]  { background: #ef4444 !important; color: #0d0d0d !important; border-color: #b91c1c !important; }
+.dock-body .editor-keys-row .toolbar-btn[data-ddcs-role="space"] { background: #9ca3af !important; color: #0d0d0d !important; border-color: #6b7280 !important; }
+.dock-body .editor-keys-row .toolbar-btn[data-ddcs-role="enter"] { background: #3b82f6 !important; color: #0d0d0d !important; border-color: #1d4ed8 !important; }
 
 /* --- Top toolbar: ONE line, never wrap (wrapping is what clipped the 2nd row). JS adds .is-compact
    to collapse labels→icons the moment the labelled bar wouldn't fit; internal scroll only as a last

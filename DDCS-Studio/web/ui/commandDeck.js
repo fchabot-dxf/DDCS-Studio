@@ -688,7 +688,6 @@ export class CommandDeck {
                     <button class="toolbar-btn" title="Inequality comparison" onclick="window.insert && window.insert('!=')">!=</button>
                     <button class="toolbar-btn" title="Less-than comparison" onclick="window.insert && window.insert('<')">&lt;</button>
                     <button class="toolbar-btn" title="Greater-than comparison" onclick="window.insert && window.insert('>')">&gt;</button>
-                    <button class="toolbar-btn" title="Modulo operator" onclick="window.insert && window.insert('%')">%</button>
                 </div>
             </div>
 
@@ -713,6 +712,7 @@ export class CommandDeck {
                     <button class="toolbar-btn" title="Open comment / operator message — ( text )" onclick="window.insert && window.insert('(')">(</button>
                     <button class="toolbar-btn" title="Close comment / operator message" onclick="window.insert && window.insert(')')">)</button>
                     <button class="toolbar-btn axis-blue" title="Operator message / pass-fail popup — #1505=1(msg) error, #1505=-5000(msg) ok" onclick="window.insert && window.insert('#1505')">#1505</button>
+                    <button class="toolbar-btn" title="Number format inside a #1505/#1503 message — e.g. %.3f (3 decimals), %.0f (integer). NOT modulo." onclick="window.insert && window.insert('%')">%</button>
                 </div>
             </div>
 
