@@ -230,7 +230,22 @@ body[data-theme="normal"]     .app-header .tab.active { background: #666666 !imp
 body[data-theme="steampunk"]  .app-header .tab.active { background: #8b6914 !important; color: #fbeecb !important; }
 body[data-theme="futuristic"] .app-header .tab.active { background: #00ffff !important; color: #00222b !important; }
 body[data-theme="organic"]    .app-header .tab.active { background: #6b8e23 !important; color: #f3f8e7 !important; }
-body[data-theme="studio"]     .app-header .tab.active { background: #cfcabf !important; color: #1c1c1c !important; }
+/* Studio (metallic) theme: the app tabs wear the same beveled metallic border as the wizard bar —
+   inactive is the recessed bevel, active the brighter raised one — and keep the coloured top accent. */
+body[data-theme="studio"] .app-header .tab {
+    color: #2a2a2a !important;
+    border: 2px solid transparent !important;
+    background:
+        linear-gradient(180deg, #cfcbc4, #b6b1a9) padding-box,
+        linear-gradient(to bottom right, #f0f0f0, #a8a8a8 35%, #585858 65%, #202020) border-box !important;
+}
+body[data-theme="studio"] .app-header .tab.active {
+    color: #1c1c1c !important;
+    background:
+        linear-gradient(180deg, #f6f3ee, #e7e3da) padding-box,
+        linear-gradient(to bottom right, #ffffff, #a8a8a8 35%, #585858 65%, #202020) border-box !important;
+    box-shadow: inset 0 3px 0 0 var(--tab-accent) !important;   /* keep the coloured top */
+}
 
 /* GATEWAY tab when no gateway is reachable (hosted / standalone): greyed but clickable —
    clicking offers the desktop exe download (see ui/gatewayStatus.js). */
