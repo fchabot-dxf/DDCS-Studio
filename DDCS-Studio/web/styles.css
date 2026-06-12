@@ -2962,16 +2962,21 @@ body[data-theme="studio"] .dock-body .ddcs-tab.active {
 .viz3d-controls label { font-size: 10px; color: #9fc4e6; display: flex; align-items: center; gap: 4px; }
 .viz3d-controls select,
 .viz3d-controls button,
+.viz3d-jog-pendant .jog-bar select,
+.viz3d-jog-pendant .jog-bar button,
 .viz3d-drawer .viz3d-status-copy {
     font-size: 11px;
-    padding: 3px 6px;
+    padding: 3px 8px;
     background: rgba(0, 0, 0, 0.55);
     color: #cfe6ff;
     border: 1px solid rgba(120, 190, 255, 0.45);
-    border-radius: 4px;
+    border-radius: 7px;            /* sleek translucent pill */
 }
-.viz3d-controls button { cursor: pointer; }
-.viz3d-controls button.on { background: rgba(40, 120, 80, 0.8); border-color: #4dff7a; color: #eaffea; }
+.viz3d-controls button,
+.viz3d-jog-pendant .jog-bar button { cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.viz3d-jog-pendant .jog-bar button:hover { background: rgba(30, 70, 110, 0.65); border-color: rgba(150, 210, 255, 0.7); }
+.viz3d-controls button.on,
+.viz3d-jog-pendant .jog-bar button.on { background: rgba(40, 120, 80, 0.8); border-color: #4dff7a; color: #eaffea; }
 /* Wizard preview controls keep the transparent main-viewer look (beat the wizard form-select styling) */
 .wiz-viz3d .viz3d-controls select,
 .wiz-viz3d .viz3d-controls button {

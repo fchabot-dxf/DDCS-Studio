@@ -31,10 +31,11 @@ function gpEls() {
 function gpRelocatePlayControls() {
     const host = gpViz && gpViz.jogPendant && gpViz.jogPendant.querySelector('#jogPlayControls');
     if (!host) return;
-    ['viz3dSpeed', 'viz3dAnimate', 'viz3dStep', 'viz3dLoop'].forEach((id) => {
+    const speed = document.getElementById('viz3dSpeed');
+    if (speed) { const lbl = speed.closest('label'); host.appendChild(speed); if (lbl) lbl.remove(); } // drop the "Speed" text label (the select keeps its tooltip)
+    ['viz3dAnimate', 'viz3dStep', 'viz3dLoop'].forEach((id) => {
         const el = document.getElementById(id);
-        if (!el) return;
-        host.appendChild(id === 'viz3dSpeed' ? (el.closest('label') || el) : el);
+        if (el) host.appendChild(el);
     });
     const bar = document.querySelector('.viz3d-controls');
     if (bar && !bar.children.length) bar.style.display = 'none';
@@ -249,7 +250,7 @@ function gpInit() {
 
     if (runBtn) {
         runBtn.classList.remove('on');
-        runBtn.textContent = '▶ Run';
+        runBtn.textContent = '▶';
         runBtn.title = 'Run the program through the execution engine';
         runBtn.addEventListener('click', () => {
             const code = els.editor ? els.editor.value : '';

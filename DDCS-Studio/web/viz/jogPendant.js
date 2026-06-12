@@ -10,16 +10,16 @@ export function setupJogPendant(viz) {
         div.className = 'viz3d-jog-pendant';
         div.style.cssText = 'background: rgba(18, 18, 22, 0.95); border-top: 1px solid rgba(255,255,255,0.08); padding: 8px 12px 12px; color: #fff; z-index: 100; font-size: 11px; display: none; user-select: none; width: 100%; box-sizing: border-box;';
         div.innerHTML = `
-            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; padding: 0 4px;">
+            <div class="jog-bar" style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; padding: 0 4px;">
                 <span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                    <button id="jogStockBtn" class="toolbar-btn" style="padding:3px 10px;" title="Stock setup — shape, size, templates (updates the 3D view live)">📦</button>
+                    <button id="jogStockBtn" title="Stock setup — shape, size, templates (updates the 3D view live)">📦 Stock</button>
                     <span id="jogPlayControls" style="display: flex; align-items: center; gap: 6px;"></span>
                     <span style="display: flex; align-items: center; gap: 8px; color: #888;">
                         <label style="cursor:pointer;"><input type="radio" name="jogStep" value="1"> 1.0</label>
                         <label style="cursor:pointer;"><input type="radio" name="jogStep" value="10" checked> 10</label>
                     </span>
                 </span>
-                <button id="jogIOBtn" class="toolbar-btn" style="padding:3px 12px;" title="Show/hide the virtual I/O panel (sensors and outputs)">I/O</button>
+                <button id="jogIOBtn" title="Show/hide the virtual I/O panel (sensors and outputs)">I/O</button>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 32px 32px; gap: 6px;">
                 <button class="toolbar-btn" data-axis="z" data-dir="-1" style="font-weight:bold; padding:0;">Z-</button>
