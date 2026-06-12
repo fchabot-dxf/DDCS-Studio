@@ -1076,10 +1076,14 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 .dock-header .toolbar-btn .btn-tx { margin-left: 6px; white-space: nowrap; }
 .dock-header .toolbar-btn .btn-caret { margin-left: 6px; font-size: 10px; opacity: .75; }
 
-/* Collapsed (JS sets .is-compact when the labelled bar wouldn't fit on one line) → icon-only */
-.dock-header .header-controls.is-compact .btn-tx { display: none; }
-.dock-header .header-controls.is-compact .toolbar-btn { min-width: 0 !important; padding-left: 9px; padding-right: 9px; }
-.dock-header .header-controls.is-compact .btn-caret { margin-left: 4px; }
+/* Priority+ collapse (JS measures, drops labels by importance to keep the most labels possible):
+   stage 1 (.is-compact) drops the editor-action group (Load/Insert/Copy/Clear/Export) labels;
+   stage 2 (.is-mini) drops the wizard labels too (Comm/WCS/Warm-up/Probe/ATC). */
+.dock-header .header-controls.is-compact .header-right .btn-tx { display: none; }
+.dock-header .header-controls.is-compact .header-right .toolbar-btn { min-width: 0 !important; padding-left: 9px; padding-right: 9px; }
+.dock-header .header-controls.is-mini .btn-tx { display: none; }
+.dock-header .header-controls.is-mini .toolbar-btn { min-width: 0 !important; padding-left: 9px; padding-right: 9px; }
+.dock-header .header-controls.is-mini .btn-caret { margin-left: 4px; }
 @media (max-width: 520px) {
     .dock-header .header-controls { padding: 6px 6px; gap: 4px; }
 }
@@ -3361,3 +3365,18 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
     .editor-container .viz3d-handle.open { bottom: var(--viz3d-size, 50%) !important; right: auto !important; }
     .editor-container .viz3d-handle:active { transform: translateX(-50%) !important; }
 }
+
+/* ── Probe-config source chip (PROBE-CONFIG-SOURCE.md) ──────────────────────
+   Controller glyph inside controller-backed wizard inputs: dim = Studio value,
+   lit = field reads the controller's parameter at runtime (input shows the var). */
+.psrc-wrap { position: relative; display: inline-flex; align-items: center; }
+.psrc-wrap > input { padding-right: 22px; }
+.psrc-glyph {
+    position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 17px; height: 17px; padding: 0; border: none; border-radius: 3px;
+    background: transparent; color: #5a6472; cursor: pointer; opacity: 0.55;
+}
+.psrc-glyph:hover { opacity: 1; background: rgba(255, 255, 255, 0.07); }
+.psrc-glyph.psrc-lit { color: #4fc3f7; opacity: 1; }
+input.psrc-ctrl { color: #4fc3f7; font-style: italic; }

@@ -30,10 +30,16 @@ const SETTINGS_DEFAULTS = {
     stockTemplates: [],   // user-saved presets: { name, x, y, z, shape }
     machine: { x: 300, y: 300, z: 120, ox: 0, oy: 0, oz: 0, show: true },
     view:    { theta: -1.5708, phi: 1.0472 }, // 3D preview start orientation (front: +X right, +Y back)
-    probes:  { 
+    probes:  {
         probePin: 3, probeLevel: 0,        // IN03 = YunKia V6 3D probe (confirmed)
         setterPin: 2, setterLevel: 0,      // IN02 = fixed Tool Setter (confirmed); was 4 (IN04 = unwired)
-        setterX: 10, setterY: 10, setterZ: -50, setterW: 20, setterH: 20 
+        setterX: 10, setterY: 10, setterZ: -50, setterW: 20, setterH: 20,
+        // Per-field source: 'studio' = literal from the form (current behaviour) | 'ctrl' = generated
+        // code reads the controller's own parameter at runtime (e.g. F#632 P#1078 — see
+        // PROBE-CONFIG-SOURCE.md). Only fields the active controller profile lists in probeVars
+        // can be 'ctrl'; the wizard inputs show a controller glyph to flip each one.
+        sources: { port: 'studio', level: 'studio', fastFeed: 'studio', retract: 'studio',
+                   setterPort: 'studio', setterLevel: 'studio', blockHeight: 'studio' },
     },
     limits: {
         xMinPin: '', xMinLevel: 0, xMaxPin: '', xMaxLevel: 0,
@@ -117,7 +123,8 @@ function loadSettings() {
                 stockTemplates: Array.isArray(p.stockTemplates) ? p.stockTemplates : [],
                 machine: { ...SETTINGS_DEFAULTS.machine, ...(p.machine || {}) },
                 view: { ...SETTINGS_DEFAULTS.view, ...(p.view || {}) },
-                probes: { ...SETTINGS_DEFAULTS.probes, ...(p.probes || {}) },
+                probes: { ...SETTINGS_DEFAULTS.probes, ...(p.probes || {}),
+                          sources: { ...SETTINGS_DEFAULTS.probes.sources, ...((p.probes || {}).sources || {}) } },
                 limits: { ...SETTINGS_DEFAULTS.limits, ...(p.limits || {}) },
                 hardwareTabs: { ...SETTINGS_DEFAULTS.hardwareTabs, ...(p.hardwareTabs || {}) },
                 atc: { ...SETTINGS_DEFAULTS.atc, ...(p.atc || {}) },
@@ -148,6 +155,34 @@ export function getRotaryAxes() {
 }
 // Push inputs[] edits back into the flat probes/limits the sim + wizards still read (stage-2 interim).
 export function syncIO() { syncFlatFromIO(_ddcsSettings); saveSettings(); }
+
+// ── Probe config source (PROBE-CONFIG-SOURCE.md) ─────────────────────────────
+// A field is controller-resident when the user flipped it to 'ctrl' AND the active
+// profile has a native var for it. Returns { ctrl, pr, label } when lit, else null.
+export function probeSrc(field) {
+    const pv = (getActiveProfile().probeVars || {})[field];
+    if (!pv) return null;
+    return (_ddcsSettings.probes.sources || {})[field] === 'ctrl' ? pv : null;
+}
+// Whether the active profile supports the field at all (drives glyph visibility).
+export function probeSrcAvailable(field) {
+    return !!(getActiveProfile().probeVars || {})[field];
+}
+export function setProbeSrc(field, mode) {
+    if (!_ddcsSettings.probes.sources) _ddcsSettings.probes.sources = {};
+    _ddcsSettings.probes.sources[field] = mode === 'ctrl' ? 'ctrl' : 'studio';
+    saveSettings();   // broadcasts ddcs:settings-changed → open wizard re-renders
+}
+/** Resolve the lit fields among `fields` → { field: {ctrl,pr,label} } for generator params. */
+export function resolveProbeSources(fields) {
+    const out = {};
+    for (const f of fields) { const s = probeSrc(f); if (s) out[f] = s; }
+    return out;
+}
+window.ddcsProbeSrc = probeSrc;
+window.ddcsProbeSrcAvailable = probeSrcAvailable;
+window.ddcsSetProbeSrc = setProbeSrc;
+window.ddcsResolveProbeSources = resolveProbeSources;
 
 let _fillSettingsInputs = null;
 
@@ -821,7 +856,7 @@ function wireSettingsOverlay(ov) {
     // Report a bug (moved here from the header)
     q('set_report').addEventListener('click', () => {
         const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V10.9\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
+        const body = 'Version: V10.10\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 

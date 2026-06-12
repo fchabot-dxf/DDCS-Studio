@@ -593,13 +593,17 @@ export class CommandDeck {
         }
     }
 
-    // Measure the labelled toolbar; if it wouldn't fit on one line, collapse it to icon-only.
-    // remove→measure→add is synchronous so there's no visible flicker.
+    // Priority+ fit for the wizard toolbar: keep the most labels possible. Stage 1 (.is-compact)
+    // drops only the editor-action labels (Load/Insert/Copy/Clear/Export); if it STILL overflows,
+    // stage 2 (.is-mini) drops the wizard labels too. remove→measure→add is synchronous (no flicker).
     _fitHeader() {
         const hc = document.querySelector('.dock-header .header-controls');
         if (!hc) return;
-        hc.classList.remove('is-compact');
-        if (hc.scrollWidth > hc.clientWidth + 2) hc.classList.add('is-compact');
+        hc.classList.remove('is-compact', 'is-mini');
+        if (hc.scrollWidth > hc.clientWidth + 2) {
+            hc.classList.add('is-compact');
+            if (hc.scrollWidth > hc.clientWidth + 2) hc.classList.add('is-mini');
+        }
     }
 
     // Top app-header: staged so the right-edge icons never overflow the window. Stage 1 drops the
