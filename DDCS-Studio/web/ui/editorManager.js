@@ -159,7 +159,9 @@ export class EditorManager {
         this.editor.dispatchEvent(new Event('input'));
     }
 
-    downloadFile() {
+    // Shared by EXPORT (downloadFile) and TRANSFER (bridgeTransfer.js) so the file on the controller
+    // is byte-identical to the download — same (Title) line, same sanitized <name>.nc.
+    buildProgram() {
         let code = this.editor.value || '';
 
         // Use the first non-empty line (normally the descriptive header) for both title and filename
@@ -188,7 +190,12 @@ export class EditorManager {
         sanitized = sanitized.replace(/^_+|_+$/g, '').slice(0, 60);
         const outName = sanitized.length > 0 ? sanitized : 'program';
 
-        UIUtils.downloadFile(`${outName}.nc`, code);
+        return { name: `${outName}.nc`, code };
+    }
+
+    downloadFile() {
+        const { name, code } = this.buildProgram();
+        UIUtils.downloadFile(name, code);
     }
 
     getValue() {

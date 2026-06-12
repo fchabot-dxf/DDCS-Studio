@@ -124,39 +124,290 @@ body {
    LAYOUT STRUCTURE (Position & Size Only)
    ============================================ */
 
-/* Header */
+/* Header — themed via --hdr-* tokens set per [data-theme] (see THEME sections) */
 .app-header {
     height: 54px;
-    padding: 0 15px;
+    padding: 0 15px 0 0;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--panel);
+    align-items: stretch;
+    background: var(--hdr-bg, var(--panel));
     border-bottom: 1px solid var(--border);
+    user-select: none;
 }
 
-.hdr-title {
+.app-header > [data-fred-home-mount] { align-self: center; }
+
+.app-header .brand {
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-weight: bold;
+    gap: 10px;
+    padding: 0 15px;
+    align-self: center;
 }
 
-/* Live-gateway status LED (hidden unless Studio is bridged to a reachable gateway). */
-.gateway-led {
-    display: none;
-    width: 9px; height: 9px; border-radius: 50%;
-    background: #888;
-    box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+/* Per-theme logo: all five marks are in the DOM, only the active theme's shows */
+.app-header .logo { height: 34px; width: auto; display: none; }
+[data-theme="normal"] .logo-normal,
+[data-theme="studio"] .logo-studio,
+[data-theme="futuristic"] .logo-futuristic,
+[data-theme="organic"] .logo-organic,
+[data-theme="steampunk"] .logo-steampunk { display: block; }
+
+.app-header .ver {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 10px;
+    color: var(--hdr-dim, var(--text-dim));
 }
-.gateway-led.led-ok   { background: #36c45a; box-shadow: 0 0 7px #36c45a, 0 0 0 1px rgba(0,0,0,0.35); }
-.gateway-led.led-warn { background: #e0b020; box-shadow: 0 0 6px #e0b020, 0 0 0 1px rgba(0,0,0,0.35); }
-.gateway-led.led-bad  { background: #d04545; box-shadow: 0 0 6px #d04545, 0 0 0 1px rgba(0,0,0,0.35); }
+
+/* App-switcher tabs (STUDIO / GATEWAY) — visual stubs, no navigation yet.
+   The :hover/:active resets shield them from the per-theme global `button` skins. */
+.hdr-tabs { display: flex; align-items: stretch; }
+
+.app-header .tab,
+.app-header .tab:hover,
+.app-header .tab:active {
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    min-height: 0;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    font-family: inherit;
+    color: var(--hdr-dim, var(--text-dim));
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    text-shadow: none;
+    filter: none;
+    transform: none;
+    cursor: pointer;
+    position: relative;
+}
+
+.app-header .tab.active,
+.app-header .tab:hover { color: var(--hdr-ink, var(--text-main)); }
+
+.app-header .tab.active::after {
+    content: '';
+    position: absolute;
+    left: 10px; right: 10px; bottom: 0;
+    height: 3px;
+    background: var(--tab-accent, var(--accent));
+    border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.app-header .tab .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    margin-right: 7px;
+    background: currentColor;
+    opacity: .45;
+}
+.app-header .tab.active .dot { background: var(--tab-accent, var(--accent)); opacity: 1; }
+
+.app-header .tab[data-app="studio"]  { --tab-accent: var(--accent-studio, var(--accent)); }
+.app-header .tab[data-app="gateway"] { --tab-accent: var(--accent-gateway, var(--accent)); }
+
+/* GATEWAY tab when no gateway is reachable (hosted / standalone): greyed but clickable —
+   clicking offers the desktop exe download (see ui/gatewayStatus.js). */
+.app-header .tab.unavailable,
+.app-header .tab.unavailable:hover,
+.app-header .tab.unavailable:active { opacity: .45; color: var(--hdr-dim, var(--text-dim)); }
+.app-header .tab.unavailable .dot { background: currentColor; opacity: .3; }
+
+/* TRANSFER button rides the same gateway detection (ui/bridgeTransfer.js). */
+.app-header .op-btn.unavailable,
+.app-header .op-btn.unavailable:hover { opacity: .45; cursor: default; }
+
+/* Zoom control — the 🔍 button opens a small popover with a slider + AUTO (ui/scaleManager.js).
+   Anchored inside the header so body zoom can't misplace it. The DOWNLOAD menu (ui/downloadMenu.js)
+   reuses the same popover look (.dl-menu below shares .scale-pop). */
+.scale-ctl, .dl-ctl { position: relative; }
+.dl-menu { display: flex; flex-direction: column; gap: 8px; min-width: 280px; }
+.dl-menu .op-btn { width: 100%; text-decoration: none; text-align: left; }
+.scale-pop {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 1000;
+    min-width: 220px;
+    padding: 12px 14px;
+    background: var(--panel, #1e1e1e);
+    border: 1px solid var(--border, #444);
+    border-radius: var(--radius, 6px);
+    box-shadow: 0 8px 22px rgba(0,0,0,.45);
+}
+.scale-pop .sp-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.scale-pop input[type="range"] { flex: 1; accent-color: var(--accent, #4a90e2); min-width: 130px; }
+.scale-pop .scale-val {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    color: var(--text-main);
+    min-width: 42px;
+    text-align: right;
+}
+.scale-pop #scaleAutoBtn { width: 100%; }
+.scale-pop #scaleAutoBtn.on { border-color: var(--accent, #4a90e2); color: var(--accent, #4a90e2); }
+
+.gateway-dl-pop {
+    position: fixed;
+    z-index: 1000;
+    max-width: 270px;
+    padding: 12px 14px;
+    background: var(--panel-bg, #1e1e1e);
+    color: var(--text-main, #ddd);
+    border: 1px solid var(--border-color, #444);
+    border-radius: var(--radius, 6px);
+    box-shadow: 0 8px 22px rgba(0,0,0,.45);
+    font-size: 12px;
+    line-height: 1.45;
+}
+.gateway-dl-pop p { margin: 0 0 8px; }
+.gateway-dl-pop .dl-note { margin: 8px 0 0; opacity: .6; font-size: 11px; }
+.gateway-dl-pop .dl-btn {
+    display: block;
+    text-align: center;
+    padding: 7px 10px;
+    border-radius: var(--radius, 6px);
+    background: var(--accent, #4a90e2);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* ============ GATEWAY app (ui/gatewayPanel.js — fairy console views ported; COMBINED-APP-PLAN Step 2)
+   Component classes ported from the bridge console, scoped under .gateway-app so they ride Studio's
+   theme tokens without colliding with Studio classes (.tab, .dot, table, …). ============ */
+.gateway-app {
+    /* bridge-only tokens, derived from the active Studio theme */
+    --panel2: var(--panel);
+    --accent2: var(--accent);
+    --bar: var(--accent);
+    display: block;
+    padding: 16px 22px 30px;
+    max-width: 1100px;
+    margin: 0 auto;
+    width: 100%;
+}
+.gateway-app.hidden { display: none; }
+
+.gateway-app .mono { font-family: ui-monospace, Consolas, "Courier New", monospace; }
+.gateway-app .muted { color: var(--text-dim); font-size: 13px; }
+.gateway-app .row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.gateway-app .spread { justify-content: space-between; }
+.gateway-app .block { margin: 18px 0; }
+.gateway-app .block:first-child { margin-top: 8px; }
+
+.gateway-app .tabs { display: flex; gap: 6px; margin: 4px 0 14px; flex-wrap: wrap; }
+.gateway-app .tabs .tab {
+    padding: 7px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--panel); color: var(--text-dim); cursor: pointer; font-weight: 600; font-size: 13px;
+}
+.gateway-app .tabs .tab.on { background: var(--panel2); color: var(--text-main); border-color: var(--accent2); }
+
+.gateway-app table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.gateway-app th, .gateway-app td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--border); }
+.gateway-app th { color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+
+/* buttons: Studio's global button.primary / button.danger / .op-btn apply (per-theme skinned) */
+
+.gateway-app .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: var(--text-dim); }
+.gateway-app .dot.ok { background: var(--success); box-shadow: 0 0 8px var(--success); }
+.gateway-app .dot.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+.gateway-app .dot.bad { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+.gateway-app .job { font: 600 18px ui-monospace, Consolas, monospace; }
+.gateway-app .state { font: 600 12px ui-monospace, monospace; padding: 3px 9px; border-radius: 6px; letter-spacing: 1px; }
+.gateway-app .s-running { background: rgba(34,197,94,.15); color: var(--success); }
+.gateway-app .s-done, .gateway-app .s-delivered { background: rgba(74,144,226,.14); color: var(--accent2); }
+.gateway-app .s-queued, .gateway-app .s-stalled { background: rgba(234,179,8,.16); color: var(--warn); }
+.gateway-app .s-failed { background: rgba(239,68,68,.15); color: var(--danger); }
+
+.gateway-app .bar { height: 22px; background: var(--panel2); border-radius: 7px; overflow: hidden; border: 1px solid var(--border); margin: 10px 0 4px; }
+.gateway-app .fill {
+    height: 100%; width: 0; background: linear-gradient(90deg, var(--bar), var(--accent2));
+    transition: width .5s ease; display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 8px; color: #fff; font: 600 12px ui-monospace, monospace;
+}
+.gateway-app .stat { background: var(--panel2); border: 1px solid var(--border); border-radius: var(--radius); padding: 9px 11px; }
+.gateway-app .stat .k { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .6px; }
+.gateway-app .stat .v { font: 600 16px ui-monospace, monospace; margin-top: 2px; }
+
+.gateway-app .q { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.gateway-app .q:last-child { border-bottom: 0; }
+.gateway-app .pill { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: var(--panel2); border: 1px solid var(--border); color: var(--text-dim); }
+.gateway-app .pill.running { color: var(--success); }
+.gateway-app .pill.queued, .gateway-app .pill.stalled { color: var(--warn); }
+.gateway-app .pill.done, .gateway-app .pill.delivered { color: var(--accent2); }
+.gateway-app .pill.failed { color: var(--danger); }
+
+.gateway-app .log { font: 12px ui-monospace, Consolas, monospace; color: var(--text-dim); max-height: 140px; overflow: auto; margin: 0; padding: 0; list-style: none; }
+.gateway-app .log li { padding: 2px 0; border-bottom: 1px dashed var(--border); }
+
+.gateway-app .drop {
+    border: 1.5px dashed var(--border); border-radius: 10px; padding: 26px; text-align: center;
+    color: var(--text-dim); background: var(--panel2); cursor: pointer;
+}
+.gateway-app .drop.over { border-color: var(--accent2); color: var(--text-main); }
+
+/* Big shop-floor Tracker (gateway/views/tracker.js) — one job, readable from across the room.
+   Type scales with the viewport (clamp), colors ride the theme tokens. */
+.gateway-app .bigtrack { text-align: center; padding: 3vh 0 2vh; }
+.gateway-app .bt-idle {
+    font: 700 clamp(64px, 18vw, 220px)/1.1 ui-monospace, Consolas, monospace;
+    color: var(--text-dim); opacity: .35; letter-spacing: .08em;
+}
+.gateway-app .bt-top { display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap; }
+.gateway-app .bt-job {
+    font: 600 clamp(20px, 3.2vw, 44px) ui-monospace, Consolas, monospace;
+    overflow-wrap: anywhere; text-align: left;
+}
+.gateway-app .bt-state {
+    font: 700 clamp(14px, 1.6vw, 22px) ui-monospace, monospace;
+    padding: .35em .8em; border-radius: 8px; letter-spacing: .15em;
+}
+.gateway-app .bt-pct {
+    font: 800 clamp(90px, 22vw, 300px)/1.05 ui-monospace, Consolas, monospace;
+    color: var(--text-main); font-variant-numeric: tabular-nums;
+}
+.gateway-app .bt-bar {
+    height: clamp(28px, 5vh, 52px); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; margin: 2vh 0 3vh;
+}
+.gateway-app .bt-fill { height: 100%; background: linear-gradient(90deg, var(--bar), var(--accent2)); transition: width .5s ease; }
+.gateway-app .bt-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.gateway-app .bt-stat { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+.gateway-app .bt-stat .k { font-size: clamp(11px, 1vw, 14px); color: var(--text-dim); text-transform: uppercase; letter-spacing: .1em; }
+.gateway-app .bt-stat .v { font: 700 clamp(22px, 3vw, 40px) ui-monospace, monospace; margin-top: 4px; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .gateway-app .bt-stats { grid-template-columns: 1fr 1fr; } }
+
+/* toast appends to <body> (gateway/util.js) — global on purpose */
+.toast {
+    position: fixed; right: 14px; bottom: 14px; z-index: 1001; background: var(--panel, #1e1e1e);
+    border: 1px solid var(--border, #444); border-radius: var(--radius, 6px); padding: 10px 14px;
+    font-size: 13px; color: var(--text-main, #ddd); box-shadow: 0 6px 24px rgba(0,0,0,.4);
+}
+.toast.bad { border-color: var(--danger, #ef4444); color: var(--danger, #ef4444); }
+
+/* Live-gateway status LED — always visible: unlit (grey) with no gateway, green when one answers,
+   red when it reports a fault. */
+.gateway-led {
+    display: inline-block;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #5a5a5a;
+    opacity: .55;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.5), 0 0 0 1px rgba(0,0,0,0.35);
+}
+.gateway-led.led-ok  { background: #36c45a; opacity: 1; box-shadow: 0 0 7px #36c45a, 0 0 0 1px rgba(0,0,0,0.35); }
+.gateway-led.led-bad { background: #d04545; opacity: 1; box-shadow: 0 0 6px #d04545, 0 0 0 1px rgba(0,0,0,0.35); }
 
 .hdr-controls {
     display: flex;
     gap: 10px;
     align-items: center;
+    margin-left: auto;
+    align-self: center;
 }
 
 /* Main Layout */
@@ -1432,6 +1683,13 @@ Middle (handle) {
     --text-dim: #666666;
     --border: #dddddd;
     --radius: 6px;
+
+    /* header */
+    --hdr-bg: #ffffff;
+    --hdr-ink: #000000;
+    --hdr-dim: #666666;
+    --accent-studio: #4a90e2;
+    --accent-gateway: #22a55e;
 }
 
 [data-theme="normal"] .toolbar-btn {
@@ -1459,6 +1717,13 @@ Middle (handle) {
     --border:        #6f6a60;
     --radius:        0;
 
+    /* header */
+    --hdr-bg:        #cfcabf;
+    --hdr-ink:       #101010;
+    --hdr-dim:       #4b4843;
+    --accent-studio: #1668ff;
+    --accent-gateway:#0a9a06;
+
     --phosphor:      #15e000;   /* primary CRT green */
     --phosphor-2:    #00b400;
     --dro-white:     #f4f4f4;
@@ -1484,7 +1749,6 @@ Middle (handle) {
 
 /* reusable bevel helper */
 [data-theme="studio"] .raised,
-[data-theme="studio"] .app-header,
 [data-theme="studio"] .controller-dock {
     border-top: 3px solid var(--bv-lite);
     border-left: 3px solid var(--bv-mid-lite);
@@ -1492,17 +1756,7 @@ Middle (handle) {
     border-bottom: 3px solid var(--bv-dark);
 }
 
-/* --- App header → blue gradient bar, matching the wizard header --- */
-[data-theme="studio"] .app-header {
-    background: linear-gradient(180deg, #2a4f82, #123a66);
-    border: none;
-    border-bottom: 2px solid var(--bv-dark);
-}
-[data-theme="studio"] .hdr-title { display: flex; align-items: center; gap: 12px; }
-[data-theme="studio"] .hdr-text {
-    color: #000; background: none; padding: 0; border: none;
-}
-[data-theme="studio"] .hdr-controls { display: flex; gap: 8px; align-items: center; }
+/* App header: silver chassis plate via the shared --hdr-* tokens (base rule). */
 
 /* --- Buttons → silver hardware keys --- */
 [data-theme="studio"] button,
@@ -1714,6 +1968,13 @@ Middle (handle) {
     --text-dim: #8b7355;
     --border: #6b5329;
     --radius: 4px;
+
+    /* header */
+    --hdr-bg: #3d2817;
+    --hdr-ink: #f5d7a8;
+    --hdr-dim: #8b7355;
+    --accent-studio: #c89b2a;
+    --accent-gateway: #7a9a4a;
 }
 
 [data-theme="steampunk"] .wizard {
@@ -1750,6 +2011,13 @@ Middle (handle) {
     --text-dim: #8892b0;
     --border: #1e293b;
     --radius: 8px;
+
+    /* header */
+    --hdr-bg: #111827;
+    --hdr-ink: #ffffff;
+    --hdr-dim: #8892b0;
+    --accent-studio: #00ffff;
+    --accent-gateway: #2bd47a;
 }
 
 [data-theme="futuristic"] .wizard {
@@ -1787,6 +2055,13 @@ Middle (handle) {
     --text-dim: #7d7d6f;
     --border: #d4d1c8;
     --radius: 12px;
+
+    /* header */
+    --hdr-bg: #faf8f3;
+    --hdr-ink: #2d2d20;
+    --hdr-dim: #7d7d6f;
+    --accent-studio: #6b8e23;
+    --accent-gateway: #8e6b23;
 }
 
 [data-theme="organic"] .wizard {

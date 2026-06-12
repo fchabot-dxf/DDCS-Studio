@@ -17,17 +17,100 @@
 </head>
 <body data-theme="studio">
 
+    <!-- Per-theme DDCS marks — one is shown at a time, switched by [data-theme] CSS -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+
+      <!-- NORMAL: clean wordmark -->
+      <symbol id="mark-normal" viewBox="0 0 150 36">
+        <text x="0" y="23" font-family="'Arial Black',Arial,sans-serif" font-size="26"
+          font-weight="900" font-style="italic" fill="#C7A900"
+          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
+        <text x="0" y="34" font-family="Arial,sans-serif" font-size="8.5" font-weight="600"
+          fill="#666666" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
+      </symbol>
+
+      <!-- STUDIO: engraved nameplate — stamped into the silver chassis -->
+      <symbol id="mark-studio" viewBox="0 0 150 36">
+        <text x="1" y="24" font-family="'Arial Black',Arial,sans-serif" font-size="26"
+          font-weight="900" font-style="italic" fill="#f0eee8"
+          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
+        <text x="0" y="23" font-family="'Arial Black',Arial,sans-serif" font-size="26"
+          font-weight="900" font-style="italic" fill="#55514a"
+          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
+        <text x="0.7" y="34.7" font-family="Arial,sans-serif" font-size="8.5" font-weight="600"
+          fill="#f0eee8" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
+        <text x="0" y="34" font-family="Arial,sans-serif" font-size="8.5" font-weight="600"
+          fill="#55514a" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
+      </symbol>
+
+      <!-- FUTURISTIC: neon glow wordmark -->
+      <symbol id="mark-futuristic" viewBox="0 0 150 36">
+        <defs>
+          <filter id="neon" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="1.6" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <text x="0" y="23" font-family="'Arial Black',Arial,sans-serif" font-size="26"
+          font-weight="900" font-style="italic" fill="#FFF100" filter="url(#neon)"
+          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
+        <text x="0" y="34" font-family="Arial,sans-serif" font-size="8.5" font-weight="600"
+          fill="#8892b0" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
+      </symbol>
+
+      <!-- ORGANIC: humanist wordmark -->
+      <symbol id="mark-organic" viewBox="0 0 150 36">
+        <text x="0" y="23" font-family="Georgia,'Times New Roman',serif" font-size="26"
+          font-weight="bold" font-style="italic" fill="#A89000"
+          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
+        <text x="0" y="34" font-family="Georgia,serif" font-size="8.5" font-weight="600"
+          fill="#7d7d6f" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
+      </symbol>
+
+      <!-- STEAMPUNK: brass serif wordmark -->
+      <symbol id="mark-steampunk" viewBox="0 0 150 36">
+        <defs>
+          <linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#F0CC3A"/><stop offset="55%" stop-color="#C89B2A"/>
+            <stop offset="100%" stop-color="#8b6914"/>
+          </linearGradient>
+        </defs>
+        <text x="0" y="23" font-family="Georgia,'Times New Roman',serif" font-size="26"
+          font-weight="bold" fill="url(#brass)"
+          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
+        <text x="0" y="34" font-family="Georgia,serif" font-size="8.5" font-weight="600"
+          fill="#8b7355" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
+      </symbol>
+
+    </svg>
+
     <header class="app-header">
         <span data-fred-home-mount></span>
-        <div class="hdr-title" style="display:flex;align-items:center;gap:12px">
-            <span class="hdr-text">DDCS STUDIO V9.81</span>
+        <div class="brand">
+            <svg class="logo logo-normal" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-normal"/></svg>
+            <svg class="logo logo-studio" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-studio"/></svg>
+            <svg class="logo logo-futuristic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-futuristic"/></svg>
+            <svg class="logo logo-organic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-organic"/></svg>
+            <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
+            <span class="ver">V9.81</span>
             <span id="gateway-led" class="gateway-led" title="Gateway status"></span>
         </div>
+        <!-- App-switcher: STUDIO ↔ GATEWAY (machine-side views). Wired by ui/gatewayStatus.js —
+             greyed when no gateway answers (click = download the desktop exe). -->
+        <nav class="hdr-tabs" aria-label="App switcher">
+            <button type="button" class="tab active" data-app="studio"><span class="dot"></span>STUDIO</button>
+            <button type="button" class="tab" data-app="gateway" title="Gateway"><span class="dot"></span>GATEWAY</button>
+        </nav>
             <div class="hdr-controls" style="display:flex;gap:10px;align-items:center">
             <button onclick="(window.toggleStyle && window.toggleStyle())" id="styleBtn" class="op-btn" title="Switch Theme"><span class="op-icon">🎨</span><span class="op-label">NORMAL</span></button>
-            <button onclick="(window.toggleScale && window.toggleScale())" id="scaleBtn" class="op-btn scale-btn" title="Toggle Zoom (AUTO)"><span class="op-icon">🔍</span><span class="op-label">AUTO</span></button>
+            <div class="scale-ctl">
+                <button id="scaleBtn" class="op-btn scale-btn" title="Zoom"><span class="op-icon">🔍</span><span class="op-label">AUTO</span></button>
+            </div>
             <button onclick="(window.openSettings && window.openSettings())" class="op-btn" id="settingsBtn" title="Settings — stock, machine envelope, variable CSV"><span class="op-icon">⚙</span><span class="op-label">SETTINGS</span></button>
-            <button onclick="(window.saveDefaults && window.saveDefaults())" class="op-btn" title="Download app with new defaults"><span class="op-icon">💾</span><span class="op-label">DOWNLOAD</span></button>
+            <button class="op-btn hidden" id="transferBtn" title="Send the current program to the machine"><span class="op-icon">📡</span><span class="op-label">TRANSFER</span></button>
+            <div class="dl-ctl">
+                <button class="op-btn" id="downloadBtn" title="Get the app — portable HTML or the desktop exe"><span class="op-icon">💾</span><span class="op-label">DOWNLOAD</span></button>
+            </div>
         </div>
     </header>
 
@@ -101,6 +184,10 @@
             </div>
         </div>
     </div>
+
+    <!-- GATEWAY app — machine-side views (Queue/Submit/Files/History/Setup), shown via the header
+         app-switcher when a gateway answers. Populated by ui/gatewayPanel.js (lazy-loaded). -->
+    <div id="gateway-app" class="gateway-app hidden"></div>
 
     <!-- Wizard overlay -->
     <div id="wizard" class="overlay">
@@ -833,6 +920,14 @@
             } catch (err) {
                 console.error('Failed to import app.js', err);
             }
+            try {
+                const { initBridgeTransfer } = await import('./ui/bridgeTransfer.js');
+                initBridgeTransfer();             // before gatewayStatus so it catches the first tick
+            } catch (err) { console.error('bridge transfer init failed', err); }
+            try {
+                const { initDownloadMenu } = await import('./ui/downloadMenu.js');
+                initDownloadMenu();
+            } catch (err) { console.error('download menu init failed', err); }
             try {
                 const { initGatewayStatus } = await import('./ui/gatewayStatus.js');
                 initGatewayStatus();

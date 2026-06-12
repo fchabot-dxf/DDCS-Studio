@@ -494,23 +494,21 @@ function wireSettingsOverlay(ov) {
             fill();
             applyHardwareTabs();
         });
-        // When Studio is pointed at a gateway (?api= / ddcs_api), fetch the controller's own profile and
-        // offer it in the list (shown as "… (from controller)"). Silently ignored if offline / not bridged.
-        try {
-            if (localStorage.getItem('ddcs_api')) {
-                makeClient().profile().then((p) => {
-                    if (p && p.id && Array.isArray(p.hardwareTabs)) { registerProfile(p); fillProfileOptions(); }
-                }).catch(() => { /* gateway offline / no /api/profile — leave builtins */ });
-            }
-        } catch (e) { /* localStorage blocked — skip */ }
+        // When a gateway answers (same-origin in the gateway-served/exe face, or via the ?api= dev
+        // override), fetch the controller's own profile and offer it in the list (shown as
+        // "… (from controller)"). Silently ignored if offline / not bridged (hosted Studio).
+        makeClient().profile().then((p) => {
+            if (p && p.id && Array.isArray(p.hardwareTabs)) { registerProfile(p); fillProfileOptions(); }
+        }).catch(() => { /* no gateway — leave builtins */ });
 
         // Explicit "Pull from controller" — fetch /api/profile and apply its tabs + pin map → inputs[].
         const pullBtn = q('set_profile_pull');
         if (pullBtn) pullBtn.addEventListener('click', async () => {
-            if (!localStorage.getItem('ddcs_api')) { alert('Not bridged to a controller. Set the gateway URL (?api=) to pull a live profile. Offline controllers like the DDCS 3.1: use Import profile with the exported settings.'); return; }
             const orig = pullBtn.textContent; pullBtn.disabled = true; pullBtn.textContent = 'Pulling…';
             try {
-                const p = await makeClient().profile();
+                let p;
+                try { p = await makeClient().profile(); }
+                catch (e) { alert('Not bridged to a controller — run the desktop app (or the gateway) to pull a live profile. Offline controllers like the DDCS 3.1: use Import profile with the exported settings.'); return; }
                 if (!p || !p.id) { alert('The gateway returned no profile.'); return; }
                 if (!confirm('Pull "' + p.name + '" from the controller? This replaces the current hardware tabs and Input/Output list with the controller values.')) return;
                 registerProfile(p); setActiveProfile(p.id);
