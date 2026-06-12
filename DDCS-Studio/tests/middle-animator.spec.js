@@ -41,9 +41,10 @@ test.describe('MiddleViz utilities & animator', () => {
   });
 
   test('MiddleVizManager.updateVisibility exposes opposite-axis 2axis child for Find Both', async ({ page }) => {
-    // KNOWN GAP: middleViz.svg has never contained the `_2axis_*` overlay groups —
-    // the Find Both 2-axis visualization silently no-ops. Re-enable once the SVG
-    // gains the groups. See session notes 2026-06-12.
+    // STALE DESIGN: dedicated `_2axis_*` overlay groups were never the plan — the SVG
+    // visualizes Find Both by CHAINING the single-axis step groups in sequence
+    // (axis1 → jog → axis2). Rewrite around updateVisibility/discoverAnimSteps chaining
+    // and drop the `_2axis_` id candidates from middleVizUtils while at it.
     test.fixme();
     await page.evaluate(() => {
       const m = new window.MiddleVizManager('#middleVizContainer');

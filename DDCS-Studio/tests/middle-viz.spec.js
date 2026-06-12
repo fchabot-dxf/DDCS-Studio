@@ -85,9 +85,11 @@ test('Middle wizard uses secondary direction in generated G-code when Find Both 
 
 
 test('Find Both shows the correct 2-axis child subgroup and hides all others', async ({ page }) => {
-  // KNOWN GAP: middleViz.svg has never contained the `_2axis_*` overlay groups this test
-  // (and middleVizUtils.getVizIds) expect — the Find Both 2-axis visualization silently
-  // no-ops in the app. Re-enable once the SVG gains the groups. See session notes 2026-06-12.
+  // STALE DESIGN: this test (and the `_2axis_*` id candidates in middleVizUtils) expect
+  // dedicated 2-axis overlay groups, but the SVG intentionally has none — Find Both is
+  // visualized by CHAINING the single-axis step groups in sequence (axis1 steps → jog →
+  // axis2 steps). Rewrite this test around the chained sequence (discoverAnimSteps with
+  // twoAxis:true) instead of dedicated groups.
   test.fixme();
   await page.goto('http://localhost:3211');
   // open via the manager — toolbar labels collapse to icon-only (v10.10), text click is unreliable
