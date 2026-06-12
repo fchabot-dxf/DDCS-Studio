@@ -346,6 +346,8 @@ export class CommandDeck {
                             <button onclick="openWiz && openWiz('circular')">⭕ Bore/Boss</button>
                             <button onclick="openEdgeWiz && openEdgeWiz()">📏 Edge</button>
                             <button onclick="openAlignmentWiz && openAlignmentWiz()">🧭 Align</button>
+                            <div style="padding:4px 12px; font-size:10px; opacity:.55; text-transform:uppercase; letter-spacing:1px;">Rotary</div>
+                            <button onclick="openWiz && openWiz('rotary_center')">🔄 Centreline</button>
                         </div>
                     </div>
                     

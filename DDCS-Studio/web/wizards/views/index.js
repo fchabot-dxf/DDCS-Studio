@@ -20,6 +20,7 @@ import { wcsView } from './wcsView.js';
 import { cornerView } from './cornerView.js';
 import { middleView } from './middleView.js';
 import { circularView } from './circularView.js';
+import { rotaryCenterView } from './rotaryCenterView.js';
 import { edgeView } from './edgeView.js';
 import { alignmentView } from './alignmentView.js';
 import { atcLengthView, atcWarmupView, atcChangeView, atcTestView } from './atcViews.js';
@@ -30,6 +31,7 @@ export const WIZARD_VIEWS = [
     cornerView,
     middleView,
     circularView,
+    rotaryCenterView,
     edgeView,
     alignmentView,
     atcLengthView,
