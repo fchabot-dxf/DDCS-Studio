@@ -304,7 +304,7 @@ function gpInit() {
         const running = !!(gpEngine && gpEngine.running);
         const paused = !!(gpEngine && gpEngine.paused);
         gpRunButton.classList.toggle('on', running && !paused);
-        gpRunButton.textContent = !running ? '▶ Run' : (paused ? '▶ Resume' : '⏸ Stop');
+        gpRunButton.textContent = !running ? '▶' : (paused ? '▶' : '⏸');
         gpRunButton.title = !running ? 'Run the program through the execution engine'
             : (paused ? 'Resume continuous execution' : 'Stop execution');
     }

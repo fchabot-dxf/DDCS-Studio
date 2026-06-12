@@ -12,7 +12,7 @@ export function setupJogPendant(viz) {
         div.innerHTML = `
             <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; padding: 0 4px;">
                 <span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                    <button id="jogStockBtn" class="toolbar-btn" style="padding:3px 12px; font-weight:bold;" title="Stock setup — shape, size, templates (updates the 3D view live)">📦 Stock</button>
+                    <button id="jogStockBtn" class="toolbar-btn" style="padding:3px 10px;" title="Stock setup — shape, size, templates (updates the 3D view live)">📦</button>
                     <span id="jogPlayControls" style="display: flex; align-items: center; gap: 6px;"></span>
                     <span style="display: flex; align-items: center; gap: 8px; color: #888;">
                         <label style="cursor:pointer;"><input type="radio" name="jogStep" value="1"> 1.0</label>
