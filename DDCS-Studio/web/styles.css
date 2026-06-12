@@ -3039,18 +3039,9 @@ body[data-scale="250"] {
 .dock-body .deck-tab[data-deck-tab="macro"].active     { background: color-mix(in srgb, var(--panel) 90%, #a855f7) !important; border-top-color: #a855f7 !important; }
 .dock-body .deck-tab[data-deck-tab="variables"].active { background: color-mix(in srgb, var(--panel) 90%, #10b981) !important; border-top-color: #10b981 !important; }
 
-body[data-theme="studio"] .dock-body .ddcs-tab {
-    color: #000 !important; border-radius: 6px 6px 0 0 !important;
-    border: 2px solid transparent !important;
-    background:
-        linear-gradient(180deg, #cfcbc4, #b6b1a9) padding-box,
-        linear-gradient(to bottom right, #f0f0f0, #a8a8a8 35%, #585858 65%, #202020) border-box !important;
-}
-body[data-theme="studio"] .dock-body .ddcs-tab.active {
-    background:
-        linear-gradient(180deg, #f4f2ee, var(--panel)) padding-box,
-        linear-gradient(to bottom right, #f0f0f0, #a8a8a8 35%, #585858 65%, #202020) border-box !important;
-}
+/* Studio keyboard tabs use the SAME folder-tab styling as every other theme (active fill = panel
+   colour → connects to the panel body). The old metallic gradient override was removed because its
+   gradient fill didn't match the panel and broke the seamless join. */
 
 #controller-dock .dock-body { background: var(--panel); border-top: none; }
 /* the framed body the tabs merge into; each panel carries a faint tint + a coloured top "shelf" of its tab */
