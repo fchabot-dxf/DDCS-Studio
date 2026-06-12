@@ -8,7 +8,7 @@ const ATC_SNIPPET = 'M10 P4 ( fire unclamp )\nN10 M31 P12 ( wait sensor )\nG0 Z5
 
 // Port 3210: the default :3000 can be shadowed by an IDE preview server serving the
 // repo root; run `npx http-server ./web -p 3210` (or rely on CI's webServer) instead.
-const BASE = process.env.STUDIO_URL || 'http://localhost:3210';
+const BASE = process.env.STUDIO_URL || 'http://localhost:3211';
 
 async function openEditorWith(page, code) {
   await page.goto(BASE);
@@ -31,13 +31,15 @@ test('Run: parks on M31 wait, I/O panel auto-shows + pulses pin, auto-answer com
 
   // Auto sensors (default ON) answers after ~0.8s → run completes
   await expect(page.locator('#viz3dStatus')).toContainText('Execution complete', { timeout: 5000 });
-  await expect(page.locator('#viz3dAnimate')).toHaveText('▶ Run');
+  // Run button is icon-only since the v10.x toolbar work; state lives in the title
+  await expect(page.locator('#viz3dAnimate')).toHaveText('▶');
+  await expect(page.locator('#viz3dAnimate')).toHaveAttribute('title', /Run the program/);
 });
 
 test('Manual: auto sensors off, clicking the pulsing input unblocks the wait', async ({ page }) => {
   await openEditorWith(page, ATC_SNIPPET);
   await page.locator('#view-toggle').click();
-  await page.locator('#viz3dIO').click();               // open the panel to reach the checkbox
+  await page.evaluate(() => window.ioPanel.show());     // open the panel to reach the checkbox (#viz3dIO button was removed)
   await page.locator('#io_panel_auto').uncheck();
   await page.locator('#viz3dAnimate').click();
 
@@ -59,7 +61,7 @@ test('Probe: G31 contact pulses the probe input pin', async ({ page }) => {
     window.addEventListener('io_change', (e) => window.__io.push(e.detail));
   });
   await page.locator('#view-toggle').click();
-  await page.locator('#viz3dIO').click();               // open the panel to watch the pins
+  await page.evaluate(() => window.ioPanel.show());     // open the panel to watch the pins (#viz3dIO button was removed)
   await page.locator('#viz3dAnimate').click();
 
   await expect(page.locator('#viz3dStatus')).toContainText('Execution complete', { timeout: 10000 });
@@ -78,15 +80,16 @@ test('Loop: program restarts automatically after completion', async ({ page }) =
   await expect(page.locator('#viz3dLoop')).toHaveClass(/on/);
   await page.locator('#viz3dAnimate').click();
 
-  await expect(page.locator('#viz3dAnimate')).toHaveText('⏸ Stop', { timeout: 5000 });
+  await expect(page.locator('#viz3dAnimate')).toHaveText('⏸', { timeout: 5000 });
   await expect(page.locator('#viz3dStatus')).toContainText('Execution complete', { timeout: 10000 });
   // ~0.8 s later the loop restarts the program
-  await expect(page.locator('#viz3dAnimate')).toHaveText('⏸ Stop', { timeout: 5000 });   // restarted
+  await expect(page.locator('#viz3dAnimate')).toHaveText('⏸', { timeout: 5000 });   // restarted
 
   await page.locator('#viz3dAnimate').click();          // stop also cancels the loop rerun
-  await expect(page.locator('#viz3dAnimate')).toHaveText('▶ Run');
+  await expect(page.locator('#viz3dAnimate')).toHaveText('▶');
   await page.waitForTimeout(1500);
-  await expect(page.locator('#viz3dAnimate')).toHaveText('▶ Run');                       // stayed stopped
+  await expect(page.locator('#viz3dAnimate')).toHaveText('▶');                       // stayed stopped
+  await expect(page.locator('#viz3dAnimate')).toHaveAttribute('title', /Run the program/);
 });
 
 test('Step: executes one line per click and pauses in between', async ({ page }) => {
@@ -94,7 +97,8 @@ test('Step: executes one line per click and pauses in between', async ({ page })
   await page.locator('#view-toggle').click();
 
   await page.locator('#viz3dStep').click();             // line 1: M10 P4
-  await expect(page.locator('#viz3dAnimate')).toHaveText('▶ Resume');
+  await expect(page.locator('#viz3dAnimate')).toHaveText('▶');
+  await expect(page.locator('#viz3dAnimate')).toHaveAttribute('title', /Resume/);
   const s1 = await page.locator('#viz3dStatus').textContent();
   await page.waitForTimeout(400);
   const s2 = await page.locator('#viz3dStatus').textContent();

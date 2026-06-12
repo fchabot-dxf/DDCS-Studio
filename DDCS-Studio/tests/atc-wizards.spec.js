@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // right dialect. (Generated-code correctness is covered in depth by
 // verification/atc-gen-test.mjs — engine round trip + DDCS linter.)
 
-const BASE = process.env.STUDIO_URL || 'http://localhost:3210';
+const BASE = process.env.STUDIO_URL || 'http://localhost:3211';
 
 async function openWizard(page, type) {
   await page.goto(BASE);
