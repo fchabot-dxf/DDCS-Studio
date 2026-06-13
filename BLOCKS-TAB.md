@@ -276,10 +276,13 @@ cd DDCS-Studio/web && python -m http.server
    unattached**; drag to move (snapped sub-stack follows); **snap into connected stacks** (touch + merged
    seam); emit order = top-to-bottom; **drag a block into a wrapper's mouth (body socket) to nest it** ✓.
    **Next on this thread:** insert-and-push on snap; drag a child back *out* of a mouth.
-7. **Granular re-taxonomy** — ⏳ **started**: atoms shipped — `Move` (mode rapid/cut/probe), `Spindle`/`Feed`
-   (Machine), `Comment` (Mark Up); category-based **signature colours** (`--cat-*`). **Next (grounded in the
-   wizard audit above):** trivial leaf atoms `Dwell`/`Coolant`/`Tool`/`WCS`/`Arc` + Spindle M3/M4 direction →
-   `Shape`/`Position` blocks → the `ZigZag`/`Concentric` fill blocks; rebuild `Drill` as `Array{Bore}`.
+7. **Granular re-taxonomy** — ⏳ **mostly shipped**: `Move` (mode rapid/cut/probe), `Arc`, `Probe`; Machine
+   atoms `Spindle`/`Feed`/`Dwell`/`Coolant`/`Tool`/`WCS`; `Comment` (Mark Up); category **signature colours**.
+   **`ZigZag Fill` + `Concentric Fill`** ✓ — the keystone area-clearing atoms (`ops/zigzag.js`,
+   `ops/concentric.js`) wrap `clearing.js` (`scanlineFill`+`fillLevelMoves` / `concentricRect`), depth-stepped
+   via `depthLevels`; rectangular region for now (circle/polygon next — clearing.js already has the kernels).
+   They unblock the **structural modularization** of Pocket/Slot/Surfacing/Text (each = region + fill + walls).
+   **Next:** `Shape`/`Position` blocks; rebuild `Drill` as `Array{Bore}`; circle/polygon fill regions.
 8. **Block shapes + sockets** (the big one) — ⏳ **started**: **body socket** ✓ (drag a block into a
    wrapper's mouth); **Reporter engine** ✓ (`ops/variable.js`/`math.js` + `resolveValue` — value-trees
    resolve recursively, scalar-compatible); **value-socket UI** ✓ (Reporter pills in fields, drag-into-socket,

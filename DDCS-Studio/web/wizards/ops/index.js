@@ -14,6 +14,8 @@
 import { drillBlock, peckDrill } from './drill.js';
 import { boreBlock, helicalBore } from './bore.js';
 import { lineBlock, lineCut } from './line.js';
+import { zigzagBlock, zigzagFill } from './zigzag.js';
+import { concentricBlock, concentricFill } from './concentric.js';
 import { probeBlock } from './probe.js';
 import { arrayBlock, patternPoints } from './array.js';
 import { helixBlock, helixPoints } from './helix.js';
@@ -38,7 +40,7 @@ import { evalExpr } from './expr.js';
 export const PALETTE = [
     moveBlock, arcBlock, probeBlock,                            // Move
     spindleBlock, feedBlock, dwellBlock, coolantBlock, toolBlock, wcsBlock,   // Machine
-    lineBlock, boreBlock, drillBlock,                          // Ops (feature presets)
+    lineBlock, boreBlock, drillBlock, zigzagBlock, concentricBlock,   // Ops (feature presets + area-clearing fills)
     arrayBlock, helixBlock,                                    // Modify
     countBlock, ifBlock, compareBlock,                        // Control (loop + conditional wrapper + boolean reporter)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
@@ -55,4 +57,4 @@ export const CATEGORIES = ['Shapes', 'Move', 'Machine', 'Ops', 'Modify', 'Contro
 export const BLOCKS = Object.fromEntries(PALETTE.map((d) => [d.type, d]));
 
 // Kernels + expression evaluator re-exported for STUDIO presets / direct callers.
-export { peckDrill, helicalBore, lineCut, patternPoints, helixPoints, evalExpr };
+export { peckDrill, helicalBore, lineCut, zigzagFill, concentricFill, patternPoints, helixPoints, evalExpr };
