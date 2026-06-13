@@ -1024,6 +1024,8 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     display: flex;
     opacity: 1;
     visibility: visible;
+    height: var(--dock-h, clamp(240px, 42vh, 440px));   /* drag handle sets --dock-h; the keys flex to fill */
+    max-height: 85vh;
 }
 
 /* Row 1: Editor Keys */
@@ -1092,14 +1094,14 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 
 /* Row 2: Macro Grid */
 .macro-grid-area {
-    flex: 1;
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     flex-direction: row;
-    flex-wrap: wrap; /* Flow buttons nicely */
-    align-content: flex-start;
+    flex-wrap: nowrap;          /* groups stay on one row — they flex/shrink instead of wrapping to a 2nd line */
+    align-items: stretch;       /* groups fill the height */
     gap: 10px;
-    justify-content: center; /* Center groups on wide screens */
-}  
+}
 
 .dock-body .deck-panel {
     display: flex;
@@ -1120,7 +1122,8 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     flex-direction: column;
     gap: 8px;
     padding: 8px;
-    min-width: 140px;
+    flex: 1 1 0;               /* groups stretch to fill the width equally, shrink on narrow */
+    min-width: 0;
     background: transparent;
 }
 
@@ -1129,6 +1132,8 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 /* Grid sizing for internal buttons */
 .deck-group .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap:8px; }
 .deck-group .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap:8px; }
+/* Keys flex to fill the group's height — the grid stretches, rows share the height equally. */
+.deck-group .grid-2, .deck-group .grid-3, .deck-group .grid-4 { flex: 1 1 auto; min-height: 0; grid-auto-rows: 1fr; }
 
 .dock-row { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-start; }
 
@@ -2029,7 +2034,7 @@ Middle (handle) {
     padding: 10px 12px 14px;
 }
 [data-theme="studio"] .deck-panel { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
-[data-theme="studio"] .deck-group { display: flex; flex-direction: column; gap: 8px; min-width: 150px; padding: 4px; }
+[data-theme="studio"] .deck-group { display: flex; flex-direction: column; gap: 8px; flex: 1 1 0; min-width: 0; padding: 4px; }
 [data-theme="studio"] .deck-group .group-header,
 [data-theme="studio"] .deck-header,
 [data-theme="studio"] .section-label {
@@ -2972,6 +2977,8 @@ body[data-scale="250"] {
     overflow: visible;
 }
 #controller-dock .header-handle .chevron { display: inline-block; line-height: 1; font-size: 14px; }
+/* The handle doubles as a drag-to-resize grip for the keyboard height (dockManager). */
+#controller-dock .header-handle { cursor: ns-resize; touch-action: none; }
 
 /* Tab strip at the top of the dock body — hidden with the body when collapsed, spaced (no overlap) */
 /* margin-bottom cancels the dock-body's 12px flex gap (+2px) so the tab strip sits ON the panel
@@ -3021,6 +3028,9 @@ body[data-scale="250"] {
     border: 1px solid var(--border);
     border-radius: 0 10px 10px 10px;
     position: relative; z-index: 1;
+    flex: 1 1 auto; min-height: 0;          /* fill the dock body's height → every tab is the SAME height */
+    display: flex; flex-direction: column;
+    overflow: hidden;
 }
 #deck-tab-move      { --tab-color: #3b82f6; background: color-mix(in srgb, var(--panel) 90%, #3b82f6); }
 #deck-tab-gm        { --tab-color: #f59e0b; background: color-mix(in srgb, var(--panel) 90%, #f59e0b); }

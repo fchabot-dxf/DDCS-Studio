@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Studio button radius mockup</title>
+<style>
+    /* Studio theme tokens copied from styles.css */
+    :root {
+        --sv-1: #e2dfd7; --sv-2: #cfcabf; --sv-3: #b6b1a5;
+        --bv-lite: #ffffff; --bv-lite-2: #f0eee8;
+        --bv-mid-lite: #b8b3a8; --bv-mid-dark: #6f6a60;
+        --bv-dark: #3a362f; --bv-dark-2: #16140f;
+        --text: #101010; --text-dim: #4b4843;
+        --sans: Arial, "Helvetica Neue", Helvetica, sans-serif;
+    }
+    body {
+        margin: 0; padding: 32px;
+        background: #c4bfb5; /* silver chassis */
+        font-family: var(--sans); color: var(--text);
+    }
+    h1 { font-size: 16px; letter-spacing: 1px; }
+    .row { display: flex; align-items: center; gap: 18px; margin: 22px 0; }
+    .row .tag { width: 280px; font-size: 12px; color: var(--text-dim); line-height: 1.4; }
+    .row .tag b { color: var(--text); }
+
+    /* shared button base (matches studio sizing) */
+    button {
+        font-family: var(--sans); font-weight: 700; font-size: 12px;
+        color: var(--text); cursor: pointer;
+        padding: 8px 16px; min-height: 28px; line-height: 1.2;
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+        transition: filter .1s ease;
+    }
+    button:hover { filter: brightness(1.05); }
+
+    /* ── A: current — square, 4 solid borders ───────────────────── */
+    .v-current {
+        border-radius: 0;
+        background: linear-gradient(180deg, var(--sv-1), var(--sv-2) 60%, var(--sv-3));
+        border-top: 2px solid var(--bv-lite);
+        border-left: 2px solid var(--bv-mid-lite);
+        border-right: 2px solid var(--bv-mid-dark);
+        border-bottom: 2px solid var(--bv-dark);
+    }
+    .v-current:active {
+        border-top: 2px solid var(--bv-dark); border-left: 2px solid var(--bv-mid-dark);
+        border-right: 2px solid var(--bv-mid-lite); border-bottom: 2px solid var(--bv-lite-2);
+        transform: translate(1px,1px);
+    }
+
+    /* ── B: slight radius, same 4 solid borders (corner seam visible) ── */
+    .v-radius2 { border-radius: 3px; }
+    .v-radius6 { border-radius: 8px; }
+
+    /* ── C: gradient-border bevel (light→dark blends through corners) ── */
+    .v-grad {
+        border: 2px solid transparent;
+        border-radius: 6px;
+        background:
+            linear-gradient(180deg, var(--sv-1), var(--sv-2) 60%, var(--sv-3)) padding-box,
+            linear-gradient(to bottom right, var(--bv-lite), var(--bv-mid-lite) 35%,
+                                     var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
+    }
+    .v-grad:active {
+        background:
+            linear-gradient(180deg, var(--sv-3), var(--sv-2) 60%, var(--sv-1)) padding-box,
+            linear-gradient(to top left, var(--bv-lite-2), var(--bv-mid-lite) 35%,
+                                     var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
+        transform: translate(1px,1px);
+    }
+    .v-grad.r2  { border-radius: 3px; }
+    .v-grad.r12 { border-radius: 14px; }
+
+    /* blue / green / red key variants with the gradient rim */
+    .v-grad.blue {
+        color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.4);
+        background:
+            linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2) padding-box,
+            linear-gradient(to bottom right, #8fbcff, #4f93ff 35%, #0a3a9e 65%, #062a72) border-box;
+    }
+    .v-grad.green {
+        color: #044a18;
+        background:
+            linear-gradient(180deg, #d6f7dc, #a7e6b4) padding-box,
+            linear-gradient(to bottom right, #ffffff, #b9e8c2 35%, #4c8a5b 65%, #1d4527) border-box;
+    }
+    .v-grad.red {
+        color: #6e0606;
+        background:
+            linear-gradient(180deg, #ffd2d2, #ffa9a9) padding-box,
+            linear-gradient(to bottom right, #ffffff, #ffc3c3 35%, #a85656 65%, #5c1f1f) border-box;
+    }
+
+    /* ── D: gold conic rim (reference-image style) ───────────────── */
+    .v-gold {
+        color: #f4e8c2; text-shadow: 0 1px 2px rgba(0,0,0,.6);
+        border: 4px solid transparent;
+        border-radius: 16px;
+        padding: 10px 26px;
+        background:
+            linear-gradient(180deg, #4a4a4a, #2b2b2b) padding-box,
+            conic-gradient(from 225deg,
+                #8a5d08, #f9e9a0 25%, #a87410 50%, #f6d77a 75%, #8a5d08) border-box;
+        box-shadow: 0 3px 8px rgba(0,0,0,.45),
+                    inset 0 1px 2px rgba(255,255,255,.25);
+    }
+    .v-gold:active { transform: translateY(1px); box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+    .v-gold.pill { border-radius: 999px; }
+
+    /* ── E: silver conic rim (hero key candidates) ───────────────── */
+    .v-silver {
+        border: 4px solid transparent;
+        border-radius: 16px;
+        padding: 10px 26px;
+        box-shadow: 0 3px 8px rgba(0,0,0,.45),
+                    inset 0 1px 2px rgba(255,255,255,.25);
+    }
+    .v-silver:active { transform: translateY(1px); box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+    /* E1: dark glossy face (reference look, de-golded) */
+    .v-silver.dark {
+        color: #eef0f2; text-shadow: 0 1px 2px rgba(0,0,0,.6);
+        background:
+            linear-gradient(180deg, #4a4a4a, #2b2b2b) padding-box,
+            conic-gradient(from 225deg,
+                #5a564e, #ffffff 25%, #8d887c 50%, #e8e5de 75%, #5a564e) border-box;
+    }
+    /* E2: electric-blue primary face (INSERT identity) */
+    .v-silver.blue {
+        color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.45);
+        background:
+            linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2) padding-box,
+            conic-gradient(from 225deg,
+                #5a564e, #ffffff 25%, #8d887c 50%, #e8e5de 75%, #5a564e) border-box;
+    }
+
+    /* ── F: new INSERT candidates (no silver conic rim) ──────────── */
+    .v-f { border-radius: 14px; padding: 8px 22px; }
+    /* F1: CRT phosphor key — black readout face, glowing green text + green rim */
+    .v-f.crt {
+        color: #15e000; text-shadow: 0 0 6px rgba(21,224,0,.8);
+        font-family: "DejaVu Sans Mono", Consolas, monospace; letter-spacing: 1px;
+        border: 2px solid transparent;
+        background:
+            linear-gradient(180deg, #0c130c, #000) padding-box,
+            linear-gradient(to bottom right, #15e000, #0a7a02 40%, #043d01 70%, #032b01) border-box;
+        box-shadow: 0 0 10px rgba(21,224,0,.25), inset 0 0 12px rgba(21,224,0,.12);
+    }
+    .v-f.crt:active { box-shadow: 0 0 4px rgba(21,224,0,.25), inset 0 0 18px rgba(21,224,0,.2); transform: translate(1px,1px); }
+    /* F2: function-bar green — the controller's green GO bar as a key */
+    .v-f.fnbar {
+        color: #03350a; text-shadow: 0 1px 0 rgba(255,255,255,.35);
+        border: 2px solid transparent;
+        background:
+            linear-gradient(180deg, #3fe437, #13c40a 55%, #0a9a06) padding-box,
+            linear-gradient(to bottom right, #b6ffb0, #3fe437 35%, #077a04 65%, #033d02) border-box;
+    }
+    .v-f.fnbar:active { transform: translate(1px,1px); filter: brightness(.95); }
+    /* F3: deep blue glossy pill — blue face, darker blue rim, gloss streak on top */
+    .v-f.pill {
+        color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.45);
+        border: 2px solid transparent; border-radius: 999px;
+        background:
+            linear-gradient(180deg, rgba(255,255,255,.45), rgba(255,255,255,0) 45%),
+            linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2) padding-box,
+            linear-gradient(to bottom right, #8fbcff, #4f93ff 35%, #0a3a9e 65%, #062a72) border-box;
+    }
+    .v-f.pill:active { transform: translate(1px,1px); filter: brightness(.95); }
+    /* F4: maroon E-stop styling inverted — cream face, maroon ring (stands apart from everything) */
+    .v-f.ring {
+        color: #7c2a16; font-weight: 800;
+        border: 3px solid transparent;
+        background:
+            linear-gradient(180deg, #fdf8ee, #efe6d2) padding-box,
+            linear-gradient(to bottom right, #b8543a, #7c2a16 45%, #54180a 75%, #3a0f05) border-box;
+    }
+    .v-f.ring:active { transform: translate(1px,1px); filter: brightness(.97); }
+</style>
+</head>
+<body>
+<h1>STUDIO THEME — WIZARD BUTTON RADIUS MOCKUP</h1>
+
+<div class="row">
+    <div class="tag"><b>A — current.</b> Square, four solid bevel borders. Hard 45° corner junction.</div>
+    <button class="v-current">▶ Generate</button>
+    <button class="v-current">Cancel</button>
+</div>
+
+<div class="row">
+    <div class="tag"><b>B1 — slight radius (3px), same solid borders.</b> Corner seam is anti-aliased; bevel mostly holds.</div>
+    <button class="v-current v-radius2">▶ Generate</button>
+    <button class="v-current v-radius2">Cancel</button>
+</div>
+
+<div class="row">
+    <div class="tag"><b>B2 — bigger radius (8px), same solid borders.</b> The light/dark split smears around the arc — this is the seam problem.</div>
+    <button class="v-current v-radius6">▶ Generate</button>
+    <button class="v-current v-radius6">Cancel</button>
+</div>
+
+<div class="row">
+    <div class="tag"><b>C1 — gradient border, 3px.</b> Light→dark blends smoothly through the corners. Click to see the pressed flip.</div>
+    <button class="v-grad r2">▶ Generate</button>
+    <button class="v-grad r2">Cancel</button>
+</div>
+
+<div class="row">
+    <div class="tag"><b>C2 — gradient border, 6px.</b> The radius the seam couldn't handle; the gradient rim wraps cleanly.</div>
+    <button class="v-grad">▶ Generate</button>
+    <button class="v-grad">Cancel</button>
+</div>
+
+<div class="row">
+    <div class="tag"><b>C3 — gradient border, colour-coded keys.</b> Blue / green / red variants with matching rims.</div>
+    <button class="v-grad blue">▶ Run</button>
+    <button class="v-grad green">✓ OK</button>
+    <button class="v-grad red">■ Stop</button>
+</div>
+
+<div class="row">
+    <div class="tag"><b>C4 — gradient border, 14px.</b> Soft, but still reads as a raised key.</div>
+    <button class="v-grad r12">▶ Generate</button>
+    <button class="v-grad r12">Cancel</button>
+</div>
+
+<div class="row">
+    <div class="tag"><b>D — gold conic rim.</b> The reference-image look: metallic ring with light wrapping around it, glossy dark face.</div>
+    <button class="v-gold">▶ GENERATE</button>
+    <button class="v-gold pill">VECTOR EPS</button>
+</div>
+
+<div class="row">
+    <div class="tag"><b>E — silver conic rim (hero key for INSERT).</b> E1 dark glossy face vs E2 electric-blue primary face. Pick one.</div>
+    <button class="v-silver dark">✓ INSERT</button>
+    <button class="v-silver blue">✓ INSERT</button>
+</div>
+
+<div class="row">
+    <div class="tag"><b>F — new INSERT candidates.</b> F1 CRT phosphor (glowing readout-green) · F2 function-bar green (controller GO bar) · F3 glossy blue pill · F4 cream key with maroon ring.</div>
+    <button class="v-f crt">✓ INSERT</button>
+    <button class="v-f fnbar">✓ INSERT</button>
+    <button class="v-f pill">✓ INSERT</button>
+    <button class="v-f ring">✓ INSERT</button>
+</div>
+
+</body>
+</html>
