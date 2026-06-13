@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -10,7 +10,6 @@
     <link rel="stylesheet" href="styles.css">
     <!-- App favicon (X/Y + chevron) -->
     <link rel="icon" href="assets/svg/favicon.svg" type="image/svg+xml">
-    <script src="https://apploader.pages.dev/fred-host.js" defer></script>
     <!-- three.js (global window.THREE) for the 3D toolpath preview. Vendored locally so
          the standalone download / future pywebview .exe works fully offline. -->
     <script defer src="assets/vendor/three.min.js"></script>
@@ -95,26 +94,23 @@
             <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
             <span class="ver">V10.20</span>
         </a>
-        <!-- App-switcher: STUDIO ↔ GATEWAY (machine-side views). Wired by ui/gatewayStatus.js —
-             greyed when no gateway answers (click = download the desktop exe). -->
+        <!-- App-switcher: STUDIO ↔ GATEWAY ↔ SETTINGS. Wired by ui/gatewayStatus.js -->
         <nav class="hdr-tabs" aria-label="App switcher">
-            <button type="button" class="tab active" data-app="studio"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span><span class="app-tx">STUDIO</span></button>
-            <button type="button" class="tab" data-app="gateway" title="Gateway"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg></span><span class="app-tx">GATEWAY</span><span id="gateway-led" class="gateway-led" title="Gateway status"></span></button>
+            <button type="button" class="tab active" data-app="studio" onclick="window.showApp && window.showApp('studio')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span><span class="app-tx">STUDIO</span></button>
+            <button type="button" class="tab" data-app="gateway" title="Gateway"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg></span><span class="app-tx">GATEWAY</span><span id="gateway-led" class="gateway-led" title="Gateway status"></span></button>
+            <button type="button" class="tab" data-app="settings" title="Settings" onclick="window.showApp && window.showApp('settings')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span class="app-tx">SETTINGS</span></button>
+
         </nav>
-            <div class="hdr-controls" style="display:flex;gap:10px;align-items:center">
+        <div class="hdr-controls" style="display:flex;gap:10px;align-items:center">
             <button onclick="(window.toggleStyle && window.toggleStyle())" id="styleBtn" class="op-btn" title="Switch Theme"><span class="op-icon">🎨</span><span class="op-label">NORMAL</span></button>
             <div class="scale-ctl">
                 <button id="scaleBtn" class="op-btn scale-btn" title="Zoom"><span class="op-icon">🔍</span><span class="op-label">AUTO</span></button>
             </div>
-            <button onclick="(window.openSettings && window.openSettings())" class="op-btn" id="settingsBtn" title="Settings — stock, machine envelope, variable CSV"><span class="op-icon">⚙</span><span class="op-label">SETTINGS</span></button>
             <button class="op-btn hidden" id="transferBtn" title="Send the current program to the machine"><span class="op-icon">📡</span><span class="op-label">TRANSFER</span></button>
-            <div class="dl-ctl">
-                <button class="op-btn" id="downloadBtn" title="Get the app — portable HTML or the desktop exe"><span class="op-icon">💾</span><span class="op-label">DOWNLOAD</span></button>
-            </div>
         </div>
     </header>
 
-    <div class="app-shell">
+    <div id="studio-app" class="app-shell">
         <!-- Top action bar: program + wizard buttons (moved up from the dock header).
              Wrapped in .dock-header so the existing .dock-header .header-controls CSS still applies. -->
         <div class="dock-header top-dock-header">
@@ -176,11 +172,6 @@
                 <div id="deck-panel" class="deck-panel"></div>
             </div>
         </div>
-    </div>
-
-    <!-- GATEWAY app — machine-side views (Queue/Submit/Files/History/Setup), shown via the header
-         app-switcher when a gateway answers. Populated by ui/gatewayPanel.js (lazy-loaded). -->
-    <div id="gateway-app" class="gateway-app hidden"></div>
 
     <!-- Wizard overlay -->
     <div id="wizard" class="overlay">
@@ -189,6 +180,7 @@
             <div class="wiz-head">
                 <span id="wizTitle">GENERATOR</span>
                 <span class="wiz-head-actions" style="display:flex; gap:14px; align-items:center;">
+                    <select id="wizProfile" title="Active controller profile — generated G-code matches this machine's dialect. Changing it switches the global profile (Settings → Profile)." style="font-size:11px; max-width:170px; padding:2px 4px; border-radius:4px; border:1px solid rgba(255,255,255,0.4); background:#fff; color:#222; cursor:pointer;"></select>
                     <span class="wiz-gear" title="Settings — stock, probe, machine (live updates this preview)" onclick="window.openSettings && window.openSettings()">⚙</span>
                     <span class="wiz-close" onclick="closeWiz()" title="Close">✕</span>
                 </span>
@@ -196,6 +188,8 @@
 
             <!-- WIZARD BODIES: One per wizard type, only one visible at a time -->
             <div id="wiz_corner" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <!-- Visualization container -->
                 <div class="viz-container">
@@ -212,6 +206,8 @@
                 </div>
 
 
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <div class="wiz-usage">Use for <b>outside corners</b> (boss). Park probe in the open space near the corner at scan depth — clear of both walls. Macro probes each wall and sets WCS X and Y (and optionally Z) to the corner.</div>
 
                 <!-- Form controls in grid layouts -->
@@ -307,10 +303,14 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_corner_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- Middle Wizard -->
             <div id="wiz_middle" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <!-- Visualization container -->
                 <div class="viz-container">
@@ -327,6 +327,8 @@
                 </div>
 
 
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <div id="middle_desc" class="wiz-usage"></div>
 
 
@@ -435,16 +437,22 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_middle_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- Circular (bore/boss) Wizard -->
             <div id="wiz_circular" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-container">
                     <div id="circularVizStatus" class="viz-status"></div>
                     <div id="circularVizContainer" class="viz-canvas"></div>
                 </div>
 
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <div id="circ_desc" class="wiz-usage"></div>
 
                 <span class="section-label">FEATURE CONTEXT</span>
@@ -501,16 +509,22 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_circular_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- Rotary Centreline (4th-axis setup) Wizard -->
             <div id="wiz_rotary_center" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-container">
                     <div id="rotaryCenterVizStatus" class="viz-status"></div>
                     <div id="rotaryCenterVizContainer" class="viz-canvas"></div>
                 </div>
 
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <div id="rc_desc" class="wiz-usage"></div>
 
                 <span class="section-label">METHOD</span>
@@ -577,16 +591,22 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_rotary_center_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- Rotary Clock (A0 to a feature) Wizard -->
             <div id="wiz_rotary_clock" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-container">
                     <div id="rotaryClockVizStatus" class="viz-status"></div>
                     <div id="rotaryClockVizContainer" class="viz-canvas"></div>
                 </div>
 
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <div id="rcl_desc" class="wiz-usage"></div>
 
                 <span class="section-label">CLOCK</span>
@@ -654,10 +674,14 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_rotary_clock_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- Edge Wizard -->
             <div id="wiz_edge" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <!-- Visualization container -->
                 <div class="viz-container">
@@ -674,6 +698,8 @@
                 </div>
 
 
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <div class="wiz-usage">Position probe touching or just clear of the edge. Macro probes the wall and sets WCS axis to the contact position.</div>
 
                 <!-- Form controls in grid layouts -->
@@ -758,10 +784,103 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_edge_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Drill / hole-pattern Wizard (Mill group) -->
+            <div id="wiz_drill" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="drillLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="drillLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="drillVizStatus" class="viz-status"></div>
+                        <div id="drillVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Drills/bores a hole pattern in the active WCS. Drag the handles in the 2D layout (left) to set the pattern — round handle sizes it, square handle places it; the 3D view (right) verifies the cut. Peck = plunge (hole Ø = drill); Bore = ring-step an end mill (hole Ø ≥ tool). Spindle start + end-of-program are added from Settings.</div>
+
+                <span class="section-label">PATTERN</span>
+                <div class="grid-2">
+                    <div><span class="label">TYPE</span>
+                        <select id="d_pattern" value="circle">
+                            <option value="grid">Grid</option>
+                            <option value="circle">Bolt circle</option>
+                            <option value="rect">Rectangle</option>
+                            <option value="line">Line</option>
+                        </select>
+                    </div>
+                    <div><span class="label">SKIP HOLES</span><input id="d_skip" value="" title="1-based hole numbers to omit (as shown in the preview), e.g. 5, 9"/></div>
+                    <div><span class="label">POSITION X</span><input id="d_originX" value="0" title="Pattern position in the active WCS (drag the square handle in the 2D layout)."/></div>
+                    <div><span class="label">POSITION Y</span><input id="d_originY" value="0" title="Pattern position in the active WCS (drag the square handle in the 2D layout)."/></div>
+                </div>
+                <div id="d_pat_grid" class="grid-2" style="display:none">
+                    <div><span class="label">COLUMNS</span><input id="d_cols" value="3"/></div>
+                    <div><span class="label">ROWS</span><input id="d_rows" value="3"/></div>
+                    <div><span class="label">X SPACING</span><input id="d_dx" value="20"/></div>
+                    <div><span class="label">Y SPACING</span><input id="d_dy" value="20"/></div>
+                </div>
+                <div id="d_pat_circle" class="grid-2">
+                    <div><span class="label">BOLT-CIRCLE Ø</span><input id="d_dia" value="50"/></div>
+                    <div><span class="label">HOLE COUNT</span><input id="d_count" value="6"/></div>
+                    <div><span class="label">START ANGLE</span><input id="d_startAngle" value="0"/></div>
+                </div>
+                <div id="d_pat_rect" class="grid-2" style="display:none">
+                    <div><span class="label">WIDTH</span><input id="d_w" value="100"/></div>
+                    <div><span class="label">HEIGHT</span><input id="d_h" value="80"/></div>
+                    <div><span class="label">HOLES / WIDTH</span><input id="d_nx" value="3"/></div>
+                    <div><span class="label">HOLES / HEIGHT</span><input id="d_ny" value="2"/></div>
+                </div>
+                <div id="d_pat_line" class="grid-2" style="display:none">
+                    <div><span class="label">HOLE COUNT</span><input id="d_lcount" value="3"/></div>
+                    <div><span class="label">SPACING</span><input id="d_spacing" value="20"/></div>
+                    <div><span class="label">ANGLE</span><input id="d_angle" value="0"/></div>
+                </div>
+
+                <span class="section-label">METHOD</span>
+                <div class="grid-2">
+                    <div><span class="label">METHOD</span>
+                        <select id="d_method" value="peck">
+                            <option value="peck">Peck drill (hole = tool)</option>
+                            <option value="helical">Bore (end mill, hole ≥ tool)</option>
+                        </select>
+                    </div>
+                    <div><span class="label">HOLE Ø</span><input id="d_holeDia" value="6" title="Hole diameter. Peck: this is your drill size. Bore: target hole size (must be ≥ tool Ø)."/></div>
+                </div>
+                <div id="d_method_peck" class="grid-2">
+                    <div><span class="label">PECK</span><input id="d_peck" value="3" title="Peck increment (mm) — full retract to clearance each peck to clear chips."/></div>
+                </div>
+                <div id="d_method_bore" class="grid-2" style="display:none">
+                    <div><span class="label">TOOL Ø (end mill)</span><input id="d_toolDia" value="4"/></div>
+                    <div><span class="label">PITCH (Z/rev)</span><input id="d_pitch" value="0.5" title="Z step per full circle (mm)."/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="d_depth" value="5"/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="d_clearance" value="5"/></div>
+                    <div><span class="label">FEED</span><input id="d_feed" value="100"/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_drill_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- Alignment Wizard -->
             <div id="wiz_alignment" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
 
                 <span class="section-label">VISUALIZATION</span>
 
@@ -782,6 +901,8 @@
                 </div>
 
 
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <div class="wiz-usage">Jog probe to <b>point A</b> along the fence at probe height → Enter. Macro probes fence, lifts Z, pauses. Jog to <b>point B</b> along same fence → Enter. Macro probes again and reports drift, span and angle.</div>
 
 
@@ -857,6 +978,8 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_alignment_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
 
             </div>
 
@@ -1133,6 +1256,15 @@
             </div>
         </div>
     </div>
+
+    </div>
+
+    <!-- GATEWAY app — machine-side views (Queue/Submit/Files/History/Setup), shown via the header
+         app-switcher when a gateway answers. Populated by ui/gatewayPanel.js (lazy-loaded). -->
+    <div id="gateway-app" class="gateway-app hidden"></div>
+
+    <!-- SETTINGS app — full-screen settings view, shown via the header app-switcher. -->
+    <div id="settings-app" class="app-shell hidden"></div>
     
     <!-- Global tooltip -->
     <div id="global-tooltip" style="display:none;"></div>
@@ -1150,10 +1282,7 @@
                 const { initBridgeTransfer } = await import('./ui/bridgeTransfer.js');
                 initBridgeTransfer();             // before gatewayStatus so it catches the first tick
             } catch (err) { console.error('bridge transfer init failed', err); }
-            try {
-                const { initDownloadMenu } = await import('./ui/downloadMenu.js');
-                initDownloadMenu();
-            } catch (err) { console.error('download menu init failed', err); }
+
             try {
                 const { initGatewayStatus } = await import('./ui/gatewayStatus.js');
                 initGatewayStatus();

@@ -9,13 +9,14 @@ import { initSuggestBar } from './suggestBar.js';
 // grid, rendered at 16px. Filled accents (origin dot, ruby ball) override fill/stroke inline.
 const _svg = (body, color = 'currentColor') => `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 const HEADER_ICONS = {
-    comm:   _svg('<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>', '#3b82f6'),
+    comm:   _svg('<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z" fill="#ffffff" stroke="#3b82f6"/><circle cx="8.5" cy="11.5" r="1.1" fill="#10b981" stroke="none"/><circle cx="12" cy="11.5" r="1.1" fill="#f59e0b" stroke="none"/><circle cx="15.5" cy="11.5" r="1.1" fill="#ef4444" stroke="none"/>', '#3b82f6'),
     // WCS = work origin: Y-up / X-right axes meeting at a filled origin dot
-    wcs:    _svg('<path d="M5 3V19H21"/><polyline points="2.5 6 5 3 7.5 6"/><polyline points="18 16.5 21 19 18 21.5"/><circle cx="5" cy="19" r="1.7" fill="#10b981" stroke="none"/>', '#10b981'),
-    warmup: _svg('<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>', '#f97316'),
+    wcs:    _svg('<path d="M5 3V19" stroke="#10b981"/><polyline points="2.5 6 5 3 7.5 6" stroke="#10b981"/><path d="M5 19H21" stroke="#3b82f6"/><polyline points="18 16.5 21 19 18 21.5" stroke="#3b82f6"/><circle cx="5" cy="19" r="2" fill="#ef4444" stroke="none"/>', '#10b981'),
+    warmup: _svg('<path d="M3.5 6Q12 2.5 20.5 6L14 18Q12 20 10.5 18Z" fill="#cbd5e1" stroke="#475569"/><path d="M5.5 9.5Q12 7.5 18 10.5" stroke="#2563eb"/><path d="M7 13Q12 11.5 16.5 14" stroke="#2563eb"/><path d="M9 16.3Q12 15.3 14.5 16.8" stroke="#2563eb"/><ellipse cx="12" cy="20.6" rx="4" ry="1.8" fill="#e2e8f0" stroke="#475569"/>', '#475569'),
     // Probe = ruby touch sensor: steel body + shaft, a solid ruby ball touching a surface line
-    probe:  _svg('<path d="M9 3h6v3l-1.5 2h-3L9 6z"/><line x1="12" y1="10" x2="12" y2="14.8"/><line x1="5" y1="21" x2="19" y2="21"/><circle cx="12" cy="17.3" r="2.4" fill="#e11d48" stroke="#e11d48"/>', '#64748b'),
-    atc:    _svg('<polyline points="22 5 22 10.5 16.5 10.5"/><polyline points="2 19 2 13.5 7.5 13.5"/><path d="M4.06 9.5A8 8 0 0 1 18 6.6l4 3.9M2 13.5l4 3.9A8 8 0 0 0 19.94 14.5"/>', '#8b5cf6'),
+    probe:  _svg('<path d="M9 3h6v3l-1.5 2h-3L9 6z" stroke="#64748b"/><line x1="12" y1="10" x2="12" y2="14.8" stroke="#64748b"/><line x1="5" y1="21" x2="19" y2="21" stroke="#f59e0b"/><circle cx="12" cy="17.3" r="2.4" fill="#e11d48" stroke="#e11d48"/>', '#64748b'),
+    atc:    _svg('<polyline points="22 5 22 10.5 16.5 10.5" stroke="#10b981"/><path d="M4.06 9.5A8 8 0 0 1 18 6.6l4 3.9" stroke="#10b981"/><polyline points="2 19 2 13.5 7.5 13.5" stroke="#f97316"/><path d="M2 13.5l4 3.9A8 8 0 0 0 19.94 14.5" stroke="#f97316"/>', '#8b5cf6'),
+    mill:   _svg('<path d="M9 2.5h6v6l1.2 1.5v9.5h-8.4v-9.5l1.2-1.5z" stroke="#64748b"/><path d="M9.6 18.7c2-1.4 3.4-3.9 4.4-7.4" stroke="#14b8a6"/><path d="M9.6 15.2c1.1-.8 1.9-2.1 2.5-3.8" stroke="#14b8a6"/><line x1="9" y1="19.5" x2="15" y2="19.5" stroke="#f59e0b" stroke-width="2.5"/>', '#64748b'),
     load:   _svg('<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>', '#f59e0b'),
     insert: _svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>', '#14b8a6'),
     copy:   _svg('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>', '#6366f1'),
@@ -166,10 +167,11 @@ export class CommandDeck {
             return panel;
         };
 
-        // MOVE = numbers + axes you enter · G-M = G-codes + program/machine words · MACRO = logic.
+        // MOVE = numbers + axes you enter · G-M = G-codes + program/machine words · MATH = math + functions · LOGIC = control flow + wcs.
         const movePanel  = makePanel('deck-tab-move',  ['numpad', 'axes'], false);
         const gmPanel    = makePanel('deck-tab-gm',    ['g-codes', 'm-codes'], true);
-        const macroPanel = makePanel('deck-tab-macro', ['math', 'functions', 'control-flow', 'wcs'], true);
+        const mathPanel  = makePanel('deck-tab-math',  ['math', 'functions'], true);
+        const logicPanel = makePanel('deck-tab-logic', ['control-flow', 'wcs'], true);
 
         // VARIABLES tab — search + filters + scrollable chips
         const varPanel = document.createElement('div');
@@ -186,7 +188,8 @@ export class CommandDeck {
         body.appendChild(this._buildTabStrip());
         body.appendChild(movePanel);
         body.appendChild(gmPanel);
-        body.appendChild(macroPanel);
+        body.appendChild(mathPanel);
+        body.appendChild(logicPanel);
         body.appendChild(varPanel);
 
         // 4. The handle is a plain chevron toggle (expand/collapse wired by DockManager).
@@ -208,7 +211,8 @@ export class CommandDeck {
         strip.innerHTML = `
             <button class="deck-tab ddcs-tab active" data-deck-tab="move">⌨ MOVE</button>
             <button class="deck-tab ddcs-tab" data-deck-tab="gm">⌗ G-M</button>
-            <button class="deck-tab ddcs-tab" data-deck-tab="macro">∑ MACRO</button>
+            <button class="deck-tab ddcs-tab" data-deck-tab="math">∑ MATH</button>
+            <button class="deck-tab ddcs-tab" data-deck-tab="logic">⇅ LOGIC</button>
             <button class="deck-tab ddcs-tab" data-deck-tab="variables"># VARIABLES</button>
         `;
         strip.querySelectorAll('.deck-tab').forEach(t => {
@@ -220,7 +224,7 @@ export class CommandDeck {
 
     switchTab(name) {
         this._activeTab = name;
-        const panels = { move: 'deck-tab-move', gm: 'deck-tab-gm', macro: 'deck-tab-macro', variables: 'deck-tab-variables' };
+        const panels = { move: 'deck-tab-move', gm: 'deck-tab-gm', math: 'deck-tab-math', logic: 'deck-tab-logic', variables: 'deck-tab-variables' };
         for (const [key, id] of Object.entries(panels)) {
             const p = document.getElementById(id);
             if (p) p.style.display = name === key ? '' : 'none';
@@ -486,7 +490,7 @@ export class CommandDeck {
                             <button onclick="openEdgeWiz && openEdgeWiz()">📏 Edge</button>
                             <button onclick="openAlignmentWiz && openAlignmentWiz()">🧭 Align</button>
                             <div style="padding:4px 12px; font-size:10px; opacity:.55; text-transform:uppercase; letter-spacing:1px;">Rotary</div>
-                            <button onclick="openWiz && openWiz('rotary_center')">🔄 Centreline</button>
+                            <button onclick="openWiz && openWiz('rotary_center')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;"><rect x="4" y="8" width="13" height="8" rx="2" stroke="#64748b"/><ellipse cx="17" cy="12" rx="2" ry="4" stroke="#64748b"/><line x1="1.5" y1="12" x2="22.5" y2="12" stroke="#e11d48" stroke-dasharray="3 2"/></svg>Centreline</button>
                             <button onclick="openWiz && openWiz('rotary_clock')">🕒 Clock A0</button>
                         </div>
                     </div>
@@ -498,6 +502,13 @@ export class CommandDeck {
                             <button onclick="openWiz && openWiz('atc_check')">🛡 Tool Check</button>
                             <button onclick="openWiz && openWiz('atc_change')">🔧 Tool Change</button>
                             <button onclick="openWiz && openWiz('atc_test')">🧪 ATC Test</button>
+                        </div>
+                    </div>
+
+                    <div class="toolbar-dropdown">
+                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.mill}</span><span class="btn-tx">Mill</span><span class="btn-caret">▼</span></button>
+                        <div class="toolbar-dropdown-content">
+                            <button onclick="openWiz && openWiz('drill')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" fill="#1e293b" stroke="none"/></svg>Drill / holes</button>
                         </div>
                     </div>
 
@@ -660,7 +671,7 @@ export class CommandDeck {
 
             <div class="deck-group axes">
                 <div class="group-header">AXES & ADDRESSES</div>
-                <div class="grid-2">
+                <div class="grid-3">
                     <button class="toolbar-btn axis-blue" title="X axis address" onclick="window.insert && window.insert('X')">X</button>
                     <button class="toolbar-btn axis-blue" title="Y axis address" onclick="window.insert && window.insert('Y')">Y</button>
                     <button class="toolbar-btn axis-blue" title="Z axis address" onclick="window.insert && window.insert('Z')">Z</button>
@@ -718,7 +729,7 @@ export class CommandDeck {
 
             <div class="deck-group g-codes">
                 <div class="group-header">G-CODES</div>
-                <div class="grid-2">
+                <div class="grid-3">
                     <button class="toolbar-btn axis-blue" title="Rapid positioning" onclick="window.insert && window.insert('G0 ')">G0</button>
                     <button class="toolbar-btn axis-blue" title="Linear interpolation" onclick="window.insert && window.insert('G1 ')">G1</button>
                     <button class="toolbar-btn axis-blue" title="Clockwise arc (I/J/K or R)" onclick="window.insert && window.insert('G2 ')">G2</button>

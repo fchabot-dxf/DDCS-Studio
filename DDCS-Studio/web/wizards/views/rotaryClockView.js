@@ -9,6 +9,7 @@ export const rotaryClockView = {
     panelId: 'wiz_rotary_clock',
     codeElId: 'wiz_rotary_clock_code',
     large: true,
+    twoPane: true,
     inputIds: [
         'rcl_action', 'rcl_reference', 'rcl_span', 'rcl_wcs',
         'rcl_dist', 'rcl_retract', 'rcl_safe_z', 'rcl_feed_fast', 'rcl_feed_slow', 'rcl_q',

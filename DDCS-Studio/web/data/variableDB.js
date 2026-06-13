@@ -189,17 +189,18 @@ export class VariableDatabase {
     // the SYSTEM vars for the selected controller while preserving the user's own entries. Persisted
     // (ddcs_var_profile) so offline users keep their choice across reloads.
     getControllerVars() {
-        try { return localStorage.getItem('ddcs_var_profile') === 'v4.1' ? 'v4.1' : 'expert'; }
+        try { const v = localStorage.getItem('ddcs_var_profile'); return (v === 'v4.1' || v === 'v3') ? v : 'expert'; }
         catch (e) { return 'expert'; }
     }
 
     async _loadDefaultCsv(family) {
         if (family === 'v4.1') return (await import('./default_vars_v41.js')).DEFAULT_VAR_CSV_V41;
+        if (family === 'v3') return (await import('./default_vars_v3.js')).DEFAULT_VAR_CSV_V3;
         return (await import('./default_vars.js')).DEFAULT_VAR_CSV;
     }
 
     async setControllerVars(family) {
-        const fam = family === 'v4.1' ? 'v4.1' : 'expert';
+        const fam = (family === 'v4.1' || family === 'v3') ? family : 'expert';
         try { localStorage.setItem('ddcs_var_profile', fam); } catch (e) { /* ignore */ }
         const userVars = (this.activeDB || []).filter(e => !e.isSys);   // keep the user's own variables
         this.activeDB = [];

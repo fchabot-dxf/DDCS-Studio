@@ -105,9 +105,9 @@ export class CircularWizard {
             g += this.reposition('move clear, around to the -X side of the boss');
             g += comment('Probe -X face (approach from -X)') + '\n' + pp('X', '+', '#52', 'Save -X edge');
             g += comment('X centre') + '\n' + line([set('#53', '[#51+#52]/2')], 'Midpoint of X faces') + '\n\n';
-            g += comment('Re-centre in X so the Y touch is a true diameter') + '\n';
-            g += g53('X', '#53', 'Move to boss X centre (machine coord)') + '\n\n';
-            g += this.reposition('move clear, around to the +Y side of the boss');
+            g += comment('Re-centre in X at SAFE Z (the boss centre is solid - never cross it at depth)') + '\n';
+            g += this.reposition('move clear, around to the +Y side of the boss',
+                { axis: 'X', value: '#53', note: 'Re-centre to boss X centre (at safe Z, above the boss)' });
             g += comment('Probe +Y face (approach from +Y)') + '\n' + pp('Y', '-', '#54', 'Save +Y edge');
             g += this.reposition('move clear, around to the -Y side of the boss');
             g += comment('Probe -Y face (approach from -Y)') + '\n' + pp('Y', '+', '#55', 'Save -Y edge');
@@ -138,10 +138,15 @@ export class CircularWizard {
         return g;
     }
 
-    /** Retract to safe Z and wait for the operator to reposition around the boss. */
-    reposition(msg) {
+    /**
+     * Retract to safe Z and wait for the operator to reposition around the boss.
+     * Optional `recentre` ({axis,value,note}) runs an absolute re-centre move while at
+     * SAFE Z — never at probe depth, where it would drive the stylus through the boss.
+     */
+    reposition(msg, recentre = null) {
         let c = line([set('#57', '#882')], 'Save current Z machine position') + '\n';
         c += line([G(0), Z('#17')], 'Retract to safe Z') + '\n\n';
+        if (recentre) c += g53(recentre.axis, recentre.value, recentre.note) + '\n';
         c += comment(`REPOSITION: ${msg}`) + '\n';
         c += line([set('#1505', '1')], 'Press Enter when repositioned - ESC=cancel') + '\n';
         c += ifGoto('#1505', '==', '0', 2) + '\n';

@@ -8,8 +8,9 @@
  *
  * ⚠ GENERATED TEMPLATE — grounded in the firmware dialect + CORE_TRUTH quirks (G53 needs a VARIABLE not a
  * constant; C-style `IF a==b`, no brackets on a simple IF, no space before the GOTO label). It is NOT
- * validated on a live ATC. Per ARCHITECTURE-MULTIUSER.md, Studio only generates — the user reviews every
- * line and dry-runs it on their own machine before cutting.
+ * validated on a live ATC. Spindle + coolant stop (M5/M9) runs first; drawbar moves wait on the M301/M302
+ * sensors — delete those waits if your machine has no drawbar sensors. Per ARCHITECTURE-MULTIUSER.md,
+ * Studio only generates — the user reviews every line and dry-runs it on their own machine before cutting.
  */
 
 function num(v, d) { return (v === '' || v == null || isNaN(Number(v))) ? d : Number(v); }
@@ -32,6 +33,8 @@ export function generateToolChangeNc(atc, outputs) {
     w('(#1504=requested tool [Tn M6]  #1300=tool in spindle  #1430+=tool-length table)');
     w('');
     w('IF #1504==#1300 GOTO999            ; requested tool already in spindle');
+    w('M5  M9                             ; spindle + coolant OFF before any drawbar action');
+    w('M300                              ; wait: spindle stopped (delete if no sensor)');
     w('#4 = ' + safeZ);
     w('G53 G0 Z#4                         ; lift to safe Z (G53 needs a variable)');
     w('');
@@ -44,6 +47,7 @@ export function generateToolChangeNc(atc, outputs) {
         w('#1 = ' + num(p.x, 0) + '  #2 = ' + num(p.y, 0) + '  #3 = ' + num(p.z, 0));
         w('G53 G0 X#1 Y#2'); w('G53 G0 Z#3');
         w(release + '                          ; drawbar release'); w('G04 P' + dwell);
+        w('M301                              ; wait: drawbar released (delete if no sensor)');
         w('G53 G0 Z#4'); w('GOTO500');
     });
     w('');
@@ -54,8 +58,12 @@ export function generateToolChangeNc(atc, outputs) {
     mag.forEach((p, i) => {
         w('N' + (201 + i) + ' (fetch T' + num(p.tool, 0) + ' from pocket ' + num(p.pocket, i + 1) + (p.name ? ' - ' + p.name : '') + ')');
         w('#1 = ' + num(p.x, 0) + '  #2 = ' + num(p.y, 0) + '  #3 = ' + num(p.z, 0));
-        w('G53 G0 X#1 Y#2'); w('G53 G0 Z#3');
+        w('G53 G0 X#1 Y#2');
+        w(release + '                          ; open collet BEFORE descending over the tool shank');
+        w('M301                              ; wait: drawbar released (delete if no sensor)');
+        w('G53 G0 Z#3                          ; descend over the tool');
         w(clamp + '                          ; drawbar clamp'); w('G04 P' + dwell);
+        w('M302                              ; wait: drawbar clamped (delete if no sensor)');
         w('G53 G0 Z#4'); w('#1300 = #1504               ; record the new tool'); w('GOTO999');
     });
     w('');

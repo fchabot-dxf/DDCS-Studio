@@ -47,6 +47,34 @@ export const CONTROLLER_PROFILES = {
             blockHeight: { ctrl: '#633',  pr: 'Pr133', label: 'Probe block thickness' },
         },
     },
+    'ddcs-v41': {
+        id: 'ddcs-v41',
+        name: 'DDCS V4.1',
+        source: 'builtin',
+        varFamily: 'v4.1',                       // which default_vars list to load (variableDB)
+        hardwareTabs: ['probes', 'limits'],
+        atc: { toolTableBaseVar: 1430, defaultToolCount: 10 },
+        // The V4.1 macro-address offset for its config params isn't confirmed (see default_vars_v41.js),
+        // so probe config stays Studio-side until verified on hardware. Reference: bridge/controllers/v4.1/.
+        probeVars: {},
+    },
+    'ddcs-v3-dm500': {
+        id: 'ddcs-v3-dm500',
+        name: 'DDCS V3 / DM500',
+        source: 'builtin',
+        varFamily: 'v3',
+        hardwareTabs: ['probes', 'limits'],
+        atc: { toolTableBaseVar: 1430, defaultToolCount: 10 },   // TODO: verify ATC base var on a real DM500
+        // Probe config sourced from the DM500's own parameter table (bridge/controllers/dm500/install/eng).
+        // The DM500 has a single probe input — no configurable port. Verify these #NNNN are macro-readable
+        // at runtime before trusting them on real hardware (the user has no DM500 — this is reference/sim).
+        probeVars: {
+            level:       { ctrl: '#70',   label: 'Probe signal electric level' },
+            fastFeed:    { ctrl: '#2011', label: 'Probe feedrate' },
+            retract:     { ctrl: '#75',   label: 'Back distance after probe' },
+            blockHeight: { ctrl: '#69',   label: 'Thickness of tool sensor' },
+        },
+    },
     'generic': {
         id: 'generic',
         name: 'Generic / unknown',

@@ -64,6 +64,8 @@ export class GcodeViz3D {
         // macro begins a new pass, placed relative to its own start so you can park it.
         this.starts = [{ x: 0, y: 0, z: 0 }];
         this.spindleMarkers = [];
+        this.selectedStart = 0;   // which start the jog pendant drives
+        this._downMarker = -1;    // marker under a pending click (selected on pointer-up)
         this._axisMat = {};        // `${pass}:${axis}` -> { mat, base }
         this.pathGroup = new THREE.Group();
         this.scene.add(this.pathGroup);
@@ -71,6 +73,7 @@ export class GcodeViz3D {
         this.onStartChange = null; // optional callback(starts)
         this.showRapids = true;
         this._animOn = true;   // play by default
+        this._animSimSpeed = 1;   // feed-true playback: 1 = real time (matches the engine)
         this._animPaused = false;
         this._gizmoPx = 60;    // on-screen gizmo size (smaller still in the compact wizard preview)
         this._animRaf = null;
@@ -176,6 +179,8 @@ export class GcodeViz3D {
             this.spindleMarkers.push(m);
             this.scene.add(m);
         }
+        if (this.selectedStart >= this._passCount) this.selectedStart = 0;
+        if (this._renderJogStarts) this._renderJogStarts();   // refresh the jog pendant's start selector
     }
 
     _positionMarkers() {
@@ -183,6 +188,40 @@ export class GcodeViz3D {
             const s = this.starts[p] || { x: 0, y: 0, z: 0 };
             this.spindleMarkers[p].position.set(s.x, s.y, s.z);
         }
+        this._highlightSelectedStart();
+    }
+
+    // Choose which start the jog pendant drives (and which ruby is highlighted).
+    selectStart(i) {
+        const n = this.spindleMarkers.length || 1;
+        this.selectedStart = Math.max(0, Math.min(n - 1, i | 0));
+        this._highlightSelectedStart();
+        if (this._renderJogStarts) this._renderJogStarts();
+        this.render();
+    }
+
+    // Brighten the selected ruby, dim the rest, so it's clear which start the pendant jogs.
+    _highlightSelectedStart() {
+        for (let p = 0; p < this.spindleMarkers.length; p++) {
+            const ruby = this.spindleMarkers[p].children[0];
+            if (!ruby || !ruby.material) continue;
+            const sel = p === this.selectedStart;
+            ruby.material.color.setHex(sel ? 0xff2a44 : 0xc4122e);
+            ruby.material.transparent = !sel;
+            ruby.material.opacity = sel ? 1 : 0.5;
+        }
+    }
+
+    // Ray-pick a start marker (ruby + numbered badge) under the pointer; returns pass index or -1.
+    _pickMarker(e) {
+        if (!this.spindleMarkers.length) return -1;
+        this.raycaster.setFromCamera(this._ndc(e), this.camera);
+        let best = -1, bestDist = Infinity;
+        for (let p = 0; p < this.spindleMarkers.length; p++) {
+            const hit = this.raycaster.intersectObject(this.spindleMarkers[p], true)[0];
+            if (hit && hit.distance < bestDist) { bestDist = hit.distance; best = p; }
+        }
+        return best;
     }
 
     // Keep each gizmo a constant on-screen size (independent of zoom): world size ∝ the
@@ -271,7 +310,11 @@ export class GcodeViz3D {
         if (!pos || (!Number.isFinite(pos.x) && !Number.isFinite(pos.y) && !Number.isFinite(pos.z))) return;
         this._ensureAnimTool();
         this._animTool.visible = true;
-        this._animTool.position.set(pos.x || 0, pos.y || 0, pos.z || 0);
+        // The toolpath is drawn offset by the spindle-start marker (starts[0]); the engine reports
+        // RAW program coords, so apply the same offset or the dot floats off the path. Matches the
+        // geometric play, which already places the tool at offset (start + delta) coords.
+        const o = this.starts[0] || { x: 0, y: 0, z: 0 };
+        this._animTool.position.set((pos.x || 0) + o.x, (pos.y || 0) + o.y, (pos.z || 0) + o.z);
         this.render();
     }
 
@@ -282,11 +325,12 @@ export class GcodeViz3D {
             const now = (typeof performance !== 'undefined' ? performance.now() : 0);
             const dt = this._animLast ? Math.min(0.1, (now - this._animLast) / 1000) : 0;
             this._animLast = now;
-            // Advance in program time: the whole path loops in ~5 s, but each segment's
-            // share of it ∝ length/feedrate — slow probes crawl, rapids zip.
+            // Advance in REAL program time (feed-true): dt seconds → dt*1000 ms of program time,
+            // scaled by _animSimSpeed (1 = real time). Each segment's ms ∝ length/feedrate, so the
+            // tool moves at the programmed speed — slow probes crawl, rapids zip, like the engine.
             const total = this._animMs || 1;
             if (!this._animPaused) {
-                this._animDist += (total / 5) * dt;
+                this._animDist += dt * 1000 * (this._animSimSpeed || 1);
                 if (this._animDist >= total) {       // reached the end → hold 1s, then loop (no beep — it loops forever)
                     this._animDist = total;
                     this._animPaused = true;
@@ -350,6 +394,10 @@ export class GcodeViz3D {
         return null;
     }
 
+    _setHighlight(pass, axis) {
+        // no-op since gizmo picking is disabled
+    }
+
     // t along axisDir (unit) from lineOrigin to the point closest to the pointer ray
     _closestAxisT(ray, lineOrigin, axisDir) {
         const d = axisDir.dot(w0);
@@ -385,14 +433,13 @@ export class GcodeViz3D {
 
         const st = this._stock;
         const pocket = !!(st && st.shape === 'pocket');
-        let box = null;
+        let box = null;       // outer block — valid collision for every stock shape (all 6 outer faces)
+        let cavity = null;    // pocket only: the inset hole, whose walls are also valid collisions
         if (st && st.show && st.x > 0 && st.y > 0 && st.z > 0) {
+            box = { min: { x: 0, y: 0, z: -st.z }, max: { x: st.x, y: st.y, z: 0 } };
             if (pocket) {
-                // probe cavity = the inset hole (matches the rendered pocket)
-                const w = Math.max(8, Math.min(st.x, st.y) * 0.25);
-                box = { min: { x: w, y: w, z: -st.z }, max: { x: st.x - w, y: st.y - w, z: 0 } };
-            } else {
-                box = { min: { x: 0, y: 0, z: -st.z }, max: { x: st.x, y: st.y, z: 0 } };
+                const w = Math.max(8, Math.min(st.x, st.y) * 0.25);   // matches the rendered pocket wall
+                cavity = { min: { x: w, y: w, z: -st.z }, max: { x: st.x - w, y: st.y - w, z: 0 } };
             }
         }
         const CAP = 20; // fallback probe length when it never contacts the stock
@@ -434,17 +481,22 @@ export class GcodeViz3D {
                 const start = cur;
                 let end = { x: start.x + dx, y: start.y + dy, z: start.z + dz };
 
-                // Probe collision with stock bounds
+                // Probe collision with the stock — stop at the first material surface hit. Outer
+                // faces register on approach from outside; for a pocket, the cavity walls also
+                // register when probing from inside the hole, so every face is a valid collision.
                 if (type === 'probe' && box) {
                     const Aw = { x: start.x + mk.x, y: start.y + mk.y, z: start.z + mk.z };
                     const Bw = { x: end.x + mk.x, y: end.y + mk.y, z: end.z + mk.z };
-                    const r = this._boxRange(Aw, Bw, box.min, box.max);
-                    if (r.hit) {
-                        let tt = null;
-                        if (pocket) { if (r.tEnter <= 1e-6 && r.tExit > 1e-6 && r.tExit < 1 - 1e-6) tt = r.tExit; }
-                        else { if (r.tEnter > 1e-6 && r.tEnter < 1 - 1e-6) tt = r.tEnter; }
-                        if (tt != null) { end = { x: start.x + dx * tt, y: start.y + dy * tt, z: start.z + dz * tt }; }
+                    let tt = null;
+                    const ro = this._boxRange(Aw, Bw, box.min, box.max);
+                    if (ro.hit && ro.tEnter > 1e-6 && ro.tEnter < 1 - 1e-6) tt = ro.tEnter;   // enter the block
+                    if (cavity) {
+                        const rc = this._boxRange(Aw, Bw, cavity.min, cavity.max);
+                        if (rc.hit && rc.tEnter <= 1e-6 && rc.tExit > 1e-6 && rc.tExit < 1 - 1e-6) {
+                            if (tt == null || rc.tExit < tt) tt = rc.tExit;   // exit the cavity → hit its wall
+                        }
                     }
+                    if (tt != null) { end = { x: start.x + dx * tt, y: start.y + dy * tt, z: start.z + dz * tt }; }
                 }
 
                 const ax = start.x + mk.x, ay = start.y + mk.y, az = start.z + mk.z;
@@ -476,10 +528,10 @@ export class GcodeViz3D {
         }
         // Colours match the wizard visualiser
         this.lineGroups.feed = this._addLine(feedPos, { vertexColors: feedCol });
-        this.lineGroups.rapid = this._addLine(rapidPos, { color: 0x00cc00, opacity: 0.55 });
+        this.lineGroups.rapid = this._addLine(rapidPos, { color: 0xffcc00, opacity: 0.6 });   // rapid = solid yellow (Fusion)
         if (this.lineGroups.rapid) this.lineGroups.rapid.visible = this.showRapids;
-        this.lineGroups.retract = this._addLine(retractPos, { color: 0xfacc15, opacity: 0.85 });
-        this.lineGroups.probe = this._addLine(probeFastPos, { color: 0x3b82f6 });      // fast probe (blue)
+        this.lineGroups.retract = this._addLine(retractPos, { color: 0x33cc55, opacity: 0.85 });  // retract/lead-out = green (Fusion)
+        this.lineGroups.probe = this._addLine(probeFastPos, { color: 0x3b82f6, dotted: true });      // probe = dotted blue
         this.lineGroups.probeSlow = this._addLine(probeSlowPos, { color: 0x93c5fd });  // slow re-probe (light blue)
         this.lineGroups.jog = this._addLine(jogPos, { color: 0xff9a0d, opacity: 0.95, dashed: true });
 
@@ -497,8 +549,10 @@ export class GcodeViz3D {
         if (opt.vertexColors) {
             g.setAttribute('color', new THREE.Float32BufferAttribute(opt.vertexColors, 3));
             mat = new THREE.LineBasicMaterial({ vertexColors: true });
-        } else if (opt.dashed) {
-            mat = new THREE.LineDashedMaterial({ color: opt.color, transparent: opt.opacity < 1, opacity: opt.opacity, dashSize: 3, gapSize: 2 });
+        } else if (opt.dashed || opt.dotted) {
+            const op = opt.opacity != null ? opt.opacity : 1;
+            const dashSize = opt.dotted ? 0.6 : 3, gapSize = opt.dotted ? 1.4 : 2;   // dotted = tiny dashes
+            mat = new THREE.LineDashedMaterial({ color: opt.color, transparent: op < 1, opacity: op, dashSize, gapSize });
         } else {
             const op = opt.opacity != null ? opt.opacity : 1;
             mat = new THREE.LineBasicMaterial({ color: opt.color, transparent: op < 1, opacity: op });
@@ -506,7 +560,7 @@ export class GcodeViz3D {
         mat.depthTest = false;            // draw the toolpath on top of the gizmo / stock
         const lines = new THREE.LineSegments(g, mat);
         lines.renderOrder = 20;           // above the gizmo (11–13); the anim tool (25) stays on top
-        if (opt.dashed) lines.computeLineDistances();
+        if (opt.dashed || opt.dotted) lines.computeLineDistances();
         this.pathGroup.add(lines);
         return lines;
     }
@@ -806,6 +860,12 @@ export class GcodeViz3D {
             if (mode === 'gizmo' && typeof this.onStartChange === 'function') {
                 this.onStartChange(this.starts);
             }
+            // A click (not a drag) on a marker/label selects it for the jog pendant.
+            if (mode !== 'gizmo' && this._downMarker >= 0 && e &&
+                Math.hypot(e.clientX - this._downX, e.clientY - this._downY) < 5) {
+                this.selectStart(this._downMarker);
+            }
+            this._downMarker = -1;
             mode = null;
             try { if (this._pid != null) el.releasePointerCapture(this._pid); } catch (_) {}
             this._pid = null;
@@ -832,6 +892,7 @@ export class GcodeViz3D {
             if (g) {
                 mode = 'gizmo';
                 this._dragPass = g.pass;
+                this.selectStart(g.pass);   // dragging a marker also selects it for the jog pendant
                 this._dragDir = g.axis === 'x' ? new THREE.Vector3(1, 0, 0)
                     : g.axis === 'y' ? new THREE.Vector3(0, 1, 0)
                     : new THREE.Vector3(0, 0, 1);
@@ -842,6 +903,10 @@ export class GcodeViz3D {
                 this._setHighlight(g.pass, g.axis);
                 this.renderer.domElement.style.cursor = 'grabbing';
             } else {
+                // Click a numbered marker/label to select it for the jog pendant (applied on
+                // pointer-up only if it was a click, not an orbit-drag).
+                this._downMarker = (e.button === 0 && !e.shiftKey) ? this._pickMarker(e) : -1;
+                this._downX = e.clientX; this._downY = e.clientY;
                 // CAD-style: middle = pan, Shift+middle = orbit; left = orbit, right/Shift+left = pan
                 if (e.button === 1) mode = e.shiftKey ? 'rot' : 'pan';
                 else mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot';
@@ -928,20 +993,9 @@ export class GcodeViz3D {
             if (this._ro) { this._ro.disconnect(); this._ro.observe(container); }
         }
         
-        // Move jog pendant
-        if (this.jogPendant) {
-            const wizBody = container.closest('.wiz-body');
-            if (wizBody) {
-                const legend = wizBody.querySelector('.viz-legend');
-                if (legend) {
-                    legend.insertAdjacentElement('afterend', this.jogPendant);
-                } else {
-                    wizBody.appendChild(this.jogPendant);
-                }
-            } else {
-                container.appendChild(this.jogPendant);
-            }
-        }
+        // Keep the jog pendant overlaid at the bottom of the 3D box (same as the main viewer),
+        // rather than dumping it at the bottom of the wizard form.
+        if (this.jogPendant) container.appendChild(this.jogPendant);
         
         this._resize();
     }

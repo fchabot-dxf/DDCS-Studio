@@ -35,7 +35,7 @@ your program:           T2 M6
 **Sensor waits (block until the input matches):**
 | M-code | Waits for | M-code | Waits for |
 |---|---|---|---|
-| **M300** | E-stop | **M301 / M302** | Drawbar **released / clamped** |
+| **M300** | Spindle stopped | **M301 / M302** | Drawbar **released / clamped** |
 | **M303 / M304** | Magazine **open / closed** | **M305 / M306** | Gripper open / closed |
 | **M307** | Servo in-position | | |
 
@@ -61,7 +61,7 @@ pin = writing a controller parameter** — which is exactly what Studio's Input/
 |---|---|---|---|
 | Drawbar released (M301) | #1123 · #1124 · #1125 | Drawbar clamped (M302) | **#1126 · #1127 · #1128** |
 | Magazine open (M303) | #1129 · #1130 · #1131 | Magazine closed (M304) | #1197 · #1198 · #1199 |
-| E-stop (M300) | #1120 · #1121 · #1122 | Servo in-pos (M307) | #1194 · #1195 · #1196 |
+| Spindle stopped (M300) | #1120 · #1121 · #1122 | Servo in-pos (M307) | #1194 · #1195 · #1196 |
 
 > ⚠ **Namespace:** the `#12xx` above are the **runtime macro vars** the M-code subprograms read (straight
 > from `slib-m.nc`). The **panel / profile I/O config** — which *physical pin* each signal is on — lives in

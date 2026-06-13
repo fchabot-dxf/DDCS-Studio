@@ -1477,9 +1477,10 @@ button.primary:hover {
 }
 
 .wiz-box {
-    width: 520px !important;    /* FORCE compact width */
-    min-width: 520px !important;
-    max-width: 90vw;            /* Safety for mobile */
+    /* Responsive, capped-fluid: near-full-width on mobile, comfortable cap on desktop.
+       Two-pane wizards widen further (see .wiz-box.two-pane). */
+    width: min(96vw, 560px);
+    max-width: 96vw;
     max-height: 95vh;           /* fallback for older browsers */
     max-height: 95dvh;          /* dynamic viewport-aware height (Chrome mobile fix) */
     margin-bottom: env(safe-area-inset-bottom);
@@ -1494,6 +1495,52 @@ button.primary:hover {
     border: 2px solid var(--accent);
     border-radius: var(--radius, 6px);   /* corners follow each theme's own radius token */
     box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+/* Shared 3D-preview host height (single-pane wizards). Two-pane grows it to fill. */
+.wiz-viz3d { height: 220px; }
+
+/* ============================================
+   TWO-PANE WIZARDS (form left / visuals right)
+   Applied to wizards with a 3D preview. Controls scroll independently on the
+   left; the visual pane fills the modal height so the 3D preview spans it.
+   Collapses to a single column on mobile.
+   ============================================ */
+.wiz-box.two-pane {
+    width: min(97vw, 1180px);
+    height: min(90dvh, 860px);   /* definite height so the right pane (3D) can span it */
+}
+.two-pane .wiz-body { overflow: hidden; padding-bottom: 0; }
+.wiz-2pane { display: flex; gap: 14px; height: 100%; min-height: 0; align-items: stretch; }
+.wiz-2pane > .wiz-controls {
+    order: 1;                    /* left, regardless of DOM order */
+    flex: 0 0 360px; min-width: 0;
+    overflow-y: auto; overflow-x: hidden;
+    padding: 2px 8px 12px 2px;
+}
+.wiz-2pane > .wiz-visual {
+    order: 2;                    /* right */
+    flex: 1 1 0; min-width: 0; min-height: 0;
+    display: flex; flex-direction: column; gap: 8px;
+}
+/* the 3D preview (and the drill 2D layout) grow to fill the visual pane's height */
+.wiz-2pane > .wiz-visual > .viz-container,
+.wiz-2pane > .wiz-visual > .viz-split { flex: 1 1 auto; min-height: 0; }
+.wiz-2pane .wiz-visual .wiz-viz3d { flex: 1 1 auto; height: auto !important; min-height: 200px; }
+.wiz-2pane .wiz-visual .viz-canvas { min-height: 0; }
+/* drill: stack the 2D layout above the 3D in the tall pane; each fills half */
+.wiz-2pane .wiz-visual .viz-split { flex-direction: column; }
+.wiz-2pane .wiz-visual .viz-split > .viz-container { flex: 1 1 0; min-height: 160px; }
+
+@media (max-width: 860px) {
+    .wiz-box.two-pane { width: min(96vw, 560px); height: auto; }
+    .two-pane .wiz-body { overflow-y: auto; }
+    .wiz-2pane { flex-direction: column; height: auto; }
+    .wiz-2pane > .wiz-controls { order: 2; flex-basis: auto; overflow: visible; width: 100%; padding: 0; }
+    .wiz-2pane > .wiz-visual { order: 1; }                 /* visuals on top on mobile */
+    .wiz-2pane .wiz-visual .wiz-viz3d { height: 220px !important; }
+    .wiz-2pane .wiz-visual .viz-split { flex-direction: row; }   /* 2D | 3D side-by-side again */
+    .wiz-2pane .wiz-visual .viz-container { flex: 1 1 280px; }
 }
 
 /* --- HEADER (Flush Fit) --- */
@@ -1644,6 +1691,25 @@ button.primary:hover {
     min-height: 160px;
     overflow: auto;
 }
+
+/* Side-by-side 2D layout + 3D verify (drill wizard) */
+.viz-split { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+.viz-split > .viz-container { flex: 1 1 280px; min-width: 280px; }
+
+/* 2D parametric layout canvas (viz/featureCanvas.js) */
+.feature-canvas { width: 100%; height: 100%; background: #000; cursor: default; user-select: none; }
+.feature-canvas .fc-grid-minor { stroke: #14202c; stroke-width: 1; }
+.feature-canvas .fc-grid-major { stroke: #243446; stroke-width: 1; }
+.feature-canvas .fc-axis-x { stroke: #7a3b3b; stroke-width: 1.5; }
+.feature-canvas .fc-axis-y { stroke: #3b7a48; stroke-width: 1.5; }
+.feature-canvas .fc-stock { fill: rgba(80,110,150,0.08); stroke: #46566a; stroke-width: 1.5; }
+.feature-canvas .fc-guide { fill: none; stroke: #2e8b9a; stroke-width: 1; stroke-dasharray: 4 3; }
+.feature-canvas .fc-hole { fill: rgba(63,182,255,0.18); stroke: #3fb6ff; stroke-width: 1.5; }
+.feature-canvas .fc-hole-skip { fill: none; stroke: #5a6470; stroke-width: 1.2; stroke-dasharray: 3 2; }
+.feature-canvas .fc-hole-label { fill: #9fd8ff; font: 10px var(--mono, monospace); text-anchor: middle; }
+.feature-canvas .fc-handle { fill: #ffce54; stroke: #1a1a1a; stroke-width: 1.5; cursor: grab; }
+.feature-canvas .fc-handle-move { fill: #ffce54; stroke: #1a1a1a; stroke-width: 1.5; }
+.feature-canvas .fc-handle-label { fill: #ffce54; font: 10px var(--mono, monospace); }
 
 /* Preview Block */
 .preview-block { margin-top: 15px; }
@@ -2654,10 +2720,11 @@ svg [id*="Zfirst_travel"] {
     border-radius: 1px;
     flex-shrink: 0;
 }
-.viz-legend-line.probe   { background: #3b82f6; }
-.viz-legend-line.retract { background: #facc15; }
+.viz-legend-line.probe   { background: transparent; border-top: 3px dotted #3b82f6; height: 0; }   /* probe = dotted blue */
+.viz-legend-line.cut     { background: linear-gradient(90deg, #0a4fd0, #35ffd0); }   /* feed/cut: blue→cyan by depth */
+.viz-legend-line.retract { background: #33cc55; }   /* retract/lead-out = green (Fusion) */
 .viz-legend-line.jog     { background: #ff9a0d; border-top: 3px dashed #ff9a0d; background: transparent; height: 0; }
-.viz-legend-line.travel  { background: #00ff00; border-top: 3px dashed #00ff00; background: transparent; height: 0; }
+.viz-legend-line.travel  { background: #ffcc00; }   /* rapid = solid yellow (Fusion) */
 
 /* Hint text below inputs */
 .hint { font-size: 9px; color: var(--text-dim); margin-top: 3px; display: block; font-style: italic; }
@@ -3160,16 +3227,16 @@ body[data-scale="250"] {
 .viz3d-drawer .viz3d-status-copy.visible { display: inline-flex; }
 
 /* Jog pendant context styling */
-.viz3d-drawer .viz3d-jog-pendant {
+/* Jog pendant = a bottom-left drawer chip, overlaid on the 3D box in both the main
+   viewer and the wizard preview (the bulky jog grid expands upward when toggled). */
+.viz3d-drawer .viz3d-jog-pendant,
+.wiz-viz3d .viz3d-jog-pendant {
     position: absolute;
-    bottom: 34px;
-    left: 12px;   /* clear the 10px left resize strip so the pendant doesn't cover the border */
-    right: 0;
+    bottom: 8px;
+    left: 8px;
+    right: auto;
+    width: auto;
     z-index: 100;
-}
-.wiz-body .viz3d-jog-pendant {
-    position: static;
-    margin-top: 8px;
 }
 .viz3d-hint { display: none; } /* was a long central line that overlapped the legend + controls */
 .viz3d-controls {
@@ -3196,6 +3263,11 @@ body[data-scale="250"] {
 .viz3d-jog-pendant .jog-bar button:hover { background: rgba(30, 70, 110, 0.65); border-color: rgba(150, 210, 255, 0.7); }
 .viz3d-controls button.on,
 .viz3d-jog-pendant .jog-bar button.on { background: rgba(40, 120, 80, 0.8); border-color: #4dff7a; color: #eaffea; }
+.viz3d-jog-pendant .jog-start-btns button {
+    min-width: 22px; padding: 2px 7px; font-size: 11px; cursor: pointer;
+    background: rgba(0, 0, 0, 0.55); color: #cfe6ff; border: 1px solid rgba(120, 190, 255, 0.45); border-radius: 4px;
+}
+.viz3d-jog-pendant .jog-start-btns button.on { background: rgba(40, 120, 80, 0.85); border-color: #4dff7a; color: #eaffea; }
 /* Wizard preview controls keep the transparent main-viewer look (beat the wizard form-select styling) */
 .wiz-viz3d .viz3d-controls select,
 .wiz-viz3d .viz3d-controls button {
@@ -3228,7 +3300,7 @@ body[data-scale="250"] {
 
 /* ===== Floating Virtual I/O panel (draggable head · CSS-resizable · flex LED grid) ===== */
 .io-panel {
-    position: fixed; top: 110px; right: 24px; z-index: 1200;
+    position: fixed; top: 110px; right: 24px; z-index: 10050;   /* above the wizard overlay (10000) */
     display: none; flex-direction: column;
     width: 330px; min-width: 220px; min-height: 170px; max-width: 92vw; max-height: 85vh;
     background: rgba(10, 14, 20, 0.96);

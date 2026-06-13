@@ -48,6 +48,7 @@ export class AtcLengthWizard {
         gcode += `( Confirm Start )\n`;
         gcode += line([set('#1505', '1')], 'Hover tool above setter. Press Enter') + '\n\n';
 
+        gcode += line([M(5), M(9)], 'Spindle & coolant OFF before probing') + '\n';
         gcode += line([G(91)], 'INCREMENTAL MODE') + '\n\n';
 
         gcode += comment('Step 1: Fast Probe Down') + '\n';

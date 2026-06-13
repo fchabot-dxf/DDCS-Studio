@@ -10,8 +10,8 @@
  *   - target tool   #1504 (stored by M6 Txx), current tool #1300, capacity #1301
  *   - pocket tables #1330+(X) #1350+(Y) #1370+(Z) — per-tool machine coords
  *   - drawbar       M154 (release) / M155 (lock) — output port = param #1250
- *   - sensor waits  M300 (spindle stopped) M302 (locked) M303 (open) M304 (closed)
- *   - dust cover    M305 / M306 (optional)
+ *   - sensor waits  M300 (spindle stopped) M301 (drawbar released) M302 (drawbar clamped)
+ *   - dust cover    M162 (open) / M163 (close) — optional
  * NOTE for the machinist: the sensor/port params (#1120-#1199, #1250-52) and the
  * pocket tables must be configured on the controller; verify the first run with
  * no tool in the spindle and a hand on the e-stop. The macro simulates end-to-end
@@ -76,14 +76,14 @@ export class AtcChangeWizard {
         const _capacity = this.toNum(params.capacity, 8);   // magazine pockets
         const _fixedT   = this.toNum(params.fixedT, 0);     // >0 = test a specific tool number
         const useM300   = params.waitSpindle !== false;     // wait for spindle-stopped sensor
-        const useCover  = params.dustCover === true;        // M305/M306 dust cover
+        const useCover  = params.dustCover === true;        // M162/M163 dust cover
         const confirm   = params.confirm === true;          // blocking prompt before moving
 
         const target = _fixedT > 0 ? String(_fixedT) : '#1504';
 
         let gcode = '';
         gcode += `( ATC | Automatic Tool Change - T.nc style )\n`;
-        gcode += `( Drawbar M154/M155 + sensor waits M302/M303 - pockets from tables #1330/#1350/#1370 )\n`;
+        gcode += `( Drawbar M154/M155 + sensor waits M301/M302 - pockets from tables #1330/#1350/#1370 )\n`;
         gcode += _fixedT > 0
             ? `( TEST MODE: fixed target tool T${_fixedT} )\n`
             : `( Target tool from #1504 - set by M6 Txx; save as T.nc to hook the controller's M6 )\n`;
@@ -108,7 +108,7 @@ export class AtcChangeWizard {
         gcode += `( === SPINDLE OFF + RETRACT === )\n`;
         gcode += line([M(5), M(9)], 'Stop spindle & coolant') + '\n';
         if (useM300) gcode += line([M(300)], 'Wait: spindle-stopped sensor') + '\n';
-        if (useCover) gcode += line([M(305)], 'Dust cover OPEN') + '\n';
+        if (useCover) gcode += line([M(162)], 'Dust cover OPEN') + '\n';
         gcode += g53('Z', '#102', 'Retract to change height') + '\n\n';
 
         gcode += `( === PUT AWAY CURRENT TOOL - skipped if spindle is empty === )\n`;
@@ -122,7 +122,7 @@ export class AtcChangeWizard {
         gcode += line([G(53), X('#110'), Y('#111')], 'Over the old pocket') + '\n';
         gcode += g53('Z', '#112', 'Down: seat tool in pocket') + '\n';
         gcode += line([M(154)], 'Drawbar RELEASE') + '\n';
-        gcode += line([M(303)], 'Wait: tool-open sensor') + '\n';
+        gcode += line([M(301)], 'Wait: drawbar-released sensor') + '\n';
         gcode += line([set('#1300', '0')], 'Spindle now empty') + '\n';
         gcode += g53('Z', '#102', 'Retract clear of the pocket') + '\n\n';
 
@@ -135,12 +135,12 @@ export class AtcChangeWizard {
         gcode += line([set('#112', '#[#107]')], 'New pocket Z') + '\n';
         gcode += line([G(53), X('#110'), Y('#111')], 'Over the new pocket') + '\n';
         gcode += line([M(154)], 'Collet OPEN before descending') + '\n';
-        gcode += line([M(303)], 'Wait: tool-open sensor') + '\n';
+        gcode += line([M(301)], 'Wait: drawbar-released sensor') + '\n';
         gcode += g53('Z', '#112', 'Down over the tool shank') + '\n';
         gcode += line([M(155)], 'Drawbar LOCK') + '\n';
         gcode += line([M(302)], 'Wait: tool-locked sensor') + '\n';
         gcode += g53('Z', '#102', 'Retract with the new tool') + '\n';
-        if (useCover) gcode += line([M(306)], 'Dust cover CLOSE') + '\n';
+        if (useCover) gcode += line([M(163)], 'Dust cover CLOSE') + '\n';
         gcode += line([set('#1300', '#100')], 'Current tool = target') + '\n';
         gcode += line([set('#1510', '#100')], 'Message arg') + '\n';
         gcode += line([set('#1505', '-5000')], 'Tool change complete: T%.0f') + '\n';

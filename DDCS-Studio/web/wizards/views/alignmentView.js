@@ -30,6 +30,7 @@ export const alignmentView = {
     panelId: 'wiz_alignment',
     codeElId: 'wiz_alignment_code',
     large: true,
+    twoPane: true,
     inputIds: [
         'al_check_axis', 'al_probe_dir',
         'al_tolerance', 'al_dist', 'al_retract', 'al_safe_z',

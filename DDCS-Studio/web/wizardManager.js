@@ -7,12 +7,27 @@
  * event wiring, dispatch, insert and the shared 3D preview host.
  */
 
-import { el } from './ui/uiUtils.js';
+import { el, makeDraggable } from './ui/uiUtils.js';
 import { WIZARD_VIEWS, viewByType } from './wizards/views/index.js';
 import { playClick, playClickReverse } from './ui/sound.js';  // audio helper for click sounds
 import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
+import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile } from './shared/js/profiles/controllerProfiles.js';
 import { GcodeViz3D } from './viz/gcodeViz3d.js';
 import { parseGcode } from './gcodeParser.js';
+
+// Map the touch-probe wizards' per-op input fields to the global 3D-probe defaults
+// (settings.probes). open() pre-fills these so every wizard starts from the configured
+// probe; the user can still tweak any field for that operation. Pin/level are read from
+// settings directly in each view, so they're not listed here.
+const PROBE_DEFAULT_FIELDS = {
+    c_radius: 'radius',
+    al_feed_fast: 'fastFeed', c_feed_fast: 'fastFeed', circ_feed_fast: 'fastFeed', m_feed_fast: 'fastFeed', p_feed_fast: 'fastFeed', rc_feed_fast: 'fastFeed', rcl_feed_fast: 'fastFeed',
+    al_feed_slow: 'slowFeed', c_feed_slow: 'slowFeed', circ_feed_slow: 'slowFeed', m_feed_slow: 'slowFeed', p_feed_slow: 'slowFeed', rc_feed_slow: 'slowFeed', rcl_feed_slow: 'slowFeed',
+    al_retract: 'retract', c_retract: 'retract', circ_retract: 'retract', m_retract: 'retract', p_retract: 'retract', rc_retract: 'retract', rcl_retract: 'retract',
+    al_safe_z: 'safeZ', c_safe_z: 'safeZ', circ_safe_z: 'safeZ', m_safe_z: 'safeZ', rc_safe_z: 'safeZ', rcl_safe_z: 'safeZ',
+    al_dist: 'maxDist', c_dist: 'maxDist', circ_dist: 'maxDist', m_dist: 'maxDist', p_dist: 'maxDist', rc_dist: 'maxDist', rcl_dist: 'maxDist',
+    al_q: 'qStop', c_q: 'qStop', circ_q: 'qStop', m_q: 'qStop', p_q: 'qStop', rc_q: 'qStop', rcl_q: 'qStop',
+};
 
 export class WizardManager {
     constructor(editorManager) {
@@ -37,11 +52,29 @@ export class WizardManager {
             }
         });
 
+        // Drag the whole generator by its header bar (but not the profile select / gear / close).
+        const box = this.wizardElement.querySelector('.wiz-box');
+        const head = box && box.querySelector('.wiz-head');
+        if (box && head) makeDraggable(box, head, { ignore: 'select, button, input, .wiz-gear, .wiz-close' });
+
         // Settings (stock/probe/machine) changed — if a wizard is open, re-run its update() so the
         // preview + the inferred spindle start track the new values live (e.g. editing stock size via
         // the in-wizard ⚙). Read-only re-render; never writes settings, so no loop.
         window.addEventListener('ddcs:settings-changed', () => {
             if (this.wizardElement && this.wizardElement.classList.contains('active')) this.update();
+        });
+
+        // Active-controller-profile chip in the shared wizard header — shows + switches the GLOBAL
+        // profile so generated code matches the machine's dialect (not a per-wizard override).
+        const prof = el('wizProfile');
+        if (prof) prof.addEventListener('change', () => {
+            setActiveProfile(prof.value);
+            // Also switch the variable list to match the controller (the var DB fires variableDB:ready,
+            // which the command deck's controller selector listens to, so everything stays in sync).
+            const p = CONTROLLER_PROFILES[prof.value];
+            const vdb = window.ddcsStudio && window.ddcsStudio.variableDB;
+            if (p && p.varFamily && vdb) vdb.setControllerVars(p.varFamily);
+            window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));   // re-render the open wizard with the new dialect
         });
 
         // Escape key to close wizard
@@ -76,6 +109,27 @@ export class WizardManager {
         });
     }
 
+    /** Refresh the header profile chip (options + current selection) — shows which machine you're generating for. */
+    syncProfileChip() {
+        const prof = el('wizProfile');
+        if (!prof) return;
+        prof.innerHTML = Object.values(CONTROLLER_PROFILES)
+            .map((p) => `<option value="${p.id}">${p.name}${p.source === 'controller' ? ' (from controller)' : ''}</option>`).join('');
+        prof.value = getActiveProfile().id;
+    }
+
+    /** Pre-fill the touch-probe wizards' per-op fields from the global 3D-probe defaults. */
+    applyProbeDefaults() {
+        const p = (window.ddcsGetSettings && window.ddcsGetSettings().probes) || null;
+        if (!p) return;
+        for (const [id, key] of Object.entries(PROBE_DEFAULT_FIELDS)) {
+            const v = p[key];
+            if (v == null) continue;
+            const e = el(id);
+            if (e) e.value = v;
+        }
+    }
+
     /** The view whose panel is currently visible (or null). */
     activeView() {
         return this.views.find((v) => {
@@ -90,6 +144,8 @@ export class WizardManager {
 
         const view = viewByType.get(type) || null;
         const box = document.querySelector('.wiz-box');
+        // Re-centre on open: clear any drag offset left from a previous session.
+        if (box) Object.assign(box.style, { position: '', left: '', top: '', right: '', bottom: '', transform: '', margin: '' });
         this._wizNeedsFit = true;   // frame the 3D preview once on open; input-change re-renders keep the camera
         console.debug('WizardManager.open()', type, 'view=', !!view, 'wizardElement=', this.wizardElement);
         if (!this.wizardElement) {
@@ -102,6 +158,8 @@ export class WizardManager {
         } else {
             box.classList.remove('large');
         }
+        // Two-pane layout (form left / visuals right) for wizards with a 3D preview.
+        box.classList.toggle('two-pane', !!(view && view.twoPane));
 
         // Ensure overlay is visible and mark active
         this.wizardElement.style.display = 'flex';
@@ -119,6 +177,8 @@ export class WizardManager {
             wizElem.style.display = 'block';
             if (view && typeof view.onShow === 'function') view.onShow(this);
             decorateProbeSrc(view);   // controller/Studio source chips (before first generate)
+            this.syncProfileChip();   // show which controller profile this code targets
+            this.applyProbeDefaults();   // seed probe fields from the global 3D-probe defaults
             // Ensure fields & preview reflect current defaults immediately
             this.update();
             if (view && typeof view.onOpen === 'function') view.onOpen(this);
@@ -201,19 +261,32 @@ export class WizardManager {
         if (!host) {
             host = document.createElement('div');
             host.className = 'wiz-viz3d';
-            host.style.cssText = 'position:relative; width:100%; height:220px;';
+            host.style.cssText = 'position:relative; width:100%;';   // height via CSS (.wiz-viz3d) so two-pane can grow it
             parent.insertBefore(host, svgCont);
+            // Canonical path legend — the 3D colour scheme is identical in every wizard, so define it
+            // once here and drop it into the visual pane, replacing any inline legend. Includes the
+            // Cut colour (blue→cyan depth gradient) that the per-wizard legends were missing.
+            const visual = host.closest('.wiz-visual') || parent;
+            if (visual) {
+                const oldLeg = visual.querySelector('.viz-legend');
+                if (oldLeg) oldLeg.remove();
+                const lg = document.createElement('div');
+                lg.className = 'viz-legend';
+                lg.innerHTML =
+                    '<div class="viz-legend-item"><div class="viz-legend-line cut"></div>Cut</div>' +
+                    '<div class="viz-legend-item"><div class="viz-legend-line travel"></div>Rapid</div>' +
+                    '<div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>' +
+                    '<div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>' +
+                    '<div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>';
+                visual.appendChild(lg);
+            }
             // Controls cloned from the main 3D viewer: stock shape + Play/Stop (default play)
             const ctrls = document.createElement('div');
             ctrls.className = 'viz3d-controls';
-            ctrls.innerHTML =
-                '<label>Stock <select class="wiz-shape"><option value="boss">Boss</option><option value="pocket">Pocket</option></select></label>' +
-                '<button type="button" class="wiz-play on">⏸ Stop</button>';
+            // Stock shape is set from the jog pendant's Stock button (full stock editor) — no
+            // redundant dropdown here. Just the play/stop toggle.
+            ctrls.innerHTML = '<button type="button" class="wiz-play on">⏸ Stop</button>';
             host.appendChild(ctrls);
-            ctrls.querySelector('.wiz-shape').addEventListener('change', (e) => {
-                if (window.ddcsApplySettings) window.ddcsApplySettings({ stock: { shape: e.target.value } });
-                this._refresh3DStock();
-            });
             ctrls.querySelector('.wiz-play').addEventListener('click', (e) => {
                 if (!this._wizViz) return;
                 const on = !this._wizViz._animOn;
@@ -234,8 +307,6 @@ export class WizardManager {
             if (start && this._wizViz.starts) this._wizViz.starts[0] = { x: +start.x || 0, y: +start.y || 0, z: +start.z || 0 };
             this._wizViz.setSegments(parseGcode(gcode || ''), this._wizNeedsFit !== false);
             this._wizNeedsFit = false;   // subsequent input-change re-renders keep the camera
-            const sel = host.querySelector('.wiz-shape');
-            if (sel && window.ddcsGetSettings) sel.value = (window.ddcsGetSettings().stock || {}).shape || 'boss';
         } catch (e) { console.warn('wizard 3D preview failed', e); }
     }
 

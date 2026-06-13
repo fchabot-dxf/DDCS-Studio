@@ -11,7 +11,7 @@ import { resetVirtualIO, setVirtualOutput, getVirtualInput, injectVirtualInput, 
 import { tokenizeWords } from './core/tokenizer.js';
 import { evalExpr, validateExpression } from './core/expression.js';
 import { evaluateCondition, validateCondition } from './core/condition.js';
-import { loadProgram as loadProgramText } from './core/program.js';
+import { loadProgram as loadProgramText, stripLine } from './core/program.js';
 
 export class GcodeExecutionEngine {
     constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
@@ -60,7 +60,7 @@ export class GcodeExecutionEngine {
 
         lines.forEach((raw, lineIndex) => {
             const trimmedRaw = raw.trim();
-            const stripped = raw.replace(/\([^)]*\)/g, ' ').replace(/;.*$/, ' ').trim();
+            const stripped = stripLine(raw);
             if (!stripped) return;
 
             const ifMatch = stripped.match(/^IF\s+(.+?)\s+GOTO\s*(\d+)$/i);

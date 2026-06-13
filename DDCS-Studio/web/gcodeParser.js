@@ -15,6 +15,7 @@
 
 import { tokenizeWords } from './engine/core/tokenizer.js';
 import { evalExpr } from './engine/core/expression.js';
+import { stripLine } from './engine/core/program.js';
 
 /**
  * Controller parameter vars seeded from Studio settings, so code generated in
@@ -79,10 +80,10 @@ export function parseGcode(text) {
         // Retract moves are G0 moves the wizard comments as "Retract"
         const isRetract = /retract/i.test(raw);
 
-        // Strip comments: ( ... ) and ; trailing
-        const line = raw.replace(/\([^)]*\)/g, ' ').replace(/;.*$/, ' ');
-        if (!line.trim()) continue;
-        const trimmed = line.trim();
+        // Strip comments: ( ... ) (incl. nested) and ; trailing
+        const line = stripLine(raw);
+        if (!line) continue;
+        const trimmed = line;
 
         // --- Variable assignment: #N = expr  (or  #[expr] = expr) ---
         if (trimmed[0] === '#') {

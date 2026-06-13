@@ -16,6 +16,7 @@ export function initGatewayStatus() {
     if (!led) return;
     const tab = document.querySelector('.hdr-tabs .tab[data-app="gateway"]');
     const studioTab = document.querySelector('.hdr-tabs .tab[data-app="studio"]');
+    const settingsTab = document.querySelector('.hdr-tabs .tab[data-app="settings"]');
     const client = makeClient();
     let bridged = false;
 
@@ -42,24 +43,41 @@ export function initGatewayStatus() {
     }
 
     async function showApp(which) {
-        const panel = document.getElementById('gateway-app');
-        const shells = document.querySelectorAll('.app-shell');
-        const gateway = which === 'gateway';
-        if (gateway) {
+        const studioApp = document.getElementById('studio-app');
+        const gatewayApp = document.getElementById('gateway-app');
+        const settingsApp = document.getElementById('settings-app');
+
+        const isStudio = which === 'studio';
+        const isGateway = which === 'gateway';
+        const isSettings = which === 'settings';
+
+        if (isGateway) {
             const mod = await import('./gatewayPanel.js');
             mod.initGatewayPanel();
             mod.setGatewayPanelVisible(true);
         } else {
             try { (await import('./gatewayPanel.js')).setGatewayPanelVisible(false); } catch { /* not loaded */ }
         }
-        panel?.classList.toggle('hidden', !gateway);
-        shells.forEach((s) => s.classList.toggle('hidden', gateway));
-        tab?.classList.toggle('active', gateway);
-        studioTab?.classList.toggle('active', !gateway);
+
+        if (isSettings) {
+            const mod = await import('./settingsPanel.js');
+            mod.openSettings();
+        }
+
+        studioApp?.classList.toggle('hidden', !isStudio);
+        gatewayApp?.classList.toggle('hidden', !isGateway);
+        settingsApp?.classList.toggle('hidden', !isSettings);
+
+        studioTab?.classList.toggle('active', isStudio);
+        tab?.classList.toggle('active', isGateway);
+        settingsTab?.classList.toggle('active', isSettings);
     }
+
+    window.showApp = showApp;
 
     if (tab) tab.addEventListener('click', () => { bridged ? showApp('gateway') : toggleDownloadPop(tab); });
     if (studioTab) studioTab.addEventListener('click', () => showApp('studio'));
+    if (settingsTab) settingsTab.addEventListener('click', () => showApp('settings'));
 
     tick();
     setInterval(tick, 5000);

@@ -1,10 +1,9 @@
 ﻿/**
- * DDCS Studio — Settings panel
+ * DDCS Studio — Settings panel (a sibling header tab to STUDIO and GATEWAY).
  *
- * A header ⚙ button opens an overlay with:
- *   - Variables: CSV import / export (the DB that feeds the keyboard VARIABLES tab)
- *   - Stock: X/Y/Z block dimensions (drawn as a translucent box in the 3D preview)
- *   - Machine: envelope travel X/Y/Z + limit/origin position (wireframe box in 3D)
+ * A header ⚙ button opens an overlay with two L1 groups:
+ *   - General:  Profile · Appearance · Variables · Program · Feedback · Network · About
+ *   - Hardware: Machine · Spindle · Input · Output · ATC  (subsystems added via "+ Add")
  *
  * Settings persist to localStorage and broadcast `ddcs:settings-changed` so the
  * 3D preview can redraw. The viewer reads them via window.ddcsGetSettings().
@@ -13,6 +12,7 @@ import { UIUtils } from './uiUtils.js';
 import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile, registerProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { makeClient } from '../shared/js/client.js';
 import { renderIoTable, renderMagazineTable } from './ioTable.js';
+import { THEMES } from './themes.js';
 import { generateToolChangeNc } from '../data/atcGenerator.js';
 
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
@@ -34,6 +34,9 @@ const SETTINGS_DEFAULTS = {
         probePin: 3, probeLevel: 0,        // IN03 = YunKia V6 3D probe (confirmed)
         setterPin: 2, setterLevel: 0,      // IN02 = fixed Tool Setter (confirmed); was 4 (IN04 = unwired)
         setterX: 10, setterY: 10, setterZ: -50, setterW: 20, setterH: 20,
+        // 3D-probe global defaults the touch-probe wizards (corner/edge/middle/circular/alignment/rotary)
+        // start from. radius drives radius compensation; feeds/retract/safeZ/maxDist/qStop seed each op.
+        radius: 2.0, fastFeed: 200, slowFeed: 50, retract: 2, safeZ: 10, maxDist: 25, qStop: 1,
         // Per-field source: 'studio' = literal from the form (current behaviour) | 'ctrl' = generated
         // code reads the controller's own parameter at runtime (e.g. F#632 P#1078 — see
         // PROBE-CONFIG-SOURCE.md). Only fields the active controller profile lists in probeVars
@@ -49,7 +52,7 @@ const SETTINGS_DEFAULTS = {
     // Which hardware tabs are shown (manual toggles, persisted). Defaults match the M350 profile:
     // Probes + Limits on, ATC off (no clutter unless you have a tool changer). Fully manual so non-bridge
     // users can configure for accurate simulation; a controller profile just presets these.
-    hardwareTabs: { probes: true, atc: false, limits: true },
+    hardwareTabs: { probes: true, atc: false, limits: true, spindle: false },
     // ATC: tool-length probe defaults (consumed by the Tool Length wizard) + the tool-offset table.
     // baseVar = DDCS tool-offset table base (#1430 = tool 1); tools[i] = stored length for tool i+1.
     atc: {
@@ -57,6 +60,17 @@ const SETTINGS_DEFAULTS = {
         blockHeight: 50, safeZ: 10, maxDist: 200, retract: 3, fFast: 300, fSlow: 50, qStop: 1,
         magType: 'straight', magazine: []   // magType: straight|disk; magazine[]: {pocket,tool,name,x,y,z}
     },
+    // Toolhead fitted to the machine. spindle/router is the working type; plasma/laser are stubs.
+    // Type-specific config lives in its own object (spindle below; plasma/laser TBD).
+    head: { type: 'spindle' },
+    // Spindle / VFD — Studio-side authoring defaults. The DDCS controller owns the live spindle
+    // params (PWM/analog, max RPM #582); these seed generated M3/M4 + S words, spin-up/down dwell,
+    // and the warm-up wizard target. Added via the Head tab's "Add head".
+    spindle: { maxRpm: 24000, defaultRpm: 18000, dir: 'cw', spinUp: 3, spinDown: 3 },
+    // End-of-program routine — the safe footer appended to generated programs. DDCS note: G53
+    // machine-coord moves are verified; G28 is NOT configured, so retract/park use G53. Global
+    // default; per-wizard overrides can layer on top later.
+    endProgram: { spindleOff: true, coolantOff: true, retract: true, retractZ: 0, park: false, parkX: 0, parkY: 0, end: 'M30' },
     // Dynamic machine I/O — the new source of truth; seeded from probes/limits on first load.
     inputs: [],
     outputs: [],
@@ -128,6 +142,9 @@ function loadSettings() {
                 limits: { ...SETTINGS_DEFAULTS.limits, ...(p.limits || {}) },
                 hardwareTabs: { ...SETTINGS_DEFAULTS.hardwareTabs, ...(p.hardwareTabs || {}) },
                 atc: { ...SETTINGS_DEFAULTS.atc, ...(p.atc || {}) },
+                head: { ...SETTINGS_DEFAULTS.head, ...(p.head || {}) },
+                spindle: { ...SETTINGS_DEFAULTS.spindle, ...(p.spindle || {}) },
+                endProgram: { ...SETTINGS_DEFAULTS.endProgram, ...(p.endProgram || {}) },
                 motors: { ...SETTINGS_DEFAULTS.motors, ...(p.motors || {}) },
                 inputs: Array.isArray(p.inputs) ? p.inputs : [],
                 outputs: Array.isArray(p.outputs) ? p.outputs : [],
@@ -200,47 +217,53 @@ export function applySettings(incoming) {
 }
 
 function buildSettingsOverlay() {
-    if (document.getElementById('settings-overlay')) return;
-    const ov = document.createElement('div');
-    ov.id = 'settings-overlay';
-    ov.className = 'overlay settings-overlay';
-    ov.innerHTML = `
-        <div class="settings-box">
-            <style>
-                .settings-main-tab { background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.45); color: #fff; padding: 3px 14px; font-size: 12px; font-weight: 700; cursor: pointer; border-radius: 5px; }
-                .settings-main-tab:not(.active) { background: transparent; border-color: transparent; color: rgba(255,255,255,0.7); }
-                .settings-subtabs .settings-tab { background: transparent; border: 1px solid transparent; color: rgba(255,255,255,0.65); padding: 2px 10px; font-size: 11px; cursor: pointer; border-radius: 4px; }
-                .settings-subtabs .settings-tab.active { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.45); color: #fff; }
-            </style>
-            <div class="settings-head" style="display: block;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; align-items: center; gap: 16px;">
-                        <span>⚙ SETTINGS</span>
-                        <div class="settings-tabs" style="display: flex; gap: 8px;">
-                            <button class="settings-main-tab active" data-group="general">General</button>
-                            <button class="settings-main-tab" data-group="hardware">Hardware</button>
-                        </div>
+    const parent = document.getElementById('settings-app');
+    if (!parent) return;
+    if (parent.querySelector('.settings-body')) return;
+        parent.classList.remove('hidden');
+    parent.innerHTML = `
+        <style>
+            #settings-app { display: flex; flex-direction: column; }
+            #settings-app .settings-head { padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--panel); flex: 0 0 auto; display: flex; align-items: center; }
+            #settings-app .settings-main-tab, #settings-app .settings-main-tab:hover, #settings-app .settings-main-tab:active { position: relative; padding: 6px 6px; font-size: 12.5px; font-weight: 700; letter-spacing: 1px; font-family: inherit; color: var(--text-dim); background: transparent; border: none; border-radius: 0; box-shadow: none; text-shadow: none; filter: none; transform: none; cursor: pointer; transition: 120ms; }
+            #settings-app .settings-main-tab:hover, #settings-app .settings-main-tab.active { color: var(--text-main); }
+            #settings-app .settings-main-tab.active::after { content: ''; position: absolute; left: 4px; right: 4px; bottom: -8px; height: 3px; background: var(--accent); border-radius: var(--radius, 3px) var(--radius, 3px) 0 0; }
+            #settings-app .settings-body { display: flex; flex-direction: row; flex: 1; min-height: 0; overflow: hidden; }
+            #settings-app .settings-sidebar { width: 160px; flex: 0 0 160px; display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; }
+            #settings-app .settings-sidebar .settings-tab { display: block; width: 100%; text-align: left; padding: 7px 12px; font-size: 12.5px; font-weight: 600; border-radius: var(--radius, 4px); border: none; background: transparent; color: var(--text-dim); cursor: pointer; transition: 120ms; }
+            #settings-app .settings-sidebar .settings-tab:hover { background: var(--bg); color: var(--text-main); }
+            #settings-app .settings-sidebar .settings-tab.active { background: var(--bg); color: var(--text-main); border-left: 3px solid var(--accent); padding-left: 9px; }
+            #settings-app .settings-sidebar .sidebar-group-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); padding: 8px 12px 4px; opacity: .6; }
+            #settings-app .settings-sidebar .sidebar-group-label:first-child { padding-top: 2px; }
+            #settings-app .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 20px; background: var(--bg); }
+            #settings-app .settings-foot { flex: 0 0 auto; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--panel); display: flex; gap: 8px; }
+        </style>
+            <div class="settings-head">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div class="settings-tabs" style="display: flex; gap: 8px;">
+                        <button class="settings-main-tab active" data-group="general">General</button>
+                        <button class="settings-main-tab" data-group="hardware">Hardware</button>
                     </div>
-                    <span class="settings-close" title="Close">✕</span>
-                </div>
-                <div class="settings-subtabs" style="display: none; gap: 6px; padding-top: 8px; flex-wrap: wrap;">
-                    <button class="settings-tab active" data-group="general" data-target="set_tab_profile">Profile</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_network">Network</button>
-                    <button class="settings-tab" data-group="hardware" data-target="set_tab_machine">Machine</button>
-                    <button class="settings-tab" data-group="hardware" data-target="set_tab_stock">Stock</button>
-                    <button class="settings-tab" data-group="hardware" data-target="set_tab_input">Input</button>
-                    <button class="settings-tab" data-group="hardware" data-target="set_tab_output">Output</button>
-                    <button class="settings-tab" data-group="hardware" data-target="set_tab_atc">ATC</button>
-                    <select id="set_add_hw" title="Add a hardware subsystem" style="display:none; background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.5); border-radius:4px; font-size:11px; padding:2px 6px; cursor:pointer; margin-left:4px;">
-                        <option value="">+ Add ▾</option>
-                        <option value="atc">ATC (tool changer)</option>
-                        <option value="spindle" disabled>Spindle / VFD (soon)</option>
-                    </select>
                 </div>
             </div>
             <div class="settings-body">
+                <div class="settings-sidebar">
+                    <div class="sidebar-group-label" data-group-label="general">General</div>
+                    <button class="settings-tab active" data-group="general" data-target="set_tab_profile">Profile</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_appearance">Appearance</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_program">Program</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_network">Network</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_about">About</button>
+                    <div class="sidebar-group-label" data-group-label="hardware" style="display:none;">Hardware</div>
+                    <button class="settings-tab" data-group="hardware" data-target="set_tab_machine" style="display:none;">Machine</button>
+                    <button class="settings-tab" data-group="hardware" data-target="set_tab_spindle" style="display:none;">Head</button>
+                    <button class="settings-tab" data-group="hardware" data-target="set_tab_input" style="display:none;">Input</button>
+                    <button class="settings-tab" data-group="hardware" data-target="set_tab_output" style="display:none;">Output</button>
+                    <button class="settings-tab" data-group="hardware" data-target="set_tab_atc" style="display:none;">Tool table</button>
+                </div>
+                <div class="settings-content">
                 <!-- GENERAL: PROFILE -->
                 <div id="set_tab_profile">
                     <div class="settings-section">
@@ -300,6 +323,64 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
+                <!-- GENERAL: APPEARANCE -->
+                <div id="set_tab_appearance" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">THEME</div>
+                        <div class="settings-row">
+                            <select id="set_theme" title="UI theme"></select>
+                        </div>
+                        <div class="settings-hint">Switches the whole UI skin. Saved on this device.</div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">KEYBOARD DRAWER</div>
+                        <div class="settings-row">
+                            <input type="range" id="set_kbd_height" min="200" max="700" step="10" style="flex:1;">
+                            <span class="settings-hint" id="set_kbd_height_val"></span>
+                        </div>
+                        <div class="settings-hint">Default open height of the on-screen keyboard. You can also drag the drawer handle to resize.</div>
+                    </div>
+                </div>
+
+                <!-- GENERAL: PROGRAM (end-of-program routine) -->
+                <div id="set_tab_program" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">END OF PROGRAM</div>
+                        <div class="settings-hint">The safe footer appended to generated programs. On the DDCS, retract &amp; park use <b>G53</b> machine coordinates (G28 isn't configured).</div>
+                        <label class="settings-check"><input type="checkbox" id="set_end_spindleoff"> Stop spindle (M5)</label>
+                        <label class="settings-check"><input type="checkbox" id="set_end_coolantoff"> Coolant off (M9)</label>
+                        <label class="settings-check"><input type="checkbox" id="set_end_retract"> Retract Z to safe height (G53)</label>
+                        <div class="settings-grid">
+                            <label>Safe Z (G53, mm)<input type="number" id="set_end_retractz" step="1"></label>
+                        </div>
+                        <label class="settings-check"><input type="checkbox" id="set_end_park"> Park XY for unload (G53)</label>
+                        <div class="settings-grid">
+                            <label>Park X (G53)<input type="number" id="set_end_parkx" step="1"></label>
+                            <label>Park Y (G53)<input type="number" id="set_end_parky" step="1"></label>
+                        </div>
+                        <div class="settings-grid">
+                            <label>Program end<select id="set_end_end"><option value="M30">M30 (end + rewind)</option><option value="M2">M2 (end)</option><option value="none">None</option></select></label>
+                        </div>
+                        <div class="settings-row" style="margin-top:8px;">
+                            <button class="toolbar-btn settings-io" id="set_end_insert">⬇ Insert end-of-program</button>
+                        </div>
+                        <div class="settings-hint">Drops the footer into the editor at the cursor. Global default; per-wizard overrides are planned.</div>
+                    </div>
+                </div>
+
+                <!-- GENERAL: ABOUT -->
+                <div id="set_tab_about" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">DDCS STUDIO</div>
+                        <div class="settings-hint">Version <b id="set_about_ver">—</b></div>
+                        <div class="settings-hint">Modular G-code generator &amp; 3D simulator for the DDCS Expert / FOINNC M350 controller.</div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">CREDITS</div>
+                        <div class="settings-hint">Built by Frédéric · MIT License</div>
+                    </div>
+                </div>
+
                 <!-- MACHINE TAB -->
                 <div id="set_tab_machine" style="display:none">
                     <div class="settings-section">
@@ -330,31 +411,50 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
-                <!-- STOCK TAB -->
-                <div id="set_tab_stock" style="display:none">
-                    <div class="settings-section">
-                        <div class="settings-section-title">STOCK (mm)</div>
-                        <label class="settings-field">TEMPLATE
-                            <select id="set_stock_tpl"><option value="">— template —</option></select>
-                        </label>
-                        <div class="settings-grid">
-                            <label>X<input type="number" id="set_stock_x" min="0" step="1"></label>
-                            <label>Y<input type="number" id="set_stock_y" min="0" step="1"></label>
-                            <label>Z<input type="number" id="set_stock_z" min="0" step="1"></label>
+                <!-- HARDWARE: SPINDLE -->
+                <div id="set_tab_spindle" style="display:none">
+                    <div class="settings-section" id="set_spin_add" style="display:none">
+                        <div class="settings-section-title">HEAD</div>
+                        <div class="settings-hint">Add the machine's toolhead — spindle / router today (plasma &amp; laser coming). Sets speed/direction and inserts M3/M4 + S into programs.</div>
+                        <button class="toolbar-btn settings-io" id="set_spin_add_btn">➕ Add head</button>
+                    </div>
+                    <div id="set_spin_config" style="display:none">
+                        <div class="settings-section">
+                            <div class="settings-section-title">HEAD</div>
+                            <div class="settings-grid">
+                                <label>Type<select id="set_head_type"><option value="spindle">Router / Spindle</option><option value="plasma">Plasma</option><option value="laser">Laser</option></select></label>
+                            </div>
                         </div>
-                        <label class="settings-field">SHAPE
-                            <select id="set_stock_shape">
-                                <option value="boss">Boss — probe the outside</option>
-                                <option value="pocket">Pocket — probe the inside</option>
-                                <option value="cylinder">Cylinder — rotary stock</option>
-                            </select>
-                        </label>
-                        <label class="settings-check"><input type="checkbox" id="set_stock_show"> Show stock in 3D</label>
-                        <div class="settings-actions">
-                            <button class="toolbar-btn settings-io" id="set_stock_tpl_save">⭐ Save as template…</button>
-                            <button class="toolbar-btn settings-io" id="set_stock_tpl_del" style="display:none">🗑 Delete template</button>
+                        <div id="set_head_spindle">
+                            <div class="settings-section">
+                                <div class="settings-section-title">SPINDLE / VFD</div>
+                                <div class="settings-grid">
+                                    <label>Max RPM<input type="number" id="set_spin_maxrpm" min="0" step="100"></label>
+                                    <label>Default RPM<input type="number" id="set_spin_defrpm" min="0" step="100"></label>
+                                    <label>Direction<select id="set_spin_dir"><option value="cw">M3 — clockwise</option><option value="ccw">M4 — counter-clockwise</option></select></label>
+                                </div>
+                                <div class="settings-grid">
+                                    <label>Spin-up dwell (s)<input type="number" id="set_spin_up" min="0" step="0.1"></label>
+                                    <label>Spin-down dwell (s)<input type="number" id="set_spin_down" min="0" step="0.1"></label>
+                                </div>
+                                <div class="settings-row" style="margin-top:8px;">
+                                    <button class="toolbar-btn settings-io" id="set_spin_insert">⬇ Insert spindle start</button>
+                                </div>
+                                <div class="settings-hint">"Insert spindle start" drops M3/M4 + S + spin-up dwell into the editor. The controller still owns the live PWM/analog spindle parameters.</div>
+                            </div>
                         </div>
-                        <div class="settings-hint">WCS zero at the top, min XY corner: X[0..X] · Y[0..Y] · Z[-Z..0]. For a cylinder, Y is the diameter and X the length along the rotary axis.</div>
+                        <div id="set_head_plasma" style="display:none">
+                            <div class="settings-section">
+                                <div class="settings-section-title">PLASMA</div>
+                                <div class="settings-hint">Coming soon — pierce height/delay, THC (torch-height control), arc-OK input.</div>
+                            </div>
+                        </div>
+                        <div id="set_head_laser" style="display:none">
+                            <div class="settings-section">
+                                <div class="settings-section-title">LASER</div>
+                                <div class="settings-hint">Coming soon — power %, PWM / M-code mapping.</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -418,6 +518,19 @@ function buildSettingsOverlay() {
                         <div class="settings-hint">Add the inputs your machine has — probes, limit switches, sensors. Pins 1–24, one use each. Wizards read probe pins from here.</div>
                         <div id="io_input_table"></div>
                     </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">3D PROBE DEFAULTS</div>
+                        <div class="settings-hint">What the touch-probe wizards (corner, edge, middle, circular, alignment, rotary) start from each time. <b>Stylus radius</b> drives radius compensation; pin &amp; level come from the 3D-probe input row above.</div>
+                        <div class="settings-grid">
+                            <label>Stylus radius (mm)<input type="number" id="set_pd_radius" min="0" step="0.1"></label>
+                            <label>Fast feed<input type="number" id="set_pd_ffast" min="0" step="1"></label>
+                            <label>Slow feed<input type="number" id="set_pd_fslow" min="0" step="1"></label>
+                            <label>Retract (mm)<input type="number" id="set_pd_retract" min="0" step="0.1"></label>
+                            <label>Safe Z (mm)<input type="number" id="set_pd_safez" step="1"></label>
+                            <label>Max search (mm)<input type="number" id="set_pd_maxdist" min="0" step="1"></label>
+                            <label>Q-stop<input type="number" id="set_pd_qstop" min="0" max="2" step="1"></label>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- HARDWARE: OUTPUT -->
@@ -429,32 +542,8 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
-                <!-- ATC TAB -->
+                <!-- TOOL TABLE TAB (always present; "+ Add tool changer (ATC)" lives here) -->
                 <div id="set_tab_atc" style="display:none">
-                    <div class="settings-section">
-                        <div class="settings-section-title">TOOL MAGAZINE</div>
-                        <div class="settings-hint">Straight = each pocket has a park XYZ; disk = one pickup + rotate-to-pocket (auto-adds rotate / index I/O). The drawbar lives in Output.</div>
-                        <div id="atc_magazine"></div>
-                        <div class="settings-row" style="margin-top:12px;">
-                            <button class="toolbar-btn settings-io" id="atc_gen_tnc">⚙ Generate T.nc</button>
-                            <button class="toolbar-btn settings-io" id="atc_dl_tnc" style="display:none">⬇ Download T.nc</button>
-                        </div>
-                        <div class="settings-hint">Builds the tool-change macro from the table above. Save it as <b>T.nc</b> on the controller — review &amp; dry-run first (generated template).</div>
-                        <textarea id="atc_tnc_out" readonly spellcheck="false" style="display:none; width:100%; height:240px; margin-top:8px; font:12px/1.45 monospace; background:#1a1a1a; color:#d8d8d8; border:1px solid #888; border-radius:4px; padding:8px; box-sizing:border-box;"></textarea>
-                    </div>
-                    <div class="settings-section">
-                        <div class="settings-section-title">TOOL LENGTH PROBE (defaults for the Tool Length wizard)</div>
-                        <div class="settings-grid">
-                            <label>Block height (mm)<input type="number" id="set_atc_blockheight" step="0.1"></label>
-                            <label>Safe Z (mm)<input type="number" id="set_atc_safez" step="0.1"></label>
-                            <label>Max search (mm)<input type="number" id="set_atc_maxdist" step="1"></label>
-                            <label>Retract (mm)<input type="number" id="set_atc_retract" step="0.1"></label>
-                            <label>Fast feed<input type="number" id="set_atc_ffast" step="1"></label>
-                            <label>Slow feed<input type="number" id="set_atc_fslow" step="1"></label>
-                            <label>Q-stop<input type="number" id="set_atc_qstop" step="1"></label>
-                        </div>
-                        <div class="settings-hint">Tool-setter pin &amp; location live in the Probes tab. The Tool Length wizard probes against the setter and writes the result to the tool table below.</div>
-                    </div>
                     <div class="settings-section">
                         <div class="settings-section-title">TOOL TABLE&nbsp;&nbsp;(#var = base + tool − 1)</div>
                         <div class="settings-grid">
@@ -467,16 +556,42 @@ function buildSettingsOverlay() {
                         </div>
                         <div class="settings-hint">"Insert tool table" drops the #var = length assignments (non-blank rows) into the editor to push the table to the controller. Probing a tool updates one row live.</div>
                     </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">TOOL LENGTH PROBE (defaults for the Tool Length wizard)</div>
+                        <div class="settings-grid">
+                            <label>Block height (mm)<input type="number" id="set_atc_blockheight" step="0.1"></label>
+                            <label>Safe Z (mm)<input type="number" id="set_atc_safez" step="0.1"></label>
+                            <label>Max search (mm)<input type="number" id="set_atc_maxdist" step="1"></label>
+                            <label>Retract (mm)<input type="number" id="set_atc_retract" step="0.1"></label>
+                            <label>Fast feed<input type="number" id="set_atc_ffast" step="1"></label>
+                            <label>Slow feed<input type="number" id="set_atc_fslow" step="1"></label>
+                            <label>Q-stop<input type="number" id="set_atc_qstop" step="1"></label>
+                        </div>
+                        <div class="settings-hint">Tool-setter pin &amp; location live in the Input tab. The Tool Length wizard probes against the setter and writes the result to the tool table above.</div>
+                    </div>
+                    <div class="settings-section" id="set_atc_add" style="display:none">
+                        <div class="settings-section-title">TOOL CHANGER (ATC)</div>
+                        <div class="settings-hint">Add an automatic tool changer to set up the magazine and generate the T.nc tool-change macro. This adds the drawbar (and, for a disk magazine, carousel-rotate / index) I/O to Output/Input.</div>
+                        <button class="toolbar-btn settings-io" id="set_atc_add_btn">➕ Add tool changer (ATC)</button>
+                    </div>
+                    <div id="set_atc_magazine_wrap" style="display:none">
+                        <div class="settings-section">
+                            <div class="settings-section-title">TOOL MAGAZINE</div>
+                            <div class="settings-hint">Straight = each pocket has a park XYZ; disk = one pickup + rotate-to-pocket (auto-adds rotate / index I/O). The drawbar lives in Output.</div>
+                            <div id="atc_magazine"></div>
+                            <div class="settings-row" style="margin-top:12px;">
+                                <button class="toolbar-btn settings-io" id="atc_gen_tnc">⚙ Generate T.nc</button>
+                                <button class="toolbar-btn settings-io" id="atc_dl_tnc" style="display:none">⬇ Download T.nc</button>
+                            </div>
+                            <div class="settings-hint">Builds the tool-change macro from the table above. Save it as <b>T.nc</b> on the controller — review &amp; dry-run first (generated template).</div>
+                            <textarea id="atc_tnc_out" readonly spellcheck="false" style="display:none; width:100%; height:240px; margin-top:8px; font:12px/1.45 monospace; background:#1a1a1a; color:#d8d8d8; border:1px solid #888; border-radius:4px; padding:8px; box-sizing:border-box;"></textarea>
+                        </div>
+                    </div>
                 </div>
 
-            </div>
-            <div class="settings-foot">
-                <button class="toolbar-btn" id="set_reset">Reset defaults</button>
-                <button class="toolbar-btn primary" id="set_done">Done</button>
-            </div>
-        </div>`;
-    document.body.appendChild(ov);
-    wireSettingsOverlay(ov);
+                        </div><!-- end settings-content -->
+            `;
+    wireSettingsOverlay(parent);
 }
 
 function wireSettingsOverlay(ov) {
@@ -505,13 +620,7 @@ function wireSettingsOverlay(ov) {
         q('set_atc_qstop').value = a.qStop ?? ad.qStop;
         q('set_atc_basevar').value = a.baseVar ?? ad.baseVar;
         q('set_atc_toolcount').value = a.toolCount ?? ad.toolCount;
-        renderToolTable();
-        q('set_stock_x').value = s.stock.x;
-        q('set_stock_y').value = s.stock.y;
-        q('set_stock_z').value = s.stock.z;
-        q('set_stock_shape').value = s.stock.shape || 'boss';
-        q('set_stock_show').checked = !!s.stock.show;
-        rebuildStockTplDropdown();
+                renderToolTable();
         q('set_mach_x').value = s.machine.x;
         q('set_mach_y').value = s.machine.y;
         q('set_mach_z').value = s.machine.z;
@@ -537,6 +646,17 @@ function wireSettingsOverlay(ov) {
         q('set_setter_w').value = s.probes.setterW;
         q('set_setter_h').value = s.probes.setterH;
 
+        const prd = SETTINGS_DEFAULTS.probes;
+        if (q('set_pd_radius')) {
+            q('set_pd_radius').value = s.probes.radius ?? prd.radius;
+            q('set_pd_ffast').value = s.probes.fastFeed ?? prd.fastFeed;
+            q('set_pd_fslow').value = s.probes.slowFeed ?? prd.slowFeed;
+            q('set_pd_retract').value = s.probes.retract ?? prd.retract;
+            q('set_pd_safez').value = s.probes.safeZ ?? prd.safeZ;
+            q('set_pd_maxdist').value = s.probes.maxDist ?? prd.maxDist;
+            q('set_pd_qstop').value = s.probes.qStop ?? prd.qStop;
+        }
+
         q('set_x_min_pin').value = s.limits.xMinPin;
         q('set_x_min_level').value = s.limits.xMinLevel;
         q('set_x_max_pin').value = s.limits.xMaxPin;
@@ -550,21 +670,49 @@ function wireSettingsOverlay(ov) {
         q('set_z_max_pin').value = s.limits.zMaxPin;
         q('set_z_max_level').value = s.limits.zMaxLevel;
 
+        const sp = s.spindle || (s.spindle = {}), spd = SETTINGS_DEFAULTS.spindle;
+        if (q('set_spin_maxrpm')) {
+            q('set_spin_maxrpm').value = sp.maxRpm ?? spd.maxRpm;
+            q('set_spin_defrpm').value = sp.defaultRpm ?? spd.defaultRpm;
+            q('set_spin_dir').value = sp.dir || spd.dir;
+            q('set_spin_up').value = sp.spinUp ?? spd.spinUp;
+            q('set_spin_down').value = sp.spinDown ?? spd.spinDown;
+        }
+        if (q('set_head_type')) { q('set_head_type').value = (s.head && s.head.type) || 'spindle'; applyHeadType(); }
+        const ep = s.endProgram || (s.endProgram = {}), epd = SETTINGS_DEFAULTS.endProgram;
+        if (q('set_end_end')) {
+            q('set_end_spindleoff').checked = ep.spindleOff !== false;
+            q('set_end_coolantoff').checked = ep.coolantOff !== false;
+            q('set_end_retract').checked = ep.retract !== false;
+            q('set_end_retractz').value = ep.retractZ ?? epd.retractZ;
+            q('set_end_park').checked = ep.park === true;
+            q('set_end_parkx').value = ep.parkX ?? epd.parkX;
+            q('set_end_parky').value = ep.parkY ?? epd.parkY;
+            q('set_end_end').value = ep.end || epd.end;
+        }
+
         updateVarCount();
     }
     fill();
     _fillSettingsInputs = fill;
 
-    // --- Controller profile + manual hardware-tab gating (decides which hardware tabs are shown) ---
+    // --- Subsystem gating: the Spindle + Tool-table tabs are always present; this toggles each tab's
+    //     in-tab "Add" button vs its config section based on whether the subsystem has been added. ---
     function applyHardwareTabs() {
         const ht = _ddcsSettings.hardwareTabs || {};
-        const want = { probes: ht.probes !== false, atc: ht.atc === true, limits: ht.limits !== false };
-        ['probes', 'atc', 'limits'].forEach((tab) => {
-            const btn = ov.querySelector('.settings-tab[data-target="set_tab_' + tab + '"]');
-            const panel = ov.querySelector('#set_tab_' + tab);
-            if (btn) btn.style.display = want[tab] ? '' : 'none';
-            if (panel && !want[tab]) panel.style.display = 'none';   // never leave a hidden tab's panel visible
-        });
+        const show = (id, on) => { const e = ov.querySelector('#' + id); if (e) e.style.display = on ? '' : 'none'; };
+        show('set_spin_config', ht.spindle === true);
+        show('set_spin_add', ht.spindle !== true);
+        show('set_atc_magazine_wrap', ht.atc === true);
+        show('set_atc_add', ht.atc !== true);
+    }
+    // Head type (spindle/plasma/laser) → show the matching config; plasma/laser are stubs for now.
+    function applyHeadType() {
+        const t = (_ddcsSettings.head && _ddcsSettings.head.type) || 'spindle';
+        const show = (id, on) => { const e = ov.querySelector('#' + id); if (e) e.style.display = on ? '' : 'none'; };
+        show('set_head_spindle', t === 'spindle');
+        show('set_head_plasma', t === 'plasma');
+        show('set_head_laser', t === 'laser');
     }
     const profileSel = q('set_profile');
     function fillProfileOptions() {
@@ -578,6 +726,9 @@ function wireSettingsOverlay(ov) {
         fillProfileOptions();
         profileSel.addEventListener('change', () => {
             const p = setActiveProfile(profileSel.value);   // a profile just PRESETS the toggles
+            // Switch the variable list to match the controller (Expert / V4.1 / V3-DM500).
+            const vdb = window.ddcsStudio && window.ddcsStudio.variableDB;
+            if (p && p.varFamily && vdb) vdb.setControllerVars(p.varFamily);
             _ddcsSettings.hardwareTabs = {
                 probes: p.hardwareTabs.includes('probes'),
                 atc: p.hardwareTabs.includes('atc'),
@@ -715,12 +866,7 @@ function wireSettingsOverlay(ov) {
         const _nc = Math.max(1, Math.min(99, num(q('set_atc_toolcount').value, a.toolCount)));
         const _rerender = (_nb !== a.baseVar || _nc !== a.toolCount);
         a.baseVar = _nb; a.toolCount = _nc;
-        if (_rerender) renderToolTable();
-        s.stock.x = num(q('set_stock_x').value, s.stock.x);
-        s.stock.y = num(q('set_stock_y').value, s.stock.y);
-        s.stock.z = num(q('set_stock_z').value, s.stock.z);
-        s.stock.shape = q('set_stock_shape').value;
-        s.stock.show = q('set_stock_show').checked;
+                if (_rerender) renderToolTable();
         s.machine.x = num(q('set_mach_x').value, s.machine.x);
         s.machine.y = num(q('set_mach_y').value, s.machine.y);
         s.machine.z = num(q('set_mach_z').value, s.machine.z);
@@ -739,6 +885,16 @@ function wireSettingsOverlay(ov) {
         s.probes.setterW = num(q('set_setter_w').value, s.probes.setterW);
         s.probes.setterH = num(q('set_setter_h').value, s.probes.setterH);
 
+        if (q('set_pd_radius')) {
+            s.probes.radius = num(q('set_pd_radius').value, s.probes.radius);
+            s.probes.fastFeed = num(q('set_pd_ffast').value, s.probes.fastFeed);
+            s.probes.slowFeed = num(q('set_pd_fslow').value, s.probes.slowFeed);
+            s.probes.retract = num(q('set_pd_retract').value, s.probes.retract);
+            s.probes.safeZ = num(q('set_pd_safez').value, s.probes.safeZ);
+            s.probes.maxDist = num(q('set_pd_maxdist').value, s.probes.maxDist);
+            s.probes.qStop = num(q('set_pd_qstop').value, s.probes.qStop);
+        }
+
         s.limits.xMinPin = q('set_x_min_pin').value ? num(q('set_x_min_pin').value, null) : null;
         s.limits.xMinLevel = num(q('set_x_min_level').value, s.limits.xMinLevel);
         s.limits.xMaxPin = q('set_x_max_pin').value ? num(q('set_x_max_pin').value, null) : null;
@@ -751,6 +907,27 @@ function wireSettingsOverlay(ov) {
         s.limits.zMinLevel = num(q('set_z_min_level').value, s.limits.zMinLevel);
         s.limits.zMaxPin = q('set_z_max_pin').value ? num(q('set_z_max_pin').value, null) : null;
         s.limits.zMaxLevel = num(q('set_z_max_level').value, s.limits.zMaxLevel);
+
+        const sp = s.spindle || (s.spindle = {});
+        if (q('set_spin_maxrpm')) {
+            sp.maxRpm = num(q('set_spin_maxrpm').value, sp.maxRpm);
+            sp.defaultRpm = num(q('set_spin_defrpm').value, sp.defaultRpm);
+            sp.dir = q('set_spin_dir').value || sp.dir;
+            sp.spinUp = num(q('set_spin_up').value, sp.spinUp);
+            sp.spinDown = num(q('set_spin_down').value, sp.spinDown);
+        }
+        if (q('set_head_type')) { s.head = s.head || {}; s.head.type = q('set_head_type').value || 'spindle'; applyHeadType(); }
+        const ep = s.endProgram || (s.endProgram = {});
+        if (q('set_end_end')) {
+            ep.spindleOff = q('set_end_spindleoff').checked;
+            ep.coolantOff = q('set_end_coolantoff').checked;
+            ep.retract = q('set_end_retract').checked;
+            ep.retractZ = num(q('set_end_retractz').value, ep.retractZ);
+            ep.park = q('set_end_park').checked;
+            ep.parkX = num(q('set_end_parkx').value, ep.parkX);
+            ep.parkY = num(q('set_end_parky').value, ep.parkY);
+            ep.end = q('set_end_end').value || ep.end;
+        }
 
         saveSettings();
     };
@@ -769,69 +946,60 @@ function wireSettingsOverlay(ov) {
         });
     }
 
-    // ── Stock templates: built-in presets + user-saved (any shape) ───────────────
-    function allStockTpls() {
-        const user = Array.isArray(_ddcsSettings.stockTemplates) ? _ddcsSettings.stockTemplates : [];
-        return STOCK_TEMPLATES.map(t => ({ t, builtin: true })).concat(user.map(t => ({ t, builtin: false })));
-    }
-    function stockTplLabel(t) {
-        const esc = (v) => String(v).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
-        const dims = t.shape === 'cylinder' ? `Ø${t.y}×${t.x}` : `${t.x}×${t.y}×${t.z}`;
-        return `${esc(t.name)} — ${dims}`;
-    }
-    function rebuildStockTplDropdown(selIdx) {
-        const sel = q('set_stock_tpl');
-        if (!sel) return;
-        const list = allStockTpls();
-        sel.innerHTML = '<option value="">— template —</option>' +
-            list.map((e, i) => `<option value="${i}">${e.builtin ? '' : '⭐ '}${stockTplLabel(e.t)}</option>`).join('');
-        sel.value = selIdx != null ? String(selIdx) : '';
-        updateStockTplDel();
-    }
-    function updateStockTplDel() {
-        const sel = q('set_stock_tpl'), del = q('set_stock_tpl_del');
-        if (!sel || !del) return;
-        const i = sel.value === '' ? -1 : parseInt(sel.value, 10);
-        const list = allStockTpls();
-        del.style.display = (i >= 0 && list[i] && !list[i].builtin) ? '' : 'none';
-    }
-    const _stockTplSel = q('set_stock_tpl');
-    if (_stockTplSel) _stockTplSel.addEventListener('change', () => {
-        const i = _stockTplSel.value === '' ? -1 : parseInt(_stockTplSel.value, 10);
-        const list = allStockTpls();
-        updateStockTplDel();
-        if (i < 0 || !list[i]) return;
-        const t = list[i].t;
-        q('set_stock_x').value = t.x;
-        q('set_stock_y').value = t.y;
-        q('set_stock_z').value = t.z;
-        q('set_stock_shape').value = t.shape || 'boss';
-        onInput(); // commit to the model + persist + re-render the 3D view
-    });
-    const _stockTplSave = q('set_stock_tpl_save');
-    if (_stockTplSave) _stockTplSave.addEventListener('click', () => {
-        const name = (prompt('Save current stock as a template — name?') || '').trim();
-        if (!name) return;
-        if (!Array.isArray(_ddcsSettings.stockTemplates)) _ddcsSettings.stockTemplates = [];
-        _ddcsSettings.stockTemplates.push({
-            name,
-            x: num(q('set_stock_x').value, 0),
-            y: num(q('set_stock_y').value, 0),
-            z: num(q('set_stock_z').value, 0),
-            shape: q('set_stock_shape').value || 'boss',
+    // Appearance: theme picker + keyboard-drawer height (own localStorage, not the settings model).
+    const _theme = q('set_theme');
+    if (_theme) {
+        const tm = window.ddcsStudio && window.ddcsStudio.themeManager;
+        const cur = (tm && tm.getCurrent && tm.getCurrent()) || localStorage.getItem('ddcs_theme') || THEMES[0];
+        _theme.innerHTML = THEMES.map(t => `<option value="${t}">${t.charAt(0).toUpperCase() + t.slice(1)}</option>`).join('');
+        _theme.value = cur;
+        _theme.addEventListener('change', () => {
+            const tm2 = window.ddcsStudio && window.ddcsStudio.themeManager;
+            if (tm2 && tm2.setCurrent) tm2.setCurrent(_theme.value);
+            else { document.body.setAttribute('data-theme', _theme.value); try { localStorage.setItem('ddcs_theme', _theme.value); } catch (e) { /* ignore */ } }
         });
-        saveSettings();
-        rebuildStockTplDropdown(STOCK_TEMPLATES.length + _ddcsSettings.stockTemplates.length - 1);
+    }
+    const _kbd = q('set_kbd_height');
+    if (_kbd) {
+        const dock = document.getElementById('controller-dock');
+        const saved = parseInt(localStorage.getItem('ddcs_dock_h') || '', 10);
+        const curH = saved || (dock ? Math.round(dock.getBoundingClientRect().height) : 300) || 300;
+        const showVal = (v) => { const el = q('set_kbd_height_val'); if (el) el.textContent = v + ' px'; };
+        _kbd.value = Math.max(200, Math.min(700, curH));
+        showVal(_kbd.value);
+        _kbd.addEventListener('input', () => {
+            const v = _kbd.value;
+            showVal(v);
+            if (dock) dock.style.setProperty('--dock-h', v + 'px');
+            try { localStorage.setItem('ddcs_dock_h', v); } catch (e) { /* ignore */ }
+        });
+    }
+    const _aboutVer = q('set_about_ver');
+    if (_aboutVer) { const v = document.querySelector('.ver'); _aboutVer.textContent = v ? v.textContent.trim() : 'V10.20'; }
+
+    // Spindle / Program → insert generated G-code into the editor (mirrors the ATC "Insert tool table").
+    const _emInsert = (code) => {
+        const em = (window.ddcsStudio && window.ddcsStudio.editorManager) || window.editorManager;
+        if (em && typeof em.insert === 'function') em.insert(code);
+    };
+    const _spinInsert = q('set_spin_insert');
+    if (_spinInsert) _spinInsert.addEventListener('click', () => {
+        const sp = _ddcsSettings.spindle || {};
+        const on = sp.dir === 'ccw' ? 'M4' : 'M3';
+        const lines = ['( Spindle start - DDCS Studio )', on + ' S' + num(sp.defaultRpm, 18000)];
+        if (num(sp.spinUp, 0) > 0) lines.push('G04 P' + Math.round(num(sp.spinUp, 0) * 1000) + '   ( spin-up dwell, ms )');
+        _emInsert(lines.join('\n') + '\n');
     });
-    const _stockTplDel = q('set_stock_tpl_del');
-    if (_stockTplDel) _stockTplDel.addEventListener('click', () => {
-        const sel = q('set_stock_tpl');
-        const i = sel.value === '' ? -1 : parseInt(sel.value, 10);
-        const list = allStockTpls();
-        if (i < 0 || !list[i] || list[i].builtin) return;
-        _ddcsSettings.stockTemplates.splice(i - STOCK_TEMPLATES.length, 1);
-        saveSettings();
-        rebuildStockTplDropdown();
+    const _endInsert = q('set_end_insert');
+    if (_endInsert) _endInsert.addEventListener('click', () => {
+        const ep = _ddcsSettings.endProgram || {};
+        const lines = ['( End of program - DDCS Studio )'];
+        if (ep.spindleOff !== false) lines.push('M5   ( spindle off )');
+        if (ep.coolantOff !== false) lines.push('M9   ( coolant off )');
+        if (ep.retract !== false) { lines.push('#101 = ' + num(ep.retractZ, 0) + '   ( safe Z - G53 needs a variable )'); lines.push('G53 G0 Z#101   ( retract )'); }
+        if (ep.park === true) { lines.push('#102 = ' + num(ep.parkX, 0) + '  #103 = ' + num(ep.parkY, 0)); lines.push('G53 G0 X#102 Y#103   ( park for unload )'); }
+        if (ep.end && ep.end !== 'none') lines.push(ep.end);
+        _emInsert(lines.join('\n') + '\n');
     });
 
     // CSV import
@@ -884,39 +1052,29 @@ function wireSettingsOverlay(ov) {
         if (around) around.addEventListener('change', apply);
     });
 
-    q('set_reset').addEventListener('click', () => {
-        if (confirm('Reset machine and stock dimensions to defaults?')) {
-            _ddcsSettings = JSON.parse(JSON.stringify(SETTINGS_DEFAULTS));
-            fill();
-            saveSettings();
-        }
-    });
-
-    // Two-level tab logic: main (General | Hardware) → Hardware reveals a sub-tab row.
+        // Two-level tab logic: main L1 (General | Hardware) → filters sidebar items.
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
-    const subTabs = [...ov.querySelectorAll('.settings-subtabs .settings-tab')];
-    const subRow = ov.querySelector('.settings-subtabs');
-    const addHwSel = q('set_add_hw');
-    const ALL_IDS = ['set_tab_profile', 'set_tab_variables', 'set_tab_feedback', 'set_tab_network',
-                     'set_tab_machine', 'set_tab_stock', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
+    const sideTabs = [...ov.querySelectorAll('.settings-sidebar .settings-tab')];
+    const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
+        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_variables', 'set_tab_program', 'set_tab_feedback', 'set_tab_network', 'set_tab_about',
+                     'set_tab_machine', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
-        subTabs.forEach(b => b.classList.toggle('active', b.dataset.target === id));
+        sideTabs.forEach(b => b.classList.toggle('active', b.dataset.target === id));
         if (id === 'set_tab_input') renderIoTable(ov.querySelector('#io_input_table'), 'input', getInputs(), syncIO);
         if (id === 'set_tab_output') renderIoTable(ov.querySelector('#io_output_table'), 'output', getOutputs(), syncIO);
         if (id === 'set_tab_atc') renderMagazineTable(ov.querySelector('#atc_magazine'), _ddcsSettings.atc, atcOnChange);
     }
     function showGroup(g) {
         mainTabs.forEach(b => b.classList.toggle('active', b.dataset.group === g));
-        subRow.style.display = 'flex';
-        subTabs.forEach(b => { b.style.display = (b.dataset.group === g) ? '' : 'none'; });
-        if (addHwSel) addHwSel.style.display = (g === 'hardware') ? '' : 'none';
-        if (g === 'hardware') applyHardwareTabs();   // re-hide hardware sub-tabs the profile turned off
-        const firstVisible = subTabs.find(b => b.dataset.group === g && b.style.display !== 'none');
+        sideTabs.forEach(b => { b.style.display = (b.dataset.group === g) ? '' : 'none'; });
+        sideGroupLabels.forEach(l => { l.style.display = (l.dataset.groupLabel === g) ? '' : 'none'; });
+        if (g === 'hardware') applyHardwareTabs();   // toggle each subsystem tab's Add button vs config
+        const firstVisible = sideTabs.find(b => b.dataset.group === g && b.style.display !== 'none');
         if (firstVisible) showPanel(firstVisible.dataset.target);
     }
     mainTabs.forEach(t => t.addEventListener('click', () => showGroup(t.dataset.group)));
-    subTabs.forEach(t => t.addEventListener('click', () => showPanel(t.dataset.target)));
+    sideTabs.forEach(t => t.addEventListener('click', () => showPanel(t.dataset.target)));
     showGroup('general');
 
     // "+ Add hardware" tool: adds a subsystem category tab + its standard I/O (mirrored + badged).
@@ -930,8 +1088,19 @@ function wireSettingsOverlay(ov) {
             applyHardwareTabs();
             showPanel('set_tab_atc');
         }
+        if (kind === 'spindle') {
+            _ddcsSettings.hardwareTabs = _ddcsSettings.hardwareTabs || {};
+            _ddcsSettings.hardwareTabs.spindle = true;
+            saveSettings();
+            applyHardwareTabs();
+            showPanel('set_tab_spindle');
+        }
     }
-    if (addHwSel) addHwSel.addEventListener('change', () => { if (addHwSel.value) addSubsystem(addHwSel.value); addHwSel.value = ''; });
+    // "+ Add" lives inside each subsystem's own (always-present) tab now.
+    const _spinAddBtn = q('set_spin_add_btn');
+    if (_spinAddBtn) _spinAddBtn.addEventListener('click', () => addSubsystem('spindle'));
+    const _atcAddBtn = q('set_atc_add_btn');
+    if (_atcAddBtn) _atcAddBtn.addEventListener('click', () => addSubsystem('atc'));
 
     // Persist ATC magazine edits; disk auto-adds (and straight removes) the carousel-rotate / index I/O.
     function atcOnChange() {
@@ -947,20 +1116,16 @@ function wireSettingsOverlay(ov) {
         saveSettings();
     }
 
-    setTimeout(() => ov.classList.add('active'), 10);
-    q('set_done').addEventListener('click', closeOv);
-    ov.querySelector('.settings-close').addEventListener('click', closeOv);
-    ov.addEventListener('click', (e) => { if (e.target === ov) closeOv(); });
 }
 
 export function openSettings() {
     buildSettingsOverlay();
-    const o = document.getElementById('settings-overlay');
-    if (o) o.classList.add('active');
+    const app = document.getElementById('settings-app');
+    if (app) app.classList.remove('hidden');
 }
 export function closeSettings() {
-    const o = document.getElementById('settings-overlay');
-    if (o) o.classList.remove('active');
+    const app = document.getElementById('settings-app');
+    if (app) app.classList.add('hidden');
 }
 
 window.openSettings = openSettings;

@@ -9,6 +9,7 @@ export const middleView = {
     panelId: 'wiz_middle',
     codeElId: 'wiz_middle_code',
     large: true,
+    twoPane: true,
     inputIds: [
         'm_type', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_sync_a', 'm_wcs', 'm_slave',
         'm_dist', 'm_retract', 'm_safe_z',

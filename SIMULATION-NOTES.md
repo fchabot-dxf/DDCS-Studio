@@ -117,8 +117,8 @@ on top.
     (rapids at 6000 mm/min) — slow probes crawl, rapids zip. **Speed** selector in
     the drawer (1× / 2× / 5× / 10× / MAX), changeable mid-move.
   - Status shows the move: `G31 probe 10.0 mm at F50 — 12.0 s`.
-  - The looping ▶ Play preview animation is also feedrate-proportional now
-    (segment time ∝ length/feed within the ~5 s loop).
+  - The looping ▶ Play preview animation is **feed-true (real time)** as of 2026-06-13
+    (was normalised to a ~5 s loop) — see the session entry at the bottom.
 - ☑ **⟳ Loop** toggle — restart the program automatically on completion (Run only).
 - ☑ **ATC generators rebuilt on the real DDCS dialect** (decoded from the variable DB):
   drawbar = `M154/M155`, sensor waits = `M300/M302/M303/M304`, dust cover `M305/M306`,
@@ -134,3 +134,37 @@ on top.
 - ☑ Beep fix: the preview loop no longer beeps every cycle; one beep when an
   engine run completes.
 - ☑ Viewer: middle-drag pans, Shift+middle orbits (CAD-style).
+
+---
+
+## Session 2026-06-13 — wizard UI, viz colours, animation, DDCS V3
+
+- ☑ **Wizard two-pane layout** — the 8 wizards with a 3D preview (corner, middle, circular,
+  rotary×2, edge, drill, alignment) now show **controls left (scrollable) / visuals right**, the
+  3D spanning the pane height; single column on mobile. Responsive modal (`min(96vw, 560px)`,
+  two-pane `≤1180px`) replaced the fixed 520px box (which overflowed phones). Opt-in via
+  `twoPane:true` on the view → `.two-pane` box class.
+- ☑ **Shared 3D, centralised legend** — the preview is one `GcodeViz3D` instance moved between
+  wizards; the path legend is injected once in `preview3D` (Cut · Rapid · Retract · Probe · Jog),
+  **Fusion-aligned**: cut = blue→cyan (depth), rapid = yellow, retract/lead = green,
+  probe = dotted blue, jog = dashed orange.
+- ☑ **Jog pendant** is now a bottom-left **drawer chip** on the 3D box (main viewer + wizards),
+  jog grid collapsed by default. Redundant bottom-right Stock dropdown removed.
+- ☑ **Two animation systems** clarified + fixed — the geometric **play** (cheap, for the looping
+  preview) is now **feed-true real time** (was a ~5 s normalised loop); the **engine** (real macro
+  sim, for the editor) now applies the spindle-start offset in `setToolPosition`, so its tool
+  **no longer floats off the path**. SVG wizard animators confirmed dead (kept, unused).
+- ☑ **Probe collision** — every stock shape collides on all outer faces; a pocket also collides on
+  its cavity walls (stop at the first material surface hit), in `gcodeViz3d._rebuild`.
+- ☑ **Multi-start jog** — multi-pass programs get one draggable ruby per pass; choose which the jog
+  buttons drive via the pendant **Start [1][2]**, by **clicking the numbered badge** (ray-pick), or
+  by dragging a marker. Selected ruby brightens.
+- ☑ **Draggable modals** — generator + stock editor drag by their headers (shared `makeDraggable`
+  in `uiUtils`); the I/O panel already did. Stock + I/O z-index raised above the wizard overlay.
+- ☑ **DDCS V3 / DM500 profile** added (+ V4.1, which had a vars list but no profile entry). Dump in
+  `bridge/controllers/dm500/`; `default_vars_v3.js` generated from the controller's own `eng`
+  parameter table (279 params). Selecting a profile now switches the variable family
+  (Expert / V4.1 / V3). DM500 has a single probe input — no configurable port (unlike Expert).
+- ☑ **2D parametric layout canvas** (`viz/featureCanvas.js`) — drag handles drive op parameters,
+  two-way bound to wizard fields (drill prototype, side-by-side with the 3D); pan/zoom/fit. Built
+  fresh after evaluating + rejecting the b-spline-gen and SketchStudio editors.

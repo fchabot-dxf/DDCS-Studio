@@ -5,7 +5,7 @@
  * BEFORE trusting an automatic change with a real tool:
  *
  *   DRAWBAR mode — cycle the drawbar N times (M154 release / M155 lock) and
- *   verify both sensors answer every cycle (M303 tool-open, M302 tool-locked).
+ *   verify both sensors answer every cycle (M301 drawbar-released, M302 drawbar-clamped).
  *   A sticky pneumatic or misadjusted sensor shows up as a hang on the exact
  *   wait — visible live on the Studio I/O panel, and on the machine.
  *
@@ -41,7 +41,7 @@ export class AtcTestWizard {
 
         let gcode = '';
         gcode += `( ATC | Drawbar Cycle Test - commissioning )\n`;
-        gcode += `( ${_cycles} release/lock cycles - sensors M303/M302 verified each cycle )\n`;
+        gcode += `( ${_cycles} release/lock cycles - sensors M301/M302 verified each cycle )\n`;
         gcode += `( NO tool in the spindle. A hang on a wait = that sensor/valve needs adjusting )\n\n`;
 
         gcode += `( === CONFIGURATION === )\n`;
@@ -56,7 +56,7 @@ export class AtcTestWizard {
         gcode += line([set('#1510', '#100')], 'Message arg') + '\n';
         gcode += line([set('#1505', '-5000')], 'Cycle %.0f: RELEASE') + '\n';
         gcode += line([M(154)], 'Drawbar RELEASE') + '\n';
-        gcode += line([M(303)], 'Wait: tool-open sensor') + '\n';
+        gcode += line([M(301)], 'Wait: drawbar-released sensor') + '\n';
         gcode += line([G(4), P('#102')], 'Dwell') + '\n';
         gcode += line([set('#1505', '-5000')], 'Cycle %.0f: LOCK') + '\n';
         gcode += line([M(155)], 'Drawbar LOCK') + '\n';

@@ -9,6 +9,7 @@ export const rotaryCenterView = {
     panelId: 'wiz_rotary_center',
     codeElId: 'wiz_rotary_center_code',
     large: true,
+    twoPane: true,
     inputIds: [
         'rc_method', 'rc_datum', 'rc_diameter', 'rc_wcs',
         'rc_dist', 'rc_retract', 'rc_safe_z', 'rc_feed_fast', 'rc_feed_slow', 'rc_q',

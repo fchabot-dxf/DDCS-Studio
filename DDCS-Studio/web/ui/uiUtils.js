@@ -5,6 +5,45 @@
 
 export const el = (id) => document.getElementById(id);
 
+/**
+ * Make `element` draggable by `handle` (e.g. a modal by its title bar). On first drag it switches
+ * to fixed left/top positioning and clamps the handle so it can't be dragged fully off-screen.
+ * `opts.ignore` = selector for descendants that must NOT start a drag (buttons, inputs, close/gear
+ * icons); `opts.onEnd` runs after each drag (e.g. to persist the position).
+ */
+export function makeDraggable(element, handle, opts = {}) {
+    if (!element || !handle || handle.dataset.dragBound) return;
+    handle.dataset.dragBound = '1';
+    handle.style.cursor = 'move';
+    handle.style.touchAction = 'none';
+    const ignore = opts.ignore || 'button, input, select, textarea, a';
+    let sx = 0, sy = 0, ox = 0, oy = 0, pid = null;
+    handle.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || (e.target.closest && e.target.closest(ignore))) return;
+        const r = element.getBoundingClientRect();
+        Object.assign(element.style, {
+            position: 'fixed', margin: '0', transform: 'none',
+            left: r.left + 'px', top: r.top + 'px', right: 'auto', bottom: 'auto',
+        });
+        sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top; pid = e.pointerId;
+        try { handle.setPointerCapture(pid); } catch (_) { /* older browsers */ }
+        e.preventDefault();
+    });
+    handle.addEventListener('pointermove', (e) => {
+        if (pid === null || e.pointerId !== pid) return;
+        element.style.left = Math.max(0, Math.min(window.innerWidth - 60, ox + e.clientX - sx)) + 'px';
+        element.style.top = Math.max(0, Math.min(window.innerHeight - 30, oy + e.clientY - sy)) + 'px';
+    });
+    const end = () => {
+        if (pid === null) return;
+        try { handle.releasePointerCapture(pid); } catch (_) { /* ignore */ }
+        pid = null;
+        if (opts.onEnd) opts.onEnd();
+    };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+}
+
 export class UIUtils {
     static showTooltip(element, content, xOffset = 10) {
         const tooltip = el('global-tooltip');

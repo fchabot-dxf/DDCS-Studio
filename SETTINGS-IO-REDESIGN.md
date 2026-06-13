@@ -97,6 +97,22 @@ outputs: [ { id, type:'coolant'|'drawbar'|'dustcover'|'mist'|'custom', label, pi
 ---
 
 ## Status
-- ☐ Stage 1 — data model + migration
-- ☐ Stage 2 — UI (2-level nav + Input/Output row lists)
-- ☐ Stage 3 — rewire sim + wizards, drop wizard P/L, remove animate-paths
+- ☑ Stage 1 — data model + migration (`inputs[]`/`outputs[]` + `migrateIO`/`syncFlatFromIO`)
+- ☑ Stage 2 — UI (2-level General/Hardware nav, Input/Output row tables, Profile dropdown, L2 `+Add`)
+- ◐ Stage 3 — rewire sim + wizards (interim: flat `probes`/`limits` still mirrored via `syncFlatFromIO`; wizards not yet reading arrays directly)
+
+## Added tabs (2026-06) — beyond the original spec
+
+The 2-level shell now carries more than Machine/IO. Current sidebar:
+
+```
+General   Profile · Appearance · Variables · Program · Feedback · Network (stub) · About
+Hardware  Machine · Spindle · Input · Output · ATC      (Spindle/ATC added via "+ Add")
+```
+
+- **Appearance** — theme picker (wired to `ThemeManager`, persisted to `ddcs_theme`) + keyboard-drawer height slider (writes `--dock-h` on `#controller-dock`, persisted to `ddcs_dock_h`, same key the drag-handle uses). Not part of `_ddcsSettings`.
+- **Program → END OF PROGRAM** — global default footer for generated programs: `spindleOff` (M5) · `coolantOff` (M9) · `retract` to safe Z (**G53**, since G28 isn't configured on the DDCS) · `park` XY (G53) · `end` (M30/M2/none). Stored as `settings.endProgram`. **Per-wizard overrides are planned, not built. Generators do not yet emit this footer — wiring is the follow-up.**
+- **About** — live version read from the header `.ver` span + credits.
+- **Spindle / VFD** — a Hardware **subsystem** (gated by `hardwareTabs.spindle`, added via `+Add` like ATC). Stored as `settings.spindle`: `maxRpm · defaultRpm · dir(cw/ccw) · spinUp · spinDown`. Studio-side authoring defaults only — the controller owns the live PWM/analog spindle params (#582 etc.). **Generators/warm-up wizard do not yet consume it — follow-up.**
+- **Units (mm/inch): dropped.** The DDCS Expert variable table has no inch/G20/metric/unit-system parameter — the controller is metric-only. (Only the simulator parses G20 in arbitrary loaded files.)
+- **Network: kept** as a stub (not migrated to the Gateway header tab).

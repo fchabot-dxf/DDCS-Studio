@@ -29,6 +29,7 @@ export const edgeView = {
     panelId: 'wiz_edge',
     codeElId: 'wiz_edge_code',
     large: true,
+    twoPane: true,
     inputIds: [
         'p_axis', 'p_dir', 'p_dist', 'p_feed_fast', 'p_feed_slow',
         'p_retract', 'p_port', 'p_level', 'p_q', 'p_sync_a', 'p_wcs', 'p_slave',

@@ -9,6 +9,7 @@ export const circularView = {
     panelId: 'wiz_circular',
     codeElId: 'wiz_circular_code',
     large: true,
+    twoPane: true,
     inputIds: [
         'circ_type', 'circ_wcs', 'circ_dist', 'circ_retract', 'circ_safe_z',
         'circ_feed_fast', 'circ_feed_slow', 'circ_q',
