@@ -288,7 +288,7 @@ export class GcodeViz3D {
         this.scene.add(this._animTool);
     }
 
-    // Toggle a tool dot that travels the whole path in execution order (~5s loop)
+    // Toggle a tool dot that travels the whole path in execution order, feed-true (real program time)
     setAnimate(on) {
         this._animOn = !!on;
         this._ensureAnimTool();

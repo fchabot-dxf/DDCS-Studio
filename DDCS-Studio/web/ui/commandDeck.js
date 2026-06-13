@@ -132,8 +132,12 @@ export class CommandDeck {
         }
         // Let other modules (e.g. a CSV import) refresh the keyboard's variable buttons
         window.refreshDeckVariables = () => this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : '');
-        // The variable DB loads asynchronously (default_vars.js + user_vars.csv); re-render when ready
-        window.addEventListener('variableDB:ready', () => {
+        // The variable DB loads asynchronously (default_vars.js + user_vars.csv); re-render when ready.
+        // Also keep the deck's variable-set selector in sync when the family changes elsewhere — e.g.
+        // switching the controller profile in Settings or the wizard header fires this with detail.family.
+        window.addEventListener('variableDB:ready', (e) => {
+            const fam = (e && e.detail && e.detail.family) || (this.variableDB ? this.variableDB.getControllerVars() : null);
+            if (fam && this._ctrlSel && this._ctrlSel.value !== fam) this._ctrlSel.value = fam;
             this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : '');
         });
     }
@@ -319,8 +323,9 @@ export class CommandDeck {
         ctrlLbl.textContent = 'Variable set:'; ctrlLbl.style.cssText = 'font-size:11px; opacity:.7;';
         const ctrlSel = document.createElement('select');
         ctrlSel.className = 'deck-var-ctrlsel'; ctrlSel.style.cssText = 'font-size:11px;';
-        ctrlSel.innerHTML = '<option value="expert">Expert M350</option><option value="v4.1">DDCS V4.1</option>';
+        ctrlSel.innerHTML = '<option value="expert">Expert M350</option><option value="v4.1">DDCS V4.1</option><option value="v3">DDCS V3 / DM500</option>';
         ctrlSel.value = this.variableDB ? this.variableDB.getControllerVars() : 'expert';
+        this._ctrlSel = ctrlSel;   // synced by the variableDB:ready listener when the profile changes elsewhere
         ctrlSel.addEventListener('change', async () => {
             if (!this.variableDB) return;
             await this.variableDB.setControllerVars(ctrlSel.value);

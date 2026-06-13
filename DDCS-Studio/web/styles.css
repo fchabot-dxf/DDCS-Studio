@@ -1533,14 +1533,21 @@ button.primary:hover {
 .wiz-2pane .wiz-visual .viz-split > .viz-container { flex: 1 1 0; min-height: 160px; }
 
 @media (max-width: 860px) {
+    /* Mobile: collapse to a single STACKED column. The desktop two-pane relies on a flex-grow chain
+       (visual flex:1 1 0 → viz-container flex:1 1 auto → absolute canvas) that needs a DEFINITE modal
+       height. Here the modal is height:auto, so that chain has no free space: the visual collapses to
+       0 and the position:absolute canvas (no in-flow height) overflows onto the form. Fix: size every
+       visual element to its content (flex:0 0 auto) with a definite viz height, and let normal block
+       flow stack visual-then-form. */
     .wiz-box.two-pane { width: min(96vw, 560px); height: auto; }
     .two-pane .wiz-body { overflow-y: auto; }
     .wiz-2pane { flex-direction: column; height: auto; }
-    .wiz-2pane > .wiz-controls { order: 2; flex-basis: auto; overflow: visible; width: 100%; padding: 0; }
-    .wiz-2pane > .wiz-visual { order: 1; }                 /* visuals on top on mobile */
-    .wiz-2pane .wiz-visual .wiz-viz3d { height: 220px !important; }
-    .wiz-2pane .wiz-visual .viz-split { flex-direction: row; }   /* 2D | 3D side-by-side again */
-    .wiz-2pane .wiz-visual .viz-container { flex: 1 1 280px; }
+    .wiz-2pane > .wiz-controls { order: 2; flex: 0 0 auto; overflow: visible; width: 100%; padding: 0; }
+    .wiz-2pane > .wiz-visual { order: 1; flex: 0 0 auto; min-height: 0; }     /* visuals on top, content-sized */
+    .wiz-2pane > .wiz-visual > .viz-container { flex: 0 0 auto; min-height: 0; }
+    .wiz-2pane .wiz-visual .wiz-viz3d { flex: 0 0 auto; height: 240px !important; min-height: 240px; }
+    .wiz-2pane .wiz-visual .viz-split { flex-direction: row; }               /* drill: 2D | 3D side-by-side */
+    .wiz-2pane .wiz-visual .viz-split > .viz-container { flex: 1 1 0; min-height: 240px; }
 }
 
 /* --- HEADER (Flush Fit) --- */
