@@ -1,0 +1,76 @@
+; =================================================================
+; Corner Probe - FL outside corner (probe +X, +Y), Z surface first
+; DIALECT: Centroid CNC12 (Acorn) - Fanuc-Macro-B-style .mac
+; Translated from: DDCS-Studio cornerWizard.js  (corner FL, seq XY)
+;
+; PRIMITIVE MAP  (DDCS  ->  Centroid CNC12):
+;   probe move    G31 X.. + IF#1920!=2 GOTO  ->  M115 /X..  (auto-errors on no-contact)
+;   two-pass      fast / retract / slow + IF  ->  M115 / M116 / M115
+;   trigger pos   #1925 (read variable)       ->  machine STOPS at it (no read needed)
+;   write WCS     #[#70+ax]=val               ->  G92 X<val>
+;   radius comp   [#1925 +/- #6]              ->  baked into the G92 value
+;   operator msg  #1505                       ->  M225 + M0
+; NOTE: positioning between walls is wizard-computed (cornerWizard.inferStart);
+;   schematic here. Probe is a switch INPUT - set #108 to its input number (Px).
+; =================================================================
+
+; ---- config: the emitter fills these from the wizard form ----
+#100 = 20.0  ; max probe distance
+#101 = 2.0   ; retract between / after touches
+#102 = 20    ; fast feed (units/min - in or mm per CNC12 config)
+#103 = 5     ; slow feed
+#104 = 2.0   ; stylus tip radius
+#105 = 10.0  ; safe Z, above the top surface
+#106 = 5.0   ; plunge below top to reach the side wall
+#107 = 50.0  ; reposition distance between the two walls
+#108 = 3     ; probe input number (the P value, e.g. P3)
+#109 = 1     ; xdir  (FL outside corner -> +X)
+#110 = 1     ; ydir  (FL outside corner -> +Y)
+#111 = 0     ; M225 message timer (0 = until acknowledged)
+
+; units follow CNC12 config (G20/G21)
+G90
+M225 #111 "Corner FL: hover OVER the corner material, then Cycle Start"
+M0           ; wait for operator  (mirrors DDCS #1505 confirm)
+
+; ===== Z surface probe (two-pass) =====
+G91          ; incremental: M115/M116 bounds are distances
+M115 /Z[-1 * #100]      P[#108] F[#102]   ; fast probe down until contact
+M116 /Z[#101]          P[#108] F[#103]   ; retract until probe clears
+M115 /Z[-1 * #101 * 2] P[#108] F[#103]   ; slow probe down - stops AT surface
+G92 Z0                                    ; top surface = Z0
+G90
+G0 Z#105                                  ; safe Z
+
+; escape off the part in -X, then plunge beside the X wall
+G91
+G0 X[-1 * #109 * #107]
+G0 Z[-1 * [#105 + #106]]
+
+; ===== X wall probe (two-pass + radius comp) =====
+M115 /X[#109 * #100]      P[#108] F[#102] ; fast touch X wall
+M116 /X[-1 * #109 * #101] P[#108] F[#103] ; retract until clears
+M115 /X[#109 * #101 * 2]  P[#108] F[#103] ; slow touch - stops AT wall
+G92 X[-1 * #109 * #104]                   ; wall face = X0, radius comp
+G0 X[-1 * #109 * #101]                    ; retract from wall
+G0 Z[#105 + #106]                         ; lift to safe Z
+
+; reposition for the Y wall
+G0 X[#109 * #107]
+G0 Y[-1 * #110 * #107]
+G0 Z[-1 * [#105 + #106]]
+
+; ===== Y wall probe (two-pass + radius comp) =====
+M115 /Y[#110 * #100]      P[#108] F[#102]
+M116 /Y[-1 * #110 * #101] P[#108] F[#103]
+M115 /Y[#110 * #101 * 2]  P[#108] F[#103]
+G92 Y[-1 * #110 * #104]                   ; wall face = Y0, radius comp
+G0 Y[-1 * #110 * #101]                    ; retract
+G90
+G0 Z#105                                  ; safe Z - done
+M225 #111 "Corner FL found: WCS X0 Y0 Z0 set"
+M30
+
+; [VERIFY on CNC12 / sim]: bracketed axis bound /X[expr] form; M30 vs M99 for a .mac;
+; whether a normally-open probe needs P sign flip on the M116 retract (doc surface-plate
+; example used positive P on both M115 and M116).

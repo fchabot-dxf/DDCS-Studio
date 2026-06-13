@@ -1,0 +1,5502 @@
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+UCCNC MACROS, SCREENSET &  
+MODBUS FUNCTIONS,  
+BUTTON, FIELD,  
+LED & CHECKBOX 
+ CODES 
+ 
+ 
+UCCNC VERSION 1.2022 
+Robertspark 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 2 of 120 
+UCCNC Version 1.2022 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Disclaimer: 
+This manual has not been produced by CNCdrive or any affiliate organisation.   No remuneration has b een 
+sought for its creation and issue and it should be considered as a free pamphlet without warrantee or liability 
+to anyone and by anyone, company or entity.  It is provided without any copyright but any trademarks are 
+accepted and respected to their rightful owners. 
+This manual has been comprised of information extracted from the UCCNC manuals, associated 
+documentation, forum posts, other sources of the internet , hearsay and rumour.  It has been compiled with 
+reasonable skill and care. 
+Operating CNC equipment can be dan gerous given a machine is only a dumb tool programmed to do 
+whatever you or anyone else request of it, automatically and does not know  when something such as you, a  
+limb, someone else or an object is where it should not be.  It is highly recommended that y ou familiarise 
+yourself fully with the CNC machine you are intending to operate and that you learn to understand what you 
+are asking your machine to do before beginning to programme Macros which may operate as autonomous 
+functions and could be programmed to ignore safety, limit switches and all other protective devices. 
+Errors and omissions are expected within a compiled manual such as this which has reformatted data.  We 
+would highly recommend that you seek out the official primary sources of information t o verify what may  or 
+may not be denoted within this manual before relying on any such second or third tier information as claims 
+of damage, accidents, incidents or death resulting from you or other persons operating machinery which you 
+choose to rely on information d enoted within this manual shall not be accepted.   If you choose to utilise this 
+manual it will be deemed that you have sourced all and every primary reference source of anything denoted 
+within this manual so any claims of liability may be passed directly o n to them.  Everything denoted within the 
+manual shall be considered as opinion.  If in doubt, do not use this manual, delete it and move on to utilise 
+something else. 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 3 of 120 
+UCCNC Version 1.2022 
+Contents 
+ 
+LIST OF G-CODES .............................................................................................. 6 
+LIST OF M-CODES .............................................................................................. 7 
+ 
+ALPHABETICAL MACRO & SCREENSET FUNCTION INDEX ......................... 8 
+ 
+MACRO FUNCTIONS .......................................................................................... 9 
+IsMoving() ........................................................................................................ 11 
+Get[XYZABC]machpos() .................................................................................. 11 
+Get[XYZABC]pos() ........................................................................................... 11 
+StopWithDeccel() ............................................................................................. 11 
+Stop() ............................................................................................................... 11 
+Wait() ................................................................................................................ 11 
+Setofflinemode() ............................................................................................... 12 
+Getcurrenttool() ................................................................................................ 12 
+Setcurrenttool() ................................................................................................ 12 
+Getnewtool() ..................................................................................................... 12 
+Ismacrostopped() ............................................................................................. 12 
+Setoutpin() ........................................................................................................ 12 
+Clroutpin() ........................................................................................................ 13 
+Code() .............................................................................................................. 13 
+Callbutton() ....................................................................................................... 13 
+Readkey() ......................................................................................................... 13 
+Writekey() ......................................................................................................... 13 
+Pluginshowup() ................................................................................................ 14 
+Swapaxis() ....................................................................................................... 14 
+Resetswapaxis() .............................................................................................. 14 
+Slaveaxis() ....................................................................................................... 14 
+Getanaloginput() .............................................................................................. 15 
+Getanalogoutput() ............................................................................................ 15 
+TextQuestion() ................................................................................................. 15 
+Question() ........................................................................................................ 15 
+Loadfile() .......................................................................................................... 15 
+IsLoading() ....................................................................................................... 15 
+Showplugin() .................................................................................................... 16 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 4 of 120 
+UCCNC Version 1.2022 
+Configplugin() ................................................................................................... 16 
+Getfield() .......................................................................................................... 16 
+Setfield() ........................................................................................................... 17 
+Validatefield() ................................................................................................... 17 
+Setfieldtext() ..................................................................................................... 17 
+GetLED() .......................................................................................................... 18 
+SetLED() .......................................................................................................... 18 
+Getbutton() ....................................................................................................... 18 
+Getbuttonstate() ............................................................................................... 18 
+Switchbutton() .................................................................................................. 19 
+AddStatusmessage() ....................................................................................... 19 
+Additemtolist() .................................................................................................. 19 
+ 
+MODBUS MACRO FUNCTIONS ....................................................................... 21 
+GetAllModbusArray() ....................................................................................... 21 
+SetModbusregister() ........................................................................................ 21 
+SetModbusregisters() ....................................................................................... 21 
+GetModbusregister() ........................................................................................ 21 
+GetModbusregisters() ...................................................................................... 21 
+WriteModbusString() ........................................................................................ 21 
+Example MODBUS macro codes .................................................................... 22 
+ 
+SCREENSET FUNCTIONS ................................................................................ 24 
+Addbackground() ............................................................................................. 25 
+Addbutton() ...................................................................................................... 25 
+Addcheckbox() ................................................................................................. 26 
+Addfield() .......................................................................................................... 27 
+Addled() ............................................................................................................ 28 
+Addmdi() ........................................................................................................... 28 
+Addtab() ........................................................................................................... 29 
+Filterfieldtext() .................................................................................................. 29 
+Loadpicture() .................................................................................................... 30 
+selectlayer() ...................................................................................................... 30 
+Setfield() ........................................................................................................... 30 
+Setfieldtext() ..................................................................................................... 30 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 5 of 120 
+UCCNC Version 1.2022 
+BUTTONS (SORT BY NUMBER) ...................................................................... 32 
+ 
+FIELDS (SORT BY NUMBER) ........................................................................... 40 
+ 
+LED’s (SORT BY NUMBER).............................................................................. 63 
+ 
+CHECKBOX OBJECTS (SORT BY NUMBER) ................................................. 71 
+ 
+BUTTONS (SORT BY ALPHABETICAL NAME) .............................................. 75 
+ 
+FIELDS (SORT BY ALPHABETICAL NAME) ................................................... 82 
+ 
+LED’s (SORT BY ALPHABETICAL NAME).................................................... 104 
+ 
+CHECKBOX OBJECTS (SORT BY ALPHABETICAL NAME) ....................... 111 
+ 
+VARIABLES # .................................................................................................. 116 
+Parametric programming ............................................................................... 116 
+Available math operators and operations ...................................................... 117 
+ 
+DOCUMENT REVISIONS ................................................................................. 120 
+ 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 6 of 120 
+UCCNC Version 1.2022 
+LIST OF G-CODES 
+  
+G0 : Linear interpolation with maximum feedrate (Parameters X,Y,Z,A,B,C) 
+G1 : Linear interpolation with set feedrate (Parameters X,Y,Z,A,B,C) 
+G2 : CW arc interpolation with set feedrate (Parameters X,Y,Z,I,J,K,R) 
+G3 : CCW arc interpolation with set feedrate (Parameters X,Y,Z,I,J,K,R) 
+G4 : Dwell, wait for the programmed time interval (Parameters P in milliseconds) 
+G10 L1 : Load tool table offset (Parameters P ,Z) Notes: P can be a value 1-20 for tools 
+number 1-20 in the tools table. 
+G10 L2 : Load offset origin point (Parameters P ,X,Y,Z,A,B,C) Notes: P can be a value 1-6 
+for G54-G59 offset tables. 
+G17/G18/G19 : XY/XZ/YZ plane selection (No parameters) 
+G28 : Run to home position (Parameters X,Y,Z,A,B,C) Note: The parameters are the 
+intermediate coordinates. 
+G28.1 : Home axis (Parameters X,Y,Z,A,B,C) Note: The parameters are the intermediate 
+coordinates. 
+G31 : Straight probe (Parameters X,Y,Z,A,B,C) Note: Only one axis is supported one time. 
+G33 : Spindle synchronized motion (Parameters X,Z,K,Q) Note: K is the pitch per 
+revolution. Q is the angle of penetration. 
+G33.1 : Rigid tapping, right-hand tap (Parameters Z,K) Note: K is the pitch per revolution. 
+G33.2 : Rigid tapping, left-hand tap (Parameters Z,K) Note: K is the pitch per revolution. 
+G43 : Set tool length offset (Parameters H) Note: The H parameter number of tool length 
+offset is loaded from tool table to tool offset. 
+G44 : Set tool length offset (Parameters H) Note: Identical to G43 code, but for negative 
+tool length offsets. 
+G49 : Cancel tool length offset (No parameters) 
+G52 : Temporary offset coordinate system (Parameters X,Y,Z,A,B,C). 
+G53 : Linear interpolation in the machine coordinate system (Parameters X,Y,Z,A,B,C) 
+Note: Can be called with G0 or G1 modal active. 
+G54 - G59 : Work offset selection (No parameters) 
+G61/G61.1 : Set path control to exact stop mode (No parameters) 
+G64 : Set path control to constant velocity mode (Parameters D,E,H,L,P,Q) 
+G73 : Peck drilling cycle with set backoff (Parameters X,Y,Z,Q,R) Note’s is the final depth, 
+Q is the depth increment, R is the retract plane. 
+G76 : Threading cycle (Parameters P,Z,I,J,K,E,L,Q,H) Note: See the documentation for 
+detailed information. 
+G80 : Cancel canned cycle (No parameters) 
+G81 : Drilling cycle (Parameters X,Y,Z,R) Note: Z is the depth, R is the retract plane. 
+G82 : Drilling cycle with dwell (Parameters X,Y,Z,R,P) Note: Z is the depth, R is the retract 
+plane, P is the dwell time in msec. 
+G83 : Peck drilling cycle with full back off (Parameters X,Y,Z,Q,R) Note: Z is the final 
+depth, Q is the depth increment, R is the retract plane. 
+G90 : Select absolute distance mode (No parameters) 
+G91 : Select relative distance mode (No parameters) 
+G92 : Temporary offset to programmed coordinates (Parameters X,Y,Z,A,B,C). 
+G92.1 : Reset temporary offset coordinates (No parameters) 
+G98 : Canned cycle return level to initial plane (No parameters) 
+G99 : Canned cycle return level to R plane (No parameters) 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 7 of 120 
+UCCNC Version 1.2022 
+LIST OF M-CODES 
+ 
+M0, M1, M60 : Program stop 
+M2 : Program end 
+M3 : CW spindle relay on 
+M4 : CCW spindle relay on 
+M5 : CW and CCW relays off 
+M6 : Tool change 
+M7 : Mist coolant on 
+M8 : Flood coolant on 
+M9 : Mist and flood coolants off 
+M10 : Fast synchronous output (laser) on (Parameters Q) Note: Q parameter range is 0-
+255, it controls the laser power, intensity. 
+M11 : Fast synchronous output(laser) off 
+M30 : Program end and program rewind 
+M31 : Z-axis straight probe macro 
+M47 : Program rewind and continue running 
+M98 : Subroutine call (Parameters P, L) Notes: P is the subroutine number, L is the times 
+of call. 
+M99 : Return from subroutine 
+M106 : Turns the spindle PWM on (Parameters P) The range of P is 0 to 255. This macro 
+is used to control the FAN speed in 3D printing 
+M107 : Turns the spindle PWM off 
+M205 : Turns THC on in synchronous with the motion. 
+M206 : Turns THC off in synchronous with the motion. 
+M207 : Turns the THC delay on in synchronous with the motion. 
+M208 : Turns the THC delay off in synchronous with the motion. 
+M209 : Turns the THC anti dive on in synchronous with the motion. 
+M210 : Turns the THC anti dive off in synchronous with the motion. 
+M211 : Turns the THC anti down on in synchronous with the motion. 
+M212 : Turns the THC anti down off in synchronous with the motion. 
+M213 : Turns the safe probe mode on. 
+M214 : Turns the safe probe mode off. 
+M215 : Changes the spindle pulley.  (Parameters P) Note: P parameter is the number of 
+the spindle pulley in use. 
+M20000 to M20999 : Macros called with button codes. 
+M99998 : Constructor macro, called once on software startup. 
+M99999 : Destructor macro, called once on software shutdown. 
+ 
+F : Feedrate value (Parameter in Unit/min) 
+S : Spindle speed (Parameter in rotational speed of 1/min) 
+T : Load tool (Parameter is the tool number, can be 1-20, example: T2) 
+O : Subroutine label (Parameter is the number of the subroutine, example: O11) 
+# : Reference an internal variable instead of a constant as parameter. (Example: G1 X#1 
+Y#2) 
+? : Show the value of an internal variable. (Example: ?#1, Note: This command works in 
+MDI input only.) 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 8 of 120 
+UCCNC Version 1.2022 
+ALPHABETICAL MACRO & SCREENSET FUNCTION INDEX 
+ 
+MACRO FUNCTION 
+Additemtolist, 19 
+AddStatusmessage, 19 
+Callbutton, 13 
+Clroutpin, 13 
+Code, 13 
+Configplugin, 16 
+Get[XYZABC]machpos, 11 
+Get[XYZABC]pos, 11 
+Getanaloginput, 15 
+Getanalogoutput, 15 
+Getbutton, 18 
+Getbuttonstate, 18 
+Getcurrenttool, 12 
+Getfield, 16 
+GetLED, 18 
+Getnewtool, 12 
+IsLoading, 15 
+Ismacrostopped, 12 
+IsMoving, 11 
+Loadfile, 15 
+Pluginshowup, 14 
+Question, 15 
+Readkey, 13 
+Resetswapaxis, 14 
+Setcurrenttool, 12 
+Setfield, 17 
+Setfieldtext, 17 
+SetLED, 18 
+Setofflinemode, 12 
+Setoutpin, 12 
+Showplugin, 16 
+Slaveaxis, 14 
+Stop, 11 
+StopWithDeccel, 11 
+Swapaxis, 14 
+Switchbutton, 19 
+TextQuestion, 15 
+Validatefield, 17 
+Wait, 11 
+Writekey, 13 
+MODBUS MACRO FUNCTIONS 
+GetAllModbusArray, 21 
+GetModbusregister, 21 
+GetModbusregisters, 21 
+SetModbusregister, 21 
+SetModbusregisters, 21 
+WriteModbusString, 21 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+SCREENSET FUNCTION 
+Addbackground, 25 
+Addbutton, 25 
+Addcheckbox, 26 
+Addfield, 27 
+Addled, 28 
+Addmdi, 28 
+Addtab, 29 
+Filterfieldtext, 29 
+Loadpicture, 30 
+selectlayer, 30 
+Setfield, 30 
+Setfieldtext, 30 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 9 of 120 
+UCCNC Version 1.2022 
+MACRO FUNCTIONS 
+  
+This section describes the UCCNC software macro function calls capability. 
+  
+The UCCNC software can have different profiles. Each profile can have different 
+machine setup/settings and therefore different macros. 
+ 
+The macro files are located in the installation folder of the UCCNC software 
+/Profile/Macro_name of profile , where the „name of profile” is the profile name 
+the software is loaded with. 
+ 
+The macros are plain text files with a “.txt” extension and with the file names 
+start with an “M” and after the number of the macro. For example M3.txt. 
+ 
+The user can make and edit new macros simply by creating a new macro file 
+and adding it to the macro folder of the software.  The macros as they are plain 
+text files are editable with the built in notepad.exe in Windows. 
+  
+The macros' programming language is C# (C-sharp). The language is not 
+described in this documentation, but it is very similar to C language and for 
+those who are yet not familiar with C# programming we recommend to study the 
+following Wiki page: http://en.wikipedia.org/wiki/C_Sharp_syntax 
+  
+The macros are compiled and executed in runtime, so they can be changed any 
+time using a text editor like notepad.  In case the macro contains a syntax error 
+and cannot be compiled the UCCNC software will show a script error notice in 
+the status box.  Also it is possible to create a runtime error, for example with 
+dividing by zero in the macro code, in this case the UCCNC software will also 
+show an error notice in the status box. 
+ 
+We recommend that when writing macros first test them without the machine 
+tool connected for safety reasons. 
+  
+All macros are compiled into the Macro class. The Macro class has visibility to 
+the following Namespaces and objects: 
+ 
+ "exec" is the executer, this is the object in the UCCNC software which 
+makes all motion execution, I/O manipulations etc. 
+ "AS3" is the main screen, this is the object on the screen where all fields, 
+buttons, LEDs are placed, the value of these can be read from the AS3 
+object. 
+ "AS3jog" is the jog panel object on the screen, all fields, buttons, LEDs 
+values on the jogpanel can be read from the AS3jog object. 
+ System, System.Windows.Forms, System.Drawing, System.Threading 
+namespaces. 
+ 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 10 of 120 
+UCCNC Version 1.2022 
+The macro text typed into the macro file is inside a function of a class and 
+therefore defining other functions and global variables directly inside the macro 
+is not possible. 
+ 
+Defining global variables and functions is possible only at the end of the macro 
+text file with writing the #Events text into the macro, this text will let the UCCNC 
+know that the remaining text of the macro has to be compiled outside of the 
+function, but still inside the macro class. 
+ 
+The following example shows a simple macro which creates a Windows Form 
+and adding a button to it and assigning an event handler to the button's click 
+event.  The example also declares a function which is then called from inside the 
+macro. 
+  
+Button MyButton = new Button(); 
+MyButton.Size = new System.Drawing.Size(80, 40); 
+MyButton.Location = new System.Drawing.Point(110, 130); 
+MyButton.Text = "Press me"; 
+MyButton.Click += new EventHandler(MyButton_Click); 
+ 
+MyForm = new Form(); 
+MyForm.Size = new System.Drawing.Size(300, 300); 
+MyForm.StartPosition = 
+System.Windows.Forms.FormStartPosition.CenterScreen; 
+MyForm.Controls.Add(MyButton); 
+MyForm.ShowDialog(); 
+ 
+MyFunction(); 
+ 
+#Events 
+ 
+Form MyForm; //This is a global variable, a Windows Form 
+ 
+void MyButton_Click(object sender, EventArgs e)  
+{ 
+  MessageBox.Show("Mybutton was clicked!"); 
+  MyForm.Close(); 
+} 
+ 
+void MyFunction() 
+{ 
+  exec.Code("G0 X10"); 
+} 
+  
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 11 of 120 
+UCCNC Version 1.2022 
+The following list contains the Executer object's functions which are callable 
+from any macros. 
+ 
+IsMoving() 
+Function: bool IsMoving(void) 
+Description: The function returns true if the software is executing a motion or a 
+function. It returns false if the software is in idle. 
+Example: while(exec.IsMoving()){} 
+ 
+Get[XYZABC]machpos() 
+Function: double Get[XYZABC]machpos(void) 
+Description: The function returns the actual machine position of an axis, this is 
+the absolute position excluding any offsets. 
+Example: double Xmachposvariable = exec.GetXmachpos(); 
+Notes: [XYZABC] means a character of X, Y, Z, A, B or C 
+ 
+ Get[XYZABC]pos() 
+Function: double Get[XYZABC]pos(void) 
+Description: The function returns the actual position of an axis including the 
+selected offset and the tool offset. 
+Example: double Xposvariable = exec.GetXpos(); 
+Notes: [XYZABC] means a character of X, Y, Z, A, B or C 
+ 
+StopWithDeccel() 
+Function: void StopWithDeccel(void) 
+Description: The function stops all axis using the set deceleration profile. 
+Example: exec.StopWithDeccel(); 
+ 
+Stop() 
+Function: void Stop(void) 
+Description: The function causing an instant stop on all axis. 
+Example: exec.Stop(); 
+ 
+Wait() 
+Function: void Wait(int milliseconds) 
+Description: The function causing the loop to stop for the set amount of time in 
+milliseconds. 
+Example: exec.Wait(1000); 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 12 of 120 
+UCCNC Version 1.2022 
+Setofflinemode() 
+Function: void Setofflinemode(bool setoffline) 
+Description: The functions sets the machine to offline mode or to online mode. In 
+offline mode the outputs of the UC100 gets disconnected from the pins, so the 
+machine can't move, however the functions like movements seems like 
+executing. 
+Example: exec.Setofflinemode(true); 
+ 
+Getcurrenttool() 
+Function: int Getcurrenttool(void) 
+Description: The function returns the actually selected tool number. It returns 
+zero if no tool was yet selected. 
+Example: int Currenttoolvariable = exec.Getcurrenttool(); 
+ 
+Setcurrenttool() 
+Function: void Setcurrenttool(int toolnumber) 
+Description: This function sets the selected tool number in the UCCNC software. 
+Useful when using automatic tool changer. We recommend to set the new tool 
+number at the end of the toolchange macro. 
+Example: exec.Setcurrenttool(2); 
+  
+Getnewtool() 
+Function: int Getnewtool(void) 
+Description: This function reads the tool number next to the M6 code, for 
+example if a code M6 T2 was executed then this function returns the number 2. 
+Example: int newtoolnumber = exec.Getnewtool(); 
+  
+Ismacrostopped() 
+Function: bool Ismacrostopped(void) 
+Description: This function checks if a stop was pressed by the user on the 
+UCCNC software GUI. 
+Example: if(exec.Ismacrostopped){return;} 
+  
+Setoutpin() 
+Function: void Setoutpin(int portnumber, int pinnumber) 
+Description: This functions sets the selected output pin to high level. 
+Note: If a pin is called which is configured for a hardware function, for example 
+to act as a step or direction pin will override this function. 
+Example: exec.Setoutpin(1, 2); 
+  
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 13 of 120 
+UCCNC Version 1.2022 
+Clroutpin() 
+Function: void Clroutpin(int portnumber, int pinnumber) 
+Description: This functions sets the selected output pin to low level. 
+Note: If a pin is called which is configured for a hardware function, for example 
+to act as a step or direction pin will override this function. 
+Example: exec.Clroutpin(1, 2); 
+  
+Code() 
+Function: void Code(string code) 
+Description: This function is the most complex of all, it makes it possible to 
+execute G-code from inside a macro. The G-code is sent as a string in the 
+parameter of the function and is interpreted in execution time. 
+Example: exec.Code(“G0 X10 Y20 Z0”); 
+  
+Callbutton() 
+Function: void Callbutton(int buttonnumber) 
+Description: This function calls an internal function of the UCCNC software. The 
+buttonnumber represents an internal function number of the UCCNC software. 
+The buttonnumber list is described in a separate documentation file. 
+Example: exec.Callbutton(100); 
+  
+Readkey() 
+Function: string Readkey(string section, string key, string defaultvalue) 
+Description: This function reads a key value from the profile (.pro) file. The 
+section and the key parameter defines which key to read from the profile file and 
+the function returns with the default value parameter if the key does not exist in 
+the profile file. The function returns a string type. 
+Example: string mykeyvalue = exec.Readkey("axessettingscontrolX", 
+"Axisenabled", "False"); 
+  
+Writekey() 
+Function: void Writekey(string section, string key, string value) 
+Description: This function writes a key value into the profile (.pro) file. The 
+section, and the key parameter defines which key to write to the profile file. The 
+value parameter is the new value to write. If the key already exists in the profile 
+file then the function overwrites the key with the new value. If the key does not 
+exist then the function creates the key in the file with the set value. 
+Example: exec.Writekey("axessettingscontrolX", "Axisenabled", "False"); 
+  
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 14 of 120 
+UCCNC Version 1.2022 
+Pluginshowup() 
+Function: void Pluginshowup(string Pluginfilename) 
+Description: This function calls a Plugin file's Showup_event(); function. This is 
+useful when the plugin should do something on a button press event, for 
+example when it should show it's GUI interface. 
+Example: exec.Pluginshowup("Plugintest.dll"); 
+  
+Swapaxis() 
+Function: void Swapaxis(int axis1, int axis2) 
+Description: This function swaps the step and direction pin numbers and pin 
+negate settings of one axis with another axis. Axis swapping may be done at 
+anytime, the software saves the swapping sequences. 
+The axis number parameter can be in the range of 0 to 5 for the axis X to C axis 
+in order. 
+Be careful with saving the axis settings when the swapaxis function is in use. If 
+the settings are saved without pressing the Apply settings button first then the 
+swapped pins will be saved for the axis! 
+Example: exec.Swapaxis(0,1); //Swaps the X-axis with Y-axis. 
+  
+Resetswapaxis() 
+Function: void Resetswapaxis() 
+Description: This function resets the swap axis sequence with rolling back all the 
+previously called axis swapping sequences. 
+Example: exec.Resetswapaxis(); 
+  
+Slaveaxis() 
+Function: void Slaveaxis(int masteraxis, int slaveaxis) 
+Description: This function slaves an axis to an axis. The master axis can be axis 
+X, Y and Z axis (numbers 0, 1, 2 respectively) and the slave axis can be A, B 
+and C axis (3, 4, 5 respectively). To remove the slave from the master axis use 
+value 0 on the slaveaxis parameter. 
+Be careful with saving the axis settings when the slaveaxis function is in use. If 
+the settings are saved without pressing the Apply settings button first then the 
+slave parameter will be saved for the master axis! 
+Example: exec.Slaveaxis(0,3); //Makes A-axis slave to the X-axis. 
+Example: exec.Slaveaxis(0,0); //Clears slave to the X-axis. 
+  
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 15 of 120 
+UCCNC Version 1.2022 
+Getanaloginput() 
+Function: int Getanaloginput(int channel) 
+Description: This function returns the actual value of an analog input channel 
+signal. The parameter defines the channel to be read. If the device has no 
+analog input channel with the channel number called then the return value will 
+be -1. The valid return range for the function is 0-65535. 
+Example: int analogin1 = exec.Getanaloginput(1); 
+  
+Getanalogoutput() 
+Function: int Getanalogoutput(int channel) 
+Description: This function returns the actual value of an analog output channel 
+signal. The parameter defines the channel to be read. If the device has no 
+analog output channel with the channel number called then the return value will 
+be -1. The valid return range for the function is 0-65535. 
+Example: int analogout1 = exec.Getanalogoutput(1); 
+  
+TextQuestion() 
+Function: string TextQuestion(string Questiontext) 
+Description:  This function shows a Question form waiting for a string as the 
+answer. The text of the question shown on the Form is the parameter. 
+Example: string val = exec.TextQuestion("Stop code execution?"); 
+ 
+Question() 
+Function: double Question(string Questiontext) 
+Description:  This function shows a Question form waiting for a double value as 
+the answer. The text of the question shown on the Form is the parameter. 
+Example: double val = exec.Question("What X position to move?"); 
+  
+Loadfile() 
+Function: void Loadfile(string filename) 
+Description:  This function loads a g-code file. The parameter is a string which is 
+the full path of the file to be loaded. 
+Example: exec.Loadfile("C:/UCCNC/Example_codes/holders.tap"); 
+  
+IsLoading() 
+Function: bool IsLoading(void) 
+Description: The function returns true if the software is loading a g-code file and 
+returns false if no file is being loaded. 
+Example: while(exec.IsLoading()){} 
+  
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 16 of 120 
+UCCNC Version 1.2022 
+Showplugin() 
+Function: int Showplugin(string pluginfilename) 
+Description:  This function calls the Showup event of a UCCNC plugin installed 
+in the /Plugins directory. The parameter is a string which is the name of the 
+plugin file including the .dll extension. 
+The possible return values are the following: 
+0: The plugin started without problems. 
+1: The plugin is not enabled and can't run. 
+2: The plugin was not found, there is no plugin installed with this filename. 
+3.: The plugin does not have the Showup event implemented. 
+Example: int returnval = exec.Showplugin("Diagnostics.dll"); 
+  
+Configplugin() 
+Function: int Configplugin(string pluginfilename) 
+Description:  This function calls the Config event of a UCCNC plugin installed in 
+the /Plugins directory. The parameter is a string which is the name of the plugin 
+file including the .dll extension. 
+The possible return values are the following: 
+0: The plugin started without problems. 
+1: The plugin is not enabled and can't run. 
+2: The plugin was not found, there is no plugin installed with this filename. 
+3.: The plugin does not have the Config event implemented. 
+Example: int returnval = exec.Configplugin("Diagnostics.dll"); 
+  
+  
+The following list contains the AS3 and AS3jog object's functions which are 
+callable from any macros. 
+ 
+Getfield() 
+Function: string Getfield(int fieldnumber) 
+Description: This function reads the value of a field object and returns the value 
+in a string. 
+Example: string fieldvalue = AS3.Getfield(100); 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 17 of 120 
+UCCNC Version 1.2022 
+Setfield() 
+Function: void Setfield(double value, int fieldnumber) 
+Description: This function sets the value of a field object. If the field exists on the 
+screen on any tab pages then it will update it's value. If it does not exist then this 
+function will do nothing. 
+Note that there are fields like the position DROs and feedrate, spindle speed etc. 
+DROs which are updated in the UCCNC from internal variables in loops, these 
+fields cannot be updated permanently using this method, 
+because the internal functions will rewrite these fields with the internal variable 
+values. Call the Validatefield after the Setfield function to change the value of the 
+field. 
+Example: AS3.Setfield(15.23, 100); 
+Validatefield() 
+Function: void Validatefield(int fieldnumber) 
+Description: This function validates the value of a field object. If the field exists 
+on the screen on any tab pages then the function executes. If it does not exist 
+then this function will do nothing. 
+When this function is called then the field value changed event is called inside 
+the UCCNC core and the software will make the actions necessary to validate 
+the actual value of the field. 
+Example: AS3.Setfield(12.34, 97); //Sets the value of the X current 
+coordinate field to 12.34 
+               AS3.Validatefield(97); //Validates the 12.34 value for the X 
+current coordinate field  with writing the offset coordinates as necessary. 
+  
+Setfieldtext() 
+Function: void Setfieldtext(string value, int fieldnumber) 
+Description: This function sets the value of a field. If the field exists on the 
+screen on any tab pages then it will update it's value. If it does not exist then this 
+function will do nothing. 
+Note that there are fields like the position DROs and feedrate, spindle speed etc. 
+DROs which are updated in the UCCNC from internal variables in loops, these 
+fields cannot be updated permanently using this method, because the internal 
+functions will rewrite these fields with the internal variable values. Call the 
+Validatefield after the Setfield function to change the value of the field. 
+Example: AS3.Setfieldtext("This is my field", 100); 
+               AS3.Validatefield(100); //Validates fieldtext 100. 
+  
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 18 of 120 
+UCCNC Version 1.2022 
+GetLED() 
+Function: bool GetLED(int LEDnumber) 
+Description: This function returns the logic state of a LED screen object. If the 
+LED is on then the function returns "true" or if the LED is off then this function 
+returns "false". If the LED does not exist on the screen then the return value is 
+"false". 
+Example: bool stateofmyLED = AS3.GetLED(18); 
+ 
+SetLED() 
+Function: void SetLED(bool state, int LEDnumber) 
+Description: This function sets the logic state of a LED screen object. If the LED 
+does not exist on the screen then this function will do nothing. 
+Note: There are LEDs which values are refreshed from internal loops of the 
+UCCNC, these LEDs cannot be set with this function, because the value will 
+update from the UCCNC's internal loop. For example the Idle and run LEDs 
+cannot be set with this function. Basically this function is to set user LEDs which 
+are not used by the UCCNC core. 
+Example: AS3.SetLED(true, 1000); 
+ 
+Getbutton() 
+Function: bool Getbutton(int buttonumber) 
+Description: This function returns true if the button is being pressed on the 
+screen or with an input trigger and returns false if the button is released. 
+Example: while(!AS3.Getbutton(128)); //Waits for the cycle start button 
+press on the main screen. 
+ 
+Getbuttonstate() 
+Function: bool Getbuttonstate(int buttonumber) 
+Description: This function works with toggle type buttons and returns true if the 
+button is in it's on state and returns false when the button is in it's off state. The 
+function always returns false for non-toggle type buttons. 
+Example: bool buttonstate = AS3.Getbuttonstate(114); //Checks if the M3 
+spindle on/off button is active. 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 19 of 120 
+UCCNC Version 1.2022 
+Switchbutton() 
+Function: void Switchbutton(bool Ison, int Buttonnumber) 
+Description: This function works with toggle type buttons and switches the button 
+to on/off states. If the Ison parameter is true switches the button to the on state 
+and false switches to the off state. The function can be used for example in 
+buttons' macros to change the state of the button toggling it's visual state. 
+Example: AS3.Switchbutton(true, 128) 
+ 
+AddStatusmessage() 
+Function: void AddStatusmessage( string StatusMessage ) 
+Description: Adds a message to the Status Listbox 
+Example: exec.AddStatusmessage( "Check Ohmic Probe" ); 
+ 
+Additemtolist() 
+Function: void Additemtolist(string val, int labelnumber) 
+Description: Adds a string value to a Listbox with the corresponding 
+labelnumber. 
+Example: AS3.Additemtolist( "Check Ohmic Probe" , 18); 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 20 of 120 
+UCCNC Version 1.2022 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Intentionally blank page to facilitate updated sections to be printed and inserted 
+to retain pagination for other sections as new Macros are added.  
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 21 of 120 
+UCCNC Version 1.2022 
+MODBUS MACRO FUNCTIONS 
+ 
+GetAllModbusArray() 
+Function: ushort[] GetAllModbusArray() 
+Reads the whole modbus register table. 
+ 
+SetModbusregister() 
+Function: bool SetModbusregister(int Registernumber, ushort Value) 
+Writes a single register in the modbus register table. 
+ 
+SetModbusregisters() 
+Function: bool SetModbusregisters(int Startregister, ushort[] Values) 
+Writes multiply registers in the modbus register table. 
+ 
+GetModbusregister() 
+Function: bool GetModbusregister(int Registernumber, out ushort Value) 
+Reads a single register from the modbus register table. 
+ 
+GetModbusregisters() 
+Function: bool GetModbusregisters(int Startregister, int Registercount, 
+ out ushort[] Values) 
+Reads multiply registers from the modbus register table. 
+ 
+WriteModbusString() 
+Function: void WriteModbusString(string String, int Startregister, 
+ bool HightoLowByteorder) 
+Converts a string into an ushort array and writes it into the modbus register 
+table. 
+ 
+In the functions where the return value is boolean indicates if the function got 
+executed with or without problems. The true return value means that the function 
+executed without problems while false means that a problem has occurred and 
+the retrieved variable(s) values may be corrupt. 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 22 of 120 
+UCCNC Version 1.2022 
+Example MODBUS macro codes 
+ 
+The following example code reads the modbus register 0 from the UCCNC 
+modbus table and writes the value into the Textfield (DRO) with ID=2000. 
+To test run the macro create a Textfield with ID=2000 using the Screen editor 
+and place the below text into a text macro file in the /Profiles/Macros folder. 
+Setup a Modbus Connection and Function in the Modbus plugin which function 
+reads value into register 0. 
+ 
+Execute the macro via MDI. 
+To execute the macro in a loop place the macro file to the macro loops in the 
+General settings/Configure macroloops and place your macro number into one 
+loop slots. 
+Running the macro in a loop will continuously read the modbus register 0 and 
+will write the read value into the DRO. 
+ 
+The code is the following: 
+ushort Readvalue; 
+if(exec.GetModbusregister(0, out Readvalue)) 
+{ 
+   AS3.Setfield(Readvalue, 2000); 
+} 
+else 
+{ 
+   //The read returned with error, handle it... 
+} 
+ 
+The following example code reads a DRO and writes the value into the modbus 
+register 0.  To test run the macro create a Textfield with ID=2000 using the 
+Screen editor and place the below text into a text macro file in the 
+/Profiles/Macros folder.  Setup a Modbus Connection and Function in the 
+Modbus plugin which writes register 0 value onto the Modbus. 
+ 
+Execute the macro via MDI. 
+To execute the macro in a loop place the macro file to the macro loops in the 
+General settings/Configure macroloops and place your macro number into one 
+loop slots.  Running the macro in a loop will continuously read the DRO value 
+and will write it to the modbus. 
+ 
+The code is the following: 
+ushort Writevalue = (ushort)AS3.Getfielddouble(2000); 
+if(!exec.SetModbusregister(0, Writevalue)) 
+{ 
+  //The write returned with error, handle it... 
+}  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 23 of 120 
+UCCNC Version 1.2022 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Intentionally blank page to facilitate updated sections to be printed and inserted 
+to retain pagination for other sections as new Macros are added.  
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 24 of 120 
+UCCNC Version 1.2022 
+SCREENSET FUNCTIONS  
+ 
+ 
+This section describes the UCCNC software screenset function calls capability. 
+  
+All the screen elements in the UCCNC software are defined in the external 
+screenset script file which file is located in the /Screens folder of the UCCNC 
+installation. 
+ 
+The screenset files have a .ssf (Screen Set File) extension and are plain textfiles 
+editable with notepad in Windows. 
+ 
+There may be more than one screenset files in the /Screens directory. Which 
+screenset file is loaded on the software startup is defined in the profile file, 
+the key which defines the name of the screenset file to be loaded is in the 
+following section with the following name: 
+  
+[Screensetsettings] 
+mainscreenfilename=Defaultscreenset 
+  
+The UCCNC software first loads the profile file and reads the name of the 
+screenset file and executes the script in this file. 
+ 
+The screenset file contains the definition of all screen elements, it defines the 
+tab layers, the backgrounds, the buttons, the fields placements, dimensions, 
+images etc. 
+ 
+Basically the UCCNC GUI is blank and all screen elements are unloaded to the 
+screen from the screenset file. 
+This makes the screen changeable and freely editable for the user, because all 
+the screen elements can be changed in the external screenset script file. 
+  
+The screenset file's programming language is C# (C-sharp). The language is not 
+described in this documentation, but it is very similar to C language and for 
+those who are yet not familiar with C# programming we recommend to study the 
+following Wiki page: http://en.wikipedia.org/wiki/C_Sharp_syntax 
+  
+There are 2 different display objects or let's call them canvas on the screen the 
+mainform.AS3 and the mainform.AS3jog. The AS3 is the main screen canvas 
+and the AS3jog is the jog panel on the left side of the screen and the screen 
+elements can be uploaded onto these separately. 
+  
+In this documentation we describe the screenset associated function calls, the 
+prototypes of these functions with some descriptions and examples are shown 
+below. 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 25 of 120 
+UCCNC Version 1.2022 
+Addbackground() 
+Function: void Addbackground(double posX, double posY, double width,  
+double height, int picturenumber, int backgroundnumber, int layernumber) 
+Description: This function renders an image onto a tab layer, in other words it 
+places a background onto a tab layer. 
+The posX and posY parameters define the top-left corner of the image to be 
+placed. The width and height parameters defines how wide and how tall the 
+image will be in pixels. 
+If the image has a different dimensions than the width and height parameters 
+then the image will be scaled into the placement dimensions. 
+The picturenumber parameter is the identifier of the picture to use and the 
+background number will be the identifier of this background. The layernumber is 
+the number of the tab layer to place the image onto. 
+Example: AS3.Addbackground(0, 0, 1024, 692, 121, 11, 12); 
+ 
+Addbutton() 
+Function: void Addbutton(double xposition, double yposition, double width,  
+double height, bool toggletype, bool blinktype, int picturenumber,  
+int buttonnumber, int layernumber) 
+Description: This function adds one button object to the screen.  
+ The xposition and yposition are the X and Y position in pixels of the top-
+left corner of the button. 
+ The width and height are also in pixels and they define how wide and 
+how tall the button will be. 
+ If the toggletype parameter is true then the button is toggling between the 
+on and off states with rendering the left side half image onto the button in 
+the off state and rendering the right side half image in the on state of the 
+button. 
+ If the blinktype parameter is true then in the on state of the button the 
+rendering of the left and right side images is rendered periodically creating 
+a blinking effect. 
+ The picturenumber is the identifier of the image used to render this 
+button, this identifier was set in the Loadpicture functions and any picture 
+which was loaded previously can be selected. 
+ The buttonnumber is an identifier for this button and this identifier also 
+defines the function of this button. For example code 128. is the cycle start 
+button code. 
+ The different button codes are listed and described in a separated 
+document. 
+ The layernumber defines on which tab layer will the button appear on. 
+Example: AS3.Addbutton(50, 60, 100, 100, false, 18, 128, 2); 
+ 
+ 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 26 of 120 
+UCCNC Version 1.2022 
+Addcheckbox() 
+Function: void Addcheckbox(string labeltext, string labelfont, int fontsize,  
+int fontcolor, int posX, int posY, int boxnumber, int layernumber) 
+Description: This function adds a checkbox control to the screen.  
+ The labeltext parameter is similar as with the field type object, it is a text 
+string appearing before the checkbox control. 
+ The labelfont defines the font type used to render the text in the control, 
+the textalign sets the text inside the control's field 
+ The fontsize sets the size of the font in pixels. 
+ The fontcolor is the RGB color code in integer format.  
+ The posX and posY defines the top-left corner position of the checkbox 
+control. 
+ The boxnumber is the unique identifier of the checkbox control. The 
+checkboxes numbers and their meaning are described in a separated 
+documentation. 
+ The layernumber defines which layer the checkbox will appear on. 
+Example: AS3.Addcheckbox("", "Arial", 16, 0, 50, 100, 100, 2); 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 27 of 120 
+UCCNC Version 1.2022 
+Addfield() 
+Function: void Addfield(string labeltext, string labelfont, string textalign,  
+int fontsize, int fontcolor, double posX, double posY, int fieldwidth, string type,  
+double min, double max, int labelnumber, int layernumber) 
+Description: This function adds one field object onto the screen. Each field 
+object represents a text label on the UCCNC screen. 
+ The labeltext parameter defines a text string which will be written before 
+the field on the screen.  
+ The labelfont parameter defines the font used for both the text string and 
+the field text. 
+ The textalign parameter defines where the text is aligned inside the field, 
+the possible values are "left", "right" and "center". 
+ The fontsize defines the size of the dont used to render the field text. 
+ The fontcolor is the color of the font in integer format of the RGB color 
+code. 
+ The posX and posY parameters define the top-left corner of the field and 
+the fieldwidth defines the length of the field in pixels. 
+ The type is a special parameter, the possible values are the "textfield", 
+"textfieldnb", "showfield", "showfieldnb", "field", "fieldnb". 
+o The "textfield", "textfieldnb", "field", "fieldnb" type fields can be read 
+and written from macro code and are editable by the user on the 
+UCCNC GUI. 
+o The "textfield", "textfieldnb" can contain any kind of text including 
+words. The "field", "fieldnb" can contain numerical values only. 
+o The "showfield", "showfieldnb" type labels can be read and written 
+from macro code and are not editable by the user on the UCCNC 
+GUI. 
+ The "nb" at the end of the parameter means "no border", so 
+these type of fields will have no visual border on the screen. 
+ The min and max parameters defines the minimal and maximal numerical 
+value for the "field", "fieldnb" type fields, the user can't enter numbers out 
+of this range. 
+ The labelnumber is the identifier number of the field, the different label 
+numbers and their meaning are listed in a separated document. 
+ The layernumber is the number of the tab layer the field will appear on. 
+Example: AS3.Addfield(" ", "Arial", "right", 21, 7961465, 50, 100, 128, 
+"showfieldnb", double.MinValue, double.MaxValue, 866, 2); 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 28 of 120 
+UCCNC Version 1.2022 
+Addled() 
+Function: void Addled(double posX, double posY, double width, double height,  
+int picturenumber, int LEDnumber, int layernumber) 
+Description: This function adds a LED to the screen.  
+ The posX and posY defines the top-left corner position of the LED, the 
+parameters are in pixels. 
+ The width and height parameters defines the dimensions of the LED and 
+these parameters are also in pixels. 
+ The picturenumber is the number of the image to render onto the LED.  
+ The LEDnumber is the unique identifier of the LED.  The LED numbers 
+and their meaning are described in a separated document. 
+ The layernumber is the number of the tab layer the LED will appear on. 
+Example: AS3.Addled(530, 420, 6, 37, 68, 216, 2); 
+ 
+Addmdi() 
+Function: void Addmdi(string labeltext, string labelfont, string textalign,  
+int fontsize, int fontcolor, int posX, int posY, int width, int MDInumber,  
+int layernumber) 
+Description: This function adds an MDI control to the screen.  
+ The labeltext parameter is similar as with the field type object, it is a text 
+string appearing before the MDI control. 
+ The labelfont defines the font type used to render the text in the control, 
+the textalign sets the text inside the control's field. 
+ The fontsize sets the size of the font in pixels. 
+ The fontcolor is the RGB color code in integer format.  
+ The posX and posY defines the top-left corner position of the MDI control 
+and the width parameter defines the width of the MDI textfield in pixels. 
+ The MDInumber is the identifier of the MDI object. 
+ The layernumber defines which layer the MDI will appear on. 
+Example: AS3.Addmdi("This is an MDI:", "Arial", "left", 26, 4564978, 541, 
+421, 280, 2); 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 29 of 120 
+UCCNC Version 1.2022 
+Addtab() 
+Function: void Addtab(string labeltext, string labelfont, string textalign, 
+int fontsize, int fontcolor, int posX, int posY, int labelwidth, int labelheight,  
+int picturenumber, int labelnumber, int parentnumber) 
+Description: This function adds one tab layer on the screen. Tab layers are the 
+base screen elements in the UCCNC software and they are like layers in CAD 
+software. 
+The tab layers can contain other screen elements like buttons, fields, 
+background images etc. 
+There can be any number of tab layers on the screen and by default the tab 
+layers are all transparent. 
+Every tab layer object has an identifier which is the labelnumber parameter and 
+also a parent number which is the last parameter. 
+Tab layers can be in parent-child relation with each other, the parentnumber 
+defines the parent of the tab layer. 
+The tabs which have the same parent numbers are on the same level and just 
+like in Windows tab controls one time only one layer can be selected from the 
+same level tabs and the screen items on the other same level tab layers are 
+hidden. 
+Every tab layer has a label which is a graphical object and is used to allow the 
+user to press and select the tab layer. The label position and width and height 
+can be defined with the posX, posY, labelwidth, labelheight parameters and the 
+label can also have a picture rendered onto it, the picturenumber defines which 
+previously loaded picture is rendered onto the label. 
+Example: AS3.Addtab("", "Arial", "center", 14, 0, 69, 30, 100, 18, 94,20, 
+4); 
+ 
+Filterfieldtext() 
+Function: void Filterfieldtext(string value, int labelnumber) 
+Description: This function filters the characters which can be input into a field. 
+The characters in the value string can be input to the field, all other characters 
+are prohibited. 
+Note, that if a '-' character needs to be allowed in the filter then the \\ mark must 
+be placed before the '-' character, because the '-' char means a range. 
+Example:  AS3.Filterfieldtext("0123456789.\\-%", 232); 
+                    AS3.Filterfieldtext("0-9", 232); //Allows characters 0123456789, 
+because the - character means range. 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 30 of 120 
+UCCNC Version 1.2022 
+Loadpicture() 
+Function: void Loadpicture(string pictureupURL, string picturedownURL,  
+int picturenumber, bool IsLastpicturetoload) 
+Description: This function loads 2 images into the memory, the first 2 parameters 
+are the filenames with the directory path for the image files. The base path is the 
+UCCNC installation /Flashscreen/ path. 
+The pictureupURL will be the image which is shown when a button is not 
+pressed (is released) and the picturedownURL is the image which is shown 
+when the button is being pressed. 
+For screen elements like for backgrounds where only one image is used set both 
+parameters the same and the software will automatically load one instance only 
+into the memory. 
+The picturenumber is an identifier for the picture, this identifier can be later used 
+to identify this image when the image has to be rendered onto a screen object 
+like on a button or a background, tab layer etc. 
+Example: AS3.Loadpicture(bitmapfolder + "plus_up.png", bitmapfolder + 
+"plus_down.png", 22, false); 
+ 
+selectlayer() 
+Function: void selectlayer(int layernumber) 
+Description: This function selects a tab layer, so that any other tab layers on the 
+same level will be hidden and this tab layer will be shown on the software 
+startup. 
+Example: AS3.selectlayer(2); 
+ 
+Setfield() 
+Function:  void Setfield(double value, int labelnumber) 
+Description: This function sets the initial value of a field object. The value 
+parameter is the numeric value of the field and the labelnumber is the number of 
+the label to set the value of. 
+Example: AS3.Setfield(0, 866); 
+ 
+Setfieldtext() 
+Function: void Setfieldtext(string value, int labelnumber) 
+Description: This function sets the initial text of a field object. The value 
+parameter is a string and the labelnumber is the number of the label to set the 
+text of. 
+Example: AS3.Setfieldtext("initialtext", 866); 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 31 of 120 
+UCCNC Version 1.2022 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Intentionally blank page to facilitate updated sections to be printed and inserted 
+to retain pagination for other sections as new Macros are added.   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 32 of 120 
+UCCNC Version 1.2022 
+BUTTONS (SORT BY NUMBER) 
+ 
+This section describes the UCCNC software Button screen objects. 
+  
+Each button represents an internal function of the UCNC software. 
+Buttons can be called by their number from macro code. 
+This documentation lists all the accessible buttons, sorted numerically. 
+ 
+BUTTON 
+NUMBER FUNCTION NAME DESCRIPTION 
+100 ZeroX Zeros the X axis position. 
+101 ZeroY Zeros the Y axis position. 
+102 ZeroZ Zeros the Z axis position. 
+103 ZeroA Zeros the A axis position. 
+104 ZeroB Zeros the B axis position. 
+105 ZeroC Zeros the C axis position. 
+106 ZeroAll Zeros All axis position. 
+107 HomeX Runs the X axis to the home sensor. 
+108 HomeY Runs the Y axis to the home sensor. 
+109 HomeZ Runs the Z axis to the home sensor. 
+110 HomeA Runs the A axis to the home sensor. 
+111 HomeB Runs the B axis to the home sensor. 
+112 HomeC Runs the C axis to the home sensor. 
+113 HomeAll Runs all axis to the home sensor. The homing 
+sequence is defined in the setup. 
+114 M3toggle Toggles the M3 spindle CW button. 
+115 M4toggle Toggles the M4 spindle CCW button. 
+116 M7toggle Toggles the M7 mist button. 
+117 M8toggle Toggles the M8 flood button. 
+118 G54select Selects the G54 coordinate offset. 
+119 G55select Selects the G55 coordinate offset. 
+120 G56select Selects the G56 coordinate offset. 
+121 G57select Selects the G57 coordinate offset. 
+122 G58select Selects the G58 coordinate offset. 
+123 G59select Selects the G59 coordinate offset. 
+124 OpenGcodefile Starts an Open G-code file dialog. 
+125 CloseGcodefile Closes the G-code file which is loaded. 
+126 EditGcodefile Opens the notepad to edit the loaded G-code 
+file. 
+127 RewindGcodefile Rewinds the loaded G-code file with jumping 
+to the first row in the file. 
+128 Cyclestart Makes a cyclic run on the loaded G-code file. 
+129 Runsingleline Executes one line of code (the actual code 
+line) of the loaded G-code file. 
+130 Cyclestop Stops the G-code execution. 
+ 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 33 of 120 
+UCCNC Version 1.2022 
+BUTTON 
+NUMBER FUNCTION NAME DESCRIPTION 
+131 Gotozero Moves all axis to the zero position with a rapid 
+linear interpolation movement. 
+132 FROincrease Increases the Feedrate override value. 
+133 FROdecrease Decreases the Feedrate override value. 
+134 SROincrease Increases the spindle speed override value. 
+135 SROdecrease Decreases the spindle speed override value. 
+136 Toolpathzoomin Zooms in the toolpath viewer. 
+137 Toolpathzoomout Zooms out the toolpath viewer. 
+138 Toolpathzoomcontents Zooms the contents in the toolpath viewer. 
+139 Toolpathview45 Sets the toolpath to a 45° look viewing mode. 
+140 Toolpathviewright Sets the toolpath to a right side look viewing 
+mode. 
+141 Toolpathviewleft Sets the toolpath to a left side look viewing 
+mode. 
+142 Toolpathviewtop Sets the toolpath to a top side look viewing 
+mode. 
+143 ToolpathviewISO Sets the toolpath to Isometric viewing mode. 
+144 Resettoggle Toggles the reset button. 
+145 Offlinetoggle Toggles the offline button. 
+146 Limitsoverridetoggle Toggles the limits override button. 
+147 JogX+ Jogs the X axis to positive direction. 
+148 JogX- Jogs the X axis to negative direction. 
+149 JogY+ Jogs the Y axis to positive direction. 
+150 JogY- Jogs the Y axis to negative direction. 
+151 JogZ+ Jogs the Z axis to positive direction. 
+152 JogZ- Jogs the Z axis to negative direction. 
+153 JogA+ Jogs the A axis to positive direction. 
+154 JogA- Jogs the A axis to negative direction. 
+155 JogB+ Jogs the B axis to positive direction. 
+156 JogB- Jogs the B axis to negative direction. 
+157 JogC+ Jogs the C axis to positive direction. 
+158 JogC- Jogs the C axis to negative direction. 
+159 Jograteincrease Increases the jog rate. 
+160 Jogratedecrease Decreases the jog rate. 
+161 Jogmodecont Sets the jog mode to continuous. 
+162 Jogmodestep Sets the jog mode to stepping. 
+163 R*   
+164 Jogsteprate001 Sets the jog distance when stepping mode to 
+0.01 Units. 
+165 Jogsteprate010 Sets the jog distance when stepping mode to 
+0.10 Units. 
+166 Jogsteprate100 Sets the jog distance when stepping mode to 
+1.00 Units. 
+167 Savesettings Saves all settings to the profile file. 
+168 Applysettings Applies the settings on the setup screens. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 34 of 120 
+UCCNC Version 1.2022 
+BUTTON 
+NUMBER FUNCTION NAME DESCRIPTION 
+169 Setnextline Sets the G-code execution pointer to the line 
+defined on the screen in the 128. labelfield. 
+170 G54offsetcurrentpos Offsets the actual position of the G54 
+coordinate system. 
+171 G55offsetcurrentpos Offsets the actual position of the G55 
+coordinate system. 
+172 G56offsetcurrentpos Offsets the actual position of the G56 
+coordinate system. 
+173 G57offsetcurrentpos Offsets the actual position of the G57 
+coordinate system. 
+174 G58offsetcurrentpos Offsets the actual position of the G58 
+coordinate system. 
+175 G59offsetcurrentpos Offsets the actual position of the G59 
+coordinate system. 
+176 G54offsetclear Clears the offset in the G54 coordinate 
+system. 
+177 G55offsetclear Clears the offset in the G55 coordinate 
+system. 
+178 G56offsetclear Clears the offset in the G56 coordinate 
+system. 
+179 G57offsetclear Clears the offset in the G57 coordinate 
+system. 
+180 G58offsetclear Clears the offset in the G58 coordinate 
+system. 
+181 G59offsetclear Clears the offset in the G59 coordinate 
+system. 
+182 Tooloffsetclear Clears the tool offset. 
+183 Tooloffsetclear Clears the tool offset. 
+184 Tooloffsetclear Clears the tool offset. 
+185 Tooloffsetclear Clears the tool offset. 
+186 Tooloffsetclear Clears the tool offset. 
+187 Tooloffsetclear Clears the tool offset. 
+188 Listprofiles Lists the available profile file names in the 
+1.Listcomponent. 
+189 Deleteprofile Deletes the actually selected profile file. 
+190 Loadprofile Loads the actually selected profile file. 
+191 Createnewprofile Create a new profile, the name of the profile is 
+held in the 216.inputfield. 
+192 DoXMLimport Imports a Mach3 .xml setup file. The function 
+start an open file dialog. 
+193 Gotoparkposition1 Commands the machine to park position 1. 
+(Code executed in Macro M200) 
+194 Gotoparkposition2 Commands the machine to park position 2. 
+(Code executed in Macro M201) 
+195 Gotoparkposition3 Commands the machine to park position 3. 
+(Code executed in Macro M202) 
+196 Toollengthmeasurement Commands a tool length measurement. (Code 
+executed in Macro M31) 
+197 Machinecoordstoggle 
+Toggles the position DROs between the 
+machine coordinates and the actual offset 
+coordinates view. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 35 of 120 
+UCCNC Version 1.2022 
+BUTTON 
+NUMBER FUNCTION NAME DESCRIPTION 
+198 CalibrateX Calibrates the steps per units value with travel 
+measurement for the X-axis. 
+199 CalibrateY Calibrates the steps per units value with travel 
+measurement for the Y-axis. 
+200 CalibrateZ Calibrates the steps per units value with travel 
+measurement for the Z-axis. 
+201 CalibrateA Calibrates the steps per units value with travel 
+measurement for the A-axis. 
+202 CalibrateB Calibrates the steps per units value with travel 
+measurement for the B-axis. 
+203 CalibrateC Calibrates the steps per units value with travel 
+measurement for the C-axis. 
+204 Softlimitstoggle Toggles the software limits enable function. 
+205 THCtoggle Toggles the THC control enable function. 
+218 Zeroworktimer Zeros the work timer. 
+219 ClearG92offset Clears the G92 offset coordinates. 
+220 MPGXaxisselect Selects the X axis for the MPG jog. 
+221 MPGYaxisselect Selects the Y axis for the MPG jog. 
+222 MPGZaxisselect Selects the Z axis for the MPG jog. 
+223 MPGAaxisselect Selects the A axis for the MPG jog. 
+224 MPGBaxisselect Selects the B axis for the MPG jog. 
+225 MPGCaxisselect Selects the C axis for the MPG jog. 
+226 MPGcontmodeselect Selects the continuous jog mode for the MPG. 
+227 MPGsinglemodeselect Selects the single step  jog mode for the MPG. 
+228 MPGmultimodeselect Selects the multi step jog mode for the MPG. 
+229 JogXplusoff Switches the X axis positive direction jogging 
+off. 
+230 JogXminusoff Switches the X axis negative direction jogging 
+off. 
+231 JogYplusoff Switches the Y axis positive direction jogging 
+off. 
+232 JogYminusoff Switches the Y axis negative direction jogging 
+off. 
+233 JogZplusoff Switches the Z axis positive direction jogging 
+off. 
+234 JogZminusoff Switches the Z axis negative direction jogging 
+off. 
+235 JogAplusoff Switches the A axis positive direction jogging 
+off. 
+236 JogAminusoff Switches the A axis negative direction jogging 
+off. 
+237 JogBplusoff Switches the B axis positive direction jogging 
+off. 
+238 JogBminusoff Switches the B axis negative direction jogging 
+off. 
+239 JogCplusoff Switches the C axis positive direction jogging 
+off. 
+240 JogCminusoff 
+Switches the C axis negative direction jogging 
+off. 
+ 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 36 of 120 
+UCCNC Version 1.2022 
+BUTTON 
+NUMBER FUNCTION NAME DESCRIPTION 
+241 Jogsteprate0001 Sets the jog distance when stepping mode to 
+0.001 Units. 
+501 CAM_ImportDXF Imports a dxf drawing file to UCCAM. 
+502 CAM_Generatetoolpath Generates the toolpath in UCCAM. 
+503 CAM_Generategcode Creates the gcode in UCCAM. 
+504 M3on Switches the M3 spindle CW button on. 
+505 M3off Switches the M3 spindle CW button off. 
+506 M4on Switches the M4 spindle CCW button on. 
+507 M4off Switches the M4 spindle CCW button off. 
+508 M7on Switches the M7 mist button on. 
+509 M7off Switches the M7 mist button off. 
+510 M8on Switches the M8 flood button on. 
+511 M8off Switches the M8 flood button off. 
+512 Reseton Switches the Reset button on. 
+513 Resetoff Switches the Reset button off. 
+514 Offlineon Switches the Offline button on. 
+515 Offlineoff Switches the Offline button off. 
+516 Machinecoordson Switches the machine coordinates button on. 
+517 Machinecoordsoff Switches the machine coordinates button off. 
+518 Softlimitson Switches the softlimits setting on. 
+519 Softlimitsoff Switches the softlimits setting off. 
+520 THCon Switches the THC control on. 
+521 THCoff Switches the THC control off. 
+522 Feedholdtoggle Toggles the feedhold button. 
+523 Feedholdon Switches the feedhold button on. 
+524 Feedholdoff Switches the feedhold button off. 
+525 Configplugins Opens the plugin configuration window 
+526 Editscreen Enters the screen editor mode 
+527 Savealloffsets Saves all offset values to the profile file. 
+528 Clearstatusmessages Clears the Status message box 
+529 THCAntiDiveon Switches the Anti Dive function for the THC 
+on. 
+530 THCAntiDiveoff Switches the Anti Dive function for the THC 
+off. 
+531 THCAntiDivetoggle Toggles the Anti Dive function for the THC. 
+532 Configmacroloops Opens the macroloop configuration window. 
+533 THCDelayon Switches the THC Delay function for the THC 
+on. 
+534 THCDelayoff Switches the THC Delay function for the THC 
+off. 
+535 THCDelaytoggle Toggles the Delay function for the THC. 
+536 THCarconsignalon_emulati
+on 
+Switches the THC arcon virtual signal on. Can 
+be used to emulate the THC arcon signal from 
+keyboard. 
+ 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 37 of 120 
+UCCNC Version 1.2022 
+BUTTON 
+NUMBER FUNCTION NAME DESCRIPTION 
+537 THCarconsignaloff_emulati
+on 
+Switches the THC arcon virtual signal off. Can 
+be used to emulate the THC arcon signal from 
+keyboard. 
+538 THCupsignalon_emulation 
+Switches the THC up virtual signal on. Can be 
+used to emulate the THC up signal from 
+keyboard. 
+539 THCupsignaloff_emulation 
+Switches the THC up virtual signal off. Can be 
+used to emulate the THC up signal from 
+keyboard. 
+540 THCdownsignalon_emulati
+on 
+Switches the THC down virtual signal on. Can 
+be used to emulate the THC down signal from 
+keyboard. 
+541 THCdownsignaloff_emulati
+on 
+Switches the THC down virtual signal off. Can 
+be used to emulate the THC down signal from 
+keyboard. 
+542 THCAntiDownon Switches the Anti Down function for the THC 
+on. 
+543 THCAntiDownoff Switches the Anti Down function for the THC 
+off. 
+544 THCAntiDowntoggle Toggles the Anti Down function for the THC. 
+545 Safeprobemodeon Switches the safe probe mode on. 
+546 Safeprobemodeoff Switches the safe probe mode off. 
+547 Safeprobemodetoggle Toggles the safe probe mode. 
+548 Operatorlock Opens the operator lock/unlock window. 
+549 Showstatistics Opens the machine statistics window. 
+550 ShowSpindlepulleys Opens the Spindle pulleys selection window. 
+551 Digitize_setfilename Sets the file name to save the Digitized points 
+to. 
+242 - 292 Sethotkeycodes Opens the Hotkeys keyboard key selection 
+window. 
+293 - 343 Sethotkeyfunctions Opens a Function selection window for the 
+hotkeys. 
+344 - 394 Setinputtriggerfunctions Opens a Function selection window for the 
+input triggers. 
+400 - 449 SelectTABlayer 
+Selects the TAB layer on the screen. The layer 
+number selected is the function code - 400, so 
+TAB layer 1. selected with code 401. Note: To 
+select a sub layer with a hotkey or with an 
+input trigger configure the same key or pin to 
+select all of it's parent layers and also the layer 
+itself, so the parent layers and the sub layers 
+will also be selected and the sub layer will 
+always showup this way, no matter which 
+parent layer was originally shown. 
+450 - 500 SetoutputtriggerLEDs Opens a LED selection window for the output 
+triggers. 
+552 - 999 R*   
+   
+   
+   
+   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 38 of 120 
+UCCNC Version 1.2022 
+BUTTON 
+NUMBER FUNCTION NAME DESCRIPTION 
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+ 
+ 
+ 
+ 
+ 
+ 
+Intentionally blank page to facilitate updated sections to be printed and inserted 
+to retain pagination for other sections as new Macros are added. 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 39 of 120 
+UCCNC Version 1.2022 
+USER 
+BUTTON 
+NUMBER 
+MACROCODE DESCRIPTION 
+Users can define M-codes M20000 to M20999 which correspond to the same Button Numbers, 
+this allows UCCNC to call the macros directly from screen button presses.   It is highly 
+recommended that you DO NOT call Macros from Macros, given there is no way to pass back to 
+the original macro given they run from start to finish (M98 excluded), hence will loop.  This section 
+is provided to allow users to record their M-codes / User Button Numbers along with any 
+descriptions for future reference. 
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+20  
+ 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 40 of 120 
+UCCNC Version 1.2022 
+FIELDS (SORT BY NUMBER) 
+ 
+This section describes the UCCNC software field screen objects. 
+  
+Each field object represents a text label on the UCCNC screen. 
+"textfield", "textfieldnb", "field", "fieldnb" type labels can be read and written from 
+macro code and are editable by the user on the UCCNC GUI. 
+The "textfield", "textfieldnb" can contain any kind of text including words. The 
+"field", "fieldnb" can contain numerical values only. 
+"showfield", "showfieldnb" type labels can be read and written from macro code 
+and are not editable by the user on the UCCNC GUI. 
+This documentation lists all the accessible field objects, sorted numerically. 
+ 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+1 Xaxissteppin   
+2 Xaxisdirpin   
+3 Xaxislimitminuspin   
+4 Xaxislimitpluspin   
+5 Xaxishomepin   
+6 Xaxishomingspeed   
+7 Xaxishomeoffset   
+8 Xaxisstepsper   
+9 Xaxisvelocity   
+10 Xaxisacceleration   
+11 Xaxissoftlimitminus   
+12 Xaxissoftlimitplus   
+13 Xaxiscompaccel   
+14 Xaxisbacklash   
+15 R*   
+16 Yaxissteppin   
+17 Yaxisdirpin   
+18 Yaxislimitminuspin   
+19 Yaxislimitpluspin   
+20 Yaxishomepin   
+21 Yaxishomingspeed   
+22 Yaxishomeoffset   
+23 Yaxisstepsper   
+24 Yaxisvelocity   
+25 Yaxisacceleration   
+26 Yaxissoftlimitminus   
+27 Yaxissoftlimitplus   
+28 Yaxiscompaccel   
+29 Yaxisbacklash   
+30 R*   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 41 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+31 Zaxissteppin   
+32 Zaxisdirpin   
+33 Zaxislimitminuspin   
+34 Zaxislimitpluspin   
+35 Zaxishomepin   
+36 Zaxishomingspeed   
+37 Zaxishomeoffset   
+38 Zaxisstepsper   
+39 Zaxisvelocity   
+40 Zaxisacceleration   
+41 Zaxissoftlimitminus   
+42 Zaxissoftlimitplus   
+43 Zaxiscompaccel   
+44 Zaxisbacklash   
+45 R*   
+46 Aaxissteppin   
+47 Aaxisdirpin   
+48 Aaxislimitminuspin   
+49 Aaxislimitpluspin   
+50 Aaxishomepin   
+51 Aaxishomingspeed   
+52 Aaxishomeoffset   
+53 Aaxisstepsper   
+54 Aaxisvelocity   
+55 Aaxisacceleration   
+56 Aaxissoftlimitminus   
+57 Aaxissoftlimitplus   
+58 Aaxiscompaccel   
+59 Aaxisbacklash   
+60 R*   
+61 Baxissteppin   
+62 Baxisdirpin   
+63 Baxislimitminuspin   
+64 Baxislimitpluspin   
+65 Baxishomepin   
+66 Baxishomingspeed   
+67 Baxishomeoffset   
+68 Baxisstepsper   
+69 Baxisvelocity   
+70 Baxisacceleration   
+71 Baxissoftlimitminus   
+72 Baxissoftlimitplus   
+73 Baxiscompaccel   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 42 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+74 Baxisbacklash   
+75 R*   
+76 Caxissteppin   
+77 Caxisdirpin   
+78 Caxislimitminuspin   
+79 Caxislimitpluspin   
+80 Caxishomepin   
+81 Caxishomingspeed   
+82 Caxishomeoffset   
+83 Caxisstepsper   
+84 Caxisvelocity   
+85 Caxisacceleration   
+86 Caxissoftlimitminus   
+87 Caxissoftlimitplus   
+88 Caxiscompaccel   
+89 Caxisbacklash   
+90 R*   
+91 Estoppin   
+92 Probepin1   
+93 Indexpin   
+94 Indexprescaler   
+95 Chargepumppin   
+96 Currenthilowpin   
+97 G54_CurrentcoordX   
+98 G54_CurrentcoordY   
+99 G54_CurrentcoordZ   
+100 G54_CurrentcoordA   
+101 G54_CurrentcoordB   
+102 G54_CurrentcoordC   
+103 G55_CurrentcoordX   
+104 G55_CurrentcoordY   
+105 G55_CurrentcoordZ   
+106 G55_CurrentcoordA   
+107 G55_CurrentcoordB   
+108 G55_CurrentcoordC   
+109 G56_CurrentcoordX   
+110 G56_CurrentcoordY   
+111 G56_CurrentcoordZ   
+112 G56_CurrentcoordA   
+113 G56_CurrentcoordB   
+114 G56_CurrentcoordC   
+115 G57_CurrentcoordX   
+116 G57_CurrentcoordY   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 43 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+117 G57_CurrentcoordZ   
+118 G57_CurrentcoordA   
+119 G57_CurrentcoordB   
+120 G57_CurrentcoordC   
+121 G58_CurrentcoordX   
+122 G58_CurrentcoordY   
+123 G58_CurrentcoordZ   
+124 G58_CurrentcoordA   
+125 G58_CurrentcoordB   
+126 G58_CurrentcoordC   
+127 G59_CurrentcoordX   
+128 G59_CurrentcoordY   
+129 G59_CurrentcoordZ   
+130 G59_CurrentcoordA   
+131 G59_CurrentcoordB   
+132 G59_CurrentcoordC   
+133 G54_WorkoffsetX   
+134 G54_WorkoffsetY   
+135 G54_WorkoffsetZ   
+136 G54_WorkoffsetA   
+137 G54_WorkoffsetB   
+138 G54_WorkoffsetC   
+139 G55_WorkoffsetX   
+140 G55_WorkoffsetY   
+141 G55_WorkoffsetZ   
+142 G55_WorkoffsetA   
+143 G55_WorkoffsetB   
+144 G55_WorkoffsetC   
+145 G56_WorkoffsetX   
+146 G56_WorkoffsetY   
+147 G56_WorkoffsetZ   
+148 G56_WorkoffsetA   
+149 G56_WorkoffsetB   
+150 G56_WorkoffsetC   
+151 G57_WorkoffsetX   
+152 G57_WorkoffsetY   
+153 G57_WorkoffsetZ   
+154 G57_WorkoffsetA   
+155 G57_WorkoffsetB   
+156 G57_WorkoffsetC   
+157 G58_WorkoffsetX   
+158 G58_WorkoffsetY   
+159 G58_WorkoffsetZ   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 44 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+160 G58_WorkoffsetA   
+161 G58_WorkoffsetB   
+162 G58_WorkoffsetC   
+163 G59_WorkoffsetX   
+164 G59_WorkoffsetY   
+165 G59_WorkoffsetZ   
+166 G59_WorkoffsetA   
+167 G59_WorkoffsetB   
+168 G59_WorkoffsetC   
+169 TooloffsetZ   
+170 PWMspindle_PWMpin   
+171 PWMspindle_dirpin   
+172 PWMspindle_PWMfrequency   
+173 Stepdirspindle_Steppin   
+174 Stepdirspindle_Dirpin   
+175 Stepdirspindle_Stepsperrotation   
+176 Stepdirspindle_Acceleration   
+177 Spindle_Minvelocity   
+178 Spindle_Maxvelocity   
+179 Spindle_M3relaypin   
+180 Spindle_M4relaypin   
+181 Spindle_M3delayon   
+182 Spindle_M3delayoff   
+183 Spindle_M4delayon   
+184 Spindle_M4delayoff   
+185 Spindle_M7relaypin   
+186 Spindle_M8relaypin   
+187 Spindle_M7delayon   
+188 Spindle_M8delayon   
+189 Spindle_M9delay   
+190 Comm_buffer_size   
+191 CV_stopangledegrees   
+192 CV_Lookaheadlines   
+193 CV_Linearerrormax   
+194 CV_Cornererrormax   
+195 PositionDROsdigits   
+196 ToolZoffset1   
+197 ToolZoffset2   
+198 ToolZoffset3   
+199 ToolZoffset4   
+200 ToolZoffset5   
+201 ToolZoffset6   
+202 ToolZoffset7   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 45 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+203 ToolZoffset8   
+204 ToolZoffset9   
+205 ToolZoffset10   
+206 ToolZoffset11   
+207 ToolZoffset12   
+208 ToolZoffset13   
+209 ToolZoffset14   
+210 ToolZoffset15   
+211 ToolZoffset16   
+212 ToolZoffset17   
+213 ToolZoffset18   
+214 ToolZoffset19   
+215 ToolZoffset20   
+216 Newprofilename   
+217 CV_Linearadditionlenght   
+218 CV_Linearunifylength   
+219 THC_onpin   
+220 THC_uppin   
+221 THC_downpin   
+222 THC_min_height   
+223 THC_max_height   
+224 THC_feedrate   
+225 SafeZheight   
+226 XposDRO   
+227 YposDRO   
+228 ZposDRO   
+229 AposDRO   
+230 BposDRO   
+231 CposDRO   
+232 FRODRO   
+233 SRODRO   
+234 THC_ondelay   
+235 G73backoff   
+236 R*   
+237 R*   
+238 R*   
+239 R*   
+240 R*   
+241 Xaxisstepport   
+242 Xaxisdirport   
+243 Xaxislimitminusport   
+244 Xaxislimitplusport   
+245 Xaxishomeport   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 46 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+246 Yaxisstepport   
+247 Yaxisdirport   
+248 Yaxislimitminusport   
+249 Yaxislimitplusport   
+250 Yaxishomeport   
+251 Zaxisstepport   
+252 Zaxisdirport   
+253 Zaxislimitminusport   
+254 Zaxislimitplusport   
+255 Zaxishomeport   
+256 Aaxisstepport   
+257 Aaxisdirport   
+258 Aaxislimitminusport   
+259 Aaxislimitplusport   
+260 Aaxishomeport   
+261 Baxisstepport   
+262 Baxisdirport   
+263 Baxislimitminusport   
+264 Baxislimitplusport   
+265 Baxishomeport   
+266 Caxisstepport   
+267 Caxisdirport   
+268 Caxislimitminusport   
+269 Caxislimitplusport   
+270 Caxishomeport   
+271 Estopport   
+272 Probeport1   
+273 Indexport   
+274 Chargepumpport   
+275 Currenthilowport   
+276 THC_onport   
+277 THC_upport   
+278 THC_downport   
+279 PWMspindle_PWMport   
+280 PWMspindle_dirport   
+281 Stepdirspindle_Stepport   
+282 Stepdirspindle_Dirport   
+283 Spindle_M3relayport   
+284 Spindle_M4relayport   
+285 Spindle_M7relayport   
+286 Spindle_M8relayport   
+287 MPGpinA   
+288 MPGportA   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 47 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+289 MPGpinB   
+290 MPGportB   
+291 Inputtrigger1pin   
+292 Inputtrigger1port   
+293 Inputtrigger1function   
+294 Inputtrigger2pin   
+295 Inputtrigger2port   
+296 Inputtrigger2function   
+297 Inputtrigger3pin   
+298 Inputtrigger3port   
+299 Inputtrigger3function   
+300 Inputtrigger4pin   
+301 Inputtrigger4port   
+302 Inputtrigger4function   
+303 Inputtrigger5pin   
+304 Inputtrigger5port   
+305 Inputtrigger5function   
+306 Inputtrigger6pin   
+307 Inputtrigger6port   
+308 Inputtrigger6function   
+309 Inputtrigger7pin   
+310 Inputtrigger7port   
+311 Inputtrigger7function   
+312 Inputtrigger8pin   
+313 Inputtrigger8port   
+314 Inputtrigger8function   
+315 Inputtrigger9pin   
+316 Inputtrigger9port   
+317 Inputtrigger9function   
+318 Inputtrigger10pin   
+319 Inputtrigger10port   
+320 Inputtrigger10function   
+321 Inputtrigger11pin   
+322 Inputtrigger11port   
+323 Inputtrigger11function   
+324 Inputtrigger12pin   
+325 Inputtrigger12port   
+326 Inputtrigger12function   
+327 Inputtrigger13pin   
+328 Inputtrigger13port   
+329 Inputtrigger13function   
+330 Inputtrigger14pin   
+331 Inputtrigger14port   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 48 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+332 Inputtrigger14function   
+333 Inputtrigger15pin   
+334 Inputtrigger15port   
+335 Inputtrigger15function   
+336 Inputtrigger16pin   
+337 Inputtrigger16port   
+338 Inputtrigger16function   
+339 Inputtrigger17pin   
+340 Inputtrigger17port   
+341 Inputtrigger17function   
+342 Inputtrigger18pin   
+343 Inputtrigger18port   
+344 Inputtrigger18function   
+345 Inputtrigger19pin   
+346 Inputtrigger19port   
+347 Inputtrigger19function   
+348 Inputtrigger20pin   
+349 Inputtrigger20port   
+350 Inputtrigger20function   
+351 Inputtrigger21pin   
+352 Inputtrigger21port   
+353 Inputtrigger21function   
+354 Inputtrigger22pin   
+355 Inputtrigger22port   
+356 Inputtrigger22function   
+357 Inputtrigger23pin   
+358 Inputtrigger23port   
+359 Inputtrigger23function   
+360 Inputtrigger24pin   
+361 Inputtrigger24port   
+362 Inputtrigger24function   
+363 Inputtrigger25pin   
+364 Inputtrigger25port   
+365 Inputtrigger25function   
+366 Inputtrigger26pin   
+367 Inputtrigger26port   
+368 Inputtrigger26function   
+369 Inputtrigger27pin   
+370 Inputtrigger27port   
+371 Inputtrigger27function   
+372 Inputtrigger28pin   
+373 Inputtrigger28port   
+374 Inputtrigger28function   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 49 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+375 Inputtrigger29pin   
+376 Inputtrigger29port   
+377 Inputtrigger29function   
+378 Inputtrigger30pin   
+379 Inputtrigger30port   
+380 Inputtrigger30function   
+381 Inputtrigger31pin   
+382 Inputtrigger31port   
+383 Inputtrigger31function   
+384 Inputtrigger32pin   
+385 Inputtrigger32port   
+386 Inputtrigger32function   
+387 Inputtrigger33pin   
+388 Inputtrigger33port   
+389 Inputtrigger33function   
+390 Inputtrigger34pin   
+391 Inputtrigger34port   
+392 Inputtrigger34function   
+393 Inputtrigger35pin   
+394 Inputtrigger35port   
+395 Inputtrigger35function   
+396 Inputtrigger36pin   
+397 Inputtrigger36port   
+398 Inputtrigger36function   
+399 Inputtrigger37pin   
+400 Inputtrigger37port   
+401 Inputtrigger37function   
+402 Inputtrigger38pin   
+403 Inputtrigger38port   
+404 Inputtrigger38function   
+405 Inputtrigger39pin   
+406 Inputtrigger39port   
+407 Inputtrigger39function   
+408 Inputtrigger40pin   
+409 Inputtrigger40port   
+410 Inputtrigger40function   
+411 Inputtrigger41pin   
+412 Inputtrigger41port   
+413 Inputtrigger41function   
+414 Inputtrigger42pin   
+415 Inputtrigger42port   
+416 Inputtrigger42function   
+417 Inputtrigger43pin   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 50 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+418 Inputtrigger43port   
+419 Inputtrigger43function   
+420 Inputtrigger44pin   
+421 Inputtrigger44port   
+422 Inputtrigger44function   
+423 Inputtrigger45pin   
+424 Inputtrigger45port   
+425 Inputtrigger45function   
+426 Inputtrigger46pin   
+427 Inputtrigger46port   
+428 Inputtrigger46function   
+429 Inputtrigger47pin   
+430 Inputtrigger47port   
+431 Inputtrigger47function   
+432 Inputtrigger48pin   
+433 Inputtrigger48port   
+434 Inputtrigger48function   
+435 R*   
+436 R*   
+437 R*   
+438 R*   
+439 R*   
+440 R*   
+443 MPGprescaler   
+444 Analoginput1var   
+445 Analoginput2var   
+446 R*   
+447 FROanalogchannelnumber   
+448 FROanalogminpercent   
+449 FROanalogmaxpercent   
+450 SROanalogchannelnumber   
+451 SROanalogminpercent   
+452 SROanalogmaxpercent   
+453 JROanalogchannelnumber   
+454 JROanalogminpercent   
+455 JROanalogmaxpercent   
+456 MPGfilterconstant   
+457 MPGspeedmultiplier   
+458 PWMspindle_PWMmindutycycle   
+459 PWMspindle_PWMmaxdutycycle   
+460 Analogoutput1var   
+461 Analogoutput2var   
+462 SpindlePWM_analogoutputchanne   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 51 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+l 
+463 Xaxisenablepin   
+464 Xaxisenableport   
+465 Yaxisenablepin   
+466 Yaxisenableport   
+467 Zaxisenablepin   
+468 Zaxisenableport   
+469 Aaxisenablepin   
+470 Aaxisenableport   
+471 Baxisenablepin   
+472 Baxisenableport   
+473 Caxisenablepin   
+474 Caxisenableport   
+475 - 499 R*   
+500 G92_offsetX   
+501 G92_offsetY   
+502 G92_offsetZ   
+503 G92_offsetA   
+504 G92_offsetB   
+505 G92_offsetC   
+506 Hotkey_keycode1   
+507 Hotkey_function1   
+508 Hotkey_keycode2   
+509 Hotkey_function2   
+510 Hotkey_keycode3   
+511 Hotkey_function3   
+512 Hotkey_keycode4   
+513 Hotkey_function4   
+514 Hotkey_keycode5   
+515 Hotkey_function5   
+516 Hotkey_keycode6   
+517 Hotkey_function6   
+518 Hotkey_keycode7   
+519 Hotkey_function7   
+520 Hotkey_keycode8   
+521 Hotkey_function8   
+522 Hotkey_keycode9   
+523 Hotkey_function9   
+524 Hotkey_keycode10   
+525 Hotkey_function10   
+526 Hotkey_keycode11   
+527 Hotkey_function11   
+528 Hotkey_keycode12   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 52 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+529 Hotkey_function12   
+530 Hotkey_keycode13   
+531 Hotkey_function13   
+532 Hotkey_keycode14   
+533 Hotkey_function14   
+534 Hotkey_keycode15   
+535 Hotkey_function15   
+536 Hotkey_keycode16   
+537 Hotkey_function16   
+538 Hotkey_keycode17   
+539 Hotkey_function17   
+540 Hotkey_keycode18   
+541 Hotkey_function18   
+542 Hotkey_keycode19   
+543 Hotkey_function19   
+544 Hotkey_keycode20   
+545 Hotkey_function20   
+546 Hotkey_keycode21   
+547 Hotkey_function21   
+548 Hotkey_keycode22   
+549 Hotkey_function22   
+550 Hotkey_keycode23   
+551 Hotkey_function23   
+552 Hotkey_keycode24   
+553 Hotkey_function24   
+554 Hotkey_keycode25   
+555 Hotkey_function25   
+556 Hotkey_keycode26   
+557 Hotkey_function26   
+558 Hotkey_keycode27   
+559 Hotkey_function27   
+560 Hotkey_keycode28   
+561 Hotkey_function28   
+562 Hotkey_keycode29   
+563 Hotkey_function29   
+564 Hotkey_keycode30   
+565 Hotkey_function30   
+566 Hotkey_keycode31   
+567 Hotkey_function31   
+568 Hotkey_keycode32   
+569 Hotkey_function32   
+570 Hotkey_keycode33   
+571 Hotkey_function33   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 53 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+572 Hotkey_keycode34   
+573 Hotkey_function34   
+574 Hotkey_keycode35   
+575 Hotkey_function35   
+576 Hotkey_keycode36   
+577 Hotkey_function36   
+578 Hotkey_keycode37   
+579 Hotkey_function37   
+580 Hotkey_keycode38   
+581 Hotkey_function38   
+582 Hotkey_keycode39   
+583 Hotkey_function39   
+584 Hotkey_keycode40   
+585 Hotkey_function40   
+586 Hotkey_keycode41   
+587 Hotkey_function41   
+588 Hotkey_keycode42   
+589 Hotkey_function42   
+590 Hotkey_keycode43   
+591 Hotkey_function43   
+592 Hotkey_keycode44   
+593 Hotkey_function44   
+594 Hotkey_keycode45   
+595 Hotkey_function45   
+596 Hotkey_keycode46   
+597 Hotkey_function46   
+598 Hotkey_keycode47   
+599 Hotkey_function47   
+600 Hotkey_keycode48   
+601 Hotkey_function48   
+602 - 699 R*   
+700 Outputtrigger1pin   
+701 Outputtrigger1port   
+702 Outputtrigger1LED   
+703 Outputtrigger2pin   
+704 Outputtrigger2port   
+705 Outputtrigger2LED   
+706 Outputtrigger3pin   
+707 Outputtrigger3port   
+708 Outputtrigger3LED   
+709 Outputtrigger4pin   
+710 Outputtrigger4port   
+711 Outputtrigger4LED   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 54 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+712 Outputtrigger5pin   
+713 Outputtrigger5port   
+714 Outputtrigger5LED   
+715 Outputtrigger6pin   
+716 Outputtrigger6port   
+717 Outputtrigger6LED   
+718 Outputtrigger7pin   
+719 Outputtrigger7port   
+720 Outputtrigger7LED   
+721 Outputtrigger8pin   
+722 Outputtrigger8port   
+723 Outputtrigger8LED   
+724 Outputtrigger9pin   
+725 Outputtrigger9port   
+726 Outputtrigger9LED   
+727 Outputtrigger10pin   
+728 Outputtrigger10port   
+729 Outputtrigger10LED   
+730 Outputtrigger11pin   
+731 Outputtrigger11port   
+732 Outputtrigger11LED   
+733 Outputtrigger12pin   
+734 Outputtrigger12port   
+735 Outputtrigger12LED   
+736 Outputtrigger13pin   
+737 Outputtrigger13port   
+738 Outputtrigger13LED   
+739 Outputtrigger14pin   
+740 Outputtrigger14port   
+741 Outputtrigger14LED   
+742 Outputtrigger15pin   
+743 Outputtrigger15port   
+744 Outputtrigger15LED   
+745 Outputtrigger16pin   
+746 Outputtrigger16port   
+747 Outputtrigger16LED   
+748 Outputtrigger17pin   
+749 Outputtrigger17port   
+750 Outputtrigger17LED   
+751 Outputtrigger18pin   
+752 Outputtrigger18port   
+753 Outputtrigger18LED   
+754 Outputtrigger19pin   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 55 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+755 Outputtrigger19port   
+756 Outputtrigger19LED   
+757 Outputtrigger20pin   
+758 Outputtrigger20port   
+759 Outputtrigger20LED   
+760 Outputtrigger21pin   
+761 Outputtrigger21port   
+762 Outputtrigger21LED   
+763 Outputtrigger22pin   
+764 Outputtrigger22port   
+765 Outputtrigger22LED   
+766 Outputtrigger23pin   
+767 Outputtrigger23port   
+768 Outputtrigger23LED   
+769 Outputtrigger24pin   
+770 Outputtrigger24port   
+771 Outputtrigger24LED   
+772 Outputtrigger25pin   
+773 Outputtrigger25port   
+774 Outputtrigger25LED   
+775 Outputtrigger26pin   
+776 Outputtrigger26port   
+777 Outputtrigger26LED   
+778 Outputtrigger27pin   
+779 Outputtrigger27port   
+780 Outputtrigger27LED   
+781 Outputtrigger28pin   
+782 Outputtrigger28port   
+783 Outputtrigger28LED   
+784 Outputtrigger29pin   
+785 Outputtrigger29port   
+786 Outputtrigger29LED   
+787 Outputtrigger30pin   
+788 Outputtrigger30port   
+789 Outputtrigger30LED   
+790 Outputtrigger31pin   
+791 Outputtrigger31port   
+792 Outputtrigger31LED   
+793 Outputtrigger32pin   
+794 Outputtrigger32port   
+795 Outputtrigger32LED   
+796 Outputtrigger33pin   
+797 Outputtrigger33port   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 56 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+798 Outputtrigger33LED   
+799 Outputtrigger34pin   
+800 Outputtrigger34port   
+801 Outputtrigger34LED   
+802 Outputtrigger35pin   
+803 Outputtrigger35port   
+804 Outputtrigger35LED   
+805 Outputtrigger36pin   
+806 Outputtrigger36port   
+807 Outputtrigger36LED   
+808 Outputtrigger37pin   
+809 Outputtrigger37port   
+810 Outputtrigger37LED   
+811 Outputtrigger38pin   
+812 Outputtrigger38port   
+813 Outputtrigger38LED   
+814 Outputtrigger39pin   
+815 Outputtrigger39port   
+816 Outputtrigger39LED   
+817 Outputtrigger40pin   
+818 Outputtrigger40port   
+819 Outputtrigger40LED   
+820 Outputtrigger41pin   
+821 Outputtrigger41port   
+822 Outputtrigger41LED   
+823 Outputtrigger42pin   
+824 Outputtrigger42port   
+825 Outputtrigger42LED   
+826 Outputtrigger43pin   
+827 Outputtrigger43port   
+828 Outputtrigger43LED   
+829 Outputtrigger44pin   
+830 Outputtrigger44port   
+831 Outputtrigger44LED   
+832 Outputtrigger45pin   
+833 Outputtrigger45port   
+834 Outputtrigger45LED   
+835 Outputtrigger46pin   
+836 Outputtrigger46port   
+837 Outputtrigger46LED   
+838 Outputtrigger47pin   
+839 Outputtrigger47port   
+840 Outputtrigger47LED   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 57 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+841 Outputtrigger48pin   
+842 Outputtrigger48port   
+843 Outputtrigger48LED   
+844 - 851 R*   
+852 EncoderApin   
+853 EncoderAport   
+854 EncoderBpin   
+855 EncoderBport   
+856 CAM_Tooldia   
+857 CAM_Startdepth   
+858 CAM_Cutdepth   
+859 CAM_Cutperpass   
+860 CAM_SafeZ   
+861 CAM_Feedrate   
+862 CAM_Tooloverlap   
+863 CAM_Plungerate   
+864 EncoderPPR   
+865 CAM_Spindlespeed   
+866 Setnextlinefield   
+867 Setfeedrate   
+868 Actfeedrate   
+869 Setspindlespeed   
+870 Actspindlespeed   
+871 MachinecoordX   
+872 MachinecoordY   
+873 MachinecoordZ   
+874 MachinecoordA   
+875 MachinecoordB   
+876 MachinecoordC   
+877 Activemodal   
+878 IOmonitor_XPOS   
+879 IOmonitor_YPOS   
+880 IOmonitor_ZPOS   
+881 IOmonitor_APOS   
+882 IOmonitor_BPOS   
+883 IOmonitor_CPOS   
+884 Motionbuffer   
+885 Diagnostics_minX   
+886 Diagnostics_minY   
+887 Diagnostics_minZ   
+888 Diagnostics_maxX   
+889 Diagnostics_maxY   
+890 Diagnostics_maxZ   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 58 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+891 Diagnostics_sizeX   
+892 Diagnostics_sizeY   
+893 Diagnostics_sizeZ   
+894 Diagnostics_totalnumberofobjects   
+895 Diagnostics_Filename   
+896 Dwell_time   
+897 Active_toolnumber   
+898 Worktimer   
+899 Active_fixture   
+900 Profile_name   
+901 Licensed_to   
+902 Softwareversion   
+903 Firmwareversion   
+904 Hardwareversion   
+905 APIversion   
+906 Serialnumber   
+907 Devicetype   
+908 CAM_Statuslabel   
+909 Analog_inputvalue1   
+910 Analog_inputvalue2   
+911 Analog_outputvalue1   
+912 Analog_outputvalue2   
+913 Jogfeedrate   
+914 Laseroutputpin   
+915 Laseroutputport   
+916 - 920 R*   
+921 ToolZoffset21   
+922 ToolZoffset22   
+923 ToolZoffset23   
+924 ToolZoffset24   
+925 ToolZoffset25   
+926 ToolZoffset26   
+927 ToolZoffset27   
+928 ToolZoffset28   
+929 ToolZoffset29   
+930 ToolZoffset30   
+931 ToolZoffset31   
+932 ToolZoffset32   
+933 ToolZoffset33   
+934 ToolZoffset34   
+935 ToolZoffset35   
+936 ToolZoffset36   
+937 ToolZoffset37   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 59 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+938 ToolZoffset38   
+939 ToolZoffset39   
+940 ToolZoffset40   
+941 ToolZoffset41   
+942 ToolZoffset42   
+943 ToolZoffset43   
+944 ToolZoffset44   
+945 ToolZoffset45   
+946 ToolZoffset46   
+947 ToolZoffset47   
+948 ToolZoffset48   
+949 ToolZoffset49   
+950 ToolZoffset50   
+951 ToolZoffset51   
+952 ToolZoffset52   
+953 ToolZoffset53   
+954 ToolZoffset54   
+955 ToolZoffset55   
+956 ToolZoffset56   
+957 ToolZoffset57   
+958 ToolZoffset58   
+959 ToolZoffset59   
+960 ToolZoffset60   
+961 ToolZoffset61   
+962 ToolZoffset62   
+963 ToolZoffset63   
+964 ToolZoffset64   
+965 ToolZoffset65   
+966 ToolZoffset66   
+967 ToolZoffset67   
+968 ToolZoffset68   
+969 ToolZoffset69   
+970 ToolZoffset70   
+971 ToolZoffset71   
+972 ToolZoffset72   
+973 ToolZoffset73   
+974 ToolZoffset74   
+975 ToolZoffset75   
+976 ToolZoffset76   
+977 ToolZoffset77   
+978 ToolZoffset78   
+979 ToolZoffset79   
+980 ToolZoffset80   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 60 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+981 ToolZoffset81   
+982 ToolZoffset82   
+983 ToolZoffset83   
+984 ToolZoffset84   
+985 ToolZoffset85   
+986 ToolZoffset86   
+987 ToolZoffset87   
+988 ToolZoffset88   
+989 ToolZoffset89   
+990 ToolZoffset90   
+991 ToolZoffset91   
+992 ToolZoffset92   
+993 ToolZoffset93   
+994 ToolZoffset94   
+995 ToolZoffset95   
+996 ToolZoffset96   
+949 - 2000 R*   
+2001 THCAntidivevelocitypercentage   
+2002 Analog_inputvalue3   
+2003 Analog_inputvalue4   
+2004 Analoginput3var   
+2005 Analoginput4var   
+2006 Analogoutput3var   
+2007 Analogoutput4var   
+2008 Analog_outputvalue3   
+2009 Analog_outputvalue4   
+2010 Plasmapieceheight   
+2011 Probepin2   
+2012 Probeport2   
+2013 Pulleynumber   
+2014 Pulleyratio   
+2015 Digitize_numberofdigits   
+2016 Digitize_proberadius   
+2017 Digitize_filename   
+2018 Digitize_numberofstoredpoints   
+   
+   
+   
+   
+   
+   
+   
+   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 61 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 62 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+ 
+R* = Reserved address, do not use this address. 
+ 
+Intentionally blank page to facilitate updated sections to be printed and inserted 
+to retain pagination for other sections as new Macros are added. 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 63 of 120 
+UCCNC Version 1.2022 
+LED’s (SORT BY NUMBER) 
+ 
+This section describes the UCCNC software LED screen objects. 
+  
+Each LED represents an internal boolean variable of the UCNC software. 
+The LEDs' logic state can be read in macro code. 
+This documentation lists all the accessible LED variables, sorted numerically. 
+ 
+LED 
+NUMBER LED NAME DESCRIPTION 
+1 OutputPT1PN1 Indicates the actual logic state of port#1 pin#1. 
+2 OutputPT1PN2 Indicates the actual logic state of port#1 pin#2. 
+3 OutputPT1PN3 Indicates the actual logic state of port#1 pin#3. 
+4 OutputPT1PN4 Indicates the actual logic state of port#1 pin#4. 
+5 OutputPT1PN5 Indicates the actual logic state of port#1 pin#5. 
+6 OutputPT1PN6 Indicates the actual logic state of port#1 pin#6. 
+7 OutputPT1PN7 Indicates the actual logic state of port#1 pin#7. 
+8 OutputPT1PN8 Indicates the actual logic state of port#1 pin#8. 
+9 OutputPT1PN9 Indicates the actual logic state of port#1 pin#9. 
+10 OutputPT1PN10 Indicates the actual logic state of port#1 pin#10. 
+11 OutputPT1PN11 Indicates the actual logic state of port#1 pin#11. 
+12 OutputPT1PN12 Indicates the actual logic state of port#1 pin#12. 
+13 OutputPT1PN13 Indicates the actual logic state of port#1 pin#13. 
+14 OutputPT1PN14 Indicates the actual logic state of port#1 pin#14. 
+15 OutputPT1PN15 Indicates the actual logic state of port#1 pin#15. 
+16 OutputPT1PN16 Indicates the actual logic state of port#1 pin#16. 
+17 OutputPT1PN17 Indicates the actual logic state of port#1 pin#17. 
+18 Idle Indicates the Idle state of the device. 
+19 Run Indicates a run state of the device. This is the 
+opposite of the Idle state. 
+20 Jog Active when a jog command is being executed. 
+21 Dwell Indicates a dwell in progress. 
+22 Backlash Active when the backlash compensation is being 
+executed. 
+23 Home Active when the homing command is being 
+executed. 
+24 Probing Active when the probing command is being 
+executed. 
+25 Reset Indicates an active reset signal. 
+26 Hardlimit Active when any of the configured limit inputs are 
+triggered. 
+27 Limitsoverride Active if the limits are overriden by the user. 
+28 Toolchangeinprogress Active when a tool change macro is being 
+executed. 
+29 Xlimitpositive Active when the X-axis positive side limit switch is 
+triggered. 
+30 Ylimitpositive Active when the Y-axis positive side limit switch is 
+triggered. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 64 of 120 
+UCCNC Version 1.2022 
+LED 
+NUMBER LED NAME DESCRIPTION 
+31 Zlimitpositive Active when the Z-axis positive side limit switch is 
+triggered. 
+32 Alimitpositive Active when the A-axis positive side limit switch is 
+triggered. 
+33 Blimitpositive Active when the B-axis positive side limit switch is 
+triggered. 
+34 Climitpositive Active when the C-axis positive side limit switch 
+is triggered. 
+35 Index Active when the index input is triggered. 
+36 Estop Active when the estop input is triggered. 
+37 Probe Active when the probe input is triggered. 
+38 Xlimitnegative Active when the X-axis negative side limit switch 
+is triggered. 
+39 Ylimitnegative Active when the Y-axis negative side limit switch 
+is triggered. 
+40 Zlimitnegative Active when the Z-axis negative side limit switch 
+is triggered. 
+41 Alimitnegative Active when the A-axis negative side limit switch 
+is triggered. 
+42 Blimitnegative Active when the B-axis negative side limit switch 
+is triggered. 
+43 Climitnegative Active when the C-axis negative side limit switch 
+is triggered. 
+44 Xhome Active when then X-axis home input is triggered. 
+45 Yhome Active when then Y-axis home input is triggered. 
+46 Zhome Active when then Z-axis home input is triggered. 
+47 Ahome Active when then A-axis home input is triggered. 
+48 Bhome Active when then B-axis home input is triggered. 
+49 Chome Active when then C-axis home input is triggered. 
+50 SpindleCW Active when the spindle is rotating Clockwise. 
+51 SpindleCCW Active when the spindle is rotating Counter-
+clockwise 
+52 Miston Active when the mist coolant is on. 
+53 Floodon Active when the flood coolant is on. 
+54 Cyclestart Active when a G-code execution cycle is in 
+progress. 
+55 Runsingleline Active when a Single line G-code execution cycle 
+is in progress. 
+56 Xhomed Active when the X-axis was already homed. 
+57 Yhomed Active when the Y-axis was already homed. 
+58 Zhomed Active when the Z-axis was already homed. 
+59 Ahomed Active when the A-axis was already homed. 
+60 Bhomed Active when the B-axis was already homed. 
+61 Chomed Active when the C-axis was already homed. 
+62 Machinecoords Active when the machine coordinate system is 
+selected to view in the position DROs. 
+63 THCon Active when the THC on physical input is active. 
+64 THCup Active when the THC up physical input is active. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 65 of 120 
+UCCNC Version 1.2022 
+LED 
+NUMBER LED NAME DESCRIPTION 
+65 THCdown Active when the THC down physical input is 
+active. 
+66 THCenabled Active when the THC control is enabled. 
+67 Softlimitsenabled Active when the Software limit function is 
+enabled. 
+68 THCdelay Active when the THC delay is ongoing. 
+69 OutputPT2PN1 Indicates the actual logic state of port#2 pin#1. 
+70 OutputPT2PN2 Indicates the actual logic state of port#2 pin#2. 
+71 OutputPT2PN3 Indicates the actual logic state of port#2 pin#3. 
+72 OutputPT2PN4 Indicates the actual logic state of port#2 pin#4. 
+73 OutputPT2PN5 Indicates the actual logic state of port#2 pin#5. 
+74 OutputPT2PN6 Indicates the actual logic state of port#2 pin#6. 
+75 OutputPT2PN7 Indicates the actual logic state of port#2 pin#7. 
+76 OutputPT2PN8 Indicates the actual logic state of port#2 pin#8. 
+77 OutputPT2PN9 Indicates the actual logic state of port#2 pin#9. 
+78 OutputPT2PN10 Indicates the actual logic state of port#2 pin#10. 
+79 OutputPT2PN11 Indicates the actual logic state of port#2 pin#11. 
+80 OutputPT2PN12 Indicates the actual logic state of port#2 pin#12. 
+81 OutputPT2PN13 Indicates the actual logic state of port#2 pin#13. 
+82 OutputPT2PN14 Indicates the actual logic state of port#2 pin#14. 
+83 OutputPT2PN15 Indicates the actual logic state of port#2 pin#15. 
+84 OutputPT2PN16 Indicates the actual logic state of port#2 pin#16. 
+85 OutputPT2PN17 Indicates the actual logic state of port#2 pin#17. 
+86 OutputPT3PN1 Indicates the actual logic state of port#3 pin#1. 
+87 OutputPT3PN2 Indicates the actual logic state of port#3 pin#2. 
+88 OutputPT3PN3 Indicates the actual logic state of port#3 pin#3. 
+89 OutputPT3PN4 Indicates the actual logic state of port#3 pin#4. 
+90 OutputPT3PN5 Indicates the actual logic state of port#3 pin#5. 
+91 OutputPT3PN6 Indicates the actual logic state of port#3 pin#6. 
+92 OutputPT3PN7 Indicates the actual logic state of port#3 pin#7. 
+93 OutputPT3PN8 Indicates the actual logic state of port#3 pin#8. 
+94 OutputPT3PN9 Indicates the actual logic state of port#3 pin#9. 
+95 OutputPT3PN10 Indicates the actual logic state of port#3 pin#10. 
+96 OutputPT3PN11 Indicates the actual logic state of port#3 pin#11. 
+97 OutputPT3PN12 Indicates the actual logic state of port#3 pin#12. 
+98 OutputPT3PN13 Indicates the actual logic state of port#3 pin#13. 
+99 OutputPT3PN14 Indicates the actual logic state of port#3 pin#14. 
+100 OutputPT3PN15 Indicates the actual logic state of port#3 pin#15. 
+101 OutputPT3PN16 Indicates the actual logic state of port#3 pin#16. 
+102 OutputPT3PN17 Indicates the actual logic state of port#3 pin#17. 
+103 OutputPT4PN1 Indicates the actual logic state of port#4 pin#1. 
+104 OutputPT4PN2 Indicates the actual logic state of port#4 pin#2. 
+105 OutputPT4PN3 Indicates the actual logic state of port#4 pin#3. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 66 of 120 
+UCCNC Version 1.2022 
+LED 
+NUMBER LED NAME DESCRIPTION 
+106 OutputPT4PN4 Indicates the actual logic state of port#4 pin#4. 
+107 OutputPT4PN5 Indicates the actual logic state of port#4 pin#5. 
+108 OutputPT4PN6 Indicates the actual logic state of port#4 pin#6. 
+109 OutputPT4PN7 Indicates the actual logic state of port#4 pin#7. 
+110 OutputPT4PN8 Indicates the actual logic state of port#4 pin#8. 
+111 OutputPT4PN9 Indicates the actual logic state of port#4 pin#9. 
+112 OutputPT4PN10 Indicates the actual logic state of port#4 pin#10. 
+113 OutputPT4PN11 Indicates the actual logic state of port#4 pin#11. 
+114 OutputPT4PN12 Indicates the actual logic state of port#4 pin#12. 
+115 OutputPT4PN13 Indicates the actual logic state of port#4 pin#13. 
+116 OutputPT4PN14 Indicates the actual logic state of port#4 pin#14. 
+117 OutputPT4PN15 Indicates the actual logic state of port#4 pin#15. 
+118 OutputPT4PN16 Indicates the actual logic state of port#4 pin#16. 
+119 OutputPT4PN17 Indicates the actual logic state of port#4 pin#17. 
+120 OutputPT5PN1 Indicates the actual logic state of port#5 pin#1. 
+121 OutputPT5PN2 Indicates the actual logic state of port#5 pin#2. 
+122 OutputPT5PN3 Indicates the actual logic state of port#5 pin#3. 
+123 OutputPT5PN4 Indicates the actual logic state of port#5 pin#4. 
+124 OutputPT5PN5 Indicates the actual logic state of port#5 pin#5. 
+125 OutputPT5PN6 Indicates the actual logic state of port#5 pin#6. 
+126 OutputPT5PN7 Indicates the actual logic state of port#5 pin#7. 
+127 OutputPT5PN8 Indicates the actual logic state of port#5 pin#8. 
+128 OutputPT5PN9 Indicates the actual logic state of port#5 pin#9. 
+129 OutputPT5PN10 Indicates the actual logic state of port#5 pin#10. 
+130 OutputPT5PN11 Indicates the actual logic state of port#5 pin#11. 
+131 OutputPT5PN12 Indicates the actual logic state of port#5 pin#12. 
+132 OutputPT5PN13 Indicates the actual logic state of port#5 pin#13. 
+133 OutputPT5PN14 Indicates the actual logic state of port#5 pin#14. 
+134 OutputPT5PN15 Indicates the actual logic state of port#5 pin#15. 
+135 OutputPT5PN16 Indicates the actual logic state of port#5 pin#16. 
+136 OutputPT5PN17 Indicates the actual logic state of port#5 pin#17. 
+137 MPGAPIN Indicates the logic state of the MPG A pin. 
+138 MPGBPIN Indicates the logic state of the MPG B pin. 
+139 EnableXaxis On when the enable output of the X axis is active 
+140 EnableYaxis On when the enable output of the Y axis is active 
+141 EnableZaxis On when the enable output of the Z axis is active 
+142 EnableAaxis On when the enable output of the A axis is active 
+143 EnableBaxis On when the enable output of the B axis is active 
+144 EnableCaxis On when the enable output of the C axis is active 
+145 Jogmodecontinous On when the continuous jog mode is selected. 
+146 Jogmodestep On when the step jog mode is selected. 
+147 R*   
+148 Jograte0001 On when the step jog rate is set to 0.001 units. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 67 of 120 
+UCCNC Version 1.2022 
+LED 
+NUMBER LED NAME DESCRIPTION 
+149 Jograte0010 On when the step jog rate is set to 0.01 units. 
+150 Jograte0100 On when the step jog rate is set to 0.1 units. 
+151 Jograte1000 On when the step jog rate is set to 1 units. 
+152 MPGmodecont On when the MPG continuous mode is selected. 
+153 MPGmodesingle On when the MPG single mode is selected. 
+154 MPGmodemulti On when the MPG multi mode is selected. 
+155 MPGXaxisselect On when the X axis is selected for the MPG jog. 
+156 MPGYaxisselect On when the Y axis is selected for the MPG jog. 
+157 MPGZaxisselect On when the Z axis is selected for the MPG jog. 
+158 MPGAaxisselect On when the A axis is selected for the MPG jog. 
+159 MPGBaxisselect On when the B axis is selected for the MPG jog. 
+160 MPGCaxisselect On when the C axis is selected for the MPG jog. 
+161 to 
+211 TABlayervisible 
+On when the tab layer is visible. The layer 
+number selected is the LED code - 161, so the 
+161. LED code is for the tab layer 0. and the 211. 
+LED code is for the 50. tab layer. Note: When 
+more than one tab layer is visible, for example if 
+a tab layer has a sub-tab layer which is also 
+visible then both LED codes are active. 
+212 Offlinemode On when the offline mode is active. 
+213 Sync_thread Active when a syncronous thread cutting is in 
+execution. 
+214 EncoderApin Indicates the logic state of the Encoder A pin. 
+215 EncoderBpin Indicates the logic state of the Encoder B pin. 
+216 MDIrunning On when an MDI command is in progress. 
+217 Feedhold On when the feedhold button is avtice. 
+218 Isdemomode On if the software is running in demo mode. 
+219 Laserdataloaded On if a laser data object is loaded to the memory 
+for laser engraving. 
+220 Laserrunning On when a laser engraving is in progress using 
+the laser data object. 
+221 OutputPT5PN26 Indicates the actual logic state of port#5 pin#26. 
+(M44 motherboard only.) 
+222 OutputPT5PN27 Indicates the actual logic state of port#5 pin#27. 
+(M44 motherboard only.) 
+223 OutputPT5PN28 Indicates the actual logic state of port#5 pin#28. 
+(M44 motherboard only.) 
+224 OutputPT5PN29 Indicates the actual logic state of port#5 pin#29. 
+(M44 motherboard only.) 
+225 OutputPT5PN30 Indicates the actual logic state of port#5 pin#30. 
+(M44 motherboard only.) 
+226 OutputPT5PN31 Indicates the actual logic state of port#5 pin#31. 
+(M44 motherboard only.) 
+227 OutputPT5PN32 Indicates the actual logic state of port#5 pin#32. 
+(M44 motherboard only.) 
+228 OutputPT5PN33 Indicates the actual logic state of port#5 pin#33. 
+(M44 motherboard only.) 
+229 M0stopactive Indicates that the M0 stop is active. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 68 of 120 
+UCCNC Version 1.2022 
+LED 
+NUMBER LED NAME DESCRIPTION 
+230 M1stopactive Indicates that the M1 stop is active. 
+231 M60stopactive Indicates that the M60 stop is active. 
+232 Pause On when any of the M0 or M1 or M60 stop mode 
+is active. 
+233 THCAntidiveactive On when in THC control and the Anti diving 
+happens. 
+234 OutputPT1PN94 Indicates the actual logic state of port#1 pin#94. 
+(5441 motherboard only.) 
+235 OutputPT1PN95 Indicates the actual logic state of port#1 pin#95. 
+(5441 motherboard only.) 
+236 MPGJogOn Indicates that the MPG jogging is active. 
+237 THCarcon_emulation Indicates that the THCarcon emulation signal is 
+active. 
+238 THCup_emulation Indicates that the THCup emulation signal is 
+active. 
+239 THCdown_emulation Indicates that the THCdown emulation signal is 
+active. 
+240 THCantidiveenabled On when the THC anti dive function is enabled. 
+241 THCdelayenabled On when the THC delay function is enabled. 
+242 THCantidownenabled On when the THC anti down function is enabled. 
+243 SafeProbeModeactive 
+On when the SafeProbeMode is active. The safe 
+probe mode actives the Reset if the probe goes 
+on when not probing. 
+244 ProbedOK 
+On if the last probing (G31) was finished with a 
+probe touch, off if the last probing did not end 
+with a touch. 
+245 Digitizing On when the M40 digitizing command is active. 
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 69 of 120 
+UCCNC Version 1.2022 
+LED 
+NUMBER LED NAME DESCRIPTION 
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 70 of 120 
+UCCNC Version 1.2022 
+LED 
+NUMBER LED NAME DESCRIPTION 
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+ 
+R* = Reserved address, do not use this address. 
+ 
+Intentionally blank page to facilitate updated sections to be printed and inserted 
+to retain pagination for other sections as new Macros are added. 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 71 of 120 
+UCCNC Version 1.2022 
+CHECKBOX OBJECTS (SORT BY NUMBER) 
+  
+This section describes the UCCNC software Checkbox screen objects. 
+  
+Each checkbox permits the user to make a selection on the UCCNC software 
+GUI. 
+Checkboxes are read only and their logic state can be read in macro code. 
+This documentation lists all the accessible Checkbox variables, sorted 
+numerically. 
+ 
+CHECKBOX 
+NUMBER CHECKBOX NAME DESCRIPTION 
+1 Xaxisenable   
+2 Xaxissteppin_activelow   
+3 Xaxisdirpin_activelow   
+4 Xaxislimitminuspin_activelow   
+5 Xaxislimitpluspin_activelow   
+6 Xaxishomepin_activelow   
+7 Xaxishomedirectionpositive   
+8 Xaxishomepositionautoset   
+9 Xaxisenablebacklash   
+10 Yaxisenable   
+11 Yaxissteppin_activelow   
+12 Yaxisdirpin_activelow   
+13 Yaxislimitminuspin_activelow   
+14 Yaxislimitpluspin_activelow   
+15 Yaxishomepin_activelow   
+16 Yaxishomedirectionpositive   
+17 Yaxishomepositionautoset   
+18 Yaxisenablebacklash   
+19 Zaxisenable   
+20 Zaxissteppin_activelow   
+21 Zaxisdirpin_activelow   
+22 Zaxislimitminuspin_activelow   
+23 Zaxislimitpluspin_activelow   
+24 Zaxishomepin_activelow   
+25 Zaxishomedirectionpositive   
+26 Zaxishomepositionautoset   
+27 Zaxisenablebacklash   
+28 Aaxisenable   
+29 Aaxissteppin_activelow   
+30 Aaxisdirpin_activelow   
+31 Aaxislimitminuspin_activelow   
+32 Aaxislimitpluspin_activelow   
+33 Aaxishomepin_activelow   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 72 of 120 
+UCCNC Version 1.2022 
+CHECKBOX 
+NUMBER CHECKBOX NAME DESCRIPTION 
+34 Aaxishomedirectionpositive   
+35 Aaxishomepositionautoset   
+36 Aaxisenablebacklash   
+37 Baxisenable   
+38 Baxissteppin_activelow   
+39 Baxisdirpin_activelow   
+40 Baxislimitminuspin_activelow   
+41 Baxislimitpluspin_activelow   
+42 Baxishomepin_activelow   
+43 Baxishomedirectionpositive   
+44 Baxishomepositionautoset   
+45 Baxisenablebacklash   
+46 Caxisenable   
+47 Caxissteppin_activelow   
+48 Caxisdirpin_activelow   
+49 Caxislimitminuspin_activelow   
+50 Caxislimitpluspin_activelow   
+51 Caxishomepin_activelow   
+52 Caxishomedirectionpositive   
+53 Caxishomepositionautoset   
+54 Caxisenablebacklash   
+55 Estoppin_activelow   
+56 Probepin1_activelow   
+57 Chargepumppin_activelow   
+58 R*   
+59 Chargepump_alwayson   
+60 Currenthilow_activelow   
+61 - 72 R*   
+73 Generalsettings_exactstoppathmode   
+74 Generalsettings_constantvelocitypathmode   
+75 Generalsettings_enablesoftlimits   
+76 Toolchange_igonoretoolchangemacro   
+77 Toolchange_stopspindleandwaitforcyclestart   
+78 Toolchange_runM6macro   
+79 Profiles_createshortcutondesktop   
+80 Appearance_3DTCPmarker   
+81 IOsetup_EnableTHCcontrol   
+82 IOsetup_THConpinactivelow   
+83 IOsetup_THCuppinactivelow   
+84 IOsetup_THCdownpinactivelow   
+85 IOsetup_ControlTHCevenifTHConisnotactive   
+86 Generalsettings_Kernelfrequency25kHz   
+87 Generalsettings_Kernelfrequency50kHz   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 73 of 120 
+UCCNC Version 1.2022 
+CHECKBOX 
+NUMBER CHECKBOX NAME DESCRIPTION 
+88 Generalsettings_Kernelfrequency100kHz   
+89 Appearance_ShowconeicononTCP   
+90 Appearance_ShowcrosshaironTCP   
+91 - 138 Inputtrigger1_activelow to 
+Inputtrigger48_activelow   
+139 R*   
+140 R*   
+141 Xaxis_enable   
+142 Yaxis_enable   
+143 Zaxis_enable   
+144 Aaxis_enable   
+145 Baxis_enable   
+146 Caxis_enable   
+147 Appearance_Maximizescreenonstartup   
+148 IOsetup_attachJROtoMPG   
+149 R*   
+150 - 197 Outputtrigger1_activelow to 
+Outputtrigger48_activelow   
+198 R*   
+199 R*   
+201 Reverseencodercountdirection   
+202 - 210 CAM_select_origin   
+211 Laseroutput_activelow   
+212 Dwelltimeinseconds   
+213 Enableusertabpage   
+214 Generalsettings_Kernelfrequency200kHz   
+215 Generalsettings_Kernelfrequency400kHz   
+216 Unknowgcode_ignore   
+217 Unknowngcode_warning   
+218 Unknowngcode_donotrun   
+219 RotateTCPwithplaneselection   
+220 Showzeromark   
+221 THCAntidiveenable   
+222 Showmessageonsoftlimits   
+223 THCDelayenable   
+224 THCAntidownenable   
+225 Probepin2_activelow   
+226 UseSpindlepulleys   
+227 ValidateTextfieldswithEnterkeyonly   
+228 Digitize_addaxisnames   
+229 Digitize_commaseparatedCSV   
+230 Digitize_includeaxisX   
+231 Digitize_includeaxisY   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 74 of 120 
+UCCNC Version 1.2022 
+CHECKBOX 
+NUMBER CHECKBOX NAME DESCRIPTION 
+232 Digitize_includeaxisZ   
+233 Digitize_includeaxisA   
+234 Digitize_includeaxisB   
+235 Digitize_includeaxisC   
+236 Digitize_Clearfilenamewhenfinished   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+ 
+R* = Reserved address, do not use this address. 
+ 
+ 
+Intentionally blank page to facilitate updated sections to be printed and inserted 
+to retain pagination for other sections as new Macros are added. 
+ 
+  
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 75 of 120 
+UCCNC Version 1.2022 
+BUTTONS (SORT BY ALPHABETICAL NAME) 
+ 
+This section describes the UCCNC software Button screen objects. 
+  
+Each button represents an internal function of the UCNC software. 
+Buttons can be called by their number from macro code. 
+This documentation lists all the accessible buttons sorted alphabetically by 
+function. 
+ 
+BUTTON 
+NUMBER FUNCTION NAME DESCRIPTION 
+168 Applysettings Applies the settings on the setup screens. 
+201 CalibrateA Calibrates the steps per units value with travel 
+measurement for the A-axis. 
+202 CalibrateB Calibrates the steps per units value with travel 
+measurement for the B-axis. 
+203 CalibrateC Calibrates the steps per units value with travel 
+measurement for the C-axis. 
+198 CalibrateX Calibrates the steps per units value with travel 
+measurement for the X-axis. 
+199 CalibrateY Calibrates the steps per units value with travel 
+measurement for the Y-axis. 
+200 CalibrateZ Calibrates the steps per units value with travel 
+measurement for the Z-axis. 
+503 CAM_Generategcode Creates the gcode in UCCAM. 
+502 CAM_Generatetoolpath Generates the toolpath in UCCAM. 
+501 CAM_ImportDXF Imports a dxf drawing file to UCCAM. 
+219 ClearG92offset Clears the G92 offset coordinates. 
+528 Clearstatusmessages Clears the Status message box 
+125 CloseGcodefile Closes the G-code fájl which is loaded. 
+532 Configmacroloops Opens the macroloop configuration window. 
+525 Configplugins Opens the plugin configuration window 
+191 Createnewprofile Create a new profile, the name of the profile is 
+held in the 216.inputfield. 
+128 Cyclestart Makes a cyclic run on the loaded G-code file. 
+130 Cyclestop Stops the G-code execution. 
+189 Deleteprofile Deletes the actually selected profile file. 
+551 Digitize_setfilename Sets the file name to save the Digitized points 
+to. 
+192 DoXMLimport Imports a Mach3 .xml setup file. The function 
+start an open file dialog. 
+126 EditGcodefile Opens the notepad to edit the loaded G-code 
+file. 
+526 Editscreen Enters the screen editor mode 
+524 Feedholdoff Switches the feedhold button off. 
+523 Feedholdon Switches the feedhold button on. 
+522 Feedholdtoggle Toggles the feedhold button. 
+133 FROdecrease Decreases the Feedrate override value. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 76 of 120 
+UCCNC Version 1.2022 
+BUTTON 
+NUMBER FUNCTION NAME DESCRIPTION 
+132 FROincrease Increases the Feedrate override value. 
+176 G54offsetclear Clears the offset in the G54 coordinate system. 
+170 G54offsetcurrentpos Offsets the actual position of the G54 
+coordinate system. 
+118 G54select Selects the G54 coordinate offset. 
+177 G55offsetclear Clears the offset in the G55 coordinate system. 
+171 G55offsetcurrentpos Offsets the actual position of the G55 
+coordinate system. 
+119 G55select Selects the G55 coordinate offset. 
+178 G56offsetclear Clears the offset in the G56 coordinate system. 
+172 G56offsetcurrentpos Offsets the actual position of the G56 
+coordinate system. 
+120 G56select Selects the G56 coordinate offset. 
+179 G57offsetclear Clears the offset in the G57 coordinate system. 
+173 G57offsetcurrentpos Offsets the actual position of the G57 
+coordinate system. 
+121 G57select Selects the G57 coordinate offset. 
+180 G58offsetclear Clears the offset in the G58 coordinate system. 
+174 G58offsetcurrentpos Offsets the actual position of the G58 
+coordinate system. 
+122 G58select Selects the G58 coordinate offset. 
+181 G59offsetclear Clears the offset in the G59 coordinate system. 
+175 G59offsetcurrentpos Offsets the actual position of the G59 
+coordinate system. 
+123 G59select Selects the G59 coordinate offset. 
+193 Gotoparkposition1 Commands the machine to park position 1. 
+(Code executed in Macro M200) 
+194 Gotoparkposition2 Commands the machine to park position 2. 
+(Code executed in Macro M201) 
+195 Gotoparkposition3 Commands the machine to park position 3. 
+(Code executed in Macro M202) 
+131 Gotozero Moves all axis to the zero position with a rapid 
+linear interpolation movement. 
+110 HomeA Runs the A axis to the home sensor. 
+113 HomeAll Runs all axis to the home sensor. The homing 
+sequence is defined in the setup. 
+111 HomeB Runs the B axis to the home sensor. 
+112 HomeC Runs the C axis to the home sensor. 
+107 HomeX Runs the X axis to the home sensor. 
+108 HomeY Runs the Y axis to the home sensor. 
+109 HomeZ Runs the Z axis to the home sensor. 
+154 JogA- Jogs the A axis to negative direction. 
+153 JogA+ Jogs the A axis to positive direction. 
+236 JogAminusoff Switches the A axis negative direction jogging 
+off. 
+235 JogAplusoff Switches the A axis positive direction jogging 
+off. 
+156 JogB- Jogs the B axis to negative direction. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 77 of 120 
+UCCNC Version 1.2022 
+BUTTON 
+NUMBER FUNCTION NAME DESCRIPTION 
+155 JogB+ Jogs the B axis to positive direction. 
+238 JogBminusoff Switches the B axis negative direction jogging 
+off. 
+237 JogBplusoff Switches the B axis positive direction jogging 
+off. 
+158 JogC- Jogs the C axis to negative direction. 
+157 JogC+ Jogs the C axis to positive direction. 
+240 JogCminusoff Switches the C axis negative direction jogging 
+off. 
+239 JogCplusoff Switches the C axis positive direction jogging 
+off. 
+161 Jogmodecont Sets the jog mode to continous. 
+162 Jogmodestep Sets the jog mode to stepping. 
+160 Jogratedecrease Decreases the jog rate. 
+159 Jograteincrease Increases the jog rate. 
+241 Jogsteprate0001 Sets the jog distance when stepping mode to 
+0.001 Units. 
+164 Jogsteprate001 Sets the jog distance when stepping mode to 
+0.01 Units. 
+165 Jogsteprate010 Sets the jog distance when stepping mode to 
+0.10 Units. 
+166 Jogsteprate100 Sets the jog distance when stepping mode to 
+1.00 Units. 
+148 JogX- Jogs the X axis to negative direction. 
+147 JogX+ Jogs the X axis to positive direction. 
+230 JogXminusoff Switches the X axis negative direction jogging 
+off. 
+229 JogXplusoff Switches the X axis positive direction jogging 
+off. 
+150 JogY- Jogs the Y axis to negative direction. 
+149 JogY+ Jogs the Y axis to positive direction. 
+232 JogYminusoff Switches the Y axis negative direction jogging 
+off. 
+231 JogYplusoff Switches the Y axis positive direction jogging 
+off. 
+152 JogZ- Jogs the Z axis to negative direction. 
+151 JogZ+ Jogs the Z axis to positive direction. 
+234 JogZminusoff Switches the Z axis negative direction jogging 
+off. 
+233 JogZplusoff Switches the Z axis positive direction jogging 
+off. 
+146 Limitsoverridetoggle Toggles the limits override button. 
+188 Listprofiles Lists the available profile file names in the 
+1.Listcomponent. 
+190 Loadprofile Loads the actually selected profile file. 
+505 M3off Switches the M3 spindle CW button off. 
+504 M3on Switches the M3 spindle CW button on. 
+114 M3toggle Toggles the M3 spindle CW button. 
+507 M4off Switches the M4 spindle CCW button off. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 78 of 120 
+UCCNC Version 1.2022 
+BUTTON 
+NUMBER FUNCTION NAME DESCRIPTION 
+506 M4on Switches the M4 spindle CCW button on. 
+115 M4toggle Toggles the M4 spindle CCW button. 
+509 M7off Switches the M7 mist button off. 
+508 M7on Switches the M7 mist button on. 
+116 M7toggle Toggles the M7 mist button. 
+511 M8off Switches the M8 flood button off. 
+510 M8on Switches the M8 flood button on. 
+117 M8toggle Toggles the M8 flood button. 
+517 Machinecoordsoff Switches the machine coordinates button off. 
+516 Machinecoordson Switches the machine coordinates button on. 
+197 Machinecoordstoggle 
+Toggles the position DROs between the 
+machine coordinates and the actual offset 
+coordinates view. 
+223 MPGAaxisselect Selects the A axis for the MPG jog. 
+224 MPGBaxisselect Selects the B axis for the MPG jog. 
+225 MPGCaxisselect Selects the C axis for the MPG jog. 
+226 MPGcontmodeselect Selects the continuous jog mode for the MPG. 
+228 MPGmultimodeselect Selects the multi step jog mode for the MPG. 
+227 MPGsinglemodeselect Selects the single step  jog mode for the MPG. 
+220 MPGXaxisselect Selects the X axis for the MPG jog. 
+221 MPGYaxisselect Selects the Y axis for the MPG jog. 
+222 MPGZaxisselect Selects the Z axis for the MPG jog. 
+515 Offlineoff Switches the Offline button off. 
+514 Offlineon Switches the Offline button on. 
+145 Offlinetoggle Toggles the offline button. 
+124 OpenGcodefile Starts an Open G-code file dialog. 
+548 Operatorlock Opens the operator lock/unlock window. 
+163 R*   
+552 - 999 R*   
+513 Resetoff Switches the Reset button off. 
+512 Reseton Switches the Reset button on. 
+144 Resettoggle Toggles the reset button. 
+127 RewindGcodefile Rewinds the loaded G-code file with jumping to 
+the first row in the file. 
+129 Runsingleline Executes one line of code (the actual code line) 
+of the loaded G-code file. 
+546 Safeprobemodeoff Switches the safe probe mode off. 
+545 Safeprobemodeon Switches the safe probe mode on. 
+547 Safeprobemodetoggle Toggles the safe probe mode. 
+527 Savealloffsets Saves all offset values to the profile file. 
+167 Savesettings 
+ 
+ 
+Saves all settings to the profile file. 
+ 
+ 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 79 of 120 
+UCCNC Version 1.2022 
+BUTTON 
+NUMBER FUNCTION NAME DESCRIPTION 
+400 - 449 SelectTABlayer 
+Selects the TAB layer on the screen. The layer 
+number selected is the function code - 400, so 
+TAB layer 1. selected with code 401. Note: To 
+select a sub layer with a hotkey or with an input 
+trigger configure the same key or pin to select 
+all of it's parent layers and also the layer itself, 
+so the parent layers and the sub layers will also 
+be selected and the sub layer will always 
+showup this way, no matter which parent layer 
+was originally shown. 
+242 - 292 Sethotkeycodes Opens the Hotkeys keyboard key selection 
+window. 
+293 - 343 Sethotkeyfunctions Opens a Function selection window for the 
+hotkeys. 
+344 - 394 Setinputtriggerfunctions Opens a Function selection window for the 
+input triggers. 
+169 Setnextline Sets the G-code execution pointer to the line 
+defined on the screen in the 128. labelfield. 
+450 - 500 SetoutputtriggerLEDs Opens a LED selection window for the output 
+triggers. 
+550 ShowSpindlepulleys Opens the Spindle pulleys selection window. 
+549 Showstatistics Opens the machine statistics window. 
+519 Softlimitsoff Switches the softlimits setting off. 
+518 Softlimitson Switches the softlimits setting on. 
+204 Softlimitstoggle Toggles the software limits enable function. 
+135 SROdecrease Decreases the spindle speed override value. 
+134 SROincrease Increases the spindle speed override value. 
+530 THCAntiDiveoff Switches the Anti Dive function for the THC off. 
+529 THCAntiDiveon Switches the Anti Dive function for the THC on. 
+531 THCAntiDivetoggle Toggles the Anti Dive function for the THC. 
+543 THCAntiDownoff Switches the Anti Down function for the THC 
+off. 
+542 THCAntiDownon Switches the Anti Down function for the THC 
+on. 
+544 THCAntiDowntoggle Toggles the Anti Down function for the THC. 
+537 THCarconsignaloff_emulat
+ion 
+Switches the THC arcon virtual signal off. Can 
+be used to emulate the THC arcon signal from 
+keyboard. 
+536 THCarconsignalon_emulat
+ion 
+Switches the THC arcon virtual signal on. Can 
+be used to emulate the THC arcon signal from 
+keyboard. 
+534 THCDelayoff Switches the THC Delay function for the THC 
+off. 
+533 THCDelayon Switches the THC Delay function for the THC 
+on. 
+535 THCDelaytoggle Toggles the Delay function for the THC. 
+541 THCdownsignaloff_emulati
+on 
+Switches the THC down virtual signal off. Can 
+be used to emulate the THC down signal from 
+keyboard. 
+ 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 80 of 120 
+UCCNC Version 1.2022 
+BUTTON 
+NUMBER FUNCTION NAME DESCRIPTION 
+540 THCdownsignalon_emulati
+on 
+Switches the THC down virtual signal on. Can 
+be used to emulate the THC down signal from 
+keyboard. 
+521 THCoff Switches the THC control off. 
+520 THCon Switches the THC control on. 
+205 THCtoggle Toggles the THC control enable function. 
+539 THCupsignaloff_emulation 
+Switches the THC up virtual signal off. Can be 
+used to emulate the THC up signal from 
+keyboard. 
+538 THCupsignalon_emulation 
+Switches the THC up virtual signal on. Can be 
+used to emulate the THC up signal from 
+keyboard. 
+196 Toollengthmeasurement Commands a tool length measurement. (Code 
+executed in Macro M31) 
+182 Tooloffsetclear Clears the tool offset. 
+183 Tooloffsetclear Clears the tool offset. 
+184 Tooloffsetclear Clears the tool offset. 
+185 Tooloffsetclear Clears the tool offset. 
+186 Tooloffsetclear Clears the tool offset. 
+187 Tooloffsetclear Clears the tool offset. 
+139 Toolpathview45 Sets the toolpath to a 45° look viewing mode. 
+143 ToolpathviewISO Sets the toolpath to Isometric viewing mode. 
+141 Toolpathviewleft Sets the toolpath to a left side look viewing 
+mode. 
+140 Toolpathviewright Sets the toolpath to a right side look viewing 
+mode. 
+142 Toolpathviewtop Sets the toolpath to a top side look viewing 
+mode. 
+138 Toolpathzoomcontents Zooms the contents in the toolpath viewer. 
+136 Toolpathzoomin Zooms in the toolpath viewer. 
+137 Toolpathzoomout Zooms out the toolpath viewer. 
+103 ZeroA Zeros the A axis position. 
+106 ZeroAll Zeros All axis position. 
+104 ZeroB Zeros the B axis position. 
+105 ZeroC Zeros the C axis position. 
+218 Zeroworktimer Zeros the work timer. 
+100 ZeroX Zeros the X axis position. 
+101 ZeroY Zeros the Y axis position. 
+102 ZeroZ Zeros the Z axis position. 
+ 
+R* = Reserved address, do not use this address. 
+  
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 81 of 120 
+UCCNC Version 1.2022 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Intentionally blank page to facilitate updated sections to be printed and inserted 
+to retain pagination for other sections as new Macros are added. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 82 of 120 
+UCCNC Version 1.2022 
+FIELDS (SORT BY ALPHABETICAL NAME) 
+ 
+This section describes the UCCNC software field screen objects. 
+  
+Each field object represents a text label on the UCCNC screen. 
+"textfield", "textfieldnb", "field", "fieldnb" type labels can be read and written from 
+macro code and are editable by the user on the UCCNC GUI. 
+The "textfield", "textfieldnb" can contain any kind of text including words. The 
+"field", "fieldnb" can contain numerical values only. 
+"showfield", "showfieldnb" type labels can be read and written from macro code 
+and are not editable by the user on the UCCNC GUI. 
+This documentation lists all the accessible field objects sorted alphabetically by 
+function. 
+ 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+55 Aaxisacceleration   
+59 Aaxisbacklash   
+58 Aaxiscompaccel   
+47 Aaxisdirpin   
+257 Aaxisdirport   
+469 Aaxisenablepin   
+470 Aaxisenableport   
+52 Aaxishomeoffset   
+50 Aaxishomepin   
+260 Aaxishomeport   
+51 Aaxishomingspeed   
+48 Aaxislimitminuspin   
+258 Aaxislimitminusport   
+49 Aaxislimitpluspin   
+259 Aaxislimitplusport   
+56 Aaxissoftlimitminus   
+57 Aaxissoftlimitplus   
+46 Aaxissteppin   
+256 Aaxisstepport   
+53 Aaxisstepsper   
+54 Aaxisvelocity   
+868 Actfeedrate   
+899 Active_fixture   
+897 Active_toolnumber   
+877 Activemodal   
+870 Actspindlespeed   
+909 Analog_inputvalue1   
+910 Analog_inputvalue2   
+2002 Analog_inputvalue3   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 83 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+2003 Analog_inputvalue4   
+911 Analog_outputvalue1   
+912 Analog_outputvalue2   
+2008 Analog_outputvalue3   
+2009 Analog_outputvalue4   
+444 Analoginput1var   
+445 Analoginput2var   
+2004 Analoginput3var   
+2005 Analoginput4var   
+460 Analogoutput1var   
+461 Analogoutput2var   
+2006 Analogoutput3var   
+2007 Analogoutput4var   
+905 APIversion   
+229 AposDRO   
+70 Baxisacceleration   
+74 Baxisbacklash   
+73 Baxiscompaccel   
+62 Baxisdirpin   
+262 Baxisdirport   
+471 Baxisenablepin   
+472 Baxisenableport   
+67 Baxishomeoffset   
+65 Baxishomepin   
+265 Baxishomeport   
+66 Baxishomingspeed   
+63 Baxislimitminuspin   
+263 Baxislimitminusport   
+64 Baxislimitpluspin   
+264 Baxislimitplusport   
+71 Baxissoftlimitminus   
+72 Baxissoftlimitplus   
+61 Baxissteppin   
+261 Baxisstepport   
+68 Baxisstepsper   
+69 Baxisvelocity   
+230 BposDRO   
+858 CAM_Cutdepth   
+859 CAM_Cutperpass   
+861 CAM_Feedrate   
+863 CAM_Plungerate   
+860 CAM_SafeZ   
+865 CAM_Spindlespeed   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 84 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+857 CAM_Startdepth   
+908 CAM_Statuslabel   
+856 CAM_Tooldia   
+862 CAM_Tooloverlap   
+85 Caxisacceleration   
+89 Caxisbacklash   
+88 Caxiscompaccel   
+77 Caxisdirpin   
+267 Caxisdirport   
+473 Caxisenablepin   
+474 Caxisenableport   
+82 Caxishomeoffset   
+80 Caxishomepin   
+270 Caxishomeport   
+81 Caxishomingspeed   
+78 Caxislimitminuspin   
+268 Caxislimitminusport   
+79 Caxislimitpluspin   
+269 Caxislimitplusport   
+86 Caxissoftlimitminus   
+87 Caxissoftlimitplus   
+76 Caxissteppin   
+266 Caxisstepport   
+83 Caxisstepsper   
+84 Caxisvelocity   
+95 Chargepumppin   
+274 Chargepumpport   
+190 Comm_buffer_size   
+231 CposDRO   
+96 Currenthilowpin   
+275 Currenthilowport   
+194 CV_Cornererrormax   
+217 CV_Linearadditionlenght   
+193 CV_Linearerrormax   
+218 CV_Linearunifylength   
+192 CV_Lookaheadlines   
+191 CV_stopangledegrees   
+907 Devicetype   
+895 Diagnostics_Filename   
+888 Diagnostics_maxX   
+889 Diagnostics_maxY   
+890 Diagnostics_maxZ   
+885 Diagnostics_minX   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 85 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+886 Diagnostics_minY   
+887 Diagnostics_minZ   
+891 Diagnostics_sizeX   
+892 Diagnostics_sizeY   
+893 Diagnostics_sizeZ   
+894 Diagnostics_totalnumberofobjects   
+2017 Digitize_filename   
+2015 Digitize_numberofdigits   
+2018 Digitize_numberofstoredpoints   
+2016 Digitize_proberadius   
+896 Dwell_time   
+852 EncoderApin   
+853 EncoderAport   
+854 EncoderBpin   
+855 EncoderBport   
+864 EncoderPPR   
+91 Estoppin   
+271 Estopport   
+903 Firmwareversion   
+447 FROanalogchannelnumber   
+449 FROanalogmaxpercent   
+448 FROanalogminpercent   
+232 FRODRO   
+100 G54_CurrentcoordA   
+101 G54_CurrentcoordB   
+102 G54_CurrentcoordC   
+97 G54_CurrentcoordX   
+98 G54_CurrentcoordY   
+99 G54_CurrentcoordZ   
+136 G54_WorkoffsetA   
+137 G54_WorkoffsetB   
+138 G54_WorkoffsetC   
+133 G54_WorkoffsetX   
+134 G54_WorkoffsetY   
+135 G54_WorkoffsetZ   
+106 G55_CurrentcoordA   
+107 G55_CurrentcoordB   
+108 G55_CurrentcoordC   
+103 G55_CurrentcoordX   
+104 G55_CurrentcoordY   
+105 G55_CurrentcoordZ   
+142 G55_WorkoffsetA   
+143 G55_WorkoffsetB   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 86 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+144 G55_WorkoffsetC   
+139 G55_WorkoffsetX   
+140 G55_WorkoffsetY   
+141 G55_WorkoffsetZ   
+112 G56_CurrentcoordA   
+113 G56_CurrentcoordB   
+114 G56_CurrentcoordC   
+109 G56_CurrentcoordX   
+110 G56_CurrentcoordY   
+111 G56_CurrentcoordZ   
+148 G56_WorkoffsetA   
+149 G56_WorkoffsetB   
+150 G56_WorkoffsetC   
+145 G56_WorkoffsetX   
+146 G56_WorkoffsetY   
+147 G56_WorkoffsetZ   
+118 G57_CurrentcoordA   
+119 G57_CurrentcoordB   
+120 G57_CurrentcoordC   
+115 G57_CurrentcoordX   
+116 G57_CurrentcoordY   
+117 G57_CurrentcoordZ   
+154 G57_WorkoffsetA   
+155 G57_WorkoffsetB   
+156 G57_WorkoffsetC   
+151 G57_WorkoffsetX   
+152 G57_WorkoffsetY   
+153 G57_WorkoffsetZ   
+124 G58_CurrentcoordA   
+125 G58_CurrentcoordB   
+126 G58_CurrentcoordC   
+121 G58_CurrentcoordX   
+122 G58_CurrentcoordY   
+123 G58_CurrentcoordZ   
+160 G58_WorkoffsetA   
+161 G58_WorkoffsetB   
+162 G58_WorkoffsetC   
+157 G58_WorkoffsetX   
+158 G58_WorkoffsetY   
+159 G58_WorkoffsetZ   
+130 G59_CurrentcoordA   
+131 G59_CurrentcoordB   
+132 G59_CurrentcoordC   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 87 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+127 G59_CurrentcoordX   
+128 G59_CurrentcoordY   
+129 G59_CurrentcoordZ   
+166 G59_WorkoffsetA   
+167 G59_WorkoffsetB   
+168 G59_WorkoffsetC   
+163 G59_WorkoffsetX   
+164 G59_WorkoffsetY   
+165 G59_WorkoffsetZ   
+235 G73backoff   
+503 G92_offsetA   
+504 G92_offsetB   
+505 G92_offsetC   
+500 G92_offsetX   
+501 G92_offsetY   
+502 G92_offsetZ   
+904 Hardwareversion   
+507 Hotkey_function1   
+525 Hotkey_function10   
+527 Hotkey_function11   
+529 Hotkey_function12   
+531 Hotkey_function13   
+533 Hotkey_function14   
+535 Hotkey_function15   
+537 Hotkey_function16   
+539 Hotkey_function17   
+541 Hotkey_function18   
+543 Hotkey_function19   
+509 Hotkey_function2   
+545 Hotkey_function20   
+547 Hotkey_function21   
+549 Hotkey_function22   
+551 Hotkey_function23   
+553 Hotkey_function24   
+555 Hotkey_function25   
+557 Hotkey_function26   
+559 Hotkey_function27   
+561 Hotkey_function28   
+563 Hotkey_function29   
+511 Hotkey_function3   
+565 Hotkey_function30   
+567 Hotkey_function31   
+569 Hotkey_function32   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 88 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+571 Hotkey_function33   
+573 Hotkey_function34   
+575 Hotkey_function35   
+577 Hotkey_function36   
+579 Hotkey_function37   
+581 Hotkey_function38   
+583 Hotkey_function39   
+513 Hotkey_function4   
+585 Hotkey_function40   
+587 Hotkey_function41   
+589 Hotkey_function42   
+591 Hotkey_function43   
+593 Hotkey_function44   
+595 Hotkey_function45   
+597 Hotkey_function46   
+599 Hotkey_function47   
+601 Hotkey_function48   
+515 Hotkey_function5   
+517 Hotkey_function6   
+519 Hotkey_function7   
+521 Hotkey_function8   
+523 Hotkey_function9   
+506 Hotkey_keycode1   
+524 Hotkey_keycode10   
+526 Hotkey_keycode11   
+528 Hotkey_keycode12   
+530 Hotkey_keycode13   
+532 Hotkey_keycode14   
+534 Hotkey_keycode15   
+536 Hotkey_keycode16   
+538 Hotkey_keycode17   
+540 Hotkey_keycode18   
+542 Hotkey_keycode19   
+508 Hotkey_keycode2   
+544 Hotkey_keycode20   
+546 Hotkey_keycode21   
+548 Hotkey_keycode22   
+550 Hotkey_keycode23   
+552 Hotkey_keycode24   
+554 Hotkey_keycode25   
+556 Hotkey_keycode26   
+558 Hotkey_keycode27   
+560 Hotkey_keycode28   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 89 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+562 Hotkey_keycode29   
+510 Hotkey_keycode3   
+564 Hotkey_keycode30   
+566 Hotkey_keycode31   
+568 Hotkey_keycode32   
+570 Hotkey_keycode33   
+572 Hotkey_keycode34   
+574 Hotkey_keycode35   
+576 Hotkey_keycode36   
+578 Hotkey_keycode37   
+580 Hotkey_keycode38   
+582 Hotkey_keycode39   
+512 Hotkey_keycode4   
+584 Hotkey_keycode40   
+586 Hotkey_keycode41   
+588 Hotkey_keycode42   
+590 Hotkey_keycode43   
+592 Hotkey_keycode44   
+594 Hotkey_keycode45   
+596 Hotkey_keycode46   
+598 Hotkey_keycode47   
+600 Hotkey_keycode48   
+514 Hotkey_keycode5   
+516 Hotkey_keycode6   
+518 Hotkey_keycode7   
+520 Hotkey_keycode8   
+522 Hotkey_keycode9   
+93 Indexpin   
+273 Indexport   
+94 Indexprescaler   
+320 Inputtrigger10function   
+318 Inputtrigger10pin   
+319 Inputtrigger10port   
+323 Inputtrigger11function   
+321 Inputtrigger11pin   
+322 Inputtrigger11port   
+326 Inputtrigger12function   
+324 Inputtrigger12pin   
+325 Inputtrigger12port   
+329 Inputtrigger13function   
+327 Inputtrigger13pin   
+328 Inputtrigger13port   
+332 Inputtrigger14function   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 90 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+330 Inputtrigger14pin   
+331 Inputtrigger14port   
+335 Inputtrigger15function   
+333 Inputtrigger15pin   
+334 Inputtrigger15port   
+338 Inputtrigger16function   
+336 Inputtrigger16pin   
+337 Inputtrigger16port   
+341 Inputtrigger17function   
+339 Inputtrigger17pin   
+340 Inputtrigger17port   
+344 Inputtrigger18function   
+342 Inputtrigger18pin   
+343 Inputtrigger18port   
+347 Inputtrigger19function   
+345 Inputtrigger19pin   
+346 Inputtrigger19port   
+293 Inputtrigger1function   
+291 Inputtrigger1pin   
+292 Inputtrigger1port   
+350 Inputtrigger20function   
+348 Inputtrigger20pin   
+349 Inputtrigger20port   
+353 Inputtrigger21function   
+351 Inputtrigger21pin   
+352 Inputtrigger21port   
+356 Inputtrigger22function   
+354 Inputtrigger22pin   
+355 Inputtrigger22port   
+359 Inputtrigger23function   
+357 Inputtrigger23pin   
+358 Inputtrigger23port   
+362 Inputtrigger24function   
+360 Inputtrigger24pin   
+361 Inputtrigger24port   
+365 Inputtrigger25function   
+363 Inputtrigger25pin   
+364 Inputtrigger25port   
+368 Inputtrigger26function   
+366 Inputtrigger26pin   
+367 Inputtrigger26port   
+371 Inputtrigger27function   
+369 Inputtrigger27pin   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 91 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+370 Inputtrigger27port   
+374 Inputtrigger28function   
+372 Inputtrigger28pin   
+373 Inputtrigger28port   
+377 Inputtrigger29function   
+375 Inputtrigger29pin   
+376 Inputtrigger29port   
+296 Inputtrigger2function   
+294 Inputtrigger2pin   
+295 Inputtrigger2port   
+380 Inputtrigger30function   
+378 Inputtrigger30pin   
+379 Inputtrigger30port   
+383 Inputtrigger31function   
+381 Inputtrigger31pin   
+382 Inputtrigger31port   
+386 Inputtrigger32function   
+384 Inputtrigger32pin   
+385 Inputtrigger32port   
+389 Inputtrigger33function   
+387 Inputtrigger33pin   
+388 Inputtrigger33port   
+392 Inputtrigger34function   
+390 Inputtrigger34pin   
+391 Inputtrigger34port   
+395 Inputtrigger35function   
+393 Inputtrigger35pin   
+394 Inputtrigger35port   
+398 Inputtrigger36function   
+396 Inputtrigger36pin   
+397 Inputtrigger36port   
+401 Inputtrigger37function   
+399 Inputtrigger37pin   
+400 Inputtrigger37port   
+404 Inputtrigger38function   
+402 Inputtrigger38pin   
+403 Inputtrigger38port   
+407 Inputtrigger39function   
+405 Inputtrigger39pin   
+406 Inputtrigger39port   
+299 Inputtrigger3function   
+297 Inputtrigger3pin   
+298 Inputtrigger3port   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 92 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+410 Inputtrigger40function   
+408 Inputtrigger40pin   
+409 Inputtrigger40port   
+413 Inputtrigger41function   
+411 Inputtrigger41pin   
+412 Inputtrigger41port   
+416 Inputtrigger42function   
+414 Inputtrigger42pin   
+415 Inputtrigger42port   
+419 Inputtrigger43function   
+417 Inputtrigger43pin   
+418 Inputtrigger43port   
+422 Inputtrigger44function   
+420 Inputtrigger44pin   
+421 Inputtrigger44port   
+425 Inputtrigger45function   
+423 Inputtrigger45pin   
+424 Inputtrigger45port   
+428 Inputtrigger46function   
+426 Inputtrigger46pin   
+427 Inputtrigger46port   
+431 Inputtrigger47function   
+429 Inputtrigger47pin   
+430 Inputtrigger47port   
+434 Inputtrigger48function   
+432 Inputtrigger48pin   
+433 Inputtrigger48port   
+302 Inputtrigger4function   
+300 Inputtrigger4pin   
+301 Inputtrigger4port   
+305 Inputtrigger5function   
+303 Inputtrigger5pin   
+304 Inputtrigger5port   
+308 Inputtrigger6function   
+306 Inputtrigger6pin   
+307 Inputtrigger6port   
+311 Inputtrigger7function   
+309 Inputtrigger7pin   
+310 Inputtrigger7port   
+314 Inputtrigger8function   
+312 Inputtrigger8pin   
+313 Inputtrigger8port   
+317 Inputtrigger9function   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 93 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+315 Inputtrigger9pin   
+316 Inputtrigger9port   
+881 IOmonitor_APOS   
+882 IOmonitor_BPOS   
+883 IOmonitor_CPOS   
+878 IOmonitor_XPOS   
+879 IOmonitor_YPOS   
+880 IOmonitor_ZPOS   
+913 Jogfeedrate   
+453 JROanalogchannelnumber   
+455 JROanalogmaxpercent   
+454 JROanalogminpercent   
+914 Laseroutputpin   
+915 Laseroutputport   
+901 Licensed_to   
+874 MachinecoordA   
+875 MachinecoordB   
+876 MachinecoordC   
+871 MachinecoordX   
+872 MachinecoordY   
+873 MachinecoordZ   
+884 Motionbuffer   
+456 MPGfilterconstant   
+287 MPGpinA   
+289 MPGpinB   
+288 MPGportA   
+290 MPGportB   
+443 MPGprescaler   
+457 MPGspeedmultiplier   
+216 Newprofilename   
+729 Outputtrigger10LED   
+727 Outputtrigger10pin   
+728 Outputtrigger10port   
+732 Outputtrigger11LED   
+730 Outputtrigger11pin   
+731 Outputtrigger11port   
+735 Outputtrigger12LED   
+733 Outputtrigger12pin   
+734 Outputtrigger12port   
+738 Outputtrigger13LED   
+736 Outputtrigger13pin   
+737 Outputtrigger13port   
+741 Outputtrigger14LED   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 94 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+739 Outputtrigger14pin   
+740 Outputtrigger14port   
+744 Outputtrigger15LED   
+742 Outputtrigger15pin   
+743 Outputtrigger15port   
+747 Outputtrigger16LED   
+745 Outputtrigger16pin   
+746 Outputtrigger16port   
+750 Outputtrigger17LED   
+748 Outputtrigger17pin   
+749 Outputtrigger17port   
+753 Outputtrigger18LED   
+751 Outputtrigger18pin   
+752 Outputtrigger18port   
+756 Outputtrigger19LED   
+754 Outputtrigger19pin   
+755 Outputtrigger19port   
+702 Outputtrigger1LED   
+700 Outputtrigger1pin   
+701 Outputtrigger1port   
+759 Outputtrigger20LED   
+757 Outputtrigger20pin   
+758 Outputtrigger20port   
+762 Outputtrigger21LED   
+760 Outputtrigger21pin   
+761 Outputtrigger21port   
+765 Outputtrigger22LED   
+763 Outputtrigger22pin   
+764 Outputtrigger22port   
+768 Outputtrigger23LED   
+766 Outputtrigger23pin   
+767 Outputtrigger23port   
+771 Outputtrigger24LED   
+769 Outputtrigger24pin   
+770 Outputtrigger24port   
+774 Outputtrigger25LED   
+772 Outputtrigger25pin   
+773 Outputtrigger25port   
+777 Outputtrigger26LED   
+775 Outputtrigger26pin   
+776 Outputtrigger26port   
+780 Outputtrigger27LED   
+778 Outputtrigger27pin   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 95 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+779 Outputtrigger27port   
+783 Outputtrigger28LED   
+781 Outputtrigger28pin   
+782 Outputtrigger28port   
+786 Outputtrigger29LED   
+784 Outputtrigger29pin   
+785 Outputtrigger29port   
+705 Outputtrigger2LED   
+703 Outputtrigger2pin   
+704 Outputtrigger2port   
+789 Outputtrigger30LED   
+787 Outputtrigger30pin   
+788 Outputtrigger30port   
+792 Outputtrigger31LED   
+790 Outputtrigger31pin   
+791 Outputtrigger31port   
+795 Outputtrigger32LED   
+793 Outputtrigger32pin   
+794 Outputtrigger32port   
+798 Outputtrigger33LED   
+796 Outputtrigger33pin   
+797 Outputtrigger33port   
+801 Outputtrigger34LED   
+799 Outputtrigger34pin   
+800 Outputtrigger34port   
+804 Outputtrigger35LED   
+802 Outputtrigger35pin   
+803 Outputtrigger35port   
+807 Outputtrigger36LED   
+805 Outputtrigger36pin   
+806 Outputtrigger36port   
+810 Outputtrigger37LED   
+808 Outputtrigger37pin   
+809 Outputtrigger37port   
+813 Outputtrigger38LED   
+811 Outputtrigger38pin   
+812 Outputtrigger38port   
+816 Outputtrigger39LED   
+814 Outputtrigger39pin   
+815 Outputtrigger39port   
+708 Outputtrigger3LED   
+706 Outputtrigger3pin   
+707 Outputtrigger3port   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 96 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+819 Outputtrigger40LED   
+817 Outputtrigger40pin   
+818 Outputtrigger40port   
+822 Outputtrigger41LED   
+820 Outputtrigger41pin   
+821 Outputtrigger41port   
+825 Outputtrigger42LED   
+823 Outputtrigger42pin   
+824 Outputtrigger42port   
+828 Outputtrigger43LED   
+826 Outputtrigger43pin   
+827 Outputtrigger43port   
+831 Outputtrigger44LED   
+829 Outputtrigger44pin   
+830 Outputtrigger44port   
+834 Outputtrigger45LED   
+832 Outputtrigger45pin   
+833 Outputtrigger45port   
+837 Outputtrigger46LED   
+835 Outputtrigger46pin   
+836 Outputtrigger46port   
+840 Outputtrigger47LED   
+838 Outputtrigger47pin   
+839 Outputtrigger47port   
+843 Outputtrigger48LED   
+841 Outputtrigger48pin   
+842 Outputtrigger48port   
+711 Outputtrigger4LED   
+709 Outputtrigger4pin   
+710 Outputtrigger4port   
+714 Outputtrigger5LED   
+712 Outputtrigger5pin   
+713 Outputtrigger5port   
+717 Outputtrigger6LED   
+715 Outputtrigger6pin   
+716 Outputtrigger6port   
+720 Outputtrigger7LED   
+718 Outputtrigger7pin   
+719 Outputtrigger7port   
+723 Outputtrigger8LED   
+721 Outputtrigger8pin   
+722 Outputtrigger8port   
+726 Outputtrigger9LED   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 97 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+724 Outputtrigger9pin   
+725 Outputtrigger9port   
+2010 Plasmapieceheight   
+195 PositionDROsdigits   
+92 Probepin1   
+2011 Probepin2   
+272 Probeport1   
+2012 Probeport2   
+900 Profile_name   
+2013 Pulleynumber   
+2014 Pulleyratio   
+171 PWMspindle_dirpin   
+280 PWMspindle_dirport   
+172 PWMspindle_PWMfrequency   
+459 PWMspindle_PWMmaxdutycycle   
+458 PWMspindle_PWMmindutycycle   
+170 PWMspindle_PWMpin   
+279 PWMspindle_PWMport   
+15 R*   
+30 R*   
+45 R*   
+60 R*   
+75 R*   
+90 R*   
+236 R*   
+237 R*   
+238 R*   
+239 R*   
+240 R*   
+435 R*   
+436 R*   
+437 R*   
+438 R*   
+439 R*   
+440 R*   
+446 R*   
+475 - 499 R*   
+602 - 699 R*   
+844 - 851 R*   
+916 - 920 R*   
+949-2000 R*   
+225 SafeZheight   
+906 Serialnumber   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 98 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+867 Setfeedrate   
+866 Setnextlinefield   
+869 Setspindlespeed   
+902 Softwareversion   
+182 Spindle_M3delayoff   
+181 Spindle_M3delayon   
+179 Spindle_M3relaypin   
+283 Spindle_M3relayport   
+184 Spindle_M4delayoff   
+183 Spindle_M4delayon   
+180 Spindle_M4relaypin   
+284 Spindle_M4relayport   
+187 Spindle_M7delayon   
+185 Spindle_M7relaypin   
+285 Spindle_M7relayport   
+188 Spindle_M8delayon   
+186 Spindle_M8relaypin   
+286 Spindle_M8relayport   
+189 Spindle_M9delay   
+178 Spindle_Maxvelocity   
+177 Spindle_Minvelocity   
+462 SpindlePWM_analogoutputchannel   
+450 SROanalogchannelnumber   
+452 SROanalogmaxpercent   
+451 SROanalogminpercent   
+233 SRODRO   
+176 Stepdirspindle_Acceleration   
+174 Stepdirspindle_Dirpin   
+282 Stepdirspindle_Dirport   
+173 Stepdirspindle_Steppin   
+281 Stepdirspindle_Stepport   
+175 Stepdirspindle_Stepsperrotation   
+221 THC_downpin   
+278 THC_downport   
+224 THC_feedrate   
+223 THC_max_height   
+222 THC_min_height   
+234 THC_ondelay   
+219 THC_onpin   
+276 THC_onport   
+220 THC_uppin   
+277 THC_upport   
+2001 THCAntidivevelocitypercentage   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 99 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+169 TooloffsetZ   
+196 ToolZoffset1   
+205 ToolZoffset10   
+206 ToolZoffset11   
+207 ToolZoffset12   
+208 ToolZoffset13   
+209 ToolZoffset14   
+210 ToolZoffset15   
+211 ToolZoffset16   
+212 ToolZoffset17   
+213 ToolZoffset18   
+214 ToolZoffset19   
+197 ToolZoffset2   
+215 ToolZoffset20   
+921 ToolZoffset21   
+922 ToolZoffset22   
+923 ToolZoffset23   
+924 ToolZoffset24   
+925 ToolZoffset25   
+926 ToolZoffset26   
+927 ToolZoffset27   
+928 ToolZoffset28   
+929 ToolZoffset29   
+198 ToolZoffset3   
+930 ToolZoffset30   
+931 ToolZoffset31   
+932 ToolZoffset32   
+933 ToolZoffset33   
+934 ToolZoffset34   
+935 ToolZoffset35   
+936 ToolZoffset36   
+937 ToolZoffset37   
+938 ToolZoffset38   
+939 ToolZoffset39   
+199 ToolZoffset4   
+940 ToolZoffset40   
+941 ToolZoffset41   
+942 ToolZoffset42   
+943 ToolZoffset43   
+944 ToolZoffset44   
+945 ToolZoffset45   
+946 ToolZoffset46   
+947 ToolZoffset47   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 100 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+948 ToolZoffset48   
+949 ToolZoffset49   
+200 ToolZoffset5   
+950 ToolZoffset50   
+951 ToolZoffset51   
+952 ToolZoffset52   
+953 ToolZoffset53   
+954 ToolZoffset54   
+955 ToolZoffset55   
+956 ToolZoffset56   
+957 ToolZoffset57   
+958 ToolZoffset58   
+959 ToolZoffset59   
+201 ToolZoffset6   
+960 ToolZoffset60   
+961 ToolZoffset61   
+962 ToolZoffset62   
+963 ToolZoffset63   
+964 ToolZoffset64   
+965 ToolZoffset65   
+966 ToolZoffset66   
+967 ToolZoffset67   
+968 ToolZoffset68   
+969 ToolZoffset69   
+202 ToolZoffset7   
+970 ToolZoffset70   
+971 ToolZoffset71   
+972 ToolZoffset72   
+973 ToolZoffset73   
+974 ToolZoffset74   
+975 ToolZoffset75   
+976 ToolZoffset76   
+977 ToolZoffset77   
+978 ToolZoffset78   
+979 ToolZoffset79   
+203 ToolZoffset8   
+980 ToolZoffset80   
+981 ToolZoffset81   
+982 ToolZoffset82   
+983 ToolZoffset83   
+984 ToolZoffset84   
+985 ToolZoffset85   
+986 ToolZoffset86   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 101 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+987 ToolZoffset87   
+988 ToolZoffset88   
+989 ToolZoffset89   
+204 ToolZoffset9   
+990 ToolZoffset90   
+991 ToolZoffset91   
+992 ToolZoffset92   
+993 ToolZoffset93   
+994 ToolZoffset94   
+995 ToolZoffset95   
+996 ToolZoffset96   
+898 Worktimer   
+10 Xaxisacceleration   
+14 Xaxisbacklash   
+13 Xaxiscompaccel   
+2 Xaxisdirpin   
+242 Xaxisdirport   
+463 Xaxisenablepin   
+464 Xaxisenableport   
+7 Xaxishomeoffset   
+5 Xaxishomepin   
+245 Xaxishomeport   
+6 Xaxishomingspeed   
+3 Xaxislimitminuspin   
+243 Xaxislimitminusport   
+4 Xaxislimitpluspin   
+244 Xaxislimitplusport   
+11 Xaxissoftlimitminus   
+12 Xaxissoftlimitplus   
+1 Xaxissteppin   
+241 Xaxisstepport   
+8 Xaxisstepsper   
+9 Xaxisvelocity   
+226 XposDRO   
+25 Yaxisacceleration   
+29 Yaxisbacklash   
+28 Yaxiscompaccel   
+17 Yaxisdirpin   
+247 Yaxisdirport   
+465 Yaxisenablepin   
+466 Yaxisenableport   
+22 Yaxishomeoffset   
+20 Yaxishomepin   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 102 of 120 
+UCCNC Version 1.2022 
+FIELD 
+NUMBER FUNCTION NAME DESCRIPTION 
+250 Yaxishomeport   
+21 Yaxishomingspeed   
+18 Yaxislimitminuspin   
+248 Yaxislimitminusport   
+19 Yaxislimitpluspin   
+249 Yaxislimitplusport   
+26 Yaxissoftlimitminus   
+27 Yaxissoftlimitplus   
+16 Yaxissteppin   
+246 Yaxisstepport   
+23 Yaxisstepsper   
+24 Yaxisvelocity   
+227 YposDRO   
+40 Zaxisacceleration   
+44 Zaxisbacklash   
+43 Zaxiscompaccel   
+32 Zaxisdirpin   
+252 Zaxisdirport   
+467 Zaxisenablepin   
+468 Zaxisenableport   
+37 Zaxishomeoffset   
+35 Zaxishomepin   
+255 Zaxishomeport   
+36 Zaxishomingspeed   
+33 Zaxislimitminuspin   
+253 Zaxislimitminusport   
+34 Zaxislimitpluspin   
+254 Zaxislimitplusport   
+41 Zaxissoftlimitminus   
+42 Zaxissoftlimitplus   
+31 Zaxissteppin   
+251 Zaxisstepport   
+38 Zaxisstepsper   
+39 Zaxisvelocity   
+228 ZposDRO   
+ 
+R* = Reserved address, do not use this address. 
+ 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 103 of 120 
+UCCNC Version 1.2022 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Intentionally blank page to facilitate updated sections to be printed and inserted 
+to retain pagination for other sections as new Macros are added. 
+ 
+ 
+ 
+ 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 104 of 120 
+UCCNC Version 1.2022 
+LED’s (SORT BY ALPHABETICAL NAME) 
+ 
+This section describes the UCCNC software LED screen objects. 
+  
+Each LED represents an internal boolean variable of the UCNC software. 
+The LEDs' logic state can be read in macro code. 
+This documentation lists all the accessible LED variables, sorted alphabetically 
+by function. 
+ 
+LED 
+NUMBER LED NAME DESCRIPTION 
+47 Ahome Active when then A-axis home input is triggered. 
+59 Ahomed Active when the A-axis was already homed. 
+41 Alimitnegative Active when the A-axis negative side limit switch 
+is triggered. 
+32 Alimitpositive Active when the A-axis positive side limit switch is 
+triggered. 
+22 Backlash Active when the backlash compensation is being 
+executed. 
+48 Bhome Active when then B-axis home input is triggered. 
+60 Bhomed Active when the B-axis was already homed. 
+42 Blimitnegative Active when the B-axis negative side limit switch 
+is triggered. 
+33 Blimitpositive Active when the B-axis positive side limit switch is 
+triggered. 
+49 Chome Active when then C-axis home input is triggered. 
+61 Chomed Active when the C-axis was already homed. 
+43 Climitnegative Active when the C-axis negative side limit switch 
+is triggered. 
+34 Climitpositive Active when the C-axis positive side limit switch 
+is triggered. 
+54 Cyclestart Active when a G-code execution cycle is in 
+progress. 
+245 Digitizing On when the M40 digitizing command is active. 
+21 Dwell Indicates a dwell in progress. 
+142 EnableAaxis On when the enable output of the A axis is active 
+143 EnableBaxis On when the enable output of the B axis is active 
+144 EnableCaxis On when the enable output of the C axis is active 
+139 EnableXaxis On when the enable output of the X axis is active 
+140 EnableYaxis On when the enable output of the Y axis is active 
+141 EnableZaxis On when the enable output of the Z axis is active 
+214 EncoderApin Indicates the logic state of the Encoder A pin. 
+215 EncoderBpin Indicates the logic state of the Encoder B pin. 
+36 Estop Active when the estop input is triggered. 
+217 Feedhold On when the feedhold button is active. 
+53 Floodon Active when the flood coolant is on. 
+26 Hardlimit Active when any of the configured limit inputs are 
+triggered. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 105 of 120 
+UCCNC Version 1.2022 
+LED 
+NUMBER LED NAME DESCRIPTION 
+23 Home Active when the homing command is being 
+executed. 
+18 Idle Indicates the Idle state of the device. 
+35 Index Active when the index input is triggered. 
+218 Isdemomode On if the software is running in demo mode. 
+20 Jog Active when a jog command is being executed. 
+145 Jogmodecontinous On when the continuous jog mode is selected. 
+146 Jogmodestep On when the step jog mode is selected. 
+148 Jograte0001 On when the step jog rate is set to 0.001 units. 
+149 Jograte0010 On when the step jog rate is set to 0.01 units. 
+150 Jograte0100 On when the step jog rate is set to 0.1 units. 
+151 Jograte1000 On when the step jog rate is set to 1 units. 
+219 Laserdataloaded On if a laser data object is loaded to the memory 
+for laser engraving. 
+220 Laserrunning On when a laser engraving is in progress using 
+the laser data object. 
+27 Limitsoverride Active if the limits are overridden by the user. 
+229 M0stopactive Indicates that the M0 stop is active. 
+230 M1stopactive Indicates that the M1 stop is active. 
+231 M60stopactive Indicates that the M60 stop is active. 
+62 Machinecoords Active when the machine coordinate system is 
+selected to view in the position DROs. 
+216 MDIrunning On when an MDI command is in progress. 
+52 Miston Active when the mist coolant is on. 
+158 MPGAaxisselect On when the A axis is selected for the MPG jog. 
+137 MPGAPIN Indicates the logic state of the MPG A pin. 
+159 MPGBaxisselect On when the B axis is selected for the MPG jog. 
+138 MPGBPIN Indicates the logic state of the MPG B pin. 
+160 MPGCaxisselect On when the C axis is selected for the MPG jog. 
+236 MPGJogOn Indicates that the MPG jogging is active. 
+152 MPGmodecont On when the MPG continuous mode is selected. 
+154 MPGmodemulti On when the MPG multi mode is selected. 
+153 MPGmodesingle On when the MPG single mode is selected. 
+155 MPGXaxisselect On when the X axis is selected for the MPG jog. 
+156 MPGYaxisselect On when the Y axis is selected for the MPG jog. 
+157 MPGZaxisselect On when the Z axis is selected for the MPG jog. 
+212 Offlinemode On when the offline mode is active. 
+1 OutputPT1PN1 Indicates the actual logic state of port#1 pin#1. 
+10 OutputPT1PN10 Indicates the actual logic state of port#1 pin#10. 
+11 OutputPT1PN11 Indicates the actual logic state of port#1 pin#11. 
+12 OutputPT1PN12 Indicates the actual logic state of port#1 pin#12. 
+13 OutputPT1PN13 Indicates the actual logic state of port#1 pin#13. 
+14 OutputPT1PN14 Indicates the actual logic state of port#1 pin#14. 
+15 OutputPT1PN15 Indicates the actual logic state of port#1 pin#15. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 106 of 120 
+UCCNC Version 1.2022 
+LED 
+NUMBER LED NAME DESCRIPTION 
+16 OutputPT1PN16 Indicates the actual logic state of port#1 pin#16. 
+17 OutputPT1PN17 Indicates the actual logic state of port#1 pin#17. 
+2 OutputPT1PN2 Indicates the actual logic state of port#1 pin#2. 
+3 OutputPT1PN3 Indicates the actual logic state of port#1 pin#3. 
+4 OutputPT1PN4 Indicates the actual logic state of port#1 pin#4. 
+5 OutputPT1PN5 Indicates the actual logic state of port#1 pin#5. 
+6 OutputPT1PN6 Indicates the actual logic state of port#1 pin#6. 
+7 OutputPT1PN7 Indicates the actual logic state of port#1 pin#7. 
+8 OutputPT1PN8 Indicates the actual logic state of port#1 pin#8. 
+9 OutputPT1PN9 Indicates the actual logic state of port#1 pin#9. 
+234 OutputPT1PN94 Indicates the actual logic state of port#1 pin#94. 
+(5441 motherboard only.) 
+235 OutputPT1PN95 Indicates the actual logic state of port#1 pin#95. 
+(5441 motherboard only.) 
+69 OutputPT2PN1 Indicates the actual logic state of port#2 pin#1. 
+78 OutputPT2PN10 Indicates the actual logic state of port#2 pin#10. 
+79 OutputPT2PN11 Indicates the actual logic state of port#2 pin#11. 
+80 OutputPT2PN12 Indicates the actual logic state of port#2 pin#12. 
+81 OutputPT2PN13 Indicates the actual logic state of port#2 pin#13. 
+82 OutputPT2PN14 Indicates the actual logic state of port#2 pin#14. 
+83 OutputPT2PN15 Indicates the actual logic state of port#2 pin#15. 
+84 OutputPT2PN16 Indicates the actual logic state of port#2 pin#16. 
+85 OutputPT2PN17 Indicates the actual logic state of port#2 pin#17. 
+70 OutputPT2PN2 Indicates the actual logic state of port#2 pin#2. 
+71 OutputPT2PN3 Indicates the actual logic state of port#2 pin#3. 
+72 OutputPT2PN4 Indicates the actual logic state of port#2 pin#4. 
+73 OutputPT2PN5 Indicates the actual logic state of port#2 pin#5. 
+74 OutputPT2PN6 Indicates the actual logic state of port#2 pin#6. 
+75 OutputPT2PN7 Indicates the actual logic state of port#2 pin#7. 
+76 OutputPT2PN8 Indicates the actual logic state of port#2 pin#8. 
+77 OutputPT2PN9 Indicates the actual logic state of port#2 pin#9. 
+86 OutputPT3PN1 Indicates the actual logic state of port#3 pin#1. 
+95 OutputPT3PN10 Indicates the actual logic state of port#3 pin#10. 
+96 OutputPT3PN11 Indicates the actual logic state of port#3 pin#11. 
+97 OutputPT3PN12 Indicates the actual logic state of port#3 pin#12. 
+98 OutputPT3PN13 Indicates the actual logic state of port#3 pin#13. 
+99 OutputPT3PN14 Indicates the actual logic state of port#3 pin#14. 
+100 OutputPT3PN15 Indicates the actual logic state of port#3 pin#15. 
+101 OutputPT3PN16 Indicates the actual logic state of port#3 pin#16. 
+102 OutputPT3PN17 Indicates the actual logic state of port#3 pin#17. 
+87 OutputPT3PN2 Indicates the actual logic state of port#3 pin#2. 
+88 OutputPT3PN3 Indicates the actual logic state of port#3 pin#3. 
+89 OutputPT3PN4 Indicates the actual logic state of port#3 pin#4. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 107 of 120 
+UCCNC Version 1.2022 
+LED 
+NUMBER LED NAME DESCRIPTION 
+90 OutputPT3PN5 Indicates the actual logic state of port#3 pin#5. 
+91 OutputPT3PN6 Indicates the actual logic state of port#3 pin#6. 
+92 OutputPT3PN7 Indicates the actual logic state of port#3 pin#7. 
+93 OutputPT3PN8 Indicates the actual logic state of port#3 pin#8. 
+94 OutputPT3PN9 Indicates the actual logic state of port#3 pin#9. 
+103 OutputPT4PN1 Indicates the actual logic state of port#4 pin#1. 
+112 OutputPT4PN10 Indicates the actual logic state of port#4 pin#10. 
+113 OutputPT4PN11 Indicates the actual logic state of port#4 pin#11. 
+114 OutputPT4PN12 Indicates the actual logic state of port#4 pin#12. 
+115 OutputPT4PN13 Indicates the actual logic state of port#4 pin#13. 
+116 OutputPT4PN14 Indicates the actual logic state of port#4 pin#14. 
+117 OutputPT4PN15 Indicates the actual logic state of port#4 pin#15. 
+118 OutputPT4PN16 Indicates the actual logic state of port#4 pin#16. 
+119 OutputPT4PN17 Indicates the actual logic state of port#4 pin#17. 
+104 OutputPT4PN2 Indicates the actual logic state of port#4 pin#2. 
+105 OutputPT4PN3 Indicates the actual logic state of port#4 pin#3. 
+106 OutputPT4PN4 Indicates the actual logic state of port#4 pin#4. 
+107 OutputPT4PN5 Indicates the actual logic state of port#4 pin#5. 
+108 OutputPT4PN6 Indicates the actual logic state of port#4 pin#6. 
+109 OutputPT4PN7 Indicates the actual logic state of port#4 pin#7. 
+110 OutputPT4PN8 Indicates the actual logic state of port#4 pin#8. 
+111 OutputPT4PN9 Indicates the actual logic state of port#4 pin#9. 
+120 OutputPT5PN1 Indicates the actual logic state of port#5 pin#1. 
+129 OutputPT5PN10 Indicates the actual logic state of port#5 pin#10. 
+130 OutputPT5PN11 Indicates the actual logic state of port#5 pin#11. 
+131 OutputPT5PN12 Indicates the actual logic state of port#5 pin#12. 
+132 OutputPT5PN13 Indicates the actual logic state of port#5 pin#13. 
+133 OutputPT5PN14 Indicates the actual logic state of port#5 pin#14. 
+134 OutputPT5PN15 Indicates the actual logic state of port#5 pin#15. 
+135 OutputPT5PN16 Indicates the actual logic state of port#5 pin#16. 
+136 OutputPT5PN17 Indicates the actual logic state of port#5 pin#17. 
+121 OutputPT5PN2 Indicates the actual logic state of port#5 pin#2. 
+221 OutputPT5PN26 Indicates the actual logic state of port#5 pin#26. 
+(M44 motherboard only.) 
+222 OutputPT5PN27 Indicates the actual logic state of port#5 pin#27. 
+(M44 motherboard only.) 
+223 OutputPT5PN28 Indicates the actual logic state of port#5 pin#28. 
+(M44 motherboard only.) 
+224 OutputPT5PN29 Indicates the actual logic state of port#5 pin#29. 
+(M44 motherboard only.) 
+122 OutputPT5PN3 Indicates the actual logic state of port#5 pin#3. 
+225 OutputPT5PN30 Indicates the actual logic state of port#5 pin#30. 
+(M44 motherboard only.) 
+226 OutputPT5PN31 Indicates the actual logic state of port#5 pin#31. 
+(M44 motherboard only.) 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 108 of 120 
+UCCNC Version 1.2022 
+LED 
+NUMBER LED NAME DESCRIPTION 
+227 OutputPT5PN32 Indicates the actual logic state of port#5 pin#32. 
+(M44 motherboard only.) 
+228 OutputPT5PN33 Indicates the actual logic state of port#5 pin#33. 
+(M44 motherboard only.) 
+123 OutputPT5PN4 Indicates the actual logic state of port#5 pin#4. 
+124 OutputPT5PN5 Indicates the actual logic state of port#5 pin#5. 
+125 OutputPT5PN6 Indicates the actual logic state of port#5 pin#6. 
+126 OutputPT5PN7 Indicates the actual logic state of port#5 pin#7. 
+127 OutputPT5PN8 Indicates the actual logic state of port#5 pin#8. 
+128 OutputPT5PN9 Indicates the actual logic state of port#5 pin#9. 
+232 Pause On when any of the M0 or M1 or M60 stop mode 
+is active. 
+37 Probe Active when the probe input is triggered. 
+244 ProbedOK 
+On if the last probing (G31) was finished with a 
+probe touch, off if the last probing did not end 
+with a touch. 
+24 Probing Active when the probing command is being 
+executed. 
+147 R*   
+25 Reset Indicates an active reset signal. 
+19 Run Indicates a run state of the device. This is the 
+opposite of the Idle state. 
+55 Runsingleline Active when a Single line G-code execution cycle 
+is in progress. 
+243 SafeProbeModeactive 
+On when the SafeProbeMode is active. The safe 
+probe mode actives the Reset if the probe goes 
+on when not probing. 
+67 Softlimitsenabled Active when the Software limit function is 
+enabled. 
+51 SpindleCCW Active when the spindle is rotating Counter-
+clockwise 
+50 SpindleCW Active when the spindle is rotating Clockwise. 
+213 Sync_thread Active when a synchronous thread cutting is in 
+execution. 
+161 to 
+211 TABlayervisible 
+On when the tab layer is visible. The layer 
+number selected is the LED code - 161, so the 
+161. LED code is for the tab layer 0. and the 211. 
+LED code is for the 50. tab layer. Note: When 
+more than one tab layer is visible, for example if 
+a tab layer has a sub-tab layer which is also 
+visible then both LED codes are active. 
+233 THCAntidiveactive On when in THC control and the Anti diving 
+happens. 
+240 THCantidiveenabled On when the THC anti dive function is enabled. 
+242 THCantidownenabled On when the THC anti down function is enabled. 
+237 THCarcon_emulation Indicates that the THCarcon emulation signal is 
+active. 
+68 THCdelay Active when the THC delay is ongoing. 
+241 THCdelayenabled On when the THC delay function is enabled. 
+ 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 109 of 120 
+UCCNC Version 1.2022 
+LED 
+NUMBER LED NAME DESCRIPTION 
+65 THCdown Active when the THC down physical input is 
+active. 
+239 THCdown_emulation Indicates that the THCdown emulation signal is 
+active. 
+66 THCenabled Active when the THC control is enabled. 
+63 THCon Active when the THC on physical input is active. 
+64 THCup Active when the THC up physical input is active. 
+238 THCup_emulation Indicates that the THCup emulation signal is 
+active. 
+28 Toolchangeinprogress Active when a tool change macro is being 
+executed. 
+44 Xhome Active when then X-axis home input is triggered. 
+56 Xhomed Active when the X-axis was already homed. 
+38 Xlimitnegative Active when the X-axis negative side limit switch 
+is triggered. 
+29 Xlimitpositive Active when the X-axis positive side limit switch is 
+triggered. 
+45 Yhome Active when then Y-axis home input is triggered. 
+57 Yhomed Active when the Y-axis was already homed. 
+39 Ylimitnegative Active when the Y-axis negative side limit switch 
+is triggered. 
+30 Ylimitpositive Active when the Y-axis positive side limit switch is 
+triggered. 
+46 Zhome Active when then Z-axis home input is triggered. 
+58 Zhomed Active when the Z-axis was already homed. 
+40 Zlimitnegative Active when the Z-axis negative side limit switch 
+is triggered. 
+31 Zlimitpositive Active when the Z-axis positive side limit switch is 
+triggered. 
+ 
+R* = Reserved address, do not use this address. 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 110 of 120 
+UCCNC Version 1.2022 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Intentionally blank page to facilitate updated sections to be printed and inserted 
+to retain pagination for other sections as new Macros are added. 
+ 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 111 of 120 
+UCCNC Version 1.2022 
+CHECKBOX OBJECTS (SORT BY ALPHABETICAL NAME) 
+ 
+This section describes the UCCNC software Checkbox screen objects. 
+  
+Each checkbox permits the user to make a selection on the UCCNC software 
+GUI. 
+Checkboxes are read only and their logic state can be read in macro code. 
+This documentation lists all the accessible Checkbox variables, sorted 
+alphabetically by function. 
+ 
+CHECKBOX 
+NUMBER CHECKBOX NAME DESCRIPTION 
+144 Aaxis_enable   
+30 Aaxisdirpin_activelow   
+28 Aaxisenable   
+36 Aaxisenablebacklash   
+34 Aaxishomedirectionpositive   
+33 Aaxishomepin_activelow   
+35 Aaxishomepositionautoset   
+31 Aaxislimitminuspin_activelow   
+32 Aaxislimitpluspin_activelow   
+29 Aaxissteppin_activelow   
+80 Appearance_3DTCPmarker   
+147 Appearance_Maximizescreenonstartup   
+89 Appearance_ShowconeicononTCP   
+90 Appearance_ShowcrosshaironTCP   
+145 Baxis_enable   
+39 Baxisdirpin_activelow   
+37 Baxisenable   
+45 Baxisenablebacklash   
+43 Baxishomedirectionpositive   
+42 Baxishomepin_activelow   
+44 Baxishomepositionautoset   
+40 Baxislimitminuspin_activelow   
+41 Baxislimitpluspin_activelow   
+38 Baxissteppin_activelow   
+202 - 210 CAM_select_origin   
+146 Caxis_enable   
+48 Caxisdirpin_activelow   
+46 Caxisenable   
+54 Caxisenablebacklash   
+52 Caxishomedirectionpositive   
+51 Caxishomepin_activelow   
+53 Caxishomepositionautoset   
+49 Caxislimitminuspin_activelow   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 112 of 120 
+UCCNC Version 1.2022 
+CHECKBOX 
+NUMBER CHECKBOX NAME DESCRIPTION 
+50 Caxislimitpluspin_activelow   
+47 Caxissteppin_activelow   
+59 Chargepump_alwayson   
+57 Chargepumppin_activelow   
+60 Currenthilow_activelow   
+228 Digitize_addaxisnames   
+236 Digitize_Clearfilenamewhenfinished   
+229 Digitize_commaseparatedCSV   
+233 Digitize_includeaxisA   
+234 Digitize_includeaxisB   
+235 Digitize_includeaxisC   
+230 Digitize_includeaxisX   
+231 Digitize_includeaxisY   
+232 Digitize_includeaxisZ   
+212 Dwelltimeinseconds   
+213 Enableusertabpage   
+55 Estoppin_activelow   
+74 Generalsettings_constantvelocitypathmode   
+75 Generalsettings_enablesoftlimits   
+73 Generalsettings_exactstoppathmode   
+88 Generalsettings_Kernelfrequency100kHz   
+214 Generalsettings_Kernelfrequency200kHz   
+86 Generalsettings_Kernelfrequency25kHz   
+215 Generalsettings_Kernelfrequency400kHz   
+87 Generalsettings_Kernelfrequency50kHz   
+91 - 138 Inputtrigger1_activelow to 
+Inputtrigger48_activelow   
+148 IOsetup_attachJROtoMPG   
+85 IOsetup_ControlTHCevenifTHConisnotactive   
+81 IOsetup_EnableTHCcontrol   
+84 IOsetup_THCdownpinactivelow   
+82 IOsetup_THConpinactivelow   
+83 IOsetup_THCuppinactivelow   
+211 Laseroutput_activelow   
+150 - 197 Outputtrigger1_activelow to 
+Outputtrigger48_activelow   
+56 Probepin1_activelow   
+225 Probepin2_activelow   
+79 Profiles_createshortcutondesktop   
+58 R*   
+139 R*   
+140 R*   
+149 R*   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 113 of 120 
+UCCNC Version 1.2022 
+CHECKBOX 
+NUMBER CHECKBOX NAME DESCRIPTION 
+198 R*   
+199 R*   
+61 - 72 R*   
+201 Reverseencodercountdirection   
+219 RotateTCPwithplaneselection   
+222 Showmessageonsoftlimits   
+220 Showzeromark   
+221 THCAntidiveenable   
+224 THCAntidownenable   
+223 THCDelayenable   
+76 Toolchange_igonoretoolchangemacro   
+78 Toolchange_runM6macro   
+77 Toolchange_stopspindleandwaitforcyclestart   
+216 Unknowgcode_ignore   
+218 Unknowngcode_donotrun   
+217 Unknowngcode_warning   
+226 UseSpindlepulleys   
+227 ValidateTextfieldswithEnterkeyonly   
+141 Xaxis_enable   
+3 Xaxisdirpin_activelow   
+1 Xaxisenable   
+9 Xaxisenablebacklash   
+7 Xaxishomedirectionpositive   
+6 Xaxishomepin_activelow   
+8 Xaxishomepositionautoset   
+4 Xaxislimitminuspin_activelow   
+5 Xaxislimitpluspin_activelow   
+2 Xaxissteppin_activelow   
+142 Yaxis_enable   
+12 Yaxisdirpin_activelow   
+10 Yaxisenable   
+18 Yaxisenablebacklash   
+16 Yaxishomedirectionpositive   
+15 Yaxishomepin_activelow   
+17 Yaxishomepositionautoset   
+13 Yaxislimitminuspin_activelow   
+14 Yaxislimitpluspin_activelow   
+11 Yaxissteppin_activelow   
+143 Zaxis_enable   
+21 Zaxisdirpin_activelow   
+19 Zaxisenable   
+27 Zaxisenablebacklash   
+25 Zaxishomedirectionpositive   
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 114 of 120 
+UCCNC Version 1.2022 
+CHECKBOX 
+NUMBER CHECKBOX NAME DESCRIPTION 
+24 Zaxishomepin_activelow   
+26 Zaxishomepositionautoset   
+22 Zaxislimitminuspin_activelow   
+23 Zaxislimitpluspin_activelow   
+20 Zaxissteppin_activelow   
+ 
+R* = Reserved address, do not use this address. 
+ 
+ 
+ 
+ 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 115 of 120 
+UCCNC Version 1.2022 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Intentionally blank page to facilitate updated sections to be printed and inserted 
+to retain pagination for other sections as new Macros are added. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 116 of 120 
+UCCNC Version 1.2022 
+VARIABLES # 
+ 
+UCCNC allows for the use of parametric programming (as shown within the 
+main UCCNC user manual), the following is an extract from the UCCNC manual 
+for ease of reference.  The purpose of this section is to provide a list of the 
+internal variables as tabled below and also a location for the user to note their 
+own variables should they be using them and to avoid (or allow for) sharing them 
+between macros. 
+Parametric programming 
+Instead of constants, variables could be also used to define coordinates or 
+feedrate, spindle speed etc.  There are 1000 spaces for internal variables 
+currently, named as #0 to #999. 
+When a number is programmed with the '#' suffix means that this parameter is 
+not a constant, but a pointer to an internal variable.  
+The variables can get new value any time programming an equation in code 
+execution or via MDI. 
+Mathematic equations can be also programmed to give values to variables.  
+For example to give a value of 1.23 to variable #2, code: '#2 = 1.23'. 
+Equations should always be on a new line, it is not allowed to place an equation 
+as a parameter of an axis word or feedrate or spindle speed set code. Only one 
+variable can be programmed as a parameter on a single line. 
+ 
+The following code example shows how to use the variables: 
+ 
+#1 = 5 (Sets the value of variable #1 to 5) 
+#2 = 10 (Sets the value of variable #2 to 10) 
+G0 X#1 Y#2 Z1 (Moves the axis with rapid to coordinates X=5, Y=10, Z=1) 
+#2 = 1.5 (Sets the value of variable #2 to 1.5) 
+G1 X#1 Y#2 Z#2 (Moves the axis with set feedrate to coordinates X=5, Y=1.5, Z=1.5) 
+#3 = #1 + #2 (Sets the value of variable #3 to 6.5) 
+#4 = 100 (Sets the value of variable #4 to 100) 
+G1 X#3 F#4 (Moves the axis with set feedrate of 100 unit/min to coordinates X=6.5) 
+ 
+To program complex equations it is often required to use brackets.  Because in 
+RS274NGC programming, the round brackets '(' and ')' are used to defined 
+comments for the equations, rectangular brackets '[' and ']' should be used 
+instead.  Also, to define a comma for functions which have more than one 
+parameter use the semicolon ';' character instead of the ',' comma. 
+ 
+For example:  #1= [1 + #2]*3 
+#4=max[#1;# 2]*7 
+ 
+And there are two available built in constant variables, these are: 'pi' and the 'e'. 
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 117 of 120 
+UCCNC Version 1.2022 
+Available math operators and operations 
+In the equations the constants and internal variables can be mixed with 
+mathematical operators and functions to calculate complex equations inline.   
+The mathematic operators and supported functions are listed below: 
+ 
+OPERATOR NAME OF FUNCTION SHORT DESCRIPTION 
++ Summation (addition) Summarise (add) numbers. 
+- Deduction (subtraction) Deduct (subtract) numbers. 
+* multiplication Multiply numbers. 
+/ division Divide numbers. 
+% division for remainder Returns the remainder of a division. 
+^ power Returns a specified number raised to the specified 
+power. 
+? get variable value 
+Shows variables value in a window. 
+For example: ?#1 prints the value of #1 variable. 
+Note: This operator works in MDI input only. 
+abs absolute value Returns the absolute value of a number. 
+acos arc cosine Returns the angle whose cosine is the specified 
+number. 
+asin arc sine Returns the angle whose sine is the specified 
+number. 
+atan arc tangent Returns the angle whose tangent is the specified 
+number. 
+cosh hyperbolic cosine Returns the hyperbolic cosine of the specified 
+angle. 
+e exponentiation Returns e (the base of natural logarithms) raised to 
+the specified power. 
+exp exponentiation Returns e (the base of natural logarithms) raised to 
+the specified power. 
+floor floor Returns the largest integer that's less than or equal 
+to the specified number. 
+log logarithm 
+Returns the natural (base e) logarithm of a specified 
+number or the logarithm of a specified number in a 
+specified base. 
+log10 10 base logarithm Returns the base 10 logarithm of a specified 
+number. 
+Min[ ; ] minimum Returns the smaller of two numbers.  
+Example: min[1; 2] gives an output of 1. 
+max[ ; ] maximum  Returns the larger of two numbers. 
+Example: max[1;2] gives an output of 2. 
+pi Pi (π) ~ 22/7 or 3.142… 
+pow[ ; ] power Returns a specified number raised to the specified 
+power.  Example: pow[2; 3] gives an output of 8. 
+rnd[ ; ] round to 0 to 9 decimals Rounds the input number to 0 to 9 decimal places.  
+Example: rnd[1.234; 2] gives an output of 1.23. 
+sin sine Returns the sine of the specified angle. 
+sinh hyperbolic sine Returns the hyperbolic sine of the specified angle. 
+sqrt square root Returns the square root of a specified number. 
+tan tangent Returns the tangent of the specified angle. 
+tanh hyperbolic tangent Returns the hyperbolic tangent of the specified 
+angle 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 118 of 120 
+UCCNC Version 1.2022 
+The following is the list of variables that are known and referenced within the 
+UCCNC manual, as others are made available the list will be updated, space is 
+provided to add the users own variables to avoid (or allow for) sharing them 
+between macros: 
+ 
+KNOWN 
+VARIABLE FUNCTION / DESCRIPTION 
+#5061 G31 Probe, X Axis Touch / Stop Coordinate 
+#5062 G31 Probe, Y Axis Touch / Stop Coordinate 
+#5063 G31 Probe, Z Axis Touch / Stop Coordinate 
+#5064 G31 Probe, A Axis Touch / Stop Coordinate 
+#5065 G31 Probe, B Axis Touch / Stop Coordinate 
+#5066 G31 Probe, C Axis Touch / Stop Coordinate 
+  
+  
+  
+  
+  
+  
+  
+  
+  
+USER 
+VARIABLES FUNCTION / DESCRIPTION 
+Permitted range: #0 to #999 
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 119 of 120 
+UCCNC Version 1.2022 
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+ 
+Intentionally blank page to facilitate updated sections to be printed and inserted 
+to retain pagination for other sections as new Macros are added. 
+ 
+  
+UCCNC MACROS & SCREENSET FUNCTIONS, BUTTONS, FIELDS, LED’s & CHEKBOXES  
+ 
+Page 120 of 120 
+UCCNC Version 1.2022 
+DOCUMENT REVISIONS 
+ 
+Version 1.2022 considered the “base” version, amendments will be noted below 
+by UCCNC version revision number and a brief description (not every button, led 
+etc code added!) 
+ 
+1.2022 Initial issue – draft versions 
+1.202  
+ 

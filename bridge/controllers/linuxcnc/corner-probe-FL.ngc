@@ -1,0 +1,74 @@
+( ================================================================= )
+( Corner Probe — FL outside corner (probe +X, +Y), Z surface first   )
+( DIALECT: RS274NGC  —  runs on LinuxCNC 2.x AND grblHAL             )
+(   grblHAL needs NGC_EXPRESSIONS_ENABLE; G38.2 / G10 L20 are native )
+( Translated from: DDCS-Studio cornerWizard.js  (corner FL, seq XY)  )
+(                                                                    )
+( PRIMITIVE MAP  (DDCS  ->  RS274NGC):                               )
+(   probe move    G31 X.. P L Q   ->  G38.2 X..   (auto-errors)      )
+(   no-contact    IF #1920!=2 GOTO1  ->  (gone: G38.2 aborts itself) )
+(   trigger pos   #1925/#1926/#1927  ->  #5061/#5062/#5063           )
+(   probe ok      #1920==2           ->  (implicit; or #5070 w/G38.3))
+(   write WCS     #[#70+ax]=val      ->  G10 L20 P<wcs>              )
+(   radius comp   [#1925 +/- #6]     ->  baked into the G10 L20 value )
+(   operator msg  #1505              ->  (MSG,..) + M0                )
+( NOTE: gross positioning between walls is wizard-computed           )
+(   (cornerWizard.inferStart); shown here schematically.            )
+( ================================================================= )
+
+( ---- config: the emitter fills these from the wizard form ---- )
+#<dist>    = 20.0   ( max probe distance )
+#<retract> =  2.0   ( retract between / after touches )
+#<f_fast>  = 200    ( fast feed )
+#<f_slow>  =  50    ( slow feed )
+#<radius>  =  2.0   ( stylus tip radius )
+#<safez>   = 10.0   ( safe Z, above the top surface )
+#<scandep> =  5.0   ( plunge below top to reach the side wall )
+#<travel>  = 50.0   ( reposition distance between the two walls )
+#<wcs>     =  1      ( G10 P-word: 1=G54 .. 6=G59 )
+( FL outside corner -> probe +X and +Y, plunge -Z )
+#<xdir>    =  1
+#<ydir>    =  1
+
+G21 ( mm )
+G90 ( absolute base )
+(MSG, Corner FL: hover OVER the corner material, then cycle-start)
+M0  ( wait for operator  — mirrors DDCS #1505 confirm )
+
+( ===== Z surface probe (two-pass) ===== )
+G91 ( incremental probe moves )
+G38.2 Z[-1 * #<dist>]              F#<f_fast>   ( fast probe down )
+G0    Z#<retract>                               ( retract )
+G38.2 Z[-1 * #<retract> * 2]      F#<f_slow>    ( slow probe — stops AT surface )
+G10 L20 P#<wcs> Z0                              ( top surface = Z0 )
+G90
+G0 Z#<safez>                                    ( safe Z )
+
+( escape off the part in -X, then plunge beside the X wall )
+G91
+G0 X[-1 * #<xdir> * #<travel>]
+G0 Z[-1 * [#<safez> + #<scandep>]]
+
+( ===== X wall probe (two-pass + radius comp) ===== )
+G38.2 X[#<xdir> * #<dist>]         F#<f_fast>   ( fast touch X wall )
+G0    X[-1 * #<xdir> * #<retract>]              ( back off )
+G38.2 X[#<xdir> * #<retract> * 2]  F#<f_slow>   ( slow touch — stops AT wall )
+G10 L20 P#<wcs> X[-1 * #<xdir> * #<radius>]     ( wall face = X0, radius comp )
+G0    X[-1 * #<xdir> * #<retract>]              ( retract from wall )
+G0    Z[#<safez> + #<scandep>]                  ( lift to safe Z )
+
+( reposition for the Y wall: back over the part, off in -Y, plunge )
+G0 X[#<xdir> * #<travel>]
+G0 Y[-1 * #<ydir> * #<travel>]
+G0 Z[-1 * [#<safez> + #<scandep>]]
+
+( ===== Y wall probe (two-pass + radius comp) ===== )
+G38.2 Y[#<ydir> * #<dist>]         F#<f_fast>
+G0    Y[-1 * #<ydir> * #<retract>]
+G38.2 Y[#<ydir> * #<retract> * 2]  F#<f_slow>   ( slow touch — stops AT wall )
+G10 L20 P#<wcs> Y[-1 * #<ydir> * #<radius>]     ( wall face = Y0, radius comp )
+G0    Y[-1 * #<ydir> * #<retract>]              ( retract )
+G90
+G0 Z#<safez>                                    ( safe Z — done )
+(MSG, Corner FL found: G54 X0 Y0 Z0 set)
+M2

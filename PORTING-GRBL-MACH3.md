@@ -22,6 +22,39 @@
   `bridge/controllers/*/assets/`. Next phase = decode var tables + G/M codes →
   map DDCS→target → translate wizards (vertical slice first).
 
+## Architecture decision — controller model (locked 2026-06-13)
+
+**Decision:** organize controllers in four layers, and **generalize the mechanism Studio
+already has** for its 3 DDCS controllers — do NOT build a new "dialect engine" upfront.
+
+| Layer | What it is | Owner | Examples |
+|---|---|---|---|
+| **Dialect** | grammar + emitter (`words.fmt` + `dialect.rules` + flow style) | Studio | DDCS-grammar · rs274ngc · centroid · uccnc · mach3 · mach4 |
+| **Control descriptor** | a real controller: `dialect` + **var-map** + **capability flags** | Studio (data) | DDCS-Expert · DDCS-V4.1 · DDCS-DM500 · Centroid-CNC12 · LinuxCNC · grblHAL · UCCNC |
+| **Vendor** | brand / hardware grouping — a **tag**, not a layer | Studio (data) | DDCS · Centroid · ArtSoft · CNCdrive |
+| **Profile** | the user's machine: pins/axes/WCS/ATC/tools | **User** | "my Bee" → DDCS-Expert + config |
+
+**Load-bearing principles:**
+1. **Control/firmware is the real key.** Even one vendor needs several — **DDCS = Expert +
+   V4.1 + DM500**, each its own var-map *and* capability set.
+2. **Dialect-sharing is opt-in and PROVEN, never inherited from a "family" name.** *Real*
+   shared dialects: the DDCS grammar across its 3 controllers; `rs274ngc` across LinuxCNC +
+   grblHAL (grblHAL **copied** LinuxCNC). *Fictional* family: `macro-b` — DDCS, Centroid,
+   Fanuc are mutually incompatible at the syntax level (`IF` form, operators, `WHILE`, `G65`,
+   WCS stride). **Real Fanuc Macro B runs on none of them.**
+3. **The only broadly-shared *code* is the primitives/HAL** (`bridge/controllers/MACHINE-PRIMITIVES-MAP.md`).
+   Each control is otherwise a concrete data bundle. Do **not** build a unified dialect engine
+   upfront — that's the trap (abstraction at N=1, leaky family boundaries).
+4. **Capability flags** carry feature deltas (homing `M115` vs `M105-108`/`G128`, `#3000`
+   alarm, Modbus) so emitters branch on **data**, not `if (control === …)`.
+5. **Extract the shared abstraction only after the rule of three** — write the first wizard
+   concretely for 2-3 controls; let the real seam reveal itself.
+
+**Already built — generalize, don't rebuild:** `controllerProfiles.js` (Expert/V4.1/V3-DM500)
++ `default_vars{,_v41,_v3}.js` + the `varFamily` switch **is** the control-descriptor + var-map
+layer, in production. The gap to close is formalizing **capability flags** (today only the
+var-map switches per profile).
+
 ## The app is already layered for this
 
 Three tiers; only the top is DDCS-specific.

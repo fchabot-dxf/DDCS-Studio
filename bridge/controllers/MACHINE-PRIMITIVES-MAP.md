@@ -132,6 +132,39 @@ only for **macros on SD/littlefs** (stream mode is limited) — which parallels 
 `.nc` to SMB; LinuxCNC has no such limit. Confidence: LinuxCNC `[DOCS]`, grblHAL
 `[DUMP grblHAL-core-src]` (`ngc_expr.c`/`ngc_flowctrl.c`/`ngc_params.c`, `gcode.c` M62-M68).
 
+## 9. In-program-branching dialects — DDCS, Centroid, Fanuc are NOT one emitter
+
+These controllers all branch *in the program* with `#vars` + conditional-`GOTO`, so they
+*look* like one "Macro-B family" — but they are **mutually incompatible at the syntax level**,
+so there is **no shared `macro-b` emitter**. Each is its own concrete dialect:
+- **DDCS** — `IF #1920!=2 GOTO1` (no brackets, no `THEN`), stride-5 `#805+` WCS *(the DDCS
+  rule, explicitly **not** Fanuc stride-20)*, no `WHILE`/`G65`, broken `G10`. A reduced,
+  Fanuc-*inspired* dialect — **real Fanuc Macro B does not run on DDCS.**
+- **Centroid CNC12** — `IF…THEN…GOTO/ELSE`, `G65` (20-deep), but probes with `M115/M116`.
+- **Fanuc / Haas** — `IF [#1920 NE 2]`, `WHILE/DO/END`, `G65`, stride-20 `#5221`.
+
+Three lookalikes, zero shared code — the canary for **"family ≠ code-reuse."** (Contrast §8:
+`rs274ngc` *is* real shared code, because grblHAL **copied** LinuxCNC.) The Centroid bindings
+below are its own; the DDCS column shows the *concept* maps, **not** the syntax — a
+DDCS→Centroid port is concept-level re-authoring, not variable-number remapping.
+
+| primitive | Centroid CNC12 | DDCS equivalent |
+|---|---|---|
+| probe move (two-pass + auto-error) | `M115/M116/M125/M126` (move-until-input; **errors on no-contact**) | `G31` + `IF #1920!=2 GOTO` |
+| probe result | machine **stops at contact** → define via `G92`/`G10` (no trigger-var read) | `#1925-27` |
+| set work offset | `G10 P<param> R[..]` / `G92 X[..]` | `#[#70+ax]=val` |
+| machine pos / params | system `#4xxx`, parameters `#9000-9999` (`#9014/15` probe rates, `#9071` TT ht) | `#880-883` |
+| digital output | by output #: `M67/M87`, `M94/M95`, `M62-65` | `M154/M155`, `M162/163` |
+| digital input read | `#50001+` (input-N state) | status `#19xx` |
+| tool / table | `#4120` requested, `#4203` in-spindle; tool table | `#1504/#1300` |
+| operator msg / prompt | `M225 #t "msg"` / `M224 … #ret` | `#1505` |
+| flow control | `IF…THEN GOTO/ELSE`, `N` blocks, `G65`/`M98` | `IF…GOTO`, `N` |
+
+**Notable exception vs every other target:** Centroid probes with `M115/M116`
+(move-until-input, stop *at* contact) instead of `G31`+trigger-var — *less* code, since the
+two-pass and no-contact error are built into the M-codes. Confidence: `[DUMP centroid txt]`.
+See `centroid/FINDINGS.md`.
+
 ## Status / next
 
 - ✅ Rows 1–6 grounded from real source for DDCS + Mach3 + Mach4 + UCCNC + grbl.
