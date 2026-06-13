@@ -97,6 +97,7 @@
         <!-- App-switcher: STUDIO ↔ GATEWAY ↔ SETTINGS. Wired by ui/gatewayStatus.js -->
         <nav class="hdr-tabs" aria-label="App switcher">
             <button type="button" class="tab active" data-app="studio" onclick="window.showApp && window.showApp('studio')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span><span class="app-tx">STUDIO</span></button>
+            <button type="button" class="tab" data-app="blocks" title="Blocks" onclick="window.showApp && window.showApp('blocks')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="5" rx="1"/><rect x="4" y="10" width="16" height="5" rx="1"/><rect x="4" y="17" width="16" height="4" rx="1"/></svg></span><span class="app-tx">BLOCKS</span></button>
             <button type="button" class="tab" data-app="gateway" title="Gateway"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg></span><span class="app-tx">GATEWAY</span><span id="gateway-led" class="gateway-led" title="Gateway status"></span></button>
             <button type="button" class="tab" data-app="settings" title="Settings" onclick="window.showApp && window.showApp('settings')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span class="app-tx">SETTINGS</span></button>
 
@@ -844,6 +845,14 @@
                     <div><span class="label">ANGLE</span><input id="d_angle" value="0"/></div>
                 </div>
 
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="d_tool" title="Pick a tool from the library (Settings → Tool table → Tool library) to load its Ø, feed and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="d_rpm" value="" title="Overrides the Head's default RPM for this op. Leave blank to use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
                 <span class="section-label">METHOD</span>
                 <div class="grid-2">
                     <div><span class="label">METHOD</span>
@@ -872,6 +881,271 @@
                 <div class="preview-block">
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_drill_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Pocket clearing Wizard (Mill group) -->
+            <div id="wiz_pocket" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="pocketLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="pocketLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="pocketVizStatus" class="viz-status"></div>
+                        <div id="pocketVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Clears a rectangular or circular pocket with an end mill in the active WCS. Drag the handles in the 2D layout (square = place, round = size); the 3D view verifies the cut. Walls are offset inward by the tool radius so the finished pocket matches the size you type. Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">SHAPE</span>
+                <div class="grid-2">
+                    <div><span class="label">SHAPE</span>
+                        <select id="p_shape" value="rect">
+                            <option value="rect">Rectangle</option>
+                            <option value="circle">Circle</option>
+                        </select>
+                    </div>
+                    <div><span class="label">STRATEGY</span>
+                        <select id="p_strategy" value="spiral">
+                            <option value="spiral">Concentric (spiral)</option>
+                            <option value="raster">Raster (zig-zag)</option>
+                        </select>
+                    </div>
+                    <div><span class="label">POSITION X</span><input id="p_originX" value="0" title="Pocket position in the active WCS (drag the square handle). Rect = min-XY corner; circle = centre."/></div>
+                    <div><span class="label">POSITION Y</span><input id="p_originY" value="0"/></div>
+                </div>
+                <div id="p_dim_rect" class="grid-2">
+                    <div><span class="label">WIDTH</span><input id="p_w" value="80"/></div>
+                    <div><span class="label">HEIGHT</span><input id="p_h" value="60"/></div>
+                </div>
+                <div id="p_dim_circle" class="grid-2" style="display:none">
+                    <div><span class="label">DIAMETER</span><input id="p_dia" value="50"/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="p_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="p_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">TOOL &amp; STEPOVER</span>
+                <div class="grid-2">
+                    <div><span class="label">TOOL Ø</span><input id="p_toolDia" value="6"/></div>
+                    <div><span class="label">STEPOVER %</span><input id="p_stepoverPct" value="40" title="Stepover as a percentage of tool diameter (40% = a 2.4 mm step on a 6 mm tool)."/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="p_depth" value="4"/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="p_stepdown" value="1.5" title="Z step-down per roughing pass (mm)."/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="p_clearance" value="5"/></div>
+                    <div><span class="label">FEED</span><input id="p_feed" value="600"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="p_plunge" value="150" title="Z plunge feedrate (mm/min) — usually slower than the cutting feed."/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_pocket_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Slot milling Wizard (Mill group) -->
+            <div id="wiz_slot" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="slotLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="slotLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="slotVizStatus" class="viz-status"></div>
+                        <div id="slotVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Mills a straight slot from point A to point B in the active WCS. Drag the A / B / width handles in the 2D layout; the 3D view verifies the cut. The tool centre travels A→B, so the slot ends are rounded a tool-radius beyond each point. Width = tool → one pass; width &gt; tool → parallel passes. Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">ENDPOINTS</span>
+                <div class="grid-2">
+                    <div><span class="label">A — X</span><input id="sl_ax" value="0"/></div>
+                    <div><span class="label">A — Y</span><input id="sl_ay" value="0"/></div>
+                    <div><span class="label">B — X</span><input id="sl_bx" value="60"/></div>
+                    <div><span class="label">B — Y</span><input id="sl_by" value="0"/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="sl_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="sl_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">TOOL &amp; WIDTH</span>
+                <div class="grid-3">
+                    <div><span class="label">WIDTH</span><input id="sl_width" value="6" title="Finished slot width (≥ tool Ø). Equal to the tool = a single pass."/></div>
+                    <div><span class="label">TOOL Ø</span><input id="sl_toolDia" value="6"/></div>
+                    <div><span class="label">STEPOVER %</span><input id="sl_stepoverPct" value="40" title="Only used when width &gt; tool. Percentage of tool diameter between parallel passes."/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="sl_depth" value="4"/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="sl_stepdown" value="1.5"/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="sl_clearance" value="5"/></div>
+                    <div><span class="label">FEED</span><input id="sl_feed" value="600"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="sl_plunge" value="150"/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_slot_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Surfacing / face-mill Wizard (Mill group) -->
+            <div id="wiz_surfacing" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="surfacingLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="surfacingLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="surfacingVizStatus" class="viz-status"></div>
+                        <div id="surfacingVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Skims the top of the stock flat over a rectangular area. Opens sized to the whole stock top; drag the handles to face a sub-area. The tool overhangs the area edge by its radius so the whole top is faced — keep the area within fixture clearance. Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">AREA</span>
+                <div class="grid-2">
+                    <div><span class="label">POSITION X</span><input id="sf_originX" value="0"/></div>
+                    <div><span class="label">POSITION Y</span><input id="sf_originY" value="0"/></div>
+                    <div><span class="label">WIDTH</span><input id="sf_w" value="100"/></div>
+                    <div><span class="label">HEIGHT</span><input id="sf_h" value="80"/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="sf_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="sf_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">TOOL &amp; STEPOVER</span>
+                <div class="grid-3">
+                    <div><span class="label">STRATEGY</span>
+                        <select id="sf_strategy" value="raster">
+                            <option value="raster">Raster (zig-zag)</option>
+                            <option value="spiral">Concentric (spiral)</option>
+                        </select>
+                    </div>
+                    <div><span class="label">TOOL Ø</span><input id="sf_toolDia" value="12"/></div>
+                    <div><span class="label">STEPOVER %</span><input id="sf_stepoverPct" value="60"/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">SKIM DEPTH</span><input id="sf_depth" value="0.5" title="Total material removed off the top (mm)."/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="sf_stepdown" value="0.5"/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="sf_clearance" value="5"/></div>
+                    <div><span class="label">FEED</span><input id="sf_feed" value="800"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="sf_plunge" value="200"/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_surfacing_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Text / label engraving Wizard (Mill group) -->
+            <div id="wiz_text" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="textLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="textLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="textVizStatus" class="viz-status"></div>
+                        <div id="textVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Engraves filled text (part tags / labels) in the active WCS. Letters are pocket-filled from a single-stroke font, so the counters (holes in O, A, 8…) come out clean. Drag the pos / height handles in the 2D layout; the 3D verifies the cut. Use a small end mill (or V-bit). Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">TEXT</span>
+                <div><input id="tx_text" value="DDCS-01" style="width:100%" title="Uppercase A–Z, 0–9 and . , - _ : / # + = ( ) ! ? — lowercase is upper-cased."/></div>
+                <div class="grid-3">
+                    <div><span class="label">HEIGHT</span><input id="tx_height" value="12" title="Cap height (mm)."/></div>
+                    <div><span class="label">STROKE WIDTH</span><input id="tx_strokeWidth" value="2.5" title="Letter boldness (mm). Use ≥ the tool Ø so the fill is clean."/></div>
+                    <div><span class="label">ALIGN</span>
+                        <select id="tx_align" value="left">
+                            <option value="left">Left</option>
+                            <option value="center">Center</option>
+                            <option value="right">Right</option>
+                        </select>
+                    </div>
+                    <div><span class="label">POSITION X</span><input id="tx_x" value="0"/></div>
+                    <div><span class="label">POSITION Y</span><input id="tx_y" value="0"/></div>
+                    <div><span class="label">LETTER SPACING</span><input id="tx_spacing" value="1.2" title="Extra gap between letters (mm)."/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="tx_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="tx_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">TOOL &amp; FILL</span>
+                <div class="grid-2">
+                    <div><span class="label">TOOL Ø</span><input id="tx_toolDia" value="1.5"/></div>
+                    <div><span class="label">STEPOVER %</span><input id="tx_stepoverPct" value="50"/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="tx_depth" value="0.4"/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="tx_stepdown" value="0.4"/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="tx_clearance" value="4"/></div>
+                    <div><span class="label">FEED</span><input id="tx_feed" value="400"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="tx_plunge" value="120"/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_text_code"></pre>
                 </div>
                 </div><!-- /.wiz-controls -->
               </div><!-- /.wiz-2pane -->
@@ -1265,7 +1539,42 @@
 
     <!-- SETTINGS app — full-screen settings view, shown via the header app-switcher. -->
     <div id="settings-app" class="app-shell hidden"></div>
-    
+
+    <!-- BLOCKS app — Codeblocks-for-G-code authoring (stack op-blocks → live G-code + preview).
+         Static shell here; blocks/blocksApp.js (lazy-loaded on first open) builds palette/stage/code. -->
+    <div id="blocks-app" class="app-shell hidden">
+        <div class="palette">
+            <h3>Blocks</h3>
+            <div id="blk-pal"></div>
+            <p>Primitive level. STUDIO composes these into presets.</p>
+        </div>
+        <div class="viewport" id="blk-viewport">
+            <div class="stage" id="blk-stage"></div>
+            <div class="bk-hint">drag background = pan · wheel = zoom · click a block ⇄ its G-code</div>
+        </div>
+        <div class="right">
+            <div class="pv">
+                <h3 class="pane-h">Preview
+                    <span class="leg">
+                        <span style="color:#5a6b7d"><i style="border-top-style:dashed;border-color:#5a6b7d"></i>rapid</span>
+                        <span style="color:#33b1c9"><i style="border-color:#33b1c9"></i>feed</span>
+                        <span style="color:#e35c5c"><i style="border-color:#e35c5c"></i>probe</span>
+                    </span>
+                    <span class="seg"><button id="blk-m2d" class="op-btn primary">2D</button><button id="blk-m3d" class="op-btn">3D</button></span>
+                    <button id="blk-play" class="op-btn">▶ Play</button>
+                </h3>
+                <div class="pv-body">
+                    <canvas id="blk-preview"></canvas>
+                    <div id="blk-host3d" style="display:none"></div>
+                </div>
+            </div>
+            <div class="gcode">
+                <h3 class="pane-h">Projected G-code</h3>
+                <pre id="blk-gcode"></pre>
+            </div>
+        </div>
+    </div>
+
     <!-- Global tooltip -->
     <div id="global-tooltip" style="display:none;"></div>
 

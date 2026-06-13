@@ -1,0 +1,38 @@
+// M20200 - HTM_ATC macro - by SeB
+// ATC Setup page - Along X button - change the rack orientation parallel with X axis
+
+RunMacro(AS3.Getbuttonstate(20200));
+
+#Events
+
+static bool isMacroRunning = false; // check running macro
+
+public void RunMacro(bool status) {
+    if (!isMacroRunning) { // if not running, run it
+        isMacroRunning = true; // macro is running
+
+		if (!status)
+		{
+		   DialogResult result = MessageBox.Show("Are you sure you want to change the rack axis?", "Changing rack axis", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2, MessageBoxOptions.ServiceNotification);
+		   //exec.AddStatusmessage( "Raspuns = " + result );
+
+			if (result == DialogResult.Yes) {
+				AS3.Switchbutton(true, 20200);
+				//exec.Writekey("atcSetup", "rackAxis", "X");
+				AS3.Switchbutton(false, 20201);
+				
+				AS3.Setfieldtext("X", 30000); // step on X axis
+				AS3.Validatefield(30000); 
+				exec.Writekey("UserTextfields", "30000", "X");
+				
+				AS3.Setfieldtext("Y", 30001); // clearence on Y axis
+				AS3.Validatefield(30001); 
+				exec.Writekey("UserTextfields", "30001", "Y");
+			}
+		}
+        // Resetăm starea macro-ului
+        isMacroRunning = false; // macro not running anymore
+    } else {
+        return;
+    }
+}

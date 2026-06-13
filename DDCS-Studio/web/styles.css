@@ -3469,3 +3469,82 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .psrc-wrap .psrc-glyph.psrc-lit { color: #0277bd; opacity: 1; }
 .psrc-wrap .psrc-glyph.psrc-lit .psrc-dot { opacity: 1; }     /* filled dot = controller */
 input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
+
+/* ============================================================================
+   BLOCKS TAB (#blocks-app) — Codeblocks-for-G-code. Ported from blocks/blocks.html.
+   ALL rules scoped under #blocks-app so the dark prototype look can't bleed into the
+   app (and the app's global classes can't bleed in — only .hint collided, renamed .bk-hint).
+   Engine: wizards/ops/* + blocks/blockModel.js; logic in blocks/blocksApp.js.
+   ============================================================================ */
+#blocks-app {
+    /* Follow the active app theme: CHROME (palette/canvas/cards) = theme tokens;
+       the preview + G-code panes = a black "screen", mirroring the app's editor. */
+    --ink: var(--text); --muted: var(--text-dim); --line: var(--border);
+    --leaf: var(--accent-studio, var(--accent)); --array: var(--accent-gateway, var(--accent));
+    --ctrl:#c9962f; --var:#8b5cf6;   /* Codeblocks-style category signatures: Control=gold, Variables=violet */
+    --field: var(--bg);
+    --screen:#000; --screen-ink:#cdd9e5; --screen-dim:#8b9bb0;   /* fixed: the screen is black in every theme */
+    display:grid; grid-template-columns:130px 1fr 380px; grid-template-rows:minmax(0,1fr);
+    background:var(--bg); color:var(--ink);
+    font:13px/1.4 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
+}
+#blocks-app *, #blocks-app *::before, #blocks-app *::after { box-sizing:border-box; }
+/* left rail (palette) — chrome */
+#blocks-app .palette { background:var(--panel); border-right:1px solid var(--line); padding:10px; overflow:auto; }
+#blocks-app .palette h3 { margin:0 0 8px; font-size:11px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; }
+/* palette buttons reuse the app's .op-btn — only the rail layout is bespoke */
+#blocks-app .palette .op-btn { display:block; width:100%; margin:0 0 6px; text-align:left; font-weight:600; }
+#blocks-app .palette .cat { margin:12px 0 6px; font-size:10px; letter-spacing:.08em; color:var(--muted);
+                            text-transform:uppercase; opacity:.7; }
+#blocks-app .palette .cat:first-child { margin-top:4px; }
+#blocks-app .cat-ops { border-left:3px solid var(--leaf); }       /* category accent stripe (keeps categories distinct) */
+#blocks-app .cat-modify { border-left:3px solid var(--array); }
+#blocks-app .cat-control { border-left:3px solid var(--ctrl); }
+#blocks-app .cat-variables { border-left:3px solid var(--var); }
+#blocks-app .palette p { color:var(--muted); font-size:11px; margin-top:14px; }
+/* block canvas + cards — chrome */
+#blocks-app .viewport { position:relative; overflow:hidden; cursor:grab; }
+#blocks-app .viewport.panning { cursor:grabbing; }
+#blocks-app .stage { position:absolute; top:0; left:0; transform-origin:0 0; padding:24px; }
+#blocks-app .bk-hint { position:absolute; left:10px; bottom:8px; color:var(--muted); font-size:11px; pointer-events:none; }
+#blocks-app .blk { width:300px; margin:0 0 8px; border-radius:8px; overflow:hidden; border:1px solid var(--line); box-shadow:0 1px 3px #0003; }
+#blocks-app .blk-head { display:flex; align-items:center; gap:8px; padding:7px 10px; color:#fff; font-weight:700; }
+/* header colour = the block's own category (> stops it leaking onto nested children) */
+#blocks-app .blk.leaf > .blk-head, #blocks-app .blk.move > .blk-head { background:var(--leaf); }      /* Ops */
+#blocks-app .blk.container > .blk-head, #blocks-app .blk.path > .blk-head { background:var(--array); } /* Modify */
+#blocks-app .blk.loop > .blk-head { background:var(--ctrl); }   /* Control */
+#blocks-app .blk.var > .blk-head { background:var(--var); }     /* Variables */
+#blocks-app .blk-head small { opacity:.6; font-weight:400; }
+#blocks-app .blk-head .x { margin-left:auto; cursor:pointer; opacity:.8; }
+#blocks-app .blk-head .x:hover { opacity:1; }
+#blocks-app .blk-body { background:var(--panel); padding:8px 10px; display:flex; flex-wrap:wrap; gap:6px; }
+#blocks-app .f { display:flex; flex-direction:column; width:62px; }
+#blocks-app .f span { font-size:10px; color:var(--muted); }
+#blocks-app .f input, #blocks-app .f select { background:var(--field); border:1px solid var(--line); color:var(--ink);
+                                              border-radius:5px; padding:4px 5px; font:inherit; width:100%; }
+#blocks-app .children { background:var(--bg); padding:8px 8px 4px 16px; border-left:3px solid var(--array); }
+#blocks-app .blk.loop > .children { border-left-color:var(--ctrl); }   /* the loop "embraces" its sub-stack in its own colour */
+#blocks-app .blk.var > .blk-body .f, #blocks-app .blk.loop > .blk-body .f { width:96px; }   /* room for names/formulas */
+#blocks-app .add-child { margin:2px 4px 6px 0; padding:4px 8px; border:1px dashed var(--line); border-radius:6px;
+                         background:transparent; color:var(--muted); cursor:pointer; }
+#blocks-app .add-child:hover { color:var(--ink); border-color:var(--muted); }
+#blocks-app .blk.selected { outline:2px solid var(--accent); outline-offset:1px; }
+#blocks-app .blk-head[data-sel] { cursor:pointer; }
+/* right column (preview + G-code) — black "screen", mirrors the app editor */
+#blocks-app .right { display:flex; flex-direction:column; border-left:1px solid var(--line); min-width:0; background:var(--screen); }
+#blocks-app .pane-h { margin:0; padding:6px 10px; font-size:11px; letter-spacing:.08em; color:var(--screen-dim);
+                      text-transform:uppercase; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+#blocks-app .pv { height:320px; display:flex; flex-direction:column; background:var(--screen); }
+#blocks-app .pv-body { flex:1; position:relative; }
+#blocks-app .pv-body > canvas, #blocks-app .pv-body > div { position:absolute; inset:0; width:100%; height:100%; }
+#blocks-app .seg { margin-left:auto; display:flex; gap:4px; }   /* 2D/3D + Play reuse .op-btn (.primary = active) */
+#blocks-app .leg { display:flex; gap:9px; font-size:10px; text-transform:none; letter-spacing:0; }
+#blocks-app .leg i { display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:middle; margin-right:3px; }
+#blocks-app .gcode { flex:1; overflow:auto; background:var(--screen); }
+#blocks-app .gcode pre { margin:0; padding:10px; font:12px/1.45 ui-monospace,Consolas,monospace; color:var(--screen-ink); white-space:pre; }
+/* code view: one span per line, carrying its owning-block ancestry → linked selection */
+#blocks-app .gl { display:block; border-radius:3px; }
+#blocks-app .gl:empty::after { content:'\200B'; }                 /* keep blank separator lines tall */
+#blocks-app .gl[data-owner] { cursor:pointer; }
+#blocks-app #blk-gcode.has-sel .gl { opacity:.3; }
+#blocks-app #blk-gcode.has-sel .gl.hot { opacity:1; background:color-mix(in srgb, var(--accent) 26%, #000); box-shadow:inset 2px 0 var(--accent); }

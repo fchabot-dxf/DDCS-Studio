@@ -1,0 +1,94 @@
+// M20330 - HTM_ATC macro - by SeB
+// macro for calibrating TCP sensor, the mcZ position
+// will be need a "Master Tool" with known length
+// have to be done once per setup or re-done if the sensor is repositioned
+
+	System.Media.SoundPlayer errorSound = new System.Media.SoundPlayer(Application.StartupPath + @"\Flashscreen\SOUND\error.wav");
+	
+	if(!exec.GetLED(56)||!exec.GetLED(57)||!exec.GetLED(58)) // If machine was not homed then it is unsafe to move in machine coordina	tes, stop here...
+	{
+		exec.AddStatusmessage("Measure TCP Z measuring cannot start! One or more axis are NOT REFERENCED");
+		errorSound.Play();
+		exec.Stop();
+		return;
+	}
+	
+		DialogResult confirmMeasure = MessageBox.Show(
+		"Are you sure you want to measure the TCP TP position?\n\nYou need the Reference Tool!\nYou also have to know the Reference Tool length!\n\nPress OK to continue or Cancel to abort", 
+		"Measure Tool!", 
+		MessageBoxButtons.OKCancel, 
+		MessageBoxIcon.Warning, 
+		MessageBoxDefaultButton.Button2, 
+		MessageBoxOptions.ServiceNotification
+		);
+					
+		if (confirmMeasure == DialogResult.Cancel) {			
+			exec.Stop();
+			return;
+		} 
+
+
+	// check for master tool
+	if (exec.Getcurrenttool() != AS3.Getfieldint(2747)) {
+		exec.AddStatusmessage("Master Tool not loaded! Master tool " + AS3.Getfieldint(2747));
+		errorSound.Play();
+		exec.Stop();
+		return;
+	}
+		
+// preluam coordonatele TCP (Tool Change Position) din ATC setup
+double tcpXpos = AS3.Getfielddouble(30020);
+double tcpYpos = AS3.Getfielddouble(30021);
+double tcpZpos = AS3.Getfielddouble(30022);
+
+double minZlimit = AS3.Getfielddouble(41);
+double FeedrateSlow = AS3.Getfielddouble(2710);
+double FeedrateFast = AS3.Getfielddouble(2709);
+double FeedRate = AS3.Getfielddouble(30017);
+
+
+// definim feed ptr masurare scula
+double retractforsecondmeasurement = AS3.Getfielddouble(2706);
+
+// lungimea master tool
+double masterLength = AS3.Getfielddouble(30024);
+// exec.AddStatusmessage("Reference Tool Length = " + masterLength);
+
+bool dodualcycle =  AS3.Getbuttonstate(853); //Do probing from 2 cycles, first with Fast and second with Slow feedrates
+// exec.AddStatusmessage(Convert.ToString(dodualcycle));
+
+
+// ne mutam in tcpZpos
+exec.Code("G53 G01 F" + FeedRate + " Z" + tcpZpos);
+exec.Code("G53 G01 F" + FeedRate + " X" + tcpXpos);
+exec.Code("G53 G01 F" + FeedRate + " Y" + tcpYpos);
+while(exec.IsMoving()){}
+
+if(!dodualcycle)
+{
+  exec.Code("G31 Z" + minZlimit + "F" + FeedrateFast); // Do the Z probing with Fast feedrate first
+  while(exec.IsMoving()){}
+
+  exec.Code("G91 G0 Z" + retractforsecondmeasurement);
+  exec.Code("G90"); 
+}
+while(exec.IsMoving()){}
+
+//coboram pana la touch, maxim pe cota minimZ definita in axe
+exec.Code("G31 F" + FeedrateSlow + " Z" + minZlimit);
+while(exec.IsMoving()){}
+
+	double mcZpos = exec.GetZmachpos();
+	exec.AddStatusmessage("mcZpos = " + mcZpos);
+	mcZpos = exec.GetZmachpos() - masterLength;
+	exec.AddStatusmessage("mcZpos + masterLength = " + mcZpos);
+	AS3.Setfield(mcZpos, 20330);
+	AS3.Validatefield(20330);
+	
+	// salvam mcZpos in profile file	
+	exec.Writekey("UserTextfields", "20330", Convert.ToString(mcZpos)); //	
+	exec.Wait(500); // Wait 500msec
+	
+exec.Code("G53 G01 F" + FeedRate + " Z" + tcpZpos);
+
+//

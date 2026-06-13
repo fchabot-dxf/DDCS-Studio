@@ -1,0 +1,4 @@
+// M20401 - HTM_ATC macro - by SeB
+// ATC Page - ***PLUS*** button for tool selection. Will call M20400 for next tool number selection (+1)
+
+if ( AS3.Getfieldint(20400) < 96 ) exec.Code("M20400E1");

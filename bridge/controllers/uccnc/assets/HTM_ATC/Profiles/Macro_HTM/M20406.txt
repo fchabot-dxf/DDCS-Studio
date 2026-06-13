@@ -1,0 +1,38 @@
+// M20406 - HTM_ATC macro - by SeB
+// ATC Page - ***Remove Tool*** button. Will remove the current tool from spindle. The tool have to be removed manually from spindle.
+
+int oldTool = exec.Getcurrenttool();
+if (oldTool != 0) {
+	DialogResult confirmMeasure = MessageBox.Show(
+	"Are you sure you want to remove current tool from spindle?\n\nPress OK to continue or Cancel to abort", 
+	"Measure Tool!", 
+	MessageBoxButtons.OKCancel, 
+	MessageBoxIcon.Warning, 
+	MessageBoxDefaultButton.Button1, 
+	MessageBoxOptions.ServiceNotification
+	);
+					
+	if (confirmMeasure == DialogResult.Cancel) {			
+		exec.Stop();
+		return;
+	} else if (confirmMeasure == DialogResult.OK) {
+		exec.AddStatusmessage("Tool removed! Spindle empty!"); 
+		exec.Setcurrenttool(0);
+		AS3.Setfield(0, 2652); 
+		AS3.Validatefield(2652);
+
+		// salvam scula incarcata in spindle ptr preluare la pornirea urmatoarei sesiuni uccnc
+		exec.Writekey("UserTextfields", "20222", "0"); // salvam starea slotului prin scriere 0 in profile
+		
+				// search for the toolNo in slots. Update fields if found.
+				for (int i = 1; i <= 10; i++) {
+                        if (oldTool == AS3.Getfieldint(20500 + i)) { 
+                            // exec.AddStatusmessage("scula T" + oldTool + "in slot #" + i);
+                            AS3.SetLED(false, (i+820)); //ledurile sunt de la 801 la 810                           
+                        }
+				}
+
+				
+	} // end code for OK response
+}		
+

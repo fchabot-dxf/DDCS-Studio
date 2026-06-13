@@ -1,0 +1,267 @@
+'Copyright (c) 2017 Jan Roters
+'
+'Permission is hereby granted, free of charge, to any person obtaining a copy
+'of this software and associated documentation files (the "Software"), to deal
+'in the Software without restriction, including without limitation the rights
+'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+'copies of the Software, and to permit persons to whom the Software is
+'furnished to do so, subject to the following conditions:
+'
+'The above copyright notice and this permission notice shall be included in all
+'copies or substantial portions of the Software.
+'
+'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+'SOFTWARE.
+
+'Modified by Juan Chong 01/15/2019
+'Tested with an OMIOCNC X8-2200L-USB
+
+'-------------- Configuration --------------
+
+'Position of tool change in machine coordinates. 
+org_tool_x = 262
+org_tool_y = -636
+
+'Position of tool length sensor in machine coordinates. 
+org_overcalib_x = 80
+org_overcalib_y = -200
+
+'This variable tells the gantry to move down quickly
+'to reduce the time for fast probing.
+'Note this is with reference to machine coordinates.
+move_z_down_time_reduce = -40
+
+'------------- Configuration END -----------
+
+'Variables that should be stored permanently
+var_toolx  = 500
+var_tooly  = 501
+var_calibx = 503
+var_caliby = 504
+var_calibz = 505
+var_calibrationz = 506
+
+Response = MachMsg("Is this a single-tool job (skip probing)?", "Skip Probing", 4)
+If Response = 6 Then
+	End
+End If
+
+If IsSuchSignal(22) Then
+
+	'Get current (job) position
+	x = GetToolChangeStart( 0 )
+	y = GetToolChangeStart( 1 )
+	z = GetToolChangeStart( 2 )
+	
+	OldAbsoluteMode = GetOemLED(48)
+	OldFeedRate = FeedRate
+	MaxFeedRate = GetOemDRO(104)
+	OldTool = GetCurrentTool()
+	NewTool = GetSelectedTool()
+	
+	SetCurrentTool( 0 )
+	
+	tmp_calibration_z = GetVar(var_calibrationz)
+
+	calibrate_sensor = false
+	If tmp_calibration_z = 0 Then
+		Response = MachMsg("The tool length sensor is not calibrated. Do you want to calibrate the tool sensor?", "Calibration required", 4)
+		If Response = 6 Then
+			calibrate_sensor = true
+		End If
+	Else
+		Response = MachMsg("Do you want to recalibrate the tool sensor?", "Calibration", 4)
+		If Response = 6 Then
+			calibrate_sensor = true
+		End If		
+	End If
+	
+	'MachMsg("x = " & x & ", y = " & y & ", z = " & z & ", OldT = " & OldTool & ", NewT = " & NewTool & ", CalZ = " & tmp_calibration_z, "Values", 0)
+
+	If calibrate_sensor Then
+		SetVar(var_toolx, org_tool_x)
+		SetVar(var_tooly, org_tool_y)
+		SetVar(var_calibx, org_overcalib_x)
+		SetVar(var_caliby, org_overcalib_y)
+
+		'Move to safe Z
+		Code("G53G90G0Z0")
+		While IsMoving
+			Sleep 100
+		Wend
+		
+		'Move to measurement position
+		Code("G53G90G0X" & org_overcalib_x & "Y" & org_overcalib_y)
+		While IsMoving
+			Sleep 100
+		Wend
+		
+		'Prompt user to connect clip to tool
+		MachMsg("Attach clip to tool.", "WARNING!!", 0)
+		
+		'Travel some mm in Z to shorten probe time
+		Code("G91G0Z" & move_z_down_time_reduce)
+		While IsMoving
+			Sleep 100
+		Wend
+		
+		'Fast probing
+		Code("G91G31Z" & move_z_down_time_reduce & "F150")
+		While IsMoving
+			Sleep 100
+		Wend
+		
+		'Go up a few mm
+		Code("G91G0Z2")
+		While IsMoving
+			Sleep 100
+		Wend
+
+		'Slow probing
+		Code("G91G31Z-2.5F25")
+		While IsMoving
+			Sleep 100
+		Wend
+		
+		'Get absolute Z position with current tool and save
+		calibration_z = GetParam("ZMachine")
+		SetVar(var_calibrationz, calibration_z)	
+
+		'Move to safe Z
+		Code("G53G90G0Z0")
+		While IsMoving
+			Sleep 100
+		Wend
+		
+		'Prompt user to disconnect clip from tool
+		MachMsg("Remove clip from tool.", "WARNING!!", 0)
+		
+		'Print debugging prompt
+		'MachMsg("x = " & x & ", y = " & y & ", z = " & z & ", OldT = " & OldTool & ", NewT = " & NewTool & ", VarCalZ = " & calibration_z, "Values", 0)
+		
+	End If
+
+	Response = MachMsg("Should I move to tool change position?", "WARNING!", 1)
+	If Response = 2 Then
+    	End
+	End If
+
+	'Retrieve positions from calibration
+	tool_x = GetVar(var_toolx)
+	tool_y = GetVar(var_tooly)
+	overcalib_x = GetVar(var_calibx)
+	overcalib_y = GetVar(var_caliby)
+	calibration_z = GetVar(var_calibrationz)
+	
+	'MachMsg("Tool sensor calibrated at machine Z:  " & calibration_z, "Calibration value", 0)
+
+	Code("G90")
+	
+    'Move to safe Z
+    Code("G53G90Z0")
+    While IsMoving
+		Sleep 100
+    Wend
+
+    'Move in X,Y to tool change position
+    Code("G53G90G0X" & tool_x & "Y" & tool_y)
+    While IsMoving
+		Sleep 100
+    Wend
+    
+    Response = MachMsg("Please change tool. When you press Ok, the gantry will move to tool change position.", "Tool change", 1)
+    
+    If Response = 2 Then
+    	End
+    End If
+        
+    'MachMsg("Move to measurement position", "Tool change", 0)
+
+    'Move to tool length measurement position
+    Code("G53G90G0X" & overcalib_x & "Y" & overcalib_y)
+    While IsMoving
+		Sleep 100
+    Wend
+	
+	'Prompt user to connect clip to tool
+	MachMsg("Attach clip to tool.", "WARNING!!", 0)
+      
+	'Travel some mm in Z to shorten probe time
+	Code("G91G0Z" & move_z_down_time_reduce)
+	While IsMoving
+		Sleep 100
+	Wend
+    
+	Code("G49")
+
+	'Fast probing
+	Code("G91G31Z" & move_z_down_time_reduce & "F150")
+	While IsMoving
+		Sleep 100
+    Wend
+
+	'Go up a few mm
+	Code("G91G0Z2")
+	While IsMoving
+		Sleep 100
+    Wend
+    
+	'Slow probing
+	Code("G91G31Z-2.5F25")
+	While IsMoving
+		Sleep 100
+	Wend
+    
+    'Get machine Z position and store in temp variable'
+	new_calib_z = GetParam("ZMachine")
+    
+    'Subtract new machine Z position from old (cal) machine Z position
+    diff_z = new_calib_z - calibration_z
+        
+	'Move to safe z
+	Code("G53G90G0Z0")
+	While IsMoving
+		Sleep 100
+    Wend
+	
+	'Prompt user to disconnect clip from tool
+	MachMsg("Remove clip from tool.", "WARNING!!", 0)
+	
+	'Response = MachMsg("Old Value: " & calibration_z & ", New Value: " & new_calib_z & ", Diff: " & diff_z, "Value", 1)
+	
+	'Set new Z tool offset based on machine measurements
+	Code("G10 L1 P" & NewTool & " Z" & diff_z)
+
+	'Program tool length offset into Tool Table
+	Code("G43 H" & NewTool)
+
+	'Set machine to use new tool (and offset)
+	SetCurrentTool( NewTool )
+        
+    MachMsg("Moving back to original position X-Y position.", "Tool change", 0)    
+    
+    'Move X and Y to original position
+    Code("G90G0X" & x & "Y" & y)
+    While IsMoving
+		Sleep 100
+    Wend
+    
+    'Set original feed rate (likely zero)
+    SetFeedRate(OldFeedRate)
+
+    'Reset movement mode
+    If OldAbsoluteMode Then
+    	Code("G90")
+    Else
+    	Code("G91")
+    End If
+
+    MachMsg("Tool change finished. Click OK to continue executing program.", "Tool change", 0)
+Else
+    MachMsg("No probing available. Check the input signal of the probe!", "Probing error", 0) 
+End If

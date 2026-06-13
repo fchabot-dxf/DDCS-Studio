@@ -2,6 +2,7 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { DrillWizard, patternPoints } from '../drillWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
+import { toolOptionsHTML, getTool } from '../toolPicker.js';
 
 const wizard = new DrillWizard();
 const layout = new FeatureCanvas();
@@ -20,6 +21,20 @@ function setFields(map) {
         first = first || e;
     }
     if (first) first.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+/** Load the picked library tool's Ø + feed into the wizard. Peck → hole Ø = drill;
+ *  Bore → tool Ø (the end mill). Works the same for ATC or manual machines. */
+function applyTool() {
+    const sel = el('d_tool');
+    if (!sel || !sel.value) return;
+    const t = getTool(sel.value);
+    if (!t) return;
+    const map = {};
+    if (t.dia !== '' && t.dia != null) map[(v('d_method') === 'helical') ? 'd_toolDia' : 'd_holeDia'] = t.dia;
+    if (t.feed !== '' && t.feed != null) map.d_feed = t.feed;
+    if (t.rpm !== '' && t.rpm != null) map.d_rpm = t.rpm;   // overrides the Head default RPM
+    if (Object.keys(map).length) setFields(map);   // setFields fires 'input' → update() redraws
 }
 
 /**
@@ -92,11 +107,24 @@ export const drillView = {
     inputIds: [
         'd_pattern', 'd_skip', 'd_originX', 'd_originY', 'd_cols', 'd_rows', 'd_dx', 'd_dy', 'd_dia', 'd_count', 'd_startAngle',
         'd_w', 'd_h', 'd_nx', 'd_ny', 'd_lcount', 'd_spacing', 'd_angle',
-        'd_method', 'd_holeDia', 'd_peck', 'd_toolDia', 'd_pitch', 'd_depth', 'd_clearance', 'd_feed',
+        'd_method', 'd_holeDia', 'd_peck', 'd_toolDia', 'd_pitch', 'd_depth', 'd_clearance', 'd_feed', 'd_rpm',
     ],
     probeSrcFields: {},   // not a probe wizard — keep the shared controller-source decorator a no-op
 
-    onOpen(ctx) { ctx.update(); },
+    onOpen(ctx) {
+        // Populate the Tool ▾ picker from the library each open (it may have changed in Settings).
+        const sel = el('d_tool');
+        if (sel) {
+            const keep = sel.value;
+            sel.innerHTML = toolOptionsHTML();
+            sel.value = keep;   // preserve selection if the tool still exists
+            if (!sel.dataset.wired) {
+                sel.dataset.wired = '1';
+                sel.addEventListener('change', () => applyTool());
+            }
+        }
+        ctx.update();
+    },
 
     update(ctx) {
         const pattern = v('d_pattern') || 'grid';
@@ -108,7 +136,7 @@ export const drillView = {
         const params = {
             pattern, method, skip: v('d_skip') || '',
             originX, originY, cx: originX, cy: originY, x0: originX, y0: originY,
-            depth: v('d_depth'), clearance: v('d_clearance'), feed: v('d_feed'),
+            depth: v('d_depth'), clearance: v('d_clearance'), feed: v('d_feed'), rpm: v('d_rpm'),
             holeDia: v('d_holeDia'), peck: v('d_peck'), toolDia: v('d_toolDia'), pitch: v('d_pitch'),
             spindle: s.spindle, head: s.head, endProgram: s.endProgram,
         };

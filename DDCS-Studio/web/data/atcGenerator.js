@@ -18,6 +18,10 @@ function num(v, d) { return (v === '' || v == null || isNaN(Number(v))) ? d : Nu
 export function generateToolChangeNc(atc, outputs) {
     atc = atc || {};
     const mag = (Array.isArray(atc.magazine) ? atc.magazine : []).filter(p => p && p.tool !== '' && p.tool != null);
+    // Tool name comes from the library (keyed by tool number); fall back to any legacy per-pocket name.
+    const nameOf = {};
+    (Array.isArray(atc.tools) ? atc.tools : []).forEach((t) => { if (t && t.num != null && t.num !== '') nameOf[Number(t.num)] = t.name || ''; });
+    const label = (p) => { const nm = p.name || nameOf[num(p.tool, 0)] || ''; return nm ? ' - ' + nm : ''; };
     const drawbar = (outputs || []).find(o => o.type === 'drawbar') || {};
     const release = (drawbar.onCode || 'M154').trim();   // spindle drawbar OPEN (release tool)
     const clamp = (drawbar.offCode || 'M155').trim();    // spindle drawbar CLOSE (clamp tool)
@@ -43,7 +47,7 @@ export function generateToolChangeNc(atc, outputs) {
     mag.forEach((p, i) => w('IF #1300==' + num(p.tool, 0) + ' GOTO' + (101 + i) + '         ; current tool -> pocket ' + num(p.pocket, i + 1)));
     w('GOTO500                           ; current tool not in magazine - skip return');
     mag.forEach((p, i) => {
-        w('N' + (101 + i) + ' (return T' + num(p.tool, 0) + ' to pocket ' + num(p.pocket, i + 1) + (p.name ? ' - ' + p.name : '') + ')');
+        w('N' + (101 + i) + ' (return T' + num(p.tool, 0) + ' to pocket ' + num(p.pocket, i + 1) + label(p) + ')');
         w('#1 = ' + num(p.x, 0) + '  #2 = ' + num(p.y, 0) + '  #3 = ' + num(p.z, 0));
         w('G53 G0 X#1 Y#2'); w('G53 G0 Z#3');
         w(release + '                          ; drawbar release'); w('G04 P' + dwell);
@@ -56,7 +60,7 @@ export function generateToolChangeNc(atc, outputs) {
     w('#1505 = 1(Tool not in magazine!) ; requested tool has no pocket');
     w('GOTO999');
     mag.forEach((p, i) => {
-        w('N' + (201 + i) + ' (fetch T' + num(p.tool, 0) + ' from pocket ' + num(p.pocket, i + 1) + (p.name ? ' - ' + p.name : '') + ')');
+        w('N' + (201 + i) + ' (fetch T' + num(p.tool, 0) + ' from pocket ' + num(p.pocket, i + 1) + label(p) + ')');
         w('#1 = ' + num(p.x, 0) + '  #2 = ' + num(p.y, 0) + '  #3 = ' + num(p.z, 0));
         w('G53 G0 X#1 Y#2');
         w(release + '                          ; open collet BEFORE descending over the tool shank');

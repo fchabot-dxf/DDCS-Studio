@@ -8,6 +8,7 @@
  * slots. Pin ranges: inputs 1–24, outputs 1–20; pins already in use are disabled in the picker so a
  * pin can't be double-assigned. Choosing a type in "+ Add" drops a row pre-expanded with its params.
  */
+import { toolOptionsHTML, getTool } from '../wizards/toolPicker.js';
 
 const INPUT_TYPES = [
     { type: 'probe',  label: '3D Probe' },
@@ -162,7 +163,7 @@ export function renderMagazineTable(container, atc, onChange) {
     const cnt = document.createElement('input'); cnt.type = 'number'; cnt.min = '0'; cnt.max = '99'; cnt.value = atc.magazine.length;
     cnt.addEventListener('change', () => {
         const n = Math.max(0, Math.min(99, parseInt(cnt.value, 10) || 0));
-        while (atc.magazine.length < n) { const k = atc.magazine.length + 1; atc.magazine.push({ pocket: k, tool: k, name: '', x: '', y: '', z: '' }); }
+        while (atc.magazine.length < n) { const k = atc.magazine.length + 1; atc.magazine.push({ pocket: k, tool: '', name: '', x: '', y: '', z: '' }); }
         atc.magazine.length = n;
         onChange(); rerender();
     });
@@ -179,7 +180,7 @@ export function renderMagazineTable(container, atc, onChange) {
         return;
     }
 
-    const COLS = [['Pocket', 46], ['Tool #', 58], ['Name', 130], ['Park X', 66], ['Park Y', 66], ['Park Z', 66]];
+    const COLS = [['Pocket', 46], ['Tool', 168], ['Description', 150], ['Park X', 66], ['Park Y', 66], ['Park Z', 66]];
     const head = document.createElement('div');
     head.style.cssText = 'display:flex; gap:8px; font-size:10px; color:#6b6150; font-weight:600; padding:2px;';
     COLS.forEach(([h, w]) => { const s = document.createElement('span'); s.textContent = h; s.style.width = w + 'px'; head.appendChild(s); });
@@ -190,17 +191,29 @@ export function renderMagazineTable(container, atc, onChange) {
         const tr = document.createElement('div');
         tr.style.cssText = 'display:flex; gap:8px; align-items:center; padding:3px 2px; border-bottom:1px solid rgba(0,0,0,0.08);';
         const pk = document.createElement('span'); pk.textContent = i + 1; pk.style.cssText = 'width:46px; font-weight:600; color:#3a3a3a;'; tr.appendChild(pk);
-        const cell = (key, w, isNum) => {
-            const inp = document.createElement('input'); inp.type = isNum ? 'number' : 'text'; if (isNum) inp.step = '0.1';
+
+        // Tool = a picker into the tool library (T-number); Description shows what that tool is.
+        const sel = document.createElement('select'); sel.innerHTML = toolOptionsHTML('— empty —');
+        sel.value = (row.tool === '' || row.tool == null) ? '' : String(row.tool);
+        sel.style.cssText = INP + ' width:158px;';
+        const desc = document.createElement('span'); desc.style.cssText = 'width:150px; font-size:11px; color:#6b6150; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+        const fillDesc = () => {
+            const t = getTool(row.tool);
+            desc.textContent = t ? ([t.type, t.flutes !== '' ? t.flutes + 'F' : '', t.feed !== '' ? 'F' + t.feed : ''].filter(Boolean).join(' · ') || t.name || '—') : '(empty)';
+        };
+        fillDesc();
+        sel.addEventListener('change', () => { row.tool = sel.value === '' ? '' : Number(sel.value); fillDesc(); onChange(); });
+        tr.appendChild(sel); tr.appendChild(desc);
+
+        const cell = (key, w) => {
+            const inp = document.createElement('input'); inp.type = 'number'; inp.step = '0.1';
             inp.value = row[key] ?? ''; inp.style.cssText = INP + ` width:${w}px;`;
-            inp.addEventListener('change', () => { row[key] = isNum ? (inp.value === '' ? '' : Number(inp.value)) : inp.value; onChange(); });
+            inp.addEventListener('change', () => { row[key] = inp.value === '' ? '' : Number(inp.value); onChange(); });
             return inp;
         };
-        tr.appendChild(cell('tool', 50, true));
-        tr.appendChild(cell('name', 122, false));
-        tr.appendChild(cell('x', 58, true));
-        tr.appendChild(cell('y', 58, true));
-        tr.appendChild(cell('z', 58, true));
+        tr.appendChild(cell('x', 58));
+        tr.appendChild(cell('y', 58));
+        tr.appendChild(cell('z', 58));
         container.appendChild(tr);
     });
 }

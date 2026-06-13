@@ -1,0 +1,102 @@
+// M20404 - HTM_ATC macro - by SeB
+// ATC Page - ***APPLY*** button. Will save the tool parameters in tool table.
+
+RunMacro(); 
+
+#Events
+
+static bool isMacroRunning = false; // Variabila globală pentru a verifica starea macro-ului
+
+public void RunMacro() {
+
+if (!isMacroRunning) {
+        isMacroRunning = true; // Setăm starea că macro-ul este în execuție
+
+        int toolNo = AS3.Getfieldint(20400); // campul in care se regaseste numarul sculei
+        if (toolNo == 0) { 
+                isMacroRunning = false;
+                return;
+        }
+        
+        string newDescription = AS3.Getfield(20401);
+        double newDiameter = AS3.Getfielddouble(20402);
+        double newLength = AS3.Getfielddouble(20403);
+        bool newType = AS3.Getbuttonstate(20403); 
+        
+        // exec.AddStatusmessage("desc = " + newDescription + "; diam = " + newDiameter + "; length = " + newLength);
+
+        // Declarăm variabilele de acces tooltable
+        var varLengthInit = Plugininterface.Datatypes.Tooltablecolumnname.Length;
+        var varDiameterInit = Plugininterface.Datatypes.Tooltablecolumnname.Diameter;
+        var varTypeInit = Plugininterface.Datatypes.Tooltablecolumnname.Type;
+        var varDescriptionInit = Plugininterface.Datatypes.Tooltablecolumnname.Description;
+
+        // Obținem valorile tooltable pentru scula curentă
+        double valueLengthInit = Convert.ToDouble(exec.Readtooltablecell(toolNo, varLengthInit)); // Citim Length ca double
+        double valueDiameterInit = Convert.ToDouble(exec.Readtooltablecell(toolNo, varDiameterInit)); // Citim Diameter ca double
+        string valueTypeInit = exec.Readtooltablecell(toolNo, varTypeInit);
+        string valueDescriptionInit = exec.Readtooltablecell(toolNo, varDescriptionInit);
+
+        // bool for RH type
+        bool initType = false;
+        if (valueTypeInit == "RH") { initType = true; } else { initType = false; }
+            
+        if ( (initType != newType) || (valueDescriptionInit != newDescription) || (valueDiameterInit != newDiameter) || (valueLengthInit != newLength)) { 
+                string modificari = "\nChanges:";
+                if (valueDescriptionInit != newDescription) modificari += "\n- Description: " + newDescription;
+                if (valueLengthInit != newLength) modificari += "\n- Length: " + newLength;
+                if (valueDiameterInit != newDiameter) modificari += "\n- Diameter: " + newDiameter;
+                if ((initType != newType) && (newType)) modificari += "\n- Repeatable Holder";
+                if ((initType != newType) && (!newType)) modificari += "\n- Non-Repeatable Holder";
+
+       			DialogResult result = MessageBox.Show(
+                "Save new data for Tool " +  toolNo +"?\n" + modificari, 
+                "Update Tool", 
+                MessageBoxButtons.YesNo, 
+                MessageBoxIcon.Question, 
+                MessageBoxDefaultButton.Button2, 
+                MessageBoxOptions.ServiceNotification);
+                
+                if (result == DialogResult.Yes) {
+                    // Salvăm noile valori în tooltable
+                    exec.Writetooltablecell(toolNo, varDiameterInit, Convert.ToString(newDiameter)); // Salvăm Slot ca int
+                    exec.Writetooltablecell(toolNo, varLengthInit, Convert.ToString(newLength)); // Salvăm Length ca double
+                    exec.Writetooltablecell(toolNo, varDescriptionInit, newDescription); // Salvăm Diameter ca double
+                    if (newType) exec.Writetooltablecell(toolNo, varTypeInit, "RH");
+                    if (!newType) exec.Writetooltablecell(toolNo, varTypeInit, "NRH");
+					
+				// search for the toolNo in slots. Update fields if found.
+				for (int i = 1; i <= 10; i++) {
+                        if (toolNo == AS3.Getfieldint(20500 + i)) { 
+                            // exec.AddStatusmessage("scula T" + toolNo + "in slot #" + i);
+                            AS3.Setfieldtext(Convert.ToString(newDiameter), i+20510); // afisam diametrul sculei din slot
+                            AS3.Validatefield(i+20520); // validam inputul
+
+                            AS3.Setfieldtext(Convert.ToString(newLength), i+20520); // afisam lungimea sculei din slot
+                            AS3.Validatefield(i+20520); // validam inputul
+                            
+                            if (newType) {
+                                AS3.SetLED(true, (i+810)); //ledurile sunt de la 801 la 810
+                            } else {
+                                AS3.SetLED(false, (i+810)); //ledurile sunt de la 801 la 810
+                            }                                
+                        }
+				}
+                }
+            
+        } else {
+            // exec.AddStatusmessage("Nothing Changed!");
+            isMacroRunning = false; 
+            return;
+        }
+        
+
+
+        // Resetăm starea macro-ului
+        isMacroRunning = false; 
+		// aici se termina codul macro
+} else {
+        exec.AddStatusmessage("Macro already running! Ignoring!");
+        return;
+}
+}

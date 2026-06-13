@@ -16,6 +16,35 @@ import { THEMES } from './themes.js';
 import { generateToolChangeNc } from '../data/atcGenerator.js';
 
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
+
+// --- Tool library ----------------------------------------------------------
+// atc.tools[i] is the record for tool i+1 (T-word). `length` is the controller
+// tool-length offset written to #[baseVar + i] (#1430 = T1); the other fields are
+// the Studio-side tool library the Mill wizards pick from. Not ATC-specific — the
+// Tool table tab is always present, so this works for manual tool change too.
+export const TOOL_TYPES = ['endmill', 'drill', 'ballnose', 'chamfer', 'vbit', 'spotdrill', 'face', 'tap', 'reamer', 'engraver', 'other'];
+// Coerce a legacy bare-number slot (was the length offset) — or a partial object — into the
+// full record. `num` is the tool number (T-word); `fallbackNum` supplies it for legacy entries
+// that pre-date sparse storage (dense index + 1). Empty/blank fields read as "unset".
+export function normalizeTool(t, fallbackNum) {
+    const fb = (fallbackNum != null) ? fallbackNum : '';
+    if (typeof t === 'number') return { num: fb, name: '', type: '', dia: '', flutes: '', length: t, rpm: '', feed: '', plunge: '' };
+    const o = (t && typeof t === 'object') ? t : {};
+    return {
+        num: (o.num != null && o.num !== '') ? o.num : fb,
+        name: o.name || '', type: o.type || '',
+        dia: o.dia ?? '', flutes: o.flutes ?? '', length: o.length ?? '',
+        rpm: o.rpm ?? '', feed: o.feed ?? '', plunge: o.plunge ?? '',
+    };
+}
+// The library as a sparse list of real tools: normalized, with a tool number, blanks dropped.
+// Legacy dense storage (index = tool−1) migrates here — index+1 becomes the tool number.
+export function libraryTools(atc) {
+    const tools = Array.isArray(atc && atc.tools) ? atc.tools : [];
+    return tools.map((t, i) => normalizeTool(t, i + 1)).filter((t) =>
+        t.name || t.type || t.dia !== '' || t.flutes !== '' || t.length !== '' || t.rpm !== '' || t.feed !== '' || t.plunge !== '');
+}
+
 // Built-in stock presets. Shape ∈ boss|pocket|cylinder; dimensions are separate (mm).
 // A flat board suits 3-axis work; rotary stock is a 3" block or Ø3" cylinder. Users can
 // save their own (any shape) on top of these — see stockTemplates in settings.
@@ -56,7 +85,7 @@ const SETTINGS_DEFAULTS = {
     // ATC: tool-length probe defaults (consumed by the Tool Length wizard) + the tool-offset table.
     // baseVar = DDCS tool-offset table base (#1430 = tool 1); tools[i] = stored length for tool i+1.
     atc: {
-        baseVar: 1430, toolCount: 10, tools: [],
+        baseVar: 1430, tools: [],
         blockHeight: 50, safeZ: 10, maxDist: 200, retract: 3, fFast: 300, fSlow: 50, qStop: 1,
         magType: 'straight', magazine: []   // magType: straight|disk; magazine[]: {pocket,tool,name,x,y,z}
     },
@@ -126,6 +155,8 @@ function syncFlatFromIO(s) {
 }
 
 let _ddcsSettings = loadSettings();
+// Migrate any legacy dense / bare-number tool storage to the sparse library shape (one pass, idempotent).
+if (_ddcsSettings.atc) _ddcsSettings.atc.tools = libraryTools(_ddcsSettings.atc);
 
 function loadSettings() {
     try {
@@ -545,16 +576,16 @@ function buildSettingsOverlay() {
                 <!-- TOOL TABLE TAB (always present; "+ Add tool changer (ATC)" lives here) -->
                 <div id="set_tab_atc" style="display:none">
                     <div class="settings-section">
-                        <div class="settings-section-title">TOOL TABLE&nbsp;&nbsp;(#var = base + tool − 1)</div>
+                        <div class="settings-section-title">TOOL LIBRARY&nbsp;&nbsp;(length offset → #[base + tool − 1])</div>
                         <div class="settings-grid">
                             <label>Base variable<input type="number" id="set_atc_basevar" step="1"></label>
-                            <label>Tool count<input type="number" id="set_atc_toolcount" min="1" max="99" step="1"></label>
                         </div>
-                        <div id="set_atc_tooltable" class="settings-grid" style="margin-top:8px;"></div>
+                        <div id="set_atc_libsummary" style="margin-top:8px;"></div>
                         <div class="settings-row" style="margin-top:8px;">
+                            <button class="toolbar-btn settings-io" id="set_atc_library">🛠 Tool library…</button>
                             <button class="toolbar-btn settings-io" id="set_atc_insert">⬇ Insert tool table</button>
                         </div>
-                        <div class="settings-hint">"Insert tool table" drops the #var = length assignments (non-blank rows) into the editor to push the table to the controller. Probing a tool updates one row live.</div>
+                        <div class="settings-hint">"Tool library" lists the tools you own (Ø, flutes, feeds/speeds) — the Mill wizards and the ATC magazine pick from it. "Insert tool table" drops the #var = length offsets (tools that have a length) into the editor to push them to the controller.</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">TOOL LENGTH PROBE (defaults for the Tool Length wizard)</div>
@@ -619,8 +650,7 @@ function wireSettingsOverlay(ov) {
         q('set_atc_fslow').value = a.fSlow ?? ad.fSlow;
         q('set_atc_qstop').value = a.qStop ?? ad.qStop;
         q('set_atc_basevar').value = a.baseVar ?? ad.baseVar;
-        q('set_atc_toolcount').value = a.toolCount ?? ad.toolCount;
-                renderToolTable();
+                renderLibSummary();
         q('set_mach_x').value = s.machine.x;
         q('set_mach_y').value = s.machine.y;
         q('set_mach_z').value = s.machine.z;
@@ -795,49 +825,155 @@ function wireSettingsOverlay(ov) {
     }
     applyHardwareTabs();
 
-    // --- ATC tool table: render rows (#var = base + tool-1), live edits, and an "Insert" generator ---
-    function renderToolTable() {
-        const cont = q('set_atc_tooltable');
+    // --- Tool library: a sparse list of the tools you own. Length offset → #[base + num − 1].
+    //     The tab shows a summary; the modal is the editor; the Mill wizards + magazine pick from it. ---
+    function renderLibSummary() {
+        const cont = q('set_atc_libsummary');
         if (!cont) return;
-        const a = _ddcsSettings.atc || {};
-        const base = parseInt(a.baseVar, 10) || 1430;
-        const count = Math.max(1, Math.min(99, parseInt(a.toolCount, 10) || 10));
-        const tools = a.tools || (a.tools = []);
-        let html = '';
-        for (let i = 0; i < count; i++) {
-            const v = (tools[i] != null && tools[i] !== '') ? tools[i] : '';
-            html += '<label>T' + (i + 1) + ' · #' + (base + i) +
-                '<input type="number" step="0.001" class="atc-tool-len" data-tool="' + i + '" value="' + v + '"></label>';
-        }
-        cont.innerHTML = html;
-    }
-    const _toolCont = q('set_atc_tooltable');
-    if (_toolCont) {
-        _toolCont.addEventListener('input', (e) => {   // dynamic rows aren't covered by the global binding
-            if (!e.target.classList || !e.target.classList.contains('atc-tool-len')) return;
-            const i = parseInt(e.target.dataset.tool, 10);
-            const a = _ddcsSettings.atc; a.tools = a.tools || [];
-            a.tools[i] = (e.target.value === '') ? '' : parseFloat(e.target.value);
-            saveSettings();
-        });
+        const tools = libraryTools(_ddcsSettings.atc || {});
+        if (!tools.length) { cont.innerHTML = '<span class="settings-hint">No tools yet — open the library to add them.</span>'; return; }
+        const chips = tools.map((t) => 'T' + t.num + (t.name ? ' ' + t.name : (t.dia !== '' ? ' Ø' + t.dia : ''))).join('  ·  ');
+        cont.innerHTML = '<span class="settings-hint">' + tools.length + ' tool' + (tools.length > 1 ? 's' : '') + ':  ' + chips + '</span>';
     }
     const _atcInsert = q('set_atc_insert');
     if (_atcInsert) {
         _atcInsert.addEventListener('click', () => {
             const a = _ddcsSettings.atc || {};
             const base = parseInt(a.baseVar, 10) || 1430;
-            const tools = a.tools || [];
-            const count = Math.max(1, Math.min(99, parseInt(a.toolCount, 10) || 0));
             const lines = [];
-            for (let i = 0; i < count; i++) {
-                const v = tools[i];
-                if (v === '' || v == null || !Number.isFinite(Number(v))) continue;
-                lines.push('#' + (base + i) + '=' + Number(v) + ' ( Tool ' + (i + 1) + ' length )');
-            }
-            if (!lines.length) { alert('No tool lengths set in the table.'); return; }
+            libraryTools(a).forEach((t) => {
+                const v = t.length, n = parseInt(t.num, 10);
+                if (v === '' || v == null || !Number.isFinite(Number(v)) || !Number.isFinite(n)) return;
+                lines.push('#' + (base + n - 1) + '=' + Number(v) + ' ( T' + n + (t.name ? ' ' + t.name : '') + ' length )');
+            });
+            if (!lines.length) { alert('No tool lengths set in the library.'); return; }
             const code = '( Tool table )\n' + lines.join('\n') + '\n';
             const em = (window.ddcsStudio && window.ddcsStudio.editorManager) || window.editorManager;
             if (em && typeof em.insert === 'function') em.insert(code);
+        });
+    }
+
+    // --- Tool library modal: the sparse editor (＋ Add / ✕ remove tools, full per-tool record) ---
+    function nextToolNum(tools) {
+        let mx = 0;
+        (tools || []).forEach((t) => { const n = parseInt(t && t.num, 10); if (Number.isFinite(n) && n > mx) mx = n; });
+        return mx + 1;
+    }
+    function lenVarLabel(num, base) {
+        const n = parseInt(num, 10);
+        return Number.isFinite(n) ? '#' + (base + n - 1) : '#—';
+    }
+    function renderToolLibRows() {
+        const body = document.getElementById('toollib-rows');
+        if (!body) return;
+        const a = _ddcsSettings.atc || {};
+        const base = parseInt(a.baseVar, 10) || 1430;
+        const tools = a.tools || (a.tools = []);
+        const opt = (cur) => '<option value="">—</option>' +
+            TOOL_TYPES.map((ty) => '<option value="' + ty + '"' + (ty === cur ? ' selected' : '') + '>' + ty + '</option>').join('');
+        const cell = (i, f, val, step) =>
+            '<td><input type="number" step="' + (step || 'any') + '" data-tool="' + i + '" data-field="' + f + '" value="' + (val === '' || val == null ? '' : val) + '"></td>';
+        if (!tools.length) { body.innerHTML = '<tr><td colspan="10" class="tl-empty">No tools yet — “＋ Add tool” to start your library.</td></tr>'; return; }
+        let html = '';
+        tools.forEach((raw, i) => {
+            const t = normalizeTool(raw, i + 1);
+            html += '<tr>' +
+                '<td class="tl-numcell"><input type="number" step="1" min="1" max="99" data-tool="' + i + '" data-field="num" value="' + (t.num === '' || t.num == null ? '' : t.num) + '"><span class="tl-var" data-var="' + i + '">' + lenVarLabel(t.num, base) + '</span></td>' +
+                '<td><input type="text" data-tool="' + i + '" data-field="name" value="' + String(t.name).replace(/"/g, '&quot;') + '" placeholder="e.g. 6mm flat 2F"></td>' +
+                '<td><select data-tool="' + i + '" data-field="type">' + opt(t.type) + '</select></td>' +
+                cell(i, 'dia', t.dia) + cell(i, 'flutes', t.flutes, '1') + cell(i, 'length', t.length, '0.001') +
+                cell(i, 'rpm', t.rpm, '1') + cell(i, 'feed', t.feed, '1') + cell(i, 'plunge', t.plunge, '1') +
+                '<td><button class="tl-del" data-del="' + i + '" title="Remove tool">✕</button></td>' +
+                '</tr>';
+        });
+        body.innerHTML = html;
+    }
+    function buildToolLibModal() {
+        if (document.getElementById('toollib-modal')) return;
+        const m = document.createElement('div');
+        m.id = 'toollib-modal';
+        m.innerHTML = `
+            <style>
+                #toollib-modal { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
+                #toollib-modal.active { display: flex; }
+                #toollib-modal .tl-panel { background: var(--panel); color: var(--text-main); border: 1px solid var(--border); border-radius: var(--radius, 6px); width: min(980px, 95vw); max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+                #toollib-modal .tl-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; letter-spacing: .5px; }
+                #toollib-modal .tl-head button { background: transparent; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; }
+                #toollib-modal .tl-body { overflow: auto; padding: 8px 16px 16px; }
+                #toollib-modal table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+                #toollib-modal th { position: sticky; top: 0; background: var(--panel); text-align: left; font-size: 10.5px; letter-spacing: .5px; text-transform: uppercase; color: var(--text-dim); padding: 6px 6px; border-bottom: 1px solid var(--border); }
+                #toollib-modal td { padding: 3px 4px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+                #toollib-modal .tl-numcell { white-space: nowrap; }
+                #toollib-modal .tl-numcell input { width: 46px; }
+                #toollib-modal .tl-var { display: inline-block; margin-left: 6px; font-size: 10px; color: var(--text-dim); }
+                #toollib-modal .tl-empty { padding: 16px; text-align: center; color: var(--text-dim); }
+                #toollib-modal input, #toollib-modal select { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 3px; padding: 4px 6px; font: inherit; }
+                #toollib-modal td:nth-child(4) input, #toollib-modal td:nth-child(5) input, #toollib-modal td:nth-child(6) input,
+                #toollib-modal td:nth-child(7) input, #toollib-modal td:nth-child(8) input, #toollib-modal td:nth-child(9) input { width: 70px; }
+                #toollib-modal .tl-del { width: auto; background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 2px 6px; }
+                #toollib-modal .tl-del:hover { color: #d66; }
+                #toollib-modal .tl-foot { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+                #toollib-modal .tl-hint { font-size: 11px; color: var(--text-dim); }
+            </style>
+            <div class="tl-panel">
+                <div class="tl-head"><span>🛠 Tool library</span><button id="toollib-close" title="Close">✕</button></div>
+                <div class="tl-body">
+                    <table>
+                        <thead><tr>
+                            <th>Tool #</th><th>Name</th><th>Type</th><th>Ø mm</th><th>Flutes</th><th>Length</th><th>RPM</th><th>Feed</th><th>Plunge</th><th></th>
+                        </tr></thead>
+                        <tbody id="toollib-rows"></tbody>
+                    </table>
+                </div>
+                <div class="tl-foot">
+                    <button class="toolbar-btn settings-io" id="toollib-add">＋ Add tool</button>
+                    <span class="tl-hint">Tool # → length offset #[base + #−1]. Feeds in mm/min. The Mill wizards' Tool ▾ and the ATC magazine read this list.</span>
+                    <button class="toolbar-btn settings-io" id="toollib-done">Done</button>
+                </div>
+            </div>`;
+        document.body.appendChild(m);
+        const close = () => m.classList.remove('active');
+        m.querySelector('#toollib-close').addEventListener('click', close);
+        m.querySelector('#toollib-done').addEventListener('click', close);
+        m.addEventListener('mousedown', (e) => { if (e.target === m) close(); });   // click backdrop
+        m.addEventListener('input', (e) => {
+            const t = e.target;
+            if (t.dataset.tool == null || !t.dataset.field) return;
+            const i = parseInt(t.dataset.tool, 10), f = t.dataset.field;
+            const a = _ddcsSettings.atc; a.tools = a.tools || [];
+            const rec = normalizeTool(a.tools[i], i + 1);
+            let val = t.value;
+            if (f !== 'name' && f !== 'type') val = (val === '') ? '' : parseFloat(val);
+            rec[f] = val;
+            a.tools[i] = rec;
+            saveSettings();
+            if (f === 'num') {   // update the #var label inline (don't re-render — keeps focus)
+                const span = m.querySelector('.tl-var[data-var="' + i + '"]');
+                if (span) span.textContent = lenVarLabel(rec.num, parseInt(a.baseVar, 10) || 1430);
+            }
+            renderLibSummary();
+        });
+        m.addEventListener('click', (e) => {
+            if (e.target.id === 'toollib-add') {
+                const a = _ddcsSettings.atc; a.tools = a.tools || [];
+                a.tools.push(normalizeTool({}, nextToolNum(a.tools)));
+                saveSettings(); renderToolLibRows(); renderLibSummary();
+                return;
+            }
+            const del = e.target.dataset ? e.target.dataset.del : null;
+            if (del != null) {
+                const a = _ddcsSettings.atc; a.tools = a.tools || [];
+                a.tools.splice(parseInt(del, 10), 1);
+                saveSettings(); renderToolLibRows(); renderLibSummary();
+            }
+        });
+    }
+    const _atcLibrary = q('set_atc_library');
+    if (_atcLibrary) {
+        _atcLibrary.addEventListener('click', () => {
+            buildToolLibModal();
+            renderToolLibRows();
+            document.getElementById('toollib-modal').classList.add('active');
         });
     }
 
@@ -863,10 +999,7 @@ function wireSettingsOverlay(ov) {
         a.fSlow = num(q('set_atc_fslow').value, a.fSlow);
         a.qStop = num(q('set_atc_qstop').value, a.qStop);
         const _nb = num(q('set_atc_basevar').value, a.baseVar);
-        const _nc = Math.max(1, Math.min(99, num(q('set_atc_toolcount').value, a.toolCount)));
-        const _rerender = (_nb !== a.baseVar || _nc !== a.toolCount);
-        a.baseVar = _nb; a.toolCount = _nc;
-                if (_rerender) renderToolTable();
+        if (_nb !== a.baseVar) { a.baseVar = _nb; renderLibSummary(); }   // base var shifts every #var
         s.machine.x = num(q('set_mach_x').value, s.machine.x);
         s.machine.y = num(q('set_mach_y').value, s.machine.y);
         s.machine.z = num(q('set_mach_z').value, s.machine.z);

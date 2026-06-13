@@ -1,0 +1,3 @@
+// macro for enable/disable rack's slots
+exec.Code("M20600E5");
+

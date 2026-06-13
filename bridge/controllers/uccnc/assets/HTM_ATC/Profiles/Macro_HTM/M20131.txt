@@ -1,0 +1,291 @@
+// M20131 - HTM_ATC macro - by SeB
+// unused - old macro for tool edit
+
+
+/*
+    public struct Tooltablestruct
+    {
+        public int Toolnumber;
+        public int Slot;
+        public double OffsetX;
+        public double OffsetZ;
+        public double Dia;
+        public string Description;
+        public string Type;
+        public string Material;
+    }
+*/
+
+
+// myEvar = Evar;
+// RunMacro(Convert.ToInt32(Evar)); // 
+
+//definire mesaj sonor de eroare
+System.Media.SoundPlayer errorSound = new System.Media.SoundPlayer(Application.StartupPath + @"\Flashscreen\SOUND\error.wav");
+        
+if (exec.Getcurrenttool() == 0) {
+    exec.AddStatusmessage("Spindle empty! Exiting");
+	errorSound.Play();
+    isMacroRunning = false; // Resetăm starea
+    return;
+}
+
+RunMacro(exec.Getcurrenttool()); // 
+
+
+#Events
+double? myEvar;
+
+static bool isMacroRunning = false; // Variabila globală pentru a verifica starea macro-ului
+
+// Metoda principală care rulează macro-ul
+public void RunMacro(int toolNo) {
+    if (!isMacroRunning) {
+        isMacroRunning = true; // Setăm starea că macro-ul este în execuție
+
+        System.Media.SoundPlayer errorSound = new System.Media.SoundPlayer(Application.StartupPath + @"\Flashscreen\SOUND\error.wav");
+
+        bool useRH = AS3.Getcheckboxstate(30002); //false; // Variabila pentru activare RH
+
+        // Declarăm variabilele de acces tooltable
+        var varSlot = Plugininterface.Datatypes.Tooltablecolumnname.Slot;
+        var varLength = Plugininterface.Datatypes.Tooltablecolumnname.Length;
+        var varDiameter = Plugininterface.Datatypes.Tooltablecolumnname.Diameter;
+        var varType = Plugininterface.Datatypes.Tooltablecolumnname.Type;
+        var varDescription = Plugininterface.Datatypes.Tooltablecolumnname.Description;
+
+        // Obținem valorile tooltable pentru scula curentă
+        int valueSlot = Convert.ToInt32(exec.Readtooltablecell(toolNo, varSlot)); // Citim Slot ca int
+        double valueLength = Convert.ToDouble(exec.Readtooltablecell(toolNo, varLength)); // Citim Length ca double
+        double valueDiameter = Convert.ToDouble(exec.Readtooltablecell(toolNo, varDiameter)); // Citim Diameter ca double
+        string valueType = exec.Readtooltablecell(toolNo, varType);
+        string valueDescription = exec.Readtooltablecell(toolNo, varDescription);
+
+
+
+
+        // Inițializăm și configurăm formularul
+        Form toolForm = new Form {
+            // Text = "Edit Tool #" + toolNo,
+            // StartPosition = FormStartPosition.CenterScreen,
+            // FormBorderStyle = FormBorderStyle.FixedDialog,
+            // MinimizeBox = false,
+            // MaximizeBox = false,
+            // ClientSize = new System.Drawing.Size(300, 400),
+            // TopMost = true
+
+
+			Text = "Edit Tool #" + toolNo,
+			// StartPosition = FormStartPosition.Manual, // Permite poziționarea manuală
+			// Location = new System.Drawing.Point(200, 200), // Setează poziția X, Y pe ecran
+            StartPosition = FormStartPosition.CenterScreen,
+			Size = new System.Drawing.Size(300, 400), // Setează dimensiunea formularului
+			FormBorderStyle = FormBorderStyle.FixedDialog,
+			MinimizeBox = false,
+			MaximizeBox = false,
+			TopMost = true
+
+
+
+
+        };
+
+        // Etichete și câmpuri de input
+        Label labelSlot = new Label { Text = "Slot:", Top = 20, Left = 10, AutoSize = true };
+        TextBox inputSlot = new TextBox { Text = valueSlot.ToString(), Left = 100, Top = 20, Width = 100, ReadOnly = true };
+        // inputSlot.KeyPress += integersKeyPress; // Adăugăm validarea inputului
+        
+        Label labelLength = new Label { Text = "Length:", Top = 60, Left = 10, AutoSize = true };
+        TextBox inputLength = new TextBox { Text = valueLength.ToString(), Left = 100, Top = 60, Width = 100 };
+        inputLength.KeyPress += NumericKeyPress; // Adăugăm validarea inputului
+
+        Label labelDiameter = new Label { Text = "Diameter:", Top = 100, Left = 10, AutoSize = true };
+        TextBox inputDiameter = new TextBox { Text = valueDiameter.ToString(), Left = 100, Top = 100, Width = 100 };
+        inputDiameter.KeyPress += NumericKeyPress; // Adăugăm validarea inputului
+
+        Label labelType = new Label { Text = "Type:", Top = 140, Left = 10, AutoSize = true };
+
+        // Declarația inputType, doar dacă useRH este false
+        TextBox inputType = null;
+
+
+
+
+
+
+
+
+
+
+        RadioButton radioRH = null;
+        RadioButton radioNRH = null;
+
+        // Câmpul Type - Radio buttons
+        if (useRH) {
+            radioRH = new RadioButton { Text = "RH", Top = 140, Left = 100, AutoSize = true };
+            radioNRH = new RadioButton { Text = "NRH", Top = 170, Left = 100, AutoSize = true };
+
+            // Configurarea radio buttons în funcție de valoarea citită
+            radioRH.Checked = (valueType == "RH");
+            radioNRH.Checked = (valueType != "RH");
+            toolForm.Controls.Add(radioRH);
+            toolForm.Controls.Add(radioNRH);
+        } else {
+            // Când useRH este false, adăugăm un TextBox
+            inputType = new TextBox { Text = valueType, Left = 100, Top = 140, Width = 100 };
+            toolForm.Controls.Add(inputType);
+        }
+
+        Label labelDescription = new Label { Text = "Description:", Top = 220, Left = 10, AutoSize = true };
+        TextBox inputDescription = new TextBox { Text = valueDescription, Left = 100, Top = 220, Width = 100 };
+
+
+		// Adăugarea unui nou buton
+		Button measureToolBtn = new Button { Text = "Measure Tool", Left = 50, Top = 290, Width = 100 };
+
+
+        // Butoane OK și Cancel
+        Button okButton = new Button { Text = "OK", Left = 50, Top = 330, DialogResult = DialogResult.OK };
+        Button cancelButton = new Button { Text = "Cancel", Left = 150, Top = 330, DialogResult = DialogResult.Cancel };
+
+		// Definirea evenimentului Click pentru buton
+		measureToolBtn.Click += (sender, e) => {
+			// Salvează modificările din câmpuri înainte de a rula codul custom
+            // exec.Writetooltablecell(toolNo, varLength, inputLength.Text);
+            // exec.Writetooltablecell(toolNo, varDiameter, inputDiameter.Text);
+            // exec.Writetooltablecell(toolNo, varType, useRH ? (radioRH.Checked ? "RH" : "NRH") : inputType.Text);
+            // exec.Writetooltablecell(toolNo, varDescription, inputDescription.Text);
+    
+			// Codul specific pentru acest buton
+
+            if(!exec.GetLED(56)||!exec.GetLED(57)||!exec.GetLED(58)) // If machine was not homed then it is unsafe to move in machine coordina	tes, stop here...
+            {
+                exec.AddStatusmessage("Measuring cannot start! One or more axis are NOT REFERENCED");
+                errorSound.Play();
+                exec.Stop();
+                return;
+            } else {
+			DialogResult confirmMeasure = MessageBox.Show(
+				"Are you sure you want to measure the current tool?\n\nWill move in TCP and then wil do the measurement operation!\n\nPress OK to continue or Cancel to abort", 
+				"Measure Tool!", 
+				MessageBoxButtons.OKCancel, 
+				MessageBoxIcon.Warning, 
+				MessageBoxDefaultButton.Button1, 
+				MessageBoxOptions.ServiceNotification
+				);
+            
+            
+			if (confirmMeasure == DialogResult.Cancel) {			
+					// errorSound.Play();		
+					exec.Stop();
+					return;
+            } else if (confirmMeasure == DialogResult.OK) {
+                
+                    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+                    exec.AddStatusmessage("Moving to TCP"); 
+
+                    exec.Code("M200");
+                    exec.Code("M20331");
+
+                    // Reîmprospătează valorile după execuție, dacă este necesar
+                    inputLength.Text = exec.Readtooltablecell(toolNo, varLength);
+                    // inputDiameter.Text = exec.Readtooltablecell(toolNo, varDiameter);
+                    // inputType.Text = exec.Readtooltablecell(toolNo, varType);
+                    // inputDescription.Text = exec.Readtooltablecell(toolNo, varDescription);
+                    
+            } // end code for OK response
+            } // end of verificare homing care dezactiveaza butonul de masurare scula in caz ca masina nu are homing facut
+        };
+
+
+
+        // Adăugăm elementele în formular
+        toolForm.Controls.Add(labelSlot);
+        toolForm.Controls.Add(inputSlot);
+        toolForm.Controls.Add(labelLength);
+        toolForm.Controls.Add(inputLength);
+        toolForm.Controls.Add(labelDiameter);
+        toolForm.Controls.Add(inputDiameter);
+        toolForm.Controls.Add(labelType);
+        toolForm.Controls.Add(labelDescription);
+        toolForm.Controls.Add(inputDescription);
+		toolForm.Controls.Add(measureToolBtn); // Adăugăm noul buton
+        toolForm.Controls.Add(okButton);
+        toolForm.Controls.Add(cancelButton);
+
+        // Afisam formularul și preluăm rezultatul
+        DialogResult result = toolForm.ShowDialog();
+
+        if (result == DialogResult.OK) {
+            // Salvăm noile valori în tooltable
+            exec.Writetooltablecell(toolNo, varSlot, inputSlot.Text); // Salvăm Slot ca int
+            exec.Writetooltablecell(toolNo, varLength, inputLength.Text); // Salvăm Length ca double
+            exec.Writetooltablecell(toolNo, varDiameter, inputDiameter.Text); // Salvăm Diameter ca double
+
+            if (useRH) {
+                // Salvează valoarea radio button-ului selectat
+                string selectedType = radioRH.Checked ? "RH" : "NRH";
+                exec.Writetooltablecell(toolNo, varType, selectedType);
+            } else {
+                // Folosește inputType când useRH este false
+                exec.Writetooltablecell(toolNo, varType, inputType.Text);
+            }
+
+            exec.Writetooltablecell(toolNo, varDescription, inputDescription.Text);
+            // exec.AddStatusmessage("Tool #" + toolNo + " updated");
+        } else {
+            // exec.AddStatusmessage("Editarea sculei anulate.");
+        }
+
+        // Resetăm starea macro-ului
+        isMacroRunning = false; 
+        // exec.AddStatusmessage("Macro-ul s-a terminat.");
+    } else {
+        exec.AddStatusmessage("Macro already running! Exiting!");
+        return;
+    }
+}
+
+
+// Eveniment pentru validarea inputului numeric
+private void NumericKeyPress(object sender, KeyPressEventArgs e) {
+    // Permite doar cifre, punct (.) și backspace
+    if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar != '.') {
+        e.Handled = true; // Anulează event-ul dacă caracterul nu este valid
+    }
+
+    // Permite doar un singur punct (.) în TextBox
+    if (e.KeyChar == '.' && (sender as TextBox).Text.IndexOf('.') > -1) {
+        e.Handled = true; // Anulează event-ul dacă există deja un punct
+    }
+}
+
+// Eveniment pentru validarea inputului numeric (numai pentru int)
+private void integersKeyPress(object sender, KeyPressEventArgs e) {
+    // Permite doar cifre și backspace
+    if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) {
+        e.Handled = true; // Anulează event-ul dacă caracterul nu este valid
+    }
+}
+
+
+
+
+// // Metodă pentru inițializarea/reîmprospătarea câmpurilor
+// void RefreshToolFields(int toolNo) {
+    // inputLength.Text = exec.Readtooltablecell(toolNo, varLength);
+    // inputDiameter.Text = exec.Readtooltablecell(toolNo, varDiameter);
+    // inputType.Text = exec.Readtooltablecell(toolNo, varType);
+    // inputDescription.Text = exec.Readtooltablecell(toolNo, varDescription);
+// }
+
+// // Metodă pentru salvarea valorilor curente din câmpuri în tooltable
+// void SaveCurrentToolValues(int toolNo) {
+    // exec.Writetooltablecell(toolNo, varLength, inputLength.Text);
+    // exec.Writetooltablecell(toolNo, varDiameter, inputDiameter.Text);
+    // exec.Writetooltablecell(toolNo, varType, useRH ? (radioRH.Checked ? "RH" : "NRH") : inputType.Text);
+    // exec.Writetooltablecell(toolNo, varDescription, inputDescription.Text);
+// }
+
+
+

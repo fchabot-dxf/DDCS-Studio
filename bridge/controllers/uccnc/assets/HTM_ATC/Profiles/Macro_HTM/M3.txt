@@ -1,0 +1,26 @@
+﻿//	If M3 delay on is not set to zero then the macro will exit after the spindle start command
+//	If it is set to zero then the macro will wait for the spindle to reach set RPM
+//	the UptospeedLEDLED will indicate this, This macro came from A_Camera
+
+double	M3DelayOn;
+int	UptospeedLED	= 800;
+int	SactDRO		= 870;
+int 	M3DelayOnDRO	= 181;
+
+double	MaximumWaitTime	= 200;	// Will wait this long before generating an error and exit
+
+	exec.DospinCW();	// Start the spindle in clockwise rotation.
+
+// Wait for the spindle speed to reach the set RPM
+
+	M3DelayOn = AS3.Getfielddouble(M3DelayOnDRO);
+
+	if (M3DelayOn == 0)	
+		{while (AS3.GetLED(UptospeedLED) == false)	// Loop until the LED is on
+			exec.Wait(50);		// Wait 50ms
+				MaximumWaitTime = MaximumWaitTime - 1;	// Decrement timeout counter
+
+		if (MaximumWaitTime == 0)
+			{MessageBox.Show(exec.mainform,"Spindle did not reach set RPM !", "Sindle Speed Error", MessageBoxButtons.OK,MessageBoxIcon.Question );
+		  		exec.Stop();
+  					return;	}}

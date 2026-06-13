@@ -1,0 +1,60 @@
+// M20405 - HTM_ATC macro - by SeB
+// ATC Page - ***Measure Tool*** button. Will measure the selected tool.
+
+//definire mesaj sonor de eroare
+System.Media.SoundPlayer errorSound = new System.Media.SoundPlayer(Application.StartupPath + @"\Flashscreen\SOUND\error.wav");
+
+
+if (AS3.Getfieldint(20400)==0) return; //not running if T0
+
+
+if(!exec.GetLED(56)||!exec.GetLED(57)||!exec.GetLED(58)) // If machine was not homed then it is unsafe to move in machine coordina	tes, stop here...
+{
+	exec.AddStatusmessage("Measuring cannot start! One or more axis are NOT REFERENCED");
+	errorSound.Play();
+	exec.Stop();
+	return;
+} else {
+	if ( 
+		exec.Getcurrenttool() ==  AS3.Getfieldint(20400)) {
+		// exec.AddStatusmessage("scula activa");
+
+		DialogResult confirmMeasure = MessageBox.Show(
+		"Are you sure you want to measure the current tool?\n\nWill move in TCP and then will do the measurement operation!\n\nPress OK to continue or Cancel to abort", 
+		"Measure Tool!", 
+		MessageBoxButtons.OKCancel, 
+		MessageBoxIcon.Warning, 
+		MessageBoxDefaultButton.Button1, 
+		MessageBoxOptions.ServiceNotification
+		);
+					
+		if (confirmMeasure == DialogResult.Cancel) {			
+			exec.Stop();
+			return;
+		} else if (confirmMeasure == DialogResult.OK) {
+			exec.AddStatusmessage("Moving to TCP"); 
+			// exec.Code("M200");
+			exec.Code("M20331");
+		} // end code for OK response
+	} else {	// end if tool in spindle
+		DialogResult confirmMeasure = MessageBox.Show(
+		"Are you sure you want to measure the current tool?\n\nWill change tool and move in TCP and then will do the measurement operation!\n\nPress OK to continue or Cancel to abort", 
+		"Measure Tool!", 
+		MessageBoxButtons.OKCancel, 
+		MessageBoxIcon.Warning, 
+		MessageBoxDefaultButton.Button1, 
+		MessageBoxOptions.ServiceNotification
+		);
+				
+		if (confirmMeasure == DialogResult.Cancel) {			
+			exec.Stop();
+			return;
+		} else if (confirmMeasure == DialogResult.OK) {
+			exec.AddStatusmessage("M06 T" + AS3.Getfieldint(20400)); 
+			exec.Code("M06T" + AS3.Getfieldint(20400));
+			exec.AddStatusmessage("Moving to TCP"); 
+			// exec.Code("M200");
+			exec.Code("M20331");
+		} // end code for OK response
+	}
+} // end of verificare homing care dezactiveaza butonul de masurare scula in caz ca masina nu are homing facut

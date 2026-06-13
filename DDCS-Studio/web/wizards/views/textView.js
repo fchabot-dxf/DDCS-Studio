@@ -1,0 +1,93 @@
+/** views/textView.js — Text / label engraving wizard view (Mill group). */
+import { el, UIUtils } from '../../ui/uiUtils.js';
+import { TextWizard, layoutText } from '../textWizard.js';
+import { FeatureCanvas } from '../../viz/featureCanvas.js';
+import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
+
+const wizard = new TextWizard();
+const layout = new FeatureCanvas();
+const v = (id) => { const e = el(id); return e ? e.value : undefined; };
+const num = (val, d) => (val === '' || val == null || isNaN(Number(val))) ? d : Number(val);
+const r3 = (n) => Math.round(n * 1000) / 1000;
+
+function setFields(map) {
+    let first = null;
+    for (const id in map) { const e = el(id); if (!e) continue; e.value = String(r3(map[id])); first = first || e; }
+    if (first) first.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+/** Load the picked library tool's Ø / feed / plunge / RPM as this op's defaults. */
+function applyTool() {
+    const sel = el('tx_tool');
+    if (!sel || !sel.value) return;
+    const m = toolFieldMap(getTool(sel.value), { dia: 'tx_toolDia', feed: 'tx_feed', plunge: 'tx_plunge', rpm: 'tx_rpm' });
+    if (Object.keys(m).length) setFields(m);
+}
+
+/** 2D layout: the glyph centrelines (preview of the letters) + a place handle and a height handle. */
+function buildTextSpec(params, stock) {
+    const ox = num(params.x, 0), oy = num(params.y, 0), H = num(params.height, 12);
+    const { strokes } = layoutText(params);
+    const items = [];
+    for (const poly of strokes) {
+        for (let i = 0; i + 1 < poly.length; i++) {
+            items.push({ kind: 'line', x1: poly[i][0], y1: poly[i][1], x2: poly[i + 1][0], y2: poly[i + 1][1] });
+        }
+    }
+    return {
+        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y } : null,
+        items,
+        handles: [
+            { id: 'origin', x: ox, y: oy, kind: 'move', label: 'pos' },
+            { id: 'height', x: ox, y: oy + H, kind: 'size', label: 'height' },
+        ],
+        onDrag(id, w) {
+            if (id === 'origin') setFields({ tx_x: w.x, tx_y: w.y });
+            else setFields({ tx_height: Math.max(2, w.y - oy) });
+        },
+    };
+}
+
+export const textView = {
+    type: 'text',
+    panelId: 'wiz_text',
+    codeElId: 'wiz_text_code',
+    large: true,
+    twoPane: true,
+    inputIds: [
+        'tx_text', 'tx_x', 'tx_y', 'tx_height', 'tx_spacing', 'tx_align', 'tx_strokeWidth',
+        'tx_toolDia', 'tx_stepoverPct', 'tx_depth', 'tx_stepdown', 'tx_clearance', 'tx_feed', 'tx_plunge', 'tx_rpm',
+    ],
+    probeSrcFields: {},
+
+    onOpen(ctx) {
+        const sel = el('tx_tool');
+        if (sel) { populateToolSelect(sel); if (!sel.dataset.wired) { sel.dataset.wired = '1'; sel.addEventListener('change', applyTool); } }
+        ctx.update();
+    },
+
+    update(ctx) {
+        const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+        const params = {
+            text: v('tx_text'), x: v('tx_x'), y: v('tx_y'), height: v('tx_height'),
+            spacing: v('tx_spacing'), align: v('tx_align') || 'left', strokeWidth: v('tx_strokeWidth'),
+            toolDia: v('tx_toolDia'), stepoverPct: v('tx_stepoverPct'),
+            depth: v('tx_depth'), stepdown: v('tx_stepdown'), clearance: v('tx_clearance'),
+            feed: v('tx_feed'), plunge: v('tx_plunge'), rpm: v('tx_rpm'),
+            spindle: s.spindle, head: s.head, endProgram: s.endProgram,
+        };
+
+        const gcode = wizard.generate(params);
+        el('wiz_text_code').innerHTML = UIUtils.formatGCode(gcode);
+        ctx.preview3D(gcode, 'textVizContainer');
+        layout.render(el('textLayoutCanvas'), buildTextSpec(params, s.stock));
+
+        const status = el('textVizStatus');
+        if (status) {
+            const passes = (gcode.match(/\( level Z/g) || []).length;
+            status.textContent = `"${String(params.text || '').slice(0, 18)}" · h${num(params.height, 12)} · ${passes} Z pass${passes === 1 ? '' : 'es'}`;
+        }
+        const lstatus = el('textLayoutStatus');
+        if (lstatus) lstatus.textContent = 'LAYOUT · drag pos / height · scroll = zoom · drag bg = pan · dbl-click = fit';
+    },
+};

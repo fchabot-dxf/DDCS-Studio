@@ -17,6 +17,7 @@ export function initGatewayStatus() {
     const tab = document.querySelector('.hdr-tabs .tab[data-app="gateway"]');
     const studioTab = document.querySelector('.hdr-tabs .tab[data-app="studio"]');
     const settingsTab = document.querySelector('.hdr-tabs .tab[data-app="settings"]');
+    const blocksTab = document.querySelector('.hdr-tabs .tab[data-app="blocks"]');
     const client = makeClient();
     let bridged = false;
 
@@ -46,10 +47,12 @@ export function initGatewayStatus() {
         const studioApp = document.getElementById('studio-app');
         const gatewayApp = document.getElementById('gateway-app');
         const settingsApp = document.getElementById('settings-app');
+        const blocksApp = document.getElementById('blocks-app');
 
         const isStudio = which === 'studio';
         const isGateway = which === 'gateway';
         const isSettings = which === 'settings';
+        const isBlocks = which === 'blocks';
 
         if (isGateway) {
             const mod = await import('./gatewayPanel.js');
@@ -67,10 +70,18 @@ export function initGatewayStatus() {
         studioApp?.classList.toggle('hidden', !isStudio);
         gatewayApp?.classList.toggle('hidden', !isGateway);
         settingsApp?.classList.toggle('hidden', !isSettings);
+        blocksApp?.classList.toggle('hidden', !isBlocks);
 
         studioTab?.classList.toggle('active', isStudio);
         tab?.classList.toggle('active', isGateway);
         settingsTab?.classList.toggle('active', isSettings);
+        blocksTab?.classList.toggle('active', isBlocks);
+
+        // Build/refresh the Blocks tab only after it's visible (canvas + three.js need layout).
+        if (isBlocks) {
+            try { (await import('../blocks/blocksApp.js')).initBlocks(); }
+            catch (err) { console.error('blocks init failed', err); }
+        }
     }
 
     window.showApp = showApp;
@@ -78,6 +89,7 @@ export function initGatewayStatus() {
     if (tab) tab.addEventListener('click', () => { bridged ? showApp('gateway') : toggleDownloadPop(tab); });
     if (studioTab) studioTab.addEventListener('click', () => showApp('studio'));
     if (settingsTab) settingsTab.addEventListener('click', () => showApp('settings'));
+    if (blocksTab) blocksTab.addEventListener('click', () => showApp('blocks'));
 
     tick();
     setInterval(tick, 5000);

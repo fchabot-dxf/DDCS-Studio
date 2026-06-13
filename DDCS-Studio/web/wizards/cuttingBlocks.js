@@ -10,12 +10,14 @@
  */
 function num(v, d) { return (v === '' || v == null || isNaN(Number(v))) ? d : Number(v); }
 
-/** Program header: absolute mode + spindle on (if a spindle head is configured). */
-export function headerBlock({ spindle } = {}) {
+/** Program header: absolute mode + spindle on. `rpm` (e.g. from the picked tool) overrides the
+ *  Head's default RPM when given; otherwise the Head's defaultRpm is used. */
+export function headerBlock({ spindle, rpm } = {}) {
     const L = ['G90   ( absolute )'];
-    if (spindle && num(spindle.defaultRpm, 0) > 0) {
-        L.push(`${spindle.dir === 'ccw' ? 'M4' : 'M3'} S${num(spindle.defaultRpm, 0)}   ( spindle on )`);
-        const up = num(spindle.spinUp, 0);
+    const r = num(rpm, 0) > 0 ? num(rpm, 0) : num(spindle && spindle.defaultRpm, 0);
+    if (r > 0) {
+        L.push(`${spindle && spindle.dir === 'ccw' ? 'M4' : 'M3'} S${r}   ( spindle on )`);
+        const up = num(spindle && spindle.spinUp, 0);
         if (up > 0) L.push(`G04 P${Math.round(up * 1000)}   ( spin-up dwell, ms )`);
     }
     return L;
