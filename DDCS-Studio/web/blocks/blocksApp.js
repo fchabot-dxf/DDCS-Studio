@@ -95,7 +95,7 @@ export function initBlocks() {
     if (def.kind === 'container' || def.kind === 'path' || def.kind === 'loop' || def.kind === 'cond') {
       const childCards = (block.children || []).map(blockHTML).join('');
       const addBtns = childTypesFor(def).map((t) => `<button class="add-child" data-add="${t}" data-parent="${block.id}">+ ${BLOCKS[t].label}</button>`).join('');
-      kids = `<div class="children">${childCards}${addBtns}</div>`;
+      kids = `<div class="children">${childCards}${addBtns}</div><div class="blk-foot"></div>`;   // C-block: body mouth + closing foot bar
     }
     return `<div class="blk ${def.kind} cat-${catSlug(def.category)}" data-bid="${block.id}">
         <div class="blk-head" data-sel="${block.id}">${def.label} <small>${block.id}</small><span class="x" data-del="${block.id}">✕</span></div>

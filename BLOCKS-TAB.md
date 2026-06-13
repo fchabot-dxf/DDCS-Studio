@@ -78,6 +78,50 @@ hexagon) so you see its connector before you drag it.
 swatches; we have **no solids to show**, so a block sizes purely by its **inputs/sockets** and stays
 compact. The palette shows shape/connector cues only — no thumbnails.
 
+### Prior art — the block-language standard (why we follow it)
+
+The puzzle-shape grammar isn't a Tinkercad invention; it's a **de-facto standard** from the Scratch/Blockly
+family, so anyone who's used any of these reads our blocks on sight — that's the whole reason to conform.
+
+- **Scratch** (MIT) — the origin of the metaphor: notched statement stacks, C-blocks for control, oval
+  **reporters**, **hexagon booleans**, hat blocks. Tinkercad Codeblocks is one skin on this lineage.
+- **Blockly** (Google) — the open-source *engine* most block editors are built on. It formalises exactly our
+  socket types: previous/next (stack), output/value (reporter), and boolean. If we ever want a hardened
+  backend instead of our hand-rolled one, Blockly is the drop-in.
+- **MakeCode** (Microsoft — micro:bit, Arduino) — Blockly-based, and notable for the **blocks ⇄ text**
+  toggle: the same program shown as blocks or as code. That's the closest analog to our **blocks ⇄ G-code**
+  split-view, and a model for round-tripping.
+- Same family (all Blockly/Scratch-derived, same shapes): **App Inventor** (MIT), **Snap!** (Berkeley,
+  first-class procedures), **Code.org**, **Open Roberta**, **mBlock / PictoBlox**, **EduBlocks**.
+
+**Shape conventions are the standard** across all of them: hexagon = boolean, rounded = value, notch =
+sequenced action, C = container. We follow these verbatim (and now *enforce* them — typed sockets reject a
+number where a boolean is expected; see Engine).
+
+**What's novel here is the domain, not the grammar.** Block-snapping is overwhelmingly education +
+microcontrollers; **CNC/G-code is normally hand-written or CAM** (Fusion). The CNC-adjacent *pro* tools that
+do go visual use a different model — **boxes-and-wires dataflow** (Grasshopper/Rhino, Unreal Blueprints,
+Node-RED, Max/TouchDesigner) — where you wire ports rather than nest puzzle pieces. We deliberately chose
+the Scratch **nesting/stack** model over wires because **G-code is fundamentally a sequence**, and a stack
+reads as sequence far better than a wire graph. Borrowed grammar (proven, familiar), new domain (CNC).
+
+**Could we just use the standard's tooling? (build-vs-adopt)** — One of these has a real drop-in API:
+- **Blockly** is an embeddable Apache-2.0 **JS library** (`Blockly.inject`, no-build via UMD `<script>` or
+  `npm i blockly`). Its **code-generator framework is exactly our `emit()` fold** — we'd define CNC blocks +
+  write a **G-code generator** and get the drag/snap/zoom canvas, **undo/redo, JSON save/load, comments,
+  collapse, and mutators** (variable-arity blocks like If/Else) for free. It's the engine under MakeCode /
+  App Inventor / Code.org.
+- **Scratch** is *not* a drop-in: `scratch-blocks` (a Blockly fork) + `scratch-vm` + `scratch-gui` (React) is
+  a full app that *runs* projects in a VM, not a code-gen API. UX reference only.
+- **MakeCode (pxt)** is a *framework*: you write TS functions annotated `//% block="…"` and it generates the
+  blocks from the signatures (+ blocks⇄TS toggle). Heavy to adopt, but the *blocks-from-annotated-API* idea
+  maps perfectly onto our wizard kernels and is worth stealing conceptually.
+
+**Tradeoff for us:** the hand-rolled engine is tiny / no-build / owned / CNC-tailored (emit-fold, scope
+threading, typed value sockets) — **ahead on *fit***. Blockly is **ahead on *editor depth*** (undo, save/load,
+mutators, a11y). Tipping point = how far we push the editor: once we want real undo/redo + save/load + big
+programs, adopting Blockly + writing one G-code generator beats reimplementing all that by hand. Revisit then.
+
 ### Envelope + parametric functions
 
 - **Envelope** — a *conscious* `Program` wrapper (a C-block) that emits the spindle header before and the
@@ -230,8 +274,12 @@ cd DDCS-Studio/web && python -m http.server
    (hexagon boolean reporter `a <>= b` → 1/0), `ops/iff.js` (`If` C-block, kind `cond`, boolean socket in the
    head + body that runs iff true), `resolveBool` in the fold. Sockets are now **typed** (`number`/`boolean`):
    a reporter only drops into a socket of its `returns` type (Variable rejected by the If, Compare accepted).
-   **Next:** stack/notch **shape rendering** (Statement notch / C-mouth silhouette) + the **sidebar in real
-   block shapes**; logical `And`/`Or`/`Not` boolean reporters (boolean-in-boolean sockets, like Math nesting).
+   **Canvas silhouettes** ✓ — blocks now render in their real shapes: **Statement** = notch top + dovetail
+   bump bottom (interlocks when stacked); **Wrapper/C** = top bar + cat-coloured left arm + foot bar
+   embracing the body mouth; **Boolean** = hexagon socket/pill; **Reporter** = rounded pill. Pure CSS
+   (`--cat` per category + notch/bump pseudo-elements + `.blk-foot`), box/snap geometry unchanged.
+   **Next:** the **sidebar in real block shapes** (item 10); logical `And`/`Or`/`Not` boolean reporters
+   (boolean-in-boolean sockets, like Math nesting).
 9. **Envelope + functions** — a conscious `Program` wrapper (replaces the auto header/footer); user-defined
    **parametric functions** (call binds args into a child scope, like `Count`'s index).
 10. **2-level sidebar** — Level-1 category rail (colour-coded) + Level-2 block list in real block shapes.

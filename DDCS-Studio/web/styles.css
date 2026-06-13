@@ -3520,22 +3520,34 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .stack.dragging { z-index:20; }
 #blocks-app .stack.dragging > .blk { cursor:grabbing; box-shadow:0 8px 20px #0007; }
 #blocks-app .stack.snap-target > .blk { box-shadow:0 4px 0 0 var(--accent), 0 1px 3px #0003; }   /* accent bar = "snaps here" */
-/* snapped-together blocks merge into one connected stack: flush seam, rounded outer corners only */
-#blocks-app .stack.conn-top > .blk { border-top:0; border-top-left-radius:0; border-top-right-radius:0; }
-#blocks-app .stack.conn-bottom > .blk { border-bottom-left-radius:0; border-bottom-right-radius:0; box-shadow:none; }
+/* snapped-together blocks merge into one connected stack: flush seam (the bump above seats into the notch below) */
+#blocks-app .stack.conn-top > .blk { border-top:0; }
+#blocks-app .stack.conn-top > .blk > .blk-head { border-top-left-radius:0; border-top-right-radius:0; }
+#blocks-app .stack.conn-top > .blk > .blk-head::before { display:none; }   /* notch is filled by the bump above */
+#blocks-app .stack.conn-bottom > .blk > :last-child { border-bottom-left-radius:0; border-bottom-right-radius:0; }
+#blocks-app .stack.conn-bottom > .blk { box-shadow:none; }
 #blocks-app .bk-hint { position:absolute; left:10px; bottom:8px; color:var(--muted); font-size:11px; pointer-events:none; }
-#blocks-app .blk { width:300px; margin:0 0 8px; border-radius:8px; overflow:hidden; border:1px solid var(--line); box-shadow:0 1px 3px #0003; }
-#blocks-app .blk-head { display:flex; align-items:center; gap:8px; padding:7px 10px; color:#fff; font-weight:700; user-select:none; }
-/* header colour = the block's category (> stops it leaking onto nested children) */
-#blocks-app .blk.cat-shapes > .blk-head { background:var(--cat-shapes); }
-#blocks-app .blk.cat-move > .blk-head { background:var(--cat-move); }
-#blocks-app .blk.cat-machine > .blk-head { background:var(--cat-machine); }
-#blocks-app .blk.cat-ops > .blk-head { background:var(--cat-ops); }
-#blocks-app .blk.cat-modify > .blk-head { background:var(--cat-modify); }
-#blocks-app .blk.cat-control > .blk-head { background:var(--cat-control); }
-#blocks-app .blk.cat-math > .blk-head { background:var(--cat-math); }
-#blocks-app .blk.cat-variables > .blk-head { background:var(--cat-variables); }
-#blocks-app .blk.cat-markup > .blk-head { background:var(--cat-markup); }
+/* --cat = this block's category colour (the head, the connector bump, the wrapper arm/foot all share it) */
+#blocks-app .blk.cat-shapes { --cat:var(--cat-shapes); }
+#blocks-app .blk.cat-move { --cat:var(--cat-move); }
+#blocks-app .blk.cat-machine { --cat:var(--cat-machine); }
+#blocks-app .blk.cat-ops { --cat:var(--cat-ops); }
+#blocks-app .blk.cat-modify { --cat:var(--cat-modify); }
+#blocks-app .blk.cat-control { --cat:var(--cat-control); }
+#blocks-app .blk.cat-math { --cat:var(--cat-math); }
+#blocks-app .blk.cat-variables { --cat:var(--cat-variables); }
+#blocks-app .blk.cat-markup { --cat:var(--cat-markup); }
+/* a STATEMENT silhouette: notch cut into the top edge + a matching bump hanging below — they dovetail when stacked.
+   overflow:visible so the bump (::after) shows below; corners moved to head/last-child since overflow no longer clips. */
+#blocks-app .blk { position:relative; width:300px; margin:0 0 8px; border-radius:8px; overflow:visible;
+                   border:1px solid var(--line); box-shadow:0 1px 3px #0003; }
+#blocks-app .blk-head::before { content:''; position:absolute; top:-1px; left:20px; width:26px; height:8px;
+                                background:var(--bg); clip-path:polygon(0 0,100% 0,calc(100% - 6px) 100%,6px 100%); }   /* top notch */
+#blocks-app .blk::after { content:''; position:absolute; bottom:-7px; left:20px; width:26px; height:8px; z-index:1;
+                          background:var(--cat); clip-path:polygon(6px 0,calc(100% - 6px) 0,calc(100% - 12px) 100%,12px 100%); }   /* bottom bump */
+#blocks-app .blk-head { position:relative; display:flex; align-items:center; gap:8px; padding:7px 10px; color:#fff;
+                        font-weight:700; user-select:none; background:var(--cat); border-radius:7px 7px 0 0; }
+#blocks-app .blk > :last-child { border-bottom-left-radius:7px; border-bottom-right-radius:7px; }
 #blocks-app .blk-head small { opacity:.6; font-weight:400; }
 #blocks-app .blk-head .x { margin-left:auto; cursor:pointer; opacity:.8; }
 #blocks-app .blk-head .x:hover { opacity:1; }
@@ -3544,8 +3556,9 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .f span { font-size:10px; color:var(--muted); }
 #blocks-app .f input, #blocks-app .f select { background:var(--field); border:1px solid var(--line); color:var(--ink);
                                               border-radius:5px; padding:4px 5px; font:inherit; width:100%; }
-#blocks-app .children { background:var(--bg); padding:8px 8px 4px 16px; border-left:3px solid var(--cat-modify); }
-#blocks-app .blk.cat-control > .children { border-left-color:var(--cat-control); }   /* the loop "embraces" its sub-stack in its own colour */
+/* a WRAPPER (C-block): head = top bar, the children left-arm + the foot bar embrace the sub-stack in the cat colour */
+#blocks-app .children { background:var(--bg); padding:8px 8px 4px 12px; border-left:12px solid var(--cat); }
+#blocks-app .blk-foot { height:13px; background:var(--cat); }   /* bottom bar of the C; last-child → rounds + carries the bump */
 #blocks-app .children.mouth-target { outline:2px dashed var(--accent); outline-offset:-3px;   /* "drop a block in here" */
                                      background:color-mix(in srgb, var(--accent) 16%, var(--bg)); }
 #blocks-app .blk.var > .blk-body .f, #blocks-app .blk.loop > .blk-body .f { width:96px; }   /* room for names/formulas */
