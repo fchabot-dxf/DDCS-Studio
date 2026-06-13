@@ -3572,3 +3572,17 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .gl[data-owner] { cursor:pointer; }
 #blocks-app #blk-gcode.has-sel .gl { opacity:.3; }
 #blocks-app #blk-gcode.has-sel .gl.hot { opacity:1; background:color-mix(in srgb, var(--accent) 26%, #000); box-shadow:inset 2px 0 var(--accent); }
+/* Reporter pills (value blocks) inside value sockets — rounded, category-coloured, recursive (Math) */
+#blocks-app .rep { display:inline-flex; align-items:center; gap:3px; padding:1px 3px 1px 6px; border-radius:11px;
+                   color:#fff; font-size:11px; vertical-align:middle; max-width:100%; }
+#blocks-app .rep.cat-variables { background:var(--cat-variables); }
+#blocks-app .rep.cat-math { background:var(--cat-math); border-radius:9px; padding-left:4px; }
+#blocks-app .rep input, #blocks-app .rep select { width:auto; min-width:24px; background:rgba(255,255,255,.92); color:#111;
+                                                  border:0; border-radius:8px; padding:1px 4px; font:inherit; }
+#blocks-app .rep .rep-name { width:54px; }
+#blocks-app .rep-x { cursor:pointer; opacity:.7; font-weight:700; padding:0 2px; }
+#blocks-app .rep-x:hover { opacity:1; }
+#blocks-app input.f-socket.socket-target { outline:2px solid var(--accent); outline-offset:1px;
+                                           background:color-mix(in srgb, var(--accent) 18%, var(--field)); }
+#blocks-app .rep-ghost { position:fixed; z-index:9999; pointer-events:none; background:var(--cat-variables); color:#fff;
+                         padding:2px 9px; border-radius:11px; font-size:11px; box-shadow:0 4px 12px #0006; }

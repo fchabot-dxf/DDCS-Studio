@@ -57,12 +57,27 @@ export function initBlocks() {
     dir: ['cw', 'ccw'], arc: ['ccw', 'cw'], op: ['+', '-', '*', '/', '%'],
   };
   function fieldHTML(block, key) {
-    const val = block.params[key];
+    return `<label class="f"><span>${key}</span>${valueHTML(block.id, key, block.params[key])}</label>`;
+  }
+  // a value socket: a Reporter pill (if a reporter is plugged in) or a scalar input/select
+  function valueHTML(ownerId, key, v) {
+    if (v && typeof v === 'object' && v.type) return reporterHTML(v, ownerId, key);
     if (SELECT_OPTS[key]) {
-      const opts = SELECT_OPTS[key].map((o) => `<option ${o === val ? 'selected' : ''}>${o}</option>`).join('');
-      return `<label class="f"><span>${key}</span><select data-bid="${block.id}" data-key="${key}">${opts}</select></label>`;
+      const opts = SELECT_OPTS[key].map((o) => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('');
+      return `<select data-bid="${ownerId}" data-key="${key}">${opts}</select>`;
     }
-    return `<label class="f"><span>${key}</span><input type="text" value="${esc(val)}" data-bid="${block.id}" data-key="${key}"></label>`;   // text → any field can hold an expression
+    return `<input class="f-socket" type="text" value="${esc(v)}" data-bid="${ownerId}" data-key="${key}">`;   // value socket
+  }
+  // a Reporter pill (rounded value block); Math is recursive — its a/b operands are themselves value sockets
+  function reporterHTML(rep, ownerId, key) {
+    byId.set(rep.id, rep);
+    const cat = catSlug(BLOCKS[rep.type].category);
+    const x = `<span class="rep-x" data-rdel="${ownerId}~${key}">×</span>`;
+    if (rep.type === 'math') {
+      const op = SELECT_OPTS.op.map((o) => `<option ${o === rep.params.op ? 'selected' : ''}>${o}</option>`).join('');
+      return `<span class="rep cat-${cat}">${valueHTML(rep.id, 'a', rep.params.a)}<select data-bid="${rep.id}" data-key="op">${op}</select>${valueHTML(rep.id, 'b', rep.params.b)}${x}</span>`;
+    }
+    return `<span class="rep cat-${cat}"><input class="rep-name" value="${esc(rep.params.name)}" data-bid="${rep.id}" data-key="name">${x}</span>`;
   }
 
   // ---- render ----
@@ -106,6 +121,10 @@ export function initBlocks() {
       const p = byId.get(btn.dataset.parent); if (p) { p.children.push(newBlock(btn.dataset.add)); render(); }
     });
     stage.querySelectorAll('[data-del]').forEach((x) => x.onclick = (e) => { e.stopPropagation(); removeById(program, x.dataset.del); render(); });
+    stage.querySelectorAll('[data-rdel]').forEach((x) => x.onclick = (e) => {   // pull a Reporter out of its socket → revert to 0
+      e.stopPropagation(); const [oid, key] = x.dataset.rdel.split('~');
+      const owner = byId.get(oid); if (owner) owner.params[key] = 0; render();
+    });
     // nested child headers select on click; top-level headers drag (or select if not moved) — see DRAG section
     stage.querySelectorAll('.children [data-sel]').forEach((h) => h.onclick = () => select(h.dataset.sel, { scrollCode: true }));
     stage.querySelectorAll('.stack > .blk > .blk-head').forEach((h) => h.addEventListener('pointerdown', onDragStart));
@@ -290,9 +309,53 @@ export function initBlocks() {
   function startCreate(e, type) {
     if (e.button !== 0) return;
     e.preventDefault();
+    if (BLOCKS[type] && BLOCKS[type].kind === 'reporter') { startReporterDrag(e, type); return; }   // reporters drop into sockets
     createDrag = { type, sx: e.clientX, sy: e.clientY, block: null };
     window.addEventListener('pointermove', onCreateMove);
     window.addEventListener('pointerup', onCreateEnd, { once: true });
+  }
+
+  // ---- reporter-drag: drag a Variable/Math pill from the palette into a value socket (not onto the canvas) ----
+  let repDrag = null;
+  const valueSocketAt = (cx, cy) => {
+    let best = null;
+    stage.querySelectorAll('input.f-socket').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) best = { bid: el.dataset.bid, key: el.dataset.key, el };
+    });
+    return best;
+  };
+  const highlightSocket = (sock) => {
+    stage.querySelectorAll('input.f-socket.socket-target').forEach((el) => el.classList.remove('socket-target'));
+    if (sock) sock.el.classList.add('socket-target');
+  };
+  function startReporterDrag(e, type) {
+    repDrag = { type, ghost: null, sx: e.clientX, sy: e.clientY, lastX: e.clientX, lastY: e.clientY };
+    window.addEventListener('pointermove', onRepMove);
+    window.addEventListener('pointerup', onRepEnd, { once: true });
+  }
+  function onRepMove(e) {
+    if (!repDrag) return;
+    if (!repDrag.ghost) {
+      if (Math.hypot(e.clientX - repDrag.sx, e.clientY - repDrag.sy) < 4) return;   // threshold: a click does nothing
+      const g = document.createElement('div'); g.className = 'rep-ghost'; g.textContent = BLOCKS[repDrag.type].label;
+      document.body.appendChild(g); repDrag.ghost = g;
+    }
+    repDrag.lastX = e.clientX; repDrag.lastY = e.clientY;
+    repDrag.ghost.style.left = (e.clientX + 10) + 'px'; repDrag.ghost.style.top = (e.clientY + 10) + 'px';
+    highlightSocket(valueSocketAt(e.clientX, e.clientY));
+  }
+  function onRepEnd() {
+    window.removeEventListener('pointermove', onRepMove);
+    if (!repDrag) return;
+    let did = false;
+    if (repDrag.ghost) {
+      const sock = valueSocketAt(repDrag.lastX, repDrag.lastY);
+      if (sock && byId.get(sock.bid)) { byId.get(sock.bid).params[sock.key] = newBlock(repDrag.type); did = true; }   // plug in
+      repDrag.ghost.remove();
+    }
+    highlightSocket(null); repDrag = null;
+    if (did) render();
   }
   function onCreateMove(e) {
     if (!createDrag) return;

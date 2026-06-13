@@ -38,19 +38,19 @@ export const PALETTE = [
     spindleBlock, feedBlock, dwellBlock, coolantBlock, toolBlock, wcsBlock,   // Machine
     lineBlock, boreBlock, drillBlock,                          // Ops (feature presets)
     arrayBlock, helixBlock,                                    // Modify
-    countBlock, setBlock, commentBlock,                        // Control / Variables / Mark Up
+    countBlock,                                                // Control
+    mathBlock,                                                 // Math (reporter — drags into value sockets)
+    setBlock, variableBlock,                                   // Variables (statement + reporter)
+    commentBlock,                                              // Mark Up
 ];
 
 /** Canonical palette-grouping order (the 2-level sidebar rail). Categories with no blocks yet don't render.
  *  Shapes/Move/Machine are the granular CNC layers (Move/Machine have no Tinkercad analog — see BLOCKS-TAB.md). */
 export const CATEGORIES = ['Shapes', 'Move', 'Machine', 'Ops', 'Modify', 'Control', 'Math', 'Variables', 'Mark Up'];
 
-/** Reporter (value) blocks: rounded pills that plug into value sockets. In BLOCKS for emit/resolve now;
- *  surfaced in the palette once the value-socket UI lands. */
-const REPORTERS = [variableBlock, mathBlock];
-
-/** type → definition, for emit dispatch and field lookup (includes reporters, which aren't in PALETTE yet). */
-export const BLOCKS = Object.fromEntries([...PALETTE, ...REPORTERS].map((d) => [d.type, d]));
+/** type → definition, for emit dispatch and field lookup. (Reporters — Variable/Math — are in PALETTE too;
+ *  dragging one drops it into a value socket rather than onto the canvas.) */
+export const BLOCKS = Object.fromEntries(PALETTE.map((d) => [d.type, d]));
 
 // Kernels + expression evaluator re-exported for STUDIO presets / direct callers.
 export { peckDrill, helicalBore, lineCut, patternPoints, helixPoints, evalExpr };
