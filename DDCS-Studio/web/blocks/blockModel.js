@@ -27,7 +27,7 @@ export function newBlock(type) {
     const def = BLOCKS[type];
     if (!def) throw new Error(`unknown block type: ${type}`);
     const b = { id: `${type}${++_seq}`, type, params: { ...def.defaults } };
-    if (def.kind === 'container' || def.kind === 'path' || def.kind === 'loop') b.children = [];
+    if (def.kind === 'container' || def.kind === 'path' || def.kind === 'loop' || def.kind === 'cond') b.children = [];
     return b;
 }
 
@@ -42,6 +42,16 @@ function resolveValue(v, scope) {
     if (typeof v === 'string') { try { return evalExpr(v, scope); } catch { return NaN; } }
     const def = BLOCKS[v.type];                              // a reporter pill plugged into the socket
     return def && def.reduce ? def.reduce(v.params || {}, scope, (c) => resolveValue(c, scope)) : 0;
+}
+
+/** Resolve a boolean socket → true/false: empty = false; a number/expression is truthy when ≠ 0; a boolean
+ *  reporter pill (Compare) is reduced (its numeric operands resolve through resolveValue). */
+function resolveBool(v, scope) {
+    if (v == null || v === '') return false;
+    if (typeof v === 'number') return v !== 0;
+    if (typeof v === 'string') { try { return evalExpr(v, scope) !== 0; } catch { return false; } }
+    const def = BLOCKS[v.type];                              // a boolean reporter pill in the socket
+    return def && def.reduce ? !!def.reduce(v.params || {}, scope, (c) => resolveValue(c, scope)) : false;
 }
 
 /** Resolve a block's params against the variable scope: a Reporter pill (object) is reduced; a string that
@@ -81,6 +91,13 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null)) {
             out.push(tag(`( ${block.id}: ${name}=${r3(k)} )`, own));
             (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child)));
         }
+        return out;
+    }
+
+    if (def.kind === 'cond') {                 // IF: run the body once, only when the condition resolves true
+        const on = resolveBool(block.params.cond, scope);
+        const out = [tag(`( ${block.id}: if ${on ? 'true' : 'false'} )`, own)];
+        if (on) (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope)));
         return out;
     }
 

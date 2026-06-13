@@ -214,7 +214,7 @@ cd DDCS-Studio/web && python -m http.server
 5. ~~**Variables/expressions + Control** blocks~~ ✓ **done** — `Set` (input/derived vars, `ops/set.js`),
    `Count` loop (`ops/count.js`, `from`/`to`/`by`, index in scope), and `evalExpr` (`ops/expr.js`) so any
    field can be an expression (`grandeur/4 - 2`, `i*spacing`). Resolved against a threaded scope at emit.
-   Not yet: an `If`/conditional block, and a variables panel / draggable variable pills (Codeblocks-style).
+   `If`/conditional now done too (see item 8). Not yet: a variables panel / draggable variable pills (Codeblocks-style).
 6. ~~**Spatial drag/snap canvas**~~ ✓ **done** — blocks are positioned cards; **drag from palette → spawn
    unattached**; drag to move (snapped sub-stack follows); **snap into connected stacks** (touch + merged
    seam); emit order = top-to-bottom; **drag a block into a wrapper's mouth (body socket) to nest it** ✓.
@@ -223,11 +223,15 @@ cd DDCS-Studio/web && python -m http.server
    (Machine), `Comment` (Mark Up); category-based **signature colours** (`--cat-*`). **Next (grounded in the
    wizard audit above):** trivial leaf atoms `Dwell`/`Coolant`/`Tool`/`WCS`/`Arc` + Spindle M3/M4 direction →
    `Shape`/`Position` blocks → the `ZigZag`/`Concentric` fill blocks; rebuild `Drill` as `Array{Bore}`.
-8. **Block shapes + sockets** (the big one) — ⏳ **started**: **body socket** done (drag a block into a
-   wrapper's mouth ✓); **Reporter engine** done (`ops/variable.js`/`math.js` + `resolveValue` — value-trees
-   resolve recursively, scalar-compatible). **Next:** the value-socket **UI** — render Reporter pills in
-   fields, drag-into-socket, recursive, *never collapse to text*; render **Statement/Wrapper/Reporter/Boolean**
-   shapes; Boolean sockets + `If` last; then the **sidebar in real block shapes**.
+8. **Block shapes + sockets** (the big one) — ⏳ **started**: **body socket** ✓ (drag a block into a
+   wrapper's mouth); **Reporter engine** ✓ (`ops/variable.js`/`math.js` + `resolveValue` — value-trees
+   resolve recursively, scalar-compatible); **value-socket UI** ✓ (Reporter pills in fields, drag-into-socket,
+   recursive, never collapse to text); **all four socket types** ✓ — **Boolean + `If`** done: `ops/compare.js`
+   (hexagon boolean reporter `a <>= b` → 1/0), `ops/iff.js` (`If` C-block, kind `cond`, boolean socket in the
+   head + body that runs iff true), `resolveBool` in the fold. Sockets are now **typed** (`number`/`boolean`):
+   a reporter only drops into a socket of its `returns` type (Variable rejected by the If, Compare accepted).
+   **Next:** stack/notch **shape rendering** (Statement notch / C-mouth silhouette) + the **sidebar in real
+   block shapes**; logical `And`/`Or`/`Not` boolean reporters (boolean-in-boolean sockets, like Math nesting).
 9. **Envelope + functions** — a conscious `Program` wrapper (replaces the auto header/footer); user-defined
    **parametric functions** (call binds args into a child scope, like `Count`'s index).
 10. **2-level sidebar** — Level-1 category rail (colour-coded) + Level-2 block list in real block shapes.

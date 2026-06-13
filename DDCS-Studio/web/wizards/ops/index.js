@@ -18,6 +18,8 @@ import { probeBlock } from './probe.js';
 import { arrayBlock, patternPoints } from './array.js';
 import { helixBlock, helixPoints } from './helix.js';
 import { countBlock } from './count.js';
+import { ifBlock } from './iff.js';
+import { compareBlock } from './compare.js';
 import { setBlock } from './set.js';
 import { moveBlock } from './move.js';
 import { arcBlock } from './arc.js';
@@ -38,7 +40,7 @@ export const PALETTE = [
     spindleBlock, feedBlock, dwellBlock, coolantBlock, toolBlock, wcsBlock,   // Machine
     lineBlock, boreBlock, drillBlock,                          // Ops (feature presets)
     arrayBlock, helixBlock,                                    // Modify
-    countBlock,                                                // Control
+    countBlock, ifBlock, compareBlock,                        // Control (loop + conditional wrapper + boolean reporter)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, variableBlock,                                   // Variables (statement + reporter)
     commentBlock,                                              // Mark Up
