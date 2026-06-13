@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<!--
+  blockly-spike.html — throwaway PHASE-0 spike for the Blocks-tab → Blockly migration.
+  Proves, in our no-build app: (1) vendored Blockly loads offline; (2) our CNC blocks render &
+  STACK / WRAP / take VALUE+BOOLEAN sockets (the same grammar as the hand-rolled tab); (3) a custom
+  G-code generator emits live; (4) it wears OUR look (zelos renderer + dark "screen" + --cat colours),
+  not stock Blockly. Standalone — touches nothing in the live tab. Open /blocks/blockly-spike.html.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Blockly spike — Codeblocks for G-code</title>
+  <script src="../vendor/blockly/blockly.min.js"></script>
+  <style>
+    :root { --bg:#0d1117; --panel:#161d28; --line:#26303d; --ink:#e6edf3; --muted:#8b97a6; --accent:#2dd4bf;
+            --cat-machine:#64748b; --cat-move:#14b8a6; --cat-ops:#22c55e; --cat-control:#f59e0b;
+            --cat-math:#84cc16; --cat-modify:#a855f7; }
+    * { box-sizing:border-box; }
+    html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+                font:13px/1.4 ui-sans-serif,system-ui,Segoe UI,sans-serif; }
+    .wrap { display:grid; grid-template-rows:auto 1fr; height:100%; }
+    header { display:flex; align-items:center; gap:12px; padding:8px 14px; background:var(--panel);
+             border-bottom:1px solid var(--line); }
+    header h1 { font-size:13px; margin:0; letter-spacing:.04em; }
+    header .tag { font-size:11px; color:var(--muted); }
+    header .renderer { margin-left:auto; font-size:11px; color:var(--muted); }
+    .main { display:grid; grid-template-columns:1fr 340px; min-height:0; }
+    #ws { position:relative; }
+    .code { display:flex; flex-direction:column; border-left:1px solid var(--line); background:#000; min-width:0; }
+    .code h2 { margin:0; padding:7px 12px; font-size:11px; letter-spacing:.08em; color:var(--muted);
+               text-transform:uppercase; border-bottom:1px solid var(--line); }
+    .code pre { margin:0; padding:12px; overflow:auto; flex:1; color:#9fe7dd;
+                font:12px/1.5 ui-monospace,Consolas,monospace; white-space:pre; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Blockly spike</h1>
+      <span class="tag">our CNC grammar on Blockly's engine — drag from the rail, watch the G-code</span>
+      <span class="renderer">renderer: <b>zelos</b> · theme: ddcs-dark</span>
+    </header>
+    <div class="main">
+      <div id="ws"></div>
+      <div class="code">
+        <h2>Generated G-code</h2>
+        <pre id="out">( drag blocks to begin )</pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const B = window.Blockly;
+
+    // ---- 1) CNC block definitions (the same atoms as wizards/ops, expressed as Blockly JSON) ----
+    B.defineBlocksWithJsonArray([
+      { type:'cnc_spindle', message0:'Spindle %1 at %2 rpm', args0:[
+          {type:'field_dropdown', name:'DIR', options:[['CW','M3'],['CCW','M4'],['off','M5']]},
+          {type:'field_number', name:'RPM', value:12000, min:0} ],
+        previousStatement:null, nextStatement:null, style:'machine_style', tooltip:'Spindle on/off (modal)' },
+
+      { type:'cnc_move', message0:'Move %1 to X %2 Y %3 %4 F %5',
+        args0:[ {type:'field_dropdown', name:'MODE', options:[['rapid','G0'],['cut','G1'],['probe','G31']]},
+          {type:'input_value', name:'X', check:'Number'}, {type:'input_value', name:'Y', check:'Number'},
+          {type:'input_dummy'}, {type:'field_number', name:'F', value:200, min:0} ],
+        inputsInline:true, previousStatement:null, nextStatement:null, style:'move_style',
+        tooltip:'Linear / rapid / probe move — X and Y are value sockets' },
+
+      { type:'cnc_drill', message0:'Drill ⌀ %1 depth %2 peck %3',
+        args0:[ {type:'field_number', name:'DIA', value:6, min:0}, {type:'field_number', name:'DEPTH', value:5},
+          {type:'field_number', name:'PECK', value:1, min:0} ],
+        previousStatement:null, nextStatement:null, style:'ops_style', tooltip:'Peck-drill a hole' },
+
+      { type:'cnc_dwell', message0:'Dwell %1 s', args0:[{type:'field_number', name:'SEC', value:1, min:0}],
+        previousStatement:null, nextStatement:null, style:'machine_style', tooltip:'G4 pause' },
+    ]);
+
+    // ---- 2) custom G-code generator (this IS the blockModel.emit fold, in Blockly's shape) ----
+    const G = new B.Generator('GCode');
+    const O = { ATOMIC:0, NONE:99 };
+    G.scrub_ = function (block, code, thisOnly) {                 // chain a statement stack top→bottom
+      const next = block.nextConnection && block.nextConnection.targetBlock();
+      return code + (thisOnly ? '' : G.blockToCode(next));
+    };
+    const val = (block, name, dflt) => G.valueToCode(block, name, O.ATOMIC) || dflt;
+    G.forBlock['cnc_spindle'] = (b) => { const d=b.getFieldValue('DIR'), r=b.getFieldValue('RPM');
+      return d==='M5' ? `M5   ( spindle off )\n` : `${d} S${r}   ( spindle )\n`; };
+    G.forBlock['cnc_move'] = (b) => `${b.getFieldValue('MODE')} X${val(b,'X','0')} Y${val(b,'Y','0')} F${b.getFieldValue('F')}\n`;
+    G.forBlock['cnc_drill'] = (b) => `( drill d${b.getFieldValue('DIA')} z${b.getFieldValue('DEPTH')} peck${b.getFieldValue('PECK')} )\nG81 Z-${Math.abs(b.getFieldValue('DEPTH'))} R2 F120\n`;
+    G.forBlock['cnc_dwell'] = (b) => `G4 P${b.getFieldValue('SEC')}\n`;
+    // reuse Blockly's native value/control blocks so reporters (rounded) + booleans (hexagon) + C-blocks work:
+    G.forBlock['math_number'] = (b) => [String(b.getFieldValue('NUM')), O.ATOMIC];
+    G.forBlock['math_arithmetic'] = (b) => { const op={ADD:'+',MINUS:'-',MULTIPLY:'*',DIVIDE:'/',POWER:'**'}[b.getFieldValue('OP')];
+      return [`(${val(b,'A','0')} ${op} ${val(b,'B','0')})`, O.ATOMIC]; };
+    G.forBlock['logic_compare'] = (b) => { const op={EQ:'==',NEQ:'!=',LT:'<',LTE:'<=',GT:'>',GTE:'>='}[b.getFieldValue('OP')];
+      return [`${val(b,'A','0')} ${op} ${val(b,'B','0')}`, O.ATOMIC]; };
+    G.forBlock['controls_if'] = (b) => { const c=val(b,'IF0','0'); const body=G.statementToCode(b,'DO0');
+      return `( if ${c} )\n${body}`; };
+    G.forBlock['controls_repeat_ext'] = (b) => { const n=val(b,'TIMES','0'); const body=G.statementToCode(b,'DO');
+      return `( repeat ${n} )\n${body}`; };
+
+    // ---- 3) theme: OUR palette on Blockly (proves "uses Blockly" ≠ "looks like Scratch") ----
+    const theme = B.Theme.defineTheme('ddcs_dark', {
+      base: B.Themes.Classic,
+      blockStyles: {
+        machine_style:{colourPrimary:'#64748b'}, move_style:{colourPrimary:'#14b8a6'},
+        ops_style:{colourPrimary:'#22c55e'}, logic_blocks:{colourPrimary:'#f59e0b'},
+        math_blocks:{colourPrimary:'#84cc16'}, loop_blocks:{colourPrimary:'#f59e0b'},
+      },
+      categoryStyles: {
+        machine_cat:{colour:'#64748b'}, move_cat:{colour:'#14b8a6'}, ops_cat:{colour:'#22c55e'},
+        control_cat:{colour:'#f59e0b'}, value_cat:{colour:'#84cc16'},
+      },
+      componentStyles: {
+        workspaceBackgroundColour:'#0d1117', toolboxBackgroundColour:'#161d28',
+        toolboxForegroundColour:'#cbd5e1', flyoutBackgroundColour:'#11171f',
+        flyoutForegroundColour:'#8b97a6', flyoutOpacity:1, scrollbarColour:'#39465a',
+        insertionMarkerColour:'#2dd4bf', insertionMarkerOpacity:0.5,
+        cursorColour:'#2dd4bf', selectedGlowColour:'#2dd4bf',
+      },
+      fontStyle:{ family:'ui-sans-serif, system-ui, Segoe UI, sans-serif', size:11 },
+    });
+
+    // ---- 4) toolbox = our 2-level rail (categories → blocks), colour-coded ----
+    const toolbox = { kind:'categoryToolbox', contents:[
+      { kind:'category', name:'Machine', categorystyle:'machine_cat', contents:[
+        {kind:'block', type:'cnc_spindle'}, {kind:'block', type:'cnc_dwell'} ]},
+      { kind:'category', name:'Move', categorystyle:'move_cat', contents:[ {kind:'block', type:'cnc_move'} ]},
+      { kind:'category', name:'Ops', categorystyle:'ops_cat', contents:[ {kind:'block', type:'cnc_drill'} ]},
+      { kind:'category', name:'Control', categorystyle:'control_cat', contents:[
+        {kind:'block', type:'controls_if'}, {kind:'block', type:'controls_repeat_ext'},
+        {kind:'block', type:'logic_compare'} ]},
+      { kind:'category', name:'Values', categorystyle:'value_cat', contents:[
+        {kind:'block', type:'math_number'}, {kind:'block', type:'math_arithmetic'} ]},
+    ]};
+
+    // ---- 5) inject + live G-code ----
+    const ws = B.inject('ws', {
+      toolbox, theme, renderer:'zelos',
+      grid:{ spacing:26, length:2, colour:'#1b2733', snap:true },
+      zoom:{ controls:true, wheel:true, startScale:0.9 }, trashcan:true, move:{ smoothScroll:true },
+    });
+    const out = document.getElementById('out');
+    const regen = () => { try { const c = G.workspaceToCode(ws).trim(); out.textContent = c || '( empty )'; }
+                          catch (e) { out.textContent = '( gen error: ' + e.message + ' )'; } };
+    ws.addChangeListener((e) => { if (!e.isUiEvent) regen(); });
+    window.__spike = { ws, G, regen };   // for the screenshot harness to seed blocks
+    regen();
+  })();
+  </script>
+</body>
+</html>

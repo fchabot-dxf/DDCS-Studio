@@ -23,7 +23,7 @@
     "probe",
     "ultimate-bee"
   ],
-  "author": "Fr\u00e9d\u00e9ric",
+  "author": "Frédéric",
   "license": "MIT",
   "files": [
     "web/app.js",
@@ -39,6 +39,7 @@
     "@playwright/test": "^1.58.2"
   },
   "dependencies": {
+    "blockly": "^12.5.1",
     "xmldom": "^0.6.0"
   }
 }
