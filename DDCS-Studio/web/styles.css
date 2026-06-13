@@ -1011,7 +1011,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     padding: 2px 12px 12px; /* minimal top gap so the keys sit just under the tabs */
     background: var(--panel);
     height: auto;            /* fit the content — no empty space below the keyboard */
-    max-height: 56vh;        /* but cap + scroll if the content is very tall */
+    max-height: 50vh;        /* cap at ~half the viewport */
     overflow-y: auto;
     overflow-x: hidden; /* Prevent horizontal overflow */
     opacity: 0;
@@ -1024,7 +1024,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     display: flex;
     opacity: 1;
     visibility: visible;
-    height: var(--dock-h, clamp(240px, 42vh, 440px));   /* drag handle sets --dock-h; the keys flex to fill */
+    height: var(--dock-h, clamp(200px, 33vh, 380px));   /* drag handle sets --dock-h; the keys flex to fill — smaller default so ~50% of editor */
     max-height: 85vh;
 }
 
