@@ -34,13 +34,24 @@ export function newBlock(type) {
 /** One emitted line + its provenance: src = ancestry [outer…inner] of owning block ids, or null = program-owned. */
 const tag = (line, src) => ({ line, src });
 
-/** Resolve a block's params against the variable scope: string fields that parse as expressions become
- *  numbers; anything that doesn't (e.g. a select like 'grid') is kept verbatim. Numbers pass through. */
+/** Resolve a value socket → a number: a literal, a scalar/expression string, or a Reporter record
+ *  (Variable/Math) evaluated recursively via its def's `reduce` (Math operands resolve through `rc`). */
+function resolveValue(v, scope) {
+    if (v == null || v === '') return 0;
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') { try { return evalExpr(v, scope); } catch { return NaN; } }
+    const def = BLOCKS[v.type];                              // a reporter pill plugged into the socket
+    return def && def.reduce ? def.reduce(v.params || {}, scope, (c) => resolveValue(c, scope)) : 0;
+}
+
+/** Resolve a block's params against the variable scope: a Reporter pill (object) is reduced; a string that
+ *  parses as an expression becomes a number; anything else (e.g. a select like 'grid') is kept. */
 function resolveParams(params, scope) {
     const out = {};
     for (const k in params) {
         const v = params[k];
-        if (typeof v === 'string') { try { out[k] = evalExpr(v, scope); } catch { out[k] = v; } }
+        if (v && typeof v === 'object') out[k] = resolveValue(v, scope);          // Reporter pill in a value socket
+        else if (typeof v === 'string') { try { out[k] = evalExpr(v, scope); } catch { out[k] = v; } }
         else out[k] = v;
     }
     return out;

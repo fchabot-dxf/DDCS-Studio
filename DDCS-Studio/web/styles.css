@@ -3480,8 +3480,9 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     /* Follow the active app theme: CHROME (palette/canvas/cards) = theme tokens;
        the preview + G-code panes = a black "screen", mirroring the app's editor. */
     --ink: var(--text); --muted: var(--text-dim); --line: var(--border);
-    --leaf: var(--accent-studio, var(--accent)); --array: var(--accent-gateway, var(--accent));
-    --ctrl:#c9962f; --var:#8b5cf6;   /* Codeblocks-style category signatures: Control=gold, Variables=violet */
+    /* fixed category signature colours (semantic, not themed — like the rapid/feed/probe move colours) */
+    --cat-shapes:#3b82f6; --cat-move:#14b8a6; --cat-machine:#64748b; --cat-ops:#22c55e;
+    --cat-modify:#a855f7; --cat-control:#f59e0b; --cat-math:#84cc16; --cat-variables:#06b6d4; --cat-markup:#94a3b8;
     --field: var(--bg);
     --screen:#000; --screen-ink:#cdd9e5; --screen-dim:#8b9bb0;   /* fixed: the screen is black in every theme */
     display:grid; grid-template-columns:130px 1fr 380px; grid-template-rows:minmax(0,1fr);
@@ -3497,23 +3498,44 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .palette .cat { margin:12px 0 6px; font-size:10px; letter-spacing:.08em; color:var(--muted);
                             text-transform:uppercase; opacity:.7; }
 #blocks-app .palette .cat:first-child { margin-top:4px; }
-#blocks-app .cat-ops { border-left:3px solid var(--leaf); }       /* category accent stripe (keeps categories distinct) */
-#blocks-app .cat-modify { border-left:3px solid var(--array); }
-#blocks-app .cat-control { border-left:3px solid var(--ctrl); }
-#blocks-app .cat-variables { border-left:3px solid var(--var); }
+/* palette button category accent stripe (scoped to .op-btn so block cards aren't striped) */
+#blocks-app .op-btn.cat-shapes { border-left:3px solid var(--cat-shapes); }
+#blocks-app .op-btn.cat-move { border-left:3px solid var(--cat-move); }
+#blocks-app .op-btn.cat-machine { border-left:3px solid var(--cat-machine); }
+#blocks-app .op-btn.cat-ops { border-left:3px solid var(--cat-ops); }
+#blocks-app .op-btn.cat-modify { border-left:3px solid var(--cat-modify); }
+#blocks-app .op-btn.cat-control { border-left:3px solid var(--cat-control); }
+#blocks-app .op-btn.cat-math { border-left:3px solid var(--cat-math); }
+#blocks-app .op-btn.cat-variables { border-left:3px solid var(--cat-variables); }
+#blocks-app .op-btn.cat-markup { border-left:3px solid var(--cat-markup); }
 #blocks-app .palette p { color:var(--muted); font-size:11px; margin-top:14px; }
 /* block canvas + cards — chrome */
 #blocks-app .viewport { position:relative; overflow:hidden; cursor:grab; }
 #blocks-app .viewport.panning { cursor:grabbing; }
-#blocks-app .stage { position:absolute; top:0; left:0; transform-origin:0 0; padding:24px; }
+#blocks-app .stage { position:absolute; top:0; left:0; transform-origin:0 0; }   /* no padding → screen↔stage coords map 1:1 for drop placement */
+/* top-level blocks are positioned cards; drag by the header, drop near a block's bottom to snap */
+#blocks-app .stack { position:absolute; top:0; left:0; will-change:transform; }
+#blocks-app .stack > .blk { margin-bottom:0; }   /* no trailing margin → snapped cards touch flush (nested children keep theirs) */
+#blocks-app .stack > .blk > .blk-head { cursor:grab; }
+#blocks-app .stack.dragging { z-index:20; }
+#blocks-app .stack.dragging > .blk { cursor:grabbing; box-shadow:0 8px 20px #0007; }
+#blocks-app .stack.snap-target > .blk { box-shadow:0 4px 0 0 var(--accent), 0 1px 3px #0003; }   /* accent bar = "snaps here" */
+/* snapped-together blocks merge into one connected stack: flush seam, rounded outer corners only */
+#blocks-app .stack.conn-top > .blk { border-top:0; border-top-left-radius:0; border-top-right-radius:0; }
+#blocks-app .stack.conn-bottom > .blk { border-bottom-left-radius:0; border-bottom-right-radius:0; box-shadow:none; }
 #blocks-app .bk-hint { position:absolute; left:10px; bottom:8px; color:var(--muted); font-size:11px; pointer-events:none; }
 #blocks-app .blk { width:300px; margin:0 0 8px; border-radius:8px; overflow:hidden; border:1px solid var(--line); box-shadow:0 1px 3px #0003; }
-#blocks-app .blk-head { display:flex; align-items:center; gap:8px; padding:7px 10px; color:#fff; font-weight:700; }
-/* header colour = the block's own category (> stops it leaking onto nested children) */
-#blocks-app .blk.leaf > .blk-head, #blocks-app .blk.move > .blk-head { background:var(--leaf); }      /* Ops */
-#blocks-app .blk.container > .blk-head, #blocks-app .blk.path > .blk-head { background:var(--array); } /* Modify */
-#blocks-app .blk.loop > .blk-head { background:var(--ctrl); }   /* Control */
-#blocks-app .blk.var > .blk-head { background:var(--var); }     /* Variables */
+#blocks-app .blk-head { display:flex; align-items:center; gap:8px; padding:7px 10px; color:#fff; font-weight:700; user-select:none; }
+/* header colour = the block's category (> stops it leaking onto nested children) */
+#blocks-app .blk.cat-shapes > .blk-head { background:var(--cat-shapes); }
+#blocks-app .blk.cat-move > .blk-head { background:var(--cat-move); }
+#blocks-app .blk.cat-machine > .blk-head { background:var(--cat-machine); }
+#blocks-app .blk.cat-ops > .blk-head { background:var(--cat-ops); }
+#blocks-app .blk.cat-modify > .blk-head { background:var(--cat-modify); }
+#blocks-app .blk.cat-control > .blk-head { background:var(--cat-control); }
+#blocks-app .blk.cat-math > .blk-head { background:var(--cat-math); }
+#blocks-app .blk.cat-variables > .blk-head { background:var(--cat-variables); }
+#blocks-app .blk.cat-markup > .blk-head { background:var(--cat-markup); }
 #blocks-app .blk-head small { opacity:.6; font-weight:400; }
 #blocks-app .blk-head .x { margin-left:auto; cursor:pointer; opacity:.8; }
 #blocks-app .blk-head .x:hover { opacity:1; }
@@ -3522,8 +3544,10 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .f span { font-size:10px; color:var(--muted); }
 #blocks-app .f input, #blocks-app .f select { background:var(--field); border:1px solid var(--line); color:var(--ink);
                                               border-radius:5px; padding:4px 5px; font:inherit; width:100%; }
-#blocks-app .children { background:var(--bg); padding:8px 8px 4px 16px; border-left:3px solid var(--array); }
-#blocks-app .blk.loop > .children { border-left-color:var(--ctrl); }   /* the loop "embraces" its sub-stack in its own colour */
+#blocks-app .children { background:var(--bg); padding:8px 8px 4px 16px; border-left:3px solid var(--cat-modify); }
+#blocks-app .blk.cat-control > .children { border-left-color:var(--cat-control); }   /* the loop "embraces" its sub-stack in its own colour */
+#blocks-app .children.mouth-target { outline:2px dashed var(--accent); outline-offset:-3px;   /* "drop a block in here" */
+                                     background:color-mix(in srgb, var(--accent) 16%, var(--bg)); }
 #blocks-app .blk.var > .blk-body .f, #blocks-app .blk.loop > .blk-body .f { width:96px; }   /* room for names/formulas */
 #blocks-app .add-child { margin:2px 4px 6px 0; padding:4px 8px; border:1px dashed var(--line); border-radius:6px;
                          background:transparent; color:var(--muted); cursor:pointer; }

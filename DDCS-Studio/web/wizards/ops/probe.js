@@ -12,7 +12,7 @@ import { G, X, Y, Z, F, P, line } from '../words.js';
 const probeMove = (pt, p) => line([G(31), X(pt.x), Y(pt.y), Z(pt.z), F(num(p.feed, 50)), P(num(p.port, 1))], 'probe');
 
 export const probeBlock = {
-    type: 'probe', label: 'Probe', kind: 'move', category: 'Ops',
+    type: 'probe', label: 'Probe', kind: 'move', category: 'Move',
     defaults: { x: 0, y: 0, z: -5, feed: 50, port: 1, clearance: 5 },
     fields: ['x', 'y', 'z', 'feed', 'port', 'clearance'],
     /** Standalone: rapid over target, drop to clearance, one straight probe to (x,y,z). */

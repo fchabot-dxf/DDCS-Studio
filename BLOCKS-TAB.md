@@ -6,8 +6,9 @@ broader architecture live in [MULTI-OP-STACKING.md](MULTI-OP-STACKING.md).
 
 Status: **live STUDIO tab** — mounted natively via `window.showApp('blocks')`, follows the app theme
 (reuses `.op-btn`/theme tokens; black code/preview "screen" like the editor). Engine verified in Node.
-Variables + Control (Codeblocks-style) shipped. The standalone prototype page was removed — the app tab
-is the single UI; the engine is headless-testable in Node.
+**Built:** Variables + Control, per-block code reveal, and a **spatial drag/snap canvas** (drag blocks out
+of the palette → spawn unattached → snap into connected stacks; order = top-to-bottom). The agreed
+**granular block-language direction** (next section) is mostly design, not yet built.
 
 ---
 
@@ -18,6 +19,121 @@ is the single UI; the engine is headless-testable in Node.
 - **Three altitudes, one engine:** motion atoms → composed feature blocks → presets.
 - **Learn G-code while doing real projects:** the code is on-demand (per-block reveal), not a constant
   wall; the preview + (future) lint make catastrophic-but-creative code *visible* rather than blocked.
+
+## Design direction — the granular block language
+
+Today's blocks (Line/Bore/Drill…) sit at the **feature** altitude and weld several concerns together
+(geometry + motion + machine-state + loop). The agreed direction is to expose the granular **atoms** and
+keep feature blocks as **presets that fold them** — `drill == array(bore)` already proves a preset *is* a
+composition. **This section is the north star; most of it is designed, not yet built.**
+
+### The altitude ladder (the categories)
+
+| Category | the question | holds | Tinkercad analog |
+| --- | --- | --- | --- |
+| **Shape** | *where* | Position, Line, Arc, Hole, Rect, Path (geometry, no motion) | Shapes |
+| **Move** ⭐ | *how the tool moves* | Travel, Cut, Probe (see below) | — (CNC-only) |
+| **Machine** ⭐ | *the context (state)* | Spindle, Feed, Tool, Coolant, WCS, Safe-Z | — (CNC-only) |
+| **Op** | *what machining* | Drill, Bore, Pocket, Contour — **folded presets** | Templates |
+| **Modify** | replicate/transform | Array, Mirror, Rotate | Modify |
+| **Control / Variables / Math** | flow & params | Count, If, Set, expressions | same |
+
+⭐ Move + Machine are the CNC-specific layers with no Tinkercad analog — they make this "Codeblocks for
+**G-code**," not for solids. **An Op is a preset = atoms folded** (`Drill = Spindle · Repeat[ Plunge↓,
+Retract↑ ]`); ship the preset, let it **explode** to atoms. The op does **not** include the pattern:
+`Drill` = **one hole**; a bolt pattern = `Array { Drill }`; bundling array+op only belongs in the
+**STUDIO wizard** (the feature altitude). Granular underneath, one-click on top.
+
+### Move = path × mode × target
+
+One primitive on three orthogonal axes:
+- **path** — Linear / Arc / Helix (the shape of the motion between two positions)
+- **mode** — Rapid (travel) / Cut (feed + spindle) / Probe (G31, seek-stop). *The 2D/3D preview legend
+  (grey/cyan/red) already draws this.* Probe's result is **data** (`#1920–#1927`) → store + reuse it.
+- **target** — a Position (absolute) / a Distance (relative ↓/↑) / an Anchor (Retract, Safe-Z, Home, var)
+
+A peck is then just `Repeat[ Move(cut, ↓ by step) , Move(rapid, → Retract) ]`. The friendly named moves
+(`Plunge`/`Retract`/`Travel`/`Probe`) are **presets of the one Move**. Positions are atomic Shapes;
+`position → move → position` interpolates complex geometry from simple blocks.
+
+### Block shapes + sockets (the visual language)
+
+Four block **shapes** ↔ four **socket** types (the Scratch/Blockly model):
+
+| Shape | connects via | examples |
+| --- | --- | --- |
+| **Statement** (notched top/bottom) | stack connection | Move, Set, Spindle, Op |
+| **Wrapper / C** (notch + mouth) | a **body** socket (a sub-stack) | Repeat, Count, If/Else (two bodies), **Envelope** |
+| **Reporter** (rounded, no stack notch) | a **value** socket | Math (`a/4−b`), Variable pill, **Position** |
+| **Boolean** (hexagon) | a **boolean** socket | `>`, `==`, `and`, `not` → If's condition |
+
+Two kinds of input: **scalar** (number/expression — already supported as text fields; *also* accept a
+dropped reporter: type for speed, drag for discovery) and **structural** (Position/Shape/Boolean/Body —
+these must be blocks). Implementation: a def's flat `fields` becomes a typed **`sockets`** spec
+(`scalar | position | boolean | body`); reporters are a shape with no stack notch. "Position into Move's
+target" lives here. **The sidebar palette renders each block in its real shape** (notched / C / rounded /
+hexagon) so you see its connector before you drag it.
+
+**No preview art.** Tinkercad's Shape blocks are tall because they carry a 3D thumbnail + color/material
+swatches; we have **no solids to show**, so a block sizes purely by its **inputs/sockets** and stays
+compact. The palette shows shape/connector cues only — no thumbnails.
+
+### Envelope + parametric functions
+
+- **Envelope** — a *conscious* `Program` wrapper (a C-block) that emits the spindle header before and the
+  footer after its body, **parametrized** (units, WCS, Safe-Z, M30/M2). Replaces today's automatic
+  header/footer wrap in `emitMapped`. It also defines **program vs. fragment**: only blocks inside the
+  envelope (or attached under it) are *the program*; loose blocks float as scratch — which is why new
+  blocks **spawn unattached**.
+- **Parametric functions** — user-defined named sub-stacks with inputs; a call binds its args into a
+  **child scope** (the exact mechanism `Count` uses for its index). Inline-expand first (universal), DDCS
+  macro/subroutine later. A user function = a user-authorable Op/preset = a **STUDIO wizard minus the form**.
+
+### Also from Codeblocks (to fold in)
+
+- **Comment / Mark Up blocks** — inline `//` annotation blocks (Tinkercad's "Mark Up" rail category). Map
+  straight to G-code comments `( … )`; great for teaching/documenting a program. Cheap, high value.
+- **Collapse / expand** (the `<` toggle) — a block with many params collapses to its essentials, advanced
+  fields one click away. This is the **progressive-disclosure** answer to "some blocks are bigger."
+- **Named objects + instancing** (`Create New Object` / `Add Copy of Object base_shape`) — define a thing
+  once, copy/transform it elsewhere. The CNC analog of **reuse / parametric functions**: define a feature
+  or path once, instance it with Move/Rotate/Mirror.
+- **Transforms as statements** — Move / Scale / Rotate / Mirror stack under an object (our **Modify** layer,
+  beyond `Array`).
+- **Step + speed playback** — Tinkercad's stepped run; the app's `GcodeViz3D` already has speed + step, so
+  the Blocks Play inherits this at integration.
+
+### Wizard analysis — the atoms to add (grounded in real emit code)
+
+An audit of the STUDIO wizards (drill/pocket/slot/surfacing/text + the probe wizards, through the
+`clearing.js` fill engine and `cuttingBlocks.js`) shows the current blocks cover **~60%** of what the
+wizards emit. Gap list, ranked by how many wizards need each:
+
+| Atom to add | Category | Wizards | Difficulty |
+| --- | --- | --- | --- |
+| **Arc** (G2/G3) | Move | bore, pocket, surface | easy (leaf) |
+| **ZigZag** (raster / boustrophedon fill) | Modify | pocket, surface, slot, text | **hard** — wraps `clearing.js` `scanlineFill` |
+| **Concentric** (spiral inward rings) | Modify | bore, pocket, surface | hard |
+| **Dwell** (G4) | Move | spin-up | trivial |
+| **Coolant** (M7/M8/M9) | Machine | footer | trivial |
+| **Tool change** (T + M6) | Machine | toolPicker | trivial |
+| **WCS-select** (G54…G59) | Machine | probe, wcs | trivial |
+| **If / Goto** | Control | probe wizards | medium (DDCS modal `IF/GOTO`) |
+
+Two refinements the audit caught: `Spindle` should gain an **M3/M4 direction** field; `Drill` should
+**decompose to `Array{Bore}`** to expose the cavity.
+
+**Per-wizard decompositions** (these *are* the modularization recipes — step (b) of the transfer project):
+- `drill   = Array{ peck | bore }`
+- `pocket / surface = Spindle + Feed + Array{ Plunge↓ + (ZigZag|Concentric)Fill + Retract↑ }`
+- `slot    = Spindle + Feed + Repeat[ Plunge↓ + zig-zag-sweep + Retract↑ ]`
+- `probe*  = If-Goto + TwoPass-Probe + Math[centre/dia] + WCS-write`
+
+**Caveats:** (1) the **raster fill engine** (`clearing.js scanlineFill`) is the critical *opaque* piece — a
+`ZigZag`/region-fill block is the highest-value but hardest gap (the core of pocket/surface/text). (2)
+**Probe control flow** (if-goto, modal `#1920` checks) is *not* loop-friendly — defer probe-sequence blocks
+until a real `If/Else` layer exists. Build order: **trivial leaf atoms** (Dwell/Coolant/Tool/WCS/Arc +
+spindle direction) → value-socket UI → the fill blocks.
 
 ## Engine
 
@@ -57,9 +173,12 @@ self-describing block def: `kind`, `defaults`, `fields`, `emit`).
 ## UI — `blocks/blocksApp.js` (the STUDIO Blocks tab)
 
 `initBlocks()` builds the tab inside `#blocks-app` (markup in `index.html`), lazy-loaded by
-`ui/gatewayStatus.js` on first open. Palette grouped by `CATEGORIES` (`.op-btn` per app theme) ·
-pannable/zoom block canvas · category-coloured cards (Ops/Modify/Control/Variables); loops "embrace"
-their sub-stack · expression fields (any field can hold `i*spacing`) · live G-code · **2D/3D preview
+`ui/gatewayStatus.js` on first open. Opens empty. **Spatial canvas:** drag a block out of the palette to
+spawn it (lands **unattached** where dropped) · drag a card by its header to move it (its snapped sub-stack
+follows) · drop near another block's bottom to **snap into a connected stack** (cards touch + merge at the
+seam) · **execution order = top-to-bottom on the canvas** · pannable/zoom. Category-coloured cards
+(Ops/Modify/Control/Variables); loops "embrace" their sub-stack ·
+expression fields (any field can hold `i*spacing`) · live G-code · **2D/3D preview
 toggle** (2D canvas + lightweight three.js; reuses `parseGcode`) · **Play** (2D progressive reveal) ·
 **per-block code reveal** (click a block ⇄ its emitted G-code lines light up / dim the rest; Esc clears).
 Styling is scoped under `#blocks-app` in `styles.css` (chrome = theme tokens; code/preview = black screen).
@@ -89,12 +208,32 @@ cd DDCS-Studio/web && python -m http.server
 3. ~~**Per-block code reveal + line→source map**~~ ✓ **done** — `emitMapped` returns a line→source map;
    clicking a block highlights its emitted lines (dims the rest) and vice-versa. Next on this thread:
    reuse the same per-op color across the 2D/3D preview + stack, and code folding.
-4. **Motion-safety lint** — rapid-into-stock, probe-above-probe-feed, over-plunge (warn/teach, don't
-   block — catastrophic code stays *possible*, just *visible*).
+4. **Motion-safety lint** — engine written (`blocks/lint.js`: param-level checks → per-block warnings,
+   threaded scope; rapid-into-stock, over-plunge, stepdown>depth, probe-above-feed; warn/teach, never
+   block). **Not yet wired into the UI** (badge on the block + marker on the G-code line).
 5. ~~**Variables/expressions + Control** blocks~~ ✓ **done** — `Set` (input/derived vars, `ops/set.js`),
    `Count` loop (`ops/count.js`, `from`/`to`/`by`, index in scope), and `evalExpr` (`ops/expr.js`) so any
    field can be an expression (`grandeur/4 - 2`, `i*spacing`). Resolved against a threaded scope at emit.
    Not yet: an `If`/conditional block, and a variables panel / draggable variable pills (Codeblocks-style).
+6. ~~**Spatial drag/snap canvas**~~ ✓ **done** — blocks are positioned cards; **drag from palette → spawn
+   unattached**; drag to move (snapped sub-stack follows); **snap into connected stacks** (touch + merged
+   seam); emit order = top-to-bottom; **drag a block into a wrapper's mouth (body socket) to nest it** ✓.
+   **Next on this thread:** insert-and-push on snap; drag a child back *out* of a mouth.
+7. **Granular re-taxonomy** — ⏳ **started**: atoms shipped — `Move` (mode rapid/cut/probe), `Spindle`/`Feed`
+   (Machine), `Comment` (Mark Up); category-based **signature colours** (`--cat-*`). **Next (grounded in the
+   wizard audit above):** trivial leaf atoms `Dwell`/`Coolant`/`Tool`/`WCS`/`Arc` + Spindle M3/M4 direction →
+   `Shape`/`Position` blocks → the `ZigZag`/`Concentric` fill blocks; rebuild `Drill` as `Array{Bore}`.
+8. **Block shapes + sockets** (the big one) — ⏳ **started**: **body socket** done (drag a block into a
+   wrapper's mouth ✓); **Reporter engine** done (`ops/variable.js`/`math.js` + `resolveValue` — value-trees
+   resolve recursively, scalar-compatible). **Next:** the value-socket **UI** — render Reporter pills in
+   fields, drag-into-socket, recursive, *never collapse to text*; render **Statement/Wrapper/Reporter/Boolean**
+   shapes; Boolean sockets + `If` last; then the **sidebar in real block shapes**.
+9. **Envelope + functions** — a conscious `Program` wrapper (replaces the auto header/footer); user-defined
+   **parametric functions** (call binds args into a child scope, like `Count`'s index).
+10. **2-level sidebar** — Level-1 category rail (colour-coded) + Level-2 block list in real block shapes.
+11. **STUDIO ↔ Blocks transfer** (modularization project) — make each wizard `form → block-stack → emit`
+    (not `form → gcode`) so a STUDIO op opens as blocks. Incremental, **per wizard**; bore/drill/line
+    kernels already extracted. Crosses `MULTI-OP-STACKING.md`'s "refactor barrier" one wizard at a time.
 
 ---
 

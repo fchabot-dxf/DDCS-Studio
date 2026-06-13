@@ -29,6 +29,7 @@ export function initBlocks() {
   const allTypes = PALETTE.map((d) => d.type);                  // a Count loop can wrap any block
   const childTypesFor = (def) => def.kind === 'path' ? moveTypes : def.kind === 'loop' ? allTypes : leafTypes;
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/\s+/g, '');   // 'Mark Up' → 'markup' (used by palette + cards)
   let mode = '2d';
   const anim = { playing: false, k: 0, raf: null };
   let curSegs = [];
@@ -42,18 +43,23 @@ export function initBlocks() {
     pal.appendChild(h);
     defs.forEach((def) => {
       const b = document.createElement('button');
-      b.className = 'op-btn cat-' + cat.toLowerCase(); b.textContent = '+ ' + def.label;   // reuse the app button
-      b.onclick = () => { program.push(newBlock(def.type)); render(); };
+      b.className = 'op-btn cat-' + catSlug(cat); b.textContent = '+ ' + def.label;   // reuse the app button
+      b.addEventListener('pointerdown', (e) => startCreate(e, def.type));   // drag from palette → spawns on the canvas
       pal.appendChild(b);
     });
   });
 
   // ---- fields ----
   const fieldsOf = (block) => { const d = BLOCKS[block.type]; return d.fieldsFor ? d.fieldsFor(block.params) : d.fields; };
+  const SELECT_OPTS = {
+    pattern: ['grid', 'line', 'circle'], mode: ['rapid', 'cut', 'probe'],
+    flow: ['flood', 'mist', 'off'], wcs: ['G54', 'G55', 'G56', 'G57', 'G58', 'G59'],
+    dir: ['cw', 'ccw'], arc: ['ccw', 'cw'], op: ['+', '-', '*', '/', '%'],
+  };
   function fieldHTML(block, key) {
     const val = block.params[key];
-    if (key === 'pattern') {
-      const opts = ['grid', 'line', 'circle'].map((o) => `<option ${o === val ? 'selected' : ''}>${o}</option>`).join('');
+    if (SELECT_OPTS[key]) {
+      const opts = SELECT_OPTS[key].map((o) => `<option ${o === val ? 'selected' : ''}>${o}</option>`).join('');
       return `<label class="f"><span>${key}</span><select data-bid="${block.id}" data-key="${key}">${opts}</select></label>`;
     }
     return `<label class="f"><span>${key}</span><input type="text" value="${esc(val)}" data-bid="${block.id}" data-key="${key}"></label>`;   // text → any field can hold an expression
@@ -70,7 +76,7 @@ export function initBlocks() {
       const addBtns = childTypesFor(def).map((t) => `<button class="add-child" data-add="${t}" data-parent="${block.id}">+ ${BLOCKS[t].label}</button>`).join('');
       kids = `<div class="children">${childCards}${addBtns}</div>`;
     }
-    return `<div class="blk ${def.kind}" data-bid="${block.id}">
+    return `<div class="blk ${def.kind} cat-${catSlug(def.category)}" data-bid="${block.id}">
         <div class="blk-head" data-sel="${block.id}">${def.label} <small>${block.id}</small><span class="x" data-del="${block.id}">✕</span></div>
         <div class="blk-body">${fields}</div>${kids}
       </div>`;
@@ -84,7 +90,11 @@ export function initBlocks() {
   }
   function render() {
     byId.clear();
-    stage.innerHTML = program.map(blockHTML).join('');
+    // top-level blocks are positioned cards ("stacks") on the spatial canvas; nested children stay in flow
+    stage.innerHTML = program.map((b) =>
+      `<div class="stack" data-stack="${b.id}" style="transform:translate(${b.x || 0}px,${b.y || 0}px)">${blockHTML(b)}</div>`
+    ).join('');
+    markConnections();   // tag stacked-together blocks so a snapped stack renders as one connected unit
     stage.querySelectorAll('[data-key]').forEach((inp) => inp.addEventListener('input', () => {
       const b = byId.get(inp.dataset.bid); if (!b) return;
       const k = inp.dataset.key;
@@ -96,11 +106,14 @@ export function initBlocks() {
       const p = byId.get(btn.dataset.parent); if (p) { p.children.push(newBlock(btn.dataset.add)); render(); }
     });
     stage.querySelectorAll('[data-del]').forEach((x) => x.onclick = (e) => { e.stopPropagation(); removeById(program, x.dataset.del); render(); });
-    stage.querySelectorAll('[data-sel]').forEach((h) => h.onclick = () => select(h.dataset.sel, { scrollCode: true }));
+    // nested child headers select on click; top-level headers drag (or select if not moved) — see DRAG section
+    stage.querySelectorAll('.children [data-sel]').forEach((h) => h.onclick = () => select(h.dataset.sel, { scrollCode: true }));
+    stage.querySelectorAll('.stack > .blk > .blk-head').forEach((h) => h.addEventListener('pointerdown', onDragStart));
     reproject();
   }
   function reproject() {
-    const { text, lines, map } = emitMapped(program);
+    const ordered = orderedProgram();                    // execution order = top-to-bottom on the canvas
+    const { text, lines, map } = emitMapped(ordered);
     renderCode(lines, map);
     curSegs = segments(text);
     if (mode === '3d') update3D(text);
@@ -261,6 +274,159 @@ export function initBlocks() {
     else { play.textContent = '▶ Play'; drawPreview(curSegs, curSegs.length); }
   };
 
+  // ---- drag & snap: blocks are cards on a spatial canvas; drop near a block's bottom to snap into a stack ----
+  const GAP = 0, SNAP_X = 150, SNAP_GAP = 40;   // GAP 0 → snapped blocks touch and render as one connected stack
+  let drag = null;                                             // { sx, sy, moved, chain:[{block,el,x0,y0}] }
+
+  /** Execution order = blocks top-to-bottom (then left-to-right) on the canvas. */
+  const orderedProgram = () => [...program].sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
+  const stackEl = (id) => stage.querySelector(`.stack[data-stack="${id}"]`);
+  const stackH = (id) => { const el = stackEl(id); return el ? el.getBoundingClientRect().height / scale : 120; };
+
+  // ---- create-by-drag: drag a block out of the palette; it materialises on the canvas and lands unattached ----
+  let createDrag = null, cascadeN = 0;
+  const screenToStage = (cx, cy) => { const r = viewport.getBoundingClientRect(); return { x: (cx - r.left - txp) / scale, y: (cy - r.top - typ) / scale }; };
+  const cascadePos = () => { const p = { x: 24 + (cascadeN % 6) * 18, y: 24 + (cascadeN % 6) * 18 }; cascadeN++; return p; };
+  function startCreate(e, type) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    createDrag = { type, sx: e.clientX, sy: e.clientY, block: null };
+    window.addEventListener('pointermove', onCreateMove);
+    window.addEventListener('pointerup', onCreateEnd, { once: true });
+  }
+  function onCreateMove(e) {
+    if (!createDrag) return;
+    if (!createDrag.block) {
+      if (Math.hypot(e.clientX - createDrag.sx, e.clientY - createDrag.sy) < 5) return;   // threshold: distinguish a click
+      const nb = newBlock(createDrag.type);
+      const p = screenToStage(e.clientX, e.clientY); nb.x = p.x - 36; nb.y = p.y - 12;     // cursor grabs the header
+      program.push(nb); createDrag.block = nb; render();
+    }
+    const nb = createDrag.block, p = screenToStage(e.clientX, e.clientY);
+    nb.x = p.x - 36; nb.y = p.y - 12;
+    const el = stackEl(nb.id); if (el) el.style.transform = `translate(${nb.x}px,${nb.y}px)`;
+    createDrag.lastX = e.clientX; createDrag.lastY = e.clientY;
+    highlightMouth(mouthTargetFor([{ block: nb }], e.clientX, e.clientY)?.el || null);
+  }
+  function onCreateEnd() {
+    window.removeEventListener('pointermove', onCreateMove);
+    if (!createDrag) return;
+    if (!createDrag.block) {                              // a click (no drag) → still spawn, unattached, at a cascade spot
+      const nb = newBlock(createDrag.type), p = cascadePos(); nb.x = p.x; nb.y = p.y; program.push(nb);
+    } else {
+      const mouth = mouthTargetFor([{ block: createDrag.block }], createDrag.lastX, createDrag.lastY);
+      if (mouth) nestInto(mouth.wid, [createDrag.block]);   // dropped into a wrapper's mouth → nest it
+    }
+    highlightMouth(null); createDrag = null; render();    // else dropped unattached — no auto-snap on create
+  }
+
+  /** The grabbed block plus the contiguous chain snapped below it (same column, touching) — they drag together. */
+  function chainFrom(head) {
+    const sorted = orderedProgram(), start = sorted.indexOf(head), chain = [];
+    let prevBottom = null;
+    for (let j = start; j < sorted.length; j++) {
+      const b = sorted[j];
+      if (j > start && (Math.abs((b.x || 0) - (head.x || 0)) > SNAP_X || Math.abs((b.y || 0) - prevBottom) > SNAP_GAP)) break;
+      chain.push({ block: b, el: stackEl(b.id), x0: b.x || 0, y0: b.y || 0 });
+      prevBottom = (b.y || 0) + stackH(b.id);
+    }
+    return chain;
+  }
+
+  function onDragStart(e) {
+    if (e.button !== 0 || e.target.closest('.x, input, select, button, .add-child')) return;
+    const block = byId.get(e.currentTarget.closest('.stack').dataset.stack); if (!block) return;
+    drag = { sx: e.clientX, sy: e.clientY, moved: false, chain: chainFrom(block) };
+    window.addEventListener('pointermove', onDragMove);
+    window.addEventListener('pointerup', onDragEnd, { once: true });
+  }
+  function onDragMove(e) {
+    if (!drag) return;
+    if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;   // threshold: keep clicks as selects
+    drag.moved = true; drag.lastX = e.clientX; drag.lastY = e.clientY;
+    const dx = (e.clientX - drag.sx) / scale, dy = (e.clientY - drag.sy) / scale;
+    drag.chain.forEach((c) => { c.block.x = c.x0 + dx; c.block.y = c.y0 + dy; if (c.el) c.el.style.transform = `translate(${c.block.x}px,${c.block.y}px)`; });
+    drag.chain[0].el?.classList.add('dragging');
+    const mouth = mouthTargetFor(drag.chain, e.clientX, e.clientY);
+    if (mouth) { highlightMouth(mouth.el); highlightSnap(null); }        // over a wrapper mouth → nest, not snap
+    else { highlightMouth(null); highlightSnap(snapTargetFor(drag.chain)); }
+  }
+  function onDragEnd() {
+    window.removeEventListener('pointermove', onDragMove);
+    if (!drag) return;
+    if (drag.moved) {
+      const mouth = mouthTargetFor(drag.chain, drag.lastX, drag.lastY);
+      if (mouth) {
+        nestInto(mouth.wid, drag.chain.map((c) => c.block));            // body socket: nest the chain into the wrapper
+      } else {
+        const tgt = snapTargetFor(drag.chain);
+        if (tgt) { const ddx = tgt.x - drag.chain[0].block.x, ddy = tgt.y - drag.chain[0].block.y;
+          drag.chain.forEach((c) => { c.block.x += ddx; c.block.y += ddy; }); }   // snap whole chain under the target
+      }
+      highlightSnap(null); highlightMouth(null); drag = null; render();
+    } else { const id = drag.chain[0].block.id; drag = null; select(id, { scrollCode: true }); }   // it was a click
+  }
+
+  /** Snap point: under the nearest non-chain block when the chain head is dropped onto its lower half or
+   *  just below it (forgiving, Codeblocks-style). Returns the resting {x,y} for the chain head, or null. */
+  function snapTargetFor(chain) {
+    const head = chain[0].block, ids = new Set(chain.map((c) => c.block.id));
+    let best = null, bestScore = Infinity;
+    program.forEach((a) => {
+      if (ids.has(a.id)) return;
+      const aH = stackH(a.id), aBottom = (a.y || 0) + aH;
+      const dx = Math.abs((a.x || 0) - (head.x || 0));
+      const dyb = (head.y || 0) - aBottom;                 // +below the target, −overlapping it
+      if (dx < SNAP_X && dyb > -aH * 0.6 && dyb < SNAP_GAP) {
+        const score = Math.abs(dyb) + dx;
+        if (score < bestScore) { best = { id: a.id, x: a.x || 0, y: aBottom + GAP }; bestScore = score; }
+      }
+    });
+    return best;
+  }
+  function highlightSnap(tgt) {
+    stage.querySelectorAll('.stack.snap-target').forEach((el) => el.classList.remove('snap-target'));
+    if (tgt) stackEl(tgt.id)?.classList.add('snap-target');
+  }
+  // ---- body sockets: drop a block into a wrapper's mouth (its .children) to nest it ----
+  function mouthTargetFor(chain, cx, cy) {
+    const ids = new Set(chain.map((c) => c.block.id));
+    let best = null;
+    stage.querySelectorAll('.stack > .blk.container > .children, .stack > .blk.loop > .children, .stack > .blk.path > .children')
+      .forEach((mouth) => {
+        const wid = mouth.closest('.stack').dataset.stack;
+        if (ids.has(wid)) return;                         // can't drop a block into itself
+        const r = mouth.getBoundingClientRect();
+        if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) best = { wid, el: mouth };
+      });
+    return best;
+  }
+  function highlightMouth(el) {
+    stage.querySelectorAll('.children.mouth-target').forEach((m) => m.classList.remove('mouth-target'));
+    if (el) el.classList.add('mouth-target');
+  }
+  /** Move blocks out of wherever they are and append them to a wrapper's children (the body socket). */
+  function nestInto(wid, blocks) {
+    const wrapper = byId.get(wid); if (!wrapper) return;
+    blocks.forEach((b) => removeById(program, b.id));
+    (wrapper.children || (wrapper.children = [])).push(...blocks);
+  }
+  /** Tag blocks that sit directly on top of one another so a snapped stack renders as one connected unit. */
+  function markConnections() {
+    const sorted = orderedProgram();
+    sorted.forEach((b) => stackEl(b.id)?.classList.remove('conn-top', 'conn-bottom'));
+    for (const a of sorted) {
+      const aBottom = (a.y || 0) + stackH(a.id);
+      for (const b of sorted) {
+        if (b === a) continue;
+        if (Math.abs((b.x || 0) - (a.x || 0)) < SNAP_X && Math.abs((b.y || 0) - aBottom) < 4) {
+          stackEl(a.id)?.classList.add('conn-bottom');
+          stackEl(b.id)?.classList.add('conn-top');
+        }
+      }
+    }
+  }
+
   // ---- pan / zoom of the block canvas ----
   let txp = 0, typ = 0, scale = 1, panning = false, sx = 0, sy = 0;
   const apply = () => { stage.style.transform = `translate(${txp}px,${typ}px) scale(${scale})`; };
@@ -270,14 +436,7 @@ export function initBlocks() {
   viewport.addEventListener('wheel', (e) => { e.preventDefault(); const r = viewport.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, nx = (px - txp) / scale, ny = (py - typ) / scale; scale = Math.min(2.5, Math.max(0.3, scale * (e.deltaY < 0 ? 1.1 : 1 / 1.1))); txp = px - nx * scale; typ = py - ny * scale; apply(); }, { passive: false });
   window.addEventListener('resize', () => { if (!root.classList.contains('hidden')) reproject(); });
 
-  // ---- seed: a sampler across all four categories (Ops · Modify · Control · Variables) ----
-  const arr = newBlock('array'); arr.children.push(newBlock('bore'));   // Modify: array(bore) == drill grid
-  const hx = newBlock('helix'); hx.children.push(newBlock('probe'));    // Modify: helix(probe) == helical probe
-  const sp = newBlock('set'); sp.params = { name: 'spacing', value: 15 };          // Variables
-  const ct = newBlock('count'); ct.params = { var: 'i', from: 1, to: 4, by: 1 };   // Control: a bolt row via a loop
-  const dr = newBlock('drill'); dr.params = { ...dr.params, x: 'i*spacing', y: 0 };// drill at i*spacing (parametric)
-  ct.children.push(dr);
-  program.push(newBlock('line'), arr, hx, sp, ct);
+  // ---- start empty: the user builds the stack from the palette ----
   render(); apply();
 
   api = { refresh: reproject };
