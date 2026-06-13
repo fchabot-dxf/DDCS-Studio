@@ -3493,21 +3493,34 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* left rail (palette) — chrome */
 #blocks-app .palette { background:var(--panel); border-right:1px solid var(--line); padding:10px; overflow:auto; }
 #blocks-app .palette h3 { margin:0 0 8px; font-size:11px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; }
-/* palette buttons reuse the app's .op-btn — only the rail layout is bespoke */
-#blocks-app .palette .op-btn { display:block; width:100%; margin:0 0 6px; text-align:left; font-weight:600; }
-#blocks-app .palette .cat { margin:12px 0 6px; font-size:10px; letter-spacing:.08em; color:var(--muted);
-                            text-transform:uppercase; opacity:.7; }
-#blocks-app .palette .cat:first-child { margin-top:4px; }
-/* palette button category accent stripe (scoped to .op-btn so block cards aren't striped) */
-#blocks-app .op-btn.cat-shapes { border-left:3px solid var(--cat-shapes); }
-#blocks-app .op-btn.cat-move { border-left:3px solid var(--cat-move); }
-#blocks-app .op-btn.cat-machine { border-left:3px solid var(--cat-machine); }
-#blocks-app .op-btn.cat-ops { border-left:3px solid var(--cat-ops); }
-#blocks-app .op-btn.cat-modify { border-left:3px solid var(--cat-modify); }
-#blocks-app .op-btn.cat-control { border-left:3px solid var(--cat-control); }
-#blocks-app .op-btn.cat-math { border-left:3px solid var(--cat-math); }
-#blocks-app .op-btn.cat-variables { border-left:3px solid var(--cat-variables); }
-#blocks-app .op-btn.cat-markup { border-left:3px solid var(--cat-markup); }
+/* 2-level palette: LEVEL 1 = colour-coded category rail (filters); LEVEL 2 = the shaped block list */
+#blocks-app .pal-rail { display:flex; flex-wrap:wrap; gap:4px; margin:0 0 10px; }
+#blocks-app .pal-cat { font-size:10px; font-weight:700; letter-spacing:.02em; padding:3px 7px; border-radius:10px;
+                       border:1px solid var(--cat,var(--line)); background:transparent; color:var(--muted); cursor:pointer; }
+#blocks-app .pal-cat.pal-all { --cat:var(--accent); }
+#blocks-app .pal-cat:hover { color:var(--ink); }
+#blocks-app .pal-cat.on { background:var(--cat); border-color:var(--cat); color:#fff; }
+#blocks-app .pal-list { display:flex; flex-direction:column; gap:7px; }
+#blocks-app .palette .cat { margin:10px 0 1px; font-size:10px; letter-spacing:.08em; color:var(--cat,var(--muted));
+                            text-transform:uppercase; opacity:.85; }
+#blocks-app .pal-list > .cat:first-child { margin-top:0; }
+/* a palette entry in its real silhouette (shares --cat with the canvas cards) */
+#blocks-app .pal-blk { position:relative; width:100%; text-align:left; border:0; cursor:grab; font:600 12px/1.3 inherit;
+                       background:var(--cat); color:#fff; padding:6px 10px; border-radius:5px; }
+#blocks-app .pal-blk .pal-lbl { position:relative; z-index:1; }
+/* statement + wrapper stack → top notch + bottom dovetail bump (mini of the canvas silhouette) */
+#blocks-app .pal-blk.pal-stmt::before, #blocks-app .pal-blk.pal-wrap::before { content:''; position:absolute; top:0; left:13px;
+    width:18px; height:5px; background:var(--panel); clip-path:polygon(0 0,100% 0,calc(100% - 4px) 100%,4px 100%); }
+#blocks-app .pal-blk.pal-stmt::after, #blocks-app .pal-blk.pal-wrap::after { content:''; position:absolute; bottom:-4px; left:13px;
+    width:18px; height:5px; background:var(--cat); clip-path:polygon(4px 0,calc(100% - 4px) 0,calc(100% - 8px) 100%,8px 100%); }
+/* wrapper (C-block): label bar + a recessed mouth slot behind a cat-coloured left arm */
+#blocks-app .pal-blk.pal-wrap { padding:0; }
+#blocks-app .pal-blk.pal-wrap .pal-lbl { display:block; padding:6px 10px 5px; }
+#blocks-app .pal-blk.pal-wrap .pal-mouth { display:block; height:9px; margin:0 0 5px 11px; background:var(--panel); border-radius:3px 0 0 3px; }
+/* reporter = rounded pill; boolean = hexagon (no stack connectors — they plug into value sockets) */
+#blocks-app .pal-blk.pal-rep { border-radius:999px; padding:5px 12px; }
+#blocks-app .pal-blk.pal-bool { border-radius:0; padding:5px 16px;
+    clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%); }
 #blocks-app .palette p { color:var(--muted); font-size:11px; margin-top:14px; }
 /* block canvas + cards — chrome */
 #blocks-app .viewport { position:relative; overflow:hidden; cursor:grab; }
@@ -3527,16 +3540,16 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .stack.conn-bottom > .blk > :last-child { border-bottom-left-radius:0; border-bottom-right-radius:0; }
 #blocks-app .stack.conn-bottom > .blk { box-shadow:none; }
 #blocks-app .bk-hint { position:absolute; left:10px; bottom:8px; color:var(--muted); font-size:11px; pointer-events:none; }
-/* --cat = this block's category colour (the head, the connector bump, the wrapper arm/foot all share it) */
-#blocks-app .blk.cat-shapes { --cat:var(--cat-shapes); }
-#blocks-app .blk.cat-move { --cat:var(--cat-move); }
-#blocks-app .blk.cat-machine { --cat:var(--cat-machine); }
-#blocks-app .blk.cat-ops { --cat:var(--cat-ops); }
-#blocks-app .blk.cat-modify { --cat:var(--cat-modify); }
-#blocks-app .blk.cat-control { --cat:var(--cat-control); }
-#blocks-app .blk.cat-math { --cat:var(--cat-math); }
-#blocks-app .blk.cat-variables { --cat:var(--cat-variables); }
-#blocks-app .blk.cat-markup { --cat:var(--cat-markup); }
+/* --cat = a block's category colour, shared by the canvas card (head/bump/arm/foot) AND the palette entry/chip */
+#blocks-app .cat-shapes { --cat:var(--cat-shapes); }
+#blocks-app .cat-move { --cat:var(--cat-move); }
+#blocks-app .cat-machine { --cat:var(--cat-machine); }
+#blocks-app .cat-ops { --cat:var(--cat-ops); }
+#blocks-app .cat-modify { --cat:var(--cat-modify); }
+#blocks-app .cat-control { --cat:var(--cat-control); }
+#blocks-app .cat-math { --cat:var(--cat-math); }
+#blocks-app .cat-variables { --cat:var(--cat-variables); }
+#blocks-app .cat-markup { --cat:var(--cat-markup); }
 /* a STATEMENT silhouette: notch cut into the top edge + a matching bump hanging below — they dovetail when stacked.
    overflow:visible so the bump (::after) shows below; corners moved to head/last-child since overflow no longer clips. */
 #blocks-app .blk { position:relative; width:300px; margin:0 0 8px; border-radius:8px; overflow:visible;

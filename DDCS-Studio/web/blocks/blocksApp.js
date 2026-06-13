@@ -34,20 +34,47 @@ export function initBlocks() {
   const anim = { playing: false, k: 0, raf: null };
   let curSegs = [];
 
-  // ---- palette (grouped by category) ----
+  // ---- palette: 2-level — a colour-coded category RAIL (level 1) filters the shaped block LIST (level 2).
+  //      Each entry renders in its real silhouette (statement notch / C wrapper / rounded reporter / hexagon
+  //      boolean) so the connector is legible before you drag — see styles.css .pal-blk.* ----
   const pal = document.getElementById('blk-pal');
-  CATEGORIES.forEach((cat) => {
-    const defs = PALETTE.filter((def) => (def.category || 'Ops') === cat);
-    if (!defs.length) return;                                  // skip empty categories (Control/Math/… for now)
-    const h = document.createElement('h4'); h.className = 'cat'; h.textContent = cat;
-    pal.appendChild(h);
-    defs.forEach((def) => {
-      const b = document.createElement('button');
-      b.className = 'op-btn cat-' + catSlug(cat); b.textContent = '+ ' + def.label;   // reuse the app button
-      b.addEventListener('pointerdown', (e) => startCreate(e, def.type));   // drag from palette → spawns on the canvas
-      pal.appendChild(b);
+  const activeCats = CATEGORIES.filter((c) => PALETTE.some((d) => (d.category || 'Ops') === c));
+  const palShape = (def) =>                                    // which silhouette an entry shows (mirrors the canvas kinds)
+    def.kind === 'reporter' ? (def.returns === 'boolean' ? 'pal-bool' : 'pal-rep')
+    : (def.kind === 'container' || def.kind === 'path' || def.kind === 'loop' || def.kind === 'cond') ? 'pal-wrap'
+    : 'pal-stmt';
+  let palCat = 'all';
+  const rail = document.createElement('div'); rail.className = 'pal-rail';
+  const list = document.createElement('div'); list.className = 'pal-list';
+  function railChip(cat, label) {
+    const c = document.createElement('button');
+    c.className = 'pal-cat' + (cat === 'all' ? ' pal-all' : ' cat-' + catSlug(cat));
+    c.textContent = label; c.dataset.cat = cat;
+    c.onclick = () => { palCat = cat; renderPalette(); };
+    return c;
+  }
+  function blockEntry(def) {
+    const b = document.createElement('button');
+    b.className = `pal-blk ${palShape(def)} cat-${catSlug(def.category)}`;
+    b.dataset.type = def.type;
+    b.innerHTML = `<span class="pal-lbl">${esc(def.label)}</span>${palShape(def) === 'pal-wrap' ? '<span class="pal-mouth"></span>' : ''}`;
+    b.addEventListener('pointerdown', (e) => startCreate(e, def.type));   // drag from palette → spawns on the canvas
+    return b;
+  }
+  function renderPalette() {
+    rail.querySelectorAll('.pal-cat').forEach((c) => c.classList.toggle('on', c.dataset.cat === palCat));
+    list.replaceChildren();
+    (palCat === 'all' ? activeCats : [palCat]).forEach((cat) => {
+      const defs = PALETTE.filter((def) => (def.category || 'Ops') === cat);
+      if (!defs.length) return;
+      if (palCat === 'all') { const h = document.createElement('h4'); h.className = 'cat cat-' + catSlug(cat); h.textContent = cat; list.appendChild(h); }
+      defs.forEach((def) => list.appendChild(blockEntry(def)));
     });
-  });
+  }
+  rail.appendChild(railChip('all', 'All'));
+  activeCats.forEach((cat) => rail.appendChild(railChip(cat, cat)));
+  pal.appendChild(rail); pal.appendChild(list);
+  renderPalette();
 
   // ---- fields ----
   const fieldsOf = (block) => { const d = BLOCKS[block.type]; return d.fieldsFor ? d.fieldsFor(block.params) : d.fields; };

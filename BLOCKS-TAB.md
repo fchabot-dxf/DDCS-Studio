@@ -122,6 +122,19 @@ threading, typed value sockets) — **ahead on *fit***. Blockly is **ahead on *e
 mutators, a11y). Tipping point = how far we push the editor: once we want real undo/redo + save/load + big
 programs, adopting Blockly + writing one G-code generator beats reimplementing all that by hand. Revisit then.
 
+**When to decide (the gate).** The repo splits in two: **portable** = block atoms (`ops/*.js` ≈ a Blockly block
+def + generator, ~1:1) and the **generation logic** (`blockModel.js` emit fold *becomes* the Blockly G-code
+generator) — building more of these does **not** raise the switch cost. **Throwaway-if-we-switch** = everything
+in `blocksApp.js` + blocks CSS (the bespoke drag/snap canvas, value-socket pills, silhouettes, palette) — Blockly
+renders its own SVG, so that's the sunk cost that grows. **So decide when the next feature is editor
+*infrastructure*, not editor *content*.** Content (more blocks) is portable — build freely. The hard triggers,
+decide at the **first** you hit: **undo/redo**, **save/load** (Blockly has canonical JSON serialization),
+**mutators** (variable-arity If/Else-if), or **real users saving programs** (after that, switching = a data
+migration). The current queue (And/Or/Not, ZigZag/Concentric fill, modularization) is all **portable** → not at
+the gate yet. **De-risk early:** run a throwaway **Blockly spike** (2 CNC blocks + a tiny G-code generator, themed
+to our tokens) *before* the first infrastructure feature, so the call is evidence-based. Avoid pouring more into
+bespoke editor mechanics (insert-and-push, drag-out-of-mouth, multi-select, copy/paste) — that's the throwaway half.
+
 ### Envelope + parametric functions
 
 - **Envelope** — a *conscious* `Program` wrapper (a C-block) that emits the spindle header before and the
@@ -278,11 +291,14 @@ cd DDCS-Studio/web && python -m http.server
    bump bottom (interlocks when stacked); **Wrapper/C** = top bar + cat-coloured left arm + foot bar
    embracing the body mouth; **Boolean** = hexagon socket/pill; **Reporter** = rounded pill. Pure CSS
    (`--cat` per category + notch/bump pseudo-elements + `.blk-foot`), box/snap geometry unchanged.
-   **Next:** the **sidebar in real block shapes** (item 10); logical `And`/`Or`/`Not` boolean reporters
+   **Sidebar in real block shapes** ✓ (item 10). **Next:** logical `And`/`Or`/`Not` boolean reporters
    (boolean-in-boolean sockets, like Math nesting).
 9. **Envelope + functions** — a conscious `Program` wrapper (replaces the auto header/footer); user-defined
    **parametric functions** (call binds args into a child scope, like `Count`'s index).
-10. **2-level sidebar** — Level-1 category rail (colour-coded) + Level-2 block list in real block shapes.
+10. ~~**2-level sidebar**~~ ✓ **done** — Level-1 **category rail** (colour-coded chips, click to filter) +
+    Level-2 **block list in real silhouettes**: statement (notch+bump), wrapper (label bar + recessed mouth +
+    arm), reporter (rounded pill), boolean (hexagon). Shares `--cat` with the canvas cards; built in
+    `blocksApp.js` (`renderPalette`), styled in `styles.css` (`.pal-rail`/`.pal-cat`/`.pal-blk.*`).
 11. **STUDIO ↔ Blocks transfer** (modularization project) — make each wizard `form → block-stack → emit`
     (not `form → gcode`) so a STUDIO op opens as blocks. Incremental, **per wizard**; bore/drill/line
     kernels already extracted. Crosses `MULTI-OP-STACKING.md`'s "refactor barrier" one wizard at a time.
