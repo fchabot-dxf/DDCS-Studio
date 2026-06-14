@@ -32,6 +32,12 @@ export const dialect = {
   spindle(dir, rpm), spindleOff(), coolant(on),
   hmiPrompt(msg), hmiToast(msg), hmiInput(varName, prompt),
 
+  // PARSE INVERSE (G-code → blocks): the byte-exact inverse of THIS dialect's emit, for the dialect-specific
+  // ops only (probe cycle, probe-read/check, machine-move, set-WCS, IF/GOTO/label, HMI). Returns the leaf
+  // block record { type, params } for a recognized line, else null (the shared core parser handles
+  // move/arc/spindle/…/`#var=expr` + the `raw` fallback). See blocks/gcodeToStack.js + BLOCKS-TAB.md.
+  recognize(line, comment) -> { type, params } | null,
+
   notes: 'free text: structural quirks, what is NOT expressible, dump file:line evidence',
 };
 ```
@@ -39,6 +45,12 @@ export const dialect = {
 ## Rules
 - **Single source of truth = the dump.** If the form isn't in the dump, say so in `notes` and mark it `TO CONFIRM`.
 - Return `[]` (empty) for a primitive a controller folds away (e.g. Centroid's `probeStatus`/`probeRead` — it stops *at* contact).
+- **`recognize()` is the byte-exact inverse of THIS dialect's emit** — `emit(parse(line)) === line`. Order matters:
+  probe-status/probe-read/read-machine are syntactically just `IF #sys… GOTO` / `#x=#sys`, distinguished only by
+  THIS dialect's magic var numbers (the `vars` above), so match those **before** the generic ifgoto/assign. Forms
+  that look like comments (RS274 `(MSG,…)`) are recognized before the parser's comment rule. Decode ONLY the
+  dialect-specific ops; leave the universal ones (move/arc/spindle/`#var=expr`) to the core parser. Add a
+  per-dialect round-trip test in `DDCS-Studio/tests/blocks-dialect-decode.spec.js`.
 - For `programModel:'script'` (Mach3/Mach4), each method returns the *script statement(s)*, not G-code lines — and `notes`
   must flag that this dialect needs the script-emitter backend, not the line emitter.
 - Keep functions pure (no DOM, no imports beyond a local axis map) so they're Node-testable.

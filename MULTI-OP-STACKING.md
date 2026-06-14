@@ -75,7 +75,10 @@ or full of DDCS quirks) is not just lossy — it's **destructive**: a bad infere
 wrong *motion* on a machine with a spinning tool. The blast radius is a crash. Same
 reason Fusion keeps its operation tree and treats the posted `.nc` as disposable.
 
-> Rule: nothing ever parses emitted G-code back into op params.
+> Rule: nothing ever *infers* high-level op intent from emitted G-code. (Sharpened in practice — see
+> [BLOCKS-TAB.md](BLOCKS-TAB.md) "Current architecture": **leaf** atoms are the exception — a `G1 X10` line
+> *declares* its params, so the Blocks tab round-trips leaf G-code ⇄ blocks. That's *declaration*, not the
+> banned *inference*; the "declared vs inferred" section below is the real axis. High-level ops stay forward-only.)
 
 ### Why multi-op *specifically* needs the params kept
 

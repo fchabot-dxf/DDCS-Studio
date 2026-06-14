@@ -4,11 +4,91 @@ A Tinkercad-Codeblocks-style tab for DDCS Studio: stack visual op-blocks → liv
 Build-first, learn-G-code-by-revealing. This is the **feature/implementation** doc; the *why* and the
 broader architecture live in [MULTI-OP-STACKING.md](MULTI-OP-STACKING.md).
 
-Status: **live STUDIO tab** — mounted natively via `window.showApp('blocks')`, follows the app theme
-(reuses `.op-btn`/theme tokens; black code/preview "screen" like the editor). Engine verified in Node.
-**Built:** Variables + Control, per-block code reveal, and a **spatial drag/snap canvas** (drag blocks out
-of the palette → spawn unattached → snap into connected stacks; order = top-to-bottom). The agreed
-**granular block-language direction** (next section) is mostly design, not yet built.
+Status: **live STUDIO tab, on Blockly** (vendored UMD 12.5.1, `web/vendor/blockly/`). The bespoke
+drag/snap canvas this doc described earlier was **replaced by Blockly** — the build-vs-adopt gate (below)
+was crossed. The block stack is the **program data**; the Studio editor is the **primary surface** and a
+**live projection** of it; editing the editor reconciles back into blocks (leaf-level). Verified by the
+Playwright suite (`tests/blocks-*.spec.js`, `gcode-to-stack.spec.js`, `blocks-dialect-decode.spec.js`).
+
+> ⚠️ **Read "Current architecture" first — it's the source of truth for what exists now.** Sections further
+> down ("spatial drag/snap canvas", "Engine verified in Node", the `ops/zigzag.js`/`concentric.js` names, the
+> closing "Never parse emitted G-code" rule) **predate the Blockly port + the program-model rework** and are
+> kept only for design rationale (altitude ladder, the vocabulary audit, build-vs-adopt).
+
+---
+
+## Current architecture (built — 2026-06)
+
+### Blocks are the DATA; the editor is the PRIMARY surface
+One program — a stack of block records — is the **source of truth**, with two *views*: the **Studio editor**
+(a `<textarea>`, the primary surface) and the **Blockly workspace** (the Blocks tab). User's framing:
+*"primary surface, but blocks are the data"* — you live in the editor; what you edit is **block data**.
+
+Implemented by **`web/blocks/programModel.js`**, owned at **app start** (not inside lazy-loaded Blockly). That
+decoupling is load-bearing: editing the editor builds/updates blocks **without ever opening the Blocks tab**.
+`setStack(next, origin)` tags each change so a view ignores its own echo (no feedback loop); the Blockly view
+(`blocksApp.js`) subscribes via `onChange`, re-renders only on foreign changes, and guards its own rebuild.
+
+### Bidirectional sync — four shipped layers
+1. **Parser** `web/blocks/gcodeToStack.js` — G-code → **leaf** block records (inverse of `emit`); unknown line → `raw`.
+2. **Editor = live projection** — `programModel` projects the emit into the editor on every change (never while
+   focused; canonicalizes on blur).
+3. **Edit → blocks reconcile** — `reconcileGcodeToStack` turns editor edits back into the stack.
+4. **Per-dialect recognizers** — each dialect decodes *its* specific ops (see below).
+emit ↔ parse is **byte-identical** for the leaf set (guarded by `gcode-to-stack` + `blocks-dialect-decode`).
+
+### Reconciling with "never invert G-code" — the declared-vs-inferred line
+The old rule (bottom of this doc) said *nothing ever parses G-code back into params*. We **do** parse
+**leaf** G-code → blocks; that is **not a violation** — it's this doc's own *declared-vs-inferred* axis:
+- **Leaf = DECLARED.** `G1 X10 F100` literally declares a Move's params — nothing to guess. So leaf G-code
+  **round-trips both ways** (text ⇄ blocks ⇄ fields). (*"writing a few lines makes atom blocks"*; *"hand
+  editing existing code should modify the block, not make raw"*.)
+- **High-level = INFERRED → FORWARD-ONLY.** Fill/Array/Step-Down emit many *derived* lines from a few scoped
+  params; you can't recover them from an edited line without guessing. **Never parsed back** — editing a
+  high-level program's text reverts on blur (edit it via blocks/fields, or the coming per-op form editor).
+
+Reconcile boundary: all-leaf/empty/imported → re-parse; high-level present → revert; unrecognized → `raw`.
+(*"writing 100 lines by hand and it NOT becoming neat blocks is fine"* — text path is for tweaks, not bulk.)
+
+### Per-dialect parse recognizers
+Each dialect exports **`recognize(line) → {type,params}|null`** — the byte-exact **inverse of its emit,
+co-located with it** (contract in `wizards/dialects/SCHEMA.md`). The parser tries the *active* dialect first,
+then the shared core (move/arc/spindle/…/`#var=expr`), then `raw`. Probe/status/DRO reads are syntactically
+just `#x=#sys` / `IF #status!=2 GOTO`, distinguishable **only by each controller's magic var numbers**
+(`dialect.vars`) — so the inverse is inherently per-controller, anchored on the verified **M350 Expert**.
+Covered (decode to proper blocks, no `raw`, byte-identical): **Expert** (probe cycle, probe-check/read,
+read-machine, set-WCS `#[805+]`, IF/GOTO/label, message/ask-number), **V4.1** (`G31 L#682`, `#1500+`, tight
+`IF…GOTO`, `G90 G92`), **V3/DM500** (WORD ops, `#864+`, `G92`, s-dwell), **RS274NGC** (O-word flow inverse,
+`G38.2`, `G10 L20`, `(MSG,…)`), + universal `M00`→Pause.
+
+### Render lessons (don't regress — full detail in `web/vendor/blockly/API-NOTES.md`)
+- v11/v12 **render queue**: build via `serialization.workspaces.load`, not `newBlock+render`.
+- **CSS `zoom` ancestor** breaks Blockly → Blocks tab forces `body{zoom:1}`; do **not** counter-zoom; do
+  **not** `setParentContainer` (left DropDownDiv's `div` uncreated → resize crash that killed the render queue).
+- **Double-inject** (double-wired tabs → 2 workspaces, loaded stack in the off-screen one — the real "nothing
+  renders") → promise-cached `initBlocks`; load placement is fixed `setScale(0.9)+scroll(30,30)`, never `zoomToFit`.
+
+### Known gaps / deferred
+- **DM500 multi-line probe** (`M101`/`G91 G01 …`/`M102`) — per-line parser can't fold a 3-line op yet; kept
+  verbatim (lossless). Needs parser look-ahead.
+- **Centroid** recognizers deferred. **Folded-to-nothing ops** (probe-status on V4.1/DM500/NGC, NGC GOTO) are
+  emit-side limits, not parse gaps. **High-level→blocks promotion** possible later via the emit's marker
+  comments (`( Step Down z=… )`, `( Array N @ … )`) / indentation → per-op recognizers (not built).
+
+### Roadmap (next)
+- **Per-op form editor** — hover a high-level op's lines → frame + edit button → its wizard opens *pre-filled
+  from the block* → Apply writes back (the clean editor for the inferred ops; reuses `opStacks.RECONCILERS`).
+- **Uniform preview** — Blocks 2D/3D+Play as the shared component for Studio's main 3D preview + the wizards.
+- **Heavy fills** (Fill Zigzag/Concentric: `direction=climb/conventional`, shared stepover, tool-Ø higher
+  context) → rework surfacing/pocket to seed them. **Forward-port** probe/ATC/comms wizards.
+- **`showApp` router** still in `ui/gatewayStatus.js` (historical) → its own module when the Gateway UI is
+  built. Blocks logic is already out: `gatewayStatus` just calls `blocksApp.showBlocks()`.
+
+### File map (current)
+`programModel.js` (data + editor⇄stack, app-start) · `blocksApp.js` (Blockly view) · `gcodeToStack.js`
+(parser + reconcile) · `blockModel.js` (emit fold + line→block map) · `blockly/stackBridge.js`,`bridge.js`
+(workspace⇄stack) · `wizards/ops/*` (primitives) · `wizards/dialects/*` (emit + `recognize`; anchor
+`ddcs-expert-m350.js`) · `vendor/blockly/API-NOTES.md` (render notes).
 
 ---
 
@@ -375,7 +455,10 @@ There's a **`ddcs-expert` skill** — use it. Key quirks the DSL already encodes
 form (`rules.ifBracket`/`gotoSpace`); probe status/result live in `#1920–#1927`
 (`probeBlocks.js` `AXIS_VARS`). `G10` is broken, `G28` not configured (see the skill).
 
-### The one hard rule
-**Never parse emitted G-code back into params.** Params are the source of truth; G-code is a one-way
-projection. Inferring intent/values from finished code can emit wrong motion → a crash. Full rationale
-in [MULTI-OP-STACKING.md](MULTI-OP-STACKING.md).
+### The one hard rule (sharpened — see "Current architecture")
+**Never *infer* high-level intent from emitted G-code.** Params are the source of truth; for **high-level ops**
+(Fill/Array/Step-Down) G-code is a one-way projection — guessing `stepover%`/`region`/cycle-intent from derived
+motion can emit wrong motion → a crash. Those stay forward-only.
+**Leaf atoms are the exception that proves it:** a `G1 X10 F100` line *declares* a Move's params (nothing to
+guess), so the parser round-trips leaf G-code ⇄ blocks (this is "declaration", not "inference" — see the
+declared-vs-inferred axis in [MULTI-OP-STACKING.md](MULTI-OP-STACKING.md) and "Current architecture" above).
