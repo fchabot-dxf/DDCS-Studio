@@ -42,10 +42,13 @@
   <script type="module">
     import { ddcsTheme } from './theme.js';
     import { installBlockly, buildToolbox } from './bridge.js';
+    import { workspaceToStack } from './stackBridge.js';
+    import { emitMapped } from '../blockModel.js';
+    import { DEFAULT_DIALECT } from '../../wizards/dialects/index.js';
 
     const RENDERER = 'geras';   // ← one-line look swap (geras | zelos | thrasos | minimalist | custom later)
     const B = window.Blockly;
-    const gen = installBlockly(B);
+    installBlockly(B);          // define every op as a Blockly block (emit is via the converter, not a generator)
     const ws = B.inject('ws', {
       toolbox: buildToolbox(), theme: ddcsTheme(B), renderer: RENDERER,
       grid: { spacing: 26, length: 2, colour: '#1b2733', snap: true },
@@ -53,10 +56,11 @@
     });
     document.getElementById('rlabel').textContent = 'renderer: ' + RENDERER + ' · theme: ddcs';
     const out = document.getElementById('out');
-    const regen = () => { try { out.textContent = gen.workspaceToCode(ws).trim() || '( empty )'; }
+    // Reuse path: workspace → our stack → the proven emitMapped fold (NOT a Blockly generator).
+    const regen = () => { try { out.textContent = emitMapped(workspaceToStack(ws), { dialect: DEFAULT_DIALECT }).text.trim() || '( empty )'; }
                           catch (e) { out.textContent = '( gen error: ' + e.message + ' )'; } };
     ws.addChangeListener((e) => { if (!e.isUiEvent) regen(); });
-    window.__bk = { B, ws, gen, regen };
+    window.__bk = { B, ws, regen };
     regen();
   </script>
 </body>

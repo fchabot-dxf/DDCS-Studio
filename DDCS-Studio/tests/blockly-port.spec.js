@@ -1,45 +1,37 @@
 import { test, expect } from '@playwright/test';
 
-// Phase-1 port: the Blockly Blocks tab is DERIVED from the ops registry. This proves the full palette
-// loads and the generator (reusing def.emit) produces correct G-code for leaf/Machine/Move/Ops atoms,
-// including value sockets (math_number plugged into Move's X/Y).
-test('derived Blockly palette renders + generator matches the emit kernels', async ({ page }) => {
-  await page.setViewportSize({ width: 1400, height: 1000 });
+// Blockly port keystone: every op is a Blockly block (derived from the ops registry), and the workspace
+// converts to our {type,params,children} stack which runs through the PROVEN emitMapped fold — no separate
+// Blockly generator. Proven by round-tripping a real cutting op (Program Start + StepDown{ StepOver(Region) }
+// + Program End) through the workspace and asserting the emitted G-code is unchanged.
+test('Blockly bridge: stack ⇄ workspace round-trips and emits via emitMapped', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('http://localhost:3211/blocks/blockly/dev.html');
   await page.waitForFunction(() => window.__bk && window.__bk.ws);
 
-  // the toolbox built from the registry has our CNC categories + the native ones
+  // the toolbox built from the registry shows our CNC categories
   const cats = await page.$$eval('.blocklyToolboxCategory, .blocklyTreeRow', (els) =>
     els.map((e) => e.textContent.trim()).filter(Boolean));
   expect(cats.join('|')).toMatch(/Move/);
   expect(cats.join('|')).toMatch(/Machine/);
   expect(cats.join('|')).toMatch(/Ops/);
 
-  // seed Spindle(cw,12000) → Move(cut, X=50, Y=20) → Drill(defaults) → Dwell(default), then read G-code
-  const code = await page.evaluate(() => {
-    const ws = window.__bk.ws; ws.clear();
-    const mk = (t) => { const b = ws.newBlock(t); b.initSvg(); return b; };
-    const num = (v) => { const b = mk('math_number'); b.setFieldValue(String(v), 'NUM'); return b; };
-    const sp = mk('spindle'); sp.setFieldValue('cw', 'DIR');
-    const mv = mk('move'); mv.setFieldValue('cut', 'MODE');
-    mv.getInput('X').connection.connect(num(50).outputConnection);
-    mv.getInput('Y').connection.connect(num(20).outputConnection);
-    const dr = mk('drill'), dw = mk('dwell');
-    sp.nextConnection.connect(mv.previousConnection);
-    mv.nextConnection.connect(dr.previousConnection);
-    dr.nextConnection.connect(dw.previousConnection);
-    sp.moveBy(40, 40); ws.render(); window.__bk.regen();
-    return document.getElementById('out').textContent;
+  const r = await page.evaluate(async () => {
+    const { stackToWorkspace, workspaceToStack } = await import('/blocks/blockly/stackBridge.js');
+    const { emitMapped } = await import('/blocks/blockModel.js');
+    const { getDialect } = await import('/wizards/dialects/index.js');
+    const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+    const ws = window.__bk.ws, d = getDialect('ddcs-expert-m350');
+    const stack = surfacingStack({ w: 100, h: 80, toolDia: 12, stepoverPct: 60, depth: 0.5, stepdown: 0.5, feed: 800, plunge: 200, clearance: 5, strategy: 'raster', spindle: { dir: 'cw', defaultRpm: 12000 }, endProgram: {} });
+    const before = emitMapped(stack, { dialect: d }).text;
+    stackToWorkspace(stack, ws);              // our stack → Blockly blocks
+    const back = workspaceToStack(ws);        // Blockly blocks → our stack
+    const after = emitMapped(back, { dialect: d }).text;
+    return { before, after, types: back.map((b) => b.type) };
   });
 
-  await page.waitForTimeout(150);
-  await page.screenshot({ path: 'tests/_blockly-port.png' });
-
-  expect(code).toContain('M3 S12000');               // spindle kernel
-  expect(code).toContain('G1 X50 Y20 Z0 F200');      // move kernel, X/Y from value sockets
-  expect(code).toMatch(/G1 Z-5/);                    // drill peck kernel
-  expect(code).toContain('G04 P1000');               // dwell kernel (dialect-correct: Expert P=ms, so 1s -> P1000)
+  expect(r.types, 'round-trip preserves the top-level op sequence').toEqual(['progstart', 'stepdown', 'progend']);
+  expect(r.after, 'emit after a workspace round-trip equals emit before').toBe(r.before);
   expect(errors, errors.join('\n')).toEqual([]);
 });
