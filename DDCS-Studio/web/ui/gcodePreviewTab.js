@@ -6,10 +6,29 @@
  * live (debounced) while that tab is active. The 3D viewer is created lazily on
  * first use so the cost is only paid when the user opens it.
  */
-import { parseGcode } from '../gcodeParser.js';
+import { traceToolpath } from '../engine/trace.js';
 import { GcodeViz3D } from '../viz/gcodeViz3d.js';
 import { GcodeExecutionEngine } from '../engine/index.js';
 import { createToolpath2d } from '../viz/toolpath2d.js';   // shared 2D toolpath view (same as Blocks + wizards)
+
+// Seed the controller's own parameter vars from Studio settings so macros generated in "read from controller"
+// mode (F#632 P#1078 L#1080 … — PROBE-CONFIG-SOURCE.md) resolve as a controller whose parameter page matches
+// the Settings panel. Shared by the trace (drawn route) AND the play engine, so they agree.
+function gpSeededVarStore() {
+    const m = new Map();
+    const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
+    const p = (cfg && cfg.probes) || {};
+    const a = (cfg && cfg.atc) || {};
+    m.set(631, 1);                                  // Pr131 probe detection times
+    m.set(632, Number(a.fFast) || 200);             // Pr132 probing speed
+    m.set(633, Number(a.blockHeight) || 50);        // Pr133 setter block thickness
+    m.set(640, Number(a.retract) || 2);             // Pr140 retraction after probe
+    m.set(1075, Number(p.setterPin) || 0);          // Pr575 fixed probe port
+    m.set(1077, Number(p.setterLevel) || 0);        // Pr577 fixed probe level
+    m.set(1078, Number(p.probePin) || 0);           // Pr578 floating probe port
+    m.set(1080, Number(p.probeLevel) || 0);         // Pr580 floating probe level
+    return m;
+}
 
 let gpViz = null;
 let gpEngine = null;
@@ -56,10 +75,12 @@ function gpSetStatus(statusEl, text, isError = false) {
 function gpRenderFromEditor() {
     const { editor, status } = gpEls();
     if (!gpViz || !editor) return;
-    const parsed = parseGcode(editor.value);
     // Stock + machine envelope from Settings (set before setSegments so the fit includes them)
     const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
     if (cfg) { gpViz.setStock(cfg.stock); gpViz.setMachine(cfg.machine); gpViz.setProbes(cfg.probes); }
+    // Route from the engine trace — the SAME resolver (stock + seeded controller vars) the play engine uses,
+    // so a #var/probe program draws exactly the path it will run (option B: what you see is what runs).
+    const parsed = traceToolpath(editor.value, { stock: cfg && cfg.stock ? cfg.stock : null, createVarStore: gpSeededVarStore });
     gpViz.setSegments(parsed);
     // A wizard insert can hand off the start position it was previewing — apply it once, then clear.
     if (window.__pendingSpindleStart && typeof gpViz.setStart === 'function') {
@@ -100,8 +121,8 @@ export function setGcodeView(view) {
     }
 
     if (!is3d) {
+        if (window.ddcsStopPreview) window.ddcsStopPreview();   // closing the preview stops any run/play
         if (gpViz) gpViz.setActive(false);
-        if (gpT2) gpT2.stop();
         return;
     }
     gpApplyMode();   // drawer open → render whichever inner view is active (2D shared canvas or 3D)
@@ -218,26 +239,6 @@ function gpInit() {
         const v = speedSel ? parseFloat(speedSel.value) : 1;
         return Number.isFinite(v) && v > 0 ? v : 1;
     };
-
-    // Seed the controller's own parameter vars from Studio settings so macros generated in
-    // "read from controller" mode (F#632 P#1078 L#1080 ... — PROBE-CONFIG-SOURCE.md) simulate
-    // as a controller whose parameter page matches the Settings panel. Without this the sim
-    // would run them with feed/port 0.
-    function gpSeededVarStore() {
-        const m = new Map();
-        const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
-        const p = (cfg && cfg.probes) || {};
-        const a = (cfg && cfg.atc) || {};
-        m.set(631, 1);                                  // Pr131 probe detection times
-        m.set(632, Number(a.fFast) || 200);             // Pr132 probing speed
-        m.set(633, Number(a.blockHeight) || 50);        // Pr133 setter block thickness
-        m.set(640, Number(a.retract) || 2);             // Pr140 retraction after probe
-        m.set(1075, Number(p.setterPin) || 0);          // Pr575 fixed probe port
-        m.set(1077, Number(p.setterLevel) || 0);        // Pr577 fixed probe level
-        m.set(1078, Number(p.probePin) || 0);           // Pr578 floating probe port
-        m.set(1080, Number(p.probeLevel) || 0);         // Pr580 floating probe level
-        return m;
-    }
 
     function ensureEngine() {
         if (gpEngine) return gpEngine;
@@ -368,6 +369,20 @@ function gpInit() {
         gpRunButton.title = !running ? 'Run the program through the execution engine'
             : (paused ? 'Resume continuous execution' : 'Stop execution');
     }
+
+    // Stop the preview engine + any play, and cancel looping. Called when leaving the Studio preview context
+    // (tab change, wizard open, drawer close) so a run never keeps executing off-screen — and so a stale run
+    // can't re-assert its code over what was inserted while it ran.
+    window.ddcsStopPreview = () => {
+        gpCancelLoop();
+        gpLastRunCode = null;                       // an implicit stop also cancels looping
+        if (gpEngine && gpEngine.running) gpEngine.stop();
+        if (gpT2) gpT2.stop();
+        if (gpViz) gpViz.setAnimate(false);
+        if (window.editorManager && typeof window.editorManager.clearActiveLine === 'function') window.editorManager.clearActiveLine();
+        gpUpdateRunButton();
+    };
+
     // Stock / machine settings changed → redraw if the 3D drawer is open
     window.addEventListener('ddcs:settings-changed', () => {
         if (gpView === '3d' && gpViz) gpRenderFromEditor();

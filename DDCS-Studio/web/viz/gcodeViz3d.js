@@ -293,6 +293,7 @@ export class GcodeViz3D {
         this._animOn = !!on;
         this._ensureAnimTool();
         this._animTool.visible = this._animOn;
+        this._dimRoute(this._animOn);   // play: route faint + bold trail revealed; stop: restore the full route
         if (this._animOn) {
             this._animDist = 0;
             this._animLast = 0;
@@ -303,6 +304,25 @@ export class GcodeViz3D {
             this._applyPartRotation(0, 0); // return the part to rest when the play stops
             this.render();
         }
+    }
+
+    // Trail mode: while playing, fade the full route (the type-grouped lines) and reveal the bold "executed"
+    // overlay up to the tool head — so you can read where you are in the program. Restores on stop.
+    _dimRoute(on) {
+        for (const k in this.lineGroups) {
+            const o = this.lineGroups[k]; if (!o) continue;
+            if (on) {
+                if (o.material.__op0 == null) o.material.__op0 = o.material.opacity != null ? o.material.opacity : 1;
+                o.material.transparent = true; o.material.opacity = o.material.__op0 * 0.18;
+            } else if (o.material.__op0 != null) {
+                o.material.opacity = o.material.__op0; o.material.transparent = o.material.__op0 < 1;
+            }
+        }
+        if (this._trailLine) {
+            this._trailLine.visible = on;
+            if (!on) this._trailLine.geometry.setDrawRange(0, 0);
+        }
+        this.render();
     }
 
     // Called by execution engine to update tool position during execution
@@ -344,6 +364,7 @@ export class GcodeViz3D {
                     const t = sg.ms > 0 ? Math.min(1, d / sg.ms) : 1;
                     this._animTool.position.set(sg.ax + (sg.bx - sg.ax) * t, sg.ay + (sg.by - sg.ay) * t, sg.az + (sg.bz - sg.az) * t);
                     this._applyPartRotation(sg.a1 + (sg.a2 - sg.a1) * t, sg.b1 + (sg.b2 - sg.b1) * t);
+                    if (this._trailLine) this._trailLine.geometry.setDrawRange(0, 2 * i);   // bold the executed segments behind the tool
                     break;
                 }
                 d -= sg.ms;
@@ -534,6 +555,22 @@ export class GcodeViz3D {
         this.lineGroups.probe = this._addLine(probeFastPos, { color: 0x3b82f6, dotted: true });      // probe = dotted blue
         this.lineGroups.probeSlow = this._addLine(probeSlowPos, { color: 0x93c5fd });  // slow re-probe (light blue)
         this.lineGroups.jog = this._addLine(jogPos, { color: 0xff9a0d, opacity: 0.95, dashed: true });
+
+        // Ordered "executed trail" overlay: the whole route as one bold line, in travel order, revealed up to
+        // the tool head via setDrawRange while playing (see _animTick / _dimRoute). The type-grouped lines above
+        // are the faint route underneath. Amber matches the tool marker.
+        if (this._trailLine) { this.pathGroup.remove(this._trailLine); this._trailLine.geometry.dispose(); this._trailLine.material.dispose(); this._trailLine = null; }
+        if (animSegs.length) {
+            const tp = [];
+            for (const s of animSegs) tp.push(s.ax, s.ay, s.az, s.bx, s.by, s.bz);
+            const g = new THREE.BufferGeometry();
+            g.setAttribute('position', new THREE.Float32BufferAttribute(tp, 3));
+            g.setDrawRange(0, 0);
+            const mat = new THREE.LineBasicMaterial({ color: 0xffd24a }); mat.depthTest = false;
+            const line = new THREE.LineSegments(g, mat); line.renderOrder = 22; line.visible = false;
+            this.pathGroup.add(line);
+            this._trailLine = line;
+        }
 
         this._positionMarkers();
         this._dataBounds = bounds;

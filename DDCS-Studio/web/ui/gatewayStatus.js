@@ -54,6 +54,10 @@ export function initGatewayStatus() {
         const isSettings = which === 'settings';
         const isBlocks = which === 'blocks';
 
+        // Leaving the Studio tab must stop the preview execution engine — otherwise a run keeps executing
+        // off-screen and its snapshot can clobber the editor on the way back (see REMINDERS / decode-standby).
+        if (!isStudio && window.ddcsStopPreview) window.ddcsStopPreview();
+
         if (isGateway) {
             const mod = await import('./gatewayPanel.js');
             mod.initGatewayPanel();

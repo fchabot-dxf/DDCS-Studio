@@ -11,7 +11,7 @@ import { installBlockly, buildToolbox } from './blockly/bridge.js';
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
-import { parseGcode } from '../gcodeParser.js';
+import { traceToolpath } from '../engine/trace.js';
 import { createToolpath2d } from '../viz/toolpath2d.js';   // shared 2D toolpath preview (also used by Studio main + wizards)
 
 let api = null;            // module singleton, set once the workspace is built: { refresh, load }
@@ -168,7 +168,7 @@ async function buildWorkspace() {
     else if (!e.isUiEvent && !muteChanges) reproject();   // muteChanges: ignore our own model→workspace rebuild
   });
 
-  // ---- 3D preview (lightweight three.js, reuses parseGcode) ----
+  // ---- 3D preview (lightweight three.js, route from the engine trace) ----
   let V = null;
   function initThree() {
     const THREE = window.THREE; if (!THREE) return false;
@@ -199,7 +199,7 @@ async function buildWorkspace() {
     if (!V && !initThree()) { console.warn('3D needs three.js — using 2D'); setMode('2d'); return; }
     const THREE = V.THREE;
     while (V.group.children.length) { const m = V.group.children.pop(); m.geometry.dispose(); m.material.dispose(); }
-    const parsed = parseGcode(gcode); const segs = parsed.segments || parsed;
+    const parsed = traceToolpath(gcode); const segs = parsed.segments || parsed;
     const groups = { rapid: [], feed: [], probe: [] };
     let a = Infinity, b = Infinity, c = Infinity, A = -Infinity, B2 = -Infinity, C = -Infinity;
     segs.forEach((s) => {

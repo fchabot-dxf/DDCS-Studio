@@ -1288,6 +1288,9 @@ function wireSettingsOverlay(ov) {
 }
 
 export function openSettings() {
+    // Opening setup leaves the Studio preview context — stop any running engine/play (any open path, not just
+    // the settings tab) so it doesn't keep executing behind the panel.
+    if (window.ddcsStopPreview) window.ddcsStopPreview();
     buildSettingsOverlay();
     const app = document.getElementById('settings-app');
     if (app) app.classList.remove('hidden');

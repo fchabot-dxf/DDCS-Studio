@@ -13,7 +13,7 @@ import { playClick, playClickReverse } from './ui/sound.js';  // audio helper fo
 import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
 import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile } from './shared/js/profiles/controllerProfiles.js';
 import { GcodeViz3D } from './viz/gcodeViz3d.js';
-import { parseGcode } from './gcodeParser.js';
+import { traceToolpath } from './engine/trace.js';
 import { createToolpath2d } from './viz/toolpath2d.js';   // shared 2D toolpath view (uniform with Blocks/Studio)
 
 // Map the touch-probe wizards' per-op input fields to the global 3D-probe defaults
@@ -46,11 +46,13 @@ export class WizardManager {
     }
 
     setupEventListeners() {
-        // Click outside wizard to close
+        // Click outside wizard to close — but only when the press STARTED on the backdrop too. Otherwise a
+        // drag that begins inside a field (selecting text) and releases past the wizard edge lands its click
+        // on the backdrop and closes the wizard mid-selection. Require pointerdown AND click both on #wizard.
+        let downOnBackdrop = false;
+        this.wizardElement.addEventListener('pointerdown', (e) => { downOnBackdrop = e.target.id === 'wizard'; });
         this.wizardElement.addEventListener('click', (e) => {
-            if (e.target.id === 'wizard') {
-                this.close();
-            }
+            if (e.target.id === 'wizard' && downOnBackdrop) this.close();
         });
 
         // Drag the whole generator by its header bar (but not the profile select / gear / close).
@@ -142,6 +144,9 @@ export class WizardManager {
     open(type) {
         // play a feedback sound whenever a wizard is opened
         playClick();
+        // Opening a wizard leaves the Studio preview context — stop any running engine/play so it doesn't keep
+        // executing behind the wizard and clobber the code the wizard inserts.
+        if (window.ddcsStopPreview) window.ddcsStopPreview();
 
         const view = viewByType.get(type) || null;
         const box = document.querySelector('.wiz-box');
@@ -349,7 +354,8 @@ export class WizardManager {
             // only — the user can still drag to override. Re-set each render so it tracks the config.
             const start = host.__start;
             if (start && this._wizViz.starts) this._wizViz.starts[0] = { x: +start.x || 0, y: +start.y || 0, z: +start.z || 0 };
-            this._wizViz.setSegments(parseGcode(host.__gcode || ''), this._wizNeedsFit !== false);
+            const wizStock = window.ddcsGetSettings ? window.ddcsGetSettings().stock : null;
+            this._wizViz.setSegments(traceToolpath(host.__gcode || '', { stock: wizStock }), this._wizNeedsFit !== false);
             this._wizNeedsFit = false;   // subsequent input-change re-renders keep the camera
         } catch (e) { console.warn('wizard 3D preview failed', e); }
     }
