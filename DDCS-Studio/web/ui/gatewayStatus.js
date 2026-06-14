@@ -93,8 +93,11 @@ export function initGatewayStatus() {
                 // op, no builder for it yet, or it's unchanged — so it won't clobber block-side edits.
                 const ops = await import('../blocks/opStacks.js');
                 const r = ops.buildActiveOpStack();
+                const ws = window.__blkws, wsEmpty = !ws || ws.getTopBlocks(false).length === 0;
                 if (r && window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(r.blocks);
-                else {   // a STUDIO op with no block builder yet → say so instead of a silent blank
+                // No fresh op + empty workspace + a hand-written editor program → parse it into leaf blocks.
+                else if (wsEmpty && window.ddcsImportEditorGcode && window.ddcsImportEditorGcode()) { /* imported */ }
+                else if (wsEmpty) {   // nothing to show — a STUDIO op with no builder yet → say so instead of a blank
                     const un = ops.unportedActiveOp(), g = document.getElementById('blk-gcode');
                     if (un && g) g.textContent = `( "${un}" isn't available as blocks yet — port in progress )`;
                 }

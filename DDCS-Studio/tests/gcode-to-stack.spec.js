@@ -62,3 +62,29 @@ test('#var / [expr] coordinates survive as literals; unknown lines → raw', asy
   expect(r.commentOnly).toEqual({ type: 'comment', params: { text: 'Surfacing' } });
   expect(r.blank).toBe(null);
 });
+
+test('reconcileGcodeToStack: leaf/empty programs re-parse; high-level programs return null', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { reconcileGcodeToStack, isAllLeaf } = await import('/blocks/gcodeToStack.js');
+    const { newBlock } = await import('/blocks/blockModel.js');
+    const leafStack = [{ type: 'move', params: { mode: 'cut', x: 1, y: 2, z: -1, feed: 100 } }];
+    // a high-level program: Step Down ▸ Fill ▸ Region
+    const sd = newBlock('stepdown'); const f = newBlock('fillzigzag'); const rg = newBlock('region');
+    f.params.region = rg; sd.children = [f];
+    return {
+      emptyIsLeaf: isAllLeaf([]),
+      leafIsLeaf: isAllLeaf(leafStack),
+      highIsLeaf: isAllLeaf([sd]),
+      fromEmpty: reconcileGcodeToStack('G0 X10 Y5\nG1 Z-3 F150', []),
+      fromLeaf: reconcileGcodeToStack('G0 X10 Y5', leafStack),
+      fromHigh: reconcileGcodeToStack('G1 X40 Y0 F600', [sd]),
+    };
+  });
+  expect(r.emptyIsLeaf).toBe(true);
+  expect(r.leafIsLeaf).toBe(true);
+  expect(r.highIsLeaf).toBe(false);
+  expect(r.fromEmpty.map((b) => b.type)).toEqual(['move', 'move']);   // empty workspace → typed leaves
+  expect(r.fromLeaf.map((b) => b.type)).toEqual(['move']);            // leaf program → re-parse
+  expect(r.fromHigh).toBe(null);                                      // high-level → not text-reconcilable
+});

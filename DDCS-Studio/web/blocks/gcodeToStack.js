@@ -15,6 +15,7 @@
  * G53 machine-move, M30) are matched best-effort; pass { dwellSeconds:true } when the source used seconds (NGC)
  * rather than the DDCS default of milliseconds.
  */
+import { BLOCKS } from '../wizards/ops/index.js';   // op kinds → detect high-level vs leaf programs
 
 // A token value: a #var (#99 / #base), a [bracket expr], or a signed/decimal number. #vars and [exprs] stay
 // strings (they emit verbatim); plain numbers become numbers so they round-trip through val()/r3().
@@ -86,4 +87,24 @@ export function parseGcodeToStack(text, opts = {}) {
         if (rec) out.push(rec);
     }
     return out;
+}
+
+// ── editor → stack reconciliation (the write direction) ───────────────────────────────────────────────
+const WRAPPER_KINDS = new Set(['container', 'path', 'loop', 'cond', 'depth', 'fill']);
+const isLeafRecord = (r) => { const d = BLOCKS[r.type]; return !!d && !WRAPPER_KINDS.has(d.kind) && !(r.children && r.children.length); };
+
+/** Is every top-level record a plain leaf (no high-level wrapper, no children)? An empty stack counts as leaf. */
+export const isAllLeaf = (stack) => (stack || []).every(isLeafRecord);
+
+/**
+ * Reconcile edited projected G-code back into the block stack. Returns the NEW stack, or null when it can't be
+ * done as text. The block stack is the source of truth, so:
+ *   - all-leaf (or empty) program → re-parse the edited text into leaf blocks (lossless: leaf G-code round-trips).
+ *   - program contains a HIGH-LEVEL op (Fill / Array / Step Down …) → null. Those ops emit many *derived* lines
+ *     from a few scoped params; an edited derived line can't be mapped back to a param, so text editing would
+ *     destroy the parametric op. Edit those via the blocks/fields or the per-op form editor instead.
+ */
+export function reconcileGcodeToStack(editedText, currentStack, opts = {}) {
+    if (!isAllLeaf(currentStack)) return null;
+    return parseGcodeToStack(editedText, opts);
 }

@@ -9,6 +9,7 @@
  */
 import { installBlockly, buildToolbox } from './blockly/bridge.js';
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
+import { parseGcodeToStack, reconcileGcodeToStack } from './gcodeToStack.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { emitMapped } from './blockModel.js';
 import { resolveActivePost } from '../wizards/dialects/index.js';
@@ -94,10 +95,12 @@ async function buildWorkspace() {
     else drawPreview(curSegs, anim.playing ? Math.floor(anim.k) : curSegs.length);
     applySelection();
     // Layer 2 — the STUDIO editor IS the live projection of the block program: push the emit on every change.
-    // Guard against wiping a hand-written program: only project when the workspace actually has output.
+    // Guard: only project when there's output (never wipe to empty), and never rewrite the editor WHILE the
+    // user is typing in it (layer 3 reconciles editor→blocks; rewriting would fight the caret — the on-blur
+    // canonicalize syncs it afterward).
     try {
       const em = window.ddcsStudio && window.ddcsStudio.editorManager;
-      if (em && text.trim() && em.getValue() !== text) em.setValue(text);
+      if (em && text.trim() && em.getValue() !== text && document.activeElement !== em.editor) em.setValue(text);
     } catch (_) { /* editor not ready */ }
   }
 
@@ -279,11 +282,44 @@ async function buildWorkspace() {
 
   window.addEventListener('resize', () => { if (!root.classList.contains('hidden')) { B.svgResize(ws); reproject(); } });
 
+  // ---- layer 3: edit the projected G-code (STUDIO editor) → reconcile back into the blocks ----
+  // Leaf/imported programs round-trip both ways; a program containing a high-level op (Fill/Array/Step Down)
+  // can't be text-reconciled (derived lines have no param inverse) — those edits are reverted on blur and must
+  // be made via the blocks/fields. The text===lastGcode guard ignores our own projection (no feedback loop).
+  function reconcileFromEditor() {
+    const em = window.ddcsStudio && window.ddcsStudio.editorManager;
+    if (!em || !em.editor) return;
+    const text = em.getValue();
+    if (text === lastGcode) return;                       // our own projection → nothing to do
+    const ns = reconcileGcodeToStack(text, workspaceToStack(ws));
+    if (!ns) return;                                      // high-level program → not text-reconcilable here
+    stackToWorkspace(ns, ws);
+    reproject();                                          // refresh blocks + preview + panel (editor untouched while focused)
+  }
+  const em0 = window.ddcsStudio && window.ddcsStudio.editorManager;
+  if (em0 && em0.editor) {
+    let deb = null;
+    em0.editor.addEventListener('input', () => { clearTimeout(deb); deb = setTimeout(reconcileFromEditor, 500); });
+    em0.editor.addEventListener('blur', () => {
+      clearTimeout(deb); reconcileFromEditor();
+      if (lastGcode && em0.getValue() !== lastGcode) em0.setValue(lastGcode);   // canonicalize / revert a non-reconcilable edit
+    });
+  }
+
   reproject();
   window.__blkws = ws;                            // workspace handle (tests / debugging)
   api = { refresh: () => { B.svgResize(ws); reproject(); }, load: loadProgram };
   window.ddcsRefreshBlocks = reproject;          // Settings (post-processor change) → re-emit live
   window.ddcsLoadBlockStack = loadProgram;       // STUDIO op → blocks (gatewayStatus calls this on tab open)
   window.ddcsGetBlockProgram = () => workspaceToStack(ws);   // blocks → STUDIO reverse reconcile
-  window.ddcsGetBlockGcode = () => lastGcode;    // blocks → STUDIO editor round-trip (on Studio-tab click)
+  window.ddcsGetBlockGcode = () => lastGcode;    // blocks → STUDIO editor live projection
+  // Import the current editor program INTO blocks (parse → leaf stack). Used when entering the Blocks tab with
+  // a hand-written editor program and no active wizard op. Returns true if it loaded anything.
+  window.ddcsImportEditorGcode = () => {
+    const em = window.ddcsStudio && window.ddcsStudio.editorManager;
+    const text = em ? em.getValue() : '';
+    if (!text.trim()) return false;
+    loadProgram(parseGcodeToStack(text));
+    return true;
+  };
 }
