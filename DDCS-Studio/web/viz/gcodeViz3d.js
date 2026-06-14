@@ -309,6 +309,7 @@ export class GcodeViz3D {
     // Trail mode: while playing, fade the full route (the type-grouped lines) and reveal the bold "executed"
     // overlay up to the tool head — so you can read where you are in the program. Restores on stop.
     _dimRoute(on) {
+        this._trailOn = on;
         for (const k in this.lineGroups) {
             const o = this.lineGroups[k]; if (!o) continue;
             if (on) {
@@ -335,6 +336,18 @@ export class GcodeViz3D {
         // geometric play, which already places the tool at offset (start + delta) coords.
         const o = this.starts[0] || { x: 0, y: 0, z: 0 };
         this._animTool.position.set((pos.x || 0) + o.x, (pos.y || 0) + o.y, (pos.z || 0) + o.z);
+        // Engine-driven trail: bold the executed route up to the tool head (option B — what you see is the path
+        // the engine actually ran). Enable trail mode lazily; setAnimate(false)/ddcsStopPreview restores it.
+        if (this._trailLine && this._animSegs && this._animSegs.length) {
+            if (!this._trailOn) this._dimRoute(true);
+            const tp = this._animTool.position;
+            let bi = 0, bd = Infinity;
+            for (let i = 0; i < this._animSegs.length; i++) {
+                const s = this._animSegs[i], dx = s.bx - tp.x, dy = s.by - tp.y, dz = s.bz - tp.z, dd = dx * dx + dy * dy + dz * dz;
+                if (dd < bd) { bd = dd; bi = i; }
+            }
+            this._trailLine.geometry.setDrawRange(0, 2 * (bi + 1));
+        }
         this.render();
     }
 

@@ -13,6 +13,7 @@ import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { traceToolpath } from '../engine/trace.js';
 import { createToolpath2d } from '../viz/toolpath2d.js';   // shared 2D toolpath preview (also used by Studio main + wizards)
+import { GcodeViz3D } from '../viz/gcodeViz3d.js';         // shared 3D viewer (same as Studio main + wizards: stock, nav-cube, trail)
 
 let api = null;            // module singleton, set once the workspace is built: { refresh, load }
 let initPromise = null;    // in-flight build. The header tabs are double-wired (inline onclick in index.html +
@@ -168,77 +169,47 @@ async function buildWorkspace() {
     else if (!e.isUiEvent && !muteChanges) reproject();   // muteChanges: ignore our own model→workspace rebuild
   });
 
-  // ---- 3D preview (lightweight three.js, route from the engine trace) ----
-  let V = null;
-  function initThree() {
-    const THREE = window.THREE; if (!THREE) return false;
-    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0d1117);
-    const cam = new THREE.PerspectiveCamera(50, 1, 0.05, 1e6); cam.up.set(0, 0, 1);
-    const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(window.devicePixelRatio || 1);
-    renderer.domElement.style.cssText = 'display:block;width:100%;height:100%'; host3d.appendChild(renderer.domElement);
-    const grid = new THREE.GridHelper(200, 20, 0x2a4866, 0x16242f); grid.rotation.x = Math.PI / 2; scene.add(grid);
-    scene.add(new THREE.AxesHelper(20));
-    const group = new THREE.Group(); scene.add(group);
-    V = { THREE, scene, cam, renderer, group, target: new THREE.Vector3(), radius: 160, theta: -Math.PI / 2, phi: Math.PI / 3, fitted: false };
-    const applyCam = () => {
-      const s = Math.sin(V.phi);
-      cam.position.set(V.target.x + V.radius * s * Math.cos(V.theta), V.target.y + V.radius * s * Math.sin(V.theta), V.target.z + V.radius * Math.cos(V.phi));
-      cam.lookAt(V.target);
-    };
-    const resize = () => { const w = host3d.clientWidth, h = host3d.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); applyCam(); renderer.render(scene, cam); };
-    V.applyCam = applyCam; V.resize = resize; V.draw = () => { applyCam(); renderer.render(scene, cam); };
-    let drag = false, lx = 0, ly = 0;
-    host3d.addEventListener('pointerdown', (e) => { drag = true; lx = e.clientX; ly = e.clientY; host3d.setPointerCapture(e.pointerId); });
-    host3d.addEventListener('pointermove', (e) => { if (!drag) return; V.theta -= (e.clientX - lx) * 0.01; V.phi = Math.max(0.05, Math.min(Math.PI - 0.05, V.phi - (e.clientY - ly) * 0.01)); lx = e.clientX; ly = e.clientY; V.draw(); });
-    host3d.addEventListener('pointerup', () => { drag = false; });
-    host3d.addEventListener('wheel', (e) => { e.preventDefault(); V.radius = Math.max(10, Math.min(2000, V.radius * (e.deltaY < 0 ? 0.9 : 1.1))); V.draw(); }, { passive: false });
-    new ResizeObserver(resize).observe(host3d);
-    return true;
+  // ---- 3D preview (shared GcodeViz3D — same viewer as Studio main + wizards: stock, nav-cube, faint-route/bold-trail) ----
+  let viz3d = null, viz3dFitted = false, viz3dPlaying = false;
+  function ensureViz3d() {
+    if (viz3d) return viz3d;
+    try {
+      viz3d = new GcodeViz3D(host3d);
+      viz3d._gizmoPx = 32;                 // compact gizmo, like the wizard preview
+      viz3d._animOn = false;               // static route until the user presses Play (then the trail reveals)
+      try { if (window.ddcsGetSettings) viz3d.setStock(window.ddcsGetSettings().stock); } catch (_) { /* no settings */ }
+    } catch (e) { console.warn('Blocks 3D unavailable — staying on 2D', e); viz3d = null; }
+    return viz3d;
   }
   function update3D(gcode) {
-    if (!V && !initThree()) { console.warn('3D needs three.js — using 2D'); setMode('2d'); return; }
-    const THREE = V.THREE;
-    while (V.group.children.length) { const m = V.group.children.pop(); m.geometry.dispose(); m.material.dispose(); }
-    const parsed = traceToolpath(gcode); const segs = parsed.segments || parsed;
-    const groups = { rapid: [], feed: [], probe: [] };
-    let a = Infinity, b = Infinity, c = Infinity, A = -Infinity, B2 = -Infinity, C = -Infinity;
-    segs.forEach((s) => {
-      const t = s.probe ? 'probe' : (s.rapid ? 'rapid' : 'feed');
-      groups[t].push(s.x1, s.y1, s.z1, s.x2, s.y2, s.z2);
-      a = Math.min(a, s.x1, s.x2); A = Math.max(A, s.x1, s.x2);
-      b = Math.min(b, s.y1, s.y2); B2 = Math.max(B2, s.y1, s.y2);
-      c = Math.min(c, s.z1, s.z2); C = Math.max(C, s.z1, s.z2);
-    });
-    const cols = { rapid: 0x5a6b7d, feed: 0x33b1c9, probe: 0xe35c5c };
-    for (const t in groups) {
-      if (!groups[t].length) continue;
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(groups[t], 3));
-      V.group.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: cols[t] })));
-    }
-    if (!V.fitted && isFinite(a)) {
-      V.target.set((a + A) / 2, (b + B2) / 2, (c + C) / 2);
-      V.radius = 1.8 * Math.max(A - a, B2 - b, C - c, 20); V.fitted = true;
-    }
-    V.resize(); V.draw();
+    const v = ensureViz3d();
+    if (!v) { setMode('2d'); return; }
+    v.setActive(true);
+    v.setSegments(traceToolpath(gcode), !viz3dFitted);   // fit the camera once; later re-renders keep it
+    viz3dFitted = true;
   }
 
   // ---- 2D / 3D toggle ----
   const m2d = document.getElementById('blk-m2d'), m3d = document.getElementById('blk-m3d');
   const play = document.getElementById('blk-play');
   function setMode(next) {
-    mode = next; t2.stop(); if (play) play.textContent = '▶ Play';
+    mode = next; t2.stop(); viz3dPlaying = false; if (play) play.textContent = '▶ Play';
     m2d.classList.toggle('primary', mode === '2d'); m3d.classList.toggle('primary', mode === '3d');
     preview.style.display = mode === '2d' ? '' : 'none';
     host3d.style.display = mode === '3d' ? '' : 'none';
+    if (mode !== '3d' && viz3d) { viz3d.setAnimate(false); viz3d.setActive(false); }   // pause the 3D loop while hidden
     renderViews(getProjection());
   }
   m2d.onclick = () => setMode('2d');
   m3d.onclick = () => setMode('3d');
 
-  // ---- play / pause (2D progressive reveal, via the shared controller) ----
+  // ---- play / pause — 2D progressive trail (t2) or the 3D viewer's feed-true trail sweep (setAnimate) ----
   play.onclick = () => {
-    if (mode !== '2d') { t2.stop(); return; }
-    play.textContent = t2.toggle() ? '⏸ Pause' : '▶ Play';
+    if (mode === '2d') { play.textContent = t2.toggle() ? '⏸ Pause' : '▶ Play'; return; }
+    if (!viz3d) return;
+    viz3dPlaying = !viz3dPlaying;
+    viz3d.setAnimate(viz3dPlaying);              // faint route + bold executed trail (drawRange) + tool dot
+    play.textContent = viz3dPlaying ? '⏸ Pause' : '▶ Play';
   };
 
 
