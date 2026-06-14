@@ -12,6 +12,7 @@ import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { parseGcode } from '../gcodeParser.js';
+import { createToolpath2d } from '../viz/toolpath2d.js';   // shared 2D toolpath preview (also used by Studio main + wizards)
 
 let api = null;            // module singleton, set once the workspace is built: { refresh, load }
 let initPromise = null;    // in-flight build. The header tabs are double-wired (inline onclick in index.html +
@@ -76,8 +77,7 @@ async function buildWorkspace() {
   const preview = document.getElementById('blk-preview');
   const host3d = document.getElementById('blk-host3d');
   let mode = '2d';
-  const anim = { playing: false, k: 0, raf: null };
-  let curSegs = [];
+  const t2 = createToolpath2d(preview);   // shared 2D toolpath view + Play
 
   const ws = B.inject(host, {
     toolbox: buildToolbox(), theme: ddcsTheme(B), renderer: 'geras',
@@ -111,9 +111,8 @@ async function buildWorkspace() {
   // Render the right pane (code panel + preview + selection) from a projection { text, lines, map }.
   function renderViews(p) {
     renderCode(p.lines, p.map);
-    curSegs = segments(p.text);
     if (mode === '3d') update3D(p.text);
-    else drawPreview(curSegs, anim.playing ? Math.floor(anim.k) : curSegs.length);
+    else t2.setGcode(p.text);
     applySelection();
   }
 
@@ -168,41 +167,6 @@ async function buildWorkspace() {
     if (e.type === B.Events.SELECTED) { selectedId = e.newElementId || null; applySelection({ scrollCode: true }); }
     else if (!e.isUiEvent && !muteChanges) reproject();   // muteChanges: ignore our own model→workspace rebuild
   });
-
-  // ---- 2D preview ----
-  function segments(text) {
-    const segs = []; let x = 0, y = 0;
-    text.split('\n').forEach((raw) => {
-      const s = raw.replace(/\(.*?\)/g, '').trim(); if (!s) return;
-      const mx = s.match(/X(-?[\d.]+)/), my = s.match(/Y(-?[\d.]+)/);
-      let type = null;
-      if (/^G31\b/.test(s)) type = 'probe';
-      else if (/^G0\b/.test(s)) type = 'rapid';
-      else if (/^G1\b/.test(s)) type = 'feed';
-      else if (/^G[23]\b/.test(s)) type = 'feed';
-      if (type && (mx || my)) { const nx = mx ? parseFloat(mx[1]) : x, ny = my ? parseFloat(my[1]) : y; segs.push({ type, x1: x, y1: y, x2: nx, y2: ny }); x = nx; y = ny; }
-      else if (mx || my) { if (mx) x = parseFloat(mx[1]); if (my) y = parseFloat(my[1]); }
-    });
-    return segs;
-  }
-  function drawPreview(segs, k) {
-    const dpr = window.devicePixelRatio || 1, W = preview.clientWidth, H = preview.clientHeight;
-    preview.width = W * dpr; preview.height = H * dpr;
-    const ctx = preview.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-    if (!segs.length) return;
-    let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity;
-    segs.forEach((s) => { a = Math.min(a, s.x1, s.x2); c = Math.max(c, s.x1, s.x2); b = Math.min(b, s.y1, s.y2); d = Math.max(d, s.y1, s.y2); });
-    const pad = 22, sc = Math.min((W - 2 * pad) / Math.max(1, c - a), (H - 2 * pad) / Math.max(1, d - b));
-    const tx = (v) => pad + (v - a) * sc, ty = (v) => H - pad - (v - b) * sc;
-    const col = { rapid: '#5a6b7d', feed: '#33b1c9', probe: '#e35c5c' };
-    const n = (k == null) ? segs.length : Math.max(0, Math.min(k, segs.length));
-    segs.slice(0, n).forEach((s) => {
-      ctx.strokeStyle = col[s.type] || '#888'; ctx.lineWidth = s.type === 'rapid' ? 1 : 2;
-      ctx.setLineDash(s.type === 'rapid' ? [4, 3] : []);
-      ctx.beginPath(); ctx.moveTo(tx(s.x1), ty(s.y1)); ctx.lineTo(tx(s.x2), ty(s.y2)); ctx.stroke();
-    });
-    ctx.setLineDash([]);
-  }
 
   // ---- 3D preview (lightweight three.js, reuses parseGcode) ----
   let V = null;
@@ -260,31 +224,21 @@ async function buildWorkspace() {
 
   // ---- 2D / 3D toggle ----
   const m2d = document.getElementById('blk-m2d'), m3d = document.getElementById('blk-m3d');
+  const play = document.getElementById('blk-play');
   function setMode(next) {
-    mode = next; stopAnim();
+    mode = next; t2.stop(); if (play) play.textContent = '▶ Play';
     m2d.classList.toggle('primary', mode === '2d'); m3d.classList.toggle('primary', mode === '3d');
     preview.style.display = mode === '2d' ? '' : 'none';
     host3d.style.display = mode === '3d' ? '' : 'none';
-    reproject();
+    renderViews(getProjection());
   }
   m2d.onclick = () => setMode('2d');
   m3d.onclick = () => setMode('3d');
 
-  // ---- play / pause (2D progressive reveal) ----
-  const play = document.getElementById('blk-play');
-  function stopAnim() { if (anim.playing) { anim.playing = false; cancelAnimationFrame(anim.raf); play.textContent = '▶ Play'; } }
-  function animLoop() {
-    if (!anim.playing) return;
-    anim.k += 1.2;
-    if (anim.k >= curSegs.length) anim.k = 0;
-    drawPreview(curSegs, Math.floor(anim.k));
-    anim.raf = requestAnimationFrame(animLoop);
-  }
+  // ---- play / pause (2D progressive reveal, via the shared controller) ----
   play.onclick = () => {
-    if (mode !== '2d') { stopAnim(); return; }
-    anim.playing = !anim.playing;
-    if (anim.playing) { anim.k = 0; play.textContent = '⏸ Pause'; animLoop(); }
-    else { play.textContent = '▶ Play'; drawPreview(curSegs, curSegs.length); }
+    if (mode !== '2d') { t2.stop(); return; }
+    play.textContent = t2.toggle() ? '⏸ Pause' : '▶ Play';
   };
 
 
