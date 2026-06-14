@@ -31,21 +31,30 @@ function word(letter, code) {
 // Drop keys whose value is undefined, so emit omits unset axes (a bare `G0 X#9` stays single-axis).
 function pick(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
 
-/** Parse one physical line → a leaf record, or null for a blank/seam line. */
+/** Parse one physical line → a leaf record, or null for a blank/seam line. `opts.dialect` (active controller)
+ *  decodes the dialect-specific ops via dialect.recognize; `opts.dialect.dwellUnits` sets the dwell P unit. */
 export function parseLine(line, opts = {}) {
     const raw = String(line);
-    const cm = raw.match(/\(([^)]*)\)\s*$/);                 // trailing ( comment )
+    const trimmed = raw.trim();
+    if (!trimmed) return null;                                                  // blank / seam
+    if (/^\([^)]*\)$/.test(trimmed)) return { type: 'comment', params: { text: trimmed.slice(1, -1).trim() } };   // full-line comment
+    // A trailing comment must be whitespace-separated (matches emit's "   ( … )"). An ATTACHED "(x)" stays part
+    // of the code — that's how DDCS HMI vars look (`#1505=1(Continue?)`), and keeping it verbatim round-trips.
+    const cm = raw.match(/\s\(([^)]*)\)\s*$/);
     const comment = cm ? cm[1].trim() : null;
     const code = (cm ? raw.slice(0, cm.index) : raw).trim();
-
     if (!code) return comment != null ? { type: 'comment', params: { text: comment } } : null;
+
+    // 1) dialect-specific forms (IF/GOTO/label/probe-read/check — vary per controller; their parse inverse is
+    //    co-located with each dialect's emit). Must run before the generic assign/ifgoto below.
+    const dialect = opts.dialect;
+    if (dialect && typeof dialect.recognize === 'function') { const r = dialect.recognize(code); if (r) return r; }
 
     const G = (n) => new RegExp('\\bG0*' + n + '\\b', 'i').test(code);   // G4 ≡ G04 (leading zeros)
     const M = (n) => new RegExp('\\bM0*' + n + '\\b', 'i').test(code);
     const w = (L) => word(L, code);
 
-    // Machine-coordinate move (G53; may carry G0 on some dialects) — one axis. Note: the `#var=value` staging
-    // line a machine-move emits before it parses as `raw` (no clean single-block inverse for the pair).
+    // Machine-coordinate move (G53; may carry G0 on some dialects) — one axis.
     if (G(53)) {
         for (const ax of ['X', 'Y', 'Z', 'A']) { const v = w(ax); if (v !== undefined) return { type: 'machinemove', params: { axis: ax, to: v } }; }
         return { type: 'raw', params: { text: raw } };
@@ -57,7 +66,7 @@ export function parseLine(line, opts = {}) {
     if (G(3)) return { type: 'arc', params: pick({ arc: 'ccw', x: w('X'), y: w('Y'), i: w('I'), j: w('J'), feed: w('F') }) };
     if (G(1)) return { type: 'move', params: pick({ mode: 'cut', x: w('X'), y: w('Y'), z: w('Z'), feed: w('F') }) };
     if (G(0)) return { type: 'move', params: pick({ mode: 'rapid', x: w('X'), y: w('Y'), z: w('Z') }) };
-    if (G(4)) { const p = w('P'); return { type: 'dwell', params: { sec: typeof p === 'number' ? (opts.dwellSeconds ? p : p / 1000) : p } }; }
+    if (G(4)) { const p = w('P'); const ms = !dialect || dialect.dwellUnits !== 's'; return { type: 'dwell', params: { sec: typeof p === 'number' ? (ms ? p / 1000 : p) : p } }; }
     for (let n = 54; n <= 59; n++) if (G(n)) return { type: 'wcs', params: { wcs: 'G' + n } };
     if (G(90)) return { type: 'distmode', params: { dist: 'abs' } };
     if (G(91)) return { type: 'distmode', params: { dist: 'inc' } };
@@ -75,6 +84,13 @@ export function parseLine(line, opts = {}) {
 
     // Feed-only line (F with no G/M word)
     if (/^F/i.test(code) && w('F') !== undefined) return { type: 'feed', params: { rate: w('F') } };
+
+    // 2) macro-var write `#var = expr` (dialect-independent) — AFTER the dialect probe-reads (#x=#sys) so those win.
+    if (/^#/.test(code) && code.includes('=')) {
+        const i = code.indexOf('=');
+        const v = code.slice(0, i).trim(), expr = code.slice(i + 1).trim();
+        if (v) return { type: 'assign', params: comment ? { var: v, value: expr, note: comment } : { var: v, value: expr } };
+    }
 
     return { type: 'raw', params: { text: raw } };   // unrecognized → verbatim (never loses a line)
 }

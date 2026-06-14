@@ -49,7 +49,7 @@ function reconcileFromEditor() {
     const e = editor(); if (!e || !e.editor) return;
     const text = e.getValue();
     if (text === proj.text) return;                 // our own projection → ignore (no loop)
-    const ns = reconcileGcodeToStack(text, stack);
+    const ns = reconcileGcodeToStack(text, stack, dialectOpts());   // active dialect → decode its specific ops
     if (!ns) return;                                // high-level program → leave blocks; blur will revert
     setStack(ns, 'editor');
 }

@@ -88,3 +88,30 @@ test('reconcileGcodeToStack: leaf/empty programs re-parse; high-level programs r
   expect(r.fromLeaf.map((b) => b.type)).toEqual(['move']);            // leaf program → re-parse
   expect(r.fromHigh).toBe(null);                                      // high-level → not text-reconcilable
 });
+
+test('M350 dialect: a probe-style program decodes to proper blocks (no raw) and round-trips', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { emitMapped } = await import('/blocks/blockModel.js');
+    const { parseGcodeToStack } = await import('/blocks/gcodeToStack.js');
+    const { getDialect } = await import('/wizards/dialects/index.js');
+    const dialect = getDialect('ddcs-expert-m350');
+    const stack = [
+      { type: 'assign', params: { var: '#100', value: '500', note: 'feed' } },   // dialect-independent macro write
+      { type: 'label', params: { n: 1 } },
+      { type: 'move', params: { mode: 'probe', x: 0, y: 0, z: -10, feed: 100 } },
+      { type: 'probecheck', params: { axis: 'Z', goto: 9 } },                     // IF #1922!=2 GOTO9 (status var)
+      { type: 'proberead', params: { axis: 'Z', var: '#50' } },                   // #50=#1927 (trigger var)
+      { type: 'readmachine', params: { axis: 'Z', var: '#57' } },                 // #57=#882 (DRO var)
+      { type: 'ifgoto', params: { lhs: '#50', op: '>', rhs: '0', goto: 2 } },
+      { type: 'goto', params: { n: 1 } },
+    ];
+    const text1 = emitMapped(stack, { dialect }).text;
+    const parsed = parseGcodeToStack(text1, { dialect });
+    const text2 = emitMapped(parsed, { dialect }).text;
+    return { text1, text2, types: parsed.map((b) => b.type) };
+  });
+  expect(r.types, 'every probe-program line decoded to a proper block (no raw fallback)').not.toContain('raw');
+  expect(r.types).toEqual(['assign', 'label', 'move', 'probecheck', 'proberead', 'readmachine', 'ifgoto', 'goto']);
+  expect(r.text2, 'M350 probe program round-trips byte-identically through the dialect recognizers').toBe(r.text1);
+});

@@ -38,6 +38,29 @@ export const dialect = {
     hmiToast: (msg) => [`#1505=-5000(${msg})`],   // display-only banner
     hmiInput: (varName, prompt) => [`#2070=${String(varName).replace('#', '')}(${prompt})`],   // blocking numeric input
 
+    // recognize(line): the PARSE INVERSE of the dialect-specific emit above (the rest is decoded by the shared
+    // core parser). Returns { type, params } or null. Probe/status/DRO reads are syntactically just `#x=#sys`
+    // / `IF #status!=2 GOTO` — distinguished ONLY by this controller's magic var numbers (vars above), so these
+    // must be tried before the generic assign/ifgoto. Mirrors the verified emit forms 1:1 (round-trips).
+    recognize(line) {
+        const AXR = ['X', 'Y', 'Z', 'A'];
+        let m;
+        // probe-trigger check: IF #1920+ax != 2 GOTO n  (probeStatus) — before the generic ifgoto
+        if ((m = line.match(/^IF #(\d+)!=2 GOTO(\d+)$/))) {
+            const ax = +m[1] - 1920; if (ax >= 0 && ax <= 3) return { type: 'probecheck', params: { axis: AXR[ax], goto: +m[2] } };
+        }
+        if ((m = line.match(/^IF (.+?)(==|!=|<=|>=|<|>)(.+?) GOTO(\d+)$/))) return { type: 'ifgoto', params: { lhs: m[1], op: m[2], rhs: m[3], goto: +m[4] } };
+        if ((m = line.match(/^GOTO(\d+)$/))) return { type: 'goto', params: { n: +m[1] } };
+        if ((m = line.match(/^N(\d+)$/))) return { type: 'label', params: { n: +m[1] } };
+        // probe trigger-position read (#var=#1925+ax) / machine-DRO read (#var=#880+ax) — before generic assign
+        if ((m = line.match(/^(#\d+)=#(\d+)$/))) {
+            const sys = +m[2];
+            let ax = sys - 1925; if (ax >= 0 && ax <= 3) return { type: 'proberead', params: { axis: AXR[ax], var: m[1] } };
+            ax = sys - 880; if (ax >= 0 && ax <= 3) return { type: 'readmachine', params: { axis: AXR[ax], var: m[1] } };
+        }
+        return null;
+    },
+
     notes: 'In-program Macro-B-INSPIRED dialect (real Fanuc Macro B does NOT run on M350). G53 needs a #var '
         + '(no literal, no G0). WCS via direct #[805+] indirect write, stride 5 (G10 L20 also works on this firmware '
         + 'but house style is the indirect write). Dwell P=ms. WHILE/DO/END also exist (word ops, bracketed). '
