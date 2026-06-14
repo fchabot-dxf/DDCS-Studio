@@ -59,6 +59,9 @@ function recToJson(rec) {
         const k = fieldKind(def, f), name = FN(f), v = rec.params[f];
         if (k === 'value' || k === 'region' || k === 'boolean') {
             if (v && typeof v === 'object' && v.type) inputs[name] = { block: recToJson(v) };   // nested reporter
+            // a #var / [expr] string in a numeric socket → a Variable reporter pill (a math_number shadow would
+            // collapse `#18` to Number()||0 = 0, silently losing the ref); a plain number → the shadow.
+            else if (k === 'value' && typeof v === 'string' && /[#[]/.test(v)) inputs[name] = { block: { type: 'variable', fields: { NAME: v } } };
             else if (k === 'value') inputs[name] = { shadow: { type: 'math_number', fields: { NUM: Number(v) || 0 } } };
             // empty region/boolean socket → leave unset
         } else if (k === 'checkbox') fields[name] = !!v;

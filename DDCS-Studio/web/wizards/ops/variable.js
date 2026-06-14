@@ -7,5 +7,12 @@ export const variableBlock = {
     type: 'variable', label: 'Variable', kind: 'reporter', category: 'Variables',
     defaults: { name: 'a' },
     fields: ['name'],
-    reduce: (p, scope) => { const n = scope[p.name]; return n == null ? 0 : Number(n); },
+    // A runtime macro ref (#100) or a [bracket expr] passes through LITERALLY — that's how a #var coordinate
+    // (e.g. `G0 Z#18`) survives in a value socket. A plain name is a compile-time Set variable → its scope value.
+    reduce: (p, scope) => {
+        const k = p.name;
+        if (typeof k === 'string' && /[#[]/.test(k)) return k;   // #ref / [expr] → emit verbatim (val() handles it)
+        const n = scope[k];
+        return n == null ? 0 : Number(n);
+    },
 };
