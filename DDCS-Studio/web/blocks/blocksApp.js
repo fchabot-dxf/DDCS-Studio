@@ -64,6 +64,7 @@ async function buildWorkspace() {
   let mode = '2d';
   const anim = { playing: false, k: 0, raf: null };
   let curSegs = [];
+  let lastGcode = '';   // most-recent projected G-code (round-trip into the STUDIO editor)
 
   const ws = B.inject(host, {
     toolbox: buildToolbox(), theme: ddcsTheme(B), renderer: 'geras',
@@ -86,6 +87,7 @@ async function buildWorkspace() {
   function reproject() {
     const dialect = resolveActivePost(getActiveProfile().id);   // active post processor (override or follow machine)
     const { text, lines, map } = emitMapped(workspaceToStack(ws), { dialect });
+    lastGcode = text;                                           // round-trip source: Blocks → STUDIO editor
     renderCode(lines, map);
     curSegs = segments(text);
     if (mode === '3d') update3D(text);
@@ -245,6 +247,16 @@ async function buildWorkspace() {
     anim.playing = !anim.playing;
     if (anim.playing) { anim.k = 0; play.textContent = '⏸ Pause'; animLoop(); }
     else { play.textContent = '▶ Play'; drawPreview(curSegs, curSegs.length); }
+  };
+
+  // ---- round-trip: insert the projected G-code into the STUDIO editor (same path as a wizard's Insert) ----
+  const toStudio = document.getElementById('blk-to-studio');
+  if (toStudio) toStudio.onclick = () => {
+    const code = (lastGcode || '').trim();
+    const em = window.ddcsStudio && window.ddcsStudio.editorManager;
+    if (!code || !em) return;
+    try { em.insert(code); } catch (e) { console.error('Blocks → STUDIO insert failed', e); return; }
+    if (window.showApp) window.showApp('studio');   // jump to the editor so the inserted code is visible
   };
 
   // ---- open-as-blocks: write a STUDIO op's stack into the workspace ----
