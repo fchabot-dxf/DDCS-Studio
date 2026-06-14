@@ -14,6 +14,7 @@ import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-sour
 import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile } from './shared/js/profiles/controllerProfiles.js';
 import { GcodeViz3D } from './viz/gcodeViz3d.js';
 import { parseGcode } from './gcodeParser.js';
+import { createToolpath2d } from './viz/toolpath2d.js';   // shared 2D toolpath view (uniform with Blocks/Studio)
 
 // Map the touch-probe wizards' per-op input fields to the global 3D-probe defaults
 // (settings.probes). open() pre-fills these so every wizard starts from the configured
@@ -280,32 +281,75 @@ export class WizardManager {
                     '<div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>';
                 visual.appendChild(lg);
             }
-            // Controls cloned from the main 3D viewer: stock shape + Play/Stop (default play)
+            // Shared 2D toolpath view (covers the 3D when active) + its controller, so the wizard preview has
+            // the same 2D/3D + Play surface as the Blocks tab and Studio main.
+            const cv = document.createElement('canvas');
+            cv.className = 'wiz-viz2d';
+            cv.style.cssText = 'width:100%; height:100%; display:none; background:#0d1117;';
+            host.appendChild(cv);
+            host.__t2 = createToolpath2d(cv);
+            // Controls: [2D | 3D] toggle + Play/Stop (Play = 2D progressive reveal, or the 3D animation).
             const ctrls = document.createElement('div');
             ctrls.className = 'viz3d-controls';
-            // Stock shape is set from the jog pendant's Stock button (full stock editor) — no
-            // redundant dropdown here. Just the play/stop toggle.
-            ctrls.innerHTML = '<button type="button" class="wiz-play on">⏸ Stop</button>';
+            ctrls.innerHTML =
+                '<span class="seg"><button type="button" class="wiz-m2d op-btn">2D</button>' +
+                '<button type="button" class="wiz-m3d op-btn primary">3D</button></span>' +
+                '<button type="button" class="wiz-play on">⏸ Stop</button>';
             host.appendChild(ctrls);
+            ctrls.querySelector('.wiz-m2d').addEventListener('click', () => this._setWizPreviewMode('2d', host));
+            ctrls.querySelector('.wiz-m3d').addEventListener('click', () => this._setWizPreviewMode('3d', host));
             ctrls.querySelector('.wiz-play').addEventListener('click', (e) => {
-                if (!this._wizViz) return;
-                const on = !this._wizViz._animOn;
-                this._wizViz.setAnimate(on);
+                let on;
+                if (this._wizPreviewMode === '2d') on = host.__t2.toggle();
+                else { if (!this._wizViz) return; on = !this._wizViz._animOn; this._wizViz.setAnimate(on); }
                 e.target.classList.toggle('on', on);
                 e.target.textContent = on ? '⏸ Stop' : '▶ Play';
             });
         }
         svgCont.style.display = 'none';
+        host.__gcode = gcode || '';
+        host.__start = start || null;
+        if (!this._wizPreviewMode) this._wizPreviewMode = '3d';
+        this._renderWizPreview(host);
+    }
+
+    /** Switch the wizard preview between 2D and 3D (shared across wizards), reset the Play button, re-render. */
+    _setWizPreviewMode(mode, host) {
+        this._wizPreviewMode = mode;
+        const c = host.querySelector('.viz3d-controls');
+        if (c) {
+            c.querySelector('.wiz-m2d').classList.toggle('primary', mode === '2d');
+            c.querySelector('.wiz-m3d').classList.toggle('primary', mode === '3d');
+            const pb = c.querySelector('.wiz-play'); if (pb) { pb.classList.remove('on'); pb.textContent = '▶ Play'; }
+        }
+        this._renderWizPreview(host);
+    }
+
+    /** Render the active view (2D shared canvas or the 3D GcodeViz3D) from host.__gcode. */
+    _renderWizPreview(host) {
+        const cv = host.querySelector('.wiz-viz2d');
+        const r3d = this._wizViz && this._wizViz.renderer ? this._wizViz.renderer.domElement : null;
+        if (this._wizPreviewMode === '2d') {
+            if (cv) cv.style.display = '';
+            if (this._wizViz) { this._wizViz.setAnimate(false); this._wizViz.setActive(false); }
+            if (r3d) r3d.style.display = 'none';
+            if (host.__t2) host.__t2.setGcode(host.__gcode);
+            return;
+        }
+        if (cv) cv.style.display = 'none';
+        if (host.__t2) host.__t2.stop();
         try {
             if (!this._wizViz) { this._wizViz = new GcodeViz3D(host); this._wizViz._gizmoPx = 32; }
             this._wizViz.attach(host);
+            if (this._wizViz.renderer && this._wizViz.renderer.domElement) this._wizViz.renderer.domElement.style.display = '';
             this._wizViz.setActive(true);
             this._refresh3DStock();
             // Position the start marker BEFORE setSegments so the incremental probe path is offset to it
             // (the inferred spindle start for this corner/config). setSegments keeps starts[0]. Preview hint
             // only — the user can still drag to override. Re-set each render so it tracks the config.
+            const start = host.__start;
             if (start && this._wizViz.starts) this._wizViz.starts[0] = { x: +start.x || 0, y: +start.y || 0, z: +start.z || 0 };
-            this._wizViz.setSegments(parseGcode(gcode || ''), this._wizNeedsFit !== false);
+            this._wizViz.setSegments(parseGcode(host.__gcode || ''), this._wizNeedsFit !== false);
             this._wizNeedsFit = false;   // subsequent input-change re-renders keep the camera
         } catch (e) { console.warn('wizard 3D preview failed', e); }
     }
