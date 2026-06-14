@@ -87,12 +87,18 @@ async function buildWorkspace() {
   function reproject() {
     const dialect = resolveActivePost(getActiveProfile().id);   // active post processor (override or follow machine)
     const { text, lines, map } = emitMapped(workspaceToStack(ws), { dialect });
-    lastGcode = text;                                           // round-trip source: Blocks → STUDIO editor
+    lastGcode = text;
     renderCode(lines, map);
     curSegs = segments(text);
     if (mode === '3d') update3D(text);
     else drawPreview(curSegs, anim.playing ? Math.floor(anim.k) : curSegs.length);
     applySelection();
+    // Layer 2 — the STUDIO editor IS the live projection of the block program: push the emit on every change.
+    // Guard against wiping a hand-written program: only project when the workspace actually has output.
+    try {
+      const em = window.ddcsStudio && window.ddcsStudio.editorManager;
+      if (em && text.trim() && em.getValue() !== text) em.setValue(text);
+    } catch (_) { /* editor not ready */ }
   }
 
   // ---- code view + linked selection (click a code line ⇄ its Blockly block) ----
@@ -249,15 +255,6 @@ async function buildWorkspace() {
     else { play.textContent = '▶ Play'; drawPreview(curSegs, curSegs.length); }
   };
 
-  // ---- round-trip: insert the projected G-code into the STUDIO editor (same path as a wizard's Insert) ----
-  const toStudio = document.getElementById('blk-to-studio');
-  if (toStudio) toStudio.onclick = () => {
-    const code = (lastGcode || '').trim();
-    const em = window.ddcsStudio && window.ddcsStudio.editorManager;
-    if (!code || !em) return;
-    try { em.insert(code); } catch (e) { console.error('Blocks → STUDIO insert failed', e); return; }
-    if (window.showApp) window.showApp('studio');   // jump to the editor so the inserted code is visible
-  };
 
   // ---- open-as-blocks: write a STUDIO op's stack into the workspace ----
   function loadProgram(stack) {
@@ -288,4 +285,5 @@ async function buildWorkspace() {
   window.ddcsRefreshBlocks = reproject;          // Settings (post-processor change) → re-emit live
   window.ddcsLoadBlockStack = loadProgram;       // STUDIO op → blocks (gatewayStatus calls this on tab open)
   window.ddcsGetBlockProgram = () => workspaceToStack(ws);   // blocks → STUDIO reverse reconcile
+  window.ddcsGetBlockGcode = () => lastGcode;    // blocks → STUDIO editor round-trip (on Studio-tab click)
 }

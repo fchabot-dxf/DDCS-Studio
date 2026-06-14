@@ -67,22 +67,8 @@ export function initGatewayStatus() {
             mod.openSettings();
         }
 
-        // Returning to STUDIO: reconcile the active wizard's form from the (edited) block stack, then
-        // re-run it so the form + code reflect block-side edits (the reverse half of the sync).
-        if (isStudio) {
-            try {
-                const { reconcileActiveOp } = await import('../blocks/opStacks.js');
-                const r = reconcileActiveOp();
-                const wm = window.ddcsStudio && window.ddcsStudio.wizardManager;
-                if (r && wm) {
-                    for (const [id, val] of Object.entries(r.fields)) {
-                        const e = document.getElementById(id);
-                        if (e && val != null && val !== '') e.value = String(val);
-                    }
-                    wm.update();
-                }
-            } catch (err) { console.error('blocks→studio reconcile failed', err); }
-        }
+        // (Blocks → STUDIO round-trip is now LIVE: the Blocks tab projects its G-code straight into the editor
+        // on every change — see blocksApp.reproject. No tab-switch copy/reconcile needed here.)
 
         studioApp?.classList.toggle('hidden', !isStudio);
         gatewayApp?.classList.toggle('hidden', !isGateway);
