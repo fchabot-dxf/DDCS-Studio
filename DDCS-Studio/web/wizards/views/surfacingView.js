@@ -81,7 +81,7 @@ export const surfacingView = {
 
         const status = el('surfacingVizStatus');
         if (status) {
-            const passes = (gcode.match(/\( level Z/g) || []).length;
+            const passes = (gcode.match(/\( Step Down z=/g) || []).length;
             status.textContent = `${num(v('sf_w'), 100)} × ${num(v('sf_h'), 80)} · ${params.strategy} · ${passes} Z pass${passes === 1 ? '' : 'es'}`;
         }
         const lstatus = el('surfacingLayoutStatus');

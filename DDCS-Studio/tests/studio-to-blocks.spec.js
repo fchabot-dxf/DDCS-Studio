@@ -47,3 +47,33 @@ test('Blocks tab opens a snippet op (WCS) emitted bare — no program header/foo
   expect(code, 'snippet is bare: no program clearance header').not.toContain('( clearance )');
   expect(errors, errors.join('\n')).toEqual([]);
 });
+
+// REVERSE sync: editing a block on the canvas, then returning to STUDIO, reconciles the wizard form from
+// the edited stack (and re-runs the wizard). Completes the bidirectional loop.
+test('Blocks → STUDIO reverse sync: editing a block reconciles the wizard form', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('surfacing'));
+  await page.waitForSelector('#wiz_surfacing', { state: 'visible' });
+  await page.fill('#sf_toolDia', '12');
+  await page.fill('#sf_depth', '2');
+  await page.evaluate(() => window.ddcsStudio.wizardManager.update());
+
+  await page.evaluate(() => window.showApp('blocks'));
+  await page.waitForSelector('#blocks-app:not(.hidden)');
+  // edit the StepDown depth (`to`) and the StepOver value (`stepover`) on the canvas
+  const toInput = page.locator('#blk-stage .blk.depth [data-key="to"]').first();
+  await expect(toInput).toBeVisible();
+  await toInput.fill('7');
+  await toInput.dispatchEvent('input');
+  const soInput = page.locator('#blk-stage .blk.fill [data-key="stepover"]').first();
+  await expect(soInput).toBeVisible();
+  await soInput.fill('6');
+  await soInput.dispatchEvent('input');
+
+  // back to STUDIO → the form reconciles from the edited block: depth=7, and stepover% = 6/12*100 = 50
+  await page.evaluate(() => window.showApp('studio'));
+  await expect(page.locator('#sf_depth')).toHaveValue('7');
+  await expect(page.locator('#sf_stepoverPct')).toHaveValue('50');
+});

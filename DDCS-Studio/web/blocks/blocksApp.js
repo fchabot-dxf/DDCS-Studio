@@ -563,7 +563,8 @@ export function initBlocks() {
     render();
   }
 
-  api = { refresh: reproject, load: loadProgram };
+  api = { refresh: reproject, load: loadProgram, program: () => program };
   window.ddcsRefreshBlocks = reproject;   // let Settings (post-processor change) re-emit live
   window.ddcsLoadBlockStack = loadProgram;   // STUDIO op → blocks: gatewayStatus calls this when the tab opens
+  window.ddcsGetBlockProgram = () => program;   // blocks → STUDIO: reconcile the form from the (edited) stack
 }

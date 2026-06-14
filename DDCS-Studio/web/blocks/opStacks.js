@@ -7,6 +7,7 @@
  * back, so there's no cycle.
  */
 import { getLastOp } from './opRecord.js';
+import { num, r3 } from '../wizards/ops/util.js';
 import { surfacingStack } from '../wizards/surfacingWizard.js';
 import { pocketStack } from '../wizards/pocketWizard.js';
 import { slotStack } from '../wizards/slotWizard.js';
@@ -17,7 +18,43 @@ import { edgeStack } from '../wizards/edgeWizard.js';
 const BUILDERS = { surfacing: surfacingStack, pocket: pocketStack, slot: slotStack, drill: drillStack, wcs: wcsStack, edge: edgeStack };
 const BARE = new Set(['wcs', 'edge']);   // snippet ops emit without the program header/footer
 
-let loadedSig = null;
+// ── reverse sync: edited block stack → STUDIO form fields ──────────────────────────────────────────────
+// Read the (possibly edited) block objects and return { formFieldId: value }. The inverse of each builder,
+// co-located with it. Numeric/geometry params reconcile cleanly here; derived (stepover) and inset (pocket)
+// params are intentionally left out for now. Only ops listed here reverse-sync.
+// Read a STUDIO form field as a number (for un-deriving block values like stepover ← stepover% × toolØ).
+const formNum = (id, d) => {
+    if (typeof document === 'undefined') return d;
+    const e = document.getElementById(id);
+    return e ? num(e.value, d) : d;
+};
+
+const RECONCILERS = {
+    surfacing(prog) {
+        const down = prog[0], over = down && down.children && down.children[0], rg = over && over.params && over.params.region;
+        if (!down || !over || !rg || !rg.params) return null;
+        const tool = formNum('sf_toolDia', 12);   // un-derive stepover% from the absolute StepOver value
+        return {
+            sf_originX: rg.params.x, sf_originY: rg.params.y, sf_w: rg.params.w, sf_h: rg.params.h,
+            sf_depth: down.params.to, sf_stepdown: down.params.by,
+            sf_strategy: over.params.strategy === 'parallel' ? 'raster' : 'spiral',
+            sf_stepoverPct: tool > 0 ? r3((num(over.params.stepover, 0) / tool) * 100) : undefined,
+            sf_feed: over.params.feed, sf_plunge: over.params.plunge, sf_clearance: over.params.clearance,
+        };
+    },
+    slot(prog) {
+        const s = prog[0];
+        if (!s || s.type !== 'slot' || !s.params) return null;
+        const p = s.params;
+        return {
+            sl_ax: p.x0, sl_ay: p.y0, sl_bx: p.x1, sl_by: p.y1, sl_width: p.width,
+            sl_toolDia: p.tool, sl_stepoverPct: p.stepoverPct, sl_depth: p.depth, sl_stepdown: p.stepdown,
+            sl_feed: p.feed, sl_plunge: p.plunge, sl_clearance: p.clearance,
+        };
+    },
+};
+
+let loadedSig = null, shownOp = null;
 const sig = (op) => (op ? `${op.type}:${JSON.stringify(op.params)}` : null);
 
 /** Does the active op have a block stack we can show? */
@@ -33,7 +70,21 @@ export function hasActiveOpStack() {
  */
 export function buildActiveOpStack() {
     const op = getLastOp(), s = sig(op);
-    if (!op || !BUILDERS[op.type] || s === loadedSig) return null;
+    if (!op || !BUILDERS[op.type]) { shownOp = null; return null; }
+    shownOp = op.type;                      // remember what the Blocks tab is showing (for reverse sync)
+    if (s === loadedSig) return null;       // already loaded → don't clobber block-side edits
     loadedSig = s;
     return { blocks: BUILDERS[op.type](op.params), bare: BARE.has(op.type) };
+}
+
+/**
+ * Reverse sync — the form fields that reflect the current (edited) block stack, or null if the shown op
+ * has no reconciler or the stack doesn't match its shape. The caller sets the fields + re-runs the wizard.
+ */
+export function reconcileActiveOp() {
+    if (!shownOp || !RECONCILERS[shownOp]) return null;
+    const prog = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? window.ddcsGetBlockProgram() : null;
+    if (!prog || !prog.length) return null;
+    const fields = RECONCILERS[shownOp](prog);
+    return fields ? { type: shownOp, fields } : null;
 }

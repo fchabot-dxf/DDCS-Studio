@@ -93,7 +93,7 @@ export const pocketView = {
 
         const status = el('pocketVizStatus');
         if (status) {
-            const passes = (gcode.match(/\( level Z/g) || []).length;
+            const passes = (gcode.match(/\( Step Down z=/g) || []).length;
             status.textContent = `${shape} · ${params.strategy} · ${passes} Z pass${passes === 1 ? '' : 'es'}`;
         }
         const lstatus = el('pocketLayoutStatus');
