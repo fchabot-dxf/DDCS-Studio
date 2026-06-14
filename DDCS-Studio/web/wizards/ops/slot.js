@@ -20,7 +20,7 @@ export function slotPath(p) {
     const clr = num(p.clearance, 5), feed = num(p.feed, 600), plunge = num(p.plunge, 150);
     const levels = depthLevels(depth, num(p.stepdown, 1.5));
     const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy);
-    const L = [`G0 Z${clr}   ( clearance )`];
+    const L = [];   // program-level clearance is provided by the enclosing program (emitMapped header)
 
     if (len < 1e-6) {     // A == B → just a plunged hole
         L.push('( zero-length slot — single plunge )');

@@ -1,77 +1,48 @@
 import { test, expect } from '@playwright/test';
 
-// "View as blocks": a STUDIO PocketWizard converts to the StepDown{ StepOver(Region) [+ Wall] } atom stack,
-// and the emitted CUTTING PASSES (G1/G2/G3) are byte-identical to the wizard — the pocket analogue of
-// drill = array(bore). Proven for raster-rect / concentric-rect / concentric-circle (the wizard's
-// raster-circle G3 arc-finish is wizard chrome and intentionally not reproduced — see fromWizard.js).
-test('pocket wizard == StepDown{StepOver(Region)+Wall} atom stack (cutting passes match)', async ({ page }) => {
-  await page.goto('http://localhost:3211/blocks/blockly/dev.html');
-
-  const results = await page.evaluate(async () => {
-    const { emitMapped } = await import('/blocks/blockModel.js');
-    const { pocketToBlocks } = await import('/blocks/fromWizard.js');
-    const { PocketWizard } = await import('/wizards/pocketWizard.js');
-    const wiz = new PocketWizard();
-    const cuts = (txt) => txt.split('\n').map((s) => s.trim()).filter((l) => /^G[123]\b/.test(l));
-    const cases = [
-      { name: 'rect raster',       p: { shape: 'rect',   w: 80, h: 60, toolDia: 6, stepoverPct: 40, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5, strategy: 'raster' } },
-      { name: 'rect concentric',   p: { shape: 'rect',   w: 80, h: 60, toolDia: 6, stepoverPct: 40, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5, strategy: 'spiral' } },
-      { name: 'circle concentric', p: { shape: 'circle', dia: 50,      toolDia: 6, stepoverPct: 40, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5, strategy: 'spiral' } },
-    ];
-    return cases.map((c) => {
-      const w = cuts(wiz.generate(c.p)), b = cuts(emitMapped(pocketToBlocks(c.p), {}).text);
-      return { name: c.name, wlen: w.length, blen: b.length, same: w.length === b.length && w.every((l, i) => l === b[i]) };
-    });
-  });
-
-  for (const r of results) {
-    expect(r.wlen, `${r.name} should have cutting passes`).toBeGreaterThan(0);
-    expect(r.same, `${r.name}: wizard ${r.wlen} cuts vs blocks ${r.blen} cuts`).toBe(true);
-  }
-});
-
-// Slot is a self-contained leaf (depth baked in, like Line) sharing the slotPath kernel with SlotWizard,
-// so the toolpath is identical — straight/narrow/angled.
-test('slot wizard == Slot atom (cutting passes match)', async ({ page }) => {
-  await page.goto('http://localhost:3211/blocks/blockly/dev.html');
-  const results = await page.evaluate(async () => {
-    const { emitMapped } = await import('/blocks/blockModel.js');
-    const { slotToBlocks } = await import('/blocks/fromWizard.js');
-    const { SlotWizard } = await import('/wizards/slotWizard.js');
-    const wiz = new SlotWizard();
-    const cuts = (txt) => txt.split('\n').map((s) => s.trim()).filter((l) => /^G[123]\b/.test(l));
-    const cases = [
-      { name: 'straight wide',  p: { ax: 0, ay: 0, bx: 60, by: 0,  toolDia: 6, width: 14, stepoverPct: 40, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5 } },
-      { name: 'narrow (=tool)', p: { ax: 0, ay: 0, bx: 50, by: 0,  toolDia: 6, width: 6,  stepoverPct: 40, depth: 3, stepdown: 1.0, feed: 600, plunge: 150, clearance: 5 } },
-      { name: 'angled wide',    p: { ax: 10, ay: 5, bx: 70, by: 40, toolDia: 6, width: 12, stepoverPct: 50, depth: 6, stepdown: 2.0, feed: 500, plunge: 120, clearance: 5 } },
-    ];
-    return cases.map((c) => {
-      const w = cuts(wiz.generate(c.p)), b = cuts(emitMapped(slotToBlocks(c.p), {}).text);
-      return { name: c.name, wlen: w.length, blen: b.length, same: w.length === b.length && w.every((l, i) => l === b[i]) };
-    });
-  });
-  for (const r of results) {
-    expect(r.wlen, `${r.name} should have cutting passes`).toBeGreaterThan(0);
-    expect(r.same, `${r.name}: wizard ${r.wlen} cuts vs blocks ${r.blen} cuts`).toBe(true);
-  }
-});
-
-// Surfacing is now REWRITTEN as a block stack (its only implementation): generate() emits surfacingStack()
-// through emitMapped. So we verify the wizard IS its stack — deterministic and identical across runs.
-test('surfacing wizard emits through its own block stack (deterministic)', async ({ page }) => {
+// The cutting wizards are REWRITTEN as block stacks — one implementation each (generate() emits its stack
+// through emitMapped, no converter). Verify each is deterministic (regenerate → byte-identical) and produces
+// real cutting passes, plus behaviour checks: circle pocket finishes with a G3 arc wall, a tiny pocket falls
+// back to a single plunge, and drill `skip` omits holes.
+test('cutting wizards emit through their block stacks (deterministic + correct)', async ({ page }) => {
   await page.goto('http://localhost:3211/blocks/blockly/dev.html');
   const r = await page.evaluate(async () => {
-    const { emitMapped } = await import('/blocks/blockModel.js');
-    const { SurfacingWizard, surfacingStack } = await import('/wizards/surfacingWizard.js');
-    const p = { w: 100, h: 80, toolDia: 12, stepoverPct: 60, depth: 0.5, stepdown: 0.5, feed: 800, plunge: 200, clearance: 5, strategy: 'raster' };
-    const title = '( Surfacing - 100 × 80 mm - DDCS Studio )';
-    const gen1 = new SurfacingWizard().generate(p);
-    const gen2 = new SurfacingWizard().generate(p);
-    const viaStack = emitMapped(surfacingStack(p), { ...p, title }).text;
-    const cuts = (t) => t.split('\n').filter((l) => /^G1 /.test(l.trim()));
-    return { deterministic: gen1 === gen2, matchesStack: gen1 === viaStack, nCuts: cuts(gen1).length };
+    const { SurfacingWizard } = await import('/wizards/surfacingWizard.js');
+    const { PocketWizard } = await import('/wizards/pocketWizard.js');
+    const { SlotWizard } = await import('/wizards/slotWizard.js');
+    const { DrillWizard } = await import('/wizards/drillWizard.js');
+    const cuts = (t) => t.split('\n').filter((l) => /^G[123]\b/.test(l.trim())).length;
+    const det = (W, p) => new W().generate(p) === new W().generate(p);
+    const holes = (t) => (t.match(/Array \d+ @/g) || []).length;
+    const out = {};
+
+    const sp = { w: 100, h: 80, toolDia: 12, stepoverPct: 60, depth: 0.5, stepdown: 0.5, feed: 800, plunge: 200, clearance: 5, strategy: 'raster' };
+    out.surfacing = { det: det(SurfacingWizard, sp), cuts: cuts(new SurfacingWizard().generate(sp)) };
+
+    const pp = { shape: 'rect', w: 80, h: 60, toolDia: 6, stepoverPct: 40, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5, strategy: 'raster' };
+    out.pocket = { det: det(PocketWizard, pp), cuts: cuts(new PocketWizard().generate(pp)) };
+
+    const pc = { shape: 'circle', dia: 50, toolDia: 6, stepoverPct: 40, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5, strategy: 'raster' };
+    out.pocketCircleArc = /G3 /.test(new PocketWizard().generate(pc));
+    const tiny = { shape: 'circle', dia: 4, toolDia: 6, depth: 3, stepdown: 1, feed: 600, plunge: 150, clearance: 5 };
+    const tinyTxt = new PocketWizard().generate(tiny);
+    out.pocketTinyGuard = /G1 Z-3/.test(tinyTxt) && !/G3 /.test(tinyTxt);
+
+    const sl = { ax: 0, ay: 0, bx: 60, by: 0, toolDia: 6, width: 14, stepoverPct: 40, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5 };
+    out.slot = { det: det(SlotWizard, sl), cuts: cuts(new SlotWizard().generate(sl)) };
+
+    const dr = { pattern: 'grid', x0: 0, y0: 0, cols: 3, rows: 2, dx: 20, dy: 20, depth: 5, peck: 2, feed: 100, clearance: 5 };
+    out.drill = { det: det(DrillWizard, dr), holes: holes(new DrillWizard().generate(dr)), cuts: cuts(new DrillWizard().generate(dr)) };
+    out.drillSkip = holes(new DrillWizard().generate({ ...dr, skip: '2,5' }));
+    return out;
   });
-  expect(r.deterministic, 'two generate() calls must be byte-identical').toBe(true);
-  expect(r.matchesStack, 'wizard output must equal emitting its own stack').toBe(true);
-  expect(r.nCuts, 'should produce facing passes').toBeGreaterThan(0);
+
+  for (const k of ['surfacing', 'pocket', 'slot', 'drill']) {
+    expect(r[k].det, `${k} must be deterministic`).toBe(true);
+    expect(r[k].cuts, `${k} must produce cutting passes`).toBeGreaterThan(0);
+  }
+  expect(r.pocketCircleArc, 'circle pocket finishes with a G3 arc wall').toBe(true);
+  expect(r.pocketTinyGuard, 'tiny pocket falls back to a single plunge (no arc)').toBe(true);
+  expect(r.drill.holes, 'drill grid 3x2 = 6 holes').toBe(6);
+  expect(r.drillSkip, 'skip 2,5 → 4 holes').toBe(4);
 });

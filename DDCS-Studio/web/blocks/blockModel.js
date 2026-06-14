@@ -130,13 +130,17 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 
     const p = resolveParams(block.params, scope);   // motion blocks: resolve expressions → numbers, then kernel
 
-    if (def.kind === 'container') {            // STAMP child(ren) at each point
+    if (def.kind === 'container') {            // STAMP child(ren) at each point (skip 1-based indices in p.skip)
         const pts = def.points(p);
+        const skip = new Set(String(p.skip || '').split(/[ ,]+/).map((s) => parseInt(s, 10)).filter((n) => n > 0));
         const out = [];
-        pts.forEach((pt, i) => (block.children || []).forEach((c) => {
-            out.push(tag(`( ${def.label} ${i + 1} @ ${pt.x},${pt.y} )`, own));
-            out.push(...emit(c, dx + pt.x, dy + pt.y, own, scope, dialect));
-        }));
+        pts.forEach((pt, i) => {
+            if (skip.has(i + 1)) return;
+            (block.children || []).forEach((c) => {
+                out.push(tag(`( ${def.label} ${i + 1} @ ${pt.x},${pt.y} )`, own));
+                out.push(...emit(c, dx + pt.x, dy + pt.y, own, scope, dialect));
+            });
+        });
         return out;
     }
 

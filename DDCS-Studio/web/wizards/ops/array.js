@@ -34,15 +34,15 @@ export function patternPoints(p) {
 
 export const arrayBlock = {
     type: 'array', label: 'Array', kind: 'container', category: 'Modify',
-    defaults: { pattern: 'grid', x0: 0, y0: 0, cols: 3, rows: 2, dx: 20, dy: 20, count: 4, spacing: 20, angle: 0, dia: 50, startAngle: 0 },
+    defaults: { pattern: 'grid', x0: 0, y0: 0, cols: 3, rows: 2, dx: 20, dy: 20, count: 4, spacing: 20, angle: 0, dia: 50, startAngle: 0, skip: '' },
     fields: ['pattern'],   // pattern-specific fields resolved by fieldsFor()
     /** Pattern points; mirrors x0/y0 → cx/cy so circle reads the same origin. */
     points: (p) => patternPoints({ ...p, cx: num(p.x0, 0), cy: num(p.y0, 0) }),
     /** Which fields to show depends on the chosen pattern. */
     fieldsFor(p) {
         const base = ['pattern', 'x0', 'y0'];
-        if (p.pattern === 'circle') return [...base, 'dia', 'count', 'startAngle'];
-        if (p.pattern === 'line') return [...base, 'count', 'spacing', 'angle'];
-        return [...base, 'cols', 'rows', 'dx', 'dy'];   // grid
+        if (p.pattern === 'circle') return [...base, 'dia', 'count', 'startAngle', 'skip'];
+        if (p.pattern === 'line') return [...base, 'count', 'spacing', 'angle', 'skip'];
+        return [...base, 'cols', 'rows', 'dx', 'dy', 'skip'];   // grid
     },
 };

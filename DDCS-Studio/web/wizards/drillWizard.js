@@ -1,39 +1,43 @@
 /**
  * wizards/drillWizard.js — hole-pattern generator (the first Mill-group op).
  *
- * This is a PRESET: a composition of primitive op-blocks — an ARRAY (patternPoints) wrapping a leaf
- * hole op, either DRILL (peckDrill) or BORE (helicalBore). The kernels now live as separate modules
- * under ops/ so the Blocks tab and this wizard share ONE implementation (see ops/index.js and
- * MULTI-OP-STACKING.md). Output is byte-identical to before the extraction.
+ * REWRITTEN AS A BLOCK STACK: the wizard's only implementation is `drillStack(params)` → [ Array{ Drill | Bore } ]
+ * — an Array container (patternPoints) stamping a hole leaf (peck Drill, or helical Bore) at each point, with
+ * `skip` omitting holes by 1-based number. The wizard form and the Blocks view are two editors of this one
+ * stack; the kernels (patternPoints / peckDrill / helicalBore) live in ops/ and are shared.
  */
-import { headerBlock, footerBlock } from './cuttingBlocks.js';
-import { patternPoints, peckDrill, helicalBore } from './ops/index.js';
+import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { patternPoints } from './ops/index.js';
 import { num } from './ops/util.js';
 
 // Re-export so views (drillView) keep importing the pattern geometry from here.
 export { patternPoints };
 
+/** Drill params → [ Array{ Drill|Bore } ]. The one source of truth for both displays. */
+export function drillStack(params = {}) {
+    const arr = newBlock('array');
+    arr.params = {
+        pattern: params.pattern || 'grid',
+        x0: num(params.x0, 0), y0: num(params.y0, 0),
+        cols: num(params.cols, 3), rows: num(params.rows, 2), dx: num(params.dx, 20), dy: num(params.dy, 20),
+        count: num(params.count, 4), spacing: num(params.spacing, 20), angle: num(params.angle, 0),
+        dia: num(params.dia, 50), startAngle: num(params.startAngle, 0),
+        skip: params.skip || '',
+    };
+    const helical = params.method === 'helical';
+    const hole = newBlock(helical ? 'bore' : 'drill');
+    hole.params = helical
+        ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) }
+        : { x: 0, y: 0, depth: num(params.depth, 5), peck: num(params.peck, 5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) };
+    arr.children = [hole];
+    return [arr];
+}
+
 export class DrillWizard {
     generate(params) {
-        const pts = patternPoints(params);
-        // Suppress holes by their 1-based number (the numbers shown in the preview / comments).
-        const skip = new Set(String(params.skip || '').split(/[ ,]+/).map(s => parseInt(s, 10)).filter(n => n > 0));
-        const kept = pts.filter((_, i) => !skip.has(i + 1)).length;
         const helical = params.method === 'helical';
-        const L = [
-            `( Hole pattern - ${params.pattern || 'grid'} - DDCS Studio )`,
-            `( ${kept} of ${pts.length} holes | ${helical ? 'helical bore' : 'peck drill'} | depth ${num(params.depth, 5)} mm )`,
-            ...headerBlock(params),
-            `G0 Z${num(params.clearance, 5)}   ( clearance )`,
-        ];
-        pts.forEach((pt, i) => {
-            const n = i + 1;
-            if (skip.has(n)) { L.push(`( hole ${n}/${pts.length} - skipped )`); return; }
-            L.push(`( hole ${n}/${pts.length} )`);
-            L.push(...(helical ? helicalBore(pt, params) : peckDrill(pt, params)));
-        });
-        L.push(...footerBlock(params));
-        return L.join('\n');
+        const title = `( Hole pattern - ${params.pattern || 'grid'} - ${helical ? 'helical bore' : 'peck drill'} - DDCS Studio )`;
+        return emitMapped(drillStack(params), { ...params, title }).text;
     }
 
     /** Preview/sim start hint (work frame): origin; the pattern is drawn from there. */

@@ -1,89 +1,60 @@
 /**
  * wizards/pocketWizard.js — pocket clearing generator (Mill group).
  *
- * Clears a rectangular or circular pocket with an end mill: roughs the interior (raster zig-zag OR
- * inward concentric rings) then a wall-finish pass, stepping down in Z by `stepdown` to full depth.
- * All geometry is solved in Studio and emitted as flat G0/G1/G2/G3 in the active WCS — no canned
- * cycles, no #vars. Walls are offset inward by the tool radius so the FINISHED pocket matches the
- * width/height/Ø you type.
- *
- * Origin convention (matches drillWizard): rect origin = min-XY corner; circle origin = centre.
+ * REWRITTEN AS A BLOCK STACK: the wizard's only implementation is `pocketStack(params)` →
+ * [ StepDown{ StepOver(Region) [+ Wall(Region)] } ]. The Region is the tool-CENTRE boundary (inset by the
+ * tool radius) so the FINISHED pocket matches the size you type. Strategy raster → parallel rows + a Wall
+ * finish; spiral → concentric rings (which reach the wall). A pocket smaller than the tool falls back to a
+ * single centre plunge (peck). Form and Blocks view are two editors of this one stack.
  */
-import { headerBlock, footerBlock } from './cuttingBlocks.js';
-import {
-    scanlineFill, fillLevelMoves, contourLevel, concentricRect, concentricCircle,
-    rectContour, circleContour, depthLevels,
-} from './clearing.js';
+import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { num } from './ops/util.js';
 
-function num(v, d) { return (v === '' || v == null || isNaN(Number(v))) ? d : Number(v); }
-const r3 = (n) => Math.round(n * 1000) / 1000;
+/** Pocket params → its block stack. The one source of truth for both displays. */
+export function pocketStack(params = {}) {
+    const shape = params.shape || 'rect';
+    const tool = Math.max(0.1, num(params.toolDia, 6)), r = tool / 2;
+    const so = Math.max(0.2, tool * num(params.stepoverPct, 40) / 100);
+    const clr = num(params.clearance, 5), feed = num(params.feed, 600), plunge = num(params.plunge, 150);
+    const ox = num(params.originX, 0), oy = num(params.originY, 0);
+    const raster = (params.strategy || 'spiral') === 'raster';
+    const depth = num(params.depth, 4), by = num(params.stepdown, 1.5);
+
+    // tool-centre region (inset by the tool radius) + too-small detection
+    let region = newBlock('region'), tooSmall, cx, cy;
+    if (shape === 'circle') {
+        const Rc = num(params.dia, 50) / 2 - r; tooSmall = Rc <= 0; cx = ox; cy = oy;
+        region.params = { shape: 'circle', x: ox, y: oy, w: 2 * Rc };
+    } else {
+        const w = num(params.w, 80), h = num(params.h, 60), iw = w - 2 * r, ih = h - 2 * r;
+        tooSmall = iw <= 0 || ih <= 0; cx = ox + w / 2; cy = oy + h / 2;
+        region.params = { shape: 'rect', x: ox + r, y: oy + r, w: iw, h: ih };
+    }
+
+    if (tooSmall) {   // pocket smaller than the tool → a single centre plunge, pecking to depth
+        const hole = newBlock('drill');
+        hole.params = { x: cx, y: cy, depth, peck: by, feed: plunge, clearance: clr };
+        return [hole];
+    }
+
+    const over = newBlock('stepover');
+    over.params = { region, stepover: so, strategy: raster ? 'parallel' : 'concentric', direction: 'bothways', z: 'z', feed, plunge, clearance: clr };
+    const down = newBlock('stepdown');
+    down.params = { to: depth, by };
+    down.children = [over];
+    if (raster) {   // raster leaves the wall un-finished → a contour pass (arc for circles, polygon for rect)
+        const wall = newBlock('wall');
+        wall.params = { region, z: 'z', feed, plunge, clearance: clr };
+        down.children.push(wall);
+    }
+    return [down];
+}
 
 export class PocketWizard {
     generate(params) {
         const shape = params.shape || 'rect';
-        const strat = params.strategy || 'spiral';
-        const tool = Math.max(0.1, num(params.toolDia, 6)), r = tool / 2;
-        const so = Math.max(0.2, tool * num(params.stepoverPct, 40) / 100);
-        const depth = num(params.depth, 4);
-        const clr = num(params.clearance, 5), feed = num(params.feed, 600), plunge = num(params.plunge, 150);
-        const ox = num(params.originX, 0), oy = num(params.originY, 0);
-        const levels = depthLevels(depth, num(params.stepdown, 1.5));
-
-        const head = shape === 'rect'
-            ? `${num(params.w, 80)} × ${num(params.h, 60)} mm`
-            : `Ø${num(params.dia, 50)} mm`;
-        const L = [
-            `( Pocket - ${shape} ${head} - DDCS Studio )`,
-            `( ${strat === 'raster' ? 'raster' : 'concentric'} | tool Ø${tool} | stepover ${r3(so)} | depth ${depth} in ${levels.length} pass${levels.length > 1 ? 'es' : ''} )`,
-            ...headerBlock(params),
-            `G0 Z${clr}   ( clearance )`,
-        ];
-
-        // Tool-centre boundary (region inset by the tool radius).
-        let rect = null, circ = null, tooSmall = false;
-        if (shape === 'rect') {
-            const w = num(params.w, 80), h = num(params.h, 60);
-            rect = { x0: ox + r, y0: oy + r, x1: ox + w - r, y1: oy + h - r };
-            tooSmall = (rect.x1 - rect.x0 <= 0) || (rect.y1 - rect.y0 <= 0);
-        } else {
-            circ = { cx: ox, cy: oy, Rc: num(params.dia, 50) / 2 - r };
-            tooSmall = circ.Rc <= 0;
-        }
-
-        if (tooSmall) {
-            const cx = shape === 'rect' ? ox + num(params.w, 80) / 2 : ox;
-            const cy = shape === 'rect' ? oy + num(params.h, 60) / 2 : oy;
-            L.push('( pocket is smaller than the tool — single plunge only )');
-            for (const d of levels) L.push(`G0 X${r3(cx)} Y${r3(cy)}`, `G1 Z${r3(-d)} F${plunge}`, `G0 Z${clr}`);
-            L.push(...footerBlock(params));
-            return L.join('\n');
-        }
-
-        const contours = shape === 'rect'
-            ? rectContour(rect.x0, rect.y0, rect.x1, rect.y1)
-            : circleContour(circ.cx, circ.cy, circ.Rc);
-        const rows = strat === 'raster' ? scanlineFill(contours, so) : null;
-
-        for (const d of levels) {
-            const ctx = { z: -d, clr, feed, plunge };
-            L.push(`( level Z${r3(-d)} )`);
-            if (strat === 'raster') {
-                L.push(...fillLevelMoves(rows, ctx));
-                if (shape === 'circle') {            // crisp arc wall finish (vs the faceted polygon)
-                    L.push(`G0 Z${r3(clr)}`, `G0 X${r3(circ.cx + circ.Rc)} Y${r3(circ.cy)}`, `G1 Z${r3(-d)} F${plunge}`,
-                           `G3 X${r3(circ.cx + circ.Rc)} Y${r3(circ.cy)} I${r3(-circ.Rc)} J0 F${feed}`);
-                } else {
-                    L.push(...contourLevel(contours, ctx));
-                }
-            } else if (shape === 'rect') {
-                L.push(...concentricRect(rect.x0, rect.y0, rect.x1, rect.y1, so, ctx));
-            } else {
-                L.push(...concentricCircle(circ.cx, circ.cy, circ.Rc, so, ctx));
-            }
-            L.push(`G0 Z${clr}`);
-        }
-
-        L.push(...footerBlock(params));
-        return L.join('\n');
+        const head = shape === 'rect' ? `${num(params.w, 80)} × ${num(params.h, 60)} mm` : `Ø${num(params.dia, 50)} mm`;
+        const title = `( Pocket - ${shape} ${head} - DDCS Studio )`;
+        return emitMapped(pocketStack(params), { ...params, title }).text;
     }
 }
