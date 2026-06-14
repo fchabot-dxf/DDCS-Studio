@@ -37,18 +37,22 @@ export function parseLine(line, opts = {}) {
     const raw = String(line);
     const trimmed = raw.trim();
     if (!trimmed) return null;                                                  // blank / seam
-    if (/^\([^)]*\)$/.test(trimmed)) return { type: 'comment', params: { text: trimmed.slice(1, -1).trim() } };   // full-line comment
-    // A trailing comment must be whitespace-separated (matches emit's "   ( … )"). An ATTACHED "(x)" stays part
-    // of the code — that's how DDCS HMI vars look (`#1505=1(Continue?)`), and keeping it verbatim round-trips.
+    // Strip a whitespace-separated trailing comment ("   ( … )"). An ATTACHED "(x)" stays part of the code —
+    // that's how DDCS HMI vars look (`#1505=1(Continue?)`) and how messages look, and keeping it round-trips.
     const cm = raw.match(/\s\(([^)]*)\)\s*$/);
     const comment = cm ? cm[1].trim() : null;
     const code = (cm ? raw.slice(0, cm.index) : raw).trim();
     if (!code) return comment != null ? { type: 'comment', params: { text: comment } } : null;
 
-    // 1) dialect-specific forms (IF/GOTO/label/probe-read/check — vary per controller; their parse inverse is
-    //    co-located with each dialect's emit). Must run before the generic assign/ifgoto below.
     const dialect = opts.dialect;
-    if (dialect && typeof dialect.recognize === 'function') { const r = dialect.recognize(code); if (r) return r; }
+    // 1) dialect-specific forms first — the active controller's parse inverse (IF/GOTO/label/probe/HMI/WCS…),
+    //    co-located with its emit. Some forms even look like comments (RS274 "(MSG,…)"), so this precedes the
+    //    full-line-comment rule. Must also precede the generic assign/ifgoto/core below.
+    if (dialect && typeof dialect.recognize === 'function') { const r = dialect.recognize(code, comment); if (r) return r; }
+    // 2) a full-line ( comment )
+    if (/^\([^)]*\)$/.test(code)) return { type: 'comment', params: { text: code.slice(1, -1).trim() } };
+    // 3) Pause — the universal program stop (M00) across all controllers
+    if (code === 'M00') return { type: 'pause', params: {} };
 
     const G = (n) => new RegExp('\\bG0*' + n + '\\b', 'i').test(code);   // G4 ≡ G04 (leading zeros)
     const M = (n) => new RegExp('\\bM0*' + n + '\\b', 'i').test(code);

@@ -51,6 +51,27 @@ export const dialect = {
     hmiToast: (msg) => [`(MSG,${msg})`],   // operator-message comment (probe-hole.ngc:84 uses (debug,…))
     hmiInput: () => [],    // [] — no blocking numeric input in stream mode
 
+    // recognize(line): parse inverse of the RS274NGC-specific emit. Flow is STRUCTURED O-WORDS: ifGoto emits
+    // `o<n> if [cond NEGATED]` and label emits `o<n> endif`, so the inverse un-negates the word operator (INV).
+    // Probe = G38.2; WCS = G10 L20; message = (MSG,…) — which looks like a comment, hence recognize runs first.
+    recognize(line) {
+        const AXR = ['X', 'Y', 'Z', 'A'];
+        const nos = (s) => (/[#[]/.test(s) ? s : (Number.isFinite(Number(s)) ? Number(s) : s));
+        const INV = { ne: '==', eq: '!=', ge: '<', le: '>', gt: '<=', lt: '>=' };   // inverse of NEG above
+        let m;
+        if ((m = line.match(/^G38\.2 ([XYZA])(\S+) F(\S+)$/))) return { type: 'probe', params: { axis: m[1], to: nos(m[2]), feed: nos(m[3]) } };
+        if ((m = line.match(/^o(\d+) if \[(.+?) (eq|ne|lt|gt|le|ge) (.+?)\]$/))) return { type: 'ifgoto', params: { lhs: m[2], op: INV[m[3]], rhs: m[4], goto: +m[1] } };
+        if ((m = line.match(/^o(\d+) endif$/))) return { type: 'label', params: { n: +m[1] } };
+        if ((m = line.match(/^G10 L20 P(\S+) ([XYZA])(.+)$/))) return { type: 'setworkoffset', params: { wcs: nos(m[1]), axis: m[2], value: m[3] } };
+        if ((m = line.match(/^\(MSG,(.*)\)$/))) return { type: 'message', params: { text: m[1] } };
+        if ((m = line.match(/^(#\d+)=#(\d+)$/))) {
+            const sys = +m[2];
+            let ax = sys - 5061; if (ax >= 0 && ax <= 3) return { type: 'proberead', params: { axis: AXR[ax], var: m[1] } };
+            ax = sys - 5420; if (ax >= 0 && ax <= 3) return { type: 'readmachine', params: { axis: AXR[ax], var: m[1] } };
+        }
+        return null;
+    },
+
     notes: 'RS274NGC family — grblHAL + LinuxCNC under ONE binding (grblHAL copied LinuxCNC: #5061 is tagged '
         + '"// LinuxCNC" in ngc_params.c). Cleanest ~1:1 with DDCS concepts and free/open ⇒ best distribution target. '
         + 'THE KEY DIFFERENCE: flow is STRUCTURED O-WORDS (o<n> if/elseif/else/endif, while/endwhile, sub/endsub/call) '

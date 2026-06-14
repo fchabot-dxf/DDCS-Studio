@@ -44,7 +44,10 @@ export const dialect = {
     // must be tried before the generic assign/ifgoto. Mirrors the verified emit forms 1:1 (round-trips).
     recognize(line) {
         const AXR = ['X', 'Y', 'Z', 'A'];
+        const nos = (s) => (/[#[]/.test(s) ? s : (Number.isFinite(Number(s)) ? Number(s) : s));   // number, else #var/[expr]
         let m;
+        // probe cycle: G31 <axis><to> F<feed> P<port> L<level> Q1  (before the core G31/move-probe)
+        if ((m = line.match(/^G31 ([XYZA])(\S+) F(\S+) P(\S+) L(\d+) Q1$/))) return { type: 'probe', params: { axis: m[1], to: nos(m[2]), feed: nos(m[3]), port: nos(m[4]), level: +m[5] } };
         // probe-trigger check: IF #1920+ax != 2 GOTO n  (probeStatus) — before the generic ifgoto
         if ((m = line.match(/^IF #(\d+)!=2 GOTO(\d+)$/))) {
             const ax = +m[1] - 1920; if (ax >= 0 && ax <= 3) return { type: 'probecheck', params: { axis: AXR[ax], goto: +m[2] } };
@@ -52,6 +55,11 @@ export const dialect = {
         if ((m = line.match(/^IF (.+?)(==|!=|<=|>=|<|>)(.+?) GOTO(\d+)$/))) return { type: 'ifgoto', params: { lhs: m[1], op: m[2], rhs: m[3], goto: +m[4] } };
         if ((m = line.match(/^GOTO(\d+)$/))) return { type: 'goto', params: { n: +m[1] } };
         if ((m = line.match(/^N(\d+)$/))) return { type: 'label', params: { n: +m[1] } };
+        // set WCS offset: indirect #[805+[wcs-1]*5+ax]=value
+        if ((m = line.match(/^#\[805\+\[(.+?)-1\]\*5\+(\d+)\]=(.+)$/))) { const ax = +m[2]; if (ax >= 0 && ax <= 3) return { type: 'setworkoffset', params: { wcs: m[1], axis: AXR[ax], value: m[3] } }; }
+        // HMI: message (#1505=-5000(text)) / ask-number (#2070=<var>(prompt)) — before the generic #x=#sys reads
+        if ((m = line.match(/^#1505=-5000\((.*)\)$/))) return { type: 'message', params: { text: m[1] } };
+        if ((m = line.match(/^#2070=([^(]+)\((.*)\)$/))) return { type: 'asknumber', params: { var: '#' + m[1].trim(), prompt: m[2] } };
         // probe trigger-position read (#var=#1925+ax) / machine-DRO read (#var=#880+ax) — before generic assign
         if ((m = line.match(/^(#\d+)=#(\d+)$/))) {
             const sys = +m[2];

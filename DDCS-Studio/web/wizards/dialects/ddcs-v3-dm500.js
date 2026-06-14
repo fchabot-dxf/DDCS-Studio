@@ -42,6 +42,22 @@ export const dialect = {
     hmiToast: () => [],
     hmiInput: () => [],
 
+    // recognize(line): parse inverse of the DM500-specific emit (WORD IF ops, #864+ DRO, G92 WCS). The
+    // move-until-input probe (M101 / G91 G01 … / M102) is a 3-line op the per-line parser can't fold back yet,
+    // so its lines stay verbatim (raw) — lossless round-trip; proper decode needs parser look-ahead (TODO).
+    recognize(line) {
+        const AXR = ['X', 'Y', 'Z', 'A'];
+        const OPI = { EQ: '==', NE: '!=', LT: '<', GT: '>', LE: '<=', GE: '>=' };
+        let m;
+        if (/^M10[12]$/.test(line) || /^G91 G01 [XYZA]\S* F\S+$/.test(line)) return { type: 'raw', params: { text: line } };   // probe triplet → verbatim
+        if ((m = line.match(/^IF (.+?)(EQ|NE|LT|GT|LE|GE)(.+?) GOTO(\d+)$/))) return { type: 'ifgoto', params: { lhs: m[1], op: OPI[m[2]], rhs: m[3], goto: +m[4] } };
+        if ((m = line.match(/^GOTO(\d+)$/))) return { type: 'goto', params: { n: +m[1] } };
+        if ((m = line.match(/^N(\d+)$/))) return { type: 'label', params: { n: +m[1] } };
+        if ((m = line.match(/^G90 G92 ([XYZA])(.+)$/))) return { type: 'setworkoffset', params: { wcs: '#578', axis: m[1], value: m[2] } };
+        if ((m = line.match(/^(#\d+)=#(\d+)$/))) { const ax = +m[2] - 864; if (ax >= 0 && ax <= 3) return { type: 'proberead', params: { axis: AXR[ax], var: m[1] } }; }
+        return null;
+    },
+
     notes: 'STRUCTURALLY different: move-until-input probing (M101/G01/M102, no G31), #864-866 DRO, G92 WCS, dwell in '
         + 'SECONDS, WORD IF operators (EQ/LT/GT — `!=`/`NE` NOT in the dump; mapped to NE best-effort, verify before use). '
         + 'machineMove G53 gated by config #395 (dump safe-Z = M98 P101 subprogram) — TO CONFIRM. HMI absent. '

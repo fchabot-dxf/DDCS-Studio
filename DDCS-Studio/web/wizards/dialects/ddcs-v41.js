@@ -38,6 +38,22 @@ export const dialect = {
     hmiToast: () => [],
     hmiInput: () => [],
 
+    // recognize(line): parse inverse of the V4.1-specific emit (probe G31…L#682, tight IF…GOTO, G90 G92 WCS,
+    // #1500+ DRO reads). No status/HMI vars here (those fold to nothing on V4.1). Probe-read and read-machine
+    // share #1500+ax, so both decode to proberead (V4.1 conflates them) — byte-identical either way.
+    recognize(line) {
+        const AXR = ['X', 'Y', 'Z', 'A'];
+        const nos = (s) => (/[#[]/.test(s) ? s : (Number.isFinite(Number(s)) ? Number(s) : s));
+        let m;
+        if ((m = line.match(/^G31 ([XYZA])(\S+) L#682 Q1 K0 F(\S+)$/))) return { type: 'probe', params: { axis: m[1], to: nos(m[2]), feed: nos(m[3]) } };
+        if ((m = line.match(/^IF (.+?)(==|!=|<=|>=|<|>)(.+?)GOTO(\d+)$/))) return { type: 'ifgoto', params: { lhs: m[1], op: m[2], rhs: m[3], goto: +m[4] } };
+        if ((m = line.match(/^GOTO(\d+)$/))) return { type: 'goto', params: { n: +m[1] } };
+        if ((m = line.match(/^N(\d+)$/))) return { type: 'label', params: { n: +m[1] } };
+        if ((m = line.match(/^G90 G92 ([XYZA])(.+)$/))) return { type: 'setworkoffset', params: { wcs: '#578', axis: m[1], value: m[2] } };
+        if ((m = line.match(/^(#\d+)=#(\d+)$/))) { const ax = +m[2] - 1500; if (ax >= 0 && ax <= 3) return { type: 'proberead', params: { axis: AXR[ax], var: m[1] } }; }
+        return null;
+    },
+
     notes: '≈Expert FORM, vars at #1500+ (DRO #1500-1503, workpiece #1506-1509, WCS base #1512 stride 6). Zero via '
         + 'G92 with a WORK coord (or direct #1506-1509 write), NOT the indirect #[805+] write. No probe status var '
         + '(result = post-probe DRO #1502). Machine move = G0 G53. ifGoto has NO space before GOTO. HMI via '
