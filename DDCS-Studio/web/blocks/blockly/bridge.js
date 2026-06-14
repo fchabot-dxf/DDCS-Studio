@@ -71,7 +71,10 @@ function jsonDef(def) {
 }
 
 /** Define every op as a Blockly block. (Emit happens via stackBridge → emitMapped, not a Blockly generator.) */
+let _Blockly = null;
+export const getBlockly = () => _Blockly;   // stackBridge needs the serialization API to render blocks (v11)
 export function installBlockly(Blockly) {
+    _Blockly = Blockly;
     Blockly.defineBlocksWithJsonArray(PALETTE.map(jsonDef));
 }
 

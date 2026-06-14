@@ -42,6 +42,7 @@ export async function initBlocks() {
   const preview = document.getElementById('blk-preview');
   const host3d = document.getElementById('blk-host3d');
   let mode = '2d';
+  let pendingFit = false;   // "frame the loaded op once the host has real dimensions" (tab just became visible)
   const anim = { playing: false, k: 0, raf: null };
   let curSegs = [];
 
@@ -50,6 +51,12 @@ export async function initBlocks() {
     grid: { spacing: 26, length: 2, colour: '#1b2733', snap: true },
     zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { smoothScroll: true },
   });
+
+  // Blockly injected into a tab that may still have 0 size — resize the workspace SVG whenever the host gets
+  // real dimensions (the fix for "G-code is there but I don't see the blocks"). On the first real size after a
+  // load, frame the op (zoomToFit) so it's actually visible.
+  const fit = () => { try { B.svgResize(ws); if (pendingFit && host.clientWidth > 0) { ws.zoomToFit(); pendingFit = false; } } catch (_) { /* pre-render */ } };
+  new ResizeObserver(fit).observe(host);
 
   // ---- emit: workspace → our stack → the proven emitMapped fold → right panel ----
   function reproject() {

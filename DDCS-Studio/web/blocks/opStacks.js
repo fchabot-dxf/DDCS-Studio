@@ -15,8 +15,9 @@ import { drillStack } from '../wizards/drillWizard.js';
 import { wcsStack } from '../wizards/wcsWizard.js';
 import { edgeStack } from '../wizards/edgeWizard.js';
 import { commStack } from '../wizards/communicationWizard.js';
+import { middleStack } from '../wizards/middleWizard.js';
 
-const BUILDERS = { surfacing: surfacingStack, pocket: pocketStack, slot: slotStack, drill: drillStack, wcs: wcsStack, edge: edgeStack, comm: commStack };
+const BUILDERS = { surfacing: surfacingStack, pocket: pocketStack, slot: slotStack, drill: drillStack, wcs: wcsStack, edge: edgeStack, comm: commStack, middle: middleStack };
 // (No bare flag — framing is now Program Start/End BLOCKS in the stack; a snippet just omits them.)
 const find = (prog, type) => (prog || []).find((b) => b && b.type === type);
 

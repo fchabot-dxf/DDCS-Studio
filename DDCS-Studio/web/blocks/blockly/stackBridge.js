@@ -6,7 +6,7 @@
  * stack is written into the workspace for "open as blocks". block.type === op type, so it's a 1:1 walk.
  */
 import { BLOCKS } from '../../wizards/ops/index.js';
-import { FN, fieldKind, fieldsOf, isWrap } from './bridge.js';
+import { FN, fieldKind, fieldsOf, isWrap, getBlockly } from './bridge.js';
 
 // ── workspace → stack ────────────────────────────────────────────────────────
 /** One block (NOT its next sibling) → a record { id, type, params, children? }. */
@@ -45,48 +45,47 @@ export function workspaceToStack(ws) {
 }
 
 // ── stack → workspace ────────────────────────────────────────────────────────
-/** Build one Blockly block from a record (fields + value sockets + DO children); returns the block. */
-function build(ws, rec) {
-    const def = BLOCKS[rec.type], b = ws.newBlock(rec.type);
-    if (def) {
-        for (const f of fieldsOf(def)) {
-            const k = fieldKind(def, f), name = FN(f), v = rec.params[f];
-            if (k === 'value' || k === 'region' || k === 'boolean') {
-                const inp = b.getInput(name);
-                if (v && typeof v === 'object' && v.type) {                  // a nested reporter record
-                    const child = build(ws, v); inp.connection.connect(child.outputConnection);
-                } else if (k === 'value') {                                  // a number → math_number shadow
-                    const sh = ws.newBlock('math_number'); sh.setFieldValue(String(Number(v) || 0), 'NUM');
-                    sh.setShadow(true); if (sh.initSvg) sh.initSvg();
-                    inp.connection.connect(sh.outputConnection);
-                }
-            } else if (k === 'checkbox') b.setFieldValue(v ? 'TRUE' : 'FALSE', name);
-            else b.setFieldValue(String(v ?? ''), name);
-        }
-        if (isWrap(def) && rec.children && rec.children.length) {
-            const doInput = b.getInput('DO');
-            let prev = null;
-            for (const c of rec.children) {
-                const cb = build(ws, c);
-                if (prev) prev.nextConnection.connect(cb.previousConnection);
-                else doInput.connection.connect(cb.previousConnection);
-                prev = cb;
-            }
-        }
+// We load via Blockly's serialization API rather than newBlock()+initSvg()+render(). In Blockly v11 the
+// latter creates valid block MODELS but never drives the render queue, so the blocks exist (G-code emits)
+// yet are never drawn or positioned — the "code is there but I can't see the blocks" bug. serialization.load
+// flushes the render queue correctly. So: stack → Blockly JSON state → load.
+
+/** One record → a Blockly serialization-JSON block node (fields + value/region sockets + DO children). */
+function recToJson(rec) {
+    const def = BLOCKS[rec.type], node = { type: rec.type };
+    if (!def) return node;
+    const fields = {}, inputs = {};
+    for (const f of fieldsOf(def)) {
+        const k = fieldKind(def, f), name = FN(f), v = rec.params[f];
+        if (k === 'value' || k === 'region' || k === 'boolean') {
+            if (v && typeof v === 'object' && v.type) inputs[name] = { block: recToJson(v) };   // nested reporter
+            else if (k === 'value') inputs[name] = { shadow: { type: 'math_number', fields: { NUM: Number(v) || 0 } } };
+            // empty region/boolean socket → leave unset
+        } else if (k === 'checkbox') fields[name] = !!v;
+        else fields[name] = String(v ?? '');
     }
-    if (b.initSvg) b.initSvg();
-    return b;
+    if (isWrap(def) && rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
+    if (Object.keys(fields).length) node.fields = fields;
+    if (Object.keys(inputs).length) node.inputs = inputs;
+    return node;
+}
+
+/** A list of records → the first node, with `next` linking the statement chain (siblings). */
+function chainToJson(records) {
+    let head = null, tail = null;
+    for (const c of (records || [])) {
+        const j = recToJson(c);
+        if (head) tail.next = { block: j }; else head = j;
+        tail = j;
+    }
+    return head;
 }
 
 /** Render a program stack into the workspace as one connected column (replaces its contents). */
 export function stackToWorkspace(stack, ws) {
-    ws.clear();
-    let prev = null;
-    (stack || []).forEach((rec) => {
-        const b = build(ws, rec);
-        if (prev) prev.nextConnection.connect(b.previousConnection);
-        else b.moveBy(24, 24);
-        prev = b;
-    });
-    if (ws.render) ws.render();
+    const B = getBlockly();
+    const head = chainToJson(stack || []);
+    if (!head) { ws.clear(); return; }
+    head.x = 24; head.y = 24;
+    B.serialization.workspaces.load({ blocks: { languageVersion: 0, blocks: [head] } }, ws);   // clears + renders
 }
