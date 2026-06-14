@@ -73,3 +73,16 @@ export function surfacingToBlocks(params = {}) {
     down.children = [over];
     return [down];
 }
+
+/** SlotWizard params → [ Slot ]. The Slot is a self-contained leaf (depth baked in, like Line), so the stack
+ *  is a single block — the wizard and the block share the slotPath kernel, so the toolpath is identical. */
+export function slotToBlocks(params = {}) {
+    const slot = newBlock('slot');
+    slot.params = {
+        x0: num(params.ax, 0), y0: num(params.ay, 0), x1: num(params.bx, 60), y1: num(params.by, 0),
+        width: num(params.width, num(params.toolDia, 6)), tool: num(params.toolDia, 6),
+        stepoverPct: num(params.stepoverPct, 40), depth: num(params.depth, 4), stepdown: num(params.stepdown, 1.5),
+        feed: num(params.feed, 600), plunge: num(params.plunge, 150), clearance: num(params.clearance, 5),
+    };
+    return [slot];
+}

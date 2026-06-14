@@ -17,6 +17,7 @@
 import { drillBlock, peckDrill } from './drill.js';
 import { boreBlock, helicalBore } from './bore.js';
 import { lineBlock, lineCut } from './line.js';
+import { slotBlock, slotPath } from './slot.js';
 import { wallBlock } from './wall.js';
 import { regionBlock } from './region.js';
 import { stepoverBlock, fillStrategy } from './stepover.js';
@@ -53,7 +54,7 @@ export const PALETTE = [
     moveBlock, arcBlock, probeBlock, machineMoveBlock,         // Move (+ G53 machine-coord move)
     spindleBlock, feedBlock, dwellBlock, coolantBlock, toolBlock, wcsBlock, distModeBlock,   // Machine (modal state)
     endProgramBlock, mcodeBlock, probeReadBlock, readMachineBlock, setWorkOffsetBlock,   // Machine (end, raw M-code, probe/DRO capture, WCS write)
-    lineBlock, boreBlock, drillBlock, wallBlock,              // Ops (feature presets + wall finish)
+    lineBlock, slotBlock, boreBlock, drillBlock, wallBlock,  // Ops (feature presets + wall finish)
     arrayBlock, helixBlock, stepoverBlock, stepdownBlock,    // Modify (stamp/sweep + lateral/depth pass wrappers)
     countBlock, ifBlock, compareBlock, probeCheckBlock, labelBlock, gotoBlock, pauseBlock, askNumberBlock,   // Control (loop/cond/bool + probe-branch + label/goto + pause/operator-input)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
@@ -70,5 +71,5 @@ export const CATEGORIES = ['Shapes', 'Move', 'Machine', 'Ops', 'Modify', 'Contro
 export const BLOCKS = Object.fromEntries(PALETTE.map((d) => [d.type, d]));
 
 // Kernels + expression evaluator re-exported for STUDIO presets / direct callers.
-export { peckDrill, helicalBore, lineCut, fillStrategy, patternPoints, helixPoints, evalExpr };
+export { peckDrill, helicalBore, lineCut, slotPath, fillStrategy, patternPoints, helixPoints, evalExpr };
 export { depthLevels } from '../clearing.js';   // StepDown's level list, used by the emit fold
