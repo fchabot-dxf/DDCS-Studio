@@ -1,0 +1,2 @@
+12.5.1
+https://unpkg.com/blockly@12.5.1/  (typings: core/blockly.d.ts is the namespace index; per-symbol signatures live in core/<module>.d.ts)
