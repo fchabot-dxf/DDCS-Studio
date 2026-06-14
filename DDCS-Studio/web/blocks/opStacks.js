@@ -16,7 +16,8 @@ import { wcsStack } from '../wizards/wcsWizard.js';
 import { edgeStack } from '../wizards/edgeWizard.js';
 
 const BUILDERS = { surfacing: surfacingStack, pocket: pocketStack, slot: slotStack, drill: drillStack, wcs: wcsStack, edge: edgeStack };
-const BARE = new Set(['wcs', 'edge']);   // snippet ops emit without the program header/footer
+// (No bare flag — framing is now Program Start/End BLOCKS in the stack; a snippet just omits them.)
+const find = (prog, type) => (prog || []).find((b) => b && b.type === type);
 
 // ── reverse sync: edited block stack → STUDIO form fields ──────────────────────────────────────────────
 // Read the (possibly edited) block objects and return { formFieldId: value }. The inverse of each builder,
@@ -31,7 +32,7 @@ const formNum = (id, d) => {
 
 const RECONCILERS = {
     surfacing(prog) {
-        const down = prog[0], over = down && down.children && down.children[0], rg = over && over.params && over.params.region;
+        const down = find(prog, 'stepdown'), over = down && down.children && down.children[0], rg = over && over.params && over.params.region;
         if (!down || !over || !rg || !rg.params) return null;
         const tool = formNum('sf_toolDia', 12);   // un-derive stepover% from the absolute StepOver value
         return {
@@ -43,8 +44,8 @@ const RECONCILERS = {
         };
     },
     slot(prog) {
-        const s = prog[0];
-        if (!s || s.type !== 'slot' || !s.params) return null;
+        const s = find(prog, 'slot');
+        if (!s || !s.params) return null;
         const p = s.params;
         return {
             sl_ax: p.x0, sl_ay: p.y0, sl_bx: p.x1, sl_by: p.y1, sl_width: p.width,
@@ -53,8 +54,8 @@ const RECONCILERS = {
         };
     },
     pocket(prog) {
-        const down = prog[0];
-        if (!down || down.type !== 'stepdown' || !Array.isArray(down.children)) return null;   // too-small fallback (drill) → no reverse
+        const down = find(prog, 'stepdown');
+        if (!down || !Array.isArray(down.children)) return null;   // too-small fallback (drill) → no reverse
         const over = down.children.find((c) => c.type === 'stepover'), rg = over && over.params && over.params.region;
         if (!over || !rg || !rg.params) return null;
         const tool = formNum('p_toolDia', 6), r = tool / 2;   // the Region is inset by the tool radius — un-inset it
@@ -74,8 +75,8 @@ const RECONCILERS = {
         return f;
     },
     drill(prog) {
-        const arr = prog[0];
-        if (!arr || arr.type !== 'array' || !arr.params) return null;
+        const arr = find(prog, 'array');
+        if (!arr || !arr.params) return null;
         const p = arr.params, hole = arr.children && arr.children[0];
         const f = { d_pattern: p.pattern, d_originX: p.x0, d_originY: p.y0, d_skip: p.skip || '' };
         if (p.pattern === 'circle') { f.d_dia = p.dia; f.d_count = p.count; f.d_startAngle = p.startAngle; }
@@ -113,7 +114,7 @@ export function buildActiveOpStack() {
     shownOp = op.type;                      // remember what the Blocks tab is showing (for reverse sync)
     if (s === loadedSig) return null;       // already loaded → don't clobber block-side edits
     loadedSig = s;
-    return { blocks: BUILDERS[op.type](op.params), bare: BARE.has(op.type) };
+    return { blocks: BUILDERS[op.type](op.params) };
 }
 
 /**

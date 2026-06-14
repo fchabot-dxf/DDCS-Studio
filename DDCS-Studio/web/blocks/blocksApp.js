@@ -34,7 +34,6 @@ export function initBlocks() {
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/\s+/g, '');   // 'Mark Up' → 'markup' (used by palette + cards)
   let mode = '2d';
-  let progBare = false;   // true when the loaded program is a macro SNIPPET (no header/footer) — e.g. a probe/WCS op
   const anim = { playing: false, k: 0, raf: null };
   let curSegs = [];
 
@@ -178,7 +177,7 @@ export function initBlocks() {
   function reproject() {
     const ordered = orderedProgram();                    // execution order = top-to-bottom on the canvas
     const dialect = resolveActivePost(getActiveProfile().id);   // active post processor (override or follow machine)
-    const { text, lines, map } = emitMapped(ordered, { dialect, bare: progBare });
+    const { text, lines, map } = emitMapped(ordered, { dialect });
     renderCode(lines, map);
     curSegs = segments(text);
     if (mode === '3d') update3D(text);
@@ -551,10 +550,9 @@ export function initBlocks() {
   render(); apply();
 
   /** Replace the canvas with a block stack (a STUDIO op viewed as blocks) and lay it out as ONE connected
-   *  column. `bare` → emit as a snippet (no program header/footer). Two-pass: render to measure real block
-   *  heights, then stack them flush so markConnections() joins them. */
-  function loadProgram(blocks, bare = false) {
-    progBare = !!bare;
+   *  column. Two-pass: render to measure real block heights, then stack them flush so markConnections() joins
+   *  them. (Program framing is just Program Start/End blocks in the stack — no special snippet mode.) */
+  function loadProgram(blocks) {
     program.length = 0;
     (blocks || []).forEach((b, i) => { b.x = 40; b.y = 24 + i * 80; program.push(b); });   // provisional spread
     render();                                                  // first pass: DOM exists → heights measurable

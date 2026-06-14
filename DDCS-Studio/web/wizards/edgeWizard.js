@@ -78,6 +78,6 @@ export function edgeStack(params = {}) {
 export class EdgeWizard {
     generate(params) {
         recordOp('edge', params);   // let the Blocks tab open this op as its stack
-        return emitMapped(edgeStack(params), { bare: true }).text;
+        return emitMapped(edgeStack(params)).text;   // a snippet: no Program Start/End blocks
     }
 }

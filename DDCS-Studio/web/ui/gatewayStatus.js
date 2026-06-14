@@ -102,7 +102,7 @@ export function initGatewayStatus() {
                 // op, no builder for it yet, or it's unchanged — so it won't clobber block-side edits.
                 const { buildActiveOpStack } = await import('../blocks/opStacks.js');
                 const r = buildActiveOpStack();
-                if (r && window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(r.blocks, r.bare);
+                if (r && window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(r.blocks);
             } catch (err) { console.error('blocks init failed', err); }
         }
     }

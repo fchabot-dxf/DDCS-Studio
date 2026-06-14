@@ -20,7 +20,6 @@
 import { BLOCKS, evalExpr, depthLevels } from '../wizards/ops/index.js';
 import { getDialect, DEFAULT_DIALECT } from '../wizards/dialects/index.js';
 import { num, r3 } from '../wizards/ops/util.js';
-import { headerBlock, footerBlock } from '../wizards/cuttingBlocks.js';
 
 let _seq = 0;
 /** Fresh block record from a registry type, seeded with that primitive's defaults. */
@@ -161,25 +160,17 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     return def.emit(p, dx, dy, dialect).map((ln) => tag(ln, own));   // leaf / move standalone (dialect = active profile)
 }
 
-/** Fold the program → { text, lines, map }. map[i] = ancestry of block ids producing line i (null = header/footer/seam). */
+/** Fold the program → { text, lines, map }. map[i] = ancestry of block ids producing line i (null = a seam).
+ *  No auto framing: the program is exactly its blocks. A full program begins with a Program Start block and
+ *  ends with Program End; a snippet (probe/WCS/comms) simply omits them. Top blocks are blank-line separated. */
 export function emitMapped(blocks, settings = {}) {
-    const clr = num(settings.clearance, 5);
     const dialect = settings.dialect || getDialect(settings.profileId);   // active controller profile → its G-code forms
     const scope = Object.create(null);   // top-level variable environment, threaded across the stack
-    // `bare` = a macro SNIPPET (probe/WCS/setup): no program header/footer/section-markers — just the blocks.
-    // (Full cutting programs use the default framing: title + G90/spindle + clearance + … + M5/M9/M30.)
-    const bare = !!settings.bare;
     const T = [];
-    if (!bare) {
-        T.push(tag(settings.title || '( DDCS Studio - Blocks )', null));
-        headerBlock(settings).forEach((l) => T.push(tag(l, null)));
-        T.push(tag(`G0 Z${clr}   ( clearance )`, null));
-    }
-    (blocks || []).forEach((b) => {
-        if (!bare) T.push(tag('', null), tag(`( --- ${b.type.toUpperCase()} --- )`, [b.id]));
+    (blocks || []).forEach((b, i) => {
+        if (i > 0) T.push(tag('', null));   // a blank line between top-level blocks
         T.push(...emit(b, 0, 0, [], scope, dialect));
     });
-    if (!bare) T.push(tag('', null), ...footerBlock(settings).map((l) => tag(l, null)));
     const lines = T.map((t) => t.line);
     return { text: lines.join('\n'), lines, map: T.map((t) => t.src) };
 }

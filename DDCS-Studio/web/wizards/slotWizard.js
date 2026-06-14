@@ -8,11 +8,10 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
+import { makeStart, makeEnd } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
 
-const r3 = (n) => Math.round(n * 1000) / 1000;
-
-/** Slot params → [ Slot ]. The one source of truth for both displays. */
+/** Slot params → [ Program Start, Slot, Program End ]. The one source of truth for both displays. */
 export function slotStack(params = {}) {
     const slot = newBlock('slot');
     slot.params = {
@@ -21,16 +20,12 @@ export function slotStack(params = {}) {
         stepoverPct: num(params.stepoverPct, 40), depth: num(params.depth, 4), stepdown: num(params.stepdown, 1.5),
         feed: num(params.feed, 600), plunge: num(params.plunge, 150), clearance: num(params.clearance, 5),
     };
-    return [slot];
+    return [makeStart(params), slot, makeEnd(params)];
 }
 
 export class SlotWizard {
     generate(params) {
         recordOp('slot', params);   // let the Blocks tab open this op as its stack
-        const dx = num(params.bx, 60) - num(params.ax, 0), dy = num(params.by, 0) - num(params.ay, 0);
-        const len = Math.hypot(dx, dy);
-        const tool = Math.max(0.1, num(params.toolDia, 6)), width = Math.max(tool, num(params.width, tool));
-        const title = `( Slot - ${r3(len)} mm long, ${width} mm wide - DDCS Studio )`;
-        return emitMapped(slotStack(params), { ...params, title }).text;
+        return emitMapped(slotStack(params)).text;
     }
 }

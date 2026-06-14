@@ -9,9 +9,8 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
+import { makeStart, makeEnd } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
-
-const r3 = (n) => Math.round(n * 1000) / 1000;
 
 /** Surfacing params → [ StepDown{ StepOver(Region) } ]. The one source of truth for both displays. */
 export function surfacingStack(params = {}) {
@@ -30,16 +29,15 @@ export function surfacingStack(params = {}) {
     const down = newBlock('stepdown');
     down.params = { to: num(params.depth, 0.5), by: num(params.stepdown, 0.5) };
     down.children = [over];
-    return [down];
+    return [makeStart(params), down, makeEnd(params)];   // Program Start … op … Program End (framing as blocks)
 }
 
 export class SurfacingWizard {
     generate(params) {
         recordOp('surfacing', params);   // let the Blocks tab open this op as its stack
         const w = num(params.w, 100), h = num(params.h, 80);
-        const title = `( Surfacing - ${w} × ${r3(h)} mm - DDCS Studio )`;
         // Emit THROUGH the block stack — the same stack the Blocks tab renders/edits.
-        const stack = (w <= 0 || h <= 0) ? [] : surfacingStack(params);
-        return emitMapped(stack, { ...params, title }).text;
+        const stack = (w <= 0 || h <= 0) ? [makeStart(params), makeEnd(params)] : surfacingStack(params);
+        return emitMapped(stack).text;
     }
 }

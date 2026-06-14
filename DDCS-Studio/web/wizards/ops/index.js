@@ -42,6 +42,7 @@ import { commentBlock } from './comment.js';
 import { variableBlock } from './variable.js';
 import { mathBlock } from './math.js';
 import { machineMoveBlock, endProgramBlock, mcodeBlock } from './macro.js';
+import { progStartBlock, progEndBlock } from './program.js';
 import { labelBlock, gotoBlock, ifGotoBlock } from './flow.js';
 import { probeReadBlock, probeCheckBlock, readMachineBlock } from './measure.js';
 import { setWorkOffsetBlock } from './setworkoffset.js';
@@ -54,7 +55,7 @@ export const PALETTE = [
     regionBlock,                                               // Shapes (boundary → fills/walls via a region socket)
     moveBlock, arcBlock, probeBlock, machineMoveBlock,         // Move (+ G53 machine-coord move)
     spindleBlock, feedBlock, dwellBlock, coolantBlock, toolBlock, wcsBlock, distModeBlock,   // Machine (modal state)
-    endProgramBlock, mcodeBlock, probeReadBlock, readMachineBlock, setWorkOffsetBlock,   // Machine (end, raw M-code, probe/DRO capture, WCS write)
+    progStartBlock, progEndBlock, endProgramBlock, mcodeBlock, probeReadBlock, readMachineBlock, setWorkOffsetBlock,   // Machine (program start/end framing, end, raw M-code, probe/DRO capture, WCS write)
     lineBlock, slotBlock, boreBlock, drillBlock, wallBlock,  // Ops (feature presets + wall finish)
     arrayBlock, helixBlock, stepoverBlock, stepdownBlock,    // Modify (stamp/sweep + lateral/depth pass wrappers)
     countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, pauseBlock, askNumberBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + pause/operator-input)

@@ -8,6 +8,7 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
+import { makeStart, makeEnd } from '../blocks/programFraming.js';
 import { patternPoints } from './ops/index.js';
 import { num } from './ops/util.js';
 
@@ -32,15 +33,13 @@ export function drillStack(params = {}) {
         ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) }
         : { x: 0, y: 0, depth: num(params.depth, 5), peck: num(params.peck, 5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) };
     arr.children = [hole];
-    return [arr];
+    return [makeStart(params), arr, makeEnd(params)];
 }
 
 export class DrillWizard {
     generate(params) {
         recordOp('drill', params);   // let the Blocks tab open this op as its stack
-        const helical = params.method === 'helical';
-        const title = `( Hole pattern - ${params.pattern || 'grid'} - ${helical ? 'helical bore' : 'peck drill'} - DDCS Studio )`;
-        return emitMapped(drillStack(params), { ...params, title }).text;
+        return emitMapped(drillStack(params)).text;
     }
 
     /** Preview/sim start hint (work frame): origin; the pattern is drawn from there. */

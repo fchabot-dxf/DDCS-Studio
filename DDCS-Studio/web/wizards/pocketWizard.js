@@ -9,6 +9,7 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
+import { makeStart, makeEnd } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
 
 /** Pocket params → its block stack. The one source of truth for both displays. */
@@ -35,7 +36,7 @@ export function pocketStack(params = {}) {
     if (tooSmall) {   // pocket smaller than the tool → a single centre plunge, pecking to depth
         const hole = newBlock('drill');
         hole.params = { x: cx, y: cy, depth, peck: by, feed: plunge, clearance: clr };
-        return [hole];
+        return [makeStart(params), hole, makeEnd(params)];
     }
 
     const over = newBlock('stepover');
@@ -48,15 +49,12 @@ export function pocketStack(params = {}) {
         wall.params = { region, z: 'z', feed, plunge, clearance: clr };
         down.children.push(wall);
     }
-    return [down];
+    return [makeStart(params), down, makeEnd(params)];
 }
 
 export class PocketWizard {
     generate(params) {
         recordOp('pocket', params);   // let the Blocks tab open this op as its stack
-        const shape = params.shape || 'rect';
-        const head = shape === 'rect' ? `${num(params.w, 80)} × ${num(params.h, 60)} mm` : `Ø${num(params.dia, 50)} mm`;
-        const title = `( Pocket - ${shape} ${head} - DDCS Studio )`;
-        return emitMapped(pocketStack(params), { ...params, title }).text;
+        return emitMapped(pocketStack(params)).text;
     }
 }

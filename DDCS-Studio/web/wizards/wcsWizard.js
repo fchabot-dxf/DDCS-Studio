@@ -56,7 +56,7 @@ export class WCSWizard {
 
     generate(params) {
         recordOp('wcs', params);   // let the Blocks tab open this op as its stack
-        return emitMapped(wcsStack(params), { bare: true }).text;
+        return emitMapped(wcsStack(params)).text;   // a snippet: no Program Start/End blocks
     }
 
     getWCSName(sys) { return sys === '0' ? 'Active WCS' : `G${sys}`; }
