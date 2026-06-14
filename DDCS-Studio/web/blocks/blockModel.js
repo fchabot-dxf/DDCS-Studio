@@ -17,7 +17,7 @@
  * the kernel runs, so the kernels still receive plain numbers and never change. Blocks give SYNTACTIC
  * correctness, not motion safety (lint comes next — see MULTI-OP-STACKING.md).
  */
-import { BLOCKS, evalExpr } from '../wizards/ops/index.js';
+import { BLOCKS, evalExpr, depthLevels } from '../wizards/ops/index.js';
 import { num, r3 } from '../wizards/ops/util.js';
 import { headerBlock, footerBlock } from '../wizards/cuttingBlocks.js';
 
@@ -27,7 +27,7 @@ export function newBlock(type) {
     const def = BLOCKS[type];
     if (!def) throw new Error(`unknown block type: ${type}`);
     const b = { id: `${type}${++_seq}`, type, params: { ...def.defaults } };
-    if (def.kind === 'container' || def.kind === 'path' || def.kind === 'loop' || def.kind === 'cond') b.children = [];
+    if (['container', 'path', 'loop', 'cond', 'depth', 'fill'].includes(def.kind)) b.children = [];
     return b;
 }
 
@@ -98,6 +98,32 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null)) {
         const on = resolveBool(block.params.cond, scope);
         const out = [tag(`( ${block.id}: if ${on ? 'true' : 'false'} )`, own)];
         if (on) (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope)));
+        return out;
+    }
+
+    if (def.kind === 'depth') {                // STEP DOWN: run the body once per Z level, exposing scope `z` (negative)
+        const ev = (x, d) => { try { return evalExpr(x, scope); } catch { return d; } };
+        const to = ev(block.params.to, 5), by = ev(block.params.by, 1) || 1;
+        const out = [];
+        for (const L of depthLevels(to, by)) {
+            const child = Object.create(scope); child.z = -L;          // child scope: cut Z visible to the body, doesn't leak out
+            out.push(tag(`( ${block.id}: depth z=${r3(-L)} )`, own));
+            (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child)));
+        }
+        return out;
+    }
+
+    if (def.kind === 'fill') {                 // STEP OVER: clear the region at the current depth (auto-cut, or run a per-pass body)
+        const p = resolveParams(block.params, scope);
+        const z = num(p.z, 0);
+        const out = [tag(`( ${block.id}: ${p.strategy} fill z=${r3(z)} )`, own)];
+        if ((block.children || []).length && def.segments) {           // body present → run it once per pass with {x0,y0,x1,y1} in scope
+            def.segments(p).forEach((seg) => {
+                const child = Object.create(scope); Object.assign(child, seg);
+                block.children.forEach((c) => out.push(...emit(c, dx, dy, own, child)));
+            });
+        } else def.lines(p, z).forEach((ln) => out.push(tag(ln, own)));   // empty body → auto-cut the passes
+        out.push(tag(`G0 Z${r3(num(p.clearance, 5))}   ( retract )`, own));
         return out;
     }
 
