@@ -52,3 +52,24 @@ export function pocketToBlocks(params = {}) {
     }
     return [down];
 }
+
+/**
+ * SurfacingWizard params → [ StepDown{ StepOver(Region) } ]. Like a pocket but the area IS the tool-centre
+ * sweep (NO radius inset — the tool overhangs the edge to face the whole top) and there's NO wall pass.
+ * Rect only; strategy raster → 'parallel', else 'concentric'. Cutting passes match the wizard.
+ */
+export function surfacingToBlocks(params = {}) {
+    const tool = Math.max(0.1, num(params.toolDia, 12));
+    const so = Math.max(0.2, tool * num(params.stepoverPct, 60) / 100);
+    const clr = num(params.clearance, 5), feed = num(params.feed, 800), plunge = num(params.plunge, 200);
+    const raster = (params.strategy || 'raster') === 'raster';
+    const region = insetRegion({ ...params, shape: 'rect' }, 0);   // tool-centre = the area itself (no inset)
+
+    const over = newBlock('stepover');
+    over.params = { region, stepover: so, strategy: raster ? 'parallel' : 'concentric', direction: 'bothways', z: 'z', feed, plunge, clearance: clr };
+
+    const down = newBlock('stepdown');
+    down.params = { to: num(params.depth, 0.5), by: num(params.stepdown, 0.5) };
+    down.children = [over];
+    return [down];
+}
