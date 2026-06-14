@@ -1,8 +1,11 @@
 /**
  * wizards/dialects/ddcs-v3-dm500.js — DDCS V3 / DM500 dialect.
  *
- * ⚠ UNVERIFIED ON HARDWARE — dump-derived best-effort. We have no DM500 to test on; trust nothing here until it
- * runs on a real DM500. Only DDCS Expert M350 is hardware-testable for us (see ddcs-expert-m350.js).
+ * ✅ FORMS DUMP-CONFIRMED vs bridge/controllers/dm500/install/ (probe.nc + defprobe.nc, 2026-06-13): the probe
+ * pair M101/G91 G01/M102, the #864-866 DRO read, the G90 G92 work-coord zero, and G04 P<seconds> dwell all match
+ * the install macros verbatim. ⚠ NOT hardware-tested (we own no DM500) — only DDCS Expert M350 is hardware-testable
+ * for us (see ddcs-expert-m350.js). The one form NOT in the dump is machineMove (G53): the stock macros retract via
+ * M98 P101 / work-frame G90 G0, never G53 — so that line is best-effort, flagged TO CONFIRM below.
  *
  * STRUCTURALLY different from Expert: move-until-input probing (M101/G01/M102, NO G31), #864-866 DRO, G92 WCS,
  * dwell in SECONDS, WORD IF operators (EQ/LT/GT — no `!=`). Read from bridge/controllers/dm500/install/

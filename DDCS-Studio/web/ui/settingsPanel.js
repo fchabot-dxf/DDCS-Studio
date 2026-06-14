@@ -10,6 +10,7 @@
  */
 import { UIUtils } from './uiUtils.js';
 import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile, registerProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { listPosts, getActivePostId, setActivePostId, isPostVerified, getDialect } from '../wizards/dialects/index.js';
 import { makeClient } from '../shared/js/client.js';
 import { renderIoTable, renderMagazineTable } from './ioTable.js';
 import { THEMES } from './themes.js';
@@ -304,6 +305,13 @@ function buildSettingsOverlay() {
                             <button class="toolbar-btn settings-io" id="set_profile_pull" title="Fetch this machine's profile (tabs + pins) from the bridged controller. Offline controllers like the DDCS 3.1: use Import profile.">↧ Pull from controller</button>
                         </div>
                         <div class="settings-hint">Presets which hardware your machine has (DDCS Expert, 4.1, …). You still add/remove inputs &amp; outputs in the Hardware tabs.</div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">POST PROCESSOR</div>
+                        <div class="settings-row">
+                            <select id="set_post" title="Which controller's G-code to generate. 'Follow machine profile' uses your machine's native post; override to emit code for another controller." style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
+                        </div>
+                        <div class="settings-hint" id="set_post_hint">Which controller's G-code the Blocks view generates. Defaults to your machine's post; override to target another controller.</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">PROFILE (settings + variables)</div>
@@ -744,6 +752,33 @@ function wireSettingsOverlay(ov) {
         show('set_head_plasma', t === 'plasma');
         show('set_head_laser', t === 'laser');
     }
+    // Post processor picker — which controller's G-code the Blocks view emits (live).
+    const postSel = q('set_post');
+    function fillPostOptions() {
+        if (!postSel) return;
+        const machinePost = getDialect(getActiveProfile().id);
+        postSel.innerHTML = ['<option value="auto">Follow machine profile (' + machinePost.name + ')</option>']
+            .concat(listPosts().map((p) => '<option value="' + p.id + '">' + p.name + (p.verified ? '  ✓' : '  ⚠ unverified') + '</option>'))
+            .join('');
+        postSel.value = getActivePostId();
+        updatePostHint();
+    }
+    function updatePostHint() {
+        const hint = q('set_post_hint'); if (!hint) return;
+        const id = getActivePostId();
+        if (id === 'auto') { hint.textContent = 'Following the machine profile (' + getDialect(getActiveProfile().id).name + '). Override to generate for another controller.'; hint.style.color = ''; }
+        else if (!isPostVerified(id)) { hint.textContent = '⚠ Unverified post — dump-derived, simulator/reference only. Not validated on hardware.'; hint.style.color = '#e0a020'; }
+        else { hint.textContent = 'Generating for ' + getDialect(id).name + ' (verified).'; hint.style.color = ''; }
+    }
+    if (postSel) {
+        fillPostOptions();
+        postSel.addEventListener('change', () => {
+            setActivePostId(postSel.value);
+            updatePostHint();
+            if (window.ddcsRefreshBlocks) window.ddcsRefreshBlocks();   // live re-emit the Blocks view
+        });
+    }
+
     const profileSel = q('set_profile');
     function fillProfileOptions() {
         if (!profileSel) return;
@@ -767,6 +802,7 @@ function wireSettingsOverlay(ov) {
             saveSettings();
             fill();
             applyHardwareTabs();
+            fillPostOptions();   // refresh the "Follow machine profile (…)" label for the new machine
         });
         // When a gateway answers (same-origin in the gateway-served/exe face, or via the ?api= dev
         // override), fetch the controller's own profile and offer it in the list (shown as

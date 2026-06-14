@@ -8,6 +8,8 @@
  */
 import { PALETTE, BLOCKS, CATEGORIES } from '../wizards/ops/index.js';
 import { newBlock, emitMapped } from './blockModel.js';
+import { resolveActivePost } from '../wizards/dialects/index.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { parseGcode } from '../gcodeParser.js';
 
 let api = null;   // module singleton, set once the UI is built: { refresh }
@@ -174,7 +176,8 @@ export function initBlocks() {
   }
   function reproject() {
     const ordered = orderedProgram();                    // execution order = top-to-bottom on the canvas
-    const { text, lines, map } = emitMapped(ordered);
+    const dialect = resolveActivePost(getActiveProfile().id);   // active post processor (override or follow machine)
+    const { text, lines, map } = emitMapped(ordered, { dialect });
     renderCode(lines, map);
     curSegs = segments(text);
     if (mode === '3d') update3D(text);
@@ -547,4 +550,5 @@ export function initBlocks() {
   render(); apply();
 
   api = { refresh: reproject };
+  window.ddcsRefreshBlocks = reproject;   // let Settings (post-processor change) re-emit live
 }
