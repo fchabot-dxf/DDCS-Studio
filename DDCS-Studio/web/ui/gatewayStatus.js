@@ -100,9 +100,13 @@ export function initGatewayStatus() {
                 await (await import('../blocks/blocksApp.js')).initBlocks();   // async: lazy-loads + injects Blockly
                 // Open the active STUDIO op AS its block stack (real param values). Skips when there's no
                 // op, no builder for it yet, or it's unchanged — so it won't clobber block-side edits.
-                const { buildActiveOpStack } = await import('../blocks/opStacks.js');
-                const r = buildActiveOpStack();
+                const ops = await import('../blocks/opStacks.js');
+                const r = ops.buildActiveOpStack();
                 if (r && window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(r.blocks);
+                else {   // a STUDIO op with no block builder yet → say so instead of a silent blank
+                    const un = ops.unportedActiveOp(), g = document.getElementById('blk-gcode');
+                    if (un && g) g.textContent = `( "${un}" isn't available as blocks yet — port in progress )`;
+                }
             } catch (err) { console.error('blocks init failed', err); }
         }
     }

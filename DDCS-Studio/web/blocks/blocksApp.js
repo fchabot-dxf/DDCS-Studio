@@ -217,7 +217,13 @@ export async function initBlocks() {
   };
 
   // ---- open-as-blocks: write a STUDIO op's stack into the workspace ----
-  function loadProgram(stack) { stackToWorkspace(stack, ws); reproject(); }
+  function loadProgram(stack) {
+    stackToWorkspace(stack, ws);
+    reproject();
+    // Defer until the (just-shown) tab has laid out, then size the SVG to the host and frame the whole op so
+    // it's actually visible (without this the stack loads off-screen — the "I don't see surfacing blocks" bug).
+    requestAnimationFrame(() => { B.svgResize(ws); try { ws.zoomToFit(); } catch (_) { /* pre-render */ } });
+  }
 
   window.addEventListener('resize', () => { if (!root.classList.contains('hidden')) { B.svgResize(ws); reproject(); } });
 
