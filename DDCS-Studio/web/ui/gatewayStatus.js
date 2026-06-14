@@ -85,22 +85,12 @@ export function initGatewayStatus() {
         // restores the app zoom on the way out). Must precede initBlocks so Blockly injects in a 1.0 context.
         try { window.scaleManager && window.scaleManager.apply(); } catch (_) { /* no scale manager */ }
 
-        // Build/refresh the Blocks tab only after it's visible (canvas + three.js need layout).
+        // Build/refresh the Blocks tab only after it's visible (canvas + three.js need layout). All Blocks logic
+        // lives in blocksApp.showBlocks — this router just routes (the showApp router itself moves out of this
+        // gateway-status module when the Gateway UI is built).
         if (isBlocks) {
             try {
-                await (await import('../blocks/blocksApp.js')).initBlocks();   // async: lazy-loads + injects Blockly
-                // Open the active STUDIO op AS its block stack (real param values). Skips when there's no
-                // op, no builder for it yet, or it's unchanged — so it won't clobber block-side edits.
-                const ops = await import('../blocks/opStacks.js');
-                const r = ops.buildActiveOpStack();
-                const ws = window.__blkws, wsEmpty = !ws || ws.getTopBlocks(false).length === 0;
-                if (r && window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(r.blocks);
-                // No fresh op + empty workspace + a hand-written editor program → parse it into leaf blocks.
-                else if (wsEmpty && window.ddcsImportEditorGcode && window.ddcsImportEditorGcode()) { /* imported */ }
-                else if (wsEmpty) {   // nothing to show — a STUDIO op with no builder yet → say so instead of a blank
-                    const un = ops.unportedActiveOp(), g = document.getElementById('blk-gcode');
-                    if (un && g) g.textContent = `( "${un}" isn't available as blocks yet — port in progress )`;
-                }
+                await (await import('../blocks/blocksApp.js')).showBlocks();
             } catch (err) { console.error('blocks init failed', err); }
         }
     }

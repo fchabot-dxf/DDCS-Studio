@@ -9,11 +9,8 @@
  */
 import { installBlockly, buildToolbox } from './blockly/bridge.js';
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
-import { parseGcodeToStack, reconcileGcodeToStack } from './gcodeToStack.js';
 import { ddcsTheme } from './blockly/theme.js';
-import { emitMapped } from './blockModel.js';
-import { resolveActivePost } from '../wizards/dialects/index.js';
-import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { parseGcode } from '../gcodeParser.js';
 
 let api = null;            // module singleton, set once the workspace is built: { refresh, load }
@@ -44,6 +41,22 @@ export function initBlocks() {
   return initPromise;
 }
 
+/** Show the Blocks tab: build the view if needed, then seed from a fresh STUDIO op (else the model already holds
+ *  the program). All Blocks logic lives here — the tab router (gatewayStatus.showApp) just calls this. */
+export async function showBlocks() {
+  await initBlocks();
+  try {
+    const ops = await import('./opStacks.js');
+    const r = ops.buildActiveOpStack();
+    if (r) setStack(r.blocks, 'load');                    // a fresh STUDIO op → render it (model + views)
+    else if (api) api.refresh();                          // no new op → re-render the existing program + reframe
+    if (!getStack().length) {                             // nothing to show — name an unported op instead of a blank
+      const un = ops.unportedActiveOp(), g = document.getElementById('blk-gcode');
+      if (un && g) g.textContent = `( "${un}" isn't available as blocks yet — port in progress )`;
+    }
+  } catch (err) { console.error('show blocks failed', err); }
+}
+
 async function buildWorkspace() {
   const root = document.getElementById('blocks-app');
   if (!root) return;
@@ -65,7 +78,6 @@ async function buildWorkspace() {
   let mode = '2d';
   const anim = { playing: false, k: 0, raf: null };
   let curSegs = [];
-  let lastGcode = '';   // most-recent projected G-code (round-trip into the STUDIO editor)
 
   const ws = B.inject(host, {
     toolbox: buildToolbox(), theme: ddcsTheme(B), renderer: 'geras',
@@ -84,25 +96,42 @@ async function buildWorkspace() {
   const fit = () => { try { B.svgResize(ws); } catch (_) { /* pre-render */ } };
   new ResizeObserver(fit).observe(host);
 
-  // ---- emit: workspace → our stack → the proven emitMapped fold → right panel ----
-  function reproject() {
-    const dialect = resolveActivePost(getActiveProfile().id);   // active post processor (override or follow machine)
-    const { text, lines, map } = emitMapped(workspaceToStack(ws), { dialect });
-    lastGcode = text;
-    renderCode(lines, map);
-    curSegs = segments(text);
-    if (mode === '3d') update3D(text);
+  // ---- this tab is a VIEW of the shared program model (blocks = the data): workspace ⇄ model + right pane ----
+  let muteChanges = false;   // true while WE rebuild the workspace from the model (suppress the change echo)
+
+  // Pin a (re)loaded program to a fixed scale + top-left scroll — metric-independent (see the double-inject /
+  // off-screen history). Guarded ticks so a transient bad viewport metric can't fling the blocks off-screen.
+  const place = () => {
+    try { if (B.renderManagement && B.renderManagement.triggerQueuedRenders) B.renderManagement.triggerQueuedRenders(); } catch (_) { /* */ }
+    try { B.svgResize(ws); } catch (_) { /* */ }
+    try { ws.setScale(0.9); } catch (_) { /* */ }
+    try { ws.scroll(30, 30); } catch (_) { /* pre-render */ }
+  };
+
+  // Render the right pane (code panel + preview + selection) from a projection { text, lines, map }.
+  function renderViews(p) {
+    renderCode(p.lines, p.map);
+    curSegs = segments(p.text);
+    if (mode === '3d') update3D(p.text);
     else drawPreview(curSegs, anim.playing ? Math.floor(anim.k) : curSegs.length);
     applySelection();
-    // Layer 2 — the STUDIO editor IS the live projection of the block program: push the emit on every change.
-    // Guard: only project when there's output (never wipe to empty), and never rewrite the editor WHILE the
-    // user is typing in it (layer 3 reconciles editor→blocks; rewriting would fight the caret — the on-blur
-    // canonicalize syncs it afterward).
-    try {
-      const em = window.ddcsStudio && window.ddcsStudio.editorManager;
-      if (em && text.trim() && em.getValue() !== text && document.activeElement !== em.editor) em.setValue(text);
-    } catch (_) { /* editor not ready */ }
   }
+
+  // User edited the WORKSPACE → push to the shared model (which re-projects the editor) → refresh the pane.
+  function reproject() {
+    setStack(workspaceToStack(ws), 'blockly');
+    renderViews(getProjection());
+  }
+
+  // The model changed ELSEWHERE (Studio editor edit / wizard seed / post-processor change) → render it into the
+  // workspace (muted so the rebuild doesn't echo back through the change listener), reframe, refresh the pane.
+  function renderFromModel(p) {
+    muteChanges = true;
+    try { stackToWorkspace(getStack(), ws); } finally { muteChanges = false; }
+    requestAnimationFrame(place); setTimeout(place, 120); setTimeout(place, 400);
+    renderViews(p);
+  }
+  onChange(({ proj, origin }) => { if (origin !== 'blockly') renderFromModel(proj); });
 
   // ---- code view + linked selection (click a code line ⇄ its Blockly block) ----
   function renderCode(lines, map) {
@@ -137,7 +166,7 @@ async function buildWorkspace() {
   // ---- workspace events: structural change → re-emit; selection → highlight code ----
   ws.addChangeListener((e) => {
     if (e.type === B.Events.SELECTED) { selectedId = e.newElementId || null; applySelection({ scrollCode: true }); }
-    else if (!e.isUiEvent) reproject();
+    else if (!e.isUiEvent && !muteChanges) reproject();   // muteChanges: ignore our own model→workspace rebuild
   });
 
   // ---- 2D preview ----
@@ -259,67 +288,12 @@ async function buildWorkspace() {
   };
 
 
-  // ---- open-as-blocks: write a STUDIO op's stack into the workspace ----
-  function loadProgram(stack) {
-    stackToWorkspace(stack, ws);   // loads the stack at a fixed canvas pos (24,24) — see stackBridge
-    reproject();
-    // Place the loaded stack DETERMINISTICALLY — never zoomToFit/scrollCenter here. Right after the tab becomes
-    // visible (body zoom flips back to 1), Blockly's viewport metric is transiently wrong, so a metric-based
-    // reframe over-scales (~1.9×) and parks the blocks off-screen — the "models loaded, canvas blank" bug. (A
-    // hand-dropped block renders fine precisely because nothing reframes it; our reference Blockly app never
-    // reframes on load either.) So: flush the v12 render queue, size the SVG to the host, then pin a fixed
-    // scale + top-left scroll — independent of any transient metric.
-    const place = () => {
-      try { if (B.renderManagement && B.renderManagement.triggerQueuedRenders) B.renderManagement.triggerQueuedRenders(); } catch (_) { /* */ }
-      try { B.svgResize(ws); } catch (_) { /* */ }
-      try { ws.setScale(0.9); } catch (_) { /* */ }
-      try { ws.scroll(30, 30); } catch (_) { /* pre-render */ }
-    };
-    requestAnimationFrame(place);
-    setTimeout(place, 120);
-    setTimeout(place, 400);
-  }
+  window.addEventListener('resize', () => { if (!root.classList.contains('hidden')) { B.svgResize(ws); renderViews(getProjection()); } });
 
-  window.addEventListener('resize', () => { if (!root.classList.contains('hidden')) { B.svgResize(ws); reproject(); } });
-
-  // ---- layer 3: edit the projected G-code (STUDIO editor) → reconcile back into the blocks ----
-  // Leaf/imported programs round-trip both ways; a program containing a high-level op (Fill/Array/Step Down)
-  // can't be text-reconciled (derived lines have no param inverse) — those edits are reverted on blur and must
-  // be made via the blocks/fields. The text===lastGcode guard ignores our own projection (no feedback loop).
-  function reconcileFromEditor() {
-    const em = window.ddcsStudio && window.ddcsStudio.editorManager;
-    if (!em || !em.editor) return;
-    const text = em.getValue();
-    if (text === lastGcode) return;                       // our own projection → nothing to do
-    const ns = reconcileGcodeToStack(text, workspaceToStack(ws));
-    if (!ns) return;                                      // high-level program → not text-reconcilable here
-    stackToWorkspace(ns, ws);
-    reproject();                                          // refresh blocks + preview + panel (editor untouched while focused)
-  }
-  const em0 = window.ddcsStudio && window.ddcsStudio.editorManager;
-  if (em0 && em0.editor) {
-    let deb = null;
-    em0.editor.addEventListener('input', () => { clearTimeout(deb); deb = setTimeout(reconcileFromEditor, 500); });
-    em0.editor.addEventListener('blur', () => {
-      clearTimeout(deb); reconcileFromEditor();
-      if (lastGcode && em0.getValue() !== lastGcode) em0.setValue(lastGcode);   // canonicalize / revert a non-reconcilable edit
-    });
-  }
-
-  reproject();
+  // Render the current program (editor-built or wizard-seeded — it already exists in the model from app start)
+  // into the freshly-injected view. The editor⇄stack sync lives in programModel (wired at startup), so this tab
+  // is purely a view: it never owns the program or the editor listeners.
+  renderFromModel(getProjection());
   window.__blkws = ws;                            // workspace handle (tests / debugging)
-  api = { refresh: () => { B.svgResize(ws); reproject(); }, load: loadProgram };
-  window.ddcsRefreshBlocks = reproject;          // Settings (post-processor change) → re-emit live
-  window.ddcsLoadBlockStack = loadProgram;       // STUDIO op → blocks (gatewayStatus calls this on tab open)
-  window.ddcsGetBlockProgram = () => workspaceToStack(ws);   // blocks → STUDIO reverse reconcile
-  window.ddcsGetBlockGcode = () => lastGcode;    // blocks → STUDIO editor live projection
-  // Import the current editor program INTO blocks (parse → leaf stack). Used when entering the Blocks tab with
-  // a hand-written editor program and no active wizard op. Returns true if it loaded anything.
-  window.ddcsImportEditorGcode = () => {
-    const em = window.ddcsStudio && window.ddcsStudio.editorManager;
-    const text = em ? em.getValue() : '';
-    if (!text.trim()) return false;
-    loadProgram(parseGcodeToStack(text));
-    return true;
-  };
+  api = { refresh: () => renderFromModel(getProjection()), load: (s) => setStack(s, 'load') };
 }

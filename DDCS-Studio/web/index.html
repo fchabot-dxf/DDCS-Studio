@@ -1580,6 +1580,13 @@
                 console.error('Failed to import app.js', err);
             }
             try {
+                // The Blocks program model (the data) + editor⇄stack sync — wired at startup so editing the
+                // STUDIO editor builds/updates blocks WITHOUT first opening the Blocks tab (the editor is the
+                // primary surface; the Blocks tab is just a view). Must run after app.js created the editor.
+                const { initProgramModel } = await import('./blocks/programModel.js');
+                initProgramModel();
+            } catch (err) { console.error('program model init failed', err); }
+            try {
                 const { initBridgeTransfer } = await import('./ui/bridgeTransfer.js');
                 initBridgeTransfer();             // before gatewayStatus so it catches the first tick
             } catch (err) { console.error('bridge transfer init failed', err); }
