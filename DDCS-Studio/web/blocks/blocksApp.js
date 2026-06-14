@@ -15,7 +15,14 @@ import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { parseGcode } from '../gcodeParser.js';
 
-let api = null;   // module singleton, set once the workspace is built: { refresh, load }
+let api = null;            // module singleton, set once the workspace is built: { refresh, load }
+let initPromise = null;    // in-flight build. The header tabs are double-wired (inline onclick in index.html +
+// addEventListener in gatewayStatus.js), so ONE Blocks click fires showApp('blocks') twice → two initBlocks().
+// `api` isn't set until the end of the build, so a plain `if (api)` guard can't stop the second call. We cache
+// the build PROMISE and hand it to every concurrent caller, so they all await the SAME single inject (never a
+// 2nd workspace) and only resume once ddcsLoadBlockStack is ready — so the first buildActiveOpStack() actually
+// loads and the second correctly no-ops (its loadedSig dedup). An early-return latch instead let the 2nd caller
+// run buildActiveOpStack() before load was ready, consuming the dedup and dropping the stack ("nothing renders").
 
 /** Lazy-load the vendored Blockly UMD (sets window.Blockly). */
 function loadBlockly() {
@@ -29,26 +36,32 @@ function loadBlockly() {
   });
 }
 
-export async function initBlocks() {
+export function initBlocks() {
+  if (api) { api.refresh(); return Promise.resolve(); }   // already built → refresh sizing/preview (callers can still await)
+  if (initPromise) return initPromise;                    // a build is already in flight → await the SAME one (no 2nd workspace)
+  initPromise = buildWorkspace().catch((e) => { initPromise = null; throw e; });   // reset on failure so a retry can rebuild
+  return initPromise;
+}
+
+async function buildWorkspace() {
   const root = document.getElementById('blocks-app');
   if (!root) return;
-  if (api) { api.refresh(); return; }          // already built → refresh sizing/preview on re-open
 
   const B = await loadBlockly();
   installBlockly(B);                            // define every op as a Blockly block
 
-  // Blockly mounts its popup singletons (WidgetDiv / DropDownDiv / Tooltip) on <body> by default. The app
-  // CSS-zooms <body> (ScaleManager), which breaks Blockly. We neutralize the zoom on #blocks-app (net 1.0,
-  // see scaleManager.neutralizeBlocksTab) — so relocate the popups INTO #blocks-app to ride that neutral
-  // scale instead of the zoomed body. Must run before inject (popup DOM is created during inject).
-  try { B.setParentContainer(root); } catch (_) { /* older Blockly without setParentContainer */ }
+  // NOTE: we deliberately do NOT call B.setParentContainer(root). It relocated the popup singletons into
+  // #blocks-app but left DropDownDiv's module-level `div` uncreated, so Blockly's GLOBAL window-resize handler
+  // crashed in DropDownDiv.hide() (`Cannot read properties of undefined (reading 'style')`) on every resize —
+  // which aborted the async render queue and left the canvas blank. The Blocks tab already runs at body-zoom 1
+  // (scaleManager), so the popups are fine on <body> where Blockly puts them by default — same as our working
+  // reference Blockly app, which never calls setParentContainer.
 
   const host = document.getElementById('blk-ws');
   const out = document.getElementById('blk-gcode');
   const preview = document.getElementById('blk-preview');
   const host3d = document.getElementById('blk-host3d');
   let mode = '2d';
-  let pendingFit = false;   // "frame the loaded op once the host has real dimensions" (tab just became visible)
   const anim = { playing: false, k: 0, raf: null };
   let curSegs = [];
 
@@ -58,10 +71,15 @@ export async function initBlocks() {
     zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { smoothScroll: true },
   });
 
+  // GUARANTEE the popup singletons' DOM exists, so Blockly's global window-resize handler can never crash in
+  // DropDownDiv.hide() (it blind-touches a `div` that createDom sets ONLY when no .blocklyDropDownDiv exists).
+  try { B.DropDownDiv && B.DropDownDiv.createDom && B.DropDownDiv.createDom(); } catch (_) { /* */ }
+  try { B.WidgetDiv && B.WidgetDiv.createDom && B.WidgetDiv.createDom(); } catch (_) { /* */ }
+  try { B.Tooltip && B.Tooltip.createDom && B.Tooltip.createDom(); } catch (_) { /* */ }
+
   // Blockly injected into a tab that may still have 0 size — resize the workspace SVG whenever the host gets
-  // real dimensions (the fix for "G-code is there but I don't see the blocks"). On the first real size after a
-  // load, frame the op (zoomToFit) so it's actually visible.
-  const fit = () => { try { B.svgResize(ws); if (pendingFit && host.clientWidth > 0) { ws.zoomToFit(); pendingFit = false; } } catch (_) { /* pre-render */ } };
+  // real dimensions, so the blocks are visible once the tab has real geometry.
+  const fit = () => { try { B.svgResize(ws); } catch (_) { /* pre-render */ } };
   new ResizeObserver(fit).observe(host);
 
   // ---- emit: workspace → our stack → the proven emitMapped fold → right panel ----
@@ -231,21 +249,23 @@ export async function initBlocks() {
 
   // ---- open-as-blocks: write a STUDIO op's stack into the workspace ----
   function loadProgram(stack) {
-    stackToWorkspace(stack, ws);
+    stackToWorkspace(stack, ws);   // loads the stack at a fixed canvas pos (24,24) — see stackBridge
     reproject();
-    // The just-shown tab may not be laid out yet, and a stray window-resize crash (Blockly's DropDownDiv) can
-    // abort a single frame attempt — leaving the blocks rendered but off-screen ("models loaded, canvas blank").
-    // So flush the v12 render queue and frame on several GUARDED ticks: svgResize → scrollCenter → zoomToFit,
-    // each independently try/caught, retried so one aborted pass doesn't lose the op.
-    const frame = () => {
+    // Place the loaded stack DETERMINISTICALLY — never zoomToFit/scrollCenter here. Right after the tab becomes
+    // visible (body zoom flips back to 1), Blockly's viewport metric is transiently wrong, so a metric-based
+    // reframe over-scales (~1.9×) and parks the blocks off-screen — the "models loaded, canvas blank" bug. (A
+    // hand-dropped block renders fine precisely because nothing reframes it; our reference Blockly app never
+    // reframes on load either.) So: flush the v12 render queue, size the SVG to the host, then pin a fixed
+    // scale + top-left scroll — independent of any transient metric.
+    const place = () => {
       try { if (B.renderManagement && B.renderManagement.triggerQueuedRenders) B.renderManagement.triggerQueuedRenders(); } catch (_) { /* */ }
       try { B.svgResize(ws); } catch (_) { /* */ }
-      try { ws.scrollCenter(); } catch (_) { /* */ }
-      try { ws.zoomToFit(); } catch (_) { /* pre-render */ }
+      try { ws.setScale(0.9); } catch (_) { /* */ }
+      try { ws.scroll(30, 30); } catch (_) { /* pre-render */ }
     };
-    requestAnimationFrame(frame);
-    setTimeout(frame, 80);
-    setTimeout(frame, 300);
+    requestAnimationFrame(place);
+    setTimeout(place, 120);
+    setTimeout(place, 400);
   }
 
   window.addEventListener('resize', () => { if (!root.classList.contains('hidden')) { B.svgResize(ws); reproject(); } });

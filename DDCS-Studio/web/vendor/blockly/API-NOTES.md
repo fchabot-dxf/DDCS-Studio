@@ -38,12 +38,32 @@ DDCS scales the whole UI with `document.body { zoom }` (the ScaleManager). The f
 - ⚠️ **A counter-zoom on `#blocks-app` (`zoom = 1/bodyZoom`) does NOT work** — *nested* CSS zoom still corrupts
   `getBoundingClientRect`, so `zoomToFit` mis-scaled (measured 1.87×) and parked the blocks far off-screen
   (`screenRect.y ≈ 1604`). "Net 1.0" is not the same as "no zoom". Don't go down that path again.
-- `blocksApp.js` also calls `Blockly.setParentContainer(#blocks-app)` before inject (harmless belt-and-suspenders
-  for the popups).
+- ⚠️ **Do NOT call `Blockly.setParentContainer(#blocks-app)`** (we used to, "belt-and-suspenders"). It relocates the
+  popup singletons but leaves `DropDownDiv`'s module-level `div` uncreated, so the GLOBAL window-resize handler
+  crashes in `DropDownDiv.hide()` (`Cannot read properties of undefined (reading 'style')`) on *every* resize —
+  which aborts the async render queue and leaves the canvas blank. Leave popups on `<body>` (where Blockly puts
+  them) and rely on the body-zoom-1 rule above. As a belt: after `inject`, call `B.DropDownDiv.createDom()` /
+  `WidgetDiv.createDom()` / `Tooltip.createDom()` so that `div` always exists.
 
-Guard: `tests/blocks-scale-safety.spec.js` (Blocks tab forces body zoom 1, no counter-zoom, and the loaded op's
-block rect is IN the host — not off-screen — with no resize crash). This is invisible to headless render tests
-because headless normalizes `zoom`; the test asserts the inline body zoom + the on-screen geometry instead.
+## The double-inject trap (the ACTUAL "nothing renders" — what finally bit us)
+
+`initBlocks()` is `async` and only sets its `api` singleton at the END. The header tabs are **double-wired**
+(inline `onclick` in `index.html` + `addEventListener` in `gatewayStatus.js`), so ONE Blocks-tab click fires
+`showApp('blocks')` **twice**. Both calls sailed past `if (api)` while awaiting `loadBlockly()` and **injected two
+Blockly workspaces** into `#blk-ws`; the 2nd stacks *below* the 1st (offset ≈ host height). The loaded stack went
+into the off-screen 2nd workspace while the visible 1st stayed empty → "grid shows, no blocks". (Tell in the
+logs: `init` runs twice; block `getBoundingClientRect().y ≈ host.y + host.height`.)
+
+Fix: **make `initBlocks` idempotent under concurrency with a cached build PROMISE** — concurrent callers await the
+SAME single inject (never a 2nd workspace), and only resume once `ddcsLoadBlockStack` is ready (so the first
+`buildActiveOpStack()` actually loads and the second no-ops via its `loadedSig` dedup). An early-return latch is
+NOT enough: it lets the 2nd caller run `buildActiveOpStack()` before load is ready, consuming the dedup and
+dropping the stack. Also: **load-and-leave** — never `zoomToFit`/`scrollCenter` on load (the metric is transiently
+wrong right after the tab appears); pin a fixed `setScale(0.9)` + `scroll(30,30)` so placement is metric-independent.
+
+Guards: `tests/blocks-single-inject.spec.js` (fires the double-click race → asserts exactly ONE workspace SVG,
+op in view, no page errors) + `tests/blocks-scale-safety.spec.js` (Blocks tab forces body zoom 1, no counter-zoom,
+op rect IN the host). Invisible to plain headless render tests, which call `showApp('blocks')` once.
 
 ## Blockly APIs DDCS depends on (all confirmed present in 12.5.1)
 
