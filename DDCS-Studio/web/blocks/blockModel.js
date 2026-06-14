@@ -116,7 +116,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     if (def.kind === 'fill') {                 // STEP OVER: clear the region at the current depth (auto-cut, or run a per-pass body)
         const p = resolveParams(block.params, scope);
         const z = num(p.z, 0);
-        const out = [tag(`( ${p.strategy} fill z=${r3(z)} )`, own)];
+        const out = [tag(`( ${p.strategy ? p.strategy + ' fill' : def.label} z=${r3(z)} )`, own)];
         if ((block.children || []).length && def.segments) {           // body present → run it once per pass with {x0,y0,x1,y1} in scope
             def.segments(p).forEach((seg) => {
                 const child = Object.create(scope); Object.assign(child, seg);

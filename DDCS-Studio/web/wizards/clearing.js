@@ -141,6 +141,93 @@ export function concentricCircle(cx, cy, Rc, step, ctx) {
     return L;
 }
 
+// ── Heavy fill blocks (Fill Zigzag / Fill Concentric) ────────────────────────────────────────────────
+// Richer, dedicated versions of the scanline/ring fills above: zigzag scans at an arbitrary angle and can
+// run one-way (climb/conventional); concentric clears outside-in or inside-out with an optional finish pass.
+// At their defaults (angle 0 / both-ways / outside-in / no finish) they are byte-identical to fillLevelMoves
+// and concentricRect/Circle, so reworking the wizards onto them changes nothing until those knobs are used.
+
+/** Zig-zag (scanline) fill at an arbitrary scan angle (deg off +X). oneway = lift+return every pass
+ *  (climb/conventional); reverse = cut the other way. Rotates the region into the scan frame, fills with
+ *  the shared scanline, and rotates each move back to world — so holes still lift correctly at any angle. */
+export function zigzagFill(contours, step, ctx, opts = {}) {
+    const { z, clr, feed, plunge } = ctx;
+    const ang = (opts.angleDeg || 0) * Math.PI / 180, oneway = !!opts.oneway, reverse = !!opts.reverse;
+    const cos = Math.cos(ang), sin = Math.sin(ang);
+    const toScan = (p) => ({ x: p.x * cos + p.y * sin, y: -p.x * sin + p.y * cos });   // world → scan (rotate −ang)
+    const toWorld = (x, y) => ({ x: x * cos - y * sin, y: x * sin + y * cos });          // scan → world (rotate +ang)
+    const rows = scanlineFill(contours.map((c) => c.map(toScan)), step);
+    const L = [];
+    const G0 = (x, y) => { const w = toWorld(x, y); return `G0 X${r3(w.x)} Y${r3(w.y)}`; };
+    const G1 = (x, y) => { const w = toWorld(x, y); return `G1 X${r3(w.x)} Y${r3(w.y)} F${feed}`; };
+    let dir = reverse ? -1 : 1, started = false, liftNext = false;
+    for (let ri = 0; ri < rows.length; ri++) {
+        const ordered = dir > 0 ? rows[ri].spans : rows[ri].spans.slice().reverse();
+        const y = rows[ri].y;
+        for (let si = 0; si < ordered.length; si++) {
+            const [xlo, xhi] = ordered[si];
+            const xs = dir > 0 ? xlo : xhi, xe = dir > 0 ? xhi : xlo;
+            if (!started) { L.push(G0(xs, y), `G1 Z${r3(z)} F${plunge}`); started = true; }
+            else if (oneway || si > 0 || liftNext) { L.push(`G0 Z${r3(clr)}`, G0(xs, y), `G1 Z${r3(z)} F${plunge}`); }
+            else { L.push(G1(xs, y)); }                       // both-ways: step through the cleared band, no lift
+            L.push(G1(xe, y));
+            liftNext = false;
+        }
+        liftNext = ordered.length > 1;                        // prior row had holes → lift into the next
+        if (!oneway) dir = -dir;                              // one-way keeps the same cut direction every pass
+    }
+    return L;
+}
+
+/** Concentric (ring) fill. order = 'outside-in' (default) | 'inside-out'; finishPass = an extra clean pass
+ *  around the outer boundary at the end. `rg` is a Region descriptor ({kind:'rect',x,y,w,h} | {kind:'circle',cx,cy,r}). */
+export function concentricFill(rg, step, ctx, opts = {}) {
+    const { z, clr, feed, plunge } = ctx;
+    const insideOut = opts.order === 'inside-out', finish = !!opts.finishPass;
+    const L = [];
+    let first = true;
+    const plungeTo = (x, y) => { L.push(`G0 X${r3(x)} Y${r3(y)}`, `G1 Z${r3(z)} F${plunge}`); first = false; };
+
+    if (rg.kind === 'circle') {
+        const radii = [];
+        for (let rad = rg.r; rad > 1e-6; rad -= step) radii.push(rad);
+        const seq = insideOut ? radii.slice().reverse() : radii;
+        if (insideOut && seq.length) plungeTo(rg.cx, rg.cy);   // start at the centre, spiral out (no uncut core)
+        for (const rad of seq) {
+            const sx = rg.cx + rad, sy = rg.cy;
+            if (first) plungeTo(sx, sy); else L.push(`G1 X${r3(sx)} Y${r3(sy)} F${feed}`);
+            L.push(`G3 X${r3(sx)} Y${r3(sy)} I${r3(-rad)} J0 F${feed}`);   // full CCW circle
+        }
+        if (!insideOut && !first) L.push(`G1 X${r3(rg.cx)} Y${r3(rg.cy)} F${feed}`);   // ending inward → clear the core
+        if (finish && seq.length) {
+            const sx = rg.cx + rg.r;
+            L.push(`G0 Z${r3(clr)}`, `G0 X${r3(sx)} Y${r3(rg.cy)}`, `G1 Z${r3(z)} F${plunge}`, `G3 X${r3(sx)} Y${r3(rg.cy)} I${r3(-rg.r)} J0 F${feed}`);
+        }
+        return L;
+    }
+
+    const x0 = rg.x, y0 = rg.y, x1 = rg.x + rg.w, y1 = rg.y + rg.h;
+    const rings = [];
+    for (let inset = 0; ; inset += step) {
+        const ax = x0 + inset, ay = y0 + inset, bx = x1 - inset, by = y1 - inset;
+        if (bx - ax < 1e-6 || by - ay < 1e-6) break;
+        rings.push({ ax, ay, bx, by });
+    }
+    const seq = insideOut ? rings.slice().reverse() : rings;
+    for (const { ax, ay, bx, by } of seq) {
+        if (first) plungeTo(ax, ay); else L.push(`G1 X${r3(ax)} Y${r3(ay)} F${feed}`);   // diagonal step to the next ring
+        L.push(`G1 X${r3(bx)} Y${r3(ay)} F${feed}`, `G1 X${r3(bx)} Y${r3(by)} F${feed}`,
+               `G1 X${r3(ax)} Y${r3(by)} F${feed}`, `G1 X${r3(ax)} Y${r3(ay)} F${feed}`);
+    }
+    if (finish && rings.length) {
+        const o = rings[0];   // the outer ring, run clean last
+        L.push(`G0 Z${r3(clr)}`, `G0 X${r3(o.ax)} Y${r3(o.ay)}`, `G1 Z${r3(z)} F${plunge}`,
+               `G1 X${r3(o.bx)} Y${r3(o.ay)} F${feed}`, `G1 X${r3(o.bx)} Y${r3(o.by)} F${feed}`,
+               `G1 X${r3(o.ax)} Y${r3(o.by)} F${feed}`, `G1 X${r3(o.ax)} Y${r3(o.ay)} F${feed}`);
+    }
+    return L;
+}
+
 /** Depth levels for a stepdown: [sd, 2·sd, …, depth] (always finishing exactly at depth). */
 export function depthLevels(depth, stepdown) {
     const D = Math.max(0, depth), sd = Math.max(0.05, stepdown), out = [];

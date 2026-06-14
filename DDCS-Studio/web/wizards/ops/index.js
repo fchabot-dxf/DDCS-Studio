@@ -21,6 +21,7 @@ import { slotBlock, slotPath } from './slot.js';
 import { wallBlock } from './wall.js';
 import { regionBlock } from './region.js';
 import { stepoverBlock, fillStrategy } from './stepover.js';
+import { fillZigzagBlock, fillConcentricBlock } from './fill.js';
 import { stepdownBlock } from './stepdown.js';
 import { probeBlock } from './probe.js';
 import { arrayBlock, patternPoints } from './array.js';
@@ -57,7 +58,7 @@ export const PALETTE = [
     spindleBlock, feedBlock, dwellBlock, coolantBlock, toolBlock, wcsBlock, distModeBlock,   // Machine (modal state)
     progStartBlock, progEndBlock, endProgramBlock, mcodeBlock, rawBlock, probeReadBlock, readMachineBlock, setWorkOffsetBlock,   // Machine (program start/end framing, end, raw M-code/G-code, probe/DRO capture, WCS write)
     lineBlock, slotBlock, boreBlock, drillBlock, wallBlock,  // Ops (feature presets + wall finish)
-    arrayBlock, helixBlock, stepoverBlock, stepdownBlock,    // Modify (stamp/sweep + lateral/depth pass wrappers)
+    arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, stepoverBlock, stepdownBlock,    // Modify (stamp/sweep + lateral fills [zigzag/concentric] + depth pass wrappers)
     countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, pauseBlock, askNumberBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + pause/operator-input)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
