@@ -7,6 +7,7 @@
  * The form and the Blocks view are two editors of this one stack. No motion: pure #805+ register writes.
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { recordOp } from '../blocks/opRecord.js';
 
 /** WCS params → [ Comment | Set# … ]. The one source of truth for both displays. */
 export function wcsStack(params = {}) {
@@ -54,6 +55,7 @@ export class WCSWizard {
     }
 
     generate(params) {
+        recordOp('wcs', params);   // let the Blocks tab open this op as its stack
         return emitMapped(wcsStack(params), { bare: true }).text;
     }
 

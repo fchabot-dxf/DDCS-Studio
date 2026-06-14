@@ -10,6 +10,7 @@
  * DDCS M350: status #1920/#1921 (2=SUCCESS, check !=2), trigger pos #1925/#1926.
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 
 const AX = {
@@ -76,6 +77,7 @@ export function edgeStack(params = {}) {
 
 export class EdgeWizard {
     generate(params) {
+        recordOp('edge', params);   // let the Blocks tab open this op as its stack
         return emitMapped(edgeStack(params), { bare: true }).text;
     }
 }

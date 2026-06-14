@@ -7,6 +7,7 @@
  * two editors of this one stack.
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 
 const r3 = (n) => Math.round(n * 1000) / 1000;
@@ -25,6 +26,7 @@ export function slotStack(params = {}) {
 
 export class SlotWizard {
     generate(params) {
+        recordOp('slot', params);   // let the Blocks tab open this op as its stack
         const dx = num(params.bx, 60) - num(params.ax, 0), dy = num(params.by, 0) - num(params.ay, 0);
         const len = Math.hypot(dx, dy);
         const tool = Math.max(0.1, num(params.toolDia, 6)), width = Math.max(tool, num(params.width, tool));

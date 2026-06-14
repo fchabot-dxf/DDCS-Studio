@@ -7,6 +7,7 @@
  * stack; the kernels (patternPoints / peckDrill / helicalBore) live in ops/ and are shared.
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { recordOp } from '../blocks/opRecord.js';
 import { patternPoints } from './ops/index.js';
 import { num } from './ops/util.js';
 
@@ -35,6 +36,7 @@ export function drillStack(params = {}) {
 
 export class DrillWizard {
     generate(params) {
+        recordOp('drill', params);   // let the Blocks tab open this op as its stack
         const helical = params.method === 'helical';
         const title = `( Hole pattern - ${params.pattern || 'grid'} - ${helical ? 'helical bore' : 'peck drill'} - DDCS Studio )`;
         return emitMapped(drillStack(params), { ...params, title }).text;

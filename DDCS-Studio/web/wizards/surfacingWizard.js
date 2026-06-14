@@ -8,6 +8,7 @@
  * and faces the whole top) and no wall pass. Rect only; raster → parallel rows, else concentric rings.
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 
 const r3 = (n) => Math.round(n * 1000) / 1000;
@@ -34,6 +35,7 @@ export function surfacingStack(params = {}) {
 
 export class SurfacingWizard {
     generate(params) {
+        recordOp('surfacing', params);   // let the Blocks tab open this op as its stack
         const w = num(params.w, 100), h = num(params.h, 80);
         const title = `( Surfacing - ${w} × ${r3(h)} mm - DDCS Studio )`;
         // Emit THROUGH the block stack — the same stack the Blocks tab renders/edits.
