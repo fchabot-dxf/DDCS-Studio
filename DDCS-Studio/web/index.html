@@ -1543,15 +1543,7 @@
     <!-- BLOCKS app — Codeblocks-for-G-code authoring (stack op-blocks → live G-code + preview).
          Static shell here; blocks/blocksApp.js (lazy-loaded on first open) builds palette/stage/code. -->
     <div id="blocks-app" class="app-shell hidden">
-        <div class="palette">
-            <h3>Blocks</h3>
-            <div id="blk-pal"></div>
-            <p>Primitive level. STUDIO composes these into presets.</p>
-        </div>
-        <div class="viewport" id="blk-viewport">
-            <div class="stage" id="blk-stage"></div>
-            <div class="bk-hint">drag a block to move · drop below another to snap · drag empty space = pan · wheel = zoom</div>
-        </div>
+        <div id="blk-ws" class="blk-ws"></div>   <!-- Blockly workspace (toolbox + canvas); built by blocksApp.js -->
         <div class="right">
             <div class="pv">
                 <h3 class="pane-h">Preview

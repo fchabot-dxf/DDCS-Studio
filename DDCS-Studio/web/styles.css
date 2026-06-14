@@ -3485,11 +3485,12 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     --cat-modify:#a855f7; --cat-control:#f59e0b; --cat-math:#84cc16; --cat-variables:#06b6d4; --cat-markup:#94a3b8;
     --field: var(--bg);
     --screen:#000; --screen-ink:#cdd9e5; --screen-dim:#8b9bb0;   /* fixed: the screen is black in every theme */
-    display:grid; grid-template-columns:130px 1fr 380px; grid-template-rows:minmax(0,1fr);
+    display:grid; grid-template-columns:1fr 380px; grid-template-rows:minmax(0,1fr);
     background:var(--bg); color:var(--ink);
     font:13px/1.4 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
 }
 #blocks-app *, #blocks-app *::before, #blocks-app *::after { box-sizing:border-box; }
+#blocks-app .blk-ws { position:relative; min-width:0; background:var(--bg); }   /* Blockly workspace host (left) */
 /* left rail (palette) — chrome */
 #blocks-app .palette { background:var(--panel); border-right:1px solid var(--line); padding:10px; overflow:auto; }
 #blocks-app .palette h3 { margin:0 0 8px; font-size:11px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; }

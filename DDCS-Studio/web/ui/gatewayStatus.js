@@ -97,7 +97,7 @@ export function initGatewayStatus() {
         // Build/refresh the Blocks tab only after it's visible (canvas + three.js need layout).
         if (isBlocks) {
             try {
-                (await import('../blocks/blocksApp.js')).initBlocks();
+                await (await import('../blocks/blocksApp.js')).initBlocks();   // async: lazy-loads + injects Blockly
                 // Open the active STUDIO op AS its block stack (real param values). Skips when there's no
                 // op, no builder for it yet, or it's unchanged — so it won't clobber block-side edits.
                 const { buildActiveOpStack } = await import('../blocks/opStacks.js');
