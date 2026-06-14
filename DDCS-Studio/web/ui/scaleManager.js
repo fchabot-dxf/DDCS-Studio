@@ -50,6 +50,7 @@ export class ScaleManager {
             this.lastAutoPct = pct;
             document.body.setAttribute('data-scale', 'auto');
             document.body.style.zoom = (pct / 100).toString();
+            this.neutralizeBlocksTab(pct);
             this.updateControls();
             this.saveScale();
             window.dispatchEvent(new CustomEvent('scaleChanged', { detail: { scale: 'auto', value: pct } }));
@@ -62,9 +63,23 @@ export class ScaleManager {
         const bucket = BUCKETS.reduce((b, v) => (Math.abs(v - n) < Math.abs(b - n) ? v : b));
         document.body.setAttribute('data-scale', bucket.toString());
         document.body.style.zoom = (n / 100).toString();
+        this.neutralizeBlocksTab(n);
         this.updateControls();
         this.saveScale();
         window.dispatchEvent(new CustomEvent('scaleChanged', { detail: { scale: n } }));
+    }
+
+    /**
+     * The Blocks tab hosts Blockly, which BREAKS inside a CSS-zoomed ancestor — mispositioned/invisible
+     * blocks and a DropDownDiv resize crash (Blockly mounts its popups on <body>, and does layout via
+     * getBoundingClientRect; neither survives an ancestor `zoom`). We can't stop zooming the app, so we
+     * counter the body zoom on #blocks-app: net zoom there = body(z) × (1/z) = 1.0, a clean context for
+     * Blockly. Its popups are relocated INTO #blocks-app (see blocksApp.js setParentContainer) so they ride
+     * this same neutral scale. The blocks themselves scale via Blockly's own workspace zoom, not the app's.
+     */
+    neutralizeBlocksTab(pct) {
+        const blk = document.getElementById('blocks-app');
+        if (blk) blk.style.zoom = (100 / Math.max(1, pct)).toString();
     }
 
     currentPct() {

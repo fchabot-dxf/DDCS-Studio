@@ -23,6 +23,24 @@ That's what `blocks/blockly/stackBridge.js` `stackToWorkspace()` does (stack →
 `workspaces.load` clears the workspace first. If you ever must build blocks imperatively, flush with
 `Blockly.renderManagement.triggerQueuedRenders()`.
 
+## The CSS `zoom` / `transform` ancestor trap (what bit us next)
+
+Blockly **breaks inside a CSS-scaled ancestor** — it lays out via `getBoundingClientRect` and mounts its
+popup singletons (`WidgetDiv` / `DropDownDiv` / `Tooltip`) on `document.body`. If an ancestor (or `body`)
+has `zoom` or `transform: scale()`, the blocks are mispositioned/invisible and you get a crash on window
+resize: `DropDownDiv.repositionForWindowResize → hide → Cannot read properties of undefined (reading 'style')`.
+
+DDCS scales the whole UI with `document.body { zoom }` (the ScaleManager). The fix (no app-wide restructure):
+- **Neutralize the zoom on the Blocks subtree** — `ScaleManager.neutralizeBlocksTab()` sets `#blocks-app`
+  `zoom = 1 / bodyZoom`, so that subtree renders at **net 1.0** (a clean context for Blockly). Blocks are
+  scaled instead by Blockly's own workspace zoom.
+- **Relocate the popups into that neutral subtree** — `blocksApp.js` calls `Blockly.setParentContainer(#blocks-app)`
+  **before** `inject` (popup DOM is created during inject), so `WidgetDiv`/`DropDownDiv`/`Tooltip` mount inside
+  `#blocks-app` (net 1.0) instead of the zoomed `<body>`.
+
+Guard: `tests/blocks-scale-safety.spec.js` (body zoomed >100% → net 1.0 on the tab, popups not on `<body>`,
+blocks render, no resize crash). This is invisible to headless render tests because headless normalizes `zoom`.
+
 ## Blockly APIs DDCS depends on (all confirmed present in 12.5.1)
 
 | API | Where we use it |

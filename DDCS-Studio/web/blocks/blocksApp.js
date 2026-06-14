@@ -37,6 +37,12 @@ export async function initBlocks() {
   const B = await loadBlockly();
   installBlockly(B);                            // define every op as a Blockly block
 
+  // Blockly mounts its popup singletons (WidgetDiv / DropDownDiv / Tooltip) on <body> by default. The app
+  // CSS-zooms <body> (ScaleManager), which breaks Blockly. We neutralize the zoom on #blocks-app (net 1.0,
+  // see scaleManager.neutralizeBlocksTab) — so relocate the popups INTO #blocks-app to ride that neutral
+  // scale instead of the zoomed body. Must run before inject (popup DOM is created during inject).
+  try { B.setParentContainer(root); } catch (_) { /* older Blockly without setParentContainer */ }
+
   const host = document.getElementById('blk-ws');
   const out = document.getElementById('blk-gcode');
   const preview = document.getElementById('blk-preview');
