@@ -34,7 +34,7 @@ test('If spawns a boolean socket; rejects a number reporter, accepts Compare', a
   const cx = vb.x + vb.width / 2, cy = vb.y + vb.height / 2;
 
   // 1) drag the If block onto the canvas (.pal-blk = a block entry, not a rail category chip)
-  await dragFromTo(page, page.locator('#blk-pal .pal-blk', { hasText: 'If' }), cx, cy);
+  await dragFromTo(page, page.locator('#blk-pal .pal-blk', { hasText: /^If$/ }), cx, cy);   // exact: not "If Goto"
   await expect(page.locator('.blk.cond')).toHaveCount(1);
   await expect(page.locator('.blk.cond .bool-socket')).toHaveCount(1);
   await expect(page.locator('.blk.cond .rep')).toHaveCount(0);
