@@ -1,0 +1,89 @@
+/**
+ * blocks/gcodeToStack.js — G-code text → a stack of LEAF atom-block records ({type, params}).
+ *
+ * The inverse of blockModel.emit for the LINE-LEVEL atoms: turns hand-written / pasted / round-tripped G-code
+ * into proper, field-editable blocks instead of opaque text. Each recognized line maps to a typed leaf
+ * (move/arc/spindle/feed/dwell/coolant/tool/wcs/distmode/comment/mcode/endprogram); anything unrecognized
+ * becomes a `raw` block that emits verbatim, so the round-trip never loses a line.
+ *
+ * HIGH-LEVEL ops are NOT recovered. A Fill/Array/Step-Down emits many derived lines from a few params; those
+ * params are gone in the expansion, so reverse-recognizing them is CAM feature-recognition (lossy). High-level
+ * ops stay forward-only (wizard/palette create them). So: low-level G-code round-trips through blocks; the
+ * structure of high-level ops does not.
+ *
+ * Dialect: most leaf emits are dialect-independent, so the parser is too. The few that differ (dwell P-units,
+ * G53 machine-move, M30) are matched best-effort; pass { dwellSeconds:true } when the source used seconds (NGC)
+ * rather than the DDCS default of milliseconds.
+ */
+
+// A token value: a #var (#99 / #base), a [bracket expr], or a signed/decimal number. #vars and [exprs] stay
+// strings (they emit verbatim); plain numbers become numbers so they round-trip through val()/r3().
+const VAL = '(#[A-Za-z0-9_.]+|\\[[^\\]]*\\]|[-+]?\\d*\\.?\\d+)';
+function word(letter, code) {
+    const m = code.match(new RegExp(letter + VAL, 'i'));
+    if (!m) return undefined;
+    const v = m[1];
+    if (/[#[]/.test(v)) return v;            // #var / [expr] → keep literal
+    const n = Number(v);
+    return Number.isFinite(n) ? n : v;
+}
+// Drop keys whose value is undefined, so emit omits unset axes (a bare `G0 X#9` stays single-axis).
+function pick(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
+
+/** Parse one physical line → a leaf record, or null for a blank/seam line. */
+export function parseLine(line, opts = {}) {
+    const raw = String(line);
+    const cm = raw.match(/\(([^)]*)\)\s*$/);                 // trailing ( comment )
+    const comment = cm ? cm[1].trim() : null;
+    const code = (cm ? raw.slice(0, cm.index) : raw).trim();
+
+    if (!code) return comment != null ? { type: 'comment', params: { text: comment } } : null;
+
+    const G = (n) => new RegExp('\\bG0*' + n + '\\b', 'i').test(code);   // G4 ≡ G04 (leading zeros)
+    const M = (n) => new RegExp('\\bM0*' + n + '\\b', 'i').test(code);
+    const w = (L) => word(L, code);
+
+    // Machine-coordinate move (G53; may carry G0 on some dialects) — one axis. Note: the `#var=value` staging
+    // line a machine-move emits before it parses as `raw` (no clean single-block inverse for the pair).
+    if (G(53)) {
+        for (const ax of ['X', 'Y', 'Z', 'A']) { const v = w(ax); if (v !== undefined) return { type: 'machinemove', params: { axis: ax, to: v } }; }
+        return { type: 'raw', params: { text: raw } };
+    }
+
+    // Motion + modal G-codes (order matters: G31 before G3/G1, G2 before nothing, etc.)
+    if (G(31)) return { type: 'move', params: pick({ mode: 'probe', x: w('X'), y: w('Y'), z: w('Z'), feed: w('F') }) };
+    if (G(2)) return { type: 'arc', params: pick({ arc: 'cw', x: w('X'), y: w('Y'), i: w('I'), j: w('J'), feed: w('F') }) };
+    if (G(3)) return { type: 'arc', params: pick({ arc: 'ccw', x: w('X'), y: w('Y'), i: w('I'), j: w('J'), feed: w('F') }) };
+    if (G(1)) return { type: 'move', params: pick({ mode: 'cut', x: w('X'), y: w('Y'), z: w('Z'), feed: w('F') }) };
+    if (G(0)) return { type: 'move', params: pick({ mode: 'rapid', x: w('X'), y: w('Y'), z: w('Z') }) };
+    if (G(4)) { const p = w('P'); return { type: 'dwell', params: { sec: typeof p === 'number' ? (opts.dwellSeconds ? p : p / 1000) : p } }; }
+    for (let n = 54; n <= 59; n++) if (G(n)) return { type: 'wcs', params: { wcs: 'G' + n } };
+    if (G(90)) return { type: 'distmode', params: { dist: 'abs' } };
+    if (G(91)) return { type: 'distmode', params: { dist: 'inc' } };
+
+    // M-codes
+    if (M(3) || M(4)) return { type: 'spindle', params: pick({ rpm: w('S'), dir: M(4) ? 'ccw' : 'cw' }) };
+    if (M(5)) return { type: 'spindle', params: { rpm: 0, dir: 'cw' } };
+    if (M(6)) { const t = w('T'); return { type: 'tool', params: { n: t !== undefined ? t : 1 } }; }
+    if (M(8)) return { type: 'coolant', params: { flow: 'flood' } };
+    if (M(7)) return { type: 'coolant', params: { flow: 'mist' } };
+    if (M(9)) return { type: 'coolant', params: { flow: 'off' } };
+    if (M(30) || M(2)) return { type: 'endprogram', params: {} };
+    const mm = code.match(/\bM0*(\d+)\b/i);
+    if (mm) return { type: 'mcode', params: { code: Number(mm[1]) } };
+
+    // Feed-only line (F with no G/M word)
+    if (/^F/i.test(code) && w('F') !== undefined) return { type: 'feed', params: { rate: w('F') } };
+
+    return { type: 'raw', params: { text: raw } };   // unrecognized → verbatim (never loses a line)
+}
+
+/** Parse a G-code program → an array of leaf block records (blank/seam lines are dropped). */
+export function parseGcodeToStack(text, opts = {}) {
+    const out = [];
+    for (const line of String(text || '').split('\n')) {
+        const rec = parseLine(line, opts);
+        if (rec) out.push(rec);
+    }
+    return out;
+}
