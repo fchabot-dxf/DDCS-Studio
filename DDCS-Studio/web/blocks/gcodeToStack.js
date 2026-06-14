@@ -99,12 +99,22 @@ export function parseLine(line, opts = {}) {
     return { type: 'raw', params: { text: raw } };   // unrecognized → verbatim (never loses a line)
 }
 
-/** Parse a G-code program → an array of leaf block records (blank/seam lines are dropped). */
+/** Parse a G-code program → an array of leaf block records (blank/seam lines are dropped).
+ *  Feedrate is modal (mirror of blockModel's applyModalFeed): a cut/probe/arc line with no F inherits the
+ *  current feed, so a block emits the right F on re-projection and the round-trip stays byte-exact. Only an F
+ *  attached to a motion line tracks modal — a standalone `F300` (feed op) is left as its own block. */
 export function parseGcodeToStack(text, opts = {}) {
     const out = [];
+    let modalFeed = null;
     for (const line of String(text || '').split('\n')) {
         const rec = parseLine(line, opts);
-        if (rec) out.push(rec);
+        if (!rec) continue;
+        if (rec.type === 'arc' || (rec.type === 'move' && (rec.params.mode === 'cut' || rec.params.mode === 'probe'))) {
+            if (typeof rec.params.feed === 'number') modalFeed = rec.params.feed;            // an F sets the modal feed
+            else if (rec.params.feed === undefined && modalFeed !== null) rec.params.feed = modalFeed;  // no F → inherit
+            else if (typeof rec.params.feed === 'string') modalFeed = null;                  // F#var/[expr] → modal unknown
+        }
+        out.push(rec);
     }
     return out;
 }

@@ -19,8 +19,10 @@ export const moveBlock = {
         if (p.y != null && p.y !== '') words.push(`Y${val(p.y, 0, dy)}`);
         if (p.z != null && p.z !== '') words.push(`Z${val(p.z, 0)}`);
         const xyz = words.join(' ');
-        if (p.mode === 'rapid') return [`G0 ${xyz}   ( travel )`];
-        if (p.mode === 'probe') return [`G31 ${xyz} F${val(p.feed, 50)}   ( probe )`];
-        return [`G1 ${xyz} F${val(p.feed, 200)}   ( cut )`];
+        // No ( travel )/( cut )/( probe ) tag: G0 is a travel, G1+F is a cut, G31 is a probe — the word says it.
+        // Block structure reads from the marker comments (( Array N @ … ), ( Step Down z=… )), not per-line tags.
+        if (p.mode === 'rapid') return [`G0 ${xyz}`];
+        if (p.mode === 'probe') return [`G31 ${xyz} F${val(p.feed, 50)}`];
+        return [`G1 ${xyz} F${val(p.feed, 200)}`];
     },
 };

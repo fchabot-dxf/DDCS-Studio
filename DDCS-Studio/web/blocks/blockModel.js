@@ -172,8 +172,28 @@ export function emitMapped(blocks, settings = {}) {
     const scope = Object.create(null);   // top-level variable environment, threaded across the stack
     const T = [];
     (blocks || []).forEach((b) => { T.push(...emit(b, 0, 0, [], scope, dialect)); });
+    applyModalFeed(T);                    // F is modal — drop it where it just repeats the current feed
     const lines = T.map((t) => t.line);
     return { text: lines.join('\n'), lines, map: T.map((t) => t.src) };
+}
+
+/** Feedrate is modal in G-code: once set it sticks until changed. The kernels emit F on every cutting line
+ *  (simple + always correct); this folds out an F *attached to a motion word* that merely repeats the current
+ *  modal feed — the way a CAM post does — so a 150-pass fill shows F once per change, not 150 times. Only a
+ *  plain-number F folds; an F#var / F[expr] (probe feeds) is kept and clears tracking so the next numeric F
+ *  always shows. gcodeToStack mirrors this (backfills the modal feed) so the round-trip stays byte-exact. */
+function applyModalFeed(T) {
+    let modalF = null;
+    for (const t of T) {
+        const m = t.line.match(/ F(-?\d+(?:\.\d+)?)\b/);   // F attached to a motion line (leading space), not a bare "F300"
+        if (m) {
+            const f = Number(m[1]);
+            if (modalF !== null && f === modalF) t.line = t.line.slice(0, m.index) + t.line.slice(m.index + m[0].length);
+            else modalF = f;
+        } else if (/ F[#[]/.test(t.line)) {
+            modalF = null;   // a #var/[expr] feed — can't fold; force the next numeric F to show
+        }
+    }
 }
 
 /** Back-compat string projection (callers that only need the text). */
