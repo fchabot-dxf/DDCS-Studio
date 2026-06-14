@@ -8,13 +8,20 @@
  *   M-Code — raw M-code escape hatch (drawbar M154/5, sensor-wait M300-2, dust-cover M162/3, M0 pause…).
  */
 import { num, r3 } from './util.js';
-import { M, raw, line } from '../words.js';
+import { M, raw, line, set } from '../words.js';
 import { g53 } from '../dialect.js';
 
 export const machineMoveBlock = {
     type: 'machinemove', label: 'Machine Move', kind: 'leaf', category: 'Move',
-    defaults: { axis: 'Z', to: 0 }, fields: ['axis', 'to'],   // axis select X/Y/Z/A; G53 frame
-    emit: (p) => [g53(p.axis || 'Z', r3(num(p.to, 0)), 'machine move')],
+    defaults: { axis: 'Z', to: '#99', var: '#99' }, fields: ['axis', 'to', 'var'],   // axis X/Y/Z/A; G53 (machine) frame
+    // DDCS rule: G53 must take a VARIABLE, not a literal (a constant fails on M350). If `to` is already a
+    // variable (e.g. a stored #57 from Read Machine) → G53 straight to it; if it's a number → stage it in `var` first.
+    emit: (p) => {
+        const axis = p.axis || 'Z', t = p.to;
+        if (typeof t === 'string' && t.trim().startsWith('#')) return [g53(axis, t.trim(), 'machine move')];
+        const v = p.var || '#99';
+        return [line([set(v, r3(num(t, 0)))], `machine ${axis} target`), g53(axis, v, 'machine move')];
+    },
 };
 
 export const endProgramBlock = {
