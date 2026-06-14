@@ -12,6 +12,7 @@ import { tokenizeWords } from './core/tokenizer.js';
 import { evalExpr, validateExpression } from './core/expression.js';
 import { evaluateCondition, validateCondition } from './core/condition.js';
 import { loadProgram as loadProgramText, stripLine } from './core/program.js';
+import { arcPoints } from './core/arc.js';
 
 export class GcodeExecutionEngine {
     constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
@@ -142,6 +143,7 @@ export class GcodeExecutionEngine {
         this.paused = false;
         this._waitPin = null;
         this._move = null;     // in-flight timed move (interpolated at the programmed feedrate)
+        this._traceSink = null;   // when non-null (trace()), moves snap + push a segment here instead of animating
         this.timer = null;
         this.stats = {
             feed: 0,
@@ -175,6 +177,55 @@ export class GcodeExecutionEngine {
         this.running = true;
         this._setStatus('Starting execution', true);
         this._scheduleTick();
+    }
+
+    /**
+     * Synchronous "trace" pass — run the whole program to completion (probes auto-detect, input waits
+     * auto-clear, no delays) and return the EXACT path the engine takes: { segments, bounds, stats }.
+     * The preview's drawn route comes from this, so it can never disagree with the played tool — both go
+     * through _executeStep with the same vars + control flow. Arcs are linearized; loops that never resolve
+     * are bounded by a step cap (stats.capped). Leaves the engine reset (ready for a subsequent run()).
+     */
+    trace(text) {
+        this.stop();
+        this.resetState();
+        this.loadProgram(text);
+        // A trace only draws the route — suppress the UI callbacks so it doesn't move the tool dot,
+        // highlight lines, or spam the status bar.
+        const cb = { line: this.onLineChange, pos: this.onPositionChange, status: this.onStatus, wait: this.onWait };
+        this.onLineChange = null; this.onPositionChange = null; this.onStatus = null; this.onWait = null;
+        const sink = [];
+        this._traceSink = sink;
+        this.running = true;
+        const cap = Math.max(this.program.length * 50, 5000);   // bound a loop that never resolves
+        let guard = 0;
+        try {
+            while (this.ip >= 0 && this.ip < this.program.length && guard++ < cap) {
+                const done = this._executeStep(this.program[this.ip]);
+                if (done) break;
+            }
+        } finally {
+            this.running = false;
+            this._traceSink = null;
+            this.onLineChange = cb.line; this.onPositionChange = cb.pos; this.onStatus = cb.status; this.onWait = cb.wait;
+        }
+        return this._buildTraceResult(sink, guard >= cap);
+    }
+
+    _buildTraceResult(segments, capped) {
+        const b = { minX: Infinity, minY: Infinity, minZ: Infinity, maxX: -Infinity, maxY: -Infinity, maxZ: -Infinity };
+        let feed = 0, rapid = 0, probe = 0;
+        for (const s of segments) {
+            b.minX = Math.min(b.minX, s.x1, s.x2); b.maxX = Math.max(b.maxX, s.x1, s.x2);
+            b.minY = Math.min(b.minY, s.y1, s.y2); b.maxY = Math.max(b.maxY, s.y1, s.y2);
+            b.minZ = Math.min(b.minZ, s.z1, s.z2); b.maxZ = Math.max(b.maxZ, s.z1, s.z2);
+            if (s.probe) probe += 1; else if (s.rapid) rapid += 1; else feed += 1;
+        }
+        return {
+            segments,
+            bounds: segments.length ? b : null,
+            stats: { feed, rapid, probe, retract: 0, passes: 1, skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped },
+        };
     }
 
     stop() {
@@ -458,6 +509,10 @@ export class GcodeExecutionEngine {
                 this._setStatus(`M${m} ${pinName} is ${target ? 'ON' : 'OFF'} (cleared)`, true);
                 return false;
             }
+            if (this._traceSink) {                            // trace: a virtual sensor satisfies the wait at once
+                injectVirtualInput(pinName, target);
+                return false;
+            }
             this._setStatus(`M${m} waiting for ${pinName} to be ${target ? 'ON' : 'OFF'}...`, true);
             this._setWaitPin({ pin, pinName, target });
             if (this.autoAnswer) this._scheduleAutoAnswer(pinName, target);
@@ -654,15 +709,36 @@ export class GcodeExecutionEngine {
                         this.vars.set(1927, target.z);
                     }
                 }
+                if (this._traceSink) {
+                    // Trace/preview: a virtual probe always "detects" at its landing point, so macros take
+                    // their success branch and probe loops (IF #1920+ax!=2 GOTO …) terminate instead of
+                    // running to the step cap. Same hands-free contract as autoAnswer for M31/M33 waits.
+                    for (const a of scannedAxes) this.vars.set(PROBE_STATUS_VAR[a], 2);
+                    this.vars.set(1925, target.x);
+                    this.vars.set(1926, target.y);
+                    this.vars.set(1927, target.z);
+                }
             } else if (effMotion === 0) {
                 this.stats.feed += 1;
+            }
+            const rapid = effMotion === 0 && !isProbe;
+            // Trace: snap to the target and record the segment (no animation). The drawn route IS the path
+            // the engine takes, so it can never disagree with the played tool (same _executeStep, same vars).
+            if (this._traceSink) {
+                this._traceSink.push({
+                    x1: this.pos.x, y1: this.pos.y, z1: this.pos.z,
+                    x2: target.x, y2: target.y, z2: target.z,
+                    rapid, probe: isProbe, type: isProbe ? 'probe' : (rapid ? 'rapid' : 'feed'), feed: this.feedVal,
+                });
+                this.pos = target;
+                this.ip += 1;
+                return false;
             }
             // Time-true playback: the move takes distance/rate (rapids at rapidRate, cuts and
             // probes at the programmed F), scaled by simSpeed. Long moves animate as an
             // in-flight interpolated move; sub-frame ones just jump.
             {
                 const d = Math.hypot(target.x - this.pos.x, target.y - this.pos.y, target.z - this.pos.z);
-                const rapid = effMotion === 0 && !isProbe;
                 const rate = rapid ? this.rapidRate : (this.feedVal > 0 ? this.feedVal : 600);
                 const realMs = rate > 0 ? (d / rate) * 60000 : 0;
                 const speed = this.simSpeed > 0 ? this.simSpeed : 1;
@@ -680,6 +756,25 @@ export class GcodeExecutionEngine {
             this.pos = target;
             if (typeof this.onPositionChange === 'function') {
                 this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
+            }
+        } else if (this._traceSink) {
+            // Arc (G2/G3) in a trace: linearize into chord segments so the drawn route shows the curve.
+            // (Real-time play still steps line-by-line and skips arcs — a separate, pre-existing gap.)
+            const off = { I: wm.I, J: wm.J, K: wm.K, R: wm.R };
+            const anyNull = ['I', 'J', 'K', 'R'].some((k) => wm[k] != null && !Number.isFinite(wm[k]));
+            if (anyNull) {
+                this.stats.skipped += 1;
+            } else {
+                const pts = arcPoints(this.pos, target, off, effMotion, this.plane, this.unitScale);
+                let prev = this.pos;
+                for (let i = 1; i < pts.length; i++) {
+                    this._traceSink.push({
+                        x1: prev.x, y1: prev.y, z1: prev.z, x2: pts[i].x, y2: pts[i].y, z2: pts[i].z,
+                        rapid: false, probe: false, type: 'feed', feed: this.feedVal,
+                    });
+                    prev = pts[i];
+                }
+                this.pos = target;
             }
         } else {
             this.stats.skipped += 1;
