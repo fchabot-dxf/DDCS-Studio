@@ -3578,6 +3578,16 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .add-child { margin:2px 4px 6px 0; padding:4px 8px; border:1px dashed var(--line); border-radius:6px;
                          background:transparent; color:var(--muted); cursor:pointer; }
 #blocks-app .add-child:hover { color:var(--ink); border-color:var(--muted); }
+/* Collapsed add-block UX: a single "+" opens the type list only when needed (no wall of buttons). */
+#blocks-app .add-slot { position:relative; display:inline-block; margin:2px 0 6px; }
+#blocks-app .add-toggle { width:24px; height:24px; line-height:20px; padding:0; border:1px dashed var(--line);
+                          border-radius:6px; background:transparent; color:var(--muted); cursor:pointer; font-size:16px; }
+#blocks-app .add-toggle:hover { color:var(--ink); border-color:var(--muted); }
+#blocks-app .add-menu { display:none; position:absolute; z-index:40; top:calc(100% + 4px); left:0; width:230px;
+                        flex-wrap:wrap; gap:2px; padding:6px; background:var(--panel,#1b2733); border:1px solid var(--line);
+                        border-radius:8px; box-shadow:0 8px 22px rgba(0,0,0,.45); }
+#blocks-app .add-slot.open .add-menu { display:flex; }
+#blocks-app .add-menu .add-child { margin:0; }
 #blocks-app .blk.selected { outline:2px solid var(--accent); outline-offset:1px; }
 #blocks-app .blk-head[data-sel] { cursor:pointer; }
 /* right column (preview + G-code) — black "screen", mirrors the app editor */

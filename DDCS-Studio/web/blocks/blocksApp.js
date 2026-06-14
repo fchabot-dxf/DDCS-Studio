@@ -133,7 +133,9 @@ export function initBlocks() {
     if (wrapKinds.has(def.kind)) {
       const childCards = (block.children || []).map(blockHTML).join('');
       const addBtns = childTypesFor(def).map((t) => `<button class="add-child" data-add="${t}" data-parent="${block.id}">+ ${BLOCKS[t].label}</button>`).join('');
-      kids = `<div class="children">${childCards}${addBtns}</div><div class="blk-foot"></div>`;   // C-block: body mouth + closing foot bar
+      // The full type list is clutter — tuck it behind a single "+" that opens a menu only when needed.
+      const addSlot = `<div class="add-slot"><button class="add-toggle" data-addtoggle="${block.id}" title="add a block inside">+</button><div class="add-menu">${addBtns}</div></div>`;
+      kids = `<div class="children">${childCards}${addSlot}</div><div class="blk-foot"></div>`;   // C-block: body mouth + closing foot bar
     }
     return `<div class="blk ${def.kind} cat-${catSlug(def.category)}" data-bid="${block.id}">
         <div class="blk-head" data-sel="${block.id}">${def.label} <small>${block.id}</small><span class="x" data-del="${block.id}">✕</span></div>
@@ -161,7 +163,14 @@ export function initBlocks() {
       if (k === 'pattern') { render(); return; }
       reproject();
     }));
-    stage.querySelectorAll('[data-add]').forEach((btn) => btn.onclick = () => {
+    stage.querySelectorAll('[data-addtoggle]').forEach((btn) => btn.onclick = (e) => {
+      e.stopPropagation();                                  // open/close the add menu for this mouth (collapsed by default)
+      const slot = btn.closest('.add-slot'), wasOpen = slot.classList.contains('open');
+      stage.querySelectorAll('.add-slot.open').forEach((s) => s.classList.remove('open'));   // one menu at a time
+      if (!wasOpen) slot.classList.add('open');
+    });
+    stage.querySelectorAll('[data-add]').forEach((btn) => btn.onclick = (e) => {
+      e.stopPropagation();
       const p = byId.get(btn.dataset.parent); if (p) { p.children.push(newBlock(btn.dataset.add)); render(); }
     });
     stage.querySelectorAll('[data-del]').forEach((x) => x.onclick = (e) => { e.stopPropagation(); removeById(program, x.dataset.del); render(); });
