@@ -49,8 +49,7 @@ export class ScaleManager {
             this.scale = 'auto';
             this.lastAutoPct = pct;
             document.body.setAttribute('data-scale', 'auto');
-            document.body.style.zoom = (pct / 100).toString();
-            this.neutralizeBlocksTab(pct);
+            this.applyBodyZoom(pct);
             this.updateControls();
             this.saveScale();
             window.dispatchEvent(new CustomEvent('scaleChanged', { detail: { scale: 'auto', value: pct } }));
@@ -62,24 +61,24 @@ export class ScaleManager {
         // exact zoom inline; data-scale snapped to the nearest bucket so the CSS guards still apply
         const bucket = BUCKETS.reduce((b, v) => (Math.abs(v - n) < Math.abs(b - n) ? v : b));
         document.body.setAttribute('data-scale', bucket.toString());
-        document.body.style.zoom = (n / 100).toString();
-        this.neutralizeBlocksTab(n);
+        this.applyBodyZoom(n);
         this.updateControls();
         this.saveScale();
         window.dispatchEvent(new CustomEvent('scaleChanged', { detail: { scale: n } }));
     }
 
     /**
-     * The Blocks tab hosts Blockly, which BREAKS inside a CSS-zoomed ancestor — mispositioned/invisible
-     * blocks and a DropDownDiv resize crash (Blockly mounts its popups on <body>, and does layout via
-     * getBoundingClientRect; neither survives an ancestor `zoom`). We can't stop zooming the app, so we
-     * counter the body zoom on #blocks-app: net zoom there = body(z) × (1/z) = 1.0, a clean context for
-     * Blockly. Its popups are relocated INTO #blocks-app (see blocksApp.js setParentContainer) so they ride
-     * this same neutral scale. The blocks themselves scale via Blockly's own workspace zoom, not the app's.
+     * Apply the UI zoom to <body> — EXCEPT when the Blocks tab is showing. Blockly breaks inside ANY CSS-scaled
+     * ancestor: its getBoundingClientRect viewport metrics go wrong, so zoomToFit mis-scales (e.g. 1.87×) and
+     * parks the blocks far off-screen. A counter-zoom on #blocks-app made it WORSE — nested zoom (body × counter)
+     * corrupts the same metrics. So when Blocks is active we force <body> to zoom 1, a true 1.0 context Blockly
+     * can measure correctly; the blocks scale via Blockly's own workspace zoom. #blocks-app is never CSS-zoomed.
      */
-    neutralizeBlocksTab(pct) {
+    applyBodyZoom(pct) {
         const blk = document.getElementById('blocks-app');
-        if (blk) blk.style.zoom = (100 / Math.max(1, pct)).toString();
+        const blocksVisible = blk && !blk.classList.contains('hidden');
+        document.body.style.zoom = (blocksVisible ? 1 : pct / 100).toString();
+        if (blk) blk.style.zoom = '';   // never CSS-zoom the Blockly tab
     }
 
     currentPct() {

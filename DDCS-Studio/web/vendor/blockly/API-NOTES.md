@@ -30,16 +30,20 @@ popup singletons (`WidgetDiv` / `DropDownDiv` / `Tooltip`) on `document.body`. I
 has `zoom` or `transform: scale()`, the blocks are mispositioned/invisible and you get a crash on window
 resize: `DropDownDiv.repositionForWindowResize → hide → Cannot read properties of undefined (reading 'style')`.
 
-DDCS scales the whole UI with `document.body { zoom }` (the ScaleManager). The fix (no app-wide restructure):
-- **Neutralize the zoom on the Blocks subtree** — `ScaleManager.neutralizeBlocksTab()` sets `#blocks-app`
-  `zoom = 1 / bodyZoom`, so that subtree renders at **net 1.0** (a clean context for Blockly). Blocks are
-  scaled instead by Blockly's own workspace zoom.
-- **Relocate the popups into that neutral subtree** — `blocksApp.js` calls `Blockly.setParentContainer(#blocks-app)`
-  **before** `inject` (popup DOM is created during inject), so `WidgetDiv`/`DropDownDiv`/`Tooltip` mount inside
-  `#blocks-app` (net 1.0) instead of the zoomed `<body>`.
+DDCS scales the whole UI with `document.body { zoom }` (the ScaleManager). The fix:
+- **Force `<body>` to zoom 1 while the Blocks tab is active** — `ScaleManager.applyBodyZoom()` checks whether
+  `#blocks-app` is visible and, if so, sets `body { zoom: 1 }` (the app scale still applies on the other tabs).
+  `showApp` re-applies on every tab switch, so entering Blocks flips body→1 *before* Blockly injects. Blocks
+  scale via Blockly's own workspace zoom instead.
+- ⚠️ **A counter-zoom on `#blocks-app` (`zoom = 1/bodyZoom`) does NOT work** — *nested* CSS zoom still corrupts
+  `getBoundingClientRect`, so `zoomToFit` mis-scaled (measured 1.87×) and parked the blocks far off-screen
+  (`screenRect.y ≈ 1604`). "Net 1.0" is not the same as "no zoom". Don't go down that path again.
+- `blocksApp.js` also calls `Blockly.setParentContainer(#blocks-app)` before inject (harmless belt-and-suspenders
+  for the popups).
 
-Guard: `tests/blocks-scale-safety.spec.js` (body zoomed >100% → net 1.0 on the tab, popups not on `<body>`,
-blocks render, no resize crash). This is invisible to headless render tests because headless normalizes `zoom`.
+Guard: `tests/blocks-scale-safety.spec.js` (Blocks tab forces body zoom 1, no counter-zoom, and the loaded op's
+block rect is IN the host — not off-screen — with no resize crash). This is invisible to headless render tests
+because headless normalizes `zoom`; the test asserts the inline body zoom + the on-screen geometry instead.
 
 ## Blockly APIs DDCS depends on (all confirmed present in 12.5.1)
 
