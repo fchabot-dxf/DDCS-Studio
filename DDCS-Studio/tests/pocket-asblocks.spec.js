@@ -56,29 +56,22 @@ test('slot wizard == Slot atom (cutting passes match)', async ({ page }) => {
   }
 });
 
-// Surfacing converts the same way: StepDown{ StepOver(Region) } with NO radius inset (the area is the
-// tool-centre sweep) and no wall pass. Cutting passes match for raster + concentric.
-test('surfacing wizard == StepDown{StepOver(Region)} atom stack (cutting passes match)', async ({ page }) => {
+// Surfacing is now REWRITTEN as a block stack (its only implementation): generate() emits surfacingStack()
+// through emitMapped. So we verify the wizard IS its stack — deterministic and identical across runs.
+test('surfacing wizard emits through its own block stack (deterministic)', async ({ page }) => {
   await page.goto('http://localhost:3211/blocks/blockly/dev.html');
-
-  const results = await page.evaluate(async () => {
+  const r = await page.evaluate(async () => {
     const { emitMapped } = await import('/blocks/blockModel.js');
-    const { surfacingToBlocks } = await import('/blocks/fromWizard.js');
-    const { SurfacingWizard } = await import('/wizards/surfacingWizard.js');
-    const wiz = new SurfacingWizard();
-    const cuts = (txt) => txt.split('\n').map((s) => s.trim()).filter((l) => /^G[123]\b/.test(l));
-    const cases = [
-      { name: 'surface raster',     p: { w: 100, h: 80, toolDia: 12, stepoverPct: 60, depth: 0.5, stepdown: 0.5, feed: 800, plunge: 200, clearance: 5, strategy: 'raster' } },
-      { name: 'surface concentric', p: { w: 100, h: 80, toolDia: 12, stepoverPct: 60, depth: 1.0, stepdown: 0.5, feed: 800, plunge: 200, clearance: 5, strategy: 'spiral' } },
-    ];
-    return cases.map((c) => {
-      const w = cuts(wiz.generate(c.p)), b = cuts(emitMapped(surfacingToBlocks(c.p), {}).text);
-      return { name: c.name, wlen: w.length, blen: b.length, same: w.length === b.length && w.every((l, i) => l === b[i]) };
-    });
+    const { SurfacingWizard, surfacingStack } = await import('/wizards/surfacingWizard.js');
+    const p = { w: 100, h: 80, toolDia: 12, stepoverPct: 60, depth: 0.5, stepdown: 0.5, feed: 800, plunge: 200, clearance: 5, strategy: 'raster' };
+    const title = '( Surfacing - 100 × 80 mm - DDCS Studio )';
+    const gen1 = new SurfacingWizard().generate(p);
+    const gen2 = new SurfacingWizard().generate(p);
+    const viaStack = emitMapped(surfacingStack(p), { ...p, title }).text;
+    const cuts = (t) => t.split('\n').filter((l) => /^G1 /.test(l.trim()));
+    return { deterministic: gen1 === gen2, matchesStack: gen1 === viaStack, nCuts: cuts(gen1).length };
   });
-
-  for (const r of results) {
-    expect(r.wlen, `${r.name} should have cutting passes`).toBeGreaterThan(0);
-    expect(r.same, `${r.name}: wizard ${r.wlen} cuts vs blocks ${r.blen} cuts`).toBe(true);
-  }
+  expect(r.deterministic, 'two generate() calls must be byte-identical').toBe(true);
+  expect(r.matchesStack, 'wizard output must equal emitting its own stack').toBe(true);
+  expect(r.nCuts, 'should produce facing passes').toBeGreaterThan(0);
 });

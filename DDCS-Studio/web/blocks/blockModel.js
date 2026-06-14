@@ -89,7 +89,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         for (let s = 0; s < Math.max(0, Math.min(steps, 100000)); s++) {   // cap guards runaway loops
             const k = from + s * by;
             const child = Object.create(scope); child[name] = k;          // child scope: index visible, doesn't leak out
-            out.push(tag(`( ${block.id}: ${name}=${r3(k)} )`, own));
+            out.push(tag(`( ${def.label} ${name}=${r3(k)} )`, own));
             (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect)));
         }
         return out;
@@ -97,7 +97,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 
     if (def.kind === 'cond') {                 // IF: run the body once, only when the condition resolves true
         const on = resolveBool(block.params.cond, scope);
-        const out = [tag(`( ${block.id}: if ${on ? 'true' : 'false'} )`, own)];
+        const out = [tag(`( ${def.label} ${on ? 'true' : 'false'} )`, own)];
         if (on) (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
         return out;
     }
@@ -108,7 +108,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         const out = [];
         for (const L of depthLevels(to, by)) {
             const child = Object.create(scope); child.z = -L;          // child scope: cut Z visible to the body, doesn't leak out
-            out.push(tag(`( ${block.id}: depth z=${r3(-L)} )`, own));
+            out.push(tag(`( ${def.label} z=${r3(-L)} )`, own));
             (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect)));
         }
         return out;
@@ -117,7 +117,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     if (def.kind === 'fill') {                 // STEP OVER: clear the region at the current depth (auto-cut, or run a per-pass body)
         const p = resolveParams(block.params, scope);
         const z = num(p.z, 0);
-        const out = [tag(`( ${block.id}: ${p.strategy} fill z=${r3(z)} )`, own)];
+        const out = [tag(`( ${p.strategy} fill z=${r3(z)} )`, own)];
         if ((block.children || []).length && def.segments) {           // body present → run it once per pass with {x0,y0,x1,y1} in scope
             def.segments(p).forEach((seg) => {
                 const child = Object.create(scope); Object.assign(child, seg);
@@ -134,7 +134,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         const pts = def.points(p);
         const out = [];
         pts.forEach((pt, i) => (block.children || []).forEach((c) => {
-            out.push(tag(`( ${block.id}[${i + 1}] @ ${pt.x},${pt.y} )`, own));
+            out.push(tag(`( ${def.label} ${i + 1} @ ${pt.x},${pt.y} )`, own));
             out.push(...emit(c, dx + pt.x, dy + pt.y, own, scope, dialect));
         }));
         return out;
@@ -144,7 +144,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         const pts = def.points(p);
         const clr = num(p.clearance, 5);
         const out = [];
-        if (pts.length) out.push(tag(`G0 X${pts[0].x} Y${pts[0].y}   ( ${block.id} start )`, own), tag(`G0 Z${clr}`, own));
+        if (pts.length) out.push(tag(`G0 X${pts[0].x} Y${pts[0].y}   ( ${def.label} start )`, own), tag(`G0 Z${clr}`, own));
         pts.forEach((pt) => (block.children || []).forEach((c) => {
             const cd = BLOCKS[c.type];
             if (cd && cd.step) out.push(tag(cd.step(resolveParams(c.params, scope), pt), [...own, c.id]));  // step swept point
@@ -163,12 +163,12 @@ export function emitMapped(blocks, settings = {}) {
     const dialect = settings.dialect || getDialect(settings.profileId);   // active controller profile → its G-code forms
     const scope = Object.create(null);   // top-level variable environment, threaded across the stack
     const T = [
-        tag('( DDCS Studio - Blocks )', null),
+        tag(settings.title || '( DDCS Studio - Blocks )', null),
         ...headerBlock(settings).map((l) => tag(l, null)),
         tag(`G0 Z${clr}   ( clearance )`, null),
     ];
     (blocks || []).forEach((b) => {
-        T.push(tag('', null), tag(`( --- ${b.type.toUpperCase()} ${b.id} --- )`, [b.id]));
+        T.push(tag('', null), tag(`( --- ${b.type.toUpperCase()} --- )`, [b.id]));
         T.push(...emit(b, 0, 0, [], scope, dialect));
     });
     T.push(tag('', null), ...footerBlock(settings).map((l) => tag(l, null)));
