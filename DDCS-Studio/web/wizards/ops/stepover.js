@@ -58,6 +58,7 @@ export const stepoverBlock = {
     type: 'stepover', label: 'Step Over', kind: 'fill', category: 'Modify',
     defaults: { region: null, stepover: 4, strategy: 'parallel', direction: 'bothways', z: 'z', feed: 600, plunge: 200, clearance: 5 },
     fields: ['region', 'stepover', 'strategy', 'direction', 'z', 'feed', 'plunge', 'clearance'],   // region = a Region socket; z follows the StepDown
+    sockets: { region: 'region' },
     lines: (p, z) => fillStrategy(p, z),       // auto-cut (empty body)
     segments: (p) => fillSegments(p),          // per-pass body: {x0,y0,x1,y1} in scope
 };

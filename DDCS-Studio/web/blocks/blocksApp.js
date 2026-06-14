@@ -27,7 +27,8 @@ export function initBlocks() {
   const leafTypes = PALETTE.filter((d) => d.kind === 'leaf').map((d) => d.type);
   const moveTypes = PALETTE.filter((d) => d.kind === 'move').map((d) => d.type);
   const allTypes = PALETTE.map((d) => d.type);                  // a Count loop can wrap any block
-  const childTypesFor = (def) => def.kind === 'path' ? moveTypes : (def.kind === 'loop' || def.kind === 'cond') ? allTypes : leafTypes;
+  const wrapKinds = new Set(['container', 'path', 'loop', 'cond', 'depth', 'fill']);   // kinds that have a body mouth
+  const childTypesFor = (def) => def.kind === 'path' ? moveTypes : (def.kind === 'loop' || def.kind === 'cond' || def.kind === 'depth' || def.kind === 'fill') ? allTypes : leafTypes;
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/\s+/g, '');   // 'Mark Up' → 'markup' (used by palette + cards)
   let mode = '2d';
@@ -94,6 +95,7 @@ export function initBlocks() {
   function valueHTML(ownerId, key, v) {
     if (v && typeof v === 'object' && v.type) return reporterHTML(v, ownerId, key);
     if (socketKind(ownerId, key) === 'boolean') return `<span class="bool-socket" data-bid="${ownerId}" data-key="${key}"></span>`;
+    if (socketKind(ownerId, key) === 'region') return `<span class="region-socket" data-bid="${ownerId}" data-key="${key}">⬚ region</span>`;
     if (SELECT_OPTS[key]) {
       const opts = SELECT_OPTS[key].map((o) => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('');
       return `<select data-bid="${ownerId}" data-key="${key}">${opts}</select>`;
@@ -112,6 +114,11 @@ export function initBlocks() {
       const op = opts.map((o) => `<option ${o === rep.params.op ? 'selected' : ''}>${o}</option>`).join('');
       return `<span class="${cls}">${valueHTML(rep.id, 'a', rep.params.a)}<select data-bid="${rep.id}" data-key="op">${op}</select>${valueHTML(rep.id, 'b', rep.params.b)}${x}</span>`;
     }
+    if (rep.type === 'region') {                           // Region pill: shape + x/y/w/h (a shape value, plugs into a region socket)
+      const sh = SELECT_OPTS.shape.map((o) => `<option ${o === rep.params.shape ? 'selected' : ''}>${o}</option>`).join('');
+      const nums = ['x', 'y', 'w', 'h'].map((f) => `<input class="rep-num" title="${f}" value="${esc(rep.params[f])}" data-bid="${rep.id}" data-key="${f}">`).join('');
+      return `<span class="${cls}"><select data-bid="${rep.id}" data-key="shape">${sh}</select>${nums}${x}</span>`;
+    }
     return `<span class="${cls}"><input class="rep-name" value="${esc(rep.params.name)}" data-bid="${rep.id}" data-key="name">${x}</span>`;
   }
 
@@ -121,7 +128,7 @@ export function initBlocks() {
     byId.set(block.id, block);
     const fields = fieldsOf(block).map((k) => fieldHTML(block, k)).join('');
     let kids = '';
-    if (def.kind === 'container' || def.kind === 'path' || def.kind === 'loop' || def.kind === 'cond') {
+    if (wrapKinds.has(def.kind)) {
       const childCards = (block.children || []).map(blockHTML).join('');
       const addBtns = childTypesFor(def).map((t) => `<button class="add-child" data-add="${t}" data-parent="${block.id}">+ ${BLOCKS[t].label}</button>`).join('');
       kids = `<div class="children">${childCards}${addBtns}</div><div class="blk-foot"></div>`;   // C-block: body mouth + closing foot bar
@@ -355,7 +362,8 @@ export function initBlocks() {
   // the socket under the cursor that accepts `want` ('number' → input.f-socket, 'boolean' → .bool-socket)
   const socketAt = (cx, cy, want = 'number') => {
     let best = null;
-    stage.querySelectorAll(want === 'boolean' ? '.bool-socket' : 'input.f-socket').forEach((el) => {
+    const sel = want === 'boolean' ? '.bool-socket' : want === 'region' ? '.region-socket' : 'input.f-socket';
+    stage.querySelectorAll(sel).forEach((el) => {
       const r = el.getBoundingClientRect();
       if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) best = { bid: el.dataset.bid, key: el.dataset.key, el };
     });
@@ -491,7 +499,7 @@ export function initBlocks() {
   function mouthTargetFor(chain, cx, cy) {
     const ids = new Set(chain.map((c) => c.block.id));
     let best = null;
-    stage.querySelectorAll('.stack > .blk.container > .children, .stack > .blk.loop > .children, .stack > .blk.path > .children, .stack > .blk.cond > .children')
+    stage.querySelectorAll('.stack > .blk.container > .children, .stack > .blk.loop > .children, .stack > .blk.path > .children, .stack > .blk.cond > .children, .stack > .blk.depth > .children, .stack > .blk.fill > .children')
       .forEach((mouth) => {
         const wid = mouth.closest('.stack').dataset.stack;
         if (ids.has(wid)) return;                         // can't drop a block into itself

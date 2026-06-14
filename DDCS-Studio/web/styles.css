@@ -3622,3 +3622,10 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .bool-socket:empty::after { content:'?'; opacity:.6; }
 #blocks-app .bool-socket.socket-target { background:color-mix(in srgb, var(--cat-control) 36%, var(--field)); color:var(--ink); }
 #blocks-app .blk.cond > .blk-body .f { width:auto; min-width:64px; }   /* room for the cond hexagon */
+/* region (shape) socket type — a Region pill plugs in; empty = a "⬚ region" prompt */
+#blocks-app .region-socket { display:inline-flex; align-items:center; gap:3px; min-width:62px; height:22px; padding:0 8px;
+                             background:var(--field); border:1px dashed var(--line); border-radius:5px; color:var(--muted); font-size:10px; cursor:default; }
+#blocks-app .region-socket.socket-target { border-color:var(--cat-shapes); background:color-mix(in srgb, var(--cat-shapes) 16%, var(--field)); color:var(--ink); }
+#blocks-app .rep.cat-shapes { background:var(--cat-shapes); }
+#blocks-app .rep .rep-num { width:30px; text-align:center; }   /* Region x/y/w/h pill fields */
+#blocks-app .blk.fill > .blk-body .f, #blocks-app .blk.depth > .blk-body .f { width:auto; }   /* room for the region socket */

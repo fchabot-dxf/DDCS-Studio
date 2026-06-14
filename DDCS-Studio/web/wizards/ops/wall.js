@@ -13,6 +13,7 @@ export const wallBlock = {
     type: 'wall', label: 'Wall', kind: 'leaf', category: 'Ops',
     defaults: { region: null, z: 'z', feed: 400, plunge: 200, clearance: 5 },
     fields: ['region', 'z', 'feed', 'plunge', 'clearance'],
+    sockets: { region: 'region' },
     emit: (p) => contourLevel(coerceRegion(p.region).contour,
         { z: num(p.z, 0), clr: num(p.clearance, 5), feed: num(p.feed, 400), plunge: num(p.plunge, 200) }),
 };
