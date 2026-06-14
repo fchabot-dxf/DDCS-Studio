@@ -166,16 +166,20 @@ export function emitMapped(blocks, settings = {}) {
     const clr = num(settings.clearance, 5);
     const dialect = settings.dialect || getDialect(settings.profileId);   // active controller profile → its G-code forms
     const scope = Object.create(null);   // top-level variable environment, threaded across the stack
-    const T = [
-        tag(settings.title || '( DDCS Studio - Blocks )', null),
-        ...headerBlock(settings).map((l) => tag(l, null)),
-        tag(`G0 Z${clr}   ( clearance )`, null),
-    ];
+    // `bare` = a macro SNIPPET (probe/WCS/setup): no program header/footer/section-markers — just the blocks.
+    // (Full cutting programs use the default framing: title + G90/spindle + clearance + … + M5/M9/M30.)
+    const bare = !!settings.bare;
+    const T = [];
+    if (!bare) {
+        T.push(tag(settings.title || '( DDCS Studio - Blocks )', null));
+        headerBlock(settings).forEach((l) => T.push(tag(l, null)));
+        T.push(tag(`G0 Z${clr}   ( clearance )`, null));
+    }
     (blocks || []).forEach((b) => {
-        T.push(tag('', null), tag(`( --- ${b.type.toUpperCase()} --- )`, [b.id]));
+        if (!bare) T.push(tag('', null), tag(`( --- ${b.type.toUpperCase()} --- )`, [b.id]));
         T.push(...emit(b, 0, 0, [], scope, dialect));
     });
-    T.push(tag('', null), ...footerBlock(settings).map((l) => tag(l, null)));
+    if (!bare) T.push(tag('', null), ...footerBlock(settings).map((l) => tag(l, null)));
     const lines = T.map((t) => t.line);
     return { text: lines.join('\n'), lines, map: T.map((t) => t.src) };
 }

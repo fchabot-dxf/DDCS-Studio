@@ -45,6 +45,7 @@ import { machineMoveBlock, endProgramBlock, mcodeBlock } from './macro.js';
 import { labelBlock, gotoBlock } from './flow.js';
 import { probeReadBlock, probeCheckBlock, readMachineBlock } from './measure.js';
 import { setWorkOffsetBlock } from './setworkoffset.js';
+import { assignBlock } from './assign.js';
 import { pauseBlock, messageBlock, askNumberBlock } from './hmi.js';
 import { evalExpr } from './expr.js';
 
@@ -58,7 +59,7 @@ export const PALETTE = [
     arrayBlock, helixBlock, stepoverBlock, stepdownBlock,    // Modify (stamp/sweep + lateral/depth pass wrappers)
     countBlock, ifBlock, compareBlock, probeCheckBlock, labelBlock, gotoBlock, pauseBlock, askNumberBlock,   // Control (loop/cond/bool + probe-branch + label/goto + pause/operator-input)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
-    setBlock, variableBlock,                                   // Variables (statement + reporter)
+    setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
 ];
 
