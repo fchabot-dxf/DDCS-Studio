@@ -233,9 +233,19 @@ export async function initBlocks() {
   function loadProgram(stack) {
     stackToWorkspace(stack, ws);
     reproject();
-    // Defer until the (just-shown) tab has laid out, then size the SVG to the host and frame the whole op so
-    // it's actually visible (without this the stack loads off-screen — the "I don't see surfacing blocks" bug).
-    requestAnimationFrame(() => { B.svgResize(ws); try { ws.zoomToFit(); } catch (_) { /* pre-render */ } });
+    // The just-shown tab may not be laid out yet, and a stray window-resize crash (Blockly's DropDownDiv) can
+    // abort a single frame attempt — leaving the blocks rendered but off-screen ("models loaded, canvas blank").
+    // So flush the v12 render queue and frame on several GUARDED ticks: svgResize → scrollCenter → zoomToFit,
+    // each independently try/caught, retried so one aborted pass doesn't lose the op.
+    const frame = () => {
+      try { if (B.renderManagement && B.renderManagement.triggerQueuedRenders) B.renderManagement.triggerQueuedRenders(); } catch (_) { /* */ }
+      try { B.svgResize(ws); } catch (_) { /* */ }
+      try { ws.scrollCenter(); } catch (_) { /* */ }
+      try { ws.zoomToFit(); } catch (_) { /* pre-render */ }
+    };
+    requestAnimationFrame(frame);
+    setTimeout(frame, 80);
+    setTimeout(frame, 300);
   }
 
   window.addEventListener('resize', () => { if (!root.classList.contains('hidden')) { B.svgResize(ws); reproject(); } });
