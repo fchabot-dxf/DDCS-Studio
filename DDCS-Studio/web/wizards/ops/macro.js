@@ -32,3 +32,9 @@ export const mcodeBlock = {
     defaults: { code: 154 }, fields: ['code'],   // raw custom M-code (accessory output / sensor wait / pause)
     emit: (p) => [line([M(Math.max(0, Math.round(num(p.code, 0))))], 'M-code')],
 };
+
+export const rawBlock = {
+    type: 'raw', label: 'Raw G-code', kind: 'leaf', category: 'Machine',
+    defaults: { text: '' }, fields: ['text'],   // verbatim escape hatch (e.g. a controller-specific G4 P / dwell)
+    emit: (p) => [String(p.text ?? '')],
+};
