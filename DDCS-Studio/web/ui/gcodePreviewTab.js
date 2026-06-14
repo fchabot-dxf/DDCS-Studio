@@ -9,10 +9,13 @@
 import { parseGcode } from '../gcodeParser.js';
 import { GcodeViz3D } from '../viz/gcodeViz3d.js';
 import { GcodeExecutionEngine } from '../engine/index.js';
+import { createToolpath2d } from '../viz/toolpath2d.js';   // shared 2D toolpath view (same as Blocks + wizards)
 
 let gpViz = null;
 let gpEngine = null;
-let gpView = 'editor';
+let gpView = 'editor';        // drawer open ('3d') vs closed ('editor')
+let gpMode = '3d';            // which view inside the open drawer: '2d' (shared canvas) | '3d' (GcodeViz3D)
+let gpT2 = null;              // shared 2D controller (created in gpInit on #viz3d2d)
 let gpDebounce = null;
 let gpRunButton = null;
 
@@ -87,19 +90,42 @@ function gpRenderFromEditor() {
 export function setGcodeView(view) {
     const els = gpEls();
     gpView = view;
-    const is3d = view === '3d';
+    const is3d = view === '3d';   // "open the preview drawer" (the inner 2D/3D pick is gpMode)
 
     // Drawer slides in/out; the code editor stays visible underneath either way.
     if (els.vizContainer) els.vizContainer.classList.toggle('open', is3d);
     if (els.toggle) {
         els.toggle.classList.toggle('open', is3d); // slide the pull-tab onto the drawer edge
-        els.toggle.title = is3d ? 'Hide the 3D preview' : 'Show 3D toolpath preview';
+        els.toggle.title = is3d ? 'Hide the toolpath preview' : 'Show the toolpath preview';
     }
 
     if (!is3d) {
         if (gpViz) gpViz.setActive(false);
+        if (gpT2) gpT2.stop();
         return;
     }
+    gpApplyMode();   // drawer open → render whichever inner view is active (2D shared canvas or 3D)
+}
+
+/** Render the active inner view of the (open) preview drawer: the shared 2D canvas, or the GcodeViz3D 3D. The
+ *  3D viewer is created lazily here (only when 3D is actually shown); 2D never needs it. */
+function gpApplyMode() {
+    const els = gpEls();
+    const cv = document.getElementById('viz3d2d');
+    const m2d = document.getElementById('viz3dM2d'), m3d = document.getElementById('viz3dM3d');
+    if (m2d) m2d.classList.toggle('primary', gpMode === '2d');
+    if (m3d) m3d.classList.toggle('primary', gpMode === '3d');
+    if (gpView !== '3d') return;   // drawer closed — nothing to render
+
+    if (gpMode === '2d') {
+        if (cv) cv.style.display = '';
+        if (gpViz) gpViz.setActive(false);     // pause the 3D loop while the 2D overlay covers it
+        if (gpT2 && els.editor) gpT2.setGcode(els.editor.value);
+        return;
+    }
+    // 3D — unchanged behaviour (lazy-create the viewer on first real use)
+    if (cv) cv.style.display = 'none';
+    if (gpT2) gpT2.stop();
     if (!gpViz) {
         try {
             gpViz = new GcodeViz3D(els.vizContainer);
@@ -121,6 +147,12 @@ export function setGcodeView(view) {
 
 function gpInit() {
     const els = gpEls();
+    // Shared 2D toolpath controller + the [2D | 3D] toggle (the same 2D view as the Blocks tab + wizards).
+    const cv2d = document.getElementById('viz3d2d');
+    if (cv2d && !gpT2) gpT2 = createToolpath2d(cv2d);
+    const m2dBtn = document.getElementById('viz3dM2d'), m3dBtn = document.getElementById('viz3dM3d');
+    if (m2dBtn) m2dBtn.addEventListener('click', () => { gpMode = '2d'; gpApplyMode(); });
+    if (m3dBtn) m3dBtn.addEventListener('click', () => { gpMode = '3d'; gpApplyMode(); });
     if (els.toggle) {
         els.toggle.addEventListener('click', () => setGcodeView(gpView === '3d' ? 'editor' : '3d'));
     }
@@ -162,7 +194,8 @@ function gpInit() {
     }
     if (els.editor) {
         els.editor.addEventListener('input', () => {
-            if (gpView !== '3d') return;
+            if (gpView !== '3d') return;                                          // drawer closed
+            if (gpMode === '2d') { if (gpT2) gpT2.setGcode(els.editor.value); return; }   // live 2D
             clearTimeout(gpDebounce);
             gpDebounce = setTimeout(gpRenderFromEditor, 300);
         });
@@ -274,6 +307,11 @@ function gpInit() {
         runBtn.textContent = '▶';
         runBtn.title = 'Run the program through the execution engine';
         runBtn.addEventListener('click', () => {
+            // In 2D mode, Play drives the shared 2D progressive reveal (not the 3D execution engine).
+            if (gpMode === '2d') {
+                if (gpT2) { const on = gpT2.toggle(); runBtn.textContent = on ? '⏸' : '▶'; runBtn.classList.toggle('on', on); }
+                return;
+            }
             const code = els.editor ? els.editor.value : '';
             const eng = ensureEngine();
             if (eng.running && !eng.paused) {
