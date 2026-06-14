@@ -160,37 +160,61 @@ bespoke editor mechanics (insert-and-push, drag-out-of-mouth, multi-select, copy
 - **Step + speed playback** — Tinkercad's stepped run; the app's `GcodeViz3D` already has speed + step, so
   the Blocks Play inherits this at integration.
 
-### Wizard analysis — the atoms to add (grounded in real emit code)
+### Canonical primitive vocabulary — full wizard + modal-group audit (2026-06-13)
 
-An audit of the STUDIO wizards (drill/pocket/slot/surfacing/text + the probe wizards, through the
-`clearing.js` fill engine and `cuttingBlocks.js`) shows the current blocks cover **~60%** of what the
-wizards emit. Gap list, ranked by how many wizards need each:
+A single pass over **(a)** the G-code modal groups and **(b)** every wizard's emit code (drill/pocket/slot/
+surfacing/circular · text/strokeFont · the 7 probe wizards · the 5 ATC wizards + wcs/comm), through
+`words.js` / `dialect.js` / `clearing.js` / `cuttingBlocks.js`. (Fanned out across 5 agents — see git history.)
 
-| Atom to add | Category | Wizards | Difficulty |
+**Headline:** the **cutting** vocabulary is essentially *complete* — drill/pocket/slot/surfacing/text are pure
+**presets** over the atoms we already have. The real gaps are an entire **macro / probe / HMI layer** the
+cutting blocks never needed: machine moves, probe capture, work-offset writes, operator dialogs, labels, I/O.
+
+**Have (26 atoms shipped):** Shapes `region` · Move `move`(G0/G1/G31) `arc`(G2/G3) `probe`(G31) · Machine
+`spindle` `feed` `dwell` `coolant` `tool` `wcs` `distmode`(G90/91) · Ops `line` `bore` `drill` `wall` · Modify
+`array` `helix` `stepover`(parallel/concentric × bothways/oneway/otherway) `stepdown` · Control `count` `if`
+`compare` · Math `math` · Variables `set` `variable` · Mark Up `comment`.
+
+**Missing atoms — the macro / probe / HMI layer** (have/missing/atom-vs-preset → these are *atoms*):
+
+| Atom | What it does | Evidence | Why an atom (not a preset) |
 | --- | --- | --- | --- |
-| **Arc** (G2/G3) | Move | bore, pocket, surface | easy (leaf) |
-| **ZigZag** (raster / boustrophedon fill) | Modify | pocket, surface, slot, text | **hard** — wraps `clearing.js` `scanlineFill` |
-| **Concentric** (spiral inward rings) | Modify | bore, pocket, surface | hard |
-| **Dwell** (G4) | Move | spin-up | trivial |
-| **Coolant** (M7/M8/M9) | Machine | footer | trivial |
-| **Tool change** (T + M6) | Machine | toolPicker | trivial |
-| **WCS-select** (G54…G59) | Machine | probe, wcs | trivial |
-| **If / Goto** | Control | probe wizards | medium (DDCS modal `IF/GOTO`) |
+| **machine-move** (G53) | rapid to absolute *machine* coords | every footer `G53 Z#101`; probe re-centre | distinct frame from WCS `move`; DDCS needs a `#var`, not a constant |
+| **end-program** (M30/M2) | terminate + rewind | every footer | own modal group; not spindle/move |
+| **set-work-offset** (G10-eq) | write a WCS register `#805+` (stride 5) from a value | corner/edge/middle/rotary wizards | `wcs` only *selects* G54-59; G10 is broken on M350 |
+| **tool-length-offset** (G43-eq) | write/read tool length in the table `#1430+T-1` | atcLength (write), atcToolCheck (read) | `tool` is select/change only |
+| **probe-read** | capture G31 trigger pos `#1925-7` → var | every probe wizard "save contact" | the *point* of probing; not generic `set` |
+| **probe-check** | branch on G31 status `#1920-2 != 2` | `probeBlocks.ifGoto(status,…)` | bound to the probe latch + error label; not plain `if` |
+| **probe-guard** | arm protected probe: stop-mode `#1905-7`, limit `#1915-7` | `probeBlocks` safety block | no primitive models guarded-probe setup |
+| **read-machine-pos** | capture live DRO `#880-3` → var | middle/alignment/rotary | not a probe trigger — the current position |
+| **label / goto** | `N`-targets + `GOTO` jumps | every macro's error/exit skeleton | `if`/`compare` give conditions but no jump target |
+| **pause** (M0-eq) | blocking operator dialog `#1505=1` + cancel branch | every ATC + probe wizard | program halt + control flow; not `comment` |
+| **prompt / report / input** | HMI: message/status/beep · formatted results `#1510-2` · read a number `#2070`→var | comm + alignment + ATC | interactive screen I/O; `input` *produces* a var |
+| **wait-sensor** | block until a digital input asserts | atcChange/Test `M300-302` | `dwell` waits on time only |
+| **raw-output / M-code** | toggle an accessory output | drawbar `M154/155`, dust-cover `M162/163` | generic escape hatch for custom M-codes |
+| **offset** (region inset) | inward tool-radius inset of a region | pocket insets, surfacing doesn't | makes "finished size vs tool-centre" a block choice (or a `region` param) |
+| **text** + **inflate** | string → glyph centrelines; centreline → filled ribbon region | textWizard / strokeFont / `strokeContours` | string→geometry + path→area; feed the existing fill |
 
-Two refinements the audit caught: `Spindle` should gain an **M3/M4 direction** field; `Drill` should
-**decompose to `Array{Bore}`** to expose the cavity.
+**Enrich existing:** `probe` needs **P** (port) / **L** (level) / **Q** (stop-mode) operands to round-trip the real probe routines.
 
-**Per-wizard decompositions** (these *are* the modularization recipes — step (b) of the transfer project):
-- `drill   = Array{ peck | bore }`
-- `pocket / surface = Spindle + Feed + Array{ Plunge↓ + (ZigZag|Concentric)Fill + Retract↑ }`
-- `slot    = Spindle + Feed + Repeat[ Plunge↓ + zig-zag-sweep + Retract↑ ]`
-- `probe*  = If-Goto + TwoPass-Probe + Math[centre/dia] + WCS-write`
+**Presets (compositions, NOT atoms):** drill · pocket · slot · surfacing · text; two-pass-probe ·
+corner/edge/middle/alignment/rotaryCenter/rotaryClock; atc-change/length/toolcheck/test · spindle-warmup-ramp;
+reposition · confirmStart. Updated decomposition recipes:
+- `drill   = Array{ drill | bore }` ✓
+- `pocket  = StepDown{ Region→offset → StepOver(fill) + Wall }`  · `surface = StepDown{ StepOver(fill) }` (no offset/wall)
+- `slot    = StepDown{ StepOver-band{ Line A→B } }`  · `text = StepDown{ StepOver( fill of text→inflate region ) }`
+- `probe*  = probe-guard + TwoPass{ probe + probe-check } + probe-read + math + set-work-offset`, in `label/goto` + `pause`
+- `atc     = spindle-off + machine-move(park) + pause + (drawbar + wait-sensor)* + end-program`
 
-**Caveats:** (1) the **raster fill engine** (`clearing.js scanlineFill`) is the critical *opaque* piece — a
-`ZigZag`/region-fill block is the highest-value but hardest gap (the core of pocket/surface/text). (2)
-**Probe control flow** (if-goto, modal `#1920` checks) is *not* loop-friendly — defer probe-sequence blocks
-until a real `If/Else` layer exists. Build order: **trivial leaf atoms** (Dwell/Coolant/Tool/WCS/Arc +
-spindle direction) → value-socket UI → the fill blocks.
+**Modal groups the app NEVER emits — low priority** (baked into precomputed coords; only matter for raw/manual
+authoring or new controllers): plane G17-19 · units G20-21 · cutter-comp G40-42 · feed-mode G93-95 · tool-length
+*mode* G43/49 (the offset *value* is needed via the tool-table write above; the modal code is not).
+
+**Build order (next vocabulary frontier):** cutting is done → build the macro/probe/HMI layer. Highest-leverage
+first: **machine-move (G53)** + **end-program** (every footer) → the **probe trio + set-work-offset** (all probe
+wizards) → **pause + label/goto** (control flow) → HMI (prompt/report/input) + I/O (wait-sensor/raw-M). That set
+turns the Blocks tab from a CAM-toolpath language into a full DDCS-program language, and unblocks modularizing
+the probe + ATC wizards (the bulk of the wizard count).
 
 ## Engine
 
