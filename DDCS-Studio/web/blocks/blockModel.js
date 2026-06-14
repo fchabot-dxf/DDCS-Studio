@@ -18,6 +18,7 @@
  * correctness, not motion safety (lint comes next — see MULTI-OP-STACKING.md).
  */
 import { BLOCKS, evalExpr, depthLevels } from '../wizards/ops/index.js';
+import { getDialect, DEFAULT_DIALECT } from '../wizards/dialects/index.js';
 import { num, r3 } from '../wizards/ops/util.js';
 import { headerBlock, footerBlock } from '../wizards/cuttingBlocks.js';
 
@@ -68,7 +69,7 @@ function resolveParams(params, scope) {
 }
 
 /** Recursive fold → tagged lines. `anc` = ancestry of block ids; `scope` = the variable environment. */
-function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null)) {
+function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dialect = DEFAULT_DIALECT) {
     const def = BLOCKS[block.type];
     const own = [...anc, block.id];            // this block's full ancestry (drives the line→source map)
     if (!def) return [tag(`( unknown block ${block.type} )`, own)];
@@ -89,7 +90,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null)) {
             const k = from + s * by;
             const child = Object.create(scope); child[name] = k;          // child scope: index visible, doesn't leak out
             out.push(tag(`( ${block.id}: ${name}=${r3(k)} )`, own));
-            (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child)));
+            (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect)));
         }
         return out;
     }
@@ -97,7 +98,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null)) {
     if (def.kind === 'cond') {                 // IF: run the body once, only when the condition resolves true
         const on = resolveBool(block.params.cond, scope);
         const out = [tag(`( ${block.id}: if ${on ? 'true' : 'false'} )`, own)];
-        if (on) (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope)));
+        if (on) (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
         return out;
     }
 
@@ -108,7 +109,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null)) {
         for (const L of depthLevels(to, by)) {
             const child = Object.create(scope); child.z = -L;          // child scope: cut Z visible to the body, doesn't leak out
             out.push(tag(`( ${block.id}: depth z=${r3(-L)} )`, own));
-            (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child)));
+            (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect)));
         }
         return out;
     }
@@ -120,7 +121,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null)) {
         if ((block.children || []).length && def.segments) {           // body present → run it once per pass with {x0,y0,x1,y1} in scope
             def.segments(p).forEach((seg) => {
                 const child = Object.create(scope); Object.assign(child, seg);
-                block.children.forEach((c) => out.push(...emit(c, dx, dy, own, child)));
+                block.children.forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect)));
             });
         } else def.lines(p, z).forEach((ln) => out.push(tag(ln, own)));   // empty body → auto-cut the passes
         out.push(tag(`G0 Z${r3(num(p.clearance, 5))}   ( retract )`, own));
@@ -134,7 +135,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null)) {
         const out = [];
         pts.forEach((pt, i) => (block.children || []).forEach((c) => {
             out.push(tag(`( ${block.id}[${i + 1}] @ ${pt.x},${pt.y} )`, own));
-            out.push(...emit(c, dx + pt.x, dy + pt.y, own, scope));
+            out.push(...emit(c, dx + pt.x, dy + pt.y, own, scope, dialect));
         }));
         return out;
     }
@@ -147,18 +148,19 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null)) {
         pts.forEach((pt) => (block.children || []).forEach((c) => {
             const cd = BLOCKS[c.type];
             if (cd && cd.step) out.push(tag(cd.step(resolveParams(c.params, scope), pt), [...own, c.id]));  // step swept point
-            else out.push(...emit(c, pt.x, pt.y, own, scope));                                              // fallback: stamp
+            else out.push(...emit(c, pt.x, pt.y, own, scope, dialect));                                     // fallback: stamp
         }));
         out.push(tag(`G0 Z${clr}   ( retract )`, own));
         return out;
     }
 
-    return def.emit(p, dx, dy).map((ln) => tag(ln, own));   // leaf / move standalone
+    return def.emit(p, dx, dy, dialect).map((ln) => tag(ln, own));   // leaf / move standalone (dialect = active profile)
 }
 
 /** Fold the program → { text, lines, map }. map[i] = ancestry of block ids producing line i (null = header/footer/seam). */
 export function emitMapped(blocks, settings = {}) {
     const clr = num(settings.clearance, 5);
+    const dialect = settings.dialect || getDialect(settings.profileId);   // active controller profile → its G-code forms
     const scope = Object.create(null);   // top-level variable environment, threaded across the stack
     const T = [
         tag('( DDCS Studio - Blocks )', null),
@@ -167,7 +169,7 @@ export function emitMapped(blocks, settings = {}) {
     ];
     (blocks || []).forEach((b) => {
         T.push(tag('', null), tag(`( --- ${b.type.toUpperCase()} ${b.id} --- )`, [b.id]));
-        T.push(...emit(b, 0, 0, [], scope));
+        T.push(...emit(b, 0, 0, [], scope, dialect));
     });
     T.push(tag('', null), ...footerBlock(settings).map((l) => tag(l, null)));
     const lines = T.map((t) => t.line);

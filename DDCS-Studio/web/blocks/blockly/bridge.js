@@ -15,6 +15,7 @@
  * (body once) and are marked TODO until the scope pass lands.
  */
 import { PALETTE, evalExpr } from '../../wizards/ops/index.js';
+import { DEFAULT_DIALECT } from '../../wizards/dialects/index.js';   // dialect-dependent atoms (probe/machine-move/dwell…) need one
 
 // ---- field classification (mirrors blocksApp.js valueHTML) ----
 const SELECTS = {
@@ -69,7 +70,7 @@ function makeGen(def, gen) {
         p[f] = v;
       } else p[f] = block.getFieldValue(FN(f));
     }
-    if (def.kind === 'leaf' || def.kind === 'move') return def.emit(p, 0, 0).join('\n') + '\n';
+    if (def.kind === 'leaf' || def.kind === 'move') return def.emit(p, 0, 0, DEFAULT_DIALECT).join('\n') + '\n';
     // container/path: shape is right; point-stamping with dx/dy is the Phase-2 scope pass
     const body = g.statementToCode(block, 'DO');
     return `( ${def.label}: ${fieldsOf(def).map((f) => `${f}=${p[f]}`).join(' ')} — TODO stamp )\n${body}`;

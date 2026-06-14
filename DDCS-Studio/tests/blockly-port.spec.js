@@ -40,6 +40,6 @@ test('derived Blockly palette renders + generator matches the emit kernels', asy
   expect(code).toContain('M3 S12000');               // spindle kernel
   expect(code).toContain('G1 X50 Y20 Z0 F200');      // move kernel, X/Y from value sockets
   expect(code).toMatch(/G1 Z-5/);                    // drill peck kernel
-  expect(code).toContain('G4 P1');                   // dwell kernel
+  expect(code).toContain('G04 P1000');               // dwell kernel (dialect-correct: Expert P=ms, so 1s -> P1000)
   expect(errors, errors.join('\n')).toEqual([]);
 });
