@@ -1,9 +1,12 @@
 /**
  * wizards/dialects/ddcs-v3-dm500.js — DDCS V3 / DM500 dialect.
  *
+ * ⚠ UNVERIFIED ON HARDWARE — dump-derived best-effort. We have no DM500 to test on; trust nothing here until it
+ * runs on a real DM500. Only DDCS Expert M350 is hardware-testable for us (see ddcs-expert-m350.js).
+ *
  * STRUCTURALLY different from Expert: move-until-input probing (M101/G01/M102, NO G31), #864-866 DRO, G92 WCS,
- * dwell in SECONDS, and WORD IF operators (EQ/LT/GT — no `!=`). Verified against bridge/controllers/dm500/install/
- * (probe.nc, defprobe.nc, slib.nc, safez.nc, gotoz.nc — garbled comments ignored) + DDCS-Studio/web/data/default_vars_v3.js.
+ * dwell in SECONDS, WORD IF operators (EQ/LT/GT — no `!=`). Read from bridge/controllers/dm500/install/
+ * (probe.nc, defprobe.nc, slib.nc — garbled comments ignored) + DDCS-Studio/web/data/default_vars_v3.js.
  */
 const AX = { X: 0, Y: 1, Z: 2, A: 3 };
 const OP = { '==': 'EQ', '!=': 'NE', '<': 'LT', '>': 'GT', '<=': 'LE', '>=': 'GE' };   // NE not actually in the dump — see notes
@@ -19,7 +22,9 @@ export const dialect = {
     probeRead: (axis, varName) => [`${varName}=#${864 + AX[axis]}`],    // capture machine DRO at contact (probe.nc:4-6)
     readMachine: (axis, varName) => [`${varName}=#${864 + AX[axis]}`],  // DRO X#864/Y#865/Z#866/A#867
     machineMove: (axis, ref) => [`G53 ${axis}${ref}`],      // G53 gated by config #395; dump safe-Z is M98 P101 — TO CONFIRM
-    setWorkOffset: (wcsExpr, axis, value) => [`G90 G92 ${axis}${value}`],   // G92 zeroing (defprobe.nc); G10 not used
+    // DM500 macros zero with G92 (defprobe.nc:21) — value is a WORK coord (plate thickness), NOT a machine coord
+    // like Expert's register write. Cross-profile value semantics unresolved → VERIFY on hardware.
+    setWorkOffset: (wcsExpr, axis, value) => [`G90 G92 ${axis}${value}   ( set datum - VERIFY on hardware )`],
     readActiveWcs: (varName) => [`${varName}=#455`],        // #455/#516 select coord system
     distMode: (mode) => (mode === 'inc' ? 'G91' : 'G90'),
     dwell: (sec) => [`G04 P${sec}`],                        // P = SECONDS (probe.nc, slib.nc G82 P#9)

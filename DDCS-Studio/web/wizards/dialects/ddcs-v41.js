@@ -1,9 +1,11 @@
 /**
  * wizards/dialects/ddcs-v41.js — DDCS V4.1 dialect.
  *
- * ≈ Expert M350 in FORM; differs in VARIABLE NUMBERS (runtime state at #1500+). Verified against the
- * V4.1 firmware macros under bridge/controllers/v4.1/assets/firmware/.../ddcsv4/ (probe-fix.nc, probe-float.nc,
- * probe-h.nc, slib-*.nc) + the app var map DDCS-Studio/web/data/default_vars_v41.js. Mirrors the anchor shape.
+ * ⚠ UNVERIFIED ON HARDWARE — dump-derived best-effort. We have no V4.1 to test on; trust nothing here until it
+ * runs on a real V4.1. Only DDCS Expert M350 is hardware-testable for us (see ddcs-expert-m350.js).
+ *
+ * ≈ Expert M350 in FORM; differs in VARIABLE NUMBERS (runtime state at #1500+). Read from the V4.1 firmware
+ * macros under bridge/controllers/v4.1/assets/firmware/.../ddcsv4/ + the var map default_vars_v41.js.
  */
 const AX = { X: 0, Y: 1, Z: 2, A: 3 };
 
@@ -18,7 +20,9 @@ export const dialect = {
     probeRead: (axis, varName) => [`${varName}=#${1500 + AX[axis]}`],   // post-probe machine pos (probe-fix.nc:11)
     readMachine: (axis, varName) => [`${varName}=#${1500 + AX[axis]}`], // DRO X#1500/Y#1501/Z#1502/A#1503
     machineMove: (axis, ref) => [`G53 ${axis}${ref}`],      // probe-fix.nc:6 "G0 G53 Z#102"
-    setWorkOffset: (wcsExpr, axis, value) => [`G90 G92 ${axis}${value}`],   // V4.1 uses G92 (probe-float.nc:7)
+    // V4.1 macros zero with G92 (probe-float.nc:7) — but value is a WORK coord (at the point), NOT a machine
+    // coord like Expert's register write. Cross-profile value semantics unresolved → VERIFY on hardware.
+    setWorkOffset: (wcsExpr, axis, value) => [`G90 G92 ${axis}${value}   ( set datum - VERIFY on hardware )`],
     readActiveWcs: () => [],                                 // TO CONFIRM
     distMode: (mode) => (mode === 'inc' ? 'G91' : 'G90'),
     dwell: (sec) => [`G04 P${Math.round(sec * 1000)}`],     // ms (firmware G04P1000)
