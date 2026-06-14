@@ -44,9 +44,12 @@ test('Blocks tab opens a snippet op (WCS) emitted bare — no program framing', 
   expect(code).not.toContain('( clearance )');        // bare: no Program Start
 });
 
-test('Blocks → STUDIO reverse sync: editing a Blockly block reconciles the wizard form', async ({ page }) => {
+// Reverse path (redesigned): editing a Blockly block re-projects the CODE — the block stack is the data, the
+// STUDIO editor is its live projection (form-reconcile was dropped in favour of code projection; see
+// BLOCKS-TAB.md "Current architecture"). So a block edit shows up in the projected G-code / editor, not the form.
+test('Blocks → STUDIO reverse sync: editing a Blockly block re-projects the code', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+  await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsGetBlockGcode);
 
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('surfacing'));
   await page.waitForSelector('#wiz_surfacing', { state: 'visible' });
@@ -55,19 +58,19 @@ test('Blocks → STUDIO reverse sync: editing a Blockly block reconciles the wiz
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
 
   await openBlocks(page);
-  // edit the StepDown depth (TO socket = a math_number shadow) → 7, and StepOver value → 6
+  // edit the StepDown depth (TO socket = a math_number shadow) → 7
   await page.evaluate(() => {
     const ws = window.__blkws;
-    const setShadow = (type, input, v) => {
-      const blk = ws.getAllBlocks().find((b) => b.type === type);
-      const tgt = blk && blk.getInput(input) && blk.getInput(input).connection.targetBlock();
-      if (tgt) tgt.setFieldValue(String(v), 'NUM');
-    };
-    setShadow('stepdown', 'TO', 7);
-    setShadow('stepover', 'STEPOVER', 6);
+    const blk = ws.getAllBlocks().find((b) => b.type === 'stepdown');
+    const tgt = blk && blk.getInput('TO') && blk.getInput('TO').connection.targetBlock();
+    if (tgt) tgt.setFieldValue('7', 'NUM');
   });
+  await page.waitForTimeout(200);
 
-  await page.evaluate(() => window.showApp('studio'));
-  await expect(page.locator('#sf_depth')).toHaveValue('7');
-  await expect(page.locator('#sf_stepoverPct')).toHaveValue('50');   // 6 / 12 * 100
+  // The projection (block G-code, which the Studio editor mirrors) now cuts down to the new depth.
+  const proj = await page.evaluate(() => window.ddcsGetBlockGcode());
+  expect(proj, 'block edit re-projected to a deeper Step Down (z=-7)').toContain('z=-7');
+  // editor is the live projection of the (edited) block program
+  const editor = await page.evaluate(() => window.ddcsStudio.editorManager.getValue());
+  expect(editor).toBe(proj);
 });

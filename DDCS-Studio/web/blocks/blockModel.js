@@ -163,14 +163,15 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 /** Fold the program → { text, lines, map }. map[i] = ancestry of block ids producing line i (null = a seam).
  *  No auto framing: the program is exactly its blocks. A full program begins with a Program Start block and
  *  ends with Program End; a snippet (probe/WCS/comms) simply omits them. Top blocks are blank-line separated. */
+// No blank separator lines between top-level blocks. They used to space out high-level ops, but that made the
+// projected program's spacing depend on its shape (leaf programs had none, high-level had some) — so a round-trip
+// that flattened to leaves dropped them, an inconsistent "line jumps come and go". The program now emits with
+// uniform single-line spacing; op structure reads from the marker comments ("( Step Down z=… )", "( Array N @ … )").
 export function emitMapped(blocks, settings = {}) {
     const dialect = settings.dialect || getDialect(settings.profileId);   // active controller profile → its G-code forms
     const scope = Object.create(null);   // top-level variable environment, threaded across the stack
     const T = [];
-    (blocks || []).forEach((b, i) => {
-        if (i > 0) T.push(tag('', null));   // a blank line between top-level blocks
-        T.push(...emit(b, 0, 0, [], scope, dialect));
-    });
+    (blocks || []).forEach((b) => { T.push(...emit(b, 0, 0, [], scope, dialect)); });
     const lines = T.map((t) => t.line);
     return { text: lines.join('\n'), lines, map: T.map((t) => t.src) };
 }
