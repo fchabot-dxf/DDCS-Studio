@@ -21,6 +21,7 @@ const SELECTS = {
   pattern: ['grid', 'line', 'circle'], mode: ['rapid', 'cut', 'probe'], flow: ['flood', 'mist', 'off'],
   wcs: ['G54', 'G55', 'G56', 'G57', 'G58', 'G59'], dir: ['cw', 'ccw'], arc: ['ccw', 'cw'],
   shape: ['rect', 'circle'], strategy: ['parallel', 'concentric'], direction: ['bothways', 'oneway', 'otherway'], dist: ['abs', 'inc'],
+  axis: ['X', 'Y', 'Z', 'A'], end: ['M30', 'M2'],
 };
 const TEXT_FIELDS = new Set(['name', 'var', 'text']);
 const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/\s+/g, '');

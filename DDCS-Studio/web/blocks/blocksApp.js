@@ -85,6 +85,7 @@ export function initBlocks() {
     flow: ['flood', 'mist', 'off'], wcs: ['G54', 'G55', 'G56', 'G57', 'G58', 'G59'],
     dir: ['cw', 'ccw'], arc: ['ccw', 'cw'], op: ['+', '-', '*', '/', '%'], cmp: ['<', '>', '<=', '>=', '==', '!='],
     shape: ['rect', 'circle'], strategy: ['parallel', 'concentric'], direction: ['bothways', 'oneway', 'otherway'], dist: ['abs', 'inc'],
+    axis: ['X', 'Y', 'Z', 'A'], end: ['M30', 'M2'],
   };
   function fieldHTML(block, key) {
     return `<label class="f"><span>${key}</span>${valueHTML(block.id, key, block.params[key])}</label>`;
