@@ -7,14 +7,16 @@
  * emit() is their standalone behaviour (rapid over target → clearance → one straight probe).
  */
 import { num, r3 } from './util.js';
-import { G, X, Y, Z, F, P, line } from '../words.js';
+import { G, X, Y, Z, F, P, L, Q, line } from '../words.js';
 
-const probeMove = (pt, p) => line([G(31), X(pt.x), Y(pt.y), Z(pt.z), F(num(p.feed, 50)), P(num(p.port, 1))], 'probe');
+// Real M350 form (verified vs bridge/controllers/expert-m350/tools/appcode): G31 … F.. P<port> L<level> Q<stop>.
+const probeMove = (pt, p) => line(
+    [G(31), X(pt.x), Y(pt.y), Z(pt.z), F(num(p.feed, 50)), P(num(p.port, 1)), L(num(p.level, 0)), Q(num(p.stop, 1))], 'probe');
 
 export const probeBlock = {
     type: 'probe', label: 'Probe', kind: 'move', category: 'Move',
-    defaults: { x: 0, y: 0, z: -5, feed: 50, port: 1, clearance: 5 },
-    fields: ['x', 'y', 'z', 'feed', 'port', 'clearance'],
+    defaults: { x: 0, y: 0, z: -5, feed: 50, port: 1, level: 0, stop: 1, clearance: 5 },
+    fields: ['x', 'y', 'z', 'feed', 'port', 'level', 'stop', 'clearance'],
     /** Standalone: rapid over target, drop to clearance, one straight probe to (x,y,z). */
     emit: (p, dx = 0, dy = 0) => {
         const x = r3(num(p.x, 0) + dx), y = r3(num(p.y, 0) + dy), z = r3(num(p.z, -5));
