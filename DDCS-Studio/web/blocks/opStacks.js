@@ -52,6 +52,45 @@ const RECONCILERS = {
             sl_feed: p.feed, sl_plunge: p.plunge, sl_clearance: p.clearance,
         };
     },
+    pocket(prog) {
+        const down = prog[0];
+        if (!down || down.type !== 'stepdown' || !Array.isArray(down.children)) return null;   // too-small fallback (drill) → no reverse
+        const over = down.children.find((c) => c.type === 'stepover'), rg = over && over.params && over.params.region;
+        if (!over || !rg || !rg.params) return null;
+        const tool = formNum('p_toolDia', 6), r = tool / 2;   // the Region is inset by the tool radius — un-inset it
+        const f = {
+            p_shape: rg.params.shape,
+            p_depth: down.params.to, p_stepdown: down.params.by,
+            p_strategy: over.params.strategy === 'parallel' ? 'raster' : 'spiral',
+            p_stepoverPct: tool > 0 ? r3((num(over.params.stepover, 0) / tool) * 100) : undefined,
+            p_feed: over.params.feed, p_plunge: over.params.plunge, p_clearance: over.params.clearance,
+        };
+        if (rg.params.shape === 'circle') {
+            f.p_dia = r3(num(rg.params.w, 0) + tool); f.p_originX = rg.params.x; f.p_originY = rg.params.y;
+        } else {
+            f.p_w = r3(num(rg.params.w, 0) + tool); f.p_h = r3(num(rg.params.h, 0) + tool);
+            f.p_originX = r3(num(rg.params.x, 0) - r); f.p_originY = r3(num(rg.params.y, 0) - r);
+        }
+        return f;
+    },
+    drill(prog) {
+        const arr = prog[0];
+        if (!arr || arr.type !== 'array' || !arr.params) return null;
+        const p = arr.params, hole = arr.children && arr.children[0];
+        const f = { d_pattern: p.pattern, d_originX: p.x0, d_originY: p.y0, d_skip: p.skip || '' };
+        if (p.pattern === 'circle') { f.d_dia = p.dia; f.d_count = p.count; f.d_startAngle = p.startAngle; }
+        else if (p.pattern === 'line') { f.d_lcount = p.count; f.d_spacing = p.spacing; f.d_angle = p.angle; }
+        else if (p.pattern === 'rect') { f.d_w = p.w; f.d_h = p.h; f.d_nx = p.nx; f.d_ny = p.ny; }
+        else { f.d_cols = p.cols; f.d_rows = p.rows; f.d_dx = p.dx; f.d_dy = p.dy; }
+        if (hole && hole.params) {
+            const h = hole.params;
+            f.d_method = hole.type === 'bore' ? 'helical' : 'peck';
+            f.d_depth = h.depth; f.d_feed = h.feed; f.d_clearance = h.clearance;
+            if (hole.type === 'bore') { f.d_holeDia = h.holeDia; f.d_toolDia = h.toolDia; f.d_pitch = h.pitch; }
+            else f.d_peck = h.peck;
+        }
+        return f;
+    },
 };
 
 let loadedSig = null, shownOp = null;

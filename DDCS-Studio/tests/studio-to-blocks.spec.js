@@ -77,3 +77,35 @@ test('Blocks → STUDIO reverse sync: editing a block reconciles the wizard form
   await expect(page.locator('#sf_depth')).toHaveValue('7');
   await expect(page.locator('#sf_stepoverPct')).toHaveValue('50');
 });
+
+test('Blocks → STUDIO reverse sync: pocket (un-inset) and drill (array) round-trip', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+
+  // POCKET: edit the StepDown depth on the canvas → p_depth reconciles
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('pocket'));
+  await page.waitForSelector('#wiz_pocket', { state: 'visible' });
+  await page.evaluate(() => window.ddcsStudio.wizardManager.update());
+  await page.evaluate(() => window.showApp('blocks'));
+  await page.waitForSelector('#blocks-app:not(.hidden)');
+  const pTo = page.locator('#blk-stage .blk.depth [data-key="to"]').first();
+  await expect(pTo).toBeVisible();
+  await pTo.fill('9');
+  await pTo.dispatchEvent('input');
+  await page.evaluate(() => window.showApp('studio'));
+  await expect(page.locator('#wiz_pocket')).toBeVisible();
+  await expect(page.locator('#p_depth')).toHaveValue('9');
+
+  // DRILL: edit the Array `cols` on the canvas → d_cols reconciles
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
+  await page.waitForSelector('#wiz_drill', { state: 'visible' });
+  await page.evaluate(() => window.ddcsStudio.wizardManager.update());
+  await page.evaluate(() => window.showApp('blocks'));
+  await page.waitForSelector('#blocks-app:not(.hidden)');
+  const dCols = page.locator('#blk-stage .blk.container [data-key="cols"]').first();
+  await expect(dCols).toBeVisible();
+  await dCols.fill('5');
+  await dCols.dispatchEvent('input');
+  await page.evaluate(() => window.showApp('studio'));
+  await expect(page.locator('#d_cols')).toHaveValue('5');
+});

@@ -23,6 +23,7 @@ export function drillStack(params = {}) {
         cols: num(params.cols, 3), rows: num(params.rows, 2), dx: num(params.dx, 20), dy: num(params.dy, 20),
         count: num(params.count, 4), spacing: num(params.spacing, 20), angle: num(params.angle, 0),
         dia: num(params.dia, 50), startAngle: num(params.startAngle, 0),
+        w: num(params.w, 100), h: num(params.h, 80), nx: num(params.nx, 2), ny: num(params.ny, 2),   // rect-perimeter pattern
         skip: params.skip || '',
     };
     const helical = params.method === 'helical';
