@@ -1581,6 +1581,11 @@
                 const { initGatewayStatus } = await import('./ui/gatewayStatus.js');
                 initGatewayStatus();
             } catch (err) { console.error('gateway status init failed', err); }
+
+            try {
+                const { initUpdateCheck } = await import('./ui/updateCheck.js');
+                initUpdateCheck();                // desktop exe only: banner if a newer GitHub release exists
+            } catch (err) { console.error('update check init failed', err); }
             try {
                 const { initHeaderPost } = await import('./ui/headerPost.js');
                 initHeaderPost();

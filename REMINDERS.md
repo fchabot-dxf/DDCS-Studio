@@ -29,13 +29,14 @@ IDEA / EXPLORE:
   actually wants G-code (formatting, modal rules) — cross-check/refine the DDCS dialect against it (see
   [[ddcs-ground-truth-reference]]). No `.cps` is in the repo yet (would need the user's file). Ties into
   [[blockly-composition-view]] and the grbl/Mach3/UCCNC porting work (PORTING-GRBL-MACH3.md). Scope before building.
-- **EXE update-check (EXE ONLY)**: the downloaded exe goes stale; the web build auto-deploys on CF (a reload is
-  enough there → web excluded, and it shouldn't poll GitHub). Plan: (1) bake the app version into the exe at build
-  (`build_fairy.ps1` stamps a `version` constant / bundled `version.txt`); (2) on launch (or via Gateway tab) query
-  GitHub Releases `api.github.com/repos/fchabot-dxf/DDCS-Studio/releases/latest`, compare `tag_name` to the baked
-  version; (3) if newer → notify in the Studio UI (banner/toast) with a Download link to the release asset + the
-  "last commit comments" (release body, or recent `…/commits` messages). Gate behind a desktop flag
-  (`window.ddcsDesktop` / served-by-gateway) so the web build never runs it.
+- **EXE update-check** — DONE (`ui/updateCheck.js`, wired in index.html). Desktop-only (gateway loopback port
+  8765-8769 or `window.pywebview`); reads the baked version from the header `.ver` chip (already bundled by
+  build_fairy via `--add-data DDCS-Studio/web`), polls `releases/latest`, and on a newer tag shows a dismissible
+  bottom banner with Download (the `.exe` asset) + recent commit subjects. Web build never runs it.
+  ⚠️ CONVENTION: tag the GitHub release with the SAME version that's in the `.ver` chip at exe-build time
+  (`bump-version.cjs` sets the chip) — else the baked-vs-tag compare is wrong. Open follow-up: pywebview may not
+  open the Download `target=_blank` externally on all setups (uses `window.open` fallback) — if it doesn't, add a
+  gateway endpoint to open the URL in the system browser.
 
 Cloud:
 - **Drive folder picker**: let the user choose WHERE the app folder lives (Google **Picker API** — `drive.file`
