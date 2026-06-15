@@ -64,7 +64,7 @@ export class WizardManager {
             if (this.wizardElement && this.wizardElement.classList.contains('active')) this.update();
         });
 
-        // (The controller-profile selector lives in the app header now — ui/headerProfile.js — not per-generator.)
+        // (The post-processor selector lives in the app header now — ui/headerPost.js — not per-generator.)
 
         // Escape key to close wizard
         document.addEventListener('keydown', (e) => {

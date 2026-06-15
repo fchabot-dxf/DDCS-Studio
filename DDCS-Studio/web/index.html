@@ -103,7 +103,7 @@
 
         </nav>
         <div class="hdr-controls" style="display:flex;gap:10px;align-items:center">
-            <select id="hdrProfile" class="hdr-profile" title="Active controller profile — generated G-code matches this machine's dialect. Switches the global profile (also in Settings → Profile)."></select>
+            <select id="hdrPost" class="hdr-post" title="Post-processor — which controller's G-code to generate. 'Auto' follows the machine profile (Settings → Profile); override to emit for another controller."></select>
             <div class="scale-ctl">
                 <button id="scaleBtn" class="op-btn scale-btn" title="Zoom"><span class="op-icon">🔍</span><span class="op-label">AUTO</span></button>
             </div>
@@ -1561,9 +1561,9 @@
                 initGatewayStatus();
             } catch (err) { console.error('gateway status init failed', err); }
             try {
-                const { initHeaderProfile } = await import('./ui/headerProfile.js');
-                initHeaderProfile();
-            } catch (err) { console.error('header profile init failed', err); }
+                const { initHeaderPost } = await import('./ui/headerPost.js');
+                initHeaderPost();
+            } catch (err) { console.error('header post init failed', err); }
             try {
                 const { initProbeInputSelects } = await import('./ui/probeInputSelect.js');
                 initProbeInputSelects();
