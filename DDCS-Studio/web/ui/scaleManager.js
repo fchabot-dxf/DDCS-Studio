@@ -113,7 +113,17 @@ export class ScaleManager {
             '<span id="scaleVal" class="scale-val"></span>' +
             '</div>' +
             '<button type="button" id="scaleAutoBtn" class="op-btn">🔍 AUTO — fit to window</button>';
-        wrap.appendChild(pop);                              // anchored in the header: no position math
+        // Append to <body> as the LAST child + position:fixed under the button. DOM order makes it paint on top of
+        // the absolutely-positioned .app-shell even where z-index is unreliable (mobile WebKit under body { zoom }) —
+        // anchoring it inside the header let the app body cover it ("zoom tool behind the wizard bar"). body has the
+        // UI zoom, so divide the button's screen rect by the zoom to get body-layout coords.
+        const z = parseFloat(getComputedStyle(document.body).zoom) || 1;
+        const r = btn.getBoundingClientRect();
+        pop.style.position = 'fixed';
+        pop.style.top = ((r.bottom + 6) / z) + 'px';
+        pop.style.right = ((window.innerWidth - r.right) / z) + 'px';
+        pop.style.zIndex = '100000';
+        document.body.appendChild(pop);
         const slider = pop.querySelector('#scaleSlider');
         // Live readout while dragging, but apply the zoom only on release — re-zooming mid-drag
         // would move the slider out from under the cursor.
