@@ -29,8 +29,8 @@ export const endProgramBlock = {
 
 export const mcodeBlock = {
     type: 'mcode', label: 'M-Code', kind: 'leaf', category: 'Machine',
-    defaults: { code: 154 }, fields: ['code'],   // raw custom M-code (accessory output / sensor wait / pause)
-    emit: (p) => [line([M(Math.max(0, Math.round(num(p.code, 0))))], 'M-code')],
+    defaults: { code: 154, note: '' }, fields: ['code', 'note'],   // raw custom M-code (accessory output / sensor wait / pause)
+    emit: (p) => [line([M(Math.max(0, Math.round(num(p.code, 0))))], (p.note && String(p.note).replace(/[()]/g, '').trim()) || 'M-code')],
 };
 
 export const rawBlock = {

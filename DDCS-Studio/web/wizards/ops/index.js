@@ -45,7 +45,7 @@ import { mathBlock } from './math.js';
 import { machineMoveBlock, endProgramBlock, mcodeBlock, rawBlock } from './macro.js';
 import { progStartBlock, progEndBlock } from './program.js';
 import { labelBlock, gotoBlock, ifGotoBlock } from './flow.js';
-import { probeReadBlock, probeCheckBlock, readMachineBlock } from './measure.js';
+import { probeReadBlock, probeCheckBlock, readMachineBlock, toolOffsetBlock } from './measure.js';
 import { setWorkOffsetBlock } from './setworkoffset.js';
 import { assignBlock } from './assign.js';
 import { pauseBlock, messageBlock, askNumberBlock, confirmBlock } from './hmi.js';
@@ -56,7 +56,7 @@ export const PALETTE = [
     regionBlock,                                               // Shapes (boundary → fills/walls via a region socket)
     moveBlock, arcBlock, probeBlock, machineMoveBlock,         // Move (+ G53 machine-coord move)
     spindleBlock, feedBlock, dwellBlock, coolantBlock, toolBlock, wcsBlock, distModeBlock,   // Machine (modal state)
-    progStartBlock, progEndBlock, endProgramBlock, mcodeBlock, rawBlock, probeReadBlock, readMachineBlock, setWorkOffsetBlock,   // Machine (program start/end framing, end, raw M-code/G-code, probe/DRO capture, WCS write)
+    progStartBlock, progEndBlock, endProgramBlock, mcodeBlock, rawBlock, probeReadBlock, readMachineBlock, toolOffsetBlock, setWorkOffsetBlock,   // Machine (program start/end framing, end, raw M-code/G-code, probe/DRO capture, tool-table write, WCS write)
     lineBlock, slotBlock, boreBlock, drillBlock, wallBlock,  // Ops (feature presets + wall finish)
     arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, stepoverBlock, stepdownBlock,    // Modify (stamp/sweep + lateral fills [zigzag/concentric] + depth pass wrappers)
     countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, pauseBlock, confirmBlock, askNumberBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + pause/confirm-gate/operator-input)

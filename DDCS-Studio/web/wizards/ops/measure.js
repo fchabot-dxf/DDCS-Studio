@@ -23,3 +23,14 @@ export const readMachineBlock = {
     defaults: { axis: 'Z', var: '#57' }, fields: ['axis', 'var'],
     emit: (p, dx, dy, dialect) => dialect.readMachine(p.axis || 'Z', p.var || '#57'),
 };
+
+export const toolOffsetBlock = {
+    type: 'tooloffset', label: 'Tool Offset', kind: 'leaf', category: 'Machine',
+    defaults: { tool: '#1300', value: '#102' }, fields: ['tool', 'value'],
+    // Write a tool-length offset into the controller's tool table. PROFILE-AWARE: the table base comes from
+    // dialect.vars.toolTable (Expert/DM500 #1430, V4.1 #1560), addressed by tool number → #[base + T - 1] = value.
+    emit: (p, dx, dy, dialect) => {
+        const base = (dialect.vars && dialect.vars.toolTable) || 1430;
+        return [`#[${base}+${p.tool || '#1300'}-1]=${p.value || '#102'}`];
+    },
+};

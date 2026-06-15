@@ -22,8 +22,17 @@ import { commStack } from '../wizards/communicationWizard.js';
 import { middleStack } from '../wizards/middleWizard.js';
 import { cornerStack } from '../wizards/cornerWizard.js';
 import { alignmentStack } from '../wizards/alignmentWizard.js';
+import { atcLengthStack } from '../wizards/atcLengthWizard.js';
+import { atcToolCheckStack } from '../wizards/atcToolCheckWizard.js';
+import { atcWarmupStack } from '../wizards/atcWarmupWizard.js';
+import { atcChangeStack } from '../wizards/atcChangeWizard.js';
+import { atcTestStack } from '../wizards/atcTestWizard.js';
 
-const BUILDERS = { surfacing: surfacingStack, pocket: pocketStack, slot: slotStack, drill: drillStack, wcs: wcsStack, edge: edgeStack, comm: commStack, middle: middleStack, corner: cornerStack, alignment: alignmentStack };
+const BUILDERS = {
+    surfacing: surfacingStack, pocket: pocketStack, slot: slotStack, drill: drillStack,
+    wcs: wcsStack, edge: edgeStack, comm: commStack, middle: middleStack, corner: cornerStack, alignment: alignmentStack,
+    atc_length: atcLengthStack, atc_check: atcToolCheckStack, atc_warmup: atcWarmupStack, atc_change: atcChangeStack, atc_test: atcTestStack,
+};
 // (No bare flag — framing is now Program Start/End BLOCKS in the stack; a snippet just omits them.)
 const find = (prog, type) => (prog || []).find((b) => b && b.type === type);
 
