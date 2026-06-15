@@ -399,6 +399,24 @@ export class GcodeExecutionEngine {
         setTimeout(() => injectVirtualInput(pinName, false), 400);
     }
 
+    // Slab ray/segment-vs-AABB. Returns the entry/exit params along A→B (0..1 spans the move).
+    // Identical to gcodeViz3d._boxRange so the engine's probe collision matches what the 3D view draws.
+    _rayBox(A, B, min, max) {
+        const d = { x: B.x - A.x, y: B.y - A.y, z: B.z - A.z };
+        let tEnter = -Infinity, tExit = Infinity;
+        for (const ax of ['x', 'y', 'z']) {
+            if (Math.abs(d[ax]) < 1e-9) {
+                if (A[ax] < min[ax] - 1e-6 || A[ax] > max[ax] + 1e-6) return { hit: false };
+            } else {
+                let t1 = (min[ax] - A[ax]) / d[ax], t2 = (max[ax] - A[ax]) / d[ax];
+                if (t1 > t2) { const t = t1; t1 = t2; t2 = t; }
+                if (t1 > tEnter) tEnter = t1;
+                if (t2 < tExit) tExit = t2;
+            }
+        }
+        return { hit: tEnter <= tExit, tEnter, tExit };
+    }
+
     // Track the input pin execution is parked on (null = not waiting) and notify the UI.
     _setWaitPin(wait) {
         const prev = this._waitPin;
@@ -667,6 +685,7 @@ export class GcodeExecutionEngine {
                 
                 let boxMin = null;
                 let boxMax = null;
+                let cavMin = null, cavMax = null;   // pocket only: the inset hole, whose walls are valid collisions too
 
                 if (probes && probePort === probes.setterPin) {
                     boxMin = { x: probes.setterX - probes.setterW/2, y: probes.setterY - probes.setterH/2, z: probes.setterZ - 0.01 }; // Thin plate at Z
@@ -674,6 +693,11 @@ export class GcodeExecutionEngine {
                 } else if (this.stock && (this.stock.x > 0 || this.stock.y > 0 || this.stock.z > 0)) {
                     boxMin = { x: 0, y: 0, z: -this.stock.z };
                     boxMax = { x: this.stock.x, y: this.stock.y, z: 0 };
+                    if (this.stock.shape === 'pocket') {   // a hole in the block — same inset the 3D view renders (gcodeViz3d _rebuild)
+                        const w = Math.max(8, Math.min(this.stock.x, this.stock.y) * 0.25);
+                        cavMin = { x: w, y: w, z: -this.stock.z };
+                        cavMax = { x: this.stock.x - w, y: this.stock.y - w, z: 0 };
+                    }
                 }
 
                 // Probe-vs-stock geometry runs in STOCK space: the tool's real position is the operator start
@@ -681,36 +705,28 @@ export class GcodeExecutionEngine {
                 // by the start marker), so dir is the same in both frames — only the start point shifts.
                 const O = this._stockOffset || { x: 0, y: 0, z: 0 };
                 if (boxMin && boxMax) {
+                    // Geometry-based collision — a probe stops at the FIRST surface it hits, with no
+                    // internal/external special-casing (mirrors gcodeViz3d._rebuild). Same frame as the route:
+                    // STOCK space (operator start + local pos); the recorded target stays origin-relative.
                     const aStart = { x: O.x + this.pos.x, y: O.y + this.pos.y, z: O.z + this.pos.z };
+                    const bEnd = { x: O.x + target.x, y: O.y + target.y, z: O.z + target.z };
                     const dir = { x: target.x - this.pos.x, y: target.y - this.pos.y, z: target.z - this.pos.z };
-                    let tmin = 0.0;
-                    let tmax = 1.0;
-                    let hit = true;
-
-                    for (const axis of ['x', 'y', 'z']) {
-                        if (Math.abs(dir[axis]) < 1e-8) {
-                            if (aStart[axis] < boxMin[axis] || aStart[axis] > boxMax[axis]) hit = false;
-                        } else {
-                            const invD = 1.0 / dir[axis];
-                            let t0 = (boxMin[axis] - aStart[axis]) * invD;
-                            let t1 = (boxMax[axis] - aStart[axis]) * invD;
-                            if (invD < 0) { const temp = t0; t0 = t1; t1 = temp; }
-                            tmin = Math.max(tmin, t0);
-                            tmax = Math.min(tmax, t1);
-                            if (tmax < tmin) hit = false;
-                        }
+                    let tt = null;
+                    const consider = (t) => { if (t != null && t > 1e-6 && t <= 1 && (tt == null || t < tt)) tt = t; };
+                    const ro = this._rayBox(aStart, bEnd, boxMin, boxMax);
+                    if (ro.hit) {
+                        if (ro.tEnter > 1e-6) consider(ro.tEnter);                       // enter the block from outside (edge/corner/boss)
+                        else if (ro.tExit > 1e-6 && ro.tExit <= 1) consider(ro.tExit);   // started on/inside a SOLID block → far face (keeps "first probe moves")
                     }
-
-                    // A probe that STARTS on the entry face (tmin≈0) hasn't travelled — clamping there gives a
-                    // zero-length move (the "first probe doesn't move" bug). Use the far surface (tmax) instead,
-                    // so the probe leaves the wall it sits against and the move is visible.
-                    let t = tmin;
-                    if (hit && tmin <= 1e-6 && tmax > 1e-6 && tmax <= 1) t = tmax;
-                    if (hit && t > 1e-6 && t <= 1) {
-                        // Clamp the recorded target to the intersection surface (in LOCAL coords).
-                        target.x = this.pos.x + dir.x * t;
-                        target.y = this.pos.y + dir.y * t;
-                        target.z = this.pos.z + dir.z * t;
+                    if (cavMin && cavMax) {
+                        const rc = this._rayBox(aStart, bEnd, cavMin, cavMax);
+                        if (rc.hit && rc.tEnter <= 1e-6 && rc.tExit > 1e-6) consider(rc.tExit);   // probing from inside the hole → stop at its wall (always closer than the outer face)
+                    }
+                    if (tt != null) {
+                        // Clamp the recorded target to the contact surface (in LOCAL coords).
+                        target.x = this.pos.x + dir.x * tt;
+                        target.y = this.pos.y + dir.y * tt;
+                        target.z = this.pos.z + dir.z * tt;
                         triggerProbeCollision();
 
                         // Flip the actual probe input pin so the I/O panel shows the touch:
