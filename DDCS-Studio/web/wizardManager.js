@@ -122,6 +122,8 @@ export class WizardManager {
     open(type) {
         // play a feedback sound whenever a wizard is opened
         playClick();
+        this.editingOpId = null;   // a fresh open is a NEW op; openForEdit re-marks it. Clear the edit glow.
+        { const b = document.querySelector('.wiz-box'); if (b) b.classList.remove('editing'); }
         // Opening a wizard leaves the Studio preview context — stop any running engine/play (every preview panel
         // + Studio's drawer) so nothing keeps executing behind the wizard and clobbers the code it inserts.
         window.dispatchEvent(new CustomEvent('ddcs:stop-previews'));
@@ -168,6 +170,29 @@ export class WizardManager {
         }
     }
 
+    /**
+     * Open a wizard to EDIT an existing op (from the editor's hover chip). Seeds the form from the op's params
+     * — the single source of truth (no snapshot) — glows the modal to mark it as editing, and on insert REPLACES
+     * that op (replaceOp rebuilds its blocks from the edited params) instead of appending a new one.
+     */
+    /** Does this op type's view support seeding its form from params yet (so it can be edited in place)? */
+    canEdit(opType) {
+        const view = viewByType.get(opType);
+        return !!(view && typeof view.setForm === 'function');
+    }
+
+    openForEdit(opId) {
+        const prog = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+        const op = prog.find((b) => b && b.type === 'op' && b.id === opId);
+        if (!op || !op.opType) return;
+        this.open(op.opType);                          // normal open (clears editing + glow, seeds defaults)
+        const view = viewByType.get(op.opType);
+        if (view && typeof view.setForm === 'function' && op.params) view.setForm(op.params);   // params → form
+        this.update();                                 // re-render preview + code from the seeded values
+        this.editingOpId = opId;                       // now mark as editing this op
+        const box = document.querySelector('.wiz-box'); if (box) box.classList.add('editing');  // accent glow
+    }
+
     // Back-compat entry points (older callers and window.* glue)
     openCorner() { this.open('corner'); }
     openMiddle() { this.open('middle'); }
@@ -186,6 +211,8 @@ export class WizardManager {
         // Hide overlay and clear active state
         this.wizardElement.classList.remove('active');
         this.wizardElement.style.display = 'none';
+        this.editingOpId = null;   // leave edit mode
+        const box = this.wizardElement.querySelector('.wiz-box'); if (box) box.classList.remove('editing');
     }
 
     update() {
@@ -217,9 +244,16 @@ export class WizardManager {
         let committed = false;
         try {
             const ops = await import('./blocks/opStacks.js');
-            committed = ops.commitActiveOp() || (!!code && ops.commitDecodedCode(code));   // builder op → high-level; else decode the generated code → blocks
+            if (this.editingOpId) {
+                // EDIT: rebuild THIS op from the new params (single source of truth) and replace it in place.
+                const { getLastOp } = await import('./blocks/opRecord.js');
+                const op = getLastOp();
+                committed = op ? ops.replaceOp(this.editingOpId, op.params) : false;
+            } else {
+                committed = ops.commitActiveOp() || (!!code && ops.commitDecodedCode(code));   // builder op → high-level; else decode the generated code → blocks
+            }
         } catch (e) { console.warn('commit op failed', e); }
-        if (!committed && code) this.editorManager.insert(code);   // last resort (nothing decoded)
+        if (!committed && !this.editingOpId && code) this.editorManager.insert(code);   // last resort (new op, nothing decoded)
 
         if (committed || code) {
             // Carry the start position the user set in this wizard's 3D preview over to the main preview.

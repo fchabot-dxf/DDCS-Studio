@@ -28,6 +28,8 @@ export function setupGlobalFunctions(app) {
         window.openAlignmentWiz = () => app.wizardManager.openAlignment();
         window.closeWiz = () => app.wizardManager.close();
         window.insertWiz = () => app.wizardManager.insert();
+        window.ddcsEditOp = (opId) => app.wizardManager.openForEdit(opId);   // editor hover-chip → edit an existing op
+        window.ddcsCanEditOp = (opType) => app.wizardManager.canEdit(opType);   // does this op type support form-edit yet?
         window.togglePreview = () => app.wizardManager.togglePreview();
         window.updateWiz = () => app.wizardManager.update();
 

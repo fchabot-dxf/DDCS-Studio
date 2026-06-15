@@ -236,6 +236,26 @@ export function commitActiveOp() {
 }
 
 /**
+ * EDIT path — re-derive a top-level op from new params and replace it IN PLACE (same op id, stable identity).
+ * params are the single source of truth; the op's blocks are just rebuilt from them (no snapshot/inference).
+ * Returns false if `opId` isn't a top-level op in the current program.
+ */
+export function replaceOp(opId, params) {
+    const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+    const idx = cur.findIndex((b) => b && b.type === 'op' && b.id === opId);
+    if (idx < 0) return false;
+    const opType = cur[idx].opType;
+    if (!BUILDERS[opType]) return false;
+    const framed = BUILDERS[opType](params);
+    const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
+    const opC = makeOp(opType, params, bare);
+    opC.id = opId;                                                     // keep the same id so views/selection stay stable
+    const next = [...cur.slice(0, idx), opC, ...cur.slice(idx + 1)];
+    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
+    return true;
+}
+
+/**
  * For ops with no block builder yet (corner / alignment / ATC / comms): DECODE their generated G-code into blocks
  * (the active dialect's recognizers turn probe / IF-GOTO / WCS into proper blocks; the rest become leaf/raw) and
  * accumulate them as a frameless snippet — so they coexist in the program and show in Blocks instead of being

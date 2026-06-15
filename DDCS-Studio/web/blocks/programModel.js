@@ -25,6 +25,35 @@ function editor() { const s = window.ddcsStudio; return s && s.editorManager; }
 export const getStack = () => stack;
 export const getGcode = () => proj.text;
 export const getProjection = () => proj;
+
+// ── line ⇄ op (for the editor's hover-to-edit) ────────────────────────────────────────────────────────────
+// Each projected line carries its block ancestry (proj.map[i]); an op-container id in that ancestry means the
+// line belongs to that op. params are the op's single source of truth (no snapshot) — the editor reads them to
+// re-open the wizard, and replaceOp rebuilds the op from the edited params.
+function findOpInStack(blocks, anc) {
+    for (const b of (blocks || [])) {
+        if (!b) continue;
+        if (b.type === 'op' && anc.includes(b.id)) return b;
+        if (b.children) { const f = findOpInStack(b.children, anc); if (f) return f; }
+    }
+    return null;
+}
+/** The op-container owning projected line `i` (or null) — only when the editor matches the live projection. */
+export function opAtLine(i) {
+    const anc = proj.map && proj.map[i];
+    return (anc && anc.length) ? findOpInStack(stack, anc) : null;
+}
+/** All projected line indices that belong to op `opId` (its highlight range in the editor). */
+export function linesForOp(opId) {
+    const out = [];
+    (proj.map || []).forEach((anc, i) => { if (anc && anc.includes(opId)) out.push(i); });
+    return out;
+}
+/** True when the editor text still matches the live projection (so the line→op map is valid for hover). */
+export function editorMatchesProjection() {
+    const e = editor();
+    return !!(e && e.editor && e.getValue() === proj.text);
+}
 /** Subscribe to model changes. cb({ stack, proj, origin }). Returns an unsubscribe fn. */
 export function onChange(cb) { subs.add(cb); return () => subs.delete(cb); }
 
@@ -62,6 +91,9 @@ export function initProgramModel() {
     window.ddcsGetBlockProgram = getStack;                     // the program stack
     window.ddcsLoadBlockStack = (s) => setStack(s, 'load');    // STUDIO op / wizard → program (blocksApp reframes)
     window.ddcsRefreshBlocks = () => setStack(stack, 'refresh');   // recompute projection (e.g. post-processor change)
+    // Editor hover-to-edit: which op owns a line, an op's line range, and whether the map is currently valid.
+    window.ddcsOpAtLine = (i) => (editorMatchesProjection() ? opAtLine(i) : null);
+    window.ddcsLinesForOp = linesForOp;
 
     const e = editor(); if (!e || !e.editor || e.editor.__pmWired) return;
     e.editor.__pmWired = true;

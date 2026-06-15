@@ -51,6 +51,18 @@ export const cornerView = {
         }, 50);
     },
 
+    // params → form (the inverse of update()'s reads) so editing an existing op re-opens the wizard showing its
+    // values. params are the single source of truth; port/level come from Settings, so they aren't form fields here.
+    setForm(p = {}) {
+        const set = (id, v) => { const e = el(id); if (e && v != null) e.value = v; };
+        const chk = (id, v) => { const e = el(id); if (e) e.checked = !!v; };
+        set('c_corner', p.corner); chk('c_probe_z_first', p.probeZ ?? p.probeZFirst); chk('c_sync_a', p.syncA);
+        set('c_slave', p.slave); set('c_probe_seq', p.probeSeq); set('c_wcs', p.wcs);
+        set('c_dist', p.dist); set('c_retract', p.retract); set('c_feed_fast', p.f_fast); set('c_feed_slow', p.f_slow);
+        set('c_q', p.qStop); set('c_safe_z', p.safeZ); set('c_travel_dist', p.travelDist);
+        set('c_scan_depth', p.scanDepth); set('c_radius', p.radius);
+    },
+
     update(ctx) {
         const params = {
             corner: el('c_corner').value,
