@@ -55,15 +55,28 @@ Absorbs the "named macro list" sub-task. Build incrementally: modal + Local volu
 `.mjson`), then mount Cloud when the storage backend lands.
 
 ## Audit LinuxCNC (rs274ngc) for features our EXISTING wizards don't surface (2026-06-15)
-*Status: TODO. Scope: EXISTING wizards only — no new wizard categories.*
+*Status: AUDIT DONE 2026-06-15 — findings below are candidate tasks. Scope: existing wizards only.*
 
-Go through LinuxCNC / rs274ngc capabilities and find ones our current wizards COULD expose but don't — limited
-to features that map onto EXISTING wizards (probe, wcs, drill, pocket, slot, surfacing, text, circular, rotary,
-alignment, ATC), not new wizard types. Candidates to check: probe variants (G38.2/.3/.4/.5 — toward/away,
-error/no-error), G10 L2/L20 WCS set, G64 path-blend tolerance, canned drill cycles (G81/82/83/85), G41/42 cutter
-comp, o-word sub/loop flow (ties to #1 oword), tool-length G43/G43.1, polar/rotary helpers. Source:
-`bridge/controllers/linuxcnc/assets/linuxcnc-src/` (+ docs). For each: does it improve an existing wizard's
-output on the rs274ngc post, and is it worth a field/option? Output = a short "add X to wizard Y" list.
+Grounded in MACHINE-PRIMITIVES-MAP §8 + `wizards/dialects/rs274ngc.js`. "Add X to wizard Y":
+
+HIGH value:
+- **Probe wizards (edge/middle/corner/circular/alignment): `G38.3` no-error probe + read `#5070`.** Today the
+  fail path on rs274 just ALARMs (`probeStatus`→`[]`; #1's balancer drops the dead branch). `G38.3` probes
+  without erroring → branch on `#5070` (`o<n> if [#5070 EQ 0]`) = a real in-program fail handler. The proper
+  successor to the #1 o-word balancing. Needs dialect support (a probeMove variant + probeStatus that emits the
+  #5070 check when no-error mode is on).
+- **Confirm / comm wizard: `M0`/`M1` pause + `(MSG,…)`.** `hmiPrompt` folds to `[]` on rs274, so operator
+  confirms VANISH. `M0` (program pause) + `(MSG,)` is the native LinuxCNC confirm — emit that instead of nothing.
+
+MEDIUM:
+- **Cutting wizards (surfacing/pocket/slot/text): `G64 P<tol> [Q<tol>]` path-blend / `G61` exact-stop** — a
+  "path smoothing / tolerance" option (speed vs accuracy); not surfaced today.
+- **Drill: native canned cycles `G81/G82/G83/G85`** (emit on rs274 vs the expanded peck loop) + `G98/G99` retract.
+- **ATC wizards: `M62–M65` digital out + `M66 P L Q`→`#5399` wait-on-input** — rs274/grblHAL drawbar/cover
+  outputs + tool-setter/slot sensor reads (vs DDCS `M154`/`M300`). Ties to the HAL port map.
+
+LOW / niche: WCS `G10 L2` + `G92` modes (we only do L20); drill rigid tap `G33.1` (needs encoder); probe
+`G38.4/.5` (probe away); tool `G43/G43.1` length offset; rotary `G93` inverse-time; cutter comp `G41/G42` (big).
 
 ## Gateway tab + cloud/service architecture (2026-06-15)
 *Status: Gateway tab DONE; cloud direction decided in principle; OAuth + dual-client awaiting a user decision.*
