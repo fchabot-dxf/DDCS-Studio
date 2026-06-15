@@ -73,7 +73,9 @@ export function middleStack(params = {}) {
         C(`2axis_${axis === 'X' ? 'XtoY' : 'YtoX'}_${resolvedDir2}`);
         seq(second, dir2Plus, 54);
         MV('Z', '#17');
-        A('#[#70+0]', '#53'); A('#[#70+1]', '#56');
+        // #53 = centre of the PRIMARY axis, #56 = centre of the SECONDARY — write each to ITS axis's WCS offset
+        // (not hardcoded X=0/Y=1, which swapped them when the primary axis was Y).
+        A(`#[#70+${AX[axis].off}]`, '#53'); A(`#[#70+${AX[second].off}]`, '#56');
     } else {
         MV('Z', '#17');
         A(`#[#70+${AX[axis].off}]`, '#53');

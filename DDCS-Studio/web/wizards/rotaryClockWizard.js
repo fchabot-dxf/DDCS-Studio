@@ -63,7 +63,7 @@ export function rotaryClockStack(params = {}) {
     MV('Y', '#6');                           // step across the flat by the span (+Y)
     C('Point B: probe down onto the flat'); ppZdown('#52');
     C('Tilt of the flat (degrees) = atan( dZ / span )');
-    A('#53', 'ATAN[[#52-#51]]/[#6]', 'phi = ATAN(Zb-Za / span)');
+    A('#53', 'ATAN[[#52-#51]/#6]', 'phi = ATAN((Zb-Za)/span)');   // ratio INSIDE atan (was atan(dZ)/span — wrong)
     RM('A', '#54');                          // current A machine position (dialect DRO)
 
     if (action === 'report') {
