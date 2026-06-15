@@ -22,16 +22,60 @@ export function disconnect() {
     window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
 }
 
-/** Start the OAuth flow: hand off to the Worker, which logs the user in and redirects back with the token. */
+/** Connect: open a MODAL that launches the OAuth sign-in in a popup (no full-page redirect) and captures the
+ *  token the Worker posts back. Base = a configured cloud service URL (Gateway → Console) if set, else same-origin
+ *  (the hosted Pages Worker serves /api). The Worker popup must postMessage {type:'ddcs-cloud-auth', token,
+ *  provider, email} to window.opener and close — see the Worker OAuth scaffold (next build step). */
 export function connect(provider = 'google') {
-    const svc = getService();
-    if (!svc.base) {
-        window.alert('Connect a cloud service first: Gateway → Console → Service (set the service URL). Then connect your '
-            + provider + ' account here.');
-        return;
-    }
-    const back = encodeURIComponent(location.href.split('?')[0]);
-    location.href = `${svc.base.replace(/\/$/, '')}/api/oauth/${provider}/start?redirect=${back}`;
+    openConnectModal(provider, (getService().base || '').replace(/\/$/, ''));
+}
+
+function openConnectModal(provider, base) {
+    const label = provLabel(provider);
+    const ov = document.createElement('div');
+    ov.className = 'cloud-modal';
+    ov.innerHTML =
+        '<div class="cloud-modal-panel">'
+        + `<div class="proj-head"><span class="proj-title">🔗 Connect ${label}</span><button class="op-btn" data-cm="cancel" title="Cancel">✕</button></div>`
+        + '<div class="cloud-modal-body">'
+        + `<div class="cloud-modal-status">Opening ${label} sign-in…</div>`
+        + `<div class="hint">A secure ${label} window opens — approve access and it returns here automatically. Nothing is stored until you approve.</div>`
+        + '</div>'
+        + '<div class="cloud-modal-foot"><button class="op-btn" data-cm="retry">Open sign-in</button><span style="flex:1"></span><button class="op-btn" data-cm="cancel">Cancel</button></div>'
+        + '</div>';
+    document.body.appendChild(ov);
+    const statusEl = ov.querySelector('.cloud-modal-status');
+    const expectOrigin = base ? new URL(base).origin : location.origin;
+    const url = `${base}/api/oauth/${provider}/start?mode=popup&origin=${encodeURIComponent(location.origin)}`;
+    let popup = null;
+    const open = () => {
+        popup = window.open(url, 'ddcs_oauth', 'width=520,height=660');
+        statusEl.textContent = popup ? `Waiting for ${label} sign-in…` : 'Popup blocked — allow popups, then “Open sign-in”.';
+    };
+    const onMsg = (e) => {
+        if (e.origin !== expectOrigin) return;                 // only trust the OAuth origin
+        const d = e.data || {};
+        if (d.type !== 'ddcs-cloud-auth' || !d.token) return;
+        try {
+            localStorage.setItem(TOK, d.token);
+            localStorage.setItem(PROV, d.provider || provider);
+            if (d.email) localStorage.setItem(EMAIL, d.email);
+        } catch (_) { /* */ }
+        cleanup(true);
+    };
+    const cleanup = (ok) => {
+        window.removeEventListener('message', onMsg);
+        try { popup && popup.close(); } catch (_) { /* */ }
+        ov.remove();
+        if (ok) window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
+    };
+    window.addEventListener('message', onMsg);
+    ov.addEventListener('click', (e) => {
+        const t = e.target.closest('[data-cm]');
+        if (!t) { if (e.target === ov) cleanup(false); return; }
+        if (t.dataset.cm === 'cancel') cleanup(false); else open();
+    });
+    open();
 }
 
 /** On load, capture a token the Worker redirected back with (?cloud_token=…&provider=…&email=…) and clean the URL. */
