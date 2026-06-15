@@ -144,8 +144,9 @@ export class WizardManager {
     open(type) {
         // play a feedback sound whenever a wizard is opened
         playClick();
-        // Opening a wizard leaves the Studio preview context — stop any running engine/play so it doesn't keep
-        // executing behind the wizard and clobber the code the wizard inserts.
+        // Opening a wizard leaves the Studio preview context — stop any running engine/play (every preview panel
+        // + Studio's drawer) so nothing keeps executing behind the wizard and clobbers the code it inserts.
+        window.dispatchEvent(new CustomEvent('ddcs:stop-previews'));
         if (window.ddcsStopPreview) window.ddcsStopPreview();
 
         const view = viewByType.get(type) || null;

@@ -4,6 +4,13 @@ Running list of things noticed mid-work that we deliberately deferred. Newest on
 
 ---
 
+## Material-removal sim: solid stock the toolpath carves into
+*Noted 2026-06-14. Status: IDEA / deferred.*
+
+Make the preview stock a **solid** (mesh/voxel), and have the toolpath actually **remove material** as it runs — so you see the cut result, not just lines over a translucent box. Big 3D feature: a voxel grid (or CSG subtraction along the swept tool volume) carved as the engine steps. Pairs with stock-lives-in-the-preview (the stock is now a sim property in `createPreviewPanel`, `PREVIEW_STOCK`) and with the engine-driven trail (the same `setToolPosition` steps could drive the carve). Start simple (voxel occupancy under the tool radius along each feed move); upgrade to a proper swept-volume boolean later.
+
+---
+
 ## Fills (and all wrapper ops): delimit the region in the projected G-code
 *Noted 2026-06-14. Status: IDEA / deferred.*
 

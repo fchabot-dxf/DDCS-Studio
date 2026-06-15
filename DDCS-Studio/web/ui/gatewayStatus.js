@@ -54,8 +54,10 @@ export function initGatewayStatus() {
         const isSettings = which === 'settings';
         const isBlocks = which === 'blocks';
 
-        // Leaving the Studio tab must stop the preview execution engine — otherwise a run keeps executing
-        // off-screen and its snapshot can clobber the editor on the way back (see REMINDERS / decode-standby).
+        // Any tab change stops every preview's run — otherwise a run keeps executing off-screen and its snapshot
+        // can clobber the editor on the way back (see REMINDERS / decode-standby). The event reaches every mounted
+        // preview panel; ddcsStopPreview covers Studio's drawer engine specifically.
+        window.dispatchEvent(new CustomEvent('ddcs:stop-previews'));
         if (!isStudio && window.ddcsStopPreview) window.ddcsStopPreview();
 
         if (isGateway) {

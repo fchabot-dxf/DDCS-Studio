@@ -1552,19 +1552,8 @@
         <div id="blk-ws" class="blk-ws"></div>   <!-- Blockly workspace (toolbox + canvas); built by blocksApp.js -->
         <div class="right">
             <div class="pv">
-                <h3 class="pane-h">Preview
-                    <span class="leg">
-                        <span style="color:#5a6b7d"><i style="border-top-style:dashed;border-color:#5a6b7d"></i>rapid</span>
-                        <span style="color:#33b1c9"><i style="border-color:#33b1c9"></i>feed</span>
-                        <span style="color:#e35c5c"><i style="border-color:#e35c5c"></i>probe</span>
-                    </span>
-                    <span class="seg"><button id="blk-m2d" class="op-btn primary">2D</button><button id="blk-m3d" class="op-btn">3D</button></span>
-                    <button id="blk-play" class="op-btn">▶ Play</button>
-                </h3>
-                <div class="pv-body">
-                    <canvas id="blk-preview"></canvas>
-                    <div id="blk-host3d" style="display:none"></div>
-                </div>
+                <h3 class="pane-h">Preview</h3>
+                <div class="pv-body"><div id="blk-preview-panel"></div></div>   <!-- the shared createPreviewPanel mounts here -->
             </div>
             <div class="gcode">
                 <h3 class="pane-h">Projected G-code</h3>

@@ -476,10 +476,6 @@ function buildSettingsOverlay() {
                                     <label>Spin-up dwell (s)<input type="number" id="set_spin_up" min="0" step="0.1"></label>
                                     <label>Spin-down dwell (s)<input type="number" id="set_spin_down" min="0" step="0.1"></label>
                                 </div>
-                                <div class="settings-row" style="margin-top:8px;">
-                                    <button class="toolbar-btn settings-io" id="set_spin_insert">⬇ Insert spindle start</button>
-                                </div>
-                                <div class="settings-hint">"Insert spindle start" drops M3/M4 + S + spin-up dwell into the editor. The controller still owns the live PWM/analog spindle parameters.</div>
                             </div>
                         </div>
                         <div id="set_head_plasma" style="display:none">
@@ -1151,14 +1147,6 @@ function wireSettingsOverlay(ov) {
         const em = (window.ddcsStudio && window.ddcsStudio.editorManager) || window.editorManager;
         if (em && typeof em.insert === 'function') em.insert(code);
     };
-    const _spinInsert = q('set_spin_insert');
-    if (_spinInsert) _spinInsert.addEventListener('click', () => {
-        const sp = _ddcsSettings.spindle || {};
-        const on = sp.dir === 'ccw' ? 'M4' : 'M3';
-        const lines = ['( Spindle start - DDCS Studio )', on + ' S' + num(sp.defaultRpm, 18000)];
-        if (num(sp.spinUp, 0) > 0) lines.push('G04 P' + Math.round(num(sp.spinUp, 0) * 1000) + '   ( spin-up dwell, ms )');
-        _emInsert(lines.join('\n') + '\n');
-    });
     const _endInsert = q('set_end_insert');
     if (_endInsert) _endInsert.addEventListener('click', () => {
         const ep = _ddcsSettings.endProgram || {};
@@ -1288,8 +1276,9 @@ function wireSettingsOverlay(ov) {
 }
 
 export function openSettings() {
-    // Opening setup leaves the Studio preview context — stop any running engine/play (any open path, not just
-    // the settings tab) so it doesn't keep executing behind the panel.
+    // Opening setup leaves the Studio preview context — stop any running engine/play (every preview panel +
+    // Studio's drawer), any open path, so nothing keeps executing behind the panel.
+    window.dispatchEvent(new CustomEvent('ddcs:stop-previews'));
     if (window.ddcsStopPreview) window.ddcsStopPreview();
     buildSettingsOverlay();
     const app = document.getElementById('settings-app');

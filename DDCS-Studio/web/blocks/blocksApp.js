@@ -11,9 +11,7 @@ import { installBlockly, buildToolbox } from './blockly/bridge.js';
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
-import { traceToolpath } from '../engine/trace.js';
-import { createToolpath2d } from '../viz/toolpath2d.js';   // shared 2D toolpath preview (also used by Studio main + wizards)
-import { GcodeViz3D } from '../viz/gcodeViz3d.js';         // shared 3D viewer (same as Studio main + wizards: stock, nav-cube, trail)
+import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
 
 let api = null;            // module singleton, set once the workspace is built: { refresh, load }
 let initPromise = null;    // in-flight build. The header tabs are double-wired (inline onclick in index.html +
@@ -75,10 +73,8 @@ async function buildWorkspace() {
 
   const host = document.getElementById('blk-ws');
   const out = document.getElementById('blk-gcode');
-  const preview = document.getElementById('blk-preview');
-  const host3d = document.getElementById('blk-host3d');
-  let mode = '2d';
-  const t2 = createToolpath2d(preview);   // shared 2D toolpath view + Play
+  // THE shared preview panel — identical to Studio main + the wizards (same code + UI); fed the projected program.
+  const panel = createPreviewPanel(document.getElementById('blk-preview-panel'), { getGcode: () => getProjection().text });
 
   const ws = B.inject(host, {
     toolbox: buildToolbox(), theme: ddcsTheme(B), renderer: 'geras',
@@ -112,8 +108,7 @@ async function buildWorkspace() {
   // Render the right pane (code panel + preview + selection) from a projection { text, lines, map }.
   function renderViews(p) {
     renderCode(p.lines, p.map);
-    if (mode === '3d') update3D(p.text);
-    else t2.setGcode(p.text);
+    panel.setGcode(p.text);
     applySelection();
   }
 
@@ -169,49 +164,7 @@ async function buildWorkspace() {
     else if (!e.isUiEvent && !muteChanges) reproject();   // muteChanges: ignore our own model→workspace rebuild
   });
 
-  // ---- 3D preview (shared GcodeViz3D — same viewer as Studio main + wizards: stock, nav-cube, faint-route/bold-trail) ----
-  let viz3d = null, viz3dFitted = false, viz3dPlaying = false;
-  function ensureViz3d() {
-    if (viz3d) return viz3d;
-    try {
-      viz3d = new GcodeViz3D(host3d);
-      viz3d._gizmoPx = 32;                 // compact gizmo, like the wizard preview
-      viz3d._animOn = false;               // static route until the user presses Play (then the trail reveals)
-      try { if (window.ddcsGetSettings) viz3d.setStock(window.ddcsGetSettings().stock); } catch (_) { /* no settings */ }
-    } catch (e) { console.warn('Blocks 3D unavailable — staying on 2D', e); viz3d = null; }
-    return viz3d;
-  }
-  function update3D(gcode) {
-    const v = ensureViz3d();
-    if (!v) { setMode('2d'); return; }
-    v.setActive(true);
-    v.setSegments(traceToolpath(gcode), !viz3dFitted);   // fit the camera once; later re-renders keep it
-    viz3dFitted = true;
-  }
-
-  // ---- 2D / 3D toggle ----
-  const m2d = document.getElementById('blk-m2d'), m3d = document.getElementById('blk-m3d');
-  const play = document.getElementById('blk-play');
-  function setMode(next) {
-    mode = next; t2.stop(); viz3dPlaying = false; if (play) play.textContent = '▶ Play';
-    m2d.classList.toggle('primary', mode === '2d'); m3d.classList.toggle('primary', mode === '3d');
-    preview.style.display = mode === '2d' ? '' : 'none';
-    host3d.style.display = mode === '3d' ? '' : 'none';
-    if (mode !== '3d' && viz3d) { viz3d.setAnimate(false); viz3d.setActive(false); }   // pause the 3D loop while hidden
-    renderViews(getProjection());
-  }
-  m2d.onclick = () => setMode('2d');
-  m3d.onclick = () => setMode('3d');
-
-  // ---- play / pause — 2D progressive trail (t2) or the 3D viewer's feed-true trail sweep (setAnimate) ----
-  play.onclick = () => {
-    if (mode === '2d') { play.textContent = t2.toggle() ? '⏸ Pause' : '▶ Play'; return; }
-    if (!viz3d) return;
-    viz3dPlaying = !viz3dPlaying;
-    viz3d.setAnimate(viz3dPlaying);              // faint route + bold executed trail (drawRange) + tool dot
-    play.textContent = viz3dPlaying ? '⏸ Pause' : '▶ Play';
-  };
-
+  // (2D/3D toggle, Play/Step/Loop, stock, trail — all owned by the shared preview panel now.)
 
   window.addEventListener('resize', () => { if (!root.classList.contains('hidden')) { B.svgResize(ws); renderViews(getProjection()); } });
 
@@ -219,6 +172,8 @@ async function buildWorkspace() {
   // into the freshly-injected view. The editor⇄stack sync lives in programModel (wired at startup), so this tab
   // is purely a view: it never owns the program or the editor listeners.
   renderFromModel(getProjection());
+  panel.setActive(true);                          // mark the preview active + initial render (tab is now visible)
   window.__blkws = ws;                            // workspace handle (tests / debugging)
-  api = { refresh: () => renderFromModel(getProjection()), load: (s) => setStack(s, 'load') };
+  window.__blkPanel = panel;                      // preview panel handle (tests / debugging)
+  api = { refresh: () => { panel.setActive(true); renderFromModel(getProjection()); }, load: (s) => setStack(s, 'load') };
 }
