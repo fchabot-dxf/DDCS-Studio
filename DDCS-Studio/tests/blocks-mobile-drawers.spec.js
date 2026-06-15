@@ -66,6 +66,27 @@ test('mobile: palette collapses (canvas reclaims width), preview + palette drawe
   expect(handleBox.top, 'handle parks near the top, not vertically centred').toBeLessThan(80);
   expect(handleBox.left, 'handle not pushed off the right edge').toBeLessThan(handleBox.vw * 0.7);
 
+  // with BOTH palette + preview open, the preview must COVER the palette at their overlap (bottom-left)
+  await page.click('#blkDrawerHandle');
+  await page.waitForTimeout(300);
+  const overlap = await page.evaluate(() => {
+    const el = document.elementFromPoint(60, window.innerHeight - 80);
+    return { inPreview: !!(el && el.closest('.right')), inToolbox: !!(el && el.closest('.blocklyToolbox')) };
+  });
+  expect(overlap.inPreview, 'preview covers the palette where they overlap').toBeTruthy();
+  expect(overlap.inToolbox).toBeFalsy();
+
+  // drag the resize strip up → drawer gets taller
+  const before = await page.evaluate(() => document.querySelector('#blocks-app .right').getBoundingClientRect().height);
+  const strip = await page.locator('#blocks-app .blk-drawer-resize').boundingBox();
+  await page.mouse.move(strip.x + strip.width / 2, strip.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(strip.x + strip.width / 2, 150, { steps: 8 });   // drag toward the top → taller
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+  const after = await page.evaluate(() => document.querySelector('#blocks-app .right').getBoundingClientRect().height);
+  expect(after, `drawer resized taller (${before} → ${after})`).toBeGreaterThan(before + 30);
+
   // close palette drawer → collapses again
   await page.click('#blkToolsHandle');
   await page.waitForTimeout(300);

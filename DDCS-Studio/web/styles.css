@@ -3776,7 +3776,8 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .blk.fill > .blk-body .f, #blocks-app .blk.depth > .blk-body .f { width:auto; }   /* room for the region socket */
 
 /* ── Blocks tab handles: hidden on desktop (the side-by-side grid already shows everything) ── */
-#blocks-app .blk-drawer-head, #blocks-app .blk-drawer-handle, #blocks-app .blk-tools-handle { display:none; }
+#blocks-app .blk-drawer-head, #blocks-app .blk-drawer-handle, #blocks-app .blk-tools-handle,
+#blocks-app .blk-drawer-resize { display:none; }
 
 /* ============================================================================
    BLOCKS TAB — MOBILE (≤860px): Blockly canvas gets the whole tab; the Preview
@@ -3789,15 +3790,21 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 @media (max-width: 860px) {
     #blocks-app { grid-template-columns:1fr; }                 /* canvas spans the tab; drawers overlay it */
 
-    /* ── Preview = bottom drawer ── */
+    /* ── Preview = bottom drawer (height is drag-resizable via --blk-pv-h; default 62vh) ── */
     #blocks-app .right {
         position:fixed; left:0; right:0; bottom:0; top:auto;
-        height:min(62vh, 520px);
+        height:var(--blk-pv-h, min(62vh, 520px));
         transform:translateY(calc(100% + 12px)); transition:transform .25s ease;
-        z-index:60; border-left:none; border-top:1px solid var(--line);
+        z-index:80; border-left:none; border-top:1px solid var(--line);   /* above Blockly toolbox (z 70) → covers the palette when both open */
         box-shadow:0 -8px 22px #0009; padding-bottom:env(safe-area-inset-bottom);
     }
     #blocks-app .right.open { transform:translateY(0); }
+
+    /* draggable top-edge strip to resize the drawer (overlays the grip; touch-friendly) */
+    #blocks-app .blk-drawer-resize {
+        display:block; position:absolute; top:0; left:0; right:0; height:16px;
+        cursor:ns-resize; touch-action:none; z-index:3;
+    }
 
     #blocks-app .blk-drawer-head {
         display:flex; align-items:center; gap:8px; position:relative;
@@ -3828,7 +3835,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     /* bottom-centre pull-tab opens the preview drawer (hidden once open) */
     #blocks-app .blk-drawer-handle {
         display:block; position:fixed; left:50%; bottom:0; transform:translateX(-50%);
-        z-index:55; padding:6px 18px calc(6px + env(safe-area-inset-bottom)); cursor:pointer;
+        z-index:81; padding:6px 18px calc(6px + env(safe-area-inset-bottom)); cursor:pointer;
         font:700 12px/1 inherit; color:var(--screen-ink); background:var(--screen);
         border:1px solid var(--line); border-bottom:none; border-radius:10px 10px 0 0; box-shadow:0 -4px 14px #0007;
     }
@@ -3837,14 +3844,15 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     /* ── Blockly palette/toolbox = left drawer over the canvas ──
        Collapsed via the toolbox's OWN setVisible() (display:none → getWidth()=0 → the canvas genuinely
        reclaims the strip), NOT a CSS translate — a translate would leave a dead strip because Blockly still
-       reserves the toolbox width in its metrics. CSS here only animates the slide-in. */
-    #blocks-app.tools-open .blk-ws .blocklyToolboxDiv { z-index:40; box-shadow:6px 0 18px #0008; animation:blkTbxIn .22s ease; }
+       reserves the toolbox width in its metrics. CSS here only animates the slide-in. (Blockly 12.5.1 toolbox
+       class is .blocklyToolbox, z-index 70 — the preview drawer sits above it at z 80.) */
+    #blocks-app.tools-open .blk-ws .blocklyToolbox { box-shadow:6px 0 18px #0008; animation:blkTbxIn .22s ease; }
     @keyframes blkTbxIn { from { transform:translateX(-100%); } to { transform:translateX(0); } }
 
     /* left-edge vertical handle opens the palette; slides to the toolbox edge when open (acts as close) */
     #blocks-app .blk-tools-handle {
         display:block; position:fixed; left:0; top:50%; transform:translateY(-50%);
-        z-index:55; padding:16px 7px; cursor:pointer; writing-mode:vertical-rl; text-orientation:mixed;
+        z-index:79; padding:16px 7px; cursor:pointer; writing-mode:vertical-rl; text-orientation:mixed;
         font:700 11px/1 inherit; letter-spacing:.08em; color:var(--screen-ink); background:var(--screen);
         border:1px solid var(--line); border-left:none; border-radius:0 10px 10px 0; box-shadow:4px 0 14px #0007;
     }

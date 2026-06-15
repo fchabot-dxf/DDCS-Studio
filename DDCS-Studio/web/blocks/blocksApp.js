@@ -228,6 +228,31 @@ async function buildWorkspace() {
     segPv && segPv.addEventListener('click', () => showPane(false));
     segCode && segCode.addEventListener('click', () => showPane(true));
 
+    // Drag the top edge to resize the preview drawer. Height lives in --blk-pv-h (only the mobile rule reads it,
+    // so desktop is untouched) and persists across sessions.
+    const resizeStrip = right.querySelector('.blk-drawer-resize');
+    if (resizeStrip) {
+      try { const h = parseInt(localStorage.getItem('ddcs_blk_pv_h'), 10); if (h > 0) right.style.setProperty('--blk-pv-h', h + 'px'); } catch (_) { /* */ }
+      let dragging = false;
+      const onMove = (e) => {
+        if (!dragging) return;
+        const y = e.touches ? e.touches[0].clientY : e.clientY;
+        const h = Math.max(160, Math.min(Math.round(window.innerHeight * 0.9), window.innerHeight - y));
+        right.style.setProperty('--blk-pv-h', h + 'px');
+      };
+      const onUp = () => {
+        if (!dragging) return;
+        dragging = false;
+        window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp);
+        try { localStorage.setItem('ddcs_blk_pv_h', parseInt(right.style.getPropertyValue('--blk-pv-h'), 10) || ''); } catch (_) { /* */ }
+        refit();   // re-fit the preview to the new drawer height
+      };
+      resizeStrip.addEventListener('pointerdown', (e) => {
+        dragging = true; e.preventDefault();
+        window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp);
+      });
+    }
+
     // Palette (Blockly toolbox) as a left drawer. Collapse via the toolbox's OWN setVisible() so the canvas
     // truly reclaims the width (display:none → getWidth()=0); a CSS translate alone would leave a dead strip.
     const tbx = () => { try { return ws.getToolbox(); } catch (_) { return null; } };
@@ -235,9 +260,8 @@ async function buildWorkspace() {
       const tb = tbx(); if (!tb) return;
       try { tb.setVisible(on); } catch (_) { /* */ }
       if (on) {                                          // measure the now-visible toolbox so the close tab parks at its edge
-        const t = host.querySelector('.blocklyToolboxDiv');
-        let w = t ? Math.round(t.getBoundingClientRect().width) : 0;   // DOM rect is reliable right after display:block
-        if (!w) { try { w = Math.round(tb.getWidth()); } catch (_) { /* */ } }
+        let w = 0; try { w = Math.round(tb.getWidth()); } catch (_) { /* */ }   // Blockly API (authoritative)
+        if (!w) { const t = host.querySelector('.blocklyToolbox'); if (t) w = Math.round(t.getBoundingClientRect().width); }
         if (w) root.style.setProperty('--blk-tbx-w', w + 'px');
       } else { try { tb.clearSelection(); } catch (_) { /* collapse any open flyout */ } }
       root.classList.toggle('tools-open', on);
