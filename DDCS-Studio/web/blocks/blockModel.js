@@ -185,6 +185,7 @@ export function emitMapped(blocks, settings = {}) {
     (blocks || []).forEach((b) => { T.push(...emit(b, 0, 0, [], scope, dialect)); });
     applyModalFeed(T);                    // F is modal — drop it where it just repeats the current feed
     applyCapGating(T, dialect);           // comment out lines the active post can't run (honest per-line gating)
+    balanceOwords(T, dialect);            // oword posts: drop orphan o<n> if/endif so structured flow is well-formed
     const lines = T.map((t) => t.line);
     return { text: lines.join('\n'), lines, map: T.map((t) => t.src) };
 }
@@ -223,6 +224,27 @@ function applyCapGating(T, dialect) {
         if ((!caps.vars && hasVar) || (caps.flow === 'none' && (isFlow || hasVar))) {
             t.line = `( gated: ${code.replace(/[()]/g, '').trim()} )`;   // comment out the non-runnable line
         }
+    }
+}
+
+/** O-word well-formedness for flow:'oword' posts (LinuxCNC / grblHAL). There, ifGoto→`o<n> if [neg]`,
+ *  label→`o<n> endif`, and goto/probecheck fold to nothing (G38.2 ALARMs on no-contact, so the status-skip is
+ *  moot). A folded probecheck leaves its target label's `o<n> endif` with no matching `o<n> if` (orphan) → the
+ *  structured flow won't parse. This drops any o<n> if/endif whose number lacks BOTH halves, so the o-words are
+ *  balanced and render cleanly. The fail-branch guard degrades gracefully (the controller alarms instead).
+ *  GOTO posts (Expert/V4.1/DM500) are untouched. */
+function balanceOwords(T, dialect) {
+    if (getCaps(dialect.id).flow !== 'oword') return;
+    const ifs = new Set(), endifs = new Set();
+    for (const t of T) {
+        const s = (t.line || '').trim();
+        let m = s.match(/^o(\d+)\s+if\b/); if (m) ifs.add(m[1]);
+        m = s.match(/^o(\d+)\s+endif$/);   if (m) endifs.add(m[1]);
+    }
+    const valid = new Set([...ifs].filter((n) => endifs.has(n)));   // keep only numbers with BOTH an if and an endif
+    for (let i = T.length - 1; i >= 0; i--) {
+        const m = (T[i].line || '').trim().match(/^o(\d+)\s+(if|endif)\b/);
+        if (m && !valid.has(m[1])) T.splice(i, 1);                 // drop the orphan o-word line (+ its map entry)
     }
 }
 
