@@ -12,9 +12,7 @@ import { WIZARD_VIEWS, viewByType } from './wizards/views/index.js';
 import { playClick, playClickReverse } from './ui/sound.js';  // audio helper for click sounds
 import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
 import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile } from './shared/js/profiles/controllerProfiles.js';
-import { GcodeViz3D } from './viz/gcodeViz3d.js';
-import { traceToolpath } from './engine/trace.js';
-import { createToolpath2d } from './viz/toolpath2d.js';   // shared 2D toolpath view (uniform with Blocks/Studio)
+import { createPreviewPanel } from './viz/createPreviewPanel.js';   // THE shared preview (identical to Blocks/Studio), fed the wizard's op code
 
 // Map the touch-probe wizards' per-op input fields to the global 3D-probe defaults
 // (settings.probes). open() pre-fills these so every wizard starts from the configured
@@ -153,7 +151,6 @@ export class WizardManager {
         const box = document.querySelector('.wiz-box');
         // Re-centre on open: clear any drag offset left from a previous session.
         if (box) Object.assign(box.style, { position: '', left: '', top: '', right: '', bottom: '', transform: '', margin: '' });
-        this._wizNeedsFit = true;   // frame the 3D preview once on open; input-change re-renders keep the camera
         console.debug('WizardManager.open()', type, 'view=', !!view, 'wizardElement=', this.wizardElement);
         if (!this.wizardElement) {
             console.warn('WizardManager.open(): no wizard container available');
@@ -240,7 +237,8 @@ export class WizardManager {
             // Carry the start position the user set in this wizard's 3D preview over to the main preview.
             // Apply now if the main viz exists; stash it so it's also applied when the main view next renders.
             try {
-                const ws = (this._wizViz && this._wizViz.starts) ? this._wizViz.starts[0] : null;
+                const v = this._activePanel && this._activePanel.viz;
+                const ws = (v && v.starts) ? v.starts[0] : null;
                 if (ws) {
                     window.__pendingSpindleStart = { x: ws.x, y: ws.y, z: ws.z };
                     if (window.ddcsSetSpindleStart) window.ddcsSetSpindleStart(ws.x, ws.y, ws.z, 0);
@@ -256,120 +254,33 @@ export class WizardManager {
         this.close(false);
     }
 
-    // Render the generated G-code as a live 3D toolpath in the active wizard's viz area
-    // (a shared GcodeViz3D moved between wizards; replaces the SVG schematic).
+    // Render the wizard's generated G-code in the active wizard's viz area using THE shared preview panel
+    // (identical code + UI to Studio main + Blocks). The SVG schematic is hidden (kept in wizards/views/* +
+    // _svgPreview.bak.js for the DDCS CAM-menu thumbnails). The wizard feeds its own op code + inferred start.
     preview3D(gcode, containerId, start) {
         const svgCont = document.getElementById(containerId);
         if (!svgCont || !svgCont.parentElement) return;
         const parent = svgCont.parentElement; // .viz-container
-        // Dedicated host beside the SVG (the SVG is injected via innerHTML and would wipe a
-        // canvas placed inside it). Hide the SVG schematic in favour of the 3D view.
         let host = parent.querySelector('.wiz-viz3d');
         if (!host) {
             host = document.createElement('div');
             host.className = 'wiz-viz3d';
             host.style.cssText = 'position:relative; width:100%;';   // height via CSS (.wiz-viz3d) so two-pane can grow it
             parent.insertBefore(host, svgCont);
-            // Canonical path legend — the 3D colour scheme is identical in every wizard, so define it
-            // once here and drop it into the visual pane, replacing any inline legend. Includes the
-            // Cut colour (blue→cyan depth gradient) that the per-wizard legends were missing.
+            // The shared panel carries its own legend + controls; drop any per-wizard inline legend.
             const visual = host.closest('.wiz-visual') || parent;
-            if (visual) {
-                const oldLeg = visual.querySelector('.viz-legend');
-                if (oldLeg) oldLeg.remove();
-                const lg = document.createElement('div');
-                lg.className = 'viz-legend';
-                lg.innerHTML =
-                    '<div class="viz-legend-item"><div class="viz-legend-line cut"></div>Cut</div>' +
-                    '<div class="viz-legend-item"><div class="viz-legend-line travel"></div>Rapid</div>' +
-                    '<div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>' +
-                    '<div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>' +
-                    '<div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>';
-                visual.appendChild(lg);
-            }
-            // Shared 2D toolpath view (covers the 3D when active) + its controller, so the wizard preview has
-            // the same 2D/3D + Play surface as the Blocks tab and Studio main.
-            const cv = document.createElement('canvas');
-            cv.className = 'wiz-viz2d';
-            cv.style.cssText = 'width:100%; height:100%; display:none; background:#0d1117;';
-            host.appendChild(cv);
-            host.__t2 = createToolpath2d(cv);
-            // Controls: [2D | 3D] toggle + Play/Stop (Play = 2D progressive reveal, or the 3D animation).
-            const ctrls = document.createElement('div');
-            ctrls.className = 'viz3d-controls';
-            ctrls.innerHTML =
-                '<span class="seg"><button type="button" class="wiz-m2d op-btn">2D</button>' +
-                '<button type="button" class="wiz-m3d op-btn primary">3D</button></span>' +
-                '<button type="button" class="wiz-play on">⏸ Stop</button>';
-            host.appendChild(ctrls);
-            ctrls.querySelector('.wiz-m2d').addEventListener('click', () => this._setWizPreviewMode('2d', host));
-            ctrls.querySelector('.wiz-m3d').addEventListener('click', () => this._setWizPreviewMode('3d', host));
-            ctrls.querySelector('.wiz-play').addEventListener('click', (e) => {
-                let on;
-                if (this._wizPreviewMode === '2d') on = host.__t2.toggle();
-                else { if (!this._wizViz) return; on = !this._wizViz._animOn; this._wizViz.setAnimate(on); }
-                e.target.classList.toggle('on', on);
-                e.target.textContent = on ? '⏸ Stop' : '▶ Play';
-            });
+            const oldLeg = visual && visual.querySelector('.viz-legend'); if (oldLeg) oldLeg.remove();
+            host.__panel = createPreviewPanel(host, { getGcode: () => host.__gcode || '', getStart: () => host.__start });
         }
         svgCont.style.display = 'none';
         host.__gcode = gcode || '';
         host.__start = start || null;
-        if (!this._wizPreviewMode) this._wizPreviewMode = '3d';
-        this._renderWizPreview(host);
-    }
-
-    /** Switch the wizard preview between 2D and 3D (shared across wizards), reset the Play button, re-render. */
-    _setWizPreviewMode(mode, host) {
-        this._wizPreviewMode = mode;
-        const c = host.querySelector('.viz3d-controls');
-        if (c) {
-            c.querySelector('.wiz-m2d').classList.toggle('primary', mode === '2d');
-            c.querySelector('.wiz-m3d').classList.toggle('primary', mode === '3d');
-            const pb = c.querySelector('.wiz-play'); if (pb) { pb.classList.remove('on'); pb.textContent = '▶ Play'; }
-        }
-        this._renderWizPreview(host);
-    }
-
-    /** Render the active view (2D shared canvas or the 3D GcodeViz3D) from host.__gcode. */
-    _renderWizPreview(host) {
-        const cv = host.querySelector('.wiz-viz2d');
-        const r3d = this._wizViz && this._wizViz.renderer ? this._wizViz.renderer.domElement : null;
-        if (this._wizPreviewMode === '2d') {
-            if (cv) cv.style.display = '';
-            if (this._wizViz) { this._wizViz.setAnimate(false); this._wizViz.setActive(false); }
-            if (r3d) r3d.style.display = 'none';
-            if (host.__t2) host.__t2.setGcode(host.__gcode);
-            return;
-        }
-        if (cv) cv.style.display = 'none';
-        if (host.__t2) host.__t2.stop();
-        try {
-            if (!this._wizViz) { this._wizViz = new GcodeViz3D(host); this._wizViz._gizmoPx = 32; }
-            this._wizViz.attach(host);
-            if (this._wizViz.renderer && this._wizViz.renderer.domElement) this._wizViz.renderer.domElement.style.display = '';
-            this._wizViz.setActive(true);
-            this._refresh3DStock();
-            // Position the start marker BEFORE setSegments so the incremental probe path is offset to it
-            // (the inferred spindle start for this corner/config). setSegments keeps starts[0]. Preview hint
-            // only — the user can still drag to override. Re-set each render so it tracks the config.
-            const start = host.__start;
-            if (start && this._wizViz.starts) this._wizViz.starts[0] = { x: +start.x || 0, y: +start.y || 0, z: +start.z || 0 };
-            const wizStock = window.ddcsGetSettings ? window.ddcsGetSettings().stock : null;
-            this._wizViz.setSegments(traceToolpath(host.__gcode || '', { stock: wizStock }), this._wizNeedsFit !== false);
-            this._wizNeedsFit = false;   // subsequent input-change re-renders keep the camera
-        } catch (e) { console.warn('wizard 3D preview failed', e); }
+        this._activePanel = host.__panel;   // for insert(): read the start the user set/dragged in this preview
+        host.__panel.setActive(true);        // mark active + render this op's code
     }
 
     // Old private name kept as an alias for any external callers
     _preview3D(gcode, containerId) { return this.preview3D(gcode, containerId); }
-
-    _refresh3DStock() {
-        if (this._wizViz && window.ddcsGetSettings) {
-            try { this._wizViz.setStock(window.ddcsGetSettings().stock); } catch (e) { /* ignore */ }
-            try { this._wizViz.setProbes(window.ddcsGetSettings().probes); } catch (e) { /* ignore */ }
-        }
-    }
 
     togglePreview() {
         const commPreview = el('comm_preview_block');

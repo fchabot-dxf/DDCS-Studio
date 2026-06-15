@@ -130,7 +130,15 @@ export function createPreviewPanel(container, opts = {}) {
         catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
         segs = parsed.segments || [];
         if (mode === '2d') t2.setSegments(segs);
-        else { const v = ensureViz(); if (v) { v.setActive(true); v.setSegments(parsed, !fitted); fitted = true; } }
+        else {
+            const v = ensureViz();
+            if (v) {
+                v.setActive(true);
+                // Optional inferred start (wizard preview): place the origin marker before setSegments so the path offsets to it.
+                const st = get('getStart'); if (st && v.starts) v.starts[0] = { x: +st.x || 0, y: +st.y || 0, z: +st.z || 0 };
+                v.setSegments(parsed, !fitted); fitted = true;
+            }
+        }
         const s = parsed.stats || {};
         setStatus(!s.drawable ? 'No drawable moves' : [s.feed && `${s.feed} cuts`, s.probe && `${s.probe} probes`, s.rapid && `${s.rapid} rapids`].filter(Boolean).join(' · '));
     }
