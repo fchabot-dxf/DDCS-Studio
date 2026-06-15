@@ -460,6 +460,10 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .op-ctx-item:hover:not(:disabled) { background: var(--accent, #0ea5e9); color: #fff; }
 .op-ctx-item:disabled { color: var(--text-dim, #8a93a0); cursor: default; }
 
+/* Capability gating: grey (not hide) a field the active post can't use — layout stays put; tooltip explains. */
+.cap-off { opacity: .4; }
+.cap-off input, .cap-off select, .cap-off button { pointer-events: none; }
+
 /* A wizard re-opened to EDIT an existing op (vs create a new one): pronounced accent glow + soft pulse. */
 .wiz-box.editing {
     border-color: var(--accent, #0ea5e9) !important;

@@ -1566,6 +1566,10 @@
                 initHeaderPost();
             } catch (err) { console.error('header post init failed', err); }
             try {
+                const { initPostGating } = await import('./ui/postGating.js');
+                initPostGating();                 // grey wizard fields the active post can't use (tooltip-only why)
+            } catch (err) { console.error('post gating init failed', err); }
+            try {
                 const { initEditorOpHover } = await import('./ui/editorOpHover.js');
                 initEditorOpHover();
             } catch (err) { console.error('editor op-hover init failed', err); }
