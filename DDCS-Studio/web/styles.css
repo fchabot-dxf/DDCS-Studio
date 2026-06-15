@@ -464,8 +464,45 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .cap-off { opacity: .4; }
 .cap-off input, .cap-off select, .cap-off button { pointer-events: none; }
 
-/* Header macro bar: Save / Open .mjson + the storage-location chip. */
+/* Header project buttons (📂 Open drawer / ⤓ Save modal). */
 .macro-bar { display: flex; gap: 6px; align-items: center; }
+
+/* Project VFS — Open/manage DRAWER (left sidebar, Fusion-style; top set in JS to the header height). */
+.proj-drawer {
+    position: fixed; left: 0; bottom: 0; top: 52px; width: 320px; max-width: 85vw; z-index: 1500;
+    display: flex; flex-direction: column;
+    background: var(--panel, #1d2530); border-right: 1px solid var(--border, rgba(255,255,255,.15));
+    box-shadow: 4px 0 24px rgba(0,0,0,.4);
+}
+.proj-drawer[hidden] { display: none; }
+.proj-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.proj-title { font-weight: 600; }
+.proj-vol { font-weight: 400; font-size: 12px; }
+.proj-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.proj-actions { display: flex; gap: 6px; }
+.proj-crumb { display: flex; align-items: center; gap: 2px; font-size: 13px; flex-wrap: wrap; }
+.proj-crumb-link { background: none; border: none; color: var(--accent, #0ea5e9); cursor: pointer; font: inherit; padding: 2px 4px; }
+.proj-list { flex: 1; overflow: auto; padding: 6px 8px; }
+.proj-row { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid var(--border); }
+.proj-row:last-child { border-bottom: 0; }
+.proj-name { flex: 1; text-align: left; background: none; border: none; color: var(--text-main); cursor: pointer; font: inherit; padding: 4px 6px; border-radius: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proj-name:hover { background: var(--panel2, rgba(255,255,255,.06)); }
+.proj-meta { font-size: 11px; white-space: nowrap; }
+.proj-rowacts { display: flex; gap: 3px; }
+.proj-foot { padding: 7px 14px; border-top: 1px solid var(--border); font-size: 11px; }
+
+/* Project VFS — SAVE modal (centered) with the folder tree picker. */
+.proj-savemodal { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; }
+.proj-savemodal[hidden] { display: none; }
+.proj-savepanel { width: min(440px, 92vw); max-height: 82vh; display: flex; flex-direction: column; background: var(--panel, #1d2530); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 48px rgba(0,0,0,.5); overflow: hidden; }
+.proj-savebody { padding: 14px 16px; overflow: auto; }
+.proj-savebody .label { display: block; margin: 0 0 4px; }
+.proj-treehead { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 6px; }
+.proj-tree { border: 1px solid var(--border); border-radius: 8px; max-height: 220px; overflow: auto; padding: 4px; }
+.proj-tree-row { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--text-main); cursor: pointer; font: inherit; padding: 5px 6px; border-radius: 5px; }
+.proj-tree-row:hover { background: var(--panel2, rgba(255,255,255,.06)); }
+.proj-tree-row.sel { background: var(--accent, #0ea5e9); color: #fff; }
+.proj-savefoot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
 
 /* A wizard re-opened to EDIT an existing op (vs create a new one): pronounced accent glow + soft pulse. */
 .wiz-box.editing {
