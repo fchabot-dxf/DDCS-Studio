@@ -94,6 +94,11 @@
             <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
             <span class="ver">V10.20</span>
         </a>
+        <!-- Project Manager: 📂 Open (drawer) / ⤓ Save (modal). Wired by ui/macroBar.js -->
+        <div class="macro-bar" id="macroBar">
+            <button class="op-btn" id="projOpenBtn" title="Open / manage projects (.mjson)"><span class="op-icon">📂</span><span class="op-label">OPEN</span></button>
+            <button class="op-btn" id="projSaveBtn" title="Save the current program as a project (.mjson)"><span class="op-icon">⤓</span><span class="op-label">SAVE</span></button>
+        </div>
         <!-- App-switcher: STUDIO ↔ GATEWAY ↔ SETTINGS. Wired by ui/gatewayStatus.js -->
         <nav class="hdr-tabs" aria-label="App switcher">
             <button type="button" class="tab active" data-app="studio" onclick="window.showApp && window.showApp('studio')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span><span class="app-tx">STUDIO</span></button>
@@ -107,10 +112,6 @@
             <span id="hdrPostWarn" class="hdr-post-warn" hidden title="">⚠</span>
             <div class="scale-ctl">
                 <button id="scaleBtn" class="op-btn scale-btn" title="Zoom"><span class="op-icon">🔍</span><span class="op-label">AUTO</span></button>
-            </div>
-            <div class="macro-bar" id="macroBar">
-                <button class="op-btn" id="projOpenBtn" title="Open / manage projects (.mjson)"><span class="op-icon">📂</span><span class="op-label">OPEN</span></button>
-                <button class="op-btn" id="projSaveBtn" title="Save the current program as a project (.mjson)"><span class="op-icon">⤓</span><span class="op-label">SAVE</span></button>
             </div>
             <button class="op-btn hidden" id="transferBtn" title="Send the current program to the machine"><span class="op-icon">📡</span><span class="op-label">TRANSFER</span></button>
         </div>
