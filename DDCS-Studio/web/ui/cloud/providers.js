@@ -52,9 +52,16 @@ export function getProvider(id) { return CFG[id] || null; }
 export function providerLabel(id) { return (CFG[id] || {}).label || id; }
 export function providerIcon(id) { return ICONS[id] || ''; }
 
-/** Public OAuth client ID for a provider — from localStorage (the user pastes theirs). Empty until set. */
+// Ship the developer's PUBLIC client IDs here (safe in the browser — no secret) so END USERS just click Connect,
+// nothing to register. The SAME id serves every user (each authorizes it for their OWN cloud). Empty until you
+// register the OAuth apps; a localStorage value overrides (dev / self-host). drive.file is non-sensitive → no
+// Google app-verification needed.
+const DEFAULT_CLIENT_IDS = { google: '', dropbox: '', onedrive: '' };
+
+/** Public OAuth client ID for a provider — localStorage override, else the shipped default. */
 export function clientId(id) {
-    try { return localStorage.getItem('ddcs_clientid_' + id) || ''; } catch (e) { return ''; }
+    try { const v = localStorage.getItem('ddcs_clientid_' + id); if (v) return v; } catch (e) { /* */ }
+    return DEFAULT_CLIENT_IDS[id] || '';
 }
 export function setClientId(id, v) {
     try { v ? localStorage.setItem('ddcs_clientid_' + id, v) : localStorage.removeItem('ddcs_clientid_' + id); } catch (e) { /* */ }

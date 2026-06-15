@@ -23,20 +23,35 @@ export function disconnect() {
     window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
 }
 
-/** Connect a provider (BYO). Needs the provider's PUBLIC client ID (no secret) — prompt for it once if unset. */
+/** Connect a provider (BYO). Uses the shipped public client ID; falls back to a one-time paste if none is set
+ *  (dev/self-host). Google uses GIS (its token model); Dropbox/OneDrive use the PKCE popup. */
 export function connect(provider = 'google') {
     const p = getProvider(provider);
     if (!p) return;
     if (!clientId(provider)) {
         const v = window.prompt(
             `Connect ${p.label} — your OWN account (no server, no secret).\n\n`
-            + `1. Register a PUBLIC / SPA OAuth app for ${p.label}.\n`
-            + `2. Add this redirect URI:\n   ${redirectUri()}\n\n`
-            + `Paste its Client ID:`);
+            + `No client ID is configured. Register a PUBLIC / SPA OAuth app for ${p.label}`
+            + (provider === 'google' ? ' (Authorized JavaScript origin = ' + location.origin + ')' : `, redirect URI:\n   ${redirectUri()}`)
+            + `\n\nPaste its Client ID:`);
         if (!v) return;
         setClientId(provider, v.trim());
     }
-    openConnectModal(provider);
+    if (provider === 'google') { connectGoogleFlow(); return; }   // GIS token model (no PKCE code exchange)
+    openConnectModal(provider);                                   // PKCE popup (Dropbox / OneDrive)
+}
+
+/** Google: GIS token-model sign-in (its own consent popup) → store the access token. */
+async function connectGoogleFlow() {
+    try {
+        const { connectGoogle } = await import('./cloud/googleDrive.js');
+        const tok = await connectGoogle(clientId('google'));
+        localStorage.setItem(TOK, tok);
+        localStorage.setItem(PROV, 'google');
+        window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
+    } catch (e) {
+        if (String(e && e.message) !== 'sign-in cancelled') window.alert('Google sign-in failed: ' + (e && e.message));
+    }
 }
 
 async function openConnectModal(provider) {
