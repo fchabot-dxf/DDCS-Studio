@@ -120,9 +120,10 @@ body {
     color: var(--text);
 }
 /* Never let the PAGE scroll horizontally — the UI zoom (body { zoom }) widens the body's layout box on mobile
-   WebKit. Inner scrollers (editor, dock-header bar, tables) keep their own overflow-x. (No max-width here: it
-   would fight the zoom and under-size the body.) */
-html, body { overflow-x: hidden; }
+   WebKit. Use `clip`, NOT `hidden`: `hidden` turns body into a scroll container (overflow-y becomes auto),
+   which reorders stacking so the absolute .app-shell paints over the header's zoom popover. `clip` just clips,
+   no scroll container, no stacking change. Inner scrollers keep their own overflow-x. */
+html, body { overflow-x: clip; }
 
 /* ============================================
    LAYOUT STRUCTURE (Position & Size Only)

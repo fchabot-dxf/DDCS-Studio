@@ -18,6 +18,16 @@ test('mobile: header controls on-screen, zoom to 50%, wizard preview controls fi
   await page.click('#scaleBtn');
   const min = await page.getAttribute('#scaleSlider', 'min');
   expect(min).toBe('50');
+  // the zoom popover must sit ABOVE the content (regression: overflow-x:hidden made the app-shell cover it)
+  const popCovered = await page.evaluate(() => {
+    const pop = document.getElementById('scale-pop'); if (!pop) return true;
+    const b = pop.getBoundingClientRect();
+    const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height - 4);
+    return !(hit && hit.closest('#scale-pop'));
+  });
+  expect(popCovered, 'zoom popover on top, not behind the dock/wizard bar').toBe(false);
+  // page must never scroll horizontally
+  expect(await page.evaluate(() => document.documentElement.scrollWidth), 'no horizontal page overflow').toBeLessThanOrEqual(391);
   await page.evaluate(() => window.scaleManager.applyScale(50));
   expect(await page.evaluate(() => Math.round(parseFloat(document.body.style.zoom) * 100))).toBe(50);
   await page.evaluate(() => window.scaleManager.applyScale('auto'));   // restore
