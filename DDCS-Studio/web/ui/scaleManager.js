@@ -77,8 +77,12 @@ export class ScaleManager {
     applyBodyZoom(pct) {
         const blk = document.getElementById('blocks-app');
         const blocksVisible = blk && !blk.classList.contains('hidden');
-        document.body.style.zoom = (blocksVisible ? 1 : pct / 100).toString();
+        const z = blocksVisible ? 1 : pct / 100;
+        document.body.style.zoom = z.toString();
         if (blk) blk.style.zoom = '';   // never CSS-zoom the Blockly tab
+        // Publish the active zoom so screen-relative overlays (the wizard modal) can divide by it and still fill
+        // the screen — otherwise body{zoom:0.75} shrinks the modal and leaves big side margins on mobile.
+        document.documentElement.style.setProperty('--ui-zoom', z.toString());
     }
 
     currentPct() {

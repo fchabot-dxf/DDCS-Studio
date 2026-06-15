@@ -119,6 +119,9 @@ body {
     background: var(--bg);
     color: var(--text);
 }
+/* No horizontal PAGE scroll — body{zoom}<1 widens the body's layout box on mobile WebKit. `clip` (not `hidden`)
+   so it doesn't become a scroll container (which would put the zoom popover behind the content). */
+html, body { overflow-x: clip; }
 
 /* ============================================
    LAYOUT STRUCTURE (Position & Size Only)
@@ -1596,10 +1599,10 @@ button.primary:hover {
 .wiz-box {
     /* Responsive, capped-fluid: near-full-width on mobile, comfortable cap on desktop.
        Two-pane wizards widen further (see .wiz-box.two-pane). */
-    width: min(96vw, 560px);
-    max-width: 96vw;
+    width: calc(min(96vw, 560px) / var(--ui-zoom, 1));   /* ÷ zoom so the modal fills the screen even at body{zoom}<1 */
+    max-width: calc(96vw / var(--ui-zoom, 1));
     max-height: 95vh;           /* fallback for older browsers */
-    max-height: 95dvh;          /* dynamic viewport-aware height (Chrome mobile fix) */
+    max-height: calc(95dvh / var(--ui-zoom, 1));   /* dynamic viewport-aware height, zoom-compensated */
     margin-bottom: env(safe-area-inset-bottom);
     
     padding: 0 !important;      /* CRITICAL: No padding so header touches edges */
@@ -1624,8 +1627,8 @@ button.primary:hover {
    Collapses to a single column on mobile.
    ============================================ */
 .wiz-box.two-pane {
-    width: min(97vw, 1180px);
-    height: min(90dvh, 860px);   /* definite height so the right pane (3D) can span it */
+    width: calc(min(97vw, 1180px) / var(--ui-zoom, 1));
+    height: calc(min(90dvh, 860px) / var(--ui-zoom, 1));   /* definite height so the right pane (3D) can span it */
 }
 .two-pane .wiz-body { overflow: hidden; padding-bottom: 0; }
 .wiz-2pane { display: flex; gap: 14px; height: 100%; min-height: 0; align-items: stretch; }
@@ -1656,7 +1659,7 @@ button.primary:hover {
        0 and the position:absolute canvas (no in-flow height) overflows onto the form. Fix: size every
        visual element to its content (flex:0 0 auto) with a definite viz height, and let normal block
        flow stack visual-then-form. */
-    .wiz-box.two-pane { width: min(96vw, 560px); height: auto; }
+    .wiz-box.two-pane { width: calc(min(96vw, 560px) / var(--ui-zoom, 1)); height: auto; }
     .two-pane .wiz-body { overflow-y: auto; }
     .wiz-2pane { flex-direction: column; height: auto; }
     .wiz-2pane > .wiz-controls { order: 2; flex: 0 0 auto; overflow: visible; width: 100%; padding: 0; }
@@ -1904,7 +1907,7 @@ button.primary:hover {
    ============================================ */
 @media (max-width: 1024px) {
     .wiz-box {
-        width: calc(100% - 24px);
+        width: calc((100% - 24px) / var(--ui-zoom, 1));
     }
 
     .sidebar {
