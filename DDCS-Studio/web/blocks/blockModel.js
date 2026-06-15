@@ -18,7 +18,7 @@
  * correctness, not motion safety (lint comes next — see MULTI-OP-STACKING.md).
  */
 import { BLOCKS, evalExpr, depthLevels } from '../wizards/ops/index.js';
-import { getDialect, DEFAULT_DIALECT } from '../wizards/dialects/index.js';
+import { getDialect, DEFAULT_DIALECT, getCaps } from '../wizards/dialects/index.js';
 import { num, r3 } from '../wizards/ops/util.js';
 
 let _seq = 0;
@@ -71,6 +71,24 @@ function resolveParams(params, scope) {
 function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dialect = DEFAULT_DIALECT) {
     const def = BLOCKS[block.type];
     const own = [...anc, block.id];            // this block's full ancestry (drives the line→source map)
+
+    // OP CONTAINER (a recorded op: { opType, label, requires, params, children }). Caps-gated: on a post whose
+    // capabilities can't run the op (e.g. a probe/ATC macro on grbl — no #vars) emit ONE marker comment and keep
+    // the op in the stack (switch to a capable post → it re-emits in full). On a capable post it's transparent —
+    // the children emit exactly as before, so capable-post output is unchanged.
+    if (block.type === 'op') {
+        const caps = getCaps(dialect.id);
+        const has = (r) => (r === 'flow' ? caps.flow !== 'none' : caps[r] !== false);
+        const unmet = (block.requires || []).filter((r) => !has(r));
+        if (unmet.length) {
+            const label = block.label || block.opType || 'op';
+            return [tag(`( ${label} - not emitted on ${dialect.name}: needs ${unmet.join(' + ')}; op kept, switch post to emit )`, own)];
+        }
+        const out = [];
+        (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
+        return out;
+    }
+
     if (!def) return [tag(`( unknown block ${block.type} )`, own)];
 
     if (def.kind === 'var') {                  // SET: bind a variable in the current scope

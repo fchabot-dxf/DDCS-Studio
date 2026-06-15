@@ -4,6 +4,40 @@ Running list of things noticed mid-work that we deliberately deferred. Newest on
 
 ---
 
+## Op-containers — keep the op record, gate the emit per post (IN PROGRESS)
+*Started 2026-06-15. Status: emit core DONE; wiring is the focused next build.*
+
+Goal (user): switching post should "replace the code with its caps" — a loaded op re-emits in full on a
+capable post, or as a single marker comment on a post that can't run it (e.g. a probe/ATC macro on grbl —
+no #vars), with the op ALWAYS kept in the stack. Plus: the op-container carries `opType`+`params`, so it
+becomes the home for OP-FORM EDITING (select an op → seed its wizard form from `params` → re-run builder →
+swap children) and REPLACES the geometry-reverse RECONCILERS.
+
+Op-container shape: `{ id, type:'op', opType, label, requires:['vars'|'flow'…], params, children }`.
+
+DONE: `blocks/blockModel.js` emit handles `type:'op'` — caps-gated via `getCaps(dialect.id)`: unmet requires →
+one marker comment `( <label> - not emitted on <post>: needs … )`; else transparent (emit children, so
+capable-post output is UNCHANGED — zero regression). Verified: corner op → full on DDCS, marker on grbl;
+drill op (requires []) → transparent everywhere.
+
+TODO (the careful, regression-sensitive part):
+1. Accumulation: `opStacks.commitActiveOp` wraps each op's bare blocks in an op-container (derive `requires`
+   by scanning for #var/flow atoms: assign/probe/proberead/readmachine/setworkoffset/tooloffset/machinemove
+   = 'vars'; ifgoto/goto/label = 'flow'; cutting ops → []). Store `op.params` for editing.
+2. **Blockly round-trip** (the hard part): `blockly/bridge.js` + `stackBridge.js` only know `BLOCKS[type]` —
+   need a real Blockly `op` GROUP block (children + opType/label fields) that round-trips, else opening/editing
+   the Blocks tab drops op-containers (children lost, params lost, gating lost). Until then op-containers are
+   unsafe to put in the live program stack.
+3. Reconcile/find: `opStacks` `find()` + `reconcileActiveOp` must look INSIDE op-containers (and ideally read
+   `params` directly instead of un-deriving from geometry).
+4. Op-form editing: select an op (its container) → open its wizard seeded from `params` → rebuild → replace
+   the container's children. Then the geometry-reverse RECONCILERS can retire.
+5. **Glow accent border on the wizard modal when RE-RUNNING/editing an op from the editor** (vs creating a new
+   op) — a `.wiz-box.editing` class with an accent glow, set when the wizard opens in edit-existing-op mode.
+
+Interim safety net already shipped: the post-selector capability LINT (⚠ #hdrPostWarn, ui/headerPost.js) warns
+when a loaded program uses caps the active post lacks, so you don't silently get non-runnable G-code today.
+
 ## Queued UI/product tasks (2026-06-14, batched while porting probes)
 *Status: TODO, not started.*
 
