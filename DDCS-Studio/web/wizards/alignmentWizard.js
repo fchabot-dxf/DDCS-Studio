@@ -108,7 +108,7 @@ export function alignmentStack(params = {}) {
     A('#1510', '#52', 'Delta: fence wander in probe axis');
     A('#1511', '#53', 'Span: absolute distance along check axis');
     A('#1512', '#54', 'Angle: misalignment in degrees');
-    MSG('Drift=%.3fmm Span=%.1fmm Angle=%.3fdeg');   // hmiToast on Expert; a comment on V4.1/DM500
+    MSG('Drift=#1510mm Span=#1511mm Angle=#1512deg');   // #vars (DDCS substitutes them); printf %.3f isn't — hmiToast on Expert, comment on V4.1/DM500
 
     // ── Footer + error handler ──
     GO(2);
