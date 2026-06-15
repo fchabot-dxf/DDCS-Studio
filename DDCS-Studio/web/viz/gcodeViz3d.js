@@ -311,15 +311,16 @@ export class GcodeViz3D {
         }
     }
 
-    // Trail mode: while playing, fade the full route (the type-grouped lines) and reveal the bold "executed"
-    // overlay up to the tool head — so you can read where you are in the program. Restores on stop.
+    // Trail mode: while playing, keep the full route (the type-grouped lines) visible but faint — a thin 50%
+    // "ghost" of the whole path — and reveal the bold solid "executed" overlay up to the tool head, so you can
+    // read where you are against where you're going. Restores the original opacity on stop.
     _dimRoute(on) {
         this._trailOn = on;
         for (const k in this.lineGroups) {
             const o = this.lineGroups[k]; if (!o) continue;
             if (on) {
                 if (o.material.__op0 == null) o.material.__op0 = o.material.opacity != null ? o.material.opacity : 1;
-                o.material.transparent = true; o.material.opacity = o.material.__op0 * 0.18;
+                o.material.transparent = true; o.material.opacity = 0.5;   // always-visible faint guide
             } else if (o.material.__op0 != null) {
                 o.material.opacity = o.material.__op0; o.material.transparent = o.material.__op0 < 1;
             }
@@ -622,7 +623,7 @@ export class GcodeViz3D {
             const g = new THREE.BufferGeometry();
             g.setAttribute('position', new THREE.Float32BufferAttribute(tp, 3));
             g.setDrawRange(0, 0);
-            const mat = new THREE.LineBasicMaterial({ color: 0xffd24a }); mat.depthTest = false;
+            const mat = new THREE.LineBasicMaterial({ color: 0xffe14d, linewidth: 3 }); mat.depthTest = false;   // bold solid amber (linewidth best-effort; ANGLE caps at 1px)
             const line = new THREE.LineSegments(g, mat); line.renderOrder = 22; line.visible = false;
             this.pathGroup.add(line);
             this._trailLine = line;

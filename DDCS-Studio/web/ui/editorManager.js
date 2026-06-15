@@ -156,6 +156,10 @@ export class EditorManager {
 
     clearCode() {
         this.editor.value = '';
+        // The editor is just a VIEW of the block-program model (blocks/programModel.js). Blanking the text alone
+        // leaves the accumulated ops in the model, which then (a) re-projects on blur and (b) gets appended to by
+        // the next Insert — the "clear keeps it in cache" bug. Wipe the model too so Clear actually clears.
+        if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack([]);
         this.editor.dispatchEvent(new Event('input'));
     }
 

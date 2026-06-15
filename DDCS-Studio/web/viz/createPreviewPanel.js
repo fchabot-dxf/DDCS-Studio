@@ -30,7 +30,9 @@ const previewPrefs = () => (window.ddcsGetSettings && window.ddcsGetSettings().p
 
 // Custom transport icons (currentColor → inherit the button's text colour), in place of emoji.
 const ICON_PLAY = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" style="vertical-align:middle" aria-hidden="true"><path d="M4.5 3 12.5 8 4.5 13Z"/></svg>';
-const ICON_PAUSE = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" style="vertical-align:middle" aria-hidden="true"><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/></svg>';
+// Stop = a square. While playing, the run button STOPS + RESETS (tool/trail cleared, next play restarts from the
+// top) — so it shows a stop glyph, not a pause glyph that would imply resume-in-place.
+const ICON_STOP = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" style="vertical-align:middle" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/></svg>';
 const ICON_STEP = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" style="vertical-align:middle" aria-hidden="true"><path d="M3.5 3 10 8 3.5 13Z"/><rect x="11" y="3" width="2.4" height="10" rx="1"/></svg>';
 const ICON_COPY = '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" style="vertical-align:middle" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>';
 // Jog = 4-direction arrow keys (X/Y/Z step movement).
@@ -50,7 +52,7 @@ const PANEL_HTML = `
     <button class="pp-mtoggle viz3d-2dtoggle" type="button" title="Toggle 2D / 3D view">3D</button>
     <button class="pp-stock" type="button" title="Stock — set the workpiece (dimensions, shape, show, templates)" aria-label="Stock">📦</button>
     <button class="pp-speed" type="button" title="Simulation speed — tap to cycle 1× 2× 5× 10×" aria-label="Simulation speed">1×</button>
-    <button class="pp-run" type="button" title="Run / pause the program in execution order">${ICON_PLAY}</button>
+    <button class="pp-run" type="button" title="Run the program · while running, click to stop and reset to the start">${ICON_PLAY}</button>
     <button class="pp-step" type="button" title="Execute one line at a time (pauses a running program)">${ICON_STEP}</button>
     <button class="pp-loop" type="button" title="Loop: restart the program when it completes" aria-label="Loop">${ICON_LOOP}</button>
     <button class="pp-follow" type="button" title="Follow-cam — keep the tool centred while playing (Settings → Preview to set damping)" aria-label="Follow cam" style="display:none">${ICON_FOLLOW}</button>
@@ -136,7 +138,7 @@ export function createPreviewPanel(container, opts = {}) {
         const b = q('.pp-run'); if (!b) return;
         const running = !!(engine && engine.running), paused = !!(engine && engine.paused);
         b.classList.toggle('on', running && !paused);
-        b.innerHTML = (running && !paused) ? ICON_PAUSE : ICON_PLAY;
+        b.innerHTML = (running && !paused) ? ICON_STOP : ICON_PLAY;
     }
 
     // Render the static route in the active view from the fed G-code (engine.trace resolves #vars/loops/probes).
