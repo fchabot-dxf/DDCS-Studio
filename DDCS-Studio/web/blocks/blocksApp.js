@@ -99,9 +99,12 @@ async function buildWorkspace() {
   // THE shared preview panel — identical to Studio main + the wizards (same code + UI); fed the projected program.
   const panel = createPreviewPanel(document.getElementById('blk-preview-panel'), { getGcode: () => getProjection().text });
 
+  // Grid lines follow the theme's border tone (best-effort: the grid colour is an inject option, so it's set
+  // once here; the rest of the chrome re-skins live via setTheme below).
+  const gridColour = (() => { try { return getComputedStyle(document.body).getPropertyValue('--border').trim() || '#1b2733'; } catch (_) { return '#1b2733'; } })();
   const ws = B.inject(host, {
     toolbox: buildToolbox(), theme: ddcsTheme(B), renderer: 'geras',
-    grid: { spacing: 26, length: 2, colour: '#1b2733', snap: true },
+    grid: { spacing: 26, length: 2, colour: gridColour, snap: true },
     zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { smoothScroll: true },
   });
 
@@ -190,6 +193,13 @@ async function buildWorkspace() {
   // (2D/3D toggle, Play/Step/Loop, stock, trail — all owned by the shared preview panel now.)
 
   window.addEventListener('resize', () => { if (!root.classList.contains('hidden')) { B.svgResize(ws); renderViews(getProjection()); } });
+
+  // Re-skin the Blockly chrome (canvas / toolbox / flyout / glow) when the app theme switches. applyTheme()
+  // just sets body[data-theme] with no event, so observe the attribute (same pattern as commandDeck).
+  try {
+    new MutationObserver(() => { try { ws.setTheme(ddcsTheme(B)); } catch (_) { /* */ } })
+      .observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+  } catch (_) { /* */ }
 
   // ---- mobile drawers (CSS-gated ≤860px; harmless no-ops on desktop) ----
   // Canvas fills the tab; Preview = bottom drawer (G-code behind its toggle), palette = left drawer over canvas.

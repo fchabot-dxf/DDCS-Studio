@@ -1,18 +1,32 @@
 /**
- * blocks/blockly/theme.js — the DDCS Blockly theme: our --cat signature colours + dark "screen" chrome,
- * on top of the Classic base. Paired with the `geras` renderer at inject time (classic/engineering look,
- * per the renderer decision). One block-style per category so a block's colour = its category, matching
- * the hand-rolled tab. Requires window.Blockly (the vendored UMD) to be loaded first.
+ * blocks/blockly/theme.js — the DDCS Blockly theme. BLOCK colours stay semantic (one --cat signature colour
+ * per category, so a block's colour = its category, matching the hand-rolled tab). The CHROME (canvas, toolbox,
+ * flyout, scrollbar, grid, glow) follows the ACTIVE APP THEME — it reads the live CSS tokens off <body> so the
+ * Blockly canvas matches whatever theme is selected (studio / normal / steampunk / futuristic / organic).
+ * Paired with the `geras` renderer (classic/engineering look). Requires window.Blockly (the vendored UMD).
+ *
+ * One theme object per app-theme, cached (Blockly's registry rejects re-defining the same name). blocksApp
+ * rebuilds + ws.setTheme() on the data-theme mutation, so switching theme re-skins the canvas live.
  */
 const CAT = {
   shapes: '#3b82f6', move: '#14b8a6', machine: '#64748b', ops: '#22c55e',
   modify: '#a855f7', control: '#f59e0b', math: '#84cc16', variables: '#06b6d4', markup: '#94a3b8',
 };
 
+/** Read a CSS custom property off <body> (where data-theme lives), with a fallback. */
+function tok(name, fallback) {
+  try { const v = getComputedStyle(document.body).getPropertyValue(name).trim(); return v || fallback; } catch (_) { return fallback; }
+}
+
+const cache = {};
+
 export function ddcsTheme(Blockly) {
+  const app = (document.body && document.body.getAttribute('data-theme')) || 'default';
+  if (cache[app]) return cache[app];
+
   const blockStyles = {};
   for (const k in CAT) blockStyles[k + '_style'] = { colourPrimary: CAT[k] };
-  // native Blockly blocks (logic/loops/math/variables) → map onto our category colours
+  // native Blockly blocks (logic/loops/math/variables/text) → map onto our category colours
   Object.assign(blockStyles, {
     logic_blocks: { colourPrimary: CAT.control }, loop_blocks: { colourPrimary: CAT.control },
     math_blocks: { colourPrimary: CAT.math }, variable_blocks: { colourPrimary: CAT.variables },
@@ -20,16 +34,26 @@ export function ddcsTheme(Blockly) {
   });
   const categoryStyles = {};
   for (const k in CAT) categoryStyles[k + '_cat'] = { colour: CAT[k] };
-  return Blockly.Theme.defineTheme('ddcs', {
+
+  const accent = tok('--accent', '#2dd4bf');
+  const theme = Blockly.Theme.defineTheme('ddcs-' + app, {
     base: Blockly.Themes.Classic,
     blockStyles, categoryStyles,
+    // CHROME follows the app theme (fallbacks = the original dark scheme for themeless contexts):
     componentStyles: {
-      workspaceBackgroundColour: '#0d1117', toolboxBackgroundColour: '#161d28',
-      toolboxForegroundColour: '#cbd5e1', flyoutBackgroundColour: '#11171f',
-      flyoutForegroundColour: '#8b97a6', flyoutOpacity: 1, scrollbarColour: '#39465a',
-      insertionMarkerColour: '#2dd4bf', insertionMarkerOpacity: 0.5,
-      cursorColour: '#2dd4bf', selectedGlowColour: '#2dd4bf',
+      workspaceBackgroundColour: tok('--bg', '#0d1117'),
+      toolboxBackgroundColour: tok('--panel', '#161d28'),
+      toolboxForegroundColour: tok('--text', '#cbd5e1'),
+      flyoutBackgroundColour: tok('--bg', '#11171f'),
+      flyoutForegroundColour: tok('--text-dim', '#8b97a6'),
+      flyoutOpacity: 1,
+      scrollbarColour: tok('--border', '#39465a'),
+      insertionMarkerColour: accent, insertionMarkerOpacity: 0.4,
+      markerColour: accent, cursorColour: accent,
+      selectedGlowColour: accent, selectedGlowOpacity: 0.6,
     },
     fontStyle: { family: 'ui-sans-serif, system-ui, Segoe UI, sans-serif', size: 11 },
   });
+  cache[app] = theme;
+  return theme;
 }
