@@ -7,6 +7,8 @@
  * params are the single source of truth; ddcsEditOp seeds the wizard from them and replaceOp rebuilds the op.
  * The editor text is transparent over the #editor-highlight overlay, so the .op-hover class shows behind it.
  */
+import { showOpMenu, hideOpMenu } from './opContextMenu.js';
+
 export function initEditorOpHover() {
     const editor = document.getElementById('editor');
     const overlay = document.getElementById('editor-highlight');
@@ -50,33 +52,14 @@ export function initEditorOpHover() {
     chip.addEventListener('click', () => { const id = chip.dataset.opId; hide(); if (id && window.ddcsEditOp) window.ddcsEditOp(id); });
     editor.addEventListener('scroll', () => { if (!chip.hidden) hide(); });   // avoid drift; re-hover to show again
 
-    // Right-click an op → context menu: Edit / Duplicate / Delete.
-    const menu = document.createElement('div');
-    menu.id = 'op-ctx-menu'; menu.className = 'op-ctx-menu'; menu.hidden = true;
-    document.body.appendChild(menu);
-    const hideMenu = () => { menu.hidden = true; };
-    const item = (label, fn, disabled) => {
-        const b = document.createElement('button');
-        b.type = 'button'; b.className = 'op-ctx-item'; b.textContent = label; b.disabled = !!disabled;
-        b.addEventListener('click', () => { hideMenu(); fn(); });
-        menu.appendChild(b);
-    };
+    // Right-click an op → shared context menu (✎ Edit / ⧉ Duplicate / 🗑 Delete).
     editor.addEventListener('contextmenu', (e) => {
         if (typeof window.ddcsOpAtLine !== 'function') return;
         const op = window.ddcsOpAtLine(lineAtY(e.clientY));
         if (!op) return;                                   // not over an op → leave the native menu
         e.preventDefault();
         hide();                                            // drop the hover chip while the menu is up
-        menu.innerHTML = '';
-        const editable = !window.ddcsCanEditOp || window.ddcsCanEditOp(op.opType);
-        item(`✎ Edit ${op.label || op.opType}`, () => window.ddcsEditOp && window.ddcsEditOp(op.id), !editable);
-        item('⧉ Duplicate', async () => { try { (await import('../blocks/opStacks.js')).duplicateOp(op.id); } catch (_) { /* */ } });
-        item('🗑 Delete', async () => { try { (await import('../blocks/opStacks.js')).deleteOp(op.id); } catch (_) { /* */ } });
-        menu.style.left = Math.round(e.clientX) + 'px';
-        menu.style.top = Math.round(e.clientY) + 'px';
-        menu.hidden = false;
+        showOpMenu(op, e.clientX, e.clientY);
     });
-    document.addEventListener('mousedown', (e) => { if (!menu.hidden && !menu.contains(e.target)) hideMenu(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideMenu(); });
-    window.addEventListener('ddcs:stop-previews', hideMenu);
+    editor.addEventListener('scroll', hideOpMenu);
 }
