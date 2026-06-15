@@ -18,6 +18,7 @@ export const dialect = {
     programModel: 'streamed', probeModel: 'g38', dwellUnits: 's',
     g53NeedsVar: false,   // grbl G53 takes a literal coord directly (no #var staging — grbl has no #vars)
     vars: { dro: null, probeStatus: null, probeTrig: null, wcsBase: null, wcsStride: null, activeWcs: null, toolTable: null, ax: AX },
+    caps: { vars: false, flow: 'none', probeStatusCheck: false, hmi: false, toolTable: false, probePort: false },   // streamed; host owns the logic
 
     probeMove: (axis, dist, { feed = 100 } = {}) => [`G38.2 ${axis}${dist} F${feed}`],   // result pushed as [PRB:…] over serial
     probeStatus: () => [],          // [] — no in-program status var (host reads [PRB:…:1/0])

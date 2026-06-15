@@ -11,6 +11,7 @@ export const dialect = {
     id: 'ddcs-expert-m350', name: 'DDCS Expert M350',
     programModel: 'inline', probeModel: 'g31', dwellUnits: 'ms',
     vars: { dro: 880, probeStatus: 1920, probeTrig: 1925, wcsBase: 805, wcsStride: 5, activeWcs: 578, toolTable: 1430, ax: AX },
+    caps: { vars: true, flow: 'goto', probeStatusCheck: true, hmi: true, toolTable: true, probePort: true },   // the fullest profile
 
     // G31 Z-10 F100 P3 L0 Q1   (snippets.nc:9 · words.nc:6 "G31 Z#7 F#3 P#5 L0 Q1")
     probeMove: (axis, dist, { feed = 100, port = 3, level = 0 } = {}) => [`G31 ${axis}${dist} F${feed} P${port} L${level} Q1`],

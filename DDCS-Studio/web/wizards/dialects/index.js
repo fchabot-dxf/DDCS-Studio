@@ -29,6 +29,24 @@ export function getDialect(profileId) {
     return DIALECTS[profileId] || DEFAULT_DIALECT;
 }
 
+// ── Controller CAPABILITIES (not just G-code forms) ───────────────────────────────────────────────────────
+// "Dialect" is more than per-line text: controllers differ in what they can DO, which drives how wizards
+// COMPOSE a program and which form fields/wizards make sense. Each dialect module declares its own `caps`
+// (alongside its emit forms); the flags are queried at build/UI time. Fields:
+//   vars             in-program #variables + expressions
+//   flow             in-program control flow: 'goto' (IF/GOTO+N labels) | 'oword' (o<n> if/while) | 'none' (host)
+//   probeStatusCheck the macro must test a probe-status var after each probe (else the probe ALARMS on no-contact)
+//   hmi              in-program blocking operator prompts (dialogs)
+//   toolTable        in-program tool-table offset writes
+//   probePort        the probe move takes a port/level word (G31 P/L) — false for G38.2 / move-until-input
+// Defaults = the DDCS Expert profile (the fullest); a dialect's own `caps` overrides what it lacks.
+const DEFAULT_CAPS = { vars: true, flow: 'goto', probeStatusCheck: true, hmi: true, toolTable: true, probePort: true };
+
+/** Capability flags for a post id (the dialect's own `caps`, merged over the Expert-full defaults). */
+export function getCaps(id) { return { ...DEFAULT_CAPS, ...((DIALECTS[id] && DIALECTS[id].caps) || {}) }; }
+/** Capabilities of the post that's actually active (explicit override, else the machine profile). */
+export function resolveActiveCaps(profileId) { return getCaps(resolveActivePost(profileId).id); }
+
 // ── Post processor selection ────────────────────────────────────────────────
 // A "post processor" IS a dialect, surfaced as a user-facing, live codegen target.
 // The active machine PROFILE picks a default post; the user can override it here so the
