@@ -1,10 +1,8 @@
 /**
- * viz/jogPendant.js — the bottom action bar of the 3D preview: a Stock launcher
+ * viz/jogPendant.js — the bottom action bar of the 3D preview: a jog-drawer toggle
  * + virtual-I/O toggle in the header, over the step-jog buttons for the draggable
- * start marker. Extracted from GcodeViz3D.
+ * start marker. (Stock lives in the preview controls' 📦 button.) Extracted from GcodeViz3D.
  */
-import { toggleStockEditor } from '../ui/stockEditor.js';
-
 export function setupJogPendant(viz) {
         const div = document.createElement('div');
         div.className = 'viz3d-jog-pendant';
@@ -38,7 +36,6 @@ export function setupJogPendant(viz) {
             </div>
             <div class="jog-bar" style="display: flex; align-items: center; gap: 6px; padding: 5px 6px; background: rgba(18,18,22,0.92); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;">
                 <button id="jogToggle" title="Show/hide the jog buttons">✛ Jog</button>
-                <button id="jogStockBtn" title="Stock setup — shape, size, templates (updates the 3D view live)">Stock</button>
                 <span id="jogPlayControls" style="display: flex; align-items: center; gap: 6px;"></span>
                 <button id="jogIOBtn" title="Show/hide the virtual I/O panel (sensors and outputs)">I/O</button>
             </div>
@@ -49,8 +46,6 @@ export function setupJogPendant(viz) {
         // Prevent touches on the jog panel from rotating the view
         div.addEventListener('pointerdown', e => e.stopPropagation());
         
-        const stockBtn = div.querySelector('#jogStockBtn');
-        if (stockBtn) stockBtn.addEventListener('click', () => toggleStockEditor(stockBtn));
         const ioBtn = div.querySelector('#jogIOBtn');
         if (ioBtn) ioBtn.addEventListener('click', () => { if (window.ioPanel) window.ioPanel.toggle(); });
 

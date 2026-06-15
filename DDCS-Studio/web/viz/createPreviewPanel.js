@@ -32,10 +32,7 @@ const PANEL_HTML = `
   <div class="pp-status viz3d-status"></div>
   <button class="pp-copy viz3d-status-copy" type="button" title="Copy status to clipboard">📋 Copy</button>
   <div class="viz3d-controls">
-    <span class="viz3d-2dtoggle" style="display:flex;gap:4px">
-      <button class="pp-m2d" type="button" title="2D top-down toolpath">2D</button>
-      <button class="pp-m3d primary" type="button" title="3D toolpath">3D</button>
-    </span>
+    <button class="pp-mtoggle viz3d-2dtoggle" type="button" title="Toggle 2D / 3D view">3D</button>
     <button class="pp-stock" type="button" title="Stock — set the workpiece (dimensions, shape, show, templates)" aria-label="Stock">📦</button>
     <select class="pp-speed" title="Simulation speed — 1× plays at the programmed feedrates" aria-label="Simulation speed">
       <option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option>
@@ -64,19 +61,6 @@ export function createPreviewPanel(container, opts = {}) {
     const cv2d = q('.pp-2d');
     const statusEl = q('.pp-status');
     const t2 = createToolpath2d(cv2d);
-
-    // Auto-hide the controls + legend + hint to free the canvas (saves space without losing functions): reveal on
-    // any pointer activity (hover on desktop, tap on mobile), then fade after a short idle. Hidden controls are
-    // pointer-events:none so canvas orbit still works; first reveal on mount makes them discoverable.
-    let chromeTimer = null;
-    const showChrome = () => {
-        container.classList.add('controls-shown');
-        clearTimeout(chromeTimer);
-        chromeTimer = setTimeout(() => container.classList.remove('controls-shown'), 2600);
-    };
-    container.addEventListener('pointermove', showChrome);
-    container.addEventListener('pointerdown', showChrome);
-    showChrome();
 
     let viz = null;            // GcodeViz3D (lazy — only when 3D is shown and WebGL is available)
     let mode = '3d', active = false, segs = [], fitted = false;
@@ -163,9 +147,8 @@ export function createPreviewPanel(container, opts = {}) {
     function setMode(next) {
         mode = next;
         stopPlay();
-        const m2 = q('.pp-m2d'), m3 = q('.pp-m3d');
-        if (m2) m2.classList.toggle('primary', mode === '2d');
-        if (m3) m3.classList.toggle('primary', mode === '3d');
+        const mt = q('.pp-mtoggle');
+        if (mt) mt.textContent = mode === '2d' ? '2D' : '3D';   // single toggle: label = current view
         if (cv2d) cv2d.style.display = mode === '2d' ? '' : 'none';
         // The 3D renderer canvas is z-index 2 (above the 2D canvas), so 2D must HIDE it, not just show the 2D
         // canvas underneath — otherwise the toggle looks dead (3D still covering it).
@@ -206,8 +189,7 @@ export function createPreviewPanel(container, opts = {}) {
     q('.pp-stock').addEventListener('click', (e) => toggleStockEditor(e.currentTarget));
 
     // ---- play / view controls ----
-    q('.pp-m2d').addEventListener('click', () => setMode('2d'));
-    q('.pp-m3d').addEventListener('click', () => setMode('3d'));
+    q('.pp-mtoggle').addEventListener('click', () => setMode(mode === '2d' ? '3d' : '2d'));
     q('.pp-run').addEventListener('click', () => {
         const eng = ensureEngine();
         if (eng.running && !eng.paused) stopPlay();
