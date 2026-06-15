@@ -1,11 +1,11 @@
 /**
  * Scale Manager - application-wide zoom.
  * One header button (🔍 AUTO (x%) / x%) that opens a small popover under it: a continuous
- * slider (75–250%) + an AUTO button (fit-to-viewport, recomputed on resize). Persists.
+ * slider (50–250%) + an AUTO button (fit-to-viewport, recomputed on resize). Persists.
  */
 
 // data-scale buckets — styles.css keys overflow/wizard guards off these exact values.
-const BUCKETS = [75, 100, 125, 150, 175, 200, 250];
+const BUCKETS = [50, 75, 100, 125, 150, 175, 200, 250];
 
 export class ScaleManager {
     constructor() {
@@ -28,7 +28,7 @@ export class ScaleManager {
         if (!saved) return;
         if (saved === 'auto') { this.scale = 'auto'; return; }
         const num = parseInt(saved, 10);
-        if (!isNaN(num)) this.scale = Math.max(75, Math.min(250, num));
+        if (!isNaN(num)) this.scale = Math.max(50, Math.min(250, num));
     }
 
     saveScale() {
@@ -45,7 +45,7 @@ export class ScaleManager {
             const vw = window.innerWidth;
             const vh = window.innerHeight - 54;            // subtract header height
             const ratio = Math.min(vw / 1280, vh / 800);
-            const pct = Math.max(75, Math.min(250, Math.round(ratio * 100)));
+            const pct = Math.max(50, Math.min(250, Math.round(ratio * 100)));
             this.scale = 'auto';
             this.lastAutoPct = pct;
             document.body.setAttribute('data-scale', 'auto');
@@ -55,7 +55,7 @@ export class ScaleManager {
             window.dispatchEvent(new CustomEvent('scaleChanged', { detail: { scale: 'auto', value: pct } }));
             return;
         }
-        const n = Math.max(75, Math.min(250, parseInt(scale, 10)));
+        const n = Math.max(50, Math.min(250, parseInt(scale, 10)));
         if (isNaN(n)) return;
         this.scale = n;
         // exact zoom inline; data-scale snapped to the nearest bucket so the CSS guards still apply
@@ -109,7 +109,7 @@ export class ScaleManager {
         pop.className = 'scale-pop';
         pop.innerHTML =
             '<div class="sp-row">' +
-            '<input type="range" id="scaleSlider" min="75" max="250" step="5">' +
+            '<input type="range" id="scaleSlider" min="50" max="250" step="5">' +
             '<span id="scaleVal" class="scale-val"></span>' +
             '</div>' +
             '<button type="button" id="scaleAutoBtn" class="op-btn">🔍 AUTO — fit to window</button>';

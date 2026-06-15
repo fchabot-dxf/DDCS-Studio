@@ -3371,6 +3371,12 @@ body[data-scale="250"] {
     max-width: 64%;
     background: rgba(0, 0, 0, 0.62); padding: 4px 6px; border-radius: 8px;  /* float over the canvas */
 }
+/* Mobile: the preview pane is narrow (wizard stacks at 860px), so 64% crams the controls into overlapping
+   rows. Let the bar span the pane width and centre-wrap into clean rows; tighter pills. */
+@media (max-width: 860px) {
+    .viz3d-controls { left: 8px; right: 8px; max-width: calc(100% - 16px); justify-content: center; gap: 4px; padding: 3px 5px; }
+    .viz3d-controls select, .viz3d-controls button { font-size: 10px; padding: 2px 6px; }
+}
 .viz3d-controls label { font-size: 10px; color: #9fc4e6; display: flex; align-items: center; gap: 4px; }
 .viz3d-controls select,
 .viz3d-controls button,
@@ -3542,6 +3548,14 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 @media (max-width: 520px) {
     .app-header .brand { padding: 0 8px; gap: 6px; }
     .app-header .logo { height: 26px; }
+}
+/* The post-processor dropdown (200px) is the header's widest item — shrink it once the header collapses
+   (and further on phones) so the zoom / transfer controls stay on-screen instead of being clipped. */
+.app-header.is-mini .hdr-post { max-width: 120px; }
+@media (max-width: 600px) {
+    .hdr-post { max-width: 104px; font-size: 11px; padding: 4px 6px; }
+    .app-header.is-mini .hdr-tabs .tab { padding: 0 8px; }
+    .hdr-controls { gap: 6px; }
 }
 
 /* ===== Portrait / mobile: 3D drawer pulls UP from the bottom of the editor ===== */
