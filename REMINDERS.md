@@ -115,6 +115,23 @@ so keeping relay is free. To build:
    backend (Drive API). NEEDS the user's Google OAuth client ID/secret (register an app in Google Cloud Console).
 3. Project Manager ☁ Cloud volume UI: provider picker + "Connect Google Drive".
 
+UPDATE 2026-06-15: **R2 + the Worker are FROZEN — no further dev; leave as-is.** So BYO does NOT route through the
+Worker. Use browser-direct **PKCE** OAuth (public client, NO secret): the browser logs into Google/Dropbox/OneDrive
+itself, the token returns to the browser, which reads/writes the user's OWN cloud directly — no server. Relay
+(R2+Worker) stays as the frozen optional fallback. To do: rewire `cloudAccount.connect()` from "call the Worker
+`/api/oauth`" to PKCE-with-the-provider (each needs a public client ID + a redirect URI; Dropbox/OneDrive PKCE is
+clean, Google needs care / Identity Services). The cloud UI (multi-provider login, modal+popup, Local/Cloud tabs)
+stays as built. `CLOUD_OAUTH_BASE` / the Worker-OAuth scaffold idea is dropped for BYO.
+
+CLOUD STORAGE BACKEND (next slice, `ui/cloud/*`): per-provider list/read/write/delete of `.mjson` under an APP
+FOLDER. **Track the folder by its provider FILE ID (stable across move/rename) — NOT by name/path** — so moving
+or renaming it in the user's Drive does NOT create a duplicate (the app follows the ID). On connect/init: stored
+ID → use it; else SEARCH the app's own files (drive.file scope sees only what the app created) for the folder by
+name → re-adopt if found, else create at root. "Decide where the folder lives" = the user moves it anywhere in
+their Drive (followed by ID); plus an optional "Choose folder" action (paste a folder link/ID, or the Google
+Picker) to re-point. Token (PKCE) is in localStorage (`ddcs_cloud_token`/`_refresh`); refresh on 401. Dropbox =
+App-folder scope; OneDrive = app folder via Graph. Then wire the drawer's ☁ Cloud tab to browse this volume.
+
 STILL OPEN: dual local+cloud at once for the GATEWAY control channel (separate from project storage) — recommended
 "Auto local+cloud" (both URLs, prefer local, fall back to cloud).
 - **Multi-tool merge** → implement the Merge stub.
