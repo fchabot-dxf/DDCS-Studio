@@ -50,15 +50,16 @@ import { probeReadBlock, probeCheckBlock, readMachineBlock, toolOffsetBlock } fr
 import { setWorkOffsetBlock } from './setworkoffset.js';
 import { assignBlock } from './assign.js';
 import { pauseBlock, messageBlock, askNumberBlock, confirmBlock } from './hmi.js';
+import { pathModeBlock, drillCycleBlock, cancelCycleBlock, outPinBlock, waitInputBlock } from './cnc.js';
 import { evalExpr } from './expr.js';
 
 /** Palette: granular atoms (Move, Machine) + feature presets (Ops) + modifiers + control/variables/markup. */
 export const PALETTE = [
     regionBlock,                                               // Shapes (boundary → fills/walls via a region socket)
     moveBlock, arcBlock, probeBlock, machineMoveBlock,         // Move (+ G53 machine-coord move)
-    spindleBlock, feedBlock, dwellBlock, coolantBlock, toolBlock, wcsBlock, distModeBlock,   // Machine (modal state)
-    progStartBlock, progEndBlock, endProgramBlock, mcodeBlock, rawBlock, probeReadBlock, readMachineBlock, toolOffsetBlock, setWorkOffsetBlock,   // Machine (program start/end framing, end, raw M-code/G-code, probe/DRO capture, tool-table write, WCS write)
-    lineBlock, slotBlock, boreBlock, drillBlock, wallBlock,  // Ops (feature presets + wall finish)
+    spindleBlock, feedBlock, dwellBlock, coolantBlock, toolBlock, wcsBlock, distModeBlock, pathModeBlock,   // Machine (modal state; pathMode = G64/G61)
+    progStartBlock, progEndBlock, endProgramBlock, mcodeBlock, rawBlock, probeReadBlock, readMachineBlock, toolOffsetBlock, setWorkOffsetBlock, outPinBlock, waitInputBlock,   // Machine (framing, end, raw, probe/DRO capture, tool-table/WCS write, digital I/O M62-66)
+    lineBlock, slotBlock, boreBlock, drillBlock, wallBlock, drillCycleBlock, cancelCycleBlock,  // Ops (feature presets + wall finish + native canned cycles G81-85/G80)
     arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, stepdownBlock,    // Modify (stamp/sweep + lateral fills [zigzag/concentric/text] + depth pass wrappers)
     countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, pauseBlock, confirmBlock, askNumberBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + pause/confirm-gate/operator-input)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
