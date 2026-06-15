@@ -6,18 +6,19 @@
  * (desktop app) or the CLOUD Worker (R2-backed) — set ?api=… to point at the cloud; the views don't change.
  * Only mounted when a gateway answers (gatewayStatus.js gates the tab), and only polls while visible.
  *
- * Layout (Studio workflow): Status · Send · Tracking · Files · Jobs · Console.
+ * Layout (Studio workflow): Status · Send · Merge · Tracking · Files · Jobs · Console.
  */
 import { makeClient, deriveStatus } from '../shared/js/client.js';
 import { el, clear } from './gateway/util.js';
 import statusView from './gateway/views/status.js';
 import sendView from './gateway/views/send.js';
+import mergeView from './gateway/views/merge.js';
 import trackerView from './gateway/views/tracker.js';
 import filesView from './gateway/views/files.js';
 import jobsView from './gateway/views/jobs.js';
 import consoleView from './gateway/views/admin.js';
 
-const VIEWS = [statusView, sendView, trackerView, filesView, jobsView, consoleView];
+const VIEWS = [statusView, sendView, mergeView, trackerView, filesView, jobsView, consoleView];
 const POLL_MS = 1500;
 
 let inited = false;
