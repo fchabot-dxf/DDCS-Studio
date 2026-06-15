@@ -20,18 +20,21 @@ one marker comment `( <label> - not emitted on <post>: needs … )`; else transp
 capable-post output is UNCHANGED — zero regression). Verified: corner op → full on DDCS, marker on grbl;
 drill op (requires []) → transparent everywhere.
 
-TODO (the careful, regression-sensitive part):
-1. Accumulation: `opStacks.commitActiveOp` wraps each op's bare blocks in an op-container (derive `requires`
-   by scanning for #var/flow atoms: assign/probe/proberead/readmachine/setworkoffset/tooloffset/machinemove
-   = 'vars'; ifgoto/goto/label = 'flow'; cutting ops → []). Store `op.params` for editing.
-2. **Blockly round-trip** (the hard part): `blockly/bridge.js` + `stackBridge.js` only know `BLOCKS[type]` —
-   need a real Blockly `op` GROUP block (children + opType/label fields) that round-trips, else opening/editing
-   the Blocks tab drops op-containers (children lost, params lost, gating lost). Until then op-containers are
-   unsafe to put in the live program stack.
-3. Reconcile/find: `opStacks` `find()` + `reconcileActiveOp` must look INSIDE op-containers (and ideally read
-   `params` directly instead of un-deriving from geometry).
+DONE (commits b874cb3, 2a6d4c1):
+1. ✅ Accumulation: `opStacks.commitActiveOp` + `buildActiveOpStack` wrap each op in an op-container; `requires`
+   derived (assign/probe/proberead/readmachine/setworkoffset/tooloffset/machinemove → 'vars'; ifgoto/goto/label
+   → 'flow'; cutting → []). `params` stored. `find()` recurses into containers so reconcilers still work.
+2. ✅ Blockly round-trip: `bridge.js` defines an `op` GROUP block (LABEL field + DO mouth); `stackBridge.js`
+   round-trips opType/requires/params via the block's serialized `data` + LABEL + DO children (no flatten).
+   field_label_serializable confirmed in the vendored Blockly. ⚠ STILL NEEDS IN-BROWSER VERIFICATION (Blockly is
+   browser-only; Node verified emit/accumulate/reconcile but not the actual Blocks-tab render/round-trip).
+3. ✅ Reconcile: recursive `find()` locates inner blocks through containers (verified: 11 fields). Reading
+   `params` DIRECTLY from the container (to retire the geometry-reverse RECONCILERS) is still TODO.
+
+TODO:
 4. Op-form editing: select an op (its container) → open its wizard seeded from `params` → rebuild → replace
-   the container's children. Then the geometry-reverse RECONCILERS can retire.
+   the container's children. Then the geometry-reverse RECONCILERS can retire. ("if we need to unbuild thats how
+   it is" — un-build the op to atoms, edit params, re-build; no shortcut.)
 5. **Glow accent border on the wizard modal when RE-RUNNING/editing an op from the editor** (vs creating a new
    op) — a `.wiz-box.editing` class with an accent glow, set when the wizard opens in edit-existing-op mode.
 
