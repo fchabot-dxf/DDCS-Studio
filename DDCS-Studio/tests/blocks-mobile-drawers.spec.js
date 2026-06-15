@@ -57,6 +57,15 @@ test('mobile: palette collapses (canvas reclaims width), preview + palette drawe
   expect(opened.toolsOpen).toBeTruthy();
   expect(opened.toolboxWidth, 'palette visible → width > 0').toBeGreaterThan(0);
 
+  // close handle should sit near the TOP (the user's bug: it was vertically centred → floating mid-canvas)
+  await page.screenshot({ path: 'tests/_blocks-mobile-open.png' });
+  const handleBox = await page.evaluate(() => {
+    const r = document.getElementById('blkToolsHandle').getBoundingClientRect();
+    return { left: r.left, top: r.top, vw: window.innerWidth };
+  });
+  expect(handleBox.top, 'handle parks near the top, not vertically centred').toBeLessThan(80);
+  expect(handleBox.left, 'handle not pushed off the right edge').toBeLessThan(handleBox.vw * 0.7);
+
   // close palette drawer → collapses again
   await page.click('#blkToolsHandle');
   await page.waitForTimeout(300);

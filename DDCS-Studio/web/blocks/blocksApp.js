@@ -224,12 +224,14 @@ async function buildWorkspace() {
     const setToolsOpen = (on) => {
       const tb = tbx(); if (!tb) return;
       try { tb.setVisible(on); } catch (_) { /* */ }
-      if (on) { let w = 0; try { w = Math.round(tb.getWidth()); } catch (_) { /* */ }
-                if (!w) { const t = host.querySelector('.blocklyToolboxDiv'); if (t) w = Math.round(t.getBoundingClientRect().width); }
-                if (w) root.style.setProperty('--blk-tbx-w', w + 'px'); }
-      else { try { tb.clearSelection(); } catch (_) { /* collapse any open flyout */ } }
+      if (on) {                                          // measure the now-visible toolbox so the close tab parks at its edge
+        const t = host.querySelector('.blocklyToolboxDiv');
+        let w = t ? Math.round(t.getBoundingClientRect().width) : 0;   // DOM rect is reliable right after display:block
+        if (!w) { try { w = Math.round(tb.getWidth()); } catch (_) { /* */ } }
+        if (w) root.style.setProperty('--blk-tbx-w', w + 'px');
+      } else { try { tb.clearSelection(); } catch (_) { /* collapse any open flyout */ } }
       root.classList.toggle('tools-open', on);
-      toolsHandle && toolsHandle.setAttribute('aria-expanded', String(on));
+      if (toolsHandle) { toolsHandle.setAttribute('aria-expanded', String(on)); toolsHandle.textContent = on ? '✕' : 'Blocks'; }
       try { B.svgResize(ws); } catch (_) { /* recompute metrics: canvas grows/shrinks by the toolbox width */ }
     };
     toolsHandle && toolsHandle.addEventListener('click', () => setToolsOpen(!root.classList.contains('tools-open')));
@@ -239,7 +241,7 @@ async function buildWorkspace() {
     const applyBreakpoint = (mobile) => {
       const tb = tbx(); if (!tb) return;
       root.classList.remove('tools-open');
-      toolsHandle && toolsHandle.setAttribute('aria-expanded', 'false');
+      if (toolsHandle) { toolsHandle.setAttribute('aria-expanded', 'false'); toolsHandle.textContent = 'Blocks'; }
       try { tb.clearSelection(); } catch (_) { /* */ }
       try { tb.setVisible(!mobile); } catch (_) { /* mobile → collapsed (canvas full); desktop → shown */ }
       try { B.svgResize(ws); } catch (_) { /* */ }

@@ -3848,5 +3848,9 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
         font:700 11px/1 inherit; letter-spacing:.08em; color:var(--screen-ink); background:var(--screen);
         border:1px solid var(--line); border-left:none; border-radius:0 10px 10px 0; box-shadow:4px 0 14px #0007;
     }
-    #blocks-app.tools-open .blk-tools-handle { transform:translateY(-50%) translateX(var(--blk-tbx-w, 220px)); }
+    /* open: park as a close tab at the palette's top-right CORNER, below the header (never floating mid-canvas) */
+    #blocks-app.tools-open .blk-tools-handle {
+        top:calc(54px + env(safe-area-inset-top)); transform:translateX(var(--blk-tbx-w, 200px));
+        padding:12px 9px; border-radius:0 10px 10px 0;
+    }
 }
