@@ -56,7 +56,12 @@ export function providerIcon(id) { return ICONS[id] || ''; }
 // nothing to register. The SAME id serves every user (each authorizes it for their OWN cloud). Empty until you
 // register the OAuth apps; a localStorage value overrides (dev / self-host). drive.file is non-sensitive → no
 // Google app-verification needed.
-const DEFAULT_CLIENT_IDS = { google: '', dropbox: '', onedrive: '' };
+const DEFAULT_CLIENT_IDS = {
+    // PUBLIC OAuth client IDs (safe in the browser — no secret). drive.file SPA client; secret stays out of git.
+    google: '895572525139-mapt84pm4lfudmjfq553k6pm4m2o0e77.apps.googleusercontent.com',
+    dropbox: '',
+    onedrive: '',
+};
 
 /** Public OAuth client ID for a provider — localStorage override, else the shipped default. */
 export function clientId(id) {
