@@ -14,6 +14,13 @@ UX:
   `.blk-ws`.
 - **Setup-UI port dropdown** (exe): pick the port in Settings → Network / Console, writing config `"port"`
   (choices limited to PORTS 8765-8769). Backend already honors it (`fairy_gateway._preferred_port`).
+- **EXE update-check (EXE ONLY)**: the downloaded exe goes stale; the web build auto-deploys on CF (a reload is
+  enough there → web excluded, and it shouldn't poll GitHub). Plan: (1) bake the app version into the exe at build
+  (`build_fairy.ps1` stamps a `version` constant / bundled `version.txt`); (2) on launch (or via Gateway tab) query
+  GitHub Releases `api.github.com/repos/fchabot-dxf/DDCS-Studio/releases/latest`, compare `tag_name` to the baked
+  version; (3) if newer → notify in the Studio UI (banner/toast) with a Download link to the release asset + the
+  "last commit comments" (release body, or recent `…/commits` messages). Gate behind a desktop flag
+  (`window.ddcsDesktop` / served-by-gateway) so the web build never runs it.
 
 Cloud:
 - **Drive folder picker**: let the user choose WHERE the app folder lives (Google **Picker API** — `drive.file`
