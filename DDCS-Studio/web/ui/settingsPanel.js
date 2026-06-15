@@ -15,6 +15,7 @@ import { makeClient } from '../shared/js/client.js';
 import { renderIoTable, renderMagazineTable } from './ioTable.js';
 import { THEMES } from './themes.js';
 import { generateToolChangeNc } from '../data/atcGenerator.js';
+import { renderCloudLogin } from './cloudAccount.js';
 
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 
@@ -371,10 +372,15 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
-                <!-- GENERAL: NETWORK (stub) -->
+                <!-- GENERAL: NETWORK (cloud account + machine network) -->
                 <div id="set_tab_network" style="display:none">
                     <div class="settings-section">
-                        <div class="settings-section-title">NETWORK</div>
+                        <div class="settings-section-title">CLOUD ACCOUNT</div>
+                        <div class="settings-hint">Connect a cloud account to sync projects and (later) send/receive machine data off-network. Projects stay local until you connect; the gateway relay (no account) stays available too.</div>
+                        <div id="set_cloud_mount" style="margin-top:8px"></div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">MACHINE NETWORK</div>
                         <div class="settings-hint">Coming soon — controller connection (IP / port), live DRO, and program upload over the network.</div>
                     </div>
                 </div>
@@ -641,6 +647,8 @@ function buildSettingsOverlay() {
 function wireSettingsOverlay(ov) {
     const q = (id) => ov.querySelector('#' + id);
     const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
+
+    renderCloudLogin(q('set_cloud_mount'));   // cloud account login (Network tab) — shared with the Project Manager drawer
 
     function updateVarCount() {
         const db = window.ddcsStudio && window.ddcsStudio.variableDB;

@@ -8,12 +8,14 @@
  */
 import { serializeProject, loadProject, downloadMacro, openMacroText } from '../../blocks/macroFile.js';
 import * as store from './projectStore.js';
+import { renderCloudLogin } from '../cloudAccount.js';
 
 const sanitize = (s) => (String(s || '').trim().replace(/[^A-Za-z0-9 _.-]+/g, '_').replace(/^\.+/, '') || 'untitled');
 
 // ── OPEN / MANAGE drawer ──────────────────────────────────────────────────────
 let drawer = null, listEl = null, crumbEl = null, footEl = null, importInput = null;
-let cwd = '';
+let localWrap = null, cloudWrap = null, cloudMount = null;
+let cwd = '', vol = 'local';
 
 export function openOpenDrawer() {
     if (!drawer) buildDrawer();
@@ -22,29 +24,50 @@ export function openOpenDrawer() {
         drawer.style.top = (h ? h.offsetHeight : 52) + 'px';
         cwd = '';
         drawer.hidden = false;
-        renderDrawer();
+        switchVol('local');
     } else {
         drawer.hidden = true;
     }
 }
 function closeDrawer() { if (drawer) drawer.hidden = true; }
 
+/** Switch the drawer's volume tab: Local (IndexedDB browse) vs Cloud (account login → future cloud browse). */
+function switchVol(v) {
+    vol = v;
+    if (localWrap) localWrap.style.display = v === 'local' ? '' : 'none';
+    if (cloudWrap) cloudWrap.style.display = v === 'cloud' ? '' : 'none';
+    drawer.querySelectorAll('.proj-voltab').forEach((t) => t.classList.toggle('on', t.dataset.vol === v));
+    if (v === 'local') renderDrawer();
+    else renderCloudLogin(cloudMount);
+}
+
 function buildDrawer() {
     drawer = document.createElement('aside');
     drawer.className = 'proj-drawer';
     drawer.hidden = true;
     drawer.innerHTML =
-        '<div class="proj-head"><span class="proj-title">📂 Projects <span class="proj-vol muted">· Local</span></span>'
+        '<div class="proj-head"><span class="proj-title">📂 Projects</span>'
         + '<button class="op-btn" data-act="close" title="Close">✕</button></div>'
+        + '<div class="proj-voltabs"><button class="proj-voltab on" data-vol="local">💾 Local</button>'
+        + '<button class="proj-voltab" data-vol="cloud">☁ Cloud</button></div>'
+        + '<div id="projLocal">'
         + '<div class="proj-bar"><span class="proj-crumb" id="projCrumb"></span>'
         + '<span class="proj-actions"><button class="op-btn" data-act="mkdir" title="New folder here">+ Folder</button>'
         + '<button class="op-btn" data-act="import" title="Import a .mjson file">Import</button></span></div>'
         + '<div class="proj-list" id="projList"></div>'
-        + '<div class="proj-foot muted" id="projFoot"></div>';
+        + '<div class="proj-foot muted" id="projFoot"></div>'
+        + '</div>'
+        + '<div id="projCloud" style="display:none">'
+        + '<div class="proj-cloudmount" id="projCloudMount"></div>'
+        + '<div class="proj-foot muted">Cloud projects appear here once an account is connected.</div>'
+        + '</div>';
     importInput = document.createElement('input');
     importInput.type = 'file'; importInput.accept = '.mjson,application/json'; importInput.style.display = 'none';
     drawer.appendChild(importInput);
     document.body.appendChild(drawer);
+    localWrap = drawer.querySelector('#projLocal');
+    cloudWrap = drawer.querySelector('#projCloud');
+    cloudMount = drawer.querySelector('#projCloudMount');
     listEl = drawer.querySelector('#projList');
     crumbEl = drawer.querySelector('#projCrumb');
     footEl = drawer.querySelector('#projFoot');
@@ -97,6 +120,8 @@ async function renderDrawer() {
 }
 
 async function onDrawerClick(e) {
+    const vt = e.target.closest('[data-vol]');
+    if (vt) { switchVol(vt.dataset.vol); return; }    // Local / Cloud volume tab
     const t = e.target.closest('[data-act]');
     if (!t) return;
     const act = t.dataset.act, path = t.dataset.path || '';

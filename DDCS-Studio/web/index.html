@@ -1576,8 +1576,12 @@
             } catch (err) { console.error('post gating init failed', err); }
             try {
                 const { initMacroBar } = await import('./ui/macroBar.js');
-                initMacroBar();                   // header Save/Open .mjson macro + storage chip
+                initMacroBar();                   // header 📂 Open / 💾 Save project buttons
             } catch (err) { console.error('macro bar init failed', err); }
+            try {
+                const { captureOAuthReturn } = await import('./ui/cloudAccount.js');
+                captureOAuthReturn();             // capture a cloud OAuth token the Worker redirected back with
+            } catch (err) { console.error('cloud account init failed', err); }
             try {
                 const { initEditorOpHover } = await import('./ui/editorOpHover.js');
                 initEditorOpHover();

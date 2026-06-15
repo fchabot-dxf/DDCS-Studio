@@ -506,6 +506,15 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .proj-tree-row.sel { background: var(--accent, #0ea5e9); color: #fff; }
 .proj-savefoot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
 
+/* Project drawer: Local / Cloud volume tabs + the cloud-login mount (also used in Settings → Network). */
+.proj-voltabs { display: flex; gap: 4px; padding: 8px 12px 0; }
+.proj-voltab { flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--text-dim); cursor: pointer; font: 600 12px inherit; }
+.proj-voltab.on { background: var(--panel2, rgba(255,255,255,.06)); color: var(--text-main); border-color: var(--accent, #0ea5e9); }
+.proj-cloudmount { padding: 10px 12px; }
+.cloud-login { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.cloud-status { font-size: 13px; color: var(--text-main); }
+.cloud-status.muted { color: var(--text-dim); }
+
 /* A wizard re-opened to EDIT an existing op (vs create a new one): pronounced accent glow + soft pulse. */
 .wiz-box.editing {
     border-color: var(--accent, #0ea5e9) !important;
