@@ -382,6 +382,10 @@ def self_test():
     good = ops.set_config({"dest": r"\\10.0.0.50\cncdisk", "machine_name": "Bench"})
     check(good.get("ok") and cfg2.expert_dest == r"\\10.0.0.50\cncdisk", "set_config accepts a network share + applies live")
     check(json.load(open(cfg2.config_path, encoding="utf-8")).get("machine_name") == "Bench", "set_config persists to config_path")
+    pset = ops.set_config({"port": 8767})
+    check(pset.get("ok") and pset.get("restart_needed") and cfg2.port == 8767, "set_config accepts a valid serve port (needs restart)")
+    check(json.load(open(cfg2.config_path, encoding="utf-8")).get("port") == 8767, "set_config persists the chosen port")
+    check(ops.set_config({"port": 9999}).get("ok") is False and cfg2.port == 8767, "set_config rejects an out-of-range port")
 
     # --- local HTTP server smoke test ---
     from .server import start_server

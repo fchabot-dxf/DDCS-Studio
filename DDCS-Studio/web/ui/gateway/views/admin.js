@@ -170,6 +170,11 @@ export default {
         ? (lanUrl ? `On your phone/tablet, open ${lanUrl}` : "LAN address unavailable — check after restart.")
         : "Off = this PC only.";
     };
+    // Serve port (desktop exe): which loopback port the app uses — limited to our registered ports so the
+    // OAuth JS-origin list still covers it. Takes effect on the next launch (fairy_gateway._preferred_port).
+    const PORTS = [8765, 8766, 8767, 8768, 8769];
+    const portSel = el("select", {}, PORTS.map((p) => el("option", { value: String(p) }, String(p))));
+    portSel.value = String(cfg.port || 8765);
     const save = el("button", { class: "primary" }, "Save");
     const info = el("div", { class: "hint" });
 
@@ -178,7 +183,7 @@ export default {
       try {
         const r = await ctx.client.setConfig({
           machine_name: name.value, dest: destField.value.trim(), enable_slave: beacons.checked,
-          host: lan.checked ? "0.0.0.0" : "127.0.0.1",
+          host: lan.checked ? "0.0.0.0" : "127.0.0.1", port: parseInt(portSel.value, 10),
         });
         if (!r.ok) { toast(r.error || "save failed", true); info.textContent = r.error || ""; }
         else {
@@ -206,6 +211,9 @@ export default {
       el("label", { class: "row", style: "margin-top:12px;gap:6px;cursor:pointer" },
         lan, "Allow other devices on my network (serve Studio on the LAN)"),
       lanHint,
+      el("div", { style: "margin-top:12px" },
+        el("span", { class: "label" }, "Serve port (desktop app)"), portSel,
+        el("span", { class: "hint" }, "Loopback port the app serves on (8765-8769). Restart to apply.")),
       el("div", { class: "row", style: "margin-top:14px" }, save), info,
 
       this.profileBlock(prof),

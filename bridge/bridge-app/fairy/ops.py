@@ -432,6 +432,16 @@ class Ops:
         for k in ("enable_slave", "backend", "host"):   # host rebind needs a server restart
             if k in updates and updates[k] is not None and getattr(c, k) != updates[k]:
                 setattr(c, k, updates[k]); restart = True
+        if "port" in updates and updates["port"] is not None:   # serve port: only our registered ports (keeps OAuth JS origins valid)
+            try:
+                p = int(updates["port"])
+            except (TypeError, ValueError):
+                return {"ok": False, "error": "port must be a number"}
+            if p not in (8765, 8766, 8767, 8768, 8769):
+                return {"ok": False, "error": "port must be one of 8765-8769 (keeps the OAuth JS origins valid)"}
+            updates = {**updates, "port": p}             # persist the int
+            if c.port != p:
+                c.port = p; restart = True               # takes effect on next launch (fairy_gateway._preferred_port)
         path = self._config_file()
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
