@@ -151,8 +151,14 @@ export function createPreviewPanel(container, opts = {}) {
         if (m2) m2.classList.toggle('primary', mode === '2d');
         if (m3) m3.classList.toggle('primary', mode === '3d');
         if (cv2d) cv2d.style.display = mode === '2d' ? '' : 'none';
-        if (mode === '2d') { if (viz) viz.setActive(false); }
-        else { const v = ensureViz(); if (v) v.setActive(true); }
+        // The 3D renderer canvas is z-index 2 (above the 2D canvas), so 2D must HIDE it, not just show the 2D
+        // canvas underneath — otherwise the toggle looks dead (3D still covering it).
+        if (mode === '2d') {
+            if (viz) { viz.setActive(false); if (viz.renderer) viz.renderer.domElement.style.display = 'none'; }
+        } else {
+            const v = ensureViz();
+            if (v) { if (v.renderer) v.renderer.domElement.style.display = ''; v.setActive(true); }
+        }
         if (active) setGcode();
     }
 
