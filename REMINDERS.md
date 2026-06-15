@@ -5,15 +5,25 @@ Running list of things noticed mid-work that we deliberately deferred. Newest on
 ---
 
 ## Project system — save macros durably (2026-06-15)
-*Status: TODO.*
+*Status: TODO. Filetype DECIDED; picker location DECIDED.*
 
 A "project" system to save generated macros/programs DURABLY (today the program is ephemeral — editor +
 localStorage). Save the high-level STACK (ops + params — the single source of truth, so it re-posts to any
-dialect and round-trips blocks↔editor), NOT just the emitted text. Needs: named projects, save / load / list /
-rename / delete, persistence (localStorage first; later sync to the gateway / cloud storage — ties to
-[[gateway-cloud-architecture]] BYO-storage). Consider: a project holds one or more macros/ops + metadata (name,
-date, target post/profile, stock); exports `.nc` on demand. The op-container program (programModel stack) is the
-thing to serialize. Pairs with the Gateway Send/Merge tabs (load a saved macro → send / merge).
+dialect and round-trips blocks↔editor), NOT just the emitted text.
+
+**FILE FORMAT (decided 2026-06-15): `.macro` — a branded extension, JSON inside.** Content = the op-stack +
+params + metadata: `{ kind:"ddcs.project"|"ddcs.macro", v, name, post, profile, stock, stack:[…op-containers…] }`.
+Lossless, editable, re-postable to any dialect, round-trips blocks↔editor. Serialize the programModel stack
+(`window.ddcsGetBlockProgram` / `ddcsLoadBlockStack`). Export `.nc` on demand for the controller (terminal/lossy —
+never re-imported as a project).
+
+**STORAGE PICKER — CLOUD + LOCAL, surfaced in the STUDIO and BLOCKS tabs (not just Gateway Console).** A compact
+chip (e.g. "☁/💾 Local ▾") + Save / Open, reusing the `service.js` seam: LOCAL = browser/desktop/gateway disk;
+CLOUD = R2 / OAuth'd Drive when a service is connected (ties to [[gateway-cloud-architecture]] BYO-storage).
+
+Needs: named projects/macros, save / load / list / rename / delete. Pairs with the Gateway Send/Merge tabs (load
+a saved `.macro` → send / merge). First slice can be local-only (`.macro` download/open + the Studio/Blocks chip);
+cloud save/load follows the storage backend.
 
 ## Audit LinuxCNC (rs274ngc) for features our EXISTING wizards don't surface (2026-06-15)
 *Status: TODO. Scope: EXISTING wizards only — no new wizard categories.*
