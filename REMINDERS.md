@@ -4,6 +4,38 @@ Running list of things noticed mid-work that we deliberately deferred. Newest on
 
 ---
 
+## Session follow-ups — new task list (2026-06-15)
+*Open work surfaced late in the session.*
+
+UX:
+- **Mobile Blocks tab** (IN PROGRESS): on mobile the Projected-G-code + Preview panels cover the Blockly canvas.
+  Target: Blockly canvas FULL + **Preview as a bottom drawer** (toggle) + G-code hidden/elsewhere. Responsive
+  `@media` on `#blocks-app` (currently `grid 1fr/380px`; `.right` = `.pv` 320px + `.gcode`). Bottom-sheet over
+  `.blk-ws`.
+- **Setup-UI port dropdown** (exe): pick the port in Settings → Network / Console, writing config `"port"`
+  (choices limited to PORTS 8765-8769). Backend already honors it (`fairy_gateway._preferred_port`).
+
+Cloud:
+- **Drive folder picker**: let the user choose WHERE the app folder lives (Google **Picker API** — `drive.file`
+  only sees app-created files, so the Picker grants access to a chosen existing folder). Today it auto-creates
+  "DDCS Studio" at Drive root (movable, tracked by id).
+- **Dropbox + OneDrive adapters** (`cloudVolume.getAdapter` stubbed for them; PKCE login built; Google done).
+- **Exe OAuth**: GIS-in-WebView2 likely blocked (`disallowed_useragent`) → register a **Desktop** OAuth client +
+  **system-browser loopback** in `fairy_gateway.py`. (Web confirmed working on desktop + iOS after propagation.)
+- **iOS GIS**: works now; consider redirect-mode for mobile-popup robustness (LOW).
+
+Atom-stack logic audit (2026-06-15) — HIGH already fixed (middle two-axis WCS swap; atan two-operand `atan[a]/[b]`
+across DDCS/LinuxCNC). Remaining:
+- **MED** — footer PARK branch emits two `#…=…` assignments on ONE line (`cuttingBlocks.js` / `ops/program.js`
+  footer, park=true path) → split into two lines.
+- **MED** — snippet-op ACCUMULATION: concatenating two probe/ATC snippets gives duplicate `N1`/`N2` labels + a
+  mid-program `M30` (strands the 2nd op; a GOTO can hit the wrong `N`). Renumber labels / strip interior `M30` on
+  accumulate (`opStacks.appendIntoProgram`). See [[decode-is-standby]].
+- **LOW** — alignment `MSG('Drift=%.3f…')` printf specifiers aren't substituted by hmiToast → shows literal
+  `%.3f`. Embed `#vars` like the other wizards.
+- **verify-on-hardware** — DDCS `atan[a]/[b]` acceptance (required on LinuxCNC per interp_read.cc; DDCS Fanuc-style
+  assumed, no dump example).
+
 ## Desktop exe: port fallback + cloud-OAuth JS origins (2026-06-15)
 *Status: fallback DONE in `fairy_gateway.py` (needs a rebuild to ship in the exe); Setup-UI port dropdown = follow-up.*
 
