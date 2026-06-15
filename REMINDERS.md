@@ -4,6 +4,70 @@ Running list of things noticed mid-work that we deliberately deferred. Newest on
 
 ---
 
+## Audit LinuxCNC (rs274ngc) for features our EXISTING wizards don't surface (2026-06-15)
+*Status: TODO. Scope: EXISTING wizards only — no new wizard categories.*
+
+Go through LinuxCNC / rs274ngc capabilities and find ones our current wizards COULD expose but don't — limited
+to features that map onto EXISTING wizards (probe, wcs, drill, pocket, slot, surfacing, text, circular, rotary,
+alignment, ATC), not new wizard types. Candidates to check: probe variants (G38.2/.3/.4/.5 — toward/away,
+error/no-error), G10 L2/L20 WCS set, G64 path-blend tolerance, canned drill cycles (G81/82/83/85), G41/42 cutter
+comp, o-word sub/loop flow (ties to #1 oword), tool-length G43/G43.1, polar/rotary helpers. Source:
+`bridge/controllers/linuxcnc/assets/linuxcnc-src/` (+ docs). For each: does it improve an existing wizard's
+output on the rs274ngc post, and is it worth a field/option? Output = a short "add X to wizard Y" list.
+
+## Gateway tab + cloud/service architecture (2026-06-15)
+*Status: Gateway tab DONE; cloud direction decided in principle; OAuth + dual-client awaiting a user decision.*
+
+Built the in-Studio GATEWAY tab (face of the bridge) — Studio-workflow sub-tabs **Status · Send · Merge ·
+Tracking · Files · Jobs · Console** (`ui/gatewayPanel.js` + `ui/gateway/views/*`, ported from the fairy console
+"for functions, adapted to our style"). Merge = a STUB (multi-tool job merge — combine single-tool programs into
+one job w/ tool changes). The tab now ALWAYS opens (was chicken-and-egg: gated behind a download popover +
+auto-kicked when no gateway answered, yet the Service picker that *connects* one lives inside it); uses the
+normal `.tab` style (the LED is the only cue). Retired duplicate views (submit→send, queue+history→jobs).
+
+Optional SERVICE flow (`ui/gateway/service.js` + a picker in the Console tab): local-first / autonomous by
+default; optionally point at a service URL+token (sets `ddcs_api`/`ddcs_token` that makeClient reads); one-click
+"use local gateway" (`http://127.0.0.1:8765`).
+
+DECISIONS (memory [[gateway-cloud-architecture]]): goal = USER AUTONOMY, replace the dev's Worker (keep it now as
+ONE optional service). Local-first prevents no function (local is the MORE capable mode; only remote needs a
+service). The hosted page CAN use a local gateway like the exe — same-PC via `http://127.0.0.1` (mixed-content
+exempt; the gateway already sends CORS); LAN-IP / remote need HTTPS or a tunnel. Local+cloud already coexist at
+the DAEMON level (the R2 relay).
+
+OPEN (need a user decision before building):
+- **OAuth for cloud storage** → lives in the WORKER (`functions/api/`); provider backends (gdrive/dropbox) behind
+  `bridge/bridge-app/fairy/backend/`. Pending: RELAY (cloud holds files) vs **BYO-storage** (user's Drive = the
+  bucket; recommended). Then stub `/api/oauth/google/{start,callback}` + a `gdrive` backend + a "Connect cloud
+  storage" row in Console.
+- **Dual local+cloud at once** → pending; recommended "Auto local+cloud" (configure both URLs, prefer local for
+  control, fall back to cloud, LED shows the active one). Today the UI is single-target.
+- **Multi-tool merge** → implement the Merge stub.
+- End state: two deployables (Studio desktop = UI + embedded gateway; Cloudflare = cloud `/api` + storage),
+  remove the standalone fairy app.
+
+## Post field-gating: grey, don't hide (#2, 2026-06-15)
+*Status: first slice DONE (probe P/L/Q); ATC-off-grbl next.*
+`ui/postGating.js` GREYS (disable + `.cap-off` opacity — NOT hide, so layout stays put) wizard fields whose
+capability the active post lacks; the explanation is TOOLTIP-ONLY (set on the field, original title stashed/
+restored). `probePort` gates the G31 P/L/Q fields (`*_port/_level/_q`, `circ/rc/rcl _q`). Next: `toolTable` to
+gate ATC fields on grbl. Runs at init + on `ddcs:settings-changed`. Memory [[post-field-gating]].
+
+## Op-form editing — DONE (2026-06-15), supersedes the rollout TODO in the op-containers section below
+Editor-only (user: "don't edit form from block"). Hover an op in the editor → highlight + ✎ chip; right-click →
+context menu Edit/Duplicate/Delete (shared `ui/opContextMenu.js`). A central `PARAM_FIELDS` map in
+`wizardManager.js` seeds the form from `op.params` (single source of truth — "a snapshot is inference") for ALL
+ops (drill has a custom `setForm` for pattern variants; `atc_length` is Settings-driven → not editable). Insert
+rebuilds in place (`opStacks.replaceOp`, keeps id); `duplicateOp`/`deleteOp` back the menu. Pulsing accent glow
+while editing an existing op. (The "view.setForm rollout" TODO further down is now COMPLETE.)
+
+## #5 native V4.1/DM500 datum path — DEFERRED (2026-06-15)
+The probe stacks hardcode the Expert WCS-register-write flow (`#578` active-WCS, `[805+[#72*5]]` base, read
+trigger `#1925`, write `#[#70+off]`). V4.1/DM500 use a STRUCTURALLY different model (`G90 G92 <axis> <value>` =
+declare a WORK coord at the probed point; Expert stores a MACHINE coord) — so it's NOT a mechanical atom-swap;
+needs a `setdatum` macro-atom each dialect expands natively. User: "hardcoded WCS is fine for now" + "needs
+[hardware] testing." The dialects already expose `proberead`/`setworkoffset`/`readActiveWcs` atoms for when done.
+
 ## Op-containers — keep the op record, gate the emit per post (IN PROGRESS)
 *Started 2026-06-15. Status: emit core DONE; wiring is the focused next build.*
 
