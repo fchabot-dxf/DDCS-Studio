@@ -33,10 +33,16 @@ IDEA / EXPLORE:
   8765-8769 or `window.pywebview`); reads the baked version from the header `.ver` chip (already bundled by
   build_fairy via `--add-data DDCS-Studio/web`), polls `releases/latest`, and on a newer tag shows a dismissible
   bottom banner with Download (the `.exe` asset) + recent commit subjects. Web build never runs it.
-  ⚠️ CONVENTION: tag the GitHub release with the SAME version that's in the `.ver` chip at exe-build time
-  (`bump-version.cjs` sets the chip) — else the baked-vs-tag compare is wrong. Open follow-up: pywebview may not
-  open the Download `target=_blank` externally on all setups (uses `window.open` fallback) — if it doesn't, add a
-  gateway endpoint to open the URL in the system browser.
+  ⚠️ CONVENTION: tag the GitHub release with the SAME version as the `.ver` chip — else the baked-vs-tag compare
+  is wrong. Open follow-up: pywebview may not open the Download `target=_blank` externally on all setups (uses
+  `window.open` fallback) — if it doesn't, add a gateway endpoint to open the URL in the system browser.
+- **AUTOMATED RELEASE** (`.github/workflows/desktop-release.yml`): on push to main that touches
+  `DDCS-Studio/web/index.html` (the `.ver` chip), CI on `windows-latest` reads the chip, and if no release
+  `v<chip>` exists yet, builds the exe (`build_fairy.ps1`) and `gh release create v<chip> … --generate-notes`.
+  So the whole "notify users of an update" loop is automatic: bump the chip → push → CI cuts the release → every
+  running exe's update-check sees the new tag. Idempotent (skips if the release exists); also `workflow_dispatch`.
+  Deps installed in CI: pyinstaller pywebview pythonnet pymodbus==3.6.9 pyserial websockets (boto3 excluded in the
+  build). First run may need a dep tweak if pywebview's Windows backend needs more — check the Actions log.
 
 Cloud:
 - **Drive folder picker** — BUILT (`ui/cloud/googlePicker.js` + "📂 Choose folder" in the project Open drawer's
