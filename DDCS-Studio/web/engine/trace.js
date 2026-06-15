@@ -8,6 +8,9 @@
  * parametric macros. Returns { segments, bounds, stats } (same shape parseGcode returned, so it's drop-in).
  *
  *   opts.stock          stock box → probe G31 stops at the surface (else it auto-detects at full travel)
+ *   opts.start          operator start in stock coords → probes test from the real tool position (incremental
+ *                       probe macros otherwise trace from the origin, on the stock face, and the first probe
+ *                       clamps to zero length). The route stays origin-relative; the viz offsets it by the start.
  *   opts.createVarStore seed controller params (#632/#1078/…) so "read from controller" feeds resolve
  */
 import { GcodeExecutionEngine } from './GcodeExecutionEngine.js';
@@ -16,6 +19,7 @@ export function traceToolpath(text, opts = {}) {
     const eng = new GcodeExecutionEngine({
         autoAnswer: true,                 // hands-free: virtual sensors/probes satisfy so loops terminate
         stock: opts.stock || null,
+        stockOffset: opts.start || null,
         createVarStore: opts.createVarStore || null,
     });
     return eng.trace(String(text || ''));

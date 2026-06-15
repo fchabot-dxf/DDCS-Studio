@@ -236,8 +236,11 @@ export class WizardManager {
         // inserts coexist and all show in Blocks — not two framed programs concatenated (M30 mid-file). Ops with
         // no block builder yet (probe/ATC families) fall back to a plain text insert.
         let committed = false;
-        try { committed = (await import('./blocks/opStacks.js')).commitActiveOp(); } catch (e) { console.warn('commit op failed', e); }
-        if (!committed && code) this.editorManager.insert(code);
+        try {
+            const ops = await import('./blocks/opStacks.js');
+            committed = ops.commitActiveOp() || (!!code && ops.commitDecodedCode(code));   // builder op → high-level; else decode the generated code → blocks
+        } catch (e) { console.warn('commit op failed', e); }
+        if (!committed && code) this.editorManager.insert(code);   // last resort (nothing decoded)
 
         if (committed || code) {
             // Carry the start position the user set in this wizard's 3D preview over to the main preview.

@@ -122,7 +122,10 @@ export function createPreviewPanel(container, opts = {}) {
     // Render the static route in the active view from the fed G-code (engine.trace resolves #vars/loops/probes).
     function setGcode(text) {
         const code = text != null ? text : (get('getGcode') || '');
-        let parsed; try { parsed = traceToolpath(code, { stock: stockForViz() }); }
+        // Inferred operator start (wizard preview): probes test from the real tool position so an incremental
+        // probe macro doesn't trace from the origin (on the stock face) and clamp its first probe to zero.
+        const st = get('getStart');
+        let parsed; try { parsed = traceToolpath(code, { stock: stockForViz(), start: st }); }
         catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
         segs = parsed.segments || [];
         if (mode === '2d') t2.setSegments(segs);
@@ -130,8 +133,8 @@ export function createPreviewPanel(container, opts = {}) {
             const v = ensureViz();
             if (v) {
                 v.setActive(true);
-                // Optional inferred start (wizard preview): place the origin marker before setSegments so the path offsets to it.
-                const st = get('getStart'); if (st && v.starts) v.starts[0] = { x: +st.x || 0, y: +st.y || 0, z: +st.z || 0 };
+                // Place the origin marker before setSegments so the (origin-relative) route offsets to it.
+                if (st && v.starts) v.starts[0] = { x: +st.x || 0, y: +st.y || 0, z: +st.z || 0 };
                 v.setSegments(parsed, !fitted); fitted = true;
             }
         }
@@ -163,6 +166,7 @@ export function createPreviewPanel(container, opts = {}) {
         eng.simSpeed = simSpeed();
         eng.autoAnswer = window.ioPanel ? window.ioPanel.isAutoSensors() : true;
         eng.stock = stockForViz();
+        eng._stockOffset = get('getStart') || { x: 0, y: 0, z: 0 };   // probes test from the operator start (see trace.js)
         if (mode === '3d') ensureViz();
         if (viz) viz.setAnimate(false);                 // engine drives the tool/trail, not the geometric sweep
         lastRunCode = get('getGcode') || '';

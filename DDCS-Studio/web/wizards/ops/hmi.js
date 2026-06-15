@@ -9,8 +9,25 @@
  * is never silently dropped. Text is paren-stripped (the host forms wrap it in `(…)`). See [[ddcs-ground-truth-reference]].
  */
 
+import { num } from './util.js';
+
 /** Strip parens from operator text so it can't break the `(…)` the host message/comment forms wrap it in. */
 const clean = (s) => String(s == null ? '' : s).replace(/[()]/g, '').trim();
+
+export const confirmBlock = {
+    type: 'confirm', label: 'Confirm', kind: 'leaf', category: 'Control',
+    defaults: { msg: 'Press Enter to continue', cancel: 2 }, fields: ['msg', 'cancel'],
+    // Operator OK/Cancel gate: the controller's blocking prompt (dialect.hmiPrompt → Expert `#1505=1(msg)`)
+    // PLUS an ESC→cancel jump to <cancel>. PROFILE-AWARE: on controllers with no scripted prompt (V4.1/DM500
+    // hmiPrompt → []) the whole gate folds to nothing, so the macro runs straight through (the operator just
+    // positions the tool and starts the program). One granular block for "confirm or bail".
+    emit: (p, dx, dy, dialect) => {
+        const prompt = dialect.hmiPrompt(clean(p.msg));
+        if (!prompt.length) return [];                       // no scripted HMI on this controller → fold
+        const lbl = Math.max(0, Math.round(num(p.cancel, 2)));
+        return [...prompt, ...dialect.ifGoto('#1505', '==', '0', lbl)];   // ESC sets #1505=0 → bail to <cancel>
+    },
+};
 
 export const pauseBlock = {
     type: 'pause', label: 'Pause', kind: 'leaf', category: 'Control',

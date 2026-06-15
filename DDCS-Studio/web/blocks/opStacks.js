@@ -8,6 +8,10 @@
  */
 import { getLastOp } from './opRecord.js';
 import { num, r3 } from '../wizards/ops/util.js';
+import { parseGcodeToStack } from './gcodeToStack.js';                       // decode a non-builder op's G-code → blocks
+import { resolveActivePost } from '../wizards/dialects/index.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } };
 import { surfacingStack } from '../wizards/surfacingWizard.js';
 import { pocketStack } from '../wizards/pocketWizard.js';
 import { slotStack } from '../wizards/slotWizard.js';
@@ -16,8 +20,10 @@ import { wcsStack } from '../wizards/wcsWizard.js';
 import { edgeStack } from '../wizards/edgeWizard.js';
 import { commStack } from '../wizards/communicationWizard.js';
 import { middleStack } from '../wizards/middleWizard.js';
+import { cornerStack } from '../wizards/cornerWizard.js';
+import { alignmentStack } from '../wizards/alignmentWizard.js';
 
-const BUILDERS = { surfacing: surfacingStack, pocket: pocketStack, slot: slotStack, drill: drillStack, wcs: wcsStack, edge: edgeStack, comm: commStack, middle: middleStack };
+const BUILDERS = { surfacing: surfacingStack, pocket: pocketStack, slot: slotStack, drill: drillStack, wcs: wcsStack, edge: edgeStack, comm: commStack, middle: middleStack, corner: cornerStack, alignment: alignmentStack };
 // (No bare flag — framing is now Program Start/End BLOCKS in the stack; a snippet just omits them.)
 const find = (prog, type) => (prog || []).find((b) => b && b.type === type);
 
@@ -133,23 +139,46 @@ export function buildActiveOpStack() {
  * still text-only) so the caller can fall back to a plain text insert. Goes through the window program hooks
  * (no import cycle): ddcsGetBlockProgram (current stack) + ddcsLoadBlockStack (set it; editor re-projects).
  */
+// Append blocks INTO the one program frame. `framed` (the op's full builder output incl progstart/progend) is the
+// framing source: empty program → use it as-is (a cutting op brings the frame) or the bare snippet (probe/ATC has
+// none); a framed program → slot the bare blocks before progend; a frameless program + a framed op → wrap the lot.
+function appendIntoProgram(bare, framed) {
+    if (!bare || !bare.length) return false;
+    const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+    let next;
+    if (!cur.length) {
+        next = framed || bare;
+    } else {
+        const endIdx = cur.findIndex((b) => b && b.type === 'progend');
+        if (endIdx >= 0) next = [...cur.slice(0, endIdx), ...bare, ...cur.slice(endIdx)];   // slot before Program End
+        else if (framed) {                                            // frameless program + a framed op → wrap everything
+            const start = framed.find((b) => b && b.type === 'progstart'), end = framed.find((b) => b && b.type === 'progend');
+            next = (start && end) ? [start, ...cur, ...bare, end] : [...cur, ...bare];
+        } else next = [...cur, ...bare];                              // both frameless → append
+    }
+    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
+    loadedSig = null;   // the program changed → next Blocks open re-renders it
+    return true;
+}
+
 export function commitActiveOp() {
     const op = getLastOp();
     if (!op || !BUILDERS[op.type]) return false;
     const framed = BUILDERS[op.type](op.params);                       // [progstart, …op…, progend]
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
-    const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
-    let next;
-    if (!cur.length) {
-        next = framed;                                                 // empty program → this op brings the frame
-    } else {
-        const endIdx = cur.findIndex((b) => b && b.type === 'progend');
-        next = endIdx >= 0 ? [...cur.slice(0, endIdx), ...bare, ...cur.slice(endIdx)]   // slot before Program End
-                           : [...cur, ...bare];                        // no frame (leaf/foreign program) → just append
-    }
-    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
-    loadedSig = null;   // the program changed → next Blocks open re-renders it
-    return true;
+    return appendIntoProgram(bare, framed);
+}
+
+/**
+ * For ops with no block builder yet (corner / alignment / ATC / comms): DECODE their generated G-code into blocks
+ * (the active dialect's recognizers turn probe / IF-GOTO / WCS into proper blocks; the rest become leaf/raw) and
+ * accumulate them as a frameless snippet — so they coexist in the program and show in Blocks instead of being
+ * lost. Not parametric like a real builder, but they round-trip and accumulate.
+ */
+export function commitDecodedCode(code) {
+    if (!code || !code.trim()) return false;
+    let bare; try { bare = parseGcodeToStack(code, dialectOpts()); } catch (_) { return false; }
+    return appendIntoProgram(bare, null);
 }
 
 /**

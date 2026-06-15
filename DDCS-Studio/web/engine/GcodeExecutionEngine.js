@@ -15,7 +15,7 @@ import { loadProgram as loadProgramText, stripLine } from './core/program.js';
 import { arcPoints } from './core/arc.js';
 
 export class GcodeExecutionEngine {
-    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
+    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
         this.stepDelay = Number.isFinite(stepDelay) ? stepDelay : 250;
         // Time-true playback: moves take distance/feedrate (rapids at rapidRate),
         // divided by simSpeed (1 = real time). Slow probes crawl, rapids zip.
@@ -34,6 +34,10 @@ export class GcodeExecutionEngine {
         // wait; onWait(null) once it clears — lets the UI pulse the waited sensor.
         this.onWait = onWait;
         this.stock = stock || null;
+        // Operator start in STOCK coords — where the tool is positioned before an (incremental) probe macro
+        // runs. The probe-vs-stock collision test adds this so probes touch the real surface; the recorded
+        // route stays origin-relative (the viz offsets it by the start marker). Default = origin.
+        this._stockOffset = stockOffset || { x: 0, y: 0, z: 0 };
         this.syntaxValidator = typeof syntaxValidator === 'function' ? syntaxValidator : null;
         // Auto-answer: a virtual sensor satisfies any M31/M33 wait after autoAnswerMs,
         // even for pins the truth table doesn't know — so any user's macro completes
@@ -143,6 +147,7 @@ export class GcodeExecutionEngine {
         this.paused = false;
         this._waitPin = null;
         this._move = null;     // in-flight timed move (interpolated at the programmed feedrate)
+        this._probeArmed = false;   // DM500 move-until-input: M101 arms, the next G01 is a probe, M102 disarms
         this._traceSink = null;   // when non-null (trace()), moves snap + push a segment here instead of animating
         this.timer = null;
         this.stats = {
@@ -564,6 +569,12 @@ export class GcodeExecutionEngine {
                 if (wm.P != null) {
                     if (waitForInput(m, wm.P, resolveVirtualPin(wm.P, 'IN'), m === 31)) waiting = true;
                 }
+            } else if (m === 101 || m === 102) {
+                // DM500 move-until-input probe cycle (bridge/controllers/dm500/install/probe.nc): M101 arms
+                // probe-input monitoring, the following G01 feeds until the input triggers (the move stops at
+                // the touch), M102 disarms. The next motion line is treated as a probe so it clamps to the
+                // stock surface like a G31 (DM500 has no G31). No status var on this controller — motion just halts.
+                this._probeArmed = (m === 101);
             }
         }
 
@@ -632,7 +643,7 @@ export class GcodeExecutionEngine {
             return false;
         }
 
-        const isProbe = gcodes.includes(31);
+        const isProbe = gcodes.includes(31) || this._probeArmed;   // G31, or a G01 inside a DM500 M101/M102 cycle
         const effMotion = isProbe ? 1 : this.motion;
 
         if (effMotion === 0 || effMotion === 1) {
@@ -665,20 +676,24 @@ export class GcodeExecutionEngine {
                     boxMax = { x: this.stock.x, y: this.stock.y, z: 0 };
                 }
 
+                // Probe-vs-stock geometry runs in STOCK space: the tool's real position is the operator start
+                // (_stockOffset) + the local pos. The recorded route stays origin-relative (the viz offsets it
+                // by the start marker), so dir is the same in both frames — only the start point shifts.
+                const O = this._stockOffset || { x: 0, y: 0, z: 0 };
                 if (boxMin && boxMax) {
-                    const start = this.pos;
-                    const dir = { x: target.x - start.x, y: target.y - start.y, z: target.z - start.z };
+                    const aStart = { x: O.x + this.pos.x, y: O.y + this.pos.y, z: O.z + this.pos.z };
+                    const dir = { x: target.x - this.pos.x, y: target.y - this.pos.y, z: target.z - this.pos.z };
                     let tmin = 0.0;
                     let tmax = 1.0;
                     let hit = true;
 
                     for (const axis of ['x', 'y', 'z']) {
                         if (Math.abs(dir[axis]) < 1e-8) {
-                            if (start[axis] < boxMin[axis] || start[axis] > boxMax[axis]) hit = false;
+                            if (aStart[axis] < boxMin[axis] || aStart[axis] > boxMax[axis]) hit = false;
                         } else {
                             const invD = 1.0 / dir[axis];
-                            let t0 = (boxMin[axis] - start[axis]) * invD;
-                            let t1 = (boxMax[axis] - start[axis]) * invD;
+                            let t0 = (boxMin[axis] - aStart[axis]) * invD;
+                            let t1 = (boxMax[axis] - aStart[axis]) * invD;
                             if (invD < 0) { const temp = t0; t0 = t1; t1 = temp; }
                             tmin = Math.max(tmin, t0);
                             tmax = Math.min(tmax, t1);
@@ -686,11 +701,16 @@ export class GcodeExecutionEngine {
                         }
                     }
 
-                    if (hit && tmin >= 0 && tmin <= 1) {
-                        // Clamp target to exact intersection surface
-                        target.x = start.x + dir.x * tmin;
-                        target.y = start.y + dir.y * tmin;
-                        target.z = start.z + dir.z * tmin;
+                    // A probe that STARTS on the entry face (tmin≈0) hasn't travelled — clamping there gives a
+                    // zero-length move (the "first probe doesn't move" bug). Use the far surface (tmax) instead,
+                    // so the probe leaves the wall it sits against and the move is visible.
+                    let t = tmin;
+                    if (hit && tmin <= 1e-6 && tmax > 1e-6 && tmax <= 1) t = tmax;
+                    if (hit && t > 1e-6 && t <= 1) {
+                        // Clamp the recorded target to the intersection surface (in LOCAL coords).
+                        target.x = this.pos.x + dir.x * t;
+                        target.y = this.pos.y + dir.y * t;
+                        target.z = this.pos.z + dir.z * t;
                         triggerProbeCollision();
 
                         // Flip the actual probe input pin so the I/O panel shows the touch:
@@ -701,12 +721,12 @@ export class GcodeExecutionEngine {
                             touchName = resolveVirtualPin(touchPin, 'IN');
                         }
 
-                        // DDCS: 2 = detected the signal; #1925-1927 = trigger
-                        // position in machine coordinates.
+                        // DDCS: 2 = detected the signal; #1925-1927 = trigger position in machine coords
+                        // (stock space = operator start + local target).
                         for (const a of scannedAxes) this.vars.set(PROBE_STATUS_VAR[a], 2);
-                        this.vars.set(1925, target.x);
-                        this.vars.set(1926, target.y);
-                        this.vars.set(1927, target.z);
+                        this.vars.set(1925, O.x + target.x);
+                        this.vars.set(1926, O.y + target.y);
+                        this.vars.set(1927, O.z + target.z);
                     }
                 }
                 if (this._traceSink) {
@@ -714,9 +734,9 @@ export class GcodeExecutionEngine {
                     // their success branch and probe loops (IF #1920+ax!=2 GOTO …) terminate instead of
                     // running to the step cap. Same hands-free contract as autoAnswer for M31/M33 waits.
                     for (const a of scannedAxes) this.vars.set(PROBE_STATUS_VAR[a], 2);
-                    this.vars.set(1925, target.x);
-                    this.vars.set(1926, target.y);
-                    this.vars.set(1927, target.z);
+                    this.vars.set(1925, O.x + target.x);
+                    this.vars.set(1926, O.y + target.y);
+                    this.vars.set(1927, O.z + target.z);
                 }
             } else if (effMotion === 0) {
                 this.stats.feed += 1;

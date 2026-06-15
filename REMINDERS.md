@@ -4,6 +4,34 @@ Running list of things noticed mid-work that we deliberately deferred. Newest on
 
 ---
 
+## Queued UI/product tasks (2026-06-14, batched while porting probes)
+*Status: TODO, not started.*
+
+- **2D preview shows nothing** — the `.pp-2d` canvas in `createPreviewPanel` may not be rendering the route (toolpath2d). Investigate (likely a regression from the shared-panel work).
+- **Add 4 standard tools to the tool library** — `settings.atc.tools[]` is empty by default (`SETTINGS_DEFAULTS.atc.tools`); seed 4 common tools (e.g. 6 mm + 3.175 mm flat endmills, 6 mm ball, 60° V-bit) so the library/Mill wizards aren't empty. Note existing localStorage keeps its (empty) tools — decide whether to seed when empty.
+- **Remove the profile chip from generators** — `wizProfile` `<select>` in the shared wizard header (`index.html` line ~161, wired in `wizardManager.js` syncProfileChip / drag-exempt). Move the controller-profile choice OUT of every generator.
+- **Add a profile selector to the app header** — surface the active controller profile globally in the header (pairs with the removal above). The post-processor + profile selectors live in Settings → Profile today.
+- **Remove the theme selector from the header** — the `🎨 styleBtn` (`index.html` line ~106, `window.toggleStyle`). Theme also lives in Settings → Appearance.
+- **Settings → Appearance: drop "Keyboard drawer height"** — `set_kbd_height` range is useless; remove the control (and its wiring).
+
+---
+
+## Wizard atom stacks hardcode Expert system vars (not native for V4.1 / DM500)
+*Noted 2026-06-14. Status: TODO (user-requested: "all wizards native across the 3 DDCS dialects via atom blocks").*
+
+The ported probe wizards (edge/middle/corner) emit NATIVE only for the *line forms* the dialect swaps — probe move (`dialect.probeMove`), IF operator words, dwell units, GOTO/label. But the STACK STRUCTURE hardcodes Expert magic vars: status `#1920/#1921/#1922`, trigger `#1925-1927`, active-WCS `#578`, base `#70=[805+[#72*5]]` (Expert stride-5), DRO `#882/#883`. Under V4.1/DM500 these are WRONG (DM500 has no status var and reads DRO `#864-866`, WCS stride differs, etc.). So a DM500-posted macro is a hybrid: DM500 probe form + Expert status/trigger/WCS vars.
+
+There ARE dialect-aware atoms for exactly this — `probecheck`/`proberead`/`readmachine` (ops/measure.js → dialect.probeStatus/probeRead/readMachine), `setworkoffset` (ops/setworkoffset.js → dialect.setWorkOffset), `readActiveWcs`. **The fix is to rewrite each wizard's `<name>Stack` to use those native atoms instead of hardcoded `assign`/`ifgoto` with Expert numbers**, so emit is native for all 3 posts. Caveat the user noted: some ops (comm/HMI) have no V3/V4 equivalent — those dialects return `[]` for hmiPrompt/hmiToast, so handle the empty-form case gracefully (skip, don't emit a broken line). Verify each wizard × {expert, v41, dm500} traces clean.
+
+## DM500 probe simulation — DONE (2026-06-14)
+*Status: FIXED + verified (Expert + V4.1 + DM500 all trace clean). Unverified on real DM500 hardware (none owned).*
+
+Two fixes landed:
+1. **First-probe-zero / "only see the retract":** incremental probe macros traced from the origin (which sits on the stock's min faces) clamped their FIRST probe to zero length. Fix: the engine takes a `stockOffset` (operator start in stock coords, threaded from the wizard's `inferStart` via `traceToolpath({start})` + the live engine in `createPreviewPanel.play`) used ONLY for the probe-vs-stock ray test (route stays origin-relative, so the viz marker offset isn't double-counted); and a probe starting on the entry face (tmin≈0) now uses the far surface (tmax) so the move is visible.
+2. **DM500 move-until-input:** the engine recognizes the `M101 … G01 … M102` cycle (`probe.nc`/`defprobe.nc`) — `M101` arms `_probeArmed`, the next `G01` is treated as a probe (clamps to the stock like G31), `M102` disarms. The condition evaluator already normalizes the WORD operators (EQ/NE/LT/GT). Verified: edge/middle/corner under all 3 posts give identical probe moves; a raw `M101/G01 Z-100/M102` touches the stock top.
+
+---
+
 ## Start inferences need a unified owner (currently tracked ad hoc)
 *Noted 2026-06-14. Status: IDEA / deferred.*
 

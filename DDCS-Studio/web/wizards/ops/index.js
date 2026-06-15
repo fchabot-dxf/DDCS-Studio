@@ -48,7 +48,7 @@ import { labelBlock, gotoBlock, ifGotoBlock } from './flow.js';
 import { probeReadBlock, probeCheckBlock, readMachineBlock } from './measure.js';
 import { setWorkOffsetBlock } from './setworkoffset.js';
 import { assignBlock } from './assign.js';
-import { pauseBlock, messageBlock, askNumberBlock } from './hmi.js';
+import { pauseBlock, messageBlock, askNumberBlock, confirmBlock } from './hmi.js';
 import { evalExpr } from './expr.js';
 
 /** Palette: granular atoms (Move, Machine) + feature presets (Ops) + modifiers + control/variables/markup. */
@@ -59,7 +59,7 @@ export const PALETTE = [
     progStartBlock, progEndBlock, endProgramBlock, mcodeBlock, rawBlock, probeReadBlock, readMachineBlock, setWorkOffsetBlock,   // Machine (program start/end framing, end, raw M-code/G-code, probe/DRO capture, WCS write)
     lineBlock, slotBlock, boreBlock, drillBlock, wallBlock,  // Ops (feature presets + wall finish)
     arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, stepoverBlock, stepdownBlock,    // Modify (stamp/sweep + lateral fills [zigzag/concentric] + depth pass wrappers)
-    countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, pauseBlock, askNumberBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + pause/operator-input)
+    countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, pauseBlock, confirmBlock, askNumberBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + pause/confirm-gate/operator-input)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
