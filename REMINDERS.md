@@ -34,12 +34,20 @@ DONE (commits b874cb3, 2a6d4c1):
 3. ✅ Reconcile: recursive `find()` locates inner blocks through containers (verified: 11 fields). Reading
    `params` DIRECTLY from the container (to retire the geometry-reverse RECONCILERS) is still TODO.
 
-TODO:
-4. Op-form editing: select an op (its container) → open its wizard seeded from `params` → rebuild → replace
-   the container's children. Then the geometry-reverse RECONCILERS can retire. ("if we need to unbuild thats how
-   it is" — un-build the op to atoms, edit params, re-build; no shortcut.)
-5. **Glow accent border on the wizard modal when RE-RUNNING/editing an op from the editor** (vs creating a new
-   op) — a `.wiz-box.editing` class with an accent glow, set when the wizard opens in edit-existing-op mode.
+DONE (commit e940ec9) — op-form editing FROM THE EDITOR, params = single truth (NO snapshot — "a snapshot is
+inference"):
+4. ✅ Framework: hover an op in the editor → highlight its lines + a floating "✎ Edit" chip (ui/editorOpHover.js,
+   via programModel opAtLine/linesForOp); click → wizardManager.openForEdit(opId) → seed the form from the op's
+   `params` (view.setForm) → on insert opStacks.replaceOp rebuilds the op in place (same id). Verified in Node.
+5. ✅ Glow: `.wiz-box.editing` accent glow when editing an existing op (vs new).
+
+TODO (op-form editing rollout):
+- `view.setForm(params)` exists only for CORNER so far (the proof). Add it to the other views (inverse of each
+  view's `update()` reads) — until then their edit chip is 🔒/disabled (canEdit() gates it). Mechanical per-view.
+- Browser-verify the hover/chip/glow + seeding (browser-only; Node verified the map + replaceOp).
+- Once setForm covers a view, its geometry-reverse RECONCILER can retire (params are read direct).
+- Op atoms shouldn't be hand-edited as loose blocks (params would desync) — edit via the wizard. Consider
+  locking op-container children in Blockly.
 
 Interim safety net already shipped: the post-selector capability LINT (⚠ #hdrPostWarn, ui/headerPost.js) warns
 when a loaded program uses caps the active post lacks, so you don't silently get non-runnable G-code today.
