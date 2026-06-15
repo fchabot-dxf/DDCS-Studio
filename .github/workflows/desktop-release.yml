@@ -41,8 +41,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release view "${{ steps.ver.outputs.tag }}" *> $null
-          if ($LASTEXITCODE -eq 0) { "build=false" >> $env:GITHUB_OUTPUT; Write-Host "release ${{ steps.ver.outputs.tag }} exists - nothing to do" }
-          else                     { "build=true"  >> $env:GITHUB_OUTPUT; Write-Host "no release ${{ steps.ver.outputs.tag }} yet - building" }
+          $exists = ($LASTEXITCODE -eq 0)
+          if ($exists) { "build=false" >> $env:GITHUB_OUTPUT; Write-Host "release ${{ steps.ver.outputs.tag }} exists - nothing to do" }
+          else         { "build=true"  >> $env:GITHUB_OUTPUT; Write-Host "no release ${{ steps.ver.outputs.tag }} yet - building" }
+          exit 0   # 'gh release view' returns non-zero when not found; don't let that fail the step
 
       - name: Set up Python
         if: steps.gate.outputs.build == 'true'
