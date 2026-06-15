@@ -17,6 +17,9 @@ const CAP_FIELDS = {
 };
 const CAP_WHY = {
     probePort: 'probes without a G31 P/L/Q word (G38.2 / move-until-input / fixed in firmware)',
+    toolTable: 'no in-program tool table / ATC on this controller (e.g. grbl)',
+    hmi: 'no in-program operator prompts on this controller',
+    vars: 'no #variables on this controller',
 };
 
 export function applyPostGating() {
@@ -43,6 +46,21 @@ export function applyPostGating() {
             }
         }
     }
+
+    // Element-level gating: any [data-cap] element (a whole panel / button, e.g. the ATC wizard panels) — grey
+    // it + disable its controls when the active post lacks that cap. Boolean caps only (toolTable/hmi/vars/…).
+    document.querySelectorAll('[data-cap]').forEach((elm) => {
+        const cap = elm.getAttribute('data-cap');
+        const ok = !!caps[cap];
+        elm.classList.toggle('cap-off', !ok);
+        elm.querySelectorAll('input, select, textarea, button').forEach((c) => { c.disabled = !ok; });
+        if (!ok) {
+            if (elm.dataset.capTitle === undefined) elm.dataset.capTitle = elm.title || '';
+            elm.title = `${post.name}: not supported — ${CAP_WHY[cap] || 'unavailable on this post'}`;
+        } else if (elm.dataset.capTitle !== undefined) {
+            elm.title = elm.dataset.capTitle; delete elm.dataset.capTitle;
+        }
+    });
 }
 
 export function initPostGating() {

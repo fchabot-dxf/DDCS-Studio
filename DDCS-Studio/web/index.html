@@ -1240,7 +1240,7 @@
             </div>
 
             <!-- ATC Length Wizard -->
-            <div id="wiz_atc_length" class="wiz-body" style="display:none">
+            <div id="wiz_atc_length" class="wiz-body" data-cap="toolTable" style="display:none">
                 <div class="settings-hint" style="margin-bottom:8px;">Tool-length probe parameters come from <b>Settings → ATC</b> (block height, feeds, max distance, retract, Q) and the tool-setter pin/level from <b>Settings → Probes</b>. The preview below reflects those values — edit them in Settings.</div>
                 <div class="preview-block">
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
@@ -1249,7 +1249,7 @@
             </div>
 
             <!-- Tool Breakage / Length Re-check Wizard -->
-            <div id="wiz_atc_check" class="wiz-body" style="display:none">
+            <div id="wiz_atc_check" class="wiz-body" data-cap="toolTable" style="display:none">
                 <div class="settings-hint" style="margin-bottom:8px;">A quick tap on the tool setter that <b>aborts if the tool is broken, missing, or the wrong length</b>. Re-measures and compares to the stored tool-length table (1430+T-1). Setter pin/level from <b>Settings → Probes</b>; block height, feeds, safe Z, max distance from <b>Settings → ATC</b>.</div>
                 <span class="section-label">TOLERANCE</span>
                 <div class="grid-2">
@@ -1263,7 +1263,7 @@
             </div>
 
             <!-- Spindle Warm-up Wizard -->
-            <div id="wiz_atc_warmup" class="wiz-body" style="display:none">
+            <div id="wiz_atc_warmup" class="wiz-body" data-cap="toolTable" style="display:none">
                 <span class="section-label">WARM-UP SEQUENCE</span>
                 <div class="param-grid">
                     <label>Stage 1 RPM<input type="number" id="atc_warmup_rpm1" value="6000" class="num-input" step="1000"></label>
@@ -1278,7 +1278,7 @@
             </div>
 
             <!-- ATC Tool Change Wizard -->
-            <div id="wiz_atc_change" class="wiz-body" style="display:none">
+            <div id="wiz_atc_change" class="wiz-body" data-cap="toolTable" style="display:none">
                 <span class="section-label">TOOL CHANGE</span>
                 <div class="param-grid">
                     <label>Mode
@@ -1313,7 +1313,7 @@
             </div>
 
             <!-- ATC Commissioning Test Wizard -->
-            <div id="wiz_atc_test" class="wiz-body" style="display:none">
+            <div id="wiz_atc_test" class="wiz-body" data-cap="toolTable" style="display:none">
                 <span class="section-label">ATC COMMISSIONING TEST</span>
                 <div class="param-grid">
                     <label>Test
