@@ -36,10 +36,9 @@ export function initGatewayStatus() {
             // Don't auto-kick out of the Gateway tab when nothing answers — its Console → Service picker is
             // how you point at one (a local daemon, the desktop exe's gateway, or a remote service).
         }
-        if (tab) {
-            tab.classList.toggle('unavailable', !bridged);
-            tab.title = bridged ? 'Gateway' : 'Gateway runs in the desktop app — click to download';
-        }
+        // The tab always opens now (the LED shows connection state), so it stays styled like the other tabs —
+        // no 'unavailable' dimming. Only the tooltip reflects status.
+        if (tab) tab.title = bridged ? 'Gateway' : 'Gateway — connect a service in the Console tab';
         // Anything else that gates on the gateway (TRANSFER button, …) listens for this.
         document.dispatchEvent(new CustomEvent('ddcs:gateway-status', { detail: { bridged } }));
     }
