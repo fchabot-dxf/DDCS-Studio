@@ -1668,6 +1668,11 @@ button.primary:hover {
     .wiz-2pane .wiz-visual .wiz-viz3d { flex: 0 0 auto; height: 240px !important; min-height: 240px; }
     .wiz-2pane .wiz-visual .viz-split { flex-direction: row; }               /* drill: 2D | 3D side-by-side */
     .wiz-2pane .wiz-visual .viz-split > .viz-container { flex: 1 1 0; min-height: 240px; }
+    /* Lock the preview at the top: it stays pinned while the form scrolls under it (single-column view). */
+    .wiz-2pane > .wiz-visual {
+        position: sticky; top: 0; z-index: 3;
+        background: var(--panel); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
 }
 
 /* --- HEADER (Flush Fit) --- */
