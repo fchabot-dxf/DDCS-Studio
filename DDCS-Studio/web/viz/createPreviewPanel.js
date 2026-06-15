@@ -30,13 +30,13 @@ const stockForViz = () => (PREVIEW_STOCK.show ? PREVIEW_STOCK : null);
 
 const PANEL_HTML = `
   <canvas class="pp-2d" aria-hidden="true" style="position:absolute;inset:0;display:none;background:#0d1117;z-index:1"></canvas>
-  <div class="viz3d-2dtoggle" style="position:absolute;bottom:6px;left:8px;z-index:20;display:flex;gap:4px">
-    <button class="pp-m2d" type="button" title="2D top-down toolpath">2D</button>
-    <button class="pp-m3d primary" type="button" title="3D toolpath">3D</button>
-  </div>
   <div class="pp-status viz3d-status"></div>
   <button class="pp-copy viz3d-status-copy" type="button" title="Copy status to clipboard">📋 Copy</button>
   <div class="viz3d-controls">
+    <span class="viz3d-2dtoggle" style="display:flex;gap:4px">
+      <button class="pp-m2d" type="button" title="2D top-down toolpath">2D</button>
+      <button class="pp-m3d primary" type="button" title="3D toolpath">3D</button>
+    </span>
     <label title="Show the workpiece stock (lives in the preview, not Settings)"><input type="checkbox" class="pp-stk-show"> Stock</label>
     <input type="number" class="pp-stk-x" title="stock X (mm)" style="width:44px">
     <input type="number" class="pp-stk-y" title="stock Y (mm)" style="width:44px">
