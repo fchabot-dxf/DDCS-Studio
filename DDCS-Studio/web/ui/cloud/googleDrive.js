@@ -6,6 +6,8 @@
  * file ID (stable across move/rename → never duplicates; name-search re-adopt if the stored id is lost).
  * Exposes the cloud-volume shape used by the Project Manager: ensureRoot / list / read / write / mkdir / del / rename.
  */
+import { clientId } from './providers.js';
+
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
@@ -37,11 +39,32 @@ export async function connectGoogle(clientId) {
     });
 }
 
-async function api(url, opts = {}) {
+async function api(url, opts = {}, retried = false) {
     const r = await fetch(url, { ...opts, headers: { Authorization: 'Bearer ' + token(), ...(opts.headers || {}) } });
-    if (r.status === 401) throw new Error('google-auth');   // token expired → caller re-connects
+    if (r.status === 401 && !retried) {
+        try { await silentRefresh(); } catch (e) { throw new Error('cloud-auth'); }
+        return api(url, opts, true);   // retry once with the freshly-minted token
+    }
+    if (r.status === 401) throw new Error('cloud-auth');
     if (!r.ok) throw new Error('Drive ' + r.status);
     return r;
+}
+
+/** Silently re-mint the access token via GIS (no popup if already consented) — keeps the user signed in across the
+ *  ~1h token expiry and page reloads, so there's no hourly re-login. Throws if there's no client id or the silent
+ *  grant fails (e.g. no Google session) — then the UI shows a reconnect. */
+async function silentRefresh() {
+    await loadGis();
+    const cid = clientId('google');
+    if (!cid) throw new Error('no client id');
+    return new Promise((resolve, reject) => {
+        const c = window.google.accounts.oauth2.initTokenClient({
+            client_id: cid, scope: SCOPE,
+            callback: (resp) => { if (resp && resp.access_token) { try { localStorage.setItem(TOK, resp.access_token); } catch (e) { /* */ } resolve(); } else reject(new Error('no token')); },
+            error_callback: () => reject(new Error('silent-fail')),
+        });
+        c.requestAccessToken({ prompt: '' });   // '' = silent grant when the user already consented
+    });
 }
 
 /** Find or create the app folder; return its id (tracked, move-safe). */

@@ -155,7 +155,7 @@ function onImportFile(e) {
 }
 
 // ── Cloud volume (mirrors Local, rooted at the provider app folder; Google adapter for now) ───────────────────
-const cloudErrMsg = (e) => (String(e && e.message) === 'google-auth')
+const cloudErrMsg = (e) => (String(e && e.message) === 'cloud-auth')
     ? 'Session expired — reconnect in the Cloud tab.' : ('cloud error: ' + (e && e.message));
 
 async function renderCloud() {
