@@ -14,6 +14,17 @@ UX:
   `.blk-ws`.
 - **Setup-UI port dropdown** (exe): pick the port in Settings → Network / Console, writing config `"port"`
   (choices limited to PORTS 8765-8769). Backend already honors it (`fairy_gateway._preferred_port`).
+- **Blocks mobile preview drawer polish**: (a) when BOTH the palette (left drawer) and the preview (bottom
+  drawer) are open, the preview should COVER the palette/sidebar (z-order: preview above palette). (b) the preview
+  drawer needs a DRAGGABLE resize handle to set its height — mirror the `.viz3d-drawer .viz3d-resize` grip
+  pattern (portrait: grip on the drawer's top edge, `ns-resize`).
+
+IDEA / EXPLORE:
+- **Post-processor as a Blockly project too?** (user idea, 2026-06-15). The post-processor = the dialect/emit
+  system (`wizards/dialects/*`: per-controller emit forms + `caps`). Could a post be AUTHORED/edited visually as a
+  Blockly project — compose how each atom maps to G-code per controller as blocks — so users build custom
+  controller posts without code? Ties into [[blockly-composition-view]], [[wizard-to-blocks-bidirectional]] and the
+  grbl/Mach3/UCCNC porting work (PORTING-GRBL-MACH3.md). Open question; scope before building.
 - **EXE update-check (EXE ONLY)**: the downloaded exe goes stale; the web build auto-deploys on CF (a reload is
   enough there → web excluded, and it shouldn't poll GitHub). Plan: (1) bake the app version into the exe at build
   (`build_fairy.ps1` stamps a `version` constant / bundled `version.txt`); (2) on launch (or via Gateway tab) query
