@@ -16,7 +16,7 @@ const AX = { X: 0, Y: 1, Z: 2, A: 3 };
 const NEG = { '==': 'ne', '!=': 'eq', '<': 'ge', '>': 'le', '<=': 'gt', '>=': 'lt' };
 
 export const dialect = {
-    id: 'rs274ngc', name: 'RS274NGC (grblHAL / LinuxCNC)',
+    id: 'rs274ngc', name: 'RS274NGC (LinuxCNC)',   // grblHAL shares these forms but is its own post (grblhal.js)
     programModel: 'inline', probeModel: 'g38', dwellUnits: 's',
     // All confirmed in grblHAL ngc_params.c (each tagged `// LinuxCNC`): probeTrig #5061-69 (:301),
     // probeStatus #5070 (:302), activeWcs #5220 (:308), wcsBase #5221 stride 20 (:309 + :258 "/20"),

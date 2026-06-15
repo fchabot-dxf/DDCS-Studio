@@ -11,6 +11,7 @@ import { dialect as v41 } from './ddcs-v41.js';
 import { dialect as v3 } from './ddcs-v3-dm500.js';
 import { dialect as centroid } from './centroid.js';
 import { dialect as rs274ngc } from './rs274ngc.js';
+import { dialect as grblhal } from './grblhal.js';
 import { dialect as grbl } from './grbl.js';
 
 export const DIALECTS = {
@@ -19,6 +20,7 @@ export const DIALECTS = {
     'ddcs-v3-dm500': v3,
     'centroid': centroid,
     'rs274ngc': rs274ngc,
+    'grblhal': grblhal,
     'grbl': grbl,
 };
 
@@ -39,8 +41,9 @@ export function getDialect(profileId) {
 //   hmi              in-program blocking operator prompts (dialogs)
 //   toolTable        in-program tool-table offset writes
 //   probePort        the probe move takes a port/level word (G31 P/L) — false for G38.2 / move-until-input
+//   flowStreamable   in-program flow runs while STREAMING (false on grblHAL: O-word flow is SD/littlefs-only)
 // Defaults = the DDCS Expert profile (the fullest); a dialect's own `caps` overrides what it lacks.
-const DEFAULT_CAPS = { vars: true, flow: 'goto', probeStatusCheck: true, hmi: true, toolTable: true, probePort: true };
+const DEFAULT_CAPS = { vars: true, flow: 'goto', probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, flowStreamable: true };
 
 /** Capability flags for a post id (the dialect's own `caps`, merged over the Expert-full defaults). */
 export function getCaps(id) { return { ...DEFAULT_CAPS, ...((DIALECTS[id] && DIALECTS[id].caps) || {}) }; }
