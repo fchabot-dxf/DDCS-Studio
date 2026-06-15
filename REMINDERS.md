@@ -11,7 +11,7 @@ A "project" system to save generated macros/programs DURABLY (today the program 
 localStorage). Save the high-level STACK (ops + params — the single source of truth, so it re-posts to any
 dialect and round-trips blocks↔editor), NOT just the emitted text.
 
-**FILE FORMAT (decided 2026-06-15): `.macro` — a branded extension, JSON inside.** Content = the op-stack +
+**FILE FORMAT (decided 2026-06-15): `.mjson` — a branded extension, JSON inside.** Content = the op-stack +
 params + metadata: `{ kind:"ddcs.project"|"ddcs.macro", v, name, post, profile, stock, stack:[…op-containers…] }`.
 Lossless, editable, re-postable to any dialect, round-trips blocks↔editor. Serialize the programModel stack
 (`window.ddcsGetBlockProgram` / `ddcsLoadBlockStack`). Export `.nc` on demand for the controller (terminal/lossy —
@@ -22,8 +22,21 @@ chip (e.g. "☁/💾 Local ▾") + Save / Open, reusing the `service.js` seam: L
 CLOUD = R2 / OAuth'd Drive when a service is connected (ties to [[gateway-cloud-architecture]] BYO-storage).
 
 Needs: named projects/macros, save / load / list / rename / delete. Pairs with the Gateway Send/Merge tabs (load
-a saved `.macro` → send / merge). First slice can be local-only (`.macro` download/open + the Studio/Blocks chip);
-cloud save/load follows the storage backend.
+a saved `.mjson` → send / merge).
+
+**DONE (first slice, 2026-06-15):** `.mjson` save/open of the op-stack (`blocks/macroFile.js`) + a header
+💾 chip · ⤓ Save · 📂 Open (`ui/macroBar.js`, global header → Studio + Blocks). Round-trip verified.
+
+**EVOLUTION (decided 2026-06-15): a full PROJECT MANAGER modal over a virtual filesystem (VFS).** User idea: a
+"virtual disk" → the right concept is a VFS / unified library: ONE browse modal over multiple VOLUMES (backends),
+each a small interface (`list / read / write / delete / rename`):
+- 💾 Local — browser IndexedDB/localStorage (the named `.mjson` list)
+- ☁ Cloud — R2 / Drive when a service is connected (ties to [[gateway-cloud-architecture]] BYO-storage)
+- 🖥 Controller — CNCDISK via the gateway (reuses `client.js` listFiles/readFile/deleteFile)
+The modal: browse / open / save / rename / delete `.mjson` projects (+ `.nc` outputs); copy between volumes =
+Send (local→controller) / Pull (controller→local). Absorbs the "named macro list" sub-task and shares the
+backend interface with the Gateway Files tab (one VFS, two surfaces). Build incrementally: modal + Local volume
+first (IndexedDB on top of `.mjson`), then mount Cloud / Controller as backends.
 
 ## Audit LinuxCNC (rs274ngc) for features our EXISTING wizards don't surface (2026-06-15)
 *Status: TODO. Scope: EXISTING wizards only — no new wizard categories.*
