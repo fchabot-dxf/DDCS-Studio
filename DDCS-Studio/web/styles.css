@@ -3374,20 +3374,30 @@ body[data-scale="250"] {
 /* Mobile: the preview pane is narrow (wizard stacks at 860px), so 64% crams the controls into overlapping
    rows. Let the bar span the pane width and centre-wrap into clean rows; tighter pills. */
 @media (max-width: 860px) {
-    .viz3d-controls { left: 8px; right: 8px; max-width: calc(100% - 16px); justify-content: center; gap: 4px; padding: 3px 5px; }
-    .viz3d-controls select, .viz3d-controls button { font-size: 10px; padding: 2px 6px; }
+    /* Two bottom bars exist (jog pendant + sim controls). On desktop they sit bottom-left vs bottom-right; on a
+       narrow pane that overlaps (play buttons end up UNDER the jog bar). STACK them: jog at the very bottom,
+       controls just above — and shrink the pills. */
+    .viz3d-jog-pendant { left: 6px; right: 6px; width: auto; bottom: 6px; }
+    .viz3d-jog-pendant .jog-bar { justify-content: center; flex-wrap: wrap; gap: 4px; padding: 3px 5px; }
+    .viz3d-controls { left: 6px; right: 6px; max-width: calc(100% - 12px); bottom: 44px; justify-content: center; gap: 4px; padding: 2px 5px; }
+    .viz3d-controls select, .viz3d-controls button,
+    .viz3d-jog-pendant .jog-bar select, .viz3d-jog-pendant .jog-bar button,
+    .viz3d-jog-pendant .jog-start-btns button { font-size: 10px; padding: 2px 5px; }
+    .viz3d-controls .pp-speed { max-width: 56px; flex: 0 0 auto; }   /* keep the speed select compact, not full-row */
 }
 /* Auto-hide chrome to free the canvas (createPreviewPanel toggles .controls-shown on pointer activity) —
    controls + legend + hint fade out when idle, fade in on hover/tap. Hidden controls don't catch clicks so
    canvas orbit still works. */
 .preview-panel .viz3d-controls,
 .preview-panel .viz3d-legend,
-.preview-panel .viz3d-hint { opacity: 0; transition: opacity 0.18s ease; }
-.preview-panel .viz3d-controls { pointer-events: none; }
+.preview-panel .viz3d-jog-pendant { opacity: 0; transition: opacity 0.18s ease; }
+.preview-panel .viz3d-controls,
+.preview-panel .viz3d-jog-pendant { pointer-events: none; }
 .preview-panel.controls-shown .viz3d-controls,
 .preview-panel.controls-shown .viz3d-legend,
-.preview-panel.controls-shown .viz3d-hint { opacity: 1; }
-.preview-panel.controls-shown .viz3d-controls { pointer-events: auto; }
+.preview-panel.controls-shown .viz3d-jog-pendant { opacity: 1; }
+.preview-panel.controls-shown .viz3d-controls,
+.preview-panel.controls-shown .viz3d-jog-pendant { pointer-events: auto; }
 .viz3d-controls label { font-size: 10px; color: #9fc4e6; display: flex; align-items: center; gap: 4px; }
 .viz3d-controls select,
 .viz3d-controls button,

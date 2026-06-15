@@ -28,13 +28,16 @@ test('mobile: header controls on-screen, zoom to 50%, wizard preview controls fi
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
   await page.waitForTimeout(300);
   const ctl = await page.evaluate(() => {
-    const c = document.querySelector('.wiz-viz3d .viz3d-controls') || document.querySelector('.viz3d-controls');
-    if (!c) return null;
-    const r = c.getBoundingClientRect(), pane = c.parentElement.getBoundingClientRect();
-    return { ctlRight: r.right, ctlLeft: r.left, paneLeft: pane.left, paneRight: pane.right };
+    const p = [...document.querySelectorAll('.preview-panel')].find((x) => x.querySelector('.viz3d-controls'));
+    if (!p) return null;
+    const c = p.querySelector('.viz3d-controls'), j = p.querySelector('.viz3d-jog-pendant');
+    const cr = c.getBoundingClientRect(), pr = p.getBoundingClientRect();
+    const jr = (j && getComputedStyle(j).display !== 'none') ? j.getBoundingClientRect() : null;
+    return { ctlLeft: cr.left, ctlRight: cr.right, ctlBottom: cr.bottom, paneLeft: pr.left, paneRight: pr.right, jogTop: jr ? jr.top : null };
   });
   expect(ctl, 'preview controls present').not.toBeNull();
   expect(ctl.ctlLeft).toBeGreaterThanOrEqual(ctl.paneLeft - 1);
   expect(ctl.ctlRight).toBeLessThanOrEqual(ctl.paneRight + 1);
+  if (ctl.jogTop !== null) expect(ctl.ctlBottom, 'sim controls sit ABOVE the jog bar (not overlapping)').toBeLessThanOrEqual(ctl.jogTop + 1);
   await page.screenshot({ path: 'tests/_mobile-layout.png' });
 });
