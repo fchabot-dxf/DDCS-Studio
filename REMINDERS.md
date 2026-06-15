@@ -4,6 +4,17 @@ Running list of things noticed mid-work that we deliberately deferred. Newest on
 
 ---
 
+## Project system — save macros durably (2026-06-15)
+*Status: TODO.*
+
+A "project" system to save generated macros/programs DURABLY (today the program is ephemeral — editor +
+localStorage). Save the high-level STACK (ops + params — the single source of truth, so it re-posts to any
+dialect and round-trips blocks↔editor), NOT just the emitted text. Needs: named projects, save / load / list /
+rename / delete, persistence (localStorage first; later sync to the gateway / cloud storage — ties to
+[[gateway-cloud-architecture]] BYO-storage). Consider: a project holds one or more macros/ops + metadata (name,
+date, target post/profile, stock); exports `.nc` on demand. The op-container program (programModel stack) is the
+thing to serialize. Pairs with the Gateway Send/Merge tabs (load a saved macro → send / merge).
+
 ## Audit LinuxCNC (rs274ngc) for features our EXISTING wizards don't surface (2026-06-15)
 *Status: TODO. Scope: EXISTING wizards only — no new wizard categories.*
 
