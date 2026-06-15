@@ -42,11 +42,11 @@ const PANEL_HTML = `
     <button class="pp-io" type="button" title="Show/hide the virtual I/O panel (sensors and outputs)">I/O</button>
   </div>
   <div class="viz3d-legend">
-    <span><i style="background:#3b82f6"></i>Probe</span>
-    <span><i style="background:#93c5fd"></i>Probe slow</span>
-    <span><i style="background:#facc15"></i>Retract</span>
-    <span><i style="background:#ff9a0d"></i>Jog</span>
-    <span><i style="background:#00cc00"></i>Rapid</span>
+    <span style="color:#3b82f6">Probe</span>
+    <span style="color:#93c5fd">Probe slow</span>
+    <span style="color:#facc15">Retract</span>
+    <span style="color:#ff9a0d">Jog</span>
+    <span style="color:#00cc00">Rapid</span>
   </div>
   <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan</div>
 `;
