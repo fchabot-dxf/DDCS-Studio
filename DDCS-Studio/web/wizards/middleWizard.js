@@ -42,13 +42,14 @@ export function middleStack(params = {}) {
     const MV = (ax, v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [ax.toLowerCase()]: v }; S.push(b); };
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
     const PR = (ax, to, feed) => { const b = newBlock('probe'); b.params = { axis: ax, to, feed, port: '#5', level: 0 }; S.push(b); };
+    const CK = (ax, g) => { const b = newBlock('probecheck'); b.params = { axis: ax, goto: g }; S.push(b); };   // folds where there's no status var
     const END = () => S.push(newBlock('endprogram'));
 
     const twoPass = (ax, plus, resultVar) => {
         const av = AX[ax], pv = plus ? '#8' : '#7', rv = plus ? '#9' : '#10', lim = plus ? '2' : '1';
         A(av.stop, '0'); A(av.limit, lim);
-        PR(ax, pv, '#3'); IF(av.status, '!=', '2', 1); MV(ax, rv);
-        PR(ax, pv, '#4'); IF(av.status, '!=', '2', 1); A(resultVar, av.result); MV(ax, rv);
+        PR(ax, pv, '#3'); CK(ax, 1); MV(ax, rv);
+        PR(ax, pv, '#4'); CK(ax, 1); A(resultVar, av.result); MV(ax, rv);
     };
     const reposition = () => { A('#57', '#882'); MV('Z', '#17'); A('#1505', '1', 'Press Enter when repositioned'); IF('#1505', '==', '0', 2); MM('Z', '#57'); };
     const seq = (ax, firstPlus, base) => {

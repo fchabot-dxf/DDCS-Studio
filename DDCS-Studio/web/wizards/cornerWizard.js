@@ -50,11 +50,11 @@ export function cornerStack(params = {}) {
     const S = [];
     const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
     const A = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; S.push(b); };
-    const IF = (l, o, r, g) => { const b = newBlock('ifgoto'); b.params = { lhs: l, op: o, rhs: r, goto: g }; S.push(b); };
     const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
     const PR = (ax, to, feed) => { const b = newBlock('probe'); b.params = { axis: ax, to, feed, port: '#5', level }; S.push(b); };
+    const CK = (ax, goto) => { const b = newBlock('probecheck'); b.params = { axis: ax, goto }; S.push(b); };   // folds where there's no status var
     const MOVE = (props) => { const b = newBlock('move'); b.params = { mode: 'rapid', ...props }; S.push(b); };
     const MV = (ax, v) => MOVE({ [ax.toLowerCase()]: v });
     const RAW = (text) => { const b = newBlock('raw'); b.params = { text }; S.push(b); };
@@ -67,8 +67,8 @@ export function cornerStack(params = {}) {
     const probeWall = (ax, dir) => {
         const av = AX[ax], probeVar = dir === '+' ? '#8' : '#7', retractVar = dir === '+' ? '#9' : '#10';
         const compOp = dir === '+' ? '+' : '-';   // boss: wall is at trigger ± stylus radius
-        PR(ax, probeVar, '#3'); IF(av.status, '!=', '2', 1); MV(ax, retractVar);
-        PR(ax, probeVar, '#4'); IF(av.status, '!=', '2', 1);
+        PR(ax, probeVar, '#3'); CK(ax, 1); MV(ax, retractVar);
+        PR(ax, probeVar, '#4'); CK(ax, 1);
         C(`Apply ${ax} WCS with Radius Comp`);
         if (ax === 'X') {
             A('#102', `[${av.result} ${compOp} #6]`, `Trigger Pos ${compOp} Radius`);
@@ -121,9 +121,9 @@ export function cornerStack(params = {}) {
     if (probeZ) {
         const firstTravelVar = firstDir === '+' ? '#16' : '#15';   // escape OPPOSITE the first wall's probe dir
         C('Step 1: Z Surface Probe');
-        PR('Z', '#7', '#3'); IF('#1922', '!=', '2', 1);
+        PR('Z', '#7', '#3'); CK('Z', 1);
         MV('Z', '#10');
-        PR('Z', '#7', '#4'); IF('#1922', '!=', '2', 1);
+        PR('Z', '#7', '#4'); CK('Z', 1);
         A('#73', '[#70+2]', 'WCS Z Address');
         A('#[#73]', '#1927', `Save ${wcsLabel} Z offset - machine coord`);
         MV('Z', '#19');

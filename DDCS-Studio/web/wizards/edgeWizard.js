@@ -34,6 +34,7 @@ export function edgeStack(params = {}) {
     const A = (v, value, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(value), note: note || '' }; S.push(b); };
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
     const PR = (to, feed) => { const b = newBlock('probe'); b.params = { axis, to, feed, port: '#5', level }; S.push(b); };
+    const CK = (goto) => { const b = newBlock('probecheck'); b.params = { axis, goto }; S.push(b); };   // folds where there's no status var
     const IF = (lhs, op, rhs, goto) => { const b = newBlock('ifgoto'); b.params = { lhs, op, rhs, goto }; S.push(b); };
     const MV = (v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [axis.toLowerCase()]: v }; S.push(b); };
     const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
@@ -64,8 +65,8 @@ export function edgeStack(params = {}) {
     C(`Probe ${axis} ${dir}`);
     A(av.stop, '0', 'Stop mode: decelerate');
     A(av.limit, limitVal, `Limit protect: ${plus ? 'positive' : 'negative'}`);
-    PR(probeVar, '#3'); IF(av.status, '!=', '2', 1); MV(retractVar);
-    PR(probeVar, '#4'); IF(av.status, '!=', '2', 1);
+    PR(probeVar, '#3'); CK(1); MV(retractVar);
+    PR(probeVar, '#4'); CK(1);
     A('#50', av.result, 'Save edge position'); MV(retractVar);
     C('Write to WCS');
     A(`#[#70+${av.off}]`, '#50', `Set ${wcsLabel} ${axis} to edge`);
