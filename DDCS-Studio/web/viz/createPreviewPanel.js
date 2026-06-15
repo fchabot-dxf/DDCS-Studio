@@ -39,8 +39,10 @@ const ICON_LOOP = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" s
 
 const PANEL_HTML = `
   <canvas class="pp-2d" aria-hidden="true" style="position:absolute;top:0;left:0;width:100%;height:100%;display:none;background:#0d1117;z-index:1"></canvas>
-  <div class="pp-status viz3d-status"></div>
-  <button class="pp-copy viz3d-status-copy" type="button" title="Copy status to clipboard" aria-label="Copy status">${ICON_COPY}</button>
+  <div class="pp-statusbar">
+    <button class="pp-copy viz3d-status-copy" type="button" title="Copy this status line to the clipboard" aria-label="Copy status">${ICON_COPY}</button>
+    <div class="pp-status viz3d-status"></div>
+  </div>
   <div class="viz3d-controls">
     <button class="pp-mtoggle viz3d-2dtoggle" type="button" title="Toggle 2D / 3D view">3D</button>
     <button class="pp-stock" type="button" title="Stock — set the workpiece (dimensions, shape, show, templates)" aria-label="Stock">📦</button>
@@ -51,13 +53,7 @@ const PANEL_HTML = `
     <button class="pp-jog" type="button" title="Jog the start marker (X/Y/Z step buttons)" aria-label="Jog" style="display:none">${ICON_JOG}</button>
     <button class="pp-io" type="button" title="Show/hide the virtual I/O panel (sensors and outputs)">I/O</button>
   </div>
-  <div class="viz3d-legend">
-    <span style="color:#3b82f6">Probe</span>
-    <span style="color:#93c5fd">Probe slow</span>
-    <span style="color:#facc15">Retract</span>
-    <span style="color:#ff9a0d">Jog</span>
-    <span style="color:#00cc00">Rapid</span>
-  </div>
+  <div class="viz3d-legend"></div>
   <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan</div>
 `;
 
@@ -153,6 +149,7 @@ export function createPreviewPanel(container, opts = {}) {
         const s = parsed.stats || {};
         setStatus(!s.drawable ? 'No drawable moves' : [s.feed && `${s.feed} cuts`, s.probe && `${s.probe} probes`, s.rapid && `${s.rapid} rapids`].filter(Boolean).join(' · '));
         syncJog();
+        renderLegend(parsed);
     }
     const refresh = () => setGcode();
 
@@ -161,6 +158,32 @@ export function createPreviewPanel(container, opts = {}) {
     function syncJog() {
         const b = q('.pp-jog'); if (!b) return;
         b.style.display = (mode === '3d' && viz && viz.jogPendant && viz.starts && viz.starts.length > 0) ? '' : 'none';
+    }
+
+    // Legend: show ONLY the path types present in the current toolpath (classified like the 3D viz). Probe splits
+    // fast/slow at the program's max probe feed; jog = the inter-pass move (≥2 start markers).
+    const LEGEND = [   // colours match the 3D view (gcodeViz3d line groups)
+        { key: 'probe', label: 'Probe', color: '#3b82f6' },
+        { key: 'probeSlow', label: 'Probe slow', color: '#93c5fd' },
+        { key: 'retract', label: 'Retract', color: '#33cc55' },
+        { key: 'jog', label: 'Jog', color: '#ff9a0d' },
+        { key: 'rapid', label: 'Rapid', color: '#ffcc00' },
+    ];
+    function renderLegend(parsed) {
+        const el = q('.viz3d-legend'); if (!el) return;
+        const ss = (parsed && parsed.segments) || [];
+        let maxProbeFeed = 0;
+        for (const s of ss) { if ((s.type === 'probe' || s.probe) && (s.feed || 0) > maxProbeFeed) maxProbeFeed = s.feed; }
+        const present = new Set();
+        for (const s of ss) {
+            const type = s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed');
+            if (type === 'rapid') present.add('rapid');
+            else if (type === 'retract') present.add('retract');
+            else if (type === 'probe') present.add(((s.feed || 0) > 0 && (s.feed || 0) < maxProbeFeed) ? 'probeSlow' : 'probe');
+        }
+        if (viz && viz.starts && viz.starts.length > 1) present.add('jog');
+        el.innerHTML = LEGEND.filter((x) => present.has(x.key)).map((x) => `<span style="color:${x.color}">${x.label}</span>`).join('');
+        el.style.display = el.childElementCount ? '' : 'none';
     }
 
     function setMode(next) {

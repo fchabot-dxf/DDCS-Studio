@@ -3344,6 +3344,18 @@ body[data-scale="250"] {
     color: #ff6b6b; background: rgba(80, 0, 0, 0.75);
     border: 1px solid rgba(255, 80, 80, 0.4);
 }
+/* Status + Copy on ONE translucent bar (top-left), so it's clear the copy button copies THIS status line.
+   Status text shrunk to the legend size. (createPreviewPanel wraps them in .pp-statusbar.) */
+.pp-statusbar {
+    position: absolute; top: 6px; left: 8px; right: auto; z-index: 10;
+    display: flex; align-items: center; gap: 5px;
+    width: fit-content; max-width: calc(100% - 16px);
+    background: rgba(0, 0, 0, 0.4); border-radius: 5px; padding: 2px 5px;
+}
+.pp-statusbar .viz3d-status {
+    position: static; top: auto; left: auto; right: auto;
+    background: transparent; padding: 0; font-size: 8px; max-height: 56px;
+}
 .viz3d-drawer .viz3d-status-copy {
     position: absolute; top: 6px; left: 8px; z-index: 4;
     cursor: pointer; display: none; user-select: none;
@@ -3440,7 +3452,7 @@ body[data-scale="250"] {
 }
 .viz3d-2dtoggle:hover,
 .preview-panel .pp-copy:hover { background: rgba(40, 80, 120, 0.7); }
-.preview-panel .pp-copy { position: absolute; top: 6px; left: 8px; z-index: 10; display: none; }
+.preview-panel .pp-copy { background: transparent; border: none; padding: 0 1px; z-index: 10; display: none; }   /* lives in .pp-statusbar now */
 .preview-panel .pp-copy.visible { display: inline-flex; }
 /* status keeps the base .viz3d-status position (top, left:74 → right:8): copy sits in the left gap, status to its
    right, toggle is now bottom-left — so nothing overlaps. */
