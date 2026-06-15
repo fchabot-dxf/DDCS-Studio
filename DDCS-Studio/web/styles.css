@@ -3204,6 +3204,8 @@ body[data-scale="250"] {
     background: linear-gradient(90deg, rgba(120, 190, 255, 0.28), transparent);
 }
 .viz3d-drawer .viz3d-resize:hover { background: linear-gradient(90deg, rgba(120, 190, 255, 0.55), transparent); }
+/* The shared preview panel fills the drawer but leaves the 10px resize grip on the left edge. */
+#viz3d-panel-host { position: absolute; inset: 0 0 0 10px; }
 .viz3d-status,
 .viz3d-hint {
     position: absolute;
