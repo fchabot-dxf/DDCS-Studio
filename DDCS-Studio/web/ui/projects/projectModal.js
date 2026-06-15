@@ -9,8 +9,8 @@
 import { serializeProject, loadProject, downloadMacro, openMacroText } from '../../blocks/macroFile.js';
 import * as store from './projectStore.js';
 import { getAccount, connect } from '../cloudAccount.js';
-import { PROVIDER_IDS, providerLabel, providerIcon } from './cloud/providers.js';
-import * as gdrive from './cloud/googleDrive.js';   // Google adapter (others plug in via the same shape)
+import { PROVIDER_IDS, providerLabel, providerIcon } from '../cloud/providers.js';
+import * as gdrive from '../cloud/googleDrive.js';   // Google adapter (others plug in via the same shape)
 
 const sanitize = (s) => (String(s || '').trim().replace(/[^A-Za-z0-9 _.-]+/g, '_').replace(/^\.+/, '') || 'untitled');
 
