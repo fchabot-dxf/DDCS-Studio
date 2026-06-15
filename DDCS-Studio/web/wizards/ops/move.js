@@ -18,6 +18,8 @@ export const moveBlock = {
         if (p.x != null && p.x !== '') words.push(`X${val(p.x, 0, dx)}`);
         if (p.y != null && p.y !== '') words.push(`Y${val(p.y, 0, dy)}`);
         if (p.z != null && p.z !== '') words.push(`Z${val(p.z, 0)}`);
+        if (p.a != null && p.a !== '') words.push(`A${val(p.a, 0)}`);   // rotary 4th axis (e.g. rotary index)
+        if (p.b != null && p.b !== '') words.push(`B${val(p.b, 0)}`);   // rotary 5th axis
         const xyz = words.join(' ');
         // No ( travel )/( cut )/( probe ) tag: G0 is a travel, G1+F is a cut, G31 is a probe — the word says it.
         // Block structure reads from the marker comments (( Array N @ … ), ( Step Down z=… )), not per-line tags.
