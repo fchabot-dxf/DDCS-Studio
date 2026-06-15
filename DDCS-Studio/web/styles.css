@@ -464,8 +464,10 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .cap-off { opacity: .4; }
 .cap-off input, .cap-off select, .cap-off button { pointer-events: none; }
 
-/* Header project buttons (📂 Open drawer / ⤓ Save modal). */
+/* Header project buttons (📂 Open drawer / 💾 Save modal) — borderless ghost icon buttons. */
 .macro-bar { display: flex; gap: 6px; align-items: center; }
+.macro-bar .op-btn { border-color: transparent; background: transparent; }
+.macro-bar .op-btn:hover { background: var(--panel2, rgba(255, 255, 255, .08)); }
 
 /* Project VFS — Open/manage DRAWER (left sidebar, Fusion-style; top set in JS to the header height). */
 .proj-drawer {
