@@ -36,6 +36,7 @@ export const dialect = {
     spindleOff: () => ['M5'],
     coolant: (on) => [on ? 'M8' : 'M9'],   // flood M8 / off M9 (mist M7 not present in dump)
     hmiPrompt: (msg) => [`#1505=1(${msg})`],      // blocking OK/Cancel; ESC sets #1505=0
+    hmiCancelVar: '#1505',                        // the prompt's cancel signal — ESC sets it to 0 (confirmBlock bails on it)
     hmiToast: (msg) => [`#1505=-5000(${msg})`],   // display-only banner
     hmiInput: (varName, prompt) => [`#2070=${String(varName).replace('#', '')}(${prompt})`],   // blocking numeric input
 

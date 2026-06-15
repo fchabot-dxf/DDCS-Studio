@@ -24,8 +24,9 @@ export const confirmBlock = {
     emit: (p, dx, dy, dialect) => {
         const prompt = dialect.hmiPrompt(clean(p.msg));
         if (!prompt.length) return [];                       // no scripted HMI on this controller → fold
+        if (!dialect.hmiCancelVar) return prompt;            // prompt has no cancel signal (e.g. RS274 M0 pause) → no bail jump
         const lbl = Math.max(0, Math.round(num(p.cancel, 2)));
-        return [...prompt, ...dialect.ifGoto('#1505', '==', '0', lbl)];   // ESC sets #1505=0 → bail to <cancel>
+        return [...prompt, ...dialect.ifGoto(dialect.hmiCancelVar, '==', '0', lbl)];   // ESC sets cancelVar=0 → bail to <cancel>
     },
 };
 

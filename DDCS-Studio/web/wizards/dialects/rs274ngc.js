@@ -48,7 +48,7 @@ export const dialect = {
     spindle: (dir, rpm) => [`${dir === 'ccw' ? 'M4' : 'M3'} S${rpm}`],
     spindleOff: () => ['M5'],
     coolant: (on) => [on ? 'M8' : 'M9'],   // flood M8 / off M9 (mist M7 also standard)
-    hmiPrompt: () => [],   // [] — no blocking operator prompt in stream mode (host UI / GUI owns it)
+    hmiPrompt: (msg) => [`(MSG,${msg})`, 'M0'],   // operator confirm = on-screen message + M0 program pause (resume on Cycle Start); no cancel signal
     hmiToast: (msg) => [`(MSG,${msg})`],   // operator-message comment (probe-hole.ngc:84 uses (debug,…))
     hmiInput: () => [],    // [] — no blocking numeric input in stream mode
 
