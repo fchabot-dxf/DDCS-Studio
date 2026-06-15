@@ -4,6 +4,21 @@ Running list of things noticed mid-work that we deliberately deferred. Newest on
 
 ---
 
+## Audit the exe build + maybe build-on-commit (2026-06-15)
+*Status: TODO.*
+
+Audit that the app still packages into a working Windows `.exe` (pywebview + PyInstaller — see memory
+[[desktop-packaging-pywebview]]; entry around `bridge/bridge-app/desktop.py` + the build script/spec): the web
+root (`DDCS-Studio/web`) + the bridge/gateway bundle in, the app launches, the Gateway tab works. As the app
+grew this session (gateway views, the project VFS, new ui/ modules), confirm nothing broke the bundle — new
+files included, relative import paths, assets/vendored Blockly + three.js all packaged.
+
+**Build on every git commit — CONSIDER but probably NOT per-commit:** PyInstaller takes minutes and the exe is a
+large binary that must not live in git. Better triggers: a CI build on push/tag (GitHub Actions — already used
+for the macOS build), a pre-push hook, or a `make exe` the user runs. Decide: per-commit (heavy) vs CI-on-push
+(recommended) vs on-tag release. Whatever the trigger, it should produce a FRESH exe from the current tree and
+smoke-test that it launches.
+
 ## Project system — save macros durably (2026-06-15)
 *Status: TODO. Filetype DECIDED; picker location DECIDED.*
 
