@@ -71,6 +71,12 @@ export function createPreviewPanel(container, opts = {}) {
     let mode = '3d', active = false, segs = [], fitted = false;
     let lastRunCode = null, loopOn = false, loopTimer = null;
 
+    // The 2D canvas only repaints when told to; without this it goes blank if first drawn at a transient/zero
+    // size (drawer slide-in) or after the panel is resized. Re-fit the 2D route whenever the container resizes.
+    if (typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(() => { if (mode === '2d') t2.redraw(); }).observe(container);
+    }
+
     const setStatus = (text, isError = false) => {
         if (!statusEl) return;
         statusEl.textContent = text || '';
@@ -128,8 +134,8 @@ export function createPreviewPanel(container, opts = {}) {
         let parsed; try { parsed = traceToolpath(code, { stock: stockForViz(), start: st }); }
         catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
         segs = parsed.segments || [];
-        if (mode === '2d') t2.setSegments(segs);
-        else {
+        t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
+        if (mode === '3d') {
             const v = ensureViz();
             if (v) {
                 v.setActive(true);
@@ -159,6 +165,7 @@ export function createPreviewPanel(container, opts = {}) {
             if (v) { if (v.renderer) v.renderer.domElement.style.display = ''; v.setActive(true); }
         }
         if (active) setGcode();
+        if (mode === '2d') t2.redraw();   // re-fit to the now-visible canvas size (toggle / after resize)
     }
 
     function play() {

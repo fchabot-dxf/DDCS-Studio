@@ -11,7 +11,6 @@ import { el, makeDraggable } from './ui/uiUtils.js';
 import { WIZARD_VIEWS, viewByType } from './wizards/views/index.js';
 import { playClick, playClickReverse } from './ui/sound.js';  // audio helper for click sounds
 import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
-import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile } from './shared/js/profiles/controllerProfiles.js';
 import { createPreviewPanel } from './viz/createPreviewPanel.js';   // THE shared preview (identical to Blocks/Studio), fed the wizard's op code
 
 // Map the touch-probe wizards' per-op input fields to the global 3D-probe defaults
@@ -53,7 +52,7 @@ export class WizardManager {
             if (e.target.id === 'wizard' && downOnBackdrop) this.close();
         });
 
-        // Drag the whole generator by its header bar (but not the profile select / gear / close).
+        // Drag the whole generator by its header bar (but not the gear / close).
         const box = this.wizardElement.querySelector('.wiz-box');
         const head = box && box.querySelector('.wiz-head');
         if (box && head) makeDraggable(box, head, { ignore: 'select, button, input, .wiz-gear, .wiz-close' });
@@ -65,18 +64,7 @@ export class WizardManager {
             if (this.wizardElement && this.wizardElement.classList.contains('active')) this.update();
         });
 
-        // Active-controller-profile chip in the shared wizard header — shows + switches the GLOBAL
-        // profile so generated code matches the machine's dialect (not a per-wizard override).
-        const prof = el('wizProfile');
-        if (prof) prof.addEventListener('change', () => {
-            setActiveProfile(prof.value);
-            // Also switch the variable list to match the controller (the var DB fires variableDB:ready,
-            // which the command deck's controller selector listens to, so everything stays in sync).
-            const p = CONTROLLER_PROFILES[prof.value];
-            const vdb = window.ddcsStudio && window.ddcsStudio.variableDB;
-            if (p && p.varFamily && vdb) vdb.setControllerVars(p.varFamily);
-            window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));   // re-render the open wizard with the new dialect
-        });
+        // (The controller-profile selector lives in the app header now — ui/headerProfile.js — not per-generator.)
 
         // Escape key to close wizard
         document.addEventListener('keydown', (e) => {
@@ -110,14 +98,6 @@ export class WizardManager {
         });
     }
 
-    /** Refresh the header profile chip (options + current selection) — shows which machine you're generating for. */
-    syncProfileChip() {
-        const prof = el('wizProfile');
-        if (!prof) return;
-        prof.innerHTML = Object.values(CONTROLLER_PROFILES)
-            .map((p) => `<option value="${p.id}">${p.name}${p.source === 'controller' ? ' (from controller)' : ''}</option>`).join('');
-        prof.value = getActiveProfile().id;
-    }
 
     /** Pre-fill the touch-probe wizards' per-op fields from the global 3D-probe defaults. */
     applyProbeDefaults() {
@@ -181,7 +161,6 @@ export class WizardManager {
             wizElem.style.display = 'block';
             if (view && typeof view.onShow === 'function') view.onShow(this);
             decorateProbeSrc(view);   // controller/Studio source chips (before first generate)
-            this.syncProfileChip();   // show which controller profile this code targets
             this.applyProbeDefaults();   // seed probe fields from the global 3D-probe defaults
             // Ensure fields & preview reflect current defaults immediately
             this.update();

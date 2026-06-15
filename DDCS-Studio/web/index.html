@@ -103,7 +103,7 @@
 
         </nav>
         <div class="hdr-controls" style="display:flex;gap:10px;align-items:center">
-            <button onclick="(window.toggleStyle && window.toggleStyle())" id="styleBtn" class="op-btn" title="Switch Theme"><span class="op-icon">🎨</span><span class="op-label">NORMAL</span></button>
+            <select id="hdrProfile" class="hdr-profile" title="Active controller profile — generated G-code matches this machine's dialect. Switches the global profile (also in Settings → Profile)."></select>
             <div class="scale-ctl">
                 <button id="scaleBtn" class="op-btn scale-btn" title="Zoom"><span class="op-icon">🔍</span><span class="op-label">AUTO</span></button>
             </div>
@@ -158,7 +158,6 @@
             <div class="wiz-head">
                 <span id="wizTitle">GENERATOR</span>
                 <span class="wiz-head-actions" style="display:flex; gap:14px; align-items:center;">
-                    <select id="wizProfile" title="Active controller profile — generated G-code matches this machine's dialect. Changing it switches the global profile (Settings → Profile)." style="font-size:11px; max-width:170px; padding:2px 4px; border-radius:4px; border:1px solid rgba(255,255,255,0.4); background:#fff; color:#222; cursor:pointer;"></select>
                     <span class="wiz-gear" title="Settings — stock, probe, machine (live updates this preview)" onclick="window.openSettings && window.openSettings()">⚙</span>
                     <span class="wiz-close" onclick="closeWiz()" title="Close">✕</span>
                 </span>
@@ -1561,6 +1560,10 @@
                 const { initGatewayStatus } = await import('./ui/gatewayStatus.js');
                 initGatewayStatus();
             } catch (err) { console.error('gateway status init failed', err); }
+            try {
+                const { initHeaderProfile } = await import('./ui/headerProfile.js');
+                initHeaderProfile();
+            } catch (err) { console.error('header profile init failed', err); }
             try {
                 const { initProbeInputSelects } = await import('./ui/probeInputSelect.js');
                 initProbeInputSelects();

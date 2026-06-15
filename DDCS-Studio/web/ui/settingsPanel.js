@@ -24,6 +24,16 @@ const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 // the Studio-side tool library the Mill wizards pick from. Not ATC-specific — the
 // Tool table tab is always present, so this works for manual tool change too.
 export const TOOL_TYPES = ['endmill', 'drill', 'ballnose', 'chamfer', 'vbit', 'spotdrill', 'face', 'tap', 'reamer', 'engraver', 'other'];
+// A small starter library so the Mill wizards have tools to pick on a fresh install. Seeded into a new install's
+// defaults and, once, into an existing install with an empty library (the `toolsSeeded` flag means clearing it
+// stays cleared). Plain editable records — feeds/speeds are conservative starting points; tune per material.
+export const STANDARD_TOOLS = [
+    { num: 1, name: '6mm Flat Endmill',  type: 'endmill',  dia: 6,     flutes: 2, length: '', rpm: 18000, feed: 1200, plunge: 400 },
+    { num: 2, name: '1/8" Flat Endmill', type: 'endmill',  dia: 3.175, flutes: 2, length: '', rpm: 18000, feed: 800,  plunge: 300 },
+    { num: 3, name: '6mm Ball Nose',     type: 'ballnose', dia: 6,     flutes: 2, length: '', rpm: 18000, feed: 1000, plunge: 350 },
+    { num: 4, name: '60° V-Bit',         type: 'vbit',     dia: 6,     flutes: 1, length: '', rpm: 18000, feed: 600,  plunge: 200 },
+];
+const standardTools = () => STANDARD_TOOLS.map((t) => ({ ...t }));
 // Coerce a legacy bare-number slot (was the length offset) — or a partial object — into the
 // full record. `num` is the tool number (T-word); `fallbackNum` supplies it for legacy entries
 // that pre-date sparse storage (dense index + 1). Empty/blank fields read as "unset".
@@ -86,7 +96,7 @@ const SETTINGS_DEFAULTS = {
     // ATC: tool-length probe defaults (consumed by the Tool Length wizard) + the tool-offset table.
     // baseVar = DDCS tool-offset table base (#1430 = tool 1); tools[i] = stored length for tool i+1.
     atc: {
-        baseVar: 1430, tools: [],
+        baseVar: 1430, tools: standardTools(),
         blockHeight: 50, safeZ: 10, maxDist: 200, retract: 3, fFast: 300, fSlow: 50, qStop: 1,
         magType: 'straight', magazine: []   // magType: straight|disk; magazine[]: {pocket,tool,name,x,y,z}
     },
@@ -164,7 +174,8 @@ function loadSettings() {
         const raw = localStorage.getItem(DDCS_SETTINGS_KEY);
         if (raw) {
             const p = JSON.parse(raw);
-            return migrateIO({
+            const merged = migrateIO({
+                toolsSeeded: p.toolsSeeded === true,
                 stock: { ...SETTINGS_DEFAULTS.stock, ...(p.stock || {}) },
                 stockTemplates: Array.isArray(p.stockTemplates) ? p.stockTemplates : [],
                 machine: { ...SETTINGS_DEFAULTS.machine, ...(p.machine || {}) },
@@ -181,6 +192,12 @@ function loadSettings() {
                 inputs: Array.isArray(p.inputs) ? p.inputs : [],
                 outputs: Array.isArray(p.outputs) ? p.outputs : [],
             });
+            // One-time seed of the starter tool library into an existing install (empty + never seeded before).
+            if (!merged.toolsSeeded && (!Array.isArray(merged.atc.tools) || merged.atc.tools.length === 0)) {
+                merged.atc.tools = standardTools();
+            }
+            merged.toolsSeeded = true;
+            return merged;
         }
     } catch (e) { /* ignore */ }
     return migrateIO(JSON.parse(JSON.stringify(SETTINGS_DEFAULTS)));
@@ -370,14 +387,6 @@ function buildSettingsOverlay() {
                             <select id="set_theme" title="UI theme"></select>
                         </div>
                         <div class="settings-hint">Switches the whole UI skin. Saved on this device.</div>
-                    </div>
-                    <div class="settings-section">
-                        <div class="settings-section-title">KEYBOARD DRAWER</div>
-                        <div class="settings-row">
-                            <input type="range" id="set_kbd_height" min="200" max="700" step="10" style="flex:1;">
-                            <span class="settings-hint" id="set_kbd_height_val"></span>
-                        </div>
-                        <div class="settings-hint">Default open height of the on-screen keyboard. You can also drag the drawer handle to resize.</div>
                     </div>
                 </div>
 
@@ -1122,21 +1131,6 @@ function wireSettingsOverlay(ov) {
             const tm2 = window.ddcsStudio && window.ddcsStudio.themeManager;
             if (tm2 && tm2.setCurrent) tm2.setCurrent(_theme.value);
             else { document.body.setAttribute('data-theme', _theme.value); try { localStorage.setItem('ddcs_theme', _theme.value); } catch (e) { /* ignore */ } }
-        });
-    }
-    const _kbd = q('set_kbd_height');
-    if (_kbd) {
-        const dock = document.getElementById('controller-dock');
-        const saved = parseInt(localStorage.getItem('ddcs_dock_h') || '', 10);
-        const curH = saved || (dock ? Math.round(dock.getBoundingClientRect().height) : 300) || 300;
-        const showVal = (v) => { const el = q('set_kbd_height_val'); if (el) el.textContent = v + ' px'; };
-        _kbd.value = Math.max(200, Math.min(700, curH));
-        showVal(_kbd.value);
-        _kbd.addEventListener('input', () => {
-            const v = _kbd.value;
-            showVal(v);
-            if (dock) dock.style.setProperty('--dock-h', v + 'px');
-            try { localStorage.setItem('ddcs_dock_h', v); } catch (e) { /* ignore */ }
         });
     }
     const _aboutVer = q('set_about_ver');
