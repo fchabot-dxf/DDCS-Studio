@@ -1,0 +1,15 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Connecting…</title>
+<body style="font-family:system-ui,sans-serif;background:#1d2530;color:#e6edf3;display:grid;place-items:center;height:100vh;margin:0">
+<div>Finishing sign-in… you can close this window.</div>
+<script>
+  // BYO OAuth redirect target (PKCE). The provider redirects the popup here with ?code/&state (or ?error);
+  // relay it to the app that opened us (same origin) and close. No secret, no server — see ui/cloud/pkce.js.
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var msg = { type: 'ddcs-oauth-code', code: q.get('code'), state: q.get('state'), error: q.get('error') };
+    try { (window.opener || window.parent).postMessage(msg, location.origin); } catch (e) { /* */ }
+    setTimeout(function () { try { window.close(); } catch (e) { /* */ } }, 300);
+  })();
+</script>

@@ -1,15 +1,16 @@
 /**
- * ui/cloudAccount.js — cloud account login (BYO: Google Drive; relay stays separate), shared by Settings
- * (Network tab) and the Project Manager drawer. The OAuth flow lives in the Worker (the only safe place for the
- * client secret); this UI starts it and captures the token the Worker redirects back with. PROJECTS only — the
- * connected account backs the ☁ Cloud volume. See [[gateway-cloud-architecture]].
+ * ui/cloudAccount.js — BYO cloud account login, shared by Settings (Network tab) and the Project Manager drawer.
  *
- * Backend status: the Worker `/api/oauth/google/{start,callback}` endpoints are the NEXT build step — until they
- * exist, Connect navigates to that URL (so it "just works" once deployed) but needs a configured service base.
+ * FULLY BROWSER-DIRECT — no server, no Worker, no relay (R2/Worker are retired). The browser does PKCE OAuth with
+ * the user's OWN provider (Google / Dropbox / OneDrive), gets a token, and later reads/writes the user's own cloud
+ * directly (ui/cloud/*). Connect opens a modal that launches the provider sign-in in a popup; the popup returns to
+ * oauth-callback.html which postMessages the code back; we exchange it (PKCE, no secret) and store the token.
+ * PROJECTS only — the connected account backs the ☁ Cloud volume. See [[gateway-cloud-architecture]].
  */
-import { getService } from './gateway/service.js';
+import { getProvider, providerLabel, providerIcon, clientId, setClientId, redirectUri, PROVIDER_IDS } from './cloud/providers.js';
+import { makeChallenge, makeState, buildAuthUrl, exchangeCode } from './cloud/pkce.js';
 
-const TOK = 'ddcs_cloud_token', PROV = 'ddcs_cloud_provider', EMAIL = 'ddcs_cloud_email';
+const TOK = 'ddcs_cloud_token', PROV = 'ddcs_cloud_provider', EMAIL = 'ddcs_cloud_email', REFRESH = 'ddcs_cloud_refresh';
 
 export function getAccount() {
     try {
@@ -18,56 +19,68 @@ export function getAccount() {
 }
 
 export function disconnect() {
-    try { localStorage.removeItem(TOK); localStorage.removeItem(PROV); localStorage.removeItem(EMAIL); } catch (e) { /* */ }
+    try { [TOK, PROV, EMAIL, REFRESH].forEach((k) => localStorage.removeItem(k)); } catch (e) { /* */ }
     window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
 }
 
-// OAuth ALWAYS runs on the cloud Worker (the only place that can hold the client secret + a public redirect).
-// So the OAuth base is: a configured service URL (override) → else the cloud Worker. When the app is SERVED from
-// that Worker (hosted Cloudflare), this is effectively same-origin; when it runs LOCALLY (desktop exe / local
-// gateway / live preview), the login still reaches the cloud Worker. Same login works for both deployments.
-const CLOUD_OAUTH_BASE = 'https://ddcs-studio.pages.dev';
-const oauthBase = () => ((getService().base || '').replace(/\/$/, '') || CLOUD_OAUTH_BASE);
-
-/** Connect: open a MODAL that launches the OAuth sign-in in a popup (no full-page redirect) and captures the
- *  token the Worker posts back. The Worker popup must postMessage {type:'ddcs-cloud-auth', token, provider, email}
- *  to window.opener (at our origin) and close — see the Worker OAuth scaffold (next build step). */
+/** Connect a provider (BYO). Needs the provider's PUBLIC client ID (no secret) — prompt for it once if unset. */
 export function connect(provider = 'google') {
-    openConnectModal(provider, oauthBase());
+    const p = getProvider(provider);
+    if (!p) return;
+    if (!clientId(provider)) {
+        const v = window.prompt(
+            `Connect ${p.label} — your OWN account (no server, no secret).\n\n`
+            + `1. Register a PUBLIC / SPA OAuth app for ${p.label}.\n`
+            + `2. Add this redirect URI:\n   ${redirectUri()}\n\n`
+            + `Paste its Client ID:`);
+        if (!v) return;
+        setClientId(provider, v.trim());
+    }
+    openConnectModal(provider);
 }
 
-function openConnectModal(provider, base) {
-    const label = provLabel(provider);
+async function openConnectModal(provider) {
+    const p = getProvider(provider);
+    const cid = clientId(provider);
     const ov = document.createElement('div');
     ov.className = 'cloud-modal';
     ov.innerHTML =
         '<div class="cloud-modal-panel">'
-        + `<div class="proj-head"><span class="proj-title">🔗 Connect ${label}</span><button class="op-btn" data-cm="cancel" title="Cancel">✕</button></div>`
+        + `<div class="proj-head"><span class="proj-title">🔗 Connect ${p.label}</span><button class="op-btn" data-cm="cancel" title="Cancel">✕</button></div>`
         + '<div class="cloud-modal-body">'
-        + `<div class="cloud-modal-status">Opening ${label} sign-in…</div>`
-        + `<div class="hint">A secure ${label} window opens — approve access and it returns here automatically. Nothing is stored until you approve.</div>`
+        + `<div class="cloud-modal-status">Opening ${p.label} sign-in…</div>`
+        + `<div class="hint">A secure ${p.label} window opens — approve access and it returns here automatically. Your token stays in this browser; nothing is sent to a server.</div>`
         + '</div>'
         + '<div class="cloud-modal-foot"><button class="op-btn" data-cm="retry">Open sign-in</button><span style="flex:1"></span><button class="op-btn" data-cm="cancel">Cancel</button></div>'
         + '</div>';
     document.body.appendChild(ov);
     const statusEl = ov.querySelector('.cloud-modal-status');
-    const expectOrigin = base ? new URL(base).origin : location.origin;
-    const url = `${base}/api/oauth/${provider}/start?mode=popup&origin=${encodeURIComponent(location.origin)}`;
+
+    const { verifier, challenge } = await makeChallenge();
+    const state = makeState();
+    const ruri = redirectUri();
+    const url = buildAuthUrl(p, { clientId: cid, redirectUri: ruri, challenge, state });
     let popup = null;
-    const open = () => {
-        popup = window.open(url, 'ddcs_oauth', 'width=520,height=660');
-        statusEl.textContent = popup ? `Waiting for ${label} sign-in…` : 'Popup blocked — allow popups, then “Open sign-in”.';
-    };
-    const onMsg = (e) => {
-        if (e.origin !== expectOrigin) return;                 // only trust the OAuth origin
+
+    const onMsg = async (e) => {
+        if (e.origin !== location.origin) return;          // the callback page is same-origin
         const d = e.data || {};
-        if (d.type !== 'ddcs-cloud-auth' || !d.token) return;
+        if (d.type !== 'ddcs-oauth-code' || d.state !== state) return;
+        window.removeEventListener('message', onMsg);
+        if (d.error) { statusEl.textContent = 'Sign-in failed: ' + d.error; return; }
         try {
-            localStorage.setItem(TOK, d.token);
-            localStorage.setItem(PROV, d.provider || provider);
-            if (d.email) localStorage.setItem(EMAIL, d.email);
-        } catch (_) { /* */ }
-        cleanup(true);
+            statusEl.textContent = 'Finishing…';
+            if (!p.corsToken) throw new Error(`${p.label}: code received, but its token exchange needs the provider SDK (TODO).`);
+            const tok = await exchangeCode(p, { code: d.code, clientId: cid, redirectUri: ruri, verifier });
+            localStorage.setItem(TOK, tok.access_token || '');
+            localStorage.setItem(PROV, provider);
+            if (tok.refresh_token) localStorage.setItem(REFRESH, tok.refresh_token);
+            cleanup(true);
+        } catch (err) { statusEl.textContent = err.message; }
+    };
+    const open = () => {
+        popup = window.open(url, 'ddcs_oauth', 'width=520,height=680');
+        statusEl.textContent = popup ? `Waiting for ${p.label} sign-in…` : 'Popup blocked — allow popups, then “Open sign-in”.';
     };
     const cleanup = (ok) => {
         window.removeEventListener('message', onMsg);
@@ -84,29 +97,6 @@ function openConnectModal(provider, base) {
     open();
 }
 
-/** On load, capture a token the Worker redirected back with (?cloud_token=…&provider=…&email=…) and clean the URL. */
-export function captureOAuthReturn() {
-    try {
-        const q = new URLSearchParams(location.search);
-        const t = q.get('cloud_token');
-        if (!t) return;
-        localStorage.setItem(TOK, t);
-        if (q.get('provider')) localStorage.setItem(PROV, q.get('provider'));
-        if (q.get('email')) localStorage.setItem(EMAIL, q.get('email'));
-        for (const k of ['cloud_token', 'provider', 'email']) q.delete(k);
-        history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q.toString() : ''));
-        window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
-    } catch (e) { /* */ }
-}
-
-/** Supported BYO cloud providers — each maps to a Worker OAuth route /api/oauth/<id>/start. */
-export const PROVIDERS = [
-    { id: 'google', label: 'Google Drive' },
-    { id: 'dropbox', label: 'Dropbox' },
-    { id: 'onedrive', label: 'OneDrive' },
-];
-const provLabel = (id) => (PROVIDERS.find((p) => p.id === id) || {}).label || id;
-
 /** Shared login UI rendered into `container` — used by Settings (Network) and the Project Manager drawer. */
 export function renderCloudLogin(container) {
     if (!container) return;
@@ -116,8 +106,8 @@ export function renderCloudLogin(container) {
     const status = document.createElement('div');
     status.className = 'cloud-status' + (a.connected ? '' : ' muted');
     status.textContent = a.connected
-        ? `Connected · ${provLabel(a.provider)}${a.email ? ' · ' + a.email : ''}`
-        : 'Not connected — projects stay local until you connect a cloud account.';
+        ? `Connected · ${providerLabel(a.provider)}${a.email ? ' · ' + a.email : ''}`
+        : 'Not connected — projects stay local until you connect your own cloud account.';
     wrap.appendChild(status);
 
     if (a.connected) {
@@ -128,10 +118,11 @@ export function renderCloudLogin(container) {
     } else {
         const row = document.createElement('div');
         row.className = 'cloud-providers';
-        for (const p of PROVIDERS) {
+        for (const id of PROVIDER_IDS) {
             const b = document.createElement('button');
-            b.className = 'op-btn'; b.textContent = '🔗 Connect ' + p.label;
-            b.addEventListener('click', () => connect(p.id));
+            b.className = 'op-btn cloud-connect';
+            b.innerHTML = providerIcon(id) + '<span>Connect ' + providerLabel(id) + '</span>';
+            b.addEventListener('click', () => connect(id));
             row.appendChild(b);
         }
         wrap.appendChild(row);

@@ -376,7 +376,7 @@ function buildSettingsOverlay() {
                 <div id="set_tab_network" style="display:none">
                     <div class="settings-section">
                         <div class="settings-section-title">CLOUD ACCOUNT</div>
-                        <div class="settings-hint">Connect a cloud account to sync projects and (later) send/receive machine data off-network. Projects stay local until you connect; the gateway relay (no account) stays available too.</div>
+                        <div class="settings-hint">Connect your OWN cloud account (Google Drive / Dropbox / OneDrive) to sync projects — browser-direct, no server. Projects stay local until you connect.</div>
                         <div id="set_cloud_mount" style="margin-top:8px"></div>
                     </div>
                     <div class="settings-section">

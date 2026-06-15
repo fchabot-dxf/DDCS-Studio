@@ -1579,10 +1579,6 @@
                 initMacroBar();                   // header 📂 Open / 💾 Save project buttons
             } catch (err) { console.error('macro bar init failed', err); }
             try {
-                const { captureOAuthReturn } = await import('./ui/cloudAccount.js');
-                captureOAuthReturn();             // capture a cloud OAuth token the Worker redirected back with
-            } catch (err) { console.error('cloud account init failed', err); }
-            try {
                 const { initEditorOpHover } = await import('./ui/editorOpHover.js');
                 initEditorOpHover();
             } catch (err) { console.error('editor op-hover init failed', err); }
