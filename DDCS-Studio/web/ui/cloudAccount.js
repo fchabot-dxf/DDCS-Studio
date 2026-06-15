@@ -49,6 +49,14 @@ export function captureOAuthReturn() {
     } catch (e) { /* */ }
 }
 
+/** Supported BYO cloud providers — each maps to a Worker OAuth route /api/oauth/<id>/start. */
+export const PROVIDERS = [
+    { id: 'google', label: 'Google Drive' },
+    { id: 'dropbox', label: 'Dropbox' },
+    { id: 'onedrive', label: 'OneDrive' },
+];
+const provLabel = (id) => (PROVIDERS.find((p) => p.id === id) || {}).label || id;
+
 /** Shared login UI rendered into `container` — used by Settings (Network) and the Project Manager drawer. */
 export function renderCloudLogin(container) {
     if (!container) return;
@@ -58,15 +66,26 @@ export function renderCloudLogin(container) {
     const status = document.createElement('div');
     status.className = 'cloud-status' + (a.connected ? '' : ' muted');
     status.textContent = a.connected
-        ? `Connected${a.provider ? ' · ' + a.provider : ''}${a.email ? ' · ' + a.email : ''}`
+        ? `Connected · ${provLabel(a.provider)}${a.email ? ' · ' + a.email : ''}`
         : 'Not connected — projects stay local until you connect a cloud account.';
     wrap.appendChild(status);
 
-    const btn = document.createElement('button');
-    btn.className = 'op-btn';
-    if (a.connected) { btn.textContent = 'Disconnect'; btn.addEventListener('click', () => { disconnect(); }); }
-    else { btn.textContent = '🔗 Connect Google Drive'; btn.addEventListener('click', () => connect('google')); }
-    wrap.appendChild(btn);
+    if (a.connected) {
+        const dc = document.createElement('button');
+        dc.className = 'op-btn'; dc.textContent = 'Disconnect';
+        dc.addEventListener('click', () => disconnect());
+        wrap.appendChild(dc);
+    } else {
+        const row = document.createElement('div');
+        row.className = 'cloud-providers';
+        for (const p of PROVIDERS) {
+            const b = document.createElement('button');
+            b.className = 'op-btn'; b.textContent = '🔗 Connect ' + p.label;
+            b.addEventListener('click', () => connect(p.id));
+            row.appendChild(b);
+        }
+        wrap.appendChild(row);
+    }
 
     container.replaceChildren(wrap);
     if (!container._cloudWired) {   // keep this mount in sync with account changes from anywhere
