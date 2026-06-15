@@ -255,6 +255,31 @@ export function replaceOp(opId, params) {
     return true;
 }
 
+/** Remove a top-level op from the program (right-click → Delete). */
+export function deleteOp(opId) {
+    const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+    const idx = cur.findIndex((b) => b && b.type === 'op' && b.id === opId);
+    if (idx < 0) return false;
+    const next = [...cur.slice(0, idx), ...cur.slice(idx + 1)];
+    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
+    return true;
+}
+
+/** Duplicate a top-level op (right-click → Duplicate) — fresh blocks/id from the same params, inserted after it. */
+export function duplicateOp(opId) {
+    const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+    const idx = cur.findIndex((b) => b && b.type === 'op' && b.id === opId);
+    if (idx < 0) return false;
+    const src = cur[idx];
+    if (!BUILDERS[src.opType]) return false;
+    const framed = BUILDERS[src.opType](src.params);
+    const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
+    const copy = makeOp(src.opType, src.params, bare);                 // fresh id
+    const next = [...cur.slice(0, idx + 1), copy, ...cur.slice(idx + 1)];
+    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
+    return true;
+}
+
 /**
  * For ops with no block builder yet (corner / alignment / ATC / comms): DECODE their generated G-code into blocks
  * (the active dialect's recognizers turn probe / IF-GOTO / WCS into proper blocks; the rest become leaf/raw) and

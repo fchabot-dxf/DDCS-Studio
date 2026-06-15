@@ -445,6 +445,21 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .op-edit-chip:disabled { background: var(--panel, #334); color: var(--text-dim, #9aa); cursor: default; box-shadow: none; }
 .op-edit-chip[hidden] { display: none; }
 
+/* Right-click op context menu (Edit / Duplicate / Delete). */
+.op-ctx-menu {
+    position: fixed; z-index: 1000; min-width: 168px; padding: 4px;
+    display: flex; flex-direction: column; gap: 2px;
+    background: var(--panel, #1d2530); border: 1px solid var(--border, rgba(255,255,255,.18));
+    border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.5);
+}
+.op-ctx-menu[hidden] { display: none; }
+.op-ctx-item {
+    text-align: left; font: 500 12.5px/1.2 inherit; padding: 7px 10px; border-radius: 5px;
+    border: none; background: transparent; color: var(--text-main, #e6edf3); cursor: pointer; white-space: nowrap;
+}
+.op-ctx-item:hover:not(:disabled) { background: var(--accent, #0ea5e9); color: #fff; }
+.op-ctx-item:disabled { color: var(--text-dim, #8a93a0); cursor: default; }
+
 /* A wizard re-opened to EDIT an existing op (vs create a new one): pronounced accent glow + soft pulse. */
 .wiz-box.editing {
     border-color: var(--accent, #0ea5e9) !important;
