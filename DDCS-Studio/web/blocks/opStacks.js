@@ -202,6 +202,48 @@ export function buildActiveOpStack() {
  * still text-only) so the caller can fall back to a plain text insert. Goes through the window program hooks
  * (no import cycle): ddcsGetBlockProgram (current stack) + ddcsLoadBlockStack (set it; editor re-projects).
  */
+// ── Accumulation hygiene: keep ONE program terminator + non-colliding jump labels when ops concatenate ──
+// Snippet/probe ops each carry their own error-handler labels (1/2) and a trailing M30. Concatenated naively
+// that gives DUPLICATE labels (a GOTO resolves to the wrong target) and a mid-program M30 (halts after op 1).
+const _walk = (arr, fn) => { for (const b of (arr || [])) { if (!b) continue; fn(b); if (b.children) _walk(b.children, fn); } };
+
+/** Highest label number anywhere in a stack (0 if none) — used to offset an appended snippet's labels. */
+function maxLabelNum(blocks) {
+    let m = 0;
+    _walk(blocks, (b) => { if (b.type === 'label' && b.params) m = Math.max(m, Math.round(num(b.params.n, 0))); });
+    return m;
+}
+
+/** Shift every label / goto / ifgoto target in a stack by `off` (in place) so an appended snippet can't collide. */
+function offsetLabels(blocks, off) {
+    if (!off) return blocks;
+    _walk(blocks, (b) => {
+        if (!b.params) return;
+        if (b.type === 'label' || b.type === 'goto') b.params.n = Math.round(num(b.params.n, 1)) + off;
+        else if (b.type === 'ifgoto') b.params.goto = Math.round(num(b.params.goto, 1)) + off;
+    });
+    return blocks;
+}
+
+/** Collapse to a SINGLE program terminator: a framed program (has progend, which emits its own M30) drops every
+ *  endprogram atom; a frameless one keeps just one, moved to the very end. Recurses into op-container children. */
+function normalizeEnds(blocks) {
+    const hasProgend = blocks.some((b) => b && b.type === 'progend');
+    let end = null;
+    const strip = (arr) => {
+        const out = [];
+        for (const b of (arr || [])) {
+            if (b && b.type === 'endprogram') { end = b; continue; }   // pull it out (keep the last seen)
+            if (b && b.children) b.children = strip(b.children);
+            out.push(b);
+        }
+        return out;
+    };
+    const cleaned = strip(blocks);
+    if (!hasProgend && end) cleaned.push(end);   // re-add a single terminator at the top-level end
+    return cleaned;
+}
+
 // Append blocks INTO the one program frame. `framed` (the op's full builder output incl progstart/progend) is the
 // framing source: empty program → use it as-is (a cutting op brings the frame) or the bare snippet (probe/ATC has
 // none); a framed program → slot the bare blocks before progend; a frameless program + a framed op → wrap the lot.
@@ -210,14 +252,16 @@ function appendIntoProgram(bare, framed) {
     const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
     let next;
     if (!cur.length) {
-        next = framed || bare;
+        next = framed || bare;                                        // first op: keep as-is (its own single frame/end)
     } else {
+        offsetLabels(bare, maxLabelNum(cur));                         // renumber the appended op so labels don't collide
         const endIdx = cur.findIndex((b) => b && b.type === 'progend');
         if (endIdx >= 0) next = [...cur.slice(0, endIdx), ...bare, ...cur.slice(endIdx)];   // slot before Program End
         else if (framed) {                                            // frameless program + a framed op → wrap everything
             const start = framed.find((b) => b && b.type === 'progstart'), end = framed.find((b) => b && b.type === 'progend');
             next = (start && end) ? [start, ...cur, ...bare, end] : [...cur, ...bare];
         } else next = [...cur, ...bare];                              // both frameless → append
+        next = normalizeEnds(next);                                   // one terminator, no interior M30 (halts the run)
     }
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
     loadedSig = null;   // the program changed → next Blocks open re-renders it

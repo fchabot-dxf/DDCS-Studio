@@ -54,7 +54,8 @@ export function footerBlock({ endProgram, dialect } = {}) {
             my[my.length - 1] += '   ( park )';
             L.push(...mx, ...my);
         } else {
-            L.push(`#102 = ${num(ep.parkX, 0)}  #103 = ${num(ep.parkY, 0)}`);
+            L.push(`#102 = ${num(ep.parkX, 0)}   ( park X - G53 needs a variable )`);
+            L.push(`#103 = ${num(ep.parkY, 0)}   ( park Y - G53 needs a variable )`);   // one assignment per line (M350 rejects two)
             const mx = d.machineMove('X', '#102'), my = d.machineMove('Y', '#103');
             my[my.length - 1] += '   ( park )';
             L.push(...mx, ...my);
