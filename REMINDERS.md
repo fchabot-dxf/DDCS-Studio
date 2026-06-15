@@ -73,12 +73,13 @@ HIGH value:
   → `(MSG,msg)`+`M0`; `confirmBlock` cancel-jump gated on a new `dialect.hmiCancelVar` (Expert `#1505`), so M0/
   Centroid prompts don't get a bogus `IF #1505==0 GOTO`. Confirms no longer vanish on LinuxCNC/grblHAL.
 
-MEDIUM:
-- **Cutting wizards (surfacing/pocket/slot/text): `G64 P<tol> [Q<tol>]` path-blend / `G61` exact-stop** — a
-  "path smoothing / tolerance" option (speed vs accuracy); not surfaced today.
-- **Drill: native canned cycles `G81/G82/G83/G85`** (emit on rs274 vs the expanded peck loop) + `G98/G99` retract.
-- **ATC wizards: `M62–M65` digital out + `M66 P L Q`→`#5399` wait-on-input** — rs274/grblHAL drawbar/cover
-  outputs + tool-setter/slot sensor reads (vs DDCS `M154`/`M300`). Ties to the HAL port map.
+MEDIUM — ✅ DONE 2026-06-15 as granular ATOMS (commit 6ec0d6f, `ops/cnc.js`; atom-block-only, not auto-wired into
+wizards yet; verified per dialect in Node):
+- **#3 `pathMode` atom** — `G64 P<tol>` blend / `G61` exact-stop (grbl folds; DDCS emits — TO CONFIRM on hw).
+- **#4 `drillCycle` atom** — native `G81/G82(+P)/G83(+Q)/G85`; `cancelCycle` = `G80` (grbl folds).
+- **#5 `outPin` / `waitInput` atoms** — `M62-65` / `M66 P L Q`→`#5399` (DDCS folds to "use an M-Code atom").
+Follow-ups: auto-wire drillCycle into the Drill wizard on rs274; wire outPin/waitInput into the ATC wizards via
+the HAL port map; `G98/G99` retract mode on drillCycle.
 
 LOW / niche: WCS `G10 L2` + `G92` modes (we only do L20); drill rigid tap `G33.1` (needs encoder); probe
 `G38.4/.5` (probe away); tool `G43/G43.1` length offset; rotary `G93` inverse-time; cutter comp `G41/G42` (big).
