@@ -3317,7 +3317,8 @@ body[data-scale="250"] {
 .viz3d-2dtoggle button.primary { background: rgba(40, 80, 120, 0.85); color: #eaffea; border-color: #4db0ff; }
 .preview-panel .pp-copy { position: absolute; top: 6px; left: 8px; z-index: 10; display: none; }
 .preview-panel .pp-copy.visible { display: inline-flex; }
-.preview-panel .pp-status { left: 8px; right: 78px; }   /* clear the top-right toggle; copy overlays the left when shown */
+/* status keeps the base .viz3d-status position (top, left:74 → right:8): copy sits in the left gap, status to its
+   right, toggle is now bottom-left — so nothing overlaps. */
 
 /* ===== Floating Virtual I/O panel (draggable head · CSS-resizable · flex LED grid) ===== */
 .io-panel {
