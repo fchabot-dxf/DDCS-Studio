@@ -3305,6 +3305,20 @@ body[data-scale="250"] {
 }
 .viz3d-views button:hover { background: rgba(40, 80, 120, 0.7); }
 
+/* Preview-panel transparent overlay buttons (same look as .viz3d-views): the 2D/3D toggle (top-right) and the
+   status Copy button (top-left). The toggle is top-right so the status (which spans to right:8) stops short of it. */
+.viz3d-2dtoggle button,
+.preview-panel .pp-copy {
+    font-size: 10px; padding: 3px 8px; border-radius: 4px; cursor: pointer; line-height: 1.2;
+    background: rgba(0, 0, 0, 0.55); color: #cfe6ff; border: 1px solid rgba(120, 190, 255, 0.35);
+}
+.viz3d-2dtoggle button:hover,
+.preview-panel .pp-copy:hover { background: rgba(40, 80, 120, 0.7); }
+.viz3d-2dtoggle button.primary { background: rgba(40, 80, 120, 0.85); color: #eaffea; border-color: #4db0ff; }
+.preview-panel .pp-copy { position: absolute; top: 6px; left: 8px; z-index: 10; display: none; }
+.preview-panel .pp-copy.visible { display: inline-flex; }
+.preview-panel .pp-status { left: 8px; right: 78px; }   /* clear the top-right toggle; copy overlays the left when shown */
+
 /* ===== Floating Virtual I/O panel (draggable head · CSS-resizable · flex LED grid) ===== */
 .io-panel {
     position: fixed; top: 110px; right: 24px; z-index: 10050;   /* above the wizard overlay (10000) */
