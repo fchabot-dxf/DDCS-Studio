@@ -15,10 +15,13 @@ swap children) and REPLACES the geometry-reverse RECONCILERS.
 
 Op-container shape: `{ id, type:'op', opType, label, requires:['vars'|'flow'…], params, children }`.
 
-DONE: `blocks/blockModel.js` emit handles `type:'op'` — caps-gated via `getCaps(dialect.id)`: unmet requires →
-one marker comment `( <label> - not emitted on <post>: needs … )`; else transparent (emit children, so
-capable-post output is UNCHANGED — zero regression). Verified: corner op → full on DDCS, marker on grbl;
-drill op (requires []) → transparent everywhere.
+DONE: gating is PER LINE (more honest than hiding a whole op — "it might leave a lone move but that's macro
+building"). The op-container is TRANSPARENT at emit (just emits its children, structure/record only); a final
+`applyCapGating(T, dialect)` pass in `emitMapped` comments out the lines the active post can't run — on
+`vars:false`/`flow:none` posts (grbl) any `#var`/flow line → `( gated: … )`; posts that run #vars+flow (DDCS/
+V4.1/DM500/LinuxCNC/grblHAL) gate nothing (output unchanged). Verified: DDCS = 44 live #var lines; grbl = 0
+uncommented #var lines (38 gated comments), op kept. Blocks view: `applyOpGating` puts a ⚠ on an op that has
+gated lines (no greying — per-line gate is partial). The op-container itself is kept for record/group/edit.
 
 DONE (commits b874cb3, 2a6d4c1):
 1. ✅ Accumulation: `opStacks.commitActiveOp` + `buildActiveOpStack` wrap each op in an op-container; `requires`

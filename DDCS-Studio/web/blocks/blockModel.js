@@ -72,18 +72,11 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     const def = BLOCKS[block.type];
     const own = [...anc, block.id];            // this block's full ancestry (drives the line→source map)
 
-    // OP CONTAINER (a recorded op: { opType, label, requires, params, children }). Caps-gated: on a post whose
-    // capabilities can't run the op (e.g. a probe/ATC macro on grbl — no #vars) emit ONE marker comment and keep
-    // the op in the stack (switch to a capable post → it re-emits in full). On a capable post it's transparent —
-    // the children emit exactly as before, so capable-post output is unchanged.
+    // OP CONTAINER (a recorded op: { opType, label, requires, params, children }) — the structure/record for an
+    // op (grouping in Blocks + op-form editing). TRANSPARENT at emit: it just emits its children. Gating is done
+    // PER LINE (applyCapGating below) — more honest than hiding a whole op: you see every line, with the ones the
+    // active post can't run commented out. The op is always kept in the stack.
     if (block.type === 'op') {
-        const caps = getCaps(dialect.id);
-        const has = (r) => (r === 'flow' ? caps.flow !== 'none' : caps[r] !== false);
-        const unmet = (block.requires || []).filter((r) => !has(r));
-        if (unmet.length) {
-            const label = block.label || block.opType || 'op';
-            return [tag(`( ${label} - not emitted on ${dialect.name}: needs ${unmet.join(' + ')}; op kept, switch post to emit )`, own)];
-        }
         const out = [];
         (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
         return out;
@@ -191,6 +184,7 @@ export function emitMapped(blocks, settings = {}) {
     const T = [];
     (blocks || []).forEach((b) => { T.push(...emit(b, 0, 0, [], scope, dialect)); });
     applyModalFeed(T);                    // F is modal — drop it where it just repeats the current feed
+    applyCapGating(T, dialect);           // comment out lines the active post can't run (honest per-line gating)
     const lines = T.map((t) => t.line);
     return { text: lines.join('\n'), lines, map: T.map((t) => t.src) };
 }
@@ -210,6 +204,24 @@ function applyModalFeed(T) {
             else modalF = f;
         } else if (/ F[#[]/.test(t.line)) {
             modalF = null;   // a #var/[expr] feed — can't fold; force the next numeric F to show
+        }
+    }
+}
+
+/** Per-line capability gating: on a post that can't run #variables / in-program flow (grbl), comment out the
+ *  lines it can't execute, keeping the op's RECORD intact (the op-container stays in the stack). Honest over
+ *  hiding — you see every line, with the non-runnable ones commented. Posts that run #vars + flow (DDCS / V4.1 /
+ *  DM500 / LinuxCNC / grblHAL) gate nothing. (Per-line can leave a lone runnable move — inherent to macro work.) */
+function applyCapGating(T, dialect) {
+    const caps = getCaps(dialect.id);
+    if (caps.vars && caps.flow !== 'none') return;   // runs #vars + flow → nothing to gate
+    for (const t of T) {
+        const code = (t.line || '').trim();
+        if (!code || code.startsWith('(') || code.startsWith(';')) continue;   // blank / already a comment
+        const hasVar = /#\d|#\[/.test(code);
+        const isFlow = /^(IF\b|GOTO\b|N\d|o\d+ )/.test(code);
+        if ((!caps.vars && hasVar) || (caps.flow === 'none' && (isFlow || hasVar))) {
+            t.line = `( gated: ${code.replace(/[()]/g, '').trim()} )`;   // comment out the non-runnable line
         }
     }
 }

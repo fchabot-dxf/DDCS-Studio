@@ -15,9 +15,10 @@ import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shar
 import { getCaps, resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
-// Gate op-container blocks the SAME way emit does: an op the active post can't run (caps don't meet its
-// `requires`) gets greyed (setEnabled false) + a native ⚠ comment with the reason — matching the marker the
-// emit drops in the G-code. The op stays in the workspace/stack (kept record); switching post re-evaluates.
+// Heads-up on op-container blocks the active post can't fully run: gating is PER LINE (emit comments out the
+// non-runnable lines — see the G-code panel), so we DON'T grey the whole op (that would overstate a partial
+// gate); just attach a native ⚠ comment naming the missing caps. The op stays in the stack (kept record);
+// re-evaluated on every render, so switching post updates it in place.
 function applyOpGating(ws) {
     const post = resolveActivePost(getActiveProfile().id), caps = getCaps(post.id);
     const has = (r) => (r === 'flow' ? caps.flow !== 'none' : caps[r] !== false);
@@ -25,8 +26,7 @@ function applyOpGating(ws) {
         if (b.type !== 'op') continue;
         let meta = {}; try { meta = JSON.parse(b.data || '{}'); } catch (_) { /* keep {} */ }
         const unmet = (meta.requires || []).filter((r) => !has(r));
-        try { b.setEnabled(unmet.length === 0); } catch (_) { /* older Blockly */ }
-        try { b.setWarningText(unmet.length ? `Not run on ${post.name}: needs ${unmet.join(' + ')}. Op kept; switch post to emit.` : null); } catch (_) { /* */ }
+        try { b.setWarningText(unmet.length ? `Some lines aren't run on ${post.name} (no ${unmet.join(' / ')}) — see the commented lines in the G-code.` : null); } catch (_) { /* older Blockly */ }
     }
 }
 
