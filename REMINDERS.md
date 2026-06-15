@@ -62,11 +62,16 @@ Grounded in MACHINE-PRIMITIVES-MAP §8 + `wizards/dialects/rs274ngc.js`. "Add X 
 HIGH value:
 - **Probe wizards (edge/middle/corner/circular/alignment): `G38.3` no-error probe + read `#5070`.** Today the
   fail path on rs274 just ALARMs (`probeStatus`→`[]`; #1's balancer drops the dead branch). `G38.3` probes
-  without erroring → branch on `#5070` (`o<n> if [#5070 EQ 0]`) = a real in-program fail handler. The proper
-  successor to the #1 o-word balancing. Needs dialect support (a probeMove variant + probeStatus that emits the
-  #5070 check when no-error mode is on).
-- **Confirm / comm wizard: `M0`/`M1` pause + `(MSG,…)`.** `hmiPrompt` folds to `[]` on rs274, so operator
-  confirms VANISH. `M0` (program pause) + `(MSG,)` is the native LinuxCNC confirm — emit that instead of nothing.
+  without erroring → branch on `#5070` (`o<n> if [#5070 EQ 0]`) = a real in-program fail handler.
+  **⚠ BIGGER THAN IT LOOKS (found 2026-06-15):** the probe stacks use a GOTO-to-fail-label pattern with REUSED
+  label numbers (e.g. edge: both probes `CK(1)` → label 1). A clean #5070 handler needs UNIQUE o-word numbers,
+  but `probeStatus(axis,label)` only has the reused label → a naive version emits duplicate `o1 if/endif` =
+  INVALID o-words, WORSE than today (today safely ALARMs via G38.2). So this is the STRUCTURED-FLOW EMITTER job
+  (allocate unique o-word numbers + restructure the GOTO-fail into real if-blocks + plumb G38.3), not a dialect
+  tweak. Current alarm-on-miss is SAFE; this is a UX upgrade. DEFER to the structured-flow project.
+- **Confirm / comm wizard: `M0`/`M1` pause + `(MSG,…)`. ✅ DONE 2026-06-15 (commit d973cab).** rs274 `hmiPrompt`
+  → `(MSG,msg)`+`M0`; `confirmBlock` cancel-jump gated on a new `dialect.hmiCancelVar` (Expert `#1505`), so M0/
+  Centroid prompts don't get a bogus `IF #1505==0 GOTO`. Confirms no longer vanish on LinuxCNC/grblHAL.
 
 MEDIUM:
 - **Cutting wizards (surfacing/pocket/slot/text): `G64 P<tol> [Q<tol>]` path-blend / `G61` exact-stop** — a
