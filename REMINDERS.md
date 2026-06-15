@@ -104,13 +104,19 @@ service). The hosted page CAN use a local gateway like the exe — same-PC via `
 exempt; the gateway already sends CORS); LAN-IP / remote need HTTPS or a tunnel. Local+cloud already coexist at
 the DAEMON level (the R2 relay).
 
-OPEN (need a user decision before building):
-- **OAuth for cloud storage** → lives in the WORKER (`functions/api/`); provider backends (gdrive/dropbox) behind
-  `bridge/bridge-app/fairy/backend/`. Pending: RELAY (cloud holds files) vs **BYO-storage** (user's Drive = the
-  bucket; recommended). Then stub `/api/oauth/google/{start,callback}` + a `gdrive` backend + a "Connect cloud
-  storage" row in Console.
-- **Dual local+cloud at once** → pending; recommended "Auto local+cloud" (configure both URLs, prefer local for
-  control, fall back to cloud, LED shows the active one). Today the UI is single-target.
+DECIDED 2026-06-15: **BYO-storage is the direction; keep RELAY too (for now) — they COEXIST as two backends
+behind one `list/read/write/delete` interface.** The Project Manager ☁ Cloud volume = "pick a provider":
+Relay (R2 via the Worker, zero-setup default) or Google Drive (BYO, opt-in "Connect Google Drive"); 💾 Local
+unchanged. Show them as SEPARATE volumes (never merge) so it's clear where a project lives. The Worker hosts BOTH
+the relay storage AND the BYO OAuth (OAuth must live there — only safe place for the client secret + redirect),
+so keeping relay is free. To build:
+1. A project-storage backend INTERFACE (Local IndexedDB done; add Relay + Drive impls).
+2. Worker endpoints — relay: R2 put/get/list `.mjson`; BYO: `/api/oauth/google/{start,callback}` + a `gdrive`
+   backend (Drive API). NEEDS the user's Google OAuth client ID/secret (register an app in Google Cloud Console).
+3. Project Manager ☁ Cloud volume UI: provider picker + "Connect Google Drive".
+
+STILL OPEN: dual local+cloud at once for the GATEWAY control channel (separate from project storage) — recommended
+"Auto local+cloud" (both URLs, prefer local, fall back to cloud).
 - **Multi-tool merge** → implement the Merge stub.
 - End state: two deployables (Studio desktop = UI + embedded gateway; Cloudflare = cloud `/api` + storage),
   remove the standalone fairy app.
