@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 test.use({ viewport: { width: 390, height: 800 } });
 
-test('mobile: header controls on-screen, zoom to 50%, wizard preview controls fit', async ({ page }) => {
+test('mobile: header controls on-screen, zoom popover on top, wizard preview controls fit', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.scaleManager);
 
@@ -14,11 +14,11 @@ test('mobile: header controls on-screen, zoom to 50%, wizard preview controls fi
   expect(hdr.zoomRight, `zoom button right (${hdr.zoomRight}) within viewport`).toBeLessThanOrEqual(hdr.vw + 1);
   expect(hdr.postW, 'post dropdown narrowed on mobile').toBeLessThanOrEqual(130);
 
-  // zoom: slider goes down to 50%
+  // zoom: slider floors at 75% (the 50% experiment was reverted — it overflowed mobile WebKit)
   await page.click('#scaleBtn');
   const min = await page.getAttribute('#scaleSlider', 'min');
-  expect(min).toBe('50');
-  // the zoom popover must sit ABOVE the content (regression: overflow-x:hidden made the app-shell cover it)
+  expect(min).toBe('75');
+  // the zoom popover must sit ABOVE the content (not behind the dock/wizard bar)
   const popCovered = await page.evaluate(() => {
     const pop = document.getElementById('scale-pop'); if (!pop) return true;
     const b = pop.getBoundingClientRect();
@@ -28,8 +28,8 @@ test('mobile: header controls on-screen, zoom to 50%, wizard preview controls fi
   expect(popCovered, 'zoom popover on top, not behind the dock/wizard bar').toBe(false);
   // page must never scroll horizontally
   expect(await page.evaluate(() => document.documentElement.scrollWidth), 'no horizontal page overflow').toBeLessThanOrEqual(391);
-  await page.evaluate(() => window.scaleManager.applyScale(50));
-  expect(await page.evaluate(() => Math.round(parseFloat(document.body.style.zoom) * 100))).toBe(50);
+  await page.evaluate(() => window.scaleManager.applyScale(50));   // below the floor → clamps to 75
+  expect(await page.evaluate(() => Math.round(parseFloat(document.body.style.zoom) * 100))).toBe(75);
   await page.evaluate(() => window.scaleManager.applyScale('auto'));   // restore
 
   // wizard preview controls fit within the pane (no horizontal overflow)

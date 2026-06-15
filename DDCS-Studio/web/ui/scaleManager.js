@@ -1,11 +1,11 @@
 /**
  * Scale Manager - application-wide zoom.
  * One header button (🔍 AUTO (x%) / x%) that opens a small popover under it: a continuous
- * slider (50–250%) + an AUTO button (fit-to-viewport, recomputed on resize). Persists.
+ * slider (75–250%) + an AUTO button (fit-to-viewport, recomputed on resize). Persists.
  */
 
 // data-scale buckets — styles.css keys overflow/wizard guards off these exact values.
-const BUCKETS = [50, 75, 100, 125, 150, 175, 200, 250];
+const BUCKETS = [75, 100, 125, 150, 175, 200, 250];
 
 export class ScaleManager {
     constructor() {
@@ -28,7 +28,7 @@ export class ScaleManager {
         if (!saved) return;
         if (saved === 'auto') { this.scale = 'auto'; return; }
         const num = parseInt(saved, 10);
-        if (!isNaN(num)) this.scale = Math.max(50, Math.min(250, num));
+        if (!isNaN(num)) this.scale = Math.max(75, Math.min(250, num));
     }
 
     saveScale() {
@@ -45,7 +45,7 @@ export class ScaleManager {
             const vw = window.innerWidth;
             const vh = window.innerHeight - 54;            // subtract header height
             const ratio = Math.min(vw / 1280, vh / 800);
-            const pct = Math.max(75, Math.min(250, Math.round(ratio * 100)));   // AUTO floors at 75% — 50% via zoom doubles the body width and overflows on mobile WebKit; 50% stays available manually
+            const pct = Math.max(75, Math.min(250, Math.round(ratio * 100)));
             this.scale = 'auto';
             this.lastAutoPct = pct;
             document.body.setAttribute('data-scale', 'auto');
@@ -55,7 +55,7 @@ export class ScaleManager {
             window.dispatchEvent(new CustomEvent('scaleChanged', { detail: { scale: 'auto', value: pct } }));
             return;
         }
-        const n = Math.max(50, Math.min(250, parseInt(scale, 10)));
+        const n = Math.max(75, Math.min(250, parseInt(scale, 10)));
         if (isNaN(n)) return;
         this.scale = n;
         // exact zoom inline; data-scale snapped to the nearest bucket so the CSS guards still apply
@@ -109,21 +109,11 @@ export class ScaleManager {
         pop.className = 'scale-pop';
         pop.innerHTML =
             '<div class="sp-row">' +
-            '<input type="range" id="scaleSlider" min="50" max="250" step="5">' +
+            '<input type="range" id="scaleSlider" min="75" max="250" step="5">' +
             '<span id="scaleVal" class="scale-val"></span>' +
             '</div>' +
             '<button type="button" id="scaleAutoBtn" class="op-btn">🔍 AUTO — fit to window</button>';
-        // Append to <body> as the LAST child + position:fixed under the button. DOM order makes it paint on top of
-        // the absolutely-positioned .app-shell even where z-index is unreliable (mobile WebKit under body { zoom }) —
-        // anchoring it inside the header let the app body cover it ("zoom tool behind the wizard bar"). body has the
-        // UI zoom, so divide the button's screen rect by the zoom to get body-layout coords.
-        const z = parseFloat(getComputedStyle(document.body).zoom) || 1;
-        const r = btn.getBoundingClientRect();
-        pop.style.position = 'fixed';
-        pop.style.top = ((r.bottom + 6) / z) + 'px';
-        pop.style.right = ((window.innerWidth - r.right) / z) + 'px';
-        pop.style.zIndex = '100000';
-        document.body.appendChild(pop);
+        wrap.appendChild(pop);                              // anchored in the header: no position math
         const slider = pop.querySelector('#scaleSlider');
         // Live readout while dragging, but apply the zoom only on release — re-zooming mid-drag
         // would move the slider out from under the cursor.
