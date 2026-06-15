@@ -27,16 +27,17 @@ a saved `.mjson` → send / merge).
 **DONE (first slice, 2026-06-15):** `.mjson` save/open of the op-stack (`blocks/macroFile.js`) + a header
 💾 chip · ⤓ Save · 📂 Open (`ui/macroBar.js`, global header → Studio + Blocks). Round-trip verified.
 
-**EVOLUTION (decided 2026-06-15): a full PROJECT MANAGER modal over a virtual filesystem (VFS).** User idea: a
-"virtual disk" → the right concept is a VFS / unified library: ONE browse modal over multiple VOLUMES (backends),
-each a small interface (`list / read / write / delete / rename`):
+**EVOLUTION (decided 2026-06-15): a full PROJECT MANAGER modal over a virtual filesystem (VFS) — PROJECTS ONLY.**
+User idea: a "virtual disk" → the right concept is a VFS / unified library: ONE browse modal over project VOLUMES
+(backends), each a small interface (`list / read / write / delete / rename`). The VFS holds `.mjson` PROJECTS ONLY:
 - 💾 Local — browser IndexedDB/localStorage (the named `.mjson` list)
 - ☁ Cloud — R2 / Drive when a service is connected (ties to [[gateway-cloud-architecture]] BYO-storage)
-- 🖥 Controller — CNCDISK via the gateway (reuses `client.js` listFiles/readFile/deleteFile)
-The modal: browse / open / save / rename / delete `.mjson` projects (+ `.nc` outputs); copy between volumes =
-Send (local→controller) / Pull (controller→local). Absorbs the "named macro list" sub-task and shares the
-backend interface with the Gateway Files tab (one VFS, two surfaces). Build incrementally: modal + Local volume
-first (IndexedDB on top of `.mjson`), then mount Cloud / Controller as backends.
+
+**EXCLUDE CNCDISK** (user, 2026-06-15): the controller disk is for `.nc` files, not projects — it stays separate
+in the Gateway Files tab, NOT a VFS volume. The crossover is one-way: a project → export `.nc` → Gateway Send
+(not a VFS copy). So the modal: browse / open / save-as / rename / delete `.mjson` projects across Local + Cloud.
+Absorbs the "named macro list" sub-task. Build incrementally: modal + Local volume first (IndexedDB on top of
+`.mjson`), then mount Cloud when the storage backend lands.
 
 ## Audit LinuxCNC (rs274ngc) for features our EXISTING wizards don't surface (2026-06-15)
 *Status: TODO. Scope: EXISTING wizards only — no new wizard categories.*
