@@ -68,7 +68,8 @@ export const edgeView = {
 
         console.debug('edgeView.update', params);
         const gcode = wizard.generate(params);
-        ctx.preview3D(gcode, 'probeVizContainer');
+        const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
+        ctx.preview3D(gcode, 'probeVizContainer', wizard.inferStart(params, stock));
         console.debug('edge generate => containsG31=', /G31/.test(gcode));
         el('wiz_edge_code').innerHTML = UIUtils.formatGCode(gcode);
 

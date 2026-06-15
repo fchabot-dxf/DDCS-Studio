@@ -81,4 +81,18 @@ export class EdgeWizard {
         recordOp('edge', params);   // let the Blocks tab open this op as its stack
         return emitMapped(edgeStack(params)).text;   // a snippet: no Program Start/End blocks
     }
+
+    /** Preview/sim start hint (stock frame): park clear of the wall being probed, perpendicular axis at centre —
+     *  the single-wall version of the Middle/Corner inferStart, so the probe approaches the face from open space.
+     *  dir pos probes +axis (hits the near/0 face from outside); dir neg probes −axis (hits the far face). */
+    inferStart(params, stock) {
+        const n = (v, d) => num(v, d);
+        const sx = n(stock && stock.x, 100), sy = n(stock && stock.y, 80), sz = n(stock && stock.z, 20);
+        const cx = sx / 2, cy = sy / 2, probeZ = -Math.min(5, sz * 0.5);
+        const outset = Math.max(6, Math.min(n(params.dist, 15) * 0.6, 15));
+        const pos = (params.dir || 'pos') !== 'neg';
+        return ((params.axis || 'X') === 'X')
+            ? { x: pos ? -outset : sx + outset, y: cy, z: probeZ }
+            : { x: cx, y: pos ? -outset : sy + outset, z: probeZ };
+    }
 }
