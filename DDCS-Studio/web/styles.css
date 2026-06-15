@@ -430,6 +430,8 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
     cursor: pointer;
 }
 .hdr-post:hover { border-color: var(--accent, #0ea5e9); }
+.hdr-post-warn { color: #e0a020; font-size: 15px; cursor: help; user-select: none; }
+.hdr-post-warn[hidden] { display: none; }
 
 /* Main Layout */
 .app-shell {
