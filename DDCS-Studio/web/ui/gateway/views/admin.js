@@ -23,9 +23,18 @@ export default {
     const svc = getService();
     const baseIn = el("input", { type: "text", value: svc.base, placeholder: "https://your-service.example/  (Cloudflare / self-host)", style: "width:100%" });
     const tokIn = el("input", { type: "text", value: svc.token, placeholder: "access token (optional)", style: "width:100%" });
+    // One-click: point the hosted (HTTPS) page at a gateway running on THIS PC — gives the exe experience
+    // (cloud UI + local controller). Browsers allow HTTPS→http://localhost, and the gateway already sends CORS.
+    const localGw = el("button", { class: "op-btn" }, "↩ Use local gateway (127.0.0.1:8765)");
+    localGw.onclick = () => { baseIn.value = "http://127.0.0.1:8765"; tokIn.value = ""; };
     const cloudFields = el("div", { class: "block" },
-      el("div", {}, el("span", { class: "label" }, "Service URL"), baseIn),
-      el("div", { style: "margin-top:8px" }, el("span", { class: "label" }, "Access token"), tokIn));
+      el("div", { class: "row" }, localGw),
+      el("div", { style: "margin-top:8px" }, el("span", { class: "label" }, "Service URL"), baseIn),
+      el("div", { style: "margin-top:8px" }, el("span", { class: "label" }, "Access token"), tokIn),
+      el("div", { class: "hint" },
+        "Same PC: point at http://127.0.0.1:<port> — the hosted page reaches a local gateway (localhost is "
+        + "allowed even from HTTPS; the gateway already sends CORS). Other PC / remote: the gateway needs HTTPS "
+        + "or a tunnel (browsers block an HTTPS page → http:// on a LAN IP)."));
 
     const local = el("input", { type: "radio", name: "gw-svc" }); local.checked = svc.mode === "local";
     const cloud = el("input", { type: "radio", name: "gw-svc" }); cloud.checked = svc.mode === "cloud";
