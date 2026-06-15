@@ -228,14 +228,19 @@ export class WizardManager {
     _startEdgeAnim() { viewByType.get('edge').startAnim(); }
     _startAlignmentAnim() { viewByType.get('alignment').startAnim(); }
 
-    insert() {
+    async insert() {
         const view = this.activeView();
         const code = view ? el(view.codeElId)?.textContent : '';
 
-        if (code) {
-            this.editorManager.insert(code);
+        // Accumulate this op INTO the one program (its high-level blocks slot before Program End) so multiple
+        // inserts coexist and all show in Blocks — not two framed programs concatenated (M30 mid-file). Ops with
+        // no block builder yet (probe/ATC families) fall back to a plain text insert.
+        let committed = false;
+        try { committed = (await import('./blocks/opStacks.js')).commitActiveOp(); } catch (e) { console.warn('commit op failed', e); }
+        if (!committed && code) this.editorManager.insert(code);
+
+        if (committed || code) {
             // Carry the start position the user set in this wizard's 3D preview over to the main preview.
-            // Apply now if the main viz exists; stash it so it's also applied when the main view next renders.
             try {
                 const v = this._activePanel && this._activePanel.viz;
                 const ws = (v && v.starts) ? v.starts[0] : null;
@@ -244,7 +249,6 @@ export class WizardManager {
                     if (window.ddcsSetSpindleStart) window.ddcsSetSpindleStart(ws.x, ws.y, ws.z, 0);
                 }
             } catch (e) { /* preview is optional */ }
-            // play click on successful insert
             playClick();
         } else {
             console.warn('WizardManager: No visible wizard or empty code.');

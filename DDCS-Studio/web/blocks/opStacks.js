@@ -126,6 +126,33 @@ export function buildActiveOpStack() {
 }
 
 /**
+ * Commit the active (just-generated) op INTO the shared program — so wizard inserts ACCUMULATE instead of
+ * concatenating whole framed programs (which would put an M30 mid-file and lose all but the last in Blocks).
+ * A program is ONE frame (Program Start … Program End); the FIRST op brings the frame, later ops slot their
+ * BARE blocks in just before Program End. Returns false for an op with no block builder (probe/ATC families
+ * still text-only) so the caller can fall back to a plain text insert. Goes through the window program hooks
+ * (no import cycle): ddcsGetBlockProgram (current stack) + ddcsLoadBlockStack (set it; editor re-projects).
+ */
+export function commitActiveOp() {
+    const op = getLastOp();
+    if (!op || !BUILDERS[op.type]) return false;
+    const framed = BUILDERS[op.type](op.params);                       // [progstart, …op…, progend]
+    const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
+    const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+    let next;
+    if (!cur.length) {
+        next = framed;                                                 // empty program → this op brings the frame
+    } else {
+        const endIdx = cur.findIndex((b) => b && b.type === 'progend');
+        next = endIdx >= 0 ? [...cur.slice(0, endIdx), ...bare, ...cur.slice(endIdx)]   // slot before Program End
+                           : [...cur, ...bare];                        // no frame (leaf/foreign program) → just append
+    }
+    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
+    loadedSig = null;   // the program changed → next Blocks open re-renders it
+    return true;
+}
+
+/**
  * Reverse sync — the form fields that reflect the current (edited) block stack, or null if the shown op
  * has no reconciler or the stack doesn't match its shape. The caller sets the fields + re-runs the wizard.
  */

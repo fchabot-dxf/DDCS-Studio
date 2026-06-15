@@ -47,9 +47,15 @@ export async function showBlocks() {
   await initBlocks();
   try {
     const ops = await import('./opStacks.js');
-    const r = ops.buildActiveOpStack();
-    if (r) setStack(r.blocks, 'load');                    // a fresh STUDIO op → render it (model + views)
-    else if (api) api.refresh();                          // no new op → re-render the existing program + reframe
+    if (getStack().length) {
+      // The program already has content (e.g. accumulated wizard inserts) — render the WHOLE program; don't
+      // replace it with just the last previewed op (that was the "only one of two inserts shows" bug).
+      if (api) api.refresh();
+    } else {
+      const r = ops.buildActiveOpStack();                // empty program → open the just-previewed op as blocks
+      if (r) setStack(r.blocks, 'load');                 // (a fresh STUDIO op → render it: model + views)
+      else if (api) api.refresh();
+    }
     if (!getStack().length) {                             // nothing to show — name an unported op instead of a blank
       const un = ops.unportedActiveOp(), g = document.getElementById('blk-gcode');
       if (un && g) g.textContent = `( "${un}" isn't available as blocks yet — port in progress )`;
