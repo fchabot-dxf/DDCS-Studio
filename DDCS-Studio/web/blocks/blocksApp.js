@@ -12,6 +12,23 @@ import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
+import { getCaps, resolveActivePost } from '../wizards/dialects/index.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+
+// Gate op-container blocks the SAME way emit does: an op the active post can't run (caps don't meet its
+// `requires`) gets greyed (setEnabled false) + a native ⚠ comment with the reason — matching the marker the
+// emit drops in the G-code. The op stays in the workspace/stack (kept record); switching post re-evaluates.
+function applyOpGating(ws) {
+    const post = resolveActivePost(getActiveProfile().id), caps = getCaps(post.id);
+    const has = (r) => (r === 'flow' ? caps.flow !== 'none' : caps[r] !== false);
+    for (const b of ws.getAllBlocks(false)) {
+        if (b.type !== 'op') continue;
+        let meta = {}; try { meta = JSON.parse(b.data || '{}'); } catch (_) { /* keep {} */ }
+        const unmet = (meta.requires || []).filter((r) => !has(r));
+        try { b.setEnabled(unmet.length === 0); } catch (_) { /* older Blockly */ }
+        try { b.setWarningText(unmet.length ? `Not run on ${post.name}: needs ${unmet.join(' + ')}. Op kept; switch post to emit.` : null); } catch (_) { /* */ }
+    }
+}
 
 let api = null;            // module singleton, set once the workspace is built: { refresh, load }
 let initPromise = null;    // in-flight build. The header tabs are double-wired (inline onclick in index.html +
@@ -128,7 +145,7 @@ async function buildWorkspace() {
   // workspace (muted so the rebuild doesn't echo back through the change listener), reframe, refresh the pane.
   function renderFromModel(p) {
     muteChanges = true;
-    try { stackToWorkspace(getStack(), ws); } finally { muteChanges = false; }
+    try { stackToWorkspace(getStack(), ws); applyOpGating(ws); } finally { muteChanges = false; }   // gate gated ops (muted: no echo)
     requestAnimationFrame(place); setTimeout(place, 120); setTimeout(place, 400);
     renderViews(p);
   }
