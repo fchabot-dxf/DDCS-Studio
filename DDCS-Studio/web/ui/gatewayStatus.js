@@ -30,10 +30,11 @@ export function initGatewayStatus() {
             led.title = 'Gateway: ' + s.label + (s.device ? ' · ' + s.device : '');
             bridged = true;
         } catch (e) {
-            led.className = 'gateway-led';   // unlit — no gateway (standalone / hosted)
+            led.className = 'gateway-led';   // unlit — no gateway (standalone / hosted / dev preview)
             led.title = 'Gateway: off';
             bridged = false;
-            if (document.getElementById('gateway-app')?.classList.contains('hidden') === false) showApp('studio');
+            // Don't auto-kick out of the Gateway tab when nothing answers — its Console → Service picker is
+            // how you point at one (a local daemon, the desktop exe's gateway, or a remote service).
         }
         if (tab) {
             tab.classList.toggle('unavailable', !bridged);
@@ -103,35 +104,11 @@ export function initGatewayStatus() {
 
     window.showApp = showApp;
 
-    if (tab) tab.addEventListener('click', () => { bridged ? showApp('gateway') : toggleDownloadPop(tab); });
+    if (tab) tab.addEventListener('click', () => showApp('gateway'));   // always opens; connect a service in Console
     if (studioTab) studioTab.addEventListener('click', () => showApp('studio'));
     if (settingsTab) settingsTab.addEventListener('click', () => showApp('settings'));
     if (blocksTab) blocksTab.addEventListener('click', () => showApp('blocks'));
 
     tick();
     setInterval(tick, 5000);
-}
-
-/** Small popover under the greyed GATEWAY tab offering the full-exe download. */
-function toggleDownloadPop(tab) {
-    const open = document.getElementById('gateway-dl-pop');
-    if (open) { open.remove(); return; }
-    const pop = document.createElement('div');
-    pop.id = 'gateway-dl-pop';
-    pop.className = 'gateway-dl-pop';
-    pop.innerHTML =
-        '<p>The <b>Gateway</b> talks to your controller, so it runs on your own PC — not in the cloud.</p>' +
-        '<a class="dl-btn" href="' + EXE_DOWNLOAD_URL + '" target="_blank" rel="noopener">⬇ Download DDCS Studio for desktop</a>' +
-        '<p class="dl-note">Full app — Studio + Gateway in one exe.</p>';
-    document.body.appendChild(pop);
-    const r = tab.getBoundingClientRect();
-    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 8)) + 'px';
-    pop.style.top = (r.bottom + 6) + 'px';
-    setTimeout(() => document.addEventListener('click', function close(e) {
-        if (!document.body.contains(pop)) { document.removeEventListener('click', close); return; }
-        if (!pop.contains(e.target) && !tab.contains(e.target)) {
-            pop.remove();
-            document.removeEventListener('click', close);
-        }
-    }), 0);
 }

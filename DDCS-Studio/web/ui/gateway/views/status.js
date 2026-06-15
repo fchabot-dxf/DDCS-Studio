@@ -3,6 +3,7 @@
 // (see [[live-cnc-readonly-when-away]]). Polled while visible.
 import { el } from '../util.js';
 import { deriveStatus, deviceName } from '../../../shared/js/client.js';
+import { EXE_DOWNLOAD_URL } from '../../gatewayStatus.js';
 
 export default {
   id: 'status',
@@ -30,7 +31,10 @@ export default {
 
     this.desc.replaceChildren(el('div', { class: 'section-label' }, 'Controller'));
     if (!d) {
-      this.desc.append(el('div', { class: 'muted' }, 'no gateway answering'));
+      this.desc.append(
+        el('div', { class: 'muted' }, 'No gateway answering. Connect one in the Console tab (a local daemon or a service URL), or:'),
+        el('a', { class: 'op-btn', href: EXE_DOWNLOAD_URL, target: '_blank', rel: 'noopener',
+                  style: 'margin-top:10px;display:inline-block;text-decoration:none' }, '⬇ Get DDCS Studio for desktop'));
     } else {
       const rows = [
         ['machine', d.machine_name || deviceName(d) || '—'],
