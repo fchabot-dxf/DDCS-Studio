@@ -1525,8 +1525,19 @@
     <!-- BLOCKS app — Codeblocks-for-G-code authoring (stack op-blocks → live G-code + preview).
          Static shell here; blocks/blocksApp.js (lazy-loaded on first open) builds palette/stage/code. -->
     <div id="blocks-app" class="app-shell hidden">
+        <!-- Mobile-only: left-edge handle opens the Blockly palette as a drawer over the canvas -->
+        <button id="blkToolsHandle" class="blk-tools-handle" type="button" aria-label="Toggle palette" aria-expanded="false">Blocks</button>
         <div id="blk-ws" class="blk-ws"></div>   <!-- Blockly workspace (toolbox + canvas); built by blocksApp.js -->
         <div class="right">
+            <!-- Mobile-only drawer header: grip + Preview/G-code toggle + close -->
+            <div class="blk-drawer-head">
+                <span class="blk-grip" aria-hidden="true"></span>
+                <div class="blk-seg">
+                    <button id="blkSegPv" class="on" type="button">Preview</button>
+                    <button id="blkSegCode" type="button">G-code</button>
+                </div>
+                <button id="blkDrawerClose" class="blk-drawer-x" type="button" aria-label="Close preview">✕</button>
+            </div>
             <div class="pv">
                 <h3 class="pane-h">Preview</h3>
                 <div class="pv-body"><div id="blk-preview-panel"></div></div>   <!-- the shared createPreviewPanel mounts here -->
@@ -1536,6 +1547,8 @@
                 <pre id="blk-gcode"></pre>
             </div>
         </div>
+        <!-- Mobile-only: bottom-centre pull-tab opens the preview drawer -->
+        <button id="blkDrawerHandle" class="blk-drawer-handle" type="button" aria-expanded="false">▲ Preview</button>
     </div>
 
     <!-- Global tooltip -->

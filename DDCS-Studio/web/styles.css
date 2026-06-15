@@ -3774,3 +3774,79 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .rep.cat-shapes { background:var(--cat-shapes); }
 #blocks-app .rep .rep-num { width:30px; text-align:center; }   /* Region x/y/w/h pill fields */
 #blocks-app .blk.fill > .blk-body .f, #blocks-app .blk.depth > .blk-body .f { width:auto; }   /* room for the region socket */
+
+/* ── Blocks tab handles: hidden on desktop (the side-by-side grid already shows everything) ── */
+#blocks-app .blk-drawer-head, #blocks-app .blk-drawer-handle, #blocks-app .blk-tools-handle { display:none; }
+
+/* ============================================================================
+   BLOCKS TAB — MOBILE (≤860px): Blockly canvas gets the whole tab; the Preview
+   becomes a BOTTOM drawer (G-code tucked behind its toggle) and the Blockly
+   palette/toolbox becomes a LEFT drawer over the canvas — each with a handle.
+   This mirrors the MakeCode/Scratch pattern (overlay flyout + collapsible
+   category column). All rules are media-gated so desktop is untouched even with
+   the .open/.show-code/.tools-open classes present.
+   ============================================================================ */
+@media (max-width: 860px) {
+    #blocks-app { grid-template-columns:1fr; }                 /* canvas spans the tab; drawers overlay it */
+
+    /* ── Preview = bottom drawer ── */
+    #blocks-app .right {
+        position:fixed; left:0; right:0; bottom:0; top:auto;
+        height:min(62vh, 520px);
+        transform:translateY(calc(100% + 12px)); transition:transform .25s ease;
+        z-index:60; border-left:none; border-top:1px solid var(--line);
+        box-shadow:0 -8px 22px #0009; padding-bottom:env(safe-area-inset-bottom);
+    }
+    #blocks-app .right.open { transform:translateY(0); }
+
+    #blocks-app .blk-drawer-head {
+        display:flex; align-items:center; gap:8px; position:relative;
+        padding:9px 10px 6px; border-bottom:1px solid var(--line); background:var(--screen);
+    }
+    #blocks-app .blk-grip {
+        position:absolute; top:4px; left:50%; transform:translateX(-50%);
+        width:38px; height:4px; border-radius:3px; background:var(--screen-dim); opacity:.5;
+    }
+    #blocks-app .blk-seg { display:flex; gap:4px; }
+    #blocks-app .blk-seg button {
+        font:600 11px/1 inherit; padding:6px 12px; border-radius:7px; cursor:pointer;
+        border:1px solid var(--line); background:transparent; color:var(--screen-dim);
+    }
+    #blocks-app .blk-seg button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+    #blocks-app .blk-drawer-x {
+        margin-left:auto; width:28px; height:28px; border-radius:7px; cursor:pointer; font-size:14px;
+        border:1px solid var(--line); background:transparent; color:var(--screen-dim);
+    }
+
+    /* one pane at a time inside the drawer — Preview prioritised, G-code behind the toggle */
+    #blocks-app .right .pane-h { display:none; }
+    #blocks-app .right .pv { height:auto; flex:1; min-height:0; }
+    #blocks-app .right .gcode { display:none; }
+    #blocks-app .right.show-code .pv { display:none; }
+    #blocks-app .right.show-code .gcode { display:flex; flex-direction:column; flex:1; }
+
+    /* bottom-centre pull-tab opens the preview drawer (hidden once open) */
+    #blocks-app .blk-drawer-handle {
+        display:block; position:fixed; left:50%; bottom:0; transform:translateX(-50%);
+        z-index:55; padding:6px 18px calc(6px + env(safe-area-inset-bottom)); cursor:pointer;
+        font:700 12px/1 inherit; color:var(--screen-ink); background:var(--screen);
+        border:1px solid var(--line); border-bottom:none; border-radius:10px 10px 0 0; box-shadow:0 -4px 14px #0007;
+    }
+    #blocks-app .right.open ~ .blk-drawer-handle { display:none; }
+
+    /* ── Blockly palette/toolbox = left drawer over the canvas ──
+       Collapsed via the toolbox's OWN setVisible() (display:none → getWidth()=0 → the canvas genuinely
+       reclaims the strip), NOT a CSS translate — a translate would leave a dead strip because Blockly still
+       reserves the toolbox width in its metrics. CSS here only animates the slide-in. */
+    #blocks-app.tools-open .blk-ws .blocklyToolboxDiv { z-index:40; box-shadow:6px 0 18px #0008; animation:blkTbxIn .22s ease; }
+    @keyframes blkTbxIn { from { transform:translateX(-100%); } to { transform:translateX(0); } }
+
+    /* left-edge vertical handle opens the palette; slides to the toolbox edge when open (acts as close) */
+    #blocks-app .blk-tools-handle {
+        display:block; position:fixed; left:0; top:50%; transform:translateY(-50%);
+        z-index:55; padding:16px 7px; cursor:pointer; writing-mode:vertical-rl; text-orientation:mixed;
+        font:700 11px/1 inherit; letter-spacing:.08em; color:var(--screen-ink); background:var(--screen);
+        border:1px solid var(--line); border-left:none; border-radius:0 10px 10px 0; box-shadow:4px 0 14px #0007;
+    }
+    #blocks-app.tools-open .blk-tools-handle { transform:translateY(-50%) translateX(var(--blk-tbx-w, 220px)); }
+}

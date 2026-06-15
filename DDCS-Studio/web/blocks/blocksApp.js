@@ -191,6 +191,64 @@ async function buildWorkspace() {
 
   window.addEventListener('resize', () => { if (!root.classList.contains('hidden')) { B.svgResize(ws); renderViews(getProjection()); } });
 
+  // ---- mobile drawers (CSS-gated ≤860px; harmless no-ops on desktop) ----
+  // Canvas fills the tab; Preview = bottom drawer (G-code behind its toggle), palette = left drawer over canvas.
+  // Preview drawer translates (keeps its size off-screen) → re-render on open. Palette uses the toolbox's own
+  // setVisible() so the canvas actually reclaims the width when collapsed.
+  (function wireDrawers() {
+    const right = root.querySelector('.right');
+    const handle = document.getElementById('blkDrawerHandle');
+    const closeBtn = document.getElementById('blkDrawerClose');
+    const segPv = document.getElementById('blkSegPv');
+    const segCode = document.getElementById('blkSegCode');
+    const toolsHandle = document.getElementById('blkToolsHandle');
+    if (!right) return;
+
+    const refit = () => { try { panel.setActive(true); panel.refresh(); } catch (_) { /* */ } };
+    const openPv = (on) => { right.classList.toggle('open', on); if (handle) handle.setAttribute('aria-expanded', String(on)); if (on) setTimeout(refit, 260); };
+    handle && handle.addEventListener('click', () => openPv(true));
+    closeBtn && closeBtn.addEventListener('click', () => openPv(false));
+
+    const showPane = (code) => {
+      right.classList.toggle('show-code', code);
+      segPv && segPv.classList.toggle('on', !code);
+      segCode && segCode.classList.toggle('on', code);
+      if (!code) setTimeout(refit, 60);                 // back to Preview → re-fit the now-visible canvas
+    };
+    segPv && segPv.addEventListener('click', () => showPane(false));
+    segCode && segCode.addEventListener('click', () => showPane(true));
+
+    // Palette (Blockly toolbox) as a left drawer. Collapse via the toolbox's OWN setVisible() so the canvas
+    // truly reclaims the width (display:none → getWidth()=0); a CSS translate alone would leave a dead strip.
+    const tbx = () => { try { return ws.getToolbox(); } catch (_) { return null; } };
+    const setToolsOpen = (on) => {
+      const tb = tbx(); if (!tb) return;
+      try { tb.setVisible(on); } catch (_) { /* */ }
+      if (on) { let w = 0; try { w = Math.round(tb.getWidth()); } catch (_) { /* */ }
+                if (!w) { const t = host.querySelector('.blocklyToolboxDiv'); if (t) w = Math.round(t.getBoundingClientRect().width); }
+                if (w) root.style.setProperty('--blk-tbx-w', w + 'px'); }
+      else { try { tb.clearSelection(); } catch (_) { /* collapse any open flyout */ } }
+      root.classList.toggle('tools-open', on);
+      toolsHandle && toolsHandle.setAttribute('aria-expanded', String(on));
+      try { B.svgResize(ws); } catch (_) { /* recompute metrics: canvas grows/shrinks by the toolbox width */ }
+    };
+    toolsHandle && toolsHandle.addEventListener('click', () => setToolsOpen(!root.classList.contains('tools-open')));
+
+    // Breakpoint behaviour: ≤860px → palette starts COLLAPSED (canvas full); desktop → toolbox always shown.
+    const mq = window.matchMedia('(max-width: 860px)');
+    const applyBreakpoint = (mobile) => {
+      const tb = tbx(); if (!tb) return;
+      root.classList.remove('tools-open');
+      toolsHandle && toolsHandle.setAttribute('aria-expanded', 'false');
+      try { tb.clearSelection(); } catch (_) { /* */ }
+      try { tb.setVisible(!mobile); } catch (_) { /* mobile → collapsed (canvas full); desktop → shown */ }
+      try { B.svgResize(ws); } catch (_) { /* */ }
+    };
+    applyBreakpoint(mq.matches);
+    if (mq.addEventListener) mq.addEventListener('change', (e) => applyBreakpoint(e.matches));
+    else if (mq.addListener) mq.addListener((e) => applyBreakpoint(e.matches));
+  })();
+
   // Render the current program (editor-built or wizard-seeded — it already exists in the model from app start)
   // into the freshly-injected view. The editor⇄stack sync lives in programModel (wired at startup), so this tab
   // is purely a view: it never owns the program or the editor listeners.
