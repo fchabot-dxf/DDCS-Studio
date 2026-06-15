@@ -20,11 +20,15 @@ UX:
   pattern (portrait: grip on the drawer's top edge, `ns-resize`).
 
 IDEA / EXPLORE:
-- **Post-processor as a Blockly project too?** (user idea, 2026-06-15). The post-processor = the dialect/emit
-  system (`wizards/dialects/*`: per-controller emit forms + `caps`). Could a post be AUTHORED/edited visually as a
-  Blockly project — compose how each atom maps to G-code per controller as blocks — so users build custom
-  controller posts without code? Ties into [[blockly-composition-view]], [[wizard-to-blocks-bidirectional]] and the
-  grbl/Mach3/UCCNC porting work (PORTING-GRBL-MACH3.md). Open question; scope before building.
+- **An app to edit Fusion/HSM `.cps` post files** (user idea, 2026-06-15; clarified — NOT a Blockly post). The user
+  has their own Fusion 360 / HSMWorks `.cps` post-processor (JS that the Fusion CAM engine runs to turn toolpaths
+  → controller G-code). Idea: build an editor/authoring app for `.cps` (visual or assisted), possibly inside DDCS
+  Studio. Relationship to DDCS: DDCS's dialect/emit system (`wizards/dialects/*`) IS conceptually a post-processor,
+  but a DIFFERENT IR — `.cps` targets Fusion's CAM toolpath model + post API, while DDCS posts map our atom stacks.
+  So `.cps` can't be consumed directly; its VALUE here is as a GROUND-TRUTH reference for how the user's machine
+  actually wants G-code (formatting, modal rules) — cross-check/refine the DDCS dialect against it (see
+  [[ddcs-ground-truth-reference]]). No `.cps` is in the repo yet (would need the user's file). Ties into
+  [[blockly-composition-view]] and the grbl/Mach3/UCCNC porting work (PORTING-GRBL-MACH3.md). Scope before building.
 - **EXE update-check (EXE ONLY)**: the downloaded exe goes stale; the web build auto-deploys on CF (a reload is
   enough there → web excluded, and it shouldn't poll GitHub). Plan: (1) bake the app version into the exe at build
   (`build_fairy.ps1` stamps a `version` constant / bundled `version.txt`); (2) on launch (or via Gateway tab) query
