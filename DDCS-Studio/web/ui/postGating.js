@@ -30,9 +30,16 @@ export function applyPostGating() {
             if (!f) continue;
             f.disabled = !ok;
             const wrap = f.closest('div') || f.parentElement;
-            if (wrap) {
-                wrap.classList.toggle('cap-off', !ok);
-                wrap.title = ok ? '' : `${post.name}: not used — ${CAP_WHY[cap]}`;   // explanation is tooltip-only
+            if (wrap) wrap.classList.toggle('cap-off', !ok);
+            if (!ok) {
+                // Tooltip-only explanation — on the field itself (it has its own title) and its wrapper. Stash
+                // the original title so it comes back when a capable post is selected again.
+                if (f.dataset.origTitle === undefined) f.dataset.origTitle = f.title || '';
+                f.title = `${post.name}: not used — ${CAP_WHY[cap]}`;
+                if (wrap) wrap.title = f.title;
+            } else {
+                if (f.dataset.origTitle !== undefined) { f.title = f.dataset.origTitle; delete f.dataset.origTitle; }
+                if (wrap) wrap.title = '';
             }
         }
     }
