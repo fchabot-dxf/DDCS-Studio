@@ -27,6 +27,30 @@ const PROBE_DEFAULT_FIELDS = {
     al_q: 'qStop', c_q: 'qStop', circ_q: 'qStop', m_q: 'qStop', p_q: 'qStop', rc_q: 'qStop', rcl_q: 'qStop',
 };
 
+// EDIT seeding: op param key → its form field id, per op type (the inverse of each view's update() reads).
+// _seedForm() restores these into the form when re-opening a wizard to edit an op (params = single truth).
+// Flat maps cover most wizards; drill has a custom view.setForm (pattern variants), atc_length is Settings-
+// driven (no per-op fields). value vs checkbox is decided by the element type at seed time.
+const PARAM_FIELDS = {
+    surfacing: { originX: 'sf_originX', originY: 'sf_originY', w: 'sf_w', h: 'sf_h', strategy: 'sf_strategy', toolDia: 'sf_toolDia', stepoverPct: 'sf_stepoverPct', depth: 'sf_depth', stepdown: 'sf_stepdown', clearance: 'sf_clearance', feed: 'sf_feed', plunge: 'sf_plunge', rpm: 'sf_rpm' },
+    pocket: { shape: 'p_shape', strategy: 'p_strategy', originX: 'p_originX', originY: 'p_originY', w: 'p_w', h: 'p_h', dia: 'p_dia', toolDia: 'p_toolDia', stepoverPct: 'p_stepoverPct', depth: 'p_depth', stepdown: 'p_stepdown', clearance: 'p_clearance', feed: 'p_feed', plunge: 'p_plunge', rpm: 'p_rpm' },
+    slot: { ax: 'sl_ax', ay: 'sl_ay', bx: 'sl_bx', by: 'sl_by', width: 'sl_width', toolDia: 'sl_toolDia', stepoverPct: 'sl_stepoverPct', depth: 'sl_depth', stepdown: 'sl_stepdown', clearance: 'sl_clearance', feed: 'sl_feed', plunge: 'sl_plunge', rpm: 'sl_rpm' },
+    text: { text: 'tx_text', x: 'tx_x', y: 'tx_y', height: 'tx_height', spacing: 'tx_spacing', align: 'tx_align', strokeWidth: 'tx_strokeWidth', toolDia: 'tx_toolDia', stepoverPct: 'tx_stepoverPct', depth: 'tx_depth', stepdown: 'tx_stepdown', clearance: 'tx_clearance', feed: 'tx_feed', plunge: 'tx_plunge', rpm: 'tx_rpm' },
+    corner: { corner: 'c_corner', probeZ: 'c_probe_z_first', syncA: 'c_sync_a', slave: 'c_slave', probeSeq: 'c_probe_seq', wcs: 'c_wcs', dist: 'c_dist', retract: 'c_retract', f_fast: 'c_feed_fast', f_slow: 'c_feed_slow', qStop: 'c_q', safeZ: 'c_safe_z', travelDist: 'c_travel_dist', scanDepth: 'c_scan_depth', radius: 'c_radius' },
+    edge: { axis: 'p_axis', dir: 'p_dir', wcs: 'p_wcs', dist: 'p_dist', retract: 'p_retract', syncA: 'p_sync_a', slave: 'p_slave', f_fast: 'p_feed_fast', f_slow: 'p_feed_slow', qStop: 'p_q' },
+    middle: { featureType: 'm_type', axis: 'm_axis', findBoth: 'm_both', syncA: 'm_sync_a', slave: 'm_slave', wcs: 'm_wcs', dist: 'm_dist', retract: 'm_retract', safeZ: 'm_safe_z', f_fast: 'm_feed_fast', f_slow: 'm_feed_slow', qStop: 'm_q', dir1: 'm_dir', dir2: 'm_dir2' },
+    wcs: { sys: 'w_sys', axisX: 'w_x', axisY: 'w_y', axisZ: 'w_z', sync: 'w_sync', slave: 'w_slave' },
+    alignment: { checkAxis: 'al_check_axis', probeDir: 'al_probe_dir', tolerance: 'al_tolerance', dist: 'al_dist', retract: 'al_retract', safeZ: 'al_safe_z', f_fast: 'al_feed_fast', f_slow: 'al_feed_slow', qStop: 'al_q' },
+    circular: { featureType: 'circ_type', wcs: 'circ_wcs', dist: 'circ_dist', retract: 'circ_retract', safeZ: 'circ_safe_z', f_fast: 'circ_feed_fast', f_slow: 'circ_feed_slow', qStop: 'circ_q' },
+    rotary_clock: { action: 'rcl_action', reference: 'rcl_reference', span: 'rcl_span', wcs: 'rcl_wcs', dist: 'rcl_dist', retract: 'rcl_retract', safeZ: 'rcl_safe_z', f_fast: 'rcl_feed_fast', f_slow: 'rcl_feed_slow', qStop: 'rcl_q' },
+    rotary_center: { method: 'rc_method', datum: 'rc_datum', diameter: 'rc_diameter', wcs: 'rc_wcs', dist: 'rc_dist', retract: 'rc_retract', safeZ: 'rc_safe_z', f_fast: 'rc_feed_fast', f_slow: 'rc_feed_slow', qStop: 'rc_q' },
+    comm: { type: 'c_type', msg: 'c_msg', val: 'c_val', cycle: 'c_cycle', popupMode: 'c_popup_mode', id: 'c_id', dest: 'c_dest', slot1: 'c_slot1', slot2: 'c_slot2', slot3: 'c_slot3', slot4: 'c_slot4', statusColor: 'c_status_color', statusMode: 'c_status_mode', statusDwell: 'c_status_dwell' },
+    atc_check: { tolerance: 'atc_check_tol' },
+    atc_warmup: { rpm1: 'atc_warmup_rpm1', time1: 'atc_warmup_time1', rpm2: 'atc_warmup_rpm2', time2: 'atc_warmup_time2' },
+    atc_change: { mode: 'atc_change_mode', x: 'atc_change_x', y: 'atc_change_y', z: 'atc_change_z', zClear: 'atc_change_zclear', capacity: 'atc_change_capacity', fixedT: 'atc_change_fixedt', waitSpindle: 'atc_change_m300', dustCover: 'atc_change_cover', confirm: 'atc_change_confirm' },
+    atc_test: { mode: 'atc_test_mode', cycles: 'atc_test_cycles', dwellMs: 'atc_test_dwell', first: 'atc_test_first', count: 'atc_test_count', zClear: 'atc_test_zclear', descend: 'atc_test_descend' },
+};
+
 export class WizardManager {
     constructor(editorManager) {
         this.editorManager = editorManager;
@@ -175,10 +199,23 @@ export class WizardManager {
      * — the single source of truth (no snapshot) — glows the modal to mark it as editing, and on insert REPLACES
      * that op (replaceOp rebuilds its blocks from the edited params) instead of appending a new one.
      */
-    /** Does this op type's view support seeding its form from params yet (so it can be edited in place)? */
+    /** Does this op type support seeding its form from params (so it can be edited in place)? */
     canEdit(opType) {
         const view = viewByType.get(opType);
-        return !!(view && typeof view.setForm === 'function');
+        return !!(opType && (PARAM_FIELDS[opType] || (view && typeof view.setForm === 'function')));
+    }
+
+    /** params → form: a custom view.setForm() when it has one (e.g. drill's pattern variants), else the central
+     *  PARAM_FIELDS map (value/checkbox decided by element type). params are the single source of truth — no snapshot. */
+    _seedForm(opType, params) {
+        const view = viewByType.get(opType);
+        if (view && typeof view.setForm === 'function') { view.setForm(params || {}); return; }
+        const map = PARAM_FIELDS[opType]; if (!map || !params) return;
+        for (const key in map) {
+            const e = el(map[key]); if (!e) continue;
+            const val = params[key]; if (val == null) continue;
+            if (e.type === 'checkbox') e.checked = !!val; else e.value = val;
+        }
     }
 
     openForEdit(opId) {
@@ -186,8 +223,7 @@ export class WizardManager {
         const op = prog.find((b) => b && b.type === 'op' && b.id === opId);
         if (!op || !op.opType) return;
         this.open(op.opType);                          // normal open (clears editing + glow, seeds defaults)
-        const view = viewByType.get(op.opType);
-        if (view && typeof view.setForm === 'function' && op.params) view.setForm(op.params);   // params → form
+        this._seedForm(op.opType, op.params);          // params → form (the single source of truth)
         this.update();                                 // re-render preview + code from the seeded values
         this.editingOpId = opId;                       // now mark as editing this op
         const box = document.querySelector('.wiz-box'); if (box) box.classList.add('editing');  // accent glow

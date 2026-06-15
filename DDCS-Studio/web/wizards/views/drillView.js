@@ -111,6 +111,20 @@ export const drillView = {
     ],
     probeSrcFields: {},   // not a probe wizard — keep the shared controller-source decorator a no-op
 
+    // Custom params → form (pattern variants: `count` lives in d_count for circle but d_lcount for line, so a
+    // flat map can't express it). The inverse of update()'s reads; used by wizardManager._seedForm on edit.
+    setForm(p = {}) {
+        const set = (id, val) => { const e = el(id); if (e && val != null) e.value = val; };
+        set('d_pattern', p.pattern); set('d_method', p.method); set('d_skip', p.skip);
+        set('d_originX', p.originX); set('d_originY', p.originY);
+        set('d_depth', p.depth); set('d_clearance', p.clearance); set('d_feed', p.feed); set('d_rpm', p.rpm);
+        set('d_holeDia', p.holeDia); set('d_peck', p.peck); set('d_toolDia', p.toolDia); set('d_pitch', p.pitch);
+        if (p.pattern === 'grid') { set('d_cols', p.cols); set('d_rows', p.rows); set('d_dx', p.dx); set('d_dy', p.dy); }
+        else if (p.pattern === 'circle') { set('d_dia', p.dia); set('d_count', p.count); set('d_startAngle', p.startAngle); }
+        else if (p.pattern === 'rect') { set('d_w', p.w); set('d_h', p.h); set('d_nx', p.nx); set('d_ny', p.ny); }
+        else if (p.pattern === 'line') { set('d_lcount', p.count); set('d_spacing', p.spacing); set('d_angle', p.angle); }
+    },
+
     onOpen(ctx) {
         // Populate the Tool ▾ picker from the library each open (it may have changed in Settings).
         const sel = el('d_tool');

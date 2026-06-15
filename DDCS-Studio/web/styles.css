@@ -445,8 +445,15 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .op-edit-chip:disabled { background: var(--panel, #334); color: var(--text-dim, #9aa); cursor: default; box-shadow: none; }
 .op-edit-chip[hidden] { display: none; }
 
-/* A wizard re-opened to EDIT an existing op (vs create a new one): accent glow on the modal. */
-.wiz-box.editing { box-shadow: 0 0 0 2px var(--accent, #0ea5e9), 0 0 22px 2px rgba(14,165,233,.55); }
+/* A wizard re-opened to EDIT an existing op (vs create a new one): pronounced accent glow + soft pulse. */
+.wiz-box.editing {
+    border-color: var(--accent, #0ea5e9) !important;
+    animation: wizEditGlow 1.5s ease-in-out infinite;
+}
+@keyframes wizEditGlow {
+    0%, 100% { box-shadow: 0 0 0 3px var(--accent, #0ea5e9), 0 0 34px 5px rgba(14, 165, 233, .65); }
+    50%      { box-shadow: 0 0 0 4px var(--accent, #0ea5e9), 0 0 52px 12px rgba(14, 165, 233, 1); }
+}
 
 /* Main Layout */
 .app-shell {
