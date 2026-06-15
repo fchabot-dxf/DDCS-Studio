@@ -5,7 +5,7 @@ import { el, toast } from "../util.js";
 
 export default {
   id: "admin",
-  label: "Setup",
+  label: "Console",
 
   async mount(ctx) {
     this.card = el("section", { class: "block" });

@@ -7,7 +7,7 @@ const stat = (k, v) => el("div", { class: "bt-stat" },
 
 export default {
   id: "tracker",
-  label: "Tracker",
+  label: "Tracking",
 
   mount(ctx) {
     this.wrap = el("section", { class: "block bigtrack" });
