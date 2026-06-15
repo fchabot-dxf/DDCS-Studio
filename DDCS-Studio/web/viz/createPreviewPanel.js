@@ -38,6 +38,8 @@ const PANEL_HTML = `
     <button class="pp-run" type="button" title="Run / pause the program in execution order">▶</button>
     <button class="pp-step" type="button" title="Execute one line at a time (pauses a running program)">⏭</button>
     <button class="pp-loop" type="button" title="Loop: restart the program when it completes">⟳</button>
+    <button class="pp-jog" type="button" title="Jog the start marker (X/Y/Z step buttons)" style="display:none">✛ Jog</button>
+    <button class="pp-io" type="button" title="Show/hide the virtual I/O panel (sensors and outputs)">I/O</button>
   </div>
   <div class="viz3d-legend">
     <span><i style="background:#3b82f6"></i>Probe</span>
@@ -140,8 +142,16 @@ export function createPreviewPanel(container, opts = {}) {
         }
         const s = parsed.stats || {};
         setStatus(!s.drawable ? 'No drawable moves' : [s.feed && `${s.feed} cuts`, s.probe && `${s.probe} probes`, s.rapid && `${s.rapid} rapids`].filter(Boolean).join(' · '));
+        syncJog();
     }
     const refresh = () => setGcode();
+
+    // Single bottom bar: the jog grid lives in the 3D viz's pendant; the bar's ✛ Jog button toggles it and only
+    // shows when there's a start marker to jog (3D + starts). I/O toggles the shared virtual-I/O panel.
+    function syncJog() {
+        const b = q('.pp-jog'); if (!b) return;
+        b.style.display = (mode === '3d' && viz && viz.jogPendant && viz.starts && viz.starts.length > 0) ? '' : 'none';
+    }
 
     function setMode(next) {
         mode = next;
@@ -203,6 +213,14 @@ export function createPreviewPanel(container, opts = {}) {
         if (engine) engine.simSpeed = simSpeed();
     });
     q('.pp-copy').addEventListener('click', () => { if (statusEl && statusEl.textContent && navigator.clipboard) navigator.clipboard.writeText(statusEl.textContent); });
+    q('.pp-jog').addEventListener('click', () => {
+        const v = ensureViz(); if (!v || !v.jogPendant) return;
+        const grid = v.jogPendant.querySelector('.jog-grid-wrap'); if (!grid) return;
+        const open = grid.style.display === 'none';
+        grid.style.display = open ? '' : 'none';
+        q('.pp-jog').classList.toggle('on', open);
+    });
+    q('.pp-io').addEventListener('click', () => { if (window.ioPanel) window.ioPanel.toggle(); });
 
     window.addEventListener('ddcs:stop-previews', stopPlay);
     // Stock (or other settings) changed — e.g. the Stock modal — update the workpiece box + re-trace (probe clamp).

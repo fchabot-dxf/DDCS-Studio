@@ -24,8 +24,13 @@ test('preview: single 2D/3D toggle, one Stock, always-visible compact controls',
       stockIcon: c.querySelector('.pp-stock') && c.querySelector('.pp-stock').textContent.trim(),
       speedLabels: c.querySelectorAll('label').length,
       controlsOpacity: getComputedStyle(c).opacity,
+      hasJog: !!c.querySelector('.pp-jog'),       // jog + I/O merged into the single bar
+      hasIO: !!c.querySelector('.pp-io'),
+      separateJogBar: !!document.querySelector('.jog-bar'),
     };
   });
+  expect(r.hasJog && r.hasIO, 'jog + I/O are in the single controls bar').toBeTruthy();
+  expect(r.separateJogBar, 'no separate jog bar (single bar)').toBeFalsy();
   expect(r.toggleLabel, 'single 2D/3D toggle, labelled with the current view').toBe('3D');
   expect(r.hasOldButtons, 'no separate 2D + 3D buttons').toBeFalsy();
   expect(r.stockCount, 'exactly one Stock button (no jog-pendant duplicate)').toBe(1);

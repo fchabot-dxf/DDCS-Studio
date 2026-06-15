@@ -40,14 +40,11 @@ test('mobile: header controls on-screen, zoom popover on top, wizard preview con
   const ctl = await page.evaluate(() => {
     const p = [...document.querySelectorAll('.preview-panel')].find((x) => x.querySelector('.viz3d-controls'));
     if (!p) return null;
-    const c = p.querySelector('.viz3d-controls'), j = p.querySelector('.viz3d-jog-pendant');
-    const cr = c.getBoundingClientRect(), pr = p.getBoundingClientRect();
-    const jr = (j && getComputedStyle(j).display !== 'none') ? j.getBoundingClientRect() : null;
-    return { ctlLeft: cr.left, ctlRight: cr.right, ctlBottom: cr.bottom, paneLeft: pr.left, paneRight: pr.right, jogTop: jr ? jr.top : null };
+    const cr = p.querySelector('.viz3d-controls').getBoundingClientRect(), pr = p.getBoundingClientRect();
+    return { ctlLeft: cr.left, ctlRight: cr.right, paneLeft: pr.left, paneRight: pr.right };
   });
   expect(ctl, 'preview controls present').not.toBeNull();
   expect(ctl.ctlLeft).toBeGreaterThanOrEqual(ctl.paneLeft - 1);
-  expect(ctl.ctlRight).toBeLessThanOrEqual(ctl.paneRight + 1);
-  if (ctl.jogTop !== null) expect(ctl.ctlBottom, 'sim controls sit ABOVE the jog bar (not overlapping)').toBeLessThanOrEqual(ctl.jogTop + 1);
+  expect(ctl.ctlRight, 'single controls bar fits within the pane').toBeLessThanOrEqual(ctl.paneRight + 1);
   await page.screenshot({ path: 'tests/_mobile-layout.png' });
 });

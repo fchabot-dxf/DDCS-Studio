@@ -3358,7 +3358,7 @@ body[data-scale="250"] {
 .viz3d-drawer .viz3d-jog-pendant,
 .wiz-viz3d .viz3d-jog-pendant {
     position: absolute;
-    bottom: 8px;
+    bottom: 42px;            /* the jog grid pops up ABOVE the single controls bar (✛ Jog lives in that bar now) */
     left: 8px;
     right: auto;
     width: auto;
@@ -3371,19 +3371,13 @@ body[data-scale="250"] {
     max-width: 64%;
     background: rgba(0, 0, 0, 0.62); padding: 4px 6px; border-radius: 8px;  /* float over the canvas */
 }
-/* Mobile: the preview pane is narrow (wizard stacks at 860px), so 64% crams the controls into overlapping
-   rows. Let the bar span the pane width and centre-wrap into clean rows; tighter pills. */
+/* Mobile: the preview pane is narrow (wizard stacks at 860px). The SINGLE controls bar spans the pane width and
+   centre-wraps into clean rows; the jog grid still pops above it. Tighter pills. */
 @media (max-width: 860px) {
-    /* Two bottom bars exist (jog pendant + sim controls). On desktop they sit bottom-left vs bottom-right; on a
-       narrow pane that overlaps (play buttons end up UNDER the jog bar). STACK them: jog at the very bottom,
-       controls just above — and shrink the pills. */
-    .viz3d-jog-pendant { left: 6px; right: 6px; width: auto; bottom: 6px; }
-    .viz3d-jog-pendant .jog-bar { justify-content: center; flex-wrap: wrap; gap: 4px; padding: 3px 5px; }
-    .viz3d-controls { left: 6px; right: 6px; max-width: calc(100% - 12px); bottom: 44px; justify-content: center; gap: 4px; padding: 2px 5px; }
+    .viz3d-controls { left: 6px; right: 6px; max-width: calc(100% - 12px); bottom: 6px; justify-content: center; gap: 4px; padding: 2px 5px; }
     .viz3d-controls select, .viz3d-controls button,
-    .viz3d-jog-pendant .jog-bar select, .viz3d-jog-pendant .jog-bar button,
     .viz3d-jog-pendant .jog-start-btns button { font-size: 9px; padding: 2px 5px; }
-    .viz3d-controls .pp-speed { max-width: 52px; flex: 0 0 auto; padding-left: 4px; }   /* compact speed select (still shows 1×/MAX) */
+    .viz3d-controls .pp-speed { max-width: 52px; flex: 0 0 auto; padding-left: 4px; }   /* compact speed button */
 }
 .viz3d-controls label { font-size: 10px; color: #9fc4e6; display: flex; align-items: center; gap: 4px; }
 .viz3d-controls select,

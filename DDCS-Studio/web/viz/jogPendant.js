@@ -34,29 +34,14 @@ export function setupJogPendant(viz) {
                     <button class="toolbar-btn" data-axis="z" data-dir="0" style="flex:1; height:24px; padding:0; background:#2b3340; border-color:#555; color:#e6ecf2;" title="Reset Z to 0">0 Z</button>
                 </div>
             </div>
-            <div class="jog-bar" style="display: flex; align-items: center; gap: 6px; padding: 5px 6px; background: rgba(18,18,22,0.92); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;">
-                <button id="jogToggle" title="Show/hide the jog buttons">✛ Jog</button>
-                <span id="jogPlayControls" style="display: flex; align-items: center; gap: 6px;"></span>
-                <button id="jogIOBtn" title="Show/hide the virtual I/O panel (sensors and outputs)">I/O</button>
-            </div>
         `;
         viz.container.appendChild(div);
         viz.jogPendant = div;
-        
+
         // Prevent touches on the jog panel from rotating the view
         div.addEventListener('pointerdown', e => e.stopPropagation());
-        
-        const ioBtn = div.querySelector('#jogIOBtn');
-        if (ioBtn) ioBtn.addEventListener('click', () => { if (window.ioPanel) window.ioPanel.toggle(); });
-
-        // Drawer toggle for the jog grid (collapsed by default).
-        const toggleBtn = div.querySelector('#jogToggle');
-        const gridWrap = div.querySelector('.jog-grid-wrap');
-        if (toggleBtn && gridWrap) toggleBtn.addEventListener('click', () => {
-            const open = gridWrap.style.display === 'none';
-            gridWrap.style.display = open ? '' : 'none';
-            toggleBtn.classList.toggle('on', open);
-        });
+        // (The visible bar moved into the single preview controls bar — its ✛ Jog button toggles .jog-grid-wrap,
+        //  I/O toggles the I/O panel. This pendant is now just the collapsible jog grid + start selector.)
 
         div.querySelectorAll('button[data-axis]').forEach(btn => {
             btn.addEventListener('click', (e) => {
