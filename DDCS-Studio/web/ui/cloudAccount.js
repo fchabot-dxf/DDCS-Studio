@@ -22,12 +22,18 @@ export function disconnect() {
     window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
 }
 
+// OAuth ALWAYS runs on the cloud Worker (the only place that can hold the client secret + a public redirect).
+// So the OAuth base is: a configured service URL (override) → else the cloud Worker. When the app is SERVED from
+// that Worker (hosted Cloudflare), this is effectively same-origin; when it runs LOCALLY (desktop exe / local
+// gateway / live preview), the login still reaches the cloud Worker. Same login works for both deployments.
+const CLOUD_OAUTH_BASE = 'https://ddcs-studio.pages.dev';
+const oauthBase = () => ((getService().base || '').replace(/\/$/, '') || CLOUD_OAUTH_BASE);
+
 /** Connect: open a MODAL that launches the OAuth sign-in in a popup (no full-page redirect) and captures the
- *  token the Worker posts back. Base = a configured cloud service URL (Gateway → Console) if set, else same-origin
- *  (the hosted Pages Worker serves /api). The Worker popup must postMessage {type:'ddcs-cloud-auth', token,
- *  provider, email} to window.opener and close — see the Worker OAuth scaffold (next build step). */
+ *  token the Worker posts back. The Worker popup must postMessage {type:'ddcs-cloud-auth', token, provider, email}
+ *  to window.opener (at our origin) and close — see the Worker OAuth scaffold (next build step). */
 export function connect(provider = 'google') {
-    openConnectModal(provider, (getService().base || '').replace(/\/$/, ''));
+    openConnectModal(provider, oauthBase());
 }
 
 function openConnectModal(provider, base) {
