@@ -27,18 +27,26 @@ import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock mo
 // broadcasts ddcs:settings-changed; every panel reads it here + re-renders, so all previews show the same stock.
 const stockForViz = () => { const s = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null; return (s && s.show) ? s : null; };
 
+// Custom transport icons (currentColor → inherit the button's text colour), in place of emoji.
+const ICON_PLAY = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" style="vertical-align:middle" aria-hidden="true"><path d="M4.5 3 12.5 8 4.5 13Z"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" style="vertical-align:middle" aria-hidden="true"><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/></svg>';
+const ICON_STEP = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" style="vertical-align:middle" aria-hidden="true"><path d="M3.5 3 10 8 3.5 13Z"/><rect x="11" y="3" width="2.4" height="10" rx="1"/></svg>';
+const ICON_COPY = '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" style="vertical-align:middle" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>';
+// Jog = 4-direction arrow keys (X/Y/Z step movement).
+const ICON_JOG = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" style="vertical-align:middle" aria-hidden="true"><path d="M8 2 6 4.5h4z"/><path d="M8 14 6 11.5h4z"/><path d="M2 8 4.5 6v4z"/><path d="M14 8 11.5 6v4z"/></svg>';
+
 const PANEL_HTML = `
-  <canvas class="pp-2d" aria-hidden="true" style="position:absolute;inset:0;display:none;background:#0d1117;z-index:1"></canvas>
+  <canvas class="pp-2d" aria-hidden="true" style="position:absolute;top:0;left:0;width:100%;height:100%;display:none;background:#0d1117;z-index:1"></canvas>
   <div class="pp-status viz3d-status"></div>
-  <button class="pp-copy viz3d-status-copy" type="button" title="Copy status to clipboard">📋 Copy</button>
+  <button class="pp-copy viz3d-status-copy" type="button" title="Copy status to clipboard" aria-label="Copy status">${ICON_COPY}</button>
   <div class="viz3d-controls">
     <button class="pp-mtoggle viz3d-2dtoggle" type="button" title="Toggle 2D / 3D view">3D</button>
     <button class="pp-stock" type="button" title="Stock — set the workpiece (dimensions, shape, show, templates)" aria-label="Stock">📦</button>
     <button class="pp-speed" type="button" title="Simulation speed — tap to cycle 1× 2× 5× 10×" aria-label="Simulation speed">1×</button>
-    <button class="pp-run" type="button" title="Run / pause the program in execution order">▶</button>
-    <button class="pp-step" type="button" title="Execute one line at a time (pauses a running program)">⏭</button>
+    <button class="pp-run" type="button" title="Run / pause the program in execution order">${ICON_PLAY}</button>
+    <button class="pp-step" type="button" title="Execute one line at a time (pauses a running program)">${ICON_STEP}</button>
     <button class="pp-loop" type="button" title="Loop: restart the program when it completes">⟳</button>
-    <button class="pp-jog" type="button" title="Jog the start marker (X/Y/Z step buttons)" style="display:none">✛ Jog</button>
+    <button class="pp-jog" type="button" title="Jog the start marker (X/Y/Z step buttons)" aria-label="Jog" style="display:none">${ICON_JOG}</button>
     <button class="pp-io" type="button" title="Show/hide the virtual I/O panel (sensors and outputs)">I/O</button>
   </div>
   <div class="viz3d-legend">
@@ -118,7 +126,7 @@ export function createPreviewPanel(container, opts = {}) {
         const b = q('.pp-run'); if (!b) return;
         const running = !!(engine && engine.running), paused = !!(engine && engine.paused);
         b.classList.toggle('on', running && !paused);
-        b.textContent = !running ? '▶' : (paused ? '▶' : '⏸');
+        b.innerHTML = (running && !paused) ? ICON_PAUSE : ICON_PLAY;
     }
 
     // Render the static route in the active view from the fed G-code (engine.trace resolves #vars/loops/probes).

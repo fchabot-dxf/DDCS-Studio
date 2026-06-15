@@ -43,6 +43,17 @@ test('preview: single 2D/3D toggle, one Stock, always-visible compact controls',
   const after = await page.evaluate(() => [...document.querySelectorAll('.preview-panel')].find((x) => x.querySelector('.pp-mtoggle')).querySelector('.pp-mtoggle').textContent.trim());
   expect(after, 'toggle flips 3D → 2D').toBe('2D');
 
+  // 2D view actually renders (regression: .pp-2d is a replaced <canvas>; inset:0 + auto width gave it 0×0)
+  await page.waitForTimeout(150);
+  const twoD = await page.evaluate(() => {
+    const cv = [...document.querySelectorAll('.preview-panel')].find((x) => x.querySelector('.pp-2d')).querySelector('.pp-2d');
+    let drawn = 0;
+    try { const ctx = cv.getContext('2d'); const d = ctx.getImageData(0, 0, cv.width, cv.height).data; for (let i = 3; i < d.length; i += 4) { if (d[i] > 0) { drawn++; if (drawn > 20) break; } } } catch (e) { /* */ }
+    return { w: cv.clientWidth, drawn };
+  });
+  expect(twoD.w, '2D canvas has a real size').toBeGreaterThan(10);
+  expect(twoD.drawn, '2D toolpath actually drew pixels').toBeGreaterThan(0);
+
   // speed is a cycling button (1× → 2× → 5× → 10× → 1×), not a dropdown
   const sp = await page.evaluate(() => {
     const s = [...document.querySelectorAll('.preview-panel')].find((x) => x.querySelector('.pp-speed')).querySelector('.pp-speed');
