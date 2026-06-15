@@ -21,7 +21,12 @@ import time
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-HOST, PORT = "127.0.0.1", 8765
+HOST = "127.0.0.1"
+# Port fallback: the exe binds the first FREE port in this range (so it still launches if 8765 is taken).
+# ALL of these must be registered as Google OAuth "Authorized JavaScript origins" (http://127.0.0.1:<p>) so the
+# in-app cloud login works whichever port it lands on. PORT is set at startup by _pick_port().
+PORTS = [8765, 8766, 8767, 8768, 8769]
+PORT = PORTS[0]
 TITLE = "DDCS Studio"   # the desktop app = Studio UI + embedded gateway ("fairy" is just the gateway daemon inside)
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "fairy.log")
 
@@ -131,13 +136,53 @@ def _msgbox(text, yesno=False):
         return True
 
 
-def _gateway_answering(timeout=0.8):
-    """True if something already answers our port — a second copy must not start (COM/port clash)."""
+def _gateway_answering(port=None, timeout=0.8):
+    """True if a DDCS gateway already answers on <port> (default PORT) — a second copy must not start."""
     try:
-        with urllib.request.urlopen(f"http://{HOST}:{PORT}/api/descriptor", timeout=timeout) as r:
+        with urllib.request.urlopen(f"http://{HOST}:{port or PORT}/api/descriptor", timeout=timeout) as r:
             return r.status == 200
     except Exception:
         return False
+
+
+def _port_free(port):
+    """True if we can bind <port> on HOST right now (i.e. it's free for our server)."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind((HOST, port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+def _preferred_port():
+    """A user-chosen port from ~/.ddcs-bridge/config.json ("port"), honored only if it's one of our registered
+    PORTS (so OAuth's JS-origin list still covers it). Lets users pick which port the exe serves on."""
+    try:
+        import json
+        with open(os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "config.json"), encoding="utf-8") as f:
+            p = json.load(f).get("port")
+        return p if p in PORTS else None
+    except Exception:
+        return None
+
+
+def _pick_port():
+    """Single-instance + port fallback, honoring the user's chosen port first. If a DDCS gateway already answers
+    on a candidate, reuse-detect it (don't start a second). Otherwise bind the first FREE candidate, trying the
+    user's preferred port ahead of the rest. Returns (port, already_running)."""
+    pref = _preferred_port()
+    order = ([pref] if pref else []) + [p for p in PORTS if p != pref]
+    for p in order:
+        if _gateway_answering(p):
+            return p, True
+    for p in order:
+        if _port_free(p):
+            return p, False
+    return order[0], False   # none free — binding will fail and report below
 
 
 def _tracking_active():
@@ -153,13 +198,17 @@ def _tracking_active():
 
 def main():
     _setup_logging()
-    # Single-instance lock (COMBINED-APP-PLAN Step 4): two gateways would silently double-bind the
-    # HTTP port and fight over the serial COM port — refuse politely instead.
-    if _gateway_answering():
+    # Single-instance lock + port fallback (COMBINED-APP-PLAN Step 4): two gateways would double-bind the HTTP
+    # port and fight over the serial COM port — refuse politely. If 8765 is taken by something else, fall back
+    # to the next free port in PORTS.
+    global PORT
+    PORT, already_running = _pick_port()
+    if already_running:
         _msgbox(f"Already running — another gateway is answering on port {PORT}.\n\n"
                 "Use the open window (or close it first); two copies would fight over the COM port.")
         print(f"[fairy] another instance answers on :{PORT} — exiting.")
         return
+    print(f"[fairy] serving on http://{HOST}:{PORT}")
     user_args = sys.argv[1:]
     threading.Thread(target=_run_gateway, args=(user_args,), daemon=True).start()
     if not _wait_up():

@@ -4,6 +4,28 @@ Running list of things noticed mid-work that we deliberately deferred. Newest on
 
 ---
 
+## Desktop exe: port fallback + cloud-OAuth JS origins (2026-06-15)
+*Status: fallback DONE in `fairy_gateway.py` (needs a rebuild to ship in the exe); Setup-UI port dropdown = follow-up.*
+
+The exe serves Studio from `http://127.0.0.1:<port>`. `_pick_port()` binds the first FREE port in
+`PORTS = [8765, 8766, 8767, 8768, 8769]` (so it launches even if 8765 is taken), reuse-detects a running gateway
+(single-instance), and honors a user-chosen port from `~/.ddcs-bridge/config.json` `"port"` (only if within PORTS).
+
+**OAuth implication — each port is a distinct origin**, so ALL must be registered as Google **Authorized
+JavaScript origins** (Client ID = the BYO Drive SPA client, see [[gateway-cloud-architecture]]):
+```
+https://ddcs-studio.pages.dev    (hosted)
+http://127.0.0.1:8765 … :8769    (exe fallback range)
+http://127.0.0.1:5501            (dev live-preview, optional)
+```
+Don't allow ports outside PORTS (cloud login would break — origin not registered). One Client ID covers web +
+preview + exe. **Redirect URIs stay empty** (GIS token model uses JS origins).
+
+Follow-ups: (1) a port dropdown in Settings → Network / gateway Console (Setup) writing config `"port"` (choices
+limited to PORTS) so users pick via UI; (2) rebuild + re-publish the exe to ship the fallback + the baked-in
+client ID; (3) embedded-webview OAuth caveat still open — WebView2 may be blocked by Google → system-browser
+loopback fallback in `fairy_gateway.py` (test the exe).
+
 ## Audit the exe build + maybe build-on-commit (2026-06-15)
 *Status: TODO.*
 
