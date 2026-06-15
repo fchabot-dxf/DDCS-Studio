@@ -3377,6 +3377,17 @@ body[data-scale="250"] {
     .viz3d-controls { left: 8px; right: 8px; max-width: calc(100% - 16px); justify-content: center; gap: 4px; padding: 3px 5px; }
     .viz3d-controls select, .viz3d-controls button { font-size: 10px; padding: 2px 6px; }
 }
+/* Auto-hide chrome to free the canvas (createPreviewPanel toggles .controls-shown on pointer activity) —
+   controls + legend + hint fade out when idle, fade in on hover/tap. Hidden controls don't catch clicks so
+   canvas orbit still works. */
+.preview-panel .viz3d-controls,
+.preview-panel .viz3d-legend,
+.preview-panel .viz3d-hint { opacity: 0; transition: opacity 0.18s ease; }
+.preview-panel .viz3d-controls { pointer-events: none; }
+.preview-panel.controls-shown .viz3d-controls,
+.preview-panel.controls-shown .viz3d-legend,
+.preview-panel.controls-shown .viz3d-hint { opacity: 1; }
+.preview-panel.controls-shown .viz3d-controls { pointer-events: auto; }
 .viz3d-controls label { font-size: 10px; color: #9fc4e6; display: flex; align-items: center; gap: 4px; }
 .viz3d-controls select,
 .viz3d-controls button,

@@ -36,13 +36,11 @@ const PANEL_HTML = `
       <button class="pp-m2d" type="button" title="2D top-down toolpath">2D</button>
       <button class="pp-m3d primary" type="button" title="3D toolpath">3D</button>
     </span>
-    <button class="pp-stock" type="button" title="Stock — set the workpiece (dimensions, shape, show, templates)">Stock</button>
-    <label>Speed
-      <select class="pp-speed" title="Simulation speed — 1× plays at the programmed feedrates">
-        <option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option>
-        <option value="10">10×</option><option value="1000">MAX</option>
-      </select>
-    </label>
+    <button class="pp-stock" type="button" title="Stock — set the workpiece (dimensions, shape, show, templates)" aria-label="Stock">📦</button>
+    <select class="pp-speed" title="Simulation speed — 1× plays at the programmed feedrates" aria-label="Simulation speed">
+      <option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option>
+      <option value="10">10×</option><option value="1000">MAX</option>
+    </select>
     <button class="pp-run" type="button" title="Run / pause the program in execution order">▶</button>
     <button class="pp-step" type="button" title="Execute one line at a time (pauses a running program)">⏭</button>
     <button class="pp-loop" type="button" title="Loop: restart the program when it completes">⟳</button>
@@ -66,6 +64,19 @@ export function createPreviewPanel(container, opts = {}) {
     const cv2d = q('.pp-2d');
     const statusEl = q('.pp-status');
     const t2 = createToolpath2d(cv2d);
+
+    // Auto-hide the controls + legend + hint to free the canvas (saves space without losing functions): reveal on
+    // any pointer activity (hover on desktop, tap on mobile), then fade after a short idle. Hidden controls are
+    // pointer-events:none so canvas orbit still works; first reveal on mount makes them discoverable.
+    let chromeTimer = null;
+    const showChrome = () => {
+        container.classList.add('controls-shown');
+        clearTimeout(chromeTimer);
+        chromeTimer = setTimeout(() => container.classList.remove('controls-shown'), 2600);
+    };
+    container.addEventListener('pointermove', showChrome);
+    container.addEventListener('pointerdown', showChrome);
+    showChrome();
 
     let viz = null;            // GcodeViz3D (lazy — only when 3D is shown and WebGL is available)
     let mode = '3d', active = false, segs = [], fitted = false;
