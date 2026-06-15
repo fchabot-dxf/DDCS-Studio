@@ -44,8 +44,16 @@ test('editing a HIGH-LEVEL program is reverted (not flattened)', async ({ page }
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.__blkws && window.__blkws.getTopBlocks(false).length > 0, { timeout: 8000 });
 
-  const beforeTypes = await page.evaluate(() => window.ddcsGetBlockProgram().map((b) => b.type));
-  expect(beforeTypes, 'surfacing seeds a high-level program (contains a Step Down)').toContain('stepdown');
+  // surfacing seeds a HIGH-LEVEL program: ops are wrapped in an 'op' container (the Step Down lives in its
+  // children), so the top level is [progstart, op, progend] — not a flat list with a top-level 'stepdown'.
+  const before = await page.evaluate(() => {
+    const prog = window.ddcsGetBlockProgram();
+    const has = (arr) => (arr || []).some((b) => b && (b.type === 'stepdown' || has(b.children)));
+    return { types: prog.map((b) => b.type), hasStepdown: has(prog) };
+  });
+  const beforeTypes = before.types;
+  expect(beforeTypes, 'surfacing seeds a high-level program wrapped in an op container').toContain('op');
+  expect(before.hasStepdown, 'the op still contains a Step Down (high-level, not flattened)').toBeTruthy();
 
   await page.evaluate(() => window.showApp('studio'));   // editor visible
   await page.locator('#editor').fill('G1 X999 Y999 Z-99 F1\n( junk )');
