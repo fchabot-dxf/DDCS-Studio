@@ -2,15 +2,57 @@
 // beacons) with a clear connection status. On the CLOUD console it's read-only (the cloud can't reach
 // into the gateway — configure it on the machine PC). A form view: mounted on tab click, not polled.
 import { el, toast } from "../util.js";
+import { getService, setService } from "../service.js";
 
 export default {
   id: "admin",
   label: "Console",
 
   async mount(ctx) {
+    this.serviceCard = el("section", { class: "block" });
     this.card = el("section", { class: "block" });
-    ctx.root.append(this.card);
-    await this.render(ctx);
+    ctx.root.append(this.serviceCard, this.card);
+    this.renderService(ctx);                 // optional cloud-service picker (always available)
+    await this.render(ctx);                  // gateway config (needs a reachable gateway)
+  },
+
+  // Optional cloud-service picker — CLIENT-side: which /api the Gateway talks to. Local-first by default so
+  // users stay autonomous (no service needed); pointing at a service just sets ddcs_api/ddcs_token (service.js).
+  // Always rendered, even when no gateway answers, so you can re-point at a different service.
+  renderService(ctx) {
+    const svc = getService();
+    const baseIn = el("input", { type: "text", value: svc.base, placeholder: "https://your-service.example/  (Cloudflare / self-host)", style: "width:100%" });
+    const tokIn = el("input", { type: "text", value: svc.token, placeholder: "access token (optional)", style: "width:100%" });
+    const cloudFields = el("div", { class: "block" },
+      el("div", {}, el("span", { class: "label" }, "Service URL"), baseIn),
+      el("div", { style: "margin-top:8px" }, el("span", { class: "label" }, "Access token"), tokIn));
+
+    const local = el("input", { type: "radio", name: "gw-svc" }); local.checked = svc.mode === "local";
+    const cloud = el("input", { type: "radio", name: "gw-svc" }); cloud.checked = svc.mode === "cloud";
+    const sync = () => cloudFields.classList.toggle("hidden", !cloud.checked);
+    local.onchange = cloud.onchange = sync;
+
+    const gdrive = el("button", { class: "op-btn", disabled: "" }, "🔗 Connect Google Drive (OAuth) — coming soon");
+
+    const apply = el("button", { class: "primary" }, "Apply");
+    apply.onclick = () => {
+      setService(cloud.checked ? { base: baseIn.value.trim(), token: tokIn.value.trim() } : {});
+      toast("Service updated — reloading");
+      setTimeout(() => location.reload(), 400);
+    };
+
+    this.serviceCard.replaceChildren(
+      el("div", { class: "section-label" }, "Service (optional)"),
+      el("div", { class: "wiz-usage" },
+        "Local-first: by default the Gateway uses the gateway on this PC — no account, fully autonomous. "
+        + "Optionally point it at a cloud service (your own Cloudflare / self-host endpoint now; OAuth'd cloud "
+        + "storage like Google Drive later). Clearing it returns to local."),
+      el("label", { class: "row", style: "gap:6px;cursor:pointer;margin-top:8px" }, local, "Local (this PC) — autonomous"),
+      el("label", { class: "row", style: "gap:6px;cursor:pointer" }, cloud, "Cloud service"),
+      cloudFields,
+      el("div", { class: "row", style: "margin-top:8px" }, gdrive),
+      el("div", { class: "row", style: "margin-top:12px" }, apply));
+    sync();
   },
 
   async render(ctx) {
