@@ -26,6 +26,7 @@ import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock mo
 // Stock button (you set the workpiece where you see it). The modal persists to the shared stock store and
 // broadcasts ddcs:settings-changed; every panel reads it here + re-renders, so all previews show the same stock.
 const stockForViz = () => { const s = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null; return (s && s.show) ? s : null; };
+const previewPrefs = () => (window.ddcsGetSettings && window.ddcsGetSettings().preview) || {};   // Settings → Preview tab
 
 // Custom transport icons (currentColor → inherit the button's text colour), in place of emoji.
 const ICON_PLAY = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" style="vertical-align:middle" aria-hidden="true"><path d="M4.5 3 12.5 8 4.5 13Z"/></svg>';
@@ -36,6 +37,8 @@ const ICON_COPY = '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" s
 const ICON_JOG = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" style="vertical-align:middle" aria-hidden="true"><path d="M8 2 6 4.5h4z"/><path d="M8 14 6 11.5h4z"/><path d="M2 8 4.5 6v4z"/><path d="M14 8 11.5 6v4z"/></svg>';
 // Loop = circular repeat arrow (legible at small size, unlike the ⟳ emoji).
 const ICON_LOOP = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/></svg>';
+// Follow-cam = centre-focus brackets framing a dot (keep the tool centred).
+const ICON_FOLLOW = '<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle" aria-hidden="true"><path d="M2 5.5V4a2 2 0 0 1 2-2h1.5"/><path d="M10.5 2H12a2 2 0 0 1 2 2v1.5"/><path d="M14 10.5V12a2 2 0 0 1-2 2h-1.5"/><path d="M5.5 14H4a2 2 0 0 1-2-2v-1.5"/><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/></svg>';
 
 const PANEL_HTML = `
   <canvas class="pp-2d" aria-hidden="true" style="position:absolute;top:0;left:0;width:100%;height:100%;display:none;background:#0d1117;z-index:1"></canvas>
@@ -50,6 +53,7 @@ const PANEL_HTML = `
     <button class="pp-run" type="button" title="Run / pause the program in execution order">${ICON_PLAY}</button>
     <button class="pp-step" type="button" title="Execute one line at a time (pauses a running program)">${ICON_STEP}</button>
     <button class="pp-loop" type="button" title="Loop: restart the program when it completes" aria-label="Loop">${ICON_LOOP}</button>
+    <button class="pp-follow" type="button" title="Follow-cam — keep the tool centred while playing (Settings → Preview to set damping)" aria-label="Follow cam" style="display:none">${ICON_FOLLOW}</button>
     <button class="pp-jog" type="button" title="Jog the start marker (X/Y/Z step buttons)" aria-label="Jog" style="display:none">${ICON_JOG}</button>
     <button class="pp-io" type="button" title="Show/hide the virtual I/O panel (sensors and outputs)">I/O</button>
   </div>
@@ -68,8 +72,8 @@ export function createPreviewPanel(container, opts = {}) {
     const t2 = createToolpath2d(cv2d);
 
     let viz = null;            // GcodeViz3D (lazy — only when 3D is shown and WebGL is available)
-    let mode = '3d', active = false, segs = [], fitted = false;
-    let lastRunCode = null, loopOn = false, loopTimer = null;
+    let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false;
+    let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false;
 
     // The 2D canvas only repaints when told to; without this it goes blank if first drawn at a transient/zero
     // size (drawer slide-in) or after the panel is resized. Re-fit the 2D route whenever the container resizes.
@@ -84,8 +88,16 @@ export function createPreviewPanel(container, opts = {}) {
         const cp = q('.pp-copy'); if (cp) cp.classList.toggle('visible', !!(text && text.length));
     };
     const SPEEDS = [1, 2, 5, 10];
-    let speedIx = 0;
+    let speedIx = Math.max(0, SPEEDS.indexOf(Number(previewPrefs().defaultSpeed) || 1));
     const simSpeed = () => SPEEDS[speedIx] || 1;
+    // Apply the Settings → Preview options to the live viz (follow-cam damping + show-rapids).
+    function applyPreviewSettings() {
+        if (!viz) return;
+        const pv = previewPrefs();
+        const damp = Number.isFinite(pv.followDamp) ? pv.followDamp : 50;        // 0 = snappy … 100 = very damped
+        if (viz.setFollowLerp) viz.setFollowLerp(0.32 - (damp / 100) * 0.30);
+        if (viz.setShowRapids) viz.setShowRapids(pv.showRapids !== false);
+    }
     const nearest2d = (pos) => {
         let bi = 0, bd = Infinity;
         for (let i = 0; i < segs.length; i++) { const s = segs[i], dx = s.x2 - pos.x, dy = s.y2 - pos.y, dd = dx * dx + dy * dy; if (dd < bd) { bd = dd; bi = i; } }
@@ -94,7 +106,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     function ensureViz() {
         if (viz) return viz;
-        try { viz = new GcodeViz3D(container); viz._gizmoPx = 36; viz._animOn = false; viz.setStock(stockForViz()); }
+        try { viz = new GcodeViz3D(container); viz._gizmoPx = 36; viz._animOn = false; viz.setStock(stockForViz()); applyPreviewSettings(); }
         catch (e) { console.warn('preview 3D unavailable — using 2D', e); viz = null; setMode('2d'); }
         return viz;
     }
@@ -114,7 +126,7 @@ export function createPreviewPanel(container, opts = {}) {
             onFinish: () => {
                 updateRunBtn();
                 if (typeof opts.onLine === 'function') opts.onLine(null);
-                if (loopOn && lastRunCode != null) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { engine.run(lastRunCode); updateRunBtn(); }, 800); }
+                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; engine.run(lastRunCode); updateRunBtn(); }, 800); }
             },
         });
         return engine;
@@ -156,8 +168,8 @@ export function createPreviewPanel(container, opts = {}) {
     // Single bottom bar: the jog grid lives in the 3D viz's pendant; the bar's ✛ Jog button toggles it and only
     // shows when there's a start marker to jog (3D + starts). I/O toggles the shared virtual-I/O panel.
     function syncJog() {
-        const b = q('.pp-jog'); if (!b) return;
-        b.style.display = (mode === '3d' && viz && viz.jogPendant && viz.starts && viz.starts.length > 0) ? '' : 'none';
+        const j = q('.pp-jog'); if (j) j.style.display = (mode === '3d' && viz && viz.jogPendant && viz.starts && viz.starts.length > 0) ? '' : 'none';
+        const f = q('.pp-follow'); if (f) f.style.display = (mode === '3d' && viz) ? '' : 'none';   // follow-cam: 3D only
     }
 
     // Legend: show ONLY the path types present in the current toolpath (classified like the 3D viz). Probe splits
@@ -254,16 +266,41 @@ export function createPreviewPanel(container, opts = {}) {
         q('.pp-jog').classList.toggle('on', open);
     });
     q('.pp-io').addEventListener('click', () => { if (window.ioPanel) window.ioPanel.toggle(); });
+    q('.pp-follow').addEventListener('click', () => {
+        const v = ensureViz(); if (!v || !v.setFollowCam) return;
+        const on = !v.followCam;
+        v.setFollowCam(on);
+        q('.pp-follow').classList.toggle('on', on);
+    });
 
     window.addEventListener('ddcs:stop-previews', stopPlay);
     // Stock (or other settings) changed — e.g. the Stock modal — update the workpiece box + re-trace (probe clamp).
-    window.addEventListener('ddcs:settings-changed', () => { renderStock(); if (active) setGcode(); });
+    window.addEventListener('ddcs:settings-changed', () => { renderStock(); applyPreviewSettings(); if (active) setGcode(); });
 
     function setActive(on) {
         active = !!on;
-        if (!active) { stopPlay(); if (viz) viz.setActive(false); return; }
+        if (!active) { stopPlay(); autoStarted = false; if (viz) viz.setActive(false); return; }
         if (mode === '3d') { const v = ensureViz(); if (v) v.setActive(true); }
         setGcode();
+        autoStartOnOpen();
+    }
+
+    // On the first activation with drawable content, apply the Preview on-open defaults: centre-lock the camera
+    // and auto-play in a loop (both toggleable in Settings → Preview). Fires once per open (autoStarted), so live
+    // wizard edits don't restart it — the loop re-reads the latest G-code each iteration instead.
+    function autoStartOnOpen() {
+        if (autoStarted || !active) return;
+        const pv = previewPrefs();
+        if (mode === '3d' && pv.followDefault !== false) {
+            const v = ensureViz();
+            if (v && v.setFollowCam) { v.setFollowCam(true); const fb = q('.pp-follow'); if (fb) fb.classList.add('on'); }
+        }
+        if (!segs.length) return;   // no drawable content yet — retry on the next activation
+        autoStarted = true;
+        if (pv.autoLoop !== false) {
+            loopOn = true; const lb = q('.pp-loop'); if (lb) lb.classList.add('on');
+            play();
+        }
     }
 
     return { setGcode, refresh, setActive, stop: stopPlay, get viz() { return viz; }, get engine() { return engine; }, el: container };

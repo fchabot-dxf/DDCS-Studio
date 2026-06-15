@@ -94,6 +94,8 @@ const SETTINGS_DEFAULTS = {
     // Probes + Limits on, ATC off (no clutter unless you have a tool changer). Fully manual so non-bridge
     // users can configure for accurate simulation; a controller profile just presets these.
     hardwareTabs: { probes: true, atc: false, limits: true, spindle: false },
+    // 3D/2D toolpath preview (read by viz/createPreviewPanel via window.ddcsGetSettings().preview).
+    preview: { followDamp: 50, showRapids: true, defaultView: '3d', defaultSpeed: 1, followDefault: true, autoLoop: true },
     // ATC: tool-length probe defaults (consumed by the Tool Length wizard) + the tool-offset table.
     // baseVar = DDCS tool-offset table base (#1430 = tool 1); tools[i] = stored length for tool i+1.
     atc: {
@@ -185,6 +187,7 @@ function loadSettings() {
                           sources: { ...SETTINGS_DEFAULTS.probes.sources, ...((p.probes || {}).sources || {}) } },
                 limits: { ...SETTINGS_DEFAULTS.limits, ...(p.limits || {}) },
                 hardwareTabs: { ...SETTINGS_DEFAULTS.hardwareTabs, ...(p.hardwareTabs || {}) },
+                preview: { ...SETTINGS_DEFAULTS.preview, ...(p.preview || {}) },
                 atc: { ...SETTINGS_DEFAULTS.atc, ...(p.atc || {}) },
                 head: { ...SETTINGS_DEFAULTS.head, ...(p.head || {}) },
                 spindle: { ...SETTINGS_DEFAULTS.spindle, ...(p.spindle || {}) },
@@ -301,6 +304,7 @@ function buildSettingsOverlay() {
                     <div class="sidebar-group-label" data-group-label="general">General</div>
                     <button class="settings-tab active" data-group="general" data-target="set_tab_profile">Profile</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_appearance">Appearance</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_preview">Preview</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_program">Program</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
@@ -314,6 +318,29 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_atc" style="display:none;">Tool table</button>
                 </div>
                 <div class="settings-content">
+                <!-- GENERAL: PREVIEW (3D/2D toolpath view + simulation) -->
+                <div id="set_tab_preview" style="display:none;">
+                    <div class="settings-section">
+                        <div class="settings-section-title">TOOLPATH PREVIEW</div>
+                        <div class="settings-field">Default view
+                            <select id="set_pv_view"><option value="3d">3D</option><option value="2d">2D (top-down)</option></select>
+                        </div>
+                        <div class="settings-field">Default play speed
+                            <select id="set_pv_speed"><option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select>
+                        </div>
+                        <label class="settings-check"><input type="checkbox" id="set_pv_rapids"> Show rapid moves (yellow) in the 3D view</label>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">FOLLOW CAMERA</div>
+                        <div class="settings-hint">Toggle the follow-cam (the ⌖ button in the preview bar) to keep the tool centred while playing. Damping smooths how fast the camera catches up.</div>
+                        <label class="settings-check"><input type="checkbox" id="set_pv_follow_default"> Centre-lock the camera when a preview opens</label>
+                        <label class="settings-check"><input type="checkbox" id="set_pv_autoloop"> Auto-play in a loop when a preview opens</label>
+                        <div class="settings-field" style="margin-top:10px">Centre-lock damping — <span id="set_pv_followdamp_val">50%</span>
+                            <input type="range" id="set_pv_followdamp" min="0" max="100" step="5" style="width:100%; max-width:280px;">
+                        </div>
+                        <div class="settings-hint">Low = snaps to the tool · High = smooth, gentle follow.</div>
+                    </div>
+                </div>
                 <!-- GENERAL: PROFILE -->
                 <div id="set_tab_profile">
                     <div class="settings-section">
@@ -662,6 +689,17 @@ function wireSettingsOverlay(ov) {
         q('set_show_probes').checked = s.hardwareTabs.probes !== false;
         q('set_show_atc').checked = s.hardwareTabs.atc === true;
         q('set_show_limits').checked = s.hardwareTabs.limits !== false;
+        const pv = s.preview || (s.preview = { ...SETTINGS_DEFAULTS.preview });
+        if (q('set_pv_view')) q('set_pv_view').value = pv.defaultView || '3d';
+        if (q('set_pv_speed')) q('set_pv_speed').value = String(pv.defaultSpeed || 1);
+        if (q('set_pv_rapids')) q('set_pv_rapids').checked = pv.showRapids !== false;
+        if (q('set_pv_follow_default')) q('set_pv_follow_default').checked = pv.followDefault !== false;
+        if (q('set_pv_autoloop')) q('set_pv_autoloop').checked = pv.autoLoop !== false;
+        if (q('set_pv_followdamp')) {
+            const d = Number.isFinite(pv.followDamp) ? pv.followDamp : 50;
+            q('set_pv_followdamp').value = String(d);
+            const lbl = q('set_pv_followdamp_val'); if (lbl) lbl.textContent = d + '%';
+        }
         const ad = SETTINGS_DEFAULTS.atc, a = s.atc || (s.atc = {});
         q('set_atc_blockheight').value = a.blockHeight ?? ad.blockHeight;
         q('set_atc_safez').value = a.safeZ ?? ad.safeZ;
@@ -1039,6 +1077,16 @@ function wireSettingsOverlay(ov) {
         s.hardwareTabs.atc = q('set_show_atc').checked;
         s.hardwareTabs.limits = q('set_show_limits').checked;
         applyHardwareTabs();
+        const pv = s.preview || (s.preview = { ...SETTINGS_DEFAULTS.preview });
+        if (q('set_pv_view')) pv.defaultView = q('set_pv_view').value;
+        if (q('set_pv_speed')) pv.defaultSpeed = num(q('set_pv_speed').value, 1);
+        if (q('set_pv_rapids')) pv.showRapids = q('set_pv_rapids').checked;
+        if (q('set_pv_follow_default')) pv.followDefault = q('set_pv_follow_default').checked;
+        if (q('set_pv_autoloop')) pv.autoLoop = q('set_pv_autoloop').checked;
+        if (q('set_pv_followdamp')) {
+            pv.followDamp = num(q('set_pv_followdamp').value, 50);
+            const lbl = q('set_pv_followdamp_val'); if (lbl) lbl.textContent = pv.followDamp + '%';
+        }
         const a = s.atc || (s.atc = {});
         a.blockHeight = num(q('set_atc_blockheight').value, a.blockHeight);
         a.safeZ = num(q('set_atc_safez').value, a.safeZ);
@@ -1113,7 +1161,7 @@ function wireSettingsOverlay(ov) {
 
         saveSettings();
     };
-    ov.querySelectorAll('input[type="number"], input[type="checkbox"], select').forEach(el => {
+    ov.querySelectorAll('input[type="number"], input[type="checkbox"], input[type="range"], select').forEach(el => {
         el.addEventListener('input', onInput);
         el.addEventListener('change', onInput);
     });
@@ -1215,7 +1263,7 @@ function wireSettingsOverlay(ov) {
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
     const sideTabs = [...ov.querySelectorAll('.settings-sidebar .settings-tab')];
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
-        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_variables', 'set_tab_program', 'set_tab_feedback', 'set_tab_network', 'set_tab_about',
+        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_variables', 'set_tab_program', 'set_tab_feedback', 'set_tab_network', 'set_tab_about',
                      'set_tab_machine', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });

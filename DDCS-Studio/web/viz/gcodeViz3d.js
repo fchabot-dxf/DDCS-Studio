@@ -47,6 +47,11 @@ export class GcodeViz3D {
         // Orbit state (Z-up spherical around target)
         this.target = new THREE.Vector3(0, 0, 0);
         this.radius = 200;
+        // Follow-cam: while playing, smoothly slide the orbit target onto the moving tool (centre-lock). followLerp
+        // is the per-frame smoothing (small = damped/laggy, large = snappy); a separate rAF runs while on.
+        this.followCam = false;
+        this.followLerp = 0.16;
+        this._followRaf = null;
         this.theta = -Math.PI / 2;  // azimuth in XY (front view: +X right, +Y back)
         this.phi = Math.PI / 3;     // polar from +Z
 
@@ -321,7 +326,15 @@ export class GcodeViz3D {
         }
         if (this._trailLine) {
             this._trailLine.visible = on;
-            if (!on) this._trailLine.geometry.setDrawRange(0, 0);
+            if (!on) {
+                // Restore any partial tip vertex so the geometry is clean for the next run, then hide the trail.
+                if (this._trailTipIdx != null && this._trailTipOrig) {
+                    const o = this._trailTipOrig, pa = this._trailLine.geometry.getAttribute('position');
+                    pa.setXYZ(this._trailTipIdx, o.x, o.y, o.z); pa.needsUpdate = true;
+                }
+                this._trailTipIdx = null; this._trailTipOrig = null;
+                this._trailLine.geometry.setDrawRange(0, 0);
+            }
         }
         this.render();
     }
@@ -340,15 +353,42 @@ export class GcodeViz3D {
         // the engine actually ran). Enable trail mode lazily; setAnimate(false)/ddcsStopPreview restores it.
         if (this._trailLine && this._animSegs && this._animSegs.length) {
             if (!this._trailOn) this._dimRoute(true);
-            const tp = this._animTool.position;
-            let bi = 0, bd = Infinity;
-            for (let i = 0; i < this._animSegs.length; i++) {
-                const s = this._animSegs[i], dx = s.bx - tp.x, dy = s.by - tp.y, dz = s.bz - tp.z, dd = dx * dx + dy * dy + dz * dz;
-                if (dd < bd) { bd = dd; bi = i; }
-            }
-            this._trailLine.geometry.setDrawRange(0, 2 * (bi + 1));
+            this._updateTrailTip(this._animTool.position);
         }
         this.render();
+    }
+
+    // Grow the bold trail so its tip sits EXACTLY on the tool head, drawing a partial current segment instead of
+    // revealing whole segments (which read as a visibility toggle). Completed segments draw fully; the current
+    // segment is shortened to a→toolhead by temporarily moving its end vertex (restored when the tip advances).
+    _updateTrailTip(tp) {
+        const line = this._trailLine, segs = this._animSegs;
+        if (!line || !segs || !segs.length) return;
+        const pos = line.geometry.getAttribute('position');
+        // Restore the segment we shortened last frame to its true end before choosing a new tip.
+        if (this._trailTipIdx != null && this._trailTipOrig) {
+            const o = this._trailTipOrig;
+            pos.setXYZ(this._trailTipIdx, o.x, o.y, o.z);
+        }
+        // Current segment = the one whose [a,b] span the tool head projects onto closest (clamped).
+        let ci = 0, best = Infinity, qx = 0, qy = 0, qz = 0;
+        for (let i = 0; i < segs.length; i++) {
+            const s = segs[i];
+            const dx = s.bx - s.ax, dy = s.by - s.ay, dz = s.bz - s.az;
+            const len2 = dx * dx + dy * dy + dz * dz || 1e-9;
+            let t = ((tp.x - s.ax) * dx + (tp.y - s.ay) * dy + (tp.z - s.az) * dz) / len2;
+            t = t < 0 ? 0 : t > 1 ? 1 : t;
+            const cx = s.ax + dx * t, cy = s.ay + dy * t, cz = s.az + dz * t;
+            const dd = (tp.x - cx) ** 2 + (tp.y - cy) ** 2 + (tp.z - cz) ** 2;
+            if (dd < best) { best = dd; ci = i; qx = cx; qy = cy; qz = cz; }
+        }
+        // Shorten segment ci to end at the tool head (its end vertex is index 2*ci+1, since each seg = a,b pair).
+        const vIdx = 2 * ci + 1;
+        this._trailTipOrig = { x: pos.getX(vIdx), y: pos.getY(vIdx), z: pos.getZ(vIdx) };
+        this._trailTipIdx = vIdx;
+        pos.setXYZ(vIdx, qx, qy, qz);
+        pos.needsUpdate = true;
+        line.geometry.setDrawRange(0, 2 * (ci + 1));
     }
 
     _animTick() {
@@ -573,6 +613,9 @@ export class GcodeViz3D {
         // the tool head via setDrawRange while playing (see _animTick / _dimRoute). The type-grouped lines above
         // are the faint route underneath. Amber matches the tool marker.
         if (this._trailLine) { this.pathGroup.remove(this._trailLine); this._trailLine.geometry.dispose(); this._trailLine.material.dispose(); this._trailLine = null; }
+        // New geometry → the old tip indices/orig are stale; clear them, and drop _trailOn so a rebuild during
+        // play re-arms the trail (re-dims the route + un-hides the bold line) on the next setToolPosition.
+        this._trailTipIdx = null; this._trailTipOrig = null; this._trailOn = false;
         if (animSegs.length) {
             const tp = [];
             for (const s of animSegs) tp.push(s.ax, s.ay, s.az, s.bx, s.by, s.bz);
@@ -841,6 +884,22 @@ export class GcodeViz3D {
             this.camera.updateProjectionMatrix();
         }
         this.camera.updateMatrixWorld();
+    }
+
+    /** Centre-lock the camera on the tool. on → a rAF loop eases the orbit target onto the tool each frame. */
+    setFollowCam(on) {
+        this.followCam = !!on;
+        if (this.followCam) { if (!this._followRaf) this._followTick(); }
+    }
+    setFollowLerp(v) { const n = +v; if (Number.isFinite(n)) this.followLerp = Math.max(0.01, Math.min(0.6, n)); }
+    _followTick() {
+        if (!this.followCam || !this.active) { this._followRaf = null; return; }
+        if (this._animTool && this._animTool.visible) {
+            const before = this.target.clone();
+            this.target.lerp(this._animTool.position, this.followLerp);   // ease the orbit centre onto the tool
+            if (this.target.distanceToSquared(before) > 1e-5) { this._applyCamera(); this.render(); }
+        }
+        this._followRaf = requestAnimationFrame(() => this._followTick());
     }
 
     _toPerspective() {
