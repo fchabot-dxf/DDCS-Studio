@@ -37,4 +37,14 @@ test('preview: single 2D/3D toggle, one Stock, always-visible compact controls',
   await page.evaluate(() => [...document.querySelectorAll('.preview-panel')].find((x) => x.querySelector('.pp-mtoggle')).querySelector('.pp-mtoggle').click());
   const after = await page.evaluate(() => [...document.querySelectorAll('.preview-panel')].find((x) => x.querySelector('.pp-mtoggle')).querySelector('.pp-mtoggle').textContent.trim());
   expect(after, 'toggle flips 3D → 2D').toBe('2D');
+
+  // speed is a cycling button (1× → 2× → 5× → 10× → 1×), not a dropdown
+  const sp = await page.evaluate(() => {
+    const s = [...document.querySelectorAll('.preview-panel')].find((x) => x.querySelector('.pp-speed')).querySelector('.pp-speed');
+    const seq = [s.textContent.trim()];
+    for (let i = 0; i < 4; i++) { s.click(); seq.push(s.textContent.trim()); }
+    return { tag: s.tagName, seq };
+  });
+  expect(sp.tag, 'speed is a button, not a select').toBe('BUTTON');
+  expect(sp.seq, 'cycles 1×→2×→5×→10×→1×').toEqual(['1×', '2×', '5×', '10×', '1×']);
 });

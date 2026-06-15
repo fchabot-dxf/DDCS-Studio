@@ -34,10 +34,7 @@ const PANEL_HTML = `
   <div class="viz3d-controls">
     <button class="pp-mtoggle viz3d-2dtoggle" type="button" title="Toggle 2D / 3D view">3D</button>
     <button class="pp-stock" type="button" title="Stock — set the workpiece (dimensions, shape, show, templates)" aria-label="Stock">📦</button>
-    <select class="pp-speed" title="Simulation speed — 1× plays at the programmed feedrates" aria-label="Simulation speed">
-      <option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option>
-      <option value="10">10×</option><option value="1000">MAX</option>
-    </select>
+    <button class="pp-speed" type="button" title="Simulation speed — tap to cycle 1× 2× 5× 10×" aria-label="Simulation speed">1×</button>
     <button class="pp-run" type="button" title="Run / pause the program in execution order">▶</button>
     <button class="pp-step" type="button" title="Execute one line at a time (pauses a running program)">⏭</button>
     <button class="pp-loop" type="button" title="Loop: restart the program when it completes">⟳</button>
@@ -78,7 +75,9 @@ export function createPreviewPanel(container, opts = {}) {
         statusEl.classList.toggle('has-error', !!isError);
         const cp = q('.pp-copy'); if (cp) cp.classList.toggle('visible', !!(text && text.length));
     };
-    const simSpeed = () => { const e = q('.pp-speed'); const v = e ? parseFloat(e.value) : 1; return Number.isFinite(v) && v > 0 ? v : 1; };
+    const SPEEDS = [1, 2, 5, 10];
+    let speedIx = 0;
+    const simSpeed = () => SPEEDS[speedIx] || 1;
     const nearest2d = (pos) => {
         let bi = 0, bd = Infinity;
         for (let i = 0; i < segs.length; i++) { const s = segs[i], dx = s.x2 - pos.x, dy = s.y2 - pos.y, dd = dx * dx + dy * dy; if (dd < bd) { bd = dd; bi = i; } }
@@ -198,7 +197,11 @@ export function createPreviewPanel(container, opts = {}) {
     });
     q('.pp-step').addEventListener('click', () => { const eng = ensureEngine(); if (viz && !eng.running) viz.setAnimate(false); eng.step(get('getGcode') || ''); updateRunBtn(); });
     q('.pp-loop').addEventListener('click', () => { loopOn = !loopOn; q('.pp-loop').classList.toggle('on', loopOn); if (!loopOn && loopTimer) { clearTimeout(loopTimer); loopTimer = null; } });
-    q('.pp-speed').addEventListener('change', () => { if (engine) engine.simSpeed = simSpeed(); });
+    q('.pp-speed').addEventListener('click', () => {   // cycle 1× → 2× → 5× → 10× → 1×
+        speedIx = (speedIx + 1) % SPEEDS.length;
+        q('.pp-speed').textContent = SPEEDS[speedIx] + '×';
+        if (engine) engine.simSpeed = simSpeed();
+    });
     q('.pp-copy').addEventListener('click', () => { if (statusEl && statusEl.textContent && navigator.clipboard) navigator.clipboard.writeText(statusEl.textContent); });
 
     window.addEventListener('ddcs:stop-previews', stopPlay);
