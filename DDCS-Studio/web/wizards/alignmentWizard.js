@@ -100,7 +100,7 @@ export function alignmentStack(params = {}) {
     A('#52', '[#51-#50]', `Delta: fence wander in ${probeAxis} from A to B`);
     A('#53', 'ABS[#72]', `Absolute span along ${checkAxis}`);
     IF('#53', '==', '0', 1);                      // abort if A and B are at the same position (zero span)
-    A('#54', 'ATAN[#52/#53]', 'Misalignment angle in degrees');
+    A('#54', 'ATAN[#52]/[#53]', 'Misalignment angle (deg) = atan2(delta, span) — two-operand atan[a]/[b] form');
     MV('Z', '#19'); DM('abs');
 
     // ── Results ──

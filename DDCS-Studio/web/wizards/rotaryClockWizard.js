@@ -63,7 +63,10 @@ export function rotaryClockStack(params = {}) {
     MV('Y', '#6');                           // step across the flat by the span (+Y)
     C('Point B: probe down onto the flat'); ppZdown('#52');
     C('Tilt of the flat (degrees) = atan( dZ / span )');
-    A('#53', 'ATAN[[#52-#51]/#6]', 'phi = ATAN((Zb-Za)/span)');   // ratio INSIDE atan (was atan(dZ)/span — wrong)
+    // atan2(dZ, span): the TWO-OPERAND form atan[a]/[b] is REQUIRED — Fanuc/DDCS Macro-B and LinuxCNC/grblHAL
+    // (interp_read.cc: "atan operation must be in the format atan[..]/[..]"). The `/[#6]` is the 2nd operand, not
+    // a divide — do NOT collapse to a single bracket.
+    A('#53', 'ATAN[[#52-#51]]/[#6]', 'phi = atan2(Zb-Za, span)');
     RM('A', '#54');                          // current A machine position (dialect DRO)
 
     if (action === 'report') {
