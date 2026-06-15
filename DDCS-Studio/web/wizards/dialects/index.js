@@ -11,6 +11,7 @@ import { dialect as v41 } from './ddcs-v41.js';
 import { dialect as v3 } from './ddcs-v3-dm500.js';
 import { dialect as centroid } from './centroid.js';
 import { dialect as rs274ngc } from './rs274ngc.js';
+import { dialect as grbl } from './grbl.js';
 
 export const DIALECTS = {
     'ddcs-expert-m350': expert,
@@ -18,6 +19,7 @@ export const DIALECTS = {
     'ddcs-v3-dm500': v3,
     'centroid': centroid,
     'rs274ngc': rs274ngc,
+    'grbl': grbl,
 };
 
 export const DEFAULT_DIALECT = expert;

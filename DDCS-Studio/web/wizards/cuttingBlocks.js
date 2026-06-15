@@ -35,16 +35,30 @@ export function footerBlock({ endProgram, dialect } = {}) {
     const L = [];
     if (ep.spindleOff !== false) L.push('M5   ( spindle off )');
     if (ep.coolantOff !== false) L.push('M9   ( coolant off )');
+    // G53 retract/park: DDCS needs the target in a #var (a literal fails on M350); grbl has no #vars and takes
+    // a literal directly (dialect.g53NeedsVar === false). LinuxCNC/grblHAL accept either — they keep the #var form.
+    const litG53 = d.g53NeedsVar === false;
     if (ep.retract !== false) {
-        L.push(`#101 = ${num(ep.retractZ, 0)}   ( safe Z - G53 needs a variable )`);
-        const mv = d.machineMove('Z', '#101'); mv[mv.length - 1] += '   ( retract )';
-        L.push(...mv);
+        if (litG53) {
+            const mv = d.machineMove('Z', num(ep.retractZ, 0)); mv[mv.length - 1] += '   ( retract )';
+            L.push(...mv);
+        } else {
+            L.push(`#101 = ${num(ep.retractZ, 0)}   ( safe Z - G53 needs a variable )`);
+            const mv = d.machineMove('Z', '#101'); mv[mv.length - 1] += '   ( retract )';
+            L.push(...mv);
+        }
     }
     if (ep.park === true) {
-        L.push(`#102 = ${num(ep.parkX, 0)}  #103 = ${num(ep.parkY, 0)}`);
-        const mx = d.machineMove('X', '#102'), my = d.machineMove('Y', '#103');
-        my[my.length - 1] += '   ( park )';
-        L.push(...mx, ...my);
+        if (litG53) {
+            const mx = d.machineMove('X', num(ep.parkX, 0)), my = d.machineMove('Y', num(ep.parkY, 0));
+            my[my.length - 1] += '   ( park )';
+            L.push(...mx, ...my);
+        } else {
+            L.push(`#102 = ${num(ep.parkX, 0)}  #103 = ${num(ep.parkY, 0)}`);
+            const mx = d.machineMove('X', '#102'), my = d.machineMove('Y', '#103');
+            my[my.length - 1] += '   ( park )';
+            L.push(...mx, ...my);
+        }
     }
     L.push(ep.end === 'M2' ? 'M2' : 'M30');
     return L;
