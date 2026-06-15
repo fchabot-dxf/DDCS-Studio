@@ -45,7 +45,7 @@ export class ScaleManager {
             const vw = window.innerWidth;
             const vh = window.innerHeight - 54;            // subtract header height
             const ratio = Math.min(vw / 1280, vh / 800);
-            const pct = Math.max(50, Math.min(250, Math.round(ratio * 100)));
+            const pct = Math.max(75, Math.min(250, Math.round(ratio * 100)));   // AUTO floors at 75% — 50% via zoom doubles the body width and overflows on mobile WebKit; 50% stays available manually
             this.scale = 'auto';
             this.lastAutoPct = pct;
             document.body.setAttribute('data-scale', 'auto');
