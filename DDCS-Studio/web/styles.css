@@ -464,6 +464,9 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .cap-off { opacity: .4; }
 .cap-off input, .cap-off select, .cap-off button { pointer-events: none; }
 
+/* Header macro bar: Save / Open .mjson + the storage-location chip. */
+.macro-bar { display: flex; gap: 6px; align-items: center; }
+
 /* A wizard re-opened to EDIT an existing op (vs create a new one): pronounced accent glow + soft pulse. */
 .wiz-box.editing {
     border-color: var(--accent, #0ea5e9) !important;

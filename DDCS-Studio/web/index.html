@@ -108,6 +108,12 @@
             <div class="scale-ctl">
                 <button id="scaleBtn" class="op-btn scale-btn" title="Zoom"><span class="op-icon">🔍</span><span class="op-label">AUTO</span></button>
             </div>
+            <div class="macro-bar" id="macroBar">
+                <button class="op-btn" id="macroStorageBtn" title="Storage location for macros"><span class="op-icon">💾</span><span class="op-label" id="macroStorageLabel">LOCAL</span></button>
+                <button class="op-btn" id="macroSaveBtn" title="Save the current program as a .mjson macro"><span class="op-icon">⤓</span></button>
+                <button class="op-btn" id="macroOpenBtn" title="Open a .mjson macro"><span class="op-icon">📂</span></button>
+                <input type="file" id="macroFileInput" accept=".mjson,application/json" style="display:none"/>
+            </div>
             <button class="op-btn hidden" id="transferBtn" title="Send the current program to the machine"><span class="op-icon">📡</span><span class="op-label">TRANSFER</span></button>
         </div>
     </header>
@@ -1569,6 +1575,10 @@
                 const { initPostGating } = await import('./ui/postGating.js');
                 initPostGating();                 // grey wizard fields the active post can't use (tooltip-only why)
             } catch (err) { console.error('post gating init failed', err); }
+            try {
+                const { initMacroBar } = await import('./ui/macroBar.js');
+                initMacroBar();                   // header Save/Open .mjson macro + storage chip
+            } catch (err) { console.error('macro bar init failed', err); }
             try {
                 const { initEditorOpHover } = await import('./ui/editorOpHover.js');
                 initEditorOpHover();
