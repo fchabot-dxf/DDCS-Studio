@@ -11,6 +11,15 @@ import { FN, fieldKind, fieldsOf, isWrap, getBlockly } from './bridge.js';
 // ── workspace → stack ────────────────────────────────────────────────────────
 /** One block (NOT its next sibling) → a record { id, type, params, children? }. */
 function toRecord(b) {
+    if (b.type === 'op') {                                   // op CONTAINER — opType/requires/params ride in `data`
+        let meta = {};
+        try { meta = JSON.parse(b.data || '{}'); } catch (_) { /* keep {} */ }
+        const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
+        return {
+            id: b.id, type: 'op', opType: meta.opType, label: b.getFieldValue('LABEL') || meta.label,
+            requires: meta.requires || [], params: meta.params || {}, children: first ? chain(first) : [],
+        };
+    }
     const def = BLOCKS[b.type];
     if (!def) return { id: b.id, type: b.type, params: {} };
     const r = { id: b.id, type: b.type, params: {} };
@@ -52,6 +61,15 @@ export function workspaceToStack(ws) {
 
 /** One record → a Blockly serialization-JSON block node (fields + value/region sockets + DO children). */
 function recToJson(rec) {
+    if (rec.type === 'op') {                                 // op CONTAINER → labelled group, meta in `data`
+        const node = {
+            type: 'op',
+            fields: { LABEL: rec.label || rec.opType || 'op' },
+            data: JSON.stringify({ opType: rec.opType, label: rec.label, requires: rec.requires || [], params: rec.params || {} }),
+        };
+        if (rec.children && rec.children.length) node.inputs = { DO: { block: chainToJson(rec.children) } };
+        return node;
+    }
     const def = BLOCKS[rec.type], node = { type: rec.type };
     if (!def) return node;
     const fields = {}, inputs = {};

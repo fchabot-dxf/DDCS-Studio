@@ -39,7 +39,51 @@ const BUILDERS = {
     circular: circularStack, rotary_clock: rotaryClockStack, rotary_center: rotaryCenterStack, text: textStack,
 };
 // (No bare flag — framing is now Program Start/End BLOCKS in the stack; a snippet just omits them.)
-const find = (prog, type) => (prog || []).find((b) => b && b.type === type);
+// find() recurses into block children (incl. op-containers), so reconcilers locate their inner blocks
+// (e.g. a 'stepdown') whether or not the op is wrapped in an op-container.
+const find = (prog, type) => {
+    for (const b of (prog || [])) {
+        if (!b) continue;
+        if (b.type === type) return b;
+        if (b.children) { const f = find(b.children, type); if (f) return f; }
+    }
+    return null;
+};
+
+// ── op CONTAINERS ───────────────────────────────────────────────────────────────────────────────────────
+// Each accumulated op is wrapped in a { type:'op', opType, label, requires, params, children } container so a
+// loaded program keeps the op RECORD and emit can gate it per post (capable → children; incapable → marker;
+// blocks/blockModel.js). `requires` is derived from the atoms the op uses: #var atoms → 'vars', flow atoms →
+// 'flow' (both absent on grbl). params ride along for op-form editing. See REMINDERS "Op-containers".
+const OP_LABELS = {
+    surfacing: 'Surfacing', pocket: 'Pocket', slot: 'Slot', drill: 'Drill', text: 'Text',
+    wcs: 'WCS', edge: 'Edge Probe', middle: 'Middle Probe', corner: 'Corner Probe', alignment: 'Alignment',
+    circular: 'Circular Probe', rotary_clock: 'Rotary Clock', rotary_center: 'Rotary Centre', comm: 'Communication',
+    atc_length: 'Tool Length', atc_check: 'Tool Check', atc_warmup: 'Spindle Warmup', atc_change: 'Tool Change', atc_test: 'ATC Test',
+};
+const VAR_ATOMS = new Set(['assign', 'probe', 'proberead', 'readmachine', 'setworkoffset', 'tooloffset', 'machinemove']);
+const FLOW_ATOMS = new Set(['ifgoto', 'goto', 'label']);
+function scanAtoms(blocks, set) {
+    for (const b of (blocks || [])) {
+        if (!b) continue;
+        if (set.has(b.type)) return true;
+        if (b.children && scanAtoms(b.children, set)) return true;
+    }
+    return false;
+}
+function opRequires(children) {
+    const r = [];
+    if (scanAtoms(children, VAR_ATOMS)) r.push('vars');
+    if (scanAtoms(children, FLOW_ATOMS)) r.push('flow');
+    return r;
+}
+let _opSeq = 0;
+function makeOp(opType, params, children) {
+    return {
+        id: `op${++_opSeq}`, type: 'op', opType, label: OP_LABELS[opType] || opType,
+        requires: opRequires(children), params: params ? JSON.parse(JSON.stringify(params)) : {}, children,
+    };
+}
 
 // ── reverse sync: edited block stack → STUDIO form fields ──────────────────────────────────────────────
 // Read the (possibly edited) block objects and return { formFieldId: value }. The inverse of each builder,
@@ -142,7 +186,12 @@ export function buildActiveOpStack() {
     shownOp = op.type;                      // remember what the Blocks tab is showing (for reverse sync)
     if (s === loadedSig) return null;       // already loaded → don't clobber block-side edits
     loadedSig = s;
-    return { blocks: BUILDERS[op.type](op.params) };
+    const framed = BUILDERS[op.type](op.params);
+    const start = framed.find((b) => b && b.type === 'progstart');
+    const end = framed.find((b) => b && b.type === 'progend');
+    const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
+    const opC = makeOp(op.type, op.params, bare);   // wrap so the Blocks view shows the op as one group (round-trips)
+    return { blocks: (start && end) ? [start, opC, end] : [opC] };
 }
 
 /**
@@ -179,8 +228,11 @@ export function commitActiveOp() {
     const op = getLastOp();
     if (!op || !BUILDERS[op.type]) return false;
     const framed = BUILDERS[op.type](op.params);                       // [progstart, …op…, progend]
+    const start = framed.find((b) => b && b.type === 'progstart');
+    const end = framed.find((b) => b && b.type === 'progend');
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
-    return appendIntoProgram(bare, framed);
+    const opC = makeOp(op.type, op.params, bare);                      // wrap: keep the op record; emit gates per post
+    return appendIntoProgram([opC], (start && end) ? [start, opC, end] : [opC]);
 }
 
 /**

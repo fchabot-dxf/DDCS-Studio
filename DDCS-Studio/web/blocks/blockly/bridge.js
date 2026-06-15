@@ -71,12 +71,28 @@ function jsonDef(def) {
     return block;
 }
 
+// The op-CONTAINER block (not an op atom — not in PALETTE/toolbox). A recorded op { opType, requires, params,
+// children } shown as a labelled group with a DO mouth holding its atoms. opType/requires/params round-trip via
+// the block's serialized `data` (a JSON blob); the LABEL field shows + serializes the op name. Editing the op's
+// params is done via its wizard form, not Blockly fields — so they ride along opaquely. Caps-gated at emit.
+const OP_BLOCK_DEF = {
+    type: 'op',
+    message0: '⬡ %1 %2',
+    args0: [
+        { type: 'field_label_serializable', name: 'LABEL', text: 'op' },
+        { type: 'input_statement', name: 'DO' },
+    ],
+    previousStatement: null, nextStatement: null,
+    colour: 210,
+    tooltip: 'Recorded op — edit via its wizard; emitted per the active post (caps-gated).',
+};
+
 /** Define every op as a Blockly block. (Emit happens via stackBridge → emitMapped, not a Blockly generator.) */
 let _Blockly = null;
 export const getBlockly = () => _Blockly;   // stackBridge needs the serialization API to render blocks (v11)
 export function installBlockly(Blockly) {
     _Blockly = Blockly;
-    Blockly.defineBlocksWithJsonArray(PALETTE.map(jsonDef));
+    Blockly.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), OP_BLOCK_DEF]);
 }
 
 /** A value input's shadow (an editable default number) for the toolbox. */
