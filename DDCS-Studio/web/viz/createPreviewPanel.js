@@ -8,11 +8,10 @@
  * position:relative so it fills whatever box each host gives it (hosts differ only in layout/size).
  *
  * Owns: a GcodeViz3D (3D) + createToolpath2d (2D) sharing one engine.trace ROUTE; a GcodeExecutionEngine for
- * Play (run / step / loop, autoAnswer sensors) driving the bold trail; the 2D/3D toggle, speed, status; and the
- * STOCK control. Stock lives HERE, not in Settings — it's a sim concern: one shared value across all preview
- * instances (PREVIEW_STOCK), edited via the in-panel W×H×D + show control, broadcast so every panel agrees.
- * Editor-line-highlight + I/O panel are OPTIONAL hooks (the I/O panel is the shared window.ioPanel singleton —
- * only one engine runs at a time, ddcsStopPreview enforces it).
+ * Play (run / step / loop, autoAnswer sensors) driving the bold trail; the 2D/3D toggle, speed, status; and a
+ * STOCK button that opens the rich Stock modal (ui/stockEditor.js — dims/shape/show/templates), so the workpiece
+ * is set from the preview. Editor-line-highlight + I/O panel are OPTIONAL hooks (the I/O panel is the shared
+ * window.ioPanel singleton — only one engine runs at a time, ddcsStopPreview enforces it).
  *
  *   createPreviewPanel(container, { getGcode, onLine, createVarStore })
  *     → { setGcode, refresh, setActive, stop, viz, engine, el }
@@ -21,12 +20,12 @@ import { GcodeViz3D } from './gcodeViz3d.js';
 import { createToolpath2d } from './toolpath2d.js';
 import { traceToolpath } from '../engine/trace.js';
 import { GcodeExecutionEngine } from '../engine/index.js';
+import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
 
-// Stock is a PREVIEW/sim property, shared by every panel (one workpiece across all three views), edited in the
-// panel — never read from Settings. Changing it in one panel broadcasts to the others via STOCK_EVENT.
-const PREVIEW_STOCK = { x: 100, y: 80, z: 20, show: false, shape: 'block' };
-const STOCK_EVENT = 'ddcs:preview-stock';
-const stockForViz = () => (PREVIEW_STOCK.show ? PREVIEW_STOCK : null);
+// Stock is a sim/preview property — configured via the Stock MODAL (ui/stockEditor.js), opened from the panel's
+// Stock button (you set the workpiece where you see it). The modal persists to the shared stock store and
+// broadcasts ddcs:settings-changed; every panel reads it here + re-renders, so all previews show the same stock.
+const stockForViz = () => { const s = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null; return (s && s.show) ? s : null; };
 
 const PANEL_HTML = `
   <canvas class="pp-2d" aria-hidden="true" style="position:absolute;inset:0;display:none;background:#0d1117;z-index:1"></canvas>
@@ -37,10 +36,7 @@ const PANEL_HTML = `
       <button class="pp-m2d" type="button" title="2D top-down toolpath">2D</button>
       <button class="pp-m3d primary" type="button" title="3D toolpath">3D</button>
     </span>
-    <label title="Show the workpiece stock (lives in the preview, not Settings)"><input type="checkbox" class="pp-stk-show"> Stock</label>
-    <input type="number" class="pp-stk-x" title="stock X (mm)" style="width:44px">
-    <input type="number" class="pp-stk-y" title="stock Y (mm)" style="width:44px">
-    <input type="number" class="pp-stk-z" title="stock Z (mm)" style="width:44px">
+    <button class="pp-stock" type="button" title="Stock — set the workpiece (dimensions, shape, show, templates)">Stock</button>
     <label>Speed
       <select class="pp-speed" title="Simulation speed — 1× plays at the programmed feedrates">
         <option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option>
@@ -182,28 +178,10 @@ export function createPreviewPanel(container, opts = {}) {
         updateRunBtn();
     }
 
-    // ---- stock control (lives in the preview; shared across panels) ----
-    function syncStockInputs() {
-        const sh = q('.pp-stk-show'), x = q('.pp-stk-x'), y = q('.pp-stk-y'), z = q('.pp-stk-z');
-        if (sh) sh.checked = !!PREVIEW_STOCK.show;
-        if (x) x.value = PREVIEW_STOCK.x; if (y) y.value = PREVIEW_STOCK.y; if (z) z.value = PREVIEW_STOCK.z;
-    }
-    function applyStock() {                              // push PREVIEW_STOCK into this panel's viz + re-trace (probe clamp)
-        if (viz) viz.setStock(stockForViz());
-        if (engine) engine.stock = stockForViz();
-        if (active) setGcode();
-    }
-    function onStockEdit() {
-        PREVIEW_STOCK.show = !!q('.pp-stk-show').checked;
-        PREVIEW_STOCK.x = Number(q('.pp-stk-x').value) || 0;
-        PREVIEW_STOCK.y = Number(q('.pp-stk-y').value) || 0;
-        PREVIEW_STOCK.z = Number(q('.pp-stk-z').value) || 0;
-        window.dispatchEvent(new CustomEvent(STOCK_EVENT));   // tell the other panels
-        applyStock();
-    }
-    ['pp-stk-show', 'pp-stk-x', 'pp-stk-y', 'pp-stk-z'].forEach((c) => { const el = q('.' + c); if (el) el.addEventListener('change', onStockEdit); });
-    window.addEventListener(STOCK_EVENT, () => { syncStockInputs(); applyStock(); });
-    syncStockInputs();
+    // ---- stock: a button that opens the rich Stock modal (ui/stockEditor.js). The modal persists to the shared
+    //      store + broadcasts ddcs:settings-changed; renderStock() then pushes it into this panel's viz/engine. ----
+    function renderStock() { if (viz) viz.setStock(stockForViz()); if (engine) engine.stock = stockForViz(); }
+    q('.pp-stock').addEventListener('click', (e) => toggleStockEditor(e.currentTarget));
 
     // ---- play / view controls ----
     q('.pp-m2d').addEventListener('click', () => setMode('2d'));
@@ -220,6 +198,8 @@ export function createPreviewPanel(container, opts = {}) {
     q('.pp-copy').addEventListener('click', () => { if (statusEl && statusEl.textContent && navigator.clipboard) navigator.clipboard.writeText(statusEl.textContent); });
 
     window.addEventListener('ddcs:stop-previews', stopPlay);
+    // Stock (or other settings) changed — e.g. the Stock modal — update the workpiece box + re-trace (probe clamp).
+    window.addEventListener('ddcs:settings-changed', () => { renderStock(); if (active) setGcode(); });
 
     function setActive(on) {
         active = !!on;
