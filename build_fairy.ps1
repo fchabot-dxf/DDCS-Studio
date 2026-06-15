@@ -3,12 +3,13 @@
 # Produces a single self-contained exe that runs the gateway HTTP server + poll loop and opens
 # the console in a native pywebview window. Local backend only (R2/boto3 excluded to slim it).
 #
-#   pwsh ./build_fairy.ps1                      # -> ./fairy.exe        (studio / CNC-FAIRY -> Expert M350)
-#   pwsh ./build_fairy.ps1 -Name benchgateway   # -> ./benchgateway.exe (this box -> bench V4.1 @ 10.0.0.50)
+#   pwsh ./build_fairy.ps1                      # -> ./DDCS-Studio.exe   (the public desktop app: Studio + gateway)
+#   pwsh ./build_fairy.ps1 -Name benchgateway   # -> ./benchgateway.exe (dev box -> bench V4.1 @ 10.0.0.50)
 #
-# Same gateway code either way — only the exe name differs; choose which controller at runtime. Both
-# exes are gitignored. Deps (one-time):  python -m pip install pyinstaller pywebview
-param([string]$Name = "fairy")
+# Same code either way — only the exe name differs; choose which controller at runtime. The exe is the FULL
+# DDCS Studio (UI + embedded gateway); "fairy" is just the internal gateway daemon. Builds are gitignored.
+# Deps (one-time):  python -m pip install pyinstaller pywebview
+param([string]$Name = "DDCS-Studio")
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 Push-Location $root

@@ -22,7 +22,7 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOST, PORT = "127.0.0.1", 8765
-TITLE = "CNC-FAIRY Gateway"
+TITLE = "DDCS Studio"   # the desktop app = Studio UI + embedded gateway ("fairy" is just the gateway daemon inside)
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "fairy.log")
 
 

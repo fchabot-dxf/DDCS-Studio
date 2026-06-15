@@ -19,9 +19,10 @@ output/
 **/scripts/tmp_bundle_check.js
 **/tmp_commandDeck_transformed.js
 
-# fairy.exe / benchgateway.exe gateway builds (PyInstaller) — artifacts only; build_*.ps1 + fairy_gateway.py are tracked
+# Desktop builds (PyInstaller) — artifacts only; build_*.ps1 + fairy_gateway.py are tracked
 /build/
 /dist/
+/DDCS-Studio.exe
 /fairy.exe
 /benchgateway.exe
 *.spec
