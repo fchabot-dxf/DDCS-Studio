@@ -72,5 +72,17 @@ export function setClientId(id, v) {
     try { v ? localStorage.setItem('ddcs_clientid_' + id, v) : localStorage.removeItem('ddcs_clientid_' + id); } catch (e) { /* */ }
 }
 
+// PUBLIC Google API key (browser key) — required by the Google PICKER API (in addition to the OAuth token) so the
+// user can choose WHERE their projects folder lives. Safe in the browser; restrict it to your origins + the Picker
+// API in the Cloud console. Empty until registered; a localStorage value (ddcs_apikey_google) overrides.
+const DEFAULT_API_KEYS = { google: '' };
+export function googleApiKey() {
+    try { const v = localStorage.getItem('ddcs_apikey_google'); if (v) return v; } catch (e) { /* */ }
+    return DEFAULT_API_KEYS.google || '';
+}
+export function setGoogleApiKey(v) {
+    try { v ? localStorage.setItem('ddcs_apikey_google', v) : localStorage.removeItem('ddcs_apikey_google'); } catch (e) { /* */ }
+}
+
 /** The redirect URI to register with each provider (our static relay page, on this origin). */
 export const redirectUri = () => location.origin + '/oauth-callback.html';

@@ -16,6 +16,16 @@ const TOK = 'ddcs_cloud_token', FOLDER_KEY = 'ddcs_gdrive_folder';
 
 const token = () => { try { return localStorage.getItem(TOK) || ''; } catch (e) { return ''; } };
 
+/** Current Google access token (for the Picker, which takes the OAuth token directly). */
+export const getAccessToken = () => token();
+
+/** Adopt a user-chosen folder as the projects root (move-safe, tracked by id). Picked via the Google Picker —
+ *  drive.file then has access to it, so the app lists/saves its own .mjson projects there. '' clears → back to
+ *  the auto "DDCS Studio" folder on next ensureRoot(). */
+export function setRoot(id) {
+    try { id ? localStorage.setItem(FOLDER_KEY, id) : localStorage.removeItem(FOLDER_KEY); } catch (e) { /* */ }
+}
+
 function loadGis() {
     if (window.google && window.google.accounts && window.google.accounts.oauth2) return Promise.resolve();
     return new Promise((res, rej) => {

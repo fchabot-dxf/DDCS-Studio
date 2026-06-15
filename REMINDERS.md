@@ -39,9 +39,13 @@ IDEA / EXPLORE:
   gateway endpoint to open the URL in the system browser.
 
 Cloud:
-- **Drive folder picker**: let the user choose WHERE the app folder lives (Google **Picker API** — `drive.file`
-  only sees app-created files, so the Picker grants access to a chosen existing folder). Today it auto-creates
-  "DDCS Studio" at Drive root (movable, tracked by id).
+- **Drive folder picker** — BUILT (`ui/cloud/googlePicker.js` + "📂 Choose folder" in the project Open drawer's
+  Cloud tab). drive.file can't browse the user's Drive, so the Google Picker grants access to a chosen existing
+  folder; the pick sets `ddcs_gdrive_folder` (the root id `ensureRoot` already uses), and the browser re-roots
+  there. ⚠️ NEEDS ONE-TIME SETUP in the Google Cloud project: (1) enable the **Google Picker API**; (2) create an
+  **API key** (browser key; restrict to the app origins + Picker API). First click prompts for the key (stored in
+  `ddcs_apikey_google`); bake it into `providers.DEFAULT_API_KEYS.google` once the user shares it (like the client
+  id). Token: the Picker uses the current GIS access token — if it's >~1h old it may need a reconnect first.
 - **Dropbox + OneDrive adapters** (`cloudVolume.getAdapter` stubbed for them; PKCE login built; Google done).
 - **Exe OAuth**: GIS-in-WebView2 likely blocked (`disallowed_useragent`) → register a **Desktop** OAuth client +
   **system-browser loopback** in `fairy_gateway.py`. (Web confirmed working on desktop + iOS after propagation.)

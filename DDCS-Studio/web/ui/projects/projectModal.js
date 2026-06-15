@@ -11,6 +11,8 @@ import * as store from './projectStore.js';
 import { getAccount, connect } from '../cloudAccount.js';
 import { PROVIDER_IDS, providerLabel, providerIcon } from '../cloud/providers.js';
 import * as gdrive from '../cloud/googleDrive.js';   // Google adapter (others plug in via the same shape)
+import { pickFolder } from '../cloud/googlePicker.js';
+import { googleApiKey, setGoogleApiKey } from '../cloud/providers.js';
 
 const sanitize = (s) => (String(s || '').trim().replace(/[^A-Za-z0-9 _.-]+/g, '_').replace(/^\.+/, '') || 'untitled');
 
@@ -183,6 +185,25 @@ async function renderCloud() {
     });
     const acts = document.createElement('span'); acts.className = 'proj-actions';
     acts.append(
+        // Pick WHERE your projects live in Drive (Google Picker — drive.file can't browse, so the picker grants access).
+        mkBtn('📂 Choose folder', async () => {
+            try {
+                if (!googleApiKey()) {
+                    const k = window.prompt('One-time setup: paste your Google API key (Cloud console → APIs & Services → Credentials → "Create credentials" → API key) and enable the "Google Picker API". Stored locally in this browser.');
+                    if (!k || !k.trim()) return;
+                    setGoogleApiKey(k.trim());
+                }
+                const f = await pickFolder();
+                gdrive.setRoot(f.id);
+                cloudStack = [{ id: f.id, name: f.name }];   // re-root the browser at the chosen folder
+                renderCloud();
+            } catch (e) {
+                const m = String(e && e.message);
+                if (m === 'cancelled') return;
+                if (m === 'no-api-key') { window.alert('A Google API key is needed for the folder picker (see the prompt).'); return; }
+                window.alert(cloudErrMsg(e));
+            }
+        }, 'op-btn'),
         mkBtn('+ Folder', async () => { const n = window.prompt('New folder name:'); if (!n) return; try { await gdrive.mkdir(sanitize(n), cur.id); renderCloud(); } catch (e) { window.alert(cloudErrMsg(e)); } }),
         mkBtn('⤓ Save here', async () => {
             const st = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
