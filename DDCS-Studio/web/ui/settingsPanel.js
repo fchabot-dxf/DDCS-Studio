@@ -352,7 +352,7 @@ function buildSettingsOverlay() {
                         <div class="settings-hint">Authoring help across both editors — the Blocks tab and the Studio text editor. All optional.</div>
                         <label class="settings-check"><input type="checkbox" id="set_cp_suggestions"> Block suggestions — the "Suggested next" chip strip in the Blocks tab</label>
                         <label class="settings-check"><input type="checkbox" id="set_cp_autocomplete"> Editor autocomplete — context suggestions at the cursor in the Studio editor</label>
-                        <label class="settings-check"><input type="checkbox" id="set_cp_ghost"> Ghost next-block — a faint preview of the likely next block (Tab to accept)</label>
+                        <label class="settings-check"><input type="checkbox" id="set_cp_ghost"> Suggestion box — a floating box of likely next blocks on the canvas (click, or Tab takes the first)</label>
                     </div>
                 </div>
                 <!-- GENERAL: PROFILE -->

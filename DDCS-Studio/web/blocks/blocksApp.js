@@ -180,14 +180,15 @@ async function buildWorkspace() {
   window.addEventListener('ddcs:settings-changed', () => updateStrip(getStack()));   // toggle on/off live
   updateStrip(getStack());
 
-  // ---- Ghost next-block (B): a faint, block-shaped preview of the single most-likely next block, anchored under
-  //      the last block on the canvas. Tab (or click) accepts it. Gated by Settings → Editor (compose.ghost). ----
-  const ghost = document.createElement('button');
-  ghost.type = 'button'; ghost.className = 'blk-ghost'; ghost.hidden = true;
-  host.appendChild(ghost);
-  let ghostType = null;
-  const ghostOn = () => { try { return window.ddcsGetSettings().compose.ghost !== false; } catch (_) { return true; } };
-  const hideGhost = () => { ghost.hidden = true; ghostType = null; };
+  // ---- Inline suggestion float (B): a small floating box of the most-likely next blocks, anchored under the last
+  //      block on the canvas — same look as the Studio editor autocomplete. Click an option to insert; Tab takes
+  //      the first. Gated by Settings → Editor (compose.ghost); fed by the SAME bigram model as the chip strip. ----
+  const sugFloat = document.createElement('div');
+  sugFloat.className = 'blk-sug-float'; sugFloat.hidden = true;
+  host.appendChild(sugFloat);
+  let floatTypes = [];                                   // current options in order (floatTypes[0] = Tab target)
+  const floatOn = () => { try { return window.ddcsGetSettings().compose.ghost !== false; } catch (_) { return true; } };
+  const hideFloat = () => { sugFloat.hidden = true; floatTypes = []; };
   const anchorBlock = () => {                            // bottom-most block of the main stack (above a trailing progend)
     try {
       const tops = ws.getTopBlocks(true);
@@ -197,40 +198,42 @@ async function buildWorkspace() {
       return b;
     } catch (_) { return null; }
   };
-  const updateGhost = () => {
-    if (!ghostOn() || !suggestionsOn()) return hideGhost();
-    const top = suggestNext(lastType(getStack()), 1, STMT)[0];
-    if (!top) return hideGhost();
-    ghostType = top;
-    ghost.className = `blk-ghost cat-${catSlugOf(top)}`;
-    ghost.innerHTML = `${labelOf(top)} <span class="blk-ghost-tab">Tab ⏎</span>`;
-    ghost.title = `Likely next: ${labelOf(top)} — press Tab to add`;
+  const updateFloat = () => {
+    if (!floatOn()) return hideFloat();
+    const hits = suggestNext(lastType(getStack()), 4, STMT);
+    if (!hits.length) return hideFloat();
+    floatTypes = hits;
+    sugFloat.innerHTML = hits.map((t, i) =>
+      `<button class="blk-sug-opt cat-${catSlugOf(t)}" data-type="${t}" type="button" title="Add ${labelOf(t)}">`
+      + `${labelOf(t)}${i === 0 ? '<kbd>Tab</kbd>' : ''}</button>`).join('');
     try {
       const hr = host.getBoundingClientRect();
       const anchor = anchorBlock();
       if (anchor) {                                                    // under the last block on the canvas
         const r = anchor.getSvgRoot().getBoundingClientRect();
-        if (r.bottom < hr.top || r.top > hr.bottom) return hideGhost();   // anchor scrolled out of view
-        ghost.style.left = Math.max(4, r.left - hr.left) + 'px';
-        ghost.style.top = (r.bottom - hr.top + 5) + 'px';
-      } else {                                                         // empty program → just right of the toolbox, where the first block lands
+        if (r.bottom < hr.top || r.top > hr.bottom) return hideFloat();   // anchor scrolled out of view
+        sugFloat.style.left = Math.max(4, r.left - hr.left) + 'px';
+        sugFloat.style.top = (r.bottom - hr.top + 6) + 'px';
+      } else {                                                         // empty program → right of the toolbox, where the first block lands
         let tbW = 0; try { tbW = ws.getToolbox() ? ws.getToolbox().getWidth() : 0; } catch (_) { /* */ }
-        ghost.style.left = (tbW + 18) + 'px'; ghost.style.top = '22px';
+        sugFloat.style.left = (tbW + 18) + 'px'; sugFloat.style.top = '22px';
       }
-    } catch (_) { return hideGhost(); }
-    ghost.hidden = false;
+      sugFloat.hidden = false;
+      const maxL = host.clientWidth - sugFloat.offsetWidth - 6;        // keep the box inside the canvas
+      if (parseFloat(sugFloat.style.left) > maxL) sugFloat.style.left = Math.max(4, maxL) + 'px';
+    } catch (_) { return hideFloat(); }
+    sugFloat.querySelectorAll('.blk-sug-opt').forEach((b) => b.addEventListener('click', () => insertSuggestion(b.dataset.type)));
   };
-  let ghostRaf = 0;
-  const refreshGhost = () => { if (ghostRaf) return; ghostRaf = requestAnimationFrame(() => { ghostRaf = 0; updateGhost(); }); };
-  ghost.addEventListener('click', () => { if (ghostType) insertSuggestion(ghostType); });
-  ws.addChangeListener(refreshGhost);                    // block moves / viewport scroll / model rebuild → reposition
-  window.addEventListener('ddcs:settings-changed', refreshGhost);
-  host.addEventListener('keydown', (e) => {              // Tab accepts — but not while editing a Blockly field
-    if (e.key !== 'Tab' || ghost.hidden || !ghostType) return;
+  let floatRaf = 0;
+  const refreshFloat = () => { if (floatRaf) return; floatRaf = requestAnimationFrame(() => { floatRaf = 0; updateFloat(); }); };
+  ws.addChangeListener(refreshFloat);                    // block moves / viewport scroll / model rebuild → reposition
+  window.addEventListener('ddcs:settings-changed', refreshFloat);
+  host.addEventListener('keydown', (e) => {              // Tab takes the first option — but not while editing a Blockly field
+    if (e.key !== 'Tab' || sugFloat.hidden || !floatTypes.length) return;
     const ae = document.activeElement;
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
     e.preventDefault(); e.stopPropagation();
-    insertSuggestion(ghostType);
+    insertSuggestion(floatTypes[0]);
   }, true);
 
   // ---- this tab is a VIEW of the shared program model (blocks = the data): workspace ⇄ model + right pane ----
