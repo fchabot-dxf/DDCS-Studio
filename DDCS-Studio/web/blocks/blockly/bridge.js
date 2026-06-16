@@ -20,7 +20,7 @@ import { PALETTE, CATEGORIES } from '../../wizards/ops/index.js';
 const SELECTS = {
     pattern: ['grid', 'line', 'circle', 'rect'], mode: ['rapid', 'cut', 'probe'], flow: ['flood', 'mist', 'off'],
     wcs: ['G54', 'G55', 'G56', 'G57', 'G58', 'G59'], dir: ['cw', 'ccw'], arc: ['ccw', 'cw'],
-    shape: ['rect', 'circle'], strategy: ['parallel', 'concentric'], direction: ['bothways', 'oneway', 'otherway'],
+    shape: ['rect', 'circle', 'polygon', 'ellipse'], strategy: ['parallel', 'concentric'], direction: ['bothways', 'oneway', 'otherway'],
     order: ['outside-in', 'inside-out'],   // Fill Concentric ring order (kept off 'direction' to avoid a dropdown clash)
     dist: ['abs', 'inc'], axis: ['X', 'Y', 'Z', 'A'], end: ['M30', 'M2'], method: ['peck', 'helical'],
 };

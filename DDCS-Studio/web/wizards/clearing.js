@@ -27,6 +27,18 @@ export function circleContour(cx, cy, r, seg = 96) {
     for (let i = 0; i < seg; i++) { const a = (2 * Math.PI * i) / seg; c.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }); }
     return [c];
 }
+/** Regular n-gon of circum-radius r about (cx,cy); a flat edge sits at the bottom (first vertex at -90°). */
+export function polygonContour(cx, cy, r, sides = 6) {
+    const n = Math.max(3, Math.round(sides)), c = [], off = -Math.PI / 2 + Math.PI / n;
+    for (let i = 0; i < n; i++) { const a = off + (2 * Math.PI * i) / n; c.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }); }
+    return [c];
+}
+/** Ellipse of x-radius rx, y-radius ry about (cx,cy). */
+export function ellipseContour(cx, cy, rx, ry, seg = 96) {
+    const c = [];
+    for (let i = 0; i < seg; i++) { const a = (2 * Math.PI * i) / seg; c.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) }); }
+    return [c];
+}
 
 /**
  * Non-zero-winding scanline fill. Rows are spaced `yStep` apart; each row lists the inside x-spans at
