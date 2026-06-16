@@ -620,7 +620,7 @@ export class GcodeViz3D {
         if (this._trailLine) { this.pathGroup.remove(this._trailLine); this._trailLine.geometry.dispose(); this._trailLine.material.dispose(); this._trailLine = null; }
         // New geometry → the old tip indices/orig are stale; clear them, and drop _trailOn so a rebuild during
         // play re-arms the trail (re-dims the route + un-hides the bold line) on the next setToolPosition.
-        this._trailTipIdx = null; this._trailTipOrig = null; this._trailOn = false;
+        this._trailTipIdx = null; this._trailTipOrig = null; this._trailOn = false; this._trailFat = null;
         if (animSegs.length) {
             const tp = [], tc = [], C = new THREE.Color();
             for (const s of animSegs) {
@@ -636,6 +636,11 @@ export class GcodeViz3D {
             const line = new THREE.LineSegments(g, mat); line.renderOrder = 22; line.visible = false;
             this.pathGroup.add(line);
             this._trailLine = line;
+            // Fat copies: children of the trail line, sharing g + mat → they inherit its draw-range, tip edits,
+            // per-vertex colours and visibility. _layoutTrailFat() offsets them ±right/±up for a thick line.
+            this._trailFat = [];
+            for (let k = 0; k < 4; k++) { const c = new THREE.LineSegments(g, mat); c.renderOrder = 21; line.add(c); this._trailFat.push(c); }
+            this._layoutTrailFat();
         }
 
         this._positionMarkers();
@@ -894,6 +899,25 @@ export class GcodeViz3D {
             this.camera.updateProjectionMatrix();
         }
         this.camera.updateMatrixWorld();
+        this._layoutTrailFat();
+    }
+
+    // Fat trail: 4 offset copies of the trail line (children of _trailLine → they share its geometry, draw-range,
+    // tip edits, colours and visibility) nudged ±right/±up in SCREEN space, so the bold executed path renders a
+    // few px thick on any GPU (GL linewidth is capped at 1px on ANGLE). Offsets recompute here so the thickness
+    // stays ~constant on screen through zoom.
+    _layoutTrailFat() {
+        const fat = this._trailFat; if (!fat || !fat.length) return;
+        const THREE = this.THREE, cam = this.camera;
+        const h = (this.renderer && this.renderer.domElement.clientHeight) || 600;
+        const fov = ((cam.fov || (this.persp && this.persp.fov) || 45) * Math.PI) / 180;
+        const o = ((2 * this.radius * Math.tan(fov / 2)) / h) * 1.1;   // ≈1.1 px (world units at the target distance)
+        const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0).normalize();
+        const up = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1).normalize();
+        fat[0].position.copy(right).multiplyScalar(o);
+        fat[1].position.copy(right).multiplyScalar(-o);
+        fat[2].position.copy(up).multiplyScalar(o);
+        fat[3].position.copy(up).multiplyScalar(-o);
     }
 
     /** Centre-lock the camera on the tool. on → a rAF loop eases the orbit target onto the tool each frame. */
