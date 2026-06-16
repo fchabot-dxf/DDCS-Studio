@@ -126,14 +126,6 @@ export const drillView = {
     },
 
     onOpen(ctx) {
-        // Mode-lock from the Drill/Bore menu entries (one-shot): set the method + title before rendering, so the
-        // form shows only that method's params and the preview generates the right hole. Cleared after applying so
-        // it never overrides an EDIT-seeded op (openForEdit seeds d_method from the op's params).
-        if (window.__drillLockMode) {
-            const m = el('d_method'); if (m) m.value = window.__drillLockMode;
-            const t = el('wizTitle'); if (t) t.textContent = (window.__drillLockMode === 'helical') ? 'BORE' : 'DRILL';
-            window.__drillLockMode = null;
-        }
         // Populate the Tool ▾ picker from the library each open (it may have changed in Settings).
         const sel = el('d_tool');
         if (sel) {
