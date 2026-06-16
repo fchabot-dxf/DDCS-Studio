@@ -12,13 +12,16 @@ const changeWizard = new AtcChangeWizard();
 const testWizard = new AtcTestWizard();
 const toolCheckWizard = new AtcToolCheckWizard();
 
+const setStatus = (id, text) => { const e = el(id); if (e) e.textContent = text; };
+
 export const atcLengthView = {
     type: 'atc_length',
     panelId: 'wiz_atc_length',
     codeElId: 'wiz_atc_length_code',
     large: true,
+    twoPane: true,
     inputIds: [],   // no wizard inputs — params come from Settings → ATC (tool-setter pin from Probes)
-    update() {
+    update(mgr) {
         const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
         const a = s.atc || {};
         const p = s.probes || {};
@@ -34,7 +37,10 @@ export const atcLengthView = {
             level: p.setterLevel,
             sources: window.ddcsResolveProbeSources(['setterPort', 'setterLevel', 'blockHeight']),
         };
-        el('wiz_atc_length_code').innerHTML = UIUtils.formatGCode(lengthWizard.generate(params));
+        const gcode = lengthWizard.generate(params);
+        el('wiz_atc_length_code').innerHTML = UIUtils.formatGCode(gcode);
+        if (mgr) mgr.preview3D(gcode, 'atcLengthViz');
+        setStatus('atcLengthVizStatus', 'Z touch on the tool setter · ▶ traces the fast approach, slow touch + retract');
     },
 };
 
@@ -43,8 +49,9 @@ export const atcCheckView = {
     panelId: 'wiz_atc_check',
     codeElId: 'wiz_atc_check_code',
     large: true,
+    twoPane: true,
     inputIds: ['atc_check_tol'],   // tolerance only — setter + feeds come from Settings → ATC / Probes
-    update() {
+    update(mgr) {
         const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
         const a = s.atc || {};
         const p = s.probes || {};
@@ -61,7 +68,10 @@ export const atcCheckView = {
             tolerance: el('atc_check_tol')?.value || '0.5',
             sources: window.ddcsResolveProbeSources(['setterPort', 'setterLevel', 'blockHeight']),
         };
-        el('wiz_atc_check_code').innerHTML = UIUtils.formatGCode(toolCheckWizard.generate(params));
+        const gcode = toolCheckWizard.generate(params);
+        el('wiz_atc_check_code').innerHTML = UIUtils.formatGCode(gcode);
+        if (mgr) mgr.preview3D(gcode, 'atcCheckViz');
+        setStatus('atcCheckVizStatus', 'Z re-tap on the setter · ▶ traces the probe; aborts if broken / wrong length');
     },
 };
 
@@ -70,15 +80,19 @@ export const atcWarmupView = {
     panelId: 'wiz_atc_warmup',
     codeElId: 'wiz_atc_warmup_code',
     large: true,
+    twoPane: true,
     inputIds: ['atc_warmup_rpm1', 'atc_warmup_time1', 'atc_warmup_rpm2', 'atc_warmup_time2'],
-    update() {
+    update(mgr) {
         const params = {
             rpm1: el('atc_warmup_rpm1')?.value || '6000',
             time1: el('atc_warmup_time1')?.value || '30',
             rpm2: el('atc_warmup_rpm2')?.value || '12000',
             time2: el('atc_warmup_time2')?.value || '30'
         };
-        el('wiz_atc_warmup_code').innerHTML = UIUtils.formatGCode(warmupWizard.generate(params));
+        const gcode = warmupWizard.generate(params);
+        el('wiz_atc_warmup_code').innerHTML = UIUtils.formatGCode(gcode);
+        if (mgr) mgr.preview3D(gcode, 'atcWarmupViz');
+        setStatus('atcWarmupVizStatus', 'Spindle warm-up · no toolpath — ▶ steps the RPM / dwell stages');
     },
 };
 
@@ -87,13 +101,14 @@ export const atcChangeView = {
     panelId: 'wiz_atc_change',
     codeElId: 'wiz_atc_change_code',
     large: true,
+    twoPane: true,
     inputIds: [
         'atc_change_mode',
         'atc_change_x', 'atc_change_y', 'atc_change_z',
         'atc_change_zclear', 'atc_change_capacity', 'atc_change_fixedt',
         'atc_change_m300', 'atc_change_cover', 'atc_change_confirm',
     ],
-    update() {
+    update(mgr) {
         const mode = el('atc_change_mode')?.value || 'manual';
         // Mode-specific parameter rows
         const manualRow = el('atc_change_manual_params');
@@ -115,7 +130,12 @@ export const atcChangeView = {
             dustCover: el('atc_change_cover')?.checked === true,
             confirm: el('atc_change_confirm')?.checked === true,
         };
-        el('wiz_atc_change_code').innerHTML = UIUtils.formatGCode(changeWizard.generate(params));
+        const gcode = changeWizard.generate(params);
+        el('wiz_atc_change_code').innerHTML = UIUtils.formatGCode(gcode);
+        if (mgr) mgr.preview3D(gcode, 'atcChangeViz');
+        setStatus('atcChangeVizStatus', mode === 'auto'
+            ? 'Auto ATC pick & place · pocket moves come from controller tables (#1330/#1350/#1370)'
+            : 'Manual park · ▶ traces the safe-Z retract then the move to the swap position');
     },
 };
 
@@ -124,12 +144,13 @@ export const atcTestView = {
     panelId: 'wiz_atc_test',
     codeElId: 'wiz_atc_test_code',
     large: true,
+    twoPane: true,
     inputIds: [
         'atc_test_mode',
         'atc_test_cycles', 'atc_test_dwell',
         'atc_test_first', 'atc_test_count', 'atc_test_zclear', 'atc_test_descend',
     ],
-    update() {
+    update(mgr) {
         const mode = el('atc_test_mode')?.value || 'drawbar';
         const drawbarRow = el('atc_test_drawbar_params');
         const pocketRow = el('atc_test_pocket_params');
@@ -145,6 +166,11 @@ export const atcTestView = {
             zClear: el('atc_test_zclear')?.value || '0',
             descend: el('atc_test_descend')?.checked === true,
         };
-        el('wiz_atc_test_code').innerHTML = UIUtils.formatGCode(testWizard.generate(params));
+        const gcode = testWizard.generate(params);
+        el('wiz_atc_test_code').innerHTML = UIUtils.formatGCode(gcode);
+        if (mgr) mgr.preview3D(gcode, 'atcTestViz');
+        setStatus('atcTestVizStatus', mode === 'pockets'
+            ? 'Pocket dry-run · visits the taught pocket positions (controller tables) at clearance Z'
+            : 'Drawbar cycle · no toolpath — ▶ steps the release / lock sequence');
     },
 };

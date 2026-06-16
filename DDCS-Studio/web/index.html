@@ -1242,15 +1242,35 @@
 
             <!-- ATC Length Wizard -->
             <div id="wiz_atc_length" class="wiz-body" data-cap="toolTable" style="display:none">
-                <div class="settings-hint" style="margin-bottom:8px;">Tool-length probe parameters come from <b>Settings → ATC</b> (block height, feeds, max distance, retract, Q) and the tool-setter pin/level from <b>Settings → Probes</b>. The preview below reflects those values — edit them in Settings.</div>
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcLengthVizStatus" class="viz-status"></div>
+                        <div id="atcLengthViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="settings-hint" style="margin-bottom:8px;">Tool-length probe parameters come from <b>Settings → ATC</b> (block height, feeds, max distance, retract, Q) and the tool-setter pin/level from <b>Settings → Probes</b>. The preview reflects those values — edit them in Settings. ▶ traces the Z touch on the setter.</div>
                 <div class="preview-block">
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_atc_length_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- Tool Breakage / Length Re-check Wizard -->
             <div id="wiz_atc_check" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcCheckVizStatus" class="viz-status"></div>
+                        <div id="atcCheckViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <div class="settings-hint" style="margin-bottom:8px;">A quick tap on the tool setter that <b>aborts if the tool is broken, missing, or the wrong length</b>. Re-measures and compares to the stored tool-length table (1430+T-1). Setter pin/level from <b>Settings → Probes</b>; block height, feeds, safe Z, max distance from <b>Settings → ATC</b>.</div>
                 <span class="section-label">TOLERANCE</span>
                 <div class="grid-2">
@@ -1261,10 +1281,21 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_atc_check_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- Spindle Warm-up Wizard -->
             <div id="wiz_atc_warmup" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcWarmupVizStatus" class="viz-status"></div>
+                        <div id="atcWarmupViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <span class="section-label">WARM-UP SEQUENCE</span>
                 <div class="param-grid">
                     <label>Stage 1 RPM<input type="number" id="atc_warmup_rpm1" value="6000" class="num-input" step="1000"></label>
@@ -1276,10 +1307,21 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_atc_warmup_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- ATC Tool Change Wizard -->
             <div id="wiz_atc_change" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcChangeVizStatus" class="viz-status"></div>
+                        <div id="atcChangeViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <span class="section-label">TOOL CHANGE</span>
                 <div class="param-grid">
                     <label>Mode
@@ -1311,10 +1353,21 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_atc_change_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- ATC Commissioning Test Wizard -->
             <div id="wiz_atc_test" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcTestVizStatus" class="viz-status"></div>
+                        <div id="atcTestViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <span class="section-label">ATC COMMISSIONING TEST</span>
                 <div class="param-grid">
                     <label>Test
@@ -1343,6 +1396,8 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_atc_test_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- Communication Wizard -->
