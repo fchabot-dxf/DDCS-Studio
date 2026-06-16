@@ -21,6 +21,7 @@ const SELECTS = {
     pattern: ['grid', 'line', 'circle', 'rect'], mode: ['rapid', 'cut', 'probe'], flow: ['flood', 'mist', 'off'],
     wcs: ['G54', 'G55', 'G56', 'G57', 'G58', 'G59'], dir: ['cw', 'ccw'], arc: ['ccw', 'cw'],
     shape: ['rect', 'circle', 'polygon', 'ellipse'], strategy: ['parallel', 'concentric'], direction: ['bothways', 'oneway', 'otherway'],
+    stop: ['M0', 'M1'], plane: ['G17', 'G18', 'G19'], fmode: ['G94', 'G95'],   // Stop / Plane / Feed-mode atoms
     order: ['outside-in', 'inside-out'],   // Fill Concentric ring order (kept off 'direction' to avoid a dropdown clash)
     dist: ['abs', 'inc'], axis: ['X', 'Y', 'Z', 'A'], end: ['M30', 'M2'], method: ['peck', 'helical'],
 };
