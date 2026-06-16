@@ -63,6 +63,29 @@ test('#var / [expr] coordinates survive as literals; unknown lines → raw', asy
   expect(r.blank).toBe(null);
 });
 
+test('standard atoms (plane / feed-mode / home / call / return) decode instead of falling to raw, and round-trip', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { emitMapped } = await import('/blocks/blockModel.js');
+    const { parseGcodeToStack } = await import('/blocks/gcodeToStack.js');
+    const stack = [
+      { type: 'plane', params: { plane: 'G18' } },
+      { type: 'feedmode', params: { fmode: 'G95' } },
+      { type: 'home', params: { axes: 'XYZ' } },
+      { type: 'call', params: { prog: 9083 } },
+      { type: 'return', params: {} },
+    ];
+    const text1 = emitMapped(stack).text;
+    const parsed = parseGcodeToStack(text1);
+    const text2 = emitMapped(parsed).text;
+    return { text1, text2, types: parsed.map((b) => b.type), homeAxes: parsed[2].params.axes, callProg: parsed[3].params.prog };
+  });
+  expect(r.types, 'standard codes decode to their atoms, not raw').toEqual(['plane', 'feedmode', 'home', 'call', 'return']);
+  expect(r.homeAxes).toBe('XYZ');
+  expect(r.callProg).toBe(9083);
+  expect(r.text2, 'byte-exact round-trip').toBe(r.text1);
+});
+
 test('reconcileGcodeToStack: leaf/empty programs re-parse; high-level programs return null', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {

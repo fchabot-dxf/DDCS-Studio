@@ -72,8 +72,17 @@ export function parseLine(line, opts = {}) {
     if (G(0)) return { type: 'move', params: pick({ mode: 'rapid', x: w('X'), y: w('Y'), z: w('Z') }) };
     if (G(4)) { const p = w('P'); const ms = !dialect || dialect.dwellUnits !== 's'; return { type: 'dwell', params: { sec: typeof p === 'number' ? (ms ? p / 1000 : p) : p } }; }
     for (let n = 54; n <= 59; n++) if (G(n)) return { type: 'wcs', params: { wcs: 'G' + n } };
+    if (G(17)) return { type: 'plane', params: { plane: 'G17' } };
+    if (G(18)) return { type: 'plane', params: { plane: 'G18' } };
+    if (G(19)) return { type: 'plane', params: { plane: 'G19' } };
     if (G(90)) return { type: 'distmode', params: { dist: 'abs' } };
     if (G(91)) return { type: 'distmode', params: { dist: 'inc' } };
+    if (G(94)) return { type: 'feedmode', params: { fmode: 'G94' } };
+    if (G(95)) return { type: 'feedmode', params: { fmode: 'G95' } };
+    if (G(28)) {   // reference return → Home; recover the referenced axes from their words
+        const axes = (code.toUpperCase().match(/[XYZA](?=[-+.\d])/g) || []).filter((a, i, arr) => arr.indexOf(a) === i);
+        return { type: 'home', params: { axes: axes.join('') || 'Z' } };
+    }
 
     // M-codes
     if (M(3) || M(4)) return { type: 'spindle', params: pick({ rpm: w('S'), dir: M(4) ? 'ccw' : 'cw' }) };
@@ -83,6 +92,8 @@ export function parseLine(line, opts = {}) {
     if (M(7)) return { type: 'coolant', params: { flow: 'mist' } };
     if (M(9)) return { type: 'coolant', params: { flow: 'off' } };
     if (M(30) || M(2)) return { type: 'endprogram', params: {} };
+    if (M(98)) { const p = w('P'); if (typeof p === 'number') return { type: 'call', params: { prog: p } }; }   // numeric P only (a #var P can't round-trip through call.emit)
+    if (M(99)) return { type: 'return', params: {} };
     const mm = code.match(/\bM0*(\d+)\b/i);
     if (mm) return { type: 'mcode', params: { code: Number(mm[1]) } };
 
