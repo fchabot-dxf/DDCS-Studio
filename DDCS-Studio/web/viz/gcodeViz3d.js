@@ -531,14 +531,14 @@ export class GcodeViz3D {
         // rapids zipping — relative speeds match the program.
         const animSegs = [];
         const ROT_DEG_PER_MIN = 3600; // nominal rotary speed for sim timing of a rotary-only move (60°/s)
-        const pushSeg = (ax, ay, az, bx, by, bz, rate, a1, b1, a2, b2) => {
+        const pushSeg = (ax, ay, az, bx, by, bz, rate, a1, b1, a2, b2, col) => {
             a1 = a1 || 0; b1 = b1 || 0; a2 = a2 || 0; b2 = b2 || 0;
             const len = Math.hypot(bx - ax, by - ay, bz - az);
             const da = Math.abs(a2 - a1) + Math.abs(b2 - b1);
             if (len < 1e-9 && da < 1e-9) return;   // truly stationary → skip
             // A rotary-only move has no XYZ length: time it by its angle so the spin actually plays.
             const ms = len >= 1e-9 ? (len / (rate > 0 ? rate : 600)) * 60000 : (da / ROT_DEG_PER_MIN) * 60000;
-            animSegs.push({ ax, ay, az, bx, by, bz, ms, a1, b1, a2, b2 });
+            animSegs.push({ ax, ay, az, bx, by, bz, ms, a1, b1, a2, b2, col: col != null ? col : 0xffe14d });
         };
         let bounds = null;
         const grow = (x, y, z) => { bounds = this._growBounds(bounds, x, y, z, x, y, z); };
@@ -548,7 +548,7 @@ export class GcodeViz3D {
             const segs = byPass[p] || [];
             const mk = this.starts[p] || { x: 0, y: 0, z: 0 };
             // manual jog from the previous pass's end to this pass's start marker
-            if (prevEnd) { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(mk.x, mk.y, mk.z); pushSeg(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z, 6000); }
+            if (prevEnd) { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(mk.x, mk.y, mk.z); pushSeg(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z, 6000, 0, 0, 0, 0, 0xff9a0d); }
             let cur = { x: 0, y: 0, z: 0 }; // pass-local, relative to the marker
             for (const s of segs) {
                 const dx = s.x2 - s.x1, dy = s.y2 - s.y1, dz = s.z2 - s.z1;
@@ -577,12 +577,16 @@ export class GcodeViz3D {
                 const ax = start.x + mk.x, ay = start.y + mk.y, az = start.z + mk.z;
                 const bx = end.x + mk.x, by = end.y + mk.y, bz = end.z + mk.z;
                 grow(ax, ay, az); grow(bx, by, bz);
+                const slowProbe = type === 'probe' && (s.feed || 0) > 0 && (s.feed || 0) < maxProbeFeed;
                 const arr = type === 'rapid' ? rapidPos
                     : type === 'retract' ? retractPos
-                    : type === 'probe' ? (((s.feed || 0) > 0 && (s.feed || 0) < maxProbeFeed) ? probeSlowPos : probeFastPos)
+                    : type === 'probe' ? (slowProbe ? probeSlowPos : probeFastPos)
                     : feedPos;
+                // trail colour = the route move-type colour, so the bold executed trail isn't always amber
+                const col = type === 'rapid' ? 0xffcc00 : type === 'retract' ? 0x33cc55
+                    : type === 'probe' ? (slowProbe ? 0x93c5fd : 0x3b82f6) : 0x35ffd0;
                 arr.push(ax, ay, az, bx, by, bz);
-                pushSeg(ax, ay, az, bx, by, bz, (type === 'rapid' || type === 'retract') ? 6000 : (s.feed > 0 ? s.feed : 600), s.a1, s.b1, s.a2, s.b2);
+                pushSeg(ax, ay, az, bx, by, bz, (type === 'rapid' || type === 'retract') ? 6000 : (s.feed > 0 ? s.feed : 600), s.a1, s.b1, s.a2, s.b2, col);
                 cur = end;
             }
             prevEnd = { x: cur.x + mk.x, y: cur.y + mk.y, z: cur.z + mk.z };
@@ -618,12 +622,17 @@ export class GcodeViz3D {
         // play re-arms the trail (re-dims the route + un-hides the bold line) on the next setToolPosition.
         this._trailTipIdx = null; this._trailTipOrig = null; this._trailOn = false;
         if (animSegs.length) {
-            const tp = [];
-            for (const s of animSegs) tp.push(s.ax, s.ay, s.az, s.bx, s.by, s.bz);
+            const tp = [], tc = [], C = new THREE.Color();
+            for (const s of animSegs) {
+                tp.push(s.ax, s.ay, s.az, s.bx, s.by, s.bz);
+                C.set(s.col != null ? s.col : 0xffe14d);
+                tc.push(C.r, C.g, C.b, C.r, C.g, C.b);   // bold trail coloured per move-type (probe blue, rapid yellow, …)
+            }
             const g = new THREE.BufferGeometry();
             g.setAttribute('position', new THREE.Float32BufferAttribute(tp, 3));
+            g.setAttribute('color', new THREE.Float32BufferAttribute(tc, 3));
             g.setDrawRange(0, 0);
-            const mat = new THREE.LineBasicMaterial({ color: 0xffe14d, linewidth: 3 }); mat.depthTest = false;   // bold solid amber (linewidth best-effort; ANGLE caps at 1px)
+            const mat = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 3 }); mat.depthTest = false;   // solid/bold; linewidth best-effort (ANGLE caps at 1px)
             const line = new THREE.LineSegments(g, mat); line.renderOrder = 22; line.visible = false;
             this.pathGroup.add(line);
             this._trailLine = line;
