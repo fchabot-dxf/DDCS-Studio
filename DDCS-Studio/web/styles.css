@@ -2701,14 +2701,11 @@ body #editor.editor-layer {
     min-height: 1.6em;   /* empty lines stay one row tall so the highlight matches the textarea */
 }
 
-#editor-highlight .g-line.active-line {
-    background: rgba(64, 110, 171, 0.22);
-}
-
-/* Wizard CODE PREVIEW: highlight the executing line during play (and the clicked line) — same blue as the
-   Studio editor. The spans are inline inside a <pre>, so the highlight sits behind the line text. The preview
-   does NOT scroll while playing; instead each newly-executing line pulses so the eye catches the motion. */
+/* Executing-line highlight — UNIFIED across the Studio editor (#editor-highlight) and the wizard CODE PREVIEW
+   (pre[id$=_code]): same blue, same pulse (each newly-executing line flashes then settles), and neither view
+   scrolls while playing (the editor's setActiveLine no longer calls _scrollToLine). */
 @keyframes ddcs-exec-pulse { from { background: rgba(64, 130, 220, 0.65); } to { background: rgba(64, 110, 171, 0.30); } }
+#editor-highlight .g-line.active-line,
 pre[id^="wiz_"][id$="_code"] .g-line.active-line { background: rgba(64, 110, 171, 0.30); border-radius: 2px; animation: ddcs-exec-pulse 0.4s ease; }
 
 /* Line-number gutter — dark grey, left, scroll-synced with the editor */

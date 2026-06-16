@@ -222,7 +222,8 @@ export class EditorManager {
         const next = this.highlight.querySelector(`.g-line[data-line-index="${lineIndex}"]`);
         if (next) next.classList.add('active-line');
         this.activeLineIndex = lineIndex;
-        this._scrollToLine(lineIndex);
+        // No _scrollToLine: the editor must not jump while playing (unified with the wizard CODE PREVIEW —
+        // the pulsing highlight tracks the line in place instead of scrolling the text).
     }
 
     clearActiveLine() {
