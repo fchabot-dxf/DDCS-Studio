@@ -9,8 +9,11 @@
  * rebuilds + ws.setTheme() on the data-theme mutation, so switching theme re-skins the canvas live.
  */
 const CAT = {
-  shapes: '#3b82f6', move: '#14b8a6', machine: '#64748b', ops: '#22c55e',
-  modify: '#a855f7', control: '#f59e0b', math: '#84cc16', variables: '#06b6d4', markup: '#94a3b8',
+  shapes: '#3b82f6', move: '#14b8a6', ops: '#22c55e', modify: '#a855f7',
+  // the former overloaded 'Machine' bucket, split into granular groups (see wizards/ops/index.js RECAT)
+  cutting: '#f97316', coordinates: '#0ea5e9', program: '#64748b', probing: '#e11d48', signals: '#8b5cf6',
+  control: '#f59e0b', math: '#84cc16', variables: '#06b6d4', markup: '#94a3b8',
+  machine: '#64748b',   // legacy alias (no blocks use it now)
 };
 
 /** Read a CSS custom property off <body> (where data-theme lives), with a fallback. */

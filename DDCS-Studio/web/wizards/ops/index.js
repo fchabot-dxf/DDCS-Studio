@@ -67,9 +67,22 @@ export const PALETTE = [
     commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
 ];
 
-/** Canonical palette-grouping order (the 2-level sidebar rail). Categories with no blocks yet don't render.
- *  Shapes/Move/Machine are the granular CNC layers (Move/Machine have no Tinkercad analog — see BLOCKS-TAB.md). */
-export const CATEGORIES = ['Shapes', 'Move', 'Machine', 'Ops', 'Modify', 'Control', 'Math', 'Variables', 'Mark Up'];
+// Re-categorise the former overloaded 'Machine' bucket (~20 blocks) into granular, semantic groups. Palette
+// grouping only (the block's emit/behaviour is unchanged); mutating the shared def's category is read solely by
+// the toolbox builder. pathMode (G64/G61) moves to Move (it's a motion mode).
+const RECAT = {
+    spindle: 'Cutting', feed: 'Cutting', dwell: 'Cutting', coolant: 'Cutting', tool: 'Cutting',
+    wcs: 'Coordinates', distmode: 'Coordinates', setworkoffset: 'Coordinates', tooloffset: 'Coordinates',
+    progstart: 'Program', progend: 'Program', endprogram: 'Program',
+    proberead: 'Probing', readmachine: 'Probing',
+    mcode: 'Signals', raw: 'Signals', outpin: 'Signals', waitinput: 'Signals',
+    pathmode: 'Move',
+};
+PALETTE.forEach((d) => { if (RECAT[d.type]) d.category = RECAT[d.type]; });
+
+/** Canonical palette-grouping order (the toolbox category order). Categories with no blocks don't render.
+ *  Geometry/toolpath → machine setup/state → probing → logic → low-level signals → annotation. */
+export const CATEGORIES = ['Shapes', 'Move', 'Ops', 'Modify', 'Cutting', 'Coordinates', 'Program', 'Probing', 'Control', 'Math', 'Variables', 'Signals', 'Mark Up'];
 
 /** type → definition, for emit dispatch and field lookup. (Reporters — Variable/Math — are in PALETTE too;
  *  dragging one drops it into a value socket rather than onto the canvas.) */

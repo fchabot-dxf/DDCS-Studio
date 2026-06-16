@@ -1,0 +1,27 @@
+import { test, expect } from '@playwright/test';
+
+// Blocks palette: the overloaded 'Machine' bucket is split into granular semantic categories
+// (Cutting / Coordinates / Program / Probing / Signals), and pathMode moves to Move.
+test('toolbox uses the granular categories (no overloaded Machine)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio);
+  const r = await page.evaluate(async () => {
+    const { buildToolbox } = await import('/blocks/blockly/bridge.js');
+    const tb = buildToolbox();
+    const names = tb.contents.map((c) => c.name);
+    const catOf = (type) => { for (const c of tb.contents) if (c.contents.some((b) => b.type === type)) return c.name; return null; };
+    return {
+      names,
+      spindle: catOf('spindle'), wcs: catOf('wcs'), mcode: catOf('mcode'),
+      proberead: catOf('proberead'), pathmode: catOf('pathmode'), progstart: catOf('progstart'),
+    };
+  });
+  expect(r.names, 'no overloaded Machine category').not.toContain('Machine');
+  expect(r.names, 'granular groups present').toEqual(expect.arrayContaining(['Cutting', 'Coordinates', 'Program', 'Probing', 'Signals']));
+  expect(r.spindle, 'spindle → Cutting').toBe('Cutting');
+  expect(r.wcs, 'wcs → Coordinates').toBe('Coordinates');
+  expect(r.progstart, 'progStart → Program').toBe('Program');
+  expect(r.proberead, 'probeRead → Probing').toBe('Probing');
+  expect(r.mcode, 'mcode → Signals').toBe('Signals');
+  expect(r.pathmode, 'pathMode → Move').toBe('Move');
+});

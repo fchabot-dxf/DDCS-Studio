@@ -15,7 +15,7 @@
  * Block shape by kind: reporter → output (typed); container/path/loop/cond/depth/fill → + a 'DO' statement
  * mouth; everything else → a statement (prev/next). Requires window.Blockly (vendored UMD).
  */
-import { PALETTE } from '../../wizards/ops/index.js';
+import { PALETTE, CATEGORIES } from '../../wizards/ops/index.js';
 
 const SELECTS = {
     pattern: ['grid', 'line', 'circle', 'rect'], mode: ['rapid', 'cut', 'probe'], flow: ['flood', 'mist', 'off'],
@@ -106,8 +106,7 @@ export function buildToolbox() {
         fieldsOf(def).forEach((f) => { if (fieldKind(def, f) === 'value') inputs[FN(f)] = shadow(def.defaults[f]); });
         (byCat[def.category] ||= []).push({ kind: 'block', type: def.type, ...(Object.keys(inputs).length ? { inputs } : {}) });
     });
-    const order = ['Shapes', 'Move', 'Machine', 'Ops', 'Modify', 'Control', 'Math', 'Variables', 'Mark Up'];
-    const cats = order.filter((c) => byCat[c]).map((c) => ({
+    const cats = CATEGORIES.filter((c) => byCat[c]).map((c) => ({
         kind: 'category', name: c, categorystyle: catSlug(c) + '_cat', contents: byCat[c],
     }));
     return { kind: 'categoryToolbox', contents: cats };
