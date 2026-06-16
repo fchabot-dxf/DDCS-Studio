@@ -26,6 +26,39 @@ test('suggestionsFor is context-aware (codes vs axis words)', async ({ page }) =
   expect(r.complete.length).toBe(0);
 });
 
+test('two modes: complete (mid-word) vs next-word (at a boundary)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { suggestionsFor } = await import('/ui/editorAutocomplete.js');
+    const m = (text) => suggestionsFor(text, text.length);
+    return {
+      completeMode: m('G9').mode,
+      nextMode: m('G1 X10 ').mode,
+      nextHits: m('G1 X10 ').hits.map((h) => h.text),     // bigram keyed on the previous token "X10" → axis words
+      lineStart: m('').hits.map((h) => h.text),           // boundary with no prior token → common openers
+    };
+  });
+  expect(r.completeMode).toBe('complete');
+  expect(r.nextMode).toBe('next');
+  expect(r.nextHits).toContain('Y');
+  expect(r.nextHits.every((t) => /^[XYZAFSPIJK]$/.test(t)), 'next-word after an axis = axis words').toBeTruthy();
+  expect(r.lineStart.length, 'line start offers openers').toBeGreaterThan(0);
+});
+
+test('next-word box renders green with a "next" tag', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => document.getElementById('editor') && window.ddcsGetSettings);
+  await page.evaluate(() => { window.ddcsGetSettings().compose.autocomplete = true; });
+  const editor = page.locator('#editor');
+  await editor.click();
+  await editor.fill('');
+  await page.evaluate(() => document.getElementById('editor').focus());
+  await page.keyboard.type('G1 X10 ');                    // trailing space → boundary → next-word mode
+  await page.waitForSelector('.ac-bar.ac-next:not([hidden])');
+  expect(await page.locator('.ac-bar.ac-next .ac-tag').count(), 'green box carries the next tag').toBe(1);
+  expect(await page.locator('.ac-bar.ac-next .ac-item').count(), 'green box offers options').toBeGreaterThan(0);
+});
+
 test('clicking a completion inserts it at the caret', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => document.getElementById('editor') && window.ddcsGetSettings);

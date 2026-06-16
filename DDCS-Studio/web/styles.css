@@ -463,6 +463,13 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .ac-item:hover { background: var(--accent, #0ea5e9); color: #fff; }
 .ac-item small { opacity: .55; font-weight: 400; }
 .ac-item:hover small { opacity: .8; }
+/* NEXT-WORD mode — distinct green tint vs the blue completion box, with a leading "next" tag. */
+.ac-bar.ac-next { border-color: #10b981; box-shadow: 0 6px 18px rgba(16,185,129,.28); }
+.ac-bar.ac-next .ac-item:hover { background: #10b981; }
+.ac-tag {
+    align-self: center; flex: 0 0 auto; margin: 0 2px 0 1px; padding: 2px 6px; border-radius: 4px;
+    background: #10b981; color: #04241a; font: 700 9px/1 ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase;
+}
 
 /* Right-click op context menu (Edit / Duplicate / Delete). */
 .op-ctx-menu {
