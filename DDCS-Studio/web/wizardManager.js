@@ -326,13 +326,29 @@ export class WizardManager {
             // The shared panel carries its own legend + controls; drop any per-wizard inline legend.
             const visual = host.closest('.wiz-visual') || parent;
             const oldLeg = visual && visual.querySelector('.viz-legend'); if (oldLeg) oldLeg.remove();
-            host.__panel = createPreviewPanel(host, { getGcode: () => host.__gcode || '', getStart: () => host.__start });
+            host.__panel = createPreviewPanel(host, {
+                getGcode: () => host.__gcode || '',
+                getStart: () => host.__start,
+                onLine: (i) => this._highlightWizLine(host, i),   // play → highlight the executing line in the CODE PREVIEW (like Studio main)
+            });
         }
         svgCont.style.display = 'none';
         host.__gcode = gcode || '';
         host.__start = start || null;
         this._activePanel = host.__panel;   // for insert(): read the start the user set/dragged in this preview
         host.__panel.setActive(true);        // mark active + render this op's code
+    }
+
+    // Highlight the executing (or clicked) line in this wizard's CODE PREVIEW — same blue as the Studio editor.
+    // i = null clears. Scope to the host's own wizard BODY (#wiz_<name>.wiz-body) — all wizards share one .wiz-box,
+    // so a broader scope would grab the first wizard's code, not the active one.
+    _highlightWizLine(host, i) {
+        const body = (host && host.closest && host.closest('.wiz-body')) || document;
+        body.querySelectorAll('pre[id^="wiz_"][id$="_code"] .g-line.active-line').forEach((s) => s.classList.remove('active-line'));
+        if (i == null) return;
+        const codeEl = body.querySelector('pre[id^="wiz_"][id$="_code"]');
+        const ln = codeEl && codeEl.querySelector(`.g-line[data-line-index="${i}"]`);
+        if (ln) { ln.classList.add('active-line'); ln.scrollIntoView({ block: 'nearest' }); }
     }
 
     // Old private name kept as an alias for any external callers

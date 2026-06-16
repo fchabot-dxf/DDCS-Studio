@@ -2676,6 +2676,10 @@ body #editor.editor-layer {
     background: rgba(64, 110, 171, 0.22);
 }
 
+/* Wizard CODE PREVIEW: highlight the executing line during play (and the clicked line) — same blue as the
+   Studio editor. The spans are inline inside a <pre>, so the highlight sits behind the line text. */
+pre[id^="wiz_"][id$="_code"] .g-line.active-line { background: rgba(64, 110, 171, 0.30); border-radius: 2px; }
+
 /* Line-number gutter — dark grey, left, scroll-synced with the editor */
 #editor-gutter {
     position: absolute;
