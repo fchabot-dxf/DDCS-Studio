@@ -12,6 +12,7 @@ import { WIZARD_VIEWS, viewByType } from './wizards/views/index.js';
 import { playClick, playClickReverse } from './ui/sound.js';  // audio helper for click sounds
 import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
 import { createPreviewPanel } from './viz/createPreviewPanel.js';   // THE shared preview (identical to Blocks/Studio), fed the wizard's op code
+import { openTemplatesPopover, closeTemplatesPopover } from './ui/wizardTemplates.js';   // per-op save/load templates (local + cloud)
 
 // Map the touch-probe wizards' per-op input fields to the global 3D-probe defaults
 // (settings.probes). open() pre-fills these so every wizard starts from the configured
@@ -92,7 +93,11 @@ export class WizardManager {
         // Drag the whole generator by its header bar (but not the gear / close).
         const box = this.wizardElement.querySelector('.wiz-box');
         const head = box && box.querySelector('.wiz-head');
-        if (box && head) makeDraggable(box, head, { ignore: 'select, button, input, .wiz-gear, .wiz-close' });
+        if (box && head) makeDraggable(box, head, { ignore: 'select, button, input, .wiz-gear, .wiz-close, .wiz-templates' });
+
+        // Wizard header → Templates popover (save / load this op's parameter templates).
+        const tplBtn = this.wizardElement.querySelector('.wiz-templates');
+        if (tplBtn) tplBtn.addEventListener('click', (e) => { e.stopPropagation(); openTemplatesPopover(this, tplBtn); });
 
         // Settings (stock/probe/machine) changed — if a wizard is open, re-run its update() so the
         // preview + the inferred spindle start track the new values live (e.g. editing stock size via
@@ -159,6 +164,8 @@ export class WizardManager {
     open(type) {
         // play a feedback sound whenever a wizard is opened
         playClick();
+        this._activeType = type;   // for the Templates popover (save/load this op's parameter templates)
+        closeTemplatesPopover();
         this.editingOpId = null;   // a fresh open is a NEW op; openForEdit re-marks it. Clear the edit glow.
         { const b = document.querySelector('.wiz-box'); if (b) b.classList.remove('editing'); }
         // Opening a wizard leaves the Studio preview context — stop any running engine/play (every preview panel
@@ -257,6 +264,7 @@ export class WizardManager {
         if (reverse) {
             playClickReverse();
         }
+        closeTemplatesPopover();
         // Hide overlay and clear active state
         this.wizardElement.classList.remove('active');
         this.wizardElement.style.display = 'none';
