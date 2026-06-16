@@ -369,7 +369,7 @@ export class WizardManager {
         if (i == null) return;
         const codeEl = body.querySelector('pre[id^="wiz_"][id$="_code"]');
         const ln = codeEl && codeEl.querySelector(`.g-line[data-line-index="${i}"]`);
-        if (ln) { ln.classList.add('active-line'); ln.scrollIntoView({ block: 'nearest' }); }
+        if (ln) ln.classList.add('active-line');   // no scrollIntoView — the CODE PREVIEW must not jump while playing; the line just pulses (CSS animation)
     }
 
     // Old private name kept as an alias for any external callers
