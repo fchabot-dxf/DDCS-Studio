@@ -239,6 +239,17 @@ export function createPreviewPanel(container, opts = {}) {
         updateRunBtn();
     }
 
+    // Static scrub: place the tool at the position the program reaches by the END of source line `i` (or the
+    // nearest earlier move). Drives "click a code line → see where the tool lands" when not playing.
+    function seekLine(i) {
+        if (!segs.length || i == null) return;
+        let best = null;
+        for (const s of segs) { if (s.line != null && s.line <= i) best = s; }
+        const pos = best ? { x: best.x2, y: best.y2, z: best.z2 } : { x: segs[0].x1, y: segs[0].y1, z: segs[0].z1 };
+        if (mode === '3d') { const v = ensureViz(); if (v && v.setToolPosition) v.setToolPosition(pos); }
+        else t2.seek(nearest2d(pos));
+    }
+
     // ---- stock: a button that opens the rich Stock modal (ui/stockEditor.js). The modal persists to the shared
     //      store + broadcasts ddcs:settings-changed; renderStock() then pushes it into this panel's viz/engine. ----
     function renderStock() { if (viz) viz.setStock(stockForViz()); if (engine) engine.stock = stockForViz(); }
@@ -305,5 +316,5 @@ export function createPreviewPanel(container, opts = {}) {
         }
     }
 
-    return { setGcode, refresh, setActive, stop: stopPlay, get viz() { return viz; }, get engine() { return engine; }, el: container };
+    return { setGcode, refresh, setActive, stop: stopPlay, seekLine, get viz() { return viz; }, get engine() { return engine; }, el: container };
 }

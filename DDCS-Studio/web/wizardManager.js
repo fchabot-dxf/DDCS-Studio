@@ -76,6 +76,19 @@ export class WizardManager {
             if (e.target.id === 'wizard' && downOnBackdrop) this.close();
         });
 
+        // Click a line in a wizard CODE PREVIEW (when not playing) → place the tool there + highlight the line.
+        this.wizardElement.addEventListener('click', (e) => {
+            const ln = e.target.closest('pre[id^="wiz_"][id$="_code"] .g-line');
+            if (!ln) return;
+            const i = parseInt(ln.getAttribute('data-line-index'), 10);
+            const panel = this._activePanel;
+            if (!Number.isFinite(i) || !panel || (panel.engine && panel.engine.running)) return;   // don't fight a running play
+            const codeEl = ln.closest('pre[id^="wiz_"][id$="_code"]');
+            codeEl.querySelectorAll('.g-line.active-line').forEach((s) => s.classList.remove('active-line'));
+            ln.classList.add('active-line');
+            if (panel.seekLine) panel.seekLine(i);
+        });
+
         // Drag the whole generator by its header bar (but not the gear / close).
         const box = this.wizardElement.querySelector('.wiz-box');
         const head = box && box.querySelector('.wiz-head');

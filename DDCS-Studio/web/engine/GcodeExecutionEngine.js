@@ -765,6 +765,7 @@ export class GcodeExecutionEngine {
                     x1: this.pos.x, y1: this.pos.y, z1: this.pos.z,
                     x2: target.x, y2: target.y, z2: target.z,
                     rapid, probe: isProbe, type: isProbe ? 'probe' : (rapid ? 'rapid' : 'feed'), feed: this.feedVal,
+                    line: step.lineIndex,   // source line → lets the preview seek the tool to a clicked code line
                 });
                 this.pos = target;
                 this.ip += 1;
@@ -807,6 +808,7 @@ export class GcodeExecutionEngine {
                     this._traceSink.push({
                         x1: prev.x, y1: prev.y, z1: prev.z, x2: pts[i].x, y2: pts[i].y, z2: pts[i].z,
                         rapid: false, probe: false, type: 'feed', feed: this.feedVal,
+                        line: step.lineIndex,
                     });
                     prev = pts[i];
                 }
