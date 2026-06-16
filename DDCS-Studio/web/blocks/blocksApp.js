@@ -213,8 +213,9 @@ async function buildWorkspace() {
         if (r.bottom < hr.top || r.top > hr.bottom) return hideGhost();   // anchor scrolled out of view
         ghost.style.left = Math.max(4, r.left - hr.left) + 'px';
         ghost.style.top = (r.bottom - hr.top + 5) + 'px';
-      } else {                                                         // empty program → where the first block lands
-        ghost.style.left = '28px'; ghost.style.top = '28px';
+      } else {                                                         // empty program → just right of the toolbox, where the first block lands
+        let tbW = 0; try { tbW = ws.getToolbox() ? ws.getToolbox().getWidth() : 0; } catch (_) { /* */ }
+        ghost.style.left = (tbW + 18) + 'px'; ghost.style.top = '22px';
       }
     } catch (_) { return hideGhost(); }
     ghost.hidden = false;
