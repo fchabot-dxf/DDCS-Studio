@@ -10,6 +10,7 @@ import { num, r3 } from './util.js';
 
 const isOword = (dialect) => !!(dialect.caps && dialect.caps.flow === 'oword');   // RS274NGC family (LinuxCNC / grblHAL)
 const noFlow = (dialect) => !!(dialect.caps && dialect.caps.flow === 'none');      // classic grbl (host-side)
+const isDDCS = (dialect) => !!(dialect.id && String(dialect.id).startsWith('ddcs'));   // DDCS Expert / V4.1 / DM500
 
 export const pathModeBlock = {
     type: 'pathmode', label: 'Path Mode', kind: 'leaf', category: 'Machine',
@@ -52,13 +53,20 @@ export const cancelCycleBlock = {
 export const outPinBlock = {
     type: 'outpin', label: 'Output Pin', kind: 'leaf', category: 'Machine',
     defaults: { pin: 0, state: 'on', sync: true }, fields: ['pin', 'state', 'sync'],
-    // RS274/grblHAL digital output: M62/M63 = synchronized with motion, M64/M65 = immediate. DDCS uses named
-    // M-codes (M154/M162…) → use the M-Code atom there (this folds to a hint).
+    // Digital output, per post:
+    //   RS274/grblHAL → M62/M63 (synced) / M64/M65 (immediate) P<n>.
+    //   DDCS          → raw output bit via M50/M52/M54… (set) / M51/M53/M55… (clear), i.e. M(50+2n)/M(51+2n);
+    //                   these map to #1552+n in the firmware I/O macros (slib O10050-O10091). Pins 0-20.
+    //   classic grbl  → no generic output → honest hint (use the M-Code atom).
     emit: (p, dx, dy, dialect) => {
         const on = p.state !== 'off';
-        if (!isOword(dialect)) return [`( output P${num(p.pin, 0)} ${on ? 'on' : 'off'} - use an M-Code atom on ${dialect.name} )`];
-        const m = p.sync ? (on ? 62 : 63) : (on ? 64 : 65);
-        return [`M${m} P${Math.max(0, Math.round(num(p.pin, 0)))}`];
+        const pin = Math.max(0, Math.round(num(p.pin, 0)));
+        if (isOword(dialect)) return [`M${p.sync ? (on ? 62 : 63) : (on ? 64 : 65)} P${pin}`];
+        if (isDDCS(dialect)) {
+            if (pin > 20) return [`( output P${pin} out of range - DDCS raw outputs are pins 0-20 [M50-M91] )`];
+            return [`M${(on ? 50 : 51) + pin * 2}   ( output P${pin} ${on ? 'on' : 'off'} )`];
+        }
+        return [`( output P${pin} ${on ? 'on' : 'off'} - use an M-Code atom on ${dialect.name} )`];
     },
 };
 
