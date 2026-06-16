@@ -177,6 +177,7 @@ export function createPreviewPanel(container, opts = {}) {
     // Legend: show ONLY the path types present in the current toolpath (classified like the 3D viz). Probe splits
     // fast/slow at the program's max probe feed; jog = the inter-pass move (≥2 start markers).
     const LEGEND = [   // colours match the 3D view (gcodeViz3d line groups)
+        { key: 'feed', label: 'Cut', color: '#35d0ff' },
         { key: 'probe', label: 'Probe', color: '#3b82f6' },
         { key: 'probeSlow', label: 'Probe slow', color: '#93c5fd' },
         { key: 'retract', label: 'Retract', color: '#33cc55' },
@@ -194,6 +195,7 @@ export function createPreviewPanel(container, opts = {}) {
             if (type === 'rapid') present.add('rapid');
             else if (type === 'retract') present.add('retract');
             else if (type === 'probe') present.add(((s.feed || 0) > 0 && (s.feed || 0) < maxProbeFeed) ? 'probeSlow' : 'probe');
+            else present.add('feed');   // G1 cut/plunge — the basic feed move
         }
         if (viz && viz.starts && viz.starts.length > 1) present.add('jog');
         el.innerHTML = LEGEND.filter((x) => present.has(x.key)).map((x) => `<span style="color:${x.color}">${x.label}</span>`).join('');

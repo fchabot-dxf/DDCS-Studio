@@ -632,7 +632,7 @@ export class GcodeViz3D {
             g.setAttribute('position', new THREE.Float32BufferAttribute(tp, 3));
             g.setAttribute('color', new THREE.Float32BufferAttribute(tc, 3));
             g.setDrawRange(0, 0);
-            const mat = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 3 }); mat.depthTest = false;   // solid/bold; linewidth best-effort (ANGLE caps at 1px)
+            const mat = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 6 }); mat.depthTest = false;   // 2× bolder; linewidth best-effort (ANGLE caps at 1px → see _trailTube for true thickness)
             const line = new THREE.LineSegments(g, mat); line.renderOrder = 22; line.visible = false;
             this.pathGroup.add(line);
             this._trailLine = line;

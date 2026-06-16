@@ -634,11 +634,9 @@ export class GcodeExecutionEngine {
             return false;
         }
 
-        if (gcodes.includes(53)) {
-            this.stats.skipped += 1;
-            this.ip += 1;
-            return false;
-        }
+        // G53 = one-shot machine-coordinate move, always ABSOLUTE. It used to be SKIPPED, so ATC park / tool-change
+        // (and the bore re-centre) moves never drew in the preview — trace it as an absolute move instead.
+        const g53 = gcodes.includes(53);
 
         const target = { x: this.pos.x, y: this.pos.y, z: this.pos.z };
         let bad = false;
@@ -649,7 +647,7 @@ export class GcodeExecutionEngine {
                 bad = true;
                 return;
             }
-            target[field] = this.absolute ? value * this.unitScale : this.pos[field] + value * this.unitScale;
+            target[field] = (this.absolute || g53) ? value * this.unitScale : this.pos[field] + value * this.unitScale;
         };
         setAxis('X', 'x');
         setAxis('Y', 'y');
