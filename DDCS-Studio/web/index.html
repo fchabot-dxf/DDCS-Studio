@@ -1529,6 +1529,8 @@
         <button id="blkToolsHandle" class="blk-tools-handle" type="button" aria-label="Toggle palette" aria-expanded="false">Blocks</button>
         <div id="blk-ws" class="blk-ws"></div>   <!-- Blockly workspace (toolbox + canvas); built by blocksApp.js -->
         <div class="right">
+            <!-- Desktop-only: drag the left edge to resize the preview column -->
+            <div class="blk-col-resize" aria-hidden="true" title="Drag to resize the preview"></div>
             <!-- Mobile-only: drag the top edge to resize the preview drawer -->
             <div class="blk-drawer-resize" aria-hidden="true"></div>
             <!-- Mobile-only drawer header: grip + Preview/G-code toggle + close -->

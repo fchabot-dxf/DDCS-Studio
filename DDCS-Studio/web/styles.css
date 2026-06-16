@@ -3657,7 +3657,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     --cat-modify:#a855f7; --cat-control:#f59e0b; --cat-math:#84cc16; --cat-variables:#06b6d4; --cat-markup:#94a3b8;
     --field: var(--bg);
     --screen:#000; --screen-ink:#cdd9e5; --screen-dim:#8b9bb0;   /* fixed: the screen is black in every theme */
-    display:grid; grid-template-columns:1fr 380px; grid-template-rows:minmax(0,1fr);
+    display:grid; grid-template-columns:1fr var(--blk-pv-w, 380px); grid-template-rows:minmax(0,1fr);
     background:var(--bg); color:var(--ink);
     font:13px/1.4 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
 }
@@ -3764,7 +3764,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .blk.selected { outline:2px solid var(--accent); outline-offset:1px; }
 #blocks-app .blk-head[data-sel] { cursor:pointer; }
 /* right column (preview + G-code) — black "screen", mirrors the app editor */
-#blocks-app .right { display:flex; flex-direction:column; border-left:1px solid var(--line); min-width:0; background:var(--screen); }
+#blocks-app .right { position:relative; display:flex; flex-direction:column; border-left:1px solid var(--line); min-width:0; background:var(--screen); }
 #blocks-app .pane-h { margin:0; padding:6px 10px; font-size:11px; letter-spacing:.08em; color:var(--screen-dim);
                       text-transform:uppercase; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
 #blocks-app .pv { height:320px; display:flex; flex-direction:column; background:var(--screen); }
@@ -3816,6 +3816,9 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* ── Blocks tab handles: hidden on desktop (the side-by-side grid already shows everything) ── */
 #blocks-app .blk-drawer-head, #blocks-app .blk-drawer-handle, #blocks-app .blk-tools-handle,
 #blocks-app .blk-drawer-resize { display:none; }
+/* Desktop: drag the left edge of the preview column to resize it (width = --blk-pv-w on #blocks-app). */
+#blocks-app .blk-col-resize { position:absolute; left:-4px; top:0; bottom:0; width:8px; cursor:ew-resize; z-index:6; }
+#blocks-app .blk-col-resize:hover { background:linear-gradient(90deg, transparent, var(--accent), transparent); opacity:.6; }
 
 /* ============================================================================
    BLOCKS TAB — MOBILE (≤860px): Blockly canvas gets the whole tab; the Preview
@@ -3843,6 +3846,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
         display:block; position:absolute; top:0; left:0; right:0; height:16px;
         cursor:ns-resize; touch-action:none; z-index:3;
     }
+    #blocks-app .blk-col-resize { display:none; }   /* desktop-only column resize off in the mobile drawer layout */
 
     #blocks-app .blk-drawer-head {
         display:flex; align-items:center; gap:8px; position:relative;

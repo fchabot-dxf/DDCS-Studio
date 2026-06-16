@@ -253,6 +253,33 @@ async function buildWorkspace() {
       });
     }
 
+    // Desktop: drag the LEFT edge of the preview column to resize it. Width lives in --blk-pv-w on #blocks-app
+    // (only the desktop grid reads it), mirrors the mobile drawer resize, and persists across sessions.
+    const colResize = right.querySelector('.blk-col-resize');
+    if (colResize) {
+      try { const w = parseInt(localStorage.getItem('ddcs_blk_pv_w'), 10); if (w > 0) root.style.setProperty('--blk-pv-w', w + 'px'); } catch (_) { /* */ }
+      let dragging = false;
+      const onMove = (e) => {
+        if (!dragging) return;
+        const x = e.touches ? e.touches[0].clientX : e.clientX;
+        const r = root.getBoundingClientRect();
+        const w = Math.max(240, Math.min(Math.round(r.width * 0.72), Math.round(r.right - x)));   // drag left → wider preview
+        root.style.setProperty('--blk-pv-w', w + 'px');
+        try { B.svgResize(ws); } catch (_) { /* canvas (1fr) shrank/grew */ }
+      };
+      const onUp = () => {
+        if (!dragging) return;
+        dragging = false;
+        window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp);
+        try { localStorage.setItem('ddcs_blk_pv_w', parseInt(root.style.getPropertyValue('--blk-pv-w'), 10) || ''); } catch (_) { /* */ }
+        refit();   // re-fit the preview to the new column width
+      };
+      colResize.addEventListener('pointerdown', (e) => {
+        dragging = true; e.preventDefault();
+        window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp);
+      });
+    }
+
     // Palette (Blockly toolbox) as a left drawer. Collapse via the toolbox's OWN setVisible() so the canvas
     // truly reclaims the width (display:none → getWidth()=0); a CSS translate alone would leave a dead strip.
     const tbx = () => { try { return ws.getToolbox(); } catch (_) { return null; } };
