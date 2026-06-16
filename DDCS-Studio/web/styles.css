@@ -3683,6 +3683,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     /* fixed category signature colours (semantic, not themed — like the rapid/feed/probe move colours) */
     --cat-shapes:#3b82f6; --cat-move:#14b8a6; --cat-machine:#64748b; --cat-ops:#22c55e;
     --cat-modify:#a855f7; --cat-control:#f59e0b; --cat-math:#84cc16; --cat-variables:#06b6d4; --cat-markup:#94a3b8;
+    --cat-cutting:#f97316; --cat-coordinates:#0ea5e9; --cat-program:#64748b; --cat-probing:#e11d48; --cat-signals:#8b5cf6;
     --field: var(--bg);
     --screen:#000; --screen-ink:#cdd9e5; --screen-dim:#8b9bb0;   /* fixed: the screen is black in every theme */
     display:grid; grid-template-columns:1fr var(--blk-pv-w, 380px); grid-template-rows:minmax(0,1fr);
@@ -3690,15 +3691,25 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     font:13px/1.4 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
 }
 #blocks-app *, #blocks-app *::before, #blocks-app *::after { box-sizing:border-box; }
-#blocks-app .blk-ws { position:relative; min-width:0; background:var(--bg); }   /* Blockly workspace host (left) */
-/* Palette search: a filter input floating above the Blockly toolbox (which is padded down to make room). */
+/* Blockly host = a column: a top BAR (search + suggestions) above the Blockly workspace, so neither overlaps
+   the toolbox/canvas (Blockly resists CSS padding + makes its own stacking context). */
+#blocks-app .blk-ws { position:relative; min-width:0; background:var(--bg); display:flex; flex-direction:column; }
+#blocks-app .blk-topbar { flex:0 0 auto; display:flex; flex-direction:column; gap:6px; padding:6px; background:var(--bg); border-bottom:1px solid var(--line); }
+#blocks-app .blk-bk-host { flex:1 1 auto; position:relative; min-height:0; }
 #blocks-app .blk-search {
-    position:absolute; top:6px; left:6px; z-index:60; width:152px; box-sizing:border-box;
-    background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:6px;
-    padding:5px 8px; font:12px/1.2 inherit; outline:none;
+    width:100%; box-sizing:border-box; background:var(--panel); color:var(--ink);
+    border:1px solid var(--line); border-radius:6px; padding:5px 8px; font:12px/1.2 inherit; outline:none;
 }
 #blocks-app .blk-search:focus { border-color:var(--accent, #0ea5e9); }
-#blocks-app .blocklyToolboxDiv { padding-top:40px; }
+/* Suggested-next strip: a single scrollable row of chips; click a chip to append that block. */
+#blocks-app .blk-suggest { display:flex; gap:4px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; }
+#blocks-app .blk-suggest:empty { display:none; }
+#blocks-app .blk-suggest::-webkit-scrollbar { display:none; }
+#blocks-app .blk-sug-chip {
+    flex:0 0 auto; font:600 11px/1 inherit; padding:4px 8px; border-radius:999px; cursor:pointer; white-space:nowrap;
+    border:1px solid var(--cat, var(--accent, #0ea5e9)); background:var(--panel); color:var(--cat, var(--ink));
+}
+#blocks-app .blk-sug-chip:hover { background:var(--cat, var(--accent, #0ea5e9)); color:#fff; }
 /* left rail (palette) — chrome */
 #blocks-app .palette { background:var(--panel); border-right:1px solid var(--line); padding:10px; overflow:auto; }
 #blocks-app .palette h3 { margin:0 0 8px; font-size:11px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; }
@@ -3759,6 +3770,11 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .cat-math { --cat:var(--cat-math); }
 #blocks-app .cat-variables { --cat:var(--cat-variables); }
 #blocks-app .cat-markup { --cat:var(--cat-markup); }
+#blocks-app .cat-cutting { --cat:var(--cat-cutting); }
+#blocks-app .cat-coordinates { --cat:var(--cat-coordinates); }
+#blocks-app .cat-program { --cat:var(--cat-program); }
+#blocks-app .cat-probing { --cat:var(--cat-probing); }
+#blocks-app .cat-signals { --cat:var(--cat-signals); }
 /* a STATEMENT silhouette: notch cut into the top edge + a matching bump hanging below — they dovetail when stacked.
    overflow:visible so the bump (::after) shows below; corners moved to head/last-child since overflow no longer clips. */
 #blocks-app .blk { position:relative; width:300px; margin:0 0 8px; border-radius:8px; overflow:visible;

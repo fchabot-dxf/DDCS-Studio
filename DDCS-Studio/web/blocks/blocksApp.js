@@ -8,7 +8,9 @@
  * Blockly (vendored UMD) is lazy-loaded on first open.
  */
 import { installBlockly, buildToolbox } from './blockly/bridge.js';
-import { PALETTE } from '../wizards/ops/index.js';   // for the palette search filter
+import { PALETTE, BLOCKS } from '../wizards/ops/index.js';   // for the palette search filter + suggestion inserts
+import { newBlock } from './blockModel.js';
+import { suggestNext, recordProgram } from './suggest.js';   // next-block suggestions
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
@@ -95,7 +97,12 @@ async function buildWorkspace() {
   // (scaleManager), so the popups are fine on <body> where Blockly puts them by default — same as our working
   // reference Blockly app, which never calls setParentContainer.
 
-  const host = document.getElementById('blk-ws');
+  const wsHost = document.getElementById('blk-ws');
+  // A top bar (search + suggestion strip) ABOVE the Blockly workspace, so neither overlaps the toolbox/canvas
+  // (Blockly's toolbox resists CSS padding + creates its own stacking context). Blockly injects into the host below.
+  const topbar = document.createElement('div'); topbar.className = 'blk-topbar';
+  const host = document.createElement('div'); host.className = 'blk-bk-host';
+  wsHost.append(topbar, host);
   const out = document.getElementById('blk-gcode');
   // THE shared preview panel — identical to Studio main + the wizards (same code + UI); fed the projected program.
   const panel = createPreviewPanel(document.getElementById('blk-preview-panel'), { getGcode: () => getProjection().text });
@@ -125,7 +132,7 @@ async function buildWorkspace() {
   const search = document.createElement('input');
   search.type = 'search'; search.className = 'blk-search'; search.placeholder = 'Search blocks…';
   search.setAttribute('aria-label', 'Search blocks');
-  host.appendChild(search);
+  topbar.appendChild(search);
   const flyout = () => { try { return ws.getToolbox().getFlyout(); } catch (_) { return null; } };
   const runSearch = () => {
     const q = search.value.trim().toLowerCase();
@@ -140,6 +147,36 @@ async function buildWorkspace() {
   search.addEventListener('input', runSearch);
   search.addEventListener('search', runSearch);   // the ✕ clear button fires 'search'
   window.__blkWs = ws;   // debug/test accessor
+
+  // ---- Suggested-next strip (A): chips for the most-likely next blocks (learned from your programs + a curated
+  //      seed); click to append. Updates as the program changes. ----
+  const STMT = new Set(PALETTE.filter((d) => d.kind !== 'reporter').map((d) => d.type));   // insertable (no reporters)
+  const labelOf = (t) => (BLOCKS[t] && BLOCKS[t].label) || t;
+  const catSlugOf = (t) => ((BLOCKS[t] && BLOCKS[t].category) || 'ops').toLowerCase().replace(/\s+/g, '');
+  const strip = document.createElement('div');
+  strip.className = 'blk-suggest';
+  topbar.appendChild(strip);
+  const lastType = (stack) => {
+    const flat = (stack || []).filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
+    const b = flat[flat.length - 1];
+    return b ? (b.type === 'op' ? (b.opType || 'op') : b.type) : 'progstart';
+  };
+  const insertSuggestion = (type) => {
+    const def = BLOCKS[type]; if (!def) return;
+    const blk = newBlock(type); blk.params = { ...(def.defaults || {}) };
+    const cur = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+    const endIdx = cur.findIndex((b) => b && b.type === 'progend');
+    const next = endIdx >= 0 ? [...cur.slice(0, endIdx), blk, ...cur.slice(endIdx)] : [...cur, blk];
+    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
+  };
+  const updateStrip = (stack) => {
+    const hits = suggestNext(lastType(stack), 5, STMT);
+    strip.innerHTML = hits.map((t) => `<button class="blk-sug-chip cat-${catSlugOf(t)}" data-type="${t}" type="button" title="Add ${labelOf(t)}">${labelOf(t)}</button>`).join('');
+    strip.style.display = hits.length ? '' : 'none';
+    strip.querySelectorAll('.blk-sug-chip').forEach((c) => c.addEventListener('click', () => insertSuggestion(c.dataset.type)));
+  };
+  onChange(({ stack }) => { recordProgram(stack); updateStrip(stack); });
+  updateStrip(getStack());
 
   // ---- this tab is a VIEW of the shared program model (blocks = the data): workspace ⇄ model + right pane ----
   let muteChanges = false;   // true while WE rebuild the workspace from the model (suppress the change echo)
