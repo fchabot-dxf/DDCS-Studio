@@ -110,6 +110,17 @@ function gpInit() {
     // Live update while the drawer is open (the panel debounces its own renders internally).
     if (els.editor) els.editor.addEventListener('input', () => { if (gpView === '3d' && gpPanel) gpPanel.setGcode(els.editor.value); });
 
+    // Click / move the caret in the editor → place the tool in the preview at that line (when not playing).
+    if (els.editor) {
+        const seekToCaret = () => {
+            if (gpView !== '3d' || !gpPanel || !gpPanel.seekLine || (gpPanel.engine && gpPanel.engine.running)) return;
+            const line = els.editor.value.slice(0, els.editor.selectionStart).split('\n').length - 1;
+            gpPanel.seekLine(line);
+        };
+        els.editor.addEventListener('click', seekToCaret);
+        els.editor.addEventListener('keyup', (e) => { if (e.key && e.key.indexOf('Arrow') === 0) seekToCaret(); });
+    }
+
     window.setGcodeView = setGcodeView;
     // Leaving the preview context stops the run (the panel also listens to ddcs:stop-previews); covers the
     // drawer-close + legacy callers (showApp/wizard/settings).
