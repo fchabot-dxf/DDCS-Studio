@@ -72,15 +72,16 @@ test('standard atoms (plane / feed-mode / home / call / return) decode instead o
       { type: 'plane', params: { plane: 'G18' } },
       { type: 'feedmode', params: { fmode: 'G95' } },
       { type: 'home', params: { axes: 'XYZ' } },
+      { type: 'stop', params: { stop: 'M1' } },
       { type: 'call', params: { prog: 9083 } },
       { type: 'return', params: {} },
     ];
     const text1 = emitMapped(stack).text;
     const parsed = parseGcodeToStack(text1);
     const text2 = emitMapped(parsed).text;
-    return { text1, text2, types: parsed.map((b) => b.type), homeAxes: parsed[2].params.axes, callProg: parsed[3].params.prog };
+    return { text1, text2, types: parsed.map((b) => b.type), homeAxes: parsed[2].params.axes, callProg: parsed[4].params.prog };
   });
-  expect(r.types, 'standard codes decode to their atoms, not raw').toEqual(['plane', 'feedmode', 'home', 'call', 'return']);
+  expect(r.types, 'standard codes decode to their atoms, not raw').toEqual(['plane', 'feedmode', 'home', 'stop', 'call', 'return']);
   expect(r.homeAxes).toBe('XYZ');
   expect(r.callProg).toBe(9083);
   expect(r.text2, 'byte-exact round-trip').toBe(r.text1);

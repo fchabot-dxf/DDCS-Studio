@@ -27,3 +27,17 @@ test('typing raw G-code in the editor decodes into the proper atom blocks', asyn
   expect(prog[5].p.axes).toBe('Z');
   expect(prog[6].p.prog).toBe(9083);
 });
+
+test('control flow (#var / label / IF-GOTO / GOTO / stop) decodes through the editor', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => document.getElementById('editor') && window.ddcsGetBlockProgram);
+  await page.evaluate(() => {
+    const ed = document.getElementById('editor');
+    ed.value = '#100=5\nN1\nG0 X#100\nIF #100>0 GOTO1\nGOTO2\nN2\nM1\nM0\nM30';
+    ed.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForFunction(() => (window.ddcsGetBlockProgram() || []).length >= 9, { timeout: 4000 });
+  const types = await page.evaluate(() => (window.ddcsGetBlockProgram() || []).map((b) => b.type));
+  expect(types).toEqual(['assign', 'label', 'move', 'ifgoto', 'goto', 'label', 'stop', 'stop', 'endprogram']);
+  expect(types).not.toContain('raw');
+});

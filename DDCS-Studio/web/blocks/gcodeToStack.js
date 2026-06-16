@@ -92,6 +92,8 @@ export function parseLine(line, opts = {}) {
     if (M(7)) return { type: 'coolant', params: { flow: 'mist' } };
     if (M(9)) return { type: 'coolant', params: { flow: 'off' } };
     if (M(30) || M(2)) return { type: 'endprogram', params: {} };
+    if (code === 'M0') return { type: 'stop', params: { stop: 'M0' } };   // program stop atom (exact 'M00' → pause atom, above)
+    if (code === 'M1') return { type: 'stop', params: { stop: 'M1' } };   // optional stop atom
     if (M(98)) { const p = w('P'); if (typeof p === 'number') return { type: 'call', params: { prog: p } }; }   // numeric P only (a #var P can't round-trip through call.emit)
     if (M(99)) return { type: 'return', params: {} };
     const mm = code.match(/\bM0*(\d+)\b/i);
