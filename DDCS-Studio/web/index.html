@@ -230,7 +230,7 @@
                 <div>
                     <span class="section-label">GEOMETRY</span>
                     <div class="grid-3">
-                        <div><span class="label">MAX PROBE</span><input type="number" id="c_dist" value="500" title="Max probe travel distance (mm). Stored as #1. Used in G31 as #7=[0-#1] (neg) or #8=#1 (pos)."/></div>
+                        <div><span class="label">MAX PROBE</span><input type="number" id="c_dist" value="100" title="Max probe travel distance (mm). Stored as #1. Used in G31 as #7=[0-#1] (neg) or #8=#1 (pos)."/></div>
                         <div><span class="label">RETRACT</span><input type="number" id="c_retract" value="5" title="Retract distance after fast probe, before slow pass (mm). Stored as #2. Used as #9=[0-#2] (neg) or #10=#2 (pos)."/></div>
                         <div><span class="label">PROBE RADIUS</span><input type="number" id="c_radius" value="2.0" step="0.001" title="Radius of the probe stylus ruby tip. Used for coordinate compensation."/></div>
                         <div><span class="label">SAFE Z</span><input type="number" id="c_safe_z" value="10" title="Z lift distance for moves between walls (mm). Stored as #19. Also used in plunge: #17=safeZ+scanDepth."/></div>
@@ -375,7 +375,7 @@
                 <div>
                     <span class="section-label">GEOMETRY</span>
                     <div class="grid-3">
-                        <div><span class="label">MAX PROBE</span><input id="m_dist" value="500" title="Max probe travel distance (mm). Stored as #1. Used as #7=[0-#1] (neg) or #8=#1 (pos) in G31."/></div>
+                        <div><span class="label">MAX PROBE</span><input id="m_dist" value="100" title="Max probe travel distance (mm). Stored as #1. Used as #7=[0-#1] (neg) or #8=#1 (pos) in G31."/></div>
                         <div><span class="label">RETRACT</span><input id="m_retract" value="2" title="Retract between fast and slow probe passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)."/></div>
                         <div><span class="label">SAFE Z</span><input id="m_safe_z" value="10" title="Z retract height between probing moves (mm). Stored as #17. Used as G0 Z#17."/></div>
                     </div>
@@ -465,7 +465,7 @@
                 <div>
                     <span class="section-label">GEOMETRY</span>
                     <div class="grid-3">
-                        <div><span class="label">MAX PROBE</span><input id="circ_dist" value="20" title="Max probe travel per touch (mm). #1; used as #7=[0-#1]/#8=#1 in G31."/></div>
+                        <div><span class="label">MAX PROBE</span><input id="circ_dist" value="100" title="Max probe travel per touch (mm). #1; used as #7=[0-#1]/#8=#1 in G31."/></div>
                         <div><span class="label">RETRACT</span><input id="circ_retract" value="2" title="Retract between fast and slow passes (mm). #2."/></div>
                         <div><span class="label">SAFE Z</span><input id="circ_safe_z" value="10" title="Z retract height between moves (mm). #17; used as G0 Z#17."/></div>
                     </div>
@@ -547,7 +547,7 @@
                 <div>
                     <span class="section-label">GEOMETRY</span>
                     <div class="grid-3">
-                        <div><span class="label">MAX PROBE</span><input id="rc_dist" value="30" title="Max probe travel per touch (mm). #1."/></div>
+                        <div><span class="label">MAX PROBE</span><input id="rc_dist" value="100" title="Max probe travel per touch (mm). #1."/></div>
                         <div><span class="label">RETRACT</span><input id="rc_retract" value="2" title="Retract between passes (mm). #2."/></div>
                         <div><span class="label">SAFE Z</span><input id="rc_safe_z" value="15" title="Z retract height (mm). #17."/></div>
                     </div>
@@ -630,7 +630,7 @@
                 <div>
                     <span class="section-label">GEOMETRY</span>
                     <div class="grid-3">
-                        <div><span class="label">MAX PROBE</span><input id="rcl_dist" value="30" title="Max Z probe travel per touch (mm). Must exceed Safe Z. #1."/></div>
+                        <div><span class="label">MAX PROBE</span><input id="rcl_dist" value="100" title="Max Z probe travel per touch (mm). Must exceed Safe Z. #1."/></div>
                         <div><span class="label">RETRACT</span><input id="rcl_retract" value="2" title="Retract between passes (mm). #2."/></div>
                         <div><span class="label">SAFE Z</span><input id="rcl_safe_z" value="10" title="Z clearance for the cross-flat move (mm). #17."/></div>
                     </div>
@@ -722,7 +722,7 @@
                 <div>
                     <span class="section-label">GEOMETRY</span>
                     <div class="grid-2">
-                        <div><span class="label">MAX PROBE</span><input id="p_dist" value="500" title="Max probe travel distance (mm). Stored as #1. #7=[0-#1] (neg), #8=#1 (pos)."/></div>
+                        <div><span class="label">MAX PROBE</span><input id="p_dist" value="100" title="Max probe travel distance (mm). Stored as #1. #7=[0-#1] (neg), #8=#1 (pos)."/></div>
                         <div><span class="label">RETRACT</span><input id="p_retract" value="2" title="Retract between fast and slow passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)."/></div>
                     </div>
 
@@ -1186,7 +1186,7 @@
                 <div>
                     <span class="section-label">GEOMETRY</span>
                     <div class="grid-3">
-                        <div><span class="label">MAX PROBE</span><input id="al_dist" type="number" value="20" title="Max probe travel toward fence (mm). Stored as #1. #7=[0-#1], #8=#1."/></div>
+                        <div><span class="label">MAX PROBE</span><input id="al_dist" type="number" value="100" title="Max probe travel toward fence (mm). Stored as #1. #7=[0-#1], #8=#1."/></div>
                         <div><span class="label">RETRACT</span><input id="al_retract" type="number" value="2" title="Retract after each probe pass (mm). Stored as #2. #9=[0-#2], #10=#2."/></div>
                         <div><span class="label">SAFE Z</span><input id="al_safe_z" type="number" value="10" title="Z lift between point A and point B (mm). Stored as #17. Used as G0 Z#17."/></div>
                     </div>

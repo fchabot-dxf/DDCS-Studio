@@ -13,7 +13,7 @@ import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
 
 export function atcLengthStack(params = {}) {
-    const blockHeight = num(params.blockHeight, 50), safeZ = num(params.safeZ, 10), maxDist = num(params.maxDist, 200);
+    const blockHeight = num(params.blockHeight, 50), safeZ = num(params.safeZ, 10), maxDist = num(params.maxDist, 100);
     const retract = num(params.retract, 3), fFast = num(params.f_fast, 300), fSlow = num(params.f_slow, 50);
     const port = num(params.port, 2), level = num(params.level, 0);
     const src = params.sources || {};

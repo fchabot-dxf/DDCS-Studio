@@ -28,7 +28,7 @@ export const atcLengthView = {
         const params = {
             blockHeight: a.blockHeight ?? 50,
             safeZ: a.safeZ ?? 10,
-            maxDist: a.maxDist ?? 200,
+            maxDist: a.maxDist ?? 100,
             retract: a.retract ?? 3,
             qStop: a.qStop ?? 1,
             f_fast: a.fFast ?? 300,
@@ -58,7 +58,7 @@ export const atcCheckView = {
         const params = {
             blockHeight: a.blockHeight ?? 50,
             safeZ: a.safeZ ?? 10,
-            maxDist: a.maxDist ?? 200,
+            maxDist: a.maxDist ?? 100,
             retract: a.retract ?? 3,
             qStop: a.qStop ?? 1,
             f_fast: a.fFast ?? 300,

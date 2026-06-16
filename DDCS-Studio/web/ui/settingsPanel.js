@@ -77,7 +77,7 @@ const SETTINGS_DEFAULTS = {
         setterX: 10, setterY: 10, setterZ: -50, setterW: 20, setterH: 20,
         // 3D-probe global defaults the touch-probe wizards (corner/edge/middle/circular/alignment/rotary)
         // start from. radius drives radius compensation; feeds/retract/safeZ/maxDist/qStop seed each op.
-        radius: 2.0, fastFeed: 200, slowFeed: 50, retract: 2, safeZ: 10, maxDist: 25, qStop: 1,
+        radius: 2.0, fastFeed: 200, slowFeed: 50, retract: 2, safeZ: 10, maxDist: 100, qStop: 1,
         // Per-field source: 'studio' = literal from the form (current behaviour) | 'ctrl' = generated
         // code reads the controller's own parameter at runtime (e.g. F#632 P#1078 — see
         // PROBE-CONFIG-SOURCE.md). Only fields the active controller profile lists in probeVars
@@ -102,7 +102,7 @@ const SETTINGS_DEFAULTS = {
     // baseVar = DDCS tool-offset table base (#1430 = tool 1); tools[i] = stored length for tool i+1.
     atc: {
         baseVar: 1430, tools: standardTools(),
-        blockHeight: 50, safeZ: 10, maxDist: 200, retract: 3, fFast: 300, fSlow: 50, qStop: 1,
+        blockHeight: 50, safeZ: 10, maxDist: 100, retract: 3, fFast: 300, fSlow: 50, qStop: 1,
         magType: 'straight', magazine: []   // magType: straight|disk; magazine[]: {pocket,tool,name,x,y,z}
     },
     // Toolhead fitted to the machine. spindle/router is the working type; plasma/laser are stubs.
