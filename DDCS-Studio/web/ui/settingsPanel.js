@@ -308,7 +308,7 @@ function buildSettingsOverlay() {
                     <button class="settings-tab active" data-group="general" data-target="set_tab_profile">Profile</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_appearance">Appearance</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_preview">Preview</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_compose">Composing</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_compose">Editor</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_program">Program</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
@@ -348,8 +348,8 @@ function buildSettingsOverlay() {
                 <!-- GENERAL: COMPOSING (authoring assists — Blocks suggestions + Studio editor autocomplete) -->
                 <div id="set_tab_compose" style="display:none;">
                     <div class="settings-section">
-                        <div class="settings-section-title">COMPOSING ASSISTS</div>
-                        <div class="settings-hint">Help build programs faster across the Blocks tab and the Studio editor. All optional.</div>
+                        <div class="settings-section-title">EDITOR ASSISTS</div>
+                        <div class="settings-hint">Authoring help across both editors — the Blocks tab and the Studio text editor. All optional.</div>
                         <label class="settings-check"><input type="checkbox" id="set_cp_suggestions"> Block suggestions — the "Suggested next" chip strip in the Blocks tab</label>
                         <label class="settings-check"><input type="checkbox" id="set_cp_autocomplete"> Editor autocomplete — context suggestions at the cursor in the Studio editor</label>
                         <label class="settings-check"><input type="checkbox" id="set_cp_ghost"> Ghost next-block — a faint preview of the likely next block (Tab to accept)</label>
