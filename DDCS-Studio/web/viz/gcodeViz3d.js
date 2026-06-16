@@ -1044,9 +1044,9 @@ export class GcodeViz3D {
         el.addEventListener('pointermove', (e) => {
             if (mode) return;
             const faceIdx = this._cubeFaceAt(e);
-            if (faceIdx !== -2) { // over the ViewCube
+            if (faceIdx !== -2) { // over the ViewCube — the whole square is clickable (near-miss snaps to nearest face)
                 this._highlightCubeFace(faceIdx);
-                el.style.cursor = faceIdx >= 0 ? 'pointer' : 'default';
+                el.style.cursor = 'pointer';
                 this._setHighlight(null, null);
                 return;
             }

@@ -57,11 +57,36 @@ export function highlightCubeFace(viz, idx) {
         if (changed) viz.render();
     }
 
-    // Hit-test a click against the ViewCube; snaps the view if a face is hit.
+    // Forgiving fallback: the cube viewport SQUARE has empty corners around the rotated box. Snap a near-miss
+    // (cursor in the square but off the box silhouette) to the VISIBLE face whose projected centre is closest to
+    // the cursor — so a click anywhere in the cube square picks a sensible view instead of doing nothing.
+function nearestVisibleFace(viz, e) {
+        if (!viz._cubeRect) return -1;
+        const THREE = viz.THREE;
+        const r = viz.renderer.domElement.getBoundingClientRect();
+        const { size, m } = viz._cubeRect;
+        const cx = e.clientX - r.left, cy = e.clientY - r.top;
+        const left = r.width - size - m, top = m;
+        const centers = [[0.5, 0, 0], [-0.5, 0, 0], [0, 0.5, 0], [0, -0.5, 0], [0, 0, 0.5], [0, 0, -0.5]]; // +X -X +Y -Y +Z -Z
+        const cam = viz._cubeCam.position;
+        let best = -1, bestD = Infinity;
+        for (let i = 0; i < 6; i++) {
+            const c = centers[i];
+            if (c[0] * cam.x + c[1] * cam.y + c[2] * cam.z <= 0) continue;   // back-facing → not clickable
+            const v = new THREE.Vector3(c[0], c[1], c[2]).project(viz._cubeCam);
+            const sx = left + (v.x * 0.5 + 0.5) * size, sy = top + (-v.y * 0.5 + 0.5) * size;
+            const d = (sx - cx) ** 2 + (sy - cy) ** 2;
+            if (d < bestD) { bestD = d; best = i; }
+        }
+        return best;
+    }
+
+    // Hit-test a click against the ViewCube; snaps the view if a face is hit (or the nearest one on a near-miss).
     // Returns true when the click landed inside the cube viewport (so it shouldn't orbit).
 export function pickCube(viz, e) {
         const idx = cubeFaceAt(viz, e);
-        if (idx === -2) return false;
-        if (idx >= 0) { const v = viz._cubeViews[idx]; if (v) viz.setView(v); }
+        if (idx === -2) return false;                                // outside the cube square → orbit
+        const face = idx >= 0 ? idx : nearestVisibleFace(viz, e);    // near-miss inside the square → nearest visible face
+        if (face >= 0) { const v = viz._cubeViews[face]; if (v) viz.setView(v); }
         return true;
     }
