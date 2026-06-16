@@ -24,12 +24,21 @@ import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 // re-evaluated on every render, so switching post updates it in place.
 function applyOpGating(ws) {
     const post = resolveActivePost(getActiveProfile().id), caps = getCaps(post.id);
+    const dl = { id: post.id, name: post.name, caps };   // dialect-shaped for an atom's gate() predicate
     const has = (r) => (r === 'flow' ? caps.flow !== 'none' : caps[r] !== false);
     for (const b of ws.getAllBlocks(false)) {
-        if (b.type !== 'op') continue;
-        let meta = {}; try { meta = JSON.parse(b.data || '{}'); } catch (_) { /* keep {} */ }
-        const unmet = (meta.requires || []).filter((r) => !has(r));
-        try { b.setWarningText(unmet.length ? `Some lines aren't run on ${post.name} (no ${unmet.join(' / ')}) — see the commented lines in the G-code.` : null); } catch (_) { /* older Blockly */ }
+        if (b.type === 'op') {                              // op CONTAINER: per-line caps gate → ⚠ (don't grey the whole op)
+            let meta = {}; try { meta = JSON.parse(b.data || '{}'); } catch (_) { /* keep {} */ }
+            const unmet = (meta.requires || []).filter((r) => !has(r));
+            try { b.setWarningText(unmet.length ? `Some lines aren't run on ${post.name} (no ${unmet.join(' / ')}) — see the commented lines in the G-code.` : null); } catch (_) { /* older Blockly */ }
+            continue;
+        }
+        const def = BLOCKS[b.type];                         // controller-specific leaf atom → grey it + why (field-gating style)
+        if (def && typeof def.gate === 'function') {
+            let reason = null; try { reason = def.gate(dl); } catch (_) { /* */ }
+            try { b.setWarningText(reason ? `Not on ${post.name} — ${reason}.` : null); } catch (_) { /* */ }
+            try { b.setEnabled(!reason); } catch (_) { /* older Blockly */ }
+        }
     }
 }
 
