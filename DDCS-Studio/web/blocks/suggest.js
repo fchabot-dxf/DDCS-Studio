@@ -10,17 +10,29 @@ let learned = load();
 function load() { try { return JSON.parse(localStorage.getItem(LKEY) || '{}'); } catch (_) { return {}; } }
 function save() { try { localStorage.setItem(LKEY, JSON.stringify(learned)); } catch (_) { /* quota */ } }
 
-// Curated cold-start transitions — semantic "what commonly follows X" (block/op types). Learned counts override.
+// Curated cold-start transitions — "what commonly follows X" (block/op types). Learned counts override.
+// The intra-op idioms below are grounded in the DDCS firmware macro library (canned cycles + probe / tool-change
+// routines: slib O9081/O9083, O501/O502, O20000, snippets.nc); op-to-op job ordering stays editorial judgement.
 const SEED = {
-    progstart: ['wcs', 'spindle', 'tool', 'move'],
-    wcs: ['move', 'spindle', 'drill', 'proberead'],
-    spindle: ['feed', 'move', 'coolant'],
+    // Program open: real jobs set safe-Z + work coords, load the tool, spin up, then rapid in.
+    progstart: ['wcs', 'tool', 'spindle', 'move'],
+    wcs: ['tool', 'move', 'spindle', 'proberead'],
+    tool: ['spindle', 'move', 'probe'],            // a change ends in G53 retracts + an auto tool-set probe (M98P502)
+    spindle: ['move', 'coolant', 'feed'],          // M3 S… → G0 rapid to start → G1 cut
+    coolant: ['move', 'feed', 'spindle'],
     feed: ['move', 'drill', 'line'],
-    move: ['move', 'feed', 'probe', 'spindle'],
+    move: ['move', 'feed', 'probe'],               // cycles alternate G0/G1; G53 rapids cluster
     arc: ['move', 'arc'],
-    probe: ['proberead', 'probecheck', 'move'],
-    proberead: ['setworkoffset', 'readmachine', 'move'],
+    // Probe idiom (every DDCS probe macro): G91 → G31 → IF #1922 check → read #1927 → G53 retract → write offset.
+    distmode: ['probe', 'move'],
+    confirm: ['distmode', 'probe', 'move'],         // "hover over the setter" prompt → G91 → G31
+    probe: ['probecheck', 'proberead', 'move'],
+    probecheck: ['proberead', 'probe', 'move'],
+    proberead: ['setworkoffset', 'tooloffset', 'move'],
     readmachine: ['setworkoffset', 'move'],
+    setworkoffset: ['move', 'progend'],
+    tooloffset: ['move', 'progend'],
+    // Canned cycles (G81/G83/G73): rapid XY, rapid R, feed Z, retract; multiple holes / arrays repeat.
     drill: ['drill', 'move', 'progend'],
     bore: ['move', 'progend'],
     line: ['line', 'move'],
@@ -28,14 +40,9 @@ const SEED = {
     wall: ['move', 'progend'],
     region: ['fillzigzag', 'fillconcentric', 'wall'],
     array: ['drill', 'bore', 'line'],
-    tool: ['spindle', 'move'],
-    coolant: ['spindle', 'move', 'feed'],
-    setworkoffset: ['move', 'progend'],
-    dwell: ['move', 'spindle'],
-    distmode: ['move'],
-    mcode: ['move', 'spindle'],
+    dwell: ['mcode', 'move', 'spindle'],           // G04 sits between drawbar M-codes + before retracts
+    mcode: ['mcode', 'move', 'dwell'],             // M-codes cluster (M151/M153/M155, M300/M301/M302)
     stepdown: ['stepover'],
-    confirm: ['probe', 'move'],
     progend: [],
 };
 
