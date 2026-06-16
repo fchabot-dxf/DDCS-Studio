@@ -836,15 +836,16 @@
                     <div><span class="label">SPINDLE RPM</span><input id="d_rpm" value="" title="Overrides the Head's default RPM for this op. Leave blank to use the Head setting. Picking a tool fills this from the library."/></div>
                 </div>
 
-                <span class="section-label">METHOD</span>
+                <!-- METHOD is locked by the menu entry (Drill = peck · Bore = helical); the toggle is hidden. -->
+                <span class="section-label" id="d_method_label" style="display:none">METHOD</span>
                 <div class="grid-2">
-                    <div><span class="label">METHOD</span>
+                    <div id="d_method_wrap" style="display:none"><span class="label">METHOD</span>
                         <select id="d_method" value="peck">
                             <option value="peck">Peck drill (hole = tool)</option>
                             <option value="helical">Bore (end mill, hole ≥ tool)</option>
                         </select>
                     </div>
-                    <div><span class="label">HOLE Ø</span><input id="d_holeDia" value="6" title="Hole diameter. Peck: this is your drill size. Bore: target hole size (must be ≥ tool Ø)."/></div>
+                    <div><span class="label" id="d_holeDia_label">HOLE Ø</span><input id="d_holeDia" value="6" title="Hole diameter. Peck: this is your drill size. Bore: target hole size (must be ≥ tool Ø)."/></div>
                 </div>
                 <div id="d_method_peck" class="grid-2">
                     <div><span class="label">PECK</span><input id="d_peck" value="3" title="Peck increment (mm) — full retract to clearance each peck to clear chips."/></div>

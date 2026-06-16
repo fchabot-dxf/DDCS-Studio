@@ -19,8 +19,17 @@ export function setupGlobalFunctions(app) {
         window.backspace = () => app.editorManager.backspace();
         window.editorManager = app.editorManager;
 
-        // Wizard functions
-        window.openWiz = (type) => app.wizardManager.open(type);
+        // Wizard functions. 'drill' and 'bore' are two menu entries for the ONE hole wizard, mode-locked: Drill =
+        // peck (hole Ø = bit), Bore = helical (end mill, hole ≥ tool). The shared METHOD toggle is hidden; the
+        // entry sets it. (Underlying op stays 'drill' with params.method.)
+        window.openWiz = (type) => {
+            if (type === 'bore' || type === 'drill') {
+                window.__drillLockMode = (type === 'bore') ? 'helical' : 'peck';   // drillView.onOpen applies it (no post-open race)
+                app.wizardManager.open('drill');
+                return;
+            }
+            app.wizardManager.open(type);
+        };
         window.openCornerWiz = () => app.wizardManager.openCorner();
         window.openMiddleWiz = () => app.wizardManager.openMiddle();
         window.CornerVizAnimator = CornerVizAnimator;
