@@ -1,0 +1,31 @@
+import { test, expect } from '@playwright/test';
+
+// Palette search: a filter input above the toolbox; typing shows the matching blocks (across all categories) in
+// the flyout; clearing restores the categories.
+test.use({ viewport: { width: 1280, height: 900 } });
+
+test('palette search filters blocks into the flyout', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+  await page.evaluate(() => window.showApp('blocks'));
+  await page.waitForFunction(() => window.__blkWs && document.querySelector('#blocks-app .blk-search'));
+
+  const flyoutCount = () => page.evaluate(() => {
+    try { return window.__blkWs.getToolbox().getFlyout().getWorkspace().getTopBlocks(false).length; } catch (_) { return -1; }
+  });
+
+  // a specific term → just that block
+  await page.fill('#blocks-app .blk-search', 'spindle');
+  await page.waitForTimeout(200);
+  expect(await flyoutCount(), 'spindle → 1 match').toBe(1);
+
+  // a broader term → several
+  await page.fill('#blocks-app .blk-search', 'probe');
+  await page.waitForTimeout(200);
+  expect(await flyoutCount(), 'probe → several matches').toBeGreaterThan(1);
+
+  // gibberish → no block matches
+  await page.fill('#blocks-app .blk-search', 'zzzqqq');
+  await page.waitForTimeout(200);
+  expect(await flyoutCount(), 'no matches → 0 blocks').toBe(0);
+});

@@ -8,6 +8,7 @@
  * Blockly (vendored UMD) is lazy-loaded on first open.
  */
 import { installBlockly, buildToolbox } from './blockly/bridge.js';
+import { PALETTE } from '../wizards/ops/index.js';   // for the palette search filter
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
@@ -118,6 +119,27 @@ async function buildWorkspace() {
   // real dimensions, so the blocks are visible once the tab has real geometry.
   const fit = () => { try { B.svgResize(ws); } catch (_) { /* pre-render */ } };
   new ResizeObserver(fit).observe(host);
+
+  // ---- Palette search: a filter input above the toolbox. Typing shows the matching blocks (across ALL
+  //      categories) in the flyout; clearing restores the normal category flyout. ----
+  const search = document.createElement('input');
+  search.type = 'search'; search.className = 'blk-search'; search.placeholder = 'Search blocks…';
+  search.setAttribute('aria-label', 'Search blocks');
+  host.appendChild(search);
+  const flyout = () => { try { return ws.getToolbox().getFlyout(); } catch (_) { return null; } };
+  const runSearch = () => {
+    const q = search.value.trim().toLowerCase();
+    const tb = (() => { try { return ws.getToolbox(); } catch (_) { return null; } })();
+    const fl = flyout(); if (!tb || !fl) return;
+    if (!q) { try { tb.clearSelection(); fl.hide(); } catch (_) { /* */ } return; }
+    const hits = PALETTE
+      .filter((d) => `${d.label || ''} ${d.type} ${d.category || ''}`.toLowerCase().includes(q))
+      .map((d) => ({ kind: 'block', type: d.type }));
+    try { tb.clearSelection(); fl.show(hits.length ? hits : [{ kind: 'label', text: 'No matching blocks' }]); } catch (_) { /* */ }
+  };
+  search.addEventListener('input', runSearch);
+  search.addEventListener('search', runSearch);   // the ✕ clear button fires 'search'
+  window.__blkWs = ws;   // debug/test accessor
 
   // ---- this tab is a VIEW of the shared program model (blocks = the data): workspace ⇄ model + right pane ----
   let muteChanges = false;   // true while WE rebuild the workspace from the model (suppress the change echo)

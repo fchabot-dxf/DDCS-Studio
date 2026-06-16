@@ -3691,6 +3691,14 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 }
 #blocks-app *, #blocks-app *::before, #blocks-app *::after { box-sizing:border-box; }
 #blocks-app .blk-ws { position:relative; min-width:0; background:var(--bg); }   /* Blockly workspace host (left) */
+/* Palette search: a filter input floating above the Blockly toolbox (which is padded down to make room). */
+#blocks-app .blk-search {
+    position:absolute; top:6px; left:6px; z-index:60; width:152px; box-sizing:border-box;
+    background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:6px;
+    padding:5px 8px; font:12px/1.2 inherit; outline:none;
+}
+#blocks-app .blk-search:focus { border-color:var(--accent, #0ea5e9); }
+#blocks-app .blocklyToolboxDiv { padding-top:40px; }
 /* left rail (palette) — chrome */
 #blocks-app .palette { background:var(--panel); border-right:1px solid var(--line); padding:10px; overflow:auto; }
 #blocks-app .palette h3 { margin:0 0 8px; font-size:11px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; }
