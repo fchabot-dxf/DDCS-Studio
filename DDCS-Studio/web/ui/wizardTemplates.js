@@ -90,7 +90,7 @@ export function openTemplatesPopover(wm, anchor) {
     pop.querySelector('.wt-save').addEventListener('click', async () => {
         try { wm.update(); } catch (_) { /* keep the recorded op fresh */ }
         const last = getLastOp();
-        const params = last && last.opType === op ? last.params : null;
+        const params = last && last.type === op ? last.params : null;   // recordOp stores { type, params } (not opType)
         if (!params) { alert('Nothing to save yet — adjust the wizard first.'); return; }
         const name = (window.prompt('Template name:') || '').trim();
         if (!name) return;

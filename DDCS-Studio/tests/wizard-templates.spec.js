@@ -39,3 +39,35 @@ test('wizard templates: store round-trips and the popover loads a template into 
 
   await page.evaluate(async () => { const T = await import('/ui/wizardTemplates.js'); await T.deleteTemplate('edge', 'T1', 'local'); });
 });
+
+test('the popover "Save current as template" actually saves the open wizard (regression: nothing-to-save)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio);
+  await page.evaluate(async () => { const T = await import('/ui/wizardTemplates.js'); await T.deleteTemplate('drill', 'FromPopover', 'local'); });
+
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
+  await page.waitForSelector('#wiz_drill', { state: 'visible' });
+
+  // stub the dialogs: name via prompt, capture any alert (the bug fired "Nothing to save…")
+  await page.evaluate(() => {
+    window.__alerts = [];
+    window.alert = (m) => window.__alerts.push(String(m));
+    window.prompt = () => 'FromPopover';
+    window.confirm = () => false;   // local
+  });
+
+  await page.click('.wiz-templates');
+  await page.waitForSelector('.wiz-tpl-pop .wt-save');
+  await page.click('.wiz-tpl-pop .wt-save');
+  await page.waitForTimeout(300);
+
+  const r = await page.evaluate(async () => {
+    const T = await import('/ui/wizardTemplates.js');
+    const list = await T.listTemplates('drill');
+    return { saved: list.some((t) => t.name === 'FromPopover'), alerts: window.__alerts };
+  });
+  expect(r.alerts.join(' '), 'no "nothing to save" alert').not.toContain('Nothing to save');
+  expect(r.saved, 'the open wizard was saved as a template from the popover').toBeTruthy();
+
+  await page.evaluate(async () => { const T = await import('/ui/wizardTemplates.js'); await T.deleteTemplate('drill', 'FromPopover', 'local'); });
+});
