@@ -169,13 +169,15 @@ async function buildWorkspace() {
     const next = endIdx >= 0 ? [...cur.slice(0, endIdx), blk, ...cur.slice(endIdx)] : [...cur, blk];
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
   };
+  const suggestionsOn = () => { try { return window.ddcsGetSettings().compose.suggestions !== false; } catch (_) { return true; } };
   const updateStrip = (stack) => {
-    const hits = suggestNext(lastType(stack), 5, STMT);
+    const hits = suggestionsOn() ? suggestNext(lastType(stack), 5, STMT) : [];   // Settings → Composing toggle
     strip.innerHTML = hits.map((t) => `<button class="blk-sug-chip cat-${catSlugOf(t)}" data-type="${t}" type="button" title="Add ${labelOf(t)}">${labelOf(t)}</button>`).join('');
     strip.style.display = hits.length ? '' : 'none';
     strip.querySelectorAll('.blk-sug-chip').forEach((c) => c.addEventListener('click', () => insertSuggestion(c.dataset.type)));
   };
   onChange(({ stack }) => { recordProgram(stack); updateStrip(stack); });
+  window.addEventListener('ddcs:settings-changed', () => updateStrip(getStack()));   // toggle on/off live
   updateStrip(getStack());
 
   // ---- this tab is a VIEW of the shared program model (blocks = the data): workspace ⇄ model + right pane ----
