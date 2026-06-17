@@ -7,15 +7,17 @@ const fs = require("fs");
 class DdcsEditorProvider {
     context;
     getPort;
-    static register(context, getPort) {
-        const provider = new DdcsEditorProvider(context, getPort);
+    diagnostics;
+    static register(context, getPort, diagnostics) {
+        const provider = new DdcsEditorProvider(context, getPort, diagnostics);
         const providerRegistration = vscode.window.registerCustomEditorProvider(DdcsEditorProvider.viewType, provider);
         return providerRegistration;
     }
     static viewType = 'ddcs.studioEditor';
-    constructor(context, getPort) {
+    constructor(context, getPort, diagnostics) {
         this.context = context;
         this.getPort = getPort;
+        this.diagnostics = diagnostics;
     }
     /**
      * Called when our custom editor is opened.
@@ -48,12 +50,16 @@ class DdcsEditorProvider {
         // Make sure we get rid of the listener when our editor is closed.
         webviewPanel.onDidDispose(() => {
             changeDocumentSubscription.dispose();
+            this.diagnostics.delete(document.uri);
         });
         // Receive message from the webview.
         webviewPanel.webview.onDidReceiveMessage(e => {
             switch (e.type) {
                 case 'documentChanged':
                     this.updateTextDocument(document, e.text);
+                    return;
+                case 'diagnostics':
+                    this.publishDiagnostics(document, e.items);
                     return;
             }
         });
@@ -71,6 +77,22 @@ class DdcsEditorProvider {
         // Just replace the entire document every time for this prototype.
         edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), text);
         return vscode.workspace.applyEdit(edit);
+    }
+    /** Publish linter findings (computed in the webview) to VS Code's Problems panel for this document. */
+    publishDiagnostics(document, items) {
+        const diags = (items || []).map((it) => {
+            const range = new vscode.Range(it.line, it.startCol, it.line, it.endCol);
+            const sev = it.severity === 'error' ? vscode.DiagnosticSeverity.Error
+                : it.severity === 'warning' ? vscode.DiagnosticSeverity.Warning
+                    : vscode.DiagnosticSeverity.Information;
+            const d = new vscode.Diagnostic(range, it.message, sev);
+            d.source = 'DDCS';
+            if (it.code) {
+                d.code = it.code;
+            }
+            return d;
+        });
+        this.diagnostics.set(document.uri, diags);
     }
     /**
      * Get the static html used for the editor webviews.

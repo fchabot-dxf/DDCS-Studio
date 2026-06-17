@@ -25,8 +25,11 @@ function activate(context) {
     });
     gatewayProcess.stderr?.on('data', (data) => console.error(`[Gateway Error] ${data.toString().trim()}`));
     let isGatewayReady = false;
+    // Diagnostics collection for the G-code linter (findings are computed in the webview, published here).
+    const ddcsDiagnostics = vscode.languages.createDiagnosticCollection('ddcs');
+    context.subscriptions.push(ddcsDiagnostics);
     // Register the custom editor provider (it reads the live gateway port for the webview transport)
-    context.subscriptions.push(DdcsEditorProvider_1.DdcsEditorProvider.register(context, () => gatewayPort));
+    context.subscriptions.push(DdcsEditorProvider_1.DdcsEditorProvider.register(context, () => gatewayPort, ddcsDiagnostics));
     // Live machine-connection indicator in the Status Bar. The extension HOST polls the gateway
     // directly (it owns the port) and renders a native workbench item — read-only, no machine writes.
     const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);

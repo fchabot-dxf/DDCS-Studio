@@ -11,6 +11,7 @@ import { reconcileGcodeToStack } from '../../../DDCS-Studio/web/blocks/gcodeToSt
 import { resolveActivePost } from '../../../DDCS-Studio/web/wizards/dialects/index.js';
 import { getActiveProfile } from '../../../DDCS-Studio/web/shared/js/profiles/controllerProfiles.js';
 import { makeClient } from '../../../DDCS-Studio/web/shared/js/client.js';
+import { lintGcode } from './gcodeLint.js';
 
 function dialectOpts() { 
     try { return { dialect: resolveActivePost(getActiveProfile().id) }; } 
@@ -73,6 +74,15 @@ document.addEventListener('DOMContentLoaded', () => {
     window.ddcsStudio = { editorManager: dummyEditorManager };
     initProgramModel();
     
+    // Lint the current program against the active post → VS Code's Problems panel (computed here, where
+    // the dialect + selected post live; the host just publishes the findings).
+    const reportLint = (text) => {
+        if (!window.vscode) return;
+        let post = null;
+        try { post = resolveActivePost(getActiveProfile().id); } catch (_) {}
+        try { window.vscode.postMessage({ type: 'diagnostics', items: lintGcode(text, post) }); } catch (_) {}
+    };
+
     // Listen for model changes and project them into the Blockly canvas
     onChange(({ stack, proj, origin }) => {
         if (origin !== 'blockly' && window.__workspace) {
@@ -83,6 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (origin !== 'vscode' && window.vscode) {
             window.vscode.postMessage({ type: 'documentChanged', text: proj.text });
         }
+
+        reportLint(proj.text);
     });
 
     // Receive document updates from VS Code
@@ -107,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Wire up the top-bar HTML buttons
     window.openWiz = (type) => window.wizardManager.open(type);
     window.closeWiz = () => window.wizardManager.close();
+    window.insertWiz = () => window.wizardManager.insert();   // INSERT button — was missing, so clicks threw
 
     // --- Main-UI tabs: BLOCKS (the #ws canvas) | GATEWAY | SETTINGS. Studio's editor tab is intentionally
     //     dropped — VS Code's own text editor is that surface. #gateway-app / #settings-app are the forked

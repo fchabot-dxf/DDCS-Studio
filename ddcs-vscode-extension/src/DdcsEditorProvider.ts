@@ -4,8 +4,8 @@ import * as fs from 'fs';
 
 export class DdcsEditorProvider implements vscode.CustomTextEditorProvider {
 
-    public static register(context: vscode.ExtensionContext, getPort: () => number): vscode.Disposable {
-        const provider = new DdcsEditorProvider(context, getPort);
+    public static register(context: vscode.ExtensionContext, getPort: () => number, diagnostics: vscode.DiagnosticCollection): vscode.Disposable {
+        const provider = new DdcsEditorProvider(context, getPort, diagnostics);
         const providerRegistration = vscode.window.registerCustomEditorProvider(DdcsEditorProvider.viewType, provider);
         return providerRegistration;
     }
@@ -14,7 +14,8 @@ export class DdcsEditorProvider implements vscode.CustomTextEditorProvider {
 
     constructor(
         private readonly context: vscode.ExtensionContext,
-        private readonly getPort: () => number
+        private readonly getPort: () => number,
+        private readonly diagnostics: vscode.DiagnosticCollection
     ) { }
 
     /**
@@ -56,6 +57,7 @@ export class DdcsEditorProvider implements vscode.CustomTextEditorProvider {
         // Make sure we get rid of the listener when our editor is closed.
         webviewPanel.onDidDispose(() => {
             changeDocumentSubscription.dispose();
+            this.diagnostics.delete(document.uri);
         });
 
         // Receive message from the webview.
@@ -63,6 +65,9 @@ export class DdcsEditorProvider implements vscode.CustomTextEditorProvider {
             switch (e.type) {
                 case 'documentChanged':
                     this.updateTextDocument(document, e.text);
+                    return;
+                case 'diagnostics':
+                    this.publishDiagnostics(document, e.items);
                     return;
             }
         });
@@ -89,6 +94,21 @@ export class DdcsEditorProvider implements vscode.CustomTextEditorProvider {
         );
 
         return vscode.workspace.applyEdit(edit);
+    }
+
+    /** Publish linter findings (computed in the webview) to VS Code's Problems panel for this document. */
+    private publishDiagnostics(document: vscode.TextDocument, items: any[]) {
+        const diags = (items || []).map((it) => {
+            const range = new vscode.Range(it.line, it.startCol, it.line, it.endCol);
+            const sev = it.severity === 'error' ? vscode.DiagnosticSeverity.Error
+                : it.severity === 'warning' ? vscode.DiagnosticSeverity.Warning
+                : vscode.DiagnosticSeverity.Information;
+            const d = new vscode.Diagnostic(range, it.message, sev);
+            d.source = 'DDCS';
+            if (it.code) { d.code = it.code; }
+            return d;
+        });
+        this.diagnostics.set(document.uri, diags);
     }
 
     /**

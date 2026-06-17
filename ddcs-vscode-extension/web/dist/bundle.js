@@ -16806,6 +16806,61 @@ init_gcodeToStack();
 init_dialects();
 init_controllerProfiles();
 init_client();
+
+// web/src/gcodeLint.js
+function codeOf(line2) {
+  return line2.replace(/\([^)]*\)/g, (m) => " ".repeat(m.length)).replace(/;.*$/, (m) => " ".repeat(m.length));
+}
+function ruleM350G53(text, post) {
+  if (!post || post.id !== "ddcs-expert-m350") return [];
+  const out = [];
+  text.split(/\r?\n/).forEach((raw2, i) => {
+    const line2 = codeOf(raw2);
+    const g53 = /\bG53\b/i.exec(line2);
+    if (!g53) return;
+    if (/\bG0(?:0)?\b/i.test(line2)) {
+      out.push({
+        line: i,
+        startCol: g53.index,
+        endCol: g53.index + 3,
+        severity: "warning",
+        message: 'DDCS M350: G53 takes no G0 prefix \u2014 use a bare "G53 <axis>#var".',
+        code: "ddcs.g53-no-g0"
+      });
+    }
+    const after = line2.slice(g53.index + 3);
+    const axisRe = /([XYZABC])\s*(#?[-+0-9.\[\]]+)/gi;
+    let a;
+    while (a = axisRe.exec(after)) {
+      if (!a[2].includes("#")) {
+        const col = g53.index + 3 + a.index;
+        const ax = a[1].toUpperCase();
+        out.push({
+          line: i,
+          startCol: col,
+          endCol: col + a[0].length,
+          severity: "error",
+          message: `DDCS M350: G53 ${ax} needs a #var ref (e.g. "G53 ${ax}#99") \u2014 a literal fails on this firmware.`,
+          code: "ddcs.g53-needs-var"
+        });
+      }
+    }
+  });
+  return out;
+}
+var RULES = [ruleM350G53];
+function lintGcode(text, post) {
+  if (!text) return [];
+  return RULES.flatMap((rule) => {
+    try {
+      return rule(text, post) || [];
+    } catch (_) {
+      return [];
+    }
+  });
+}
+
+// web/src/extensionApp.js
 function dialectOpts3() {
   try {
     return { dialect: resolveActivePost(getActiveProfile().id) };
@@ -16865,6 +16920,18 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   window.ddcsStudio = { editorManager: dummyEditorManager };
   initProgramModel();
+  const reportLint = (text) => {
+    if (!window.vscode) return;
+    let post = null;
+    try {
+      post = resolveActivePost(getActiveProfile().id);
+    } catch (_) {
+    }
+    try {
+      window.vscode.postMessage({ type: "diagnostics", items: lintGcode(text, post) });
+    } catch (_) {
+    }
+  };
   onChange(({ stack: stack2, proj: proj2, origin }) => {
     if (origin !== "blockly" && window.__workspace) {
       stackToWorkspace(stack2, window.__workspace);
@@ -16872,6 +16939,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (origin !== "vscode" && window.vscode) {
       window.vscode.postMessage({ type: "documentChanged", text: proj2.text });
     }
+    reportLint(proj2.text);
   });
   window.addEventListener("vscode:updateDocument", (e) => {
     const text = e.detail;
@@ -16889,6 +16957,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.wizardManager = new WizardManager(dummyEditorManager);
   window.openWiz = (type) => window.wizardManager.open(type);
   window.closeWiz = () => window.wizardManager.close();
+  window.insertWiz = () => window.wizardManager.insert();
   const mainEl = document.querySelector(".main");
   const gatewayApp = document.getElementById("gateway-app");
   const settingsApp = document.getElementById("settings-app");
