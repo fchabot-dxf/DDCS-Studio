@@ -3,167 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
-    <title>DDCS Studio V10.23 - Modular</title>
+    <title>DDCS VS Code Extension</title>
     
-    <!-- Ensure project stylesheet is applied after inline legacy rules -->
-    <link rel="stylesheet" href="styles.css">
-    <!-- App favicon (X/Y + chevron) -->
-    <link rel="icon" href="assets/svg/favicon.svg" type="image/svg+xml">
-    <!-- three.js (global window.THREE) for the 3D toolpath preview. Vendored locally so
-         the standalone download / future pywebview .exe works fully offline. -->
-    <script defer src="assets/vendor/three.min.js"></script>
+    <!-- Shared app styles -->
+    <link rel="stylesheet" href="../../DDCS-Studio/web/styles.css">
+    
+    <!-- Extension specific overrides -->
+    <link rel="stylesheet" href="extension_styles.css">
+    
+    <!-- Shared three.js for 3D viz -->
+    <script defer src="../../DDCS-Studio/web/assets/vendor/three.min.js"></script>
 </head>
-<body data-theme="studio">
+<body data-theme="studio" style="background: transparent;">
 
-    <!-- Per-theme DDCS marks — one is shown at a time, switched by [data-theme] CSS -->
-    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-
-      <!-- NORMAL: clean wordmark -->
-      <symbol id="mark-normal" viewBox="0 0 150 36">
-        <text x="0" y="23" font-family="'Arial Black',Arial,sans-serif" font-size="26"
-          font-weight="900" font-style="italic" fill="#C7A900"
-          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
-        <text x="0" y="34" font-family="Arial,sans-serif" font-size="8.5" font-weight="600"
-          fill="#666666" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
-      </symbol>
-
-      <!-- STUDIO: engraved nameplate — stamped into the silver chassis -->
-      <symbol id="mark-studio" viewBox="0 0 150 36">
-        <text x="1" y="24" font-family="'Arial Black',Arial,sans-serif" font-size="26"
-          font-weight="900" font-style="italic" fill="#f0eee8"
-          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
-        <text x="0" y="23" font-family="'Arial Black',Arial,sans-serif" font-size="26"
-          font-weight="900" font-style="italic" fill="#55514a"
-          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
-        <text x="0.7" y="34.7" font-family="Arial,sans-serif" font-size="8.5" font-weight="600"
-          fill="#f0eee8" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
-        <text x="0" y="34" font-family="Arial,sans-serif" font-size="8.5" font-weight="600"
-          fill="#55514a" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
-      </symbol>
-
-      <!-- FUTURISTIC: neon glow wordmark -->
-      <symbol id="mark-futuristic" viewBox="0 0 150 36">
-        <defs>
-          <filter id="neon" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="1.6" result="b"/>
-            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-        </defs>
-        <text x="0" y="23" font-family="'Arial Black',Arial,sans-serif" font-size="26"
-          font-weight="900" font-style="italic" fill="#FFF100" filter="url(#neon)"
-          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
-        <text x="0" y="34" font-family="Arial,sans-serif" font-size="8.5" font-weight="600"
-          fill="#8892b0" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
-      </symbol>
-
-      <!-- ORGANIC: humanist wordmark -->
-      <symbol id="mark-organic" viewBox="0 0 150 36">
-        <text x="0" y="23" font-family="Georgia,'Times New Roman',serif" font-size="26"
-          font-weight="bold" font-style="italic" fill="#A89000"
-          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
-        <text x="0" y="34" font-family="Georgia,serif" font-size="8.5" font-weight="600"
-          fill="#7d7d6f" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
-      </symbol>
-
-      <!-- STEAMPUNK: brass serif wordmark -->
-      <symbol id="mark-steampunk" viewBox="0 0 150 36">
-        <defs>
-          <linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#F0CC3A"/><stop offset="55%" stop-color="#C89B2A"/>
-            <stop offset="100%" stop-color="#8b6914"/>
-          </linearGradient>
-        </defs>
-        <text x="0" y="23" font-family="Georgia,'Times New Roman',serif" font-size="26"
-          font-weight="bold" fill="url(#brass)"
-          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
-        <text x="0" y="34" font-family="Georgia,serif" font-size="8.5" font-weight="600"
-          fill="#8b7355" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
-      </symbol>
-
-    </svg>
-
-    <header class="app-header">
-        <span data-fred-home-mount></span>
-        <a class="brand" href="https://ddcs-studio.pages.dev" target="_blank" rel="noopener"
-           title="Open DDCS Studio online — ddcs-studio.pages.dev">
-            <svg class="logo logo-normal" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-normal"/></svg>
-            <svg class="logo logo-studio" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-studio"/></svg>
-            <svg class="logo logo-futuristic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-futuristic"/></svg>
-            <svg class="logo logo-organic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-organic"/></svg>
-            <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
-            <span class="ver">V10.23</span>
-        </a>
-        <!-- Project Manager: 📂 Open (drawer) / ⤓ Save (modal). Wired by ui/macroBar.js -->
-        <div class="macro-bar" id="macroBar">
-            <button class="op-btn" id="projOpenBtn" title="Open / manage projects (.mjson)"><span class="op-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span></button>
-            <button class="op-btn" id="projSaveBtn" title="Save the current program as a project (.mjson)"><span class="op-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></span></button>
-        </div>
-        <!-- App-switcher: STUDIO ↔ GATEWAY ↔ SETTINGS. Wired by ui/gatewayStatus.js -->
-        <nav class="hdr-tabs" aria-label="App switcher">
-            <button type="button" class="tab active" data-app="studio" onclick="window.showApp && window.showApp('studio')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span><span class="app-tx">STUDIO</span></button>
-            <button type="button" class="tab" data-app="blocks" title="Blocks" onclick="window.showApp && window.showApp('blocks')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="5" rx="1"/><rect x="4" y="10" width="16" height="5" rx="1"/><rect x="4" y="17" width="16" height="4" rx="1"/></svg></span><span class="app-tx">BLOCKS</span></button>
-            <button type="button" class="tab" data-app="gateway" title="Gateway"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg></span><span class="app-tx">GATEWAY</span><span id="gateway-led" class="gateway-led" title="Gateway status"></span></button>
-            <button type="button" class="tab" data-app="settings" title="Settings" onclick="window.showApp && window.showApp('settings')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span class="app-tx">SETTINGS</span></button>
-
-        </nav>
-        <div class="hdr-controls" style="display:flex;gap:10px;align-items:center">
-            <select id="hdrPost" class="hdr-post" title="Post-processor — which controller's G-code to generate. 'Auto' follows the machine profile (Settings → Profile); override to emit for another controller."></select>
-            <span id="hdrPostWarn" class="hdr-post-warn" hidden title="">⚠</span>
-            <div class="scale-ctl">
-                <button id="scaleBtn" class="op-btn scale-btn" title="Zoom"><span class="op-icon">🔍</span><span class="op-label">AUTO</span></button>
-            </div>
-            <button class="op-btn hidden" id="transferBtn" title="Send the current program to the machine"><span class="op-icon">📡</span><span class="op-label">TRANSFER</span></button>
-        </div>
+    <!-- Extension Header (No App switcher, no Dock) -->
+    <header class="app-header" style="height: 40px; border-bottom: 1px solid var(--border-color);">
+        <span style="font-family: 'Arial Black', sans-serif; font-style: italic; color: var(--accent-blue); padding-left: 15px;">DDCS WIZARDS</span>
+        <button onclick="window.openWiz('corner')" style="margin-left:20px;">Test Corner Wiz</button>
     </header>
 
-    <div id="studio-app" class="app-shell">
-        <!-- Top action bar: program + wizard buttons (moved up from the dock header).
-             Wrapped in .dock-header so the existing .dock-header .header-controls CSS still applies. -->
-        <div class="dock-header top-dock-header">
-            <div class="header-controls">
-                <div class="header-left" aria-label="Left controls"></div>
-                <div class="header-center" aria-label="Center wizards"></div>
-                <div class="header-right" aria-label="Right controls"></div>
-            </div>
-        </div>
+    <main style="padding: 20px;">
+        <p>The wizards will take over the screen when opened.</p>
+    </main>
 
-        <!-- RIGHT COLUMN: EDITOR (Fills remaining width, same height) -->
-        <main class="main">
-            <div class="editor-container">
-                <pre id="editor-highlight" class="editor-layer" aria-hidden="true"></pre>
-                <textarea id="editor" class="editor-layer" spellcheck="false" inputmode="none" placeholder="( System Ready )"></textarea>
-                <div id="editor-statusbar" class="editor-statusbar hidden">
-                    <button class="editor-status-copy" id="editor-status-copy" type="button" title="Copy errors to the clipboard" aria-label="Copy errors">
-                        <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" style="vertical-align:middle" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>
-                    </button>
-                    <div id="editor-status-text" class="editor-status-text"></div>
-                </div>
-                <!-- 3D toolpath preview — slides in as a drawer from the right; the editor stays visible -->
-                <aside id="gcodeViz3dContainer" class="viz3d-drawer">
-                    <div class="viz3d-resize" title="Drag to resize the preview"></div>
-                    <div id="viz3d-panel-host"></div>   <!-- the shared createPreviewPanel mounts here (same as Blocks + wizards) -->
-                </aside>
-                <!-- Side pull-tab on the right edge: slides the 3D drawer open/closed -->
-                <button id="view-toggle" class="viz3d-handle" title="Toggle 3D toolpath preview" aria-label="Toggle 3D toolpath preview">
-                    <svg class="viz3d-handle-cube" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-                        <path d="M12 2 21 7 21 17 12 22 3 17 3 7Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                        <path d="M3 7 12 12 21 7 M12 12 12 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-            </div>
-        </main>
-
-        <div id="controller-dock" class="controller-dock">
-            <div class="dock-header">
-                <div class="header-handle" role="button" tabindex="0" aria-label="Toggle Dock" aria-expanded="false"><span class="chevron">▲</span></div>
-            </div>
-            <div class="dock-body">
-                <div id="deck-panel" class="deck-panel"></div>
-            </div>
-        </div>
-
-    <!-- Wizard overlay -->
+<!-- Wizard overlay -->
     <div id="wizard" class="overlay">
         <div class="wiz-box">
             <!-- HEADER: Blue bar with title and close button -->
@@ -2517,5 +2380,59 @@
     })();
     </script>
 
+
+
+
+    <!-- Include the real Wizard Logic -->
+    <script src="../../DDCS-Studio/web/gcodeParser.js"></script>
+    <script src="../../DDCS-Studio/web/wizardManager.js"></script>
+
+    <!-- Wire the wizards to the VS Code API -->
+    <script>
+        // Override the insertWiz function to send to VS Code
+        window.insertWiz = () => {
+            const pre = document.querySelector('.wiz-body[style*="block"] pre:not(:empty)') || 
+                        document.querySelector('#wizard pre:not(:empty)');
+            if (pre && window.vscode) {
+                window.vscode.postMessage({
+                    command: 'insertCode',
+                    text: pre.textContent + '\n'
+                });
+                // Optional: show a small visual feedback
+                const origBg = pre.style.backgroundColor;
+                pre.style.backgroundColor = '#1e4620';
+                setTimeout(() => pre.style.backgroundColor = origBg, 200);
+            }
+        };
+
+        // Dynamically add a massive "Insert Code" button under every code preview
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.preview-block').forEach(block => {
+                const btn = document.createElement('button');
+                btn.innerHTML = '<b>INSERT INTO EDITOR TAB</b>';
+                btn.style.marginTop = '15px';
+                btn.style.width = '100%';
+                btn.style.padding = '15px';
+                btn.style.background = '#007acc';
+                btn.style.color = 'white';
+                btn.style.border = 'none';
+                btn.style.cursor = 'pointer';
+                btn.style.fontSize = '14px';
+                btn.onclick = window.insertWiz;
+                
+                // Add hover effect
+                btn.onmouseover = () => btn.style.background = '#005999';
+                btn.onmouseout = () => btn.style.background = '#007acc';
+
+                block.appendChild(btn);
+            });
+            
+            // Auto-open a wizard for testing purposes if none is open
+            if (window.openWiz) {
+                window.openWiz('corner');
+            }
+        });
+    </script>
 </body>
+
 </html>

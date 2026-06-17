@@ -1,0 +1,1282 @@
+
+--- PAGE 198 ---
++
+Addition (or unary
+positive)
+-
+Subtraction (or unary
+negative)
+*
+Multiplication
+/
+Division
+^
+Exponentiation
+Mod or %
+Modulo (remainder of a division)
+abs
+Absolute
+value
+sin
+Sine (degrees)
+cos
+Cosine (degrees)
+tan
+Tangent (degrees)
+sqrt
+Square
+root
+asin
+Arc Sine (degrees)
+acos
+Arc Cosine (degrees)
+atan
+Arc
+Tangent (degrees)
+fix
+Floor (round
+down to nearest
+integer)
+fup
+Ceiling (round up to nearest
+integer)
+#
+Variable
+access
+eq or ==
+Equals
+ne or !=
+Not equals
+ge or
+>=
+Greater
+than or equals
+gt or >
+Greater
+than
+le or
+<=
+Less than or equals
+lt or <
+Less than
+not or !
+Logical
+NOT
+&&
+Logical
+AND
+||
+Logical OR
+and
+Bit -wise AND
+xor
+Bit -wise
+exclusive OR
+or
+Bit -wise OR
+~
+Bit -wise
+complement
+Example:
+G91 X[13/64] Z[1+3/8]
+; move the X axis
+13/64
+(0.2031)
+units
+; and the Z axis 1 3/8
+(1.375)
+units
+incrementally
+X[SQRT[ABS[SIN [#101] - COS [#102]]]] ; Move X as a function of #101 and #102
+11.2.15
+$ — ASCII Code Substitution
+The ’$’ symbol followed by an ASCII code is an alternate way of specifying a letter. Only ASCII codes 65 – 90
+(’A’ - ’Z’) are valid. This substitution can be used where a letter command or axis label is normally speciﬁed.
+Example:
+G0 $88 2.0
+; Rapid
+move X to 2.0
+( Equivalent to G0 X2.0 )
+$71 0 $[88+2] 3.0
+; Rapid
+move Z to 3.0
+( Equivalent to G0 Z3.0 )
+M26 /$90
+; Set Z home
+( Equivalent to M26 /Z
+)
+11.2.16
+#, = — User or System Variable reference
+The ’#’ character is used to reference a macro or a user or system variable. For variables that can be written,
+the ’=’ is used to assign to them. General purpose user variables are #100 to #149 and #29000 to #31999.
+197
+
+--- PAGE 199 ---
+Index
+Description
+Returns
+R\W
+1-3
+Macro arguments A-C
+The ﬂoating point value if
+deﬁned by a G65 call, 0.0
+otherwise. These can be used as
+private, local variables in any
+program or subprogram except
+in custom macro M functions.
+In custom macro M functions,
+the macro arguments are passed
+in by reference.
+R/W
+4-6
+Macro arguments I-K (1st set)
+R/W
+7-9
+Macro arguments D-F or 2nd set of I-K
+R/W
+10
+3rd I (G is invalid)
+R/W
+11
+Macro argument H or 3rd J
+R/W
+12
+3rd K (L is invalid)
+R/W
+13
+Macro argument M or 4th I
+R/W
+14
+4th J (N is invalid)
+R/W
+15
+4th K (O is invalid)
+R/W
+16
+5th I (P is invalid)
+R/W
+17-18
+Macro argument Q-R or 5th J-K
+R/W
+19-21
+Macro arguments S,T,U or 6th set of I-K
+R/W
+22-24
+Macro arguments V,W,X or 7th set of I-K
+R/W
+25-27
+Macro arguments Y,Z or 8th set of I-K
+R/W
+28-30
+9th set of I-K
+R/W
+31-33
+10th set of I-K
+R/W
+100 - 149
+User variables
+Floating-point value. Initialized
+to 0.0 at start of job processing
+R/W
+150 - 159
+Nonvolatile user variables
+Floating-point value saved in
+cncm.job.xml ﬁle.
+R/W
+300-399
+User string variables. These variables re-
+tain their values until the CNC software is
+exited
+String Literal
+R/W
+2400, 2401-2418
+Active WCS, WCS #1-18 CSR angles
+Floating point value
+R/W
+2500, 2501-2518
+Active WCS, WCS #1-18 Axis 1 values
+R/W
+2600, 2601-2618
+Active WCS, WCS #1-18 Axis 2 values
+R/W
+2700, 2701-2718
+Active WCS, WCS #1-18 Axis 3 values
+R/W
+2800, 2801-2818
+Active WCS, WCS #1-18 Axis 4 values
+R/W
+2900, 2901-2918
+Active WCS, WCS #1-18 Axis 5 values
+R/W
+3000, 3001-3018
+Active WCS, WCS #1-18 Axis 6 values
+R/W
+3100, 3101-3118
+Active WCS, WCS #1-18 Axis 7 values
+R/W
+3200, 3201-3218
+Active WCS, WCS #1-18 Axis 8 values
+R/W
+3901
+Parts Cut (Part #)
+R/W
+3902
+Parts Required (Part Cnt)
+R/W
+4001
+Move mode
+0.0 (rapid) or 1.0 (feed)
+R
+4003
+Positioning mode
+90.0 (abs) or 91.0 (inc)
+R
+4006
+Units of measure
+20.0 (inches) or 21.0 (metric)
+R
+4014
+WCS
+54.0-71.0 (WCS#1-18)
+R
+4109
+Feedrate (F)
+Floating point value
+R
+4119
+Spindle Speed (S)
+R
+4120
+Tool Number (T)
+R
+4121
+Current height oﬀset number (H)
+R
+4122
+Current diameter oﬀset number (D, mill
+only)
+R
+4201
+Job processing state
+0 = normal, 1 = graph
+R
+4202
+Job Search mode
+0 = search mode oﬀ
+1 = searching for line number
+2 = searching for block number
+N
+3 = searching for Tool number
+4 = resuming job
+R
+198
+
+--- PAGE 200 ---
+Index
+Description
+Returns
+R\W
+4203
+Tool in spindle
+R
+5021-5028
+Machine Position (axis 1 = 5021, axis 2 =
+5022, etc.)
+Floating point value
+R
+5041-5048
+Current Position (axis 1 = 5041, axis 2 =
+5042, etc.)
+R
+9000-9399
+Parameter values 0 - 399
+See Machine Parameters
+R
+9900-9999
+Parameter values 900 - 999
+See Machine Parameters
+R
+10000
+Mill: Height oﬀset amount, active H
+Floating point value
+R/W
+10001-10200
+Mill: Height oﬀset amount, H001 – H200
+Floating point value
+R/W
+11000
+Mill: Diameter oﬀset amount, active D
+Floating point value
+R/W
+11001-11200
+Mill:
+Diameter oﬀset amount, D001 –
+D200
+Floating point value
+R/W
+12000
+Mill: Tool H number, active tool (T)
+0 - 200
+R/W
+12001-12200
+Mill: Tool H number, tools 1 - 200
+0 - 200
+R/W
+13000
+Mill: Tool D number, active tool (T)
+0 - 200
+R/W
+13001-13200
+Mill: Tool D number, tools 1 - 200
+0 - 200
+R/W
+14000
+Mill: Tool coolant, active tool (T)
+7, 8, 9
+R/W
+14001-14200
+Mill: Tool coolant, tools 1 – 200
+7, 8, 9
+R/W
+15000
+Mill:
+Tool spindle direction, active tool
+(T)
+3, 4, 5
+R/W
+15001-15200
+Mill: Tool spindle direction, tools 1 - 200
+3, 4, 5
+R/W
+16000
+Mill: Tool spindle speed, active tool (T)
+Floating point value
+R/W
+16001-16200
+Mill: Tool spindle speed, tools 1 - 200
+Floating point value
+R/W
+17000
+Mill: Tool bin number, active tool (T)
+Floating point value
+R/W
+17001-17200
+Mill: Tool bin number, tools 1 - 200
+Floating point value
+R/W
+18000
+Mill: Tool putback, active tool (T)
+Floating point value
+R/W
+18001-18200
+Mill: Tool putback, tools 1 – 200
+Floating point value
+R/W
+19000
+Tool Life Data: Tool T1 Tool Type
+0 = Drill, 1 = End Mill
+R/W
+19001
+Tool Life Data: Tool T1 Total Life
+Floating point value
+R/W
+19002
+Tool Life Data: Tool T1 Used Life
+Floating point value
+R/W
+19003
+Tool Life Data: Tool T1 Units
+0 = Cycles, 1 = Inch/mm dis-
+tance
+R/W
+19004
+Tool Life Data: Tool T1 Update Mode
+0 = Manual, 1 = Auto
+R/W
+19005-19009
+Tool Life Data for Tool T2
+see 19000-19004 above
+R/W
+19010-19014
+Tool Life Data for Tool T3
+see above
+R/W
+19015-19999
+Tool Life Data for Tools T4 through T200
+see above
+R/W
+20001-20008
+max rate for axes 1-8
+R
+20101-20108
+label for axes 1-8
+R
+20201-20208
+slow jog for axes 1-8
+R
+20301-20308
+fast jog for axes 1-8
+R
+20401-20408
+screw pitch for axes 1-8
+R/W
+20501-20508
+lash comp for axes 1-8
+R
+20601-20608
+counts per unit for axes 1-8
+R
+20701-20708
+accel time for axes 1-8
+R
+20801-20808
+deadstart velocity for axes 1-8
+R
+20901-20908
+delta vmax for axes 1-8
+R
+21001-21008
+counts per turn for axes 1-8
+R
+21101-21108
+minus limit for axes 1-8
+R
+21201-21208
+plus limit for axes 1-8
+R
+21301-21308
+minus home for axes 1-8
+R
+21401-21408
+plus home for axes 1-8
+R
+199
+
+--- PAGE 201 ---
+Index
+Description
+Returns
+R\W
+21501-21508
+reversed for axes 1-8
+R
+21601-21608
+laser comp for axes 1-8
+R
+21701-21708
+proportional for axes 1-8
+R
+21801-21808
+integration limit for axes 1-8
+R
+21901-21908
+kg for axes 1-8
+R
+22001-22008
+integral for axes 1-8
+R
+22101-22108
+kv1 for axes 1-8
+R
+22201-22208
+derivative for axes 1-8
+R
+22301-22308
+ka for axes 1-8
+R
+22401-22408
+num motor poles for axes 1-8
+R
+22501-22508
+drive current for axes 1-8
+R
+22601-22608
+drive oﬀset angle for axes 1-8
+R
+22701-22708
+pwm kp for axes 1-8
+R
+22801-22808
+pwm ki for axes 1-8
+R
+22901-22908
+pwm kd for axes 1-8
+R
+23001-23008
+abrupt kp for axes 1-8
+R
+23101-23108
+feed forward kp for axes 1-8
+R
+23201-23208
+max error (PID) for axes 1-8
+R
+23301-23308
+min error (PID) for axes 1-8
+R
+23401-23408
+at index pulse for axes 1-8
+R
+23501-23508
+travel minus for axes 1-8
+R/W
+23601-23608
+travel plus for axes 1-8
+R/W
+23701-23708
+axis home set for axes 1-8
+R
+23801-23808
+abs position (in encoder counts) for axes
+1-8
+R
+23901-23908
+PID out for axes 1-8
+R
+24001-24008
+reference set for axes 1-8
+R
+24101-24108
+Axis reference value for axes 1-8
+R
+24201-24208
+tilt table level oﬀsets for axes 1-8
+R
+24301-24308
+dsp positions for axes 1-8
+R
+24401-24408
+abs position (in encoder counts) for axes
+1-8
+R
+24501-24508
+dsp positon in local cooridinates for axes
+1-8
+R
+24601-24608
+local probing +limit position for axes 1-8
+R
+24701-24708
+local probing -limit position for axes 1-8
+R
+24801-24808
+probe stylus compensation amount for
+axes 1-8
+R
+24901-24908
+servo controlled axis indicator for axes 1-8
+0 = no, 1 = yes
+R
+25000
+DRO display units
+R
+25001
+default units of measure
+R
+25002
+PLC type
+R
+25003
+console type
+R
+25004
+jog panel optional
+R
+25005
+min spin high
+R
+25006
+max spin high
+R
+25007
+home at powerup
+R
+25008
+screen blank time
+R
+25009
+Displayed / Calculated spindle speed. If
+parameter 78 =1 and spindle encoder is
+mounted.
+R
+200
+
+--- PAGE 202 ---
+Index
+Description
+Returns
+R\W
+25010
+current spindle position (in counts)
+R
+25011
+dsp time (in seconds)
+R
+25012
+time (in seconds)
+R
+25013
+clear max/min PID errors
+R
+25014
+software type (Mill/Lathe)
+R
+25015
+feedrate override
+R
+25016
+spindle override
+R
+25017
+OS
+Windows/LINUX = 2; other OS
+= 1.0
+R
+25018
+CNC series number (11 for CNC11)
+R
+25019
+Software version number
+R
+25020
+Software Beta revision number
+R
+25021
+Digitizing boundary hit
+hit = 1, not hit = 0
+R
+25022
+last M115/116/125/126 probe trip
+1 = tripped, 0 = not tripped
+R
+25023
+Drive type
+0 = Standard, 1 = Legacy DC,
+2 = Legacy AC
+R
+25101-25108
+Encoder counts away from index pulse for
+axes 1-8
+Counts away from index pulse.
+Values less than 0 means that in-
+dex pulse is not detected yet.
+R
+26001-26008
+dsp mechanical machine positions for axes
+1-8
+R
+26101-26108
+dsp mechanical local positions for axes 1-8
+R
+26201-26208
+local + travel limit position for axes 1-8
+R
+26301-26308
+local - travel limit position for axes 1-8
+R
+26401-26404
+Axis 1 reference points 1-4
+R
+26501-26504
+Axis 2 reference points 1-4
+R
+26601-26604
+Axis 3 reference points 1-4
+R
+26701-26704
+Axis 4 reference points 1-4
+R
+26801-26804
+Axis 5 reference points 1-4
+R
+26901-26904
+Axis 6 reference points 1-4
+R
+27001-27004
+Axis 7 reference points 1-4
+R
+27101-27104
+Axis 8 reference points 1-4
+R
+27201-27208
+ACDC drive estimated brake wattage for
+axes 1-8
+R
+27301-27308
+Real motor encoder positions for axes 1-8
+Motor encoder positions that ac-
+counts for lash, MPG, and scale
+oﬀsets. (Note that these can be
+diﬀerent from what is displayed
+as Abs Pos in the PID menu.)
+R
+27401-27408
+Scale encoder positions for axes 1-8
+R
+29000-31999
+User variables.
+These variables retain
+their values until the CNC software is ex-
+ited.
+Floating point value
+R/W
+32000-34999
+Reserved for internal use. DO NOT USE
+Floating point value
+R/W
+50001-51312
+PLC Inputs 1-1312
+Jog Panel is on INP1057-1312
+R
+60001-61312
+PLC Outputs 1-1312
+Jog Panel is on OUT1057-1312
+R
+70001-71024
+PLC Memory Bits 1-1024
+R
+80001-89999
+Reserved
+R
+90001-90064
+Timer 1-64 status bits
+R
+91001-91064
+Reserved
+R
+92001-92064
+Reserved
+R
+201
+
+--- PAGE 203 ---
+Index
+Description
+Returns
+R\W
+93001-93256
+Stage 1-256 status bits
+R
+94001-94256
+Fast Stage 1-256 status bits
+R
+95001-95256
+Reserved
+R
+96001-96044
+W1-W44 (32-bit signed integers)
+R
+97001-97022*
+DW1-DW22 (64-bit signed integers)
+R
+98001-98044
+FW1-FW44 (32-bit ﬂoats)
+R
+99001-99022
+DFW1-DFW22 (64-bit ﬂoats)
+R
+* Since user or system variables are turned into (double) ﬂoating point values when referenced in an M- or
+G-code program, the 64-bit integer values lose precision when they exceed 253 (9,007,199,254,740,992).
+Example:
+#100 = #5041
+; set user
+variable
+#100 to the X axis
+current
+position
+G90 X [#5041+1+7/32] ; move the X axis 1 7/32
+units
+(1.2188)
+incrementally
+#2501 = #5021
+; set WCS#1 X value to the
+current X position
+#2703=[#2703+1/8]
+; add 1/8 units
+(.125) to the WCS#3 Z value
+; Subroutine
+parameter
+and local
+variable
+access.
+G1 X#A Y#B Z#C F#F
+; move to the
+coordinates
+passed as parameters
+#[Q] = #F * .10
+; Assign
+local
+variable #Q to 10% of #F
+#17 = #7 * .10
+; Same
+statement as previous
+using
+number
+references.
+#[C] = 0.05
+; Reassign #C. (Value
+passed as parameter is lost .)
+11.3
+Advanced Macro Statements
+Branching and conditional execution are extremely powerful tools that,
+combined with access to system variables, allow you to do many things that
+would otherwise be impossible. Nevertheless, using branching and condi-
+tional execution can introduce undesirable and even unpredictable behav-
+ior into your programs. Undesirable eﬀects can occur simply by graphing a
+program. The least of these undesirable eﬀects could be entering an endless
+loop, failing to draw anything, or wiping out all the information in your
+tool library or WCS settings. It is your responsibility to make sure that
+undesirable things do not happen in your programs. You must monitor the
+job processing and search modes in your program, if necessary, and take
+appropriate action. Until you are conﬁdent of the actions of your program,
+you should step through it one block at a time to conﬁrm your program
+logic.
+11.3.1
+GOTO — Branch Execution
+To branch to another line within the same program or subprogram, use the statement:
+GOTO <expression>
+where <expression> is any expression that evaluates to a valid block number in the program. GOTO causes
+an immediate branch to the speciﬁed destination. Program codes preceding a GOTO on the same line will
+be executed normally. Any program codes following GOTO on the same line will cause an error.
+202
+
+--- PAGE 204 ---
+If fast branching is disabled (parameter 145 = 0) then the CNC software searches forward in the program for
+the ﬁrst matching block number and resumes searching, if necessary from the top of the program. For this
+reason when fast branching is disabled, backward branches take longer than forward branches and backward
+branch times depend on the total program size.
+If the program is suﬃciently large, use of the GOTO
+statement could introduce temporary pauses.
+When fast branching is enabled (parameter 145 = 1) then the CNC software remembers the locations of block
+numbers as it ﬁnds them during program execution. Backward branches always take place immediately. The
+ﬁrst forward branch to a block not yet encountered will take additional time as the CNC software searches
+forward for the block number; however, subsequent forward branches to that block number will take place
+immediately. The trade-oﬀfor using fast branching is that all line numbers at a given level of program or
+subprogram must be unique and programs will use more memory (approximately 16kilobytes of memory for
+every 1000 block numbers in the program.)
+11.3.2
+IF THEN ELSE — Conditional Execution
+Program symbols, G-codes, M codes and GOTO commands may be executed conditionally using the IF
+statement. The general form of the IF statement is:
+IF <expression> THEN <execute if true> ELSE <execute if false>
+where <expression> is any valid expression, <execute if true> is one or more program codes to execute
+if <expression> evaluates to ”true” (non-zero) and <execute if false> is one or more program codes to
+execute if <expression> evaluates to ”false” (zero). All parts of the IF statement must appear on the same
+line. The ”ELSE <execute if false>” part of the statement is optional and may be omitted. The ”THEN”
+may be omitted; however, <expression> must be enclosed in brackets ([ ]). The IF statement may follow
+other program codes on the same line. Compound conditionals are possible but they cannot be nested. The
+ﬁrst THEN always pairs with the ﬁrst IF. ELSE always pairs with the ﬁrst <expression> that evaluates to
+”false”. All program codes executed are executed as part of the same block.
+Example:
+; Branch to N200 if machine
+position is okay , otherwise go to N300
+N100 IF #5041 LE 5.0 THEN GOTO 200 ELSE GOTO 300
+; Force
+subprogram
+parameter #D to be within
+range.
+IF [#D LE 0.005] #[D] = 0.005
+; Compound
+conditionals
+IF [#A LE 0.0] GOTO 100 ELSE IF [#A LE 2.5] GOTO 200 ELSE GOTO 300
+IF [#A GT 0.0] IF [#D/#A GE 0.0] #[C] = SQRT [#D/#A]
+11.3.3
+INPUT — Prompt Operator For Input
+The INPUT macro prompts the operator for numeric input. The general form of the INPUT statement is:
+INPUT ”<prompt>” <variable>
+Where <prompt> is the message prompt for the operator and <variable> is the variable in which to store
+the input. The CNC software will display a dialog with the given prompt and space for the operator response.
+The operator may enter any numeric expression (see above) including variables as a response. The operator
+must press CYCLE START or Alt-S to dismiss the dialog. Pressing ESC will cancel the job.
+The CNC software parses well ahead of the current execution to maximize throughput and eﬃciency. For
+this reason, an INPUT macro may prompt the operator for input immediately even though the INPUT
+macro is located in the middle or near the end of the job. Parsing pauses while the dialog is displayed.
+203
+
+--- PAGE 205 ---
+Any statements parsed prior to the INPUT macro will have been queued and will continue to execute in
+the background while the prompt is displayed. Job processing will pause only if all queued statements have
+been executed before the operator supplies a response.
+INPUT macros will not graph. If you must graph the job, ﬁrst set the input variable to a default value and
+use a conditional to execute the INPUT only if the job is being run normally.
+Use search mode cautiously with INPUT macros. To have search work properly, you may have to supply
+exactly the same input during the search as you did during the last actual run.
+Example:
+; Ask
+operator
+for pocket
+depth.
+Store
+result in #101
+; Note: this will not graph.
+INPUT "Enter
+pocket
+depth" #101
+; Allow job with
+INPUT
+statements to be graphed.
+#101 = 0.5;
+Supply a default
+value for
+graphing
+; Ask for
+operator
+input
+only if not
+graphing.
+IF NOT #4201
+THEN
+INPUT "Enter
+pocket
+depth" #101
+11.3.4
+DEFINE — Text Aliases
+You can deﬁne your own text aliases using angle brackets (<>). This is a pure text replacement tool (with
+one exception — any text found after a semicolon (’;’) will be ignored as a comment), but can be quite
+useful.
+To deﬁne an alias in your G-code program, use the word DEFINE followed by the name of your alias (in
+angled brackets) followed by the text it will be replacing.
+For example, consider the following G-code program:
+G17 G90 F25
+G00 X1.0 Y1.0 Z0.0
+G02 X2.0 Y2.0 Z0.0 R -1.0
+Using the angle bracket deﬁnes, we could write:
+; Definitions
+begin
+here
+DEFINE <XY_PLANE > G17
+DEFINE <ABSOLUTE_POSITIONING > G90
+DEFINE <FEEDRATE > F
+DEFINE <RAPID_POSITIONING > G0
+DEFINE <START_POSITION > X1.0 Y1.0 Z0.0
+DEFINE <CLOCKWISE_ARC > G02
+DEFINE <END_POSITION > X2.0 Y2.0 Z0.0
+DEFINE <BIG_ARC_RADIUS > R -1.0
+; Actual job begins
+below
+<XY_PLANE > <ABSOLUTE_POSITIONING > <FEEDRATE >25
+204
+
+--- PAGE 206 ---
+<RAPID_POSITIONING > <START_POSITION >
+<CLOCKWISE_ARC > <END_POSITION > <BIG_ARC_RADIUS >
+This can make your G-code programs more readable and understandable.
+205
+
+--- PAGE 207 ---
+Chapter 12
+CNC Program Codes: G-Codes
+G-Code
+Group
+Description
+G00
+*
+A
+Rapid Positioning
+G01
+A
+Linear Interpolation
+G02
+A
+Circular or Helical Interpolation CW
+G03
+A
+Circular or Helical Interpolation CCW
+G04
+B
+Dwell
+G09
+B
+Decelerate and Stop (formerly known as Exact Stop)
+G10
+B
+Parameter Setting
+G17
+*
+C
+Circular Interpolation Plane Selection XY
+G18
+C
+Circular Interpolation Plane Selection ZX
+G19
+C
+Circular Interpolation Plane Selection YZ
+G20
+*
+K
+Select Inch Units
+G21
+K
+Select Metric Units
+G22
+O
+Work envelope on
+G23
+*
+O
+Work envelope oﬀ
+G28
+B
+Return to Reference Point
+G29
+B
+Return from Reference Point
+G30
+B
+Return to Secondary Reference Point
+G40
+*
+D
+Cutter Compensation Cancel
+G41
+D
+Cutter Compensation Left
+G42
+D
+Cutter Compensation Right
+G43
+E
+Tool Length Compensation (+)
+G43.3
+E
+Tool Length Compensation (+) with Axis Tilt Compensation
+G43.4
+E
+Rotary Tool Center Point (with G43.3 compensation)
+G44
+E
+Tool Length Compensation (-)
+G49
+*
+E
+Tool Length Compensation Cancel
+G50
+*
+M
+Scaling/Mirroring Oﬀ
+G51
+M
+Scaling/Mirroring On
+G52
+B
+Oﬀset Local Coordinate System Origin
+G53
+B
+Rapid Position in Machine Coordinates
+G54
+L
+Select Work Coordinate System #1
+G55
+L
+Select Work Coordinate System #2
+G56
+L
+Select Work Coordinate System #3
+G57
+L
+Select Work Coordinate System #4
+G58
+L
+Select Work Coordinate System #5
+G59
+L
+Select Work Coordinate System #6
+206
+
+--- PAGE 208 ---
+G-Code
+Group
+Description
+G61
+F
+Modal Decel and Stop (formerly known as Exact Stop Mode)
+G64
+*
+F
+Smoothing mode selection / Cancel Modal Decelerate and Stop
+G65
+J
+Call Macro
+G68
+N
+Coordinate Rotation on
+G68.1
+N
+Transformed Work Coordinate System
+G69
+*
+N
+Coordinate Rotation oﬀ
+G73
+G
+High Speed Peck Drilling
+G74
+G
+Counter Tapping
+G76
+G
+Fine Bore Cycle
+G80
+*
+G
+Canned Cycle Cancel
+G81
+G
+Drilling and Spot Drilling
+G82
+G
+Drill with Dwell
+G83
+G
+Deep Hole Drilling
+G84
+G
+Tapping
+G85
+G
+Boring
+G89
+G
+Boring with Dwell
+G90
+*
+H
+Absolute Positioning Mode
+G91
+H
+Incremental positioning Mode
+G92
+B
+Set Absolute position
+G93
+P
+Inverse Time On
+G93.1
+P
+Velocity Scrubber for Smoothed Inverse Time Data
+G94
+P
+Inverse Time Oﬀ
+G98
+*
+I
+Initial Point Return
+G99
+I
+R Point Return
+G117
+C
+Rotation of Plane Selection XY
+G118
+C
+Rotation of Plane Selection ZX
+G119
+C
+Rotation of Plane Selection YZ
+G173
+G
+Compound High Speed Peck Drilling
+G174
+G
+Compound Counter Tapping
+G176
+G
+Compound Fine Bore Cycle
+G180
+G
+Compound Canned Cycle Cancel
+G181
+G
+Compound Drilling and Spot Drilling
+G182
+G
+Compound Drill with Dwell
+G183
+G
+Compound Deep Hole Drilling
+G184
+G
+Compound Tapping
+G185
+G
+Compound Boring
+G189
+G
+Compound Boring with Dwell
+NOTES:
+- All the default G-codes have been marked with the symbol ”*”.
+- A given line of a program may contain more than one G-code.
+- If several G-codes from one group are used in the same line, only the G-code speciﬁed last will remain
+active.
+- G-codes from group B are of ”one shot” type (active only in the line in which they are speciﬁed). All
+other Gcodes are modal (active until another G-code of the same group is speciﬁed).
+- If a G-code from group A is used in a canned cycle mode, the canned cycle will be canceled. Canned
+cycle Gcodes, however, have no eﬀect on G-codes from group A.
+207
+
+--- PAGE 209 ---
+12.1
+G00 - Rapid Positioning
+G0 moves to the speciﬁed position at the maximum motor rate. The coordinates may
+be either absolute positions (G90) or incremental positions (G91). G0 is modal and
+remains in eﬀect until another positioning mode (G1, G2, G3 etc.) is commanded.
+G0 is the default-positioning mode.
+When the Z axis is commanded to move in the + direction, the Z axis will move up to its new position
+ﬁrst, then the other axes will move to their new position along a straight line.
+When the Z axis is commanded to move in the - direction, all axes but the Z axis will move to their new
+position along a straight line, then the Z axis will move down to its new position.
+Example:
+G0 X0.0 Y0.0 Z0.0
+; Rapid move to X0, Y0, Z0
+The feedrate override knob has no eﬀect on G0 moves unless rapid
+override is turned ON.
+12.2
+G01 - Linear Interpolation
+G1 moves to the speciﬁed position at the programmed feedrate. The coordinates may
+be either absolute positions (G90) or incremental positions (G91). The movement will
+be along a straight line. G1 is modal and remains in eﬀect until another positioning
+mode (G0, G2, G3 etc.) is commanded.
+Example:
+G01 X2 Y3 Z4 W5 F10
+; Linear move to X2, Y3, Z4, W5 at a 10in/min
+G91 X6 Y7
+; Linear move to X8, Y10
+Z3 W4 F20
+; Linear move to Z7, W9 at 20in/min (G91 is modal)
+12.3
+G02 & G03 - Circular or Helical Interpolation
+G2 moves in a clockwise circular motion, and G3 moves in a counterclockwise circular
+motion. This clockwise and counterclockwise motion is relative to your point of view,
+however. See the diagram below. The X, Y or Z position speciﬁed in the G2 or G3
+command is the end position of the arc, and may be an absolute position (G90) or an
+incremental position (G91). G2 and G3 are modal and remain in eﬀect until another
+positioning mode (G0, G1, etc.) is commanded.
+208
+
+--- PAGE 210 ---
+*Note: When using G18, the G2 command moves in a counterclockwise direction in the XZ plane.
+The axes included in the currently selected circular plane (G17, G18, or G19) will move in a circular
+motion. Any other axes speciﬁed will move along a straight line (helical movement). The programmed
+feedrate is used for the interpolated motion along the movement of all axes.
+Helical and circular motion can be programmed in two diﬀerent ways: specifying the ﬁnal point and the
+radius of the arc, or specifying the ﬁnal point and the parameters I, J, K (center point of the arc as
+incremental values from the start position).
+*Note: For closed circles (arc of 360 degrees), use method 2: specify ﬁnal point and parameters I, J and
+K. Method 1 (specify ﬁnal point and radius) will not work.
+METHOD 1: USING FINAL POINT AND RADIUS
+The commands G2 and G3 will have the following structure:
+G2 Xa Yb Zc Rd
+G3 Xa Yb Zc Rd
+where a, b, and c will be the X, Y, and Z coordinates of the ﬁnal point of the arc, and d will be the radius.
+In most cases there will be two possible arcs of the same radius connecting two given points. This occurs
+because the center of the arc is not speciﬁed. To choose the bigger arc, make the radius negative. To choose
+the smaller arc, make the radius positive. See examples 1 and 2 for graphical explanations of this concept.
+Example 1 (small arc solution: positive radius):
+G17 G90 F25
+; selects XY plane and absolute positioning
+G00 X1.0 Y1.0 Z0
+; rapid to start position X1, Y1, Z0
+G02 X2 Y2 Z0 R1
+; arc to X2 Y2 Z0 with radius of 1
+; (small arc solution)
+209

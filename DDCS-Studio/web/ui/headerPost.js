@@ -14,6 +14,7 @@
  */
 import { listPosts, getActivePostId, setActivePostId, getDialect, resolveActivePost, getCaps } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { validate, summarize } from '../shared/js/validate/validate.js';
 
 export function initHeaderPost() {
     const sel = document.getElementById('hdrPost');
@@ -44,14 +45,70 @@ export function initHeaderPost() {
         } else if (caps.flowStreamable === false && (hasProbe || hasVars)) {
             msg = `${post.name}: load this macro from SD/littlefs — its O-word flow doesn't run while streaming over serial.`;
         }
-        warnEl.hidden = !msg;
-        warnEl.title = msg;
+        let linterMsg = '';
+        if (post.id.includes('ddcs')) {
+            const res = validate(text);
+            if (!res.ok || res.warnings > 0) {
+                linterMsg = summarize(res) + ' - ' + res.findings.map(f => `Line ${f.line}: ${f.msg}`).join(' | ');
+            }
+        }
+
+        const combinedMsg = [msg, linterMsg].filter(Boolean).join('\n\n');
+        warnEl.hidden = !combinedMsg;
+        warnEl.title = combinedMsg;
+
+        const statusBar = document.getElementById('editor-statusbar');
+        const statusText = document.getElementById('editor-status-text');
+        if (statusBar && statusText) {
+            statusBar.classList.toggle('hidden', !linterMsg);
+            statusText.textContent = linterMsg;
+        }
     };
+
+    const copyBtn = document.getElementById('editor-status-copy');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+            const statusText = document.getElementById('editor-status-text');
+            if (!statusText || !statusText.textContent) return;
+            const text = statusText.textContent;
+            
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); } catch (e) {}
+                document.body.removeChild(ta);
+            }
+            
+            copyBtn.style.color = '#00ff00';
+            setTimeout(() => copyBtn.style.color = '', 500);
+        });
+    }
 
     fillOptions();
 
     sel.addEventListener('change', () => {
         setActivePostId(sel.value);                                 // persist the active post (override or 'auto')
+        
+        // Automatically sync the variable DB to the active post's family
+        const post = resolveActivePost(getActiveProfile().id);
+        const vdb = window.ddcsStudio && window.ddcsStudio.variableDB;
+        if (vdb && post) {
+            let fam = 'expert';
+            if (post.id.includes('v4')) fam = 'v4.1';
+            else if (post.id.includes('centroid')) fam = 'centroid';
+            else if (post.id.includes('rs274ngc') || post.id.includes('linuxcnc')) fam = 'rs274ngc';
+            else if (post.id.includes('mach3')) fam = 'mach3';
+            else if (post.id.includes('mach4')) fam = 'mach4';
+            else if (post.id.includes('uccnc')) fam = 'uccnc';
+            vdb.setControllerVars(fam);
+        }
+
         if (window.ddcsRefreshBlocks) window.ddcsRefreshBlocks();   // re-project Blocks/editor in the new post
         window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));   // re-render open previews/wizards
         lint();

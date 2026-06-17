@@ -318,7 +318,7 @@ export class CommandDeck {
         // The V4.1 and Expert have completely different variable maps; this swaps the system vars.
         const ctrlRow = document.createElement('div');
         ctrlRow.className = 'deck-var-ctrlrow';
-        ctrlRow.style.cssText = 'display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;';
+        ctrlRow.style.cssText = 'display:none;'; // Hidden: now automatically synced to the active post
         const ctrlLbl = document.createElement('span');
         ctrlLbl.textContent = 'Variable set:'; ctrlLbl.style.cssText = 'font-size:11px; opacity:.7;';
         const ctrlSel = document.createElement('select');
@@ -441,7 +441,16 @@ export class CommandDeck {
         }
 
         const frag = document.createDocumentFragment();
-        vars.forEach(v => {
+        
+        let displayVars = vars;
+        const LIMIT = 500;
+        let limited = false;
+        if (displayVars.length > LIMIT) {
+            displayVars = displayVars.slice(0, LIMIT);
+            limited = true;
+        }
+
+        displayVars.forEach(v => {
             const id = String(v.i).split('-')[0];
             const desc = v.d || 'User Variable';
             const btn = document.createElement('button');
@@ -466,6 +475,15 @@ export class CommandDeck {
             }, { passive: false });
             frag.appendChild(btn);
         });
+
+        if (limited) {
+            const limitNote = document.createElement('div');
+            limitNote.className = 'deck-var-limit';
+            limitNote.style.cssText = 'grid-column: 1 / -1; text-align: center; font-size: 10px; opacity: 0.6; padding: 10px; border: 1px dashed rgba(255,255,255,0.2); border-radius: 4px;';
+            limitNote.textContent = `Showing first 500 of ${vars.length} variables. Use the search bar to find more.`;
+            frag.appendChild(limitNote);
+        }
+
         grid.appendChild(frag);
     }
 

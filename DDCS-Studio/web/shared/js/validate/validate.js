@@ -24,6 +24,13 @@ const MCALL = /\b(MSETDATA|MGETDATA)\s*\[([^\]]*)\]/g;
 const LITERAL_ASSIGN = /^#(\d+)\s*=\s*[-+]?\d+(?:\.\d+)?\s*$/;   // '#n = <constant>'
 const IF_WORD = /\bIF\b/;
 const G10 = /\bG10\b/;
+const STRAY_WORD = /[A-Za-z]{2,}/g;
+const VALID_MACRO_WORDS = new Set([
+  "IF", "THEN", "GOTO", "WHILE", "DO", "END",
+  "EQ", "NE", "GT", "GE", "LT", "LE", "AND", "OR", "XOR", "MOD",
+  "SIN", "COS", "TAN", "ATAN", "ASIN", "ACOS", "SQRT", "ABS", "ROUND", "FIX", "FUP", "LN", "EXP",
+  "MSETDATA", "MGETDATA"
+]);
 
 // Documented persistent-storage ranges that need priming (CORE_TRUTH unsafe ranges).
 const isPersistent = (n) => (n >= 1153 && n <= 1193) || (n >= 2039 && n <= 2071) || (n >= 2500 && n <= 2599);
@@ -67,6 +74,13 @@ function lintLine(n, raw, findings, primed) {
   // GOTO with a space before the label
   if (GOTO_SPACE.test(code)) {
     findings.push({ line: n, sev: "ERROR", code: "E-GOTOSPACE", msg: "space after GOTO - must be 'GOTO1' / 'GOTO[expr]', not 'GOTO 1'" });
+  }
+
+  // stray words (invalid alphabetical sequences)
+  for (const match of code.matchAll(STRAY_WORD)) {
+    if (!VALID_MACRO_WORDS.has(match[0].toUpperCase())) {
+      findings.push({ line: n, sev: "ERROR", code: "E-STRAYWORD", msg: `unrecognized word '${match[0]}' outside of a comment` });
+    }
   }
 
   // FANUC comparison words instead of C-style operators

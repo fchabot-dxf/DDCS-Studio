@@ -1,0 +1,41 @@
+{
+  "name": "ddcs-vscode-extension",
+  "displayName": "DDCS Studio",
+  "description": "Prototype DDCS Studio Wizard",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ddcs.openWizard",
+        "title": "DDCS: Open Wizard",
+        "icon": "$(tools)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "ddcs.openWizard",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "18.x",
+    "typescript": "^5.1.3"
+  }
+}

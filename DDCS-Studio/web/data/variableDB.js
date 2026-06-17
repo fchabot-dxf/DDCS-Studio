@@ -134,8 +134,8 @@ export class VariableDatabase {
             // Skip header row
             if (index === 0 && isNaN(id) && !id.startsWith('#')) return;
 
-            // Ensure ID has # prefix
-            if (/^\d+$/.test(id)) id = '#' + id;
+            // Ensure ID has # prefix if it starts with a number
+            if (/^\d/.test(id)) id = '#' + id;
 
             // If forceSystem is provided, honor it. Otherwise infer from description presence.
             let isSystem = (forceSystem === true) ? true
@@ -189,18 +189,23 @@ export class VariableDatabase {
     // the SYSTEM vars for the selected controller while preserving the user's own entries. Persisted
     // (ddcs_var_profile) so offline users keep their choice across reloads.
     getControllerVars() {
-        try { const v = localStorage.getItem('ddcs_var_profile'); return (v === 'v4.1' || v === 'v3') ? v : 'expert'; }
+        try { const v = localStorage.getItem('ddcs_var_profile'); return (v === 'v4.1' || v === 'v3' || v === 'centroid' || v === 'rs274ngc' || v === 'mach3' || v === 'mach4' || v === 'uccnc') ? v : 'expert'; }
         catch (e) { return 'expert'; }
     }
 
     async _loadDefaultCsv(family) {
         if (family === 'v4.1') return (await import('./default_vars_v41.js')).DEFAULT_VAR_CSV_V41;
         if (family === 'v3') return (await import('./default_vars_v3.js')).DEFAULT_VAR_CSV_V3;
+        if (family === 'centroid') return (await import('./default_vars_centroid.js')).DEFAULT_VAR_CSV_CENTROID;
+        if (family === 'rs274ngc') return (await import('./default_vars_rs274ngc.js')).DEFAULT_VAR_CSV_RS274NGC;
+        if (family === 'mach3') return (await import('./default_vars_mach3.js')).DEFAULT_VAR_CSV_MACH3;
+        if (family === 'mach4') return (await import('./default_vars_mach4.js')).DEFAULT_VAR_CSV_MACH4;
+        if (family === 'uccnc') return (await import('./default_vars_uccnc.js')).DEFAULT_VAR_CSV_UCCNC;
         return (await import('./default_vars.js')).DEFAULT_VAR_CSV;
     }
 
     async setControllerVars(family) {
-        const fam = (family === 'v4.1' || family === 'v3') ? family : 'expert';
+        const fam = (family === 'v4.1' || family === 'v3' || family === 'centroid' || family === 'rs274ngc' || family === 'mach3' || family === 'mach4' || family === 'uccnc') ? family : 'expert';
         try { localStorage.setItem('ddcs_var_profile', fam); } catch (e) { /* ignore */ }
         const userVars = (this.activeDB || []).filter(e => !e.isSys);   // keep the user's own variables
         this.activeDB = [];

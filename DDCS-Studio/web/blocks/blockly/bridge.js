@@ -28,7 +28,13 @@ const SELECTS = {
     atcMode: ['auto', 'manual'],
     testMode: ['current', 'all'],
     wcsSys: [['Auto', '0'], ['G54', '54'], ['G55', '55'], ['G56', '56'], ['G57', '57'], ['G58', '58'], ['G59', '59']],
-    commType: [['Popup', 'popup'], ['Status', 'status'], ['Input', 'input'], ['Beep', 'beep'], ['Dwell', 'dwell']]
+    commType: [['Popup', 'popup'], ['Status', 'status'], ['Input', 'input'], ['Beep', 'beep'], ['Dwell', 'dwell']],
+    fmode: ['G94', 'G95'],
+    plane: ['G17', 'G18', 'G19'],
+    dist: ['abs', 'inc'],
+    stop: ['M0', 'M1'],
+    cycle: ['drill', 'dwell', 'peck', 'bore'],
+    state: ['on', 'off']
 };
 const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/\s+/g, '');
 export const FN = (field) => field.toUpperCase();   // Blockly input/field name from an op field
@@ -37,9 +43,70 @@ const outputCheck = (def) => REPORTER_CHECK[def.returns] || 'Number';
 export const isWrap = (def) => ['container', 'path', 'loop', 'cond', 'depth', 'fill'].includes(def.kind);
 export const fieldsOf = (def, params) => (def.fieldsFor ? def.fieldsFor(params || def.defaults) : def.fields) || [];
 
-const optionsFor = (def, field) =>
-    field === 'op' ? (def.type === 'compare' ? ['<', '>', '<=', '>=', '==', '!='] : ['+', '-', '*', '/', '%'])
-        : (SELECTS[field] || null);
+const DESCRIPTIONS = {
+    fmode: "Feed Mode: G94 (Units/Min) or G95 (Units/Rev)",
+    plane: "Arc/Compensation Plane (G17 XY, G18 XZ, G19 YZ)",
+    dist: "Distance Mode: Absolute (G90) or Incremental (G91)",
+    stop: "Stop Type: M0 (Program Stop) or M1 (Optional Stop)",
+    cycle: "Canned Cycle Type (Drill, Dwell, Peck, Bore)",
+    state: "Output State (On/Off)",
+    mode: "Mode of operation",
+    x: "X coordinate",
+    y: "Y coordinate",
+    z: "Z coordinate",
+    r: "Retract/R plane",
+    q: "Peck depth / Timeout",
+    dwell: "Dwell time (ms or s)",
+    feed: "Feed rate",
+    pin: "I/O Pin Number",
+    var: "Variable to store result",
+    tol: "Tolerance / Blend radius",
+    op: "Operator",
+    axes: "Axes to reference",
+    prog: "Program Number (O-word)",
+    sys: "Work Coordinate System (0-6)",
+    axisx: "Enable X Axis",
+    axisy: "Enable Y Axis",
+    axisz: "Enable Z Axis",
+    sync: "Synchronize movement",
+    slave: "Slave axis alignment",
+    type: "Communication type",
+    color: "Popup/Beep color or mode",
+    corner: "Corner to probe",
+    probeseq: "Probe Sequence (XY or YX)",
+    wcs: "Target WCS for result",
+    probez: "Probe Z axis first",
+    synca: "Sync A axis",
+    qstop: "Quick stop on error",
+    axis: "Axis to probe/move",
+    axisdir: "Direction of movement",
+    featuretype: "Feature type (Boss, Pocket, Bore)",
+    dir1: "Direction 1",
+    dir2: "Direction 2",
+    twoaxis: "Enable 2-Axis probe",
+    waitspindle: "Wait for spindle",
+    dustcover: "Dust cover control",
+    confirm: "Wait for operator confirmation",
+    radius: "Radius of the feature",
+    depth: "Depth to cut",
+    step: "Stepover / Stepdown amount",
+    speed: "Spindle speed (RPM)",
+    dir: "Spindle direction (CW / CCW)",
+    coolant: "Coolant (Flood / Mist / Off)",
+    tool: "Tool Number (T)",
+    value: "Value to set"
+};
+const getDesc = (f) => DESCRIPTIONS[f.toLowerCase()] || `The ${f} parameter`;
+
+const optionsFor = (def, field) => {
+    if (field === 'op') return def.type === 'compare' ? ['<', '>', '<=', '>=', '==', '!='] : ['+', '-', '*', '/', '%'];
+    if (field === 'mode') {
+        if (def.type === 'pathmode') return ['blend', 'exact'];
+        if (def.type === 'waitinput') return ['imm', 'rise', 'fall', 'high', 'low'];
+        if (def.type === 'move') return ['cut', 'rapid', 'probe'];
+    }
+    return SELECTS[field] || null;
+};
 
 /** Classify a field → how it renders in Blockly. */
 export function fieldKind(def, field) {
@@ -60,12 +127,13 @@ function jsonDef(def) {
     for (const f of fieldsOf(def)) {
         const k = fieldKind(def, f);
         message += ` ${f} %${++n}`;
-        if (k === 'dropdown') args.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => [o, o]) });
-        else if (k === 'checkbox') args.push({ type: 'field_checkbox', name: FN(f), checked: def.defaults[f] !== false });
-        else if (k === 'text') args.push({ type: 'field_input', name: FN(f), text: String(def.defaults[f] ?? '') });
-        else if (k === 'region') args.push({ type: 'input_value', name: FN(f), check: 'Region' });
-        else if (k === 'boolean') args.push({ type: 'input_value', name: FN(f), check: 'Boolean' });
-        else args.push({ type: 'input_value', name: FN(f), check: 'Number' });
+        const desc = getDesc(f);
+        if (k === 'dropdown') args.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });
+        else if (k === 'checkbox') args.push({ type: 'field_checkbox', name: FN(f), checked: def.defaults[f] !== false, tooltip: desc });
+        else if (k === 'text') args.push({ type: 'field_input', name: FN(f), text: String(def.defaults[f] ?? ''), tooltip: desc });
+        else if (k === 'region') args.push({ type: 'input_value', name: FN(f), check: 'Region', tooltip: desc });
+        else if (k === 'boolean') args.push({ type: 'input_value', name: FN(f), check: 'Boolean', tooltip: desc });
+        else args.push({ type: 'input_value', name: FN(f), check: 'Number', tooltip: desc });
     }
     if (isWrap(def)) { message += ` %${++n}`; args.push({ type: 'input_statement', name: 'DO' }); }
     const block = {
@@ -81,8 +149,8 @@ const makeOpDef = (type, label, msgAdd = '', argsAdd = []) => ({
     type: type,
     message0: `⬡ %1 ${msgAdd}`,
     args0: [
-        { type: 'field_label_serializable', name: 'LABEL', text: label },
-        ...argsAdd
+        { type: 'field_label_serializable', name: 'LABEL', text: label, tooltip: getDesc(type) },
+        ...argsAdd.map(a => ({ ...a, tooltip: getDesc(a.name) }))
     ],
     message1: '%1',
     args1: [ { type: 'input_statement', name: 'DO' } ],

@@ -45,9 +45,9 @@ export function ddcsTheme(Blockly) {
     // CHROME follows the app theme (fallbacks = the original dark scheme for themeless contexts):
     componentStyles: {
       workspaceBackgroundColour: tok('--bg', '#0d1117'),
-      toolboxBackgroundColour: tok('--panel', '#161d28'),
+      toolboxBackgroundColour: tok('--panel2', tok('--panel', '#161d28')),
       toolboxForegroundColour: tok('--text', '#cbd5e1'),
-      flyoutBackgroundColour: tok('--bg', '#11171f'),
+      flyoutBackgroundColour: tok('--panel2', tok('--panel', '#11171f')),
       flyoutForegroundColour: tok('--text-dim', '#8b97a6'),
       flyoutOpacity: 1,
       scrollbarColour: tok('--border', '#39465a'),
