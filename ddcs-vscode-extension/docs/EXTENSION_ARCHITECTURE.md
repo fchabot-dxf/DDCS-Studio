@@ -26,13 +26,13 @@ The Extension Host is the "brain" of the extension. It runs in VS Code's backgro
 - **State Routing:** Acts as a message broker between the sandboxed Webviews and the Python backend.
 - **Native Integration:** Handles file Save/Open dialogs, notifications, and reads user preferences from VS Code settings.
 
-### 2.2 The Custom UI (Webviews)
+### 2.2 The Custom UI (Webviews & Custom Editors)
 Webviews are essentially `iframes` running inside VS Code. They are heavily sandboxed for security.
 
 **Touchpoints:**
-- **WebviewPanels:** Main editor tabs. This is where the primary Blockly workspace or full-screen 3D CAM viewer lives.
-- **CustomEditors:** A specific type of WebviewPanel. If you register a Custom Editor for `.ddcs` files, double-clicking a file in the VS Code explorer will automatically open it in your Webview instead of as raw text.
-- **WebviewViews:** Sidebar panels (Activity Bar). Ideal for a persistent "Machine Status" or "Toolbox" view that remains visible while the user edits other code files.
+- **CustomEditors (Implemented):** A specific type of WebviewPanel natively tied to a VS Code `TextDocument`. We have registered a Custom Editor for `.nc` and `.ddcs` files. Double-clicking one of these files automatically opens it in our DDCS Blockly UI instead of as raw text. This provides built-in two-way synchronization: edits in the Blockly UI update the hidden text document, and direct text edits update the Blockly canvas.
+- **WebviewPanels:** Main editor tabs for things that aren't tied to a specific text file (e.g., a standalone wizard launcher).
+- **WebviewViews:** Sidebar panels (Activity Bar). Ideal for a persistent "Machine Status" or "Toolbox" view.
 
 ### 2.3 The Core Backend (Python Bridge)
 The Python backend handles the actual machine logic, g-code generation, and serial communication.
@@ -109,8 +109,8 @@ To work on this extension effectively, you need to run two things at once:
 - [ ] Create a basic `WebviewPanel` that simply loads an `<iframe>` of the existing DDCS Studio web app running locally to prove it works.
 
 ### Phase 2: Decoupling & The Build Step
-- [ ] Update the `DDCS-Studio/web` code to check if it is running inside VS Code (`acquireVsCodeApi()`) or in a browser, and route its API calls accordingly.
-- [ ] Create an `esbuild` script that automatically copies the production-ready `web` files into the extension's `out/` directory.
+- `[x]` Update the `DDCS-Studio/web` code to check if it is running inside VS Code (`acquireVsCodeApi()`) or in a browser, and route its API calls accordingly.
+- `[x]` Create an `esbuild` script that automatically bundles the shared `web` ES6 modules into the extension's `dist/` directory, resolving CORS and Sandbox restrictions natively.
 
 ### Phase 3: The Headless Bridge
 - [ ] Strip all GUI code from `fairy_gateway.py`.
@@ -118,6 +118,31 @@ To work on this extension effectively, you need to run two things at once:
 - [ ] Write TypeScript logic in the Extension Host to automatically spawn the Python executable on startup.
 
 ### Phase 4: Native VS Code Integration
-- [ ] Register a `CustomEditorProvider` so `.ddcs` project files open directly into the Blockly interface.
+- `[x]` Register a `CustomEditorProvider` so `.nc` and `.ddcs` project files open directly into the Blockly interface, offering real-time two-way sync with the generated G-code.
 - [ ] Add VS Code settings (`contributes.configuration` in `package.json`) so users can configure COM ports natively in VS Code's settings UI.
 - [ ] Package via `vsce` for distribution.
+
+---
+
+## 7. UI Module Sharing Strategy (Prototype vs Production)
+
+A core goal of this extension is to minimize copying backend and frontend logic from the `DDCS-Studio/web` directory.
+
+### The Sandbox Prototype (Completed)
+During initial rapid prototyping, Python scripts were used to aggressively extract HTML blocks and JS logic. This was done strictly to prove the VS Code Webview UX layout without fighting module load paths.
+
+### The Production Target (True Module Sharing - Implemented)
+In the production architecture, `extension_index.html` remains a stripped-down skeleton. 
+All UI components, blocks, and parsers are loaded natively from the shared folder via an `esbuild` bundling process.
+
+**Current Production Entrypoint (`extensionApp.js`):**
+```javascript
+// Natively load definitions from the standalone app! No copying!
+import { OP_BLOCKS } from '../../DDCS-Studio/web/blocks/blockly/bridge.js';
+import { initBlocks } from '../../DDCS-Studio/web/blocks/blocksApp.js';
+import { wizardManager } from '../../DDCS-Studio/web/wizardManager.js';
+
+// Boot the UI using shared logic
+Blockly.defineBlocksWithJsonArray(OP_BLOCKS);
+```
+This ensures that any time a new wizard or CNC block is added to the standalone DDCS Studio app, the VS Code extension inherits it automatically on the next build with zero code duplication.

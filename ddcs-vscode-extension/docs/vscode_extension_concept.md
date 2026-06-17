@@ -35,15 +35,17 @@ To support both non-developer users (via a `.exe`) and developers (via VS Code),
    - Registers commands and UI contributions in the `package.json`.
    - Manages file saving/loading via standard VS Code APIs.
    - Spawns and manages any backend processes.
-2. **Custom UI (HTML/JS/CSS in Webviews):**
-   - Renders the Blockly workspace and custom 3D/CAM visualizations inside `WebviewPanels` or sidebar `WebviewViews`.
-   - **Multiple Webviews:** You can open several Webviews at once (e.g., Blockly in one tab, 3D CAM in another). Since Webviews are isolated sandboxes and cannot talk directly to each other, they communicate by sending messages to the Extension Host, which then routes the data to the appropriate view.
+2. **Custom UI (HTML/JS/CSS in Webviews & Custom Editors):**
+   - Renders the Blockly workspace and custom 3D/CAM visualizations.
+   - **Custom Text Editor:** The extension registers a Custom Editor for `.nc` and `.ddcs` files. When you open one, VS Code replaces the text area with the DDCS Blockly UI, providing real-time two-way synchronization between the visual blocks and the raw G-code text.
+   - **Multiple Webviews:** You can open several Webviews at once (e.g., Blockly in one tab, 3D CAM in another). Since Webviews are isolated sandboxes and cannot talk directly to each other, they communicate by sending messages to the Extension Host.
 3. **Backend Processes:**
-   - Existing heavy lifting or logic (e.g., Python scripts like `generate_centroid_vars.py`) is executed by the extension host via child processes or local HTTP/WebSocket servers.
+   - Existing heavy lifting or logic (e.g., Python scripts like `headless_gateway.py`) is executed by the extension host via child processes.
 
-## Next Steps (When starting the parallel project)
+## Next Steps (Completed)
 
-- [ ] Create a boilerplate VS Code extension using the generator (`npx yo code`).
-- [ ] Prototype rendering the existing Blockly interface inside a VS Code Webview.
-- [ ] Establish a basic message-passing protocol between the Webview and the Extension Host.
-- [ ] Evaluate the effort required to strictly decouple the current backend logic from the existing standalone frontend.
+- `[x]` Create a boilerplate VS Code extension using the generator (`npx yo code`).
+- `[x]` Prototype rendering the existing Blockly interface inside a VS Code Webview.
+- `[x]` Establish a basic message-passing protocol between the Webview and the Extension Host.
+- `[x]` Evaluate the effort required to strictly decouple the current backend logic from the existing standalone frontend.
+- `[x]` Implement a `CustomTextEditorProvider` for two-way synchronization.

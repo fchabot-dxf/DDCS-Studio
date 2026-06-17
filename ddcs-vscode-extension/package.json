@@ -26,16 +26,29 @@
           "group": "navigation"
         }
       ]
-    }
+    },
+    "customEditors": [
+      {
+        "viewType": "ddcs.studioEditor",
+        "displayName": "DDCS Studio",
+        "selector": [
+          { "filenamePattern": "*.nc" },
+          { "filenamePattern": "*.ddcs" }
+        ],
+        "priority": "default"
+      }
+    ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run compile && npm run build:web",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "build:web": "esbuild web/src/extensionApp.js --bundle --outfile=web/dist/bundle.js --format=esm --external:./dropbox.js --external:./gdrive.js"
   },
   "devDependencies": {
-    "@types/vscode": "^1.80.0",
     "@types/node": "18.x",
+    "@types/vscode": "^1.80.0",
+    "esbuild": "^0.28.1",
     "typescript": "^5.1.3"
   }
 }

@@ -1,32 +1,76 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
     <title>DDCS VS Code Extension</title>
     
     <!-- Shared app styles -->
     <link rel="stylesheet" href="../../DDCS-Studio/web/styles.css">
+    
+    <!-- Blockly library -->
+    <script src="../../DDCS-Studio/web/vendor/blockly/blockly.min.js"></script>
     
     <!-- Extension specific overrides -->
     <link rel="stylesheet" href="extension_styles.css">
     
     <!-- Shared three.js for 3D viz -->
     <script defer src="../../DDCS-Studio/web/assets/vendor/three.min.js"></script>
+    
+    <style>
+        /* Blockly spike base styles */
+        :root { --bg:#0d1117; --panel:#161d28; --line:#26303d; --ink:#e6edf3; --muted:#8b97a6; --accent:#2dd4bf;
+                --cat-machine:#64748b; --cat-move:#14b8a6; --cat-ops:#22c55e; --cat-control:#f59e0b;
+                --cat-math:#84cc16; --cat-modify:#a855f7; }
+        html, body { margin:0; height:100%; overflow: hidden; background:var(--bg); color:var(--ink);
+                    font:13px/1.4 ui-sans-serif,system-ui,Segoe UI,sans-serif; }
+        .wrap { display:flex; flex-direction:column; height:100%; }
+        
+        /* The Wizard Bar */
+        .wizard-bar { display:flex; align-items:center; gap:12px; padding:8px 14px; background:var(--panel);
+                 border-bottom:1px solid var(--line); }
+        .wizard-bar h1 { font-size:14px; margin:0; letter-spacing:.04em; color: var(--accent-blue); font-style: italic; }
+        .wizard-bar button { padding: 6px 12px; background: #26303d; border: 1px solid #39465a; color: #cbd5e1; border-radius: 4px; cursor: pointer; }
+        .wizard-bar button:hover { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        
+        /* The Blockly Canvas */
+        .main { display:grid; grid-template-columns:1fr; flex:1; min-height:0; position: relative; }
+        #ws { position:absolute; top:0; left:0; right:0; bottom:0; }
+        
+        /* Modals for wizards */
+        #wizard { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
+        #wizard .wiz-box { max-height: 90vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    </style>
 </head>
-<body data-theme="studio" style="background: transparent;">
-
-    <!-- Extension Header (No App switcher, no Dock) -->
-    <header class="app-header" style="height: 40px; border-bottom: 1px solid var(--border-color);">
-        <span style="font-family: 'Arial Black', sans-serif; font-style: italic; color: var(--accent-blue); padding-left: 15px;">DDCS WIZARDS</span>
-        <button onclick="window.openWiz('corner')" style="margin-left:20px;">Test Corner Wiz</button>
+<body>
+  <!-- ════ SEAM: EXTENSION SHELL (extension-owned chrome + mount points) ══════════════════════════
+       This wrap (wizard-bar + #ws Blockly canvas) is the extension's own minimal chrome — safe to
+       restyle/replace without touching Studio. Mount points the bundle needs: #ws (Blockly canvas),
+       #gw-status (status chip), and #wizard (overlay, below). ═══════════════════════════════════════ -->
+  <div class="wrap">
+    <!-- WIZARD BAR -->
+    <header class="wizard-bar">
+      <h1>DDCS STUDIO</h1>
+      <button onclick="window.openWiz('corner')">Corner</button>
+      <button onclick="window.openWiz('edge')">Edge</button>
+      <button onclick="window.openWiz('middle')">Middle</button>
+      <button onclick="window.openWiz('alignment')">Alignment</button>
+      <span id="gw-status" style="margin-left:auto; font:12px/1 ui-monospace,SFMono-Regular,monospace; color:#8b97a6;">gateway: …</span>
     </header>
+    
+    <!-- BLOCKLY CANVAS -->
+    <div class="main">
+      <div id="ws"></div>
+    </div>
+  </div>
 
-    <main style="padding: 20px;">
-        <p>The wizards will take over the screen when opened.</p>
-    </main>
-
-<!-- Wizard overlay -->
+  <!-- ════ SEAM: SHARED WIZARD BODY (forked from DDCS-Studio/web/index.html) ══════════════════════
+       Everything from #wizard down to #global-tooltip is a fork of Studio's wizard markup (38 wizard
+       forms + their #wiz_*_code outputs + viz containers). The wizards in bundle.js read/write these
+       IDs, so it is LOAD-BEARING — do NOT strip it. It is the drift surface: when Studio adds/edits a
+       wizard, this copy goes stale. De-fork path: generate this region from the canonical index.html
+       at build time, or splice it in DdcsEditorProvider — see docs/HTML_SEAMS.md. ════════════════════ -->
+  <!-- THE WIZARDS (Hidden by default) -->
+  <!-- Wizard overlay -->
     <div id="wizard" class="overlay">
         <div class="wiz-box">
             <!-- HEADER: Blue bar with title and close button -->
@@ -1483,72 +1527,17 @@
     <!-- Global tooltip -->
     <div id="global-tooltip" style="display:none;"></div>
 
-    <!-- IMPORTANT: Load the modular JavaScript with diagnostic logging -->
-    <script type="module">
-        (async () => {
-            try {
-                const mod = await import('./app.js');
-                console.log('Imported app.js', mod);
-            } catch (err) {
-                console.error('Failed to import app.js', err);
-            }
-            try {
-                // The Blocks program model (the data) + editor⇄stack sync — wired at startup so editing the
-                // STUDIO editor builds/updates blocks WITHOUT first opening the Blocks tab (the editor is the
-                // primary surface; the Blocks tab is just a view). Must run after app.js created the editor.
-                const { initProgramModel } = await import('./blocks/programModel.js');
-                initProgramModel();
-            } catch (err) { console.error('program model init failed', err); }
-            try {
-                const { initBridgeTransfer } = await import('./ui/bridgeTransfer.js');
-                initBridgeTransfer();             // before gatewayStatus so it catches the first tick
-            } catch (err) { console.error('bridge transfer init failed', err); }
+    <!-- ════ SEAM: EXTENSION BOOTSTRAP (host-owned) ═══════════════════════════════════════════════
+         Studio's standalone bootstrap (import ./app.js + ./ui/*.js) was forked in here but is DEAD in
+         the extension — those modules live in DDCS-Studio/web/, not this folder, so every import only
+         threw into its catch. The extension boots from web/src/extensionApp.js → web/dist/bundle.js
+         (loaded at the end of <body>). To surface a Studio init module (gatewayStatus, postGating, …)
+         in the extension, import it from extensionApp.js — not here. ════════════════════════════════ -->
 
-            try {
-                const { initGatewayStatus } = await import('./ui/gatewayStatus.js');
-                initGatewayStatus();
-            } catch (err) { console.error('gateway status init failed', err); }
-
-            try {
-                const { initUpdateCheck } = await import('./ui/updateCheck.js');
-                initUpdateCheck();                // desktop exe only: banner if a newer GitHub release exists
-            } catch (err) { console.error('update check init failed', err); }
-            try {
-                const { initHeaderPost } = await import('./ui/headerPost.js');
-                initHeaderPost();
-            } catch (err) { console.error('header post init failed', err); }
-            try {
-                const { initPostGating } = await import('./ui/postGating.js');
-                initPostGating();                 // grey wizard fields the active post can't use (tooltip-only why)
-            } catch (err) { console.error('post gating init failed', err); }
-            try {
-                const { initMacroBar } = await import('./ui/macroBar.js');
-                initMacroBar();                   // header 📂 Open / 💾 Save project buttons
-            } catch (err) { console.error('macro bar init failed', err); }
-            try {
-                const { initEditorOpHover } = await import('./ui/editorOpHover.js');
-                initEditorOpHover();
-            } catch (err) { console.error('editor op-hover init failed', err); }
-            try {
-                const { initEditorAutocomplete } = await import('./ui/editorAutocomplete.js');
-                initEditorAutocomplete();         // phone-autocorrect-style caret bar (gated by compose.autocomplete)
-            } catch (err) { console.error('editor autocomplete init failed', err); }
-            try {
-                const { initProbeInputSelects } = await import('./ui/probeInputSelect.js');
-                initProbeInputSelects();
-            } catch (err) { console.error('probe-input selects init failed', err); }
-        })();
-    </script>
-    
-
-    <!-- 
-    Optional: Keep any standalone visualization functions here
-    that manipulate SVG elements (drawCornerViz, drawMiddleViz, etc.)
-    These can remain as regular <script> tags since they work with
-    existing DOM elements.
-    
-    The modular app will call these through window.drawCornerViz() etc.
-    -->
+    <!-- ════ SEAM: SHARED WIZARD VIZ (forked from DDCS-Studio/web/index.html) ════════════════════════
+         Inline SVG wizard-visualization helpers (drawCornerViz, drawMiddleViz, …), called via window.*
+         by the wizards in bundle.js — LOAD-BEARING. Same fork/drift caveat as the wizard body above:
+         when Studio edits these, this copy goes stale. De-fork it the same way (see docs/HTML_SEAMS.md). -->
     <script>
         // Simple SVG visualization functions (no external libs)
         function clearSVG(svg) {
@@ -2260,179 +2249,12 @@
             }
         };
     </script>
-    <!-- Fallback: expose simple wizard controls if module failed to initialize -->
-    <script>
-    (function(){
-        if (typeof window.openCornerWiz !== 'undefined') return;
 
-        function showWizardPanel(type){
-            const w = document.getElementById('wizard');
-            if (!w) return console.warn('Fallback wizard: no #wizard in DOM');
-            const box = w.querySelector('.wiz-box');
-            w.style.display = 'flex';
-            w.classList.add('active');
-            ['wiz_comm','wiz_wcs','wiz_corner','wiz_middle','wiz_edge','wiz_alignment'].forEach(id=>{
-                const el = document.getElementById(id);
-                if (el) el.style.display = 'none';
-            });
-            const panel = document.getElementById('wiz_' + type);
-            if (panel) panel.style.display = 'block';
-        }
-
-        window.openWiz = (type) => showWizardPanel(type);
-        window.openCornerWiz = () => {
-            showWizardPanel('corner');
-            const startAnim = async () => {
-                try {
-                    if (window.drawCornerViz) await window.drawCornerViz();
-                    const corner   = document.getElementById('c_corner')?.value || 'FL';
-                    const seq      = document.getElementById('c_probe_seq')?.value || 'YX';
-                    const zfirst   = document.getElementById('c_probe_z_first')?.checked || false;
-                    if (window.__cornerAnimator) { try { window.__cornerAnimator.stop(); } catch(e){} }
-                    if (!window.__cornerAnimator && window.CornerVizAnimator) {
-                        window.__cornerAnimator = new window.CornerVizAnimator();
-                    }
-                    if (window.__cornerAnimator) {
-                        setTimeout(() => window.__cornerAnimator.play(corner, seq, zfirst), 60);
-                    }
-                } catch(err) { console.warn('openCornerWiz anim failed', err); }
-            };
-            startAnim();
-        };
-        // Enhanced fallback: show the middle panel and attempt autoplay if animator exists
-        window.openMiddleWiz = () => {
-            showWizardPanel('middle');
-            // draw SVG and start animation — drawMiddleViz is awaited before animator starts
-            if (window.__middleAnimTimeout) { clearTimeout(window.__middleAnimTimeout); window.__middleAnimTimeout = null; }
-            const startAnim = async () => {
-                try {
-                    if (window.drawMiddleViz) await window.drawMiddleViz();
-
-                    const featureType = document.getElementById('m_type')?.value || 'pocket';
-                    const axis = document.getElementById('m_axis')?.value || 'X';
-                    const dir1 = document.getElementById('m_dir')?.value || 'pos';
-                    const twoAxis = !!document.getElementById('m_both')?.checked;
-                    const animate = document.getElementById('m_animate')?.checked !== false;
-
-                    if (window.discoverAnimSteps && window.PathAnimator) {
-                        const dir2 = document.getElementById('m_dir2')?.value || (dir1 === 'pos' ? 'neg' : 'pos');
-                        const animInput = window.discoverAnimSteps({ featureType, axis, dir1, twoAxis, dir2 });
-
-                        if (window.__middleAnimator) {
-                            try { window.__middleAnimator.stop(); } catch (e) { /* ignore */ }
-                        }
-
-                        if (animate) {
-                            if (!window.__middleAnimator) {
-                                window.__middleAnimator = new window.PathAnimator({ loop: true });
-                            }
-                            window.__middleAnimTimeout = setTimeout(() => {
-                                window.__middleAnimTimeout = null;
-                                const wcsId = `middle_probe_${featureType}_${axis}_${dir1}_wcs`;
-                                animInput.wcsEls = [document.getElementById(wcsId)].filter(Boolean);
-                                window.__middleAnimator.playSequence(animInput).catch(() => {});
-                            }, 60);
-                        } else {
-                            // Static mode - show all paths immediately
-                            const allSteps = [
-                                ...(animInput.axis1Steps || []),
-                                ...(animInput.jogPath ? [animInput.jogPath] : []),
-                                ...(animInput.axis2Steps || [])
-                            ];
-                            allSteps.forEach(step => {
-                                if (!step || !step.selector) return;
-                                const el = document.querySelector(step.selector);
-                                if (el) {
-                                    el.classList.add('path-draw');
-                                    const parent = el.closest('g');
-                                    if (parent) {
-                                        if (step.type === 'probe') parent.classList.add('is-probing');
-                                        else if (step.type === 'retract') parent.classList.add('is-retracting');
-                                        else if (step.type === 'jog') parent.classList.add('is-jogging');
-                                    }
-                                }
-                            });
-                        }
-                    }
-                } catch (err) {
-                    console.warn('fallback openMiddleWiz autoplay failed', err);
-                }
-            };
-            startAnim();
-        };
-        window.openEdgeWiz = () => showWizardPanel('edge');
-        window.openAlignmentWiz = () => showWizardPanel('alignment');
-        window.closeWiz = () => {
-            const w = document.getElementById('wizard');
-            if (w) { w.style.display = 'none'; w.classList.remove('active'); }
-        };
-        window.insertWiz = () => {
-            // append current visible pre text to editor as a simple fallback
-            const editor = document.getElementById('editor');
-            if (!editor) return;
-            const pre = document.querySelector('#wizard pre:not(:empty)');
-            if (pre) {
-                editor.value = editor.value + '\n' + pre.textContent + '\n';
-            }
-            window.closeWiz();
-        };
-        console.info('Fallback wizard controls installed');
-    })();
-    </script>
-
-
-
-
-    <!-- Include the real Wizard Logic -->
-    <script src="../../DDCS-Studio/web/gcodeParser.js"></script>
-    <script src="../../DDCS-Studio/web/wizardManager.js"></script>
-
-    <!-- Wire the wizards to the VS Code API -->
-    <script>
-        // Override the insertWiz function to send to VS Code
-        window.insertWiz = () => {
-            const pre = document.querySelector('.wiz-body[style*="block"] pre:not(:empty)') || 
-                        document.querySelector('#wizard pre:not(:empty)');
-            if (pre && window.vscode) {
-                window.vscode.postMessage({
-                    command: 'insertCode',
-                    text: pre.textContent + '\n'
-                });
-                // Optional: show a small visual feedback
-                const origBg = pre.style.backgroundColor;
-                pre.style.backgroundColor = '#1e4620';
-                setTimeout(() => pre.style.backgroundColor = origBg, 200);
-            }
-        };
-
-        // Dynamically add a massive "Insert Code" button under every code preview
-        document.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('.preview-block').forEach(block => {
-                const btn = document.createElement('button');
-                btn.innerHTML = '<b>INSERT INTO EDITOR TAB</b>';
-                btn.style.marginTop = '15px';
-                btn.style.width = '100%';
-                btn.style.padding = '15px';
-                btn.style.background = '#007acc';
-                btn.style.color = 'white';
-                btn.style.border = 'none';
-                btn.style.cursor = 'pointer';
-                btn.style.fontSize = '14px';
-                btn.onclick = window.insertWiz;
-                
-                // Add hover effect
-                btn.onmouseover = () => btn.style.background = '#005999';
-                btn.onmouseout = () => btn.style.background = '#007acc';
-
-                block.appendChild(btn);
-            });
-            
-            // Auto-open a wizard for testing purposes if none is open
-            if (window.openWiz) {
-                window.openWiz('corner');
-            }
-        });
-    </script>
+    <!-- ════ SEAM: EXTENSION ENTRYPOINT ════════════════════════════════════════════════════════════
+         The single bundle that boots the extension webview (esbuild of web/src/extensionApp.js). It
+         replaces Studio's removed ./app.js bootstrap and natively imports the shared DDCS-Studio/web
+         modules, wires the client.js gateway seam, and the VS Code document sync. ═════════════════════ -->
+    <!-- UI Bundle -->
+    <script type="module" src="dist/bundle.js"></script>
 </body>
-
 </html>

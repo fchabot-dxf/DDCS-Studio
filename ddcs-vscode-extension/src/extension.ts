@@ -1,89 +1,129 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as cp from 'child_process';
+import * as http from 'http';
+import { DdcsEditorProvider } from './DdcsEditorProvider';
+
+let gatewayProcess: cp.ChildProcess | undefined;
+let gatewayPort = 8765;   // updated from the backend's `DDCS_PORT=…` stdout line (it may fall back off 8765)
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('DDCS Studio Prototype is now active!');
 
-    let disposable = vscode.commands.registerCommand('ddcs.openWizard', () => {
-        // We define the two folders the Webview is allowed to read from:
-        const extensionWebPath = path.join(context.extensionPath, 'web');
-        const studioWebPath = path.join(context.extensionPath, '../DDCS-Studio/web');
+    // Spawn the headless Python backend
+    const backendPath = path.join(context.extensionPath, 'backend', 'headless_gateway.py');
+    gatewayProcess = cp.spawn('python', [backendPath], { cwd: context.extensionPath });
 
-        // Create and show a new webview
-        const panel = vscode.window.createWebviewPanel(
-            'ddcsWizard', 
-            'DDCS Studio Wizards', 
-            vscode.ViewColumn.Beside, 
-            {
-                enableScripts: true, 
-                retainContextWhenHidden: true, 
-                // Grant access to BOTH the extension's web folder and the shared Studio web folder
-                localResourceRoots: [
-                    vscode.Uri.file(extensionWebPath),
-                    vscode.Uri.file(studioWebPath)
-                ]
+    gatewayProcess.stdout?.on('data', (data) => {
+        const text = data.toString();
+        // The backend prints `DDCS_PORT=<n>` once it has picked (or discovered) its port.
+        const m = text.match(/DDCS_PORT=(\d+)/);
+        if (m) { gatewayPort = parseInt(m[1], 10); }
+        console.log(`[Gateway] ${text.trim()}`);
+    });
+    gatewayProcess.stderr?.on('data', (data) => console.error(`[Gateway Error] ${data.toString().trim()}`));
+
+    let isGatewayReady = false;
+
+    // Register the custom editor provider (it reads the live gateway port for the webview transport)
+    context.subscriptions.push(DdcsEditorProvider.register(context, () => gatewayPort));
+
+    // Live machine-connection indicator in the Status Bar. The extension HOST polls the gateway
+    // directly (it owns the port) and renders a native workbench item — read-only, no machine writes.
+    const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    statusBar.command = 'ddcs.openWizard';
+    statusBar.text = '$(sync~spin) DDCS: starting…';
+    statusBar.tooltip = 'Starting the DDCS gateway…';
+    statusBar.show();
+    context.subscriptions.push(statusBar);
+
+    updateStatusBar(statusBar);   // immediate first paint
+    const pollStatus = setInterval(() => updateStatusBar(statusBar), 3000);
+    context.subscriptions.push(new vscode.Disposable(() => clearInterval(pollStatus)));
+
+    let disposable = vscode.commands.registerCommand('ddcs.openWizard', async () => {
+        // Wait for gateway
+        if (!isGatewayReady) {
+            const ready = await waitForGateway();
+            if (!ready) {
+                vscode.window.showErrorMessage("Could not connect to the DDCS Gateway backend.");
+                return;
             }
-        );
+            isGatewayReady = true;
+        }
 
-        // Set the HTML content for the webview
-        panel.webview.html = getRealWebviewContent(panel.webview, extensionWebPath);
-
-        // Handle messages from the webview
-        panel.webview.onDidReceiveMessage(
-            message => {
-                switch (message.command) {
-                    case 'insertCode':
-                        insertCodeToEditor(message.text);
-                        return;
-                }
-            },
-            undefined,
-            context.subscriptions
-        );
+        // Instead of opening a webview directly, create an untitled .nc file.
+        // VS Code will automatically use our Custom Editor for it!
+        const uri = vscode.Uri.parse('untitled:untitled.nc');
+        vscode.commands.executeCommand('vscode.openWith', uri, 'ddcs.studioEditor');
     });
 
     context.subscriptions.push(disposable);
 }
 
-function insertCodeToEditor(text: string) {
-    vscode.workspace.openTextDocument({ content: text, language: 'plaintext' }).then(document => {
-        vscode.window.showTextDocument(document, vscode.ViewColumn.One);
+function waitForGateway(maxRetries: number = 20): Promise<boolean> {
+    return new Promise((resolve) => {
+        let retries = 0;
+        const interval = setInterval(() => {
+            retries++;
+            if (retries > maxRetries) {
+                clearInterval(interval);
+                resolve(false);
+                return;
+            }
+
+            // Read the live gatewayPort each tick — the backend may have reported a fallback port by now.
+            const req = http.get(`http://127.0.0.1:${gatewayPort}/api/descriptor`, (res) => {
+                if (res.statusCode === 200) {
+                    clearInterval(interval);
+                    resolve(true);
+                }
+            });
+            
+            req.on('error', () => {
+                // Connection refused, just ignore and retry
+            });
+            
+            req.end();
+        }, 500);
     });
 }
 
-function getRealWebviewContent(webview: vscode.Webview, extensionWebPath: string): string {
-    // 1. Read the new stripped-down index file we just generated
-    const indexPath = path.join(extensionWebPath, 'extension_index.html');
-    let htmlContent = fs.readFileSync(indexPath, 'utf8');
-
-    // 2. Regex magic: Find all src="..." and href="..." that are relative paths
-    htmlContent = htmlContent.replace(/(src|href)="([^"h#d][^"]*)"/g, (match, attr, relativePath) => {
-        // Ignore absolute URLs like http://, data:, or vscode-webview://
-        if (relativePath.startsWith('http') || relativePath.startsWith('data:') || relativePath.startsWith('vscode-webview:')) {
-            return match;
-        }
-        
-        // Resolve the relative path (e.g. "../../DDCS-Studio/web/styles.css") 
-        // into an absolute hard drive path
-        const absolutePath = path.resolve(extensionWebPath, relativePath);
-        
-        // Convert the hard drive path into a secure VS Code URI
-        const webviewUri = webview.asWebviewUri(vscode.Uri.file(absolutePath)).toString();
-        
-        return `${attr}="${webviewUri}"`;
+// Fetch the gateway descriptor over host-side HTTP. Resolves null on any error/timeout/non-200.
+function fetchDescriptor(port: number): Promise<any | null> {
+    return new Promise((resolve) => {
+        const req = http.get(`http://127.0.0.1:${port}/api/descriptor`, { timeout: 2000 }, (res) => {
+            if (res.statusCode !== 200) { res.resume(); resolve(null); return; }
+            let body = '';
+            res.on('data', (c) => body += c);
+            res.on('end', () => { try { resolve(JSON.parse(body)); } catch { resolve(null); } });
+        });
+        req.on('error', () => resolve(null));
+        req.on('timeout', () => { req.destroy(); resolve(null); });
     });
-
-    // We inject a tiny script to capture the VS Code API globally
-    const injection = `
-        <script>
-            // Store VS Code API globally so existing DDCS scripts can talk to the editor
-            window.vscode = acquireVsCodeApi();
-        </script>
-    `;
-    htmlContent = htmlContent.replace('</head>', `${injection}</head>`);
-
-    return htmlContent;
 }
 
-export function deactivate() {}
+async function updateStatusBar(item: vscode.StatusBarItem) {
+    const d = await fetchDescriptor(gatewayPort);
+    if (!d) {
+        item.text = '$(circle-slash) DDCS: offline';
+        item.tooltip = `No gateway answering on 127.0.0.1:${gatewayPort}`;
+        return;
+    }
+    if (d.controller_connected) {
+        const name = d.controller_name || d.machine_name || d.controller_family || 'controller';
+        const fw = d.controller_firmware ? ` · fw ${d.controller_firmware}` : '';
+        item.text = `$(zap) DDCS: ${name}`;
+        item.tooltip = `Connected: ${name}${fw}\nbackend ${d.backend} · :${gatewayPort}`;
+    } else {
+        item.text = '$(plug) DDCS: gateway up';
+        item.tooltip = `Gateway up (backend ${d.backend}) on :${gatewayPort} — no controller connected`;
+    }
+}
+
+export function deactivate() {
+    if (gatewayProcess) {
+        gatewayProcess.kill();
+    }
+}
