@@ -59,11 +59,13 @@ export function middleStack(params = {}) {
         A(`#${base + 2}`, `[#${base}+#${base + 1}]/2`);     // centre = midpoint of the two walls
     };
 
-    C(`Middle | ${twoAxis ? `${axis} ${sgn(dir1Plus)} + ${second} ${sgn(dir2Plus)}` : `${axis} ${sgn(dir1Plus)}`} | ${wcsLabel}`);
-    A('#1', dist); A('#2', retract); A('#3', fFast); A('#4', fSlow); A('#5', port);
-    A('#51', 0); A('#52', 0); A('#53', 0); A('#54', 0); A('#55', 0); A('#56', 0);
-    A('#7', '[0-#1]'); A('#8', '#1'); A('#9', '[0-#2]'); A('#10', '#2'); A('#17', safeZ);
-    if (wcs === 'active') { A('#71', '#578'); A('#72', '[#71-1]'); A('#70', '[805+[#72*5]]'); }
+    A('#1', dist, 'Max probe distance'); A('#2', retract, 'Retract distance');
+    A('#3', fFast, 'Fast feedrate'); A('#4', fSlow, 'Slow feedrate'); A('#5', port, 'Probe port');
+    A('#51', 0, 'Wall 1 pos'); A('#52', 0, 'Wall 2 pos'); A('#53', 0, 'Center pos');
+    A('#54', 0, 'Wall 3 pos'); A('#55', 0, 'Wall 4 pos'); A('#56', 0, 'Center pos 2');
+    A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
+    A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract'); A('#17', safeZ, 'Safe Z retract');
+    if (wcs === 'active') { A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'); A('#72', '[#71-1]', 'Zero-based index'); A('#70', '[805+[#72*5]]', 'Base WCS address'); }
     else A('#70', WCS_BASE[wcs]);
     A('#1505', '1', 'Press Enter to probe - ESC=cancel'); IF('#1505', '==', '0', 2); DM('inc');
 

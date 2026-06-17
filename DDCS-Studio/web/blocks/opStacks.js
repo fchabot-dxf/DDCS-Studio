@@ -6,7 +6,7 @@
  * snippet ops (no program header/footer). Imports the wizards (which import opRecord); nothing imports this
  * back, so there's no cycle.
  */
-import { getLastOp } from './opRecord.js';
+import { getLastOp, recordOp } from './opRecord.js';
 import { num, r3 } from '../wizards/ops/util.js';
 import { parseGcodeToStack } from './gcodeToStack.js';                       // decode a non-builder op's G-code → blocks
 import { resolveActivePost } from '../wizards/dialects/index.js';
@@ -295,6 +295,7 @@ export function replaceOp(opId, params) {
     const opC = makeOp(opType, params, bare);
     opC.id = opId;                                                     // keep the same id so views/selection stay stable
     const next = [...cur.slice(0, idx), opC, ...cur.slice(idx + 1)];
+    recordOp(opType, params);                                          // update the lastOp snapshot so preview syncs
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
     return true;
 }

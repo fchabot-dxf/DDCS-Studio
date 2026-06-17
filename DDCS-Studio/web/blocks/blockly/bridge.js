@@ -18,12 +18,15 @@
 import { PALETTE, CATEGORIES } from '../../wizards/ops/index.js';
 
 const SELECTS = {
-    pattern: ['grid', 'line', 'circle', 'rect'], mode: ['rapid', 'cut', 'probe'], flow: ['flood', 'mist', 'off'],
-    wcs: ['G54', 'G55', 'G56', 'G57', 'G58', 'G59'], dir: ['cw', 'ccw'], arc: ['ccw', 'cw'],
-    shape: ['rect', 'circle', 'polygon', 'ellipse'], strategy: ['parallel', 'concentric'], direction: ['bothways', 'oneway', 'otherway'],
-    stop: ['M0', 'M1'], plane: ['G17', 'G18', 'G19'], fmode: ['G94', 'G95'],   // Stop / Plane / Feed-mode atoms
-    order: ['outside-in', 'inside-out'],   // Fill Concentric ring order (kept off 'direction' to avoid a dropdown clash)
-    dist: ['abs', 'inc'], axis: ['X', 'Y', 'Z', 'A'], end: ['M30', 'M2'], method: ['peck', 'helical'],
+    corner: ['FL', 'FR', 'BL', 'BR'],
+    probeSeq: ['XY', 'YX'],
+    axis: ['X', 'Y', 'Z', 'A', 'B', 'C'],
+    axisDir: ['pos', 'neg'],
+    featureType: ['boss', 'pocket', 'bore'],
+    wcs: ['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59', 'G59P1', 'G59P2', 'G59P3', 'G59P4', 'G59P5', 'G59P6', 'G59P7', 'G59P8', 'G59P9', 'G59P10'],
+    slave: [['A', '3'], ['B', '4'], ['C', '5']],
+    atcMode: ['auto', 'manual'],
+    testMode: ['current', 'all']
 };
 const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/\s+/g, '');
 export const FN = (field) => field.toUpperCase();   // Blockly input/field name from an op field
@@ -72,28 +75,85 @@ function jsonDef(def) {
     return block;
 }
 
-// The op-CONTAINER block (not an op atom — not in PALETTE/toolbox). A recorded op { opType, requires, params,
-// children } shown as a labelled group with a DO mouth holding its atoms. opType/requires/params round-trip via
-// the block's serialized `data` (a JSON blob); the LABEL field shows + serializes the op name. Editing the op's
-// params is done via its wizard form, not Blockly fields — so they ride along opaquely. Caps-gated at emit.
-const OP_BLOCK_DEF = {
-    type: 'op',
-    message0: '⬡ %1 %2',
+const makeOpDef = (type, label, msgAdd = '', argsAdd = []) => ({
+    type: type,
+    message0: `⬡ %1 ${msgAdd}`,
     args0: [
-        { type: 'field_label_serializable', name: 'LABEL', text: 'op' },
-        { type: 'input_statement', name: 'DO' },
+        { type: 'field_label_serializable', name: 'LABEL', text: label },
+        ...argsAdd
     ],
+    message1: '%1',
+    args1: [ { type: 'input_statement', name: 'DO' } ],
     previousStatement: null, nextStatement: null,
     colour: 210,
-    tooltip: 'Recorded op — edit via its wizard; emitted per the active post (caps-gated).',
-};
+    tooltip: 'Recorded op — edit via its wizard.',
+});
+
+export const OP_BLOCKS = [
+    makeOpDef('op', 'op'),
+    makeOpDef('corner_op', 'Corner Probe', 'Corner %2 Seq %3 WCS %4 Z-First %5 Sync %6 Slave %7 Stop %8', [
+        { type: 'field_dropdown', name: 'CORNER', options: SELECTS.corner.map(o => [o, o]) },
+        { type: 'field_dropdown', name: 'PROBESEQ', options: SELECTS.probeSeq.map(o => [o, o]) },
+        { type: 'field_dropdown', name: 'WCS', options: SELECTS.wcs.map(o => [o, o]) },
+        { type: 'field_checkbox', name: 'PROBEZ', checked: false },
+        { type: 'field_checkbox', name: 'SYNCA', checked: false },
+        { type: 'field_dropdown', name: 'SLAVE', options: SELECTS.slave },
+        { type: 'field_checkbox', name: 'QSTOP', checked: false }
+    ]),
+    makeOpDef('edge_op', 'Edge Probe', 'Axis %2 Dir %3 WCS %4 Sync %5 Slave %6 Stop %7', [
+        { type: 'field_dropdown', name: 'AXIS', options: SELECTS.axis.map(o => [o, o]) },
+        { type: 'field_dropdown', name: 'AXISDIR', options: SELECTS.axisDir.map(o => [o, o]) },
+        { type: 'field_dropdown', name: 'WCS', options: SELECTS.wcs.map(o => [o, o]) },
+        { type: 'field_checkbox', name: 'SYNCA', checked: false },
+        { type: 'field_dropdown', name: 'SLAVE', options: SELECTS.slave },
+        { type: 'field_checkbox', name: 'QSTOP', checked: false }
+    ]),
+    makeOpDef('circular_op', 'Circular Probe', 'Type %2 WCS %3 Stop %4', [
+        { type: 'field_dropdown', name: 'FEATURETYPE', options: SELECTS.featureType.map(o => [o, o]) },
+        { type: 'field_dropdown', name: 'WCS', options: SELECTS.wcs.map(o => [o, o]) },
+        { type: 'field_checkbox', name: 'QSTOP', checked: false }
+    ]),
+    makeOpDef('middle_op', 'Middle Probe', 'Type %2 Axis %3 Dir %4 %5 2-Axis Dir2 %6 WCS %7 Sync %8 Slave %9 Stop %10', [
+        { type: 'field_dropdown', name: 'FEATURETYPE', options: SELECTS.featureType.map(o => [o, o]) },
+        { type: 'field_dropdown', name: 'AXIS', options: SELECTS.axis.map(o => [o, o]) },
+        { type: 'field_dropdown', name: 'DIR1', options: SELECTS.axisDir.map(o => [o, o]) },
+        { type: 'field_checkbox', name: 'TWOAXIS', checked: false },
+        { type: 'field_dropdown', name: 'DIR2', options: SELECTS.axisDir.map(o => [o, o]) },
+        { type: 'field_dropdown', name: 'WCS', options: SELECTS.wcs.map(o => [o, o]) },
+        { type: 'field_checkbox', name: 'SYNCA', checked: false },
+        { type: 'field_dropdown', name: 'SLAVE', options: SELECTS.slave },
+        { type: 'field_checkbox', name: 'QSTOP', checked: false }
+    ]),
+    makeOpDef('atc_change_op', 'ATC Tool Change', 'Mode %2 Wait-Spindle %3 Dust-Cover %4 Confirm %5', [
+        { type: 'field_dropdown', name: 'MODE', options: SELECTS.atcMode.map(o => [o, o]) },
+        { type: 'field_checkbox', name: 'WAITSPINDLE', checked: true },
+        { type: 'field_checkbox', name: 'DUSTCOVER', checked: false },
+        { type: 'field_checkbox', name: 'CONFIRM', checked: false }
+    ]),
+    makeOpDef('atc_test_op', 'ATC Magazine Test', 'Mode %2 Wait-Spindle %3 Dust-Cover %4', [
+        { type: 'field_dropdown', name: 'MODE', options: SELECTS.testMode.map(o => [o, o]) },
+        { type: 'field_checkbox', name: 'WAITSPINDLE', checked: true },
+        { type: 'field_checkbox', name: 'DUSTCOVER', checked: false }
+    ]),
+    makeOpDef('atc_check_op', 'ATC Tool Check', 'Wait-Spindle %2 Dust-Cover %3', [
+        { type: 'field_checkbox', name: 'WAITSPINDLE', checked: true },
+        { type: 'field_checkbox', name: 'DUSTCOVER', checked: false }
+    ]),
+    makeOpDef('atc_length_op', 'ATC Tool Length', ''),
+    makeOpDef('atc_warmup_op', 'ATC Spindle Warmup', ''),
+    makeOpDef('surfacing_op', 'Surfacing', ''),
+    makeOpDef('pocket_op', 'Pocket', ''),
+    makeOpDef('slot_op', 'Slot', ''),
+    makeOpDef('drill_op', 'Drill', ''),
+    makeOpDef('text_op', 'Text', '')
+];
 
 /** Define every op as a Blockly block. (Emit happens via stackBridge → emitMapped, not a Blockly generator.) */
 let _Blockly = null;
 export const getBlockly = () => _Blockly;   // stackBridge needs the serialization API to render blocks (v11)
 export function installBlockly(Blockly) {
     _Blockly = Blockly;
-    Blockly.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), OP_BLOCK_DEF]);
+    Blockly.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), ...OP_BLOCKS]);
 }
 
 /** A value input's shadow (an editable default number) for the toolbox. */

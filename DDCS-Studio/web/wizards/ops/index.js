@@ -50,6 +50,7 @@ import { probeReadBlock, probeCheckBlock, readMachineBlock, toolOffsetBlock } fr
 import { setWorkOffsetBlock } from './setworkoffset.js';
 import { assignBlock } from './assign.js';
 import { pauseBlock, messageBlock, askNumberBlock, confirmBlock } from './hmi.js';
+import { cornerConfigBlock } from './corner_config.js';
 import { pathModeBlock, drillCycleBlock, cancelCycleBlock, outPinBlock, waitInputBlock } from './cnc.js';
 import { stopBlock, planeBlock, feedModeBlock, homeBlock, callBlock, returnBlock } from './more.js';
 import { evalExpr } from './expr.js';
@@ -66,6 +67,7 @@ export const PALETTE = [
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
+    cornerConfigBlock,                                         // Universal Corner Macro config (emits #30 and #31)
 ];
 
 // Re-categorise the former overloaded 'Machine' bucket (~20 blocks) into granular, semantic groups. Palette

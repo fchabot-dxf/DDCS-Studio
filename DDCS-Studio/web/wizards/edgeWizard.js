@@ -40,9 +40,7 @@ export function edgeStack(params = {}) {
     const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
     const END = () => { S.push(newBlock('endprogram')); };
-
-    C(`Edge | ${axis} ${dir} | ${wcsLabel}`);
-    C('DDCS M350 - Single edge probe');
+    
     C('Motion Variables');
     A('#1', dist, 'Max probe distance'); A('#2', retract, 'Retract distance');
     A('#3', fFast, 'Fast feedrate'); A('#4', fSlow, 'Slow feedrate'); A('#5', port, 'Probe port');

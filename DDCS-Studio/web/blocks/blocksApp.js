@@ -17,6 +17,16 @@ import { setStack, getStack, getProjection, onChange } from './programModel.js';
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
 import { getCaps, resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { getLastOp } from './opRecord.js';
+import { CornerWizard } from '../wizards/cornerWizard.js';
+import { EdgeWizard } from '../wizards/edgeWizard.js';
+import { MiddleWizard } from '../wizards/middleWizard.js';
+import { CircularWizard } from '../wizards/circularWizard.js';
+
+const WIZARDS = {
+    corner: new CornerWizard(), edge: new EdgeWizard(),
+    middle: new MiddleWizard(), circular: new CircularWizard()
+};
 
 // Heads-up on op-container blocks the active post can't fully run: gating is PER LINE (emit comments out the
 // non-runnable lines — see the G-code panel), so we DON'T grey the whole op (that would overstate a partial
@@ -43,6 +53,7 @@ function applyOpGating(ws) {
 }
 
 let api = null;            // module singleton, set once the workspace is built: { refresh, load }
+let _ops = null;           // captured opStacks module reference for interceptors
 let initPromise = null;    // in-flight build. The header tabs are double-wired (inline onclick in index.html +
 // addEventListener in gatewayStatus.js), so ONE Blocks click fires showApp('blocks') twice → two initBlocks().
 // `api` isn't set until the end of the build, so a plain `if (api)` guard can't stop the second call. We cache
@@ -76,16 +87,15 @@ export async function showBlocks() {
   await initBlocks();
   try {
     const ops = await import('./opStacks.js');
+    if (_ops === null) _ops = ops;
+    
     if (getStack().length) {
       // The program already has content (e.g. accumulated wizard inserts) — render the WHOLE program; don't
       // replace it with just the last previewed op (that was the "only one of two inserts shows" bug).
-      if (api) api.refresh();
+      renderFromModel();
     } else {
-      const r = ops.buildActiveOpStack();                // empty program → open the just-previewed op as blocks
-      if (r) setStack(r.blocks, 'load');                 // (a fresh STUDIO op → render it: model + views)
-      else if (api) api.refresh();
-    }
-    if (!getStack().length) {                             // nothing to show — name an unported op instead of a blank
+      // The model is empty (fresh tab click), seed it with whatever active op the UI is focused on.
+      ops.previewActiveOp();
       const un = ops.unportedActiveOp(), g = document.getElementById('blk-gcode');
       if (un && g) g.textContent = `( "${un}" isn't available as blocks yet — port in progress )`;
     }
@@ -114,7 +124,17 @@ async function buildWorkspace() {
   wsHost.append(topbar, host);
   const out = document.getElementById('blk-gcode');
   // THE shared preview panel — identical to Studio main + the wizards (same code + UI); fed the projected program.
-  const panel = createPreviewPanel(document.getElementById('blk-preview-panel'), { getGcode: () => getProjection().text });
+  const panel = createPreviewPanel(document.getElementById('blk-preview-panel'), {
+    getGcode: () => getProjection().text,
+    getStart: () => {
+      const op = getLastOp();
+      if (op && WIZARDS[op.type] && WIZARDS[op.type].inferStart) {
+        const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
+        return WIZARDS[op.type].inferStart(op.params, stock);
+      }
+      return null;
+    }
+  });
 
   // Grid lines follow the theme's border tone (best-effort: the grid colour is an inject option, so it's set
   // once here; the rest of the chrome re-skins live via setTheme below).
@@ -313,6 +333,37 @@ async function buildWorkspace() {
   // ---- workspace events: structural change → re-emit; selection → highlight code ----
   ws.addChangeListener((e) => {
     if (e.type === B.Events.SELECTED) { selectedId = e.newElementId || null; applySelection({ scrollCode: true }); }
+    else if (e.element === 'field' && _ops) {
+      try {
+        const blk = ws.getBlockById(e.blockId);
+        if (blk && (blk.type === 'op' || blk.type.endsWith('_op'))) {
+          let meta = {}; try { meta = JSON.parse(blk.data || '{}'); } catch (_) {}
+          const params = { ...(meta.params || {}) };
+          
+          if (blk.type === 'corner_op') {
+            params.corner = blk.getFieldValue('CORNER') || 'FL';
+            params.probeSeq = blk.getFieldValue('PROBESEQ') || 'YX';
+          } else if (blk.type === 'edge_op') {
+            params.axis = blk.getFieldValue('AXIS') || 'X';
+            params.dir = blk.getFieldValue('AXISDIR') || 'pos';
+          } else if (blk.type === 'middle_op') {
+            params.featureType = blk.getFieldValue('FEATURETYPE') || 'pocket';
+            params.axis = blk.getFieldValue('AXIS') || 'X';
+            params.dir1 = blk.getFieldValue('DIR1') || 'pos';
+            params.twoAxis = blk.getFieldValue('TWOAXIS') === 'TRUE';
+            params.dir2 = blk.getFieldValue('DIR2') || 'pos';
+          } else if (blk.type === 'circular_op') {
+            params.featureType = blk.getFieldValue('FEATURETYPE') || 'bore';
+          }
+          
+          if (blk.type !== 'op') {
+              _ops.replaceOp(blk.id, params);
+              return;
+          }
+        }
+      } catch (_) { }
+      if (!e.isUiEvent && !muteChanges) reproject();
+    }
     else if (!e.isUiEvent && !muteChanges) reproject();   // muteChanges: ignore our own model→workspace rebuild
   });
 

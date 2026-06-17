@@ -55,7 +55,6 @@ export function circularStack(params = {}) {
         MM('Z', '#57'); DM('inc');
     };
 
-    C(`Circular ${inside ? 'Bore (inside)' : 'Boss (outside)'} | centre + diameter | ${wcsLabel}`);
     C('Two-pass probe, X then Y, re-centred so Y is a true diameter');
     C(`Max probe ${dist}mm | Retract ${retract}mm | Safe Z ${safeZ}mm | Fast ${fFast} | Slow ${fSlow}`);
     C('Motion Variables');

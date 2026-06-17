@@ -6,18 +6,66 @@
  * stack is written into the workspace for "open as blocks". block.type === op type, so it's a 1:1 walk.
  */
 import { BLOCKS } from '../../wizards/ops/index.js';
-import { FN, fieldKind, fieldsOf, isWrap, getBlockly } from './bridge.js';
+import { FN, fieldKind, fieldsOf, isWrap, getBlockly, OP_BLOCKS } from './bridge.js';
+
+const HAS_CUSTOM_OP = {};
+OP_BLOCKS.forEach(b => HAS_CUSTOM_OP[b.type] = true);
 
 // ── workspace → stack ────────────────────────────────────────────────────────
 /** One block (NOT its next sibling) → a record { id, type, params, children? }. */
 function toRecord(b) {
-    if (b.type === 'op') {                                   // op CONTAINER — opType/requires/params ride in `data`
+    if (b.type === 'op' || b.type.endsWith('_op')) {         // op CONTAINER — opType/requires/params ride in `data`
         let meta = {};
         try { meta = JSON.parse(b.data || '{}'); } catch (_) { /* keep {} */ }
+        const params = { ...(meta.params || {}) };
+        
+        if (b.type === 'corner_op') {
+            params.corner = b.getFieldValue('CORNER') || 'FL';
+            params.probeSeq = b.getFieldValue('PROBESEQ') || 'YX';
+            params.wcs = b.getFieldValue('WCS') || 'active';
+            params.probeZ = b.getFieldValue('PROBEZ') === 'TRUE';
+            params.syncA = b.getFieldValue('SYNCA') === 'TRUE';
+            params.slave = b.getFieldValue('SLAVE') || '3';
+            params.qStop = b.getFieldValue('QSTOP') === 'TRUE';
+        } else if (b.type === 'edge_op') {
+            params.axis = b.getFieldValue('AXIS') || 'X';
+            params.dir = b.getFieldValue('AXISDIR') || 'pos';
+            params.wcs = b.getFieldValue('WCS') || 'active';
+            params.syncA = b.getFieldValue('SYNCA') === 'TRUE';
+            params.slave = b.getFieldValue('SLAVE') || '3';
+            params.qStop = b.getFieldValue('QSTOP') === 'TRUE';
+        } else if (b.type === 'middle_op') {
+            params.featureType = b.getFieldValue('FEATURETYPE') || 'pocket';
+            params.axis = b.getFieldValue('AXIS') || 'X';
+            params.dir1 = b.getFieldValue('DIR1') || 'pos';
+            params.twoAxis = b.getFieldValue('TWOAXIS') === 'TRUE';
+            params.dir2 = b.getFieldValue('DIR2') || 'pos';
+            params.wcs = b.getFieldValue('WCS') || 'active';
+            params.syncA = b.getFieldValue('SYNCA') === 'TRUE';
+            params.slave = b.getFieldValue('SLAVE') || '3';
+            params.qStop = b.getFieldValue('QSTOP') === 'TRUE';
+        } else if (b.type === 'circular_op') {
+            params.featureType = b.getFieldValue('FEATURETYPE') || 'bore';
+            params.wcs = b.getFieldValue('WCS') || 'active';
+            params.qStop = b.getFieldValue('QSTOP') === 'TRUE';
+        } else if (b.type === 'atc_change_op') {
+            params.mode = b.getFieldValue('MODE') || 'auto';
+            params.waitSpindle = b.getFieldValue('WAITSPINDLE') === 'TRUE';
+            params.dustCover = b.getFieldValue('DUSTCOVER') === 'TRUE';
+            params.confirm = b.getFieldValue('CONFIRM') === 'TRUE';
+        } else if (b.type === 'atc_test_op') {
+            params.mode = b.getFieldValue('MODE') || 'current';
+            params.waitSpindle = b.getFieldValue('WAITSPINDLE') === 'TRUE';
+            params.dustCover = b.getFieldValue('DUSTCOVER') === 'TRUE';
+        } else if (b.type === 'atc_check_op') {
+            params.waitSpindle = b.getFieldValue('WAITSPINDLE') === 'TRUE';
+            params.dustCover = b.getFieldValue('DUSTCOVER') === 'TRUE';
+        }
+
         const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
         return {
             id: b.id, type: 'op', opType: meta.opType, label: b.getFieldValue('LABEL') || meta.label,
-            requires: meta.requires || [], params: meta.params || {}, children: first ? chain(first) : [],
+            requires: meta.requires || [], params: params, children: first ? chain(first) : [],
         };
     }
     const def = BLOCKS[b.type];
@@ -61,12 +109,57 @@ export function workspaceToStack(ws) {
 
 /** One record → a Blockly serialization-JSON block node (fields + value/region sockets + DO children). */
 function recToJson(rec) {
-    if (rec.type === 'op') {                                 // op CONTAINER → labelled group, meta in `data`
+    if (rec.type === 'op') {
+        const type = HAS_CUSTOM_OP[rec.opType + '_op'] ? (rec.opType + '_op') : 'op';
         const node = {
-            type: 'op',
+            type: type, id: rec.id,
             fields: { LABEL: rec.label || rec.opType || 'op' },
-            data: JSON.stringify({ opType: rec.opType, label: rec.label, requires: rec.requires || [], params: rec.params || {} }),
+            data: JSON.stringify({ opType: rec.opType, params: rec.params || {} })
         };
+
+        if (type === 'corner_op') {
+            node.fields.CORNER = rec.params.corner || 'FL';
+            node.fields.PROBESEQ = rec.params.probeSeq || 'YX';
+            node.fields.WCS = rec.params.wcs || 'active';
+            node.fields.PROBEZ = rec.params.probeZ ? 'TRUE' : 'FALSE';
+            node.fields.SYNCA = rec.params.syncA ? 'TRUE' : 'FALSE';
+            node.fields.SLAVE = rec.params.slave || '3';
+            node.fields.QSTOP = rec.params.qStop ? 'TRUE' : 'FALSE';
+        } else if (type === 'edge_op') {
+            node.fields.AXIS = rec.params.axis || 'X';
+            node.fields.AXISDIR = rec.params.dir || 'pos';
+            node.fields.WCS = rec.params.wcs || 'active';
+            node.fields.SYNCA = rec.params.syncA ? 'TRUE' : 'FALSE';
+            node.fields.SLAVE = rec.params.slave || '3';
+            node.fields.QSTOP = rec.params.qStop ? 'TRUE' : 'FALSE';
+        } else if (type === 'middle_op') {
+            node.fields.FEATURETYPE = rec.params.featureType || 'pocket';
+            node.fields.AXIS = rec.params.axis || 'X';
+            node.fields.DIR1 = rec.params.dir1 || 'pos';
+            node.fields.TWOAXIS = rec.params.twoAxis ? 'TRUE' : 'FALSE';
+            node.fields.DIR2 = rec.params.dir2 || 'pos';
+            node.fields.WCS = rec.params.wcs || 'active';
+            node.fields.SYNCA = rec.params.syncA ? 'TRUE' : 'FALSE';
+            node.fields.SLAVE = rec.params.slave || '3';
+            node.fields.QSTOP = rec.params.qStop ? 'TRUE' : 'FALSE';
+        } else if (type === 'circular_op') {
+            node.fields.FEATURETYPE = rec.params.featureType || 'bore';
+            node.fields.WCS = rec.params.wcs || 'active';
+            node.fields.QSTOP = rec.params.qStop ? 'TRUE' : 'FALSE';
+        } else if (type === 'atc_change_op') {
+            node.fields.MODE = rec.params.mode || 'auto';
+            node.fields.WAITSPINDLE = (rec.params.waitSpindle !== false) ? 'TRUE' : 'FALSE';
+            node.fields.DUSTCOVER = rec.params.dustCover ? 'TRUE' : 'FALSE';
+            node.fields.CONFIRM = rec.params.confirm ? 'TRUE' : 'FALSE';
+        } else if (type === 'atc_test_op') {
+            node.fields.MODE = rec.params.mode || 'current';
+            node.fields.WAITSPINDLE = (rec.params.waitSpindle !== false) ? 'TRUE' : 'FALSE';
+            node.fields.DUSTCOVER = rec.params.dustCover ? 'TRUE' : 'FALSE';
+        } else if (type === 'atc_check_op') {
+            node.fields.WAITSPINDLE = (rec.params.waitSpindle !== false) ? 'TRUE' : 'FALSE';
+            node.fields.DUSTCOVER = rec.params.dustCover ? 'TRUE' : 'FALSE';
+        }
+
         if (rec.children && rec.children.length) node.inputs = { DO: { block: chainToJson(rec.children) } };
         return node;
     }
