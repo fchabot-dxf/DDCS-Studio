@@ -35,6 +35,16 @@
         /* The Blockly Canvas */
         .main { display:grid; grid-template-columns:1fr; flex:1; min-height:0; position: relative; }
         #ws { position:absolute; top:0; left:0; right:0; bottom:0; }
+
+        /* Main-UI tab bar (extension shell). Header is 54px so the forked .app-shell/.gateway-app panels
+           (position:absolute; top:54px) sit flush beneath it. */
+        .wizard-bar { min-height:54px; box-sizing:border-box; }
+        .ext-tabs { display:flex; gap:4px; }
+        .ext-tab { padding:6px 14px; background:transparent; border:1px solid transparent; color:var(--muted);
+                   border-radius:4px; cursor:pointer; font-weight:600; letter-spacing:.03em; font-size:12px; }
+        .ext-tab:hover { color:var(--ink); }
+        .ext-tab.active { color:var(--ink); background:#26303d; border-color:#39465a; }
+        .wiz-launchers { margin-left:auto; display:flex; gap:8px; align-items:center; }
         
         /* Modals for wizards */
         #wizard { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
@@ -50,11 +60,19 @@
     <!-- WIZARD BAR -->
     <header class="wizard-bar">
       <h1>DDCS STUDIO</h1>
-      <button onclick="window.openWiz('corner')">Corner</button>
-      <button onclick="window.openWiz('edge')">Edge</button>
-      <button onclick="window.openWiz('middle')">Middle</button>
-      <button onclick="window.openWiz('alignment')">Alignment</button>
-      <span id="gw-status" style="margin-left:auto; font:12px/1 ui-monospace,SFMono-Regular,monospace; color:#8b97a6;">gateway: …</span>
+      <nav class="ext-tabs" role="tablist">
+        <button type="button" class="ext-tab active" data-app="blocks" onclick="window.showApp('blocks')">BLOCKS</button>
+        <button type="button" class="ext-tab" data-app="gateway" onclick="window.showApp('gateway')">GATEWAY</button>
+        <button type="button" class="ext-tab" data-app="settings" onclick="window.showApp('settings')">SETTINGS</button>
+      </nav>
+      <span class="wiz-launchers">
+        <button onclick="window.openWiz('corner')">Corner</button>
+        <button onclick="window.openWiz('edge')">Edge</button>
+        <button onclick="window.openWiz('middle')">Middle</button>
+        <button onclick="window.openWiz('alignment')">Alignment</button>
+      </span>
+      <select id="hdrPost" class="hdr-post" title="Post-processor — which controller's G-code to generate. 'Auto' follows the machine profile (Settings → Profile)."></select>
+      <span id="gw-status" style="font:12px/1 ui-monospace,SFMono-Regular,monospace; color:#8b97a6;">gateway: …</span>
     </header>
     
     <!-- BLOCKLY CANVAS -->

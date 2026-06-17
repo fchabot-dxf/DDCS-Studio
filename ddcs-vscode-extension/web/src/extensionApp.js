@@ -108,6 +108,47 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openWiz = (type) => window.wizardManager.open(type);
     window.closeWiz = () => window.wizardManager.close();
 
+    // --- Main-UI tabs: BLOCKS (the #ws canvas) | GATEWAY | SETTINGS. Studio's editor tab is intentionally
+    //     dropped — VS Code's own text editor is that surface. #gateway-app / #settings-app are the forked
+    //     Studio app-shells (position:absolute under the 54px header); we swap them over the Blocks view. ---
+    const mainEl = document.querySelector('.main');
+    const gatewayApp = document.getElementById('gateway-app');
+    const settingsApp = document.getElementById('settings-app');
+    let _gatewayInited = false;
+    window.showApp = async (which) => {
+        const isBlocks = which === 'blocks', isGateway = which === 'gateway', isSettings = which === 'settings';
+        if (mainEl) mainEl.style.display = isBlocks ? '' : 'none';
+        gatewayApp && gatewayApp.classList.toggle('hidden', !isGateway);
+        settingsApp && settingsApp.classList.toggle('hidden', !isSettings);
+        document.querySelectorAll('.ext-tab').forEach((t) => t.classList.toggle('active', t.dataset.app === which));
+
+        // Panels are dynamic-imported + try/caught so one misbehaving panel can't take down the Blocks view.
+        if (isGateway) {
+            try {
+                const mod = await import('../../../DDCS-Studio/web/ui/gatewayPanel.js');
+                if (!_gatewayInited) { mod.initGatewayPanel(); _gatewayInited = true; }
+                mod.setGatewayPanelVisible(true);
+            } catch (err) { console.error('[DDCS] gateway panel failed:', err); }
+        } else {
+            try { (await import('../../../DDCS-Studio/web/ui/gatewayPanel.js')).setGatewayPanelVisible(false); } catch (_) {}
+        }
+        if (isSettings) {
+            try { (await import('../../../DDCS-Studio/web/ui/settingsPanel.js')).openSettings(); }
+            catch (err) { console.error('[DDCS] settings panel failed:', err); }
+        }
+        // Blockly mis-sizes if its container was display:none; re-measure when returning to Blocks.
+        if (isBlocks && window.Blockly && window.__workspace) {
+            try { window.Blockly.svgResize(window.__workspace); } catch (_) {}
+        }
+    };
+
+    // Populate the header post selector (#hdrPost) — lazy + isolated so a failure can't break the shell.
+    import('../../../DDCS-Studio/web/ui/headerPost.js')
+        .then((m) => m.initHeaderPost())
+        .catch((err) => console.error('[DDCS] header post init failed:', err));
+
+    window.showApp('blocks');   // start on the Blocks view
+
     // No need to intercept wizardManager.insert anymore! 
     // The wizard will commit the op to programModel, which triggers onChange,
     // which automatically sends the entire file contents to VS Code.
