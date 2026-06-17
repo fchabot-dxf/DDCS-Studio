@@ -26,7 +26,9 @@ const SELECTS = {
     wcs: ['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59', 'G59P1', 'G59P2', 'G59P3', 'G59P4', 'G59P5', 'G59P6', 'G59P7', 'G59P8', 'G59P9', 'G59P10'],
     slave: [['A', '3'], ['B', '4'], ['C', '5']],
     atcMode: ['auto', 'manual'],
-    testMode: ['current', 'all']
+    testMode: ['current', 'all'],
+    wcsSys: [['Auto', '0'], ['G54', '54'], ['G55', '55'], ['G56', '56'], ['G57', '57'], ['G58', '58'], ['G59', '59']],
+    commType: [['Popup', 'popup'], ['Status', 'status'], ['Input', 'input'], ['Beep', 'beep'], ['Dwell', 'dwell']]
 };
 const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/\s+/g, '');
 export const FN = (field) => field.toUpperCase();   // Blockly input/field name from an op field
@@ -145,7 +147,20 @@ export const OP_BLOCKS = [
     makeOpDef('pocket_op', 'Pocket', ''),
     makeOpDef('slot_op', 'Slot', ''),
     makeOpDef('drill_op', 'Drill', ''),
-    makeOpDef('text_op', 'Text', '')
+    makeOpDef('text_op', 'Text', ''),
+    makeOpDef('wcs_op', 'WCS', 'Target %2 X %3 Y %4 Z %5 Sync %6 Slave %7', [
+        { type: 'field_dropdown', name: 'SYS', options: SELECTS.wcsSys },
+        { type: 'field_checkbox', name: 'AXISX', checked: true },
+        { type: 'field_checkbox', name: 'AXISY', checked: true },
+        { type: 'field_checkbox', name: 'AXISZ', checked: true },
+        { type: 'field_checkbox', name: 'SYNC', checked: false },
+        { type: 'field_dropdown', name: 'SLAVE', options: SELECTS.slave }
+    ]),
+    makeOpDef('comm_op', 'Communication', 'Type %2 Mode %3 Color %4', [
+        { type: 'field_dropdown', name: 'TYPE', options: SELECTS.commType },
+        { type: 'field_number', name: 'MODE', value: 1 },
+        { type: 'field_number', name: 'COLOR', value: -1 }
+    ])
 ];
 
 /** Define every op as a Blockly block. (Emit happens via stackBridge → emitMapped, not a Blockly generator.) */

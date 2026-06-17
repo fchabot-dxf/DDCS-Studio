@@ -4,6 +4,10 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
+import { resolveActivePost, getCaps } from './dialects/index.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+
+const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
 const fmtCtrl = (msg) => String(msg || '').replace(/\r\n|\r|\n/g, ' / ').replace(/\s*\/\s*/g, ' / ').trim();
 const fmtLine = (msg) => String(msg || '').replace(/\r\n|\r|\n/g, ' ').replace(/\s+/g, ' ').trim();
@@ -22,6 +26,10 @@ export function commStack(params = {}) {
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
     const RAW = (t) => { const b = newBlock('raw'); b.params = { text: t }; S.push(b); };
 
+    const dialect = getDialect();
+    if (!dialect) { C('Error: No dialect loaded'); return S; }
+    const caps = getCaps(dialect.id);
+
     const type = params.type;
     if (['popup', 'status', 'input'].includes(type)) {   // data slots
         if (params.slot1) A('#1510', params.slot1);
@@ -32,32 +40,51 @@ export function commStack(params = {}) {
     const msg = fmtCtrl(params.msg);
     if (type === 'popup') {
         const mode = Number(params.popupMode);
-        if (mode === 1) { C('Popup - OK/Cancel'); A('#1505', `1(${msg})`); IF('#1505', '==', '0', 9); C('--- action if OK ---'); LB(9); }
-        else if (mode === 3) { C('Popup - Binary Choice'); A('#1505', `3(${msg})`); IF('#1505', '==', '0', 8); C('--- ENTER action ---'); GO(9); LB(8); C('--- ESC action ---'); LB(9); }
-        else { C('Popup - Toast'); A('#1505', `-5000(${msg})`); }
+        if (!caps.hmi) {
+            C(`Fallback: Controller does not support HMI popups`);
+            MSG(msg);
+            if (mode === 1 || mode === 3) RAW('M00 ( Pause for operator acknowledgement )');
+        } else {
+            if (mode === 1) { C('Popup - OK/Cancel'); RAW(dialect.hmiPrompt(msg, 1).join('\n')); IF('#1505', '==', '0', 9); C('--- action if OK ---'); LB(9); }
+            else if (mode === 3) { C('Popup - Binary Choice'); RAW(dialect.hmiPrompt(msg, 3).join('\n')); IF('#1505', '==', '0', 8); C('--- ENTER action ---'); GO(9); LB(8); C('--- ESC action ---'); LB(9); }
+            else { C('Popup - Toast'); RAW(dialect.hmiToast ? dialect.hmiToast(msg).join('\n') : dialect.hmiPrompt(msg, -5000).join('\n')); }
+        }
     } else if (type === 'status') {
         const line = fmtLine(params.msg);
         const useColor = params.statusColor != null && Number(params.statusColor) !== -1;
         const mode = (params.statusMode != null && params.statusMode !== '') ? Number(params.statusMode) : 1;
         const dwell = (params.statusDwell && Number(params.statusDwell) > 0) ? Number(params.statusDwell) : 0;
         C(mode === -3000 ? 'Persistent Status Bar' : 'Status Bar Update');
-        if (useColor) A('#2039', Number(params.statusColor), 'Status bar color - BGR');
-        A('#1503', `${mode}(${line})`);
-        if (useColor) A('#2039', '-1', 'Restore default color');
-        if (dwell > 0 && mode !== -3000) RAW(`G4 P${dwell}  ( Dwell - keep message visible )`);
+        if (!caps.hmi) {
+            C('Fallback: Status bar text not supported');
+            MSG(line);
+        } else {
+            if (useColor) A('#2039', Number(params.statusColor), 'Status bar color - BGR');
+            A('#1503', `${mode}(${line})`); // Still hardcoded for now, but guarded by hmi cap
+            if (useColor) A('#2039', '-1', 'Restore default color');
+            if (dwell > 0 && mode !== -3000) RAW(`G4 P${dwell}  ( Dwell - keep message visible )`);
+        }
     } else if (type === 'input') {
         const idNum = Number(String(params.id).replace('#', ''));
         const useId = (Number.isFinite(idNum) && idNum >= 50 && idNum <= 499) ? idNum : 100;
-        C('Numeric Input - DDCS Safe');
-        A('#2070', `${useId}(${msg})`);
-        if (params.dest && String(params.dest).trim() !== '') A(String(params.dest), `#${useId}`, 'Copy to persistent');
+        if (!caps.hmi) {
+            C('Fallback: Numeric input not supported');
+            MSG(`Missing input for #${useId}: ${msg}`);
+            RAW('M00 ( Pause to manually edit variable if needed )');
+        } else {
+            C('Numeric Input - DDCS Safe');
+            RAW(dialect.hmiInput ? dialect.hmiInput(`#${useId}`, msg).join('\n') : `#2070=${useId}(${msg})`);
+            if (params.dest && String(params.dest).trim() !== '') A(String(params.dest), `#${useId}`, 'Copy to persistent');
+        }
     } else if (type === 'beep') {
         const dur = (params.val != null && params.val !== '') ? params.val : 500;
         const cyc = (params.cycle != null && params.cycle !== '') ? Number(params.cycle) : 0;
         if (cyc > 0) { C(`System Beep - ${Math.round(dur / (cyc * 2))} pulses of ${cyc}ms`); A('#2043', cyc, 'Pulse width ms'); A('#2042', dur, 'Total duration ms'); }
         else { C('System Beep'); A('#2042', dur, 'Beep duration ms'); }
     } else if (type === 'dwell') {
-        C('Dwell'); RAW(`G4 P${params.val}`);
+        C('Dwell');
+        if (dialect && dialect.dwell) RAW(dialect.dwell(params.val).join('\n'));
+        else RAW(`G4 P${params.val}`);
     } else {
         C(`Unknown communication type: ${type}`);
     }

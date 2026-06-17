@@ -60,6 +60,20 @@ function toRecord(b) {
         } else if (b.type === 'atc_check_op') {
             params.waitSpindle = b.getFieldValue('WAITSPINDLE') === 'TRUE';
             params.dustCover = b.getFieldValue('DUSTCOVER') === 'TRUE';
+        } else if (b.type === 'wcs_op') {
+            params.sys = b.getFieldValue('SYS') || '0';
+            params.axisX = b.getFieldValue('AXISX') === 'TRUE';
+            params.axisY = b.getFieldValue('AXISY') === 'TRUE';
+            params.axisZ = b.getFieldValue('AXISZ') === 'TRUE';
+            params.sync = b.getFieldValue('SYNC') === 'TRUE';
+            params.slave = b.getFieldValue('SLAVE') || 'A';
+        } else if (b.type === 'comm_op') {
+            params.type = b.getFieldValue('TYPE') || 'popup';
+            if (params.type === 'popup') params.popupMode = b.getFieldValue('MODE');
+            if (params.type === 'status') {
+                params.statusMode = b.getFieldValue('MODE');
+                params.statusColor = b.getFieldValue('COLOR');
+            }
         }
 
         const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
@@ -158,6 +172,17 @@ function recToJson(rec) {
         } else if (type === 'atc_check_op') {
             node.fields.WAITSPINDLE = (rec.params.waitSpindle !== false) ? 'TRUE' : 'FALSE';
             node.fields.DUSTCOVER = rec.params.dustCover ? 'TRUE' : 'FALSE';
+        } else if (type === 'wcs_op') {
+            node.fields.SYS = rec.params.sys || '0';
+            node.fields.AXISX = (rec.params.axisX !== false) ? 'TRUE' : 'FALSE';
+            node.fields.AXISY = (rec.params.axisY !== false) ? 'TRUE' : 'FALSE';
+            node.fields.AXISZ = (rec.params.axisZ !== false) ? 'TRUE' : 'FALSE';
+            node.fields.SYNC = rec.params.sync ? 'TRUE' : 'FALSE';
+            node.fields.SLAVE = rec.params.slave || 'A';
+        } else if (type === 'comm_op') {
+            node.fields.TYPE = rec.params.type || 'popup';
+            node.fields.MODE = (rec.params.type === 'status') ? (rec.params.statusMode || 1) : (rec.params.popupMode || 1);
+            node.fields.COLOR = rec.params.statusColor || -1;
         }
 
         if (rec.children && rec.children.length) node.inputs = { DO: { block: chainToJson(rec.children) } };

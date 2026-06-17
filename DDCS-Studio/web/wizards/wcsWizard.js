@@ -8,6 +8,10 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
+import { resolveActivePost } from './dialects/index.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+
+const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
 /** WCS params → [ Comment | Set# … ]. The one source of truth for both displays. */
 export function wcsStack(params = {}) {
@@ -21,16 +25,21 @@ export function wcsStack(params = {}) {
     const C = (text) => { const b = newBlock('comment'); b.params = { text }; S.push(b); };
     const A = (v, value, note) => { const b = newBlock('assign'); b.params = { var: v, value, note: note || '' }; S.push(b); };
 
-    C('WCS | Direct #805+ writes');
+    C('WCS | Direct register writes');
+    const dialect = getDialect();
+    if (!dialect) { C('Error: No dialect loaded'); return S; }
+    const { wcsBase, wcsStride } = dialect.vars;
+    if (!wcsBase || !wcsStride) { C('Error: Dialect does not support direct WCS register writes'); return S; }
+
     C('M350 Ready - G10 not used');
     if (auto) {
         C('Auto-detect active WCS from #578');
         A('#150', '#578');
-        A('#151', '805+[#150-1]*5');
+        A('#151', `${wcsBase}+[#150-1]*${wcsStride}`);
         C('Zero selected axes');
         axes.forEach((a) => A(`#[#151+${a.off}]`, a.var));
     } else {
-        const base = 805 + (parseInt(params.sys, 10) - 53 - 1) * 5;
+        const base = wcsBase + (parseInt(params.sys, 10) - 53 - 1) * wcsStride;
         C(`Fixed WCS: G${params.sys} - Base address #${base}`);
         C('Zero selected axes');
         axes.forEach((a) => A(`#${base + a.off}`, a.var));
@@ -42,7 +51,7 @@ export function wcsStack(params = {}) {
             A('#152', `[#151+${slaveOffset}]`, 'Base WCS + Slave Offset');
             A('#[#152]', `#88${slave}`);
         } else {
-            const base = 805 + (parseInt(params.sys, 10) - 53 - 1) * 5;
+            const base = wcsBase + (parseInt(params.sys, 10) - 53 - 1) * wcsStride;
             A(`#${base + slaveOffset}`, `#88${slave}`);
         }
     }
