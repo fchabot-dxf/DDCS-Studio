@@ -1,4 +1,4 @@
-﻿/**
+/**
  * DDCS Studio — Settings panel (a sibling header tab to STUDIO and GATEWAY).
  *
  * A header ⚙ button opens an overlay with two L1 groups:

@@ -1,4 +1,4 @@
-﻿export const DEFAULT_VAR_CSV_UCCNC = `
+export const DEFAULT_VAR_CSV_UCCNC = `
 5061,S,G38 X,5061-5069 - Coordinates of a G38 probe result (X, Y, Z, A, B, C, U, V & W). Coordinates are in the coordinate system in which the G38 took place. Volatile.
 5062,S,G38 Y,5061-5069 - Coordinates of a G38 probe result (X, Y, Z, A, B, C, U, V & W). Coordinates are in the coordinate system in which the G38 took place. Volatile.
 5063,S,G38 Z,5061-5069 - Coordinates of a G38 probe result (X, Y, Z, A, B, C, U, V & W). Coordinates are in the coordinate system in which the G38 took place. Volatile.
