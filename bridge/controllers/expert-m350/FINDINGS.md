@@ -242,6 +242,20 @@ PROFILE_BUILD_TASK predicted (Ultimate Bee = manual tool change). Other useful s
 filter time. The decision logic is general (these param #s are firmware-defined; the *values* are per-machine
 wiring) — so the gateway can map any same-firmware Expert, and the values here are this machine's truth.
 
+### Macro I/O dialect — read input / set output / wait `[CONFIRMED from slib-m.nc factory M-code library 2026-06-18]`
+The Expert exposes I/O to a **running program** directly — this is what the V4.1 lacks (HL-TNC told a customer "4.1 no, Expert yes", and a Facebook thread confirmed it). The `-m16` params above are the pin *assignment*; the live *state* is a separate variable range:
+- **Read input N (live state):** `#[1520 + N − 1]`  (IN01=`#1520` … IN24=`#1543`). So `IF #1536==1 GOTO10` reads IN17 — exactly the "`IF #xxxx==1 GOTO`" people ask for.
+- **Set output N:** `#[1551 + N] = 1` (on) / `= 0` (off) — proven by `O10050`(=M50)→`#1552=1`, `O10051`→`#1552=0`, … (OUT01=`#1552` … OUT20=`#1571`).
+- **Wait-for-input idiom** (verbatim from the built-in sensor-waits `O10300`–`O10307`):
+  ```
+  WHILE [#[1520+N-1] != L] DO1
+    G04 P10            ( poll )
+  END1
+  ```
+  ⇒ the Expert has a real **`WHILE … DO1 … END1`** loop, not just `IF/GOTO`.
+- **Named sensor-waits** (block until a *function* input matches, port/enable/level read from a param triple then the WHILE-poll above): `M300` spindle-stopped · `M301/2` drawbar released/clamped · `M303/4` magazine open/closed · `M305/6` **gripper open/closed** · `M307` servo in-pos.
+⇒ This **supersedes the "inputs are config-only" framing above.** The forum gripper case (actuate output + wait IN17/IN18, no motion) IS doable on the Expert. Open item: `G04 P` units (`P10` poll vs `P1.0`=1 s elsewhere) — confirm on-machine. This dialect is the basis for Studio's planned **I/O atoms** (`setOutput`/`waitInput`/`dwell`/`jump`) → general automation builder, Expert-capability-gated.
+
 > ⚠️ **Namespace caution:** these are **`setting`-file param indices**, a DIFFERENT address space from the
 > runtime **macro `#` variables**. E.g. `setting#578` = *Floating Probe port*, but macro `#578` = *active WCS
 > number* (below); `setting#576` = *Fixed-Probe level*, but panel Pr76/macro `#576` = *Macro Enable*. Don't

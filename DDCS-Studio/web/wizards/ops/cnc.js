@@ -77,13 +77,21 @@ export const outPinBlock = {
 export const waitInputBlock = {
     type: 'waitinput', label: 'Wait Input', kind: 'leaf', category: 'Machine',
     defaults: { pin: 0, mode: 'rise', timeout: 0, var: '#5399' }, fields: ['pin', 'mode', 'timeout', 'var'],
-    gate: (d) => isOword(d) ? null : 'wait-on-input is oword-only — use a sensor M-Code',
+    gate: (d) => (isOword(d) || (isDDCS(d) && d.caps && d.caps.inputRead)) ? null : 'wait-on-input: M66 (RS274) or DDCS Expert only — V4.1/DM500 use a sensor M-Code',
     // RS274/grblHAL wait-on-input: M66 P<n> L<mode> Q<timeout> → result in #5399 (L: 0 immediate, 1 rise, 2 fall,
-    // 3 high, 4 low). DDCS uses sensor M-codes (M300-302) → use the M-Code atom there (this folds to a hint).
+    // 3 high, 4 low). DDCS EXPERT (caps.inputRead) → generic live-input poll WHILE [#[1520+N]!=L] (slib O10300);
+    // V4.1/DM500 lack it → fold to a hint (use a named sensor M-code M300-307).
     emit: (p, dx, dy, dialect) => {
-        if (!isOword(dialect)) return [`( wait input P${num(p.pin, 0)} - use an M-Code atom on ${dialect.name} )`];
-        const L = { imm: 0, rise: 1, fall: 2, high: 3, low: 4 }[p.mode] ?? 1;
-        const q = num(p.timeout, 0);
-        return [`M66 P${Math.max(0, Math.round(num(p.pin, 0)))} L${L}${q > 0 ? ` Q${r3(q)}` : ''}`];
+        const pin = Math.max(0, Math.round(num(p.pin, 0)));
+        if (isOword(dialect)) {
+            const L = { imm: 0, rise: 1, fall: 2, high: 3, low: 4 }[p.mode] ?? 1;
+            const q = num(p.timeout, 0);
+            return [`M66 P${pin} L${L}${q > 0 ? ` Q${r3(q)}` : ''}`];
+        }
+        // DDCS reads LEVEL, not edge → high/rise = 1, low/fall = 0. timeout not modelled (factory poll waits indefinitely).
+        if (isDDCS(dialect) && dialect.caps && dialect.caps.inputRead && dialect.waitInput) {
+            return dialect.waitInput(pin, (p.mode === 'fall' || p.mode === 'low') ? 0 : 1);
+        }
+        return [`( wait input P${pin} - use an M-Code atom on ${dialect.name} )`];
     },
 };
