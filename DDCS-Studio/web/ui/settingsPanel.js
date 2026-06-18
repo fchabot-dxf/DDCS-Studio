@@ -772,25 +772,18 @@ async function renderLanAccess(mount) {
     const lanOn = c.host === '0.0.0.0';
     const lanIp = c.lan_ip || '';
     const lanUrl = (lanOn && lanIp) ? ('http://' + lanIp + ':' + port + '/') : '';
+    // No on/off toggle — the gateway serves the LAN by default (config host=0.0.0.0); we just surface the URLs + QR
+    // so other devices can connect. (To restrict to this PC, set host to 127.0.0.1 in the gateway config.)
     const wrap = document.createElement('div');
     wrap.innerHTML =
-        '<label class="settings-check"><input type="checkbox" id="lan_toggle"' + (lanOn ? ' checked' : '') + '> Allow other devices on my network (LAN)</label>'
-        + '<div class="cloud-status" style="margin-top:6px">This PC: <code>http://localhost:' + port + '</code></div>'
+        '<div class="cloud-status">This PC: <code>http://localhost:' + port + '</code></div>'
         + (lanUrl
-            ? '<div class="cloud-status" style="margin-top:4px">Other devices: <code>' + lanUrl + '</code></div>'
+            ? '<div class="cloud-status" style="margin-top:4px">On your wifi: <code>' + lanUrl + '</code></div>'
+              + '<div class="settings-hint" style="margin-top:2px">Other devices on the same network can open this — scan the code or share the link.</div>'
               + '<img src="/api/lan-qr" alt="Scan to open on your phone" width="148" height="148" style="margin-top:8px;background:#fff;border-radius:6px;padding:6px" '
               + 'onerror="this.style.display=\'none\'">'
-            : '<div class="cloud-status muted" style="margin-top:4px">Turn on LAN access to get a shareable URL + QR code.</div>')
-        + '<div class="lan-msg settings-hint" style="margin-top:6px"></div>';
+            : '<div class="settings-hint" style="margin-top:4px">Served on this PC only — set <code>host</code> to <code>0.0.0.0</code> in the gateway config to allow other devices.</div>');
     mount.replaceChildren(wrap);
-    const msg = wrap.querySelector('.lan-msg');
-    wrap.querySelector('#lan_toggle').addEventListener('change', async (e) => {
-        msg.textContent = 'Saving…';
-        try { await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host: e.target.checked ? '0.0.0.0' : '127.0.0.1' }) }); }
-        catch (err) { msg.textContent = 'Save failed.'; return; }
-        msg.textContent = 'Saved — restart the app to apply the LAN binding.';
-        setTimeout(() => renderLanAccess(mount), 600);
-    });
 }
 
 function wireSettingsOverlay(ov) {

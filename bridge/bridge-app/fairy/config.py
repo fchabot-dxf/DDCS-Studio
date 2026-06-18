@@ -53,7 +53,8 @@ class Config:
 
     # --- local server (offline / local configs: serve the console + ops API) ------
     serve: bool = False                     # run the local HTTP server (server.py)
-    host: str = "127.0.0.1"                 # bind address (0.0.0.0 to reach from the LAN)
+    host: str = "0.0.0.0"                   # bind address — DEFAULT 0.0.0.0 so the exe is reachable from the LAN
+                                            # (phone/tablet on the same wifi); set "127.0.0.1" in config.json for localhost-only
     port: int = 8765
     console_dir: str = ""                   # legacy fairy console; at / unless studio_dir is set (then /fairy/)
     studio_dir: str = ""                    # Studio web root (DDCS-Studio/web) served at / — the one-app face
