@@ -23,8 +23,8 @@ output/
 /build/
 /dist/
 /DDCS-Studio.exe
-/fairy.exe
 /benchgateway.exe
+*.exe.old
 *.spec
 
 # fairy local-backend runtime data (created when the gateway runs with --backend local)

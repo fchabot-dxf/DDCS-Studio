@@ -11,6 +11,7 @@
     "prebundle": "npm run svg:rename-gradients",
     "bundle": "node scripts/bundle.cjs --src web",
     "build": "echo \"no build step: Studio is static; Cloudflare serves web/ as-is\"",
+    "build:exe": "pwsh ../build_fairy.ps1",
     "build:standalone": "npm run bump-version && npm run generate-vars && npm run bundle",
     "bump-version": "node scripts/bump-version.cjs",
     "test:e2e": "playwright test"
