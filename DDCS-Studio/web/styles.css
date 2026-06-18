@@ -136,7 +136,6 @@ html, body { overflow-x: clip; }
     background: var(--hdr-bg, var(--panel));
     border-bottom: 1px solid var(--border);
     user-select: none;
-    position: relative;   /* positioning context for the .is-burger controls dropdown */
 }
 
 .app-header > [data-fred-home-mount] { align-self: center; }
@@ -427,7 +426,7 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 /* Editor op hover-to-edit: highlight the hovered op's lines (in the #editor-highlight overlay) + a float chip. */
 #editor-highlight .g-line.op-hover { background: rgba(14, 165, 233, 0.16); border-radius: 2px; }
 .op-edit-chip {
-    position: absolute; right: 12px; z-index: 12;
+    position: absolute; left: 12px; z-index: 12;
     font: 600 11px/1 inherit; padding: 3px 9px; border-radius: 999px; cursor: pointer;
     background: var(--accent, #0ea5e9); color: #fff; border: none; box-shadow: 0 2px 8px rgba(0,0,0,.35);
     white-space: nowrap; opacity: .95;
@@ -3601,52 +3600,14 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
     .app-header .brand { padding: 0 8px; gap: 6px; }
     .app-header .logo { height: 26px; }
 }
-/* The post-processor dropdown (200px) is the header's widest item — shrink it once the header collapses
-   (and further on phones) so the transfer control stays on-screen instead of being clipped. */
+/* The post-processor dropdown is the header's widest item — shrink it on tablet (is-mini); on PHONE
+   hide it entirely (set it in Settings → Post processor). Project Open/Save (macro-bar) stay in the header. */
 .app-header.is-mini .hdr-post { max-width: 120px; }
 @media (max-width: 600px) {
-    .hdr-post { max-width: 104px; font-size: 11px; padding: 4px 6px; }
     .app-header.is-mini .hdr-tabs .tab { padding: 0 8px; }
     .hdr-controls { gap: 6px; }
+    #hdrPost, #hdrPostWarn { display: none; }   /* post selector lives in Settings on phone */
 }
-
-/* Phone ☰ (.is-burger, ≤600px): the project bar + post/transfer controls reparent into #hdrMenu
-   (ui/commandDeck.js _setupHeaderBurger) and open as a dropdown. */
-/* .app-header scope so this beats the per-theme `[data-theme=…] button { display:inline-flex }` skins. */
-.app-header .hdr-burger {
-    display: none;
-    margin-left: auto;
-    align-self: center;
-    background: transparent;
-    border: none;
-    color: var(--hdr-ink, var(--text-main));
-    font-size: 20px;
-    line-height: 1;
-    padding: 0 14px;
-    cursor: pointer;
-}
-.app-header.is-burger .hdr-burger { display: inline-flex; align-items: center; }
-.hdr-menu {
-    display: none;
-    position: absolute;
-    top: 54px;
-    right: 8px;
-    z-index: 1000;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    min-width: 200px;
-    padding: 10px;
-    background: var(--panel, #1e1e1e);
-    border: 1px solid var(--border, #444);
-    border-radius: var(--radius, 6px);
-    box-shadow: 0 8px 22px rgba(0,0,0,.45);
-}
-.hdr-menu.open { display: flex; }
-.hdr-menu .macro-bar,
-.hdr-menu .hdr-controls { display: flex; gap: 8px; align-items: center; margin: 0; }
-.hdr-menu .hdr-post { max-width: none; width: 100%; }
-.hdr-menu #transferBtn { flex: 1; justify-content: center; }
 
 /* ===== Portrait / mobile: 3D drawer pulls UP from the bottom of the editor ===== */
 @media (orientation: portrait) {

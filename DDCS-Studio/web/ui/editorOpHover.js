@@ -44,13 +44,8 @@ export function initEditorOpHover() {
         chip.disabled = !editable;
         chip.title = editable ? `Edit this ${op.label || op.opType}` : `${op.label || op.opType}: form-edit not wired yet`;
         chip.style.top = Math.max(2, Math.round(first * lineHeight() + padTop() - editor.scrollTop)) + 'px';
-        // Keep the chip in the VISIBLE editor: when the 3D preview drawer is open over the right side, tuck the
-        // chip to its left so the drawer / view-cube gizmo doesn't cover it (the "out of reach" report).
-        const cont = editor.parentElement.getBoundingClientRect();
-        const drawer = document.getElementById('gcodeViz3dContainer');
-        let rightPx = 12;
-        if (drawer) { const dr = drawer.getBoundingClientRect(); if (dr.width > 4 && dr.left < cont.right - 4) rightPx = Math.round(cont.right - dr.left + 12); }
-        chip.style.right = rightPx + 'px';
+        // Chip floats on the LEFT of the editor (left: 12px in CSS) — clear of the right-side 3D preview
+        // drawer / view-cube gizmo, so it's always reachable (the "out of reach" report).
         chip.dataset.opId = op.id;
         chip.hidden = false;
     });

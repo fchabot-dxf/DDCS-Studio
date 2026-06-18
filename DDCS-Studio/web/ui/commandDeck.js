@@ -636,7 +636,6 @@ export class CommandDeck {
         requestAnimationFrame(() => { this._fitHeader(); this._fitAppHeader(); });
         if (!this._headerFitInit) {
             this._headerFitInit = true;
-            this._setupHeaderBurger();
             const fit = () => requestAnimationFrame(() => { this._fitHeader(); this._fitAppHeader(); });
             window.addEventListener('resize', fit);
             if (window.MutationObserver) {
@@ -669,56 +668,10 @@ export class CommandDeck {
         h.classList.remove('is-compact', 'is-mini');
         // Strict (no tolerance): the app-header has no internal scroll, so ANY overflow is page
         // overflow. Collapse on the first pixel over so the right-edge icons never leave the window.
-        // (.is-burger — the phone ☰ — is owned separately by the matchMedia handler, not measured here.)
         if (h.scrollWidth > h.clientWidth) {
             h.classList.add('is-compact');
             if (h.scrollWidth > h.clientWidth) h.classList.add('is-mini');
         }
-    }
-
-    // Phone (≤600px): the project bar + post/transfer controls don't fit even icon-only, and they sit on
-    // OPPOSITE sides of the tabs — so reparent both into one #hdrMenu dropdown behind a ☰. matchMedia (not
-    // measured) so it flips once at the breakpoint; reparenting preserves each control's wired listeners.
-    _setupHeaderBurger() {
-        const header = document.querySelector('.app-header');
-        const macro = document.getElementById('macroBar');
-        const ctrls = header && header.querySelector('.hdr-controls');
-        const menu = document.getElementById('hdrMenu');
-        const burger = document.getElementById('hdrBurger');
-        if (!header || !macro || !ctrls || !menu || !burger) return;
-
-        // Capture home positions BEFORE any move, so we can restore exactly on the way back to desktop.
-        const macroHome = { p: macro.parentNode, n: macro.nextSibling };
-        const ctrlHome = { p: ctrls.parentNode, n: ctrls.nextSibling };
-
-        const closeMenu = () => { menu.classList.remove('open'); burger.setAttribute('aria-expanded', 'false'); };
-        const applyBurger = (on) => {
-            if (on) {
-                if (macro.parentNode !== menu) menu.appendChild(macro);
-                if (ctrls.parentNode !== menu) menu.appendChild(ctrls);
-                header.classList.add('is-burger');
-            } else {
-                if (macro.parentNode !== macroHome.p) macroHome.p.insertBefore(macro, macroHome.n);
-                if (ctrls.parentNode !== ctrlHome.p) ctrlHome.p.insertBefore(ctrls, ctrlHome.n);
-                header.classList.remove('is-burger');
-                closeMenu();
-            }
-        };
-
-        const mq = window.matchMedia('(max-width: 600px)');
-        applyBurger(mq.matches);
-        mq.addEventListener('change', (e) => applyBurger(e.matches));
-
-        burger.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const open = menu.classList.toggle('open');
-            burger.setAttribute('aria-expanded', open ? 'true' : 'false');
-        });
-        document.addEventListener('click', (e) => {
-            if (!menu.classList.contains('open')) return;
-            if (e.target.closest('#hdrMenu') || e.target.closest('#hdrBurger')) return;
-            closeMenu();
-        });
     }
 
     // Helper: build macro groups into provided container
