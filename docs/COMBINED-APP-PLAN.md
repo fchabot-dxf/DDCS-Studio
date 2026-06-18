@@ -82,8 +82,8 @@ presses Cycle Start). `editorManager.buildProgram()` is shared by EXPORT and TRA
 the controller is byte-identical to the download. Gated by the same gateway detection as the LED/tab
 (via a `ddcs:gateway-status` event from `gatewayStatus.js`).
 **Verified (Playwright):** bridged — un-greys, sends, toast, job lands in the queue; standalone —
-greyed and inert, no errors. Pre-flight lint hook deferred until the VERIFY panel
-(`addstudioverify.md`) exists.
+greyed and inert, no errors. Pre-flight lint hook: the VERIFY panel (`addstudioverify.md`) now exists —
+wiring the lint into TRANSFER is the remaining follow-up.
 
 ### Step 5 — Retire the fairy local UI
 Once Step 2 covers everything it did, archive `bridge-app/web/ui/`. One UI from here on.

@@ -10,9 +10,9 @@ machine simulation (WCS + origin + envelope). June 2026._
 The 3D preview parses the editor G-code and draws the toolpath. It is **automatic**:
 
 - While the 3D view is open, it re-draws as you type — ~300 ms after you stop
-  ([`DDCS-Studio/web/ui/gcodePreviewTab.js`](DDCS-Studio/web/ui/gcodePreviewTab.js#L156)).
+  ([`DDCS-Studio/web/ui/gcodePreviewTab.js`](../DDCS-Studio/web/ui/gcodePreviewTab.js#L156)).
 - Switching **to** the 3D tab re-draws the current editor content
-  ([`gcodePreviewTab.js:241`](DDCS-Studio/web/ui/gcodePreviewTab.js#L241)).
+  ([`gcodePreviewTab.js:241`](../DDCS-Studio/web/ui/gcodePreviewTab.js#L241)).
 - It only re-renders when the 3D view is the active one (`if (gpView !== '3d') return;`).
 
 Everything is drawn in the **active WCS**, with program-zero at world `(0,0,0)`.
@@ -21,7 +21,7 @@ Everything is drawn in the **active WCS**, with program-zero at world `(0,0,0)`.
 
 The preview only draws **motion it can resolve into coordinates**: `G0/G1/G2/G3` moves and
 `G31` probes with X/Y/Z. It legitimately draws **nothing** (and the status bar shows
-**"No drawable moves in this program"** — [`gcodePreviewTab.js:61`](DDCS-Studio/web/ui/gcodePreviewTab.js#L61))
+**"No drawable moves in this program"** — [`gcodePreviewTab.js:61`](../DDCS-Studio/web/ui/gcodePreviewTab.js#L61))
 when the program is:
 
 - setup / M-codes / comments / `#variable` assignments only — no motion;
@@ -99,8 +99,13 @@ on top.
 ## Status / decision
 
 - ☑ **Decided (June 2026):** stay program-centric for now — machine frame deferred.
+- 🔄 **REVERSED (2026-06-17):** machine frame is now **ACTIVE** — a "personalised sim" sourced from the
+  **static controller dump** (envelope + WCS/origin + soft limits). Plan: memory `personalised-sim-from-dump`
+  + root [`VERIFY-AT-MACHINE.md`](VERIFY-AT-MACHINE.md). Fixes the `G53`-drawn-in-WCS-space bug
+  ([`GcodeExecutionEngine.js:650`](../DDCS-Studio/web/engine/GcodeExecutionEngine.js#L650)).
 - ☑ Preview is program-centric (active WCS at origin) — works for cuts + probes.
-- ☐ Machine frame (envelope + origin + `G53` + limit check) — **deferred**.
+- ◐ Machine frame (envelope + origin + `G53` + limit check) — envelope is **drawn** (`gcodeViz3d.setMachine`)
+  but **not yet enforced**; being built per the personalised-sim plan.
 - ☑ **I/O state-stepping (sensor-wait / output simulation) — built.**
   - Floating **Virtual I/O panel** (draggable, resizable; `I/O` button in the 3D drawer):
     24 inputs (click-to-toggle) + 24 outputs, replaces the Settings I/O tab.

@@ -3,7 +3,7 @@
 **Unit:** none yet — Centroid **Acorn** board (ARM motion CPU, Ethernet) + **CNC12**
 Windows software. **Scope:** Centroid CNC12 as a target. From the CNC12 macro manual
 (extracted to `assets/…txt`) — **not tested on owned hardware.**
-**Studio-side:** [`../../PORTING-GRBL-MACH3.md`](../../PORTING-GRBL-MACH3.md). **Dialect:**
+**Studio-side:** [`../PORTING-GRBL-MACH3.md`](../PORTING-GRBL-MACH3.md). **Dialect:**
 Centroid CNC12 — its own concrete dialect (in-program `#var`/branching, Fanuc-Macro-B-*style*
 but **not** interchangeable with DDCS or Fanuc). See [`../MACHINE-PRIMITIVES-MAP.md`](../MACHINE-PRIMITIVES-MAP.md) §9.
 
@@ -70,4 +70,4 @@ onControllerMacros ✅ (Macro B `.mac`) · variables ✅ · flowControl native `
 - `assets/Centroid_CNC12_Macro_Programming.pdf` + `.txt` (extracted, readable).
 
 Cross-ref: [`../MACHINE-PRIMITIVES-MAP.md`](../MACHINE-PRIMITIVES-MAP.md) §9 (Macro-B family),
-[`../../PORTING-GRBL-MACH3.md`](../../PORTING-GRBL-MACH3.md).
+[`../PORTING-GRBL-MACH3.md`](../PORTING-GRBL-MACH3.md).

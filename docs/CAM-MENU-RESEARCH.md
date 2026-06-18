@@ -140,7 +140,7 @@ configurable probe setup, ATC + rotary suites, and authoring quality.
 
 ---
 
-## 5. Feature idea: "Export as CAM slot"
+## 5. Feature idea: "Export as CAM slot"  `[ARCHIVED 2026-06-12 — demoted in §5b; not on the roadmap, kept for rationale]`
 
 One-click export from any wizard producing the complete bundle:
 

@@ -1,6 +1,8 @@
 # Settings + Machine-I/O Redesign — spec
 
-_Locked design for the Settings overlay rework. Build target; not yet implemented. June 2026._
+_The canonical Settings overlay spec, reflecting what shipped (June 2026; updated 2026-06-17).
+Stages 1–2 are built; stage 3 (wizards read `inputs[]`/`outputs[]` directly) is the open item.
+Broader session history: [`SETTINGS-TABS-NOTES.md`](SETTINGS-TABS-NOTES.md)._
 
 ---
 
@@ -20,13 +22,14 @@ Hardware         Machine   (single config)
                  Output    [ + Add output ▾ ]  list of ONLY the outputs you've added
                               Coolant        pin [ 1 ]   M8 / M9
                               Drawbar        pin [ 2 ]   M154 / M155
-                 [ + Add ▾ ]  →  adds a whole category tab (ATC · future subsystems)
+                 Head       (spindle/router; plasma/laser stubs)          ← always-present
+                 Tool table (tool-length table; "Add ATC" → magazine + T.nc) ← always-present
 ```
 
 - **Input and Output are separate tabs.** Inside each, the parts are a **table — one row per part, no drill-down / no third-level tabs.** The **`+ Add`** button opens a **dropdown of preprogrammed types**; choosing one drops a new row **pre-expanded with that type's parameters** (a Probe row shows pin/level/location; a Coolant row shows pin/on-code/off-code). **Only the rows you've added are shown — no empty pin slots.** Each row has a **pin # field (inputs 1–24, outputs 1–20)**, and the Add menu / pin picker is **free-pin-aware** (pins already in use are greyed out) so a pin can't be double-assigned. _(DDCS Expert M350 hardware: 24 inputs, 20 outputs — the Virtual I/O panel should match.)_
-- **Two `+Add` scopes:**
+- **`+Add` scopes (as built):**
   - per-tab **`+Add`** (inside Input / Output) → adds a **row** (a part).
-  - L2 **`+Add ▾`** (beside the sub-tabs) → adds a whole **subsystem category tab**. A subsystem = several pins + its own config/logic, *not* a single on/off pin. Candidates: **ATC** (now) · **Spindle / VFD** (speed + M3/M4/M5 + at-speed/fault) · **Lubrication / auto-oiler** · **Pneumatic clamping / 4th-axis** · **Laser / plasma THC**. Each auto-adds its standard I/O (tagged `group`, mirrored) + holds its config. Single on/off devices (coolant, mist, air blast, dust, a lone sensor) stay as plain Input/Output rows — not categories.
+  - **subsystem tabs are always-present** (Head, Tool table) — there is **no L2 category dropdown** (the original `+Add`-adds-a-tab design was dropped). Each subsystem tab carries its own **in-tab "Add"** that reveals its config ("Add spindle/head", "Add tool changer (ATC)"); `applyHardwareTabs()` toggles the in-tab section. Adding ATC still pushes its standard I/O (drawbar; disk carousel + index) into the Output/Input tables, tagged `group:'atc'` + mirrored. Single on/off devices (coolant, mist, air blast, dust, a lone sensor) stay as plain Input/Output rows.
 - Machine + Stock stay single-config. **ATC is a subsystem (its own L2 category tab), not an input or output.** Only *some* of its parts are I/O.
   - **Adding the ATC category auto-adds only the standard, non-optional parts** — **drawbar** output (M154/M155) always; **+ carousel-rotate output + pocket/index sensor input** when the magazine type is **disk** (both required for it to run) — with **pins blank**, all **removable**. **Optional parts (tool-present sensor, dust cover, …) are added manually** via the ATC tab's Add.
   - **The ATC tab also has its own "+ Add input / + Add output"** for extras. Rows (auto or manual) are tagged **`group:'atc'`** and **mirrored into the global Input/Output tables** — same underlying row in `inputs[]`/`outputs[]`, editable from either place, one pin map (a small "ATC" badge marks them in the global tables).
@@ -107,12 +110,12 @@ The 2-level shell now carries more than Machine/IO. Current sidebar:
 
 ```
 General   Profile · Appearance · Variables · Program · Feedback · Network (stub) · About
-Hardware  Machine · Spindle · Input · Output · ATC      (Spindle/ATC added via "+ Add")
+Hardware  Machine · Head · Input · Output · Tool table   (all always-present; in-tab "Add" reveals config)
 ```
 
 - **Appearance** — theme picker (wired to `ThemeManager`, persisted to `ddcs_theme`) + keyboard-drawer height slider (writes `--dock-h` on `#controller-dock`, persisted to `ddcs_dock_h`, same key the drag-handle uses). Not part of `_ddcsSettings`.
 - **Program → END OF PROGRAM** — global default footer for generated programs: `spindleOff` (M5) · `coolantOff` (M9) · `retract` to safe Z (**G53**, since G28 isn't configured on the DDCS) · `park` XY (G53) · `end` (M30/M2/none). Stored as `settings.endProgram`. **Per-wizard overrides are planned, not built. Generators do not yet emit this footer — wiring is the follow-up.**
 - **About** — live version read from the header `.ver` span + credits.
-- **Spindle / VFD** — a Hardware **subsystem** (gated by `hardwareTabs.spindle`, added via `+Add` like ATC). Stored as `settings.spindle`: `maxRpm · defaultRpm · dir(cw/ccw) · spinUp · spinDown`. Studio-side authoring defaults only — the controller owns the live PWM/analog spindle params (#582 etc.). **Generators/warm-up wizard do not yet consume it — follow-up.**
+- **Head (was "Spindle / VFD")** — the always-present **Head** tab with a **Type** selector (Router/Spindle working; Plasma/Laser stubs). Spindle config stored as `settings.spindle`: `maxRpm · defaultRpm · dir(cw/ccw) · spinUp · spinDown` (plus `settings.head = { type }`). Studio-side authoring defaults only — the controller owns the live PWM/analog params (#582 etc.). Generators now have an "⬇ Insert" button emitting `M3/M4 S<rpm>` + spin-up dwell; **automatic emission in every generated program is still follow-up.**
 - **Units (mm/inch): dropped.** The DDCS Expert variable table has no inch/G20/metric/unit-system parameter — the controller is metric-only. (Only the simulator parses G20 in arbitrary loaded files.)
 - **Network: kept** as a stub (not migrated to the Gateway header tab).

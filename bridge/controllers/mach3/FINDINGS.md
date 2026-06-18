@@ -3,7 +3,7 @@
 **Unit:** none yet — Mach3 is a **PC-based** controller (Windows + parallel port, or an external
 motion device: SmoothStepper / UC100 / etc.). **Scope:** Mach3 as a *target* for DDCS Studio
 output. From ArtSoft docs/manual — **nothing tested on hardware we own.**
-**Studio-side emitter analysis:** [`../../../PORTING-GRBL-MACH3.md`](../../../PORTING-GRBL-MACH3.md).
+**Studio-side emitter analysis:** [`../PORTING-GRBL-MACH3.md`](../PORTING-GRBL-MACH3.md).
 
 > Tags: `[CONFIRMED via docs]` documented behavior · `[TO TEST]` needs our hardware ·
 > `[HYPOTHESIS]` unverified guess · `[ANALYSIS]` derived from Studio's code.
@@ -70,4 +70,4 @@ output. From ArtSoft docs/manual — **nothing tested on hardware we own.**
 - `mach3/FINDINGS.md` — this file.
 
 Cross-ref: [`../shared/ARCHITECTURE.md`](../shared/ARCHITECTURE.md),
-[`../../../PORTING-GRBL-MACH3.md`](../../../PORTING-GRBL-MACH3.md).
+[`../PORTING-GRBL-MACH3.md`](../PORTING-GRBL-MACH3.md).

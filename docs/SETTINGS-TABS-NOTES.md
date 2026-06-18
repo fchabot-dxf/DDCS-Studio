@@ -1,7 +1,8 @@
-# Settings tabs — working notes (2026-06)
+# Session notes (2026-06) — settings, Mill wizards, ATC/probe fixes
 
-Running notes from the settings-panel expansion session. Companion to the spec in
-[`SETTINGS-IO-REDESIGN.md`](SETTINGS-IO-REDESIGN.md) (which now records the implemented additions).
+Running session log. **Settings are now canonical in [`SETTINGS-IO-REDESIGN.md`](SETTINGS-IO-REDESIGN.md)** —
+this file keeps the broader session history (Mill/drill wizards, ATC generator fixes, the still-open rotary
+probe bug, the sim-parser fix). The settings-tab notes below are historical; the spec is the source of truth.
 
 ## Done this session (in `web/ui/settingsPanel.js`)
 
@@ -111,27 +112,12 @@ avoid (offset side, lead-in, tabs, strategy). Recommend: stay parametric; if arb
 **DXF/SVG import** (draw in a real tool, Studio offsets + depth-steps) is the pragmatic path — a separate,
 bigger project — but a **built-in editor is a different product**, not "make hand-coding easier."
 
-## Root .md triage (recommendation — not yet actioned)
+## Root .md triage — DONE (2026-06-17)
 
-| File | Read | Recommendation |
-|------|------|----------------|
-| ARCHITECTURE-MULTIUSER.md | load-bearing liability boundary | **Keep** — canonical, referenced everywhere |
-| COMBINED-APP-PLAN.md | DECIDED, supersedes MONOREPO P4–P6 | **Keep** — active product plan |
-| MONOREPO_PLAN.md | self-declared "superseded by COMBINED-APP-PLAN" for phasing | **Keep but mark**; archive the P4–P6 phasing section only |
-| SETTINGS-IO-REDESIGN.md | spec, now mostly implemented | **Keep** — updated this session (status ◐ stage 3) |
-| ATC implementation_plan.md | older wizard-bar + tool-length plan | **Candidate to archive/merge** into DDCS-ATC-WORKFLOW.md if stale |
-| DDCS-ATC-WORKFLOW.md | firmware-derived ATC ground truth | **Keep** — reference |
-| CONTROLLER_TASKS.md | live-controller test roll-up | **Keep** — active index |
-| BENCH-CHECKLIST.md | physical-controller checklist | **Keep** — active |
-| PROBE-CONFIG-SOURCE.md | settled design, partly implemented | **Keep** |
-| ROTARY-PLAN.md | foundation built, sim-spin scoped | **Keep** — active |
-| SIMULATION-NOTES.md | how preview works + sim roadmap | **Keep** — reference |
-| CAM-MENU-RESEARCH.md | research/ideas | **Keep** (research) or move to a `research/` folder |
-| injection-tooltips-guide.md | design guide | **Keep** (design) or move to a `docs/` folder |
-
-Suggested low-risk action: create `docs/archive/` and move only **fully superseded** material there
-(none are 100% dead yet — MONOREPO_PLAN and ATC implementation_plan are the closest). Hold for confirmation
-before moving, since these are planning docs with cross-references.
+Executed: removed `ATC implementation_plan.md` + `injection-tooltips-guide.md` (verified implemented/spent);
+relocated `DDCS-ATC-WORKFLOW.md` → `bridge/controllers/expert-m350/` and `PORTING-GRBL-MACH3.md` →
+`bridge/controllers/`; consolidated settings into `SETTINGS-IO-REDESIGN.md` (this file kept as session log);
+un-deferred the machine-frame in `SIMULATION-NOTES.md`. See git history for the full pass.
 
 ## ATC wizard correctness — review findings (2026-06)
 

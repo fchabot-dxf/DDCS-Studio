@@ -1,6 +1,6 @@
 # Probe config source — per-field controller/override glyph
 
-Design settled 2026-06-12. Lets generated macros read probe config from the controller's
+Design settled 2026-06-12 — **core SHIPPED** (per-field controller glyph + profile var-map + sim var-seeding); **PENDING:** the `#1170+` persistence tier (§ below) and the V4.1 bench unlocks. Lets generated macros read probe config from the controller's
 own parameter page (Brad's `macro_cam13` pattern: `F#632 P#1078 L#1080`) instead of baking
 Studio values — per field, via an in-input glyph, no toggle rows.
 
@@ -36,7 +36,7 @@ Studio values — per field, via an in-input glyph, no toggle rows.
 
 No native var anywhere for: slow feed, max scan stroke/extent, safe Z.
 
-## Convention tier — `#1170+` persistent block
+## Convention tier — `#1170+` persistent block  `[PENDING — not built]`
 
 Official "user storage" slots; `#1170` = probe radius is already our production convention
 (`set_probe_radius.nc`). Extend & formalize (written by a Studio-generated setup macro,
@@ -50,7 +50,7 @@ slot map documented in its comments):
 | `#1173` | Safe Z |
 | `#1174–#1175` | reserved |
 
-## Implementation notes (v1)
+## Implementation notes (v1)  `[DONE — glyph + sourcing + sim seeding shipped; only #1170+ tier pending]`
 
 - Wizards `toNum()`-coerce params — controller mode must be an explicit flag into the
   generators, not a `'#1078'` string smuggled through `port` (it would coerce to default).

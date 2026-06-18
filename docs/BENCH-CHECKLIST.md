@@ -20,7 +20,7 @@ offline-confirmable parts are already done + pushed. Bench V4.1 @ `10.0.0.50`; E
 
 ## 2. Variable value mappings — turns Watch `#500+` from "pending" to real
 - [ ] **`#100–499` (uservar):** add `#200` in Watch, set a known value, confirm it shows. `[CONFIRMED in findings — re-verify in the UI]`
-- [ ] **`#500–1499` (setting): find the macro# → setting-index offset.** Read `setting`, change ONE known param on the parameter page, diff → the moved slot = the offset. Then extend `ops._var_value` (the `500..1499` branch).
+- [x] **`#500–1499` (setting): macro# → setting-index offset — Expert SOLVED.** **macro = param + 500 `[CONFIRMED 2026-06-17]`** (active WCS param #78 ↔ macro #578; WCS table param #305+ ↔ macro #805+, decoded from the live dump). V4.1 offset still unconfirmed (bench). Extend `ops._var_value` (the `500..1499` branch) via the +500 rule.
 - [ ] **WCS (`coord1`, 432 B): map the byte layout.** Read `coord1`, set **G54 X** to a known value on the panel, re-read → the moved 8-byte slot = G54 X. Establish axis order (X/Y/Z/A) + WCS order (G54–G59, G52). → unlocks the **WCS grid tab**.
 - [ ] **Positions `#1500–1503`:** find the live current-position source (`.pos` format / status / descriptor); confirm a known position reads right.
 - [ ] Confirm **snapshot timing**: values flush at run start/end (not mid-run) — Watch shows last-run state.

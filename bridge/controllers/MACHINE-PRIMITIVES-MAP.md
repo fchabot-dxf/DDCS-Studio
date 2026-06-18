@@ -10,7 +10,7 @@
 >
 > Confidence tags: `[CODE]` proven from our DDCS source · `[DUMP]` read from a target's
 > real macro/source in `*/assets/` · `[DOCS]` from the target's documentation ·
-> `[TO CONFIRM]`. Cross-ref `../../PORTING-GRBL-MACH3.md` and each `*/FINDINGS.md`.
+> `[TO CONFIRM]`. Cross-ref `PORTING-GRBL-MACH3.md` and each `*/FINDINGS.md`.
 
 ---
 

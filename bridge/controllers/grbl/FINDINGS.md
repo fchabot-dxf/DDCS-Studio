@@ -3,7 +3,7 @@
 **Unit:** none yet — grbl runs on Arduino/ESP32-class hardware (desktop CNC, 3018, diode
 lasers). **Scope:** facts about grbl as a *target* for DDCS Studio output. Everything here is
 from grbl docs/spec/source — **nothing tested on hardware we own.**
-**Studio-side emitter analysis:** [`../../../PORTING-GRBL-MACH3.md`](../../../PORTING-GRBL-MACH3.md).
+**Studio-side emitter analysis:** [`../PORTING-GRBL-MACH3.md`](../PORTING-GRBL-MACH3.md).
 
 > Tags: `[CONFIRMED via docs]` documented/spec behavior · `[TO TEST]` needs our hardware ·
 > `[HYPOTHESIS]` unverified guess · `[ANALYSIS]` derived from reading Studio's code.
@@ -73,4 +73,4 @@ from grbl docs/spec/source — **nothing tested on hardware we own.**
 - `grbl/FINDINGS.md` — this file.
 
 Cross-ref: [`../shared/ARCHITECTURE.md`](../shared/ARCHITECTURE.md),
-[`../../../PORTING-GRBL-MACH3.md`](../../../PORTING-GRBL-MACH3.md).
+[`../PORTING-GRBL-MACH3.md`](../PORTING-GRBL-MACH3.md).
