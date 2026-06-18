@@ -312,7 +312,8 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_program">Program</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_network">Network</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_gateway">Gateway</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_about">About</button>
                     <div class="sidebar-group-label" data-group-label="hardware" style="display:none;">Hardware</div>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_machine" style="display:none;">Machine</button>
@@ -414,21 +415,25 @@ function buildSettingsOverlay() {
                 </div>
 
                 <!-- GENERAL: NETWORK (cloud account + machine network) -->
-                <div id="set_tab_network" style="display:none">
+                <div id="set_tab_gateway" style="display:none">
                     <div class="settings-section">
-                        <div class="settings-section-title">CLOUD ACCOUNT</div>
-                        <div class="settings-hint">Connect your OWN cloud account (Google Drive / Dropbox / OneDrive) to sync projects — browser-direct, no server. Projects stay local until you connect.</div>
-                        <div id="set_cloud_mount" style="margin-top:8px"></div>
-                    </div>
-                    <div class="settings-section">
-                        <div class="settings-section-title">MACHINE NETWORK</div>
-                        <div class="settings-hint">Point this gateway at your controller's SMB share — or scan the LAN to find it. Live view/control needs the gateway (the desktop app); the hosted page can't reach a machine on your network.</div>
+                        <div class="settings-section-title">CONTROLLER</div>
+                        <div class="settings-hint">Point the gateway at your controller's CNCDISK share — or scan the LAN to find it. Needs the gateway (the desktop app); the hosted page can't reach a machine on your network.</div>
                         <div id="set_machinenet_mount" style="margin-top:8px"></div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">LAN ACCESS</div>
-                        <div class="settings-hint">Open Studio from a phone/laptop on the same wifi — your exe serves it (the "personal cloud"). Use this URL, not the hosted page.</div>
+                        <div class="settings-hint">Open Studio from a phone/laptop on the same wifi — your exe serves it. Use this URL, not the hosted page.</div>
                         <div id="set_lan_mount" style="margin-top:8px"></div>
+                    </div>
+                </div>
+
+                <!-- GENERAL: CLOUD (project storage — separate from the machine) -->
+                <div id="set_tab_cloud" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">CLOUD STORAGE</div>
+                        <div class="settings-hint">Sign in to your OWN cloud (Google Drive / Dropbox / OneDrive) to save &amp; sync project files — browser-direct, no server. This is file storage only; it does NOT connect to your machine. Projects stay local until you connect.</div>
+                        <div id="set_cloud_mount" style="margin-top:8px"></div>
                     </div>
                 </div>
 
@@ -1403,7 +1408,7 @@ function wireSettingsOverlay(ov) {
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
     const sideTabs = [...ov.querySelectorAll('.settings-sidebar .settings-tab')];
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
-        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_program', 'set_tab_feedback', 'set_tab_network', 'set_tab_about',
+        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_program', 'set_tab_feedback', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_about',
                      'set_tab_machine', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
