@@ -6,7 +6,6 @@
  */
 
 import { ThemeManager } from './ui/themes.js';
-import { ScaleManager } from './ui/scaleManager.js';
 import { VariableDatabase } from './data/variableDB.js';
 import { EditorManager } from './ui/editorManager.js';
 import { DockManager } from './ui/dockManager.js';
@@ -46,8 +45,6 @@ class DDCSStudio {
     constructor() {
         this.themeManager = new ThemeManager();
         console.debug('DDCSStudio: ThemeManager initialized');
-        this.scaleManager = new ScaleManager();
-        console.debug('DDCSStudio: ScaleManager initialized');
         this.variableDB = new VariableDatabase();
         console.debug('DDCSStudio: VariableDatabase initialized');
         this.editorManager = new EditorManager();
@@ -72,13 +69,6 @@ class DDCSStudio {
 
         // Setup file upload handler
         this.setupFileUpload();
-
-        // Setup window resize handler
-        window.addEventListener('resize', () => {
-            if (this.scaleManager.isAutoScale()) {
-                this.scaleManager.apply();
-            }
-        });
 
         // Visual Viewport -> detect virtual keyboard on mobile (adds/removes `keyboard-active` on <body>)
         if (window.visualViewport) {
@@ -109,25 +99,16 @@ class DDCSStudio {
             _checkKeyboard();
         }
 
-        // Apply initial scale
-        this.scaleManager.apply();
-
         // Initialize corner visualization
         this.initializeCornerVisualization();
         this.setupVisualizationListeners();
 
-        // Log layout snapshot for debugging: sizes, transforms, and visibility
-        window.addEventListener('scaleChanged', (ev) => {
-            console.debug('scaleChanged event received', ev.detail);
-            this.logLayoutSnapshot();
-        });
-        // initial snapshot
+        // Log layout snapshot for debugging: sizes and visibility
         this.logLayoutSnapshot();
     }
 
     logLayoutSnapshot() {
         try {
-            const bodyScale = document.body.getAttribute('data-scale');
             const bodyStyle = getComputedStyle(document.body);
             const appShell = document.querySelector('.app-shell');
             const main = document.querySelector('.main');
@@ -140,7 +121,6 @@ class DDCSStudio {
             const editorRect = editor ? editor.getBoundingClientRect() : null;
 
             console.debug('LayoutSnapshot', {
-                bodyScale,
                 bodyTransform: bodyStyle.transform,
                 bodyClient: { w: document.body.clientWidth, h: document.body.clientHeight },
                 appShellTransform: appShell ? getComputedStyle(appShell).transform : null,

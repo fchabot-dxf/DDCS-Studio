@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
     <title>DDCS Studio V10.23 - Modular</title>
     
@@ -107,14 +107,15 @@
             <button type="button" class="tab" data-app="settings" title="Settings" onclick="window.showApp && window.showApp('settings')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span class="app-tx">SETTINGS</span></button>
 
         </nav>
-        <div class="hdr-controls" style="display:flex;gap:10px;align-items:center">
+        <div class="hdr-controls">
             <select id="hdrPost" class="hdr-post" title="Post-processor — which controller's G-code to generate. 'Auto' follows the machine profile (Settings → Profile); override to emit for another controller."></select>
             <span id="hdrPostWarn" class="hdr-post-warn" hidden title="">⚠</span>
-            <div class="scale-ctl">
-                <button id="scaleBtn" class="op-btn scale-btn" title="Zoom"><span class="op-icon">🔍</span><span class="op-label">AUTO</span></button>
-            </div>
             <button class="op-btn hidden" id="transferBtn" title="Send the current program to the machine"><span class="op-icon">📡</span><span class="op-label">TRANSFER</span></button>
         </div>
+        <!-- Phone (≤600px): the project bar + post/transfer controls reparent into #hdrMenu behind this ☰
+             (they sit on opposite sides of the tabs and don't fit even icon-only). Wired in ui/commandDeck.js. -->
+        <button class="hdr-burger" id="hdrBurger" type="button" aria-label="More controls" aria-expanded="false" title="More controls">☰</button>
+        <div class="hdr-menu" id="hdrMenu"></div>
     </header>
 
     <div id="studio-app" class="app-shell">

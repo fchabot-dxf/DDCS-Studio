@@ -86,11 +86,6 @@ export function initGatewayStatus() {
         settingsTab?.classList.toggle('active', isSettings);
         blocksTab?.classList.toggle('active', isBlocks);
 
-        // Blockly breaks inside a CSS-zoomed ancestor, so the Blocks tab must run at body-zoom 1. Re-apply
-        // scaling now that visibility changed (applyBodyZoom forces zoom 1 while #blocks-app is visible, and
-        // restores the app zoom on the way out). Must precede initBlocks so Blockly injects in a 1.0 context.
-        try { window.scaleManager && window.scaleManager.apply(); } catch (_) { /* no scale manager */ }
-
         // Build/refresh the Blocks tab only after it's visible (canvas + three.js need layout). All Blocks logic
         // lives in blocksApp.showBlocks — this router just routes (the showApp router itself moves out of this
         // gateway-status module when the Gateway UI is built).

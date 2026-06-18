@@ -112,9 +112,9 @@ async function buildWorkspace() {
   // NOTE: we deliberately do NOT call B.setParentContainer(root). It relocated the popup singletons into
   // #blocks-app but left DropDownDiv's module-level `div` uncreated, so Blockly's GLOBAL window-resize handler
   // crashed in DropDownDiv.hide() (`Cannot read properties of undefined (reading 'style')`) on every resize —
-  // which aborted the async render queue and left the canvas blank. The Blocks tab already runs at body-zoom 1
-  // (scaleManager), so the popups are fine on <body> where Blockly puts them by default — same as our working
-  // reference Blockly app, which never calls setParentContainer.
+  // which aborted the async render queue and left the canvas blank. The app no longer CSS-zooms <body>, so the
+  // popups are fine on <body> where Blockly puts them by default — same as our working reference Blockly app,
+  // which never calls setParentContainer.
 
   const wsHost = document.getElementById('blk-ws');
   // A top bar (search + suggestion strip) ABOVE the Blockly workspace, so neither overlaps the toolbox/canvas

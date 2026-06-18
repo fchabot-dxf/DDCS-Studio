@@ -29,9 +29,8 @@ with sync_playwright() as p:
     page.goto(url, wait_until='load')
     # do smoke-like interactions to trigger behaviors and capture any errors
     try:
-        # click the style/scale buttons
+        # click the style button
         page.click('#styleBtn')
-        page.click('#scaleBtn')
     except Exception as e:
         print('Click error:', e)
 

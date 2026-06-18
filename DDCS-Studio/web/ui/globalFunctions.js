@@ -9,7 +9,6 @@ import { resetVirtualIO, setVirtualOutput, getVirtualInput } from '../engine/vir
 export function setupGlobalFunctions(app) {
         // Expose key functions to global scope for HTML onclick handlers
         window.toggleStyle = () => app.themeManager.toggle();
-        window.toggleScale = () => app.scaleManager.toggle();
         window.saveDefaults = () => app.saveDefaults();
         window.copyCode = () => app.editorManager.copyCode();
         window.clearCode = () => app.editorManager.clearCode();

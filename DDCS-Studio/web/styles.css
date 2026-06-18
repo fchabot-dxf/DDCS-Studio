@@ -136,6 +136,7 @@ html, body { overflow-x: clip; }
     background: var(--hdr-bg, var(--panel));
     border-bottom: 1px solid var(--border);
     user-select: none;
+    position: relative;   /* positioning context for the .is-burger controls dropdown */
 }
 
 .app-header > [data-fred-home-mount] { align-self: center; }
@@ -230,10 +231,8 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .app-header .op-btn.unavailable,
 .app-header .op-btn.unavailable:hover { opacity: .45; cursor: default; }
 
-/* Zoom control — the 🔍 button opens a small popover with a slider + AUTO (ui/scaleManager.js).
-   Anchored inside the header so body zoom can't misplace it. The DOWNLOAD menu (ui/downloadMenu.js)
-   reuses the same popover look (.dl-menu below shares .scale-pop). */
-.scale-ctl, .dl-ctl { position: relative; }
+/* Header popover base (.scale-pop) — used by the DOWNLOAD menu (ui/downloadMenu.js, .dl-menu). */
+.dl-ctl { position: relative; }
 .dl-menu { display: flex; flex-direction: column; gap: 8px; min-width: 280px; }
 .dl-menu .op-btn { width: 100%; text-decoration: none; text-align: left; }
 .scale-pop {
@@ -248,17 +247,6 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
     border-radius: var(--radius, 6px);
     box-shadow: 0 8px 22px rgba(0,0,0,.45);
 }
-.scale-pop .sp-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.scale-pop input[type="range"] { flex: 1; accent-color: var(--accent, #4a90e2); min-width: 130px; }
-.scale-pop .scale-val {
-    font-family: ui-monospace, Consolas, monospace;
-    font-size: 12px;
-    color: var(--text-main);
-    min-width: 42px;
-    text-align: right;
-}
-.scale-pop #scaleAutoBtn { width: 100%; }
-.scale-pop #scaleAutoBtn.on { border-color: var(--accent, #4a90e2); color: var(--accent, #4a90e2); }
 
 .gateway-dl-pop {
     position: fixed;
@@ -1647,10 +1635,10 @@ button.primary:hover {
 .wiz-box {
     /* Responsive, capped-fluid: near-full-width on mobile, comfortable cap on desktop.
        Two-pane wizards widen further (see .wiz-box.two-pane). */
-    width: calc(min(96vw, 560px) / var(--ui-zoom, 1));   /* ÷ zoom so the modal fills the screen even at body{zoom}<1 */
-    max-width: calc(96vw / var(--ui-zoom, 1));
+    width: min(96vw, 560px);
+    max-width: 96vw;
     max-height: 95vh;           /* fallback for older browsers */
-    max-height: calc(95dvh / var(--ui-zoom, 1));   /* dynamic viewport-aware height, zoom-compensated */
+    max-height: 95dvh;          /* dynamic viewport-aware height */
     margin-bottom: env(safe-area-inset-bottom);
     
     padding: 0 !important;      /* CRITICAL: No padding so header touches edges */
@@ -1675,8 +1663,8 @@ button.primary:hover {
    Collapses to a single column on mobile.
    ============================================ */
 .wiz-box.two-pane {
-    width: calc(min(97vw, 1180px) / var(--ui-zoom, 1));
-    height: calc(min(90dvh, 860px) / var(--ui-zoom, 1));   /* definite height so the right pane (3D) can span it */
+    width: min(97vw, 1180px);
+    height: min(90dvh, 860px);   /* definite height so the right pane (3D) can span it */
 }
 .two-pane .wiz-body { overflow: hidden; padding-bottom: 0; }
 .wiz-2pane { display: flex; gap: 14px; height: 100%; min-height: 0; align-items: stretch; }
@@ -1707,7 +1695,7 @@ button.primary:hover {
        0 and the position:absolute canvas (no in-flow height) overflows onto the form. Fix: size every
        visual element to its content (flex:0 0 auto) with a definite viz height, and let normal block
        flow stack visual-then-form. */
-    .wiz-box.two-pane { width: calc(min(96vw, 560px) / var(--ui-zoom, 1)); height: auto; }
+    .wiz-box.two-pane { width: min(96vw, 560px); height: auto; }
     .two-pane .wiz-body { overflow-y: auto; }
     .wiz-2pane { flex-direction: column; height: auto; }
     .wiz-2pane > .wiz-controls { order: 2; flex: 0 0 auto; overflow: visible; width: 100%; padding: 0; }
@@ -1989,7 +1977,7 @@ button.primary:hover {
    ============================================ */
 @media (max-width: 1024px) {
     .wiz-box {
-        width: calc((100% - 24px) / var(--ui-zoom, 1));
+        width: calc(100% - 24px);
     }
 
     .sidebar {
@@ -2789,50 +2777,6 @@ pre[id^="wiz_"][id$="_code"] .g-line.active-line { background: rgba(64, 110, 171
 /* Comment Color */
 .g-comment { color: var(--success) !important; font-weight: bold; }
 
-/* ============================================================================
-   GLOBAL SCALE SYSTEM - FIXED VERSION
-   Uses CSS zoom instead of transform for proper layout behavior
-   ============================================================================ */
-
-/* Remove the transform-based scaling and use zoom instead */
-body {
-    /* Remove: transform-origin: top left; */
-    /* Remove: transition: transform 0.2s ease; */
-}
-
-/* Scale using zoom (better layout preservation) */
-body[data-scale="75"] {
-    zoom: 0.75;
-}
-
-body[data-scale="100"] {
-    zoom: 1.0;
-}
-
-body[data-scale="auto"] {
-    /* inline computed zoom by ScaleManager (e.g., 112%) */
-}
-
-body[data-scale="125"] {
-    zoom: 1.25;
-}
-
-body[data-scale="150"] {
-    zoom: 1.5;
-}
-
-body[data-scale="175"] {
-    zoom: 1.75;
-}
-
-body[data-scale="200"] {
-    zoom: 2.0;
-}
-
-body[data-scale="250"] {
-    zoom: 2.5;
-}
-
 /* Ensure wizards still constrained to viewport when large */
 .overlay {
     position: fixed;
@@ -3182,25 +3126,6 @@ svg [id$="_wcs"] { display: none; }
 
 /* Wizard usage instructions */
 .wiz-usage { font-size: 10px; color: var(--text-dim); padding: 6px 8px; margin: 4px 0 6px; border-left: 2px solid var(--accent); background: rgba(255,255,255,0.03); line-height: 1.5; }
-
-/* Prevent wizard overflow at larger scales */
-body[data-scale="125"] .wiz-box,
-body[data-scale="150"] .wiz-box,
-body[data-scale="175"] .wiz-box,
-body[data-scale="200"] .wiz-box,
-body[data-scale="250"] .wiz-box {
-    max-width: 80vw;
-    max-height: 80vh;
-}
-
-/* Keep scrollbars functional for larger scale modes */
-body[data-scale="125"],
-body[data-scale="150"],
-body[data-scale="175"],
-body[data-scale="200"],
-body[data-scale="250"] {
-    overflow: auto;
-}
 
 /* ============================================
    VIEW TOGGLE FAB  (3D / CODE)  +  3D PREVIEW
@@ -3631,6 +3556,34 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .settings-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); }
 .settings-io { cursor: pointer; }
 
+/* Phone (≤600): the Settings tab is a 160px sidebar + content row (injected inline by ui/settingsPanel.js).
+   Stack it — sidebar becomes a horizontal scrolling tab strip, content goes full-width so selects stop
+   clipping. `body #settings-app …` so it outranks the runtime-injected `#settings-app …` rules. */
+@media (max-width: 600px) {
+    body #settings-app .settings-body { flex-direction: column; }
+    body #settings-app .settings-sidebar {
+        width: 100%;
+        flex: 0 0 auto;
+        flex-direction: row;
+        gap: 4px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 8px;
+    }
+    body #settings-app .settings-sidebar .settings-tab { width: auto; flex: 0 0 auto; }
+    body #settings-app .settings-sidebar .settings-tab.active {
+        border-left: none;
+        border-bottom: 3px solid var(--accent);
+        padding-left: 12px;
+    }
+    body #settings-app .settings-sidebar .sidebar-group-label { display: none; }
+    body #settings-app .settings-content { padding: 14px; }
+    body #settings-app .settings-field { max-width: none; }
+}
+
 /* Header op-buttons: never wrap labels to 2 lines; collapse to icon-only when narrow */
 .app-header { flex-wrap: nowrap; }
 .op-btn { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
@@ -3649,13 +3602,51 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
     .app-header .logo { height: 26px; }
 }
 /* The post-processor dropdown (200px) is the header's widest item — shrink it once the header collapses
-   (and further on phones) so the zoom / transfer controls stay on-screen instead of being clipped. */
+   (and further on phones) so the transfer control stays on-screen instead of being clipped. */
 .app-header.is-mini .hdr-post { max-width: 120px; }
 @media (max-width: 600px) {
     .hdr-post { max-width: 104px; font-size: 11px; padding: 4px 6px; }
     .app-header.is-mini .hdr-tabs .tab { padding: 0 8px; }
     .hdr-controls { gap: 6px; }
 }
+
+/* Phone ☰ (.is-burger, ≤600px): the project bar + post/transfer controls reparent into #hdrMenu
+   (ui/commandDeck.js _setupHeaderBurger) and open as a dropdown. */
+/* .app-header scope so this beats the per-theme `[data-theme=…] button { display:inline-flex }` skins. */
+.app-header .hdr-burger {
+    display: none;
+    margin-left: auto;
+    align-self: center;
+    background: transparent;
+    border: none;
+    color: var(--hdr-ink, var(--text-main));
+    font-size: 20px;
+    line-height: 1;
+    padding: 0 14px;
+    cursor: pointer;
+}
+.app-header.is-burger .hdr-burger { display: inline-flex; align-items: center; }
+.hdr-menu {
+    display: none;
+    position: absolute;
+    top: 54px;
+    right: 8px;
+    z-index: 1000;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    min-width: 200px;
+    padding: 10px;
+    background: var(--panel, #1e1e1e);
+    border: 1px solid var(--border, #444);
+    border-radius: var(--radius, 6px);
+    box-shadow: 0 8px 22px rgba(0,0,0,.45);
+}
+.hdr-menu.open { display: flex; }
+.hdr-menu .macro-bar,
+.hdr-menu .hdr-controls { display: flex; gap: 8px; align-items: center; margin: 0; }
+.hdr-menu .hdr-post { max-width: none; width: 100%; }
+.hdr-menu #transferBtn { flex: 1; justify-content: center; }
 
 /* ===== Portrait / mobile: 3D drawer pulls UP from the bottom of the editor ===== */
 @media (orientation: portrait) {
