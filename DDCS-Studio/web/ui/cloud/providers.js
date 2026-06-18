@@ -48,6 +48,9 @@ const ICONS = {
 };
 
 export const PROVIDER_IDS = Object.keys(CFG);
+// Providers actually OFFERED in the UI today. Dropbox/OneDrive are scaffolded above (PKCE config + icons) but not
+// finished — re-add their ids here once their adapters are done (see ui/cloud/cloudVolume.js).
+export const AVAILABLE_PROVIDER_IDS = ['google'];
 export function getProvider(id) { return CFG[id] || null; }
 export function providerLabel(id) { return (CFG[id] || {}).label || id; }
 export function providerIcon(id) { return ICONS[id] || ''; }

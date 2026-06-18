@@ -7,7 +7,7 @@
  * oauth-callback.html which postMessages the code back; we exchange it (PKCE, no secret) and store the token.
  * PROJECTS only — the connected account backs the ☁ Cloud volume. See [[gateway-cloud-architecture]].
  */
-import { getProvider, providerLabel, providerIcon, clientId, setClientId, redirectUri, PROVIDER_IDS } from './cloud/providers.js';
+import { getProvider, providerLabel, providerIcon, clientId, setClientId, redirectUri, AVAILABLE_PROVIDER_IDS } from './cloud/providers.js';
 import { makeChallenge, makeState, buildAuthUrl, exchangeCode } from './cloud/pkce.js';
 
 const TOK = 'ddcs_cloud_token', PROV = 'ddcs_cloud_provider', EMAIL = 'ddcs_cloud_email', REFRESH = 'ddcs_cloud_refresh';
@@ -150,7 +150,7 @@ export function renderCloudLogin(container) {
     status.className = 'cloud-status' + (a.connected ? '' : ' muted');
     status.textContent = a.connected
         ? `Connected · ${providerLabel(a.provider)}${a.email ? ' · ' + a.email : ''}`
-        : 'Not connected — projects stay local until you connect your own cloud account.';
+        : 'Not connected — sign in to sync your projects to your own Google Drive.';
     wrap.appendChild(status);
 
     if (a.connected) {
@@ -161,7 +161,7 @@ export function renderCloudLogin(container) {
     } else {
         const row = document.createElement('div');
         row.className = 'cloud-providers';
-        for (const id of PROVIDER_IDS) {
+        for (const id of AVAILABLE_PROVIDER_IDS) {
             const b = document.createElement('button');
             b.className = 'op-btn cloud-connect';
             b.innerHTML = providerIcon(id) + '<span>Connect ' + providerLabel(id) + '</span>';

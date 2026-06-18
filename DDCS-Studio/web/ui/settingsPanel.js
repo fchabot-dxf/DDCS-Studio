@@ -432,7 +432,7 @@ function buildSettingsOverlay() {
                 <div id="set_tab_cloud" style="display:none">
                     <div class="settings-section">
                         <div class="settings-section-title">CLOUD STORAGE</div>
-                        <div class="settings-hint">Sign in to your OWN cloud (Google Drive / Dropbox / OneDrive) to save &amp; sync project files — browser-direct, no server. This is file storage only; it does NOT connect to your machine. Projects stay local until you connect.</div>
+                        <div class="settings-hint">Sign in to your own Google Drive to save &amp; sync your project files — browser-direct, no server. This is file storage only; it does NOT connect to your machine.</div>
                         <div id="set_cloud_mount" style="margin-top:8px"></div>
                     </div>
                 </div>
@@ -483,7 +483,7 @@ function buildSettingsOverlay() {
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">CREDITS</div>
-                        <div class="settings-hint">Built by Frédéric · MIT License</div>
+                        <div class="settings-hint">Built by Frédéric Chabot · MIT License</div>
                     </div>
                 </div>
 
