@@ -28,6 +28,9 @@ export function disconnect() {
 export function connect(provider = 'google') {
     const p = getProvider(provider);
     if (!p) return;
+    // Desktop (exe/webview): Google's popup can't open + Google blocks embedded webviews, so route Google
+    // sign-in through the gateway's loopback flow (its client id lives in gateway config, not providers.js).
+    if (provider === 'google' && window.pywebview && window.pywebview.api) { connectGoogleDesktop(); return; }
     if (!clientId(provider)) {
         const v = window.prompt(
             `Connect ${p.label} — your OWN account (no server, no secret).\n\n`
@@ -52,6 +55,31 @@ async function connectGoogleFlow() {
     } catch (e) {
         if (String(e && e.message) !== 'sign-in cancelled') window.alert('Google sign-in failed: ' + (e && e.message));
     }
+}
+
+/** Desktop (exe): the gateway runs the loopback OAuth — opens the SYSTEM browser for consent and exchanges
+ *  the code server-side (bridge/bridge-app/fairy/oauth.py). We kick it off, then poll for the access token. */
+async function connectGoogleDesktop() {
+    let r;
+    try { r = await (await fetch('/oauth/google/start')).json(); }
+    catch (e) { window.alert('Could not reach the gateway to start Google sign-in.'); return; }
+    if (!r.ok) {
+        window.alert('Google sign-in unavailable: ' + (r.error || 'set a Google Desktop client id in the gateway Setup.'));
+        return;
+    }
+    // Consent is now open in the system browser; poll the gateway until it has exchanged a token (3 min cap).
+    const deadline = Date.now() + 180000;
+    const tick = async () => {
+        let t = {};
+        try { t = await (await fetch('/api/oauth/google/token')).json(); } catch (e) { /* keep polling */ }
+        if (t.access_token) {
+            try { localStorage.setItem(TOK, t.access_token); localStorage.setItem(PROV, 'google'); } catch (e) { /* */ }
+            window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
+            return;
+        }
+        if (Date.now() < deadline) setTimeout(tick, 1500);
+    };
+    setTimeout(tick, 2000);
 }
 
 async function openConnectModal(provider) {

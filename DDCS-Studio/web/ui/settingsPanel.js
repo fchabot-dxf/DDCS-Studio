@@ -69,7 +69,7 @@ export const STOCK_TEMPLATES = [
 const SETTINGS_DEFAULTS = {
     stock:   { x: 100, y: 80, z: 20, shape: 'boss', show: true },
     stockTemplates: [],   // user-saved presets: { name, x, y, z, shape }
-    machine: { x: 300, y: 300, z: 120, ox: 0, oy: 0, oz: 0, show: true },
+    machine: { x: 300, y: 300, z: 120, ox: 0, oy: 0, oz: 0, show: true, workOrigin: { x: 0, y: 0, z: 0 } },
     view:    { theta: -1.5708, phi: 1.0472 }, // 3D preview start orientation (front: +X right, +Y back)
     probes:  {
         probePin: 3, probeLevel: 0,        // IN03 = YunKia V6 3D probe (confirmed)
@@ -422,7 +422,13 @@ function buildSettingsOverlay() {
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">MACHINE NETWORK</div>
-                        <div class="settings-hint">Coming soon — controller connection (IP / port), live DRO, and program upload over the network.</div>
+                        <div class="settings-hint">Point this gateway at your controller's SMB share — or scan the LAN to find it. Live view/control needs the gateway (the desktop app); the hosted page can't reach a machine on your network.</div>
+                        <div id="set_machinenet_mount" style="margin-top:8px"></div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">LAN ACCESS</div>
+                        <div class="settings-hint">Open Studio from a phone/laptop on the same wifi — your exe serves it (the "personal cloud"). Use this URL, not the hosted page.</div>
+                        <div id="set_lan_mount" style="margin-top:8px"></div>
                     </div>
                 </div>
 
@@ -490,6 +496,13 @@ function buildSettingsOverlay() {
                             <label>Origin X<input type="number" id="set_mach_ox" step="1"></label>
                             <label>Origin Y<input type="number" id="set_mach_oy" step="1"></label>
                             <label>Origin Z<input type="number" id="set_mach_oz" step="1"></label>
+                        </div>
+                        <div class="settings-section-title sub">WORK ORIGIN — machine coords of part-zero (mm)</div>
+                        <div class="settings-hint">Where your G54 part-zero sits in machine coordinates (after homing + probing). Makes <code>G53</code> machine-frame moves (safe-Z retract, park) draw correctly in the sim. Leave 0 if program-zero = machine-zero. Auto-filled from a controller dump when available.</div>
+                        <div class="settings-grid">
+                            <label>Work origin X<input type="number" id="set_mach_wx" step="0.001"></label>
+                            <label>Work origin Y<input type="number" id="set_mach_wy" step="0.001"></label>
+                            <label>Work origin Z<input type="number" id="set_mach_wz" step="0.001"></label>
                         </div>
                         <label class="settings-check"><input type="checkbox" id="set_mach_show"> Show machine envelope in 3D</label>
                         <div class="settings-hint">Origin = program zero position within the envelope.</div>
@@ -685,11 +698,108 @@ function buildSettingsOverlay() {
     wireSettingsOverlay(parent);
 }
 
+// MACHINE NETWORK (Network tab): live controller connection through the gateway. Only meaningful when the
+// app is served by the gateway/exe (same-origin /api) — the hosted Cloudflare page can't reach a local machine.
+async function renderMachineNet(mount) {
+    if (!mount) return;
+    mount.textContent = 'Checking gateway…';
+    let d = null;
+    try { d = await (await fetch('/api/descriptor')).json(); } catch (e) { d = null; }
+    if (!d) {
+        mount.innerHTML = '<div class="settings-hint">Run the <b>desktop app</b> (the gateway) to connect a '
+            + 'controller — the hosted page can\'t reach a machine on your LAN.</div>';
+        return;
+    }
+    const connected = !!d.controller_connected;
+    const fam = (d.controller_family && d.controller_family !== 'unknown') ? d.controller_family : '';
+    const dest = d.dest || '';
+    const wrap = document.createElement('div');
+    wrap.innerHTML =
+        '<div class="cloud-status' + (connected ? '' : ' muted') + '">'
+        + (connected ? 'Connected' + (fam ? ' · ' + fam : '') + (dest ? ' · ' + dest : '')
+                     : 'Not connected' + (dest ? ' · ' + dest : ' — no controller share set')) + '</div>'
+        + '<label style="display:block;margin-top:8px">Controller share (SMB)'
+        + '<input id="mn_dest" type="text" placeholder="\\\\10.0.0.50\\cncdisk" value="' + dest.replace(/"/g, '&quot;') + '"></label>'
+        + '<div style="display:flex;gap:8px;margin-top:8px;align-items:center">'
+        + '<button class="op-btn" data-mn="save">Save &amp; connect</button>'
+        + '<button class="op-btn" data-mn="scan">🔍 Scan LAN</button>'
+        + '<span class="mn-msg" style="flex:1"></span></div>'
+        + '<div class="mn-results" style="margin-top:6px"></div>';
+    mount.replaceChildren(wrap);
+    const msg = wrap.querySelector('.mn-msg');
+    const results = wrap.querySelector('.mn-results');
+
+    async function save(val) {
+        const v = (val != null ? val : wrap.querySelector('#mn_dest').value).trim();
+        if (!v) { msg.textContent = 'Enter a share path.'; return; }
+        msg.textContent = 'Saving…';
+        try {
+            const r = await (await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dest: v }) })).json();
+            if (r && r.ok === false) { msg.textContent = r.error || 'Save failed.'; return; }
+        } catch (e) { msg.textContent = 'Save failed (gateway unreachable).'; return; }
+        renderMachineNet(mount);   // re-read status after applying
+    }
+    async function scan() {
+        msg.textContent = 'Scanning the LAN…'; results.textContent = '';
+        let list = [];
+        try { list = ((await (await fetch('/api/scan')).json()).controllers) || []; } catch (e) { msg.textContent = 'Scan failed.'; return; }
+        msg.textContent = list.length ? (list.length + ' found — pick one') : 'No controllers found on the LAN.';
+        results.replaceChildren(...list.map((c) => {
+            const b = document.createElement('button');
+            b.className = 'op-btn';
+            b.style.cssText = 'display:block;width:100%;text-align:left;margin-top:4px';
+            b.textContent = (c.family || 'controller') + ' · ' + c.ip + '  (' + c.dest + ')';
+            b.addEventListener('click', () => save(c.dest));
+            return b;
+        }));
+    }
+    wrap.addEventListener('click', (e) => {
+        const t = e.target.closest('[data-mn]'); if (!t) return;
+        if (t.dataset.mn === 'save') save(); else scan();
+    });
+}
+
+// LAN ACCESS (Network tab): the URL + QR other devices on the wifi use to reach THIS exe-served Studio
+// (the "personal cloud" — your exe serving the LAN, not Cloudflare). Needs the gateway; QR is generated
+// server-side (/api/lan-qr, pure-python SVG, offline).
+async function renderLanAccess(mount) {
+    if (!mount) return;
+    mount.textContent = 'Checking…';
+    let c = null;
+    try { c = await (await fetch('/api/config')).json(); } catch (e) { c = null; }
+    if (!c) { mount.innerHTML = '<div class="settings-hint">Available in the desktop app (the gateway).</div>'; return; }
+    const port = location.port || c.port || 8765;
+    const lanOn = c.host === '0.0.0.0';
+    const lanIp = c.lan_ip || '';
+    const lanUrl = (lanOn && lanIp) ? ('http://' + lanIp + ':' + port + '/') : '';
+    const wrap = document.createElement('div');
+    wrap.innerHTML =
+        '<label class="settings-check"><input type="checkbox" id="lan_toggle"' + (lanOn ? ' checked' : '') + '> Allow other devices on my network (LAN)</label>'
+        + '<div class="cloud-status" style="margin-top:6px">This PC: <code>http://localhost:' + port + '</code></div>'
+        + (lanUrl
+            ? '<div class="cloud-status" style="margin-top:4px">Other devices: <code>' + lanUrl + '</code></div>'
+              + '<img src="/api/lan-qr" alt="Scan to open on your phone" width="148" height="148" style="margin-top:8px;background:#fff;border-radius:6px;padding:6px" '
+              + 'onerror="this.style.display=\'none\'">'
+            : '<div class="cloud-status muted" style="margin-top:4px">Turn on LAN access to get a shareable URL + QR code.</div>')
+        + '<div class="lan-msg settings-hint" style="margin-top:6px"></div>';
+    mount.replaceChildren(wrap);
+    const msg = wrap.querySelector('.lan-msg');
+    wrap.querySelector('#lan_toggle').addEventListener('change', async (e) => {
+        msg.textContent = 'Saving…';
+        try { await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host: e.target.checked ? '0.0.0.0' : '127.0.0.1' }) }); }
+        catch (err) { msg.textContent = 'Save failed.'; return; }
+        msg.textContent = 'Saved — restart the app to apply the LAN binding.';
+        setTimeout(() => renderLanAccess(mount), 600);
+    });
+}
+
 function wireSettingsOverlay(ov) {
     const q = (id) => ov.querySelector('#' + id);
     const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 
     renderCloudLogin(q('set_cloud_mount'));   // cloud account login (Network tab) — shared with the Project Manager drawer
+    renderMachineNet(q('set_machinenet_mount'));   // MACHINE NETWORK: live controller connection via the gateway
+    renderLanAccess(q('set_lan_mount'));   // LAN ACCESS: shareable URL + QR for the exe-served Studio
 
     function updateVarCount() {
         const db = window.ddcsStudio && window.ddcsStudio.variableDB;
@@ -734,6 +844,7 @@ function wireSettingsOverlay(ov) {
         q('set_mach_ox').value = s.machine.ox;
         q('set_mach_oy').value = s.machine.oy;
         q('set_mach_oz').value = s.machine.oz;
+        { const w = s.machine.workOrigin || { x: 0, y: 0, z: 0 }; q('set_mach_wx').value = w.x; q('set_mach_wy').value = w.y; q('set_mach_wz').value = w.z; }
         q('set_mach_show').checked = !!s.machine.show;
         if (q('set_axis_a_role')) {
             const mo = s.motors || {};
@@ -923,6 +1034,19 @@ function wireSettingsOverlay(ov) {
             }
             _ddcsSettings.inputs = ins;
             syncFlatFromIO(_ddcsSettings);
+        }
+        // Machine-frame geometry from the dump: travel (envelope) + the active WCS work origin (→ the sim's
+        // G53 offset, machine coords of part-zero). Per-axis travel may be null (soft-limit disabled) → keep default.
+        const m = _ddcsSettings.machine || (_ddcsSettings.machine = {});
+        if (p.geometry && p.geometry.travel) {
+            const t = p.geometry.travel;
+            if (t.x != null && t.x > 0) m.x = t.x;
+            if (t.y != null && t.y > 0) m.y = t.y;
+            if (t.z != null && t.z > 0) m.z = t.z;
+        }
+        if (p.wcs && p.wcs.workOrigin) {
+            const wo = p.wcs.workOrigin;
+            m.workOrigin = { x: +wo.x || 0, y: +wo.y || 0, z: +wo.z || 0 };
         }
         saveSettings();
         fill();
@@ -1125,6 +1249,7 @@ function wireSettingsOverlay(ov) {
         s.machine.ox = num(q('set_mach_ox').value, s.machine.ox);
         s.machine.oy = num(q('set_mach_oy').value, s.machine.oy);
         s.machine.oz = num(q('set_mach_oz').value, s.machine.oz);
+        { const w = s.machine.workOrigin || (s.machine.workOrigin = { x: 0, y: 0, z: 0 }); w.x = num(q('set_mach_wx').value, w.x); w.y = num(q('set_mach_wy').value, w.y); w.z = num(q('set_mach_wz').value, w.z); }
         s.machine.show = q('set_mach_show').checked;
 
         s.probes.probePin = num(q('set_probe_pin').value, s.probes.probePin);

@@ -124,15 +124,20 @@ class Ops:
         }
 
     # --- controller detection (V4.1 vs Expert) -----------------------------
-    def _sysdisk_path(self):
-        """The SYSDISK share for the connected controller (holds the firmware + `setting`). expert_dest
-        is normally the CNCDISK share; swap the trailing share name to reach SYSDISK. None if no dest."""
-        dest = (self.cfg.expert_dest or "").rstrip("\\/")
+    @staticmethod
+    def _sysdisk_for(dest):
+        """SYSDISK share path for a given CNCDISK dest (swap the trailing share name). None if no dest.
+        Shared by the connected-controller path and the LAN scan (which fingerprints arbitrary hosts)."""
+        dest = (dest or "").rstrip("\\/")
         if not dest:
             return None
         if dest.upper().endswith("CNCDISK"):
             return dest[: -len("CNCDISK")] + "SYSDISK"
         return dest  # already SYSDISK, or an unknown share name — try as-is
+
+    def _sysdisk_path(self):
+        """The SYSDISK share for the connected controller (holds the firmware + `setting`)."""
+        return self._sysdisk_for(self.cfg.expert_dest)
 
     def detect_controller(self):
         """Read-only fingerprint of the connected controller (V4.1 vs Expert), from its firmware `.out`
@@ -142,34 +147,74 @@ class Ops:
         dest = self.cfg.expert_dest or ""
         if self._detect_cache and self._detect_cache[0] == dest:
             return self._detect_cache[1]
-        result = {"family": "unknown", "firmware": None, "signals": {}}
-        sysdisk = self._sysdisk_path()
-        if sysdisk and os.path.isdir(sysdisk):
-            fw = None
-            try:
-                outs = [n for n in sorted(os.listdir(sysdisk)) if n.lower().endswith(".out")]
-                fw = outs[0] if outs else None
-            except OSError:
-                fw = None
-            name = (fw or "").lower()
-            family, sig = "unknown", {}
-            if name == "ddcsv4.out":
-                family = "v4.1"
-            elif any(t in name for t in ("ddcse", "expert", "m350")):
-                family = "expert-m350"
-            elif fw:  # ambiguous filename — scan the firmware strings as a tiebreaker (read-only)
-                try:
-                    with open(os.path.join(sysdisk, fw), "rb") as f:
-                        text = f.read().decode("ascii", "ignore").lower()
-                except OSError:
-                    text = ""
-                sig = {k: (k.lower() in text) for k in self._FW_KEYS}
-                is_v4 = sig.get("DDCSV4", False)
-                is_exp = any(sig.get(k, False) for k in ("DDCSE", "Expert", "M350", "MSETDATA", "MGETDATA", "Modbus"))
-                family = "v4.1" if (is_v4 and not is_exp) else "expert-m350" if (is_exp and not is_v4) else "unknown"
-            result = {"family": family, "firmware": fw, "signals": sig}
+        result = self._fingerprint_sysdisk(self._sysdisk_path())
         self._detect_cache = (dest, result)
         return result
+
+    def _fingerprint_sysdisk(self, sysdisk):
+        """Family/firmware from a SYSDISK path's `.out` firmware file (`ddcsv4.out` = V4.1; else a filename
+        match, else a read-only string scan as tiebreaker). Read-only; never raises. Shared by
+        detect_controller (connected dest) and scan_controllers (arbitrary LAN hosts)."""
+        result = {"family": "unknown", "firmware": None, "signals": {}}
+        if not (sysdisk and os.path.isdir(sysdisk)):
+            return result
+        fw = None
+        try:
+            outs = [n for n in sorted(os.listdir(sysdisk)) if n.lower().endswith(".out")]
+            fw = outs[0] if outs else None
+        except OSError:
+            fw = None
+        name = (fw or "").lower()
+        family, sig = "unknown", {}
+        if name == "ddcsv4.out":
+            family = "v4.1"
+        elif any(t in name for t in ("ddcse", "expert", "m350")):
+            family = "expert-m350"
+        elif fw:  # ambiguous filename — scan the firmware strings as a tiebreaker (read-only)
+            try:
+                with open(os.path.join(sysdisk, fw), "rb") as f:
+                    text = f.read().decode("ascii", "ignore").lower()
+            except OSError:
+                text = ""
+            sig = {k: (k.lower() in text) for k in self._FW_KEYS}
+            is_v4 = sig.get("DDCSV4", False)
+            is_exp = any(sig.get(k, False) for k in ("DDCSE", "Expert", "M350", "MSETDATA", "MGETDATA", "Modbus"))
+            family = "v4.1" if (is_v4 and not is_exp) else "expert-m350" if (is_exp and not is_v4) else "unknown"
+        return {"family": family, "firmware": fw, "signals": sig}
+
+    def scan_controllers(self, timeout=0.3, workers=64):
+        """Discover DDCS controllers on the gateway PC's local /24: hosts with SMB (445) open that expose a
+        SYSDISK share whose `.out` fingerprints as V4.1/Expert. Read-only; never raises. Windows (UNC).
+        Returns [{ip, dest, family, firmware}] — `dest` is the CNCDISK share to set as expert_dest."""
+        import socket
+        import concurrent.futures
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))   # no packets sent — just learns the primary outbound IP
+            net = ".".join(s.getsockname()[0].split(".")[:3])
+            s.close()
+        except Exception:
+            return []
+
+        def smb_open(host):
+            try:
+                socket.create_connection((host, 445), timeout=timeout).close()
+                return host
+            except Exception:
+                return None
+
+        hosts = ["%s.%d" % (net, i) for i in range(1, 255)]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            live = [h for h in ex.map(smb_open, hosts) if h]
+        found = []
+        for h in live:
+            for share in ("cncdisk", "CNCDISK"):
+                dest = r"\\%s\%s" % (h, share)
+                fp = self._fingerprint_sysdisk(self._sysdisk_for(dest))
+                if fp["family"] != "unknown":
+                    found.append({"ip": h, "dest": dest, "family": fp["family"], "firmware": fp["firmware"]})
+                    break
+        return found
 
     # --- controller profile (shared with Studio) ---------------------------
     def profile(self):
@@ -195,6 +240,7 @@ class Ops:
             prof["source"] = "controller"
             prof["paramCount"] = len(params)
             self._map_setting_to_profile(params, prof)
+            self._map_geometry_to_profile(params, prof)
             prof["validation"] = self.validate_profile(params)   # reuse the read; UI shows match/warnings
         return prof
 
@@ -250,6 +296,66 @@ class Ops:
             "probe": probe, "probeLevel": level(self._PROBE_PORT + 2) if probe else 0,
             "setter": setter, "setterLevel": level(self._SETTER_PORT + 2) if setter else 0,
             "limits": {k: v for k, v in limits.items() if v},
+        }
+
+    # Machine-frame geometry + WCS offset table from the live `setting` array (param-space; macro = param + 500).
+    # Indices CONFIRMED against cfg_utf8/eng + a live-dump decode (2026-06-17, see VERIFY-AT-MACHINE.md):
+    #   soft limits neg #161-163 / pos #166-168  (±9999 = axis sentinel: "no soft limit on that axis")
+    #   homing dir  #112-114  (0 = negative, 1 = positive)
+    #   mach-zero   #235-237  ("mach pos at the mechanical zero switch")
+    #   active WCS  #78  (1..6 = G54..G59);  WCS offset table base #305 (= macro #805), stride 5 = [X,Y,Z,A,B]
+    # A WCS register holds the MACHINE coordinate of that work origin (direct `#805 = #880` sets G54 X = current
+    # machine X), so workOrigin (the active WCS's X/Y/Z) IS the sim's wcsOffset: part = machine - workOrigin.
+    _SOFT_NEG = (161, 162, 163)
+    _SOFT_POS = (166, 167, 168)
+    _HOMING_DIR = (112, 113, 114)
+    _MACH_ZERO = (235, 236, 237)
+    _ACTIVE_WCS = 78
+    _WCS_BASE = 305
+    _WCS_STRIDE = 5
+    _SENTINEL = 9999.0
+
+    def _map_geometry_to_profile(self, params, prof):
+        """Emit `geometry` (travel / soft-limits / homing / mach-zero) + `wcs` (active index, offset table,
+        and workOrigin = machine coords of part-zero) from the live `setting` array.
+        Read-only; never raises (bad indices fall back to 0 / None)."""
+        def at(i, default=0.0):
+            try:
+                v = params[i]
+                return float(v) if isinstance(v, (int, float)) else default
+            except (IndexError, TypeError):
+                return default
+
+        def span(neg_i, pos_i):  # travel = pos - neg; a ±9999 sentinel on either end means "no soft limit"
+            neg, pos = at(neg_i, -self._SENTINEL), at(pos_i, self._SENTINEL)
+            if abs(neg) >= self._SENTINEL or abs(pos) >= self._SENTINEL or pos <= neg:
+                return None
+            return round(pos - neg, 4)
+
+        active = at(self._ACTIVE_WCS, 1.0)
+        active = int(active) if 1 <= active <= 6 else 1
+        base = self._WCS_BASE + (active - 1) * self._WCS_STRIDE
+
+        table = {}
+        for w in range(6):
+            b = self._WCS_BASE + w * self._WCS_STRIDE
+            table["g%d" % (54 + w)] = [round(at(b), 4), round(at(b + 1), 4), round(at(b + 2), 4)]
+
+        prof["geometry"] = {
+            "travel": {"x": span(self._SOFT_NEG[0], self._SOFT_POS[0]),
+                       "y": span(self._SOFT_NEG[1], self._SOFT_POS[1]),
+                       "z": span(self._SOFT_NEG[2], self._SOFT_POS[2])},
+            "softLimits": {"xMin": at(self._SOFT_NEG[0]), "xMax": at(self._SOFT_POS[0]),
+                           "yMin": at(self._SOFT_NEG[1]), "yMax": at(self._SOFT_POS[1]),
+                           "zMin": at(self._SOFT_NEG[2]), "zMax": at(self._SOFT_POS[2])},
+            "homingDir": {"x": int(at(self._HOMING_DIR[0])), "y": int(at(self._HOMING_DIR[1])),
+                          "z": int(at(self._HOMING_DIR[2]))},
+            "machZero": {"x": at(self._MACH_ZERO[0]), "y": at(self._MACH_ZERO[1]), "z": at(self._MACH_ZERO[2])},
+        }
+        prof["wcs"] = {
+            "active": active,
+            "workOrigin": {"x": round(at(base), 4), "y": round(at(base + 1), 4), "z": round(at(base + 2), 4)},
+            "table": table,
         }
 
     # Expected `setting` shape + anchor sanity for the Expert — used to confirm the live file decoded

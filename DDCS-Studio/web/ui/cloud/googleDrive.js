@@ -64,6 +64,14 @@ async function api(url, opts = {}, retried = false) {
  *  ~1h token expiry and page reloads, so there's no hourly re-login. Throws if there's no client id or the silent
  *  grant fails (e.g. no Google session) — then the UI shows a reconnect. */
 async function silentRefresh() {
+    // Desktop (exe): GIS can't run in the embedded webview — the gateway holds the refresh token and mints a
+    // fresh access token (bridge/bridge-app/fairy/oauth.py). Pull it and cache it for api().
+    if (window.pywebview && window.pywebview.api) {
+        let t = {};
+        try { t = await (await fetch('/api/oauth/google/token')).json(); } catch (e) { /* */ }
+        if (t.access_token) { try { localStorage.setItem(TOK, t.access_token); } catch (e) { /* */ } return; }
+        throw new Error('silent-fail');
+    }
     await loadGis();
     const cid = clientId('google');
     if (!cid) throw new Error('no client id');

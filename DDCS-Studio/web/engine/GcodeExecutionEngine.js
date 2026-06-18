@@ -15,7 +15,7 @@ import { loadProgram as loadProgramText, stripLine } from './core/program.js';
 import { arcPoints } from './core/arc.js';
 
 export class GcodeExecutionEngine {
-    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
+    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
         this.stepDelay = Number.isFinite(stepDelay) ? stepDelay : 250;
         // Time-true playback: moves take distance/feedrate (rapids at rapidRate),
         // divided by simSpeed (1 = real time). Slow probes crawl, rapids zip.
@@ -38,6 +38,10 @@ export class GcodeExecutionEngine {
         // runs. The probe-vs-stock collision test adds this so probes touch the real surface; the recorded
         // route stays origin-relative (the viz offsets it by the start marker). Default = origin.
         this._stockOffset = stockOffset || { x: 0, y: 0, z: 0 };
+        // Work origin (active WCS) expressed in MACHINE coords — the machine coordinate of part-zero.
+        // Lets G53 machine-frame moves draw in the part/WCS frame the rest of the route uses:
+        // part = machine - wcsOffset. Default = origin, so when unknown (no dump/profile) G53 is unchanged.
+        this._wcsOffset = wcsOffset || { x: 0, y: 0, z: 0 };
         this.syntaxValidator = typeof syntaxValidator === 'function' ? syntaxValidator : null;
         // Auto-answer: a virtual sensor satisfies any M31/M33 wait after autoAnswerMs,
         // even for pins the truth table doesn't know — so any user's macro completes
@@ -634,8 +638,10 @@ export class GcodeExecutionEngine {
             return false;
         }
 
-        // G53 = one-shot machine-coordinate move, always ABSOLUTE. It used to be SKIPPED, so ATC park / tool-change
-        // (and the bore re-centre) moves never drew in the preview — trace it as an absolute move instead.
+        // G53 = one-shot machine-coordinate move, always ABSOLUTE. It used to be SKIPPED (ATC park / tool-change
+        // never drew), then traced as a plain absolute move — but that plotted MACHINE coords in the part/WCS
+        // frame, so a `G53 Z-5` safe-Z retract drew below the part. Now we map machine -> part:
+        // part = machine - wcsOffset (wcsOffset defaults to origin, so it's a no-op until a dump/profile sets it).
         const g53 = gcodes.includes(53);
 
         const target = { x: this.pos.x, y: this.pos.y, z: this.pos.z };
@@ -647,7 +653,9 @@ export class GcodeExecutionEngine {
                 bad = true;
                 return;
             }
-            target[field] = (this.absolute || g53) ? value * this.unitScale : this.pos[field] + value * this.unitScale;
+            target[field] = g53 ? value * this.unitScale - (this._wcsOffset[field] || 0)
+                          : this.absolute ? value * this.unitScale
+                          : this.pos[field] + value * this.unitScale;
         };
         setAxis('X', 'x');
         setAxis('Y', 'y');

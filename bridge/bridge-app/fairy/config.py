@@ -45,6 +45,12 @@ class Config:
     machine_name: str = ""                  # human label, e.g. "Ultimate Bee"
     identity_filename: str = ".bridge-machine.json"   # written on the controller's disk
 
+    # --- BYO cloud (desktop OAuth; oauth.py) -------------------------------
+    google_client_id: str = ""              # Google "Desktop app" OAuth client id — enables the loopback Drive
+                                            # sign-in inside the exe; empty = desktop Google disabled
+    google_client_secret: str = ""          # the Desktop client's secret (non-confidential for installed apps);
+                                            # sent in the token exchange when set (Google's Desktop flow expects it)
+
     # --- local server (offline / local configs: serve the console + ops API) ------
     serve: bool = False                     # run the local HTTP server (server.py)
     host: str = "127.0.0.1"                 # bind address (0.0.0.0 to reach from the LAN)
@@ -64,6 +70,8 @@ class Config:
         "dest": "expert_dest", "machine_name": "machine_name", "machine_id": "machine_id",
         "com_port": "com_port", "backend": "backend", "enable_slave": "enable_slave",
         "host": "host",   # LAN serving toggle ("127.0.0.1" | "0.0.0.0") — COMBINED-APP-PLAN Step 3
+        "google_client_id": "google_client_id",   # Google Desktop OAuth client id (BYO cloud / Drive sign-in)
+        "google_client_secret": "google_client_secret",
     }
 
     @staticmethod

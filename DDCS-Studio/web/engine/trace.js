@@ -11,6 +11,8 @@
  *   opts.start          operator start in stock coords → probes test from the real tool position (incremental
  *                       probe macros otherwise trace from the origin, on the stock face, and the first probe
  *                       clamps to zero length). The route stays origin-relative; the viz offsets it by the start.
+ *   opts.wcsOffset      work origin in MACHINE coords (machine coord of part-zero) → G53 machine-frame moves
+ *                       draw in the part/WCS frame instead of raw machine coords. Default = origin (no-op).
  *   opts.createVarStore seed controller params (#632/#1078/…) so "read from controller" feeds resolve
  */
 import { GcodeExecutionEngine } from './GcodeExecutionEngine.js';
@@ -20,6 +22,7 @@ export function traceToolpath(text, opts = {}) {
         autoAnswer: true,                 // hands-free: virtual sensors/probes satisfy so loops terminate
         stock: opts.stock || null,
         stockOffset: opts.start || null,
+        wcsOffset: opts.wcsOffset || null,   // work origin in MACHINE coords → G53 moves draw in the part frame
         createVarStore: opts.createVarStore || null,
     });
     return eng.trace(String(text || ''));

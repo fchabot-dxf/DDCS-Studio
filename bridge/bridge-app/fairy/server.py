@@ -27,6 +27,8 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from . import oauth   # desktop (loopback) Google OAuth — see oauth.py
+
 # ES modules must be served with a JS MIME type or the browser refuses them. On Windows mimetypes
 # reads the registry, where .js sometimes maps to text/plain — pin .js/.mjs so the console and the
 # /shared/ modules always load as modules.
@@ -64,6 +66,14 @@ class _Handler(BaseHTTPRequestHandler):
             return json.loads(self.rfile.read(n).decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
             return {}
+
+    def _send_html(self, html, code=200):
+        body = html.encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def log_message(self, *a):  # keep the gateway log clean
         pass
@@ -108,6 +118,48 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send_json(self.ops.list_files())
         if path == "/api/file":
             return self._send_json(self.ops.read_file((q.get("name") or [""])[0]))
+        if path == "/api/scan":
+            return self._send_json({"controllers": self.ops.scan_controllers()})
+        if path == "/api/lan-qr":
+            try:                              # QR of the LAN URL (pure-python SVG, offline) for the Settings LAN ACCESS panel
+                import io
+                import qrcode
+                import qrcode.image.svg
+                url = "http://%s:%d/" % (self.ops._lan_ip(), self.server.server_address[1])
+                buf = io.BytesIO()
+                qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage).save(buf)
+                svg = buf.getvalue()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/svg+xml")
+                self.send_header("Content-Length", str(len(svg)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(svg)
+            except Exception as e:
+                self._send_json({"error": "qr unavailable: %s" % e}, 500)
+            return
+        # --- desktop Google OAuth (loopback flow; oauth.py). The exe's webview can't run Google's popup,
+        #     so the gateway opens the SYSTEM browser and catches the redirect here, exchanging server-side.
+        if path == "/oauth/google/start":
+            cid = self.ops.cfg.google_client_id
+            if not cid:
+                return self._send_json({"ok": False, "error": "no Google Desktop client id (Setup > Network)"}, 400)
+            redirect = "http://127.0.0.1:%d/oauth/google/callback" % self.server.server_address[1]
+            try:
+                return self._send_json({"ok": True, "url": oauth.start(cid, redirect)})
+            except Exception as e:
+                return self._send_json({"ok": False, "error": str(e)}, 500)
+        if path == "/oauth/google/callback":
+            ok = oauth.callback(self.ops.cfg.google_client_id, self.ops.cfg.google_client_secret, (q.get("state") or [""])[0], (q.get("code") or [""])[0])
+            note = ("Signed in to Google Drive — close this tab and return to DDCS Studio." if ok
+                    else "Sign-in failed — close this tab and try again from DDCS Studio.")
+            return self._send_html("<!doctype html><meta charset=utf-8><title>DDCS Studio</title>"
+                                   "<body style='font:16px system-ui;padding:3em;text-align:center'><h2>%s</h2></body>" % note)
+        if path == "/api/oauth/google/token":
+            cid = self.ops.cfg.google_client_id
+            return self._send_json({"access_token": oauth.access_token(cid, self.ops.cfg.google_client_secret) if cid else "", "connected": oauth.connected()})
+        if path == "/api/oauth/google/status":
+            return self._send_json({"connected": oauth.connected(), "configured": bool(self.ops.cfg.google_client_id)})
         if path.startswith("/shared/"):
             # the monorepo shared/ core (client.js, instrument/, …) — single source, served as-is (no build)
             return self._serve_file(self.server.shared_dir, path[len("/shared/"):])

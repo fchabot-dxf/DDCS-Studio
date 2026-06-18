@@ -26,6 +26,8 @@ import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock mo
 // Stock button (you set the workpiece where you see it). The modal persists to the shared stock store and
 // broadcasts ddcs:settings-changed; every panel reads it here + re-renders, so all previews show the same stock.
 const stockForViz = () => { const s = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null; return (s && s.show) ? s : null; };
+const wcsForViz = () => { const m = (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null; return (m && m.workOrigin) ? m.workOrigin : null; };   // work origin in MACHINE coords → G53 moves draw in the part frame
+const machineForViz = () => (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null;   // envelope: travel + show + ox/oy/oz (drawn by viz.setMachine, gated on machine.show)
 const previewPrefs = () => (window.ddcsGetSettings && window.ddcsGetSettings().preview) || {};   // Settings → Preview tab
 
 // Custom transport icons (currentColor → inherit the button's text colour), in place of emoji.
@@ -108,7 +110,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     function ensureViz() {
         if (viz) return viz;
-        try { viz = new GcodeViz3D(container); viz._gizmoPx = 36; viz._animOn = false; viz.setStock(stockForViz()); applyPreviewSettings(); }
+        try { viz = new GcodeViz3D(container); viz._gizmoPx = 36; viz._animOn = false; viz.setStock(stockForViz()); viz.setMachine(machineForViz()); applyPreviewSettings(); }
         catch (e) { console.warn('preview 3D unavailable — using 2D', e); viz = null; setMode('2d'); }
         return viz;
     }
@@ -119,6 +121,7 @@ export function createPreviewPanel(container, opts = {}) {
         engine = new GcodeExecutionEngine({
             autoAnswer: window.ioPanel ? window.ioPanel.isAutoSensors() : true,
             stock: stockForViz(),
+            wcsOffset: wcsForViz(),
             simSpeed: simSpeed(),
             createVarStore: opts.createVarStore || null,
             onLineChange: ({ lineIndex, raw }) => { if (typeof opts.onLine === 'function') opts.onLine(lineIndex); if (raw) setStatus(`Executing line ${lineIndex + 1}: ${raw.trim()}`); },
@@ -147,7 +150,7 @@ export function createPreviewPanel(container, opts = {}) {
         // Inferred operator start (wizard preview): probes test from the real tool position so an incremental
         // probe macro doesn't trace from the origin (on the stock face) and clamp its first probe to zero.
         const st = get('getStart');
-        let parsed; try { parsed = traceToolpath(code, { stock: stockForViz(), start: st }); }
+        let parsed; try { parsed = traceToolpath(code, { stock: stockForViz(), start: st, wcsOffset: wcsForViz() }); }
         catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
         segs = parsed.segments || [];
         t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
@@ -226,6 +229,7 @@ export function createPreviewPanel(container, opts = {}) {
         eng.autoAnswer = window.ioPanel ? window.ioPanel.isAutoSensors() : true;
         eng.stock = stockForViz();
         eng._stockOffset = get('getStart') || { x: 0, y: 0, z: 0 };   // probes test from the operator start (see trace.js)
+        eng._wcsOffset = wcsForViz() || { x: 0, y: 0, z: 0 };          // G53 machine moves draw in the part frame (see trace.js)
         if (mode === '3d') ensureViz();
         if (viz) viz.setAnimate(false);                 // engine drives the tool/trail, not the geometric sweep
         lastRunCode = get('getGcode') || '';
@@ -290,7 +294,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     window.addEventListener('ddcs:stop-previews', stopPlay);
     // Stock (or other settings) changed — e.g. the Stock modal — update the workpiece box + re-trace (probe clamp).
-    window.addEventListener('ddcs:settings-changed', () => { renderStock(); applyPreviewSettings(); if (active) setGcode(); });
+    window.addEventListener('ddcs:settings-changed', () => { renderStock(); if (viz) viz.setMachine(machineForViz()); applyPreviewSettings(); if (active) setGcode(); });
 
     function setActive(on) {
         active = !!on;

@@ -196,6 +196,33 @@ def _tracking_active():
         return False
 
 
+def _shutdown_other(port):
+    """Force-close whatever is LISTENING on <port> so this instance can take it over. Forceful (taskkill):
+    job state is durable and the OS reclaims the COM port on exit. Windows-only; best-effort, never raises.
+    Returns True once the port is actually free."""
+    import subprocess
+    pids = set()
+    try:
+        out = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, text=True, timeout=5).stdout
+        for line in out.splitlines():
+            parts = line.split()
+            if (len(parts) >= 5 and parts[0].upper() in ("TCP", "TCP6")
+                    and parts[1].endswith(f":{port}") and parts[3].upper() == "LISTENING"):
+                pids.add(parts[4])
+    except Exception:
+        return _port_free(port)
+    for pid in pids:
+        try:
+            subprocess.run(["taskkill", "/PID", pid, "/F"], capture_output=True, timeout=5)
+        except Exception:
+            pass
+    for _ in range(25):                 # wait up to ~5s for the OS to release the socket
+        if _port_free(port):
+            return True
+        time.sleep(0.2)
+    return _port_free(port)
+
+
 def main():
     _setup_logging()
     # Single-instance lock + port fallback (COMBINED-APP-PLAN Step 4): two gateways would double-bind the HTTP
@@ -204,10 +231,22 @@ def main():
     global PORT
     PORT, already_running = _pick_port()
     if already_running:
-        _msgbox(f"Already running — another gateway is answering on port {PORT}.\n\n"
-                "Use the open window (or close it first); two copies would fight over the COM port.")
-        print(f"[fairy] another instance answers on :{PORT} — exiting.")
-        return
+        # Default = TAKE OVER the port (close the other instance, start here). A stale/forgotten/orphaned
+        # gateway is replaced seamlessly: job state is durable on disk and Studio state persists, so the new
+        # window comes back to the same place. The ONLY thing unsafe to interrupt is a file TRANSFER to the
+        # controller (mid-write could deliver a partial .nc) — so we ASK FIRST only when a job is in flight.
+        if _tracking_active():
+            if not _msgbox(f"DDCS Studio is already running on port {PORT} and a job is in flight.\n\n"
+                           "Taking over now could interrupt a file transfer to the controller. "
+                           "Close it and take over anyway?", yesno=True):
+                print(f"[fairy] another instance on :{PORT} is busy — left running, exiting.")
+                return
+        print(f"[fairy] taking over :{PORT} — closing the other instance…")
+        if not _shutdown_other(PORT):
+            _msgbox(f"Couldn't free port {PORT}. Close the other DDCS Studio window manually, then relaunch.")
+            print(f"[fairy] :{PORT} still in use after take-over — exiting.")
+            return
+        PORT, _ = _pick_port()   # port is free now — bind it and start normally below
     print(f"[fairy] serving on http://{HOST}:{PORT}")
     user_args = sys.argv[1:]
     threading.Thread(target=_run_gateway, args=(user_args,), daemon=True).start()
