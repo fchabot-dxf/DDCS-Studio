@@ -72,6 +72,8 @@ export const dialect = {
             let ax = sys - 1925; if (ax >= 0 && ax <= 3) return { type: 'proberead', params: { axis: AXR[ax], var: m[1] } };
             ax = sys - 880; if (ax >= 0 && ax <= 3) return { type: 'readmachine', params: { axis: AXR[ax], var: m[1] } };
         }
+        // generic digital output toggle: M50/M52/… = on, M51/M53/… = off (slib O10050+, write #1552+; pins 0-20)
+        if ((m = line.match(/^M0*(\d+)$/))) { const mc = +m[1]; if (mc >= 50 && mc <= 91) return { type: 'outpin', params: { pin: (mc - 50) >> 1, state: (mc - 50) % 2 === 0 ? 'on' : 'off' } }; }
         return null;
     },
 

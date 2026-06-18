@@ -116,11 +116,29 @@ export function parseLine(line, opts = {}) {
  *  Feedrate is modal (mirror of blockModel's applyModalFeed): a cut/probe/arc line with no F inherits the
  *  current feed, so a block emits the right F on re-projection and the round-trip stays byte-exact. Only an F
  *  attached to a motion line tracks modal — a standalone `F300` (feed op) is left as its own block. */
+// Multi-line: collapse the DDCS-Expert wait-on-input poll (waitInputBlock's emit) back into ONE waitinput block —
+// otherwise its WHILE/END lines fall to raw blocks. Matches: `WHILE [#[1520+N] != L] DO1` / `G04 P<ms>` / `END1`
+// (L = 0|1). Gated to inputRead posts (the Expert) so it never collapses on a controller that can't re-emit it.
+function matchWaitInputPoll(lines, i, opts) {
+    const d = opts && opts.dialect;
+    if (!(d && d.caps && d.caps.inputRead)) return null;
+    const m = String(lines[i]).trim().match(/^WHILE\s*\[#\[1520\+(\d+)\]\s*!=\s*([01])\]\s*DO1\b/i);
+    if (!m) return null;
+    let j = i + 1; while (j < lines.length && !lines[j].trim()) j++;                          // next: the poll dwell
+    if (j >= lines.length || !/^G0*4\s+P[\d.]+/i.test(lines[j].trim())) return null;
+    let k = j + 1; while (k < lines.length && !lines[k].trim()) k++;                          // then: END1
+    if (k >= lines.length || !/^END1\b/i.test(lines[k].trim())) return null;
+    return { rec: { type: 'waitinput', params: { pin: Number(m[1]), mode: Number(m[2]) === 1 ? 'high' : 'low' } }, end: k };
+}
+
 export function parseGcodeToStack(text, opts = {}) {
     const out = [];
     let modalFeed = null;
-    for (const line of String(text || '').split('\n')) {
-        const rec = parseLine(line, opts);
+    const lines = String(text || '').split('\n');
+    for (let i = 0; i < lines.length; i++) {
+        const wi = matchWaitInputPoll(lines, i, opts);    // multi-line: WHILE-poll → one Wait Input block (else raw)
+        if (wi) { out.push(wi.rec); i = wi.end; continue; }
+        const rec = parseLine(lines[i], opts);
         if (!rec) continue;
         if (rec.type === 'arc' || (rec.type === 'move' && (rec.params.mode === 'cut' || rec.params.mode === 'probe'))) {
             if (typeof rec.params.feed === 'number') modalFeed = rec.params.feed;            // an F sets the modal feed
