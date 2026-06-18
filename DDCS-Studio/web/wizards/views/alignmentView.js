@@ -73,18 +73,6 @@ export const alignmentView = {
             status.textContent = `Alignment | Check: ${params.checkAxis} | Probe: ${probeAxis}`;
         }
 
-        // Update alignment visualization
-        if (window.drawAlignmentViz) {
-            try {
-                const drawResult = window.drawAlignmentViz();
-                if (drawResult && typeof drawResult.then === 'function') {
-                    drawResult.then(() => startAlignmentAnim()).catch(() => {});
-                } else {
-                    startAlignmentAnim();
-                }
-            } catch (e) { console.warn('drawAlignmentViz failed', e); }
-        } else {
-            startAlignmentAnim();
-        }
+        startAlignmentAnim();
     },
 };

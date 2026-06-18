@@ -40,9 +40,6 @@ export const edgeView = {
 
     onOpen(ctx) {
         setTimeout(() => {
-            // prefer specialized edge SVG loader when available
-            if (window.drawEdgeViz) window.drawEdgeViz();
-            else if (window.drawProbeViz) window.drawProbeViz();
             ctx.update();
             // start animator similar to corner animator
             setTimeout(() => { startEdgeAnim(); }, 60);
@@ -77,11 +74,5 @@ export const edgeView = {
         const edgeStatus = el('edgeVizStatus');
         if (edgeStatus) edgeStatus.textContent = `Edge: ${params.axis}${params.dir === 'pos' ? '+' : '-'}`;
 
-        // Update visualization: prefer specialized edge SVG loader if available
-        if (window.drawEdgeViz) {
-            window.drawEdgeViz();
-        } else if (window.drawProbeViz) {
-            window.drawProbeViz();
-        }
     },
 };

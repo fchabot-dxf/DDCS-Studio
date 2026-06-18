@@ -46,7 +46,6 @@ export const cornerView = {
 
     onOpen() {
         setTimeout(async () => {
-            if (window.drawCornerViz) await window.drawCornerViz();
             startCornerAnim();
         }, 50);
     },
@@ -86,10 +85,7 @@ export const cornerView = {
         const cornerStatus = el('cornerVizStatus');
         if (cornerStatus) cornerStatus.textContent = `Corner: ${params.corner} (${dirMap[params.corner]}) - ${params.probeSeq}` + (params.probeZ ? ' + Z' : '');
 
-        // Update visualization and restart animator
-        if (window.drawCornerViz) {
-            window.drawCornerViz(params.probeZFirst);
-        }
+        // Restart animator
         startCornerAnim();
     },
 };

@@ -99,7 +99,7 @@ const DESCRIPTIONS = {
 const getDesc = (f) => DESCRIPTIONS[f.toLowerCase()] || `The ${f} parameter`;
 
 const optionsFor = (def, field) => {
-    if (field === 'op') return def.type === 'compare' ? ['<', '>', '<=', '>=', '==', '!='] : ['+', '-', '*', '/', '%'];
+    if (field === 'op') return (def.type === 'compare' || def.type === 'ifgoto') ? ['<', '>', '<=', '>=', '==', '!='] : ['+', '-', '*', '/', '%'];
     if (field === 'mode') {
         if (def.type === 'pathmode') return ['blend', 'exact'];
         if (def.type === 'waitinput') return ['imm', 'rise', 'fall', 'high', 'low'];

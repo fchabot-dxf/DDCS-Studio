@@ -79,34 +79,6 @@ export const middleView = {
         const bothLabel = params.findBoth ? ` (both: ${params.dir1}/${params.dir2})` : '';
         if (middleStatus) middleStatus.textContent = `Middle: ${params.featureType} | ${params.axis} ${dirLabel}${bothLabel}`;
 
-        // Update visualization if function exists — await SVG injection so autoplay can find elements
-        if (window.drawMiddleViz) {
-            console.debug('middleView.update: calling drawMiddleViz and awaiting completion');
-            await window.drawMiddleViz();
-            console.debug('middleView.update: drawMiddleViz complete');
-
-            // Diagnostic: show available SVG IDs and resolved selectors in the status area
-            try {
-                const svgRoot = document.getElementById('middleVizContainer')?.querySelector('svg');
-                const statusEl = document.getElementById('middleVizStatus');
-                if (!svgRoot) {
-                    if (statusEl) statusEl.textContent = 'ERROR: SVG not injected into middleVizContainer';
-                    console.warn('middleView.update: svgRoot missing after drawMiddleViz');
-                } else {
-                    const ids = Array.from(svgRoot.querySelectorAll('[id]')).map(e => e.id);
-                    if (statusEl) {
-                        // Show the first non-empty line of the generated G-code (the current configC)
-                        const firstLine = (gcode || '').split(/\r?\n/).find(l => l.trim().length > 0)
-                            || `Middle: ${params.featureType} | ${params.axis} ${dirLabel}${bothLabel}`;
-                        const title = firstLine.length > 80 ? firstLine.slice(0, 77) + '...' : firstLine;
-                        // Only show the config (do not append SVG element counts)
-                        statusEl.textContent = title;
-                    }
-                    console.debug('middleView.update: SVG element IDs (first 60)=', ids.slice(0, 60));
-                }
-            } catch (e) { console.warn('middleView.update: diagnostics failed', e); }
-        }
-
         // Autoplay simulation when Middle wizard is opened — use discoverAnimSteps + PathAnimator
         if (window.discoverAnimSteps && window.PathAnimator) {
             try {
