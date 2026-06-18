@@ -33,8 +33,8 @@
         .wizard-bar button:hover { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
         
         /* The Blockly Canvas */
-        .main { display:grid; grid-template-columns:1fr; flex:1; min-height:0; position: relative; }
-        #ws { position:absolute; top:0; left:0; right:0; bottom:0; }
+        .main { display:flex; flex-direction:column; flex:1; min-height:0; }
+        #ws { flex:1; min-height:0; position:relative; }
 
         /* Main-UI tab bar (extension shell). Header is 54px so the forked .app-shell/.gateway-app panels
            (position:absolute; top:54px) sit flush beneath it. */
@@ -44,7 +44,9 @@
                    border-radius:4px; cursor:pointer; font-weight:600; letter-spacing:.03em; font-size:12px; }
         .ext-tab:hover { color:var(--ink); }
         .ext-tab.active { color:var(--ink); background:#26303d; border-color:#39465a; }
-        .wiz-launchers { margin-left:auto; display:flex; gap:8px; align-items:center; }
+        .wiz-launchers { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line); }
+        .wiz-launchers button { padding:6px 12px; background:#26303d; border:1px solid #39465a; color:#cbd5e1; border-radius:4px; cursor:pointer; font-size:12px; }
+        .wiz-sep { width:1px; align-self:stretch; background:var(--line); margin:2px 4px; }
         
         /* Modals for wizards */
         #wizard { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
@@ -59,24 +61,49 @@
   <div class="wrap">
     <!-- WIZARD BAR -->
     <header class="wizard-bar">
-      <h1>DDCS STUDIO</h1>
+      <h1>DDCS Extension</h1>
       <nav class="ext-tabs" role="tablist">
         <button type="button" class="ext-tab active" data-app="blocks" onclick="window.showApp('blocks')">BLOCKS</button>
         <button type="button" class="ext-tab" data-app="gateway" onclick="window.showApp('gateway')">GATEWAY</button>
         <button type="button" class="ext-tab" data-app="settings" onclick="window.showApp('settings')">SETTINGS</button>
       </nav>
-      <span class="wiz-launchers">
+      <button type="button" class="ext-tab" onclick="window.openPreview && window.openPreview()" title="Open a 3D toolpath preview in a separate window">👁 Preview</button>
+      <select id="hdrPost" class="hdr-post" style="margin-left:auto;" title="Post-processor — which controller's G-code to generate. 'Auto' follows the machine profile (Settings → Profile)."></select>
+      <span id="gw-status" style="font:12px/1 ui-monospace,SFMono-Regular,monospace; color:#8b97a6;">gateway: …</span>
+    </header>
+    
+    <!-- WIZARD LAUNCHER SUB-BAR (row 2, under the tabs) + BLOCKLY CANVAS -->
+    <div class="main">
+      <div class="wiz-launchers">
+        <!-- Probe / WCS -->
         <button onclick="window.openWiz('corner')">Corner</button>
         <button onclick="window.openWiz('edge')">Edge</button>
         <button onclick="window.openWiz('middle')">Middle</button>
         <button onclick="window.openWiz('alignment')">Alignment</button>
-      </span>
-      <select id="hdrPost" class="hdr-post" title="Post-processor — which controller's G-code to generate. 'Auto' follows the machine profile (Settings → Profile)."></select>
-      <span id="gw-status" style="font:12px/1 ui-monospace,SFMono-Regular,monospace; color:#8b97a6;">gateway: …</span>
-    </header>
-    
-    <!-- BLOCKLY CANVAS -->
-    <div class="main">
+        <button onclick="window.openWiz('wcs')">WCS</button>
+        <span class="wiz-sep"></span>
+        <!-- CAM -->
+        <button onclick="window.openWiz('drill')">Drill</button>
+        <button onclick="window.openWiz('pocket')">Pocket</button>
+        <button onclick="window.openWiz('slot')">Slot</button>
+        <button onclick="window.openWiz('surfacing')">Surface</button>
+        <button onclick="window.openWiz('text')">Text</button>
+        <button onclick="window.openWiz('circular')">Circular</button>
+        <span class="wiz-sep"></span>
+        <!-- Rotary -->
+        <button onclick="window.openWiz('rotary_center')">Rotary Center</button>
+        <button onclick="window.openWiz('rotary_clock')">Rotary Clock</button>
+        <span class="wiz-sep"></span>
+        <!-- ATC -->
+        <button onclick="window.openWiz('atc_change')">ATC Change</button>
+        <button onclick="window.openWiz('atc_check')">ATC Check</button>
+        <button onclick="window.openWiz('atc_length')">ATC Length</button>
+        <button onclick="window.openWiz('atc_test')">ATC Test</button>
+        <button onclick="window.openWiz('atc_warmup')">ATC Warmup</button>
+        <span class="wiz-sep"></span>
+        <!-- Comms -->
+        <button onclick="window.openWiz('comm')">Comms</button>
+      </div>
       <div id="ws"></div>
     </div>
   </div>

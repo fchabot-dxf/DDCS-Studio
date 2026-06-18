@@ -2774,7 +2774,7 @@ var init_bridge = __esm({
     };
     getDesc = (f) => DESCRIPTIONS[f.toLowerCase()] || `The ${f} parameter`;
     optionsFor = (def, field3) => {
-      if (field3 === "op") return def.type === "compare" ? ["<", ">", "<=", ">=", "==", "!="] : ["+", "-", "*", "/", "%"];
+      if (field3 === "op") return def.type === "compare" || def.type === "ifgoto" ? ["<", ">", "<=", ">=", "==", "!="] : ["+", "-", "*", "/", "%"];
       if (field3 === "mode") {
         if (def.type === "pathmode") return ["blend", "exact"];
         if (def.type === "waitinput") return ["imm", "rise", "fall", "high", "low"];
@@ -7126,6 +7126,13 @@ function buildSettingsOverlay() {
                             <label>Origin Y<input type="number" id="set_mach_oy" step="1"></label>
                             <label>Origin Z<input type="number" id="set_mach_oz" step="1"></label>
                         </div>
+                        <div class="settings-section-title sub">WORK ORIGIN \u2014 machine coords of part-zero (mm)</div>
+                        <div class="settings-hint">Where your G54 part-zero sits in machine coordinates (after homing + probing). Makes <code>G53</code> machine-frame moves (safe-Z retract, park) draw correctly in the sim. Leave 0 if program-zero = machine-zero. Auto-filled from a controller dump when available.</div>
+                        <div class="settings-grid">
+                            <label>Work origin X<input type="number" id="set_mach_wx" step="0.001"></label>
+                            <label>Work origin Y<input type="number" id="set_mach_wy" step="0.001"></label>
+                            <label>Work origin Z<input type="number" id="set_mach_wz" step="0.001"></label>
+                        </div>
                         <label class="settings-check"><input type="checkbox" id="set_mach_show"> Show machine envelope in 3D</label>
                         <div class="settings-hint">Origin = program zero position within the envelope.</div>
                     </div>
@@ -7369,6 +7376,12 @@ function wireSettingsOverlay(ov) {
     q("set_mach_ox").value = s.machine.ox;
     q("set_mach_oy").value = s.machine.oy;
     q("set_mach_oz").value = s.machine.oz;
+    {
+      const w2 = s.machine.workOrigin || { x: 0, y: 0, z: 0 };
+      q("set_mach_wx").value = w2.x;
+      q("set_mach_wy").value = w2.y;
+      q("set_mach_wz").value = w2.z;
+    }
     q("set_mach_show").checked = !!s.machine.show;
     if (q("set_axis_a_role")) {
       const mo = s.motors || {};
@@ -7572,6 +7585,17 @@ function wireSettingsOverlay(ov) {
       }
       _ddcsSettings.inputs = ins;
       syncFlatFromIO(_ddcsSettings);
+    }
+    const m = _ddcsSettings.machine || (_ddcsSettings.machine = {});
+    if (p.geometry && p.geometry.travel) {
+      const t = p.geometry.travel;
+      if (t.x != null && t.x > 0) m.x = t.x;
+      if (t.y != null && t.y > 0) m.y = t.y;
+      if (t.z != null && t.z > 0) m.z = t.z;
+    }
+    if (p.wcs && p.wcs.workOrigin) {
+      const wo = p.wcs.workOrigin;
+      m.workOrigin = { x: +wo.x || 0, y: +wo.y || 0, z: +wo.z || 0 };
     }
     saveSettings();
     fill();
@@ -7785,6 +7809,12 @@ function wireSettingsOverlay(ov) {
     s.machine.ox = num11(q("set_mach_ox").value, s.machine.ox);
     s.machine.oy = num11(q("set_mach_oy").value, s.machine.oy);
     s.machine.oz = num11(q("set_mach_oz").value, s.machine.oz);
+    {
+      const w2 = s.machine.workOrigin || (s.machine.workOrigin = { x: 0, y: 0, z: 0 });
+      w2.x = num11(q("set_mach_wx").value, w2.x);
+      w2.y = num11(q("set_mach_wy").value, w2.y);
+      w2.z = num11(q("set_mach_wz").value, w2.z);
+    }
     s.machine.show = q("set_mach_show").checked;
     s.probes.probePin = num11(q("set_probe_pin").value, s.probes.probePin);
     s.probes.probeLevel = num11(q("set_probe_level").value, s.probes.probeLevel);
@@ -8076,7 +8106,7 @@ var init_settingsPanel = __esm({
       stock: { x: 100, y: 80, z: 20, shape: "boss", show: true },
       stockTemplates: [],
       // user-saved presets: { name, x, y, z, shape }
-      machine: { x: 300, y: 300, z: 120, ox: 0, oy: 0, oz: 0, show: true },
+      machine: { x: 300, y: 300, z: 120, ox: 0, oy: 0, oz: 0, show: true, workOrigin: { x: 0, y: 0, z: 0 } },
       view: { theta: -1.5708, phi: 1.0472 },
       // 3D preview start orientation (front: +X right, +Y back)
       probes: {
@@ -10399,7 +10429,7 @@ var init_GcodeExecutionEngine = __esm({
     init_program2();
     init_arc2();
     GcodeExecutionEngine = class _GcodeExecutionEngine {
-      constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6e3 } = {}) {
+      constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6e3 } = {}) {
         this.stepDelay = Number.isFinite(stepDelay) ? stepDelay : 250;
         this.simSpeed = Number.isFinite(simSpeed) && simSpeed > 0 ? simSpeed : 1;
         this.rapidRate = Number.isFinite(rapidRate) && rapidRate > 0 ? rapidRate : 6e3;
@@ -10411,6 +10441,7 @@ var init_GcodeExecutionEngine = __esm({
         this.onWait = onWait;
         this.stock = stock || null;
         this._stockOffset = stockOffset || { x: 0, y: 0, z: 0 };
+        this._wcsOffset = wcsOffset || { x: 0, y: 0, z: 0 };
         this.syntaxValidator = typeof syntaxValidator === "function" ? syntaxValidator : null;
         this.autoAnswer = autoAnswer !== false;
         this.autoAnswerMs = Number.isFinite(autoAnswerMs) ? autoAnswerMs : 800;
@@ -10957,7 +10988,7 @@ var init_GcodeExecutionEngine = __esm({
             bad = true;
             return;
           }
-          target[field3] = this.absolute || g53 ? value * this.unitScale : this.pos[field3] + value * this.unitScale;
+          target[field3] = g53 ? value * this.unitScale - (this._wcsOffset[field3] || 0) : this.absolute ? value * this.unitScale : this.pos[field3] + value * this.unitScale;
         };
         setAxis("X", "x");
         setAxis("Y", "y");
@@ -11171,6 +11202,8 @@ function traceToolpath(text, opts = {}) {
     // hands-free: virtual sensors/probes satisfy so loops terminate
     stock: opts.stock || null,
     stockOffset: opts.start || null,
+    wcsOffset: opts.wcsOffset || null,
+    // work origin in MACHINE coords → G53 moves draw in the part frame
     createVarStore: opts.createVarStore || null
   });
   return eng.trace(String(text || ""));
@@ -11547,6 +11580,7 @@ function createPreviewPanel(container, opts = {}) {
       viz._gizmoPx = 36;
       viz._animOn = false;
       viz.setStock(stockForViz());
+      viz.setMachine(machineForViz());
       applyPreviewSettings();
     } catch (e) {
       console.warn("preview 3D unavailable \u2014 using 2D", e);
@@ -11561,6 +11595,7 @@ function createPreviewPanel(container, opts = {}) {
     engine = new GcodeExecutionEngine({
       autoAnswer: window.ioPanel ? window.ioPanel.isAutoSensors() : true,
       stock: stockForViz(),
+      wcsOffset: wcsForViz(),
       simSpeed: simSpeed(),
       createVarStore: opts.createVarStore || null,
       onLineChange: ({ lineIndex, raw: raw2 }) => {
@@ -11605,7 +11640,7 @@ function createPreviewPanel(container, opts = {}) {
     const st = get("getStart");
     let parsed;
     try {
-      parsed = traceToolpath(code, { stock: stockForViz(), start: st });
+      parsed = traceToolpath(code, { stock: stockForViz(), start: st, wcsOffset: wcsForViz() });
     } catch (e) {
       console.warn("trace failed", e);
       parsed = { segments: [], stats: {} };
@@ -11689,6 +11724,7 @@ function createPreviewPanel(container, opts = {}) {
     eng.autoAnswer = window.ioPanel ? window.ioPanel.isAutoSensors() : true;
     eng.stock = stockForViz();
     eng._stockOffset = get("getStart") || { x: 0, y: 0, z: 0 };
+    eng._wcsOffset = wcsForViz() || { x: 0, y: 0, z: 0 };
     if (mode === "3d") ensureViz();
     if (viz) viz.setAnimate(false);
     lastRunCode = get("getGcode") || "";
@@ -11776,6 +11812,7 @@ function createPreviewPanel(container, opts = {}) {
   window.addEventListener("ddcs:stop-previews", stopPlay);
   window.addEventListener("ddcs:settings-changed", () => {
     renderStock();
+    if (viz) viz.setMachine(machineForViz());
     applyPreviewSettings();
     if (active2) setGcode();
   });
@@ -11820,7 +11857,7 @@ function createPreviewPanel(container, opts = {}) {
     return engine;
   }, el: container };
 }
-var stockForViz, previewPrefs, ICON_PLAY, ICON_STOP, ICON_STEP, ICON_COPY, ICON_JOG, ICON_LOOP, ICON_FOLLOW, PANEL_HTML;
+var stockForViz, wcsForViz, machineForViz, previewPrefs, ICON_PLAY, ICON_STOP, ICON_STEP, ICON_COPY, ICON_JOG, ICON_LOOP, ICON_FOLLOW, PANEL_HTML;
 var init_createPreviewPanel = __esm({
   "../DDCS-Studio/web/viz/createPreviewPanel.js"() {
     init_gcodeViz3d();
@@ -11832,6 +11869,11 @@ var init_createPreviewPanel = __esm({
       const s = window.ddcsGetSettings && window.ddcsGetSettings().stock || null;
       return s && s.show ? s : null;
     };
+    wcsForViz = () => {
+      const m = window.ddcsGetSettings && window.ddcsGetSettings().machine || null;
+      return m && m.workOrigin ? m.workOrigin : null;
+    };
+    machineForViz = () => window.ddcsGetSettings && window.ddcsGetSettings().machine || null;
     previewPrefs = () => window.ddcsGetSettings && window.ddcsGetSettings().preview || {};
     ICON_PLAY = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" style="vertical-align:middle" aria-hidden="true"><path d="M4.5 3 12.5 8 4.5 13Z"/></svg>';
     ICON_STOP = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" style="vertical-align:middle" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/></svg>';
@@ -14298,7 +14340,6 @@ var cornerView = {
   startAnim: startCornerAnim,
   onOpen() {
     setTimeout(async () => {
-      if (window.drawCornerViz) await window.drawCornerViz();
       startCornerAnim();
     }, 50);
   },
@@ -14332,9 +14373,6 @@ var cornerView = {
     const dirMap = { FL: "X pos, Y pos", FR: "X neg, Y pos", BL: "X pos, Y neg", BR: "X neg, Y neg" };
     const cornerStatus = el("cornerVizStatus");
     if (cornerStatus) cornerStatus.textContent = `Corner: ${params.corner} (${dirMap[params.corner]}) - ${params.probeSeq}` + (params.probeZ ? " + Z" : "");
-    if (window.drawCornerViz) {
-      window.drawCornerViz(params.probeZFirst);
-    }
     startCornerAnim();
   }
 };
@@ -14415,29 +14453,6 @@ var middleView = {
     const dirLabel = params.dir1 === "pos" ? "pos" : "neg";
     const bothLabel = params.findBoth ? ` (both: ${params.dir1}/${params.dir2})` : "";
     if (middleStatus) middleStatus.textContent = `Middle: ${params.featureType} | ${params.axis} ${dirLabel}${bothLabel}`;
-    if (window.drawMiddleViz) {
-      console.debug("middleView.update: calling drawMiddleViz and awaiting completion");
-      await window.drawMiddleViz();
-      console.debug("middleView.update: drawMiddleViz complete");
-      try {
-        const svgRoot = document.getElementById("middleVizContainer")?.querySelector("svg");
-        const statusEl = document.getElementById("middleVizStatus");
-        if (!svgRoot) {
-          if (statusEl) statusEl.textContent = "ERROR: SVG not injected into middleVizContainer";
-          console.warn("middleView.update: svgRoot missing after drawMiddleViz");
-        } else {
-          const ids = Array.from(svgRoot.querySelectorAll("[id]")).map((e) => e.id);
-          if (statusEl) {
-            const firstLine = (gcode || "").split(/\r?\n/).find((l) => l.trim().length > 0) || `Middle: ${params.featureType} | ${params.axis} ${dirLabel}${bothLabel}`;
-            const title = firstLine.length > 80 ? firstLine.slice(0, 77) + "..." : firstLine;
-            statusEl.textContent = title;
-          }
-          console.debug("middleView.update: SVG element IDs (first 60)=", ids.slice(0, 60));
-        }
-      } catch (e) {
-        console.warn("middleView.update: diagnostics failed", e);
-      }
-    }
     if (window.discoverAnimSteps && window.PathAnimator) {
       try {
         const animInput = window.discoverAnimSteps({
@@ -14743,8 +14758,6 @@ var edgeView = {
   startAnim: startEdgeAnim,
   onOpen(ctx2) {
     setTimeout(() => {
-      if (window.drawEdgeViz) window.drawEdgeViz();
-      else if (window.drawProbeViz) window.drawProbeViz();
       ctx2.update();
       setTimeout(() => {
         startEdgeAnim();
@@ -14775,11 +14788,6 @@ var edgeView = {
     el("wiz_edge_code").innerHTML = UIUtils.formatGCode(gcode);
     const edgeStatus = el("edgeVizStatus");
     if (edgeStatus) edgeStatus.textContent = `Edge: ${params.axis}${params.dir === "pos" ? "+" : "-"}`;
-    if (window.drawEdgeViz) {
-      window.drawEdgeViz();
-    } else if (window.drawProbeViz) {
-      window.drawProbeViz();
-    }
   }
 };
 
@@ -14868,21 +14876,7 @@ var alignmentView = {
     if (status) {
       status.textContent = `Alignment | Check: ${params.checkAxis} | Probe: ${probeAxis}`;
     }
-    if (window.drawAlignmentViz) {
-      try {
-        const drawResult = window.drawAlignmentViz();
-        if (drawResult && typeof drawResult.then === "function") {
-          drawResult.then(() => startAlignmentAnim()).catch(() => {
-          });
-        } else {
-          startAlignmentAnim();
-        }
-      } catch (e) {
-        console.warn("drawAlignmentViz failed", e);
-      }
-    } else {
-      startAlignmentAnim();
-    }
+    startAlignmentAnim();
   }
 };
 
@@ -16869,6 +16863,26 @@ function dialectOpts3() {
   }
 }
 document.addEventListener("DOMContentLoaded", () => {
+  let __logSeq = 0;
+  ["log", "warn", "error"].forEach((lvl) => {
+    const orig = console[lvl].bind(console);
+    console[lvl] = (...args) => {
+      orig(...args);
+      try {
+        const text = args.map((a) => typeof a === "string" ? a : (() => {
+          try {
+            return JSON.stringify(a);
+          } catch (_) {
+            return String(a);
+          }
+        })()).join(" ");
+        if ((lvl !== "log" || text.indexOf("DDCS") >= 0) && window.vscode) {
+          window.vscode.postMessage({ type: "log", text: "#" + ++__logSeq + " [" + lvl + "] " + text.slice(0, 1500) });
+        }
+      } catch (_) {
+      }
+    };
+  });
   const B = window.Blockly;
   if (!B) {
     console.error("Blockly not found!");
@@ -16897,12 +16911,12 @@ document.addEventListener("DOMContentLoaded", () => {
     setGw("gateway: offline", "#f87171");
   });
   installBlockly(B);
-  const theme = B.Theme.defineTheme("ddcs_dark", ddcsTheme);
+  const theme = ddcsTheme(B);
   const toolbox = buildToolbox();
   const ws = B.inject("ws", {
     toolbox,
     theme,
-    renderer: "zelos",
+    renderer: "geras",
     grid: { spacing: 26, length: 2, colour: "#1b2733", snap: true },
     zoom: { controls: true, wheel: true, startScale: 0.9 },
     trashcan: true,
@@ -16932,38 +16946,86 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (_) {
     }
   };
+  let muteChanges = false;
+  let blocksActive = true;
+  let lastSentText = null;
   onChange(({ stack: stack2, proj: proj2, origin }) => {
+    const tlen = proj2 && proj2.text ? proj2.text.length : 0;
+    console.log(`[DDCS] onChange origin=${origin} stackLen=${stack2 ? stack2.length : "null"} textLen=${tlen} blocksActive=${blocksActive}`);
     if (origin !== "blockly" && window.__workspace) {
-      stackToWorkspace(stack2, window.__workspace);
+      muteChanges = true;
+      if (window.Blockly) window.Blockly.Events.disable();
+      try {
+        stackToWorkspace(stack2, window.__workspace);
+      } finally {
+        if (window.Blockly) window.Blockly.Events.enable();
+        muteChanges = false;
+      }
     }
     if (origin !== "vscode" && window.vscode) {
+      console.log(`[DDCS] \u2192 postMessage documentChanged textLen=${tlen}`);
+      lastSentText = proj2.text;
       window.vscode.postMessage({ type: "documentChanged", text: proj2.text });
     }
     reportLint(proj2.text);
   });
   window.addEventListener("vscode:updateDocument", (e) => {
     const text = e.detail;
+    const norm = (s) => (s || "").replace(/\r\n/g, "\n");
+    if (norm(text) === norm(lastSentText)) {
+      console.log("[DDCS] vscode:updateDocument IGNORED (echo of our own change)");
+      return;
+    }
     const currentStack = getStack();
     const newStack = reconcileGcodeToStack(text, currentStack, dialectOpts3());
+    console.log(`[DDCS] vscode:updateDocument textLen=${text ? text.length : 0} curStackLen=${currentStack ? currentStack.length : "null"} reconciledLen=${newStack ? newStack.length : "null"}`);
     if (newStack) {
       setStack(newStack, "vscode");
     }
   });
   window.__workspace.addChangeListener((e) => {
-    if (e.isUiEvent || e.type === Blockly.Events.FINISHED_LOADING) return;
+    if (e.isUiEvent || muteChanges || !blocksActive || e.type === Blockly.Events.FINISHED_LOADING) {
+      if (!e.isUiEvent) console.log(`[DDCS] ws-change IGNORED type=${e.type} muted=${muteChanges} blocksActive=${blocksActive}`);
+      return;
+    }
     const stack2 = workspaceToStack(window.__workspace);
+    console.log(`[DDCS] ws\u2192model setStack(blockly) stackLen=${stack2 ? stack2.length : "null"} (event ${e.type})`);
     setStack(stack2, "blockly");
   });
   window.wizardManager = new WizardManager(dummyEditorManager);
   window.openWiz = (type) => window.wizardManager.open(type);
   window.closeWiz = () => window.wizardManager.close();
-  window.insertWiz = () => window.wizardManager.insert();
+  window.openPreview = () => {
+    try {
+      window.vscode && window.vscode.postMessage({ type: "openPreview", start: window.__pendingSpindleStart || null });
+    } catch (_) {
+    }
+  };
+  const sendSettings = () => {
+    try {
+      const store = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k) store[k] = localStorage.getItem(k);
+      }
+      window.vscode && window.vscode.postMessage({ type: "settings", store });
+    } catch (_) {
+    }
+  };
+  window.addEventListener("ddcs:settings-changed", sendSettings);
+  sendSettings();
+  window.insertWiz = () => {
+    console.log("[DDCS] insertWiz() clicked");
+    return window.wizardManager.insert();
+  };
   const mainEl = document.querySelector(".main");
   const gatewayApp = document.getElementById("gateway-app");
   const settingsApp = document.getElementById("settings-app");
   let _gatewayInited = false;
   window.showApp = async (which) => {
     const isBlocks = which === "blocks", isGateway = which === "gateway", isSettings = which === "settings";
+    console.log(`[DDCS] showApp(${which})`);
+    blocksActive = isBlocks;
     if (mainEl) mainEl.style.display = isBlocks ? "" : "none";
     gatewayApp && gatewayApp.classList.toggle("hidden", !isGateway);
     settingsApp && settingsApp.classList.toggle("hidden", !isSettings);
@@ -16992,10 +17054,22 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("[DDCS] settings panel failed:", err);
       }
     }
-    if (isBlocks && window.Blockly && window.__workspace) {
+    if (isBlocks && window.__workspace) {
+      const gs = getStack();
+      console.log(`[DDCS] re-project on Blocks show, modelStackLen=${gs ? gs.length : "null"}`);
+      muteChanges = true;
+      if (window.Blockly) window.Blockly.Events.disable();
       try {
-        window.Blockly.svgResize(window.__workspace);
-      } catch (_) {
+        stackToWorkspace(gs, window.__workspace);
+      } finally {
+        if (window.Blockly) window.Blockly.Events.enable();
+        muteChanges = false;
+      }
+      if (window.Blockly) {
+        try {
+          window.Blockly.svgResize(window.__workspace);
+        } catch (_) {
+        }
       }
     }
   };

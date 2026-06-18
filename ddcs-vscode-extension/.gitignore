@@ -1,2 +1,5 @@
 # Runtime gateway state (heartbeat, cncdisk index) — not source.
 _bridge_data/
+
+# Debug log (temporary diagnostics).
+_debug.log

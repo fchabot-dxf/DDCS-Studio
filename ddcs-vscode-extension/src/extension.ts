@@ -3,13 +3,15 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as cp from 'child_process';
 import * as http from 'http';
-import { DdcsEditorProvider } from './DdcsEditorProvider';
+import { DdcsApp } from './DdcsApp';
+import { dlog, dlogClear } from './dlog';
 
 let gatewayProcess: cp.ChildProcess | undefined;
 let gatewayPort = 8765;   // updated from the backend's `DDCS_PORT=…` stdout line (it may fall back off 8765)
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('DDCS Studio Prototype is now active!');
+    dlogClear();
 
     // Spawn the headless Python backend
     const backendPath = path.join(context.extensionPath, 'backend', 'headless_gateway.py');
@@ -19,19 +21,17 @@ export function activate(context: vscode.ExtensionContext) {
         const text = data.toString();
         // The backend prints `DDCS_PORT=<n>` once it has picked (or discovered) its port.
         const m = text.match(/DDCS_PORT=(\d+)/);
-        if (m) { gatewayPort = parseInt(m[1], 10); }
+        if (m) { gatewayPort = parseInt(m[1], 10); dlog(`[host] DDCS_PORT=${gatewayPort}`); }
         console.log(`[Gateway] ${text.trim()}`);
     });
     gatewayProcess.stderr?.on('data', (data) => console.error(`[Gateway Error] ${data.toString().trim()}`));
-
-    let isGatewayReady = false;
 
     // Diagnostics collection for the G-code linter (findings are computed in the webview, published here).
     const ddcsDiagnostics = vscode.languages.createDiagnosticCollection('ddcs');
     context.subscriptions.push(ddcsDiagnostics);
 
-    // Register the custom editor provider (it reads the live gateway port for the webview transport)
-    context.subscriptions.push(DdcsEditorProvider.register(context, () => gatewayPort, ddcsDiagnostics));
+    // The DDCS app — a WebviewPanel tool (not a custom editor). It owns the gateway port + settings.
+    const ddcsApp = new DdcsApp(context, () => gatewayPort, ddcsDiagnostics);
 
     // Live machine-connection indicator in the Status Bar. The extension HOST polls the gateway
     // directly (it owns the port) and renders a native workbench item — read-only, no machine writes.
@@ -47,51 +47,16 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(new vscode.Disposable(() => clearInterval(pollStatus)));
 
     let disposable = vscode.commands.registerCommand('ddcs.openWizard', async () => {
-        // Wait for gateway
-        if (!isGatewayReady) {
-            const ready = await waitForGateway();
-            if (!ready) {
-                vscode.window.showErrorMessage("Could not connect to the DDCS Gateway backend.");
-                return;
-            }
-            isGatewayReady = true;
+        dlog('[host] ddcs.openWizard fired');
+        try {
+            await ddcsApp.launch();
+        } catch (err: any) {
+            dlog('[host] launch threw: ' + (err?.message || err));
+            vscode.window.showErrorMessage('DDCS launch failed: ' + (err?.message || err));
         }
-
-        // Instead of opening a webview directly, create an untitled .nc file.
-        // VS Code will automatically use our Custom Editor for it!
-        const uri = vscode.Uri.parse('untitled:untitled.nc');
-        vscode.commands.executeCommand('vscode.openWith', uri, 'ddcs.studioEditor');
     });
 
     context.subscriptions.push(disposable);
-}
-
-function waitForGateway(maxRetries: number = 20): Promise<boolean> {
-    return new Promise((resolve) => {
-        let retries = 0;
-        const interval = setInterval(() => {
-            retries++;
-            if (retries > maxRetries) {
-                clearInterval(interval);
-                resolve(false);
-                return;
-            }
-
-            // Read the live gatewayPort each tick — the backend may have reported a fallback port by now.
-            const req = http.get(`http://127.0.0.1:${gatewayPort}/api/descriptor`, (res) => {
-                if (res.statusCode === 200) {
-                    clearInterval(interval);
-                    resolve(true);
-                }
-            });
-            
-            req.on('error', () => {
-                // Connection refused, just ignore and retry
-            });
-            
-            req.end();
-        }, 500);
-    });
 }
 
 // Fetch the gateway descriptor over host-side HTTP. Resolves null on any error/timeout/non-200.

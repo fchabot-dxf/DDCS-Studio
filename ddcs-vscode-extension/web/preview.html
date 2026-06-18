@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>DDCS Preview</title>
+    <!-- Shared app styles (.preview-panel / .pp-* come from here) -->
+    <link rel="stylesheet" href="../../DDCS-Studio/web/styles.css">
+    <!-- three.js for the 3D toolpath (GcodeViz3D reads window.THREE) -->
+    <script defer src="../../DDCS-Studio/web/assets/vendor/three.min.js"></script>
+    <style>
+        html, body { margin:0; height:100%; overflow:hidden; background:#0d1117; }
+        #preview-host { position:absolute; inset:0; }
+    </style>
+</head>
+<body>
+    <!-- The shared createPreviewPanel mounts its own UI into this host -->
+    <div id="preview-host"></div>
+    <script type="module" src="dist/preview.js"></script>
+</body>
+</html>

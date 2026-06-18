@@ -21,6 +21,22 @@ function dialectOpts() {
 // The standalone app's blockly-spike manually created a generator and defined basic blocks.
 // We'll reproduce that setup here, but using the shared code natively.
 document.addEventListener('DOMContentLoaded', () => {
+    // Forward webview console output to the host → _debug.log (the webview DevTools console isn't easily
+    // readable). DDCS logs + all warns/errors.
+    let __logSeq = 0;
+    ['log', 'warn', 'error'].forEach((lvl) => {
+        const orig = console[lvl].bind(console);
+        console[lvl] = (...args) => {
+            orig(...args);
+            try {
+                const text = args.map((a) => typeof a === 'string' ? a : (() => { try { return JSON.stringify(a); } catch (_) { return String(a); } })()).join(' ');
+                if ((lvl !== 'log' || text.indexOf('DDCS') >= 0) && window.vscode) {
+                    window.vscode.postMessage({ type: 'log', text: '#' + (++__logSeq) + ' [' + lvl + '] ' + text.slice(0, 1500) });
+                }
+            } catch (_) {}
+        };
+    });
+
     // 1. Ensure Blockly is loaded globally (the HTML still includes blockly.min.js via <script>)
     const B = window.Blockly;
     if (!B) {
@@ -43,17 +59,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Install DDCS blocks from the shared bridge
     installBlockly(B);
 
-    // 3. Define the theme
-    const theme = B.Theme.defineTheme('ddcs_dark', ddcsTheme);
+    // 3. Define the theme — ddcsTheme is a FACTORY: call it with B (Studio does `theme: ddcsTheme(B)`).
+    //    Passing the function itself gave a theme with no blockStyles → every block rendered black.
+    const theme = ddcsTheme(B);
 
     // 4. Build the toolbox
     const toolbox = buildToolbox();
 
-    // 5. Inject Blockly into the workspace div
+    // 5. Inject Blockly into the workspace div (geras renderer, matching Studio's Blocks tab)
     const ws = B.inject('ws', {
         toolbox,
         theme,
-        renderer: 'zelos',
+        renderer: 'geras',
         grid: { spacing: 26, length: 2, colour: '#1b2733', snap: true },
         zoom: { controls: true, wheel: true, startScale: 0.9 },
         trashcan: true,
@@ -83,14 +100,31 @@ document.addEventListener('DOMContentLoaded', () => {
         try { window.vscode.postMessage({ type: 'diagnostics', items: lintGcode(text, post) }); } catch (_) {}
     };
 
+    // Mute the workspace change listener while WE rebuild the canvas from the model — otherwise
+    // stackToWorkspace's events echo back as setStack('blockly') with an empty/partial stack, wiping
+    // the model (blocks vanish on tab switch + the doc gets emptied). Same guard Studio's blocksApp uses.
+    let muteChanges = false;
+    let blocksActive = true;   // Blocks starts visible; the workspace→model sync only runs while it is
+    let lastSentText = null;   // text we pushed to the doc — ignore the host's echo of it (don't reconcile our own change)
+
     // Listen for model changes and project them into the Blockly canvas
     onChange(({ stack, proj, origin }) => {
+        const tlen = (proj && proj.text) ? proj.text.length : 0;
+        console.log(`[DDCS] onChange origin=${origin} stackLen=${stack ? stack.length : 'null'} textLen=${tlen} blocksActive=${blocksActive}`);
         if (origin !== 'blockly' && window.__workspace) {
-            stackToWorkspace(stack, window.__workspace);
+            // Disable Blockly events during the load so the rebuild can't echo back through the change
+            // listener. A flag doesn't work: Blockly fires its create events ASYNC, after the flag resets —
+            // Events.disable() drops them at creation instead.
+            muteChanges = true;
+            if (window.Blockly) window.Blockly.Events.disable();
+            try { stackToWorkspace(stack, window.__workspace); }
+            finally { if (window.Blockly) window.Blockly.Events.enable(); muteChanges = false; }
         }
-        
+
         // Sync back to VS Code!
         if (origin !== 'vscode' && window.vscode) {
+            console.log(`[DDCS] → postMessage documentChanged textLen=${tlen}`);
+            lastSentText = proj.text;
             window.vscode.postMessage({ type: 'documentChanged', text: proj.text });
         }
 
@@ -100,17 +134,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // Receive document updates from VS Code
     window.addEventListener('vscode:updateDocument', (e) => {
         const text = e.detail;
+        // Ignore the host echoing back the change WE just made — reconciling our own output can return a
+        // different/empty stack and clobber the blocks the wizard just committed. (Normalize EOL: the doc
+        // may store CRLF.) Only reconcile genuinely external edits.
+        const norm = (s) => (s || '').replace(/\r\n/g, '\n');
+        if (norm(text) === norm(lastSentText)) {
+            console.log('[DDCS] vscode:updateDocument IGNORED (echo of our own change)');
+            return;
+        }
         const currentStack = getStack();
         const newStack = reconcileGcodeToStack(text, currentStack, dialectOpts());
+        console.log(`[DDCS] vscode:updateDocument textLen=${text ? text.length : 0} curStackLen=${currentStack ? currentStack.length : 'null'} reconciledLen=${newStack ? newStack.length : 'null'}`);
         if (newStack) {
             setStack(newStack, 'vscode');
         }
     });
 
-    // Send Blockly changes back to the model
+    // Send Blockly changes back to the model (skip our own model→workspace rebuild via muteChanges)
     window.__workspace.addChangeListener((e) => {
-        if (e.isUiEvent || e.type === Blockly.Events.FINISHED_LOADING) return;
+        if (e.isUiEvent || muteChanges || !blocksActive || e.type === Blockly.Events.FINISHED_LOADING) {
+            if (!e.isUiEvent) console.log(`[DDCS] ws-change IGNORED type=${e.type} muted=${muteChanges} blocksActive=${blocksActive}`);
+            return;
+        }
         const stack = workspaceToStack(window.__workspace);
+        console.log(`[DDCS] ws→model setStack(blockly) stackLen=${stack ? stack.length : 'null'} (event ${e.type})`);
         setStack(stack, 'blockly');
     });
 
@@ -119,7 +166,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Wire up the top-bar HTML buttons
     window.openWiz = (type) => window.wizardManager.open(type);
     window.closeWiz = () => window.wizardManager.close();
-    window.insertWiz = () => window.wizardManager.insert();   // INSERT button — was missing, so clicks threw
+    window.openPreview = () => {
+        // Pass the operator start (set on INSERT from the wizard's 3D preview) so the pop-out positions the
+        // toolpath and tests probes from the real tool position — incremental (G91) probe G-code needs it,
+        // or it renders from origin into a default stock (the wrong toolpath you saw).
+        try { window.vscode && window.vscode.postMessage({ type: 'openPreview', start: window.__pendingSpindleStart || null }); } catch (_) {}
+    };
+
+    // Mirror settings up to the host — it owns the canonical copy (persisted) and seeds it into every
+    // webview (this app on next launch + the preview), so all windows share one source of truth.
+    const sendSettings = () => {
+        try {
+            const store = {};
+            for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k) store[k] = localStorage.getItem(k); }
+            window.vscode && window.vscode.postMessage({ type: 'settings', store });
+        } catch (_) {}
+    };
+    window.addEventListener('ddcs:settings-changed', sendSettings);
+    sendSettings();   // initial mirror (covers first-ever launch when the host has nothing yet)
+    window.insertWiz = () => { console.log('[DDCS] insertWiz() clicked'); return window.wizardManager.insert(); };
 
     // --- Main-UI tabs: BLOCKS (the #ws canvas) | GATEWAY | SETTINGS. Studio's editor tab is intentionally
     //     dropped — VS Code's own text editor is that surface. #gateway-app / #settings-app are the forked
@@ -130,6 +195,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let _gatewayInited = false;
     window.showApp = async (which) => {
         const isBlocks = which === 'blocks', isGateway = which === 'gateway', isSettings = which === 'settings';
+        console.log(`[DDCS] showApp(${which})`);
+        blocksActive = isBlocks;   // set BEFORE hiding .main so hide-fired events are ignored, not synced as empty
         if (mainEl) mainEl.style.display = isBlocks ? '' : 'none';
         gatewayApp && gatewayApp.classList.toggle('hidden', !isGateway);
         settingsApp && settingsApp.classList.toggle('hidden', !isSettings);
@@ -149,9 +216,17 @@ document.addEventListener('DOMContentLoaded', () => {
             try { (await import('../../../DDCS-Studio/web/ui/settingsPanel.js')).openSettings(); }
             catch (err) { console.error('[DDCS] settings panel failed:', err); }
         }
-        // Blockly mis-sizes if its container was display:none; re-measure when returning to Blocks.
-        if (isBlocks && window.Blockly && window.__workspace) {
-            try { window.Blockly.svgResize(window.__workspace); } catch (_) {}
+        // Returning to Blocks: re-project the model (the source of truth) into the canvas, then re-measure.
+        // Without the re-project, any blocks the workspace dropped while hidden don't come back — Studio's
+        // blocksApp re-renders from the model on tab show for the same reason.
+        if (isBlocks && window.__workspace) {
+            const gs = getStack();
+            console.log(`[DDCS] re-project on Blocks show, modelStackLen=${gs ? gs.length : 'null'}`);
+            muteChanges = true;
+            if (window.Blockly) window.Blockly.Events.disable();
+            try { stackToWorkspace(gs, window.__workspace); }
+            finally { if (window.Blockly) window.Blockly.Events.enable(); muteChanges = false; }
+            if (window.Blockly) { try { window.Blockly.svgResize(window.__workspace); } catch (_) {} }
         }
     };
 

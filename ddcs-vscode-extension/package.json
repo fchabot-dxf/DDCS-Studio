@@ -1,7 +1,7 @@
 {
   "name": "ddcs-vscode-extension",
-  "displayName": "DDCS Studio",
-  "description": "Prototype DDCS Studio Wizard",
+  "displayName": "DDCS Extension",
+  "description": "DDCS CNC programming in VS Code — visual blocks, wizards, live G-code, and toolpath preview.",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.80.0"
@@ -15,7 +15,7 @@
     "commands": [
       {
         "command": "ddcs.openWizard",
-        "title": "DDCS: Open Wizard",
+        "title": "DDCS: New Program",
         "icon": "$(tools)"
       }
     ],
@@ -26,24 +26,14 @@
           "group": "navigation"
         }
       ]
-    },
-    "customEditors": [
-      {
-        "viewType": "ddcs.studioEditor",
-        "displayName": "DDCS Studio",
-        "selector": [
-          { "filenamePattern": "*.nc" },
-          { "filenamePattern": "*.ddcs" }
-        ],
-        "priority": "default"
-      }
-    ]
+    }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile && npm run build:web",
+    "vscode:prepublish": "npm run compile && npm run build:web && npm run build:preview",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "build:web": "esbuild web/src/extensionApp.js --bundle --outfile=web/dist/bundle.js --format=esm --external:./dropbox.js --external:./gdrive.js"
+    "build:web": "esbuild web/src/extensionApp.js --bundle --outfile=web/dist/bundle.js --format=esm --external:./dropbox.js --external:./gdrive.js",
+    "build:preview": "esbuild web/src/previewApp.js --bundle --outfile=web/dist/preview.js --format=esm --external:./dropbox.js --external:./gdrive.js"
   },
   "devDependencies": {
     "@types/node": "18.x",
