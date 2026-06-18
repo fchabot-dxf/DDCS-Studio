@@ -652,8 +652,8 @@ var dialect = {
   probeModel: "g31",
   dwellUnits: "ms",
   vars: { dro: 880, probeStatus: 1920, probeTrig: 1925, wcsBase: 805, wcsStride: 5, activeWcs: 578, toolTable: 1430, ax: AX },
-  caps: { vars: true, flow: "goto", probeStatusCheck: true, hmi: true, toolTable: true, probePort: true },
-  // the fullest profile
+  caps: { vars: true, flow: "goto", probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, inputRead: true },
+  // the fullest profile (inputRead = generic live-input poll #[1520+N], slib O10300)
   // G31 Z-10 F100 P3 L0 Q1   (snippets.nc:9 · words.nc:6 "G31 Z#7 F#3 P#5 L0 Q1")
   probeMove: (axis, dist, { feed = 100, port = 3, level = 0 } = {}) => [`G31 ${axis}${dist} F${feed} P${port} L${level} Q1`],
   // IF #1922!=2 GOTO1   (3D PROBE G55.nc:29 · snippets.nc:10). status block #1920+axis; "!=2" = did NOT trigger
@@ -677,6 +677,10 @@ var dialect = {
   // symbolic ops ==/!=/<=; GOTO no space
   goto: (label) => [`GOTO${label}`],
   label: (n) => [`N${n}`],
+  // Wait until input N (0-based: pin 0 = IN01 = #1520) reaches level L (0/1): poll #[1520+N] in a
+  // WHILE..DO1..END1 with a 10 ms dwell — the verbatim factory sensor-wait idiom (slib-m.nc O10300:
+  // `WHILE [#[1520+#4-1] != #6] DO1 / G04 P10 / END1`). P = ms (slib-g.nc:691). No timeout: the poll waits indefinitely.
+  waitInput: (n, level) => [`WHILE [#[1520+${n}] != ${level}] DO1   ( wait input ${n} = ${level} )`, "G04 P10", "END1"],
   spindle: (dir, rpm) => [`${dir === "ccw" ? "M4" : "M3"} S${rpm}`],
   // M3.nc / M4.nc
   spindleOff: () => ["M5"],
@@ -6191,6 +6195,7 @@ function createPreviewPanel(container, opts = {}) {
   const t2 = createToolpath2d(cv2d);
   let viz = null;
   let mode = previewPrefs().defaultView === "2d" ? "2d" : "3d", active = false, segs = [], fitted = false;
+  let lastVizMode = mode === "io" ? "3d" : mode;
   let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false;
   if (typeof ResizeObserver !== "undefined") {
     new ResizeObserver(() => {
@@ -6260,11 +6265,11 @@ function createPreviewPanel(container, opts = {}) {
       },
       onStatus: ({ message }) => setStatus(message),
       onWait: (wait) => {
-        if (window.ioPanel) {
-          if (wait) window.ioPanel.show();
-          window.ioPanel.setWait(wait);
-        }
+        if (!window.ioPanel) return;
+        if (mode !== "io" && wait) window.ioPanel.show();
+        window.ioPanel.setWait(wait);
       },
+      // docked I/O view already shows it; else float
       onFinish: () => {
         updateRunBtn();
         if (typeof opts.onLine === "function") opts.onLine(null);
@@ -6350,8 +6355,23 @@ function createPreviewPanel(container, opts = {}) {
     el2.style.display = el2.childElementCount ? "" : "none";
   }
   function setMode(next) {
+    const ioBtn = q(".pp-io");
+    if (next !== "io") lastVizMode = next;
     mode = next;
     stopPlay();
+    if (mode === "io") {
+      if (cv2d) cv2d.style.display = "none";
+      if (viz) {
+        viz.setActive(false);
+        if (viz.renderer) viz.renderer.domElement.style.display = "none";
+      }
+      if (window.ioPanel) window.ioPanel.show(container);
+      if (ioBtn) ioBtn.classList.add("on");
+      syncJog();
+      return;
+    }
+    if (window.ioPanel && window.ioPanel.isVisible()) window.ioPanel.hide();
+    if (ioBtn) ioBtn.classList.remove("on");
     const mt = q(".pp-mtoggle");
     if (mt) mt.textContent = mode === "2d" ? "2D" : "3D";
     if (cv2d) cv2d.style.display = mode === "2d" ? "" : "none";
@@ -6411,7 +6431,7 @@ function createPreviewPanel(container, opts = {}) {
     if (engine) engine.stock = stockForViz();
   }
   q(".pp-stock").addEventListener("click", (e) => toggleStockEditor(e.currentTarget));
-  q(".pp-mtoggle").addEventListener("click", () => setMode(mode === "2d" ? "3d" : "2d"));
+  q(".pp-mtoggle").addEventListener("click", () => setMode(mode === "io" ? lastVizMode : mode === "2d" ? "3d" : "2d"));
   q(".pp-run").addEventListener("click", () => {
     const eng = ensureEngine();
     if (eng.running && !eng.paused) stopPlay();
@@ -6451,9 +6471,7 @@ function createPreviewPanel(container, opts = {}) {
     grid.style.display = open ? "" : "none";
     q(".pp-jog").classList.toggle("on", open);
   });
-  q(".pp-io").addEventListener("click", () => {
-    if (window.ioPanel) window.ioPanel.toggle();
-  });
+  q(".pp-io").addEventListener("click", () => setMode(mode === "io" ? lastVizMode : "io"));
   q(".pp-follow").addEventListener("click", () => {
     const v = ensureViz();
     if (!v || !v.setFollowCam) return;
@@ -6503,7 +6521,7 @@ function createPreviewPanel(container, opts = {}) {
       play();
     }
   }
-  return { setGcode, refresh, setActive, stop: stopPlay, seekLine, get viz() {
+  return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, get viz() {
     return viz;
   }, get engine() {
     return engine;

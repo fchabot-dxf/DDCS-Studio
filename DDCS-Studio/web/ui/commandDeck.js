@@ -1,5 +1,9 @@
 import { el, UIUtils } from './uiUtils.js';
 import { initSuggestBar } from './suggestBar.js';
+import { resolveActivePost } from '../wizards/dialects/index.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { outPinBlock, waitInputBlock } from '../wizards/ops/cnc.js';
+import { dwellBlock } from '../wizards/ops/dwell.js';
 
 // Header toolbar icons — inline line-art SVG (not emoji) so they render identically on every OS,
 // inherit the theme via currentColor, stay crisp at any size, and give each button an icon to
@@ -23,6 +27,8 @@ const HEADER_ICONS = {
     clear:  _svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>', '#ef4444'),
     // Export = share / upload: open-top box with an up arrow rising out (per the supplied glyph)
     export: _svg('<path d="M16 9h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2"/><line x1="12" y1="14" x2="12" y2="3"/><polyline points="8 7 12 3 16 7"/>', '#0ea5e9'),
+    // I/O = two opposite arrows (output out · input in)
+    io:     _svg('<line x1="3" y1="8" x2="14" y2="8" stroke="#22c55e"/><polyline points="11 5 14 8 11 11" stroke="#22c55e"/><line x1="21" y1="16" x2="10" y2="16" stroke="#38bdf8"/><polyline points="13 13 10 16 13 19" stroke="#38bdf8"/>', '#22c55e'),
 };
 
 // Load a G-code / .nc file from disk into the editor, then trigger a re-parse + preview — for
@@ -85,6 +91,31 @@ window.insertGcodeFile = function insertGcodeFile() {
         document.body.appendChild(input);
     }
     input.click();
+};
+
+// Quick-insert an I/O step (Set Output / Wait Input / Dwell) at the editor caret in the active post's dialect
+// (Expert → #[1551+N] outputs + the WHILE input poll; V4.1/DM500 fold to a hint). The atoms already live in the
+// Blocks "Signals" palette — this toolbar I/O ▾ is just the discoverable front door. Snaps to whole lines; with
+// no caret in the editor it drops before a trailing M30 so the program end stays valid (op-aware targeting later).
+const IO_BLOCKS = { outpin: outPinBlock, waitinput: waitInputBlock, dwell: dwellBlock };
+window.ddcsInsertIo = function ddcsInsertIo(type) {
+    const block = IO_BLOCKS[type];
+    const ed = document.getElementById('editor');
+    if (!block || !ed) return;
+    let dialect; try { dialect = resolveActivePost(getActiveProfile().id); } catch (_) { dialect = {}; }
+    const out = block.emit({ ...block.defaults }, 0, 0, dialect);
+    const text = (Array.isArray(out) ? out : [out]).join('\n');
+    let pos = Number.isInteger(ed.selectionStart) ? ed.selectionStart : ed.value.length;
+    if (document.activeElement !== ed) {                 // caret not in the editor → before a trailing M30, else append
+        const m = ed.value.match(/\n[ \t]*M30\b/i);
+        pos = m ? m.index + 1 : ed.value.length;
+    }
+    const before = ed.value.slice(0, pos), after = ed.value.slice(pos);
+    const lead = before && !before.endsWith('\n') ? '\n' : '';
+    ed.value = before + lead + text + '\n' + after;
+    const caret = (before + lead + text + '\n').length;
+    try { ed.focus(); ed.setSelectionRange(caret, caret); } catch (_) { /* ignore */ }
+    ed.dispatchEvent(new Event('input', { bubbles: true }));
 };
 
 // Variable filter categories — heuristic predicates over the DB (description keywords + flags).
@@ -536,6 +567,15 @@ export class CommandDeck {
                             <button onclick="openWiz && openWiz('slot')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="9" width="18" height="6" rx="3" stroke="#94a3b8" stroke-width="2.5"/><line x1="7" y1="12" x2="17" y2="12" stroke="#1e293b" stroke-width="2" stroke-linecap="round"/></svg>Slot</button>
                             <button onclick="openWiz && openWiz('surfacing')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="4" width="18" height="16" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><path d="M5 8h14M5 12h14M5 16h14" stroke="#1e293b" stroke-width="1.5"/></svg>Surfacing</button>
                             <button onclick="openWiz && openWiz('text')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><path d="M5 6h14M12 6v13" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/></svg>Text / engrave</button>
+                        </div>
+                    </div>
+
+                    <div class="toolbar-dropdown">
+                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.io}</span><span class="btn-tx">I/O</span><span class="btn-caret">▼</span></button>
+                        <div class="toolbar-dropdown-content">
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('outpin')">⚡ Set Output</button>
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('waitinput')">⏱ Wait Input</button>
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('dwell')">⏳ Dwell</button>
                         </div>
                     </div>
 

@@ -1395,8 +1395,8 @@ var init_ddcs_expert_m350 = __esm({
       probeModel: "g31",
       dwellUnits: "ms",
       vars: { dro: 880, probeStatus: 1920, probeTrig: 1925, wcsBase: 805, wcsStride: 5, activeWcs: 578, toolTable: 1430, ax: AX },
-      caps: { vars: true, flow: "goto", probeStatusCheck: true, hmi: true, toolTable: true, probePort: true },
-      // the fullest profile
+      caps: { vars: true, flow: "goto", probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, inputRead: true },
+      // the fullest profile (inputRead = generic live-input poll #[1520+N], slib O10300)
       // G31 Z-10 F100 P3 L0 Q1   (snippets.nc:9 · words.nc:6 "G31 Z#7 F#3 P#5 L0 Q1")
       probeMove: (axis, dist, { feed = 100, port = 3, level = 0 } = {}) => [`G31 ${axis}${dist} F${feed} P${port} L${level} Q1`],
       // IF #1922!=2 GOTO1   (3D PROBE G55.nc:29 · snippets.nc:10). status block #1920+axis; "!=2" = did NOT trigger
@@ -1420,6 +1420,10 @@ var init_ddcs_expert_m350 = __esm({
       // symbolic ops ==/!=/<=; GOTO no space
       goto: (label) => [`GOTO${label}`],
       label: (n) => [`N${n}`],
+      // Wait until input N (0-based: pin 0 = IN01 = #1520) reaches level L (0/1): poll #[1520+N] in a
+      // WHILE..DO1..END1 with a 10 ms dwell — the verbatim factory sensor-wait idiom (slib-m.nc O10300:
+      // `WHILE [#[1520+#4-1] != #6] DO1 / G04 P10 / END1`). P = ms (slib-g.nc:691). No timeout: the poll waits indefinitely.
+      waitInput: (n, level) => [`WHILE [#[1520+${n}] != ${level}] DO1   ( wait input ${n} = ${level} )`, "G04 P10", "END1"],
       spindle: (dir, rpm) => [`${dir === "ccw" ? "M4" : "M3"} S${rpm}`],
       // M3.nc / M4.nc
       spindleOff: () => ["M5"],
@@ -2309,14 +2313,21 @@ var init_cnc = __esm({
       category: "Machine",
       defaults: { pin: 0, mode: "rise", timeout: 0, var: "#5399" },
       fields: ["pin", "mode", "timeout", "var"],
-      gate: (d) => isOword(d) ? null : "wait-on-input is oword-only \u2014 use a sensor M-Code",
+      gate: (d) => isOword(d) || isDDCS(d) && d.caps && d.caps.inputRead ? null : "wait-on-input: M66 (RS274) or DDCS Expert only \u2014 V4.1/DM500 use a sensor M-Code",
       // RS274/grblHAL wait-on-input: M66 P<n> L<mode> Q<timeout> → result in #5399 (L: 0 immediate, 1 rise, 2 fall,
-      // 3 high, 4 low). DDCS uses sensor M-codes (M300-302) → use the M-Code atom there (this folds to a hint).
+      // 3 high, 4 low). DDCS EXPERT (caps.inputRead) → generic live-input poll WHILE [#[1520+N]!=L] (slib O10300);
+      // V4.1/DM500 lack it → fold to a hint (use a named sensor M-code M300-307).
       emit: (p, dx, dy, dialect8) => {
-        if (!isOword(dialect8)) return [`( wait input P${num(p.pin, 0)} - use an M-Code atom on ${dialect8.name} )`];
-        const L2 = { imm: 0, rise: 1, fall: 2, high: 3, low: 4 }[p.mode] ?? 1;
-        const q = num(p.timeout, 0);
-        return [`M66 P${Math.max(0, Math.round(num(p.pin, 0)))} L${L2}${q > 0 ? ` Q${r3(q)}` : ""}`];
+        const pin = Math.max(0, Math.round(num(p.pin, 0)));
+        if (isOword(dialect8)) {
+          const L2 = { imm: 0, rise: 1, fall: 2, high: 3, low: 4 }[p.mode] ?? 1;
+          const q = num(p.timeout, 0);
+          return [`M66 P${pin} L${L2}${q > 0 ? ` Q${r3(q)}` : ""}`];
+        }
+        if (isDDCS(dialect8) && dialect8.caps && dialect8.caps.inputRead && dialect8.waitInput) {
+          return dialect8.waitInput(pin, p.mode === "fall" || p.mode === "low" ? 0 : 1);
+        }
+        return [`( wait input P${pin} - use an M-Code atom on ${dialect8.name} )`];
       }
     };
   }
@@ -3223,19 +3234,19 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = /* @__PURE__ */ Object.cr
 function emitMapped(blocks, settings = {}) {
   const dialect8 = settings.dialect || getDialect(settings.profileId);
   const scope = /* @__PURE__ */ Object.create(null);
-  const T = [];
+  const T2 = [];
   (blocks || []).forEach((b2) => {
-    T.push(...emit(b2, 0, 0, [], scope, dialect8));
+    T2.push(...emit(b2, 0, 0, [], scope, dialect8));
   });
-  applyModalFeed(T);
-  applyCapGating(T, dialect8);
-  balanceOwords(T, dialect8);
-  const lines = T.map((t) => t.line);
-  return { text: lines.join("\n"), lines, map: T.map((t) => t.src) };
+  applyModalFeed(T2);
+  applyCapGating(T2, dialect8);
+  balanceOwords(T2, dialect8);
+  const lines = T2.map((t) => t.line);
+  return { text: lines.join("\n"), lines, map: T2.map((t) => t.src) };
 }
-function applyModalFeed(T) {
+function applyModalFeed(T2) {
   let modalF = null;
-  for (const t of T) {
+  for (const t of T2) {
     const m = t.line.match(/ F(-?\d+(?:\.\d+)?)\b/);
     if (m) {
       const f = Number(m[1]);
@@ -3246,10 +3257,10 @@ function applyModalFeed(T) {
     }
   }
 }
-function applyCapGating(T, dialect8) {
+function applyCapGating(T2, dialect8) {
   const caps = getCaps(dialect8.id);
   if (caps.vars && caps.flow !== "none") return;
-  for (const t of T) {
+  for (const t of T2) {
     const code = (t.line || "").trim();
     if (!code || code.startsWith("(") || code.startsWith(";")) continue;
     const hasVar = /#\d|#\[/.test(code);
@@ -3259,10 +3270,10 @@ function applyCapGating(T, dialect8) {
     }
   }
 }
-function balanceOwords(T, dialect8) {
+function balanceOwords(T2, dialect8) {
   if (getCaps(dialect8.id).flow !== "oword") return;
   const ifs = /* @__PURE__ */ new Set(), endifs = /* @__PURE__ */ new Set();
-  for (const t of T) {
+  for (const t of T2) {
     const s = (t.line || "").trim();
     let m = s.match(/^o(\d+)\s+if\b/);
     if (m) ifs.add(m[1]);
@@ -3270,9 +3281,9 @@ function balanceOwords(T, dialect8) {
     if (m) endifs.add(m[1]);
   }
   const valid = new Set([...ifs].filter((n) => endifs.has(n)));
-  for (let i = T.length - 1; i >= 0; i--) {
-    const m = (T[i].line || "").trim().match(/^o(\d+)\s+(if|endif)\b/);
-    if (m && !valid.has(m[1])) T.splice(i, 1);
+  for (let i = T2.length - 1; i >= 0; i--) {
+    const m = (T2[i].line || "").trim().match(/^o(\d+)\s+(if|endif)\b/);
+    if (m && !valid.has(m[1])) T2.splice(i, 1);
   }
 }
 var _seq, tag;
@@ -5824,6 +5835,12 @@ var init_drillWizard = __esm({
 });
 
 // ../DDCS-Studio/web/shared/js/client.js
+var client_exports = {};
+__export(client_exports, {
+  deriveStatus: () => deriveStatus,
+  deviceName: () => deviceName,
+  makeClient: () => makeClient
+});
 function resolveBase(opts) {
   if (opts.base != null) return opts.base;
   try {
@@ -6194,10 +6211,49 @@ var init_ioTable = __esm({
 });
 
 // ../DDCS-Studio/web/ui/themes.js
-var THEMES;
+var THEMES, ThemeManager;
 var init_themes = __esm({
   "../DDCS-Studio/web/ui/themes.js"() {
     THEMES = ["studio", "normal", "steampunk", "futuristic", "organic"];
+    ThemeManager = class {
+      constructor() {
+        this.themes = THEMES;
+        let saved = null;
+        try {
+          saved = localStorage.getItem("ddcs_theme");
+        } catch (e) {
+        }
+        const initial = saved && this.themes.includes(saved) ? saved : document.body ? document.body.getAttribute("data-theme") : null;
+        const idx = initial && this.themes.includes(initial) ? this.themes.indexOf(initial) : 0;
+        this.currentThemeIndex = idx;
+        this.applyTheme(this.themes[this.currentThemeIndex]);
+      }
+      toggle() {
+        this.currentThemeIndex = (this.currentThemeIndex + 1) % this.themes.length;
+        this.applyTheme(this.themes[this.currentThemeIndex]);
+      }
+      setCurrent(themeName) {
+        const index = this.themes.indexOf(themeName);
+        if (index !== -1) {
+          this.currentThemeIndex = index;
+          this.applyTheme(themeName);
+        }
+      }
+      getCurrent() {
+        return this.themes[this.currentThemeIndex];
+      }
+      applyTheme(themeName) {
+        document.body.setAttribute("data-theme", themeName);
+        try {
+          localStorage.setItem("ddcs_theme", themeName);
+        } catch (e) {
+        }
+        const styleBtn = document.getElementById("styleBtn");
+        if (styleBtn) {
+          styleBtn.innerHTML = '<span class="op-icon">\u{1F3A8}</span><span class="op-label">' + themeName.toUpperCase() + "</span>";
+        }
+      }
+    };
   }
 });
 
@@ -11698,6 +11754,7 @@ function createPreviewPanel(container, opts = {}) {
   const t2 = createToolpath2d(cv2d);
   let viz = null;
   let mode = previewPrefs().defaultView === "2d" ? "2d" : "3d", active2 = false, segs = [], fitted = false;
+  let lastVizMode = mode === "io" ? "3d" : mode;
   let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false;
   if (typeof ResizeObserver !== "undefined") {
     new ResizeObserver(() => {
@@ -11767,11 +11824,11 @@ function createPreviewPanel(container, opts = {}) {
       },
       onStatus: ({ message }) => setStatus2(message),
       onWait: (wait) => {
-        if (window.ioPanel) {
-          if (wait) window.ioPanel.show();
-          window.ioPanel.setWait(wait);
-        }
+        if (!window.ioPanel) return;
+        if (mode !== "io" && wait) window.ioPanel.show();
+        window.ioPanel.setWait(wait);
       },
+      // docked I/O view already shows it; else float
       onFinish: () => {
         updateRunBtn();
         if (typeof opts.onLine === "function") opts.onLine(null);
@@ -11857,8 +11914,23 @@ function createPreviewPanel(container, opts = {}) {
     el3.style.display = el3.childElementCount ? "" : "none";
   }
   function setMode(next) {
+    const ioBtn = q(".pp-io");
+    if (next !== "io") lastVizMode = next;
     mode = next;
     stopPlay();
+    if (mode === "io") {
+      if (cv2d) cv2d.style.display = "none";
+      if (viz) {
+        viz.setActive(false);
+        if (viz.renderer) viz.renderer.domElement.style.display = "none";
+      }
+      if (window.ioPanel) window.ioPanel.show(container);
+      if (ioBtn) ioBtn.classList.add("on");
+      syncJog();
+      return;
+    }
+    if (window.ioPanel && window.ioPanel.isVisible()) window.ioPanel.hide();
+    if (ioBtn) ioBtn.classList.remove("on");
     const mt = q(".pp-mtoggle");
     if (mt) mt.textContent = mode === "2d" ? "2D" : "3D";
     if (cv2d) cv2d.style.display = mode === "2d" ? "" : "none";
@@ -11918,7 +11990,7 @@ function createPreviewPanel(container, opts = {}) {
     if (engine) engine.stock = stockForViz();
   }
   q(".pp-stock").addEventListener("click", (e) => toggleStockEditor(e.currentTarget));
-  q(".pp-mtoggle").addEventListener("click", () => setMode(mode === "2d" ? "3d" : "2d"));
+  q(".pp-mtoggle").addEventListener("click", () => setMode(mode === "io" ? lastVizMode : mode === "2d" ? "3d" : "2d"));
   q(".pp-run").addEventListener("click", () => {
     const eng = ensureEngine();
     if (eng.running && !eng.paused) stopPlay();
@@ -11958,9 +12030,7 @@ function createPreviewPanel(container, opts = {}) {
     grid.style.display = open ? "" : "none";
     q(".pp-jog").classList.toggle("on", open);
   });
-  q(".pp-io").addEventListener("click", () => {
-    if (window.ioPanel) window.ioPanel.toggle();
-  });
+  q(".pp-io").addEventListener("click", () => setMode(mode === "io" ? lastVizMode : "io"));
   q(".pp-follow").addEventListener("click", () => {
     const v6 = ensureViz();
     if (!v6 || !v6.setFollowCam) return;
@@ -12010,7 +12080,7 @@ function createPreviewPanel(container, opts = {}) {
       play();
     }
   }
-  return { setGcode, refresh, setActive, stop: stopPlay, seekLine, get viz() {
+  return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, get viz() {
     return viz;
   }, get engine() {
     return engine;
@@ -16952,7 +17022,924 @@ var WizardManager = class {
   }
 };
 
+// ../DDCS-Studio/web/ui/commandDeck.js
+init_uiUtils();
+
+// ../DDCS-Studio/web/ui/suggestBar.js
+var SUG_KEY = "ddcs_suggest_on";
+var suggestEnabled = () => {
+  try {
+    return localStorage.getItem(SUG_KEY) !== "off";
+  } catch (e) {
+    return true;
+  }
+};
+var T = (arr) => arr.map((x) => typeof x === "string" ? { label: x.trim() || x, insert: x } : x);
+function suggestFor(lineBeforeCursor) {
+  const raw2 = String(lineBeforeCursor || "");
+  const code = raw2.replace(/\([^)]*\)/g, "");
+  if (/(^|\n)[^\S\n]*$/.test(code)) return T(["G0 ", "G1 ", "G31 ", "IF ", "M3 ", "#", "("]);
+  const cur = code.replace(/[\s\S]*\n/, "");
+  const words = cur.trim().split(/\s+/).filter(Boolean);
+  const last = words[words.length - 1] || "";
+  const isIf = words[0] === "IF";
+  const hasG31 = words.includes("G31");
+  if (/^(G0|G1|G2|G3|G53)$/.test(last)) return T(["X", "Y", "Z", "A", "F"]);
+  if (last === "G31") return T(["X", "Y", "Z", "F", "P", "L", "Q"]);
+  if (last === "G4") return T(["P"]);
+  if (last === "M") return T(["3", "5", "8", "9", "30"]);
+  if (last === "#") return T(["1505", "1925", "1920", "1922", "880", "882"]);
+  if (last === "IF") return T(["#1920", "#1922", "#1505"]);
+  if (last === "GOTO") return T(["1", "2", "3"]);
+  if (last === "=") return T(["1", "0", "#", "["]);
+  if (isIf && /[!=<>]+\d*$/.test(last)) return T(["GOTO"]);
+  if (isIf && /^#?\d+$/.test(last)) return T(["!=", "==", "<", ">"]);
+  if (hasG31 && /^[XYZFPLQ]$/.test(last) || /^[XYZABF]$/.test(last)) return T(["#", "-"]);
+  if (/^[XYZA]-?\d*\.?\d*$/.test(last)) return T(["Y", "Z", "F", "#"]);
+  return T(["G1 ", "GOTO", "IF ", "#", "M5 "]);
+}
+function initSuggestBar() {
+  const row = document.createElement("div");
+  row.className = "ddcs-suggest-bar";
+  row.style.cssText = "display:flex; gap:6px; align-items:center; overflow:hidden; padding:4px 8px; min-height:30px; border-bottom:1px solid rgba(255,255,255,0.06);";
+  const chips = document.createElement("div");
+  chips.style.cssText = "display:flex; gap:6px; flex:1 1 auto; overflow:hidden; flex-wrap:nowrap;";
+  row.appendChild(chips);
+  const lineBeforeCursor = () => {
+    const ed2 = document.getElementById("editor");
+    if (!ed2) return "";
+    const pos = Number.isInteger(ed2.selectionStart) ? ed2.selectionStart : ed2.value.length;
+    return ed2.value.slice(0, pos);
+  };
+  function fit() {
+    const max = chips.clientWidth;
+    if (!max) return;
+    let used = 0;
+    Array.from(chips.children).forEach((b2, i) => {
+      b2.style.display = "";
+      used += b2.offsetWidth + 6;
+      if (i > 0 && used > max) b2.style.display = "none";
+    });
+  }
+  function render() {
+    if (!suggestEnabled()) {
+      row.style.display = "none";
+      return;
+    }
+    row.style.display = "flex";
+    chips.innerHTML = "";
+    for (const s of suggestFor(lineBeforeCursor())) {
+      const b2 = document.createElement("button");
+      b2.className = "toolbar-btn ddcs-suggest-chip";
+      b2.style.cssText = "padding:2px 10px; font-size:12px; white-space:nowrap; flex:0 0 auto;";
+      b2.textContent = s.label;
+      b2.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        if (window.insert) window.insert(s.insert);
+        setTimeout(render, 0);
+      }, { passive: false });
+      chips.appendChild(b2);
+    }
+    requestAnimationFrame(fit);
+  }
+  const ed = document.getElementById("editor");
+  if (ed) ["input", "keyup", "click", "focus"].forEach((ev) => ed.addEventListener(ev, render));
+  window.addEventListener("ddcs:suggest-changed", render);
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(chips);
+  window.addEventListener("resize", fit);
+  render();
+  return row;
+}
+
+// ../DDCS-Studio/web/ui/commandDeck.js
+init_dialects();
+init_controllerProfiles();
+init_cnc();
+init_dwell();
+var _svg = (body, color = "currentColor") => `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+var HEADER_ICONS = {
+  comm: _svg('<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z" fill="#ffffff" stroke="#3b82f6"/><circle cx="8.5" cy="11.5" r="1.1" fill="#10b981" stroke="none"/><circle cx="12" cy="11.5" r="1.1" fill="#f59e0b" stroke="none"/><circle cx="15.5" cy="11.5" r="1.1" fill="#ef4444" stroke="none"/>', "#3b82f6"),
+  // WCS = work origin: Y-up / X-right axes meeting at a filled origin dot
+  wcs: _svg('<path d="M5 3V19" stroke="#10b981"/><polyline points="2.5 6 5 3 7.5 6" stroke="#10b981"/><path d="M5 19H21" stroke="#3b82f6"/><polyline points="18 16.5 21 19 18 21.5" stroke="#3b82f6"/><circle cx="5" cy="19" r="2" fill="#ef4444" stroke="none"/>', "#10b981"),
+  warmup: _svg('<path d="M3.5 6Q12 2.5 20.5 6L14 18Q12 20 10.5 18Z" fill="#cbd5e1" stroke="#475569"/><path d="M5.5 9.5Q12 7.5 18 10.5" stroke="#2563eb"/><path d="M7 13Q12 11.5 16.5 14" stroke="#2563eb"/><path d="M9 16.3Q12 15.3 14.5 16.8" stroke="#2563eb"/><ellipse cx="12" cy="20.6" rx="4" ry="1.8" fill="#e2e8f0" stroke="#475569"/>', "#475569"),
+  // Probe = ruby touch sensor: steel body + shaft, a solid ruby ball touching a surface line
+  probe: _svg('<path d="M9 3h6v3l-1.5 2h-3L9 6z" stroke="#64748b"/><line x1="12" y1="10" x2="12" y2="14.8" stroke="#64748b"/><line x1="5" y1="21" x2="19" y2="21" stroke="#f59e0b"/><circle cx="12" cy="17.3" r="2.4" fill="#e11d48" stroke="#e11d48"/>', "#64748b"),
+  atc: _svg('<polyline points="22 5 22 10.5 16.5 10.5" stroke="#10b981"/><path d="M4.06 9.5A8 8 0 0 1 18 6.6l4 3.9" stroke="#10b981"/><polyline points="2 19 2 13.5 7.5 13.5" stroke="#f97316"/><path d="M2 13.5l4 3.9A8 8 0 0 0 19.94 14.5" stroke="#f97316"/>', "#8b5cf6"),
+  mill: _svg('<path d="M9 2.5h6v6l1.2 1.5v9.5h-8.4v-9.5l1.2-1.5z" stroke="#64748b"/><path d="M9.6 18.7c2-1.4 3.4-3.9 4.4-7.4" stroke="#14b8a6"/><path d="M9.6 15.2c1.1-.8 1.9-2.1 2.5-3.8" stroke="#14b8a6"/><line x1="9" y1="19.5" x2="15" y2="19.5" stroke="#f59e0b" stroke-width="2.5"/>', "#64748b"),
+  load: _svg('<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>', "#f59e0b"),
+  insert: _svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>', "#14b8a6"),
+  copy: _svg('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>', "#6366f1"),
+  clear: _svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>', "#ef4444"),
+  // Export = share / upload: open-top box with an up arrow rising out (per the supplied glyph)
+  export: _svg('<path d="M16 9h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2"/><line x1="12" y1="14" x2="12" y2="3"/><polyline points="8 7 12 3 16 7"/>', "#0ea5e9"),
+  // I/O = two opposite arrows (output out · input in)
+  io: _svg('<line x1="3" y1="8" x2="14" y2="8" stroke="#22c55e"/><polyline points="11 5 14 8 11 11" stroke="#22c55e"/><line x1="21" y1="16" x2="10" y2="16" stroke="#38bdf8"/><polyline points="13 13 10 16 13 19" stroke="#38bdf8"/>', "#22c55e")
+};
+window.loadGcodeFile = function loadGcodeFile() {
+  let input = document.getElementById("gcode-file-input");
+  if (!input) {
+    input = document.createElement("input");
+    input.type = "file";
+    input.id = "gcode-file-input";
+    input.accept = ".nc,.gcode,.gco,.g,.ngc,.tap,.cnc,.txt";
+    input.style.display = "none";
+    input.addEventListener("change", () => {
+      const f = input.files && input.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = (e) => {
+        const ed = document.getElementById("editor");
+        if (ed) {
+          ed.value = e.target.result || "";
+          ed.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      };
+      r.readAsText(f);
+      input.value = "";
+    });
+    document.body.appendChild(input);
+  }
+  input.click();
+};
+window.insertGcodeFile = function insertGcodeFile() {
+  let input = document.getElementById("gcode-insert-input");
+  if (!input) {
+    input = document.createElement("input");
+    input.type = "file";
+    input.id = "gcode-insert-input";
+    input.accept = ".nc,.gcode,.gco,.g,.ngc,.tap,.cnc,.txt";
+    input.style.display = "none";
+    input.addEventListener("change", () => {
+      const f = input.files && input.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = (e) => {
+        const ed = document.getElementById("editor");
+        if (!ed) return;
+        const text = e.target.result || "";
+        const pos = Number.isInteger(ed.selectionStart) ? ed.selectionStart : ed.value.length;
+        const before = ed.value.slice(0, pos), after = ed.value.slice(pos);
+        const lead = before && !before.endsWith("\n") ? "\n" : "";
+        const tail = text.endsWith("\n") ? "" : "\n";
+        ed.value = before + lead + text + tail + after;
+        const caret = (before + lead + text + tail).length;
+        try {
+          ed.setSelectionRange(caret, caret);
+        } catch (_) {
+        }
+        ed.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+      r.readAsText(f);
+      input.value = "";
+    });
+    document.body.appendChild(input);
+  }
+  input.click();
+};
+var IO_BLOCKS = { outpin: outPinBlock, waitinput: waitInputBlock, dwell: dwellBlock };
+window.ddcsInsertIo = function ddcsInsertIo(type) {
+  const block = IO_BLOCKS[type];
+  const ed = document.getElementById("editor");
+  if (!block || !ed) return;
+  let dialect8;
+  try {
+    dialect8 = resolveActivePost(getActiveProfile().id);
+  } catch (_) {
+    dialect8 = {};
+  }
+  const out = block.emit({ ...block.defaults }, 0, 0, dialect8);
+  const text = (Array.isArray(out) ? out : [out]).join("\n");
+  let pos = Number.isInteger(ed.selectionStart) ? ed.selectionStart : ed.value.length;
+  if (document.activeElement !== ed) {
+    const m = ed.value.match(/\n[ \t]*M30\b/i);
+    pos = m ? m.index + 1 : ed.value.length;
+  }
+  const before = ed.value.slice(0, pos), after = ed.value.slice(pos);
+  const lead = before && !before.endsWith("\n") ? "\n" : "";
+  ed.value = before + lead + text + "\n" + after;
+  const caret = (before + lead + text + "\n").length;
+  try {
+    ed.focus();
+    ed.setSelectionRange(caret, caret);
+  } catch (_) {
+  }
+  ed.dispatchEvent(new Event("input", { bubbles: true }));
+};
+var VAR_FILTERS = [
+  { key: "user", label: "User", test: (v6) => !v6.isSys },
+  { key: "hasDesc", label: "Has Desc", test: (v6) => (v6.d || "").trim().length > 0 },
+  { key: "probe", label: "Probe", test: (v6) => /probe|g31/i.test((v6.d || "") + " " + v6.i) },
+  { key: "wcs", label: "WCS", test: (v6) => /wcs|work offset|g5[4-9]/i.test(v6.d || "") },
+  { key: "axis", label: "Axis", test: (v6) => /axis/i.test(v6.d || "") },
+  { key: "signal", label: "Signal", test: (v6) => /signal/i.test(v6.d || "") },
+  { key: "offset", label: "Offset", test: (v6) => /offset/i.test(v6.d || "") },
+  { key: "tool", label: "Tool", test: (v6) => /tool/i.test(v6.d || "") },
+  { key: "port", label: "Port", test: (v6) => /port/i.test(v6.d || "") },
+  { key: "status", label: "Status", test: (v6) => /status/i.test(v6.d || "") },
+  { key: "input", label: "Input", test: (v6) => /input/i.test(v6.d || "") },
+  { key: "output", label: "Output", test: (v6) => /output/i.test(v6.d || "") },
+  { key: "func", label: "Func", test: (v6) => /func/i.test(v6.d || "") },
+  { key: "key", label: "Key", test: (v6) => /\bkey\b/i.test(v6.d || "") }
+];
+var CommandDeck = class {
+  constructor(editorManager, variableDB = null) {
+    this.editorManager = editorManager;
+    this.variableDB = variableDB;
+    this.panel = el("deck-panel");
+    this._varGrid = null;
+    this._varSearch = null;
+    this._activeTab = "move";
+    this._activeFilters = /* @__PURE__ */ new Set();
+    this.build();
+    const dock = document.getElementById("controller-dock") || this.panel;
+    if (dock) {
+      dock.addEventListener("click", (e) => {
+        const b2 = e.target && e.target.closest ? e.target.closest("button") : null;
+        if (b2 && b2.dataset.__ddcs_handled === "1") {
+          delete b2.dataset.__ddcs_handled;
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }, true);
+    }
+    window.refreshDeckVariables = () => this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : "");
+    window.addEventListener("variableDB:ready", (e) => {
+      const fam = e && e.detail && e.detail.family || (this.variableDB ? this.variableDB.getControllerVars() : null);
+      if (fam && this._ctrlSel && this._ctrlSel.value !== fam) this._ctrlSel.value = fam;
+      this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : "");
+    });
+  }
+  build() {
+    this.renderHeader();
+    const body = document.querySelector(".dock-body");
+    if (!body) return;
+    const all = document.getElementById("deck-panel") || document.createElement("div");
+    all.id = "deck-panel";
+    all.className = "dock-row macro-grid-area";
+    all.innerHTML = "";
+    this.buildMacroGroups(all);
+    this._wireDeckButtons(all);
+    const makePanel = (id, groupClasses, hidden) => {
+      const panel = document.createElement("div");
+      panel.className = "deck-tab-panel";
+      panel.id = id;
+      if (hidden) panel.style.display = "none";
+      const gc = document.createElement("div");
+      gc.className = "dock-row macro-grid-area";
+      groupClasses.forEach((c2) => {
+        const g = all.querySelector(".deck-group." + c2);
+        if (g) gc.appendChild(g);
+      });
+      panel.appendChild(gc);
+      return panel;
+    };
+    const movePanel = makePanel("deck-tab-move", ["numpad", "axes"], false);
+    const gmPanel = makePanel("deck-tab-gm", ["g-codes", "m-codes"], true);
+    const mathPanel = makePanel("deck-tab-math", ["math", "functions"], true);
+    const logicPanel = makePanel("deck-tab-logic", ["control-flow", "wcs"], true);
+    const varPanel = document.createElement("div");
+    varPanel.className = "deck-tab-panel";
+    varPanel.id = "deck-tab-variables";
+    varPanel.style.display = "none";
+    this.buildVariablesPanel(varPanel);
+    body.innerHTML = "";
+    body.appendChild(initSuggestBar());
+    body.appendChild(this._makeEditorRow());
+    body.appendChild(this._buildTabStrip());
+    body.appendChild(movePanel);
+    body.appendChild(gmPanel);
+    body.appendChild(mathPanel);
+    body.appendChild(logicPanel);
+    body.appendChild(varPanel);
+    this.renderHandle();
+  }
+  // Restore the chevron handle (DockManager handles the expand/collapse click).
+  renderHandle() {
+    const handle = document.querySelector("#controller-dock .header-handle");
+    if (!handle) return;
+    handle.innerHTML = '<span class="chevron">\u25B2</span>';
+    handle.setAttribute("aria-label", "Toggle keyboard dock");
+  }
+  // KEYBOARD / VARIABLES tab strip for the top of the dock body
+  _buildTabStrip() {
+    const strip = document.createElement("div");
+    strip.className = "deck-tabs";
+    strip.innerHTML = `
+            <button class="deck-tab ddcs-tab active" data-deck-tab="move">\u2328 MOVE</button>
+            <button class="deck-tab ddcs-tab" data-deck-tab="gm">\u2317 G-M</button>
+            <button class="deck-tab ddcs-tab" data-deck-tab="math">\u2211 MATH</button>
+            <button class="deck-tab ddcs-tab" data-deck-tab="logic">\u21C5 LOGIC</button>
+            <button class="deck-tab ddcs-tab" data-deck-tab="variables"># VARIABLES</button>
+        `;
+    strip.querySelectorAll(".deck-tab").forEach((t) => {
+      t.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+      }, { passive: false });
+      t.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.switchTab(t.dataset.deckTab);
+      });
+    });
+    return strip;
+  }
+  switchTab(name) {
+    this._activeTab = name;
+    const panels = { move: "deck-tab-move", gm: "deck-tab-gm", math: "deck-tab-math", logic: "deck-tab-logic", variables: "deck-tab-variables" };
+    for (const [key, id] of Object.entries(panels)) {
+      const p = document.getElementById(id);
+      if (p) p.style.display = name === key ? "" : "none";
+    }
+    document.querySelectorAll("#controller-dock .deck-tab").forEach((t) => {
+      t.classList.toggle("active", t.dataset.deckTab === name);
+    });
+    if (name === "variables") {
+      this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : "");
+    }
+  }
+  // Build + wire a BACK/SPACE/ENTER editor-keys row (one per keyboard tab).
+  _makeEditorRow() {
+    const editorRow = document.createElement("div");
+    editorRow.className = "dock-row editor-keys-row grid-3";
+    editorRow.innerHTML = `
+            <button class="toolbar-btn" data-ddcs-role="back">\u232B BACK</button>
+            <button class="toolbar-btn" data-ddcs-role="space">\u2423 SPACE</button>
+            <button class="toolbar-btn" data-ddcs-role="enter">\u21B5 ENTER</button>
+        `;
+    this._wireEditorRow(editorRow);
+    return editorRow;
+  }
+  _wireEditorRow(editorRow) {
+    const backBtn = editorRow.querySelector('[data-ddcs-role="back"]');
+    const spaceBtn = editorRow.querySelector('[data-ddcs-role="space"]');
+    const enterBtn = editorRow.querySelector('[data-ddcs-role="enter"]');
+    if (backBtn) backBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      backBtn.dataset.__ddcs_handled = "1";
+      const ed = document.getElementById("editor");
+      if (ed) {
+        const start = ed.selectionStart;
+        const end = ed.selectionEnd;
+        if (start !== end) {
+          ed.value = ed.value.slice(0, start) + ed.value.slice(end);
+          ed.setSelectionRange(start, Math.min(ed.value.length, start + 1));
+        } else if (start > 0) {
+          ed.value = ed.value.slice(0, start - 1) + ed.value.slice(start);
+          const newPos = start - 1;
+          ed.setSelectionRange(newPos, Math.min(ed.value.length, newPos + 1));
+        }
+        ed.dispatchEvent(new Event("input"));
+        ed.setAttribute("inputmode", "none");
+        ed.blur();
+      }
+    }, { passive: false });
+    if (spaceBtn) spaceBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      spaceBtn.dataset.__ddcs_handled = "1";
+      window.insert && window.insert(" ");
+      const ed = document.getElementById("editor");
+      if (ed) {
+        ed.setAttribute("inputmode", "none");
+        ed.blur();
+      }
+    }, { passive: false });
+    if (enterBtn) enterBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      enterBtn.dataset.__ddcs_handled = "1";
+      window.insert && window.insert("\n");
+      const ed = document.getElementById("editor");
+      if (ed) {
+        ed.setAttribute("inputmode", "none");
+        ed.blur();
+      }
+    }, { passive: false });
+  }
+  _wireDeckButtons(container) {
+    container.querySelectorAll("button").forEach((btn) => {
+      btn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        try {
+          btn.dataset.__ddcs_handled = "1";
+          if (typeof btn.onclick === "function") {
+            btn.onclick.call(btn, e);
+          }
+        } catch (err) {
+        }
+        const ed = document.getElementById("editor");
+        if (ed) {
+          ed.setAttribute("inputmode", "none");
+          ed.blur();
+        }
+      }, { passive: false });
+    });
+  }
+  // VARIABLES tab: search + filters + a scrollable box of key-styled chips
+  buildVariablesPanel(panel) {
+    panel.innerHTML = "";
+    this._activeFilters = /* @__PURE__ */ new Set();
+    const ctrlRow = document.createElement("div");
+    ctrlRow.className = "deck-var-ctrlrow";
+    ctrlRow.style.cssText = "display:none;";
+    const ctrlLbl = document.createElement("span");
+    ctrlLbl.textContent = "Variable set:";
+    ctrlLbl.style.cssText = "font-size:11px; opacity:.7;";
+    const ctrlSel = document.createElement("select");
+    ctrlSel.className = "deck-var-ctrlsel";
+    ctrlSel.style.cssText = "font-size:11px;";
+    ctrlSel.innerHTML = '<option value="expert">Expert M350</option><option value="v4.1">DDCS V4.1</option><option value="v3">DDCS V3 / DM500</option>';
+    ctrlSel.value = this.variableDB ? this.variableDB.getControllerVars() : "expert";
+    this._ctrlSel = ctrlSel;
+    ctrlSel.addEventListener("change", async () => {
+      if (!this.variableDB) return;
+      await this.variableDB.setControllerVars(ctrlSel.value);
+      if (this._varStatus) this._varStatus.textContent = "";
+      this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : "");
+    });
+    const pullBtn = document.createElement("button");
+    pullBtn.className = "toolbar-btn";
+    pullBtn.style.cssText = "padding:2px 8px; font-size:11px;";
+    pullBtn.textContent = "\u21A7 Pull from controller";
+    pullBtn.title = "Detect the connected controller via the gateway and load its variable set";
+    pullBtn.addEventListener("pointerdown", (e) => e.preventDefault(), { passive: false });
+    pullBtn.addEventListener("click", () => this._pullControllerVars(ctrlSel));
+    const ctrlStatus = document.createElement("span");
+    ctrlStatus.style.cssText = "font-size:10px; opacity:.7;";
+    this._varStatus = ctrlStatus;
+    ctrlRow.appendChild(ctrlLbl);
+    ctrlRow.appendChild(ctrlSel);
+    ctrlRow.appendChild(pullBtn);
+    ctrlRow.appendChild(ctrlStatus);
+    panel.appendChild(ctrlRow);
+    const searchRow = document.createElement("div");
+    searchRow.className = "deck-var-searchrow";
+    const search = document.createElement("input");
+    search.type = "text";
+    search.className = "deck-var-search";
+    search.placeholder = "Search variables\u2026";
+    search.setAttribute("autocomplete", "off");
+    const filterBtn = document.createElement("button");
+    filterBtn.className = "deck-var-filterbtn";
+    filterBtn.textContent = "Filters";
+    searchRow.appendChild(search);
+    searchRow.appendChild(filterBtn);
+    panel.appendChild(searchRow);
+    const filterRow = document.createElement("div");
+    filterRow.className = "deck-var-filters";
+    filterRow.style.display = "none";
+    VAR_FILTERS.forEach((f) => {
+      const chip = document.createElement("button");
+      chip.className = "deck-var-filterchip";
+      chip.textContent = f.label;
+      chip.dataset.filterKey = f.key;
+      chip.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+      }, { passive: false });
+      chip.addEventListener("click", () => {
+        if (this._activeFilters.has(f.key)) {
+          this._activeFilters.delete(f.key);
+          chip.classList.remove("active");
+        } else {
+          this._activeFilters.add(f.key);
+          chip.classList.add("active");
+        }
+        this.renderVariables(this._varSearch.value.trim().toLowerCase());
+      });
+      filterRow.appendChild(chip);
+    });
+    panel.appendChild(filterRow);
+    filterBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+    }, { passive: false });
+    filterBtn.addEventListener("click", () => {
+      const show = filterRow.style.display === "none";
+      filterRow.style.display = show ? "flex" : "none";
+      filterBtn.classList.toggle("active", show);
+    });
+    const scroll = document.createElement("div");
+    scroll.className = "deck-var-scroll";
+    const grid = document.createElement("div");
+    grid.className = "deck-var-grid";
+    scroll.appendChild(grid);
+    panel.appendChild(scroll);
+    this._varGrid = grid;
+    this._varSearch = search;
+    search.addEventListener("input", () => this.renderVariables(search.value.trim().toLowerCase()));
+    this.renderVariables();
+  }
+  // Pull-from-controller: ask the gateway which controller it's connected to (the read-only
+  // fingerprint) and load that controller's variable set. Falls back to a manual pick if offline.
+  async _pullControllerVars(sel) {
+    if (this._varStatus) this._varStatus.textContent = "detecting\u2026";
+    let fam = null;
+    try {
+      const { makeClient: makeClient2 } = await Promise.resolve().then(() => (init_client(), client_exports));
+      const d = await makeClient2().descriptor();
+      fam = d && d.controller_family;
+    } catch (e) {
+    }
+    const target = fam === "v4.1" ? "v4.1" : fam === "expert-m350" ? "expert" : null;
+    if (!target) {
+      if (this._varStatus) this._varStatus.textContent = "no controller detected \u2014 pick a set manually";
+      return;
+    }
+    if (this.variableDB) await this.variableDB.setControllerVars(target);
+    if (sel) sel.value = target;
+    this.renderVariables(this._varSearch ? this._varSearch.value.trim().toLowerCase() : "");
+    if (this._varStatus) this._varStatus.textContent = `loaded ${target === "v4.1" ? "DDCS V4.1" : "Expert M350"} (via gateway)`;
+  }
+  renderVariables(filter = "") {
+    const grid = this._varGrid;
+    if (!grid || !this.variableDB) return;
+    grid.innerHTML = "";
+    let vars = this.variableDB.getAll();
+    if (filter) {
+      vars = vars.filter((v6) => (String(v6.i) + " " + (v6.d || "")).toLowerCase().includes(filter));
+    }
+    const active2 = this._activeFilters;
+    if (active2 && active2.size) {
+      const tests = VAR_FILTERS.filter((f) => active2.has(f.key));
+      vars = vars.filter((v6) => tests.every((f) => f.test(v6)));
+    }
+    if (vars.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "deck-var-empty";
+      empty.textContent = filter || active2 && active2.size ? "No matching variables" : "No variables loaded";
+      grid.appendChild(empty);
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    let displayVars = vars;
+    const LIMIT = 500;
+    let limited = false;
+    if (displayVars.length > LIMIT) {
+      displayVars = displayVars.slice(0, LIMIT);
+      limited = true;
+    }
+    displayVars.forEach((v6) => {
+      const id = String(v6.i).split("-")[0];
+      const desc = v6.d || "User Variable";
+      const btn = document.createElement("button");
+      btn.className = "toolbar-btn deck-var-chip";
+      const idEl = document.createElement("span");
+      idEl.className = "var-id";
+      idEl.textContent = id;
+      const descEl = document.createElement("span");
+      descEl.className = "var-desc";
+      descEl.textContent = desc;
+      btn.appendChild(idEl);
+      btn.appendChild(descEl);
+      btn.addEventListener("mouseenter", () => UIUtils.showTooltip(btn, `${desc}
+
+ID: ${v6.i}
+Type: ${v6.t || ""}`));
+      btn.addEventListener("mouseleave", () => UIUtils.hideTooltip());
+      btn.onclick = () => {
+        if (this.editorManager) this.editorManager.insert(null, id);
+      };
+      btn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        btn.dataset.__ddcs_handled = "1";
+        if (typeof btn.onclick === "function") btn.onclick.call(btn, e);
+        const ed = document.getElementById("editor");
+        if (ed) {
+          ed.setAttribute("inputmode", "none");
+          ed.blur();
+        }
+      }, { passive: false });
+      frag.appendChild(btn);
+    });
+    if (limited) {
+      const limitNote = document.createElement("div");
+      limitNote.className = "deck-var-limit";
+      limitNote.style.cssText = "grid-column: 1 / -1; text-align: center; font-size: 10px; opacity: 0.6; padding: 10px; border: 1px dashed rgba(255,255,255,0.2); border-radius: 4px;";
+      limitNote.textContent = `Showing first 500 of ${vars.length} variables. Use the search bar to find more.`;
+      frag.appendChild(limitNote);
+    }
+    grid.appendChild(frag);
+  }
+  // Helper: Render header left/center/right
+  renderHeader() {
+    const leftTarget = document.querySelector(".dock-header .header-left");
+    if (leftTarget) {
+      leftTarget.innerHTML = `
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <button class="toolbar-btn" onclick="openWiz && openWiz('comm')" title="Comm / MDI console"><span class="btn-ico">${HEADER_ICONS.comm}</span><span class="btn-tx">Comm</span></button>
+                    <button class="toolbar-btn" onclick="openWiz && openWiz('wcs')" title="Work coordinate systems"><span class="btn-ico">${HEADER_ICONS.wcs}</span><span class="btn-tx">WCS</span></button>
+                    <button class="toolbar-btn" onclick="openWiz && openWiz('atc_warmup')" title="Spindle warm-up sequence"><span class="btn-ico">${HEADER_ICONS.warmup}</span><span class="btn-tx">Warm-up</span></button>
+                </div>
+            `;
+    }
+    const centerTarget = document.querySelector(".dock-header .header-center");
+    if (centerTarget) {
+      centerTarget.innerHTML = `
+                <div style="display:flex; gap:6px; width:auto; align-items:center;">
+                    <div class="toolbar-dropdown">
+                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.probe}</span><span class="btn-tx">Probe</span><span class="btn-caret">\u25BC</span></button>
+                        <div class="toolbar-dropdown-content">
+                            <button onclick="openCornerWiz && openCornerWiz()">\u{1F4D0} Corner</button>
+                            <button onclick="openMiddleWiz && openMiddleWiz()">\u{1F3AF} Middle</button>
+                            <button onclick="openWiz && openWiz('circular')">\u2B55 Bore/Boss</button>
+                            <button onclick="openEdgeWiz && openEdgeWiz()">\u{1F4CF} Edge</button>
+                            <button onclick="openAlignmentWiz && openAlignmentWiz()">\u{1F9ED} Align</button>
+                            <div style="padding:4px 12px; font-size:10px; opacity:.55; text-transform:uppercase; letter-spacing:1px;">Rotary</div>
+                            <button onclick="openWiz && openWiz('rotary_center')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;"><rect x="4" y="8" width="13" height="8" rx="2" stroke="#64748b"/><ellipse cx="17" cy="12" rx="2" ry="4" stroke="#64748b"/><line x1="1.5" y1="12" x2="22.5" y2="12" stroke="#e11d48" stroke-dasharray="3 2"/></svg>Centreline</button>
+                            <button onclick="openWiz && openWiz('rotary_clock')">\u{1F552} Clock A0</button>
+                        </div>
+                    </div>
+                    
+                    <div class="toolbar-dropdown">
+                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.atc}</span><span class="btn-tx">ATC</span><span class="btn-caret">\u25BC</span></button>
+                        <div class="toolbar-dropdown-content">
+                            <button onclick="openWiz && openWiz('atc_length')">\u{1F4CF} Tool Length</button>
+                            <button onclick="openWiz && openWiz('atc_check')">\u{1F6E1} Tool Check</button>
+                            <button onclick="openWiz && openWiz('atc_change')">\u{1F527} Tool Change</button>
+                            <button onclick="openWiz && openWiz('atc_test')">\u{1F9EA} ATC Test</button>
+                        </div>
+                    </div>
+
+                    <div class="toolbar-dropdown">
+                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.mill}</span><span class="btn-tx">Mill</span><span class="btn-caret">\u25BC</span></button>
+                        <div class="toolbar-dropdown-content">
+                            <button onclick="openWiz && openWiz('drill')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" fill="#1e293b" stroke="none"/></svg>Drill / holes</button>
+                            <button onclick="openWiz && openWiz('pocket')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="5" width="18" height="14" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><rect x="7" y="9" width="10" height="6" rx="1" fill="#1e293b" stroke="none"/></svg>Pocket</button>
+                            <button onclick="openWiz && openWiz('slot')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="9" width="18" height="6" rx="3" stroke="#94a3b8" stroke-width="2.5"/><line x1="7" y1="12" x2="17" y2="12" stroke="#1e293b" stroke-width="2" stroke-linecap="round"/></svg>Slot</button>
+                            <button onclick="openWiz && openWiz('surfacing')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="4" width="18" height="16" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><path d="M5 8h14M5 12h14M5 16h14" stroke="#1e293b" stroke-width="1.5"/></svg>Surfacing</button>
+                            <button onclick="openWiz && openWiz('text')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><path d="M5 6h14M12 6v13" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/></svg>Text / engrave</button>
+                        </div>
+                    </div>
+
+                    <div class="toolbar-dropdown">
+                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.io}</span><span class="btn-tx">I/O</span><span class="btn-caret">\u25BC</span></button>
+                        <div class="toolbar-dropdown-content">
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('outpin')">\u26A1 Set Output</button>
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('waitinput')">\u23F1 Wait Input</button>
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('dwell')">\u23F3 Dwell</button>
+                        </div>
+                    </div>
+
+                    <!-- Comm and WCS buttons are provided in the left header; avoid duplicates here -->
+                </div>
+            `;
+      centerTarget.querySelectorAll(".toolbar-dropdown > button").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const parent = btn.parentElement;
+          centerTarget.querySelectorAll(".toolbar-dropdown").forEach((d) => {
+            if (d !== parent) {
+              d.classList.remove("active");
+              const cc = d.querySelector(".toolbar-dropdown-content");
+              if (cc) {
+                cc.style.position = "";
+                cc.style.left = "";
+                cc.style.top = "";
+                cc.style.minWidth = "";
+                cc.style.paddingTop = "";
+              }
+            }
+          });
+          const content = parent.querySelector(".toolbar-dropdown-content");
+          const willOpen = !parent.classList.contains("active");
+          parent.classList.toggle("active");
+          if (content && willOpen) {
+            try {
+              const rect = btn.getBoundingClientRect();
+              const pad = 6;
+              content.style.position = "fixed";
+              content.style.left = `${Math.max(6, Math.round(rect.left - pad))}px`;
+              content.style.top = `${Math.round(rect.top - pad)}px`;
+              content.style.minWidth = `${Math.max(btn.offsetWidth + pad * 2, 0)}px`;
+              content.style.paddingTop = `${btn.offsetHeight + pad + 4}px`;
+            } catch (err) {
+              content.style.position = "";
+            }
+          } else if (content) {
+            content.style.position = "";
+            content.style.left = "";
+            content.style.top = "";
+            content.style.minWidth = "";
+            content.style.paddingTop = "";
+          }
+        });
+      });
+      document.addEventListener("click", () => {
+        centerTarget.querySelectorAll(".toolbar-dropdown").forEach((d) => {
+          d.classList.remove("active");
+          const cc = d.querySelector(".toolbar-dropdown-content");
+          if (cc) {
+            cc.style.position = "";
+            cc.style.left = "";
+            cc.style.top = "";
+            cc.style.minWidth = "";
+            cc.style.paddingTop = "";
+          }
+        });
+      });
+    }
+    const rightTarget = document.querySelector(".dock-header .header-right");
+    if (rightTarget) {
+      rightTarget.innerHTML = `
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <button class="toolbar-btn" onclick="loadGcodeFile && loadGcodeFile()" title="Load a G-code / .nc file into the editor (replaces the current program)"><span class="btn-ico">${HEADER_ICONS.load}</span><span class="btn-tx">Load</span></button>
+                    <button class="toolbar-btn" onclick="insertGcodeFile && insertGcodeFile()" title="Insert a G-code file at the cursor \u2014 keeps your current program"><span class="btn-ico">${HEADER_ICONS.insert}</span><span class="btn-tx">Insert</span></button>
+                    <button class="toolbar-btn" onclick="copyCode && copyCode()" title="Copy editor to clipboard"><span class="btn-ico">${HEADER_ICONS.copy}</span><span class="btn-tx">Copy</span></button>
+                    <button class="toolbar-btn" onclick="clearCode && clearCode()" title="Clear the editor"><span class="btn-ico">${HEADER_ICONS.clear}</span><span class="btn-tx">Clear</span></button>
+                    <button class="toolbar-btn" onclick="downloadFile && downloadFile()" title="Export / download the program"><span class="btn-ico">${HEADER_ICONS.export}</span><span class="btn-tx">Export</span></button>
+                </div>
+            `;
+    }
+    document.querySelectorAll(".dock-header .header-left button, .dock-header .header-center button, .dock-header .header-right button").forEach((btn) => btn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+    }, { passive: false }));
+    document.addEventListener("click", (ev) => {
+      const t = ev.target;
+      if (t && t.dataset && t.dataset.__ddcs_handled) {
+        try {
+          ev.stopImmediatePropagation();
+          ev.preventDefault();
+        } catch (e) {
+        }
+        try {
+          delete t.dataset.__ddcs_handled;
+        } catch (e) {
+        }
+      }
+    }, true);
+    requestAnimationFrame(() => {
+      this._fitHeader();
+      this._fitAppHeader();
+    });
+    if (!this._headerFitInit) {
+      this._headerFitInit = true;
+      const fit = () => requestAnimationFrame(() => {
+        this._fitHeader();
+        this._fitAppHeader();
+      });
+      window.addEventListener("resize", fit);
+      if (window.MutationObserver) {
+        const mo = new MutationObserver(fit);
+        mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+        if (document.body) mo.observe(document.body, { attributes: true, attributeFilter: ["data-theme"] });
+      }
+    }
+  }
+  // Priority+ fit for the wizard toolbar: keep the most labels possible. Stage 1 (.is-compact)
+  // drops only the editor-action labels (Load/Insert/Copy/Clear/Export); if it STILL overflows,
+  // stage 2 (.is-mini) drops the wizard labels too. remove→measure→add is synchronous (no flicker).
+  _fitHeader() {
+    const hc = document.querySelector(".dock-header .header-controls");
+    if (!hc) return;
+    hc.classList.remove("is-compact", "is-mini");
+    if (hc.scrollWidth > hc.clientWidth + 2) {
+      hc.classList.add("is-compact");
+      if (hc.scrollWidth > hc.clientWidth + 2) hc.classList.add("is-mini");
+    }
+  }
+  // Top app-header: staged so the right-edge icons never overflow the window. Stage 1 drops the
+  // op-button labels (.is-compact); if it still overflows, stage 2 drops STUDIO/GATEWAY labels +
+  // version (.is-mini). Measured each call (load + resize + theme change) — no fixed breakpoints.
+  _fitAppHeader() {
+    const h = document.querySelector(".app-header");
+    if (!h) return;
+    h.classList.remove("is-compact", "is-mini");
+    if (h.scrollWidth > h.clientWidth) {
+      h.classList.add("is-compact");
+      if (h.scrollWidth > h.clientWidth) h.classList.add("is-mini");
+    }
+  }
+  // Helper: build macro groups into provided container
+  buildMacroGroups(container) {
+    if (!container) return;
+    container.innerHTML = `
+            <div class="deck-group numpad">
+                <div class="group-header">NUMPAD</div>
+                <div class="grid-3">
+                    <button class="toolbar-btn" title="Insert 7" onclick="window.insert && window.insert('7')">7</button>
+                    <button class="toolbar-btn" title="Insert 8" onclick="window.insert && window.insert('8')">8</button>
+                    <button class="toolbar-btn" title="Insert 9" onclick="window.insert && window.insert('9')">9</button>
+                    <button class="toolbar-btn" title="Insert 4" onclick="window.insert && window.insert('4')">4</button>
+                    <button class="toolbar-btn" title="Insert 5" onclick="window.insert && window.insert('5')">5</button>
+                    <button class="toolbar-btn" title="Insert 6" onclick="window.insert && window.insert('6')">6</button>
+                    <button class="toolbar-btn" title="Insert 1" onclick="window.insert && window.insert('1')">1</button>
+                    <button class="toolbar-btn" title="Insert 2" onclick="window.insert && window.insert('2')">2</button>
+                    <button class="toolbar-btn" title="Insert 3" onclick="window.insert && window.insert('3')">3</button>
+                    <button class="toolbar-btn" title="Decimal point" onclick="window.insert && window.insert('.')">.</button>
+                    <button class="toolbar-btn" title="Insert 0" onclick="window.insert && window.insert('0')">0</button>
+                    <button class="toolbar-btn" title="Minus sign" onclick="window.insert && window.insert('-')">-</button>
+                </div>
+            </div>
+
+            <div class="deck-group axes">
+                <div class="group-header">AXES & ADDRESSES</div>
+                <div class="grid-3">
+                    <button class="toolbar-btn axis-blue" title="X axis address" onclick="window.insert && window.insert('X')">X</button>
+                    <button class="toolbar-btn axis-blue" title="Y axis address" onclick="window.insert && window.insert('Y')">Y</button>
+                    <button class="toolbar-btn axis-blue" title="Z axis address" onclick="window.insert && window.insert('Z')">Z</button>
+                    <button class="toolbar-btn axis-blue" title="A axis address" onclick="window.insert && window.insert('A')">A</button>
+                    <button class="toolbar-btn axis-blue" title="B axis address" onclick="window.insert && window.insert('B')">B</button>
+                    <button class="toolbar-btn axis-blue" title="Macro variable prefix" onclick="window.insert && window.insert('#')">#</button>
+                    <button class="toolbar-btn axis-blue" title="C axis address" onclick="window.insert && window.insert('C')">C</button>
+                    <button class="toolbar-btn axis-blue" title="Arc center offset I" onclick="window.insert && window.insert('I')">I</button>
+                    <button class="toolbar-btn axis-blue" title="Arc center offset J" onclick="window.insert && window.insert('J')">J</button>
+                    <button class="toolbar-btn axis-blue" title="Arc center offset K" onclick="window.insert && window.insert('K')">K</button>
+                </div>
+            </div>
+
+            <div class="deck-group math">
+                <div class="group-header">MATH & LOGIC</div>
+                <div class="grid-3">
+                    <button class="toolbar-btn" title="Open expression bracket" onclick="window.insert && window.insert('[')">[</button>
+                    <button class="toolbar-btn" title="Close expression bracket" onclick="window.insert && window.insert(']')">]</button>
+                    <button class="toolbar-btn" title="Assignment equals" onclick="window.insert && window.insert('=')">=</button>
+                    <button class="toolbar-btn" title="Addition operator" onclick="window.insert && window.insert('+')">+</button>
+                    <button class="toolbar-btn" title="Subtraction operator" onclick="window.insert && window.insert('-')">-</button>
+                    <button class="toolbar-btn" title="Multiplication operator" onclick="window.insert && window.insert('*')">*</button>
+                    <button class="toolbar-btn" title="Division operator" onclick="window.insert && window.insert('/')">/</button>
+                    <button class="toolbar-btn" title="Equality comparison" onclick="window.insert && window.insert('==')">==</button>
+                    <button class="toolbar-btn" title="Inequality comparison" onclick="window.insert && window.insert('!=')">!=</button>
+                    <button class="toolbar-btn" title="Less-than comparison" onclick="window.insert && window.insert('<')">&lt;</button>
+                    <button class="toolbar-btn" title="Greater-than comparison" onclick="window.insert && window.insert('>')">&gt;</button>
+                </div>
+            </div>
+
+            <div class="deck-group functions">
+                <div class="group-header">FUNCTIONS</div>
+                <div class="grid-3">
+                    <button class="toolbar-btn" title="Square root \u2014 SQRT[expr]" onclick="window.insert && window.insert('SQRT[')">SQRT[</button>
+                    <button class="toolbar-btn" title="Absolute value \u2014 ABS[expr]" onclick="window.insert && window.insert('ABS[')">ABS[</button>
+                    <button class="toolbar-btn" title="Sine, degrees \u2014 SIN[expr]" onclick="window.insert && window.insert('SIN[')">SIN[</button>
+                    <button class="toolbar-btn" title="Cosine, degrees \u2014 COS[expr]" onclick="window.insert && window.insert('COS[')">COS[</button>
+                    <button class="toolbar-btn" title="Arctangent, degrees \u2014 ATAN[y]/[x]" onclick="window.insert && window.insert('ATAN[')">ATAN[</button>
+                    <button class="toolbar-btn" title="Modulo \u2014 a MOD b" onclick="window.insert && window.insert(' MOD ')">MOD</button>
+                </div>
+            </div>
+
+            <div class="deck-group control-flow">
+                <div class="group-header">CONTROL FLOW</div>
+                <div class="grid-3">
+                    <button class="toolbar-btn axis-blue" title="Conditional \u2014 C-style, no brackets on a simple IF (e.g. IF #1920!=2 GOTO1)" onclick="window.insert && window.insert('IF ')">IF</button>
+                    <button class="toolbar-btn axis-blue" title="Jump to an N-label \u2014 NO space before the number (GOTO1)" onclick="window.insert && window.insert('GOTO')">GOTO</button>
+                    <button class="toolbar-btn axis-blue" title="Label target \u2014 N1, N2 ... (success path jumps past the error handlers)" onclick="window.insert && window.insert('N')">N</button>
+                    <button class="toolbar-btn" title="Open comment / operator message \u2014 ( text )" onclick="window.insert && window.insert('(')">(</button>
+                    <button class="toolbar-btn" title="Close comment / operator message" onclick="window.insert && window.insert(')')">)</button>
+                    <button class="toolbar-btn axis-blue" title="Operator message / pass-fail popup \u2014 #1505=1(msg) error, #1505=-5000(msg) ok" onclick="window.insert && window.insert('#1505')">#1505</button>
+                    <button class="toolbar-btn" title="Number format inside a #1505/#1503 message \u2014 e.g. %.3f (3 decimals), %.0f (integer). NOT modulo." onclick="window.insert && window.insert('%')">%</button>
+                </div>
+            </div>
+
+            <div class="deck-group g-codes">
+                <div class="group-header">G-CODES</div>
+                <div class="grid-3">
+                    <button class="toolbar-btn axis-blue" title="Rapid positioning" onclick="window.insert && window.insert('G0 ')">G0</button>
+                    <button class="toolbar-btn axis-blue" title="Linear interpolation" onclick="window.insert && window.insert('G1 ')">G1</button>
+                    <button class="toolbar-btn axis-blue" title="Clockwise arc (I/J/K or R)" onclick="window.insert && window.insert('G2 ')">G2</button>
+                    <button class="toolbar-btn axis-blue" title="Counter-clockwise arc (I/J/K or R)" onclick="window.insert && window.insert('G3 ')">G3</button>
+                    <button class="toolbar-btn axis-blue" title="Dwell \u2014 G4 P&lt;seconds&gt;" onclick="window.insert && window.insert('G4 ')">G4</button>
+                    <button class="toolbar-btn axis-blue" title="Machine coordinate move" onclick="window.insert && window.insert('G53 ')">G53</button>
+                    <button class="toolbar-btn axis-blue" title="Absolute programming mode" onclick="window.insert && window.insert('G90 ')">G90</button>
+                    <button class="toolbar-btn axis-blue" title="Incremental programming mode" onclick="window.insert && window.insert('G91 ')">G91</button>
+                    <button class="toolbar-btn axis-blue" title="Probe move" onclick="window.insert && window.insert('G31 ')">G31</button>
+                    <button class="toolbar-btn m-red" title="Program stop / pause" onclick="window.insert && window.insert('M0 ')">M0</button>
+                    <button class="toolbar-btn m-red" title="Program end and rewind" onclick="window.insert && window.insert('M30')">M30</button>
+                </div>
+            </div>
+
+            <div class="deck-group wcs">
+                <div class="group-header">WORK OFFSETS</div>
+                <div class="grid-3">
+                    <button class="toolbar-btn axis-blue" title="Select work coordinate system G54" onclick="window.insert && window.insert('G54 ')">G54</button>
+                    <button class="toolbar-btn axis-blue" title="Select work coordinate system G55" onclick="window.insert && window.insert('G55 ')">G55</button>
+                    <button class="toolbar-btn axis-blue" title="Select work coordinate system G56" onclick="window.insert && window.insert('G56 ')">G56</button>
+                    <button class="toolbar-btn axis-blue" title="Select work coordinate system G57" onclick="window.insert && window.insert('G57 ')">G57</button>
+                    <button class="toolbar-btn axis-blue" title="Select work coordinate system G58" onclick="window.insert && window.insert('G58 ')">G58</button>
+                    <button class="toolbar-btn axis-blue" title="Select work coordinate system G59" onclick="window.insert && window.insert('G59 ')">G59</button>
+                </div>
+            </div>
+
+            <div class="deck-group m-codes">
+                <div class="group-header">PROGRAM & MACHINE WORDS</div>
+                <div class="grid-3">
+                    <button class="toolbar-btn axis-blue" title="G-code address" onclick="window.insert && window.insert('G')">G</button>
+                    <button class="toolbar-btn axis-blue" title="M-code address" onclick="window.insert && window.insert('M')">M</button>
+                    <button class="toolbar-btn axis-blue" title="Parameter word (G31 probe input port)" onclick="window.insert && window.insert('P')">P</button>
+                    <button class="toolbar-btn axis-blue" title="Probe trigger level \u2014 G31 L0 (NPN) / L1 (PNP)" onclick="window.insert && window.insert('L')">L</button>
+                    <button class="toolbar-btn axis-blue" title="Probe stop mode \u2014 G31 Q1 (immediate) / Q0 (decelerate)" onclick="window.insert && window.insert('Q')">Q</button>
+                    <button class="toolbar-btn axis-blue" title="Arc radius or parameter" onclick="window.insert && window.insert('R')">R</button>
+                    <button class="toolbar-btn m-green" title="Spindle ON clockwise" onclick="window.insert && window.insert('M3 ')">M3</button>
+                    <button class="toolbar-btn m-red" title="Spindle OFF" onclick="window.insert && window.insert('M5 ')">M5</button>
+                    <button class="toolbar-btn m-green" title="Coolant ON" onclick="window.insert && window.insert('M8 ')">M8</button>
+                    <button class="toolbar-btn m-red" title="Coolant OFF" onclick="window.insert && window.insert('M9 ')">M9</button>
+                    <button class="toolbar-btn axis-blue" title="Tool radius offset register" onclick="window.insert && window.insert('D')">D</button>
+                    <button class="toolbar-btn axis-blue" title="Feed rate word" onclick="window.insert && window.insert('F')">F</button>
+                    <button class="toolbar-btn axis-blue" title="Tool length offset register" onclick="window.insert && window.insert('H')">H</button>
+                    <button class="toolbar-btn axis-blue" title="Spindle speed word" onclick="window.insert && window.insert('S')">S</button>
+                    <button class="toolbar-btn axis-blue" title="Tool selection word" onclick="window.insert && window.insert('T')">T</button>
+                </div>
+            </div>
+        `;
+  }
+};
+
 // web/src/extensionApp.js
+init_themes();
 init_programModel();
 init_stackBridge();
 init_gcodeToStack();
@@ -17042,6 +18029,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
   });
+  try {
+    new ThemeManager();
+  } catch (err) {
+    console.warn("[DDCS] ThemeManager init failed:", err && err.message ? err.message : err);
+  }
   const B = window.Blockly;
   if (!B) {
     console.error("Blockly not found!");
@@ -17177,6 +18169,25 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("[DDCS] insertWiz() clicked");
     return window.wizardManager.insert();
   };
+  window.openCornerWiz = () => window.openWiz("corner");
+  window.openMiddleWiz = () => window.openWiz("middle");
+  window.openEdgeWiz = () => window.openWiz("edge");
+  window.openAlignmentWiz = () => window.openWiz("alignment");
+  window.clearCode = () => setStack([], "clear");
+  try {
+    const deck = new CommandDeck(dummyEditorManager, null);
+    deck.renderHeader();
+    window.__commandDeck = deck;
+    document.querySelectorAll(".dock-header .header-right button").forEach((btn) => {
+      const tx = (btn.querySelector(".btn-tx") || {}).textContent || "";
+      if (tx.trim() !== "Clear") {
+        btn.style.display = "none";
+      }
+    });
+    console.log("[DDCS] commandDeck toolbar rendered");
+  } catch (err) {
+    console.error("[DDCS] commandDeck.renderHeader failed:", err && err.message ? err.message : err);
+  }
   const mainEl = document.querySelector(".main");
   const gatewayApp = document.getElementById("gateway-app");
   const settingsApp = document.getElementById("settings-app");

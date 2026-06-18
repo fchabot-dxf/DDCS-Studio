@@ -5,6 +5,8 @@
 import { installBlockly, buildToolbox } from '../../../DDCS-Studio/web/blocks/blockly/bridge.js';
 import { ddcsTheme } from '../../../DDCS-Studio/web/blocks/blockly/theme.js';
 import { WizardManager } from '../../../DDCS-Studio/web/wizardManager.js';
+import { CommandDeck } from '../../../DDCS-Studio/web/ui/commandDeck.js';
+import { ThemeManager } from '../../../DDCS-Studio/web/ui/themes.js';
 import { initProgramModel, onChange, setStack, getStack } from '../../../DDCS-Studio/web/blocks/programModel.js';
 import { stackToWorkspace, workspaceToStack } from '../../../DDCS-Studio/web/blocks/blockly/stackBridge.js';
 import { reconcileGcodeToStack } from '../../../DDCS-Studio/web/blocks/gcodeToStack.js';
@@ -36,6 +38,12 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (_) {}
         };
     });
+
+    // Apply the DDCS theme (sets body[data-theme]). Studio boots this in app.js; without it the app has no
+    // theme and falls back to the bare gray base colors — the unstyled "VS Code" look. Default is 'studio'
+    // (THEMES[0], the tan one); a saved ddcs_theme (seeded by the host) overrides it, and the Settings tab's
+    // switcher re-skins live.
+    try { new ThemeManager(); } catch (err) { console.warn('[DDCS] ThemeManager init failed:', err && err.message ? err.message : err); }
 
     // 1. Ensure Blockly is loaded globally (the HTML still includes blockly.min.js via <script>)
     const B = window.Blockly;
@@ -185,6 +193,33 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('ddcs:settings-changed', sendSettings);
     sendSettings();   // initial mirror (covers first-ever launch when the host has nothing yet)
     window.insertWiz = () => { console.log('[DDCS] insertWiz() clicked'); return window.wizardManager.insert(); };
+
+    // The Probe dropdown calls these specific globals (Studio wires them in globalFunctions.js); each is
+    // just open(<type>) under the hood (wizardManager.js:253-256), so alias them to the proven openWiz path.
+    window.openCornerWiz = () => window.openWiz('corner');
+    window.openMiddleWiz = () => window.openWiz('middle');
+    window.openEdgeWiz = () => window.openWiz('edge');
+    window.openAlignmentWiz = () => window.openWiz('alignment');
+    // Clear is the only editor-op we keep (Load/Insert/Copy/Export are VS Code's job) — wipe the program:
+    // a neutral origin makes onChange both rebuild the (empty) canvas AND post the empty doc to the editor.
+    window.clearCode = () => setStack([], 'clear');
+
+    // Build the real wizard toolbar from source. commandDeck.renderHeader() populates .header-left/center/
+    // right (Comm/WCS/Warm-up + Probe/ATC/Mill dropdowns); its buttons call the globals wired above, so it
+    // works as-is — and it tracks Studio (add a wizard there → it appears here) instead of a forked list.
+    try {
+        const deck = new CommandDeck(dummyEditorManager, null);
+        deck.renderHeader();
+        window.__commandDeck = deck;
+        // Hide the editor-ops we don't use here; keep only Clear.
+        document.querySelectorAll('.dock-header .header-right button').forEach((btn) => {
+            const tx = (btn.querySelector('.btn-tx') || {}).textContent || '';
+            if (tx.trim() !== 'Clear') { btn.style.display = 'none'; }
+        });
+        console.log('[DDCS] commandDeck toolbar rendered');
+    } catch (err) {
+        console.error('[DDCS] commandDeck.renderHeader failed:', err && err.message ? err.message : err);
+    }
 
     // --- Main-UI tabs: BLOCKS (the #ws canvas) | GATEWAY | SETTINGS. Studio's editor tab is intentionally
     //     dropped — VS Code's own text editor is that surface. #gateway-app / #settings-app are the forked

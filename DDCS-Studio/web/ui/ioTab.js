@@ -180,8 +180,17 @@ class IOPanel {
         return cb ? cb.checked : true;
     }
 
-    show() {
+    // show() floats the panel (mounts in <body>); show(container) DOCKS it into that container ('embedded'
+    // mode — fills it, no drag/close), e.g. the preview pane showing I/O in place of the 3D view.
+    show(mount) {
         this._build();
+        if (mount) {
+            if (this.el.parentNode !== mount) mount.appendChild(this.el);
+            this.el.classList.add('embedded');
+        } else {
+            if (this.el.parentNode !== document.body) document.body.appendChild(this.el);
+            this.el.classList.remove('embedded');
+        }
         this.el.classList.add('visible');
         this.refresh();
         // Poll while visible: outputs change without an io_change event (M10/M11),

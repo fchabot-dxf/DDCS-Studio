@@ -18,9 +18,13 @@
     
     <style>
         /* Blockly spike base styles */
-        :root { --bg:#0d1117; --panel:#161d28; --line:#26303d; --ink:#e6edf3; --muted:#8b97a6; --accent:#2dd4bf;
-                --cat-machine:#64748b; --cat-move:#14b8a6; --cat-ops:#22c55e; --cat-control:#f59e0b;
+        /* Block-category colors only. Studio's theme system (styles.css + body[data-theme]) owns every
+           app-chrome color — redefining --bg/--panel/etc here is exactly what overrode the theme into a
+           dark, VS-Code-looking skin. The extension's chrome uses private var names; alias them to Studio's
+           theme tokens ON BODY (which carries data-theme) so they track the active theme. */
+        :root { --cat-machine:#64748b; --cat-move:#14b8a6; --cat-ops:#22c55e; --cat-control:#f59e0b;
                 --cat-math:#84cc16; --cat-modify:#a855f7; }
+        body { --ink: var(--text); --line: var(--border); --muted: var(--text-dim); --accent-blue: var(--accent); }
         html, body { margin:0; height:100%; overflow: hidden; background:var(--bg); color:var(--ink);
                     font:13px/1.4 ui-sans-serif,system-ui,Segoe UI,sans-serif; }
         .wrap { display:flex; flex-direction:column; height:100%; }
@@ -29,7 +33,7 @@
         .wizard-bar { display:flex; align-items:center; gap:12px; padding:8px 14px; background:var(--panel);
                  border-bottom:1px solid var(--line); }
         .wizard-bar h1 { font-size:14px; margin:0; letter-spacing:.04em; color: var(--accent-blue); font-style: italic; }
-        .wizard-bar button { padding: 6px 12px; background: #26303d; border: 1px solid #39465a; color: #cbd5e1; border-radius: 4px; cursor: pointer; }
+        .wizard-bar button { padding: 6px 12px; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 4px; cursor: pointer; }
         .wizard-bar button:hover { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
         
         /* The Blockly Canvas */
@@ -43,7 +47,7 @@
         .ext-tab { padding:6px 14px; background:transparent; border:1px solid transparent; color:var(--muted);
                    border-radius:4px; cursor:pointer; font-weight:600; letter-spacing:.03em; font-size:12px; }
         .ext-tab:hover { color:var(--ink); }
-        .ext-tab.active { color:var(--ink); background:#26303d; border-color:#39465a; }
+        .ext-tab.active { color:var(--ink); background:var(--bg); border-color:var(--border); }
         .wiz-launchers { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line); }
         .wiz-launchers button { padding:6px 12px; background:#26303d; border:1px solid #39465a; color:#cbd5e1; border-radius:4px; cursor:pointer; font-size:12px; }
         .wiz-sep { width:1px; align-self:stretch; background:var(--line); margin:2px 4px; }
@@ -74,35 +78,16 @@
     
     <!-- WIZARD LAUNCHER SUB-BAR (row 2, under the tabs) + BLOCKLY CANVAS -->
     <div class="main">
-      <div class="wiz-launchers">
-        <!-- Probe / WCS -->
-        <button onclick="window.openWiz('corner')">Corner</button>
-        <button onclick="window.openWiz('edge')">Edge</button>
-        <button onclick="window.openWiz('middle')">Middle</button>
-        <button onclick="window.openWiz('alignment')">Alignment</button>
-        <button onclick="window.openWiz('wcs')">WCS</button>
-        <span class="wiz-sep"></span>
-        <!-- CAM -->
-        <button onclick="window.openWiz('drill')">Drill</button>
-        <button onclick="window.openWiz('pocket')">Pocket</button>
-        <button onclick="window.openWiz('slot')">Slot</button>
-        <button onclick="window.openWiz('surfacing')">Surface</button>
-        <button onclick="window.openWiz('text')">Text</button>
-        <button onclick="window.openWiz('circular')">Circular</button>
-        <span class="wiz-sep"></span>
-        <!-- Rotary -->
-        <button onclick="window.openWiz('rotary_center')">Rotary Center</button>
-        <button onclick="window.openWiz('rotary_clock')">Rotary Clock</button>
-        <span class="wiz-sep"></span>
-        <!-- ATC -->
-        <button onclick="window.openWiz('atc_change')">ATC Change</button>
-        <button onclick="window.openWiz('atc_check')">ATC Check</button>
-        <button onclick="window.openWiz('atc_length')">ATC Length</button>
-        <button onclick="window.openWiz('atc_test')">ATC Test</button>
-        <button onclick="window.openWiz('atc_warmup')">ATC Warmup</button>
-        <span class="wiz-sep"></span>
-        <!-- Comms -->
-        <button onclick="window.openWiz('comm')">Comms</button>
+      <!-- Toolbar built from source by commandDeck.renderHeader() — these are the empty mount points it
+           populates (Comm/WCS/Warm-up + Probe/ATC/Mill dropdowns). Reusing the real builder keeps the
+           launcher bar in sync with Studio instead of being a hand-maintained list. Same .dock-header
+           wrapper Studio uses, so styles.css styles it identically. -->
+      <div class="dock-header top-dock-header">
+        <div class="header-controls">
+          <div class="header-left" aria-label="Left controls"></div>
+          <div class="header-center" aria-label="Center wizards"></div>
+          <div class="header-right" aria-label="Right controls"></div>
+        </div>
       </div>
       <div id="ws"></div>
     </div>
