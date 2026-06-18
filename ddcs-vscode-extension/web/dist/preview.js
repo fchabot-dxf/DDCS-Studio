@@ -142,6 +142,21 @@ async function api(url, opts = {}, retried = false) {
   return r;
 }
 async function silentRefresh() {
+  if (window.pywebview && window.pywebview.api) {
+    let t = {};
+    try {
+      t = await (await fetch("/api/oauth/google/token")).json();
+    } catch (e) {
+    }
+    if (t.access_token) {
+      try {
+        localStorage.setItem(TOK, t.access_token);
+      } catch (e) {
+      }
+      return;
+    }
+    throw new Error("silent-fail");
+  }
   await loadGis();
   const cid = clientId("google");
   if (!cid) throw new Error("no client id");
@@ -1584,6 +1599,10 @@ function disconnect() {
 function connect(provider = "google") {
   const p = getProvider(provider);
   if (!p) return;
+  if (provider === "google" && window.pywebview && window.pywebview.api) {
+    connectGoogleDesktop();
+    return;
+  }
   if (!clientId(provider)) {
     const v = window.prompt(
       `Connect ${p.label} \u2014 your OWN account (no server, no secret).
@@ -1612,6 +1631,38 @@ async function connectGoogleFlow() {
   } catch (e) {
     if (String(e && e.message) !== "sign-in cancelled") window.alert("Google sign-in failed: " + (e && e.message));
   }
+}
+async function connectGoogleDesktop() {
+  let r;
+  try {
+    r = await (await fetch("/oauth/google/start")).json();
+  } catch (e) {
+    window.alert("Could not reach the gateway to start Google sign-in.");
+    return;
+  }
+  if (!r.ok) {
+    window.alert("Google sign-in unavailable: " + (r.error || "set a Google Desktop client id in the gateway Setup."));
+    return;
+  }
+  const deadline = Date.now() + 18e4;
+  const tick = async () => {
+    let t = {};
+    try {
+      t = await (await fetch("/api/oauth/google/token")).json();
+    } catch (e) {
+    }
+    if (t.access_token) {
+      try {
+        localStorage.setItem(TOK2, t.access_token);
+        localStorage.setItem(PROV, "google");
+      } catch (e) {
+      }
+      window.dispatchEvent(new CustomEvent("ddcs:cloud-account"));
+      return;
+    }
+    if (Date.now() < deadline) setTimeout(tick, 1500);
+  };
+  setTimeout(tick, 2e3);
 }
 async function openConnectModal(provider) {
   const p = getProvider(provider);
@@ -2160,7 +2211,13 @@ function buildSettingsOverlay() {
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">MACHINE NETWORK</div>
-                        <div class="settings-hint">Coming soon \u2014 controller connection (IP / port), live DRO, and program upload over the network.</div>
+                        <div class="settings-hint">Point this gateway at your controller's SMB share \u2014 or scan the LAN to find it. Live view/control needs the gateway (the desktop app); the hosted page can't reach a machine on your network.</div>
+                        <div id="set_machinenet_mount" style="margin-top:8px"></div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">LAN ACCESS</div>
+                        <div class="settings-hint">Open Studio from a phone/laptop on the same wifi \u2014 your exe serves it (the "personal cloud"). Use this URL, not the hosted page.</div>
+                        <div id="set_lan_mount" style="margin-top:8px"></div>
                     </div>
                 </div>
 
@@ -2429,6 +2486,106 @@ function buildSettingsOverlay() {
             `;
   wireSettingsOverlay(parent);
 }
+async function renderMachineNet(mount) {
+  if (!mount) return;
+  mount.textContent = "Checking gateway\u2026";
+  let d = null;
+  try {
+    d = await (await fetch("/api/descriptor")).json();
+  } catch (e) {
+    d = null;
+  }
+  if (!d) {
+    mount.innerHTML = `<div class="settings-hint">Run the <b>desktop app</b> (the gateway) to connect a controller \u2014 the hosted page can't reach a machine on your LAN.</div>`;
+    return;
+  }
+  const connected = !!d.controller_connected;
+  const fam = d.controller_family && d.controller_family !== "unknown" ? d.controller_family : "";
+  const dest = d.dest || "";
+  const wrap = document.createElement("div");
+  wrap.innerHTML = '<div class="cloud-status' + (connected ? "" : " muted") + '">' + (connected ? "Connected" + (fam ? " \xB7 " + fam : "") + (dest ? " \xB7 " + dest : "") : "Not connected" + (dest ? " \xB7 " + dest : " \u2014 no controller share set")) + '</div><label style="display:block;margin-top:8px">Controller share (SMB)<input id="mn_dest" type="text" placeholder="\\\\10.0.0.50\\cncdisk" value="' + dest.replace(/"/g, "&quot;") + '"></label><div style="display:flex;gap:8px;margin-top:8px;align-items:center"><button class="op-btn" data-mn="save">Save &amp; connect</button><button class="op-btn" data-mn="scan">\u{1F50D} Scan LAN</button><span class="mn-msg" style="flex:1"></span></div><div class="mn-results" style="margin-top:6px"></div>';
+  mount.replaceChildren(wrap);
+  const msg = wrap.querySelector(".mn-msg");
+  const results = wrap.querySelector(".mn-results");
+  async function save(val) {
+    const v = (val != null ? val : wrap.querySelector("#mn_dest").value).trim();
+    if (!v) {
+      msg.textContent = "Enter a share path.";
+      return;
+    }
+    msg.textContent = "Saving\u2026";
+    try {
+      const r = await (await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dest: v }) })).json();
+      if (r && r.ok === false) {
+        msg.textContent = r.error || "Save failed.";
+        return;
+      }
+    } catch (e) {
+      msg.textContent = "Save failed (gateway unreachable).";
+      return;
+    }
+    renderMachineNet(mount);
+  }
+  async function scan() {
+    msg.textContent = "Scanning the LAN\u2026";
+    results.textContent = "";
+    let list2 = [];
+    try {
+      list2 = (await (await fetch("/api/scan")).json()).controllers || [];
+    } catch (e) {
+      msg.textContent = "Scan failed.";
+      return;
+    }
+    msg.textContent = list2.length ? list2.length + " found \u2014 pick one" : "No controllers found on the LAN.";
+    results.replaceChildren(...list2.map((c2) => {
+      const b2 = document.createElement("button");
+      b2.className = "op-btn";
+      b2.style.cssText = "display:block;width:100%;text-align:left;margin-top:4px";
+      b2.textContent = (c2.family || "controller") + " \xB7 " + c2.ip + "  (" + c2.dest + ")";
+      b2.addEventListener("click", () => save(c2.dest));
+      return b2;
+    }));
+  }
+  wrap.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-mn]");
+    if (!t) return;
+    if (t.dataset.mn === "save") save();
+    else scan();
+  });
+}
+async function renderLanAccess(mount) {
+  if (!mount) return;
+  mount.textContent = "Checking\u2026";
+  let c2 = null;
+  try {
+    c2 = await (await fetch("/api/config")).json();
+  } catch (e) {
+    c2 = null;
+  }
+  if (!c2) {
+    mount.innerHTML = '<div class="settings-hint">Available in the desktop app (the gateway).</div>';
+    return;
+  }
+  const port = location.port || c2.port || 8765;
+  const lanOn = c2.host === "0.0.0.0";
+  const lanIp = c2.lan_ip || "";
+  const lanUrl = lanOn && lanIp ? "http://" + lanIp + ":" + port + "/" : "";
+  const wrap = document.createElement("div");
+  wrap.innerHTML = '<label class="settings-check"><input type="checkbox" id="lan_toggle"' + (lanOn ? " checked" : "") + '> Allow other devices on my network (LAN)</label><div class="cloud-status" style="margin-top:6px">This PC: <code>http://localhost:' + port + "</code></div>" + (lanUrl ? '<div class="cloud-status" style="margin-top:4px">Other devices: <code>' + lanUrl + `</code></div><img src="/api/lan-qr" alt="Scan to open on your phone" width="148" height="148" style="margin-top:8px;background:#fff;border-radius:6px;padding:6px" onerror="this.style.display='none'">` : '<div class="cloud-status muted" style="margin-top:4px">Turn on LAN access to get a shareable URL + QR code.</div>') + '<div class="lan-msg settings-hint" style="margin-top:6px"></div>';
+  mount.replaceChildren(wrap);
+  const msg = wrap.querySelector(".lan-msg");
+  wrap.querySelector("#lan_toggle").addEventListener("change", async (e) => {
+    msg.textContent = "Saving\u2026";
+    try {
+      await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ host: e.target.checked ? "0.0.0.0" : "127.0.0.1" }) });
+    } catch (err) {
+      msg.textContent = "Save failed.";
+      return;
+    }
+    msg.textContent = "Saved \u2014 restart the app to apply the LAN binding.";
+    setTimeout(() => renderLanAccess(mount), 600);
+  });
+}
 function wireSettingsOverlay(ov) {
   const q = (id) => ov.querySelector("#" + id);
   const num2 = (v, d) => {
@@ -2436,6 +2593,8 @@ function wireSettingsOverlay(ov) {
     return Number.isFinite(n) ? n : d;
   };
   renderCloudLogin(q("set_cloud_mount"));
+  renderMachineNet(q("set_machinenet_mount"));
+  renderLanAccess(q("set_lan_mount"));
   function updateVarCount() {
     const db = window.ddcsStudio && window.ddcsStudio.variableDB;
     const el2 = q("set_var_count");

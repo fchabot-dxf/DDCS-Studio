@@ -33,7 +33,9 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "build:web": "esbuild web/src/extensionApp.js --bundle --outfile=web/dist/bundle.js --format=esm --external:./dropbox.js --external:./gdrive.js",
-    "build:preview": "esbuild web/src/previewApp.js --bundle --outfile=web/dist/preview.js --format=esm --external:./dropbox.js --external:./gdrive.js"
+    "build:preview": "esbuild web/src/previewApp.js --bundle --outfile=web/dist/preview.js --format=esm --external:./dropbox.js --external:./gdrive.js",
+    "watch:web": "npm run build:web -- --watch=forever",
+    "watch:preview": "npm run build:preview -- --watch=forever"
   },
   "devDependencies": {
     "@types/node": "18.x",
