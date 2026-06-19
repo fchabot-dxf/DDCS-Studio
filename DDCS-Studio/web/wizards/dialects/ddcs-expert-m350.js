@@ -82,7 +82,9 @@ export const dialect = {
     },
 
     notes: 'In-program Macro-B-INSPIRED dialect (real Fanuc Macro B does NOT run on M350). G53 needs a #var '
-        + '(no literal, no G0). WCS via direct #[805+] indirect write, stride 5 (G10 L20 also works on this firmware '
-        + 'but house style is the indirect write). Dwell P=ms. WHILE/DO/END also exist (word ops, bracketed). '
+        + '(no literal, no G0). WCS via direct #[805+] indirect write, stride 5. ⚠️ NEVER emit G10 L20/L2 with axis '
+        + 'words: V1 on-machine (2026-06-19) proved G10 L20 P6 X25 writes NO offset and the X word executes as a '
+        + 'G90/G01 MOVE (Mach X 5→73.286) — broken AND dangerous. Direct register write is the only safe WCS set. '
+        + 'Dwell P=ms. WHILE/DO/END also exist (word ops, bracketed). '
         + 'Verified vs bridge/controllers/expert-m350 — appcode/snippets.nc, SYSDISK/slib-*.nc, CNCDISK captures.',
 };
