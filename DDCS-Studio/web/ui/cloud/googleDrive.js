@@ -141,3 +141,11 @@ export async function write(name, obj, parentId) {
 
 export async function del(id) { await api(`${API}/files/${id}`, { method: 'DELETE' }); }
 export async function rename(id, name) { await api(`${API}/files/${id}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }); }
+
+/** The signed-in account → { name, email }. about.get works with the drive.file scope (no extra consent). Best-effort. */
+export async function getUserInfo() {
+    try {
+        const u = (await (await api(`${API}/about?fields=user`)).json()).user || {};
+        return { name: u.displayName || '', email: u.emailAddress || '' };
+    } catch (e) { return { name: '', email: '' }; }
+}

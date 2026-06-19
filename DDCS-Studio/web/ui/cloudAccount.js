@@ -10,16 +10,28 @@
 import { getProvider, providerLabel, providerIcon, clientId, setClientId, redirectUri, AVAILABLE_PROVIDER_IDS } from './cloud/providers.js';
 import { makeChallenge, makeState, buildAuthUrl, exchangeCode } from './cloud/pkce.js';
 
-const TOK = 'ddcs_cloud_token', PROV = 'ddcs_cloud_provider', EMAIL = 'ddcs_cloud_email', REFRESH = 'ddcs_cloud_refresh';
+const TOK = 'ddcs_cloud_token', PROV = 'ddcs_cloud_provider', EMAIL = 'ddcs_cloud_email', REFRESH = 'ddcs_cloud_refresh', NAME = 'ddcs_cloud_name';
 
 export function getAccount() {
     try {
-        return { connected: !!localStorage.getItem(TOK), provider: localStorage.getItem(PROV) || '', email: localStorage.getItem(EMAIL) || '' };
-    } catch (e) { return { connected: false, provider: '', email: '' }; }
+        return { connected: !!localStorage.getItem(TOK), provider: localStorage.getItem(PROV) || '', email: localStorage.getItem(EMAIL) || '', name: localStorage.getItem(NAME) || '' };
+    } catch (e) { return { connected: false, provider: '', email: '', name: '' }; }
 }
 
 export function disconnect() {
-    try { [TOK, PROV, EMAIL, REFRESH].forEach((k) => localStorage.removeItem(k)); } catch (e) { /* */ }
+    try { [TOK, PROV, EMAIL, REFRESH, NAME].forEach((k) => localStorage.removeItem(k)); } catch (e) { /* */ }
+    window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
+}
+
+/** Fetch the signed-in Google account's name + email (via Drive about.get) and cache it, then refresh the UI.
+ *  Best-effort — the connection is valid whether or not identity resolves. */
+async function captureGoogleIdentity() {
+    try {
+        const { getUserInfo } = await import('./cloud/googleDrive.js');
+        const u = await getUserInfo();
+        if (u.email) localStorage.setItem(EMAIL, u.email);
+        if (u.name) localStorage.setItem(NAME, u.name);
+    } catch (e) { /* identity is optional */ }
     window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
 }
 
@@ -51,7 +63,8 @@ async function connectGoogleFlow() {
         const tok = await connectGoogle(clientId('google'));
         localStorage.setItem(TOK, tok);
         localStorage.setItem(PROV, 'google');
-        window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
+        window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));   // show "Connected" now
+        captureGoogleIdentity();                                       // fill in name + email when it resolves
     } catch (e) {
         if (String(e && e.message) !== 'sign-in cancelled') window.alert('Google sign-in failed: ' + (e && e.message));
     }
@@ -75,6 +88,7 @@ async function connectGoogleDesktop() {
         if (t.access_token) {
             try { localStorage.setItem(TOK, t.access_token); localStorage.setItem(PROV, 'google'); } catch (e) { /* */ }
             window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
+            captureGoogleIdentity();   // resolve + cache the account name + email
             return;
         }
         if (Date.now() < deadline) setTimeout(tick, 1500);
@@ -144,12 +158,14 @@ async function openConnectModal(provider) {
 export function renderCloudLogin(container) {
     if (!container) return;
     const a = getAccount();
+    // Backfill identity for a session that connected before we captured it (once per load; no loop on failure).
+    if (a.connected && !a.name && !a.email && !captureGoogleIdentity._tried) { captureGoogleIdentity._tried = true; captureGoogleIdentity(); }
     const wrap = document.createElement('div');
     wrap.className = 'cloud-login';
     const status = document.createElement('div');
     status.className = 'cloud-status' + (a.connected ? '' : ' muted');
     status.textContent = a.connected
-        ? `Connected · ${providerLabel(a.provider)}${a.email ? ' · ' + a.email : ''}`
+        ? `Connected · ${providerLabel(a.provider)}${a.name ? ' · ' + a.name : ''}${a.email ? ' · ' + a.email : ''}`
         : 'Not connected — sign in to sync your projects to your own Google Drive.';
     wrap.appendChild(status);
 

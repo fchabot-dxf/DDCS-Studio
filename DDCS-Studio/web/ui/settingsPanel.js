@@ -1113,14 +1113,32 @@ function wireSettingsOverlay(ov) {
                 cands.push({ group: 'WCS work offset', label: `G${53 + idx} work origin`, value: `X${wx ? wx.value : 0} Y${wy ? wy.value : 0} Z${wz ? wz.value : 0}`, changed: [wx, wy, wz].some((o) => o && o.userSet), kind: 'wcs', data: { x: wx ? wx.value : 0, y: wy ? wy.value : 0, z: wz ? wz.value : 0 } });
             else notes.push({ group: 'WCS work offset', label: `G${53 + idx} at default`, value: 'origin = 0', kind: 'note' });
         } else notes.push({ group: 'WCS work offset', label: 'Not readable', value: '—', kind: 'note' });
+        // Machine envelope / travel — from the controller's soft-limit params (gateway /api/profile geometry).
+        const tv = hwProfile && hwProfile.geometry && hwProfile.geometry.travel;
+        const mc = _ddcsSettings.machine || {};
+        if (tv && [tv.x, tv.y, tv.z].some((v) => v != null && v > 0)) {
+            const tx = (tv.x > 0 ? tv.x : mc.x), ty = (tv.y > 0 ? tv.y : mc.y), tz = (tv.z > 0 ? tv.z : mc.z);
+            const changed = (tv.x > 0 && tv.x !== mc.x) || (tv.y > 0 && tv.y !== mc.y) || (tv.z > 0 && tv.z !== mc.z);
+            cands.push({ group: 'Machine envelope', label: 'Travel X/Y/Z', value: `${tx} × ${ty} × ${tz} mm`, changed, kind: 'travel', data: { x: tv.x, y: tv.y, z: tv.z } });
+        } else if (hwProfile && hwProfile.id) {
+            notes.push({ group: 'Machine envelope', label: 'Not set', value: 'soft limits off — keeping current', kind: 'note' });
+        }
         return { connected, candidates: cands.concat(notes) };
     }
     async function applyCandidates(checked) {
         const a = _ddcsSettings.atc || (_ddcsSettings.atc = {});
         const mag = checked.filter((c) => c.kind === 'magazine').map((c) => c.data).sort((x, y) => x.pocket - y.pocket);
-        if (mag.length) a.magazine = mag;
+        if (mag.length) {
+            a.magazine = mag;
+            // The magazine's tool # selects from the Tool library — make sure each pulled tool exists there,
+            // else the dropdown can't show it and the number is lost. Create a minimal stub if missing.
+            a.tools = a.tools || [];
+            mag.forEach((p) => { const tn = Number(p.tool); if (tn > 0 && !a.tools.some((t) => parseInt(t && t.num, 10) === tn)) a.tools.push(normalizeTool({}, tn)); });
+        }
         checked.filter((c) => c.kind === 'length').forEach((c) => upsertToolLength(a, c.data.num, c.data.length));
         const wcs = checked.find((c) => c.kind === 'wcs'); if (wcs) (_ddcsSettings.machine || (_ddcsSettings.machine = {})).workOrigin = wcs.data;
+        const tvc = checked.find((c) => c.kind === 'travel');
+        if (tvc) { const mm = _ddcsSettings.machine || (_ddcsSettings.machine = {}); if (tvc.data.x > 0) mm.x = tvc.data.x; if (tvc.data.y > 0) mm.y = tvc.data.y; if (tvc.data.z > 0) mm.z = tvc.data.z; }
         for (const c of checked.filter((c) => c.kind === 'hardware')) { try { await applyHardwareProfile(c.data); } catch (e) { /* ignore */ } }
         saveSettings(); fill();
         const mt = ov.querySelector('#atc_magazine'); if (mt) renderMagazineTable(mt, _ddcsSettings.atc, atcOnChange);
