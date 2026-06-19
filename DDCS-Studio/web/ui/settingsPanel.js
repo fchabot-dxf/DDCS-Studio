@@ -360,12 +360,12 @@ function buildSettingsOverlay() {
                 <!-- GENERAL: PROFILE -->
                 <div id="set_tab_profile">
                     <div class="settings-section">
-                        <div class="settings-section-title">CONTROLLER PROFILE</div>
+                        <div class="settings-section-title">CONTROLLER</div>
                         <div class="settings-row">
                             <select id="set_profile" title="Controller profile — presets the hardware your machine has" style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
                             <button class="toolbar-btn settings-io" id="set_profile_pull" title="Fetch this machine's profile (tabs + pins) from the bridged controller. Offline controllers like the DDCS 3.1: use Import profile.">↧ Pull from controller</button>
                         </div>
-                        <div class="settings-hint">Presets which hardware your machine has (DDCS Expert, 4.1, …). You still add/remove inputs &amp; outputs in the Hardware tabs.</div>
+                        <div class="settings-hint">Which controller you have (DDCS Expert, 4.1, …) — sets the G-code dialect/post and presets your hardware tabs. (The <b>Profile</b> below saves your actual settings + variables for it.)</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">POST PROCESSOR</div>
@@ -938,7 +938,7 @@ function wireSettingsOverlay(ov) {
     function fillPostOptions() {
         if (!postSel) return;
         const machinePost = getDialect(getActiveProfile().id);
-        postSel.innerHTML = ['<option value="auto">Follow machine profile (' + machinePost.name + ')</option>']
+        postSel.innerHTML = ['<option value="auto">Follow controller (' + machinePost.name + ')</option>']
             .concat(listPosts().map((p) => '<option value="' + p.id + '">' + p.name + (p.verified ? '  ✓' : '  ⚠ unverified') + '</option>'))
             .join('');
         postSel.value = getActivePostId();
@@ -947,7 +947,7 @@ function wireSettingsOverlay(ov) {
     function updatePostHint() {
         const hint = q('set_post_hint'); if (!hint) return;
         const id = getActivePostId();
-        if (id === 'auto') { hint.textContent = 'Following the machine profile (' + getDialect(getActiveProfile().id).name + '). Override to generate for another controller.'; hint.style.color = ''; }
+        if (id === 'auto') { hint.textContent = 'Following the controller (' + getDialect(getActiveProfile().id).name + '). Override to generate for another controller.'; hint.style.color = ''; }
         else if (!isPostVerified(id)) { hint.textContent = '⚠ Unverified post — dump-derived, simulator/reference only. Not validated on hardware.'; hint.style.color = '#e0a020'; }
         else { hint.textContent = 'Generating for ' + getDialect(id).name + ' (verified).'; hint.style.color = ''; }
     }
@@ -1040,6 +1040,10 @@ function wireSettingsOverlay(ov) {
         applyHardwareTabs();
     }
     applyHardwareTabs();
+
+    // Profile load (profileStore.applyProfile) calls this after switching the controller, to re-sync the
+    // CONTROLLER dropdown + post selector + hardware tabs to the loaded profile's controller.
+    window.ddcsRefreshControllerUI = () => { try { fillProfileOptions(); fillPostOptions(); applyHardwareTabs(); fill(); } catch (e) { /* */ } };
 
     // --- Centralized "Pull from controller": read ALL machine data, then review each value (changed-vs-default)
     //     and tick what to apply. Everything pulled is PROFILE data — also settable by hand, saved via Export. ---

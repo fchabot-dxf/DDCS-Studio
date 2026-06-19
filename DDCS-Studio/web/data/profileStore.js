@@ -8,7 +8,7 @@
  */
 import { getSettings, applySettings } from '../ui/settingsPanel.js';
 import { getAccessToken, ensureRoot, list as driveList, read as driveRead, write as driveWrite, mkdir as driveMkdir, del as driveDel } from '../ui/cloud/googleDrive.js';
-import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { getActiveProfile, setActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
 const PROFILE_VERSION = 1;
 const CLOUD_EXT = '.ddcsprofile.json';   // distinguishes profiles from .mjson projects in the user's Drive
@@ -18,8 +18,11 @@ function isPywebview() { return !!(window.pywebview && window.pywebview.api); }
 
 export function buildProfile() {
     const db = getDB();
+    const ap = (() => { try { return getActiveProfile(); } catch (e) { return null; } })();
     return {
         version: PROFILE_VERSION,
+        controllerId: ap ? ap.id : '',        // which controller this profile is for → load restores the dialect/post
+        controllerName: ap ? ap.name : '',
         settings: getSettings(),
         userVars: db ? db.getAll().filter(v => !v.isSys) : [],
     };
@@ -32,6 +35,18 @@ export function applyProfile(profile) {
     if (Array.isArray(profile.userVars) && db && db.importUserVars) {
         db.importUserVars(profile.userVars);
         if (window.refreshDeckVariables) window.refreshDeckVariables();
+    }
+    // Switch the CONTROLLER to the one this profile was saved for (dialect/post follow it). Older profiles
+    // without a controllerId fall back to the cloud machine.id stamp; if neither, the controller is left as-is.
+    const cid = profile.controllerId || (profile.machine && profile.machine.id);
+    if (cid) {
+        try {
+            setActiveProfile(cid);
+            const ap = getActiveProfile(); const vdb = window.ddcsStudio && window.ddcsStudio.variableDB;
+            if (ap && ap.varFamily && vdb) vdb.setControllerVars(ap.varFamily);   // switch the #var list too
+        } catch (e) { /* */ }
+        if (window.ddcsRefreshControllerUI) window.ddcsRefreshControllerUI();      // re-sync the Settings dropdown + post + tabs
+        window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));            // re-sync the header post chip + open previews (after the switch)
     }
     return true;
 }
