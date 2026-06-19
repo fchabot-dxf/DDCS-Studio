@@ -432,7 +432,7 @@ function buildSettingsOverlay() {
                 <div id="set_tab_cloud" style="display:none">
                     <div class="settings-section">
                         <div class="settings-section-title">CLOUD STORAGE</div>
-                        <div class="settings-hint">Sign in to your own Google Drive to save &amp; sync your project files — browser-direct, no server. This is file storage only; it does NOT connect to your machine.</div>
+                        <div class="settings-hint">Sign in to save &amp; sync your projects to your own Google Drive — files go straight to your account, we never see them.</div>
                         <div id="set_cloud_mount" style="margin-top:8px"></div>
                     </div>
                 </div>
@@ -989,25 +989,11 @@ function wireSettingsOverlay(ov) {
             if (p && p.id && Array.isArray(p.hardwareTabs)) { registerProfile(p); fillProfileOptions(); }
         }).catch(() => { /* no gateway — leave builtins */ });
 
-        // Explicit "Pull from controller" — fetch /api/profile and apply its tabs + pin map → inputs[].
+        // "Pull from controller" → the review modal: it reads ALL machine data, tags each value "changed" vs
+        // factory "default", and you tick what to apply. Everything here is PROFILE data — equally settable by
+        // hand and saved/loaded via Export/Import profile (the desktop app auto-saves it on every change).
         const pullBtn = q('set_profile_pull');
-        if (pullBtn) pullBtn.addEventListener('click', async () => {
-            const orig = pullBtn.textContent; pullBtn.disabled = true; pullBtn.textContent = 'Pulling…';
-            try {
-                let p;
-                try { p = await makeClient().profile(); }
-                catch (e) { alert('Not bridged to a controller — run the desktop app (or the gateway) to pull a live profile. Offline controllers like the DDCS 3.1: use Import profile with the exported settings.'); return; }
-                if (!p || !p.id) { alert('The gateway returned no profile.'); return; }
-                if (!confirm('Pull "' + p.name + '" from the controller? This replaces the current hardware tabs and Input/Output list with the controller values.')) return;
-                registerProfile(p); setActiveProfile(p.id);
-                applyControllerProfile(p);
-                fillProfileOptions();
-                const it = ov.querySelector('#io_input_table'); if (it) renderIoTable(it, 'input', getInputs(), syncIO);
-                const ot = ov.querySelector('#io_output_table'); if (ot) renderIoTable(ot, 'output', getOutputs(), syncIO);
-                alert('Pulled "' + p.name + '": ' + getInputs().length + ' inputs configured.');
-            } catch (e) { alert('Pull failed: ' + (e && e.message ? e.message : e)); }
-            finally { pullBtn.disabled = false; pullBtn.textContent = orig; }
-        });
+        if (pullBtn) pullBtn.addEventListener('click', () => openImportModal());
     }
 
     // Apply a controller-sourced profile (from the gateway): set hardware tabs + rebuild inputs[] from its pin map.
@@ -1051,6 +1037,190 @@ function wireSettingsOverlay(ov) {
         applyHardwareTabs();
     }
     applyHardwareTabs();
+
+    // --- Centralized "Pull from controller": read ALL machine data, then review each value (changed-vs-default)
+    //     and tick what to apply. Everything pulled is PROFILE data — also settable by hand, saved via Export. ---
+    function activeDialect() {
+        const pid = getActivePostId();
+        return getDialect(pid && pid !== 'auto' ? pid : getActiveProfile().id);
+    }
+    function upsertToolLength(a, num, len) {
+        a.tools = a.tools || [];
+        let rec = a.tools.find((t) => parseInt(t && t.num, 10) === num);
+        if (!rec) { rec = normalizeTool({}, num); rec.num = num; a.tools.push(rec); }
+        rec.length = len;
+    }
+    async function applyHardwareProfile(p) {   // tabs + pin map → inputs[]/outputs[]
+        if (!p || !p.id) throw new Error('no profile');
+        registerProfile(p); setActiveProfile(p.id);
+        applyControllerProfile(p);
+        fillProfileOptions();
+        const it = ov.querySelector('#io_input_table'); if (it) renderIoTable(it, 'input', getInputs(), syncIO);
+        const ot = ov.querySelector('#io_output_table'); if (ot) renderIoTable(ot, 'output', getOutputs(), syncIO);
+    }
+    // Read everything off the controller → review candidates. Each carries `changed` = differs from the factory
+    // default (setting vs default_setting; non-zero for the ATC/uservar tables that have no default file).
+    async function scanController() {
+        const d = activeDialect();
+        const atc = d.vars && d.vars.atc;
+        const tb = (d.vars && d.vars.toolTable) || 1430;
+        const wcsBase = (d.vars && d.vars.wcsBase) || 805, wcsStride = (d.vars && d.vars.wcsStride) || 5, activeWcsVar = (d.vars && d.vars.activeWcs) || 578;
+        const MAX = 24;                                   // pockets/tools scanned (most magazines ≤ 24)
+        let hwProfile = null;
+        try { hwProfile = await makeClient().profile(); } catch (e) { /* offline */ }
+        const need = new Set([activeWcsVar]);
+        for (let k = 0; k < 6 * wcsStride; k++) need.add(wcsBase + k);
+        for (let i = 0; i < MAX; i++) { need.add(tb + i); if (atc) { need.add(atc.pocketX + i); need.add(atc.pocketY + i); need.add(atc.pocketZ + i); } }
+        let values = {}, connected = false;
+        try { const res = await makeClient().readVars([...need].map(String)); connected = !!(res && res.connected); values = (res && res.values) || {}; } catch (e) { /* offline */ }
+        const obj = (n) => { const x = values[String(n)]; return x && x.available ? x : null; };   // {value,userSet,default?}
+        const cands = [], notes = [];   // notes = explicit "not readable / not available / at default" rows
+        // Hardware & I/O
+        if (hwProfile && hwProfile.id) { connected = true; cands.push({ group: 'Hardware & I/O', label: `Profile “${hwProfile.name}”`, value: 'tabs + pin map', changed: true, kind: 'hardware', data: hwProfile }); }
+        else notes.push({ group: 'Hardware & I/O', label: 'Not available', value: 'no gateway profile', kind: 'note' });
+        // ATC magazine (pocket XYZ tables)
+        let magReadable = false, magCount = 0;
+        if (atc) for (let i = 0; i < MAX; i++) {
+            const x = obj(atc.pocketX + i), y = obj(atc.pocketY + i), z = obj(atc.pocketZ + i);
+            if (x || y || z) magReadable = true;
+            const xx = x ? x.value : 0, yy = y ? y.value : 0, zz = z ? z.value : 0;
+            if (!xx && !yy && !zz) continue;
+            magCount++;
+            cands.push({ group: 'ATC magazine', label: `Pocket ${i + 1} (T${i + 1})`, value: `X${xx} Y${yy} Z${zz}`, changed: [x, y, z].some((o) => o && o.userSet), kind: 'magazine', data: { pocket: i + 1, tool: i + 1, name: '', x: xx, y: yy, z: zz } });
+        }
+        if (!atc) notes.push({ group: 'ATC magazine', label: 'Not available on this controller', value: 'no mapped ATC model', kind: 'note' });
+        else if (!magReadable) notes.push({ group: 'ATC magazine', label: 'Not readable', value: 'controller returned nothing', kind: 'note' });
+        else if (!magCount) notes.push({ group: 'ATC magazine', label: 'No taught pockets', value: 'all at default (0)', kind: 'note' });
+        // Tool lengths
+        let lenReadable = false, lenCount = 0;
+        for (let i = 0; i < MAX; i++) {
+            const L = obj(tb + i); if (L) lenReadable = true;
+            if (!L || L.value === 0) continue;
+            lenCount++;
+            cands.push({ group: 'Tool lengths', label: `T${i + 1} length`, value: String(L.value), changed: !!L.userSet, kind: 'length', data: { num: i + 1, length: L.value } });
+        }
+        if (!lenReadable) notes.push({ group: 'Tool lengths', label: 'Not readable on this controller', value: '—', kind: 'note' });
+        else if (!lenCount) notes.push({ group: 'Tool lengths', label: 'None set', value: 'all at default (0)', kind: 'note' });
+        // WCS work offset (active system)
+        const idxO = obj(activeWcsVar); const idx = (idxO && idxO.value >= 1 && idxO.value <= 6) ? Math.round(idxO.value) : 1;
+        const base = wcsBase + (idx - 1) * wcsStride;
+        const wx = obj(base), wy = obj(base + 1), wz = obj(base + 2);
+        if (wx || wy || wz) {
+            if ((wx && wx.value) || (wy && wy.value) || (wz && wz.value))
+                cands.push({ group: 'WCS work offset', label: `G${53 + idx} work origin`, value: `X${wx ? wx.value : 0} Y${wy ? wy.value : 0} Z${wz ? wz.value : 0}`, changed: [wx, wy, wz].some((o) => o && o.userSet), kind: 'wcs', data: { x: wx ? wx.value : 0, y: wy ? wy.value : 0, z: wz ? wz.value : 0 } });
+            else notes.push({ group: 'WCS work offset', label: `G${53 + idx} at default`, value: 'origin = 0', kind: 'note' });
+        } else notes.push({ group: 'WCS work offset', label: 'Not readable', value: '—', kind: 'note' });
+        return { connected, candidates: cands.concat(notes) };
+    }
+    async function applyCandidates(checked) {
+        const a = _ddcsSettings.atc || (_ddcsSettings.atc = {});
+        const mag = checked.filter((c) => c.kind === 'magazine').map((c) => c.data).sort((x, y) => x.pocket - y.pocket);
+        if (mag.length) a.magazine = mag;
+        checked.filter((c) => c.kind === 'length').forEach((c) => upsertToolLength(a, c.data.num, c.data.length));
+        const wcs = checked.find((c) => c.kind === 'wcs'); if (wcs) (_ddcsSettings.machine || (_ddcsSettings.machine = {})).workOrigin = wcs.data;
+        for (const c of checked.filter((c) => c.kind === 'hardware')) { try { await applyHardwareProfile(c.data); } catch (e) { /* ignore */ } }
+        saveSettings(); fill();
+        const mt = ov.querySelector('#atc_magazine'); if (mt) renderMagazineTable(mt, _ddcsSettings.atc, atcOnChange);
+        renderLibSummary();
+    }
+    let _importCands = [];
+    function buildImportModal() {
+        if (document.getElementById('import-modal')) return;
+        const m = document.createElement('div');
+        m.id = 'import-modal';
+        m.innerHTML = `
+            <style>
+                #import-modal { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
+                #import-modal.active { display: flex; }
+                #import-modal .im-panel { background: var(--panel); color: var(--text-main); border: 1px solid var(--border); border-radius: var(--radius, 6px); width: min(620px, 95vw); max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+                #import-modal .im-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; letter-spacing: .5px; }
+                #import-modal .im-head button { background: transparent; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; }
+                #import-modal .im-body { overflow: auto; padding: 4px 14px 10px; min-height: 80px; }
+                #import-modal .im-empty { padding: 24px 8px; text-align: center; color: var(--text-dim); }
+                #import-modal .im-group { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); padding: 12px 4px 4px; font-weight: 700; }
+                #import-modal .im-row { display: grid; grid-template-columns: 22px 1fr auto auto; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid var(--border); cursor: pointer; }
+                #import-modal .im-lbl { font-weight: 600; }
+                #import-modal .im-val { font-family: monospace; font-size: 11.5px; color: var(--text-dim); }
+                #import-modal .im-tag { font-size: 9.5px; text-transform: uppercase; letter-spacing: .5px; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+                #import-modal .im-tag.chg { background: rgba(60,180,90,.22); color: #3cb24f; }
+                #import-modal .im-tag.def { background: rgba(128,128,128,.18); color: var(--text-dim); }
+                #import-modal .im-tag.na { background: transparent; color: var(--text-dim); font-style: italic; }
+                #import-modal .im-note-row { cursor: default; opacity: .85; }
+                #import-modal .im-foot { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+                #import-modal .im-only { font-size: 11.5px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; cursor: pointer; }
+            </style>
+            <div class="im-panel">
+                <div class="im-head"><span>↧ Pull from controller</span><button id="import-close" title="Close">✕</button></div>
+                <div class="im-body" id="import-body"></div>
+                <div class="im-foot">
+                    <label class="im-only"><input type="checkbox" id="import-only" checked> Show only changed</label>
+                    <span style="flex:1"></span>
+                    <button class="toolbar-btn settings-io" id="import-cancel">Cancel</button>
+                    <button class="toolbar-btn settings-io" id="import-apply" disabled>Apply</button>
+                </div>
+            </div>`;
+        document.body.appendChild(m);
+        const close = () => m.classList.remove('active');
+        m.querySelector('#import-close').addEventListener('click', close);
+        m.querySelector('#import-cancel').addEventListener('click', close);
+        m.addEventListener('mousedown', (e) => { if (e.target === m) close(); });
+    }
+    function renderImportReview() {
+        const m = document.getElementById('import-modal');
+        const body = m.querySelector('#import-body');
+        const applyBtn = m.querySelector('#import-apply');
+        const onlyChanged = m.querySelector('#import-only').checked;
+        const isNote = (c) => c.kind === 'note';
+        if (!_importCands.length) { body.innerHTML = '<div class="im-empty">Nothing readable on the controller.</div>'; applyBtn.disabled = true; return; }
+        const shown = _importCands.filter((c) => isNote(c) || !onlyChanged || c.changed);   // status notes always shown
+        const hiddenDefaults = _importCands.filter((c) => !isNote(c) && !c.changed).length;
+        const groups = {};
+        shown.forEach((c) => { (groups[c.group] = groups[c.group] || []).push(c); });
+        let html = '';
+        Object.keys(groups).forEach((g) => {
+            html += `<div class="im-group">${g}</div>`;
+            groups[g].forEach((c) => {
+                if (isNote(c)) {   // explicit "not readable / not available / at default" — informational, not tickable
+                    html += `<div class="im-row im-note-row"><span></span><span class="im-lbl">${c.label}</span><span class="im-val">${c.value}</span><span class="im-tag na">n/a</span></div>`;
+                    return;
+                }
+                const i = _importCands.indexOf(c);
+                html += `<label class="im-row"><input type="checkbox" data-cand="${i}"${c.checked ? ' checked' : ''}>`
+                    + `<span class="im-lbl">${c.label}</span><span class="im-val">${c.value}</span>`
+                    + `<span class="im-tag ${c.changed ? 'chg' : 'def'}">${c.changed ? 'changed' : 'default'}</span></label>`;
+            });
+        });
+        if (onlyChanged && hiddenDefaults) html += `<div class="im-empty">+${hiddenDefaults} value${hiddenDefaults > 1 ? 's' : ''} at factory default — untick “Show only changed” to add them.</div>`;
+        body.innerHTML = html;
+        body.querySelectorAll('[data-cand]').forEach((cb) => cb.addEventListener('change', () => { _importCands[+cb.dataset.cand].checked = cb.checked; updateApply(); }));
+        updateApply();
+    }
+    function updateApply() {
+        const applyBtn = document.querySelector('#import-apply');
+        const n = _importCands.filter((c) => c.checked).length;
+        applyBtn.disabled = !n; applyBtn.textContent = n ? `Apply ${n}` : 'Apply';
+    }
+    async function openImportModal() {
+        buildImportModal();
+        const m = document.getElementById('import-modal');
+        const body = m.querySelector('#import-body');
+        _importCands = [];
+        body.innerHTML = '<div class="im-empty">Reading the controller…</div>';
+        m.querySelector('#import-apply').disabled = true;
+        m.classList.add('active');
+        let scan;
+        try { scan = await scanController(); } catch (e) { scan = { connected: false, candidates: [] }; }
+        if (!scan.connected) { body.innerHTML = '<div class="im-empty">Not bridged to a controller — run the desktop app / gateway, or Import a saved profile instead.</div>'; return; }
+        _importCands = scan.candidates.map((c) => ({ ...c, checked: !!c.changed }));   // pre-tick what the operator changed
+        renderImportReview();
+        m.querySelector('#import-only').onchange = renderImportReview;
+        m.querySelector('#import-apply').onclick = async () => {
+            const checked = _importCands.filter((c) => c.checked);
+            const btn = m.querySelector('#import-apply'); btn.disabled = true; btn.textContent = 'Applying…';
+            try { await applyCandidates(checked); m.classList.remove('active'); }
+            catch (e) { body.innerHTML = '<div class="im-empty">Apply failed: ' + (e && e.message ? e.message : e) + '</div>'; }
+        };
+    }
 
     // --- Tool library: a sparse list of the tools you own. Length offset → #[base + num − 1].
     //     The tab shows a summary; the modal is the editor; the Mill wizards + magazine pick from it. ---

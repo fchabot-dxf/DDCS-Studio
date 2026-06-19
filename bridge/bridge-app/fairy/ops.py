@@ -435,13 +435,59 @@ class Ops:
                 continue
         return None
 
+    def _read_camsetting(self):
+        """Decode the controller's `camsetting` file as little-endian f64 — the ATC / CAM parameter tables
+        #1000-1499 (slot = #var-1000). Mapping boundary-confirmed by the captured sentinels (#1000/#1050/
+        #1099/#1100/#1300/#1499). Holds current tool #1300, capacity #1301, pocket XYZ #1330/#1350/#1370 and
+        the tool-length table #1430+. On SYSDISK. Returns list[float], or None if unreachable. Never raises."""
+        import struct
+        if not self.controller_reachable():
+            return None
+        for base in (self._sysdisk_path(), self.cfg.expert_dest):
+            if not base:
+                continue
+            try:
+                with open(os.path.join(base, "camsetting"), "rb") as f:
+                    raw = f.read()
+            except OSError:
+                continue
+            n = len(raw) // 8
+            if n:
+                try:
+                    return list(struct.unpack("<%dd" % n, raw[: n * 8]))
+                except struct.error:
+                    continue
+        return None
+
+    def _read_default_setting(self):
+        """Decode `default_setting` — the factory baseline of `setting` (same index = param # layout, 1000×f64).
+        Used to flag which pulled #0-999 params the operator actually changed from default. On SYSDISK. Never raises."""
+        import struct
+        if not self.controller_reachable():
+            return None
+        for base in (self._sysdisk_path(), self.cfg.expert_dest):
+            if not base:
+                continue
+            try:
+                with open(os.path.join(base, "default_setting"), "rb") as f:
+                    raw = f.read()
+            except OSError:
+                continue
+            n = len(raw) // 8
+            if n:
+                try:
+                    return list(struct.unpack("<%dd" % n, raw[: n * 8]))
+                except struct.error:
+                    continue
+        return None
+
     # --- live variable values (read-only watch list) -----------------------
-    # Values are read from the controller's disk over SMB. CONFIRMED: #100-499 live in `uservar`
-    # (slot = #var-100), f64 LE — true on both the V4.1 (SYSDISK, 400 slots) and the Expert (CNCDISK,
-    # 450 slots), so we just try both shares. #0-99 are locals (RAM-only, never on disk). #500+ ranges
-    # (setting/coord1/positions) have an unverified macro-address mapping on each controller — we return
-    # available:false rather than show a wrong value off a machine tool. NOTE: values flush only at run
-    # start/end, so this is a snapshot of the last run, not a live tick.
+    # Values are read from the controller's disk over SMB (read-only snapshot, flushed at run start/end):
+    #   #0-99    locals — RAM-only, never on disk (unavailable)
+    #   #100-549 `uservar`  (slot = #var-100), f64 LE — V4.1 SYSDISK 400 slots / Expert CNCDISK 450 slots
+    #   #100-999 `setting`  (index = #var) — persisted system params: WCS #805+, serial, servo, …
+    #   #1000-1499 `camsetting` (slot = #var-1000) — ATC/CAM tables: current tool, pockets, tool lengths
+    #   #1500+   position/runtime — bench-map pending (unavailable)
     def _read_uservar(self):
         import struct
         if not self.controller_reachable():
@@ -462,34 +508,59 @@ class Ops:
                     continue
         return None
 
-    def _var_value(self, n, uservar):
+    def _var_value(self, n, files):
+        uservar, setting, camsetting = files.get("uservar"), files.get("setting"), files.get("camsetting")
+        default_setting = files.get("default_setting")
         try:
             n = int(n)
         except (TypeError, ValueError):
             return {"available": False, "reason": "not a number"}
         if 0 <= n <= 99:
             return {"available": False, "source": "local", "reason": "local var - RAM-only, not on disk"}
-        if uservar is not None:
-            slot = n - 100
-            if 0 <= slot < len(uservar):
-                return {"available": True, "value": uservar[slot], "source": "uservar"}
+        # uservar: live macro vars #100-549 (slot = #var-100). No factory baseline → userSet = non-zero.
+        if uservar is not None and 100 <= n and (n - 100) < len(uservar):
+            v = uservar[n - 100]
+            return {"available": True, "value": v, "source": "uservar", "userSet": v != 0}
+        # camsetting: ATC/CAM tables #1000-1499 (slot = #var-1000). No default file → userSet = non-zero (untaught = 0).
+        if 1000 <= n <= 1499 and camsetting is not None and (n - 1000) < len(camsetting):
+            v = camsetting[n - 1000]
+            return {"available": True, "value": v, "source": "camsetting", "userSet": v != 0}
+        # setting: persisted system params #0-999 (index = #var) — WCS #805+, serial, servo, … userSet = differs
+        # from the factory `default_setting` baseline (so the import can flag what the operator actually changed).
+        if 100 <= n <= 999 and setting is not None and n < len(setting):
+            v = setting[n]
+            out = {"available": True, "value": v, "source": "setting"}
+            if default_setting is not None and n < len(default_setting):
+                out["default"] = default_setting[n]
+                out["userSet"] = abs(v - default_setting[n]) > 1e-9
+            else:
+                out["userSet"] = v != 0
+            return out
         if not self.controller_reachable():
             return {"available": False, "reason": "controller unreachable"}
-        # Known system ranges we can't read yet — say which kind, and that the per-controller disk-slot
-        # mapping needs one bench confirmation (read the file, change a known value, see which slot moves).
-        if 500 <= n <= 1499:
-            return {"available": False, "source": "setting", "reason": "system parameter - bench-map pending"}
         if n >= 1500:
             return {"available": False, "source": "runtime", "reason": "position/runtime var - bench-map pending"}
         return {"available": False, "source": "tbd", "reason": "mapping pending bench verification"}
 
     def read_vars(self, nums):
-        """Read a watch list of variable numbers (read-only). Returns {connected, values:{n:{...}}}."""
-        uservar = self._read_uservar()
+        """Read a watch list of variable numbers (read-only). Returns {connected, values:{n:{...}}}.
+        Reads only the disk files a request actually needs (uservar always; setting/camsetting on demand)."""
+        ints = []
+        for x in nums:
+            try:
+                ints.append(int(x))
+            except (TypeError, ValueError):
+                pass
+        files = {"uservar": self._read_uservar()}
+        if any(100 <= v <= 999 for v in ints):
+            files["setting"] = self._read_setting_params()
+            files["default_setting"] = self._read_default_setting()   # factory baseline → userSet diff
+        if any(1000 <= v <= 1499 for v in ints):
+            files["camsetting"] = self._read_camsetting()
         return {
             "connected": self.controller_reachable(),
             "snapshot": "last run start/end",
-            "values": {str(n): self._var_value(n, uservar) for n in nums},
+            "values": {str(n): self._var_value(n, files) for n in nums},
         }
 
     # --- gateway setup (the Setup UI; local gateway only — the cloud can't reach in) --------

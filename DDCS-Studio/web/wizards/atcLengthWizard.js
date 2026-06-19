@@ -11,6 +11,12 @@ import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
+import { resolveActivePost } from './dialects/index.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+
+const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
+// Current-tool var from the active profile (Expert #1300); falls back to the Expert convention where unmapped.
+const curToolVar = (d) => '#' + ((d && d.vars && d.vars.atc && d.vars.atc.currentTool) || 1300);
 
 export function atcLengthStack(params = {}) {
     const blockHeight = num(params.blockHeight, 50), safeZ = num(params.safeZ, 10), maxDist = num(params.maxDist, 100);
@@ -62,7 +68,7 @@ export function atcLengthStack(params = {}) {
     C('Calculate and store the tool length offset');
     RD('#101');                               // machine Z trigger (dialect: #1927 / #1502 / #866)
     A('#102', '[#101 - #6]', 'Length = MachineZ - BlockHeight');
-    A('#103', '#1300', 'Read current tool number');
+    A('#103', curToolVar(getDialect()), 'Read current tool number');
     IF('#103', '<', '1', 3);
     TO('#103', '#102');                        // tool table write (dialect base #1430/#1560)
     MV('Z', '#19');                           // retract to safe Z

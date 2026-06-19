@@ -555,6 +555,7 @@ export class CommandDeck {
                             <button onclick="openWiz && openWiz('atc_length')">📏 Tool Length</button>
                             <button onclick="openWiz && openWiz('atc_check')">🛡 Tool Check</button>
                             <button onclick="openWiz && openWiz('atc_change')">🔧 Tool Change</button>
+                            <button onclick="openWiz && openWiz('atc_table')">📋 Tool Table</button>
                             <button onclick="openWiz && openWiz('atc_test')">🧪 ATC Test</button>
                         </div>
                     </div>

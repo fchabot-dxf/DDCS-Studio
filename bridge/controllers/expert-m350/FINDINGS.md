@@ -140,6 +140,18 @@ client + `EnableInsecureGuestLogons $true` + `BlockNTLM $false` (admin + reboot)
   SMB (operator test writes 111/222/…/888 landed exactly on `#150,#151,#200,#250,#350,#450,#520,#521`).
   ⇒ **Expert `uservar` range = #100–#549** (450 slots; bigger than V4.1's #100–#499). The PC reads controller
   state by decoding this file as little-endian f64 — `[CONFIRMED readback 2026-06-06]`. Slot 0 = byte 0 (no header).
+- **System params live in two more SYSDISK f64 files — the PC can read #0–#1499 over SMB, not just `uservar`:**
+  - **`SYSDISK/setting`** (8000 B = **1000×f64, index == param #**) → persisted system params #0–#999: WCS offsets
+    `#805+[WCS−1]*5`, serial/servo/feed params, etc. Mapping `[CONFIRMED]` by `tools/diff_setting.py` differential
+    toggles. **`SYSDISK/default_setting`** is the factory baseline of the same layout → diff `setting` vs
+    `default_setting` = **which params the operator actually changed** (160 differ on the studio rig).
+  - **`SYSDISK/camsetting`** (4000 B = **500×f64, slot = #var − 1000**) → the ATC/CAM tables #1000–#1499:
+    current tool `#1300`, capacity `#1301`, pocket X/Y/Z `#1330/#1350/#1370`, tool-length table `#1430+`.
+    Slot map `[CONFIRMED]` by the captured boundary sentinels (`#1000`=222.111 · `#1050`=222.222 · `#1099`=222.333 ·
+    `#1100`=333.111 · `#1300`=333.222 · `#1499`=333.333) in `assets/capture/20260610T163337Z/SYSDISK/camsetting`.
+  - ⇒ `ops.py read_vars` decodes uservar (#100–549) + setting (#0–999, with `default_setting` → `userSet` flag) +
+    camsetting (#1000–1499); #1500+ stays runtime/unreadable. Studio's "Pull from controller" import reads pockets,
+    tool lengths and WCS from these. Same lazy-snapshot caveat as `uservar` (flush at run start/end — Save before pull).
 - Run-state hidden files exist on SYSDISK: per-program **`.<name>.nc.pos`** (60 B each) and **`.break0/.break1`**
   (breakpoint-resume) — same family as the V4.1 run-state files. `[TO TEST what they track]`
 - ⚠️ **`uservar` file ↔ RAM is TWO-WAY ISOLATED while running (A9-a `[CONFIRMED 2026-06-10]`):**

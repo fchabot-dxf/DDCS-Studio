@@ -10,8 +10,15 @@ import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
+import { resolveActivePost } from './dialects/index.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+
+const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
 export function atcToolCheckStack(params = {}) {
+    const d = getDialect();
+    const toolBase = (d && d.vars && d.vars.toolTable) || 1430;                       // tool-length table base (Expert/DM500 #1430, V4.1 #1560)
+    const curTool = '#' + ((d && d.vars && d.vars.atc && d.vars.atc.currentTool) || 1300);
     const blockHeight = num(params.blockHeight, 50), safeZ = num(params.safeZ, 10), maxDist = num(params.maxDist, 100);
     const retract = num(params.retract, 3), fFast = num(params.f_fast, 300), fSlow = num(params.f_slow, 50);
     const port = num(params.port, 2), level = num(params.level, 0), tol = num(params.tolerance, 0.5);
@@ -54,9 +61,9 @@ export function atcToolCheckStack(params = {}) {
     C('Measure + compare to the stored tool length');
     RD('#51');                                // machine Z trigger
     A('#52', '[#51-#6]', 'Measured length = MachineZ - block height');
-    A('#53', '#1300', 'Current tool number');
+    A('#53', curTool, 'Current tool number');
     IF('#53', '<', '1', 3);
-    A('#54', '[1430+#53-1]', 'Tool table address');
+    A('#54', `[${toolBase}+#53-1]`, 'Tool table address');
     A('#55', '#[#54]', 'Expected stored length');
     A('#56', '[#52-#55]', 'Deviation');
     IF('#56', '>', '#20', 4);

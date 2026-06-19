@@ -17,8 +17,8 @@ const OP = { '==': 'EQ', '!=': 'NE', '<': 'LT', '>': 'GT', '<=': 'LE', '>=': 'GE
 export const dialect = {
     id: 'ddcs-v3-dm500', name: 'DDCS V3 / DM500',
     programModel: 'inline', probeModel: 'move-until-input', dwellUnits: 's',
-    vars: { dro: 864, probeStatus: null, probeTrig: 864, wcsBase: 804, wcsStride: 4, activeWcs: 455, toolTable: 1430, ax: AX },
-    caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false },   // M101/G01/M102 halts on the probe input
+    vars: { dro: 864, probeStatus: null, probeTrig: 864, wcsBase: 804, wcsStride: 4, activeWcs: 455, toolTable: 1430, atc: null, ax: AX },   // atc null: no confirmed tool-changer firmware model on the DM500
+    caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false },   // M101/G01/M102 halts on the probe input; manual tool change only
 
     // move-until-input: arm (M101) → feed move → disarm (M102). probe.nc:23-25.
     probeMove: (axis, dist, { feed = 100 } = {}) => ['M101', `G91 G01 ${axis}${dist} F${feed}`, 'M102'],

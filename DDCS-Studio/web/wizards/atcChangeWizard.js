@@ -13,6 +13,10 @@
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
+import { resolveActivePost } from './dialects/index.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+
+const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
 // Shared atom helpers over a stack array.
 function H(S) {
@@ -35,6 +39,7 @@ function H(S) {
 
 function manualStack(params) {
     const x = num(params.x, 100), y = num(params.y, 100), z = num(params.z, 0);
+    const d = getDialect(); const dro = (d && d.vars && d.vars.dro) || 880;   // machine-DRO base (Expert #880, V4.1 #1500, DM500 #864)
     const S = []; const { C, A, SPOFF, COOLOFF, MM, PAUSE, MSG, END } = H(S);
     C('ATC | Manual Tool Change');
     C(`Park: X${x} Y${y} Z${z} - operator swaps the tool by hand`);
@@ -42,8 +47,8 @@ function manualStack(params) {
     A('#1', x, 'Park X'); A('#2', y, 'Park Y'); A('#3', z, 'Park Z');
     C('Stop spindle and coolant');
     SPOFF(); COOLOFF();
-    A('#1155', '#880 + 0', 'Save Tool Change X - washed for DDCS priming');
-    A('#1156', '#881 + 0', 'Save Tool Change Y - washed for DDCS priming');
+    A('#1155', `#${dro} + 0`, 'Save Tool Change X - washed for DDCS priming');
+    A('#1156', `#${dro + 1} + 0`, 'Save Tool Change Y - washed for DDCS priming');
     C('Park clear of the work - safe Z first, then XY');
     MM('Z', '#3');                            // retract Z to park
     MM('X', '#1'); MM('Y', '#2');             // move to XY park
@@ -57,24 +62,42 @@ function manualStack(params) {
 }
 
 function autoStack(params) {
-    const zClear = num(params.zClear, 0), capacity = num(params.capacity, 8), fixedT = num(params.fixedT, 0);
-    const useM300 = params.waitSpindle !== false, useCover = params.dustCover === true, confirm = params.confirm === true;
-    const target = fixedT > 0 ? String(fixedT) : '#1504';
-
+    const d = getDialect();
     const S = []; const { C, A, IF, GO, LB, SPOFF, COOLOFF, MM, MC, CF, MSG, END } = H(S);
-    C('ATC | Automatic Tool Change - T.nc style');
-    C('Drawbar M154/M155 + sensor waits M301/M302 - pockets from tables #1330/#1350/#1370');
-    C(fixedT > 0 ? `TEST MODE: fixed target tool T${fixedT}` : 'Target tool from #1504 - set by M6 Txx; save as T.nc');
+
+    // Auto pick & place needs the controller's tool-changer firmware vars — only the Expert has a confirmed model.
+    const atc = d && d.vars && d.vars.atc;
+    if (!atc) {
+        C('ATC | Automatic Tool Change');
+        C(`Not available on ${d ? d.name : 'this controller'} — no confirmed ATC firmware model.`);
+        C('Use Manual mode, or select the DDCS Expert post.');
+        END();
+        return S;
+    }
+
+    const zClear = num(params.zClear, 0), fixedT = num(params.fixedT, 0);
+    const useM300 = params.waitSpindle !== false, useCover = params.dustCover === true, confirm = params.confirm === true;
+    // Pockets + park XYZ come from the Settings → Tool table magazine (literal coords, dispatched by tool number).
+    const mag = (Array.isArray(params.magazine) ? params.magazine : []).filter((p) => p && p.tool !== '' && p.tool != null);
+    const cur = '#' + atc.currentTool;                                   // tool in spindle (#1300)
+    const tgt = fixedT > 0 ? String(fixedT) : '#' + atc.targetTool;      // requested tool (#1504 from M6 Txx)
+
+    C('ATC | Automatic Tool Change — magazine pick & place');
+    C('Pockets + park XYZ come from Settings → Tool table magazine');
+    C(fixedT > 0 ? `TEST MODE: fixed target tool T${fixedT}` : `Target tool from ${tgt} — set by M6 Txx; save as T.nc`);
     C('VERIFY FIRST RUN with no tool in spindle + hand on e-stop');
+    if (!mag.length) {
+        C('!! Magazine is EMPTY — add pockets in Settings → Tool table (or Import from controller).');
+        END();
+        return S;
+    }
+
     C('=== CONFIGURATION ===');
-    A('#100', target, 'Target tool');
-    A('#101', '#1300', 'Current tool in spindle, 0 = empty');
-    A('#102', zClear, 'Z change height - MACHINE coords');
-    A('#103', capacity, 'Magazine capacity - keep equal to param #1301');
+    A('#100', tgt, 'Target tool');
+    A('#101', cur, 'Current tool in spindle, 0 = empty');
+    A('#102', String(zClear), 'Z change height - MACHINE coords');
     C('=== VALIDATE ===');
-    IF('#100', '<', '1', 910);
-    IF('#100', '>', '#103', 910);
-    IF('#100', '==', '#101', 900);
+    IF('#100', '==', '#101', 900);            // requested tool already loaded
     if (confirm) { A('#1510', '#100', 'Show target tool'); CF('Change to this tool? Press Enter', 999); }
 
     C('=== SPINDLE OFF + RETRACT ===');
@@ -83,36 +106,37 @@ function autoStack(params) {
     if (useCover) MC(162, 'Dust cover OPEN');
     MM('Z', '#102');                          // retract to change height
 
-    C('=== PUT AWAY CURRENT TOOL - skipped if spindle is empty ===');
+    C('=== PUT AWAY CURRENT TOOL — skipped if spindle empty or tool not in magazine ===');
     IF('#101', '<', '1', 20);
-    A('#105', '[1330+#101-1]', 'Old pocket X table address');
-    A('#106', '[1350+#101-1]', 'Old pocket Y table address');
-    A('#107', '[1370+#101-1]', 'Old pocket Z table address');
-    A('#110', '#[#105]', 'Old pocket X'); A('#111', '#[#106]', 'Old pocket Y'); A('#112', '#[#107]', 'Old pocket Z');
-    MM('X', '#110'); MM('Y', '#111');         // over the old pocket
-    MM('Z', '#112');                          // down: seat tool in pocket
-    MC(154, 'Drawbar RELEASE'); MC(301, 'Wait: drawbar-released sensor');
-    A('#1300', '0', 'Spindle now empty');
-    MM('Z', '#102');                          // retract clear of the pocket
+    mag.forEach((p, i) => IF('#101', '==', String(num(p.tool, 0)), 100 + i));
+    GO(20);                                   // current tool not in the magazine — skip the return
+    mag.forEach((p, i) => {
+        LB(100 + i); C(`Return T${num(p.tool, 0)} to pocket ${i + 1}`);
+        A('#110', String(num(p.x, 0)), 'Pocket X'); A('#111', String(num(p.y, 0)), 'Pocket Y'); A('#112', String(num(p.z, 0)), 'Pocket Z');
+        MM('X', '#110'); MM('Y', '#111');     // over the pocket
+        MM('Z', '#112');                      // down: seat tool in pocket
+        MC(154, 'Drawbar RELEASE'); MC(301, 'Wait: drawbar-released sensor');
+        MM('Z', '#102');                      // retract clear of the pocket
+        A(cur, '0', 'Spindle now empty'); GO(20);
+    });
 
-    LB(20); C('PICK UP NEW TOOL');
-    A('#105', '[1330+#100-1]', 'New pocket X table address');
-    A('#106', '[1350+#100-1]', 'New pocket Y table address');
-    A('#107', '[1370+#100-1]', 'New pocket Z table address');
-    A('#110', '#[#105]', 'New pocket X'); A('#111', '#[#106]', 'New pocket Y'); A('#112', '#[#107]', 'New pocket Z');
-    MM('X', '#110'); MM('Y', '#111');         // over the new pocket
-    MC(154, 'Collet OPEN before descending'); MC(301, 'Wait: drawbar-released sensor');
-    MM('Z', '#112');                          // down over the tool shank
-    MC(155, 'Drawbar LOCK'); MC(302, 'Wait: tool-locked sensor');
-    MM('Z', '#102');                          // retract with the new tool
-    if (useCover) MC(163, 'Dust cover CLOSE');
-    A('#1300', '#100', 'Current tool = target');
-    MSG('Tool change complete');
-    GO(999);
+    LB(20); C('=== PICK UP TARGET TOOL ===');
+    mag.forEach((p, i) => IF('#100', '==', String(num(p.tool, 0)), 200 + i));
+    A('#1505', '1', 'ERROR: target tool has no pocket in the magazine'); GO(999);   // Expert dialog flag
+    mag.forEach((p, i) => {
+        LB(200 + i); C(`Fetch T${num(p.tool, 0)} from pocket ${i + 1}`);
+        A('#110', String(num(p.x, 0)), 'Pocket X'); A('#111', String(num(p.y, 0)), 'Pocket Y'); A('#112', String(num(p.z, 0)), 'Pocket Z');
+        MM('X', '#110'); MM('Y', '#111');     // over the pocket
+        MC(154, 'Collet OPEN before descending'); MC(301, 'Wait: drawbar-released sensor');
+        MM('Z', '#112');                      // down over the tool shank
+        MC(155, 'Drawbar LOCK'); MC(302, 'Wait: tool-locked sensor');
+        MM('Z', '#102');                      // retract with the new tool
+        if (useCover) MC(163, 'Dust cover CLOSE');
+        A(cur, '#100', 'Current tool = target'); MSG('Tool change complete'); GO(999);
+    });
 
     C('=== HANDLERS ===');
     LB(900); MSG('Tool already in spindle - nothing to do'); GO(999);
-    LB(910); A('#1505', '1', 'ERROR: invalid target tool - check M6 T / capacity');
     LB(999); END();
     return S;
 }

@@ -24,7 +24,7 @@ import { rotaryCenterView } from './rotaryCenterView.js';
 import { rotaryClockView } from './rotaryClockView.js';
 import { edgeView } from './edgeView.js';
 import { alignmentView } from './alignmentView.js';
-import { atcLengthView, atcWarmupView, atcChangeView, atcTestView, atcCheckView } from './atcViews.js';
+import { atcLengthView, atcWarmupView, atcChangeView, atcTestView, atcCheckView, atcTableView } from './atcViews.js';
 import { drillView } from './drillView.js';
 import { pocketView } from './pocketView.js';
 import { slotView } from './slotView.js';

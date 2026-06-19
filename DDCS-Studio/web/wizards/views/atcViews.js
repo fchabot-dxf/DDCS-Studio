@@ -1,16 +1,19 @@
 /** views/atcViews.js — the ATC wizard views (length / warmup / change / commissioning test). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
+import { num } from '../ops/util.js';
 import { AtcLengthWizard } from '../atcLengthWizard.js';
 import { AtcWarmupWizard } from '../atcWarmupWizard.js';
 import { AtcChangeWizard } from '../atcChangeWizard.js';
 import { AtcTestWizard } from '../atcTestWizard.js';
 import { AtcToolCheckWizard } from '../atcToolCheckWizard.js';
+import { AtcTableWizard } from '../atcTableWizard.js';
 
 const lengthWizard = new AtcLengthWizard();
 const warmupWizard = new AtcWarmupWizard();
 const changeWizard = new AtcChangeWizard();
 const testWizard = new AtcTestWizard();
 const toolCheckWizard = new AtcToolCheckWizard();
+const tableWizard = new AtcTableWizard();
 
 const setStatus = (id, text) => { const e = el(id); if (e) e.textContent = text; };
 
@@ -109,6 +112,7 @@ export const atcChangeView = {
         'atc_change_m300', 'atc_change_cover', 'atc_change_confirm',
     ],
     update(mgr) {
+        const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
         const mode = el('atc_change_mode')?.value || 'manual';
         // Mode-specific parameter rows
         const manualRow = el('atc_change_manual_params');
@@ -124,11 +128,11 @@ export const atcChangeView = {
             z: el('atc_change_z')?.value || '0',
             // auto
             zClear: el('atc_change_zclear')?.value || '0',
-            capacity: el('atc_change_capacity')?.value || '8',
             fixedT: el('atc_change_fixedt')?.value || '0',
             waitSpindle: el('atc_change_m300')?.checked !== false,
             dustCover: el('atc_change_cover')?.checked === true,
             confirm: el('atc_change_confirm')?.checked === true,
+            magazine: (s.atc && s.atc.magazine) || [],   // pockets + park XYZ come from Settings → Tool table
         };
         const gcode = changeWizard.generate(params);
         el('wiz_atc_change_code').innerHTML = UIUtils.formatGCode(gcode);
@@ -151,6 +155,7 @@ export const atcTestView = {
         'atc_test_first', 'atc_test_count', 'atc_test_zclear', 'atc_test_descend',
     ],
     update(mgr) {
+        const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
         const mode = el('atc_test_mode')?.value || 'drawbar';
         const drawbarRow = el('atc_test_drawbar_params');
         const pocketRow = el('atc_test_pocket_params');
@@ -165,12 +170,40 @@ export const atcTestView = {
             count: el('atc_test_count')?.value || '8',
             zClear: el('atc_test_zclear')?.value || '0',
             descend: el('atc_test_descend')?.checked === true,
+            magazine: (s.atc && s.atc.magazine) || [],   // pocket dry-run visits the Settings → Tool table magazine
         };
         const gcode = testWizard.generate(params);
         el('wiz_atc_test_code').innerHTML = UIUtils.formatGCode(gcode);
         if (mgr) mgr.preview3D(gcode, 'atcTestViz');
         setStatus('atcTestVizStatus', mode === 'pockets'
-            ? 'Pocket dry-run · visits the taught pocket positions (controller tables) at clearance Z'
+            ? 'Pocket dry-run · visits each magazine pocket (Settings → Tool table) at clearance Z'
             : 'Drawbar cycle · no toolpath — ▶ steps the release / lock sequence');
+    },
+};
+
+export const atcTableView = {
+    type: 'atc_table',
+    panelId: 'wiz_atc_table',
+    codeElId: 'wiz_atc_table_code',
+    large: true,
+    twoPane: true,
+    inputIds: ['atc_table_lengths', 'atc_table_pockets'],   // include lengths / include pockets
+    update(mgr) {
+        const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+        const a = s.atc || {};
+        const params = {
+            tools: a.tools || [],
+            magazine: a.magazine || [],
+            includeLengths: el('atc_table_lengths') ? el('atc_table_lengths').checked : true,
+            includePockets: el('atc_table_pockets') ? el('atc_table_pockets').checked : true,
+        };
+        const gcode = tableWizard.generate(params);   // the apply-macro the operator RUNS on the controller
+        el('wiz_atc_table_code').innerHTML = UIUtils.formatGCode(gcode);
+        // Preview reuses the 3D engine: plot each pocket as a rapid visit so you can review the rack layout.
+        const mag = (Array.isArray(a.magazine) ? a.magazine : []).filter((p) => p && (p.x !== '' || p.y !== '' || p.z !== ''));
+        const pv = ['G90'].concat(mag.map((p) => `G0 X${num(p.x, 0)} Y${num(p.y, 0)} Z${num(p.z, 0)}`)).join('\n');
+        if (mgr) mgr.preview3D(pv, 'atcTableViz');
+        const lens = (a.tools || []).filter((t) => t && t.length !== '' && t.length != null).map((t) => `T${t.num} ${t.length}`).join(' · ');
+        setStatus('atcTableVizStatus', `${mag.length} pocket${mag.length === 1 ? '' : 's'} plotted${lens ? ' · lengths: ' + lens : ' · no tool lengths set'}`);
     },
 };

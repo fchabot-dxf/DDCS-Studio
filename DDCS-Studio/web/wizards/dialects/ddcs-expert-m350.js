@@ -10,8 +10,12 @@ const AX = { X: 0, Y: 1, Z: 2, A: 3 };
 export const dialect = {
     id: 'ddcs-expert-m350', name: 'DDCS Expert M350',
     programModel: 'inline', probeModel: 'g31', dwellUnits: 'ms',
-    vars: { dro: 880, probeStatus: 1920, probeTrig: 1925, wcsBase: 805, wcsStride: 5, activeWcs: 578, toolTable: 1430, ax: AX },
-    caps: { vars: true, flow: 'goto', probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, inputRead: true },   // the fullest profile (inputRead = generic live-input poll #[1520+N], slib O10300)
+    vars: { dro: 880, probeStatus: 1920, probeTrig: 1925, wcsBase: 805, wcsStride: 5, activeWcs: 578, toolTable: 1430,
+        // ATC tool-changer firmware tables. currentTool/capacity/pockets live in SYSDISK/camsetting (#1000-1499,
+        // slot = var-1000 — boundary-confirmed by the captured sentinels) so the gateway can READ them over SMB;
+        // targetTool #1504 is a runtime var (M6 Txx). Param meanings from default_vars.js (#1300/#1330/#1350/#1370).
+        atc: { currentTool: 1300, capacity: 1301, targetTool: 1504, pocketX: 1330, pocketY: 1350, pocketZ: 1370 }, ax: AX },
+    caps: { vars: true, flow: 'goto', probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, inputRead: true, atc: true },   // the fullest profile (inputRead = generic live-input poll #[1520+N], slib O10300; atc = full pick&place model)
 
     // G31 Z-10 F100 P3 L0 Q1   (snippets.nc:9 · words.nc:6 "G31 Z#7 F#3 P#5 L0 Q1")
     probeMove: (axis, dist, { feed = 100, port = 3, level = 0 } = {}) => [`G31 ${axis}${dist} F${feed} P${port} L${level} Q1`],

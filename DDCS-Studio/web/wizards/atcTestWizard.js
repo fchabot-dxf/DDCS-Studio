@@ -12,6 +12,10 @@
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
+import { resolveActivePost } from './dialects/index.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+
+const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
 function H(S) {
     return {
@@ -55,30 +59,35 @@ function drawbarStack(params) {
 }
 
 function pocketsStack(params) {
+    const d = getDialect();
+    const S = []; const { C, A, LB, SPOFF, COOLOFF, MM, CF, MSG, END } = H(S);
+    const atc = d && d.vars && d.vars.atc;
+    // Pockets come from the Settings → Tool table magazine (literal coords); first/count slice it.
+    const mag = (Array.isArray(params.magazine) ? params.magazine : []).filter((p) => p && p.tool !== '' && p.tool != null);
     const first = Math.max(1, num(params.first, 1));
-    const count = Math.max(1, num(params.count, 8));
+    const count = Math.max(1, num(params.count, mag.length || 1));
+    const sel = mag.slice(first - 1, first - 1 + count);
     const zClear = num(params.zClear, 0);
     const descend = params.descend === true;
-    const S = []; const { C, A, IF, LB, SPOFF, COOLOFF, MM, CF, MSG, END } = H(S);
+
     C('ATC | Pocket Dry-Run - commissioning');
-    C(`Visits pockets ${first}..${first + count - 1} from tables #1330/#1350/#1370`);
+    C('Visits each taught magazine pocket (Settings → Tool table) at clearance Z');
     C('NO tool in spindle, NO drawbar action - visual alignment check at each stop');
+    if (!atc) { C(`Not available on ${d ? d.name : 'this controller'} — select the DDCS Expert post.`); END(); return S; }
+    if (!sel.length) { C('!! Magazine is EMPTY — add pockets in Settings → Tool table (or Import from controller).'); END(); return S; }
+
     C('=== CONFIGURATION ===');
-    A('#100', first, 'First pocket'); A('#101', first + count - 1, 'Last pocket'); A('#102', zClear, 'Z clearance height - MACHINE coords');
+    A('#102', String(zClear), 'Z clearance height - MACHINE coords');
     SPOFF(); COOLOFF();
     MM('Z', '#102');                          // retract to clearance
-    LB(10); C('NEXT POCKET');
-    A('#105', '[1330+#100-1]', 'Pocket X table address'); A('#106', '[1350+#100-1]', 'Pocket Y table address');
-    A('#110', '#[#105]', 'Pocket X'); A('#111', '#[#106]', 'Pocket Y');
-    MM('X', '#110'); MM('Y', '#111');         // over the pocket
-    if (descend) {
-        A('#107', '[1370+#100-1]', 'Pocket Z table address'); A('#112', '#[#107]', 'Pocket Z');
-        MM('Z', '#112');                      // descend to pocket height
-    }
-    CF('Pocket #100 - verify alignment. Enter = next', 999);
-    if (descend) MM('Z', '#102');             // back to clearance
-    A('#100', '[#100+1]', 'Next pocket');
-    IF('#100', '<=', '#101', 10);
+    sel.forEach((p, i) => {
+        C(`Pocket ${first + i} — T${num(p.tool, 0)}`);
+        A('#110', String(num(p.x, 0)), 'Pocket X'); A('#111', String(num(p.y, 0)), 'Pocket Y');
+        MM('X', '#110'); MM('Y', '#111');     // over the pocket
+        if (descend) { A('#112', String(num(p.z, 0)), 'Pocket Z'); MM('Z', '#112'); }   // descend to pocket height
+        CF(`Pocket ${first + i} — verify alignment. Enter = next`, 999);
+        if (descend) MM('Z', '#102');         // back to clearance
+    });
     C('Complete');
     MSG('Pocket dry-run complete');
     LB(999); END();

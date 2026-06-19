@@ -1314,6 +1314,31 @@
               </div><!-- /.wiz-2pane -->
             </div>
 
+            <!-- ATC Tool Table Wizard (push lengths + pockets to the controller) -->
+            <div id="wiz_atc_table" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">MAGAZINE PREVIEW</span>
+                    <div class="viz-container">
+                        <div id="atcTableVizStatus" class="viz-status"></div>
+                        <div id="atcTableViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <span class="section-label">TOOL TABLE → CONTROLLER</span>
+                <div class="param-grid">
+                    <label>Tool lengths<input type="checkbox" id="atc_table_lengths" checked></label>
+                    <label>Pocket positions<input type="checkbox" id="atc_table_pockets" checked></label>
+                </div>
+                <div class="wiz-note">Reads Settings → Tool table (library + magazine). Generates a macro you <b>run on the controller</b> to write the table — variable writes only, no motion. Pocket writes are unverified; running it is the test.</div>
+                <div class="preview-block">
+                    <span class="label">APPLY MACRO <span class="compliant-tag">(RUN ON CONTROLLER)</span></span>
+                    <pre id="wiz_atc_table_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
             <!-- ATC Tool Change Wizard -->
             <div id="wiz_atc_change" class="wiz-body" data-cap="toolTable" style="display:none">
               <div class="wiz-2pane">
