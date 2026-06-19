@@ -1,6 +1,7 @@
 /** views/atcViews.js — the ATC wizard views (length / warmup / change / commissioning test). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { num } from '../ops/util.js';
+import { toolProfileSvg } from '../../viz/toolProfile.js';
 import { AtcLengthWizard } from '../atcLengthWizard.js';
 import { AtcWarmupWizard } from '../atcWarmupWizard.js';
 import { AtcChangeWizard } from '../atcChangeWizard.js';
@@ -203,6 +204,21 @@ export const atcTableView = {
         const mag = (Array.isArray(a.magazine) ? a.magazine : []).filter((p) => p && (p.x !== '' || p.y !== '' || p.z !== ''));
         const pv = ['G90'].concat(mag.map((p) => `G0 X${num(p.x, 0)} Y${num(p.y, 0)} Z${num(p.z, 0)}`)).join('\n');
         if (mgr) mgr.preview3D(pv, 'atcTableViz');
+        // Tool-profile rack strip: each magazine tool drawn at its real shape (type/Ø) + length — review the rack.
+        const byNum = {};
+        (a.tools || []).forEach((t) => { if (t && t.num != null && t.num !== '') byNum[Number(t.num)] = t; });
+        const rack = el('atcTableTools');
+        if (rack) {
+            const cells = (Array.isArray(a.magazine) ? a.magazine : []).map((p, i) => {
+                const tn = Number(p.tool);
+                const tool = byNum[tn] || { type: 'endmill', dia: 6, length: '' };
+                const len = (tool.length !== '' && tool.length != null) ? tool.length + 'mm' : '';
+                return '<div style="text-align:center;flex:0 0 auto;font-size:10px;color:var(--text-dim);">'
+                    + toolProfileSvg(tool, { w: 30, h: 46 })
+                    + `<div>P${num(p.pocket, i + 1)}${tn ? ' · T' + tn : ''}</div><div>${len}</div></div>`;
+            }).join('');
+            rack.innerHTML = cells || '<span style="font-size:11px;color:var(--text-dim);">No pockets — add them in Settings → Tool table.</span>';
+        }
         const lens = (a.tools || []).filter((t) => t && t.length !== '' && t.length != null).map((t) => `T${t.num} ${t.length}`).join(' · ');
         setStatus('atcTableVizStatus', `${mag.length} pocket${mag.length === 1 ? '' : 's'} plotted${lens ? ' · lengths: ' + lens : ' · no tool lengths set'}`);
     },

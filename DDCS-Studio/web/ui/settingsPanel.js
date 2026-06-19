@@ -13,6 +13,7 @@ import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile, registerProfil
 import { listPosts, getActivePostId, setActivePostId, isPostVerified, getDialect } from '../wizards/dialects/index.js';
 import { makeClient } from '../shared/js/client.js';
 import { renderIoTable, renderMagazineTable } from './ioTable.js';
+import { toolProfileSvg } from '../viz/toolProfile.js';
 import { THEMES } from './themes.js';
 import { generateToolChangeNc } from '../data/atcGenerator.js';
 import { renderCloudLogin } from './cloudAccount.js';
@@ -378,8 +379,10 @@ function buildSettingsOverlay() {
                         <div class="settings-row">
                             <button class="toolbar-btn settings-io" id="set_profile_export">⬇ Export profile</button>
                             <button class="toolbar-btn settings-io" id="set_profile_import">⬆ Import profile</button>
+                            <button class="toolbar-btn settings-io" id="set_profile_cloud_save">☁ Save to cloud</button>
+                            <button class="toolbar-btn settings-io" id="set_profile_cloud_load">☁ Load from cloud</button>
                         </div>
-                        <div class="settings-hint">One JSON with your machine/stock/limits + user variables. The desktop app saves it to a local file automatically.</div>
+                        <div class="settings-hint">One JSON with your machine/stock/limits + user variables. The desktop app saves it to a local file automatically; <b>Save/Load to cloud</b> keeps named profiles in your own Google Drive (Settings → Cloud) — pull at the machine, load on a remote PC for a faithful sim.</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">EDITOR</div>
@@ -1270,7 +1273,7 @@ function wireSettingsOverlay(ov) {
             TOOL_TYPES.map((ty) => '<option value="' + ty + '"' + (ty === cur ? ' selected' : '') + '>' + ty + '</option>').join('');
         const cell = (i, f, val, step) =>
             '<td><input type="number" step="' + (step || 'any') + '" data-tool="' + i + '" data-field="' + f + '" value="' + (val === '' || val == null ? '' : val) + '"></td>';
-        if (!tools.length) { body.innerHTML = '<tr><td colspan="10" class="tl-empty">No tools yet — “＋ Add tool” to start your library.</td></tr>'; return; }
+        if (!tools.length) { body.innerHTML = '<tr><td colspan="11" class="tl-empty">No tools yet — “＋ Add tool” to start your library.</td></tr>'; return; }
         let html = '';
         tools.forEach((raw, i) => {
             const t = normalizeTool(raw, i + 1);
@@ -1278,6 +1281,7 @@ function wireSettingsOverlay(ov) {
                 '<td class="tl-numcell"><input type="number" step="1" min="1" max="99" data-tool="' + i + '" data-field="num" value="' + (t.num === '' || t.num == null ? '' : t.num) + '"><span class="tl-var" data-var="' + i + '">' + lenVarLabel(t.num, base) + '</span></td>' +
                 '<td><input type="text" data-tool="' + i + '" data-field="name" value="' + String(t.name).replace(/"/g, '&quot;') + '" placeholder="e.g. 6mm flat 2F"></td>' +
                 '<td><select data-tool="' + i + '" data-field="type">' + opt(t.type) + '</select></td>' +
+                '<td class="tl-prof" data-prof="' + i + '">' + toolProfileSvg(t, { w: 26, h: 40 }) + '</td>' +
                 cell(i, 'dia', t.dia) + cell(i, 'flutes', t.flutes, '1') + cell(i, 'length', t.length, '0.001') +
                 cell(i, 'rpm', t.rpm, '1') + cell(i, 'feed', t.feed, '1') + cell(i, 'plunge', t.plunge, '1') +
                 '<td><button class="tl-del" data-del="' + i + '" title="Remove tool">✕</button></td>' +
@@ -1303,6 +1307,8 @@ function wireSettingsOverlay(ov) {
                 #toollib-modal .tl-numcell { white-space: nowrap; }
                 #toollib-modal .tl-numcell input { width: 46px; }
                 #toollib-modal .tl-var { display: inline-block; margin-left: 6px; font-size: 10px; color: var(--text-dim); }
+                #toollib-modal .tl-prof { text-align: center; width: 34px; }
+                #toollib-modal .tl-prof svg { display: block; margin: 0 auto; }
                 #toollib-modal .tl-empty { padding: 16px; text-align: center; color: var(--text-dim); }
                 #toollib-modal input, #toollib-modal select { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 3px; padding: 4px 6px; font: inherit; }
                 #toollib-modal td:nth-child(4) input, #toollib-modal td:nth-child(5) input, #toollib-modal td:nth-child(6) input,
@@ -1317,7 +1323,7 @@ function wireSettingsOverlay(ov) {
                 <div class="tl-body">
                     <table>
                         <thead><tr>
-                            <th>Tool #</th><th>Name</th><th>Type</th><th>Ø mm</th><th>Flutes</th><th>Length</th><th>RPM</th><th>Feed</th><th>Plunge</th><th></th>
+                            <th>Tool #</th><th>Name</th><th>Type</th><th>Profile</th><th>Ø mm</th><th>Flutes</th><th>Length</th><th>RPM</th><th>Feed</th><th>Plunge</th><th></th>
                         </tr></thead>
                         <tbody id="toollib-rows"></tbody>
                     </table>
@@ -1347,6 +1353,10 @@ function wireSettingsOverlay(ov) {
             if (f === 'num') {   // update the #var label inline (don't re-render — keeps focus)
                 const span = m.querySelector('.tl-var[data-var="' + i + '"]');
                 if (span) span.textContent = lenVarLabel(rec.num, parseInt(a.baseVar, 10) || 1430);
+            }
+            if (f === 'type' || f === 'dia' || f === 'length') {   // redraw the silhouette in place (keeps focus)
+                const cellEl = m.querySelector('.tl-prof[data-prof="' + i + '"]');
+                if (cellEl) cellEl.innerHTML = toolProfileSvg(rec, { w: 26, h: 40 });
             }
             renderLibSummary();
         });
@@ -1553,6 +1563,61 @@ function wireSettingsOverlay(ov) {
     // Profile import/export (JSON = settings + user variables)
     q('set_profile_export').addEventListener('click', () => { if (window.ddcsExportProfile) window.ddcsExportProfile(); });
     q('set_profile_import').addEventListener('click', () => { if (window.ddcsImportProfile) window.ddcsImportProfile(); });
+
+    // Cloud profile save/load — named profiles in the user's own Google Drive (Settings → Cloud). Remote-sim leg.
+    const cloudSave = q('set_profile_cloud_save');
+    if (cloudSave) cloudSave.addEventListener('click', async () => {
+        if (!window.ddcsSaveProfileToCloud) return;
+        let def = ''; try { def = getActiveProfile().name || ''; } catch (e) { /* */ }
+        const name = window.prompt('Save this profile to your cloud as:', def || 'My machine');
+        if (!name) return;
+        const orig = cloudSave.textContent; cloudSave.disabled = true; cloudSave.textContent = 'Saving…';
+        try { const n = await window.ddcsSaveProfileToCloud(name); alert('Saved “' + n + '” to your cloud.'); }
+        catch (e) { alert('Cloud save failed: ' + (e && e.message ? e.message : e)); }
+        finally { cloudSave.disabled = false; cloudSave.textContent = orig; }
+    });
+    const cloudLoad = q('set_profile_cloud_load');
+    if (cloudLoad) cloudLoad.addEventListener('click', () => openCloudProfilePicker());
+
+    async function openCloudProfilePicker() {
+        let items = [];
+        try { items = (await window.ddcsListCloudProfiles()) || []; }
+        catch (e) { alert('Could not reach your cloud: ' + (e && e.message ? e.message : e)); return; }
+        if (!items.length) { alert('No cloud profiles yet — sign in (Settings → Cloud) and use “Save to cloud”.'); return; }
+        let m = document.getElementById('cloudprof-modal');
+        if (!m) {
+            m = document.createElement('div'); m.id = 'cloudprof-modal';
+            m.innerHTML = '<style>'
+                + '#cloudprof-modal { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.5); }'
+                + '#cloudprof-modal .cp-panel { background:var(--panel); color:var(--text-main); border:1px solid var(--border); border-radius:var(--radius,6px); width:min(460px,94vw); max-height:80vh; display:flex; flex-direction:column; box-shadow:0 12px 40px rgba(0,0,0,.5); }'
+                + '#cloudprof-modal .cp-head { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); font-weight:700; }'
+                + '#cloudprof-modal .cp-head button { background:transparent; border:none; color:var(--text-dim); font-size:18px; cursor:pointer; }'
+                + '#cloudprof-modal .cp-body { overflow:auto; padding:6px 12px 12px; }'
+                + '#cloudprof-modal .cp-row { display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid var(--border); }'
+                + '#cloudprof-modal .cp-name { flex:1; font-weight:600; } #cloudprof-modal .cp-date { font-size:11px; color:var(--text-dim); }'
+                + '</style><div class="cp-panel"><div class="cp-head"><span>☁ Load profile from cloud</span><button data-cp="x">✕</button></div><div class="cp-body" id="cloudprof-body"></div></div>';
+            document.body.appendChild(m);
+            m.addEventListener('mousedown', (e) => { if (e.target === m || (e.target.dataset && e.target.dataset.cp === 'x')) m.remove(); });
+        }
+        const body = m.querySelector('#cloudprof-body');
+        body.innerHTML = items.map((it) => {
+            const d = it.savedAt ? new Date(it.savedAt).toLocaleString() : '';
+            return '<div class="cp-row"><span class="cp-name">' + it.name + '</span><span class="cp-date">' + d + '</span>'
+                + '<button class="toolbar-btn settings-io" data-load="' + it.id + '">Load</button>'
+                + '<button class="op-btn" data-del="' + it.id + '" title="Delete">✕</button></div>';
+        }).join('');
+        body.querySelectorAll('[data-load]').forEach((b) => b.addEventListener('click', async () => {
+            if (!confirm('Load this profile? It replaces your current settings + variables.')) return;
+            b.disabled = true; b.textContent = 'Loading…';
+            try { await window.ddcsLoadCloudProfile(b.dataset.load); m.remove(); fill(); applyHardwareTabs(); alert('Profile loaded.'); }
+            catch (e) { alert('Load failed: ' + (e && e.message ? e.message : e)); b.disabled = false; b.textContent = 'Load'; }
+        }));
+        body.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+            if (!confirm('Delete this cloud profile?')) return;
+            try { await window.ddcsDeleteCloudProfile(b.dataset.del); openCloudProfilePicker(); }
+            catch (e) { alert('Delete failed: ' + (e && e.message ? e.message : e)); }
+        }));
+    }
 
     // ATC: generate a T.nc tool-change macro from the magazine table (client-side; review before running).
     const genTnc = q('atc_gen_tnc');

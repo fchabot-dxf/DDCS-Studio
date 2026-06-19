@@ -7,8 +7,11 @@
  * window.pywebview.api, so persistence carries over with no rework.
  */
 import { getSettings, applySettings } from '../ui/settingsPanel.js';
+import { getAccessToken, ensureRoot, list as driveList, read as driveRead, write as driveWrite, mkdir as driveMkdir, del as driveDel } from '../ui/cloud/googleDrive.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
 const PROFILE_VERSION = 1;
+const CLOUD_EXT = '.ddcsprofile.json';   // distinguishes profiles from .mjson projects in the user's Drive
 
 function getDB() { return window.ddcsStudio && window.ddcsStudio.variableDB; }
 function isPywebview() { return !!(window.pywebview && window.pywebview.api); }
@@ -77,6 +80,63 @@ export async function importProfile() {
     input.click();
 }
 
+// --- Cloud (BYO Google Drive): named profiles in a "Profiles" subfolder of the app's Drive root. ---
+//     Pull at the machine → save here → load on a remote PC for a faithful sim. See [[controller-import-remote-sim]].
+function cloudConnected() { try { return !!getAccessToken(); } catch (e) { return false; } }
+
+// Never publish secrets to the cloud: the profile bundle is settings + user-vars (no tokens today), but scrub
+// defensively before upload — a cloud profile is effectively published.
+function sanitizeForCloud(obj) {
+    const SENSITIVE = /token|secret|refresh|password|api[_-]?key|client[_-]?secret/i;
+    const clone = JSON.parse(JSON.stringify(obj));
+    const scrub = (o) => { if (o && typeof o === 'object') for (const k of Object.keys(o)) { if (SENSITIVE.test(k)) delete o[k]; else scrub(o[k]); } };
+    scrub(clone);
+    return clone;
+}
+
+async function profilesFolderId() {
+    const root = await ensureRoot();
+    const kids = await driveList(root);
+    const f = kids.find((k) => k.type === 'folder' && k.name === 'Profiles');
+    return f ? f.id : await driveMkdir('Profiles', root);
+}
+
+const safeName = (s) => (String(s || 'profile').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'profile');
+
+/** Save the current profile (settings + user vars) to Drive under `name`, stamped with machine + savedAt. */
+export async function saveProfileToCloud(name) {
+    if (!cloudConnected()) throw new Error('Not signed in — connect your cloud account in Settings → Cloud.');
+    const ap = (() => { try { return getActiveProfile(); } catch (e) { return null; } })();
+    const profile = sanitizeForCloud({
+        ...buildProfile(),
+        machine: { id: ap ? ap.id : '', name: ap ? ap.name : '' },   // bind to a machine so a remote load picks the right frame
+        savedAt: new Date().toISOString(),
+    });
+    await driveWrite(safeName(name) + CLOUD_EXT, profile, await profilesFolderId());   // upserts by name
+    return safeName(name);
+}
+
+/** List saved cloud profiles → [{ id, name, savedAt }]. */
+export async function listCloudProfiles() {
+    if (!cloudConnected()) return [];
+    return (await driveList(await profilesFolderId()))
+        .filter((e) => e.type !== 'folder' && e.name.endsWith(CLOUD_EXT))
+        .map((e) => ({ id: e.id, name: e.name.slice(0, -CLOUD_EXT.length), savedAt: e.savedAt }));
+}
+
+/** Load + apply a cloud profile by Drive file id. */
+export async function loadCloudProfile(fileId) {
+    if (!cloudConnected()) throw new Error('Not signed in to cloud.');
+    const obj = await driveRead(fileId);
+    applyProfile(obj);
+    return obj;
+}
+
+export async function deleteCloudProfile(fileId) {
+    if (!cloudConnected()) throw new Error('Not signed in to cloud.');
+    await driveDel(fileId);
+}
+
 // pywebview-only auto persistence (no-ops in a browser)
 function autoSaveProfile() {
     if (!isPywebview() || !window.pywebview.api.saveProfile) return;
@@ -92,6 +152,10 @@ async function autoLoadProfile() {
 
 window.ddcsExportProfile = exportProfile;
 window.ddcsImportProfile = importProfile;
+window.ddcsSaveProfileToCloud = saveProfileToCloud;
+window.ddcsListCloudProfiles = listCloudProfiles;
+window.ddcsLoadCloudProfile = loadCloudProfile;
+window.ddcsDeleteCloudProfile = deleteCloudProfile;
 
 // .exe: load the profile when the pywebview API is ready; save on any settings change
 window.addEventListener('pywebviewready', autoLoadProfile);
