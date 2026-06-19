@@ -1053,24 +1053,29 @@ function wireSettingsOverlay(ov) {
         if (!rec) { rec = normalizeTool({}, num); rec.num = num; a.tools.push(rec); }
         rec.length = len;
     }
-    async function applyHardwareProfile(p) {   // tabs + pin map → inputs[]/outputs[]
+    async function applyHardwareProfile(p) {   // tabs + pin map → inputs[]/outputs[]; also switches the active dialect
         if (!p || !p.id) throw new Error('no profile');
         registerProfile(p); setActiveProfile(p.id);
         applyControllerProfile(p);
+        const vdb = window.ddcsStudio && window.ddcsStudio.variableDB;     // switch the #var list to the controller
+        const ap = getActiveProfile(); if (ap && ap.varFamily && vdb) vdb.setControllerVars(ap.varFamily);
         fillProfileOptions();
+        fillPostOptions();   // refresh "Follow machine profile (…)" so the post/dialect matches the pulled controller
         const it = ov.querySelector('#io_input_table'); if (it) renderIoTable(it, 'input', getInputs(), syncIO);
         const ot = ov.querySelector('#io_output_table'); if (ot) renderIoTable(ot, 'output', getOutputs(), syncIO);
     }
     // Read everything off the controller → review candidates. Each carries `changed` = differs from the factory
     // default (setting vs default_setting; non-zero for the ATC/uservar tables that have no default file).
     async function scanController() {
-        const d = activeDialect();
+        // Read using the CONNECTED controller's dialect (from its profile), not the current active one — otherwise
+        // the #var numbers (pockets/tooltable/WCS) won't match the machine we're actually pulling from.
+        let hwProfile = null;
+        try { hwProfile = await makeClient().profile(); } catch (e) { /* offline */ }
+        const d = (hwProfile && hwProfile.id) ? getDialect(hwProfile.id) : activeDialect();
         const atc = d.vars && d.vars.atc;
         const tb = (d.vars && d.vars.toolTable) || 1430;
         const wcsBase = (d.vars && d.vars.wcsBase) || 805, wcsStride = (d.vars && d.vars.wcsStride) || 5, activeWcsVar = (d.vars && d.vars.activeWcs) || 578;
         const MAX = 24;                                   // pockets/tools scanned (most magazines ≤ 24)
-        let hwProfile = null;
-        try { hwProfile = await makeClient().profile(); } catch (e) { /* offline */ }
         const need = new Set([activeWcsVar]);
         for (let k = 0; k < 6 * wcsStride; k++) need.add(wcsBase + k);
         for (let i = 0; i < MAX; i++) { need.add(tb + i); if (atc) { need.add(atc.pocketX + i); need.add(atc.pocketY + i); need.add(atc.pocketZ + i); } }
@@ -1123,7 +1128,7 @@ function wireSettingsOverlay(ov) {
         } else if (hwProfile && hwProfile.id) {
             notes.push({ group: 'Machine envelope', label: 'Not set', value: 'soft limits off — keeping current', kind: 'note' });
         }
-        return { connected, candidates: cands.concat(notes) };
+        return { connected, candidates: cands.concat(notes), controller: (hwProfile && hwProfile.id) ? { id: hwProfile.id, name: hwProfile.name } : null };
     }
     async function applyCandidates(checked) {
         const a = _ddcsSettings.atc || (_ddcsSettings.atc = {});
@@ -1145,6 +1150,7 @@ function wireSettingsOverlay(ov) {
         renderLibSummary();
     }
     let _importCands = [];
+    let _importController = null;   // the connected controller {id,name} for the "will switch profile" banner
     function buildImportModal() {
         if (document.getElementById('import-modal')) return;
         const m = document.createElement('div');
@@ -1158,6 +1164,7 @@ function wireSettingsOverlay(ov) {
                 #import-modal .im-head button { background: transparent; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; }
                 #import-modal .im-body { overflow: auto; padding: 4px 14px 10px; min-height: 80px; }
                 #import-modal .im-empty { padding: 24px 8px; text-align: center; color: var(--text-dim); }
+                #import-modal .im-banner { margin: 8px 2px 2px; padding: 8px 10px; border-radius: 4px; font-size: 12px; background: rgba(224,160,32,.16); border: 1px solid rgba(224,160,32,.5); color: var(--text-main); }
                 #import-modal .im-group { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); padding: 12px 4px 4px; font-weight: 700; }
                 #import-modal .im-row { display: grid; grid-template-columns: 22px 1fr auto auto; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid var(--border); cursor: pointer; }
                 #import-modal .im-lbl { font-weight: 600; }
@@ -1198,6 +1205,9 @@ function wireSettingsOverlay(ov) {
         const groups = {};
         shown.forEach((c) => { (groups[c.group] = groups[c.group] || []).push(c); });
         let html = '';
+        if (_importController && _importController.id && _importController.id !== getActiveProfile().id) {   // pulling will change the dialect
+            html += `<div class="im-banner">Connected controller: <b>${_importController.name}</b> — applying <b>Hardware &amp; I/O</b> switches your machine profile + post from <b>${getActiveProfile().name}</b> to it.</div>`;
+        }
         Object.keys(groups).forEach((g) => {
             html += `<div class="im-group">${g}</div>`;
             groups[g].forEach((c) => {
@@ -1232,6 +1242,7 @@ function wireSettingsOverlay(ov) {
         let scan;
         try { scan = await scanController(); } catch (e) { scan = { connected: false, candidates: [] }; }
         if (!scan.connected) { body.innerHTML = '<div class="im-empty">Not bridged to a controller — run the desktop app / gateway, or Import a saved profile instead.</div>'; return; }
+        _importController = scan.controller || null;
         _importCands = scan.candidates.map((c) => ({ ...c, checked: !!c.changed }));   // pre-tick what the operator changed
         renderImportReview();
         m.querySelector('#import-only').onchange = renderImportReview;
