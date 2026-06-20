@@ -1,0 +1,270 @@
+/**
+ * ui/macrosApp.js — the MACROS main-tab view (promoted out of Settings: these are authoring surfaces,
+ * not configuration). Three builders: custom M-codes (O100nn), K-buttons (key-N.nc), and the CAM Pack
+ * Builder. M-codes/K-buttons persist in the profile via getSettings()/saveSettings(); the CAM pack is a
+ * distributable kept in localStorage. Mounted lazily into #macros-app by showApp('macros').
+ */
+import { getSettings, saveSettings } from './settingsPanel.js';
+import { makeClient } from '../shared/js/client.js';
+import * as camPack from '../data/camPack.js';
+import { bmpDataUrl } from '../data/bmp.js';
+
+let _wired = false;
+
+export function initMacrosApp() {
+    const root = document.getElementById('macros-app');
+    if (!root || _wired) return; _wired = true;
+
+    root.innerHTML = `
+        <div style="padding:16px; overflow:auto; height:100%; box-sizing:border-box;">
+            <div style="display:flex; gap:8px; margin-bottom:14px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                <button class="toolbar-btn settings-io macros-sub active" data-msub="m">Macros — M-codes &amp; K-buttons</button>
+                <button class="toolbar-btn settings-io macros-sub" data-msub="c">CAM Pack Builder</button>
+            </div>
+            <div id="macros_sub_m">
+                <div class="settings-section">
+                    <div class="settings-section-title">CUSTOM M-CODES</div>
+                    <div class="settings-hint">Macros called <b>from a program</b> — O100nn ⇄ <b>M<i>nn</i></b> (e.g. M15 tool-break check). Build one with a wizard in Studio, then <b>＋ Add from editor</b>. <b>Generate</b> wraps it as the installable O100nn block. Saved with your Profile.</div>
+                    <div id="mcodes_list"></div>
+                    <div class="settings-row" style="margin-top:8px;">
+                        <button class="toolbar-btn settings-io" id="mcodes_add_editor">＋ Add from editor</button>
+                        <button class="toolbar-btn settings-io" id="mcodes_add_blank">＋ Add blank</button>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-section-title">K-BUTTONS (K1–K7)</div>
+                    <div class="settings-hint">The 7 panel buttons — each runs <b>key-<i>N</i>.nc</b> when pressed. Type/paste a body or <b>⇪ From editor</b>, then <b>Generate</b> for the install file. Empty = unused.</div>
+                    <div id="kbuttons_list"></div>
+                </div>
+            </div>
+            <div id="macros_sub_c" style="display:none">
+                <div class="settings-section">
+                    <div class="settings-section-title">CAM PACK BUILDER</div>
+                    <div class="settings-hint">Author a DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's CAM page — to share with the community. Each slot = a <b>form</b> + a <b>macro</b> that reads the form live (the <code>#2600+</code> mirrors). Studio auto-allocates the shared <code>#1100–1499</code> form params and flags collisions. <i>Phase 1: form designer + macro + plain export. Icons + eng-merge install come next.</i></div>
+                    <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button></div>
+                    <div id="cam_validate" class="settings-hint" style="margin-top:6px;"></div>
+                    <div id="cam_slots" style="margin-top:6px;"></div>
+                </div>
+            </div>
+        </div>`;
+
+    const q = (id) => root.querySelector('#' + id);
+    root.querySelectorAll('[data-msub]').forEach((b) => b.addEventListener('click', () => {
+        root.querySelectorAll('[data-msub]').forEach((x) => x.classList.toggle('active', x === b));
+        q('macros_sub_m').style.display = b.dataset.msub === 'm' ? '' : 'none';
+        q('macros_sub_c').style.display = b.dataset.msub === 'c' ? '' : 'none';
+    }));
+
+    // --- Macros: author controller macros (M-code O100nn / K-button key-N); saved in the profile. ---
+    const macrosArr = () => (getSettings().macros || (getSettings().macros = []));
+    const editorText = () => { const e = document.getElementById('editor'); return e ? e.value : ''; };
+    function macroFileText(m) {
+        const name = (m.name || 'macro').trim();
+        const body = String(m.body || '').replace(/\r/g, '').replace(/\s+$/, '');
+        const t = m.trigger || {};
+        const hasEnd = /\b(M99|M30|M0?2)\b/.test(body);
+        if (t.kind === 'mcode') { const n = Math.max(0, parseInt(t.code, 10) || 0); return `O${10000 + n} ( ${name} — M${n} )\n${body}${hasEnd ? '' : '\nM99'}\n`; }
+        if (t.kind === 'kbutton') { const k = Math.min(7, Math.max(1, parseInt(t.key, 10) || 1)); return `( save as key-${k}.nc on SYSDISK — K${k} button )\n${body}${hasEnd ? '' : '\nM30'}\n`; }
+        return `( save as ${(name || 'macro').replace(/[^\w-]+/g, '_')}.nc )\n${body}${hasEnd ? '' : '\nM30'}\n`;
+    }
+    const insertToEditor = (txt) => { const em = (window.ddcsStudio && window.ddcsStudio.editorManager) || window.editorManager; if (em && typeof em.insert === 'function') em.insert(txt); else alert('Editor not available.'); };
+    const findKbtn = (k) => macrosArr().find((m) => (m.trigger || {}).kind === 'kbutton' && (m.trigger || {}).key === k);
+    const ensureKbtn = (k) => { let m = findKbtn(k); if (!m) { m = { name: '', trigger: { kind: 'kbutton', key: k }, body: '' }; macrosArr().push(m); } return m; };
+    async function pushMcode(m) {
+        const n = parseInt((m.trigger || {}).code, 10) || 0; const oNum = 'O' + (10000 + n);
+        if (!confirm(`Merge M${n} (${oNum}) into the controller's macro library (slib-m.nc)?\n\nThe existing slib-m.nc is backed up first (slib-m.nc.bak). You must REBOOT the controller afterward for it to load.`)) return;
+        try {
+            const cur = await makeClient().readSysfile('slib-m.nc');
+            if (!cur || cur.ok === false) { alert('Could not read slib-m.nc — needs the gateway/desktop app + a connected controller.' + (cur && cur.error ? '\n(' + cur.error + ')' : '')); return; }
+            if (new RegExp('(^|\\s)' + oNum + '(\\s|$)').test(cur.content || '')) { alert(`${oNum} is already in slib-m.nc — remove it on the controller first so it isn't duplicated, then push again.`); return; }
+            const res = await makeClient().writeSysfile('slib-m.nc', '\n' + macroFileText(m), 'append');
+            if (res && res.ok) alert(`Merged ${oNum} (M${n}) into slib-m.nc${res.backup ? ' — backup ' + res.backup : ''}.\n\nReboot the controller to load it; then M${n} is callable from a program.`);
+            else alert('Push failed: ' + ((res && res.error) || 'unknown'));
+        } catch (err) { alert('Push failed: ' + (err && err.message ? err.message : err)); }
+    }
+    async function pushKbutton(k, m) {
+        if (!confirm(`Write key-${k}.nc to the controller (the K${k} button)?\n\nThe existing key-${k}.nc is backed up first (key-${k}.nc.bak).`)) return;
+        try {
+            const res = await makeClient().writeSysfile('key-' + k + '.nc', macroFileText(m), 'write');
+            if (res && res.ok) alert(`Wrote key-${k}.nc${res.backup ? ' — backup ' + res.backup : ''}.\nPress K${k} to run it (reboot if the controller doesn't pick it up).`);
+            else alert('Push failed: ' + ((res && res.error) || 'needs the gateway/desktop app + a connected controller'));
+        } catch (err) { alert('Push failed: ' + (err && err.message ? err.message : err)); }
+    }
+    function renderMcodes() {
+        const host = q('mcodes_list'); if (!host) return;
+        const rows = macrosArr().map((m, i) => ({ m, i })).filter((x) => (x.m.trigger || {}).kind === 'mcode');
+        if (!rows.length) { host.innerHTML = '<div class="settings-hint">No custom M-codes yet — “＋ Add from editor” or “＋ Add blank”.</div>'; return; }
+        host.innerHTML = rows.map(({ m, i }) => `<div class="macro-card" data-i="${i}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <label style="font-size:11px; color:var(--text-dim);">M<input type="number" class="mc-f" data-f="num" value="${(m.trigger || {}).code != null ? m.trigger.code : 15}" min="0" max="99" style="width:52px; margin-left:2px;"></label>
+                <input class="mc-f" data-f="name" value="${String(m.name || '').replace(/"/g, '&quot;')}" placeholder="Name" style="flex:1; min-width:120px;">
+                <span class="mc-o" style="font-size:10px; color:var(--text-dim);">→ O${10000 + (parseInt((m.trigger || {}).code, 10) || 0)}</span>
+            </div>
+            <textarea class="mc-f" data-f="body" spellcheck="false" placeholder="macro body (G-code)" style="width:100%; height:110px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${String(m.body || '').replace(/</g, '&lt;')}</textarea>
+            <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="gen">⬇ Generate</button><button class="toolbar-btn settings-io" data-act="push">⬆ Push to controller</button><span style="flex:1"></span><button class="op-btn" data-act="del" title="Delete">✕</button></div>
+        </div>`).join('');
+    }
+    function renderKbuttons() {
+        const host = q('kbuttons_list'); if (!host) return;
+        let html = '';
+        for (let k = 1; k <= 7; k++) {
+            const m = findKbtn(k);
+            html += `<div class="kbtn-row" data-k="${k}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <b style="width:30px;">K${k}</b>
+                    <input class="kb-f" data-f="name" value="${m ? String(m.name || '').replace(/"/g, '&quot;') : ''}" placeholder="(unused)" style="flex:1;">
+                    <span style="font-size:10px; color:var(--text-dim);">key-${k}.nc</span>
+                </div>
+                <textarea class="kb-f" data-f="body" spellcheck="false" placeholder="button macro body" style="width:100%; height:80px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${m ? String(m.body || '').replace(/</g, '&lt;') : ''}</textarea>
+                <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="ked">⇪ From editor</button><button class="toolbar-btn settings-io" data-act="kgen">⬇ Generate</button><button class="toolbar-btn settings-io" data-act="kpush">⬆ Push</button><span style="flex:1"></span><button class="op-btn" data-act="kclr" title="Clear">✕</button></div>
+            </div>`;
+        }
+        host.innerHTML = html;
+    }
+    const mch = q('mcodes_list');
+    if (mch) {
+        mch.addEventListener('input', (e) => {
+            const c = e.target.closest('.macro-card'); if (!c || !e.target.dataset.f) return;
+            const m = macrosArr()[+c.dataset.i]; if (!m) return; const f = e.target.dataset.f;
+            if (f === 'name') m.name = e.target.value;
+            else if (f === 'body') m.body = e.target.value;
+            else if (f === 'num') { m.trigger = m.trigger || { kind: 'mcode' }; m.trigger.kind = 'mcode'; m.trigger.code = parseInt(e.target.value, 10) || 0; const s = c.querySelector('.mc-o'); if (s) s.textContent = '→ O' + (10000 + m.trigger.code); }
+            saveSettings();
+        });
+        mch.addEventListener('click', (e) => {
+            const c = e.target.closest('.macro-card'); if (!c) return; const i = +c.dataset.i; const a = e.target.dataset.act;
+            if (a === 'del') { macrosArr().splice(i, 1); saveSettings(); renderMcodes(); }
+            else if (a === 'gen') insertToEditor(macroFileText(macrosArr()[i]));
+            else if (a === 'push') pushMcode(macrosArr()[i]);
+        });
+    }
+    const kbh = q('kbuttons_list');
+    if (kbh) {
+        kbh.addEventListener('input', (e) => { const r = e.target.closest('.kbtn-row'); if (!r || !e.target.dataset.f) return; const m = ensureKbtn(+r.dataset.k); if (e.target.dataset.f === 'name') m.name = e.target.value; else m.body = e.target.value; saveSettings(); });
+        kbh.addEventListener('click', (e) => {
+            const r = e.target.closest('.kbtn-row'); if (!r) return; const k = +r.dataset.k; const a = e.target.dataset.act;
+            if (a === 'ked') { ensureKbtn(k).body = editorText().trim(); saveSettings(); renderKbuttons(); }
+            else if (a === 'kgen') { const m = findKbtn(k); if (!m || !String(m.body).trim()) { alert('K' + k + ' is empty.'); return; } insertToEditor(macroFileText(m)); }
+            else if (a === 'kpush') { const m = findKbtn(k); if (!m || !String(m.body).trim()) { alert('K' + k + ' is empty.'); return; } pushKbutton(k, m); }
+            else if (a === 'kclr') { const i = macrosArr().findIndex((x) => (x.trigger || {}).kind === 'kbutton' && (x.trigger || {}).key === k); if (i >= 0) macrosArr().splice(i, 1); saveSettings(); renderKbuttons(); }
+        });
+    }
+    const _mcAddEd = q('mcodes_add_editor');
+    if (_mcAddEd) _mcAddEd.addEventListener('click', () => { macrosArr().push({ name: 'New M-code', trigger: { kind: 'mcode', code: 15 }, body: editorText().trim() }); saveSettings(); renderMcodes(); });
+    const _mcAddBlank = q('mcodes_add_blank');
+    if (_mcAddBlank) _mcAddBlank.addEventListener('click', () => { macrosArr().push({ name: 'New M-code', trigger: { kind: 'mcode', code: 15 }, body: '' }); saveSettings(); renderMcodes(); });
+    renderMcodes(); renderKbuttons();
+
+    // --- CAM Pack Builder (Phase 1): author CAM-menu slots (form + macro), auto-allocate #11xx, export. ---
+    const CAMPACK_KEY = 'ddcs_campack';
+    const loadCamPack = () => { try { const p = JSON.parse(localStorage.getItem(CAMPACK_KEY)); if (p && Array.isArray(p.slots)) return p; } catch (e) { /* */ } return { meta: { name: 'My CAM pack', baseSlot: 22 }, slots: [] }; };
+    let _camPack = loadCamPack();
+    const saveCamPack = () => { try { localStorage.setItem(CAMPACK_KEY, JSON.stringify(_camPack)); } catch (e) { /* */ } };
+    const camEsc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    function renderCamBuilder() {
+        const host = q('cam_slots'); if (!host) return;
+        const nameEl = q('cam_pack_name'); if (nameEl && document.activeElement !== nameEl) nameEl.value = (_camPack.meta && _camPack.meta.name) || '';
+        const v = camPack.validatePack(_camPack);
+        const vEl = q('cam_validate');
+        if (vEl) vEl.innerHTML = [...v.errors.map((e) => '⛔ ' + e), ...v.warnings.map((w) => '⚠ ' + w)].join('<br>') || ('✓ No collisions · ' + camPack.usedParams(_camPack).size + '/400 form params used.');
+        if (!_camPack.slots.length) { host.innerHTML = '<div class="settings-hint">No slots yet — “＋ Add slot”. Slots default to cam' + ((_camPack.meta && _camPack.meta.baseSlot) || 22) + '+ (cam0–21 are factory / community).</div>'; return; }
+        host.innerHTML = _camPack.slots.map((slot, si) => {
+            const fields = slot.fields || [];
+            const rows = fields.map((f, fi) => `<tr data-si="${si}" data-fi="${fi}">
+                <td><input class="cf" data-f="label" value="${camEsc(f.label)}" placeholder="Label" style="width:100%;"></td>
+                <td><input class="cf" data-f="units" value="${camEsc(f.units)}" placeholder="mm" style="width:46px;"></td>
+                <td><input class="cf" data-f="def" type="number" value="${f.def != null ? f.def : 0}" style="width:62px;"></td>
+                <td><input class="cf" data-f="min" type="number" value="${f.min != null ? f.min : 0}" style="width:62px;"></td>
+                <td><input class="cf" data-f="max" type="number" value="${f.max != null ? f.max : 0}" style="width:62px;"></td>
+                <td><input class="cf" data-f="var" value="${camEsc(f.var || '#' + (fi + 1))}" style="width:42px;"></td>
+                <td style="color:var(--text-dim); font-size:10px; white-space:nowrap;">#${f.idx} → #${camPack.mirrorVar(f.idx)}</td>
+                <td><button class="op-btn" data-act="delf" title="Remove field">✕</button></td>
+            </tr>`).join('');
+            return `<div class="cam-slot" data-si="${si}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:10px;">
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <label style="font-size:11px; color:var(--text-dim);">cam<input type="number" class="cs" data-f="slot" value="${slot.slot}" min="0" max="9999" style="width:60px; margin-left:2px;"></label>
+                    <input class="cs" data-f="name" value="${camEsc(slot.name)}" placeholder="Slot name" style="flex:1; min-width:120px;">
+                    <span style="font-size:10px; color:var(--text-dim);">form group -m${camPack.slotGroup(slot.slot)}</span>
+                    <button class="op-btn" data-act="dels" title="Remove slot">✕</button>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+                    ${slot.icon ? `<img src="${slot.icon.data}" alt="" style="width:72px; height:36px; object-fit:contain; border:1px solid var(--border); background:#000;"><span style="font-size:10px; color:var(--text-dim);">${camEsc(slot.icon.name)}${slot.icon.w ? ' · ' + slot.icon.w + '×' + slot.icon.h + (slot.icon.w === 360 && slot.icon.h === 180 ? '' : ' ⚠ not 360×180') : ''}</span><button class="op-btn" data-act="delicon" title="Remove icon">✕</button>` : '<span style="font-size:11px; color:var(--text-dim);">No icon (camN.bmp)</span>'}
+                    <button class="toolbar-btn settings-io" data-act="icon">🖼 ${slot.icon ? 'Replace' : 'Import'} BMP</button>
+                    <span style="font-size:10px; color:var(--text-dim);">or from palette →</span>
+                    ${['corner', 'edge', 'middle', 'align'].map((s) => `<button class="toolbar-btn settings-io" data-act="svg" data-svg="${s}Viz" style="padding:2px 7px;">${s}</button>`).join('')}
+                </div>
+                <table style="width:100%; font-size:11.5px; margin-top:6px; border-collapse:collapse;"><thead><tr style="color:var(--text-dim); font-size:10px; text-align:left;"><th>Label</th><th>Units</th><th>Default</th><th>Min</th><th>Max</th><th>Var</th><th>#param→#2600</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+                <div class="settings-row" style="margin-top:4px;"><button class="toolbar-btn settings-io" data-act="addf">＋ Add field</button></div>
+                <textarea class="cs" data-f="body" spellcheck="false" placeholder="macro body — reference each field's Var (#1, #2 …)" style="width:100%; height:110px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${camEsc(slot.body)}</textarea>
+                <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button></div>
+            </div>`;
+        }).join('');
+    }
+    function importCamIcon(slot) {
+        const input = document.createElement('input'); input.type = 'file'; input.accept = '.bmp,image/bmp,image/*';
+        input.addEventListener('change', () => {
+            const f = input.files && input.files[0]; if (!f) return;
+            const r = new FileReader();
+            r.onload = () => {
+                const data = r.result; const img = new Image();
+                img.onload = () => { slot.icon = { name: f.name, data, w: img.naturalWidth, h: img.naturalHeight }; saveCamPack(); renderCamBuilder(); };
+                img.onerror = () => { slot.icon = { name: f.name, data }; saveCamPack(); renderCamBuilder(); };
+                img.src = data;
+            };
+            r.readAsDataURL(f);
+        });
+        input.click();
+    }
+    async function svgToCamIcon(slot, svgName) {
+        try {
+            const resp = await fetch('assets/svg/' + svgName + '.svg');
+            if (!resp.ok) throw new Error('SVG not found (' + resp.status + ')');
+            let svg = (await resp.text()).replace(/width="100%"/, 'width="465"').replace(/height="100%"/, 'height="465"');
+            const blobUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+            const img = new Image();
+            img.onload = () => {
+                const W = 360, H = 180; const c = document.createElement('canvas'); c.width = W; c.height = H;
+                const ctx = c.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+                const iw = img.naturalWidth || 465, ih = img.naturalHeight || 465; const sc = Math.min(W / iw, H / ih);
+                ctx.drawImage(img, (W - iw * sc) / 2, (H - ih * sc) / 2, iw * sc, ih * sc);
+                URL.revokeObjectURL(blobUrl);
+                try { slot.icon = { name: svgName + '.bmp', data: bmpDataUrl(W, H, ctx.getImageData(0, 0, W, H).data), w: W, h: H, source: 'svg:' + svgName }; saveCamPack(); renderCamBuilder(); }
+                catch (e) { alert('Could not read the rendered icon: ' + (e && e.message ? e.message : e)); }
+            };
+            img.onerror = () => { URL.revokeObjectURL(blobUrl); alert('Could not render ' + svgName + '.svg'); };
+            img.src = blobUrl;
+        } catch (e) { alert('Palette icon failed: ' + (e && e.message ? e.message : e)); }
+    }
+    const camHost = q('cam_slots');
+    if (camHost) {
+        camHost.addEventListener('input', (e) => {
+            const t = e.target; const card = t.closest('.cam-slot'); if (!card) return; const slot = _camPack.slots[+card.dataset.si]; if (!slot) return;
+            if (t.classList.contains('cf')) {
+                const f = (slot.fields || [])[+t.closest('tr').dataset.fi]; if (!f) return; const fld = t.dataset.f;
+                f[fld] = (fld === 'label' || fld === 'units' || fld === 'var') ? t.value : (t.value === '' ? '' : parseFloat(t.value));
+                saveCamPack();
+            } else if (t.classList.contains('cs')) {
+                const fld = t.dataset.f;
+                if (fld === 'slot') { slot.slot = parseInt(t.value, 10) || 0; saveCamPack(); renderCamBuilder(); }
+                else { slot[fld] = t.value; saveCamPack(); if (fld !== 'body') renderCamBuilder(); }
+            }
+        });
+        camHost.addEventListener('click', (e) => {
+            const card = e.target.closest('.cam-slot'); if (!card) return; const si = +card.dataset.si; const slot = _camPack.slots[si]; if (!slot) return; const a = e.target.dataset.act;
+            if (a === 'addf') { slot.fields = slot.fields || []; const idx = camPack.nextParam(camPack.usedParams(_camPack)); if (idx == null) { alert('The #1100–1499 form-param pool is full.'); return; } slot.fields.push({ idx, label: '', units: '', def: 0, min: 0, max: 0, type: 1, var: '#' + (slot.fields.length + 1) }); saveCamPack(); renderCamBuilder(); }
+            else if (a === 'delf') { slot.fields.splice(+e.target.closest('tr').dataset.fi, 1); saveCamPack(); renderCamBuilder(); }
+            else if (a === 'dels') { _camPack.slots.splice(si, 1); saveCamPack(); renderCamBuilder(); }
+            else if (a === 'icon') { importCamIcon(slot); }
+            else if (a === 'svg') { svgToCamIcon(slot, e.target.dataset.svg); }
+            else if (a === 'delicon') { slot.icon = null; saveCamPack(); renderCamBuilder(); }
+            else if (a === 'exp') { insertToEditor('( ===== eng form lines — MERGE into the controller eng language file ===== )\n' + camPack.slotEng(slot) + '\n\n' + camPack.slotMacro(slot)); }
+        });
+    }
+    const _camName = q('cam_pack_name');
+    if (_camName) _camName.addEventListener('input', () => { _camPack.meta = _camPack.meta || {}; _camPack.meta.name = _camName.value; saveCamPack(); });
+    const _camAddSlot = q('cam_add_slot');
+    if (_camAddSlot) _camAddSlot.addEventListener('click', () => { const base = (_camPack.meta && _camPack.meta.baseSlot) || 22; const used = new Set(_camPack.slots.map((s) => +s.slot)); let n = base; while (used.has(n)) n++; _camPack.slots.push({ slot: n, name: 'New slot', fields: [], body: '' }); saveCamPack(); renderCamBuilder(); });
+    renderCamBuilder();
+}
+
+window.ddcsInitMacrosApp = initMacrosApp;
