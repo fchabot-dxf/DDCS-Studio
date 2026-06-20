@@ -43,7 +43,9 @@ export const FN = (field) => field.toUpperCase();   // Blockly input/field name 
 const REPORTER_CHECK = { boolean: 'Boolean', region: 'Region' };   // reporter return type → Blockly output check
 const outputCheck = (def) => REPORTER_CHECK[def.returns] || 'Number';
 export const isWrap = (def) => ['container', 'path', 'loop', 'cond', 'depth', 'fill'].includes(def.kind);
-export const fieldsOf = (def, params) => (def.fieldsFor ? def.fieldsFor(params || def.defaults) : def.fields) || [];
+// Blocks build/read ALL fields when a def lists them (so a dynamic block like array round-trips every pattern,
+// not just the default); a `dynamic` extension toggles which are visible. The wizard uses fieldsFor() directly.
+export const fieldsOf = (def, params) => (def.allFields || (def.fieldsFor ? def.fieldsFor(params || def.defaults) : def.fields)) || [];
 
 const DESCRIPTIONS = {
     fmode: "Feed Mode: G94 (Units/Min) or G95 (Units/Rev)",
@@ -144,6 +146,7 @@ function jsonDef(def) {
         type: def.type, message0: message, args0: args, inputsInline: true,
         style: catSlug(def.category) + '_style', tooltip: `${def.label} (${def.category})`,
     };
+    if (def.dynamic) block.extensions = ['ddcs_dynfields'];   // toggle pattern-specific inputs per the `dynamic` field
     if (def.kind === 'reporter') block.output = outputCheck(def);   // value block
     else { block.previousStatement = null; block.nextStatement = null; }   // statement block
     return block;
@@ -238,8 +241,38 @@ export const OP_BLOCKS = [
 /** Define every op as a Blockly block. (Emit happens via stackBridge → emitMapped, not a Blockly generator.) */
 let _Blockly = null;
 export const getBlockly = () => _Blockly;   // stackBridge needs the serialization API to render blocks (v11)
+const DEF_BY_TYPE = {}; PALETTE.forEach((d) => { DEF_BY_TYPE[d.type] = d; });
+
+// Dynamic block extension: show only the fields the current `dynamic` value calls for (e.g. array → only the
+// chosen pattern's fields). Degrades safely — if anything throws, all fields stay visible (still editable).
+function registerDynExtension(Blockly) {
+    try {
+        Blockly.Extensions.register('ddcs_dynfields', function () {
+            const def = DEF_BY_TYPE[this.type];
+            if (!def || !def.dynamic || !def.fieldsFor) return;
+            const all = def.allFields || [];
+            const apply = () => {
+                try {
+                    const params = { ...def.defaults, [def.dynamic]: this.getFieldValue(FN(def.dynamic)) };
+                    const show = new Set(def.fieldsFor(params).map(FN));
+                    all.forEach((f) => { const inp = this.getInput(FN(f)); if (inp) inp.setVisible(show.has(FN(f))); });
+                    if (this.rendered) { if (this.queueRender) this.queueRender(); else if (this.render) this.render(); }
+                } catch (e) { /* degrade to all-fields-visible */ }
+            };
+            this.setOnChange(function () {
+                if (this.isInFlyout || !this.workspace) return;
+                const v = this.getFieldValue(FN(def.dynamic));
+                if (v === this._ddcsDyn) return;
+                this._ddcsDyn = v; apply();
+            });
+            apply();
+        });
+    } catch (e) { /* already registered */ }
+}
+
 export function installBlockly(Blockly) {
     _Blockly = Blockly;
+    registerDynExtension(Blockly);
     Blockly.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), ...OP_BLOCKS]);
 }
 
