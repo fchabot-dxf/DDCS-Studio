@@ -23,9 +23,16 @@ async function extractTiles(file) {
     const svg = mount.querySelector('svg'); const tiles = [];
     try {
         const sr = svg.getBoundingClientRect();
-        svg.querySelectorAll('g[id]').forEach((g) => {
+        // Judgement: surface the "primitive" objects, not the collection containers that bundle them, and
+        // not the over-atomic fragments. A leaf id-group (no nested g[id]) is that primitive; we also drop
+        // the full-frame group (≈the whole diagram) and micro bits. Fallback to all groups if none nest.
+        const groups = [...svg.querySelectorAll('g[id]')];
+        const leaves = groups.filter((g) => !g.querySelector('g[id]'));
+        const pool = leaves.length ? leaves : groups;
+        pool.forEach((g) => {
             let gr; try { gr = g.getBoundingClientRect(); } catch (e) { return; }
-            if (gr.width < 4 || gr.height < 4) return;
+            if (Math.max(gr.width, gr.height) < 10) return;          // too atomic to be a useful tile
+            if (gr.width > 440 && gr.height > 440) return;            // ≈ the full 465 frame (whole diagram)
             const pad = 4, x = gr.left - sr.left - pad, y = gr.top - sr.top - pad;
             const clone = svg.cloneNode(true);
             let tgt = null; try { tgt = clone.querySelector('#' + (window.CSS && CSS.escape ? CSS.escape(g.id) : g.id)); } catch (e) { /* */ }
