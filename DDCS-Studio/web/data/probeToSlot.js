@@ -240,3 +240,167 @@ export function edgeSlot(used = new Set(), varOffset = 0) {
     ].join('\n');
     return { name: 'Probe edge', fields, body };
 }
+
+const INSIDE_FIELDS = [
+    { key: 'wcs', label: 'WCS (0act 1-6 G54-G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
+    { key: 'maxProbe', label: 'Max probe', units: 'mm', def: 25, min: 1, max: 9999, type: 1 },
+    { key: 'retract', label: 'Retract', units: 'mm', def: 2, min: 0.1, max: 999, type: 1 },
+    { key: 'safeZ', label: 'Safe Z lift', units: 'mm', def: 10, min: 0.1, max: 999, type: 1 },
+    { key: 'fast', label: 'Fast feed', units: 'mm/min', def: 200, min: 1, max: 9999, type: 0 },
+    { key: 'slow', label: 'Slow feed', units: 'mm/min', def: 50, min: 1, max: 9999, type: 0 },
+    { key: 'port', label: 'Probe port P', units: '', def: 3, min: 0, max: 99, type: 0 },
+    { key: 'level', label: 'Trigger level L (0 1)', units: '', def: 0, min: 0, max: 1, type: 0 },
+];
+
+/**
+ * Build the "Probe inside centre" CAM slot — works for a rectangular POCKET or a round BORE. Probe ±X to find
+ * the X centre, re-centre X (G53) so the Y touch is a true diameter (essential for a circle, harmless for a
+ * rectangle — parallel walls), probe ±Y, write centre to WCS X/Y. Reports X/Y span (= diameters for a bore,
+ * width/height for a pocket) and roundness. No radius comp needed — the midpoint cancels the stylus radius.
+ * Position the probe INSIDE the feature at probe depth, press Enter. Ported from circularStack (bore). Inside
+ * only: the tool crosses the open cavity. (Outside/boss needs operator repositions — a separate slot.)
+ */
+export function insideCentreSlot(used = new Set(), varOffset = 0) {
+    const { fields, v } = allocFields(INSIDE_FIELDS, used, varOffset);
+    // Two-pass probe (fast→slow) in one direction, saving the trigger; retract after each pass.
+    const twoPass = (ax, tgt, ret, resultVar) => {
+        const st = ax === 'X' ? '#1920' : '#1921', res = ax === 'X' ? '#1925' : '#1926';
+        return [
+            `G31 ${ax}${tgt} F${v.fast} P${v.port} L${v.level} Q1`, `IF ${st}!=2 GOTO 1`, `G0 ${ax}${ret}`,
+            `G31 ${ax}${tgt} F${v.slow} P${v.port} L${v.level} Q1`, `IF ${st}!=2 GOTO 1`, `${resultVar}=${res}`, `G0 ${ax}${ret}`,
+        ];
+    };
+    const body = [
+        '( Probe INSIDE centre — rect pocket OR round bore. Position the probe INSIDE the feature at depth, press Enter. )',
+        ...fields.map(readLine),
+        '',
+        '( WCS base address — 0 = read the active WCS from #578 )',
+        `#71=${v.wcs}`,
+        'IF #71 EQ 0 THEN #71=#578',
+        '#70=[805+[#71-1]*5]',
+        '',
+        `#90=${v.maxProbe}   ;+max probe`,
+        `#91=[0-${v.maxProbe}]   ;-max probe`,
+        `#92=${v.retract}   ;+retract`,
+        `#93=[0-${v.retract}]   ;-retract`,
+        '',
+        `#1505=1   ;Position the probe INSIDE the feature at depth, press Enter`,
+        'G91   ( incremental )',
+        '',
+        '( X axis: probe both walls across the cavity → X centre )',
+        ...twoPass('X', '#90', '#93', '#51'),
+        ...twoPass('X', '#91', '#92', '#52'),
+        '#53=[[#51+#52]/2]   ;X centre (machine coord)',
+        '( re-centre X so the Y touch is a true diameter, not a chord )',
+        'G53 X#53',
+        'G91   ( incremental )',
+        '',
+        '( Y axis: probe both walls at the X centre → Y centre )',
+        ...twoPass('Y', '#90', '#93', '#54'),
+        ...twoPass('Y', '#91', '#92', '#55'),
+        '#56=[[#54+#55]/2]   ;Y centre (machine coord)',
+        '',
+        '( spans: diameters for a bore, width/height for a pocket )',
+        '#58=[#51-#52]   ;X span',
+        '#59=[#54-#55]   ;Y span',
+        '#61=[#58-#59]   ;roundness (X span - Y span)',
+        '',
+        `G0 Z${v.safeZ}   ;lift clear`,
+        '#[#70]=#53   ;write WCS X centre',
+        '#73=[#70+1]',
+        '#[#73]=#56   ;write WCS Y centre',
+        '',
+        'G90   ( absolute )',
+        '#1505=-5000   ;centre found',
+        'GOTO 2',
+        '( error handler )',
+        'N1',
+        'G91',
+        `G0 Z${v.safeZ}   ;lift clear`,
+        'G90',
+        '#1505=1   ;ERROR: probe did not trigger',
+        'N2',
+        'M30',
+    ].join('\n');
+    return { name: 'Probe inside centre', fields, body };
+}
+
+const ALIGN_FIELDS = [
+    { key: 'checkAxis', label: 'Fence along (0X 1Y)', units: '', def: 0, min: 0, max: 1, type: 0 },
+    { key: 'dir', label: 'Probe dir (0pos 1neg)', units: '', def: 0, min: 0, max: 1, type: 0 },
+    { key: 'maxProbe', label: 'Max probe', units: 'mm', def: 20, min: 1, max: 9999, type: 1 },
+    { key: 'retract', label: 'Retract', units: 'mm', def: 2, min: 0.1, max: 999, type: 1 },
+    { key: 'safeZ', label: 'Safe Z lift', units: 'mm', def: 10, min: 0.1, max: 999, type: 1 },
+    { key: 'fast', label: 'Fast feed', units: 'mm/min', def: 200, min: 1, max: 9999, type: 0 },
+    { key: 'slow', label: 'Slow feed', units: 'mm/min', def: 20, min: 1, max: 9999, type: 0 },
+    { key: 'port', label: 'Probe port P', units: '', def: 3, min: 0, max: 99, type: 0 },
+    { key: 'level', label: 'Trigger level L (0 1)', units: '', def: 0, min: 0, max: 1, type: 0 },
+];
+
+/**
+ * Build the "Probe alignment" CAM slot — measure a fence's angular misalignment. Probe the fence at point A,
+ * the operator jogs along it to point B, probe again; angle = atan2(Δcontact, span) in degrees. Reports to the
+ * #1510-1512 popups; it does NOT write a WCS. #checkAxis (0=fence along X→probe Y, 1=fence along Y→probe X)
+ * branches the probe axis + the DRO read (#880 X / #881 Y); #dir is a sign var. Ported from alignmentStack.
+ */
+export function alignmentSlot(used = new Set(), varOffset = 0) {
+    const { fields, v } = allocFields(ALIGN_FIELDS, used, varOffset);
+    // One point: confirm prompt → read the check-axis DRO → two-pass probe of the perpendicular fence face.
+    const point = (probeAx, machVar, into, prompt, descend) => {
+        const st = probeAx === 'X' ? '#1920' : '#1921', res = probeAx === 'X' ? '#1925' : '#1926';
+        const L = [`#1505=1   ;${prompt}`, `${into === '#50' ? '#70' : '#71'}=${machVar}   ;check-axis machine coord`];
+        if (into === '#51') L.push('#72=[#71-#70]   ;span = B - A along the fence');
+        L.push('G91   ( incremental )');
+        if (descend) L.push(`G0 Z[0-${v.safeZ}]   ;descend to probe height`);
+        L.push(
+            `G31 ${probeAx}#93 F${v.fast} P${v.port} L${v.level} Q1`, `IF ${st}!=2 GOTO 1`, `G0 ${probeAx}#95`,
+            `G31 ${probeAx}#93 F${v.slow} P${v.port} L${v.level} Q1`, `IF ${st}!=2 GOTO 1`, `${into}=${res}`, `G0 ${probeAx}#95`,
+        );
+        if (!descend) L.push(`G0 Z${v.safeZ}   ;lift to clear for the jog`);
+        L.push('G90   ( absolute )');
+        return L;
+    };
+    const path = (probeAx, machVar) => [
+        ...point(probeAx, machVar, '#50', 'Position the probe at point A on the fence, press Enter', false),
+        ...point(probeAx, machVar, '#51', 'Jog along the fence to point B (same Y/Z), press Enter', true),
+    ];
+    const body = [
+        '( Probe ALIGNMENT — measure a fence angle. Probe A, jog to B along the fence, probe again. )',
+        ...fields.map(readLine),
+        '',
+        '( probe direction sign: 0=pos → +1, 1=neg → -1 )',
+        '#90=1',
+        `IF ${v.dir} EQ 1 THEN #90=0-1`,
+        `#93=[#90*${v.maxProbe}]   ;signed probe target`,
+        `#95=[[0-#90]*${v.retract}]   ;signed retract`,
+        '',
+        `IF ${v.checkAxis} EQ 1 GOTO 20`,
+        '( fence along X → probe Y, read X DRO #880 )',
+        ...path('Y', '#880'),
+        'GOTO 30',
+        'N20',
+        '( fence along Y → probe X, read Y DRO #881 )',
+        ...path('X', '#881'),
+        'N30',
+        '',
+        '( compute misalignment )',
+        '#52=[#51-#50]   ;delta: fence wander A→B',
+        '#53=ABS[#72]   ;absolute span',
+        'IF #53 EQ 0 GOTO 1',
+        '#54=ATAN[#52]/[#53]   ;angle (deg) = atan2(delta, span)',
+        `G0 Z${v.safeZ}`,
+        'G90   ( absolute )',
+        '#1510=#52   ;drift',
+        '#1511=#53   ;span',
+        '#1512=#54   ;angle (deg)',
+        '#1505=-5000   ;Drift=#1510 Span=#1511 Angle=#1512 deg',
+        'GOTO 2',
+        '( error handler )',
+        'N1',
+        'G90',
+        '#1505=1   ;ERROR: probe did not trigger or zero span',
+        'N2',
+        'M30',
+    ].join('\n');
+    return { name: 'Probe alignment', fields, body };
+}

@@ -101,6 +101,52 @@ test('edge probe slot: axis/direction select the wall and the WCS axis written',
   expect(r.yp).toEqual(['Y+', 'Y+']);
 });
 
+test('inside-centre slot: probes ±X then ±Y with a G53 re-centre between (bore = true diameter)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { insideCentreSlot } = await import('/data/probeToSlot.js');
+    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
+    const s = insideCentreSlot();
+    const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
+    const seed = new Map(); s.fields.forEach((f) => seed.set(mirrorVar(f.idx), Number(f.def)));
+    const t = new GcodeExecutionEngine({ createVarStore: () => new Map(seed) }).trace(macro);
+    const probes = t.segments.filter((g) => g.probe).map((g) => {
+      const dx = g.x2 - g.x1, dy = g.y2 - g.y1;
+      return Math.abs(dx) > 1e-6 ? 'X' + (dx < 0 ? '-' : '+') : Math.abs(dy) > 1e-6 ? 'Y' + (dy < 0 ? '-' : '+') : '0';
+    });
+    const lefts = (macro.match(/\[/g) || []).length, rights = (macro.match(/\]/g) || []).length;
+    return { balanced: lefts === rights, capped: t.stats.capped, probes, recentre: /G53 X#53/.test(macro), writesWcs: /#\[#70\]=#53/.test(macro) };
+  });
+  expect(r.balanced).toBe(true); expect(r.capped).toBe(false);
+  expect(r.probes).toEqual(['X+', 'X+', 'X-', 'X-', 'Y+', 'Y+', 'Y-', 'Y-']);
+  expect(r.recentre, 'G53 re-centre in X before Y').toBe(true);
+  expect(r.writesWcs, 'writes the centre to WCS X').toBe(true);
+});
+
+test('alignment slot: fence axis selects the probe axis; measures (no WCS write)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { alignmentSlot } = await import('/data/probeToSlot.js');
+    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
+    const s = alignmentSlot();
+    const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
+    const axes = (checkAxis) => {
+      const seed = new Map(); s.fields.forEach((f) => seed.set(mirrorVar(f.idx), Number(f.def)));
+      const f = s.fields.find((x) => x.key === 'checkAxis'); seed.set(mirrorVar(f.idx), checkAxis);
+      const t = new GcodeExecutionEngine({ createVarStore: () => new Map(seed) }).trace(macro);
+      return { capped: t.stats.capped, ax: [...new Set(t.segments.filter((g) => g.probe).map((g) => Math.abs(g.x2 - g.x1) > 1e-6 ? 'X' : 'Y'))] };
+    };
+    return { fenceX: axes(0), fenceY: axes(1), atan2: /ATAN\[#52\]\/\[#53\]/.test(macro), noWcs: !/#\[#70\]=/.test(macro) };
+  });
+  expect(r.fenceX.capped).toBe(false);
+  expect(r.fenceX.ax, 'fence along X → probe Y').toEqual(['Y']);
+  expect(r.fenceY.ax, 'fence along Y → probe X').toEqual(['X']);
+  expect(r.atan2, 'uses two-operand atan2').toBe(true);
+  expect(r.noWcs, 'alignment only measures — no WCS write').toBe(true);
+});
+
 test('preview panel mounts on a seeded slot macro without throwing', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const ok = await page.evaluate(async () => {
