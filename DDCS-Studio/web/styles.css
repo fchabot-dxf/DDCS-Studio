@@ -106,6 +106,61 @@ svg [id*="Zfirst_travel"] {
     --warn: #eab308;
 }
 
+/* ============================================================================
+   DESIGN-TOKEN CONTRACT  ·  the "skin" API
+   A SKIN is one [data-theme="…"] bundle that sets these tokens; components read
+   ONLY tokens, never raw colour. The defaults below ALIAS the base palette above,
+   so any token a skin leaves unset is still sane and a skin can stay tiny.
+
+   To add a skin: copy the SKIN TEMPLATE comment near the theme bundles, give it a
+   new data-theme value, add it to THEMES in ui/themes.js, and fill the tokens you
+   want to change. Keyboard material tokens (--kbd-*) live in the GLASS KEYBOARD
+   section; everything else lives here.
+   ============================================================================ */
+:root {
+    /* Surfaces & elevation — what panels / popovers / wells are made of */
+    --surface-1: var(--panel);                                       /* cards, popovers, dock body   */
+    --surface-2: var(--bg);                                          /* inset wells, inputs, tracks  */
+    --surface-3: color-mix(in srgb, var(--panel) 86%, var(--text));  /* raised / hover               */
+    --outline:   var(--border);                                      /* hairline edges / separators  */
+    --scrim:     rgba(0, 0, 0, .55);                                 /* modal / overlay backdrop     */
+    --elev-1: 0 2px 8px rgba(0, 0, 0, .18);
+    --elev-2: 0 8px 22px rgba(0, 0, 0, .34);
+
+    /* Typography */
+    --font-ui:   var(--sans, "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif);
+    --font-code: var(--mono, ui-monospace, "Consolas", "Liberation Mono", monospace);
+
+    /* Shape */
+    --border-w: 1px;
+
+    /* Editor / code "screen" (reserved contract slots — editor rules migrate here incrementally) */
+    --screen:       #000000;
+    --code-text:    #e6e6e6;
+    --code-comment: var(--success, #22c55e);
+    --code-num:     #d9b3ff;
+    --code-word:    #67d3ff;
+    --code-ln:      #ff6b6b;
+}
+
+/*  SKIN TEMPLATE — copy this block, rename the data-theme, add it to THEMES in
+    ui/themes.js, and change the values you want. Only `--bg/--panel/--accent/--text*
+    /--border` are essential; everything else inherits a sane default from the contract.
+
+    [data-theme="my-skin"] {
+        --bg: #101418;  --panel: #161b22;  --accent: #58a6ff;
+        --text: #c9d1d9;  --text-main: #fff;  --text-dim: #8b949e;  --border: #30363d;
+        --radius: 8px;
+
+        --surface-1: #161b22;  --surface-2: #0d1117;  --outline: #30363d;
+        --scrim: rgba(1,4,9,.7);
+
+        --kbd-glass: linear-gradient(180deg, rgba(22,27,34,.4), rgba(13,17,23,.78));
+        --kbd-blur: 5px;  --kbd-handle: linear-gradient(180deg,#21262d,#0d1117);
+        --kbd-grip: rgba(88,166,255,.6);  --kbd-edge: #30363d;
+    }
+*/
+
 /* ============================================
    RESET & BASE
    ============================================ */
@@ -241,10 +296,10 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
     z-index: 1000;
     min-width: 220px;
     padding: 12px 14px;
-    background: var(--panel, #1e1e1e);
-    border: 1px solid var(--border, #444);
+    background: var(--surface-1, var(--panel, #1e1e1e));
+    border: var(--border-w, 1px) solid var(--outline, var(--border, #444));
     border-radius: var(--radius, 6px);
-    box-shadow: 0 8px 22px rgba(0,0,0,.45);
+    box-shadow: var(--elev-2, 0 8px 22px rgba(0,0,0,.45));
 }
 
 .gateway-dl-pop {
@@ -252,11 +307,11 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
     z-index: 1000;
     max-width: 270px;
     padding: 12px 14px;
-    background: var(--panel-bg, #1e1e1e);
+    background: var(--surface-1, var(--panel-bg, #1e1e1e));
     color: var(--text-main, #ddd);
-    border: 1px solid var(--border-color, #444);
+    border: var(--border-w, 1px) solid var(--outline, var(--border-color, #444));
     border-radius: var(--radius, 6px);
-    box-shadow: 0 8px 22px rgba(0,0,0,.45);
+    box-shadow: var(--elev-2, 0 8px 22px rgba(0,0,0,.45));
     font-size: 12px;
     line-height: 1.45;
 }
@@ -1332,8 +1387,8 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     width: 280px;
     padding: 12px;
     overflow-y: auto;
-    background: var(--panel);
-    border-right: 1px solid var(--border);
+    background: var(--surface-1, var(--panel));
+    border-right: var(--border-w, 1px) solid var(--outline, var(--border));
     z-index: 2;
 }
 
@@ -3341,17 +3396,18 @@ svg [id$="_wcs"] { display: none; }
     --kbd-edge: var(--bv-dark);
 }
 
-/* ORGANIC — "the newcomer": calm warm vellum. Soft, LOW see-through (low distraction), woven
-   paper texture, high blur, opaque keys. */
+/* ORGANIC — living sage glass. The MOST see-through theme (a thin botanical veil over the code),
+   with its own character: a green diagonal weave + dappled "cell" texture. Distinct from the other
+   light themes. Keys stay opaque (cream) for legibility; code glows through the green gutters. */
 [data-theme="organic"] {
     --kbd-glass:
-        linear-gradient(180deg, rgba(250,248,243,.80), rgba(244,241,232,.93)),
-        repeating-linear-gradient(45deg, rgba(120,110,80,.035) 0 2px, transparent 2px 6px),
-        repeating-linear-gradient(-45deg, rgba(120,110,80,.03) 0 2px, transparent 2px 6px);
-    --kbd-blur: 9px;
-    --kbd-handle: linear-gradient(180deg, rgba(255,255,255,.85), rgba(244,241,232,.95));
-    --kbd-grip: rgba(45,45,32,.5);
-    --kbd-edge: var(--border);
+        linear-gradient(160deg, rgba(107,142,35,.15), rgba(61,90,20,.40)),
+        repeating-linear-gradient(60deg, rgba(150,180,80,.07) 0 3px, transparent 3px 10px),
+        repeating-radial-gradient(circle at 30% 15%, rgba(190,210,130,.06) 0 2px, transparent 2px 15px);
+    --kbd-blur: 4px;
+    --kbd-handle: linear-gradient(180deg, rgba(150,180,80,.55), rgba(61,90,20,.72));
+    --kbd-grip: rgba(245,250,230,.8);
+    --kbd-edge: rgba(107,142,35,.55);
 }
 
 /* NORMAL — clean white frost. LEAST see-through (a light bg needs density to stay legible). */
@@ -3406,6 +3462,21 @@ svg [id$="_wcs"] { display: none; }
     color: var(--kbd-key-ink) !important;
     box-shadow: none !important;
 }
+
+/* The tabbed-deck surfaces go glass too — translucent COLOURED panels + tabs so code shows through them
+   (the panel behind the keys was the last opaque layer). Each keeps its accent identity as a colour cast. */
+#deck-tab-move      { background: color-mix(in srgb, #3b82f6 14%, transparent); }
+#deck-tab-gm        { background: color-mix(in srgb, #f59e0b 14%, transparent); }
+#deck-tab-macro     { background: color-mix(in srgb, #a855f7 14%, transparent); }
+#deck-tab-variables { background: color-mix(in srgb, #10b981 14%, transparent); }
+#controller-dock .dock-body .deck-tab { background: color-mix(in srgb, var(--panel) 24%, transparent) !important; }
+#controller-dock .dock-body .deck-tab[data-deck-tab="move"].active      { background: color-mix(in srgb, #3b82f6 26%, transparent) !important; }
+#controller-dock .dock-body .deck-tab[data-deck-tab="gm"].active        { background: color-mix(in srgb, #f59e0b 26%, transparent) !important; }
+#controller-dock .dock-body .deck-tab[data-deck-tab="macro"].active     { background: color-mix(in srgb, #a855f7 26%, transparent) !important; }
+#controller-dock .dock-body .deck-tab[data-deck-tab="variables"].active { background: color-mix(in srgb, #10b981 26%, transparent) !important; }
+/* labels stay legible over the moving code behind them */
+#controller-dock .group-header, #controller-dock .section-label,
+#controller-dock .deck-tabs .deck-tab { text-shadow: 0 1px 2px rgba(0,0,0,.35); }
 
 /* Desktop & tablet: FLOAT the keyboard over the editor so the live code shows behind it.
    The editor pads its scroll by the keyboard height so the active line always clears the keys. */
