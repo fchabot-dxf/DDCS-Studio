@@ -43,6 +43,7 @@ export const arrayBlock = {
         const base = ['pattern', 'x0', 'y0'];
         if (p.pattern === 'circle') return [...base, 'dia', 'count', 'startAngle', 'skip'];
         if (p.pattern === 'line') return [...base, 'count', 'spacing', 'angle', 'skip'];
+        if (p.pattern === 'rect') return [...base, 'w', 'h', 'nx', 'ny', 'skip'];   // rect-perimeter
         return [...base, 'cols', 'rows', 'dx', 'dy', 'skip'];   // grid
     },
 };
