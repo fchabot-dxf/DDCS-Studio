@@ -92,7 +92,14 @@ async function loadAllTiles() {
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
-/** Render the stage SVG markup from the layer list (selected layer gets an outline). */
+function rotateVec(v, deg) { const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a); return { x: v.x * c - v.y * s, y: v.x * s + v.y * c }; }
+// Stage coords of a box's normalized point (nx,ny ∈ [0,1]), honouring its rotation about the centre.
+function boxPoint(nx, ny, b) {
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2, r = rotateVec({ x: (nx - 0.5) * b.w, y: (ny - 0.5) * b.h }, b.rot || 0);
+    return { x: cx + r.x, y: cy + r.y };
+}
+
+/** Render the stage SVG markup from the layer list (selected layer gets a Figma-style handle frame). */
 function stageSvg(layers, sel) {
     const body = layers.map((L, i) => {
         const t = `translate(${L.x} ${L.y}) rotate(${L.rot || 0} ${L.w / 2} ${L.h / 2})`;
@@ -103,8 +110,17 @@ function stageSvg(layers, sel) {
         else if (L.type === 'line') el = `<line x1="0" y1="${L.h / 2}" x2="${L.w}" y2="${L.h / 2}" stroke="${L.color || '#3cf'}" stroke-width="${L.sw || 3}"/>`;
         else if (L.type === 'circle') el = `<ellipse cx="${L.w / 2}" cy="${L.h / 2}" rx="${L.w / 2}" ry="${L.h / 2}" fill="${L.fill || 'none'}" stroke="${L.color || '#3cf'}" stroke-width="${L.sw || 3}"/>`;
         else if (L.type === 'arrow') el = `<g stroke="${L.color || '#3cf'}" stroke-width="${L.sw || 3}" fill="none"><line x1="0" y1="${L.h / 2}" x2="${L.w}" y2="${L.h / 2}"/><polyline points="${L.w - 12},${L.h / 2 - 8} ${L.w},${L.h / 2} ${L.w - 12},${L.h / 2 + 8}"/></g>`;
-        const ring = i === sel ? `<rect x="-1" y="-1" width="${L.w + 2}" height="${L.h + 2}" fill="none" stroke="#0ea5e9" stroke-width="1.5" stroke-dasharray="4 3"/>` : '';
-        return `<g data-li="${i}" transform="${t}" style="cursor:move;">${el}${ring}</g>`;
+        let deco = '';
+        if (i === sel) {
+            const hs = 6, hh = hs / 2;
+            const pts = [['nw', 0, 0], ['n', L.w / 2, 0], ['ne', L.w, 0], ['e', L.w, L.h / 2], ['se', L.w, L.h], ['s', L.w / 2, L.h], ['sw', 0, L.h], ['w', 0, L.h / 2]];
+            const cur = { nw: 'nwse', n: 'ns', ne: 'nesw', e: 'ew', se: 'nwse', s: 'ns', sw: 'nesw', w: 'ew' };
+            deco = `<rect x="0" y="0" width="${L.w}" height="${L.h}" fill="none" stroke="#0ea5e9" stroke-width="1" vector-effect="non-scaling-stroke"/>`
+                + `<line x1="${L.w / 2}" y1="0" x2="${L.w / 2}" y2="-20" stroke="#0ea5e9" stroke-width="1"/>`
+                + `<circle data-h="rot" cx="${L.w / 2}" cy="-24" r="5" fill="#fff" stroke="#0ea5e9" stroke-width="1.5" style="cursor:grab;"/>`
+                + pts.map(([k, px, py]) => `<rect data-h="${k}" x="${px - hh}" y="${py - hh}" width="${hs}" height="${hs}" fill="#fff" stroke="#0ea5e9" stroke-width="1.5" style="cursor:${cur[k]}-resize;"/>`).join('');
+        }
+        return `<g data-li="${i}" transform="${t}" style="cursor:move;">${el}${deco}</g>`;
     }).join('');
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#000"/>${body}</svg>`;
 }
@@ -235,20 +251,39 @@ export function openIconEditor(initial, onSave) {
         else if (p === 'fillon') { L.fill = e.target.checked ? (L.fill && L.fill !== 'none' ? L.fill : '#000000') : 'none'; renderProps(); }
         renderStage();
     });
-    // drag to move (pointer on the stage; hit the nearest <g data-li>)
-    let drag = null;
+    // Figma-style direct manipulation: drag the body to move, a corner/edge handle to resize (keeping the
+    // opposite point anchored, in the layer's own rotated frame), or the top handle to rotate about centre.
+    const HXY = { nw: [0, 0], n: [0.5, 0], ne: [1, 0], e: [1, 0.5], se: [1, 1], s: [0.5, 1], sw: [0, 1], w: [0, 0.5] };
+    let gesture = null;
+    const ptStage = (e) => { const r = stage.getBoundingClientRect(); return { x: (e.clientX - r.left) / ZOOM, y: (e.clientY - r.top) / ZOOM }; };
     stage.addEventListener('pointerdown', (e) => {
+        const hEl = e.target.closest('[data-h]');
+        if (hEl && sel >= 0) {
+            const L = layers[sel]; const b0 = { x: L.x, y: L.y, w: L.w, h: L.h, rot: L.rot || 0 }; const h = hEl.dataset.h;
+            if (h === 'rot') gesture = { type: 'rotate', cx: b0.x + b0.w / 2, cy: b0.y + b0.h / 2 };
+            else { const [hx, hy] = HXY[h]; gesture = { type: 'resize', hx, hy, rot: b0.rot, w0: b0.w, h0: b0.h, anchor: boxPoint(1 - hx, 1 - hy, b0) }; }
+            stage.setPointerCapture(e.pointerId); return;
+        }
         const g = e.target.closest('g[data-li]'); if (!g) return;
-        sel = +g.dataset.li; const L = layers[sel]; const r = stage.getBoundingClientRect();
-        drag = { ox: (e.clientX - r.left) / ZOOM - L.x, oy: (e.clientY - r.top) / ZOOM - L.y };
+        sel = +g.dataset.li; const L = layers[sel]; const P = ptStage(e);
+        gesture = { type: 'move', ox: P.x - L.x, oy: P.y - L.y };
         stage.setPointerCapture(e.pointerId); refresh();
     });
     stage.addEventListener('pointermove', (e) => {
-        if (!drag || sel < 0) return; const L = layers[sel]; const r = stage.getBoundingClientRect();
-        L.x = Math.round((e.clientX - r.left) / ZOOM - drag.ox); L.y = Math.round((e.clientY - r.top) / ZOOM - drag.oy);
+        if (!gesture || sel < 0) return; const L = layers[sel]; const P = ptStage(e);
+        if (gesture.type === 'move') { L.x = Math.round(P.x - gesture.ox); L.y = Math.round(P.y - gesture.oy); }
+        else if (gesture.type === 'rotate') { let a = Math.atan2(P.y - gesture.cy, P.x - gesture.cx) * 180 / Math.PI + 90; if (e.shiftKey) a = Math.round(a / 15) * 15; L.rot = Math.round(a); }
+        else if (gesture.type === 'resize') {
+            const d = { x: P.x - gesture.anchor.x, y: P.y - gesture.anchor.y }, ld = rotateVec(d, -gesture.rot);
+            const nW = gesture.hx === 0.5 ? gesture.w0 : Math.max(6, Math.abs(ld.x));
+            const nH = gesture.hy === 0.5 ? gesture.h0 : Math.max(6, Math.abs(ld.y));
+            const off = rotateVec({ x: (gesture.hx - 0.5) * nW, y: (gesture.hy - 0.5) * nH }, gesture.rot);
+            const cx = gesture.anchor.x + off.x, cy = gesture.anchor.y + off.y;
+            L.w = nW; L.h = nH; L.x = cx - nW / 2; L.y = cy - nH / 2; L.bw = nW; L.bh = nH; L.scale = 1;
+        }
         renderStage();
     });
-    stage.addEventListener('pointerup', () => { drag = null; renderLayers(); });
+    stage.addEventListener('pointerup', () => { if (gesture && gesture.type !== 'move') renderProps(); gesture = null; renderLayers(); });
 
     function saveIcon() {
         const svg = stageSvg(layers, -1);   // no selection ring in the export
