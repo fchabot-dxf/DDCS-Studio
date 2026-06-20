@@ -49,7 +49,7 @@ export function initMacrosApp() {
                 <div class="settings-section">
                     <div class="settings-section-title">CAM PACK BUILDER</div>
                     <div class="settings-hint">Author a DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's CAM page — to share with the community. Each slot = a <b>form</b> + a <b>macro</b> that reads the form live (the <code>#2600+</code> mirrors). Studio auto-allocates the shared <code>#1100–1499</code> form params and flags collisions. <i>Phase 1: form designer + macro + plain export. Icons + eng-merge install come next.</i></div>
-                    <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button></div>
+                    <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button><button class="toolbar-btn settings-io" id="cam_merge_eng" title="Paste the controller's CURRENT eng file → get a safely-merged eng (your pack appended, #param / -m group collisions flagged). Avoids the community full-replace mistake.">🔗 Merge eng</button></div>
                     <div id="cam_validate" class="settings-hint" style="margin-top:6px;"></div>
                     <div id="cam_slots" style="margin-top:6px;"></div>
                 </div>
@@ -365,6 +365,42 @@ export function initMacrosApp() {
         files.push({ name: 'README.txt', data: readmeText(name) });
         downloadBytes(name.replace(/[^\w-]+/g, '_') + '.zip', makeZip(files));
     });
+
+    // Safe eng merge: paste the controller's CURRENT eng → append this pack's params, flag collisions, download.
+    const _camMerge = q('cam_merge_eng');
+    if (_camMerge) _camMerge.addEventListener('click', () => {
+        if (!_camPack.slots.length) { alert('No slots to merge — add a slot first.'); return; }
+        const additions = _camPack.slots.map((s) => camPack.slotEng(s)).join('\n') + '\n';
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center;';
+        overlay.innerHTML = `<div style="width:min(900px,92vw); height:min(680px,88vh); background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px; display:flex; flex-direction:column; overflow:hidden;">
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--border);"><b style="flex:1">🔗 Merge into controller eng</b><button class="toolbar-btn settings-io" data-mc>✕ Close</button></div>
+            <div style="padding:12px; display:flex; flex-direction:column; gap:8px; flex:1; min-height:0;">
+                <div class="settings-hint">Paste the controller's CURRENT <code>eng</code> file (pull it over the gateway or copy from the controller). Studio appends this pack's params and flags any <code>#param</code> / <code>-m</code> group collisions — then downloads the merged <code>eng</code> to push back. It never replaces existing content.</div>
+                <textarea data-eng spellcheck="false" placeholder="paste the controller eng here…" style="flex:1; width:100%; font:12px/1.4 monospace; box-sizing:border-box;"></textarea>
+                <div data-mout class="settings-hint" style="margin:0"></div>
+                <div class="settings-row"><button class="toolbar-btn settings-io" data-mgo>Check &amp; download merged eng</button></div>
+            </div></div>`;
+        document.body.appendChild(overlay);
+        const close = () => overlay.remove();
+        overlay.querySelector('[data-mc]').addEventListener('click', close);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        overlay.querySelector('[data-mgo]').addEventListener('click', () => {
+            const eng = overlay.querySelector('[data-eng]').value;
+            if (!eng.trim()) { alert('Paste the controller eng first.'); return; }
+            const m = camPack.mergeEng(eng, additions);
+            const msgs = [];
+            if (m.paramCollisions.length) msgs.push('⚠ #param collisions (already defined in the eng): ' + m.paramCollisions.map((n) => '#' + n).join(', ') + ' — reallocate these fields in the builder before installing.');
+            if (m.groupCollisions.length) msgs.push('⚠ -m group collisions: ' + m.groupCollisions.map((g) => 'm' + g).join(', ') + ' — change the slot number(s).');
+            msgs.push(`Appended ${m.added.length} param line(s).` + (m.paramCollisions.length || m.groupCollisions.length ? ' Merged file downloaded, but FIX the collisions first.' : ' No collisions — safe to install.'));
+            const out = overlay.querySelector('[data-mout]');
+            out.innerHTML = msgs.join('<br>');
+            out.style.color = (m.paramCollisions.length || m.groupCollisions.length) ? '#ff6b6b' : '#3c9';
+            const blob = new Blob([m.merged], { type: 'text/plain' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'eng-merged.txt'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        });
+    });
+
     renderCamBuilder();
 }
 

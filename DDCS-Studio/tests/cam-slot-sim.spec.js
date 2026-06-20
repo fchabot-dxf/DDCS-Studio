@@ -294,6 +294,26 @@ test('probe-Z slot: two-pass Z touch down, writes WCS Z so the touch reads as Su
   expect(r.writesZ, 'writes the Z slot of the WCS table').toBe(true);
 });
 
+test('mergeEng appends pack params, preserves the eng, and flags collisions', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { mergeEng } = await import('/data/camPack.js');
+    const existing = '#100 -s1"Existing setting" -m1\n#1116 -s1"Community param" -m33\n';
+    const additions = '#1100 -p0 =0 -t1 -s1"My field" -s2"mm" -m42 -min=0 -max=10\n#1116 -p0 =0 -t1 -s1"Clash" -m42\n';
+    const m = mergeEng(existing, additions);
+    return {
+      keepsExisting: m.merged.includes('#100 -s1"Existing setting"'),
+      appendsNew: m.merged.includes('#1100') && m.merged.indexOf('#1100') > m.merged.indexOf('#100'),
+      paramCollisions: m.paramCollisions, groupCollisions: m.groupCollisions, added: m.added,
+    };
+  });
+  expect(r.keepsExisting, 'never replaces the eng').toBe(true);
+  expect(r.appendsNew, 'appends new params after existing').toBe(true);
+  expect(r.paramCollisions, '#1116 already defined → flagged').toContain(1116);
+  expect(r.groupCollisions, 'group m42 is new, m33 belongs to existing → no group clash').toEqual([]);
+  expect(r.added, '#1100 is new').toContain(1100);
+});
+
 test('auto-icon renders a valid 360x180 BMP from the op name/kind', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {

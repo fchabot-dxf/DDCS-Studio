@@ -82,6 +82,28 @@ export function slotMacro(slot) {
     return head.concat(reads, body ? [body] : [], hasEnd ? [] : ['M99']).join('\n') + '\n';
 }
 
+/**
+ * Merge a pack's `additions` (eng param lines) into the controller's CURRENT `eng` text — the safe install
+ * that community packs get wrong (they ship a full-replacement eng and clobber the operator's customisations;
+ * CAM-MENU-RESEARCH §2.4). APPENDS the new param lines, never replaces. Surfaces the cross-pack/factory
+ * collisions the in-pack allocator can't see (a #11xx the eng already defines, or a -m group already in use).
+ * @returns {{ merged:string, paramCollisions:number[], groupCollisions:number[], added:number[] }}
+ */
+export function mergeEng(existingEng, additions) {
+    const paramOf = (l) => { const m = String(l).match(/^\s*#(\d+)\b/); return m ? Number(m[1]) : null; };
+    const groupOf = (l) => { const m = String(l).match(/-m(\d+)\b/); return m ? Number(m[1]) : null; };
+    const have = new Set(), haveGroups = new Set();
+    String(existingEng || '').split(/\r?\n/).forEach((l) => { const p = paramOf(l); if (p != null) have.add(p); const g = groupOf(l); if (g != null) haveGroups.add(g); });
+    const addLines = String(additions || '').split(/\r?\n/).filter((l) => paramOf(l) != null);
+    const paramCollisions = [], added = [];
+    addLines.forEach((l) => { const p = paramOf(l); (have.has(p) ? paramCollisions : added).push(p); });
+    const addGroups = [...new Set(addLines.map(groupOf).filter((g) => g != null))];
+    const groupCollisions = addGroups.filter((g) => haveGroups.has(g));
+    const base = String(existingEng || '').replace(/\s+$/, '');
+    const merged = base + '\n\n( ===== merged CAM pack params (DDCS Studio) ===== )\n' + addLines.join('\n') + '\n';
+    return { merged, paramCollisions: [...new Set(paramCollisions)], groupCollisions: [...new Set(groupCollisions)], added };
+}
+
 /** Validate a pack → { ok, errors:[], warnings:[] } for the "simulate before publish" gate. */
 export function validatePack(pack) {
     const errors = [], warnings = [];
