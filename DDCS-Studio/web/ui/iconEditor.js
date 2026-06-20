@@ -11,10 +11,15 @@ const W = 360, H = 180, ZOOM = 2;
 const TILESET_FILES = ['cornerViz', 'edgeViz', 'middleViz', 'alignViz'];
 let _tileCache = null;
 
-// Strip a trailing position/index token (needs a _/- separator so plain words aren't truncated) so repeated
-// variants collapse to one family: corner_BL → corner, middle_probe_TL → middle_probe, edge_2 → edge.
+// Family key for de-dup: strip the direction / axis / position / index tokens *anywhere* in the id (each must
+// be a whole _token, so plain words aren't truncated) so repeated variants collapse to one. e.g. all of
+// middle_probe_pocket_{X_pos,Y_pos,X_neg,…}_miniprobe → middle_probe_pocket_miniprobe; corner_BL → corner.
 function baseId(id) {
-    return String(id).replace(/[_-](BL|BR|FL|FR|TL|TR|TC|BC|LC|RC|NE|NW|SE|SW|[NSEWLRTBXYZ]|\d+)$/i, '') || String(id);
+    return String(id).toLowerCase()
+        .replace(/[_-](x|y|z)(?=[_-]|$)/g, '_')
+        .replace(/[_-](pos|neg|plus|minus|top|bottom|left|right|front|back|up|down|cw|ccw|bl|br|fl|fr|tl|tr|tc|bc|lc|rc|ne|nw|se|sw|[nsew])(?=[_-]|$)/g, '_')
+        .replace(/\d+/g, '')
+        .replace(/[_-]+/g, '_').replace(/^_+|_+$/g, '') || String(id);
 }
 // Show ONLY the target's lineage: walk up to the root hiding each on-path node's siblings, so neighbouring
 // geometry (axis lines, other probes) can't bleed into the crop. Ancestor transforms still apply (position).
@@ -106,6 +111,7 @@ export function openIconEditor(initial, onSave) {
         #iconed-modal .ie-tile{flex:0 0 auto;width:48px;height:48px;padding:3px;border:1px solid var(--border);border-radius:5px;background:#000;cursor:pointer;display:flex;align-items:center;justify-content:center;}
         #iconed-modal .ie-tile:hover{border-color:#0ea5e9;}
         #iconed-modal .ie-tile img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none;}
+        #iconed-modal .ie-addrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--border);}
         #iconed-modal .ie-body{display:flex;gap:12px;padding:12px 14px;overflow:auto;}
         #iconed-modal .ie-stage{flex:0 0 auto;width:${W * ZOOM}px;height:${H * ZOOM}px;border:1px solid var(--border);background:#000;touch-action:none;}
         #iconed-modal .ie-stage svg{width:100%;height:100%;display:block;}
@@ -123,17 +129,18 @@ export function openIconEditor(initial, onSave) {
     </style>
     <div class="ie-panel">
         <div class="ie-head"><span>🖼 Icon editor — 360×180</span><button data-ie="x">✕</button></div>
+        <div class="ie-addrow">
+            <button class="toolbar-btn settings-io" data-add="text">＋ Text</button>
+            <button class="toolbar-btn settings-io" data-add="rect">▭ Rect</button>
+            <button class="toolbar-btn settings-io" data-add="line">／ Line</button>
+            <button class="toolbar-btn settings-io" data-add="circle">◯ Circle</button>
+            <button class="toolbar-btn settings-io" data-add="arrow">→ Arrow</button>
+            <span style="flex:1"></span><span style="font-size:10px;color:var(--text-dim);">click a tile below to drop it on the canvas ↓</span>
+        </div>
         <div class="ie-toolbar" id="ie_tiles" title="Tileset — click a tile to drop it on the canvas"><span style="font-size:11px;color:var(--text-dim);">Loading tiles…</span></div>
         <div class="ie-body">
             <div class="ie-stage" id="ie_stage"></div>
             <div class="ie-side">
-                <div class="ie-grp"><h4>Add</h4><div class="ie-row">
-                    <button class="toolbar-btn settings-io" data-add="text">＋ Text</button>
-                    <button class="toolbar-btn settings-io" data-add="rect">▭</button>
-                    <button class="toolbar-btn settings-io" data-add="line">／</button>
-                    <button class="toolbar-btn settings-io" data-add="circle">◯</button>
-                    <button class="toolbar-btn settings-io" data-add="arrow">→</button>
-                </div></div>
                 <div class="ie-grp"><h4>Selected</h4><div id="ie_props"></div></div>
                 <div class="ie-grp"><h4>Layers (top = front)</h4><div class="ie-layers" id="ie_layers"></div></div>
             </div>
