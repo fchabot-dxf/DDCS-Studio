@@ -57,13 +57,15 @@ export function probeSave(ax, o) {
 
 /**
  * Raster-clear a rectangle in Z layers: zig-zag rows inset half a stepover, optional wall finish pass per
- * layer. Owns scratch #27 (rows) #28 (z) #29 (yy) #30 (i) #31 (dir) #32 (xt). Bounds are var/expr strings.
+ * layer, with a zig ramp lead-in (no vertical plunge into solid). Owns scratch #27 (rows) #28 (z) #29 (yy)
+ * #30 (i) #31 (dir) #32 (xt) #33 (ramp len) — callers own #20–#26, so the kit stays at #27+. Bounds are var/expr.
  * @param {{x0,x1,y0,y1, depth, stepdown, stepover, feed, plunge, clearance:string, wall?:boolean}} o
  */
 export function rasterClear(o) {
     const { x0, x1, y0, y1, depth, stepdown, stepover, feed, plunge, clearance, wall } = o;
     const lines = [
         `#27=FUP[[${y1}-${y0}]/${stepover}]   ;raster row count`,
+        `#33=${stepover}   ;ramp lead-in length`,
         '',
         'G90   ( absolute )',
         `G0 Z${clearance}`,
@@ -75,7 +77,9 @@ export function rasterClear(o) {
         '  #30=0   ;row index',
         '  #31=1   ;zig direction',
         `  G0 X${x0} Y#29`,
-        `  G1 Z[0-#28] F${plunge}`,
+        `  G0 Z[${stepdown}-#28]   ;rapid through cleared air to the previous depth`,
+        `  G1 X[${x0}+#33] Z[0-#28] F${plunge}   ;ramp down into the layer (no vertical plunge into solid)`,
+        `  G1 X${x0} F${feed}   ;back to the row start at depth`,
         '  WHILE #30 LT #27 DO2',
         `    IF #31 GT 0 THEN #32=${x1}`,
         `    IF #31 LT 0 THEN #32=${x0}`,
@@ -104,7 +108,8 @@ export function rasterClear(o) {
 
 /**
  * Concentric-circle clear of a ROUND pocket, Z layers, inside-out (plunge at centre → rings out to the wall).
- * Rings are planar full-circle G3 arcs. Owns scratch #27 (maxR) #28 (z) #29 (ring radius). `cx`/`cy` = centre,
+ * Rings are planar full-circle G3 arcs, with a zig ramp lead-in. Owns scratch #27 (maxR) #28 (z) #29 (ring
+ * radius) #33 (ramp len) — callers own #20–#26. `cx`/`cy` = centre,
  * `maxR` = max tool-centre radius (= dia/2 − toolR). Expr/var strings throughout.
  * @param {{cx,cy,maxR, depth, stepdown, stepover, feed, plunge, clearance:string}} o
  */
@@ -112,6 +117,7 @@ export function ringClear(o) {
     const { cx, cy, maxR, depth, stepdown, stepover, feed, plunge, clearance } = o;
     return [
         `#27=${maxR}   ;max tool-centre radius`,
+        `#33=${stepover}   ;ramp lead-in length`,
         '',
         'G90   ( absolute )',
         `G0 Z${clearance}`,
@@ -120,7 +126,9 @@ export function ringClear(o) {
         `  #28=[#28+${stepdown}]`,
         `  IF #28 GT ${depth} THEN #28=${depth}`,
         `  G0 X${cx} Y${cy}   ;to centre`,
-        `  G1 Z[0-#28] F${plunge}   ;plunge at centre`,
+        `  G0 Z[${stepdown}-#28]   ;rapid through cleared air to the previous depth`,
+        `  G1 X[${cx}+#33] Z[0-#28] F${plunge}   ;ramp down into the layer (no vertical plunge)`,
+        `  G1 X${cx} F${feed}   ;back to centre at depth`,
         `  #29=${stepover}   ;ring radius`,
         '  WHILE #29 LT #27 DO2',
         `    G1 X[${cx}+#29] Y${cy} F${feed}   ;step out to the ring`,
