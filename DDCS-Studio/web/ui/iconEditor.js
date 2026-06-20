@@ -106,10 +106,10 @@ function stageSvg(layers, sel) {
         let el = '';
         if (L.type === 'tile') el = `<image href="${L.uri}" x="0" y="0" width="${L.w}" height="${L.h}" preserveAspectRatio="xMidYMid meet"/>`;
         else if (L.type === 'text') el = `<text x="0" y="${L.h * 0.75}" font-family="Consolas, monospace" font-size="${L.size || 20}" fill="${L.color || '#ffd23f'}" style="white-space:pre;">${esc(L.text)}</text>`;
-        else if (L.type === 'rect') el = `<rect x="0" y="0" width="${L.w}" height="${L.h}" fill="${L.fill || 'none'}" stroke="${L.color || '#3cf'}" stroke-width="${L.sw || 3}"/>`;
-        else if (L.type === 'line') el = `<line x1="0" y1="${L.h / 2}" x2="${L.w}" y2="${L.h / 2}" stroke="${L.color || '#3cf'}" stroke-width="${L.sw || 3}"/>`;
-        else if (L.type === 'circle') el = `<ellipse cx="${L.w / 2}" cy="${L.h / 2}" rx="${L.w / 2}" ry="${L.h / 2}" fill="${L.fill || 'none'}" stroke="${L.color || '#3cf'}" stroke-width="${L.sw || 3}"/>`;
-        else if (L.type === 'arrow') el = `<g stroke="${L.color || '#3cf'}" stroke-width="${L.sw || 3}" fill="none"><line x1="0" y1="${L.h / 2}" x2="${L.w}" y2="${L.h / 2}"/><polyline points="${L.w - 12},${L.h / 2 - 8} ${L.w},${L.h / 2} ${L.w - 12},${L.h / 2 + 8}"/></g>`;
+        else if (L.type === 'rect') el = `<rect x="0" y="0" width="${L.w}" height="${L.h}" fill="${L.fill || 'none'}" stroke="${L.color || '#3cf'}" stroke-width="${L.sw != null ? L.sw : 3}"/>`;
+        else if (L.type === 'line') el = `<line x1="0" y1="${L.h / 2}" x2="${L.w}" y2="${L.h / 2}" stroke="${L.color || '#3cf'}" stroke-width="${L.sw != null ? L.sw : 3}"/>`;
+        else if (L.type === 'circle') el = `<ellipse cx="${L.w / 2}" cy="${L.h / 2}" rx="${L.w / 2}" ry="${L.h / 2}" fill="${L.fill || 'none'}" stroke="${L.color || '#3cf'}" stroke-width="${L.sw != null ? L.sw : 3}"/>`;
+        else if (L.type === 'arrow') el = `<g stroke="${L.color || '#3cf'}" stroke-width="${L.sw != null ? L.sw : 3}" fill="none"><line x1="0" y1="${L.h / 2}" x2="${L.w}" y2="${L.h / 2}"/><polyline points="${L.w - 12},${L.h / 2 - 8} ${L.w},${L.h / 2} ${L.w - 12},${L.h / 2 + 8}"/></g>`;
         let deco = '';
         if (i === sel) {
             const hs = 6, hh = hs / 2;
@@ -128,7 +128,9 @@ function stageSvg(layers, sel) {
 /** Open the editor. `initial` = { layers } or null. onSave(bmpDataUrl, { layers }). */
 export function openIconEditor(initial, onSave) {
     const layers = (initial && Array.isArray(initial.layers)) ? JSON.parse(JSON.stringify(initial.layers)) : [];
-    let sel = layers.length ? 0 : -1;
+    // New icon → a real, editable background rectangle covering the 360×180 frame (recolour/resize like any layer).
+    if (!layers.length) layers.push({ type: 'rect', x: 0, y: 0, w: W, h: H, rot: 0, scale: 1, bw: W, bh: H, fill: '#000000', color: '#000000', sw: 0, bg: true });
+    let sel = -1;
 
     const m = document.createElement('div'); m.id = 'iconed-modal';
     m.innerHTML = `<style>
@@ -203,8 +205,10 @@ export function openIconEditor(initial, onSave) {
         if (sel < 0 || !layers[sel]) { host.innerHTML = '<span style="font-size:11px;color:var(--text-dim);">Nothing selected.</span>'; return; }
         const L = layers[sel];
         let html = `<div class="ie-row">
-            <label>Scale<input type="range" min="0.1" max="3" step="0.05" value="${(L.scale || 1)}" data-p="scale"></label>
-            <label>Rotate<input type="range" min="-180" max="180" step="1" value="${L.rot || 0}" data-p="rot"></label>
+            <label>W<input type="number" min="6" value="${Math.round(L.w)}" data-p="w" style="width:56px;"></label>
+            <button class="op-btn" data-act="lock" title="${L.lock ? 'Aspect locked — uniform scale' : 'Aspect unlocked — free scale'}" style="align-self:flex-end;height:26px;">${L.lock ? '🔒' : '🔓'}</button>
+            <label>H<input type="number" min="6" value="${Math.round(L.h)}" data-p="h" style="width:56px;"></label>
+            <label>Rotate<input type="number" value="${Math.round(L.rot || 0)}" data-p="rot" style="width:56px;"></label>
         </div>`;
         if (L.type === 'text') html += `<div class="ie-row"><label style="flex:1;">Text<input type="text" value="${esc(L.text)}" data-p="text" style="width:100%;"></label><label>Size<input type="number" min="6" max="80" value="${L.size || 20}" data-p="size" style="width:54px;"></label></div>`;
         if (L.type !== 'tile') html += `<div class="ie-row"><label>Colour<input type="color" value="${L.color || (L.type === 'text' ? '#ffd23f' : '#33ccff')}" data-p="color"></label>${L.type !== 'text' && L.type !== 'line' ? `<label>Fill<input type="color" value="${L.fill && L.fill !== 'none' ? L.fill : '#000000'}" data-p="fill"></label><label style="flex-direction:row;align-items:center;gap:4px;"><input type="checkbox" ${L.fill && L.fill !== 'none' ? 'checked' : ''} data-p="fillon">filled</label>` : ''}</div>`;
@@ -231,6 +235,7 @@ export function openIconEditor(initial, onSave) {
         if (ie === 'x' || ie === 'cancel') { m.remove(); return; }
         if (ie === 'save') { saveIcon(); return; }
         const addT = e.target.dataset.add; if (addT) { add(addT); return; }
+        if (e.target.dataset.act === 'lock' && sel >= 0) { layers[sel].lock = !layers[sel].lock; renderProps(); return; }
         const li = e.target.closest('.ie-lyr'); if (li) { const i = +li.dataset.li; const mv = e.target.dataset.mv;
             if (mv === 'del') { layers.splice(i, 1); sel = Math.min(sel, layers.length - 1); refresh(); }
             else if (mv === 'up') { if (i < layers.length - 1) { [layers[i], layers[i + 1]] = [layers[i + 1], layers[i]]; sel = i + 1; refresh(); } }
@@ -242,7 +247,14 @@ export function openIconEditor(initial, onSave) {
     });
     $('ie_props').addEventListener('input', (e) => {
         const L = layers[sel]; if (!L) return; const p = e.target.dataset.p; if (!p) return;
-        if (p === 'scale') { const sc = parseFloat(e.target.value) || 1; const cx = L.x + L.w / 2, cy = L.y + L.h / 2; L.w = (L.bw || L.w) * sc; L.h = (L.bh || L.h) * sc; L.x = cx - L.w / 2; L.y = cy - L.h / 2; L.scale = sc; }
+        if (p === 'w' || p === 'h') {
+            const cx = L.x + L.w / 2, cy = L.y + L.h / 2, ar = L.w / L.h || 1;
+            let nw = L.w, nh = L.h;
+            if (p === 'w') { nw = Math.max(6, parseFloat(e.target.value) || L.w); if (L.lock) nh = nw / ar; }
+            else { nh = Math.max(6, parseFloat(e.target.value) || L.h); if (L.lock) nw = nh * ar; }
+            L.w = nw; L.h = nh; L.x = cx - nw / 2; L.y = cy - nh / 2; L.bw = nw; L.bh = nh; L.scale = 1;
+            if (L.lock) { const sib = e.target.closest('.ie-row').querySelector(p === 'w' ? '[data-p="h"]' : '[data-p="w"]'); if (sib) sib.value = Math.round(p === 'w' ? nh : nw); }
+        }
         else if (p === 'rot') L.rot = parseFloat(e.target.value) || 0;
         else if (p === 'text') L.text = e.target.value;
         else if (p === 'size') L.size = parseInt(e.target.value, 10) || 20;
@@ -275,8 +287,13 @@ export function openIconEditor(initial, onSave) {
         else if (gesture.type === 'rotate') { let a = Math.atan2(P.y - gesture.cy, P.x - gesture.cx) * 180 / Math.PI + 90; if (e.shiftKey) a = Math.round(a / 15) * 15; L.rot = Math.round(a); }
         else if (gesture.type === 'resize') {
             const d = { x: P.x - gesture.anchor.x, y: P.y - gesture.anchor.y }, ld = rotateVec(d, -gesture.rot);
-            const nW = gesture.hx === 0.5 ? gesture.w0 : Math.max(6, Math.abs(ld.x));
-            const nH = gesture.hy === 0.5 ? gesture.h0 : Math.max(6, Math.abs(ld.y));
+            let nW = gesture.hx === 0.5 ? gesture.w0 : Math.max(6, Math.abs(ld.x));
+            let nH = gesture.hy === 0.5 ? gesture.h0 : Math.max(6, Math.abs(ld.y));
+            if (L.lock) {   // aspect-locked → uniform: the dragged axis drives the other
+                const ar = gesture.w0 / gesture.h0 || 1;
+                if (gesture.hx === 0.5) nW = nH * ar; else if (gesture.hy === 0.5) nH = nW / ar;
+                else if (nW / gesture.w0 >= nH / gesture.h0) nH = nW / ar; else nW = nH * ar;
+            }
             const off = rotateVec({ x: (gesture.hx - 0.5) * nW, y: (gesture.hy - 0.5) * nH }, gesture.rot);
             const cx = gesture.anchor.x + off.x, cy = gesture.anchor.y + off.y;
             L.w = nW; L.h = nH; L.x = cx - nW / 2; L.y = cy - nH / 2; L.bw = nW; L.bh = nH; L.scale = 1;
