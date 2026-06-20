@@ -251,6 +251,8 @@ export function initMacrosApp() {
                 <select class="cam-op-type" data-oi="${oi}" title="Op type — changing it rebuilds this op's fields + macro">${opTypeOpts(op.type)}</select>
                 <select class="cam-op-var" data-oi="${oi}" title="${secondCtlTitle(op.type)}"${SECOND_CTL[op.type] ? '' : ' style="display:none"'}>${secondCtlOpts(op.type, op.variant)}</select>
                 <span style="flex:1"></span>
+                <button class="op-btn" data-act="opup" data-oi="${oi}" title="Move up (ops run in this order)"${oi === 0 ? ' disabled' : ''}>▲</button>
+                <button class="op-btn" data-act="opdown" data-oi="${oi}" title="Move down (ops run in this order)"${oi === slot.ops.length - 1 ? ' disabled' : ''}>▼</button>
                 <button class="op-btn" data-act="delop" data-oi="${oi}" title="Remove this op">✕</button>
             </div>`).join('');
         const dirty = slot.bodyDirty ? '<div class="settings-hint" style="color:#fd0; margin:0;">✎ macro hand-edited — changing an op rebuilds it and discards those edits</div>' : '';
@@ -419,6 +421,13 @@ export function initMacrosApp() {
             else if (a === 'delop') {
                 if (!regenGuard(slot)) { renderCamBuilder(); return; }
                 slot.ops.splice(+e.target.dataset.oi, 1);
+                buildSlotFromOps(slot); saveCamPack(); renderCamBuilder();
+            }
+            else if (a === 'opup' || a === 'opdown') {
+                const oi = +e.target.dataset.oi, ni = a === 'opup' ? oi - 1 : oi + 1;
+                if (!slot.ops || ni < 0 || ni >= slot.ops.length) return;
+                if (!regenGuard(slot)) { renderCamBuilder(); return; }
+                const tmp = slot.ops[oi]; slot.ops[oi] = slot.ops[ni]; slot.ops[ni] = tmp;   // values travel with the op
                 buildSlotFromOps(slot); saveCamPack(); renderCamBuilder();
             }
             else if (a === 'refresh') {

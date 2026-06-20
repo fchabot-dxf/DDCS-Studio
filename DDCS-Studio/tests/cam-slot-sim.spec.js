@@ -471,3 +471,32 @@ test('structured op editing: tuned field values persist across an op edit (per-o
   expect(r.afterType.def, 'tuned default survives a type change').toBe('9');
   expect(r.afterType.body).toBe(true);
 });
+
+test('structured op editing: ▲/▼ reorder the ops (macro run order) and tuned values travel', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const mod = await import('/ui/macrosApp.js'); mod.initMacrosApp();
+    const root = document.getElementById('macros-app');
+    root.querySelector('#cam_add_slot').click();
+    const card = () => root.querySelector('.cam-slot');
+    const addOp = (type) => { const o = card().querySelector('.cam-op'); o.value = type; o.dispatchEvent(new Event('change', { bubbles: true })); card().querySelector('[data-act="addop"]').click(); };
+    const body = () => card().querySelector('textarea[data-f="body"]').value;
+    const types = () => Array.from(card().querySelectorAll('.cam-op-card')).map((d) => d.querySelector('.cam-op-type').value);
+    const rowFor = (l) => Array.from(card().querySelectorAll('tr[data-fi]')).find((r) => r.querySelector('.cf[data-f="label"]').value === l);
+    const setDef = (l, v) => { const i = rowFor(l).querySelector('.cf[data-f="def"]'); i.value = String(v); i.dispatchEvent(new Event('input', { bubbles: true })); };
+    addOp('drill'); addOp('slot');
+    setDef('Depth', 9);   // first 'Depth' row = drill's
+    const drillFirst = (b) => b.indexOf('drill bolt circle') < b.indexOf('slot A->B');
+    const out = { initial: types(), initialDrillFirst: drillFirst(body()), topUpDisabled: card().querySelector('[data-act="opup"]').disabled };
+    card().querySelectorAll('[data-act="opdown"]')[0].click();   // move drill down
+    out.after = types(); out.afterDrillFirst = drillFirst(body());
+    out.depths = Array.from(card().querySelectorAll('tr[data-fi]')).filter((r) => r.querySelector('.cf[data-f="label"]').value === 'Depth').map((r) => r.querySelector('.cf[data-f="def"]').value);
+    return out;
+  });
+  expect(r.initial).toEqual(['drill', 'slot']);
+  expect(r.initialDrillFirst, 'drill macro section comes first initially').toBe(true);
+  expect(r.topUpDisabled, 'first op cannot move up').toBe(true);
+  expect(r.after).toEqual(['slot', 'drill']);
+  expect(r.afterDrillFirst, 'macro re-emitted with slot before drill').toBe(false);
+  expect(r.depths.includes('9'), 'drill tuned depth=9 travelled with the op').toBe(true);
+});
