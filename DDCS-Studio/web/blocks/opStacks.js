@@ -144,8 +144,8 @@ const RECONCILERS = {
     drill(prog) {
         const arr = find(prog, 'array');
         if (!arr || !arr.params) return null;
-        const p = arr.params, hole = arr.children && arr.children[0];
-        const f = { d_pattern: p.pattern, d_originX: p.x0, d_originY: p.y0, d_skip: p.skip || '' };
+        const p = arr.params, hole = arr.children && arr.children[0], wb = find(prog, 'wcs');
+        const f = { d_pattern: p.pattern, d_originX: p.x0, d_originY: p.y0, d_skip: p.skip || '', d_wcs: (wb && wb.params && wb.params.wcs) || 'active' };
         if (p.pattern === 'circle') { f.d_dia = p.dia; f.d_count = p.count; f.d_startAngle = p.startAngle; }
         else if (p.pattern === 'line') { f.d_lcount = p.count; f.d_spacing = p.spacing; f.d_angle = p.angle; }
         else if (p.pattern === 'rect') { f.d_w = p.w; f.d_h = p.h; f.d_nx = p.nx; f.d_ny = p.ny; }
