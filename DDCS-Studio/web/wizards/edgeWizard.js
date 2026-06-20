@@ -24,10 +24,11 @@ export function edgeStack(params = {}) {
     const axis = params.axis === 'Y' ? 'Y' : 'X', av = AX[axis];
     const dir = params.dir === 'neg' ? 'neg' : 'pos', plus = dir === 'pos';
     const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
-    const dist = num(params.dist, 15), retract = num(params.retract, 2);
+    const dist = num(params.dist, 15), retract = num(params.retract, 2), radius = num(params.radius, 2);
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
     const level = num(params.level, 0);
     const probeVar = plus ? '#8' : '#7', retractVar = plus ? '#9' : '#10', limitVal = plus ? '2' : '1';
+    const compOp = plus ? '+' : '-';   // edge is at trigger ± stylus radius (toward the probe direction)
 
     const S = [];
     const C = (text) => { const b = newBlock('comment'); b.params = { text }; S.push(b); };
@@ -44,6 +45,7 @@ export function edgeStack(params = {}) {
     C('Motion Variables');
     A('#1', dist, 'Max probe distance'); A('#2', retract, 'Retract distance');
     A('#3', fFast, 'Fast feedrate'); A('#4', fSlow, 'Slow feedrate'); A('#5', port, 'Probe port');
+    A('#6', radius, 'Probe stylus radius');
     C('Result storage'); A('#50', 0, 'Edge contact position');
     C('Pre-calculated motion values');
     A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
@@ -65,7 +67,7 @@ export function edgeStack(params = {}) {
     A(av.limit, limitVal, `Limit protect: ${plus ? 'positive' : 'negative'}`);
     PR(probeVar, '#3'); CK(1); MV(retractVar);
     PR(probeVar, '#4'); CK(1);
-    A('#50', av.result, 'Save edge position'); MV(retractVar);
+    A('#50', `[${av.result}${compOp}#6]`, 'Edge = trigger +/- stylus radius'); MV(retractVar);
     C('Write to WCS');
     A(`#[#70+${av.off}]`, '#50', `Set ${wcsLabel} ${axis} to edge`);
     DM('abs'); A('#1505', '-5000', 'Edge found'); GO(2);
