@@ -10,10 +10,11 @@
 
 /** Spindle RPM field to append to a cutting slot's form, + the start/stop lines that bracket the toolpath. */
 export const SPINDLE_FIELD = { key: 'rpm', label: 'Spindle RPM', units: 'rpm', def: 8000, min: 1, max: 60000, type: 0 };
-// Forms verified against a real Expert macro (SYSDISK/key-7.nc): spindle speed is a BRACKETED var `S[#var]`
-// and G04 P is in SECONDS (key-7: `G04 P[#142]`, #142=30 → "30 seconds"), not milliseconds.
-/** Spindle on CW at the form RPM, with a short spin-up dwell (P = seconds). */
-export const spindleOn = (rpmVar) => [`M3 S[${rpmVar}]   ( spindle on )`, 'G04 P2   ( spin-up dwell, seconds )'];
+// Spindle speed is a BRACKETED var `S[#var]` (key-7.nc: `M03 S[#140]`). G04 P is in MILLISECONDS on the
+// Expert — factory slib-g.nc has `G04 P100 //100ms` (explicit) + many `G04 P2000` (2s dwells). (key-7's
+// author misread P as seconds; their P30 "30s" warmup really dwells 30ms — a community-macro bug.)
+/** Spindle on CW at the form RPM, with a ~2-second spin-up dwell (P = ms). */
+export const spindleOn = (rpmVar) => [`M3 S[${rpmVar}]   ( spindle on )`, 'G04 P2000   ( spin-up dwell ~2s, P=ms )'];
 export const spindleOff = () => ['M5   ( spindle off )'];
 
 /** Per-axis DDCS probe system vars: status (2=success) + trigger position (machine coord). */

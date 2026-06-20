@@ -345,3 +345,42 @@ Shelved with the CAM-slot export (answer only if it's revived):
 - [ ] Get the original "CAM Function instructions" doc from the FB group into the
       ddcs-expert skill references.
 - [ ] Slot allocation policy (adopt community cam10–21 vs start at cam22+).
+
+---
+
+## 8. Build log + roadmap forks (2026-06-20)
+
+The CAM Pack Builder (§5d) is built out. State:
+
+### Shipped (all Simulate-verified — `DDCS-Studio/tests/cam-slot-sim.spec.js`)
+- **Generators:** `data/opToSlot.js` (drill/bore × circle/grid/line/rect, + standalone slot),
+  `data/probeToSlot.js` (corner, edge, inside-centre [rect pocket OR round bore], boss-centre,
+  alignment), `data/millToSlot.js` (rect pocket, surface/face). Wired into the CAM builder Add-op.
+- **`data/camMacroKit.js`** — shared emitters: `twoPassProbe`/`probeSave`, `wcsBase`, `writeAxis`
+  (`#[805+(wcs-1)*5+ax]`), `rasterClear`, `spindleOn`/`spindleOff`/`SPINDLE_FIELD`.
+- **▶ Simulate** per-slot modal — the sim engine now executes full DDCS macros (`WHILE/DO/END`,
+  inline `IF…THEN`, trig coords). Seeds `#2600+` from field defaults. THE verification backbone.
+- **Bug fixes (found while porting):** invalid named M-code → inline cut; edge wizard missing
+  stylus-radius comp; sim two-operand `ATAN[a]/[b]` (atan2).
+- **Spindle:** cutting slots manage the spindle: `M3 S[#rpm]` (BRACKETED var, per `key-7.nc`
+  `M03 S[#140]`) + `G04 P2000` (~2s spin-up; **P is MILLISECONDS** on Expert — factory `slib-g.nc`
+  has `G04 P100 //100ms` + many `P2000`) … `M5`. NB: `key-7.nc`'s author misread P as seconds.
+
+### Controller-side access (how the operator reaches it — research doc §2.4 expanded)
+- CAM page opened by a **K-key bound to function code 1399** (`Pr210–252`). Tap slot → form → Start.
+- Slots only appear after `CAM/` is copied to **internal** storage (F2→Program→F1→F4); USB-run
+  does nothing. Studio packs start at **cam22+**. eng lines must be **merged** (not replace).
+
+### Roadmap forks
+- **Spindle in CAM slots [DECIDED, verify on machine]:** included because `key-7.nc` proves
+  self-contained op macros drive the spindle; safe either way (M3 only sets speed; editable line).
+  Genuinely unverifiable from the dump: whether the CAM menu pre-starts the spindle.
+- **(retracted) "wizard dwell bug":** investigated `makeStart`'s `G04 P2000`; it is CORRECT —
+  G04 P is **ms** on Expert (factory `slib-g.nc` `G04 P100 //100ms`). Lesson: a factory file
+  outranks a community macro (`key-7.nc` misread P as seconds).
+- **In progress:** auto-icon (render 360×180 BMP from op type, §5 idea 2), Probe-Z/tool-touch slot.
+- **Open variants:** circle pocket + spiral strategy; ramp/helical pocket lead-in.
+- **Later:** install path (#5 — eng-merge testable now, SMB push per §5c); alignment real-correction
+  (no G68; write `#763`/Pr263 Z-rot "in 3D toolpath mode", OR Studio rotates the program by #1512).
+- **Field-count friction:** probe/cutting slots run 9–14 fields; the form is ~8 rows practical (§5).
+  Mitigated by ordering job-params first; auto-icon + trimming defaults help.

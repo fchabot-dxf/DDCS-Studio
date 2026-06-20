@@ -340,7 +340,10 @@ export function initMacrosApp() {
         '3. F2 -> Program -> F1 (select U-disk) -> cursor on the CAM folder -> F4 (copy to local).',
         '   Macros MUST run from internal storage — running from USB silently does nothing.',
         '4. MERGE eng-additions.txt into the controller eng (and chs) language file — do NOT replace it.',
-        '', 'The new operations then appear on the CAM page.'].join('\n') + '\n';
+        '5. Open the CAM page: bind a K-key (K1-K7) to function code 1399 (parameter range Pr210-252),',
+        '   then press it. The new slots (cam22+) appear as icons — tap one, fill the form, press Start.',
+        '', 'Spindle: the cutting slots run M3/M5 themselves. If your CAM workflow starts the spindle',
+        'separately, delete the M3/G04/M5 lines from the macro (they are plain editable lines).'].join('\n') + '\n';
     const _camExport = q('cam_export_pack');
     if (_camExport) _camExport.addEventListener('click', () => {
         if (!_camPack.slots.length) { alert('No slots to export — add a slot first.'); return; }
