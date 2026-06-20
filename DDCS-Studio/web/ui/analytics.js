@@ -51,15 +51,7 @@ function isExe() {
   } catch (_) { return false; }
 }
 
-// Visiting any page with "?dev=1" marks THIS browser as the developer's own (persisted across visits);
-// "?dev=0" clears it. Your events are still recorded, but tagged dev=1 so you can filter your own
-// testing out of the numbers (do this once per browser you test from — it's per-browser, not per-network).
-try {
-  const q = new URLSearchParams(location.search);
-  if (q.get('dev') === '1') localStorage.setItem('ddcs_dev', '1');
-  if (q.get('dev') === '0') localStorage.removeItem('ddcs_dev');
-} catch (_) { /* storage blocked — ignore */ }
-
+// dev = this browser was marked as the developer's own (via ?dev=1, persisted). See the bottom of the file.
 function isDev() {
   try { return localStorage.getItem('ddcs_dev') === '1'; } catch (_) { return false; }
 }
@@ -82,5 +74,14 @@ export function track(event, name = '') {
 
 if (typeof window !== 'undefined') window.ddcsTrack = track;
 
-// One visit per page load.
+// "?dev=1" marks THIS browser as the developer's own (persisted) AND registers your current network, so
+// other devices on the same wifi count as you too; "?dev=0" undoes both. You only need it once per network.
+// (A tagged browser also re-registers the network on every visit below, so it self-heals if your IP changes.)
+try {
+  const q = new URLSearchParams(location.search);
+  if (q.get('dev') === '1') { localStorage.setItem('ddcs_dev', '1'); track('dev_register'); }
+  else if (q.get('dev') === '0') { localStorage.removeItem('ddcs_dev'); track('dev_unregister'); }
+} catch (_) { /* storage blocked — ignore */ }
+
+// One visit per page load (carries dev=1 if this browser is tagged → that also refreshes the network IP).
 track('visit', (typeof location !== 'undefined' && location.pathname) || '/');

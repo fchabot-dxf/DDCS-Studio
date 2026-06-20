@@ -2,7 +2,8 @@
 
 A tiny Cloudflare Worker that collects **anonymous, cookieless** usage events from the web app and the
 exe, and writes them to **Workers Analytics Engine**. Country is derived from `request.cf` at Cloudflare's
-edge — the visitor's IP is never sent or stored. No personal data, no consent banner needed.
+edge — visitors' IPs are never stored. No personal data, no cookies, no consent banner needed. (One
+exception: when you register a *dev* network, your OWN IP is kept privately to exclude your traffic — below.)
 
 It answers: how many **visits**, from which **countries**, on which **version/OS**, **web vs exe**, and
 which **basic functions** get used (open wizard, insert, export, tab switches…).
@@ -29,19 +30,20 @@ the exe beacon.
 
 ## What gets sent
 
-`POST` JSON: `{ event, name, id, app, version, os }`
+`POST` JSON: `{ event, name, id, app, version, os, dev }`
 
 | field | meaning |
 |-------|---------|
-| `event` | `visit` · `feature` · `app_launch` |
+| `event` | `visit` · `feature` · `app_launch` (+ internal `dev_register` / `dev_unregister`) |
 | `name` | feature/page label, e.g. `wizard:drill`, `insert`, `tab:gateway`, `/` |
 | `id` | anonymous random id (web: localStorage UUID · exe: `~/.ddcs-bridge/install_id`) — **not a person** |
 | `app` | `web` · `exe` |
 | `version` | Studio version, e.g. `10.23` |
 | `os` | coarse platform string |
+| `dev` | `1` = the developer's own traffic (else `0`) — see "Separating your own activity" |
 
 Stored in Analytics Engine as: `blob1`=event, `blob2`=name, `blob3`=country, `blob4`=app,
-`blob5`=version, `blob6`=os, `blob7`=city, `blob8`=region; `double1`=1 (count).
+`blob5`=version, `blob6`=os, `blob7`=city, `blob8`=region, `blob9`=dev; `double1`=1 (count).
 
 ## Querying
 
@@ -80,10 +82,13 @@ GROUP BY country ORDER BY launches DESC;
 
 Your own usage is tagged `dev = 1` (blob9) so you can exclude it — or look at only it:
 
-- **Each browser you test from** — open one of these once (it persists in that browser; per-browser,
-  not per-network, so do it on every browser you test with across your PCs):
-  - Mark this browser as yours (dev):  <https://ddcs-studio.pages.dev/?dev=1>
-  - Undo / mark as a normal visitor:   <https://ddcs-studio.pages.dev/?dev=0>
+- **Per network (covers all your devices):** from any one device on a network, visit
+  <https://ddcs-studio.pages.dev/?dev=1> once. That marks that browser as yours **and** registers the
+  network's IP (privately, in KV) so every other device on the same wifi — phone, tablet, other PCs —
+  counts as you too. Undo with <https://ddcs-studio.pages.dev/?dev=0>.
+  - **Self-healing:** any tagged browser re-registers the network on every visit, so if your ISP rotates
+    your IP it fixes itself the next time you open the app on a tagged device. (Worst case after an IP
+    change: *untagged* devices on that network count as real until you next open a tagged one there.)
 - **Dev runs of the exe** (`python fairy_gateway.py`): auto-tagged `dev=1` (a non-frozen run). A
   released `.exe` counts as real; set env `DDCS_DEV=1` to exclude a specific installed copy.
 
@@ -96,6 +101,8 @@ Filter in any query:
 
 ## Privacy / opt-out
 
-- No IP stored (country derived at the edge), no cookies, anonymous id only.
+- No visitor IP stored (country derived at the edge), no cookies, anonymous id only. The one exception
+  is your OWN IP, kept privately in KV (TTL'd ~120 days) only when you register a dev network — used
+  solely to exclude your own traffic.
 - Web: `localStorage.setItem('ddcs_no_analytics','1')` — also honours Do-Not-Track.
 - Exe: set env `DDCS_NO_ANALYTICS=1`.
