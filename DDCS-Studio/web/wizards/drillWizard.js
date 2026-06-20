@@ -30,7 +30,7 @@ export function drillStack(params = {}) {
     const helical = params.method === 'helical';
     const hole = newBlock(helical ? 'bore' : 'drill');
     hole.params = helical
-        ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) }
+        ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), ramp: params.ramp || 'step', feed: num(params.feed, 100), clearance: num(params.clearance, 5) }
         : { x: 0, y: 0, depth: num(params.depth, 5), peck: num(params.peck, 5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) };
     arr.children = [hole];
     return [makeStart(params), arr, makeEnd(params)];

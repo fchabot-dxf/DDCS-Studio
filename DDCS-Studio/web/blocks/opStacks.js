@@ -154,7 +154,7 @@ const RECONCILERS = {
             const h = hole.params;
             f.d_method = hole.type === 'bore' ? 'helical' : 'peck';
             f.d_depth = h.depth; f.d_feed = h.feed; f.d_clearance = h.clearance;
-            if (hole.type === 'bore') { f.d_holeDia = h.holeDia; f.d_toolDia = h.toolDia; f.d_pitch = h.pitch; }
+            if (hole.type === 'bore') { f.d_holeDia = h.holeDia; f.d_toolDia = h.toolDia; f.d_pitch = h.pitch; f.d_ramp = h.ramp; }
             else f.d_peck = h.peck;
         }
         return f;

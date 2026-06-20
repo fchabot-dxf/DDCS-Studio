@@ -855,7 +855,13 @@
                 </div>
                 <div id="d_method_bore" class="grid-2" style="display:none">
                     <div><span class="label">TOOL Ø (end mill)</span><input id="d_toolDia" value="4"/></div>
-                    <div><span class="label">PITCH (Z/rev)</span><input id="d_pitch" value="0.5" title="Z step per full circle (mm)."/></div>
+                    <div><span class="label">PITCH (Z/turn)</span><input id="d_pitch" value="0.5" title="Z step per full circle (mm)."/></div>
+                    <div><span class="label">RAMP</span>
+                        <select id="d_ramp" value="step" title="Step = plunge then flat circle each level (proven). Helix = continuous descent, linearized to G1 (the controller has no proven helical G2/G3).">
+                            <option value="step">Step (plunge + flat circle)</option>
+                            <option value="helix">Helix (linearized ramp)</option>
+                        </select>
+                    </div>
                 </div>
 
                 <span class="section-label">DEPTH &amp; FEED</span>
