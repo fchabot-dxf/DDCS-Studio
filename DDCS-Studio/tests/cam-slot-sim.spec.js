@@ -124,6 +124,29 @@ test('inside-centre slot: probes ±X then ±Y with a G53 re-centre between (bore
   expect(r.writesWcs, 'writes the centre to WCS X').toBe(true);
 });
 
+test('boss-centre slot: probes 4 faces from outside, 3 reposition prompts, writes centre', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { bossCentreSlot } = await import('/data/probeToSlot.js');
+    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
+    const s = bossCentreSlot();
+    const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
+    const seed = new Map(); s.fields.forEach((f) => seed.set(mirrorVar(f.idx), Number(f.def)));
+    const t = new GcodeExecutionEngine({ createVarStore: () => new Map(seed) }).trace(macro);
+    const probes = t.segments.filter((g) => g.probe).map((g) => {
+      const dx = g.x2 - g.x1, dy = g.y2 - g.y1;
+      return Math.abs(dx) > 1e-6 ? 'X' + (dx < 0 ? '-' : '+') : Math.abs(dy) > 1e-6 ? 'Y' + (dy < 0 ? '-' : '+') : '0';
+    });
+    const lefts = (macro.match(/\[/g) || []).length, rights = (macro.match(/\]/g) || []).length;
+    return { balanced: lefts === rights, capped: t.stats.capped, probes, prompts: (macro.match(/REPOSITION/g) || []).length, writesWcs: /#\[#70\]=#53/.test(macro) && /#\[#73\]=#56/.test(macro) };
+  });
+  expect(r.balanced).toBe(true); expect(r.capped).toBe(false);
+  expect(r.probes, 'each face probed from outside').toEqual(['X-', 'X-', 'X+', 'X+', 'Y-', 'Y-', 'Y+', 'Y+']);
+  expect(r.prompts, '3 operator repositions around the boss').toBe(3);
+  expect(r.writesWcs, 'writes the centre to WCS X/Y').toBe(true);
+});
+
 test('alignment slot: fence axis selects the probe axis; measures (no WCS write)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {

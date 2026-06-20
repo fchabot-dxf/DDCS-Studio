@@ -325,6 +325,98 @@ export function insideCentreSlot(used = new Set(), varOffset = 0) {
     return { name: 'Probe inside centre', fields, body };
 }
 
+const BOSS_FIELDS = [
+    { key: 'wcs', label: 'WCS (0act 1-6 G54-G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
+    { key: 'maxProbe', label: 'Max probe', units: 'mm', def: 50, min: 1, max: 9999, type: 1 },
+    { key: 'retract', label: 'Retract', units: 'mm', def: 2, min: 0.1, max: 999, type: 1 },
+    { key: 'safeZ', label: 'Safe Z lift', units: 'mm', def: 15, min: 0.1, max: 999, type: 1 },
+    { key: 'fast', label: 'Fast feed', units: 'mm/min', def: 200, min: 1, max: 9999, type: 0 },
+    { key: 'slow', label: 'Slow feed', units: 'mm/min', def: 50, min: 1, max: 9999, type: 0 },
+    { key: 'port', label: 'Probe port P', units: '', def: 3, min: 0, max: 99, type: 0 },
+    { key: 'level', label: 'Trigger level L (0 1)', units: '', def: 0, min: 0, max: 1, type: 0 },
+];
+
+/**
+ * Build the "Probe boss centre" CAM slot — find the centre of an OUTSIDE feature (post/boss). Probe each of
+ * the 4 faces FROM OUTSIDE; because the tool can't cross a solid boss, the operator must move AROUND it — so
+ * the macro PAUSES with a reposition prompt (#1505) between faces, saving/restoring probe-height Z via the Z
+ * DRO (#882) + G53, and re-centres X at safe Z before the Y faces (never cross the boss at depth). Writes the
+ * centre to WCS X/Y; reports span/roundness. Ported from circularStack (boss).
+ */
+export function bossCentreSlot(used = new Set(), varOffset = 0) {
+    const { fields, v } = allocFields(BOSS_FIELDS, used, varOffset);
+    // Two-pass probe of one face: approach (tgt), retract (ret = away from the face), save trigger.
+    const face = (ax, tgt, ret, resultVar) => {
+        const st = ax === 'X' ? '#1920' : '#1921', res = ax === 'X' ? '#1925' : '#1926';
+        return [
+            `G31 ${ax}${tgt} F${v.fast} P${v.port} L${v.level} Q1`, `IF ${st}!=2 GOTO 1`, `G0 ${ax}${ret}`,
+            `G31 ${ax}${tgt} F${v.slow} P${v.port} L${v.level} Q1`, `IF ${st}!=2 GOTO 1`, `${resultVar}=${res}`, `G0 ${ax}${ret}`,
+        ];
+    };
+    // Save probe-height Z, lift clear, optional re-centre, PAUSE for the operator to move around, return to Z.
+    const reposition = (msg, recentreAx, recentreVal) => {
+        const L = ['#57=#882   ;save probe-height Z (machine DRO)', `G0 Z${v.safeZ}   ;lift clear of the boss`];
+        if (recentreAx) L.push(`G53 ${recentreAx}${recentreVal}   ;re-centre at safe Z (never cross the boss at depth)`);
+        L.push(`#1505=1   ;REPOSITION: ${msg}, then press Enter`, 'IF #1505 EQ 0 GOTO 2', 'G53 Z#57   ;back to probe height', 'G91   ( incremental )');
+        return L;
+    };
+    const body = [
+        '( Probe BOSS / outside centre. Position clear of the +X face at probe depth, press Enter. You will be prompted to move around between faces. )',
+        ...fields.map(readLine),
+        '',
+        '( WCS base address — 0 = read the active WCS from #578 )',
+        `#71=${v.wcs}`,
+        'IF #71 EQ 0 THEN #71=#578',
+        '#70=[805+[#71-1]*5]',
+        '',
+        `#90=${v.maxProbe}   ;+max probe`,
+        `#91=[0-${v.maxProbe}]   ;-max probe`,
+        `#92=${v.retract}   ;+retract`,
+        `#93=[0-${v.retract}]   ;-retract`,
+        '',
+        `#1505=1   ;Position clear of the +X face at probe depth, press Enter`,
+        'IF #1505 EQ 0 GOTO 2',
+        'G91   ( incremental )',
+        '',
+        '( +X face: approach from +X, probe -X )',
+        ...face('X', '#91', '#92', '#51'),
+        ...reposition('move clear, around to the -X side of the boss'),
+        '( -X face: approach from -X, probe +X )',
+        ...face('X', '#90', '#93', '#52'),
+        '#53=[[#51+#52]/2]   ;X centre (machine coord)',
+        ...reposition('move clear, around to the +Y side of the boss', 'X', '#53'),
+        '( +Y face: approach from +Y, probe -Y )',
+        ...face('Y', '#91', '#92', '#54'),
+        ...reposition('move clear, around to the -Y side of the boss'),
+        '( -Y face: approach from -Y, probe +Y )',
+        ...face('Y', '#90', '#93', '#55'),
+        '#56=[[#54+#55]/2]   ;Y centre (machine coord)',
+        '',
+        '( spans: diameters for a round boss, width/height for a rectangular boss )',
+        '#58=[#51-#52]   ;X span',
+        '#59=[#54-#55]   ;Y span',
+        '#61=[#58-#59]   ;roundness (X span - Y span)',
+        '',
+        `G0 Z${v.safeZ}   ;lift clear`,
+        '#[#70]=#53   ;write WCS X centre',
+        '#73=[#70+1]',
+        '#[#73]=#56   ;write WCS Y centre',
+        '',
+        'G90   ( absolute )',
+        '#1505=-5000   ;boss centre found',
+        'GOTO 2',
+        '( error handler )',
+        'N1',
+        'G91',
+        `G0 Z${v.safeZ}   ;lift clear`,
+        'G90',
+        '#1505=1   ;ERROR: probe did not trigger',
+        'N2',
+        'M30',
+    ].join('\n');
+    return { name: 'Probe boss centre', fields, body };
+}
+
 const ALIGN_FIELDS = [
     { key: 'checkAxis', label: 'Fence along (0X 1Y)', units: '', def: 0, min: 0, max: 1, type: 0 },
     { key: 'dir', label: 'Probe dir (0pos 1neg)', units: '', def: 0, min: 0, max: 1, type: 0 },
