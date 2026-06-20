@@ -444,3 +444,30 @@ test('structured op editing: ops manifest drives the macro; edit type/variant + 
   expect(r.remaining).toEqual(['bore']); expect(r.noPocket, 'removing an op regenerates without it').toBe(true);
   expect(r.probeVarHidden, 'probe op card hides the variant control').toBe(true);
 });
+
+test('structured op editing: tuned field values persist across an op edit (per-op, matched by key)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const mod = await import('/ui/macrosApp.js'); mod.initMacrosApp();
+    const root = document.getElementById('macros-app');
+    root.querySelector('#cam_add_slot').click();
+    const card = () => root.querySelector('.cam-slot');
+    const op = card().querySelector('.cam-op'); op.value = 'drill'; op.dispatchEvent(new Event('change', { bubbles: true }));
+    card().querySelector('[data-act="addop"]').click();
+    const body = () => card().querySelector('textarea[data-f="body"]').value;
+    const rowFor = (label) => Array.from(card().querySelectorAll('tr[data-fi]')).find((r) => r.querySelector('.cf[data-f="label"]').value === label);
+    const defOf = (label) => { const r = rowFor(label); return r ? r.querySelector('.cf[data-f="def"]').value : null; };
+    const setDef = (label, val) => { const i = rowFor(label).querySelector('.cf[data-f="def"]'); i.value = String(val); i.dispatchEvent(new Event('input', { bubbles: true })); };
+    const setSel = (sel, v) => { sel.value = v; sel.dispatchEvent(new Event('change', { bubbles: true })); };
+    setDef('Depth', 9);
+    setSel(card().querySelectorAll('.cam-op-var')[0], 'grid');   // variant change — Depth carries over
+    const afterVariant = { def: defOf('Depth'), body: /;Depth \[mm\] =9 /.test(body()) };
+    setSel(card().querySelectorAll('.cam-op-type')[0], 'bore');  // type change — Depth carries over
+    const afterType = { def: defOf('Depth'), body: /;Depth \[mm\] =9 /.test(body()) };
+    return { afterVariant, afterType };
+  });
+  expect(r.afterVariant.def, 'tuned default survives a variant change').toBe('9');
+  expect(r.afterVariant.body, 'macro read-line re-synced to the tuned default').toBe(true);
+  expect(r.afterType.def, 'tuned default survives a type change').toBe('9');
+  expect(r.afterType.body).toBe(true);
+});

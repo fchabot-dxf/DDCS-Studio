@@ -198,18 +198,42 @@ export function initMacrosApp() {
     const defaultVariant = (type) => (SECOND_CTL[type] ? SECOND_CTL[type].opts[0][0] : '');
     // Generate one op into a starting point. The mill/probe ops live in CAM_GEN; drill/bore/slot go via slotFromOp.
     const generateOp = (type, variant, used, off) => (CAM_GEN[type] ? CAM_GEN[type](used, off, variant) : slotFromOp(type, variant, used, off));
+    // Columns the user can tune in the field table that we PERSIST per op (so a regenerate keeps them, matched by
+    // field key). `var` is generator-assigned (renaming would desync the body) and `type` has no column, so neither
+    // is persisted. Stored on the op as op.values[key] = {def, min, max, label, units}.
+    const FIELD_OVR_COLS = ['label', 'units', 'def', 'min', 'max'];
+    // A read-line in canonical form (identical to what every generator emits) — used to re-sync the macro comment
+    // to a tuned field so the table, the macro, Simulate and "Refresh fields" all agree.
+    const canonicalRead = (f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`;
+    function applyOverridesToBody(body, fields, values) {
+        let out = body;
+        fields.forEach((f) => {
+            if (!values[f.key]) return;   // only fields the user actually tuned
+            const re = new RegExp('^[ \\t]*' + f.var.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=#' + (f.idx + 1500) + '\\b.*$', 'm');
+            if (re.test(out)) out = out.replace(re, canonicalRead(f));
+        });
+        return out;
+    }
     // Rebuild a slot's fields + body + name from its op list. Params are allocated AROUND the other slots' params
-    // (so a regenerate doesn't collide), and vars continue across ops — exactly the Add-op append sequence. Field
-    // defaults reset to each op's generator defaults (a structural edit is a rebuild); the icon is left alone.
+    // (so a regenerate doesn't collide), and vars continue across ops — exactly the Add-op append sequence. Each
+    // field is tagged with its owning op (_op) and any value the user tuned on that op (op.values) is re-applied to
+    // both the field and its macro read-line; only keys carried over by the new op/variant survive. Icon untouched.
     function buildSlotFromOps(slot) {
         const used = new Set();
         _camPack.slots.forEach((s) => { if (s !== slot) (s.fields || []).forEach((f) => used.add(f.idx)); });
         let fields = [], parts = [], name = '';
-        (slot.ops || []).forEach((op) => {
+        (slot.ops || []).forEach((op, oi) => {
             const gen = generateOp(op.type, op.variant, used, fields.length);
-            gen.fields.forEach((f) => used.add(f.idx));
+            let body = gen.body;
+            gen.fields.forEach((f) => {
+                used.add(f.idx);
+                f._op = oi;
+                const ov = op.values && op.values[f.key];
+                if (ov) FIELD_OVR_COLS.forEach((k) => { if (ov[k] !== undefined) f[k] = ov[k]; });
+            });
+            if (op.values) body = applyOverridesToBody(body, gen.fields, op.values);
             fields = fields.concat(gen.fields);
-            parts.push(gen.body);
+            parts.push(body);
             name = name ? name + ' + ' + gen.name.replace(/^(Drill|Bore) — /, '') : gen.name;
         });
         slot.fields = fields;
@@ -231,7 +255,7 @@ export function initMacrosApp() {
             </div>`).join('');
         const dirty = slot.bodyDirty ? '<div class="settings-hint" style="color:#fd0; margin:0;">✎ macro hand-edited — changing an op rebuilds it and discards those edits</div>' : '';
         return `<div class="cam-ops" style="margin-top:8px; display:flex; flex-direction:column; gap:5px;">
-                <div style="font-size:10px; color:var(--text-dim);">OPS IN THIS SLOT — edit to rebuild the macro (field defaults reset to each op's defaults)</div>
+                <div style="font-size:10px; color:var(--text-dim);">OPS IN THIS SLOT — edit to rebuild the macro (tuned field values are kept where the new op shares the same field)</div>
                 ${cards}${dirty}
             </div>`;
     }
@@ -351,6 +375,11 @@ export function initMacrosApp() {
             if (t.classList.contains('cf')) {
                 const f = (slot.fields || [])[+t.closest('tr').dataset.fi]; if (!f) return; const fld = t.dataset.f;
                 f[fld] = (fld === 'label' || fld === 'units' || fld === 'var') ? t.value : (t.value === '' ? '' : parseFloat(t.value));
+                // Structured slot: remember this tuned column on the owning op so a regenerate keeps it.
+                if (slot.ops && f._op != null && f.key && FIELD_OVR_COLS.includes(fld)) {
+                    const op = slot.ops[f._op];
+                    if (op) { op.values = op.values || {}; op.values[f.key] = op.values[f.key] || {}; op.values[f.key][fld] = f[fld]; }
+                }
                 saveCamPack();
             } else if (t.classList.contains('cs')) {
                 const fld = t.dataset.f;
