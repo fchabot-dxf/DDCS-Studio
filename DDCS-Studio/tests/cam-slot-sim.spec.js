@@ -245,6 +245,23 @@ test('cutting slots manage the spindle with the proven Expert forms (M3 S[#var],
   }
 });
 
+test('auto-icon renders a valid 360x180 BMP from the op name/kind', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { autoIconBmp } = await import('/data/autoIcon.js');
+    const url = autoIconBmp('Probe corner', 'corner');
+    const bin = atob(url.split(',')[1]);
+    const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    const rd = (o) => u[o] | (u[o + 1] << 8) | (u[o + 2] << 16) | (u[o + 3] << 24);   // LE int32
+    return { isBmp: url.startsWith('data:image/bmp;base64,'), magic: bin.slice(0, 2), w: rd(18), h: rd(22), pocketOk: autoIconBmp('Pocket (rect)', 'pocket').startsWith('data:image/bmp') };
+  });
+  expect(r.isBmp).toBe(true);
+  expect(r.magic, 'BMP signature').toBe('BM');
+  expect(r.w, 'width 360').toBe(360);
+  expect(r.h, 'height 180').toBe(180);
+  expect(r.pocketOk).toBe(true);
+});
+
 test('preview panel mounts on a seeded slot macro without throwing', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const ok = await page.evaluate(async () => {

@@ -12,6 +12,7 @@ import { openIconEditor } from './iconEditor.js';
 import { slotFromOp } from '../data/opToSlot.js';
 import { cornerSlot, edgeSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } from '../data/probeToSlot.js';
 import { pocketSlot, surfacingSlot } from '../data/millToSlot.js';
+import { autoIconBmp } from '../data/autoIcon.js';
 import { auditMacroVars } from '../data/varMap.js';
 import { makeZip, downloadBytes } from '../data/zip.js';
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';
@@ -301,7 +302,11 @@ export function initMacrosApp() {
                 // Probe ops (corner/edge, …) are single self-positioning sequences, not point-patterns — they ignore the pattern select.
                 const GEN = { corner: cornerSlot, edge: edgeSlot, inside: insideCentreSlot, boss: bossCentreSlot, align: alignmentSlot, pocket: pocketSlot, surface: surfacingSlot };
                 const gen = GEN[method] ? GEN[method](camPack.usedParams(_camPack), off) : slotFromOp(method, pattern, camPack.usedParams(_camPack), off);
-                if (empty) { slot.name = gen.name; slot.fields = gen.fields; slot.body = gen.body; }
+                if (empty) {
+                    slot.name = gen.name; slot.fields = gen.fields; slot.body = gen.body;
+                    // Auto-seed a labelled icon so a fresh slot isn't blank (editable via the icon editor).
+                    if (!slot.icon) { try { slot.icon = { name: (gen.name || 'cam' + slot.slot) + '.bmp', data: autoIconBmp(gen.name, method), w: 360, h: 180, source: 'auto' }; } catch (_) { /* canvas unavailable */ } }
+                }
                 else {   // APPEND a second op → multi-op slot (vars continue; ops run in sequence)
                     slot.fields = (slot.fields || []).concat(gen.fields);
                     slot.body = String(slot.body || '').replace(/\s+$/, '') + '\n\n' + gen.body;
