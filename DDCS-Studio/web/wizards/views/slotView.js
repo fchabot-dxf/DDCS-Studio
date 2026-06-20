@@ -65,7 +65,7 @@ export const slotView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'sl_ax', 'sl_ay', 'sl_bx', 'sl_by', 'sl_width',
+        'sl_ax', 'sl_ay', 'sl_bx', 'sl_by', 'sl_width', 'sl_wcs',
         'sl_toolDia', 'sl_stepoverPct', 'sl_depth', 'sl_stepdown', 'sl_clearance', 'sl_feed', 'sl_plunge', 'sl_rpm',
     ],
     probeSrcFields: {},
@@ -79,7 +79,7 @@ export const slotView = {
     update(ctx) {
         const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
         const params = {
-            ax: v('sl_ax'), ay: v('sl_ay'), bx: v('sl_bx'), by: v('sl_by'), width: v('sl_width'),
+            ax: v('sl_ax'), ay: v('sl_ay'), bx: v('sl_bx'), by: v('sl_by'), width: v('sl_width'), wcs: v('sl_wcs') || 'active',
             toolDia: v('sl_toolDia'), stepoverPct: v('sl_stepoverPct'),
             depth: v('sl_depth'), stepdown: v('sl_stepdown'), clearance: v('sl_clearance'),
             feed: v('sl_feed'), plunge: v('sl_plunge'), rpm: v('sl_rpm'),

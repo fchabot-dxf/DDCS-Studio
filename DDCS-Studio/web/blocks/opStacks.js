@@ -101,8 +101,9 @@ const RECONCILERS = {
     surfacing(prog) {
         const down = find(prog, 'stepdown'), over = down && down.children && down.children[0], rg = over && over.params && over.params.region;
         if (!down || !over || !rg || !rg.params) return null;
-        const tool = formNum('sf_toolDia', 12);   // un-derive stepover% from the absolute StepOver value
+        const tool = formNum('sf_toolDia', 12), wb = find(prog, 'wcs');   // un-derive stepover% from the absolute StepOver value
         return {
+            sf_wcs: (wb && wb.params && wb.params.wcs) || 'active',
             sf_originX: rg.params.x, sf_originY: rg.params.y, sf_w: rg.params.w, sf_h: rg.params.h,
             sf_depth: down.params.to, sf_stepdown: down.params.by,
             sf_strategy: over.params.strategy === 'parallel' ? 'raster' : 'spiral',
@@ -113,8 +114,9 @@ const RECONCILERS = {
     slot(prog) {
         const s = find(prog, 'slot');
         if (!s || !s.params) return null;
-        const p = s.params;
+        const p = s.params, wb = find(prog, 'wcs');
         return {
+            sl_wcs: (wb && wb.params && wb.params.wcs) || 'active',
             sl_ax: p.x0, sl_ay: p.y0, sl_bx: p.x1, sl_by: p.y1, sl_width: p.width,
             sl_toolDia: p.tool, sl_stepoverPct: p.stepoverPct, sl_depth: p.depth, sl_stepdown: p.stepdown,
             sl_feed: p.feed, sl_plunge: p.plunge, sl_clearance: p.clearance,
@@ -125,8 +127,9 @@ const RECONCILERS = {
         if (!down || !Array.isArray(down.children)) return null;   // too-small fallback (drill) → no reverse
         const over = down.children.find((c) => c.type === 'stepover'), rg = over && over.params && over.params.region;
         if (!over || !rg || !rg.params) return null;
-        const tool = formNum('p_toolDia', 6), r = tool / 2;   // the Region is inset by the tool radius — un-inset it
+        const tool = formNum('p_toolDia', 6), r = tool / 2, wb = find(prog, 'wcs');   // the Region is inset by the tool radius — un-inset it
         const f = {
+            p_wcs: (wb && wb.params && wb.params.wcs) || 'active',
             p_shape: rg.params.shape,
             p_depth: down.params.to, p_stepdown: down.params.by,
             p_strategy: over.params.strategy === 'parallel' ? 'raster' : 'spiral',

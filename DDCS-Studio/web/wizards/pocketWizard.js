@@ -21,6 +21,7 @@ export function pocketStack(params = {}) {
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
     const raster = (params.strategy || 'spiral') === 'raster';
     const depth = num(params.depth, 4), by = num(params.stepdown, 1.5);
+    const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
 
     // tool-centre region (inset by the tool radius) + too-small detection
     let region = newBlock('region'), tooSmall, cx, cy;
@@ -36,7 +37,7 @@ export function pocketStack(params = {}) {
     if (tooSmall) {   // pocket smaller than the tool → a single centre plunge, pecking to depth
         const hole = newBlock('drill');
         hole.params = { x: cx, y: cy, depth, peck: by, feed: plunge, clearance: clr };
-        return [makeStart(params), hole, makeEnd(params)];
+        return [makeStart(params), wcs, hole, makeEnd(params)];
     }
 
     const over = newBlock('stepover');
@@ -49,7 +50,7 @@ export function pocketStack(params = {}) {
         wall.params = { region, z: 'z', feed, plunge, clearance: clr };
         down.children.push(wall);
     }
-    return [makeStart(params), down, makeEnd(params)];
+    return [makeStart(params), wcs, down, makeEnd(params)];
 }
 
 export class PocketWizard {

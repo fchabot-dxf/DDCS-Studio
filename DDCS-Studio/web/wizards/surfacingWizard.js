@@ -29,7 +29,8 @@ export function surfacingStack(params = {}) {
     const down = newBlock('stepdown');
     down.params = { to: num(params.depth, 0.5), by: num(params.stepdown, 0.5) };
     down.children = [over];
-    return [makeStart(params), down, makeEnd(params)];   // Program Start … op … Program End (framing as blocks)
+    const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
+    return [makeStart(params), wcs, down, makeEnd(params)];   // Program Start … WCS … op … Program End
 }
 
 export class SurfacingWizard {

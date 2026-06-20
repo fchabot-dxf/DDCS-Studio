@@ -49,7 +49,7 @@ export const surfacingView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'sf_originX', 'sf_originY', 'sf_w', 'sf_h',
+        'sf_originX', 'sf_originY', 'sf_w', 'sf_h', 'sf_wcs',
         'sf_strategy', 'sf_toolDia', 'sf_stepoverPct', 'sf_depth', 'sf_stepdown', 'sf_clearance', 'sf_feed', 'sf_plunge', 'sf_rpm',
     ],
     probeSrcFields: {},
@@ -66,7 +66,7 @@ export const surfacingView = {
     update(ctx) {
         const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
         const params = {
-            originX: v('sf_originX'), originY: v('sf_originY'), w: v('sf_w'), h: v('sf_h'),
+            originX: v('sf_originX'), originY: v('sf_originY'), w: v('sf_w'), h: v('sf_h'), wcs: v('sf_wcs') || 'active',
             strategy: v('sf_strategy') || 'raster',
             toolDia: v('sf_toolDia'), stepoverPct: v('sf_stepoverPct'),
             depth: v('sf_depth'), stepdown: v('sf_stepdown'), clearance: v('sf_clearance'),

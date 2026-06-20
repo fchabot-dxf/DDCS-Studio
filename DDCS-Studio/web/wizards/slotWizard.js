@@ -20,7 +20,8 @@ export function slotStack(params = {}) {
         stepoverPct: num(params.stepoverPct, 40), depth: num(params.depth, 4), stepdown: num(params.stepdown, 1.5),
         feed: num(params.feed, 600), plunge: num(params.plunge, 150), clearance: num(params.clearance, 5),
     };
-    return [makeStart(params), slot, makeEnd(params)];
+    const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
+    return [makeStart(params), wcs, slot, makeEnd(params)];
 }
 
 export class SlotWizard {
