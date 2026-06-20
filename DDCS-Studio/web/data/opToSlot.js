@@ -34,6 +34,29 @@ const SPEC = {
     pitch: { label: 'Pitch (Z/turn)', units: 'mm', def: 0.5, min: 0.05, max: 999, type: 1 },
     feed: { label: 'Feed', units: 'mm/min', def: 300, min: 1, max: 99999, type: 0 },
     clearance: { label: 'Clearance Z', units: 'mm', def: 5, min: 0, max: 9999, type: 1 },
+    ax: { label: 'A — X', units: 'mm', def: 0, min: -99999, max: 99999, type: 1 },
+    ay: { label: 'A — Y', units: 'mm', def: 0, min: -99999, max: 99999, type: 1 },
+    bx: { label: 'B — X', units: 'mm', def: 60, min: -99999, max: 99999, type: 1 },
+    by: { label: 'B — Y', units: 'mm', def: 0, min: -99999, max: 99999, type: 1 },
+    stepdown: { label: 'Stepdown', units: 'mm', def: 1.5, min: 0.1, max: 9999, type: 1 },
+};
+
+// Standalone ops (not point-patterns) — each: the form fields it exposes + a parametric body builder(v).
+const STANDALONE = {
+    slot: {
+        label: 'Slot',
+        fields: ['ax', 'ay', 'bx', 'by', 'depth', 'stepdown', 'feed', 'clearance'],
+        body: (v) => ['( slot A->B centerline, stepping down. For width > tool, add perpendicular offset passes. )',
+            '#50=0',
+            `WHILE #50 LT ${v.depth} DO1`,
+            `  #50=#50+${v.stepdown}`,
+            `  IF #50 GT ${v.depth} THEN #50=${v.depth}`,
+            `  G0 X${v.ax} Y${v.ay}`,
+            `  G1 Z[-#50] F${v.feed}`,
+            `  G1 X${v.bx} Y${v.by} F${v.feed}`,
+            `  G0 Z${v.clearance}`,
+            'END1'].join('\n'),
+    },
 };
 
 const PATTERN_FIELDS = { circle: ['dia', 'count', 'startAngle'], grid: ['cols', 'rows', 'dx', 'dy'], line: ['count', 'spacing', 'angle'], rect: ['w', 'h', 'nx', 'ny'] };
@@ -87,7 +110,8 @@ function loopBody(pattern, v, call) {
  * Returns { name, fields:[{idx,label,units,def,min,max,type,var}], body }  — plugs straight into camPack.
  */
 export function slotFromOp(method, pattern, used = new Set(), varOffset = 0) {
-    const order = ['posX', 'posY', ...PATTERN_FIELDS[pattern], ...HOLE_FIELDS[method], 'feed', 'clearance'];
+    const std = STANDALONE[method];
+    const order = std ? std.fields : ['posX', 'posY', ...PATTERN_FIELDS[pattern], ...HOLE_FIELDS[method], 'feed', 'clearance'];
     const taken = new Set(used);
     const fields = order.map((key, i) => {
         const idx = nextParam(taken); if (idx != null) taken.add(idx);
@@ -96,6 +120,11 @@ export function slotFromOp(method, pattern, used = new Set(), varOffset = 0) {
         return { key, idx, var: '#' + (varOffset + i + 1), label: s.label, units: s.units, def, min: s.min, max: s.max, type: s.type };
     });
     const v = {}; fields.forEach((f) => { v[f.key] = f.var; });
+    if (std) {   // standalone op (slot/pocket/surfacing) — no pattern, no shared sub
+        const reads = fields.map((f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`);
+        const body = [`( ${std.label} )`, ...reads, '', std.body(v)].join('\n');
+        return { name: std.label, fields, body };
+    }
     const call = method === 'bore' ? 'M_borehole' : 'M_drillhole';
     // copy the hole params (+ feed/clearance) into the sub's working vars #30+, then run the pattern loop.
     const wv = method === 'bore'
