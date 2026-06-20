@@ -15,6 +15,7 @@
  * (radius-comp temps) — clear of drill/bore's #30–#54 so a probe can share a slot if ever appended.
  */
 import { nextParam } from './camPack.js';
+import { PROBE, wcsBase, writeAxis, twoPassProbe, probeSave } from './camMacroKit.js';
 
 // Probe form fields, in display + #-var order. type 1 = decimal, 0 = integer. Legends use ( ) not [ ]/=
 // so the mirror-read comment stays parseable by fieldsFromMacro ("Refresh fields").
@@ -58,25 +59,16 @@ export function cornerSlot(used = new Set(), varOffset = 0) {
     // One wall: fast touch → check → retract → slow touch → check → radius-comp → WCS write → back off + lift.
     // sgn = ±1 sign var for this axis; the wall is at trigger + sgn*radius (outside/boss corner).
     const wall = (ax) => {
-        const st = ax === 'X' ? '#1920' : '#1921';   // probe status (2 = success)
-        const res = ax === 'X' ? '#1925' : '#1926';  // trigger position (machine coord)
         const tgt = ax === 'X' ? '#93' : '#94';      // signed probe target
         const ret = ax === 'X' ? '#95' : '#96';      // signed retract (away from wall)
         const sgn = ax === 'X' ? '#90' : '#91';
-        const L = [
-            `G31 ${ax}${tgt} F${v.fast} P${v.port} L${v.level} Q1`,
-            `IF ${st}!=2 GOTO 1`,
-            `G0 ${ax}${ret}`,
-            `G31 ${ax}${tgt} F${v.slow} P${v.port} L${v.level} Q1`,
-            `IF ${st}!=2 GOTO 1`,
+        const comp = ax === 'X' ? '#102' : '#101';
+        return [
+            ...twoPassProbe(ax, { tgt, ret, fast: v.fast, slow: v.slow, port: v.port, level: v.level }),
+            `${comp}=[${PROBE[ax].result}+${sgn}*${v.radius}]   ;trigger + sign*radius`,
+            ...writeAxis(ax === 'X' ? 0 : 1, comp, 'write WCS ' + ax),
+            `G0 ${ax}${ret}   ;back off the wall`, `G0 Z#92   ;lift to safe Z`,
         ];
-        if (ax === 'X') {
-            L.push(`#102=[${res}+${sgn}*${v.radius}]   ;trigger + sign*radius`, `#[#70]=#102   ;write WCS X`);
-        } else {
-            L.push(`#101=[${res}+${sgn}*${v.radius}]   ;trigger + sign*radius`, `#73=[#70+1]`, `#[#73]=#101   ;write WCS Y`);
-        }
-        L.push(`G0 ${ax}${ret}   ;back off the wall`, `G0 Z#92   ;lift to safe Z`);
-        return L;
     };
 
     // Reposition between walls: move ALONG the just-probed wall (own dir) + AROUND to the next (opposite dir).
@@ -111,9 +103,7 @@ export function cornerSlot(used = new Set(), varOffset = 0) {
         `IF ${v.corner} EQ 4 THEN #91=0-1`,
         '',
         '( WCS base address — 0 = read the active WCS from #578 )',
-        `#71=${v.wcs}`,
-        `IF #71 EQ 0 THEN #71=#578`,
-        '#70=[805+[#71-1]*5]',
+        ...wcsBase(v.wcs),
         '',
         '( calculated motions )',
         `#92=[${v.safeZ}+${v.scan}]   ;plunge depth = safe Z + scan`,
@@ -128,13 +118,8 @@ export function cornerSlot(used = new Set(), varOffset = 0) {
         '',
         '( optional Z surface probe )',
         `IF ${v.probeZ} EQ 0 GOTO 10`,
-        `G31 Z#97 F${v.fast} P${v.port} L${v.level} Q1`,
-        'IF #1922!=2 GOTO 1',
-        `G0 Z${v.retract}`,
-        `G31 Z#97 F${v.slow} P${v.port} L${v.level} Q1`,
-        'IF #1922!=2 GOTO 1',
-        '#73=[#70+2]',
-        '#[#73]=#1927   ;write WCS Z = trigger (machine coord)',
+        ...twoPassProbe('Z', { tgt: '#97', ret: v.retract, fast: v.fast, slow: v.slow, port: v.port, level: v.level }),
+        ...writeAxis(2, '#1927', 'write WCS Z = trigger (machine coord)'),
         `G0 Z${v.safeZ}   ;lift to safe Z`,
         'N10',
         '',
@@ -184,22 +169,12 @@ const EDGE_FIELDS = [
  */
 export function edgeSlot(used = new Set(), varOffset = 0) {
     const { fields, v } = allocFields(EDGE_FIELDS, used, varOffset);
-    const wallProbe = (ax) => {
-        const st = ax === 'X' ? '#1920' : '#1921';
-        const res = ax === 'X' ? '#1925' : '#1926';
-        const L = [
-            `G31 ${ax}#93 F${v.fast} P${v.port} L${v.level} Q1`,
-            `IF ${st}!=2 GOTO 1`,
-            `G0 ${ax}#95`,
-            `G31 ${ax}#93 F${v.slow} P${v.port} L${v.level} Q1`,
-            `IF ${st}!=2 GOTO 1`,
-            `#50=[${res}+#90*${v.radius}]   ;edge = trigger + sign*radius`,
-        ];
-        if (ax === 'X') L.push('#[#70]=#50   ;write WCS X');
-        else L.push('#73=[#70+1]', '#[#73]=#50   ;write WCS Y');
-        L.push(`G0 ${ax}#95   ;back off the wall`);
-        return L;
-    };
+    const wallProbe = (ax) => [
+        ...twoPassProbe(ax, { tgt: '#93', ret: '#95', fast: v.fast, slow: v.slow, port: v.port, level: v.level }),
+        `#50=[${PROBE[ax].result}+#90*${v.radius}]   ;edge = trigger + sign*radius`,
+        ...writeAxis(ax === 'X' ? 0 : 1, '#50', 'write WCS ' + ax),
+        `G0 ${ax}#95   ;back off the wall`,
+    ];
     const body = [
         '( Probe ONE edge → set one WCS axis. Position clear of the wall at probe depth, press Enter. )',
         ...fields.map(readLine),
@@ -209,9 +184,7 @@ export function edgeSlot(used = new Set(), varOffset = 0) {
         `IF ${v.dir} EQ 1 THEN #90=0-1`,
         '',
         '( WCS base address — 0 = read the active WCS from #578 )',
-        `#71=${v.wcs}`,
-        'IF #71 EQ 0 THEN #71=#578',
-        '#70=[805+[#71-1]*5]',
+        ...wcsBase(v.wcs),
         '',
         `#93=[#90*${v.maxProbe}]   ;signed probe target`,
         `#95=[[0-#90]*${v.retract}]   ;signed retract (away from wall)`,
@@ -263,21 +236,14 @@ const INSIDE_FIELDS = [
 export function insideCentreSlot(used = new Set(), varOffset = 0) {
     const { fields, v } = allocFields(INSIDE_FIELDS, used, varOffset);
     // Two-pass probe (fast→slow) in one direction, saving the trigger; retract after each pass.
-    const twoPass = (ax, tgt, ret, resultVar) => {
-        const st = ax === 'X' ? '#1920' : '#1921', res = ax === 'X' ? '#1925' : '#1926';
-        return [
-            `G31 ${ax}${tgt} F${v.fast} P${v.port} L${v.level} Q1`, `IF ${st}!=2 GOTO 1`, `G0 ${ax}${ret}`,
-            `G31 ${ax}${tgt} F${v.slow} P${v.port} L${v.level} Q1`, `IF ${st}!=2 GOTO 1`, `${resultVar}=${res}`, `G0 ${ax}${ret}`,
-        ];
-    };
+    const twoPass = (ax, tgt, ret, into) =>
+        probeSave(ax, { tgt, ret, into, fast: v.fast, slow: v.slow, port: v.port, level: v.level });
     const body = [
         '( Probe INSIDE centre — rect pocket OR round bore. Position the probe INSIDE the feature at depth, press Enter. )',
         ...fields.map(readLine),
         '',
         '( WCS base address — 0 = read the active WCS from #578 )',
-        `#71=${v.wcs}`,
-        'IF #71 EQ 0 THEN #71=#578',
-        '#70=[805+[#71-1]*5]',
+        ...wcsBase(v.wcs),
         '',
         `#90=${v.maxProbe}   ;+max probe`,
         `#91=[0-${v.maxProbe}]   ;-max probe`,
@@ -306,9 +272,8 @@ export function insideCentreSlot(used = new Set(), varOffset = 0) {
         '#61=[#58-#59]   ;roundness (X span - Y span)',
         '',
         `G0 Z${v.safeZ}   ;lift clear`,
-        '#[#70]=#53   ;write WCS X centre',
-        '#73=[#70+1]',
-        '#[#73]=#56   ;write WCS Y centre',
+        ...writeAxis(0, '#53', 'write WCS X centre'),
+        ...writeAxis(1, '#56', 'write WCS Y centre'),
         '',
         'G90   ( absolute )',
         '#1505=-5000   ;centre found',
@@ -346,13 +311,8 @@ const BOSS_FIELDS = [
 export function bossCentreSlot(used = new Set(), varOffset = 0) {
     const { fields, v } = allocFields(BOSS_FIELDS, used, varOffset);
     // Two-pass probe of one face: approach (tgt), retract (ret = away from the face), save trigger.
-    const face = (ax, tgt, ret, resultVar) => {
-        const st = ax === 'X' ? '#1920' : '#1921', res = ax === 'X' ? '#1925' : '#1926';
-        return [
-            `G31 ${ax}${tgt} F${v.fast} P${v.port} L${v.level} Q1`, `IF ${st}!=2 GOTO 1`, `G0 ${ax}${ret}`,
-            `G31 ${ax}${tgt} F${v.slow} P${v.port} L${v.level} Q1`, `IF ${st}!=2 GOTO 1`, `${resultVar}=${res}`, `G0 ${ax}${ret}`,
-        ];
-    };
+    const face = (ax, tgt, ret, into) =>
+        probeSave(ax, { tgt, ret, into, fast: v.fast, slow: v.slow, port: v.port, level: v.level });
     // Save probe-height Z, lift clear, optional re-centre, PAUSE for the operator to move around, return to Z.
     const reposition = (msg, recentreAx, recentreVal) => {
         const L = ['#57=#882   ;save probe-height Z (machine DRO)', `G0 Z${v.safeZ}   ;lift clear of the boss`];
@@ -365,9 +325,7 @@ export function bossCentreSlot(used = new Set(), varOffset = 0) {
         ...fields.map(readLine),
         '',
         '( WCS base address — 0 = read the active WCS from #578 )',
-        `#71=${v.wcs}`,
-        'IF #71 EQ 0 THEN #71=#578',
-        '#70=[805+[#71-1]*5]',
+        ...wcsBase(v.wcs),
         '',
         `#90=${v.maxProbe}   ;+max probe`,
         `#91=[0-${v.maxProbe}]   ;-max probe`,
@@ -398,9 +356,8 @@ export function bossCentreSlot(used = new Set(), varOffset = 0) {
         '#61=[#58-#59]   ;roundness (X span - Y span)',
         '',
         `G0 Z${v.safeZ}   ;lift clear`,
-        '#[#70]=#53   ;write WCS X centre',
-        '#73=[#70+1]',
-        '#[#73]=#56   ;write WCS Y centre',
+        ...writeAxis(0, '#53', 'write WCS X centre'),
+        ...writeAxis(1, '#56', 'write WCS Y centre'),
         '',
         'G90   ( absolute )',
         '#1505=-5000   ;boss centre found',
@@ -439,15 +396,11 @@ export function alignmentSlot(used = new Set(), varOffset = 0) {
     const { fields, v } = allocFields(ALIGN_FIELDS, used, varOffset);
     // One point: confirm prompt → read the check-axis DRO → two-pass probe of the perpendicular fence face.
     const point = (probeAx, machVar, into, prompt, descend) => {
-        const st = probeAx === 'X' ? '#1920' : '#1921', res = probeAx === 'X' ? '#1925' : '#1926';
         const L = [`#1505=1   ;${prompt}`, `${into === '#50' ? '#70' : '#71'}=${machVar}   ;check-axis machine coord`];
         if (into === '#51') L.push('#72=[#71-#70]   ;span = B - A along the fence');
         L.push('G91   ( incremental )');
         if (descend) L.push(`G0 Z[0-${v.safeZ}]   ;descend to probe height`);
-        L.push(
-            `G31 ${probeAx}#93 F${v.fast} P${v.port} L${v.level} Q1`, `IF ${st}!=2 GOTO 1`, `G0 ${probeAx}#95`,
-            `G31 ${probeAx}#93 F${v.slow} P${v.port} L${v.level} Q1`, `IF ${st}!=2 GOTO 1`, `${into}=${res}`, `G0 ${probeAx}#95`,
-        );
+        L.push(...probeSave(probeAx, { tgt: '#93', ret: '#95', into, fast: v.fast, slow: v.slow, port: v.port, level: v.level }));
         if (!descend) L.push(`G0 Z${v.safeZ}   ;lift to clear for the jog`);
         L.push('G90   ( absolute )');
         return L;
