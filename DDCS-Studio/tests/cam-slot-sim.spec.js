@@ -199,6 +199,31 @@ test('pocket slot: raster-clears the rect to depth in layers; guards a too-small
   expect(r.smallFeed, 'a pocket smaller than the tool cuts nothing (guarded)').toBe(0);
 });
 
+test('circle-pocket slot: concentric rings clear the disc to depth (Ø − tool), guards too-small', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { circlePocketSlot } = await import('/data/millToSlot.js');
+    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
+    const s = circlePocketSlot();
+    const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
+    const run = (ov) => {
+      const seed = new Map(); s.fields.forEach((f) => seed.set(mirrorVar(f.idx), Number(f.def)));
+      for (const [k, val] of Object.entries(ov || {})) { const f = s.fields.find((x) => x.key === k); if (f) seed.set(mirrorVar(f.idx), val); }
+      return new GcodeExecutionEngine({ createVarStore: () => new Map(seed) }).trace(macro);
+    };
+    const t = run();
+    const lefts = (macro.match(/\[/g) || []).length, rights = (macro.match(/\]/g) || []).length;
+    const small = run({ dia: 4 });   // 4mm bore, 6mm tool → guard
+    return { balanced: lefts === rights, capped: t.stats.capped, maxX: t.bounds.maxX, minX: t.bounds.minX, minZ: t.bounds.minZ, smallFeed: small.stats.feed };
+  });
+  expect(r.balanced).toBe(true); expect(r.capped).toBe(false);
+  expect(r.maxX, 'clears to Ø/2 − tool radius (30−3)').toBeCloseTo(27, 0);
+  expect(r.minX).toBeCloseTo(-27, 0);
+  expect(r.minZ, 'full depth').toBeCloseTo(-4, 1);
+  expect(r.smallFeed, 'bore smaller than tool cuts nothing (guarded)').toBe(0);
+});
+
 test('surfacing slot: rasters the full area with no inset and no wall pass', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {

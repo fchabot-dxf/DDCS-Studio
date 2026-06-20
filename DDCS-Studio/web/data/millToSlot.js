@@ -12,7 +12,19 @@
  * See [[cam-probing-and-simulate]], [[cam-menu-architecture]], [[priorities-friendliness-over-perf]].
  */
 import { allocFields, readLine } from './probeToSlot.js';
-import { rasterClear, SPINDLE_FIELD, spindleOn, spindleOff } from './camMacroKit.js';
+import { rasterClear, ringClear, SPINDLE_FIELD, spindleOn, spindleOff } from './camMacroKit.js';
+
+const CIRCLE_POCKET_FIELDS = [
+    { key: 'dia', label: 'Diameter', units: 'mm', def: 60, min: 1, max: 99999, type: 1 },
+    { key: 'depth', label: 'Depth', units: 'mm', def: 4, min: 0.1, max: 9999, type: 1 },
+    { key: 'stepdown', label: 'Stepdown', units: 'mm', def: 1.5, min: 0.1, max: 999, type: 1 },
+    { key: 'stepover', label: 'Stepover', units: 'mm', def: 2.4, min: 0.1, max: 999, type: 1 },
+    { key: 'toolDia', label: 'Tool Ø', units: 'mm', def: 6, min: 0.1, max: 999, type: 1 },
+    { key: 'feed', label: 'Feed', units: 'mm/min', def: 600, min: 1, max: 99999, type: 0 },
+    { key: 'plunge', label: 'Plunge feed', units: 'mm/min', def: 150, min: 1, max: 99999, type: 0 },
+    { key: 'clearance', label: 'Clearance Z', units: 'mm', def: 5, min: 0, max: 9999, type: 1 },
+    SPINDLE_FIELD,
+];
 
 const POCKET_FIELDS = [
     { key: 'w', label: 'Width (X)', units: 'mm', def: 80, min: 1, max: 99999, type: 1 },
@@ -80,6 +92,35 @@ export function pocketSlot(used = new Set(), varOffset = 0) {
         'M30',
     ].join('\n');
     return { name: 'Pocket (rect)', fields, body };
+}
+
+/**
+ * Build the "Pocket (circle)" CAM slot — concentric-ring clear of a round pocket, layer by layer. Tool-centre
+ * paths inset by the tool radius so the finished bore Ø = the form value. Runs at the WCS origin (centre).
+ */
+export function circlePocketSlot(used = new Set(), varOffset = 0) {
+    const { fields, v } = allocFields(CIRCLE_POCKET_FIELDS, used, varOffset);
+    const body = [
+        '( Round pocket — concentric-ring clear, layer by layer. Runs at the WCS origin (pocket centre). )',
+        '( Spindle must already be running. Edit #20/#21 to offset the centre within the WCS. )',
+        ...fields.map(readLine),
+        '',
+        '#20=0   ;centre X (edit to offset)',
+        '#21=0   ;centre Y',
+        `#22=[[${v.dia}-${v.toolDia}]/2]   ;max tool-centre radius (so finished bore = Diameter)`,
+        'IF #22 LE 0 GOTO 8',
+        '',
+        ...spindleOn(v.rpm),
+        ...ringClear({ cx: '#20', cy: '#21', maxR: '#22', depth: v.depth, stepdown: v.stepdown, stepover: v.stepover, feed: v.feed, plunge: v.plunge, clearance: v.clearance }),
+        ...spindleOff(),
+        'GOTO 9',
+        '( error )',
+        'N8',
+        '#1505=1   ;ERROR: pocket smaller than the tool',
+        'N9',
+        'M30',
+    ].join('\n');
+    return { name: 'Pocket (circle)', fields, body };
 }
 
 /**

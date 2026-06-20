@@ -101,3 +101,37 @@ export function rasterClear(o) {
     lines.push('END1', `G0 Z${clearance}`);
     return lines;
 }
+
+/**
+ * Concentric-circle clear of a ROUND pocket, Z layers, inside-out (plunge at centre → rings out to the wall).
+ * Rings are planar full-circle G3 arcs. Owns scratch #27 (maxR) #28 (z) #29 (ring radius). `cx`/`cy` = centre,
+ * `maxR` = max tool-centre radius (= dia/2 − toolR). Expr/var strings throughout.
+ * @param {{cx,cy,maxR, depth, stepdown, stepover, feed, plunge, clearance:string}} o
+ */
+export function ringClear(o) {
+    const { cx, cy, maxR, depth, stepdown, stepover, feed, plunge, clearance } = o;
+    return [
+        `#27=${maxR}   ;max tool-centre radius`,
+        '',
+        'G90   ( absolute )',
+        `G0 Z${clearance}`,
+        '#28=0   ;current depth',
+        `WHILE #28 LT ${depth} DO1`,
+        `  #28=[#28+${stepdown}]`,
+        `  IF #28 GT ${depth} THEN #28=${depth}`,
+        `  G0 X${cx} Y${cy}   ;to centre`,
+        `  G1 Z[0-#28] F${plunge}   ;plunge at centre`,
+        `  #29=${stepover}   ;ring radius`,
+        '  WHILE #29 LT #27 DO2',
+        `    G1 X[${cx}+#29] Y${cy} F${feed}   ;step out to the ring`,
+        `    G3 X[${cx}+#29] Y${cy} I[0-#29] J0 F${feed}   ;full circle`,
+        `    #29=[#29+${stepover}]`,
+        '  END2',
+        '  ( final wall ring at the full radius )',
+        `  G1 X[${cx}+#27] Y${cy} F${feed}`,
+        `  G3 X[${cx}+#27] Y${cy} I[0-#27] J0 F${feed}`,
+        `  G0 Z${clearance}`,
+        'END1',
+        `G0 Z${clearance}`,
+    ];
+}
