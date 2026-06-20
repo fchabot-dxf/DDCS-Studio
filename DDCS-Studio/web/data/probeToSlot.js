@@ -17,6 +17,12 @@
 import { nextParam } from './camPack.js';
 import { PROBE, wcsBase, writeAxis, twoPassProbe, probeSave } from './camMacroKit.js';
 
+// Probe port + trigger level are MACHINE-CONSTANT config, so the macros read them from the controller's
+// floating-probe params (Pr578→#1078 port, Pr580→#1080 level) instead of charging a form row for each — the
+// "machine-portable probe config" technique (CAM-MENU-RESEARCH §6, proven in Brad Goldbeck's cam13). The
+// operator sets the probe once in the controller's probe settings; every probe slot inherits it.
+const PORT = '#1078', LEVEL = '#1080';
+
 // Probe form fields, in display + #-var order. type 1 = decimal, 0 = integer. Legends use ( ) not [ ]/=
 // so the mirror-read comment stays parseable by fieldsFromMacro ("Refresh fields").
 const CORNER_FIELDS = [
@@ -32,8 +38,7 @@ const CORNER_FIELDS = [
     { key: 'scan', label: 'Scan depth', units: 'mm', def: 5, min: 0.1, max: 999, type: 1 },
     { key: 'fast', label: 'Fast feed', units: 'mm/min', def: 200, min: 1, max: 9999, type: 0 },
     { key: 'slow', label: 'Slow feed', units: 'mm/min', def: 50, min: 1, max: 9999, type: 0 },
-    { key: 'port', label: 'Probe port P', units: '', def: 3, min: 0, max: 99, type: 0 },
-    { key: 'level', label: 'Trigger level L (0 1)', units: '', def: 0, min: 0, max: 1, type: 0 },
+    // port (P) + level (L) come from the controller's floating-probe config (#1078/#1080), not form rows
 ];
 
 /** Allocate #11xx params + #-vars for a field list. Returns {fields, v} where v maps key → its #var. */
@@ -64,7 +69,7 @@ export function cornerSlot(used = new Set(), varOffset = 0) {
         const sgn = ax === 'X' ? '#90' : '#91';
         const comp = ax === 'X' ? '#102' : '#101';
         return [
-            ...twoPassProbe(ax, { tgt, ret, fast: v.fast, slow: v.slow, port: v.port, level: v.level }),
+            ...twoPassProbe(ax, { tgt, ret, fast: v.fast, slow: v.slow, port: PORT, level: LEVEL }),
             `${comp}=[${PROBE[ax].result}+${sgn}*${v.radius}]   ;trigger + sign*radius`,
             ...writeAxis(ax === 'X' ? 0 : 1, comp, 'write WCS ' + ax),
             `G0 ${ax}${ret}   ;back off the wall`, `G0 Z#92   ;lift to safe Z`,
@@ -118,7 +123,7 @@ export function cornerSlot(used = new Set(), varOffset = 0) {
         '',
         '( optional Z surface probe )',
         `IF ${v.probeZ} EQ 0 GOTO 10`,
-        ...twoPassProbe('Z', { tgt: '#97', ret: v.retract, fast: v.fast, slow: v.slow, port: v.port, level: v.level }),
+        ...twoPassProbe('Z', { tgt: '#97', ret: v.retract, fast: v.fast, slow: v.slow, port: PORT, level: LEVEL }),
         ...writeAxis(2, '#1927', 'write WCS Z = trigger (machine coord)'),
         `G0 Z${v.safeZ}   ;lift to safe Z`,
         'N10',
@@ -157,8 +162,7 @@ const ZPROBE_FIELDS = [
     { key: 'surfaceZ', label: 'Surface = Z', units: 'mm', def: 0, min: -9999, max: 9999, type: 1 },
     { key: 'fast', label: 'Fast feed', units: 'mm/min', def: 200, min: 1, max: 9999, type: 0 },
     { key: 'slow', label: 'Slow feed', units: 'mm/min', def: 50, min: 1, max: 9999, type: 0 },
-    { key: 'port', label: 'Probe port P', units: '', def: 3, min: 0, max: 99, type: 0 },
-    { key: 'level', label: 'Trigger level L (0 1)', units: '', def: 0, min: 0, max: 1, type: 0 },
+    // port (P) + level (L) come from the controller's floating-probe config (#1078/#1080), not form rows
 ];
 
 /**
@@ -180,7 +184,7 @@ export function probeZSlot(used = new Set(), varOffset = 0) {
         '',
         `#1505=1   ;Position the probe over the surface, press Enter`,
         'G91   ( incremental )',
-        ...twoPassProbe('Z', { tgt: '#93', ret: '#95', fast: v.fast, slow: v.slow, port: v.port, level: v.level }),
+        ...twoPassProbe('Z', { tgt: '#93', ret: '#95', fast: v.fast, slow: v.slow, port: PORT, level: LEVEL }),
         `#50=[${PROBE.Z.result}-${v.surfaceZ}]   ;WCS Z offset so the touch reads as Surface = Z`,
         ...writeAxis(2, '#50', 'write WCS Z'),
         `G0 Z${v.safeZ}   ;lift clear`,
@@ -206,8 +210,7 @@ const EDGE_FIELDS = [
     { key: 'radius', label: 'Stylus radius', units: 'mm', def: 2, min: 0.001, max: 99, type: 1 },
     { key: 'fast', label: 'Fast feed', units: 'mm/min', def: 200, min: 1, max: 9999, type: 0 },
     { key: 'slow', label: 'Slow feed', units: 'mm/min', def: 50, min: 1, max: 9999, type: 0 },
-    { key: 'port', label: 'Probe port P', units: '', def: 3, min: 0, max: 99, type: 0 },
-    { key: 'level', label: 'Trigger level L (0 1)', units: '', def: 0, min: 0, max: 1, type: 0 },
+    // port (P) + level (L) come from the controller's floating-probe config (#1078/#1080), not form rows
 ];
 
 /**
@@ -218,7 +221,7 @@ const EDGE_FIELDS = [
 export function edgeSlot(used = new Set(), varOffset = 0) {
     const { fields, v } = allocFields(EDGE_FIELDS, used, varOffset);
     const wallProbe = (ax) => [
-        ...twoPassProbe(ax, { tgt: '#93', ret: '#95', fast: v.fast, slow: v.slow, port: v.port, level: v.level }),
+        ...twoPassProbe(ax, { tgt: '#93', ret: '#95', fast: v.fast, slow: v.slow, port: PORT, level: LEVEL }),
         `#50=[${PROBE[ax].result}+#90*${v.radius}]   ;edge = trigger + sign*radius`,
         ...writeAxis(ax === 'X' ? 0 : 1, '#50', 'write WCS ' + ax),
         `G0 ${ax}#95   ;back off the wall`,
@@ -269,8 +272,7 @@ const INSIDE_FIELDS = [
     { key: 'safeZ', label: 'Safe Z lift', units: 'mm', def: 10, min: 0.1, max: 999, type: 1 },
     { key: 'fast', label: 'Fast feed', units: 'mm/min', def: 200, min: 1, max: 9999, type: 0 },
     { key: 'slow', label: 'Slow feed', units: 'mm/min', def: 50, min: 1, max: 9999, type: 0 },
-    { key: 'port', label: 'Probe port P', units: '', def: 3, min: 0, max: 99, type: 0 },
-    { key: 'level', label: 'Trigger level L (0 1)', units: '', def: 0, min: 0, max: 1, type: 0 },
+    // port (P) + level (L) come from the controller's floating-probe config (#1078/#1080), not form rows
 ];
 
 /**
@@ -285,7 +287,7 @@ export function insideCentreSlot(used = new Set(), varOffset = 0) {
     const { fields, v } = allocFields(INSIDE_FIELDS, used, varOffset);
     // Two-pass probe (fast→slow) in one direction, saving the trigger; retract after each pass.
     const twoPass = (ax, tgt, ret, into) =>
-        probeSave(ax, { tgt, ret, into, fast: v.fast, slow: v.slow, port: v.port, level: v.level });
+        probeSave(ax, { tgt, ret, into, fast: v.fast, slow: v.slow, port: PORT, level: LEVEL });
     const body = [
         '( Probe INSIDE centre — rect pocket OR round bore. Position the probe INSIDE the feature at depth, press Enter. )',
         ...fields.map(readLine),
@@ -345,8 +347,7 @@ const BOSS_FIELDS = [
     { key: 'safeZ', label: 'Safe Z lift', units: 'mm', def: 15, min: 0.1, max: 999, type: 1 },
     { key: 'fast', label: 'Fast feed', units: 'mm/min', def: 200, min: 1, max: 9999, type: 0 },
     { key: 'slow', label: 'Slow feed', units: 'mm/min', def: 50, min: 1, max: 9999, type: 0 },
-    { key: 'port', label: 'Probe port P', units: '', def: 3, min: 0, max: 99, type: 0 },
-    { key: 'level', label: 'Trigger level L (0 1)', units: '', def: 0, min: 0, max: 1, type: 0 },
+    // port (P) + level (L) come from the controller's floating-probe config (#1078/#1080), not form rows
 ];
 
 /**
@@ -360,7 +361,7 @@ export function bossCentreSlot(used = new Set(), varOffset = 0) {
     const { fields, v } = allocFields(BOSS_FIELDS, used, varOffset);
     // Two-pass probe of one face: approach (tgt), retract (ret = away from the face), save trigger.
     const face = (ax, tgt, ret, into) =>
-        probeSave(ax, { tgt, ret, into, fast: v.fast, slow: v.slow, port: v.port, level: v.level });
+        probeSave(ax, { tgt, ret, into, fast: v.fast, slow: v.slow, port: PORT, level: LEVEL });
     // Save probe-height Z, lift clear, optional re-centre, PAUSE for the operator to move around, return to Z.
     const reposition = (msg, recentreAx, recentreVal) => {
         const L = ['#57=#882   ;save probe-height Z (machine DRO)', `G0 Z${v.safeZ}   ;lift clear of the boss`];
@@ -430,8 +431,7 @@ const ALIGN_FIELDS = [
     { key: 'safeZ', label: 'Safe Z lift', units: 'mm', def: 10, min: 0.1, max: 999, type: 1 },
     { key: 'fast', label: 'Fast feed', units: 'mm/min', def: 200, min: 1, max: 9999, type: 0 },
     { key: 'slow', label: 'Slow feed', units: 'mm/min', def: 20, min: 1, max: 9999, type: 0 },
-    { key: 'port', label: 'Probe port P', units: '', def: 3, min: 0, max: 99, type: 0 },
-    { key: 'level', label: 'Trigger level L (0 1)', units: '', def: 0, min: 0, max: 1, type: 0 },
+    // port (P) + level (L) come from the controller's floating-probe config (#1078/#1080), not form rows
 ];
 
 /**
@@ -448,7 +448,7 @@ export function alignmentSlot(used = new Set(), varOffset = 0) {
         if (into === '#51') L.push('#72=[#71-#70]   ;span = B - A along the fence');
         L.push('G91   ( incremental )');
         if (descend) L.push(`G0 Z[0-${v.safeZ}]   ;descend to probe height`);
-        L.push(...probeSave(probeAx, { tgt: '#93', ret: '#95', into, fast: v.fast, slow: v.slow, port: v.port, level: v.level }));
+        L.push(...probeSave(probeAx, { tgt: '#93', ret: '#95', into, fast: v.fast, slow: v.slow, port: PORT, level: LEVEL }));
         if (!descend) L.push(`G0 Z${v.safeZ}   ;lift to clear for the jog`);
         L.push('G90   ( absolute )');
         return L;
