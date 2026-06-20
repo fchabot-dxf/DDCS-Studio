@@ -170,6 +170,35 @@ test('alignment slot: fence axis selects the probe axis; measures (no WCS write)
   expect(r.noWcs, 'alignment only measures — no WCS write').toBe(true);
 });
 
+test('pocket slot: raster-clears the rect to depth in layers; guards a too-small pocket', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { pocketSlot } = await import('/data/millToSlot.js');
+    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
+    const s = pocketSlot();
+    const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
+    const run = (ov) => {
+      const seed = new Map(); s.fields.forEach((f) => seed.set(mirrorVar(f.idx), Number(f.def)));
+      for (const [k, val] of Object.entries(ov || {})) { const f = s.fields.find((x) => x.key === k); if (f) seed.set(mirrorVar(f.idx), val); }
+      return new GcodeExecutionEngine({ createVarStore: () => new Map(seed) }).trace(macro);
+    };
+    const t = run();
+    const lefts = (macro.match(/\[/g) || []).length, rights = (macro.match(/\]/g) || []).length;
+    const small = run({ w: 4 });   // 4mm pocket, 6mm tool → guard
+    return {
+      balanced: lefts === rights, hasNamedM: /M_\w+/.test(macro), capped: t.stats.capped,
+      feed: t.stats.feed, maxX: t.bounds.maxX, maxY: t.bounds.maxY, minZ: t.bounds.minZ, smallFeed: small.stats.feed,
+    };
+  });
+  expect(r.balanced).toBe(true); expect(r.hasNamedM).toBe(false); expect(r.capped).toBe(false);
+  expect(r.feed, 'many clearing passes').toBeGreaterThan(50);
+  expect(r.maxX, 'clears to the far X wall (80 − 3mm tool radius)').toBeCloseTo(77, 0);
+  expect(r.maxY).toBeCloseTo(57, 0);
+  expect(r.minZ, 'reaches full depth').toBeCloseTo(-4, 1);
+  expect(r.smallFeed, 'a pocket smaller than the tool cuts nothing (guarded)').toBe(0);
+});
+
 test('preview panel mounts on a seeded slot macro without throwing', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const ok = await page.evaluate(async () => {

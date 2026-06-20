@@ -36,7 +36,7 @@ const CORNER_FIELDS = [
 ];
 
 /** Allocate #11xx params + #-vars for a field list. Returns {fields, v} where v maps key → its #var. */
-function allocFields(spec, used, varOffset) {
+export function allocFields(spec, used, varOffset) {
     const taken = new Set(used);
     const fields = spec.map((s, i) => {
         const idx = nextParam(taken); if (idx != null) taken.add(idx);
@@ -46,7 +46,7 @@ function allocFields(spec, used, varOffset) {
     return { fields, v };
 }
 
-const readLine = (f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`;
+export const readLine = (f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`;
 
 /**
  * Build the "Probe outside corner" CAM slot. One branching macro: #corner→signs, #wcs→base address,
