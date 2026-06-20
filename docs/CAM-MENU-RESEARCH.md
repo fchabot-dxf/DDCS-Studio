@@ -363,8 +363,9 @@ The CAM Pack Builder (§5d) is built out. State:
 - **Bug fixes (found while porting):** invalid named M-code → inline cut; edge wizard missing
   stylus-radius comp; sim two-operand `ATAN[a]/[b]` (atan2).
 - **Spindle:** cutting slots manage the spindle: `M3 S[#rpm]` (BRACKETED var, per `key-7.nc`
-  `M03 S[#140]`) + `G04 P2000` (~2s spin-up; **P is MILLISECONDS** on Expert — factory `slib-g.nc`
-  has `G04 P100 //100ms` + many `P2000`) … `M5`. NB: `key-7.nc`'s author misread P as seconds.
+  `M03 S[#140]`) + `G04 P2000` (= 2 s) … `M5`. **G04 P unit depends on FORMAT** (machine owner,
+  2026-06-20): an **integer is milliseconds** (`P2000`=2s, factory `slib-g.nc` `P100 //100ms`), a
+  **decimal is seconds** (`P5.2`=5.2 s). `key-7.nc`'s `P30` integer = 30 ms (its "30 s" comment is a bug).
 
 ### Controller-side access (how the operator reaches it — research doc §2.4 expanded)
 - CAM page opened by a **K-key bound to function code 1399** (`Pr210–252`). Tap slot → form → Start.

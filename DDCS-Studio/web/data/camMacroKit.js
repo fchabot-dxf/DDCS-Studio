@@ -10,11 +10,11 @@
 
 /** Spindle RPM field to append to a cutting slot's form, + the start/stop lines that bracket the toolpath. */
 export const SPINDLE_FIELD = { key: 'rpm', label: 'Spindle RPM', units: 'rpm', def: 8000, min: 1, max: 60000, type: 0 };
-// Spindle speed is a BRACKETED var `S[#var]` (key-7.nc: `M03 S[#140]`). G04 P is in MILLISECONDS on the
-// Expert — factory slib-g.nc has `G04 P100 //100ms` (explicit) + many `G04 P2000` (2s dwells). (key-7's
-// author misread P as seconds; their P30 "30s" warmup really dwells 30ms — a community-macro bug.)
-/** Spindle on CW at the form RPM, with a ~2-second spin-up dwell (P = ms). */
-export const spindleOn = (rpmVar) => [`M3 S[${rpmVar}]   ( spindle on )`, 'G04 P2000   ( spin-up dwell ~2s, P=ms )'];
+// Spindle speed is a BRACKETED var `S[#var]` (key-7.nc: `M03 S[#140]`). G04 P units depend on FORMAT on the
+// Expert: an INTEGER is milliseconds (slib-g.nc `G04 P100 //100ms`, `P2000`=2s), a DECIMAL is seconds
+// (`P5.2`=5.2s). So P2000 (integer) = 2 s. (key-7's `P30` integer = 30ms — its "30s" comment is a bug.)
+/** Spindle on CW at the form RPM, with a ~2-second spin-up dwell (integer P2000 = 2000 ms). */
+export const spindleOn = (rpmVar) => [`M3 S[${rpmVar}]   ( spindle on )`, 'G04 P2000   ( spin-up dwell 2000ms = 2s )'];
 export const spindleOff = () => ['M5   ( spindle off )'];
 
 /** Per-axis DDCS probe system vars: status (2=success) + trigger position (machine coord). */
