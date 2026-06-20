@@ -135,7 +135,7 @@ export function openIconEditor(initial, onSave) {
     const m = document.createElement('div'); m.id = 'iconed-modal';
     m.innerHTML = `<style>
         #iconed-modal{position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);}
-        #iconed-modal .ie-panel{background:var(--panel);color:var(--text-main);border:1px solid var(--border);border-radius:8px;width:min(880px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 14px 48px rgba(0,0,0,.5);}
+        #iconed-modal .ie-panel{background:var(--panel);color:var(--text-main);border:1px solid var(--border);border-radius:8px;width:min(1000px,96vw);max-width:96vw;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 14px 48px rgba(0,0,0,.5);}
         #iconed-modal .ie-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;}
         #iconed-modal .ie-head button{background:transparent;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;}
         #iconed-modal .ie-toolbar{display:flex;gap:6px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);overflow-x:auto;overflow-y:hidden;min-height:58px;}
@@ -143,10 +143,10 @@ export function openIconEditor(initial, onSave) {
         #iconed-modal .ie-tile:hover{border-color:#0ea5e9;}
         #iconed-modal .ie-tile img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none;}
         #iconed-modal .ie-addrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--border);}
-        #iconed-modal .ie-body{display:flex;gap:12px;padding:12px 14px;overflow:auto;}
-        #iconed-modal .ie-stage{flex:0 0 auto;width:${W * ZOOM}px;height:${H * ZOOM}px;border:1px solid var(--border);background:#000;touch-action:none;}
+        #iconed-modal .ie-body{display:flex;flex-wrap:wrap;gap:12px;padding:12px 14px;overflow:auto;}
+        #iconed-modal .ie-stage{flex:1 1 360px;min-width:0;max-width:${W * ZOOM}px;aspect-ratio:${W} / ${H};border:1px solid var(--border);background:#000;touch-action:none;}
         #iconed-modal .ie-stage svg{width:100%;height:100%;display:block;}
-        #iconed-modal .ie-side{flex:1;min-width:200px;display:flex;flex-direction:column;gap:10px;}
+        #iconed-modal .ie-side{flex:1 1 240px;min-width:180px;display:flex;flex-direction:column;gap:10px;}
         #iconed-modal .ie-grp{border:1px solid var(--border);border-radius:6px;padding:8px;}
         #iconed-modal .ie-grp h4{margin:0 0 6px;font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim);}
         #iconed-modal .ie-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
@@ -267,7 +267,7 @@ export function openIconEditor(initial, onSave) {
     // opposite point anchored, in the layer's own rotated frame), or the top handle to rotate about centre.
     const HXY = { nw: [0, 0], n: [0.5, 0], ne: [1, 0], e: [1, 0.5], se: [1, 1], s: [0.5, 1], sw: [0, 1], w: [0, 0.5] };
     let gesture = null;
-    const ptStage = (e) => { const r = stage.getBoundingClientRect(); return { x: (e.clientX - r.left) / ZOOM, y: (e.clientY - r.top) / ZOOM }; };
+    const ptStage = (e) => { const r = stage.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
     stage.addEventListener('pointerdown', (e) => {
         const hEl = e.target.closest('[data-h]');
         if (hEl && sel >= 0) {
