@@ -17,7 +17,7 @@ let _tileCache = null;
 function baseId(id) {
     return String(id).toLowerCase()
         .replace(/[_-](x|y|z)(?=[_-]|$)/g, '_')
-        .replace(/[_-](pos|neg|plus|minus|top|bottom|left|right|front|back|up|down|cw|ccw|bl|br|fl|fr|tl|tr|tc|bc|lc|rc|ne|nw|se|sw|[nsew])(?=[_-]|$)/g, '_')
+        .replace(/[_-](pos|neg|plus|minus|top|bottom|left|right|front|back|up|down|cw|ccw|xy|yx|zfirst|zlast|bl|br|fl|fr|tl|tr|tc|bc|lc|rc|ne|nw|se|sw|[nsew])(?=[_-]|$)/g, '_')
         .replace(/\d+/g, '')
         .replace(/[_-]+/g, '_').replace(/^_+|_+$/g, '') || String(id);
 }
@@ -44,29 +44,34 @@ async function extractTiles(file) {
     mount.style.cssText = 'position:absolute;left:-99999px;top:0;width:465px;height:465px;overflow:hidden;';
     mount.innerHTML = text; document.body.appendChild(mount);
     const svg = mount.querySelector('svg'); const tiles = [];
+    const isShape = (el) => /^(path|rect|circle|ellipse|polygon|polyline|line)$/i.test(el.tagName || '');
     try {
         const sr = svg.getBoundingClientRect();
-        // What becomes a tile: primitive LEAF groups (a g[id] with no nested g[id]) PLUS any loose id'd shape
-        // not wrapped in a group (so other asset types surface) — never the collection containers or a group's
-        // own sub-paths. Then drop the full-frame group + micro bits, isolate each from sibling geometry, and
-        // de-dup repeated variants by family (one mini-probe, not four).
+        // These viz files are probe-sequence diagrams: the leaf groups are all mini-probes / wcs glyphs, while
+        // the actual SHAPES (corner, edge, pocket, boss, quad) are CONTAINER groups. So surface both —
+        //   • leaf groups + loose id'd shapes  → primitives (probe tip, datum, loose objects),
+        //   • container groups rendered with their child groups hidden  → the bare outline shape,
+        // skipping containers that have no own geometry (their outline lives in children, would be blank).
         const groups = [...svg.querySelectorAll('g[id]')];
-        const leafGroups = groups.filter((g) => !g.querySelector('g[id]'));
         const looseShapes = [...svg.querySelectorAll('path[id],polygon[id],polyline[id],rect[id],circle[id],ellipse[id]')].filter((s) => !s.closest('g[id]'));
-        const pool = (leafGroups.length || looseShapes.length) ? leafGroups.concat(looseShapes) : groups;
-        const seen = new Set();
-        pool.forEach((g) => {
+        const cands = groups.map((g) => ({ g, kind: g.querySelector('g[id]') ? 'outline' : 'leaf' }))
+            .filter((c) => c.kind === 'leaf' || [...c.g.children].some(isShape))   // drop outline-less containers
+            .concat(looseShapes.map((s) => ({ g: s, kind: 'leaf' })));
+        cands.forEach(({ g, kind }) => {
             let gr; try { gr = g.getBoundingClientRect(); } catch (e) { return; }
             if (Math.max(gr.width, gr.height) < 10) return;          // too atomic to be a useful tile
             if (gr.width > 440 && gr.height > 440) return;            // ≈ the full 465 frame (whole diagram)
-            const fam = file + ':' + baseId(g.id); if (seen.has(fam)) return; seen.add(fam);
             const pad = 4, x = gr.left - sr.left - pad, y = gr.top - sr.top - pad;
             const clone = svg.cloneNode(true);
             let tgt = null; try { tgt = clone.querySelector('#' + (window.CSS && CSS.escape ? CSS.escape(g.id) : g.id)); } catch (e) { /* */ }
-            if (tgt) isolate(clone, tgt);
+            if (tgt) {
+                isolate(clone, tgt);
+                if (kind === 'outline') tgt.querySelectorAll('g[id]').forEach((c) => { c.style.display = 'none'; });   // outline only
+            }
             clone.setAttribute('viewBox', `${x.toFixed(1)} ${y.toFixed(1)} ${(gr.width + 2 * pad).toFixed(1)} ${(gr.height + 2 * pad).toFixed(1)}`);
             clone.removeAttribute('width'); clone.removeAttribute('height');
-            tiles.push({ id: g.id, source: file, uri: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(clone.outerHTML), w: gr.width, h: gr.height });
+            const toks = String(g.id).split(/[_-]/); const prim = (toks[toks.length - 1] || g.id).toLowerCase();
+            tiles.push({ id: g.id, source: file, kind, fam: baseId(g.id), prim, uri: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(clone.outerHTML), w: gr.width, h: gr.height });
         });
     } finally { document.body.removeChild(mount); }
     return tiles;
@@ -74,7 +79,15 @@ async function extractTiles(file) {
 async function loadAllTiles() {
     if (_tileCache) return _tileCache;
     const all = []; for (const f of TILESET_FILES) { try { all.push(...await extractTiles(f)); } catch (e) { /* skip */ } }
-    _tileCache = all; return all;
+    // De-dup across the whole tileset: leaf primitives by TYPE (one mini-probe, one wcs… regardless of which
+    // probe/corner they came from); outline shapes by family (one corner, one pocket, one boss…).
+    const out = [], seenPrim = new Set(), seenFam = new Set();
+    for (const t of all) {
+        const key = t.kind === 'leaf' ? 'p:' + t.prim : 'f:' + t.fam;
+        const seen = t.kind === 'leaf' ? seenPrim : seenFam;
+        if (seen.has(key)) continue; seen.add(key); out.push(t);
+    }
+    _tileCache = out; return out;
 }
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
