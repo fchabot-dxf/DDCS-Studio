@@ -6119,7 +6119,11 @@ function makeClient(opts = {}) {
     deleteFile: (name) => postJSON("/api/files/delete", { name }),
     submitJob: (name, nc, map) => postJSON("/api/jobs", { name, nc, map }),
     getConfig: () => call("/api/config"),
-    setConfig: (updates) => postJSON("/api/config", updates)
+    setConfig: (updates) => postJSON("/api/config", updates),
+    readSysfile: (name) => call("/api/sysfile?name=" + encodeURIComponent(name)),
+    // SYSDISK macro file (key-N.nc / slib-m.nc)
+    writeSysfile: (name, content, mode = "write") => postJSON("/api/sysfile", { name, content, mode })
+    // backed-up write/append
   };
 }
 function deviceName(d) {
@@ -8825,6 +8829,44 @@ ${body}${hasEnd ? "" : "\nM30"}
     }
     return m;
   };
+  async function pushMcode(m) {
+    const n = parseInt((m.trigger || {}).code, 10) || 0;
+    const oNum = "O" + (1e4 + n);
+    if (!confirm(`Merge M${n} (${oNum}) into the controller's macro library (slib-m.nc)?
+
+The existing slib-m.nc is backed up first (slib-m.nc.bak). You must REBOOT the controller afterward for it to load.`)) return;
+    try {
+      const cur = await makeClient().readSysfile("slib-m.nc");
+      if (!cur || cur.ok === false) {
+        alert("Could not read slib-m.nc \u2014 needs the gateway/desktop app + a connected controller." + (cur && cur.error ? "\n(" + cur.error + ")" : ""));
+        return;
+      }
+      if (new RegExp("(^|\\s)" + oNum + "(\\s|$)").test(cur.content || "")) {
+        alert(`${oNum} is already in slib-m.nc \u2014 remove it on the controller first so it isn't duplicated, then push again.`);
+        return;
+      }
+      const res = await makeClient().writeSysfile("slib-m.nc", "\n" + macroFileText(m), "append");
+      if (res && res.ok) alert(`Merged ${oNum} (M${n}) into slib-m.nc${res.backup ? " \u2014 backup " + res.backup : ""}.
+
+Reboot the controller to load it; then M${n} is callable from a program.`);
+      else alert("Push failed: " + (res && res.error || "unknown"));
+    } catch (err) {
+      alert("Push failed: " + (err && err.message ? err.message : err));
+    }
+  }
+  async function pushKbutton(k, m) {
+    if (!confirm(`Write key-${k}.nc to the controller (the K${k} button)?
+
+The existing key-${k}.nc is backed up first (key-${k}.nc.bak).`)) return;
+    try {
+      const res = await makeClient().writeSysfile("key-" + k + ".nc", macroFileText(m), "write");
+      if (res && res.ok) alert(`Wrote key-${k}.nc${res.backup ? " \u2014 backup " + res.backup : ""}.
+Press K${k} to run it (reboot if the controller doesn't pick it up).`);
+      else alert("Push failed: " + (res && res.error || "needs the gateway/desktop app + a connected controller"));
+    } catch (err) {
+      alert("Push failed: " + (err && err.message ? err.message : err));
+    }
+  }
   function renderMcodes() {
     const host = q("mcodes_list");
     if (!host) return;
@@ -8840,7 +8882,7 @@ ${body}${hasEnd ? "" : "\nM30"}
                 <span class="mc-o" style="font-size:10px; color:var(--text-dim);">\u2192 O${1e4 + (parseInt((m.trigger || {}).code, 10) || 0)}</span>
             </div>
             <textarea class="mc-f" data-f="body" spellcheck="false" placeholder="macro body (G-code)" style="width:100%; height:110px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${String(m.body || "").replace(/</g, "&lt;")}</textarea>
-            <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="gen">\u2B07 Generate</button><span style="flex:1"></span><button class="op-btn" data-act="del" title="Delete">\u2715</button></div>
+            <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="gen">\u2B07 Generate</button><button class="toolbar-btn settings-io" data-act="push">\u2B06 Push to controller</button><span style="flex:1"></span><button class="op-btn" data-act="del" title="Delete">\u2715</button></div>
         </div>`).join("");
   }
   function renderKbuttons() {
@@ -8856,7 +8898,7 @@ ${body}${hasEnd ? "" : "\nM30"}
                     <span style="font-size:10px; color:var(--text-dim);">key-${k}.nc</span>
                 </div>
                 <textarea class="kb-f" data-f="body" spellcheck="false" placeholder="button macro body" style="width:100%; height:80px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${m ? String(m.body || "").replace(/</g, "&lt;") : ""}</textarea>
-                <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="ked">\u21EA From editor</button><button class="toolbar-btn settings-io" data-act="kgen">\u2B07 Generate</button><span style="flex:1"></span><button class="op-btn" data-act="kclr" title="Clear">\u2715</button></div>
+                <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="ked">\u21EA From editor</button><button class="toolbar-btn settings-io" data-act="kgen">\u2B07 Generate</button><button class="toolbar-btn settings-io" data-act="kpush">\u2B06 Push</button><span style="flex:1"></span><button class="op-btn" data-act="kclr" title="Clear">\u2715</button></div>
             </div>`;
     }
     host.innerHTML = html;
@@ -8890,6 +8932,7 @@ ${body}${hasEnd ? "" : "\nM30"}
         saveSettings();
         renderMcodes();
       } else if (a === "gen") insertToEditor(macroFileText(macrosArr()[i]));
+      else if (a === "push") pushMcode(macrosArr()[i]);
     });
   }
   const kbh = q("kbuttons_list");
@@ -8918,6 +8961,13 @@ ${body}${hasEnd ? "" : "\nM30"}
           return;
         }
         insertToEditor(macroFileText(m));
+      } else if (a === "kpush") {
+        const m = findKbtn(k);
+        if (!m || !String(m.body).trim()) {
+          alert("K" + k + " is empty.");
+          return;
+        }
+        pushKbutton(k, m);
       } else if (a === "kclr") {
         const i = macrosArr().findIndex((x) => (x.trigger || {}).kind === "kbutton" && (x.trigger || {}).key === k);
         if (i >= 0) macrosArr().splice(i, 1);
