@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  DDCS CAM icon TILESET — source of the editor's tile palette (ui/iconEditor.js → TILESET_FILES).
+
+  HOW IT'S USED
+    The editor extracts every leaf <g id="…"> as one tile, cropped to its bounding box. You draw
+    reusable OBJECTS here; in the editor you place / rotate / flip / scale / recolour-by-redraw them
+    to compose 360×180 CAM-menu icons.
+
+  RULES (so each object extracts as a clean tile)
+    • Keep the root exactly as below: viewBox="0 0 465 465", width/height="100%".
+      The extractor mounts this at 465px, so 1 unit = 1px and crops land correctly. Don't change it.
+    • One object = ONE <g id="name"> of plain shapes (path/rect/circle/line). NO nested <g id> inside
+      an object (a group that contains another id-group is treated as a container, not a tile).
+    • Make each object ONCE. No _BL/_BR or X+/Y- copies — the editor rotates/flips, so duplicates just
+      clutter the palette. One corner, one arrow, one probe.
+    • Style lives on the <g> (children inherit): fill:none; stroke; stroke-width; round caps/joins.
+      Objects render on a BLACK icon background, so use light/coloured strokes (not black).
+    • Self-contained: no shared <defs>/gradients/clipPaths (a cropped tile loses them).
+    • Spread objects out so they're easy to author; overlap is fine for extraction (siblings are hidden
+      per tile) but messy to draw.
+    • Names: stock_rect, bore, boss_round, slot, corner, edge, arrow, arrow_double, crosshair,
+      probe_ball, stylus_side, endmill_top, endmill_side, tool_setter, wcs_origin, axis_arrow,
+      datum_corner, jogpath, touch_spark, dim_line, angle_arc, centerline, plus, minus, bolt_circle …
+      (see the chat list — add the rest following the examples below).
+
+  NOTE: edit this file then RELOAD the page to see changes (tiles are cached per page load).
+-->
+<svg width="100%" height="100%" viewBox="0 0 465 465" version="1.1"
+     xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     style="stroke-linejoin:round;stroke-linecap:round;">
+
+    <!-- ============ ROW 1 ============ -->
+
+    <!-- Rectangular stock / plate (top view) -->
+    <g id="stock_rect" style="fill:none;stroke:#ffffff;stroke-width:4;">
+        <rect x="20" y="100" width="76" height="60"/>
+    </g>
+
+    <!-- Round hole / bore (top view) with centre mark -->
+    <g id="bore" style="fill:none;stroke:#ffffff;stroke-width:4;">
+        <circle cx="174" cy="130" r="37"/>
+        <path d="M174,116 L174,144 M160,130 L188,130"/>
+    </g>
+
+    <!-- Outside corner bracket — rotate/flip in the editor for the other 3 corners -->
+    <g id="corner" style="fill:none;stroke:#ffffff;stroke-width:5;">
+        <path d="M256,168 L256,92 L324,92"/>
+    </g>
+
+    <!-- Direction arrow — the workhorse; rotate for X+/X-/Y+/Y- etc. -->
+    <g id="arrow" style="fill:none;stroke:#33ccff;stroke-width:4;">
+        <path d="M372,130 L430,130 M418,119 L431,130 L418,141"/>
+    </g>
+
+    <!-- ============ ROW 2 ============ -->
+
+    <!-- Centre / target crosshair -->
+    <g id="crosshair" style="fill:none;stroke:#ffffff;stroke-width:4;">
+        <path d="M58,286 L58,354 M24,320 L92,320"/>
+        <circle cx="58" cy="320" r="9"/>
+    </g>
+
+    <!-- Touch-probe ruby tip (top view) — concentric rings + core -->
+    <g id="probe_ball" style="fill:none;stroke:#ff6b6b;stroke-width:3;">
+        <circle cx="174" cy="320" r="26"/>
+        <circle cx="174" cy="320" r="17"/>
+        <circle cx="174" cy="320" r="8" style="fill:#ff6b6b;stroke:none;"/>
+    </g>
+
+    <!-- WCS / datum origin — X (red) + Y (green) axis triad with origin dot -->
+    <g id="wcs_origin" style="fill:none;stroke-width:4;">
+        <path d="M268,350 L330,350 M320,343 L331,350 L320,357" style="stroke:#ff6b6b;fill:none;"/>
+        <path d="M268,350 L268,288 M261,298 L268,287 L275,298" style="stroke:#4ade80;fill:none;"/>
+        <circle cx="268" cy="350" r="4" style="fill:#ffffff;stroke:none;"/>
+    </g>
+
+    <!-- Dimension line with end ticks + inward arrowheads -->
+    <g id="dim_line" style="fill:none;stroke:#ffffff;stroke-width:3;">
+        <path d="M378,320 L434,320 M378,309 L378,331 M434,309 L434,331 M389,314 L378,320 L389,326 M423,314 L434,320 L423,326"/>
+    </g>
+
+</svg>

@@ -7,8 +7,10 @@
 import { bmpDataUrl } from '../data/bmp.js';
 
 const W = 360, H = 180, ZOOM = 2;
-// Current tileset = the structured viz SVGs; a future custom tileset just adds files here (or a user import).
-const TILESET_FILES = ['cornerViz', 'edgeViz', 'middleViz', 'alignViz'];
+// Tile source SVG(s) under web/assets/svg/. tileset.svg is the purpose-built CAM-icon library; add more
+// files here to extend it. (The old probe-sequence viz files — cornerViz/edgeViz/middleViz/alignViz — are
+// retired from the palette; re-add their names here if you want them back.)
+const TILESET_FILES = ['tileset'];
 let _tileCache = null;
 
 // Family key for de-dup: strip the direction / axis / position / index tokens *anywhere* in the id (each must
