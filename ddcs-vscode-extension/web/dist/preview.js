@@ -693,7 +693,7 @@ var dialect = {
   // #578 = active WCS index 1=G54… (COPY_WCS.nc:15)
   distMode: (mode) => mode === "inc" ? "G91" : "G90",
   dwell: (sec) => [`G04 P${Math.round(sec * 1e3)}`],
-  // P = ms (slib-g.nc:691 "G04 P100 //100ms")
+  // integer P = ms (slib-g.nc:691 "G04 P100 //100ms"); a DECIMAL P would be seconds — we always emit the unambiguous integer-ms form
   endProgram: () => ["M30"],
   // universal end; no M2/M02 in any capture
   ifGoto: (lhs, op, rhs, label) => [`IF ${lhs}${op}${rhs} GOTO${label}`],
@@ -5390,6 +5390,13 @@ function evalExpr(str, vars, opts = {}) {
       const arg = parseExpr();
       if (peek() === "]") p += 1;
       if (arg === null) return null;
+      if (t.fn === "ATAN" && peek() === "/" && toks[p + 1] === "[") {
+        p += 2;
+        const arg2 = parseExpr();
+        if (peek() === "]") p += 1;
+        if (arg2 === null) return null;
+        return Math.atan2(arg, arg2) * 180 / Math.PI;
+      }
       return fn(arg);
     }
     if (t === "#") {

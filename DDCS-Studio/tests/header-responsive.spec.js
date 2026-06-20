@@ -13,7 +13,7 @@ test('phone (390): header fits, Open/Save stay, post-selector hidden (it lives i
       overflow: h.scrollWidth - h.clientWidth,
       docScrollW: document.documentElement.scrollWidth,
       vw: window.innerWidth,
-      postHidden: document.getElementById('hdrPost').offsetParent === null,
+      postHidden: document.getElementById('hdrPostBtn').offsetParent === null,
       macroVisible: macro.offsetParent !== null && macro.closest('.app-header') !== null,
       noBurger: document.getElementById('hdrBurger') === null,
     };
@@ -26,7 +26,7 @@ test('phone (390): header fits, Open/Save stay, post-selector hidden (it lives i
   await page.screenshot({ path: 'tests/_header-390.png', clip: { x: 0, y: 0, width: 390, height: 60 } });
 });
 
-test('desktop (1100): post selector + Open/Save both visible inline', async ({ page }) => {
+test('desktop (1100): quick-menu chevron present; standalone Open/Save moved into it', async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 800 });
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
@@ -34,12 +34,48 @@ test('desktop (1100): post selector + Open/Save both visible inline', async ({ p
   const d = await page.evaluate(() => {
     const h = document.querySelector('.app-header');
     return {
-      postVisible: document.getElementById('hdrPost').offsetParent !== null,
-      macroVisible: document.getElementById('macroBar').offsetParent !== null,
+      chevronVisible: document.getElementById('hdrPostBtn').offsetParent !== null,
+      macroHidden: document.getElementById('macroBar').offsetParent === null,
       overflow: h.scrollWidth - h.clientWidth,
     };
   });
-  expect(d.postVisible, 'post selector visible on desktop').toBe(true);
-  expect(d.macroVisible, 'Open/Save visible on desktop').toBe(true);
+  expect(d.chevronVisible, 'quick-menu chevron visible on desktop').toBe(true);
+  expect(d.macroHidden, 'standalone Open/Save hidden on desktop (moved into the chevron)').toBe(true);
   expect(d.overflow, 'no header overflow on desktop').toBeLessThanOrEqual(0);
+});
+
+test('quick-menu chevron: icon-only; opens Program actions + Post-processor + Theme', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio);
+  await page.waitForTimeout(300);
+
+  // Icon-only at full width — no "Auto · …" text leaks onto the chevron.
+  const btnText = (await page.locator('#hdrPostBtn').innerText()).trim();
+  expect(btnText, 'chevron shows no text label').toBe('');
+
+  // Closed by default; opens on click.
+  expect(await page.locator('#hdrPostMenu').isHidden()).toBe(true);
+  await page.click('#hdrPostBtn');
+  expect(await page.locator('#hdrPostMenu').isHidden()).toBe(false);
+  expect(await page.getAttribute('#hdrPostBtn', 'aria-expanded')).toBe('true');
+
+  // Program file-actions present (Open/Save moved in, plus load/insert/copy/clear/export).
+  const actions = await page.locator('#hdrPostMenu .hdr-quick-item[data-act]').count();
+  expect(actions, 'seven program actions').toBe(7);
+  // Exactly one active post and one active theme are checked.
+  const postChecked = await page.locator('#hdrPostMenu .hdr-quick-item[data-post][aria-checked="true"]').count();
+  const themeChecked = await page.locator('#hdrPostMenu .hdr-quick-item[data-theme][aria-checked="true"]').count();
+  expect(postChecked, 'one active post checked').toBe(1);
+  expect(themeChecked, 'one active theme checked').toBe(1);
+
+  // Escape closes it.
+  await page.keyboard.press('Escape');
+  expect(await page.locator('#hdrPostMenu').isHidden()).toBe(true);
+
+  // Reopen and pick a theme → it applies and the menu closes.
+  await page.click('#hdrPostBtn');
+  await page.click('#hdrPostMenu .hdr-quick-item[data-theme="futuristic"]');
+  expect(await page.getAttribute('body', 'data-theme')).toBe('futuristic');
+  expect(await page.locator('#hdrPostMenu').isHidden()).toBe(true);
 });

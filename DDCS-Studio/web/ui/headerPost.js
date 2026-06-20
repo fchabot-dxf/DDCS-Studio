@@ -1,6 +1,6 @@
 /**
- * ui/headerPost.js — the global POST-PROCESSOR (dialect) selector in the app header (#hdrPost) + a
- * capability LINT (#hdrPostWarn).
+ * ui/headerPost.js — the global POST-PROCESSOR (dialect) selector in the app header: a discreet chevron
+ * quick-action button (#hdrPostBtn) that opens a popover picker (#hdrPostMenu) + a capability LINT (#hdrPostWarn).
  *
  * The post decides WHICH controller's G-code is generated — distinct from the machine PROFILE (hardware
  * config, in Settings → Profile). `auto` follows the active profile's native post; pick a specific post to
@@ -15,19 +15,113 @@
 import { listPosts, getActivePostId, setActivePostId, getDialect, resolveActivePost, getCaps } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { validate, summarize } from '../shared/js/validate/validate.js';
+import { THEMES } from './themes.js';
+
+// Quick-menu glyphs (24×24 stroke grid) — mirror the dock toolbar icons so the menu reads consistently.
+const HQ_ICONS = {
+    open:   { c: '#f59e0b', d: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>' },
+    save:   { c: '#0ea5e9', d: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>' },
+    load:   { c: '#f59e0b', d: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>' },
+    insert: { c: '#14b8a6', d: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>' },
+    copy:   { c: '#6366f1', d: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>' },
+    clear:  { c: '#ef4444', d: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>' },
+    export: { c: '#0ea5e9', d: '<path d="M16 9h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2"/><line x1="12" y1="14" x2="12" y2="3"/><polyline points="8 7 12 3 16 7"/>' },
+};
+// data-act → the existing handler it proxies (file ops are window globals; Open/Save click their header buttons).
+const HQ_ACTIONS = [
+    { act: 'open',   label: 'Open project' },
+    { act: 'save',   label: 'Save project' },
+    { act: 'load',   label: 'Load file' },
+    { act: 'insert', label: 'Insert file' },
+    { act: 'copy',   label: 'Copy program' },
+    { act: 'clear',  label: 'Clear editor' },
+    { act: 'export', label: 'Export / download' },
+];
+const HQ_THEME_SWATCH = { studio: '#9aa0a6', normal: '#4a90e2', steampunk: '#b07a2a', futuristic: '#00e5e5', organic: '#6b8e23' };
+
+function runQuickAction(act) {
+    switch (act) {
+        case 'open':   document.getElementById('projOpenBtn')?.click(); break;
+        case 'save':   document.getElementById('projSaveBtn')?.click(); break;
+        case 'load':   window.loadGcodeFile?.(); break;
+        case 'insert': window.insertGcodeFile?.(); break;
+        case 'copy':   window.copyCode?.(); break;
+        case 'clear':  window.clearCode?.(); break;
+        case 'export': window.downloadFile?.(); break;
+    }
+}
+
+function setQuickTheme(name) {
+    try {
+        const tm = window.ddcsStudio && window.ddcsStudio.themeManager;
+        if (tm && tm.setCurrent) tm.setCurrent(name);
+        else { document.body.setAttribute('data-theme', name); localStorage.setItem('ddcs_theme', name); }
+    } catch (_) { document.body.setAttribute('data-theme', name); }
+}
 
 export function initHeaderPost() {
-    const sel = document.getElementById('hdrPost');
-    if (!sel) return;
+    const btn = document.getElementById('hdrPostBtn');
+    const menu = document.getElementById('hdrPostMenu');
+    if (!btn || !menu) return;
     const warnEl = document.getElementById('hdrPostWarn');
 
-    const fillOptions = () => {
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const svgIco = (k) => `<svg class="hq-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="${HQ_ICONS[k].c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HQ_ICONS[k].d}</svg>`;
+
+    // Build the quick-actions popover: Program (file ops) · Post-processor (dialect) · Theme. The dialect
+    // and theme rows carry a ✓ on the active one; the chevron's tooltip names the active post.
+    const fillMenu = () => {
         const machinePost = getDialect(getActiveProfile().id);
-        sel.innerHTML = [`<option value="auto">Auto · ${machinePost.name}</option>`]
-            .concat(listPosts().map((p) => `<option value="${p.id}">${p.name}${p.verified ? '' : ' ⚠'}</option>`))
-            .join('');
-        sel.value = getActivePostId();
+        const active = getActivePostId();
+        const autoLabel = `Auto · ${machinePost.name}`;
+        const curTheme = document.body.getAttribute('data-theme') || 'studio';
+
+        const actionRow = (a) =>
+            `<button type="button" role="menuitem" class="hdr-quick-item" data-act="${a.act}">`
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco(a.act)
+            + `<span class="hdr-quick-lbl">${a.label}</span></button>`;
+        const postRow = (value, label, warn) =>
+            `<button type="button" role="menuitemradio" class="hdr-quick-item" data-post="${esc(value)}" aria-checked="${active === value}">`
+            + `<span class="hdr-quick-check" aria-hidden="true">${active === value ? '✓' : ''}</span>`
+            + `<span class="hdr-quick-lbl">${esc(label)}</span>`
+            + (warn ? '<span class="hdr-quick-warn" title="Not yet verified">⚠</span>' : '')
+            + '</button>';
+        const themeRow = (name) =>
+            `<button type="button" role="menuitemradio" class="hdr-quick-item" data-theme="${name}" aria-checked="${curTheme === name}">`
+            + `<span class="hdr-quick-check" aria-hidden="true">${curTheme === name ? '✓' : ''}</span>`
+            + `<span class="hq-swatch" style="background:${HQ_THEME_SWATCH[name] || '#888'}"></span>`
+            + `<span class="hdr-quick-lbl">${name[0].toUpperCase() + name.slice(1)}</span></button>`;
+
+        menu.innerHTML = '<div class="hdr-quick-head">Program</div>'
+            + HQ_ACTIONS.map(actionRow).join('')
+            + '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Post-processor</div>'
+            + postRow('auto', autoLabel, false)
+            + listPosts().map((p) => postRow(p.id, p.name, !p.verified)).join('')
+            + '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Theme</div>'
+            + THEMES.map(themeRow).join('');
+
+        const activeName = active === 'auto' ? autoLabel : (listPosts().find((p) => p.id === active)?.name || active);
+        btn.title = `Quick actions — open / save / load / export, post-processor (${activeName}), theme. Click to open.`;
+        btn.setAttribute('aria-label', `Quick actions (post-processor: ${activeName})`);
     };
+
+    const onDocClick = (e) => { if (!menu.contains(e.target) && !btn.contains(e.target)) closeMenu(); };
+    const onKey = (e) => { if (e.key === 'Escape') { closeMenu(); btn.focus(); } };
+    function closeMenu() {
+        if (menu.hidden) return;
+        menu.hidden = true;
+        btn.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('click', onDocClick, true);
+        document.removeEventListener('keydown', onKey, true);
+    }
+    function openMenu() {
+        fillMenu();
+        menu.hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
+        document.addEventListener('click', onDocClick, true);
+        document.addEventListener('keydown', onKey, true);
+    }
 
     // Warn (don't break) when the loaded program uses capabilities the active post lacks.
     const lint = () => {
@@ -90,11 +184,20 @@ export function initHeaderPost() {
         });
     }
 
-    fillOptions();
+    fillMenu();
 
-    sel.addEventListener('change', () => {
-        setActivePostId(sel.value);                                 // persist the active post (override or 'auto')
-        
+    btn.addEventListener('click', (e) => { e.stopPropagation(); if (menu.hidden) openMenu(); else closeMenu(); });
+
+    // Route a menu click: a file action, a theme, or a post pick (the post path keeps the old <select> effects).
+    menu.addEventListener('click', (e) => {
+        const it = e.target.closest('.hdr-quick-item');
+        if (!it) return;
+        closeMenu();
+        if (it.dataset.act) { runQuickAction(it.dataset.act); return; }
+        if (it.dataset.theme) { setQuickTheme(it.dataset.theme); return; }
+
+        setActivePostId(it.dataset.post);                           // persist the active post (override or 'auto')
+
         // Automatically sync the variable DB to the active post's family
         const post = resolveActivePost(getActiveProfile().id);
         const vdb = window.ddcsStudio && window.ddcsStudio.variableDB;
@@ -114,8 +217,8 @@ export function initHeaderPost() {
         lint();
     });
 
-    // Re-sync the 'Auto · <name>' label + re-lint when the profile/post or program changes elsewhere.
-    window.addEventListener('ddcs:settings-changed', () => { fillOptions(); lint(); });
+    // Re-sync the 'Auto · <name>' tooltip + re-lint when the profile/post or program changes elsewhere.
+    window.addEventListener('ddcs:settings-changed', () => { fillMenu(); lint(); });
     const ed = document.getElementById('editor');
     if (ed) ed.addEventListener('input', lint);
     lint();

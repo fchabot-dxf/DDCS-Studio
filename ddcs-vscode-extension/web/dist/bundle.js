@@ -1443,7 +1443,7 @@ var init_ddcs_expert_m350 = __esm({
       // #578 = active WCS index 1=G54… (COPY_WCS.nc:15)
       distMode: (mode) => mode === "inc" ? "G91" : "G90",
       dwell: (sec) => [`G04 P${Math.round(sec * 1e3)}`],
-      // P = ms (slib-g.nc:691 "G04 P100 //100ms")
+      // integer P = ms (slib-g.nc:691 "G04 P100 //100ms"); a DECIMAL P would be seconds — we always emit the unambiguous integer-ms form
       endProgram: () => ["M30"],
       // universal end; no M2/M02 in any capture
       ifGoto: (lhs, op, rhs, label) => [`IF ${lhs}${op}${rhs} GOTO${label}`],
@@ -4835,10 +4835,11 @@ function edgeStack(params = {}) {
   const axis = params.axis === "Y" ? "Y" : "X", av = AX9[axis];
   const dir = params.dir === "neg" ? "neg" : "pos", plus = dir === "pos";
   const wcs = params.wcs || "active", wcsLabel = wcs === "active" ? "Active WCS" : wcs;
-  const dist = num(params.dist, 15), retract = num(params.retract, 2);
+  const dist = num(params.dist, 15), retract = num(params.retract, 2), radius = num(params.radius, 2);
   const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
   const level = num(params.level, 0);
   const probeVar = plus ? "#8" : "#7", retractVar = plus ? "#9" : "#10", limitVal = plus ? "2" : "1";
+  const compOp = plus ? "+" : "-";
   const S = [];
   const C = (text) => {
     const b2 = newBlock("comment");
@@ -4894,6 +4895,7 @@ function edgeStack(params = {}) {
   A("#3", fFast, "Fast feedrate");
   A("#4", fSlow, "Slow feedrate");
   A("#5", port, "Probe port");
+  A("#6", radius, "Probe stylus radius");
   C("Result storage");
   A("#50", 0, "Edge contact position");
   C("Pre-calculated motion values");
@@ -4922,7 +4924,7 @@ function edgeStack(params = {}) {
   MV(retractVar);
   PR(probeVar, "#4");
   CK(1);
-  A("#50", av.result, "Save edge position");
+  A("#50", `[${av.result}${compOp}#6]`, "Edge = trigger +/- stylus radius");
   MV(retractVar);
   C("Write to WCS");
   A(`#[#70+${av.off}]`, "#50", `Set ${wcsLabel} ${axis} to edge`);
@@ -11110,6 +11112,13 @@ function evalExpr2(str, vars, opts = {}) {
       const arg = parseExpr();
       if (peek() === "]") p += 1;
       if (arg === null) return null;
+      if (t.fn === "ATAN" && peek() === "/" && toks[p + 1] === "[") {
+        p += 2;
+        const arg2 = parseExpr();
+        if (peek() === "]") p += 1;
+        if (arg2 === null) return null;
+        return Math.atan2(arg, arg2) * 180 / Math.PI;
+      }
       return fn(arg);
     }
     if (t === "#") {
@@ -15027,15 +15036,86 @@ var headerPost_exports = {};
 __export(headerPost_exports, {
   initHeaderPost: () => initHeaderPost
 });
+function runQuickAction(act) {
+  switch (act) {
+    case "open":
+      document.getElementById("projOpenBtn")?.click();
+      break;
+    case "save":
+      document.getElementById("projSaveBtn")?.click();
+      break;
+    case "load":
+      window.loadGcodeFile?.();
+      break;
+    case "insert":
+      window.insertGcodeFile?.();
+      break;
+    case "copy":
+      window.copyCode?.();
+      break;
+    case "clear":
+      window.clearCode?.();
+      break;
+    case "export":
+      window.downloadFile?.();
+      break;
+  }
+}
+function setQuickTheme(name) {
+  try {
+    const tm = window.ddcsStudio && window.ddcsStudio.themeManager;
+    if (tm && tm.setCurrent) tm.setCurrent(name);
+    else {
+      document.body.setAttribute("data-theme", name);
+      localStorage.setItem("ddcs_theme", name);
+    }
+  } catch (_) {
+    document.body.setAttribute("data-theme", name);
+  }
+}
 function initHeaderPost() {
-  const sel = document.getElementById("hdrPost");
-  if (!sel) return;
+  const btn = document.getElementById("hdrPostBtn");
+  const menu = document.getElementById("hdrPostMenu");
+  if (!btn || !menu) return;
   const warnEl = document.getElementById("hdrPostWarn");
-  const fillOptions = () => {
+  const esc3 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const svgIco = (k) => `<svg class="hq-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="${HQ_ICONS[k].c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HQ_ICONS[k].d}</svg>`;
+  const fillMenu = () => {
     const machinePost = getDialect(getActiveProfile().id);
-    sel.innerHTML = [`<option value="auto">Auto \xB7 ${machinePost.name}</option>`].concat(listPosts().map((p) => `<option value="${p.id}">${p.name}${p.verified ? "" : " \u26A0"}</option>`)).join("");
-    sel.value = getActivePostId();
+    const active2 = getActivePostId();
+    const autoLabel = `Auto \xB7 ${machinePost.name}`;
+    const curTheme = document.body.getAttribute("data-theme") || "studio";
+    const actionRow = (a) => `<button type="button" role="menuitem" class="hdr-quick-item" data-act="${a.act}"><span class="hdr-quick-check" aria-hidden="true"></span>` + svgIco(a.act) + `<span class="hdr-quick-lbl">${a.label}</span></button>`;
+    const postRow = (value, label, warn) => `<button type="button" role="menuitemradio" class="hdr-quick-item" data-post="${esc3(value)}" aria-checked="${active2 === value}"><span class="hdr-quick-check" aria-hidden="true">${active2 === value ? "\u2713" : ""}</span><span class="hdr-quick-lbl">${esc3(label)}</span>` + (warn ? '<span class="hdr-quick-warn" title="Not yet verified">\u26A0</span>' : "") + "</button>";
+    const themeRow = (name) => `<button type="button" role="menuitemradio" class="hdr-quick-item" data-theme="${name}" aria-checked="${curTheme === name}"><span class="hdr-quick-check" aria-hidden="true">${curTheme === name ? "\u2713" : ""}</span><span class="hq-swatch" style="background:${HQ_THEME_SWATCH[name] || "#888"}"></span><span class="hdr-quick-lbl">${name[0].toUpperCase() + name.slice(1)}</span></button>`;
+    menu.innerHTML = '<div class="hdr-quick-head">Program</div>' + HQ_ACTIONS.map(actionRow).join("") + '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Post-processor</div>' + postRow("auto", autoLabel, false) + listPosts().map((p) => postRow(p.id, p.name, !p.verified)).join("") + '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Theme</div>' + THEMES.map(themeRow).join("");
+    const activeName = active2 === "auto" ? autoLabel : listPosts().find((p) => p.id === active2)?.name || active2;
+    btn.title = `Quick actions \u2014 open / save / load / export, post-processor (${activeName}), theme. Click to open.`;
+    btn.setAttribute("aria-label", `Quick actions (post-processor: ${activeName})`);
   };
+  const onDocClick = (e) => {
+    if (!menu.contains(e.target) && !btn.contains(e.target)) closeMenu();
+  };
+  const onKey = (e) => {
+    if (e.key === "Escape") {
+      closeMenu();
+      btn.focus();
+    }
+  };
+  function closeMenu() {
+    if (menu.hidden) return;
+    menu.hidden = true;
+    btn.setAttribute("aria-expanded", "false");
+    document.removeEventListener("click", onDocClick, true);
+    document.removeEventListener("keydown", onKey, true);
+  }
+  function openMenu() {
+    fillMenu();
+    menu.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+    document.addEventListener("click", onDocClick, true);
+    document.addEventListener("keydown", onKey, true);
+  }
   const lint = () => {
     if (!warnEl) return;
     const post = resolveActivePost(getActiveProfile().id);
@@ -15092,9 +15172,25 @@ function initHeaderPost() {
       setTimeout(() => copyBtn.style.color = "", 500);
     });
   }
-  fillOptions();
-  sel.addEventListener("change", () => {
-    setActivePostId(sel.value);
+  fillMenu();
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (menu.hidden) openMenu();
+    else closeMenu();
+  });
+  menu.addEventListener("click", (e) => {
+    const it = e.target.closest(".hdr-quick-item");
+    if (!it) return;
+    closeMenu();
+    if (it.dataset.act) {
+      runQuickAction(it.dataset.act);
+      return;
+    }
+    if (it.dataset.theme) {
+      setQuickTheme(it.dataset.theme);
+      return;
+    }
+    setActivePostId(it.dataset.post);
     const post = resolveActivePost(getActiveProfile().id);
     const vdb = window.ddcsStudio && window.ddcsStudio.variableDB;
     if (vdb && post) {
@@ -15112,18 +15208,39 @@ function initHeaderPost() {
     lint();
   });
   window.addEventListener("ddcs:settings-changed", () => {
-    fillOptions();
+    fillMenu();
     lint();
   });
   const ed = document.getElementById("editor");
   if (ed) ed.addEventListener("input", lint);
   lint();
 }
+var HQ_ICONS, HQ_ACTIONS, HQ_THEME_SWATCH;
 var init_headerPost = __esm({
   "../DDCS-Studio/web/ui/headerPost.js"() {
     init_dialects();
     init_controllerProfiles();
     init_validate();
+    init_themes();
+    HQ_ICONS = {
+      open: { c: "#f59e0b", d: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>' },
+      save: { c: "#0ea5e9", d: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>' },
+      load: { c: "#f59e0b", d: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>' },
+      insert: { c: "#14b8a6", d: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>' },
+      copy: { c: "#6366f1", d: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>' },
+      clear: { c: "#ef4444", d: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>' },
+      export: { c: "#0ea5e9", d: '<path d="M16 9h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2"/><line x1="12" y1="14" x2="12" y2="3"/><polyline points="8 7 12 3 16 7"/>' }
+    };
+    HQ_ACTIONS = [
+      { act: "open", label: "Open project" },
+      { act: "save", label: "Save project" },
+      { act: "load", label: "Load file" },
+      { act: "insert", label: "Insert file" },
+      { act: "copy", label: "Copy program" },
+      { act: "clear", label: "Clear editor" },
+      { act: "export", label: "Export / download" }
+    ];
+    HQ_THEME_SWATCH = { studio: "#9aa0a6", normal: "#4a90e2", steampunk: "#b07a2a", futuristic: "#00e5e5", organic: "#6b8e23" };
   }
 });
 
@@ -15771,6 +15888,7 @@ var edgeView = {
     "p_axis",
     "p_dir",
     "p_dist",
+    "p_radius",
     "p_feed_fast",
     "p_feed_slow",
     "p_retract",
@@ -15798,6 +15916,7 @@ var edgeView = {
       dir: el("p_dir")?.value || "pos",
       wcs: el("p_wcs")?.value || "active",
       dist: el("p_dist")?.value || "15",
+      radius: el("p_radius")?.value || "2",
       retract: el("p_retract")?.value || "2",
       syncA: el("p_sync_a")?.checked || false,
       slave: el("p_slave")?.value || "3",
