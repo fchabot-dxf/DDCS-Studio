@@ -73,8 +73,10 @@ export function slotMacro(slot) {
     const fields = slot.fields || [];
     const head = [`( macro_cam${num(slot.slot, 0)}.nc — ${esc(slot.name) || 'CAM slot ' + num(slot.slot, 0)} )`,
         '( form values are read live from the #2600+ mirrors — never edit camsetting )'];
-    const reads = fields.map((f, i) => `${f.var || '#' + (i + 1)}=#${mirrorVar(f.idx)}   ;${esc(f.label)}`);
     const body = String(slot.body || '').replace(/\r/g, '').replace(/\s+$/, '');
+    // Macro-first: if the body already declares the mirror reads, don't prepend them again (it IS the macro).
+    const hasReads = /#\d+\s*=\s*#2[6-9]\d\d/.test(body);
+    const reads = hasReads ? [] : fields.map((f, i) => `${f.var || '#' + (i + 1)}=#${mirrorVar(f.idx)}   ;${esc(f.label)}`);
     const hasEnd = /\b(M99|M30|M0?2)\b/.test(body);
     return head.concat(reads, body ? [body] : [], hasEnd ? [] : ['M99']).join('\n') + '\n';
 }
@@ -90,4 +92,38 @@ export function validatePack(pack) {
         if ((slot.fields || []).length > 8) warnings.push(`Slot cam${slot.slot}: ${slot.fields.length} fields — >8 rows may not fit the form.`);
     });
     return { ok: errors.length === 0, errors, warnings };
+}
+
+/** Parse a mirror-read comment "Label [units] =default [min~max]" (all parts optional) into field metadata.
+ *  Defaults to a permissive editable range so a freshly-imported field is usable in the controller GUI. */
+function parseFieldComment(c) {
+    const f = { label: '', units: '', def: 0, min: -9999, max: 9999, type: 1 };
+    let s = String(c || '').trim(); if (!s) return f;
+    const range = s.match(/\[\s*(-?\d*\.?\d+)\s*~\s*(-?\d*\.?\d+)\s*\]/);
+    if (range) { f.min = Number(range[1]); f.max = Number(range[2]); s = s.replace(range[0], ' '); }
+    const def = s.match(/=\s*(-?\d*\.?\d+)/);
+    if (def) { f.def = Number(def[1]); f.type = /\./.test(def[1]) ? 1 : 0; s = s.replace(def[0], ' '); }
+    const units = s.match(/\[([^\]~]*)\]/);   // a [mm]-style unit tag, not the range
+    if (units) { f.units = units[1].trim(); s = s.replace(units[0], ' '); }
+    f.label = s.replace(/\s+/g, ' ').trim();
+    return f;
+}
+
+/** Scan a macro for its form FIELDS: every `#var=#26xx ;comment` mirror-read becomes a field (genuine operator
+ *  params only — #2600–#2999, never working/local vars). Returns the field list; does NOT touch the body, so it
+ *  can re-derive ("Refresh") the fields from a macro that is the single source. Metadata comes from the comment
+ *  (Label [units] =default [min~max]); the caller merges in any ranges the author already edited. */
+export function fieldsFromMacro(text) {
+    const fields = [], seen = new Set();
+    const re = /#(\d+)\s*=\s*#(2[6-9]\d\d)\b\s*;?\s*(.*?)\s*$/;
+    for (const ln of String(text || '').split(/\r?\n/)) {
+        const m = ln.match(re), mir = m ? Number(m[2]) : 0;
+        if (m && mir >= 2600 && mir <= 2999 && !seen.has(mir)) {
+            seen.add(mir);
+            const f = parseFieldComment(m[3]); f.idx = mir - 1500; f.var = '#' + m[1];
+            fields.push(f);
+        }
+    }
+    fields.sort((a, b) => a.idx - b.idx);
+    return fields;
 }

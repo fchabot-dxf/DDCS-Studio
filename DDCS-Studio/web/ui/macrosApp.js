@@ -10,6 +10,7 @@ import * as camPack from '../data/camPack.js';
 import { bmpDataUrl } from '../data/bmp.js';
 import { openIconEditor } from './iconEditor.js';
 import { slotFromOp, sharedSub } from '../data/opToSlot.js';
+import { auditMacroVars } from '../data/varMap.js';
 
 let _wired = false;
 
@@ -203,8 +204,9 @@ export function initMacrosApp() {
                     <button class="toolbar-btn settings-io" data-act="icon">🖼 Import BMP</button>
                 </div>
                 <table style="width:100%; font-size:11.5px; margin-top:6px; border-collapse:collapse;"><thead><tr style="color:var(--text-dim); font-size:10px; text-align:left;"><th>Label</th><th>Units</th><th>Default</th><th>Min</th><th>Max</th><th>Var</th><th>#param→#2600</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-                <div class="settings-row" style="margin-top:4px;"><button class="toolbar-btn settings-io" data-act="addf">＋ Add field</button></div>
-                <textarea class="cs" data-f="body" spellcheck="false" placeholder="macro body — reference each field's Var (#1, #2 …)" style="width:100%; height:110px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${camEsc(slot.body)}</textarea>
+                <div class="settings-row" style="margin-top:4px;"><button class="toolbar-btn settings-io" data-act="addf">＋ Add field</button><button class="toolbar-btn settings-io" data-act="refresh" title="Re-scan the macro body's #2600 mirror reads and regenerate the field list — keeps any default/range you've edited.">🔄 Refresh fields from macro</button></div>
+                <textarea class="cs" data-f="body" spellcheck="false" placeholder="macro body — declare fields as  #1=#2600 ;Label [mm] =0 [min~max]  then reference each Var (#1, #2 …)" style="width:100%; height:130px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${camEsc(slot.body)}</textarea>
+                ${(() => { const a = auditMacroVars(slot.body); return a.danger.length ? `<div class="settings-hint" style="color:#ff6b6b; margin-top:4px;">⚠ macro writes persistent vars — ${a.danger.map(camEsc).join('; ')}</div>` : ''; })()}
                 <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button></div>
             </div>`;
         }).join('');
@@ -266,6 +268,13 @@ export function initMacrosApp() {
             else if (a === 'edit') { openIconEditor(slot.icon || null, (bmp, model) => { slot.icon = { name: (slot.name || 'cam' + slot.slot) + '.bmp', data: bmp, w: 360, h: 180, layers: model.layers }; saveCamPack(); renderCamBuilder(); }); }
             else if (a === 'icon') { importCamIcon(slot); }
             else if (a === 'delicon') { slot.icon = null; saveCamPack(); renderCamBuilder(); }
+            else if (a === 'refresh') {
+                // Re-derive the field list from the macro's #2600 mirror reads; KEEP any default/range already edited.
+                const scanned = camPack.fieldsFromMacro(slot.body);
+                const byIdx = new Map((slot.fields || []).map((f) => [f.idx, f]));
+                slot.fields = scanned.map((s, i) => { const e = byIdx.get(s.idx); return e ? { ...e, label: s.label || e.label, var: s.var || e.var } : { ...s, var: s.var || ('#' + (i + 1)) }; });
+                saveCamPack(); renderCamBuilder();
+            }
             else if (a === 'exp') { insertToEditor('( ===== eng form lines — MERGE into the controller eng language file ===== )\n' + camPack.slotEng(slot) + '\n\n' + camPack.slotMacro(slot)); }
         });
     }

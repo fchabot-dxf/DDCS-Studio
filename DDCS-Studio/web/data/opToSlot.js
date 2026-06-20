@@ -99,9 +99,12 @@ export function slotFromOp(method, pattern, used = new Set()) {
     const call = method === 'bore' ? 'M_borehole' : 'M_drillhole';
     // copy the hole params (+ feed/clearance) into the sub's working vars #30+, then run the pattern loop.
     const wv = method === 'bore'
-        ? `#30=${v.holeDia} #31=${v.toolDia} #32=${v.depth} #33=${v.pitch} #34=${v.feed} #35=${v.clearance}`
-        : `#30=${v.holeDia} #31=${v.depth} #32=${v.peck} #33=${v.feed} #34=${v.clearance}`;
-    const body = [`( ${method} ${PATTERN_LABEL[pattern]} — needs the ${call} sub installed )`, wv, loopBody(pattern, v, call)].join('\n');
+        ? `#30=${v.holeDia} #31=${v.toolDia} #32=${v.depth} #33=${v.pitch} #34=${v.feed} #35=${v.clearance}   ;-> ${call} working vars (#30-#35, scratch)`
+        : `#30=${v.holeDia} #31=${v.depth} #32=${v.peck} #33=${v.feed} #34=${v.clearance}   ;-> ${call} working vars (#30-#34, scratch)`;
+    // The body IS the scannable macro: structured mirror-read header (so "Refresh fields" can re-derive the
+    // form) + working-var copy + the pattern loop. All scratch vars (#1-#54) are < #500 = safe/volatile.
+    const reads = fields.map((f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`);
+    const body = [`( ${method} ${PATTERN_LABEL[pattern]} — needs the ${call} sub installed )`, ...reads, '', wv, loopBody(pattern, v, call)].join('\n');
     const name = method === 'bore' ? `Bore — ${PATTERN_LABEL[pattern]}` : `Drill — ${PATTERN_LABEL[pattern]}`;
     return { name, fields, body };
 }
