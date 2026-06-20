@@ -407,3 +407,40 @@ test('preview panel mounts on a seeded slot macro without throwing', async ({ pa
   });
   expect(ok, 'createPreviewPanel built its DOM + exposed stop()').toBe(true);
 });
+
+test('structured op editing: ops manifest drives the macro; edit type/variant + remove regenerates', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const mod = await import('/ui/macrosApp.js'); mod.initMacrosApp();
+    const root = document.getElementById('macros-app');
+    root.querySelector('#cam_add_slot').click();
+    const card = () => root.querySelector('.cam-slot');
+    const addOp = (type, variant) => {
+      const c = card(); const op = c.querySelector('.cam-op'); const v = c.querySelector('.cam-op-pat');
+      op.value = type; op.dispatchEvent(new Event('change', { bubbles: true }));
+      if (variant) v.value = variant;
+      c.querySelector('[data-act="addop"]').click();
+    };
+    const setSel = (sel, val) => { sel.value = val; sel.dispatchEvent(new Event('change', { bubbles: true })); };
+    const body = () => card().querySelector('textarea[data-f="body"]').value;
+    const types = () => Array.from(card().querySelectorAll('.cam-op-card')).map((d) => d.querySelector('.cam-op-type').value);
+    addOp('drill', 'circle'); addOp('pocket', 'y');
+    const o = { initial: types(), hasDrill: /drill bolt circle/.test(body()), hasPocketY: /rows ∥ Y/.test(body()) };
+    setSel(card().querySelectorAll('.cam-op-type')[0], 'bore');    // change op 0 drill -> bore (regenerates)
+    o.hasBore = /bore bolt circle/i.test(body());
+    setSel(card().querySelectorAll('.cam-op-var')[0], 'grid');     // change op 0 variant bolt circle -> grid
+    o.hasGrid = /grid/i.test(body().split('\n')[0]);
+    card().querySelectorAll('[data-act="delop"]')[1].click();      // remove op 1 (pocket)
+    o.remaining = types(); o.noPocket = !/rows ∥/.test(body());
+    addOp('corner');                                              // a probe op card hides its variant control
+    const cs = card().querySelectorAll('.cam-op-card');
+    o.probeVarHidden = cs[cs.length - 1].querySelector('.cam-op-var').style.display === 'none';
+    return o;
+  });
+  expect(r.initial).toEqual(['drill', 'pocket']);
+  expect(r.hasDrill).toBe(true); expect(r.hasPocketY).toBe(true);
+  expect(r.hasBore, 'changing op type regenerates the macro').toBe(true);
+  expect(r.hasGrid, 'changing op variant regenerates the macro').toBe(true);
+  expect(r.remaining).toEqual(['bore']); expect(r.noPocket, 'removing an op regenerates without it').toBe(true);
+  expect(r.probeVarHidden, 'probe op card hides the variant control').toBe(true);
+});

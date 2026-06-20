@@ -180,7 +180,7 @@ export function initMacrosApp() {
         surface: { title: 'Raster direction — which axis the facing rows run along', opts: [['x', 'rows ∥ X'], ['y', 'rows ∥ Y']] },
         cpocket: { title: 'Ring direction (CW spindle): climb = CCW/G3, conventional = CW/G2', opts: [['G3', 'climb (G3)'], ['G2', 'conventional (G2)']] },
     };
-    const secondCtlOpts = (method) => (SECOND_CTL[method] ? SECOND_CTL[method].opts.map(([val, lbl]) => `<option value="${val}">${lbl}</option>`).join('') : '');
+    const secondCtlOpts = (method, sel) => (SECOND_CTL[method] ? SECOND_CTL[method].opts.map(([val, lbl]) => `<option value="${val}"${sel === val ? ' selected' : ''}>${lbl}</option>`).join('') : '');
     const secondCtlTitle = (method) => (SECOND_CTL[method] ? SECOND_CTL[method].title : '');
     // Rebuild the second dropdown's options + tooltip for a method, hiding it when the op has no build-time choice.
     function applySecondCtl(sel, method) {
@@ -188,6 +188,52 @@ export function initMacrosApp() {
         sel.innerHTML = secondCtlOpts(method);
         sel.title = secondCtlTitle(method);
         sel.style.display = has ? '' : 'none';
+    }
+    // ---- Structured op model: a slot can remember the OPS it was built from (slot.ops = [{type, variant}]) so
+    // they can be edited as cards and the macro REGENERATED from them. Legacy/hand-built slots (no slot.ops) keep
+    // the raw-text workflow untouched. ----
+    const OP_LABEL = { drill: 'Drill', bore: 'Bore', slot: 'Slot', pocket: 'Pocket (rect)', cpocket: 'Pocket (circle)', surface: 'Surface / face', corner: 'Probe corner', edge: 'Probe edge', zprobe: 'Probe Z surface', inside: 'Probe inside centre', boss: 'Probe boss centre', align: 'Probe alignment' };
+    const CAM_GEN = { corner: cornerSlot, edge: edgeSlot, zprobe: probeZSlot, inside: insideCentreSlot, boss: bossCentreSlot, align: alignmentSlot, pocket: pocketSlot, cpocket: circlePocketSlot, surface: surfacingSlot };
+    const opTypeOpts = (sel) => Object.entries(OP_LABEL).map(([v, l]) => `<option value="${v}"${sel === v ? ' selected' : ''}>${l}</option>`).join('');
+    const defaultVariant = (type) => (SECOND_CTL[type] ? SECOND_CTL[type].opts[0][0] : '');
+    // Generate one op into a starting point. The mill/probe ops live in CAM_GEN; drill/bore/slot go via slotFromOp.
+    const generateOp = (type, variant, used, off) => (CAM_GEN[type] ? CAM_GEN[type](used, off, variant) : slotFromOp(type, variant, used, off));
+    // Rebuild a slot's fields + body + name from its op list. Params are allocated AROUND the other slots' params
+    // (so a regenerate doesn't collide), and vars continue across ops — exactly the Add-op append sequence. Field
+    // defaults reset to each op's generator defaults (a structural edit is a rebuild); the icon is left alone.
+    function buildSlotFromOps(slot) {
+        const used = new Set();
+        _camPack.slots.forEach((s) => { if (s !== slot) (s.fields || []).forEach((f) => used.add(f.idx)); });
+        let fields = [], parts = [], name = '';
+        (slot.ops || []).forEach((op) => {
+            const gen = generateOp(op.type, op.variant, used, fields.length);
+            gen.fields.forEach((f) => used.add(f.idx));
+            fields = fields.concat(gen.fields);
+            parts.push(gen.body);
+            name = name ? name + ' + ' + gen.name.replace(/^(Drill|Bore) — /, '') : gen.name;
+        });
+        slot.fields = fields;
+        slot.body = parts.join('\n\n');
+        if (name) slot.name = name;
+        slot.bodyDirty = false;
+    }
+    // A structural edit rebuilds the macro. If the body was hand-edited since the last build, confirm first.
+    function regenGuard(slot) { return !slot.bodyDirty || confirm('Rebuild the macro from the ops?\nYour manual edits to the macro body will be discarded.'); }
+    // The editable op list for a slot (empty for legacy/hand-built slots with no op manifest).
+    function opCardsHtml(slot) {
+        if (!slot.ops || !slot.ops.length) return '';
+        const cards = slot.ops.map((op, oi) => `<div class="cam-op-card" style="display:flex; align-items:center; gap:6px; padding:4px 6px; background:rgba(127,127,127,.05); border:1px solid var(--border); border-radius:6px;">
+                <span style="font-size:10px; color:var(--text-dim); width:14px; text-align:center;">${oi + 1}</span>
+                <select class="cam-op-type" data-oi="${oi}" title="Op type — changing it rebuilds this op's fields + macro">${opTypeOpts(op.type)}</select>
+                <select class="cam-op-var" data-oi="${oi}" title="${secondCtlTitle(op.type)}"${SECOND_CTL[op.type] ? '' : ' style="display:none"'}>${secondCtlOpts(op.type, op.variant)}</select>
+                <span style="flex:1"></span>
+                <button class="op-btn" data-act="delop" data-oi="${oi}" title="Remove this op">✕</button>
+            </div>`).join('');
+        const dirty = slot.bodyDirty ? '<div class="settings-hint" style="color:#fd0; margin:0;">✎ macro hand-edited — changing an op rebuilds it and discards those edits</div>' : '';
+        return `<div class="cam-ops" style="margin-top:8px; display:flex; flex-direction:column; gap:5px;">
+                <div style="font-size:10px; color:var(--text-dim);">OPS IN THIS SLOT — edit to rebuild the macro (field defaults reset to each op's defaults)</div>
+                ${cards}${dirty}
+            </div>`;
     }
     function renderCamBuilder() {
         const host = q('cam_slots'); if (!host) return;
@@ -223,6 +269,7 @@ export function initMacrosApp() {
                 </div>
                 <table style="width:100%; font-size:11.5px; margin-top:6px; border-collapse:collapse;"><thead><tr style="color:var(--text-dim); font-size:10px; text-align:left;"><th>Label</th><th>Units</th><th>Default</th><th>Min</th><th>Max</th><th>Var</th><th>#param→#2600</th><th></th></tr></thead><tbody>${rows}</tbody></table>
                 <div class="settings-row" style="margin-top:4px;"><button class="toolbar-btn settings-io" data-act="addf">＋ Add field</button><button class="toolbar-btn settings-io" data-act="refresh" title="Rebuild the field table from the macro's #2600 mirror-read comments — label, units, default and min~max all come from the macro (field type is preserved). Edit a read-line comment, then refresh to apply it.">🔄 Refresh fields from macro</button><span style="flex:1"></span><span style="display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px dashed var(--border); border-radius:6px; background:rgba(127,127,127,.06);"><span style="font-size:10px; color:var(--text-dim); white-space:nowrap;" title="Pick a NEW op to generate into this slot. These do NOT edit the macro below — the macro body is the editable source of truth.">＋ Add op:</span><select class="cam-op"><option value="drill">Drill</option><option value="bore">Bore</option><option value="slot">Slot</option><option value="pocket">Pocket (rect)</option><option value="cpocket">Pocket (circle)</option><option value="surface">Surface / face</option><option value="corner">Probe corner</option><option value="edge">Probe edge</option><option value="zprobe">Probe Z surface</option><option value="inside">Probe inside centre</option><option value="boss">Probe boss centre</option><option value="align">Probe alignment</option></select><select class="cam-op-pat" title="${secondCtlTitle('drill')}">${secondCtlOpts('drill')}</select><button class="toolbar-btn settings-io" data-act="addop" title="Generate the selected op into the slot — fills a blank slot, or APPENDS it to the existing macro (multi-op). It does NOT rewrite code you've already edited; the macro body below is the editable source of truth.">Generate ▸</button></span></div>
+                ${opCardsHtml(slot)}
                 <textarea class="cs" data-f="body" spellcheck="false" placeholder="macro body — declare fields as  #1=#2600 ;Label [mm] =0 [min~max]  then reference each Var (#1, #2 …)" style="width:100%; height:130px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${camEsc(slot.body)}</textarea>
                 ${(() => { const a = auditMacroVars(slot.body); return a.danger.length ? `<div class="settings-hint" style="color:#ff6b6b; margin-top:4px;">⚠ macro writes persistent vars — ${a.danger.map(camEsc).join('; ')}</div>` : ''; })()}
                 <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="sim" title="Run this slot's macro in the simulator with each field seeded from its default — verify the toolpath before publishing.">▶ Simulate</button><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button></div>
@@ -308,7 +355,7 @@ export function initMacrosApp() {
             } else if (t.classList.contains('cs')) {
                 const fld = t.dataset.f;
                 if (fld === 'slot') { slot.slot = parseInt(t.value, 10) || 0; saveCamPack(); renderCamBuilder(); }
-                else { slot[fld] = t.value; saveCamPack(); if (fld !== 'body') renderCamBuilder(); }
+                else { slot[fld] = t.value; if (fld === 'body' && slot.ops && slot.ops.length) slot.bodyDirty = true; saveCamPack(); if (fld !== 'body') renderCamBuilder(); }
             }
         });
         camHost.addEventListener('click', (e) => {
@@ -321,23 +368,29 @@ export function initMacrosApp() {
             else if (a === 'delicon') { slot.icon = null; saveCamPack(); renderCamBuilder(); }
             else if (a === 'addop') {
                 const method = card.querySelector('.cam-op').value, variant = card.querySelector('.cam-op-pat').value;
-                const empty = !(slot.fields && slot.fields.length) && !String(slot.body || '').trim();
-                const off = empty ? 0 : (slot.fields || []).length;
                 // The second dropdown's value is the op's VARIANT: pattern for drill/bore, raster dir ('x'/'y') for
                 // pocket/surface, arc dir ('G3'/'G2') for the round pocket. Probes ignore it (runtime form fields).
-                const GEN = { corner: cornerSlot, edge: edgeSlot, zprobe: probeZSlot, inside: insideCentreSlot, boss: bossCentreSlot, align: alignmentSlot, pocket: pocketSlot, cpocket: circlePocketSlot, surface: surfacingSlot };
-                const gen = GEN[method] ? GEN[method](camPack.usedParams(_camPack), off, variant) : slotFromOp(method, variant, camPack.usedParams(_camPack), off);
-                if (empty) {
-                    slot.name = gen.name; slot.fields = gen.fields; slot.body = gen.body;
-                    // Auto-seed a labelled icon so a fresh slot isn't blank (editable via the icon editor).
-                    if (!slot.icon) { try { slot.icon = { name: (gen.name || 'cam' + slot.slot) + '.bmp', data: autoIconBmp(gen.name, method), w: 360, h: 180, source: 'auto' }; } catch (_) { /* canvas unavailable */ } }
-                }
-                else {   // APPEND a second op → multi-op slot (vars continue; ops run in sequence)
+                const empty = !(slot.fields && slot.fields.length) && !String(slot.body || '').trim();
+                if (!slot.ops && !empty) {
+                    // Legacy / hand-built slot (no op manifest) — keep the raw-text append so manual work is never lost.
+                    const gen = generateOp(method, variant, camPack.usedParams(_camPack), (slot.fields || []).length);
                     slot.fields = (slot.fields || []).concat(gen.fields);
                     slot.body = String(slot.body || '').replace(/\s+$/, '') + '\n\n' + gen.body;
                     slot.name = (slot.name || 'Slot') + ' + ' + gen.name.replace(/^(Drill|Bore) — /, '');
+                } else {
+                    // Structured slot — record the op and regenerate fields + body from the whole op list.
+                    slot.ops = slot.ops || [];
+                    slot.ops.push({ type: method, variant });
+                    buildSlotFromOps(slot);
+                    // Auto-seed a labelled icon so a fresh slot isn't blank (editable via the icon editor).
+                    if (empty && !slot.icon) { try { slot.icon = { name: (slot.name || 'cam' + slot.slot) + '.bmp', data: autoIconBmp(slot.name, method), w: 360, h: 180, source: 'auto' }; } catch (_) { /* canvas unavailable */ } }
                 }
                 saveCamPack(); renderCamBuilder();
+            }
+            else if (a === 'delop') {
+                if (!regenGuard(slot)) { renderCamBuilder(); return; }
+                slot.ops.splice(+e.target.dataset.oi, 1);
+                buildSlotFromOps(slot); saveCamPack(); renderCamBuilder();
             }
             else if (a === 'refresh') {
                 // Rebuild the field table from the macro's #2600 mirror reads. The read-line comment
@@ -352,11 +405,26 @@ export function initMacrosApp() {
             else if (a === 'sim') { simulateSlot(slot); }
             else if (a === 'exp') { insertToEditor('( ===== eng form lines — MERGE into the controller eng language file ===== )\n' + camPack.slotEng(slot) + '\n\n' + camPack.slotMacro(slot)); }
         });
-        // Selecting an op rebuilds its second dropdown into the relevant build-time setting (or hides it).
         camHost.addEventListener('change', (e) => {
-            if (!e.target.classList.contains('cam-op')) return;
-            const sel = e.target.parentElement.querySelector('.cam-op-pat');
-            if (sel) applySecondCtl(sel, e.target.value);
+            const t = e.target;
+            // Add-op selector: rebuild its variant dropdown into the relevant build-time setting (or hide it).
+            if (t.classList.contains('cam-op')) {
+                const sel = t.parentElement.querySelector('.cam-op-pat');
+                if (sel) applySecondCtl(sel, t.value);
+                return;
+            }
+            // Structured op-card edits → mutate the op manifest and regenerate the slot from it.
+            const card = t.closest('.cam-slot'); if (!card) return; const slot = _camPack.slots[+card.dataset.si]; if (!slot || !slot.ops) return;
+            const op = slot.ops[+t.dataset.oi]; if (!op) return;
+            if (t.classList.contains('cam-op-type')) {
+                if (!regenGuard(slot)) { renderCamBuilder(); return; }
+                op.type = t.value; op.variant = defaultVariant(t.value);   // reset the variant to the new type's default
+                buildSlotFromOps(slot); saveCamPack(); renderCamBuilder();
+            } else if (t.classList.contains('cam-op-var')) {
+                if (!regenGuard(slot)) { renderCamBuilder(); return; }
+                op.variant = t.value;
+                buildSlotFromOps(slot); saveCamPack(); renderCamBuilder();
+            }
         });
     }
     const _camName = q('cam_pack_name');
