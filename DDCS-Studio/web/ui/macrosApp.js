@@ -11,6 +11,7 @@ import { bmpDataUrl } from '../data/bmp.js';
 import { openIconEditor } from './iconEditor.js';
 import { slotFromOp, sharedSub } from '../data/opToSlot.js';
 import { auditMacroVars } from '../data/varMap.js';
+import { makeZip, downloadBytes } from '../data/zip.js';
 
 let _wired = false;
 
@@ -44,7 +45,7 @@ export function initMacrosApp() {
                 <div class="settings-section">
                     <div class="settings-section-title">CAM PACK BUILDER</div>
                     <div class="settings-hint">Author a DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's CAM page — to share with the community. Each slot = a <b>form</b> + a <b>macro</b> that reads the form live (the <code>#2600+</code> mirrors). Studio auto-allocates the shared <code>#1100–1499</code> form params and flags collisions. <i>Phase 1: form designer + macro + plain export. Icons + eng-merge install come next.</i></div>
-                    <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add blank slot</button></div>
+                    <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add blank slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + shared subs + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button></div>
                     <div class="settings-row" style="margin-top:4px;">
                         <label>From op
                             <select id="cam_op"><option value="drill">Drill</option><option value="bore">Bore</option></select>
@@ -291,6 +292,37 @@ export function initMacrosApp() {
     });
     const _camSubs = q('cam_subs');
     if (_camSubs) _camSubs.addEventListener('click', () => insertToEditor('( ===== shared per-hole subs — install ONCE (slib-m / O-subs); every generated CAM slot calls them ===== )\n\n' + sharedSub('drill') + '\n' + sharedSub('bore')));
+
+    // Pack export: bundle the whole pack into a USB-ready .zip (CAM/ folder + eng-merge + shared subs + README).
+    const packBytes = (dataUrl) => { const bin = atob(String(dataUrl || '').split(',')[1] || ''); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
+    const readmeText = (hasSubs, name) => [name, '',
+        'INSTALL (DDCS Expert / M350):',
+        '1. Copy the CAM/ folder onto a FAT32 USB stick.',
+        '2. Power off the controller, insert the USB, power on, wait for restart.',
+        '3. F2 -> Program -> F1 (select U-disk) -> cursor on the CAM folder -> F4 (copy to local).',
+        '   Macros MUST run from internal storage — running from USB silently does nothing.',
+        '4. MERGE eng-additions.txt into the controller eng (and chs) language file — do NOT replace it.',
+        hasSubs ? '5. APPEND slib-additions.nc to slib-m.nc, then REBOOT so the shared subs load.' : '',
+        '', 'The new operations then appear on the CAM page.'].filter((x) => x !== '').join('\n') + '\n';
+    const _camExport = q('cam_export_pack');
+    if (_camExport) _camExport.addEventListener('click', () => {
+        if (!_camPack.slots.length) { alert('No slots to export — add a slot first.'); return; }
+        const v = camPack.validatePack(_camPack);
+        if (!v.ok && !confirm('This pack has problems:\n\n' + v.errors.join('\n') + '\n\nExport anyway?')) return;
+        const files = [], eng = [], subs = new Set();
+        _camPack.slots.forEach((slot) => {
+            files.push({ name: `CAM/macro_cam${slot.slot}.nc`, data: camPack.slotMacro(slot) });
+            if (slot.icon && slot.icon.data) files.push({ name: `CAM/cam${slot.slot}.bmp`, data: packBytes(slot.icon.data) });
+            eng.push(`( ===== cam${slot.slot} — ${slot.name || ''} ===== )`, camPack.slotEng(slot), '');
+            if (/\bM_borehole\b/.test(slot.body)) subs.add('bore');
+            if (/\bM_drillhole\b/.test(slot.body)) subs.add('drill');
+        });
+        files.push({ name: 'eng-additions.txt', data: '( MERGE these lines into the controller eng/chs language file — do NOT replace it. )\n\n' + eng.join('\n') });
+        if (subs.size) files.push({ name: 'slib-additions.nc', data: '( APPEND these shared subs to slib-m.nc, then REBOOT so they load. )\n\n' + [...subs].map((m) => sharedSub(m)).join('\n') });
+        const name = (_camPack.meta && _camPack.meta.name) || 'CAM pack';
+        files.push({ name: 'README.txt', data: readmeText(subs.size > 0, name) });
+        downloadBytes(name.replace(/[^\w-]+/g, '_') + '.zip', makeZip(files));
+    });
     renderCamBuilder();
 }
 
