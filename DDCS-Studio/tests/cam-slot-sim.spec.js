@@ -70,6 +70,37 @@ test('corner probe slot: each corner probes the correct X/Y walls and every bran
   expect(r.brZ.dirs, 'Z-first prepends the Z surface probe').toEqual(['Z-', 'Z-', 'Y-', 'Y-', 'X-', 'X-']);
 });
 
+test('edge probe slot: axis/direction select the wall and the WCS axis written', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { edgeSlot } = await import('/data/probeToSlot.js');
+    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
+    const s = edgeSlot();
+    const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
+    const dirs = (ov) => {
+      const seed = new Map(); s.fields.forEach((f) => seed.set(mirrorVar(f.idx), Number(f.def)));
+      for (const [k, val] of Object.entries(ov)) { const f = s.fields.find((x) => x.key === k); if (f) seed.set(mirrorVar(f.idx), val); }
+      const t = new GcodeExecutionEngine({ createVarStore: () => new Map(seed) }).trace(macro);
+      return t.segments.filter((g) => g.probe).map((g) => {
+        const dx = g.x2 - g.x1, dy = g.y2 - g.y1;
+        if (Math.abs(dx) > 1e-6) return 'X' + (dx < 0 ? '-' : '+');
+        if (Math.abs(dy) > 1e-6) return 'Y' + (dy < 0 ? '-' : '+');
+        return '0';
+      });
+    };
+    const lefts = (macro.match(/\[/g) || []).length, rights = (macro.match(/\]/g) || []).length;
+    // radius comp must be present (the bug we fixed): edge = trigger + sign*radius
+    const hasComp = /#50=\[#1925\+#90\*#6\]/.test(macro.replace(/\s/g, ''));
+    return { balanced: lefts === rights, hasComp, xp: dirs({ axis: 0, dir: 0 }), xn: dirs({ axis: 0, dir: 1 }), yp: dirs({ axis: 1, dir: 0 }) };
+  });
+  expect(r.balanced).toBe(true);
+  expect(r.hasComp, 'edge applies radius comp').toBe(true);
+  expect(r.xp).toEqual(['X+', 'X+']);
+  expect(r.xn).toEqual(['X-', 'X-']);
+  expect(r.yp).toEqual(['Y+', 'Y+']);
+});
+
 test('preview panel mounts on a seeded slot macro without throwing', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const ok = await page.evaluate(async () => {

@@ -163,3 +163,80 @@ export function cornerSlot(used = new Set(), varOffset = 0) {
 
     return { name: 'Probe corner', fields, body };
 }
+
+const EDGE_FIELDS = [
+    { key: 'axis', label: 'Axis (0X 1Y)', units: '', def: 0, min: 0, max: 1, type: 0 },
+    { key: 'dir', label: 'Direction (0pos 1neg)', units: '', def: 0, min: 0, max: 1, type: 0 },
+    { key: 'wcs', label: 'WCS (0act 1-6 G54-G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
+    { key: 'maxProbe', label: 'Max probe', units: 'mm', def: 100, min: 1, max: 9999, type: 1 },
+    { key: 'retract', label: 'Retract', units: 'mm', def: 5, min: 0.1, max: 999, type: 1 },
+    { key: 'radius', label: 'Stylus radius', units: 'mm', def: 2, min: 0.001, max: 99, type: 1 },
+    { key: 'fast', label: 'Fast feed', units: 'mm/min', def: 200, min: 1, max: 9999, type: 0 },
+    { key: 'slow', label: 'Slow feed', units: 'mm/min', def: 50, min: 1, max: 9999, type: 0 },
+    { key: 'port', label: 'Probe port P', units: '', def: 3, min: 0, max: 99, type: 0 },
+    { key: 'level', label: 'Trigger level L (0 1)', units: '', def: 0, min: 0, max: 1, type: 0 },
+];
+
+/**
+ * Build the "Probe edge" CAM slot — probe ONE wall on the chosen axis/direction, set that WCS axis to the
+ * edge (trigger + sign*radius). #axis branches X/Y (the G31 letter is fixed), #dir is a sign var. No Z motion
+ * (probes at the current height) — position the tool clear of the wall at probing depth, press Enter.
+ */
+export function edgeSlot(used = new Set(), varOffset = 0) {
+    const { fields, v } = allocFields(EDGE_FIELDS, used, varOffset);
+    const wallProbe = (ax) => {
+        const st = ax === 'X' ? '#1920' : '#1921';
+        const res = ax === 'X' ? '#1925' : '#1926';
+        const L = [
+            `G31 ${ax}#93 F${v.fast} P${v.port} L${v.level} Q1`,
+            `IF ${st}!=2 GOTO 1`,
+            `G0 ${ax}#95`,
+            `G31 ${ax}#93 F${v.slow} P${v.port} L${v.level} Q1`,
+            `IF ${st}!=2 GOTO 1`,
+            `#50=[${res}+#90*${v.radius}]   ;edge = trigger + sign*radius`,
+        ];
+        if (ax === 'X') L.push('#[#70]=#50   ;write WCS X');
+        else L.push('#73=[#70+1]', '#[#73]=#50   ;write WCS Y');
+        L.push(`G0 ${ax}#95   ;back off the wall`);
+        return L;
+    };
+    const body = [
+        '( Probe ONE edge → set one WCS axis. Position clear of the wall at probe depth, press Enter. )',
+        ...fields.map(readLine),
+        '',
+        `( direction sign: 0=pos → +1, 1=neg → -1 )`,
+        '#90=1',
+        `IF ${v.dir} EQ 1 THEN #90=0-1`,
+        '',
+        '( WCS base address — 0 = read the active WCS from #578 )',
+        `#71=${v.wcs}`,
+        'IF #71 EQ 0 THEN #71=#578',
+        '#70=[805+[#71-1]*5]',
+        '',
+        `#93=[#90*${v.maxProbe}]   ;signed probe target`,
+        `#95=[[0-#90]*${v.retract}]   ;signed retract (away from wall)`,
+        '',
+        `#1505=1   ;Position clear of the wall at probe depth, press Enter`,
+        'G91   ( incremental )',
+        '',
+        `IF ${v.axis} EQ 1 GOTO 20`,
+        '( X edge )',
+        ...wallProbe('X'),
+        'GOTO 30',
+        'N20',
+        '( Y edge )',
+        ...wallProbe('Y'),
+        'N30',
+        '',
+        'G90   ( absolute )',
+        '#1505=-5000   ;edge found',
+        'GOTO 2',
+        '( error handler )',
+        'N1',
+        'G90',
+        '#1505=1   ;ERROR: probe did not trigger',
+        'N2',
+        'M30',
+    ].join('\n');
+    return { name: 'Probe edge', fields, body };
+}
