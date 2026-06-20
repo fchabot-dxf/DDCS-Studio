@@ -1711,6 +1711,27 @@ function wireSettingsOverlay(ov) {
     const insertToEditor = (txt) => { const em = (window.ddcsStudio && window.ddcsStudio.editorManager) || window.editorManager; if (em && typeof em.insert === 'function') em.insert(txt); else alert('Editor not available.'); };
     const findKbtn = (k) => macrosArr().find((m) => (m.trigger || {}).kind === 'kbutton' && (m.trigger || {}).key === k);
     const ensureKbtn = (k) => { let m = findKbtn(k); if (!m) { m = { name: '', trigger: { kind: 'kbutton', key: k }, body: '' }; macrosArr().push(m); } return m; };
+    // Push an M-code into the controller's macro library (slib-m.nc) — backed-up append; refuse a duplicate; reboot to load.
+    async function pushMcode(m) {
+        const n = parseInt((m.trigger || {}).code, 10) || 0; const oNum = 'O' + (10000 + n);
+        if (!confirm(`Merge M${n} (${oNum}) into the controller's macro library (slib-m.nc)?\n\nThe existing slib-m.nc is backed up first (slib-m.nc.bak). You must REBOOT the controller afterward for it to load.`)) return;
+        try {
+            const cur = await makeClient().readSysfile('slib-m.nc');
+            if (!cur || cur.ok === false) { alert('Could not read slib-m.nc — needs the gateway/desktop app + a connected controller.' + (cur && cur.error ? '\n(' + cur.error + ')' : '')); return; }
+            if (new RegExp('(^|\\s)' + oNum + '(\\s|$)').test(cur.content || '')) { alert(`${oNum} is already in slib-m.nc — remove it on the controller first so it isn't duplicated, then push again.`); return; }
+            const res = await makeClient().writeSysfile('slib-m.nc', '\n' + macroFileText(m), 'append');
+            if (res && res.ok) alert(`Merged ${oNum} (M${n}) into slib-m.nc${res.backup ? ' — backup ' + res.backup : ''}.\n\nReboot the controller to load it; then M${n} is callable from a program.`);
+            else alert('Push failed: ' + ((res && res.error) || 'unknown'));
+        } catch (err) { alert('Push failed: ' + (err && err.message ? err.message : err)); }
+    }
+    async function pushKbutton(k, m) {
+        if (!confirm(`Write key-${k}.nc to the controller (the K${k} button)?\n\nThe existing key-${k}.nc is backed up first (key-${k}.nc.bak).`)) return;
+        try {
+            const res = await makeClient().writeSysfile('key-' + k + '.nc', macroFileText(m), 'write');
+            if (res && res.ok) alert(`Wrote key-${k}.nc${res.backup ? ' — backup ' + res.backup : ''}.\nPress K${k} to run it (reboot if the controller doesn't pick it up).`);
+            else alert('Push failed: ' + ((res && res.error) || 'needs the gateway/desktop app + a connected controller'));
+        } catch (err) { alert('Push failed: ' + (err && err.message ? err.message : err)); }
+    }
 
     // --- M-codes table (custom O100nn) ---
     function renderMcodes() {
@@ -1724,7 +1745,7 @@ function wireSettingsOverlay(ov) {
                 <span class="mc-o" style="font-size:10px; color:var(--text-dim);">→ O${10000 + (parseInt((m.trigger || {}).code, 10) || 0)}</span>
             </div>
             <textarea class="mc-f" data-f="body" spellcheck="false" placeholder="macro body (G-code)" style="width:100%; height:110px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${String(m.body || '').replace(/</g, '&lt;')}</textarea>
-            <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="gen">⬇ Generate</button><span style="flex:1"></span><button class="op-btn" data-act="del" title="Delete">✕</button></div>
+            <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="gen">⬇ Generate</button><button class="toolbar-btn settings-io" data-act="push">⬆ Push to controller</button><span style="flex:1"></span><button class="op-btn" data-act="del" title="Delete">✕</button></div>
         </div>`).join('');
     }
     // --- K-buttons table (fixed K1..K7) ---
@@ -1740,7 +1761,7 @@ function wireSettingsOverlay(ov) {
                     <span style="font-size:10px; color:var(--text-dim);">key-${k}.nc</span>
                 </div>
                 <textarea class="kb-f" data-f="body" spellcheck="false" placeholder="button macro body" style="width:100%; height:80px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${m ? String(m.body || '').replace(/</g, '&lt;') : ''}</textarea>
-                <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="ked">⇪ From editor</button><button class="toolbar-btn settings-io" data-act="kgen">⬇ Generate</button><span style="flex:1"></span><button class="op-btn" data-act="kclr" title="Clear">✕</button></div>
+                <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="ked">⇪ From editor</button><button class="toolbar-btn settings-io" data-act="kgen">⬇ Generate</button><button class="toolbar-btn settings-io" data-act="kpush">⬆ Push</button><span style="flex:1"></span><button class="op-btn" data-act="kclr" title="Clear">✕</button></div>
             </div>`;
         }
         host.innerHTML = html;
@@ -1759,6 +1780,7 @@ function wireSettingsOverlay(ov) {
             const c = e.target.closest('.macro-card'); if (!c) return; const i = +c.dataset.i; const a = e.target.dataset.act;
             if (a === 'del') { macrosArr().splice(i, 1); saveSettings(); renderMcodes(); }
             else if (a === 'gen') insertToEditor(macroFileText(macrosArr()[i]));
+            else if (a === 'push') pushMcode(macrosArr()[i]);
         });
     }
     const kbh = q('kbuttons_list');
@@ -1768,6 +1790,7 @@ function wireSettingsOverlay(ov) {
             const r = e.target.closest('.kbtn-row'); if (!r) return; const k = +r.dataset.k; const a = e.target.dataset.act;
             if (a === 'ked') { ensureKbtn(k).body = editorText().trim(); saveSettings(); renderKbuttons(); }
             else if (a === 'kgen') { const m = findKbtn(k); if (!m || !String(m.body).trim()) { alert('K' + k + ' is empty.'); return; } insertToEditor(macroFileText(m)); }
+            else if (a === 'kpush') { const m = findKbtn(k); if (!m || !String(m.body).trim()) { alert('K' + k + ' is empty.'); return; } pushKbutton(k, m); }
             else if (a === 'kclr') { const i = macrosArr().findIndex((x) => (x.trigger || {}).kind === 'kbutton' && (x.trigger || {}).key === k); if (i >= 0) macrosArr().splice(i, 1); saveSettings(); renderKbuttons(); }
         });
     }

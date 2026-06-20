@@ -55,6 +55,8 @@ export function makeClient(opts = {}) {
     submitJob: (name, nc, map) => postJSON("/api/jobs", { name, nc, map }),
     getConfig: () => call("/api/config"),
     setConfig: (updates) => postJSON("/api/config", updates),
+    readSysfile: (name) => call("/api/sysfile?name=" + encodeURIComponent(name)),                  // SYSDISK macro file (key-N.nc / slib-m.nc)
+    writeSysfile: (name, content, mode = "write") => postJSON("/api/sysfile", { name, content, mode }),   // backed-up write/append
   };
 }
 

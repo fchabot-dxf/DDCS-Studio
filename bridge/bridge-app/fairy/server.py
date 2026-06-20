@@ -118,6 +118,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send_json(self.ops.list_files())
         if path == "/api/file":
             return self._send_json(self.ops.read_file((q.get("name") or [""])[0]))
+        if path == "/api/sysfile":
+            return self._send_json(self.ops.read_sysfile((q.get("name") or [""])[0]))
         if path == "/api/scan":
             return self._send_json({"controllers": self.ops.scan_controllers()})
         if path == "/api/lan-qr":
@@ -179,6 +181,9 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send_json(self.ops.delete_file(b.get("name", "")))
         if self.path == "/api/config":
             return self._send_json(self.ops.set_config(self._read_body()))
+        if self.path == "/api/sysfile":
+            b = self._read_body()
+            return self._send_json(self.ops.write_sysfile(b.get("name", ""), b.get("content", ""), b.get("mode", "write")))
         return self._send_json({"error": "not found"}, 404)
 
     # -- static console -------------------------------------------------------

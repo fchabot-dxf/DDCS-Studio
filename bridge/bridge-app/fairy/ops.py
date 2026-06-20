@@ -97,6 +97,50 @@ class Ops:
         except OSError as e:
             return {"ok": False, "error": str(e)}
 
+    # --- SYSDISK macro files: K-button programs (key-N.nc) + the O100nn library (slib-m.nc) ---------
+    # WRITE to the controller's macro disk. Whitelisted names only (no traversal, no firmware files); the
+    # existing file is ALWAYS backed up to <name>.bak before any change. The controller loads slib-m.nc at
+    # boot, so a merged M-code needs a REBOOT to take effect (the UI says so); key-N.nc is a button program.
+    def _sysfile_path(self, name):
+        base = self._sysdisk_path()
+        if not base or not name or not re.match(r"^(key-[1-7]\.nc|slib-m\.nc)$", name):
+            return None
+        return os.path.join(base, name)
+
+    def read_sysfile(self, name):
+        """Read a whitelisted SYSDISK macro file (text) — for previewing / merging slib-m.nc."""
+        if not self.controller_reachable():
+            return {"ok": False, "error": "controller unreachable"}
+        p = self._sysfile_path(name)
+        if not p:
+            return {"ok": False, "error": f"name not allowed: {name!r}"}
+        try:
+            with open(p, "r", encoding="utf-8", errors="replace") as f:
+                return {"ok": True, "name": name, "content": f.read()}
+        except OSError as e:
+            return {"ok": False, "error": str(e)}
+
+    def write_sysfile(self, name, content, mode="write"):
+        """Write (overwrite) or append a whitelisted SYSDISK macro file. Backs the existing file up to
+        <name>.bak first. mode='append' adds to the end — used to merge an O100nn block into slib-m.nc
+        WITHOUT rewriting the factory content (binary-preserved original + appended block)."""
+        if not self.controller_reachable():
+            return {"ok": False, "error": "controller unreachable"}
+        p = self._sysfile_path(name)
+        if not p:
+            return {"ok": False, "error": f"name not allowed: {name!r}"}
+        try:
+            backed = False
+            if os.path.exists(p):
+                with open(p, "rb") as src, open(p + ".bak", "wb") as dst:
+                    dst.write(src.read())
+                backed = True
+            with open(p, "a" if mode == "append" else "w", encoding="utf-8", newline="") as f:
+                f.write(content)
+            return {"ok": True, "name": name, "backup": (name + ".bak") if backed else ""}
+        except OSError as e:
+            return {"ok": False, "error": str(e)}
+
     # --- identity / descriptor ---------------------------------------------
     def controller_reachable(self):
         if not self.cfg.expert_dest:
