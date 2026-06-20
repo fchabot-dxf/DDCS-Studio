@@ -113,7 +113,7 @@ export const drillView = {
 
     // Variant entries (Drill vs Bore): one form, two menu entries. Lock the method + hide its selector so the
     // op's identity is fixed by which entry opened it — no toggle to silently turn a drill into a bore.
-    variants: [{ id: 'drill', label: 'Drill / holes' }, { id: 'bore', label: 'Bore / helical' }],
+    variants: [{ id: 'drill', label: 'Drill' }, { id: 'bore', label: 'Bore' }],
     applyVariant(variant) {
         const m = el('d_method');
         if (m && variant === 'bore') m.value = 'helical';
