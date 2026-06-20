@@ -500,3 +500,55 @@ test('structured op editing: ▲/▼ reorder the ops (macro run order) and tuned
   expect(r.afterDrillFirst, 'macro re-emitted with slot before drill').toBe(false);
   expect(r.depths.includes('9'), 'drill tuned depth=9 travelled with the op').toBe(true);
 });
+
+test('duplicate op + structured slot: clone inherits tuned values, gets fresh params (no collision)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const mod = await import('/ui/macrosApp.js'); mod.initMacrosApp();
+    const root = document.getElementById('macros-app');
+    root.querySelector('#cam_add_slot').click();
+    const slot0 = () => root.querySelector('.cam-slot');
+    const addOp = (t) => { const o = slot0().querySelector('.cam-op'); o.value = t; o.dispatchEvent(new Event('change', { bubbles: true })); slot0().querySelector('[data-act="addop"]').click(); };
+    const rowFor = (l) => Array.from(slot0().querySelectorAll('tr[data-fi]')).find((r) => r.querySelector('.cf[data-f="label"]').value === l);
+    const setDef = (l, v) => { const i = rowFor(l).querySelector('.cf[data-f="def"]'); i.value = String(v); i.dispatchEvent(new Event('input', { bubbles: true })); };
+    addOp('drill'); setDef('Depth', 9);
+    slot0().querySelector('[data-act="dupop"]').click();   // clone the op
+    const opTypes = Array.from(slot0().querySelectorAll('.cam-op-card')).map((d) => d.querySelector('.cam-op-type').value);
+    const depths = Array.from(slot0().querySelectorAll('tr[data-fi]')).filter((r) => r.querySelector('.cf[data-f="label"]').value === 'Depth').map((r) => r.querySelector('.cf[data-f="def"]').value);
+    slot0().querySelector('[data-act="dupslot"]').click();   // clone the whole slot
+    const slots = root.querySelectorAll('.cam-slot');
+    return { opTypes, depths, slotCount: slots.length, cloneHasOpCards: slots[1].querySelectorAll('.cam-op-card').length, noCollision: !/⛔/.test(root.querySelector('#cam_validate').textContent) };
+  });
+  expect(r.opTypes).toEqual(['drill', 'drill']);
+  expect(r.depths, 'the duplicated op inherits the tuned default').toEqual(['9', '9']);
+  expect(r.slotCount).toBe(2);
+  expect(r.cloneHasOpCards, 'structured clone keeps its op list').toBeGreaterThan(0);
+  expect(r.noCollision, 'duplicate allocated fresh params').toBe(true);
+});
+
+test('duplicate a legacy (hand-built) slot remaps its #params off the original — no collision', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    localStorage.setItem('ddcs_campack', JSON.stringify({ meta: { name: 't', baseSlot: 22 }, slots: [{
+      slot: 22, name: 'Manual', fields: [
+        { idx: 1100, var: '#1', label: 'Depth', units: 'mm', def: 5, min: 0, max: 99, type: 1, key: 'depth' },
+        { idx: 1101, var: '#2', label: 'Feed', units: 'mm/min', def: 300, min: 1, max: 9999, type: 0, key: 'feed' },
+      ], body: '#1=#2600   ;Depth [mm] =5 [0~99]\n#2=#2601   ;Feed [mm/min] =300 [1~9999]\nG1 Z[0-#1] F#2\nM30' }] }));
+    const mod = await import('/ui/macrosApp.js'); mod.initMacrosApp();
+    const root = document.getElementById('macros-app');
+    root.querySelector('.cam-slot [data-act="dupslot"]').click();
+    const slots = Array.from(root.querySelectorAll('.cam-slot'));
+    return {
+      camNums: slots.map((s) => s.querySelector('.cs[data-f="slot"]').value),
+      origKeeps2600: /=#2600/.test(slots[0].querySelector('textarea[data-f="body"]').value),
+      cloneRemapped: /#1=#2602/.test(slots[1].querySelector('textarea[data-f="body"]').value),
+      calcUntouched: /G1 Z\[0-#1\] F#2/.test(slots[1].querySelector('textarea[data-f="body"]').value),
+      noCollision: !/⛔/.test(root.querySelector('#cam_validate').textContent),
+    };
+  });
+  expect(r.camNums).toEqual(['22', '23']);
+  expect(r.origKeeps2600).toBe(true);
+  expect(r.cloneRemapped, 'clone read-line mirror remapped').toBe(true);
+  expect(r.calcUntouched, 'working-var calc lines untouched by the remap').toBe(true);
+  expect(r.noCollision).toBe(true);
+});

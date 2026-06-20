@@ -243,6 +243,21 @@ export function initMacrosApp() {
     }
     // A structural edit rebuilds the macro. If the body was hand-edited since the last build, confirm first.
     function regenGuard(slot) { return !slot.bodyDirty || confirm('Rebuild the macro from the ops?\nYour manual edits to the macro body will be discarded.'); }
+    // Re-allocate a slot's form params (#11xx) to free ones around `otherUsed`, rewriting each field's read-line
+    // mirror (#26xx) to match. For duplicating a LEGACY/hand-built slot (no op manifest to regenerate from) so the
+    // copy doesn't collide with the original. Anchored to each field's `var=#mirror` at line start — calcs untouched.
+    function reallocSlotParams(slot, otherUsed) {
+        const taken = new Set(otherUsed);
+        let body = String(slot.body || '');
+        (slot.fields || []).forEach((f) => {
+            const ni = camPack.nextParam(taken); if (ni == null || ni === f.idx) { if (ni != null) taken.add(ni); return; }
+            taken.add(ni);
+            const re = new RegExp('^([ \\t]*' + f.var.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=#)' + (f.idx + 1500) + '\\b', 'm');
+            body = body.replace(re, '$1' + (ni + 1500));
+            f.idx = ni;
+        });
+        slot.body = body;
+    }
     // The editable op list for a slot (empty for legacy/hand-built slots with no op manifest).
     function opCardsHtml(slot) {
         if (!slot.ops || !slot.ops.length) return '';
@@ -253,6 +268,7 @@ export function initMacrosApp() {
                 <span style="flex:1"></span>
                 <button class="op-btn" data-act="opup" data-oi="${oi}" title="Move up (ops run in this order)"${oi === 0 ? ' disabled' : ''}>▲</button>
                 <button class="op-btn" data-act="opdown" data-oi="${oi}" title="Move down (ops run in this order)"${oi === slot.ops.length - 1 ? ' disabled' : ''}>▼</button>
+                <button class="op-btn" data-act="dupop" data-oi="${oi}" title="Duplicate this op">⧉</button>
                 <button class="op-btn" data-act="delop" data-oi="${oi}" title="Remove this op">✕</button>
             </div>`).join('');
         const dirty = slot.bodyDirty ? '<div class="settings-hint" style="color:#fd0; margin:0;">✎ macro hand-edited — changing an op rebuilds it and discards those edits</div>' : '';
@@ -286,6 +302,7 @@ export function initMacrosApp() {
                     <input class="cs" data-f="name" value="${camEsc(slot.name)}" placeholder="Slot name" style="flex:1; min-width:120px;">
                     <label style="font-size:10px; color:var(--text-dim);" title="Work coordinate system this slot's macro runs in. Active = whatever G54–G59 the operator has selected; or bake a specific one.">WCS<select class="cs" data-f="wcs" style="margin-left:3px;">${['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59'].map((o) => `<option value="${o}"${(slot.wcs || 'active') === o ? ' selected' : ''}>${o === 'active' ? 'Active' : o}</option>`).join('')}</select></label>
                     <span style="font-size:10px; color:var(--text-dim);">-m${camPack.slotGroup(slot.slot)}</span>
+                    <button class="op-btn" data-act="dupslot" title="Duplicate this slot to a new cam number">⧉</button>
                     <button class="op-btn" data-act="dels" title="Remove slot">✕</button>
                 </div>
                 <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
@@ -429,6 +446,22 @@ export function initMacrosApp() {
                 if (!regenGuard(slot)) { renderCamBuilder(); return; }
                 const tmp = slot.ops[oi]; slot.ops[oi] = slot.ops[ni]; slot.ops[ni] = tmp;   // values travel with the op
                 buildSlotFromOps(slot); saveCamPack(); renderCamBuilder();
+            }
+            else if (a === 'dupop') {
+                if (!slot.ops) return; const src = slot.ops[+e.target.dataset.oi]; if (!src) return;
+                if (!regenGuard(slot)) { renderCamBuilder(); return; }
+                slot.ops.splice(+e.target.dataset.oi + 1, 0, JSON.parse(JSON.stringify(src)));   // deep copy incl. tuned values
+                buildSlotFromOps(slot); saveCamPack(); renderCamBuilder();
+            }
+            else if (a === 'dupslot') {
+                const clone = JSON.parse(JSON.stringify(slot)); delete clone.bodyDirty;
+                clone.slot = nextSlotNum();
+                const otherUsed = new Set(); _camPack.slots.forEach((s) => (s.fields || []).forEach((f) => otherUsed.add(f.idx)));
+                _camPack.slots.push(clone);
+                if (clone.ops && clone.ops.length) buildSlotFromOps(clone);   // structured → fresh params for free
+                else reallocSlotParams(clone, otherUsed);                     // legacy → remap params off the original
+                clone.name = (clone.name || 'Slot') + ' (copy)';
+                saveCamPack(); renderCamBuilder();
             }
             else if (a === 'refresh') {
                 // Rebuild the field table from the macro's #2600 mirror reads. The read-line comment
