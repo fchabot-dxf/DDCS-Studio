@@ -128,8 +128,9 @@ function stageSvg(layers, sel) {
 /** Open the editor. `initial` = { layers } or null. onSave(bmpDataUrl, { layers }). */
 export function openIconEditor(initial, onSave) {
     const layers = (initial && Array.isArray(initial.layers)) ? JSON.parse(JSON.stringify(initial.layers)) : [];
-    // New icon → a real, editable background rectangle covering the 360×180 frame (recolour/resize like any layer).
-    if (!layers.length) layers.push({ type: 'rect', x: 0, y: 0, w: W, h: H, rot: 0, scale: 1, bw: W, bh: H, fill: '#000000', color: '#000000', sw: 0, bg: true });
+    // Ensure a real, editable background rectangle at the back (covers the 360×180 frame; recolour/resize like
+    // any layer). Added to existing icons too — just behind their content, so nothing changes until recoloured.
+    if (!layers.some((l) => l.bg)) layers.unshift({ type: 'rect', x: 0, y: 0, w: W, h: H, rot: 0, scale: 1, bw: W, bh: H, fill: '#000000', color: '#000000', sw: 0, bg: true });
     let sel = -1;
 
     const m = document.createElement('div'); m.id = 'iconed-modal';
@@ -198,7 +199,7 @@ export function openIconEditor(initial, onSave) {
 
     function renderStage() { stage.innerHTML = stageSvg(layers, sel); }
     function renderLayers() {
-        $('ie_layers').innerHTML = layers.map((L, i) => `<div class="ie-lyr ${i === sel ? 'sel' : ''}" data-li="${i}"><span>${L.type === 'text' ? '“' + esc(L.text).slice(0, 16) + '”' : L.type === 'tile' ? L.tile : L.type}</span><button class="op-btn" data-mv="up" title="Forward">▲</button><button class="op-btn" data-mv="dn" title="Back">▼</button><button class="op-btn" data-mv="del" title="Delete">✕</button></div>`).reverse().join('');
+        $('ie_layers').innerHTML = layers.map((L, i) => `<div class="ie-lyr ${i === sel ? 'sel' : ''}" data-li="${i}"><span>${L.bg ? '▪ background' : L.type === 'text' ? '“' + esc(L.text).slice(0, 16) + '”' : L.type === 'tile' ? L.tile : L.type}</span><button class="op-btn" data-mv="up" title="Forward">▲</button><button class="op-btn" data-mv="dn" title="Back">▼</button><button class="op-btn" data-mv="del" title="Delete">✕</button></div>`).reverse().join('');
     }
     function renderProps() {
         const host = $('ie_props');
