@@ -376,11 +376,15 @@ export class GcodeExecutionEngine {
             return;
         }
         if (typeof this.onPositionChange === 'function') {
-            this.onPositionChange({
-                x: mv.from.x + (mv.to.x - mv.from.x) * t,
-                y: mv.from.y + (mv.to.y - mv.from.y) * t,
-                z: mv.from.z + (mv.to.z - mv.from.z) * t,
-            });
+            let p;
+            if (mv.path) {   // arc: interpolate along the linearized polyline (~5° chords → ~constant speed)
+                const segs = mv.path.length - 1, f = t * segs, i = Math.min(segs - 1, Math.floor(f)), u = f - i;
+                const a = mv.path[i], b = mv.path[i + 1];
+                p = { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, z: a.z + (b.z - a.z) * u };
+            } else {
+                p = { x: mv.from.x + (mv.to.x - mv.from.x) * t, y: mv.from.y + (mv.to.y - mv.from.y) * t, z: mv.from.z + (mv.to.z - mv.from.z) * t };
+            }
+            this.onPositionChange(p);
         }
         this._nextDelayMs = 16;   // ~60 fps while travelling
     }
@@ -821,7 +825,29 @@ export class GcodeExecutionEngine {
                 this.pos = target;
             }
         } else {
-            this.stats.skipped += 1;
+            // Arc (G2/G3) in real-time play: walk the linearized arc so the curve actually animates. Direction
+            // is inherited from arcPoints (it sweeps per the motion code; a full circle start==end sweeps a ring).
+            const off = { I: wm.I, J: wm.J, K: wm.K, R: wm.R };
+            const anyNull = ['I', 'J', 'K', 'R'].some((k) => wm[k] != null && !Number.isFinite(wm[k]));
+            const pts = anyNull ? null : arcPoints(this.pos, target, off, effMotion, this.plane, this.unitScale);
+            if (!pts || pts.length < 3) {
+                this.stats.skipped += 1;
+            } else {
+                let len = 0;
+                for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y, pts[i].z - pts[i - 1].z);
+                const rate = this.feedVal > 0 ? this.feedVal : 600;
+                const realMs = rate > 0 ? (len / rate) * 60000 : 0;
+                const speed = this.simSpeed > 0 ? this.simSpeed : 1;
+                if (realMs / speed > 50) {
+                    this._move = { from: { ...pts[0] }, to: { ...pts[pts.length - 1] }, path: pts, durMs: realMs, elapsed: 0, last: null, touchName: null };
+                    this._setStatus(`${effMotion === 2 ? 'G2 cw' : 'G3 ccw'} arc ${len.toFixed(1)} mm at F${rate} — ${(realMs / 1000).toFixed(1)} s${speed !== 1 ? ` @ ${speed}×` : ''}`, true);
+                    this._nextDelayMs = 16;
+                    this.ip += 1;
+                    return false;   // ticks now advance along the arc; next line runs when it lands
+                }
+                this.pos = target;   // sub-frame arc: jump to the end
+                if (typeof this.onPositionChange === 'function') this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
+            }
         }
 
         this.ip += 1;
