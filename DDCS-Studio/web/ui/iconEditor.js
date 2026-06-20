@@ -11,6 +11,24 @@ const W = 360, H = 180, ZOOM = 2;
 const TILESET_FILES = ['cornerViz', 'edgeViz', 'middleViz', 'alignViz'];
 let _tileCache = null;
 
+// Strip a trailing position/index token (needs a _/- separator so plain words aren't truncated) so repeated
+// variants collapse to one family: corner_BL → corner, middle_probe_TL → middle_probe, edge_2 → edge.
+function baseId(id) {
+    return String(id).replace(/[_-](BL|BR|FL|FR|TL|TR|TC|BC|LC|RC|NE|NW|SE|SW|[NSEWLRTBXYZ]|\d+)$/i, '') || String(id);
+}
+// Show ONLY the target's lineage: walk up to the root hiding each on-path node's siblings, so neighbouring
+// geometry (axis lines, other probes) can't bleed into the crop. Ancestor transforms still apply (position).
+function isolate(clone, tgt) {
+    let node = tgt;
+    while (node && node.parentNode && node !== clone) {
+        [...(node.parentNode.children || [])].forEach((sib) => {
+            const tag = (sib.tagName || '').toLowerCase();
+            if (sib !== node && tag !== 'defs' && tag !== 'style' && tag !== 'title' && tag !== 'metadata') sib.style.display = 'none';
+        });
+        node = node.parentNode;
+    }
+}
+
 // Extract each id'd group from a source SVG as a cropped tile. The full SVG is kept (so transforms / defs
 // stay correct); unrelated id-groups are hidden and the viewBox is cropped to the group's rendered bbox,
 // measured in a hidden 465px mount (1px = 1 user unit, so the client rect maps straight to viewBox coords).
@@ -23,20 +41,24 @@ async function extractTiles(file) {
     const svg = mount.querySelector('svg'); const tiles = [];
     try {
         const sr = svg.getBoundingClientRect();
-        // Judgement: surface the "primitive" objects, not the collection containers that bundle them, and
-        // not the over-atomic fragments. A leaf id-group (no nested g[id]) is that primitive; we also drop
-        // the full-frame group (≈the whole diagram) and micro bits. Fallback to all groups if none nest.
+        // What becomes a tile: primitive LEAF groups (a g[id] with no nested g[id]) PLUS any loose id'd shape
+        // not wrapped in a group (so other asset types surface) — never the collection containers or a group's
+        // own sub-paths. Then drop the full-frame group + micro bits, isolate each from sibling geometry, and
+        // de-dup repeated variants by family (one mini-probe, not four).
         const groups = [...svg.querySelectorAll('g[id]')];
-        const leaves = groups.filter((g) => !g.querySelector('g[id]'));
-        const pool = leaves.length ? leaves : groups;
+        const leafGroups = groups.filter((g) => !g.querySelector('g[id]'));
+        const looseShapes = [...svg.querySelectorAll('path[id],polygon[id],polyline[id],rect[id],circle[id],ellipse[id]')].filter((s) => !s.closest('g[id]'));
+        const pool = (leafGroups.length || looseShapes.length) ? leafGroups.concat(looseShapes) : groups;
+        const seen = new Set();
         pool.forEach((g) => {
             let gr; try { gr = g.getBoundingClientRect(); } catch (e) { return; }
             if (Math.max(gr.width, gr.height) < 10) return;          // too atomic to be a useful tile
             if (gr.width > 440 && gr.height > 440) return;            // ≈ the full 465 frame (whole diagram)
+            const fam = file + ':' + baseId(g.id); if (seen.has(fam)) return; seen.add(fam);
             const pad = 4, x = gr.left - sr.left - pad, y = gr.top - sr.top - pad;
             const clone = svg.cloneNode(true);
             let tgt = null; try { tgt = clone.querySelector('#' + (window.CSS && CSS.escape ? CSS.escape(g.id) : g.id)); } catch (e) { /* */ }
-            if (tgt) clone.querySelectorAll('g[id]').forEach((c) => { if (c !== tgt && !c.contains(tgt) && !tgt.contains(c)) c.style.display = 'none'; });
+            if (tgt) isolate(clone, tgt);
             clone.setAttribute('viewBox', `${x.toFixed(1)} ${y.toFixed(1)} ${(gr.width + 2 * pad).toFixed(1)} ${(gr.height + 2 * pad).toFixed(1)}`);
             clone.removeAttribute('width'); clone.removeAttribute('height');
             tiles.push({ id: g.id, source: file, uri: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(clone.outerHTML), w: gr.width, h: gr.height });
