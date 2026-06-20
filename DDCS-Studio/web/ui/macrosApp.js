@@ -188,7 +188,8 @@ export function initMacrosApp() {
                 <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                     <label style="font-size:11px; color:var(--text-dim);">cam<input type="number" class="cs" data-f="slot" value="${slot.slot}" min="0" max="9999" style="width:60px; margin-left:2px;"></label>
                     <input class="cs" data-f="name" value="${camEsc(slot.name)}" placeholder="Slot name" style="flex:1; min-width:120px;">
-                    <span style="font-size:10px; color:var(--text-dim);">form group -m${camPack.slotGroup(slot.slot)}</span>
+                    <label style="font-size:10px; color:var(--text-dim);" title="Work coordinate system this slot's macro runs in. Active = whatever G54–G59 the operator has selected; or bake a specific one.">WCS<select class="cs" data-f="wcs" style="margin-left:3px;">${['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59'].map((o) => `<option value="${o}"${(slot.wcs || 'active') === o ? ' selected' : ''}>${o === 'active' ? 'Active' : o}</option>`).join('')}</select></label>
+                    <span style="font-size:10px; color:var(--text-dim);">-m${camPack.slotGroup(slot.slot)}</span>
                     <button class="op-btn" data-act="dels" title="Remove slot">✕</button>
                 </div>
                 <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">

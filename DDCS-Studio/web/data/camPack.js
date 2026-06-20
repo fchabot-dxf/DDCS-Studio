@@ -73,6 +73,7 @@ export function slotMacro(slot) {
     const fields = slot.fields || [];
     const head = [`( macro_cam${num(slot.slot, 0)}.nc — ${esc(slot.name) || 'CAM slot ' + num(slot.slot, 0)} )`,
         '( form values are read live from the #2600+ mirrors — never edit camsetting )'];
+    if (slot.wcs && slot.wcs !== 'active') head.push(`${esc(slot.wcs)}   ( work offset )`);
     const body = String(slot.body || '').replace(/\r/g, '').replace(/\s+$/, '');
     // Macro-first: if the body already declares the mirror reads, don't prepend them again (it IS the macro).
     const hasReads = /#\d+\s*=\s*#2[6-9]\d\d/.test(body);
