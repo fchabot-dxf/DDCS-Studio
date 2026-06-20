@@ -80,9 +80,10 @@ GROUP BY country ORDER BY launches DESC;
 
 Your own usage is tagged `dev = 1` (blob9) so you can exclude it — or look at only it:
 
-- **Each browser you test from:** visit your site once with `?dev=1` on the URL, e.g.
-  `https://ddcs-studio.pages.dev/?dev=1`. It persists in that browser; `?dev=0` clears it. It's
-  per-browser (not per-network), so do it once on each browser across your PCs.
+- **Each browser you test from** — open one of these once (it persists in that browser; per-browser,
+  not per-network, so do it on every browser you test with across your PCs):
+  - Mark this browser as yours (dev):  <https://ddcs-studio.pages.dev/?dev=1>
+  - Undo / mark as a normal visitor:   <https://ddcs-studio.pages.dev/?dev=0>
 - **Dev runs of the exe** (`python fairy_gateway.py`): auto-tagged `dev=1` (a non-frozen run). A
   released `.exe` counts as real; set env `DDCS_DEV=1` to exclude a specific installed copy.
 
