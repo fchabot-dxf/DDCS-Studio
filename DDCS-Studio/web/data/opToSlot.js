@@ -86,14 +86,14 @@ function loopBody(pattern, v, call) {
  * `used` = Set of #11xx already taken in the pack (for collision-free allocation).
  * Returns { name, fields:[{idx,label,units,def,min,max,type,var}], body }  — plugs straight into camPack.
  */
-export function slotFromOp(method, pattern, used = new Set()) {
+export function slotFromOp(method, pattern, used = new Set(), varOffset = 0) {
     const order = ['posX', 'posY', ...PATTERN_FIELDS[pattern], ...HOLE_FIELDS[method], 'feed', 'clearance'];
     const taken = new Set(used);
     const fields = order.map((key, i) => {
         const idx = nextParam(taken); if (idx != null) taken.add(idx);
         const s = SPEC[key];
         const def = key === 'holeDia' && method === 'drill' ? 6 : s.def;
-        return { key, idx, var: '#' + (i + 1), label: s.label, units: s.units, def, min: s.min, max: s.max, type: s.type };
+        return { key, idx, var: '#' + (varOffset + i + 1), label: s.label, units: s.units, def, min: s.min, max: s.max, type: s.type };
     });
     const v = {}; fields.forEach((f) => { v[f.key] = f.var; });
     const call = method === 'bore' ? 'M_borehole' : 'M_drillhole';

@@ -45,15 +45,7 @@ export function initMacrosApp() {
                 <div class="settings-section">
                     <div class="settings-section-title">CAM PACK BUILDER</div>
                     <div class="settings-hint">Author a DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's CAM page — to share with the community. Each slot = a <b>form</b> + a <b>macro</b> that reads the form live (the <code>#2600+</code> mirrors). Studio auto-allocates the shared <code>#1100–1499</code> form params and flags collisions. <i>Phase 1: form designer + macro + plain export. Icons + eng-merge install come next.</i></div>
-                    <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add blank slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + shared subs + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button></div>
-                    <div class="settings-row" style="margin-top:4px;">
-                        <label>From op
-                            <select id="cam_op"><option value="drill">Drill</option><option value="bore">Bore</option></select>
-                        </label>
-                        <select id="cam_op_pat"><option value="circle">bolt circle</option><option value="grid">grid</option><option value="line">line</option><option value="rect">rectangle</option></select>
-                        <button class="toolbar-btn settings-io" id="cam_add_op">➕ Add from op</button>
-                        <button class="toolbar-btn settings-io" id="cam_subs" title="Export the shared per-hole subs (M_drillhole / M_borehole) to the editor — install once on the controller; every generated slot calls them.">⬇ Shared subs</button>
-                    </div>
+                    <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + shared subs + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button><button class="toolbar-btn settings-io" id="cam_subs" title="Export the shared per-hole subs (M_drillhole / M_borehole) to the editor — install once on the controller; every generated slot's ➕ Add op calls them.">⬇ Shared subs</button></div>
                     <div id="cam_validate" class="settings-hint" style="margin-top:6px;"></div>
                     <div id="cam_slots" style="margin-top:6px;"></div>
                 </div>
@@ -205,7 +197,7 @@ export function initMacrosApp() {
                     <button class="toolbar-btn settings-io" data-act="icon">🖼 Import BMP</button>
                 </div>
                 <table style="width:100%; font-size:11.5px; margin-top:6px; border-collapse:collapse;"><thead><tr style="color:var(--text-dim); font-size:10px; text-align:left;"><th>Label</th><th>Units</th><th>Default</th><th>Min</th><th>Max</th><th>Var</th><th>#param→#2600</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-                <div class="settings-row" style="margin-top:4px;"><button class="toolbar-btn settings-io" data-act="addf">＋ Add field</button><button class="toolbar-btn settings-io" data-act="refresh" title="Re-scan the macro body's #2600 mirror reads and regenerate the field list — keeps any default/range you've edited.">🔄 Refresh fields from macro</button></div>
+                <div class="settings-row" style="margin-top:4px;"><button class="toolbar-btn settings-io" data-act="addf">＋ Add field</button><button class="toolbar-btn settings-io" data-act="refresh" title="Re-scan the macro body's #2600 mirror reads and regenerate the field list — keeps any default/range you've edited.">🔄 Refresh fields from macro</button><span style="flex:1"></span><select class="cam-op"><option value="drill">Drill</option><option value="bore">Bore</option></select><select class="cam-op-pat"><option value="circle">bolt circle</option><option value="grid">grid</option><option value="line">line</option><option value="rect">rectangle</option></select><button class="toolbar-btn settings-io" data-act="addop" title="Generate an op into this slot — fills a blank slot, or APPENDS another op (multi-op: drill + bore on the same pattern).">➕ Add op</button></div>
                 <textarea class="cs" data-f="body" spellcheck="false" placeholder="macro body — declare fields as  #1=#2600 ;Label [mm] =0 [min~max]  then reference each Var (#1, #2 …)" style="width:100%; height:130px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${camEsc(slot.body)}</textarea>
                 ${(() => { const a = auditMacroVars(slot.body); return a.danger.length ? `<div class="settings-hint" style="color:#ff6b6b; margin-top:4px;">⚠ macro writes persistent vars — ${a.danger.map(camEsc).join('; ')}</div>` : ''; })()}
                 <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button></div>
@@ -269,6 +261,18 @@ export function initMacrosApp() {
             else if (a === 'edit') { openIconEditor(slot.icon || null, (bmp, model) => { slot.icon = { name: (slot.name || 'cam' + slot.slot) + '.bmp', data: bmp, w: 360, h: 180, layers: model.layers }; saveCamPack(); renderCamBuilder(); }); }
             else if (a === 'icon') { importCamIcon(slot); }
             else if (a === 'delicon') { slot.icon = null; saveCamPack(); renderCamBuilder(); }
+            else if (a === 'addop') {
+                const method = card.querySelector('.cam-op').value, pattern = card.querySelector('.cam-op-pat').value;
+                const empty = !(slot.fields && slot.fields.length) && !String(slot.body || '').trim();
+                const gen = slotFromOp(method, pattern, camPack.usedParams(_camPack), empty ? 0 : (slot.fields || []).length);
+                if (empty) { slot.name = gen.name; slot.fields = gen.fields; slot.body = gen.body; }
+                else {   // APPEND a second op → multi-op slot (vars continue; ops run in sequence)
+                    slot.fields = (slot.fields || []).concat(gen.fields);
+                    slot.body = String(slot.body || '').replace(/\s+$/, '') + '\n\n' + gen.body;
+                    slot.name = (slot.name || 'Slot') + ' + ' + gen.name.replace(/^(Drill|Bore) — /, '');
+                }
+                saveCamPack(); renderCamBuilder();
+            }
             else if (a === 'refresh') {
                 // Re-derive the field list from the macro's #2600 mirror reads; KEEP any default/range already edited.
                 const scanned = camPack.fieldsFromMacro(slot.body);
@@ -284,12 +288,6 @@ export function initMacrosApp() {
     const nextSlotNum = () => { const base = (_camPack.meta && _camPack.meta.baseSlot) || 22; const used = new Set(_camPack.slots.map((s) => +s.slot)); let n = base; while (used.has(n)) n++; return n; };
     const _camAddSlot = q('cam_add_slot');
     if (_camAddSlot) _camAddSlot.addEventListener('click', () => { _camPack.slots.push({ slot: nextSlotNum(), name: 'New slot', fields: [], body: '' }); saveCamPack(); renderCamBuilder(); });
-    const _camAddOp = q('cam_add_op');
-    if (_camAddOp) _camAddOp.addEventListener('click', () => {
-        const gen = slotFromOp(q('cam_op').value, q('cam_op_pat').value, camPack.usedParams(_camPack));
-        _camPack.slots.push({ slot: nextSlotNum(), name: gen.name, fields: gen.fields, body: gen.body });
-        saveCamPack(); renderCamBuilder();
-    });
     const _camSubs = q('cam_subs');
     if (_camSubs) _camSubs.addEventListener('click', () => insertToEditor('( ===== shared per-hole subs — install ONCE (slib-m / O-subs); every generated CAM slot calls them ===== )\n\n' + sharedSub('drill') + '\n' + sharedSub('bore')));
 
