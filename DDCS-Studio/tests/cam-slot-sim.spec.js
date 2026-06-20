@@ -199,6 +199,26 @@ test('pocket slot: raster-clears the rect to depth in layers; guards a too-small
   expect(r.smallFeed, 'a pocket smaller than the tool cuts nothing (guarded)').toBe(0);
 });
 
+test('surfacing slot: rasters the full area with no inset and no wall pass', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { surfacingSlot } = await import('/data/millToSlot.js');
+    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
+    const s = surfacingSlot();
+    const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
+    const seed = new Map(); s.fields.forEach((f) => seed.set(mirrorVar(f.idx), Number(f.def)));
+    const t = new GcodeExecutionEngine({ createVarStore: () => new Map(seed) }).trace(macro);
+    const lefts = (macro.match(/\[/g) || []).length, rights = (macro.match(/\]/g) || []).length;
+    return { balanced: lefts === rights, capped: t.stats.capped, feed: t.stats.feed, maxX: t.bounds.maxX, maxY: t.bounds.maxY, minZ: t.bounds.minZ };
+  });
+  expect(r.balanced).toBe(true); expect(r.capped).toBe(false);
+  expect(r.feed, 'raster passes').toBeGreaterThan(10);
+  expect(r.maxX, 'sweeps the full area (no inset)').toBeCloseTo(100, 0);
+  expect(r.maxY).toBeCloseTo(80, 0);
+  expect(r.minZ, 'shallow skim').toBeCloseTo(-0.5, 2);
+});
+
 test('preview panel mounts on a seeded slot macro without throwing', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const ok = await page.evaluate(async () => {
