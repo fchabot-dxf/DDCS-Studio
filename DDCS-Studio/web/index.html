@@ -109,7 +109,15 @@
 
         </nav>
         <div class="hdr-controls">
-            <select id="hdrPost" class="hdr-post" title="Post-processor — which controller's G-code to generate. 'Auto' follows the machine profile (Settings → Profile); override to emit for another controller."></select>
+            <!-- Discreet quick-action chevron (ui/headerPost.js) — opens the post-processor / dialect picker.
+                 Icon-only at every width; the active post shows in the tooltip and as a ✓ in the menu. -->
+            <div class="hdr-quick" id="hdrQuick">
+                <button type="button" id="hdrPostBtn" class="hdr-quick-btn" aria-haspopup="menu" aria-expanded="false"
+                        title="Post-processor — which controller's G-code to generate. 'Auto' follows the machine profile (Settings → Profile). Click to change.">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div id="hdrPostMenu" class="scale-pop hdr-quick-menu" role="menu" hidden></div>
+            </div>
             <span id="hdrPostWarn" class="hdr-post-warn" hidden title="">⚠</span>
             <button class="op-btn hidden" id="transferBtn" title="Send the current program to the machine"><span class="op-icon">📡</span><span class="op-label">TRANSFER</span></button>
         </div>
@@ -131,6 +139,7 @@
             <div class="editor-container">
                 <pre id="editor-highlight" class="editor-layer" aria-hidden="true"></pre>
                 <textarea id="editor" class="editor-layer" spellcheck="false" inputmode="none" placeholder="( System Ready )"></textarea>
+                <button id="align-rotate-btn" type="button" onclick="ddcsAlignRotate()" class="toolbar-btn settings-io" title="Alignment correction — rotate the whole program by a measured fence angle about a pivot (no G68 on DDCS, so Studio does it). Simulate after." style="position:absolute; left:8px; bottom:8px; z-index:3; opacity:.75; font-size:11px; padding:3px 8px;">⟳ Align</button>
                 <div id="editor-statusbar" class="editor-statusbar hidden">
                     <button class="editor-status-copy" id="editor-status-copy" type="button" title="Copy errors to the clipboard" aria-label="Copy errors">
                         <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" style="vertical-align:middle" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>

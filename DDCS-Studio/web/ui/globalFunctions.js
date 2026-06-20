@@ -5,6 +5,7 @@
 import { el } from './uiUtils.js';
 import { CornerVizAnimator } from '../viz/cornerVizAnimator.js';
 import { resetVirtualIO, setVirtualOutput, getVirtualInput } from '../engine/virtualIO.js';
+import { rotateProgram } from '../data/rotateProgram.js';
 
 export function setupGlobalFunctions(app) {
         // Expose key functions to global scope for HTML onclick handlers
@@ -114,6 +115,39 @@ export function setupGlobalFunctions(app) {
             } catch (err) {
                 console.warn('Beep preview failed', err);
             }
+        };
+
+        // Alignment correction: rotate the editor program by a measured fence angle about a pivot (no G68 on
+        // DDCS, so Studio does it — see the alignment-real-correction memory). ALWAYS simulate the result.
+        window.ddcsAlignRotate = () => {
+            const ed = el('editor'); if (!ed) return;
+            const ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center;';
+            ov.innerHTML = `<div style="width:min(440px,92vw); background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px;">
+                <b>⟳ Rotate program (alignment)</b>
+                <div class="settings-hint" style="margin:0">Rotate every XY move + arc by a measured fence angle about a pivot (the part datum). DDCS has no G68, so Studio rewrites the program. <b>Simulate the result before cutting.</b></div>
+                <label>Angle (deg, CCW)<input type="number" data-ang value="0" step="0.001" style="width:100%"></label>
+                <div class="settings-row"><label style="flex:1">Pivot X<input type="number" data-px value="0" step="0.001" style="width:100%"></label><label style="flex:1">Pivot Y<input type="number" data-py value="0" step="0.001" style="width:100%"></label></div>
+                <div data-rout class="settings-hint" style="margin:0"></div>
+                <div class="settings-row" style="justify-content:flex-end"><button class="toolbar-btn settings-io" data-rc>Cancel</button><button class="toolbar-btn settings-io" data-rgo>Rotate editor program</button></div>
+            </div>`;
+            document.body.appendChild(ov);
+            const close = () => ov.remove();
+            ov.querySelector('[data-rc]').addEventListener('click', close);
+            ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+            ov.querySelector('[data-rgo]').addEventListener('click', () => {
+                const ang = parseFloat(ov.querySelector('[data-ang]').value) || 0;
+                const px = parseFloat(ov.querySelector('[data-px]').value) || 0;
+                const py = parseFloat(ov.querySelector('[data-py]').value) || 0;
+                if (!ang) { ov.querySelector('[data-rout]').textContent = 'Enter a non-zero angle.'; return; }
+                const r = rotateProgram(ed.value, ang, px, py);
+                ed.value = r.text;
+                ed.dispatchEvent(new Event('input', { bubbles: true }));   // refresh highlight + preview
+                window.ddcsTrack?.('feature', 'align-rotate');
+                const msg = `Rotated ${r.rotated} move(s) by ${ang}° about (${px}, ${py}).` + (r.hadIncremental ? ' ⚠ G91 incremental moves were left unrotated — check them.' : ' Simulate to verify.');
+                ov.querySelector('[data-rout]').innerHTML = msg;
+                ov.querySelector('[data-rout]').style.color = r.hadIncremental ? '#ff6b6b' : '#3c9';
+            });
         };
 
         // Insert in message function for wizards

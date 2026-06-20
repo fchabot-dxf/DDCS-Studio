@@ -294,6 +294,29 @@ test('probe-Z slot: two-pass Z touch down, writes WCS Z so the touch reads as Su
   expect(r.writesZ, 'writes the Z slot of the WCS table').toBe(true);
 });
 
+test('rotateProgram rotates XY + arc I/J about a pivot; tracks partial moves; flags G91', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { rotateProgram } = await import('/data/rotateProgram.js');
+    return {
+      pt: rotateProgram('G1 X10 Y0 F100', 90).text,
+      arc: rotateProgram('G2 X10 Y0 I5 J0', 90).text,
+      partial: rotateProgram('G1 X10', 90).text,          // Y implied 0 → both emitted
+      pivot: rotateProgram('G0 X5 Y5', 90, 5, 5).text,     // pivot = point → unchanged
+      rform: rotateProgram('G3 X10 Y0 R5', 90).text,       // R invariant
+      inc: rotateProgram('G91\nG1 X10 Y0', 90).hadIncremental,
+      passthru: rotateProgram('G0 Z5\nM3 S8000', 90).text, // no XY → untouched
+    };
+  });
+  expect(r.pt.replace(/\s+/g, ' ')).toContain('X0 Y10');
+  expect(r.arc.replace(/\s+/g, ' ')).toContain('X0 Y10 I0 J5');
+  expect(r.partial.replace(/\s+/g, ' ')).toContain('X0 Y10');
+  expect(r.pivot.replace(/\s+/g, ' '), 'rotating about the point leaves it put').toContain('X5 Y5');
+  expect(r.rform).toContain('R5');
+  expect(r.inc, 'incremental flagged, not silently mis-rotated').toBe(true);
+  expect(r.passthru).toBe('G0 Z5\nM3 S8000');
+});
+
 test('mergeEng appends pack params, preserves the eng, and flags collisions', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
