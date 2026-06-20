@@ -15,6 +15,7 @@ import { makeClient } from '../shared/js/client.js';
 import { renderIoTable, renderMagazineTable } from './ioTable.js';
 import { toolProfileSvg } from '../viz/toolProfile.js';
 import * as camPack from '../data/camPack.js';
+import { bmpDataUrl } from '../data/bmp.js';
 import { THEMES } from './themes.js';
 import { generateToolChangeNc } from '../data/atcGenerator.js';
 import { renderCloudLogin } from './cloudAccount.js';
@@ -1845,12 +1846,57 @@ function wireSettingsOverlay(ov) {
                     <span style="font-size:10px; color:var(--text-dim);">form group -m${camPack.slotGroup(slot.slot)}</span>
                     <button class="op-btn" data-act="dels" title="Remove slot">✕</button>
                 </div>
+                <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+                    ${slot.icon ? `<img src="${slot.icon.data}" alt="" style="width:72px; height:36px; object-fit:contain; border:1px solid var(--border); background:#000;"><span style="font-size:10px; color:var(--text-dim);">${camEsc(slot.icon.name)}${slot.icon.w ? ' · ' + slot.icon.w + '×' + slot.icon.h + (slot.icon.w === 360 && slot.icon.h === 180 ? '' : ' ⚠ not 360×180') : ''}</span><button class="op-btn" data-act="delicon" title="Remove icon">✕</button>` : '<span style="font-size:11px; color:var(--text-dim);">No icon (camN.bmp)</span>'}
+                    <button class="toolbar-btn settings-io" data-act="icon">🖼 ${slot.icon ? 'Replace' : 'Import'} BMP</button>
+                    <span style="font-size:10px; color:var(--text-dim);">or from palette →</span>
+                    ${['corner', 'edge', 'middle', 'align'].map((s) => `<button class="toolbar-btn settings-io" data-act="svg" data-svg="${s}Viz" style="padding:2px 7px;">${s}</button>`).join('')}
+                </div>
                 <table style="width:100%; font-size:11.5px; margin-top:6px; border-collapse:collapse;"><thead><tr style="color:var(--text-dim); font-size:10px; text-align:left;"><th>Label</th><th>Units</th><th>Default</th><th>Min</th><th>Max</th><th>Var</th><th>#param→#2600</th><th></th></tr></thead><tbody>${rows}</tbody></table>
                 <div class="settings-row" style="margin-top:4px;"><button class="toolbar-btn settings-io" data-act="addf">＋ Add field</button></div>
                 <textarea class="cs" data-f="body" spellcheck="false" placeholder="macro body — reference each field's Var (#1, #2 …)" style="width:100%; height:110px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${camEsc(slot.body)}</textarea>
                 <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button></div>
             </div>`;
         }).join('');
+    }
+    // Phase 2 (import-only for now): pick a BMP and store it on the slot; the SVG→BMP encoder comes later
+    // once we validate the format against a real example. Stored as a data URL in the pack (localStorage).
+    function importCamIcon(slot) {
+        const input = document.createElement('input'); input.type = 'file'; input.accept = '.bmp,image/bmp,image/*';
+        input.addEventListener('change', () => {
+            const f = input.files && input.files[0]; if (!f) return;
+            const r = new FileReader();
+            r.onload = () => {
+                const data = r.result; const img = new Image();
+                img.onload = () => { slot.icon = { name: f.name, data, w: img.naturalWidth, h: img.naturalHeight }; saveCamPack(); renderCamBuilder(); };
+                img.onerror = () => { slot.icon = { name: f.name, data }; saveCamPack(); renderCamBuilder(); };   // store even if the browser can't preview BMP
+                img.src = data;
+            };
+            r.readAsDataURL(f);
+        });
+        input.click();
+    }
+    // Render one of Studio's structured viz SVGs to the CAM icon: fetch → fit on a 360×180 black canvas →
+    // encode the exact factory 24-bit BMP. (The §5 "auto-icon from structured SVGs" plan.)
+    async function svgToCamIcon(slot, svgName) {
+        try {
+            const resp = await fetch('assets/svg/' + svgName + '.svg');
+            if (!resp.ok) throw new Error('SVG not found (' + resp.status + ')');
+            let svg = (await resp.text()).replace(/width="100%"/, 'width="465"').replace(/height="100%"/, 'height="465"');
+            const blobUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+            const img = new Image();
+            img.onload = () => {
+                const W = 360, H = 180; const c = document.createElement('canvas'); c.width = W; c.height = H;
+                const ctx = c.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+                const iw = img.naturalWidth || 465, ih = img.naturalHeight || 465; const sc = Math.min(W / iw, H / ih);
+                ctx.drawImage(img, (W - iw * sc) / 2, (H - ih * sc) / 2, iw * sc, ih * sc);   // letterbox-fit
+                URL.revokeObjectURL(blobUrl);
+                try { slot.icon = { name: svgName + '.bmp', data: bmpDataUrl(W, H, ctx.getImageData(0, 0, W, H).data), w: W, h: H, source: 'svg:' + svgName }; saveCamPack(); renderCamBuilder(); }
+                catch (e) { alert('Could not read the rendered icon: ' + (e && e.message ? e.message : e)); }
+            };
+            img.onerror = () => { URL.revokeObjectURL(blobUrl); alert('Could not render ' + svgName + '.svg'); };
+            img.src = blobUrl;
+        } catch (e) { alert('Palette icon failed: ' + (e && e.message ? e.message : e)); }
     }
     const camHost = q('cam_slots');
     if (camHost) {
@@ -1871,6 +1917,9 @@ function wireSettingsOverlay(ov) {
             if (a === 'addf') { slot.fields = slot.fields || []; const idx = camPack.nextParam(camPack.usedParams(_camPack)); if (idx == null) { alert('The #1100–1499 form-param pool is full.'); return; } slot.fields.push({ idx, label: '', units: '', def: 0, min: 0, max: 0, type: 1, var: '#' + (slot.fields.length + 1) }); saveCamPack(); renderCamBuilder(); }
             else if (a === 'delf') { slot.fields.splice(+e.target.closest('tr').dataset.fi, 1); saveCamPack(); renderCamBuilder(); }
             else if (a === 'dels') { _camPack.slots.splice(si, 1); saveCamPack(); renderCamBuilder(); }
+            else if (a === 'icon') { importCamIcon(slot); }
+            else if (a === 'svg') { svgToCamIcon(slot, e.target.dataset.svg); }
+            else if (a === 'delicon') { slot.icon = null; saveCamPack(); renderCamBuilder(); }
             else if (a === 'exp') { insertToEditor('( ===== eng form lines — MERGE into the controller eng language file ===== )\n' + camPack.slotEng(slot) + '\n\n' + camPack.slotMacro(slot)); }
         });
     }
