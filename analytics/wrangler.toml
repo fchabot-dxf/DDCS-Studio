@@ -1,0 +1,17 @@
+# DDCS Studio analytics — a tiny standalone Worker that receives anonymous usage events from the
+# web app + the exe and writes them to Cloudflare Workers Analytics Engine. Country is derived from
+# request.cf at the edge (the visitor's IP is never stored).
+#
+# Deploy (from analytics/):   wrangler deploy
+# Wrangler prints the URL (https://ddcs-analytics.<your-subdomain>.workers.dev). Put that URL +"/e"
+# into ENDPOINT in DDCS-Studio/web/ui/analytics.js and ANALYTICS_URL in fairy_gateway.py.
+# Query (examples): see README.md.
+
+name = "ddcs-analytics"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# Analytics Engine dataset — auto-created on first write. Bound here as env.EVENTS.
+[[analytics_engine_datasets]]
+binding = "EVENTS"
+dataset = "ddcs_events"

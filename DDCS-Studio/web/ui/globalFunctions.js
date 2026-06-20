@@ -12,21 +12,21 @@ export function setupGlobalFunctions(app) {
         window.saveDefaults = () => app.saveDefaults();
         window.copyCode = () => app.editorManager.copyCode();
         window.clearCode = () => app.editorManager.clearCode();
-        window.downloadFile = () => app.editorManager.downloadFile();
+        window.downloadFile = () => { window.ddcsTrack?.('feature', 'export'); return app.editorManager.downloadFile(); };
         window.clearSearch = () => app.dockManager.clear();
         window.insert = (key, text) => app.editorManager.insert(key, text);
         window.backspace = () => app.editorManager.backspace();
         window.editorManager = app.editorManager;
 
         // Wizard functions
-        window.openWiz = (type, variant) => app.wizardManager.open(type, variant);
-        window.openCornerWiz = () => app.wizardManager.openCorner();
-        window.openMiddleWiz = () => app.wizardManager.openMiddle();
+        window.openWiz = (type, variant) => { window.ddcsTrack?.('feature', 'wizard:' + type); return app.wizardManager.open(type, variant); };
+        window.openCornerWiz = () => { window.ddcsTrack?.('feature', 'wizard:corner'); return app.wizardManager.openCorner(); };
+        window.openMiddleWiz = () => { window.ddcsTrack?.('feature', 'wizard:middle'); return app.wizardManager.openMiddle(); };
         window.CornerVizAnimator = CornerVizAnimator;
-        window.openEdgeWiz = () => app.wizardManager.openEdge();
-        window.openAlignmentWiz = () => app.wizardManager.openAlignment();
+        window.openEdgeWiz = () => { window.ddcsTrack?.('feature', 'wizard:edge'); return app.wizardManager.openEdge(); };
+        window.openAlignmentWiz = () => { window.ddcsTrack?.('feature', 'wizard:alignment'); return app.wizardManager.openAlignment(); };
         window.closeWiz = () => app.wizardManager.close();
-        window.insertWiz = () => app.wizardManager.insert();
+        window.insertWiz = () => { window.ddcsTrack?.('feature', 'insert'); return app.wizardManager.insert(); };
         window.ddcsEditOp = (opId) => app.wizardManager.openForEdit(opId);   // editor hover-chip → edit an existing op
         window.ddcsCanEditOp = (opType) => app.wizardManager.canEdit(opType);   // does this op type support form-edit yet?
         window.togglePreview = () => app.wizardManager.togglePreview();

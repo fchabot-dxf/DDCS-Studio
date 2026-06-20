@@ -45,6 +45,7 @@ export function initGatewayStatus() {
     }
 
     async function showApp(which) {
+        window.ddcsTrack?.('feature', 'tab:' + which);
         const studioApp = document.getElementById('studio-app');
         const gatewayApp = document.getElementById('gateway-app');
         const settingsApp = document.getElementById('settings-app');
