@@ -120,6 +120,10 @@ const SETTINGS_DEFAULTS = {
     // Dynamic machine I/O — the new source of truth; seeded from probes/limits on first load.
     inputs: [],
     outputs: [],
+    // Custom controller macros (PART OF THE PROFILE): each = { id, name, trigger, body }. trigger.kind =
+    // 'mcode' (O100nn → Mnn, called from a program) | 'kbutton' (key-1..7.nc, a panel button) | 'program'
+    // (a named .nc). Authored in the Macros tab; rides in Export/Import/cloud via buildProfile.
+    macros: [],
     // Axis roles — X/Y/Z linear; A/B optionally rotary. The sim reads this to spin the solid on a
     // rotary-axis move (around the declared Cartesian axis). Two rotary axes are allowed (A and B).
     motors: {
@@ -199,6 +203,7 @@ function loadSettings() {
                 motors: { ...SETTINGS_DEFAULTS.motors, ...(p.motors || {}) },
                 inputs: Array.isArray(p.inputs) ? p.inputs : [],
                 outputs: Array.isArray(p.outputs) ? p.outputs : [],
+                macros: Array.isArray(p.macros) ? p.macros : [],
             });
             // One-time seed of the starter tool library into an existing install (empty + never seeded before).
             if (!merged.toolsSeeded && (!Array.isArray(merged.atc.tools) || merged.atc.tools.length === 0)) {
@@ -260,15 +265,29 @@ window.ddcsResolveProbeSources = resolveProbeSources;
 
 let _fillSettingsInputs = null;
 
-// Merge incoming settings (e.g. from an imported profile), persist, and refresh the panel
+// Merge incoming settings (e.g. from an imported / cloud-loaded profile), persist, and refresh the panel.
+// Restores the FULL persisted config (mirrors the load-merge) so a loaded profile brings back the magazine,
+// tool library, macros, I/O, head, etc. — not just a subset.
 export function applySettings(incoming) {
     if (!incoming || typeof incoming !== 'object') return;
-    if (incoming.stock) _ddcsSettings.stock = { ...SETTINGS_DEFAULTS.stock, ..._ddcsSettings.stock, ...incoming.stock };
-    if (incoming.machine) _ddcsSettings.machine = { ...SETTINGS_DEFAULTS.machine, ..._ddcsSettings.machine, ...incoming.machine };
-    if (incoming.probes) _ddcsSettings.probes = { ...SETTINGS_DEFAULTS.probes, ..._ddcsSettings.probes, ...incoming.probes };
-    if (incoming.limits) _ddcsSettings.limits = { ...SETTINGS_DEFAULTS.limits, ..._ddcsSettings.limits, ...incoming.limits };
-    if (Array.isArray(incoming.inputs)) { _ddcsSettings.inputs = incoming.inputs; syncFlatFromIO(_ddcsSettings); }
-    if (Array.isArray(incoming.outputs)) _ddcsSettings.outputs = incoming.outputs;
+    const D = SETTINGS_DEFAULTS, S = _ddcsSettings;
+    if (incoming.stock) S.stock = { ...D.stock, ...S.stock, ...incoming.stock };
+    if (incoming.machine) S.machine = { ...D.machine, ...S.machine, ...incoming.machine };
+    if (incoming.probes) S.probes = { ...D.probes, ...S.probes, ...incoming.probes, sources: { ...D.probes.sources, ...((S.probes || {}).sources || {}), ...((incoming.probes || {}).sources || {}) } };
+    if (incoming.limits) S.limits = { ...D.limits, ...S.limits, ...incoming.limits };
+    if (incoming.atc) S.atc = { ...D.atc, ...S.atc, ...incoming.atc };
+    if (incoming.head) S.head = { ...D.head, ...S.head, ...incoming.head };
+    if (incoming.spindle) S.spindle = { ...D.spindle, ...S.spindle, ...incoming.spindle };
+    if (incoming.endProgram) S.endProgram = { ...D.endProgram, ...S.endProgram, ...incoming.endProgram };
+    if (incoming.motors) S.motors = { ...D.motors, ...S.motors, ...incoming.motors };
+    if (incoming.hardwareTabs) S.hardwareTabs = { ...D.hardwareTabs, ...S.hardwareTabs, ...incoming.hardwareTabs };
+    if (incoming.preview) S.preview = { ...D.preview, ...S.preview, ...incoming.preview };
+    if (incoming.compose) S.compose = { ...D.compose, ...S.compose, ...incoming.compose };
+    if (incoming.view) S.view = { ...D.view, ...S.view, ...incoming.view };
+    if (Array.isArray(incoming.stockTemplates)) S.stockTemplates = incoming.stockTemplates;
+    if (Array.isArray(incoming.inputs)) { S.inputs = incoming.inputs; syncFlatFromIO(S); }
+    if (Array.isArray(incoming.outputs)) S.outputs = incoming.outputs;
+    if (Array.isArray(incoming.macros)) S.macros = incoming.macros;
     saveSettings();
     if (_fillSettingsInputs) _fillSettingsInputs();
 }
@@ -312,6 +331,7 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="general" data-target="set_tab_compose">Editor</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_program">Program</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_macros">Macros</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_gateway">Gateway</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
@@ -474,6 +494,24 @@ function buildSettingsOverlay() {
                             <button class="toolbar-btn settings-io" id="set_end_insert">⬇ Insert end-of-program</button>
                         </div>
                         <div class="settings-hint">Drops the footer into the editor at the cursor. Global default; per-wizard overrides are planned.</div>
+                    </div>
+                </div>
+
+                <!-- GENERAL: MACROS (custom M-codes + K-buttons; part of the profile) -->
+                <div id="set_tab_macros" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">CUSTOM M-CODES</div>
+                        <div class="settings-hint">Macros called <b>from a program</b> — O100nn ⇄ <b>M<i>nn</i></b> (e.g. M15 tool-break check). Build one with a wizard in Studio, then <b>＋ Add from editor</b>. <b>Generate</b> wraps it as the installable O100nn block. Saved with your Profile.</div>
+                        <div id="mcodes_list"></div>
+                        <div class="settings-row" style="margin-top:8px;">
+                            <button class="toolbar-btn settings-io" id="mcodes_add_editor">＋ Add from editor</button>
+                            <button class="toolbar-btn settings-io" id="mcodes_add_blank">＋ Add blank</button>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">K-BUTTONS (K1–K7)</div>
+                        <div class="settings-hint">The 7 panel buttons — each runs <b>key-<i>N</i>.nc</b> when pressed. Type/paste a body or <b>⇪ From editor</b>, then <b>Generate</b> for the install file. Empty = unused.</div>
+                        <div id="kbuttons_list"></div>
                     </div>
                 </div>
 
@@ -1652,6 +1690,93 @@ function wireSettingsOverlay(ov) {
         }));
     }
 
+    // --- Macros tab: author controller macros (M-code O100nn / K-button key-N / program); saved in the profile. ---
+    function macrosArr() { return (_ddcsSettings.macros || (_ddcsSettings.macros = [])); }
+    function editorText() { const e = document.getElementById('editor'); return e ? e.value : ''; }
+    function macroFileText(m) {
+        const name = (m.name || 'macro').trim();
+        const body = String(m.body || '').replace(/\r/g, '').replace(/\s+$/, '');
+        const t = m.trigger || {};
+        const hasEnd = /\b(M99|M30|M0?2)\b/.test(body);
+        if (t.kind === 'mcode') {
+            const n = Math.max(0, parseInt(t.code, 10) || 0);
+            return `O${10000 + n} ( ${name} — M${n} )\n${body}${hasEnd ? '' : '\nM99'}\n`;   // M99 returns to the calling program
+        }
+        if (t.kind === 'kbutton') {
+            const k = Math.min(7, Math.max(1, parseInt(t.key, 10) || 1));
+            return `( save as key-${k}.nc on SYSDISK — K${k} button )\n${body}${hasEnd ? '' : '\nM30'}\n`;
+        }
+        return `( save as ${(name || 'macro').replace(/[^\w-]+/g, '_')}.nc )\n${body}${hasEnd ? '' : '\nM30'}\n`;
+    }
+    const insertToEditor = (txt) => { const em = (window.ddcsStudio && window.ddcsStudio.editorManager) || window.editorManager; if (em && typeof em.insert === 'function') em.insert(txt); else alert('Editor not available.'); };
+    const findKbtn = (k) => macrosArr().find((m) => (m.trigger || {}).kind === 'kbutton' && (m.trigger || {}).key === k);
+    const ensureKbtn = (k) => { let m = findKbtn(k); if (!m) { m = { name: '', trigger: { kind: 'kbutton', key: k }, body: '' }; macrosArr().push(m); } return m; };
+
+    // --- M-codes table (custom O100nn) ---
+    function renderMcodes() {
+        const host = q('mcodes_list'); if (!host) return;
+        const rows = macrosArr().map((m, i) => ({ m, i })).filter((x) => (x.m.trigger || {}).kind === 'mcode');
+        if (!rows.length) { host.innerHTML = '<div class="settings-hint">No custom M-codes yet — “＋ Add from editor” or “＋ Add blank”.</div>'; return; }
+        host.innerHTML = rows.map(({ m, i }) => `<div class="macro-card" data-i="${i}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <label style="font-size:11px; color:var(--text-dim);">M<input type="number" class="mc-f" data-f="num" value="${(m.trigger || {}).code != null ? m.trigger.code : 15}" min="0" max="99" style="width:52px; margin-left:2px;"></label>
+                <input class="mc-f" data-f="name" value="${String(m.name || '').replace(/"/g, '&quot;')}" placeholder="Name" style="flex:1; min-width:120px;">
+                <span class="mc-o" style="font-size:10px; color:var(--text-dim);">→ O${10000 + (parseInt((m.trigger || {}).code, 10) || 0)}</span>
+            </div>
+            <textarea class="mc-f" data-f="body" spellcheck="false" placeholder="macro body (G-code)" style="width:100%; height:110px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${String(m.body || '').replace(/</g, '&lt;')}</textarea>
+            <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="gen">⬇ Generate</button><span style="flex:1"></span><button class="op-btn" data-act="del" title="Delete">✕</button></div>
+        </div>`).join('');
+    }
+    // --- K-buttons table (fixed K1..K7) ---
+    function renderKbuttons() {
+        const host = q('kbuttons_list'); if (!host) return;
+        let html = '';
+        for (let k = 1; k <= 7; k++) {
+            const m = findKbtn(k);
+            html += `<div class="kbtn-row" data-k="${k}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <b style="width:30px;">K${k}</b>
+                    <input class="kb-f" data-f="name" value="${m ? String(m.name || '').replace(/"/g, '&quot;') : ''}" placeholder="(unused)" style="flex:1;">
+                    <span style="font-size:10px; color:var(--text-dim);">key-${k}.nc</span>
+                </div>
+                <textarea class="kb-f" data-f="body" spellcheck="false" placeholder="button macro body" style="width:100%; height:80px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${m ? String(m.body || '').replace(/</g, '&lt;') : ''}</textarea>
+                <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="ked">⇪ From editor</button><button class="toolbar-btn settings-io" data-act="kgen">⬇ Generate</button><span style="flex:1"></span><button class="op-btn" data-act="kclr" title="Clear">✕</button></div>
+            </div>`;
+        }
+        host.innerHTML = html;
+    }
+    const mch = q('mcodes_list');
+    if (mch) {
+        mch.addEventListener('input', (e) => {
+            const c = e.target.closest('.macro-card'); if (!c || !e.target.dataset.f) return;
+            const m = macrosArr()[+c.dataset.i]; if (!m) return; const f = e.target.dataset.f;
+            if (f === 'name') m.name = e.target.value;
+            else if (f === 'body') m.body = e.target.value;
+            else if (f === 'num') { m.trigger = m.trigger || { kind: 'mcode' }; m.trigger.kind = 'mcode'; m.trigger.code = parseInt(e.target.value, 10) || 0; const s = c.querySelector('.mc-o'); if (s) s.textContent = '→ O' + (10000 + m.trigger.code); }
+            saveSettings();
+        });
+        mch.addEventListener('click', (e) => {
+            const c = e.target.closest('.macro-card'); if (!c) return; const i = +c.dataset.i; const a = e.target.dataset.act;
+            if (a === 'del') { macrosArr().splice(i, 1); saveSettings(); renderMcodes(); }
+            else if (a === 'gen') insertToEditor(macroFileText(macrosArr()[i]));
+        });
+    }
+    const kbh = q('kbuttons_list');
+    if (kbh) {
+        kbh.addEventListener('input', (e) => { const r = e.target.closest('.kbtn-row'); if (!r || !e.target.dataset.f) return; const m = ensureKbtn(+r.dataset.k); if (e.target.dataset.f === 'name') m.name = e.target.value; else m.body = e.target.value; saveSettings(); });
+        kbh.addEventListener('click', (e) => {
+            const r = e.target.closest('.kbtn-row'); if (!r) return; const k = +r.dataset.k; const a = e.target.dataset.act;
+            if (a === 'ked') { ensureKbtn(k).body = editorText().trim(); saveSettings(); renderKbuttons(); }
+            else if (a === 'kgen') { const m = findKbtn(k); if (!m || !String(m.body).trim()) { alert('K' + k + ' is empty.'); return; } insertToEditor(macroFileText(m)); }
+            else if (a === 'kclr') { const i = macrosArr().findIndex((x) => (x.trigger || {}).kind === 'kbutton' && (x.trigger || {}).key === k); if (i >= 0) macrosArr().splice(i, 1); saveSettings(); renderKbuttons(); }
+        });
+    }
+    const _mcAddEd = q('mcodes_add_editor');
+    if (_mcAddEd) _mcAddEd.addEventListener('click', () => { macrosArr().push({ name: 'New M-code', trigger: { kind: 'mcode', code: 15 }, body: editorText().trim() }); saveSettings(); renderMcodes(); });
+    const _mcAddBlank = q('mcodes_add_blank');
+    if (_mcAddBlank) _mcAddBlank.addEventListener('click', () => { macrosArr().push({ name: 'New M-code', trigger: { kind: 'mcode', code: 15 }, body: '' }); saveSettings(); renderMcodes(); });
+    renderMcodes(); renderKbuttons();
+
     // ATC: generate a T.nc tool-change macro from the magazine table (client-side; review before running).
     const genTnc = q('atc_gen_tnc');
     if (genTnc) genTnc.addEventListener('click', () => {
@@ -1676,7 +1801,7 @@ function wireSettingsOverlay(ov) {
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
     const sideTabs = [...ov.querySelectorAll('.settings-sidebar .settings-tab')];
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
-        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_program', 'set_tab_feedback', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_about',
+        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_program', 'set_tab_macros', 'set_tab_feedback', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_about',
                      'set_tab_machine', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });

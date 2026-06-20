@@ -37,7 +37,7 @@ function setClientId(id, v) {
   } catch (e) {
   }
 }
-var CFG, ICONS, PROVIDER_IDS, DEFAULT_CLIENT_IDS, redirectUri;
+var CFG, ICONS, PROVIDER_IDS, AVAILABLE_PROVIDER_IDS, DEFAULT_CLIENT_IDS, redirectUri;
 var init_providers = __esm({
   "../DDCS-Studio/web/ui/cloud/providers.js"() {
     CFG = {
@@ -73,6 +73,7 @@ var init_providers = __esm({
       onedrive: '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="#0364B8" d="M13.6 9.7a4.3 4.3 0 0 0-8.1-1.4A3.8 3.8 0 0 0 6 15.9h12.3a3.2 3.2 0 0 0 .4-6.4 3.7 3.7 0 0 0-5.1-.2z"/></svg>'
     };
     PROVIDER_IDS = Object.keys(CFG);
+    AVAILABLE_PROVIDER_IDS = ["google"];
     DEFAULT_CLIENT_IDS = {
       // PUBLIC OAuth client IDs (safe in the browser — no secret). drive.file SPA client; secret stays out of git.
       google: "895572525139-mapt84pm4lfudmjfq553k6pm4m2o0e77.apps.googleusercontent.com",
@@ -90,6 +91,7 @@ __export(googleDrive_exports, {
   del: () => del,
   ensureRoot: () => ensureRoot,
   getAccessToken: () => getAccessToken,
+  getUserInfo: () => getUserInfo,
   list: () => list,
   mkdir: () => mkdir,
   read: () => read,
@@ -249,6 +251,14 @@ async function del(id) {
 }
 async function rename(id, name) {
   await api(`${API}/files/${id}?fields=id`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+}
+async function getUserInfo() {
+  try {
+    const u = (await (await api(`${API}/about?fields=user`)).json()).user || {};
+    return { name: u.displayName || "", email: u.emailAddress || "" };
+  } catch (e) {
+    return { name: "", email: "" };
+  }
 }
 var SCOPE, API, UPLOAD, FOLDER_MIME, TOK, FOLDER_KEY, token, getAccessToken;
 var init_googleDrive = __esm({
@@ -651,9 +661,22 @@ var dialect = {
   programModel: "inline",
   probeModel: "g31",
   dwellUnits: "ms",
-  vars: { dro: 880, probeStatus: 1920, probeTrig: 1925, wcsBase: 805, wcsStride: 5, activeWcs: 578, toolTable: 1430, ax: AX },
-  caps: { vars: true, flow: "goto", probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, inputRead: true },
-  // the fullest profile (inputRead = generic live-input poll #[1520+N], slib O10300)
+  vars: {
+    dro: 880,
+    probeStatus: 1920,
+    probeTrig: 1925,
+    wcsBase: 805,
+    wcsStride: 5,
+    activeWcs: 578,
+    toolTable: 1430,
+    // ATC tool-changer firmware tables. currentTool/capacity/pockets live in SYSDISK/camsetting (#1000-1499,
+    // slot = var-1000 — boundary-confirmed by the captured sentinels) so the gateway can READ them over SMB;
+    // targetTool #1504 is a runtime var (M6 Txx). Param meanings from default_vars.js (#1300/#1330/#1350/#1370).
+    atc: { currentTool: 1300, capacity: 1301, targetTool: 1504, pocketX: 1330, pocketY: 1350, pocketZ: 1370 },
+    ax: AX
+  },
+  caps: { vars: true, flow: "goto", probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, inputRead: true, atc: true },
+  // the fullest profile (inputRead = generic live-input poll #[1520+N], slib O10300; atc = full pick&place model)
   // G31 Z-10 F100 P3 L0 Q1   (snippets.nc:9 · words.nc:6 "G31 Z#7 F#3 P#5 L0 Q1")
   probeMove: (axis, dist, { feed = 100, port = 3, level = 0 } = {}) => [`G31 ${axis}${dist} F${feed} P${port} L${level} Q1`],
   // IF #1922!=2 GOTO1   (3D PROBE G55.nc:29 · snippets.nc:10). status block #1920+axis; "!=2" = did NOT trigger
@@ -723,9 +746,13 @@ var dialect = {
       ax = sys - 880;
       if (ax >= 0 && ax <= 3) return { type: "readmachine", params: { axis: AXR[ax], var: m[1] } };
     }
+    if (m = line.match(/^M0*(\d+)$/)) {
+      const mc = +m[1];
+      if (mc >= 50 && mc <= 91) return { type: "outpin", params: { pin: mc - 50 >> 1, state: (mc - 50) % 2 === 0 ? "on" : "off" } };
+    }
     return null;
   },
-  notes: "In-program Macro-B-INSPIRED dialect (real Fanuc Macro B does NOT run on M350). G53 needs a #var (no literal, no G0). WCS via direct #[805+] indirect write, stride 5 (G10 L20 also works on this firmware but house style is the indirect write). Dwell P=ms. WHILE/DO/END also exist (word ops, bracketed). Verified vs bridge/controllers/expert-m350 \u2014 appcode/snippets.nc, SYSDISK/slib-*.nc, CNCDISK captures."
+  notes: "In-program Macro-B-INSPIRED dialect (real Fanuc Macro B does NOT run on M350). G53 needs a #var (no literal, no G0). WCS via direct #[805+] indirect write, stride 5. \u26A0\uFE0F NEVER emit G10 L20/L2 with axis words: V1 on-machine (2026-06-19) proved G10 L20 P6 X25 writes NO offset and the X word executes as a G90/G01 MOVE (Mach X 5\u219273.286) \u2014 broken AND dangerous. Direct register write is the only safe WCS set. Dwell P=ms. WHILE/DO/END also exist (word ops, bracketed). Verified vs bridge/controllers/expert-m350 \u2014 appcode/snippets.nc, SYSDISK/slib-*.nc, CNCDISK captures."
 };
 
 // ../DDCS-Studio/web/wizards/dialects/ddcs-v41.js
@@ -737,9 +764,10 @@ var dialect2 = {
   probeModel: "g31",
   dwellUnits: "ms",
   // dro = machine pos #1500-1503; wcsWork = workpiece pos #1506-1509 (what zero*.nc writes); toolTable #1560/#764.
-  vars: { dro: 1500, wcsWork: 1506, probeStatus: null, probeTrig: 1500, wcsBase: 1512, wcsStride: 6, activeWcs: null, toolTable: 1560, ax: AX2 },
-  caps: { vars: true, flow: "goto", probeStatusCheck: false, hmi: false, toolTable: true, probePort: false },
-  // G31 L#682; success read from DRO #1502
+  vars: { dro: 1500, wcsWork: 1506, probeStatus: null, probeTrig: 1500, wcsBase: 1512, wcsStride: 6, activeWcs: null, toolTable: 1560, atc: null, ax: AX2 },
+  // atc null: the #1300/#1330 ATC firmware tables are unmapped on V4.1 (the dump shows them as generic "system parameter area")
+  caps: { vars: true, flow: "goto", probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false },
+  // G31 L#682; success read from DRO #1502; no confirmed pick&place ATC model
   // G91 G31 Z-1000 L#682 Q1 K0 F#106  (probe-float.nc, live). L#682 = probe-selector config param; no P-port word.
   probeMove: (axis, dist, { feed = 100 } = {}) => [`G31 ${axis}${dist} L#682 Q1 K0 F${feed}`],
   probeStatus: () => [],
@@ -800,9 +828,10 @@ var dialect3 = {
   programModel: "inline",
   probeModel: "move-until-input",
   dwellUnits: "s",
-  vars: { dro: 864, probeStatus: null, probeTrig: 864, wcsBase: 804, wcsStride: 4, activeWcs: 455, toolTable: 1430, ax: AX3 },
-  caps: { vars: true, flow: "goto", probeStatusCheck: false, hmi: false, toolTable: true, probePort: false },
-  // M101/G01/M102 halts on the probe input
+  vars: { dro: 864, probeStatus: null, probeTrig: 864, wcsBase: 804, wcsStride: 4, activeWcs: 455, toolTable: 1430, atc: null, ax: AX3 },
+  // atc null: no confirmed tool-changer firmware model on the DM500
+  caps: { vars: true, flow: "goto", probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false },
+  // M101/G01/M102 halts on the probe input; manual tool change only
   // move-until-input: arm (M101) → feed move → disarm (M102). probe.nc:23-25.
   probeMove: (axis, dist, { feed = 100 } = {}) => ["M101", `G91 G01 ${axis}${dist} F${feed}`, "M102"],
   probeStatus: () => [],
@@ -1462,6 +1491,69 @@ function renderMagazineTable(container, atc, onChange) {
   });
 }
 
+// ../DDCS-Studio/web/viz/toolProfile.js
+var DEFAULT_ANGLE = { vbit: 90, chamfer: 90, engraver: 30, spotdrill: 90, drill: 118 };
+var numOr = (v, d) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : d;
+};
+function toolHalfProfile(tool) {
+  const type = tool && tool.type || "endmill";
+  const dia = numOr(tool && tool.dia, 6);
+  const r = dia / 2;
+  const len = numOr(tool && tool.length, dia * 4);
+  const ang = numOr(tool && tool.angle, DEFAULT_ANGLE[type] || 0);
+  switch (type) {
+    case "ballnose": {
+      const pts = [];
+      const segs = 10;
+      for (let i = 0; i <= segs; i++) {
+        const a = Math.PI / 2 * (i / segs);
+        pts.push([r * Math.sin(a), r - r * Math.cos(a)]);
+      }
+      pts.push([r, Math.max(len, r)]);
+      return pts;
+    }
+    case "vbit":
+    case "chamfer":
+    case "engraver":
+    case "spotdrill": {
+      const coneH = r / Math.tan((ang || 90) / 2 * Math.PI / 180);
+      return [[0, 0], [r, coneH], [r, Math.max(len, coneH)]];
+    }
+    case "drill": {
+      const tipH = r / Math.tan((ang || 118) / 2 * Math.PI / 180);
+      return [[0, 0], [r, tipH], [r, Math.max(len, tipH)]];
+    }
+    case "tapered": {
+      const tip = r * 0.3;
+      return [[tip, 0], [r, len * 0.6], [r, len]];
+    }
+    case "face":
+    case "surfacing":
+      return [[r, 0], [r, Math.max(len * 0.35, r * 0.6)]];
+    case "tap":
+    case "reamer":
+    case "endmill":
+    default:
+      return [[r, 0], [r, len]];
+  }
+}
+function toolProfileSvg(tool, { w = 40, h = 60, color = "var(--accent, #6cc)", stroke = "#888", bg = "transparent" } = {}) {
+  const half = toolHalfProfile(tool);
+  const maxR = Math.max(0.1, ...half.map((p) => p[0]));
+  const maxZ = Math.max(0.1, ...half.map((p) => p[1]));
+  const pad = 3;
+  const sx = (w / 2 - pad) / maxR;
+  const sz = (h - 2 * pad) / maxZ;
+  const cx = w / 2;
+  const toXY = (p, sign) => [(cx + sign * p[0] * sx).toFixed(1), (h - pad - p[1] * sz).toFixed(1)];
+  const right = half.map((p) => toXY(p, 1));
+  const left = half.slice().reverse().map((p) => toXY(p, -1));
+  const poly = right.concat(left).map((q) => q[0] + "," + q[1]).join(" ");
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" class="tool-profile" aria-hidden="true">` + (bg !== "transparent" ? `<rect width="${w}" height="${h}" fill="${bg}"/>` : "") + `<polygon points="${poly}" fill="${color}" stroke="${stroke}" stroke-width="0.6" stroke-linejoin="round"/></svg>`;
+}
+
 // ../DDCS-Studio/web/ui/themes.js
 var THEMES = ["studio", "normal", "steampunk", "futuristic", "organic"];
 
@@ -1586,16 +1678,27 @@ var TOK2 = "ddcs_cloud_token";
 var PROV = "ddcs_cloud_provider";
 var EMAIL = "ddcs_cloud_email";
 var REFRESH = "ddcs_cloud_refresh";
+var NAME = "ddcs_cloud_name";
 function getAccount() {
   try {
-    return { connected: !!localStorage.getItem(TOK2), provider: localStorage.getItem(PROV) || "", email: localStorage.getItem(EMAIL) || "" };
+    return { connected: !!localStorage.getItem(TOK2), provider: localStorage.getItem(PROV) || "", email: localStorage.getItem(EMAIL) || "", name: localStorage.getItem(NAME) || "" };
   } catch (e) {
-    return { connected: false, provider: "", email: "" };
+    return { connected: false, provider: "", email: "", name: "" };
   }
 }
 function disconnect() {
   try {
-    [TOK2, PROV, EMAIL, REFRESH].forEach((k) => localStorage.removeItem(k));
+    [TOK2, PROV, EMAIL, REFRESH, NAME].forEach((k) => localStorage.removeItem(k));
+  } catch (e) {
+  }
+  window.dispatchEvent(new CustomEvent("ddcs:cloud-account"));
+}
+async function captureGoogleIdentity() {
+  try {
+    const { getUserInfo: getUserInfo2 } = await Promise.resolve().then(() => (init_googleDrive(), googleDrive_exports));
+    const u = await getUserInfo2();
+    if (u.email) localStorage.setItem(EMAIL, u.email);
+    if (u.name) localStorage.setItem(NAME, u.name);
   } catch (e) {
   }
   window.dispatchEvent(new CustomEvent("ddcs:cloud-account"));
@@ -1632,6 +1735,7 @@ async function connectGoogleFlow() {
     localStorage.setItem(TOK2, tok);
     localStorage.setItem(PROV, "google");
     window.dispatchEvent(new CustomEvent("ddcs:cloud-account"));
+    captureGoogleIdentity();
   } catch (e) {
     if (String(e && e.message) !== "sign-in cancelled") window.alert("Google sign-in failed: " + (e && e.message));
   }
@@ -1662,6 +1766,7 @@ async function connectGoogleDesktop() {
       } catch (e) {
       }
       window.dispatchEvent(new CustomEvent("ddcs:cloud-account"));
+      captureGoogleIdentity();
       return;
     }
     if (Date.now() < deadline) setTimeout(tick, 1500);
@@ -1730,11 +1835,15 @@ async function openConnectModal(provider) {
 function renderCloudLogin(container) {
   if (!container) return;
   const a = getAccount();
+  if (a.connected && !a.name && !a.email && !captureGoogleIdentity._tried) {
+    captureGoogleIdentity._tried = true;
+    captureGoogleIdentity();
+  }
   const wrap = document.createElement("div");
   wrap.className = "cloud-login";
   const status = document.createElement("div");
   status.className = "cloud-status" + (a.connected ? "" : " muted");
-  status.textContent = a.connected ? `Connected \xB7 ${providerLabel(a.provider)}${a.email ? " \xB7 " + a.email : ""}` : "Not connected \u2014 projects stay local until you connect your own cloud account.";
+  status.textContent = a.connected ? `Connected \xB7 ${providerLabel(a.provider)}${a.name ? " \xB7 " + a.name : ""}${a.email ? " \xB7 " + a.email : ""}` : "Not connected \u2014 sign in to sync your projects to your own Google Drive.";
   wrap.appendChild(status);
   if (a.connected) {
     const dc = document.createElement("button");
@@ -1745,7 +1854,7 @@ function renderCloudLogin(container) {
   } else {
     const row = document.createElement("div");
     row.className = "cloud-providers";
-    for (const id of PROVIDER_IDS) {
+    for (const id of AVAILABLE_PROVIDER_IDS) {
       const b2 = document.createElement("button");
       b2.className = "op-btn cloud-connect";
       b2.innerHTML = providerIcon(id) + "<span>Connect " + providerLabel(id) + "</span>";
@@ -1891,6 +2000,10 @@ var SETTINGS_DEFAULTS = {
   // Dynamic machine I/O — the new source of truth; seeded from probes/limits on first load.
   inputs: [],
   outputs: [],
+  // Custom controller macros (PART OF THE PROFILE): each = { id, name, trigger, body }. trigger.kind =
+  // 'mcode' (O100nn → Mnn, called from a program) | 'kbutton' (key-1..7.nc, a panel button) | 'program'
+  // (a named .nc). Authored in the Macros tab; rides in Export/Import/cloud via buildProfile.
+  macros: [],
   // Axis roles — X/Y/Z linear; A/B optionally rotary. The sim reads this to spin the solid on a
   // rotary-axis move (around the declared Cartesian axis). Two rotary axes are allowed (A and B).
   motors: {
@@ -1985,7 +2098,8 @@ function loadSettings() {
         endProgram: { ...SETTINGS_DEFAULTS.endProgram, ...p.endProgram || {} },
         motors: { ...SETTINGS_DEFAULTS.motors, ...p.motors || {} },
         inputs: Array.isArray(p.inputs) ? p.inputs : [],
-        outputs: Array.isArray(p.outputs) ? p.outputs : []
+        outputs: Array.isArray(p.outputs) ? p.outputs : [],
+        macros: Array.isArray(p.macros) ? p.macros : []
       });
       if (!merged.toolsSeeded && (!Array.isArray(merged.atc.tools) || merged.atc.tools.length === 0)) {
         merged.atc.tools = standardTools();
@@ -2053,15 +2167,27 @@ window.ddcsResolveProbeSources = resolveProbeSources;
 var _fillSettingsInputs = null;
 function applySettings(incoming) {
   if (!incoming || typeof incoming !== "object") return;
-  if (incoming.stock) _ddcsSettings.stock = { ...SETTINGS_DEFAULTS.stock, ..._ddcsSettings.stock, ...incoming.stock };
-  if (incoming.machine) _ddcsSettings.machine = { ...SETTINGS_DEFAULTS.machine, ..._ddcsSettings.machine, ...incoming.machine };
-  if (incoming.probes) _ddcsSettings.probes = { ...SETTINGS_DEFAULTS.probes, ..._ddcsSettings.probes, ...incoming.probes };
-  if (incoming.limits) _ddcsSettings.limits = { ...SETTINGS_DEFAULTS.limits, ..._ddcsSettings.limits, ...incoming.limits };
+  const D = SETTINGS_DEFAULTS, S = _ddcsSettings;
+  if (incoming.stock) S.stock = { ...D.stock, ...S.stock, ...incoming.stock };
+  if (incoming.machine) S.machine = { ...D.machine, ...S.machine, ...incoming.machine };
+  if (incoming.probes) S.probes = { ...D.probes, ...S.probes, ...incoming.probes, sources: { ...D.probes.sources, ...(S.probes || {}).sources || {}, ...(incoming.probes || {}).sources || {} } };
+  if (incoming.limits) S.limits = { ...D.limits, ...S.limits, ...incoming.limits };
+  if (incoming.atc) S.atc = { ...D.atc, ...S.atc, ...incoming.atc };
+  if (incoming.head) S.head = { ...D.head, ...S.head, ...incoming.head };
+  if (incoming.spindle) S.spindle = { ...D.spindle, ...S.spindle, ...incoming.spindle };
+  if (incoming.endProgram) S.endProgram = { ...D.endProgram, ...S.endProgram, ...incoming.endProgram };
+  if (incoming.motors) S.motors = { ...D.motors, ...S.motors, ...incoming.motors };
+  if (incoming.hardwareTabs) S.hardwareTabs = { ...D.hardwareTabs, ...S.hardwareTabs, ...incoming.hardwareTabs };
+  if (incoming.preview) S.preview = { ...D.preview, ...S.preview, ...incoming.preview };
+  if (incoming.compose) S.compose = { ...D.compose, ...S.compose, ...incoming.compose };
+  if (incoming.view) S.view = { ...D.view, ...S.view, ...incoming.view };
+  if (Array.isArray(incoming.stockTemplates)) S.stockTemplates = incoming.stockTemplates;
   if (Array.isArray(incoming.inputs)) {
-    _ddcsSettings.inputs = incoming.inputs;
-    syncFlatFromIO(_ddcsSettings);
+    S.inputs = incoming.inputs;
+    syncFlatFromIO(S);
   }
-  if (Array.isArray(incoming.outputs)) _ddcsSettings.outputs = incoming.outputs;
+  if (Array.isArray(incoming.outputs)) S.outputs = incoming.outputs;
+  if (Array.isArray(incoming.macros)) S.macros = incoming.macros;
   saveSettings();
   if (_fillSettingsInputs) _fillSettingsInputs();
 }
@@ -2104,8 +2230,10 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="general" data-target="set_tab_compose">Editor</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_program">Program</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_macros">Macros</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_network">Network</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_gateway">Gateway</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_about">About</button>
                     <div class="sidebar-group-label" data-group-label="hardware" style="display:none;">Hardware</div>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_machine" style="display:none;">Machine</button>
@@ -2151,12 +2279,12 @@ function buildSettingsOverlay() {
                 <!-- GENERAL: PROFILE -->
                 <div id="set_tab_profile">
                     <div class="settings-section">
-                        <div class="settings-section-title">CONTROLLER PROFILE</div>
+                        <div class="settings-section-title">CONTROLLER</div>
                         <div class="settings-row">
                             <select id="set_profile" title="Controller profile \u2014 presets the hardware your machine has" style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
                             <button class="toolbar-btn settings-io" id="set_profile_pull" title="Fetch this machine's profile (tabs + pins) from the bridged controller. Offline controllers like the DDCS 3.1: use Import profile.">\u21A7 Pull from controller</button>
                         </div>
-                        <div class="settings-hint">Presets which hardware your machine has (DDCS Expert, 4.1, \u2026). You still add/remove inputs &amp; outputs in the Hardware tabs.</div>
+                        <div class="settings-hint">Which controller you have (DDCS Expert, 4.1, \u2026) \u2014 sets the G-code dialect/post and presets your hardware tabs. (The <b>Profile</b> below saves your actual settings + variables for it.)</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">POST PROCESSOR</div>
@@ -2170,8 +2298,10 @@ function buildSettingsOverlay() {
                         <div class="settings-row">
                             <button class="toolbar-btn settings-io" id="set_profile_export">\u2B07 Export profile</button>
                             <button class="toolbar-btn settings-io" id="set_profile_import">\u2B06 Import profile</button>
+                            <button class="toolbar-btn settings-io" id="set_profile_cloud_save">\u2601 Save to cloud</button>
+                            <button class="toolbar-btn settings-io" id="set_profile_cloud_load">\u2601 Load from cloud</button>
                         </div>
-                        <div class="settings-hint">One JSON with your machine/stock/limits + user variables. The desktop app saves it to a local file automatically.</div>
+                        <div class="settings-hint">One JSON with your machine/stock/limits + user variables. The desktop app saves it to a local file automatically; <b>Save/Load to cloud</b> keeps named profiles in your own Google Drive (Settings \u2192 Cloud) \u2014 pull at the machine, load on a remote PC for a faithful sim.</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">EDITOR</div>
@@ -2207,21 +2337,25 @@ function buildSettingsOverlay() {
                 </div>
 
                 <!-- GENERAL: NETWORK (cloud account + machine network) -->
-                <div id="set_tab_network" style="display:none">
+                <div id="set_tab_gateway" style="display:none">
                     <div class="settings-section">
-                        <div class="settings-section-title">CLOUD ACCOUNT</div>
-                        <div class="settings-hint">Connect your OWN cloud account (Google Drive / Dropbox / OneDrive) to sync projects \u2014 browser-direct, no server. Projects stay local until you connect.</div>
-                        <div id="set_cloud_mount" style="margin-top:8px"></div>
-                    </div>
-                    <div class="settings-section">
-                        <div class="settings-section-title">MACHINE NETWORK</div>
-                        <div class="settings-hint">Point this gateway at your controller's SMB share \u2014 or scan the LAN to find it. Live view/control needs the gateway (the desktop app); the hosted page can't reach a machine on your network.</div>
+                        <div class="settings-section-title">CONTROLLER</div>
+                        <div class="settings-hint">Point the gateway at your controller's CNCDISK share \u2014 or scan the LAN to find it. Needs the gateway (the desktop app); the hosted page can't reach a machine on your network.</div>
                         <div id="set_machinenet_mount" style="margin-top:8px"></div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">LAN ACCESS</div>
-                        <div class="settings-hint">Open Studio from a phone/laptop on the same wifi \u2014 your exe serves it (the "personal cloud"). Use this URL, not the hosted page.</div>
+                        <div class="settings-hint">Open Studio from a phone/laptop on the same wifi \u2014 your exe serves it. Use this URL, not the hosted page.</div>
                         <div id="set_lan_mount" style="margin-top:8px"></div>
+                    </div>
+                </div>
+
+                <!-- GENERAL: CLOUD (project storage \u2014 separate from the machine) -->
+                <div id="set_tab_cloud" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">CLOUD STORAGE</div>
+                        <div class="settings-hint">Sign in to save &amp; sync your projects to your own Google Drive \u2014 files go straight to your account, we never see them.</div>
+                        <div id="set_cloud_mount" style="margin-top:8px"></div>
                     </div>
                 </div>
 
@@ -2262,6 +2396,24 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
+                <!-- GENERAL: MACROS (custom M-codes + K-buttons; part of the profile) -->
+                <div id="set_tab_macros" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">CUSTOM M-CODES</div>
+                        <div class="settings-hint">Macros called <b>from a program</b> \u2014 O100nn \u21C4 <b>M<i>nn</i></b> (e.g. M15 tool-break check). Build one with a wizard in Studio, then <b>\uFF0B Add from editor</b>. <b>Generate</b> wraps it as the installable O100nn block. Saved with your Profile.</div>
+                        <div id="mcodes_list"></div>
+                        <div class="settings-row" style="margin-top:8px;">
+                            <button class="toolbar-btn settings-io" id="mcodes_add_editor">\uFF0B Add from editor</button>
+                            <button class="toolbar-btn settings-io" id="mcodes_add_blank">\uFF0B Add blank</button>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">K-BUTTONS (K1\u2013K7)</div>
+                        <div class="settings-hint">The 7 panel buttons \u2014 each runs <b>key-<i>N</i>.nc</b> when pressed. Type/paste a body or <b>\u21EA From editor</b>, then <b>Generate</b> for the install file. Empty = unused.</div>
+                        <div id="kbuttons_list"></div>
+                    </div>
+                </div>
+
                 <!-- GENERAL: ABOUT -->
                 <div id="set_tab_about" style="display:none">
                     <div class="settings-section">
@@ -2271,7 +2423,7 @@ function buildSettingsOverlay() {
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">CREDITS</div>
-                        <div class="settings-hint">Built by Fr\xE9d\xE9ric \xB7 MIT License</div>
+                        <div class="settings-hint">Built by Fr\xE9d\xE9ric Chabot \xB7 MIT License</div>
                     </div>
                 </div>
 
@@ -2575,20 +2727,8 @@ async function renderLanAccess(mount) {
   const lanIp = c2.lan_ip || "";
   const lanUrl = lanOn && lanIp ? "http://" + lanIp + ":" + port + "/" : "";
   const wrap = document.createElement("div");
-  wrap.innerHTML = '<label class="settings-check"><input type="checkbox" id="lan_toggle"' + (lanOn ? " checked" : "") + '> Allow other devices on my network (LAN)</label><div class="cloud-status" style="margin-top:6px">This PC: <code>http://localhost:' + port + "</code></div>" + (lanUrl ? '<div class="cloud-status" style="margin-top:4px">Other devices: <code>' + lanUrl + `</code></div><img src="/api/lan-qr" alt="Scan to open on your phone" width="148" height="148" style="margin-top:8px;background:#fff;border-radius:6px;padding:6px" onerror="this.style.display='none'">` : '<div class="cloud-status muted" style="margin-top:4px">Turn on LAN access to get a shareable URL + QR code.</div>') + '<div class="lan-msg settings-hint" style="margin-top:6px"></div>';
+  wrap.innerHTML = '<div class="cloud-status">This PC: <code>http://localhost:' + port + "</code></div>" + (lanUrl ? '<div class="cloud-status" style="margin-top:4px">On your wifi: <code>' + lanUrl + `</code></div><div class="settings-hint" style="margin-top:2px">Other devices on the same network can open this \u2014 scan the code or share the link.</div><img src="/api/lan-qr" alt="Scan to open on your phone" width="148" height="148" style="margin-top:8px;background:#fff;border-radius:6px;padding:6px" onerror="this.style.display='none'">` : '<div class="settings-hint" style="margin-top:4px">Served on this PC only \u2014 set <code>host</code> to <code>0.0.0.0</code> in the gateway config to allow other devices.</div>');
   mount.replaceChildren(wrap);
-  const msg = wrap.querySelector(".lan-msg");
-  wrap.querySelector("#lan_toggle").addEventListener("change", async (e) => {
-    msg.textContent = "Saving\u2026";
-    try {
-      await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ host: e.target.checked ? "0.0.0.0" : "127.0.0.1" }) });
-    } catch (err) {
-      msg.textContent = "Save failed.";
-      return;
-    }
-    msg.textContent = "Saved \u2014 restart the app to apply the LAN binding.";
-    setTimeout(() => renderLanAccess(mount), 600);
-  });
 }
 function wireSettingsOverlay(ov) {
   const q = (id) => ov.querySelector("#" + id);
@@ -2739,7 +2879,7 @@ function wireSettingsOverlay(ov) {
   function fillPostOptions() {
     if (!postSel) return;
     const machinePost = getDialect(getActiveProfile().id);
-    postSel.innerHTML = ['<option value="auto">Follow machine profile (' + machinePost.name + ")</option>"].concat(listPosts().map((p) => '<option value="' + p.id + '">' + p.name + (p.verified ? "  \u2713" : "  \u26A0 unverified") + "</option>")).join("");
+    postSel.innerHTML = ['<option value="auto">Follow controller (' + machinePost.name + ")</option>"].concat(listPosts().map((p) => '<option value="' + p.id + '">' + p.name + (p.verified ? "  \u2713" : "  \u26A0 unverified") + "</option>")).join("");
     postSel.value = getActivePostId();
     updatePostHint();
   }
@@ -2748,7 +2888,7 @@ function wireSettingsOverlay(ov) {
     if (!hint) return;
     const id = getActivePostId();
     if (id === "auto") {
-      hint.textContent = "Following the machine profile (" + getDialect(getActiveProfile().id).name + "). Override to generate for another controller.";
+      hint.textContent = "Following the controller (" + getDialect(getActiveProfile().id).name + "). Override to generate for another controller.";
       hint.style.color = "";
     } else if (!isPostVerified(id)) {
       hint.textContent = "\u26A0 Unverified post \u2014 dump-derived, simulator/reference only. Not validated on hardware.";
@@ -2796,39 +2936,7 @@ function wireSettingsOverlay(ov) {
     }).catch(() => {
     });
     const pullBtn = q("set_profile_pull");
-    if (pullBtn) pullBtn.addEventListener("click", async () => {
-      const orig = pullBtn.textContent;
-      pullBtn.disabled = true;
-      pullBtn.textContent = "Pulling\u2026";
-      try {
-        let p;
-        try {
-          p = await makeClient().profile();
-        } catch (e) {
-          alert("Not bridged to a controller \u2014 run the desktop app (or the gateway) to pull a live profile. Offline controllers like the DDCS 3.1: use Import profile with the exported settings.");
-          return;
-        }
-        if (!p || !p.id) {
-          alert("The gateway returned no profile.");
-          return;
-        }
-        if (!confirm('Pull "' + p.name + '" from the controller? This replaces the current hardware tabs and Input/Output list with the controller values.')) return;
-        registerProfile(p);
-        setActiveProfile(p.id);
-        applyControllerProfile(p);
-        fillProfileOptions();
-        const it = ov.querySelector("#io_input_table");
-        if (it) renderIoTable(it, "input", getInputs(), syncIO);
-        const ot = ov.querySelector("#io_output_table");
-        if (ot) renderIoTable(ot, "output", getOutputs(), syncIO);
-        alert('Pulled "' + p.name + '": ' + getInputs().length + " inputs configured.");
-      } catch (e) {
-        alert("Pull failed: " + (e && e.message ? e.message : e));
-      } finally {
-        pullBtn.disabled = false;
-        pullBtn.textContent = orig;
-      }
-    });
+    if (pullBtn) pullBtn.addEventListener("click", () => openImportModal());
   }
   function applyControllerProfile(p) {
     if (!p) return;
@@ -2868,6 +2976,283 @@ function wireSettingsOverlay(ov) {
     applyHardwareTabs();
   }
   applyHardwareTabs();
+  window.ddcsRefreshControllerUI = () => {
+    try {
+      fillProfileOptions();
+      fillPostOptions();
+      applyHardwareTabs();
+      fill();
+    } catch (e) {
+    }
+  };
+  function activeDialect() {
+    const pid = getActivePostId();
+    return getDialect(pid && pid !== "auto" ? pid : getActiveProfile().id);
+  }
+  function upsertToolLength(a, num3, len) {
+    a.tools = a.tools || [];
+    let rec = a.tools.find((t) => parseInt(t && t.num, 10) === num3);
+    if (!rec) {
+      rec = normalizeTool({}, num3);
+      rec.num = num3;
+      a.tools.push(rec);
+    }
+    rec.length = len;
+  }
+  async function applyHardwareProfile(p) {
+    if (!p || !p.id) throw new Error("no profile");
+    registerProfile(p);
+    setActiveProfile(p.id);
+    applyControllerProfile(p);
+    const vdb = window.ddcsStudio && window.ddcsStudio.variableDB;
+    const ap = getActiveProfile();
+    if (ap && ap.varFamily && vdb) vdb.setControllerVars(ap.varFamily);
+    fillProfileOptions();
+    fillPostOptions();
+    const it = ov.querySelector("#io_input_table");
+    if (it) renderIoTable(it, "input", getInputs(), syncIO);
+    const ot = ov.querySelector("#io_output_table");
+    if (ot) renderIoTable(ot, "output", getOutputs(), syncIO);
+  }
+  async function scanController() {
+    let hwProfile = null;
+    try {
+      hwProfile = await makeClient().profile();
+    } catch (e) {
+    }
+    const d = hwProfile && hwProfile.id ? getDialect(hwProfile.id) : activeDialect();
+    const atc = d.vars && d.vars.atc;
+    const tb = d.vars && d.vars.toolTable || 1430;
+    const wcsBase = d.vars && d.vars.wcsBase || 805, wcsStride = d.vars && d.vars.wcsStride || 5, activeWcsVar = d.vars && d.vars.activeWcs || 578;
+    const MAX = 24;
+    const need = /* @__PURE__ */ new Set([activeWcsVar]);
+    for (let k = 0; k < 6 * wcsStride; k++) need.add(wcsBase + k);
+    for (let i = 0; i < MAX; i++) {
+      need.add(tb + i);
+      if (atc) {
+        need.add(atc.pocketX + i);
+        need.add(atc.pocketY + i);
+        need.add(atc.pocketZ + i);
+      }
+    }
+    let values = {}, connected = false;
+    try {
+      const res = await makeClient().readVars([...need].map(String));
+      connected = !!(res && res.connected);
+      values = res && res.values || {};
+    } catch (e) {
+    }
+    const obj = (n) => {
+      const x = values[String(n)];
+      return x && x.available ? x : null;
+    };
+    const cands = [], notes = [];
+    if (hwProfile && hwProfile.id) {
+      connected = true;
+      cands.push({ group: "Hardware & I/O", label: `Profile \u201C${hwProfile.name}\u201D`, value: "tabs + pin map", changed: true, kind: "hardware", data: hwProfile });
+    } else notes.push({ group: "Hardware & I/O", label: "Not available", value: "no gateway profile", kind: "note" });
+    let magReadable = false, magCount = 0;
+    if (atc) for (let i = 0; i < MAX; i++) {
+      const x = obj(atc.pocketX + i), y = obj(atc.pocketY + i), z = obj(atc.pocketZ + i);
+      if (x || y || z) magReadable = true;
+      const xx = x ? x.value : 0, yy = y ? y.value : 0, zz = z ? z.value : 0;
+      if (!xx && !yy && !zz) continue;
+      magCount++;
+      cands.push({ group: "ATC magazine", label: `Pocket ${i + 1} (T${i + 1})`, value: `X${xx} Y${yy} Z${zz}`, changed: [x, y, z].some((o) => o && o.userSet), kind: "magazine", data: { pocket: i + 1, tool: i + 1, name: "", x: xx, y: yy, z: zz } });
+    }
+    if (!atc) notes.push({ group: "ATC magazine", label: "Not available on this controller", value: "no mapped ATC model", kind: "note" });
+    else if (!magReadable) notes.push({ group: "ATC magazine", label: "Not readable", value: "controller returned nothing", kind: "note" });
+    else if (!magCount) notes.push({ group: "ATC magazine", label: "No taught pockets", value: "all at default (0)", kind: "note" });
+    let lenReadable = false, lenCount = 0;
+    for (let i = 0; i < MAX; i++) {
+      const L = obj(tb + i);
+      if (L) lenReadable = true;
+      if (!L || L.value === 0) continue;
+      lenCount++;
+      cands.push({ group: "Tool lengths", label: `T${i + 1} length`, value: String(L.value), changed: !!L.userSet, kind: "length", data: { num: i + 1, length: L.value } });
+    }
+    if (!lenReadable) notes.push({ group: "Tool lengths", label: "Not readable on this controller", value: "\u2014", kind: "note" });
+    else if (!lenCount) notes.push({ group: "Tool lengths", label: "None set", value: "all at default (0)", kind: "note" });
+    const idxO = obj(activeWcsVar);
+    const idx = idxO && idxO.value >= 1 && idxO.value <= 6 ? Math.round(idxO.value) : 1;
+    const base = wcsBase + (idx - 1) * wcsStride;
+    const wx = obj(base), wy = obj(base + 1), wz = obj(base + 2);
+    if (wx || wy || wz) {
+      if (wx && wx.value || wy && wy.value || wz && wz.value)
+        cands.push({ group: "WCS work offset", label: `G${53 + idx} work origin`, value: `X${wx ? wx.value : 0} Y${wy ? wy.value : 0} Z${wz ? wz.value : 0}`, changed: [wx, wy, wz].some((o) => o && o.userSet), kind: "wcs", data: { x: wx ? wx.value : 0, y: wy ? wy.value : 0, z: wz ? wz.value : 0 } });
+      else notes.push({ group: "WCS work offset", label: `G${53 + idx} at default`, value: "origin = 0", kind: "note" });
+    } else notes.push({ group: "WCS work offset", label: "Not readable", value: "\u2014", kind: "note" });
+    const tv = hwProfile && hwProfile.geometry && hwProfile.geometry.travel;
+    const mc = _ddcsSettings.machine || {};
+    if (tv && [tv.x, tv.y, tv.z].some((v) => v != null && v > 0)) {
+      const tx = tv.x > 0 ? tv.x : mc.x, ty = tv.y > 0 ? tv.y : mc.y, tz = tv.z > 0 ? tv.z : mc.z;
+      const changed = tv.x > 0 && tv.x !== mc.x || tv.y > 0 && tv.y !== mc.y || tv.z > 0 && tv.z !== mc.z;
+      cands.push({ group: "Machine envelope", label: "Travel X/Y/Z", value: `${tx} \xD7 ${ty} \xD7 ${tz} mm`, changed, kind: "travel", data: { x: tv.x, y: tv.y, z: tv.z } });
+    } else if (hwProfile && hwProfile.id) {
+      notes.push({ group: "Machine envelope", label: "Not set", value: "soft limits off \u2014 keeping current", kind: "note" });
+    }
+    return { connected, candidates: cands.concat(notes), controller: hwProfile && hwProfile.id ? { id: hwProfile.id, name: hwProfile.name } : null };
+  }
+  async function applyCandidates(checked) {
+    const a = _ddcsSettings.atc || (_ddcsSettings.atc = {});
+    const mag = checked.filter((c2) => c2.kind === "magazine").map((c2) => c2.data).sort((x, y) => x.pocket - y.pocket);
+    if (mag.length) {
+      a.magazine = mag;
+      a.tools = a.tools || [];
+      mag.forEach((p) => {
+        const tn = Number(p.tool);
+        if (tn > 0 && !a.tools.some((t) => parseInt(t && t.num, 10) === tn)) a.tools.push(normalizeTool({}, tn));
+      });
+    }
+    checked.filter((c2) => c2.kind === "length").forEach((c2) => upsertToolLength(a, c2.data.num, c2.data.length));
+    const wcs = checked.find((c2) => c2.kind === "wcs");
+    if (wcs) (_ddcsSettings.machine || (_ddcsSettings.machine = {})).workOrigin = wcs.data;
+    const tvc = checked.find((c2) => c2.kind === "travel");
+    if (tvc) {
+      const mm = _ddcsSettings.machine || (_ddcsSettings.machine = {});
+      if (tvc.data.x > 0) mm.x = tvc.data.x;
+      if (tvc.data.y > 0) mm.y = tvc.data.y;
+      if (tvc.data.z > 0) mm.z = tvc.data.z;
+    }
+    for (const c2 of checked.filter((c3) => c3.kind === "hardware")) {
+      try {
+        await applyHardwareProfile(c2.data);
+      } catch (e) {
+      }
+    }
+    saveSettings();
+    fill();
+    const mt = ov.querySelector("#atc_magazine");
+    if (mt) renderMagazineTable(mt, _ddcsSettings.atc, atcOnChange);
+    renderLibSummary();
+  }
+  let _importCands = [];
+  let _importController = null;
+  function buildImportModal() {
+    if (document.getElementById("import-modal")) return;
+    const m = document.createElement("div");
+    m.id = "import-modal";
+    m.innerHTML = `
+            <style>
+                #import-modal { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
+                #import-modal.active { display: flex; }
+                #import-modal .im-panel { background: var(--panel); color: var(--text-main); border: 1px solid var(--border); border-radius: var(--radius, 6px); width: min(620px, 95vw); max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+                #import-modal .im-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; letter-spacing: .5px; }
+                #import-modal .im-head button { background: transparent; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; }
+                #import-modal .im-body { overflow: auto; padding: 4px 14px 10px; min-height: 80px; }
+                #import-modal .im-empty { padding: 24px 8px; text-align: center; color: var(--text-dim); }
+                #import-modal .im-banner { margin: 8px 2px 2px; padding: 8px 10px; border-radius: 4px; font-size: 12px; background: rgba(224,160,32,.16); border: 1px solid rgba(224,160,32,.5); color: var(--text-main); }
+                #import-modal .im-group { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); padding: 12px 4px 4px; font-weight: 700; }
+                #import-modal .im-row { display: grid; grid-template-columns: 22px 1fr auto auto; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid var(--border); cursor: pointer; }
+                #import-modal .im-lbl { font-weight: 600; }
+                #import-modal .im-val { font-family: monospace; font-size: 11.5px; color: var(--text-dim); }
+                #import-modal .im-tag { font-size: 9.5px; text-transform: uppercase; letter-spacing: .5px; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+                #import-modal .im-tag.chg { background: rgba(60,180,90,.22); color: #3cb24f; }
+                #import-modal .im-tag.def { background: rgba(128,128,128,.18); color: var(--text-dim); }
+                #import-modal .im-tag.na { background: transparent; color: var(--text-dim); font-style: italic; }
+                #import-modal .im-note-row { cursor: default; opacity: .85; }
+                #import-modal .im-foot { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+                #import-modal .im-only { font-size: 11.5px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; cursor: pointer; }
+            </style>
+            <div class="im-panel">
+                <div class="im-head"><span>\u21A7 Pull from controller</span><button id="import-close" title="Close">\u2715</button></div>
+                <div class="im-body" id="import-body"></div>
+                <div class="im-foot">
+                    <label class="im-only"><input type="checkbox" id="import-only" checked> Show only changed</label>
+                    <span style="flex:1"></span>
+                    <button class="toolbar-btn settings-io" id="import-cancel">Cancel</button>
+                    <button class="toolbar-btn settings-io" id="import-apply" disabled>Apply</button>
+                </div>
+            </div>`;
+    document.body.appendChild(m);
+    const close = () => m.classList.remove("active");
+    m.querySelector("#import-close").addEventListener("click", close);
+    m.querySelector("#import-cancel").addEventListener("click", close);
+    m.addEventListener("mousedown", (e) => {
+      if (e.target === m) close();
+    });
+  }
+  function renderImportReview() {
+    const m = document.getElementById("import-modal");
+    const body = m.querySelector("#import-body");
+    const applyBtn = m.querySelector("#import-apply");
+    const onlyChanged = m.querySelector("#import-only").checked;
+    const isNote = (c2) => c2.kind === "note";
+    if (!_importCands.length) {
+      body.innerHTML = '<div class="im-empty">Nothing readable on the controller.</div>';
+      applyBtn.disabled = true;
+      return;
+    }
+    const shown = _importCands.filter((c2) => isNote(c2) || !onlyChanged || c2.changed);
+    const hiddenDefaults = _importCands.filter((c2) => !isNote(c2) && !c2.changed).length;
+    const groups = {};
+    shown.forEach((c2) => {
+      (groups[c2.group] = groups[c2.group] || []).push(c2);
+    });
+    let html = "";
+    if (_importController && _importController.id && _importController.id !== getActiveProfile().id) {
+      html += `<div class="im-banner">Connected controller: <b>${_importController.name}</b> \u2014 applying <b>Hardware &amp; I/O</b> switches your machine profile + post from <b>${getActiveProfile().name}</b> to it.</div>`;
+    }
+    Object.keys(groups).forEach((g) => {
+      html += `<div class="im-group">${g}</div>`;
+      groups[g].forEach((c2) => {
+        if (isNote(c2)) {
+          html += `<div class="im-row im-note-row"><span></span><span class="im-lbl">${c2.label}</span><span class="im-val">${c2.value}</span><span class="im-tag na">n/a</span></div>`;
+          return;
+        }
+        const i = _importCands.indexOf(c2);
+        html += `<label class="im-row"><input type="checkbox" data-cand="${i}"${c2.checked ? " checked" : ""}><span class="im-lbl">${c2.label}</span><span class="im-val">${c2.value}</span><span class="im-tag ${c2.changed ? "chg" : "def"}">${c2.changed ? "changed" : "default"}</span></label>`;
+      });
+    });
+    if (onlyChanged && hiddenDefaults) html += `<div class="im-empty">+${hiddenDefaults} value${hiddenDefaults > 1 ? "s" : ""} at factory default \u2014 untick \u201CShow only changed\u201D to add them.</div>`;
+    body.innerHTML = html;
+    body.querySelectorAll("[data-cand]").forEach((cb) => cb.addEventListener("change", () => {
+      _importCands[+cb.dataset.cand].checked = cb.checked;
+      updateApply();
+    }));
+    updateApply();
+  }
+  function updateApply() {
+    const applyBtn = document.querySelector("#import-apply");
+    const n = _importCands.filter((c2) => c2.checked).length;
+    applyBtn.disabled = !n;
+    applyBtn.textContent = n ? `Apply ${n}` : "Apply";
+  }
+  async function openImportModal() {
+    buildImportModal();
+    const m = document.getElementById("import-modal");
+    const body = m.querySelector("#import-body");
+    _importCands = [];
+    body.innerHTML = '<div class="im-empty">Reading the controller\u2026</div>';
+    m.querySelector("#import-apply").disabled = true;
+    m.classList.add("active");
+    let scan;
+    try {
+      scan = await scanController();
+    } catch (e) {
+      scan = { connected: false, candidates: [] };
+    }
+    if (!scan.connected) {
+      body.innerHTML = '<div class="im-empty">Not bridged to a controller \u2014 run the desktop app / gateway, or Import a saved profile instead.</div>';
+      return;
+    }
+    _importController = scan.controller || null;
+    _importCands = scan.candidates.map((c2) => ({ ...c2, checked: !!c2.changed }));
+    renderImportReview();
+    m.querySelector("#import-only").onchange = renderImportReview;
+    m.querySelector("#import-apply").onclick = async () => {
+      const checked = _importCands.filter((c2) => c2.checked);
+      const btn = m.querySelector("#import-apply");
+      btn.disabled = true;
+      btn.textContent = "Applying\u2026";
+      try {
+        await applyCandidates(checked);
+        m.classList.remove("active");
+      } catch (e) {
+        body.innerHTML = '<div class="im-empty">Apply failed: ' + (e && e.message ? e.message : e) + "</div>";
+      }
+    };
+  }
   function renderLibSummary() {
     const cont = q("set_atc_libsummary");
     if (!cont) return;
@@ -2920,13 +3305,13 @@ function wireSettingsOverlay(ov) {
     const opt = (cur) => '<option value="">\u2014</option>' + TOOL_TYPES.map((ty) => '<option value="' + ty + '"' + (ty === cur ? " selected" : "") + ">" + ty + "</option>").join("");
     const cell = (i, f, val, step) => '<td><input type="number" step="' + (step || "any") + '" data-tool="' + i + '" data-field="' + f + '" value="' + (val === "" || val == null ? "" : val) + '"></td>';
     if (!tools.length) {
-      body.innerHTML = '<tr><td colspan="10" class="tl-empty">No tools yet \u2014 \u201C\uFF0B Add tool\u201D to start your library.</td></tr>';
+      body.innerHTML = '<tr><td colspan="11" class="tl-empty">No tools yet \u2014 \u201C\uFF0B Add tool\u201D to start your library.</td></tr>';
       return;
     }
     let html = "";
     tools.forEach((raw, i) => {
       const t = normalizeTool(raw, i + 1);
-      html += '<tr><td class="tl-numcell"><input type="number" step="1" min="1" max="99" data-tool="' + i + '" data-field="num" value="' + (t.num === "" || t.num == null ? "" : t.num) + '"><span class="tl-var" data-var="' + i + '">' + lenVarLabel(t.num, base) + '</span></td><td><input type="text" data-tool="' + i + '" data-field="name" value="' + String(t.name).replace(/"/g, "&quot;") + '" placeholder="e.g. 6mm flat 2F"></td><td><select data-tool="' + i + '" data-field="type">' + opt(t.type) + "</select></td>" + cell(i, "dia", t.dia) + cell(i, "flutes", t.flutes, "1") + cell(i, "length", t.length, "0.001") + cell(i, "rpm", t.rpm, "1") + cell(i, "feed", t.feed, "1") + cell(i, "plunge", t.plunge, "1") + '<td><button class="tl-del" data-del="' + i + '" title="Remove tool">\u2715</button></td></tr>';
+      html += '<tr><td class="tl-numcell"><input type="number" step="1" min="1" max="99" data-tool="' + i + '" data-field="num" value="' + (t.num === "" || t.num == null ? "" : t.num) + '"><span class="tl-var" data-var="' + i + '">' + lenVarLabel(t.num, base) + '</span></td><td><input type="text" data-tool="' + i + '" data-field="name" value="' + String(t.name).replace(/"/g, "&quot;") + '" placeholder="e.g. 6mm flat 2F"></td><td><select data-tool="' + i + '" data-field="type">' + opt(t.type) + '</select></td><td class="tl-prof" data-prof="' + i + '">' + toolProfileSvg(t, { w: 26, h: 40 }) + "</td>" + cell(i, "dia", t.dia) + cell(i, "flutes", t.flutes, "1") + cell(i, "length", t.length, "0.001") + cell(i, "rpm", t.rpm, "1") + cell(i, "feed", t.feed, "1") + cell(i, "plunge", t.plunge, "1") + '<td><button class="tl-del" data-del="' + i + '" title="Remove tool">\u2715</button></td></tr>';
     });
     body.innerHTML = html;
   }
@@ -2948,6 +3333,8 @@ function wireSettingsOverlay(ov) {
                 #toollib-modal .tl-numcell { white-space: nowrap; }
                 #toollib-modal .tl-numcell input { width: 46px; }
                 #toollib-modal .tl-var { display: inline-block; margin-left: 6px; font-size: 10px; color: var(--text-dim); }
+                #toollib-modal .tl-prof { text-align: center; width: 34px; }
+                #toollib-modal .tl-prof svg { display: block; margin: 0 auto; }
                 #toollib-modal .tl-empty { padding: 16px; text-align: center; color: var(--text-dim); }
                 #toollib-modal input, #toollib-modal select { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 3px; padding: 4px 6px; font: inherit; }
                 #toollib-modal td:nth-child(4) input, #toollib-modal td:nth-child(5) input, #toollib-modal td:nth-child(6) input,
@@ -2962,7 +3349,7 @@ function wireSettingsOverlay(ov) {
                 <div class="tl-body">
                     <table>
                         <thead><tr>
-                            <th>Tool #</th><th>Name</th><th>Type</th><th>\xD8 mm</th><th>Flutes</th><th>Length</th><th>RPM</th><th>Feed</th><th>Plunge</th><th></th>
+                            <th>Tool #</th><th>Name</th><th>Type</th><th>Profile</th><th>\xD8 mm</th><th>Flutes</th><th>Length</th><th>RPM</th><th>Feed</th><th>Plunge</th><th></th>
                         </tr></thead>
                         <tbody id="toollib-rows"></tbody>
                     </table>
@@ -2995,6 +3382,10 @@ function wireSettingsOverlay(ov) {
       if (f === "num") {
         const span = m.querySelector('.tl-var[data-var="' + i + '"]');
         if (span) span.textContent = lenVarLabel(rec.num, parseInt(a.baseVar, 10) || 1430);
+      }
+      if (f === "type" || f === "dia" || f === "length") {
+        const cellEl = m.querySelector('.tl-prof[data-prof="' + i + '"]');
+        if (cellEl) cellEl.innerHTML = toolProfileSvg(rec, { w: 26, h: 40 });
       }
       renderLibSummary();
     });
@@ -3224,6 +3615,241 @@ function wireSettingsOverlay(ov) {
   q("set_profile_import").addEventListener("click", () => {
     if (window.ddcsImportProfile) window.ddcsImportProfile();
   });
+  const cloudSave = q("set_profile_cloud_save");
+  if (cloudSave) cloudSave.addEventListener("click", async () => {
+    if (!window.ddcsSaveProfileToCloud) return;
+    let def = "";
+    try {
+      def = getActiveProfile().name || "";
+    } catch (e) {
+    }
+    const name = window.prompt("Save this profile to your cloud as:", def || "My machine");
+    if (!name) return;
+    const orig = cloudSave.textContent;
+    cloudSave.disabled = true;
+    cloudSave.textContent = "Saving\u2026";
+    try {
+      const n = await window.ddcsSaveProfileToCloud(name);
+      alert("Saved \u201C" + n + "\u201D to your cloud.");
+    } catch (e) {
+      alert("Cloud save failed: " + (e && e.message ? e.message : e));
+    } finally {
+      cloudSave.disabled = false;
+      cloudSave.textContent = orig;
+    }
+  });
+  const cloudLoad = q("set_profile_cloud_load");
+  if (cloudLoad) cloudLoad.addEventListener("click", () => openCloudProfilePicker());
+  async function openCloudProfilePicker() {
+    let items = [];
+    try {
+      items = await window.ddcsListCloudProfiles() || [];
+    } catch (e) {
+      alert("Could not reach your cloud: " + (e && e.message ? e.message : e));
+      return;
+    }
+    if (!items.length) {
+      alert("No cloud profiles yet \u2014 sign in (Settings \u2192 Cloud) and use \u201CSave to cloud\u201D.");
+      return;
+    }
+    let m = document.getElementById("cloudprof-modal");
+    if (!m) {
+      m = document.createElement("div");
+      m.id = "cloudprof-modal";
+      m.innerHTML = '<style>#cloudprof-modal { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.5); }#cloudprof-modal .cp-panel { background:var(--panel); color:var(--text-main); border:1px solid var(--border); border-radius:var(--radius,6px); width:min(460px,94vw); max-height:80vh; display:flex; flex-direction:column; box-shadow:0 12px 40px rgba(0,0,0,.5); }#cloudprof-modal .cp-head { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); font-weight:700; }#cloudprof-modal .cp-head button { background:transparent; border:none; color:var(--text-dim); font-size:18px; cursor:pointer; }#cloudprof-modal .cp-body { overflow:auto; padding:6px 12px 12px; }#cloudprof-modal .cp-row { display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid var(--border); }#cloudprof-modal .cp-name { flex:1; font-weight:600; } #cloudprof-modal .cp-date { font-size:11px; color:var(--text-dim); }</style><div class="cp-panel"><div class="cp-head"><span>\u2601 Load profile from cloud</span><button data-cp="x">\u2715</button></div><div class="cp-body" id="cloudprof-body"></div></div>';
+      document.body.appendChild(m);
+      m.addEventListener("mousedown", (e) => {
+        if (e.target === m || e.target.dataset && e.target.dataset.cp === "x") m.remove();
+      });
+    }
+    const body = m.querySelector("#cloudprof-body");
+    body.innerHTML = items.map((it) => {
+      const d = it.savedAt ? new Date(it.savedAt).toLocaleString() : "";
+      return '<div class="cp-row"><span class="cp-name">' + it.name + '</span><span class="cp-date">' + d + '</span><button class="toolbar-btn settings-io" data-load="' + it.id + '">Load</button><button class="op-btn" data-del="' + it.id + '" title="Delete">\u2715</button></div>';
+    }).join("");
+    body.querySelectorAll("[data-load]").forEach((b2) => b2.addEventListener("click", async () => {
+      if (!confirm("Load this profile? It replaces your current settings + variables.")) return;
+      b2.disabled = true;
+      b2.textContent = "Loading\u2026";
+      try {
+        await window.ddcsLoadCloudProfile(b2.dataset.load);
+        m.remove();
+        fill();
+        applyHardwareTabs();
+        alert("Profile loaded.");
+      } catch (e) {
+        alert("Load failed: " + (e && e.message ? e.message : e));
+        b2.disabled = false;
+        b2.textContent = "Load";
+      }
+    }));
+    body.querySelectorAll("[data-del]").forEach((b2) => b2.addEventListener("click", async () => {
+      if (!confirm("Delete this cloud profile?")) return;
+      try {
+        await window.ddcsDeleteCloudProfile(b2.dataset.del);
+        openCloudProfilePicker();
+      } catch (e) {
+        alert("Delete failed: " + (e && e.message ? e.message : e));
+      }
+    }));
+  }
+  function macrosArr() {
+    return _ddcsSettings.macros || (_ddcsSettings.macros = []);
+  }
+  function editorText() {
+    const e = document.getElementById("editor");
+    return e ? e.value : "";
+  }
+  function macroFileText(m) {
+    const name = (m.name || "macro").trim();
+    const body = String(m.body || "").replace(/\r/g, "").replace(/\s+$/, "");
+    const t = m.trigger || {};
+    const hasEnd = /\b(M99|M30|M0?2)\b/.test(body);
+    if (t.kind === "mcode") {
+      const n = Math.max(0, parseInt(t.code, 10) || 0);
+      return `O${1e4 + n} ( ${name} \u2014 M${n} )
+${body}${hasEnd ? "" : "\nM99"}
+`;
+    }
+    if (t.kind === "kbutton") {
+      const k = Math.min(7, Math.max(1, parseInt(t.key, 10) || 1));
+      return `( save as key-${k}.nc on SYSDISK \u2014 K${k} button )
+${body}${hasEnd ? "" : "\nM30"}
+`;
+    }
+    return `( save as ${(name || "macro").replace(/[^\w-]+/g, "_")}.nc )
+${body}${hasEnd ? "" : "\nM30"}
+`;
+  }
+  const insertToEditor = (txt) => {
+    const em = window.ddcsStudio && window.ddcsStudio.editorManager || window.editorManager;
+    if (em && typeof em.insert === "function") em.insert(txt);
+    else alert("Editor not available.");
+  };
+  const findKbtn = (k) => macrosArr().find((m) => (m.trigger || {}).kind === "kbutton" && (m.trigger || {}).key === k);
+  const ensureKbtn = (k) => {
+    let m = findKbtn(k);
+    if (!m) {
+      m = { name: "", trigger: { kind: "kbutton", key: k }, body: "" };
+      macrosArr().push(m);
+    }
+    return m;
+  };
+  function renderMcodes() {
+    const host = q("mcodes_list");
+    if (!host) return;
+    const rows = macrosArr().map((m, i) => ({ m, i })).filter((x) => (x.m.trigger || {}).kind === "mcode");
+    if (!rows.length) {
+      host.innerHTML = '<div class="settings-hint">No custom M-codes yet \u2014 \u201C\uFF0B Add from editor\u201D or \u201C\uFF0B Add blank\u201D.</div>';
+      return;
+    }
+    host.innerHTML = rows.map(({ m, i }) => `<div class="macro-card" data-i="${i}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <label style="font-size:11px; color:var(--text-dim);">M<input type="number" class="mc-f" data-f="num" value="${(m.trigger || {}).code != null ? m.trigger.code : 15}" min="0" max="99" style="width:52px; margin-left:2px;"></label>
+                <input class="mc-f" data-f="name" value="${String(m.name || "").replace(/"/g, "&quot;")}" placeholder="Name" style="flex:1; min-width:120px;">
+                <span class="mc-o" style="font-size:10px; color:var(--text-dim);">\u2192 O${1e4 + (parseInt((m.trigger || {}).code, 10) || 0)}</span>
+            </div>
+            <textarea class="mc-f" data-f="body" spellcheck="false" placeholder="macro body (G-code)" style="width:100%; height:110px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${String(m.body || "").replace(/</g, "&lt;")}</textarea>
+            <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="gen">\u2B07 Generate</button><span style="flex:1"></span><button class="op-btn" data-act="del" title="Delete">\u2715</button></div>
+        </div>`).join("");
+  }
+  function renderKbuttons() {
+    const host = q("kbuttons_list");
+    if (!host) return;
+    let html = "";
+    for (let k = 1; k <= 7; k++) {
+      const m = findKbtn(k);
+      html += `<div class="kbtn-row" data-k="${k}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <b style="width:30px;">K${k}</b>
+                    <input class="kb-f" data-f="name" value="${m ? String(m.name || "").replace(/"/g, "&quot;") : ""}" placeholder="(unused)" style="flex:1;">
+                    <span style="font-size:10px; color:var(--text-dim);">key-${k}.nc</span>
+                </div>
+                <textarea class="kb-f" data-f="body" spellcheck="false" placeholder="button macro body" style="width:100%; height:80px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${m ? String(m.body || "").replace(/</g, "&lt;") : ""}</textarea>
+                <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="ked">\u21EA From editor</button><button class="toolbar-btn settings-io" data-act="kgen">\u2B07 Generate</button><span style="flex:1"></span><button class="op-btn" data-act="kclr" title="Clear">\u2715</button></div>
+            </div>`;
+    }
+    host.innerHTML = html;
+  }
+  const mch = q("mcodes_list");
+  if (mch) {
+    mch.addEventListener("input", (e) => {
+      const c2 = e.target.closest(".macro-card");
+      if (!c2 || !e.target.dataset.f) return;
+      const m = macrosArr()[+c2.dataset.i];
+      if (!m) return;
+      const f = e.target.dataset.f;
+      if (f === "name") m.name = e.target.value;
+      else if (f === "body") m.body = e.target.value;
+      else if (f === "num") {
+        m.trigger = m.trigger || { kind: "mcode" };
+        m.trigger.kind = "mcode";
+        m.trigger.code = parseInt(e.target.value, 10) || 0;
+        const s = c2.querySelector(".mc-o");
+        if (s) s.textContent = "\u2192 O" + (1e4 + m.trigger.code);
+      }
+      saveSettings();
+    });
+    mch.addEventListener("click", (e) => {
+      const c2 = e.target.closest(".macro-card");
+      if (!c2) return;
+      const i = +c2.dataset.i;
+      const a = e.target.dataset.act;
+      if (a === "del") {
+        macrosArr().splice(i, 1);
+        saveSettings();
+        renderMcodes();
+      } else if (a === "gen") insertToEditor(macroFileText(macrosArr()[i]));
+    });
+  }
+  const kbh = q("kbuttons_list");
+  if (kbh) {
+    kbh.addEventListener("input", (e) => {
+      const r = e.target.closest(".kbtn-row");
+      if (!r || !e.target.dataset.f) return;
+      const m = ensureKbtn(+r.dataset.k);
+      if (e.target.dataset.f === "name") m.name = e.target.value;
+      else m.body = e.target.value;
+      saveSettings();
+    });
+    kbh.addEventListener("click", (e) => {
+      const r = e.target.closest(".kbtn-row");
+      if (!r) return;
+      const k = +r.dataset.k;
+      const a = e.target.dataset.act;
+      if (a === "ked") {
+        ensureKbtn(k).body = editorText().trim();
+        saveSettings();
+        renderKbuttons();
+      } else if (a === "kgen") {
+        const m = findKbtn(k);
+        if (!m || !String(m.body).trim()) {
+          alert("K" + k + " is empty.");
+          return;
+        }
+        insertToEditor(macroFileText(m));
+      } else if (a === "kclr") {
+        const i = macrosArr().findIndex((x) => (x.trigger || {}).kind === "kbutton" && (x.trigger || {}).key === k);
+        if (i >= 0) macrosArr().splice(i, 1);
+        saveSettings();
+        renderKbuttons();
+      }
+    });
+  }
+  const _mcAddEd = q("mcodes_add_editor");
+  if (_mcAddEd) _mcAddEd.addEventListener("click", () => {
+    macrosArr().push({ name: "New M-code", trigger: { kind: "mcode", code: 15 }, body: editorText().trim() });
+    saveSettings();
+    renderMcodes();
+  });
+  const _mcAddBlank = q("mcodes_add_blank");
+  if (_mcAddBlank) _mcAddBlank.addEventListener("click", () => {
+    macrosArr().push({ name: "New M-code", trigger: { kind: "mcode", code: 15 }, body: "" });
+    saveSettings();
+    renderMcodes();
+  });
+  renderMcodes();
+  renderKbuttons();
   const genTnc = q("atc_gen_tnc");
   if (genTnc) genTnc.addEventListener("click", () => {
     const nc = generateToolChangeNc(_ddcsSettings.atc, getOutputs());
@@ -3260,8 +3886,10 @@ function wireSettingsOverlay(ov) {
     "set_tab_compose",
     "set_tab_variables",
     "set_tab_program",
+    "set_tab_macros",
     "set_tab_feedback",
-    "set_tab_network",
+    "set_tab_gateway",
+    "set_tab_cloud",
     "set_tab_about",
     "set_tab_machine",
     "set_tab_spindle",
