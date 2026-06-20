@@ -8,6 +8,7 @@ import { getSettings, saveSettings } from './settingsPanel.js';
 import { makeClient } from '../shared/js/client.js';
 import * as camPack from '../data/camPack.js';
 import { bmpDataUrl } from '../data/bmp.js';
+import { openIconEditor } from './iconEditor.js';
 
 let _wired = false;
 
@@ -189,9 +190,8 @@ export function initMacrosApp() {
                 </div>
                 <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
                     ${slot.icon ? `<img src="${slot.icon.data}" alt="" style="width:72px; height:36px; object-fit:contain; border:1px solid var(--border); background:#000;"><span style="font-size:10px; color:var(--text-dim);">${camEsc(slot.icon.name)}${slot.icon.w ? ' · ' + slot.icon.w + '×' + slot.icon.h + (slot.icon.w === 360 && slot.icon.h === 180 ? '' : ' ⚠ not 360×180') : ''}</span><button class="op-btn" data-act="delicon" title="Remove icon">✕</button>` : '<span style="font-size:11px; color:var(--text-dim);">No icon (camN.bmp)</span>'}
-                    <button class="toolbar-btn settings-io" data-act="icon">🖼 ${slot.icon ? 'Replace' : 'Import'} BMP</button>
-                    <span style="font-size:10px; color:var(--text-dim);">or from palette →</span>
-                    ${['corner', 'edge', 'middle', 'align'].map((s) => `<button class="toolbar-btn settings-io" data-act="svg" data-svg="${s}Viz" style="padding:2px 7px;">${s}</button>`).join('')}
+                    <button class="toolbar-btn settings-io" data-act="edit">🎨 ${slot.icon ? 'Edit' : 'Create'} icon</button>
+                    <button class="toolbar-btn settings-io" data-act="icon">🖼 Import BMP</button>
                 </div>
                 <table style="width:100%; font-size:11.5px; margin-top:6px; border-collapse:collapse;"><thead><tr style="color:var(--text-dim); font-size:10px; text-align:left;"><th>Label</th><th>Units</th><th>Default</th><th>Min</th><th>Max</th><th>Var</th><th>#param→#2600</th><th></th></tr></thead><tbody>${rows}</tbody></table>
                 <div class="settings-row" style="margin-top:4px;"><button class="toolbar-btn settings-io" data-act="addf">＋ Add field</button></div>
@@ -254,8 +254,8 @@ export function initMacrosApp() {
             if (a === 'addf') { slot.fields = slot.fields || []; const idx = camPack.nextParam(camPack.usedParams(_camPack)); if (idx == null) { alert('The #1100–1499 form-param pool is full.'); return; } slot.fields.push({ idx, label: '', units: '', def: 0, min: 0, max: 0, type: 1, var: '#' + (slot.fields.length + 1) }); saveCamPack(); renderCamBuilder(); }
             else if (a === 'delf') { slot.fields.splice(+e.target.closest('tr').dataset.fi, 1); saveCamPack(); renderCamBuilder(); }
             else if (a === 'dels') { _camPack.slots.splice(si, 1); saveCamPack(); renderCamBuilder(); }
+            else if (a === 'edit') { openIconEditor(slot.icon || null, (bmp, model) => { slot.icon = { name: (slot.name || 'cam' + slot.slot) + '.bmp', data: bmp, w: 360, h: 180, layers: model.layers }; saveCamPack(); renderCamBuilder(); }); }
             else if (a === 'icon') { importCamIcon(slot); }
-            else if (a === 'svg') { svgToCamIcon(slot, e.target.dataset.svg); }
             else if (a === 'delicon') { slot.icon = null; saveCamPack(); renderCamBuilder(); }
             else if (a === 'exp') { insertToEditor('( ===== eng form lines — MERGE into the controller eng language file ===== )\n' + camPack.slotEng(slot) + '\n\n' + camPack.slotMacro(slot)); }
         });
