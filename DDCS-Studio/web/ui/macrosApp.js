@@ -252,13 +252,17 @@ export function initMacrosApp() {
         const macro = camPack.slotMacro(slot);
         const seed = new Map();
         (slot.fields || []).forEach((f) => { const v = Number(f.def); seed.set(camPack.mirrorVar(f.idx), Number.isFinite(v) ? v : 0); });
+        // Probe macros (G31) trace their full travel unless the engine has stock to clamp to — the panel's
+        // Stock button (📦) sets it, so a probe then stops at the real surface instead of running to the limit.
+        const isProbe = /\bG31\b/.test(macro);
+        const hint = isProbe ? 'probes clamp to Stock (📦) — else they trace full travel' : 'form values seeded from field defaults';
         const overlay = document.createElement('div');
         overlay.className = 'cam-sim-overlay';
         overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center;';
         overlay.innerHTML = `<div style="width:min(1100px,92vw); height:min(760px,88vh); background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px; display:flex; flex-direction:column; overflow:hidden;">
             <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--border);">
                 <b style="flex:1">▶ Simulate — ${camEsc(slot.name || ('CAM slot ' + slot.slot))}</b>
-                <span class="settings-hint" style="margin:0">form values seeded from field defaults</span>
+                <span class="settings-hint" style="margin:0">${hint}</span>
                 <button class="toolbar-btn settings-io" data-sim-close>✕ Close</button>
             </div>
             <div class="cam-sim-host" style="flex:1; position:relative; min-height:0;"></div>

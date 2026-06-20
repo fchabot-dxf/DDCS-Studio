@@ -129,12 +129,23 @@ export function setupGlobalFunctions(app) {
                 <label>Angle (deg, CCW)<input type="number" data-ang value="0" step="0.001" style="width:100%"></label>
                 <div class="settings-row"><label style="flex:1">Pivot X<input type="number" data-px value="0" step="0.001" style="width:100%"></label><label style="flex:1">Pivot Y<input type="number" data-py value="0" step="0.001" style="width:100%"></label></div>
                 <div data-rout class="settings-hint" style="margin:0"></div>
-                <div class="settings-row" style="justify-content:flex-end"><button class="toolbar-btn settings-io" data-rc>Cancel</button><button class="toolbar-btn settings-io" data-rgo>Rotate editor program</button></div>
+                <div class="settings-row" style="justify-content:flex-end"><button class="toolbar-btn settings-io" data-rc>Cancel</button><button class="toolbar-btn settings-io" data-r763 title="Alternative: copy a #763 snippet to set the controller's native toolpath Z-rotation (Pr263). Only applies in 3D-toolpath mode — verify on your machine.">Copy #763 snippet</button><button class="toolbar-btn settings-io" data-rgo>Rotate editor program</button></div>
             </div>`;
             document.body.appendChild(ov);
             const close = () => ov.remove();
             ov.querySelector('[data-rc]').addEventListener('click', close);
             ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+            // Native alternative: write the angle to #763 (Pr263 Z toolpath rotation). Applies only in 3D
+            // toolpath mode — unconfirmed on this firmware, so it's an opt-in snippet the operator verifies.
+            ov.querySelector('[data-r763]').addEventListener('click', () => {
+                const ang = parseFloat(ov.querySelector('[data-ang]').value) || 0;
+                if (!ang) { ov.querySelector('[data-rout]').textContent = 'Enter a non-zero angle.'; return; }
+                const snip = `#763=${ang}   ( Z-axis toolpath rotation — needs 3D toolpath mode active; verify on the machine )`;
+                try { navigator.clipboard?.writeText(snip); } catch (_) { /* no clipboard */ }
+                const o = ov.querySelector('[data-rout]');
+                o.innerHTML = 'Copied native snippet (run on the controller instead of rotating the program):<br><code>' + snip + '</code><br>⚠ Only applies in 3D-toolpath mode — unconfirmed on this firmware. Verify before trusting it.';
+                o.style.color = '#fd0';
+            });
             ov.querySelector('[data-rgo]').addEventListener('click', () => {
                 const ang = parseFloat(ov.querySelector('[data-ang]').value) || 0;
                 const px = parseFloat(ov.querySelector('[data-px]').value) || 0;
