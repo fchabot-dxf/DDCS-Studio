@@ -64,10 +64,21 @@ var init_drill = __esm({
 function helicalBore(pt, p) {
   const clr = num(p.clearance, 5), depth = num(p.depth, 5), feed = num(p.feed, 100);
   const r = (num(p.holeDia, 12) - num(p.toolDia, 6)) / 2, pitch = Math.max(0.05, num(p.pitch, 0.5));
+  const ramp = p.ramp === "helix" ? "helix" : "step";
   const cx = pt.x, cy = pt.y;
   if (r <= 0.01) return [`G0 X${cx} Y${cy}`, `G0 Z${clr}`, `G1 Z${r3(-depth)} F${feed}`, `G0 Z${clr}`];
   const L2 = [`G0 X${r3(cx + r)} Y${cy}   ( bore radius )`, `G0 Z${clr}`];
   const arc = `G3 X${r3(cx + r)} Y${cy} I${r3(-r)} J0`;
+  if (ramp === "helix") {
+    const segPerTurn = 24, turns = Math.max(1, Math.ceil(depth / pitch)), total = turns * segPerTurn;
+    L2.push(`G1 Z0 F${feed}   ( helix top )`);
+    for (let s = 1; s <= total; s++) {
+      const a = s / segPerTurn * 2 * Math.PI;
+      L2.push(`G1 X${r3(cx + r * Math.cos(a))} Y${r3(cy + r * Math.sin(a))} Z${r3(-(depth * s) / total)} F${feed}`);
+    }
+    L2.push(`${arc} F${feed}   ( finish circle )`, `G0 Z${clr}`);
+    return L2;
+  }
   let z = 0;
   while (z < depth - 1e-6) {
     z = Math.min(z + pitch, depth);
@@ -85,8 +96,9 @@ var init_bore = __esm({
       label: "Bore",
       kind: "leaf",
       category: "Ops",
-      defaults: { x: 0, y: 0, holeDia: 12, toolDia: 6, depth: 5, pitch: 0.5, feed: 120, clearance: 5 },
-      fields: ["x", "y", "holeDia", "toolDia", "depth", "pitch", "feed", "clearance"],
+      defaults: { x: 0, y: 0, holeDia: 12, toolDia: 6, depth: 5, pitch: 0.5, ramp: "step", feed: 120, clearance: 5 },
+      fields: ["x", "y", "holeDia", "toolDia", "depth", "pitch", "ramp", "feed", "clearance"],
+      // ramp: step / helix
       emit: (p, dx = 0, dy = 0) => helicalBore({ x: r3(num(p.x, 0) + dx), y: r3(num(p.y, 0) + dy) }, p)
     };
   }
@@ -907,6 +919,10 @@ var init_array = __esm({
       defaults: { pattern: "grid", x0: 0, y0: 0, cols: 3, rows: 2, dx: 20, dy: 20, count: 4, spacing: 20, angle: 0, dia: 50, startAngle: 0, skip: "" },
       fields: ["pattern"],
       // pattern-specific fields resolved by fieldsFor()
+      // Blocks view carries ALL pattern fields (so every pattern is editable + round-trips); a Blockly extension
+      // toggles which are visible per `pattern` (the `dynamic` field). The wizard uses fieldsFor() directly.
+      allFields: ["pattern", "x0", "y0", "cols", "rows", "dx", "dy", "count", "spacing", "angle", "dia", "startAngle", "w", "h", "nx", "ny", "skip"],
+      dynamic: "pattern",
       /** Pattern points; mirrors x0/y0 → cx/cy so circle reads the same origin. */
       points: (p) => patternPoints({ ...p, cx: num(p.x0, 0), cy: num(p.y0, 0) }),
       /** Which fields to show depends on the chosen pattern. */
@@ -914,6 +930,7 @@ var init_array = __esm({
         const base = ["pattern", "x0", "y0"];
         if (p.pattern === "circle") return [...base, "dia", "count", "startAngle", "skip"];
         if (p.pattern === "line") return [...base, "count", "spacing", "angle", "skip"];
+        if (p.pattern === "rect") return [...base, "w", "h", "nx", "ny", "skip"];
         return [...base, "cols", "rows", "dx", "dy", "skip"];
       }
     };
@@ -2692,6 +2709,7 @@ function jsonDef(def) {
     style: catSlug(def.category) + "_style",
     tooltip: `${def.label} (${def.category})`
   };
+  if (def.dynamic) block.extensions = ["ddcs_dynfields"];
   if (def.kind === "reporter") block.output = outputCheck(def);
   else {
     block.previousStatement = null;
@@ -2699,8 +2717,42 @@ function jsonDef(def) {
   }
   return block;
 }
+function registerDynExtension(Blockly2) {
+  try {
+    Blockly2.Extensions.register("ddcs_dynfields", function() {
+      const def = DEF_BY_TYPE[this.type];
+      if (!def || !def.dynamic || !def.fieldsFor) return;
+      const all = def.allFields || [];
+      const apply = () => {
+        try {
+          const params = { ...def.defaults, [def.dynamic]: this.getFieldValue(FN(def.dynamic)) };
+          const show = new Set(def.fieldsFor(params).map(FN));
+          all.forEach((f) => {
+            const inp = this.getInput(FN(f));
+            if (inp) inp.setVisible(show.has(FN(f)));
+          });
+          if (this.rendered) {
+            if (this.queueRender) this.queueRender();
+            else if (this.render) this.render();
+          }
+        } catch (e) {
+        }
+      };
+      this.setOnChange(function() {
+        if (this.isInFlyout || !this.workspace) return;
+        const v6 = this.getFieldValue(FN(def.dynamic));
+        if (v6 === this._ddcsDyn) return;
+        this._ddcsDyn = v6;
+        apply();
+      });
+      apply();
+    });
+  } catch (e) {
+  }
+}
 function installBlockly(Blockly2) {
   _Blockly = Blockly2;
+  registerDynExtension(Blockly2);
   Blockly2.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), ...OP_BLOCKS]);
 }
 function buildToolbox() {
@@ -2720,7 +2772,7 @@ function buildToolbox() {
   }));
   return { kind: "categoryToolbox", contents: cats };
 }
-var SELECTS, catSlug, FN, REPORTER_CHECK, outputCheck, isWrap, fieldsOf, DESCRIPTIONS, getDesc, optionsFor, makeOpDef, OP_BLOCKS, _Blockly, getBlockly, shadow;
+var SELECTS, catSlug, FN, REPORTER_CHECK, outputCheck, isWrap, fieldsOf, DESCRIPTIONS, getDesc, optionsFor, makeOpDef, OP_BLOCKS, _Blockly, getBlockly, DEF_BY_TYPE, shadow;
 var init_bridge = __esm({
   "../DDCS-Studio/web/blocks/blockly/bridge.js"() {
     init_ops();
@@ -2741,14 +2793,18 @@ var init_bridge = __esm({
       dist: ["abs", "inc"],
       stop: ["M0", "M1"],
       cycle: ["drill", "dwell", "peck", "bore"],
-      state: ["on", "off"]
+      state: ["on", "off"],
+      pattern: ["grid", "line", "circle", "rect"],
+      // array (drill/bore) hole pattern
+      ramp: ["step", "helix"]
+      // bore stepdown
     };
     catSlug = (c2) => (c2 || "Ops").toLowerCase().replace(/\s+/g, "");
     FN = (field3) => field3.toUpperCase();
     REPORTER_CHECK = { boolean: "Boolean", region: "Region" };
     outputCheck = (def) => REPORTER_CHECK[def.returns] || "Number";
     isWrap = (def) => ["container", "path", "loop", "cond", "depth", "fill"].includes(def.kind);
-    fieldsOf = (def, params) => (def.fieldsFor ? def.fieldsFor(params || def.defaults) : def.fields) || [];
+    fieldsOf = (def, params) => def.allFields || (def.fieldsFor ? def.fieldsFor(params || def.defaults) : def.fields) || [];
     DESCRIPTIONS = {
       fmode: "Feed Mode: G94 (Units/Min) or G95 (Units/Rev)",
       plane: "Arc/Compensation Plane (G17 XY, G18 XZ, G19 YZ)",
@@ -2800,7 +2856,9 @@ var init_bridge = __esm({
       dir: "Spindle direction (CW / CCW)",
       coolant: "Coolant (Flood / Mist / Off)",
       tool: "Tool Number (T)",
-      value: "Value to set"
+      value: "Value to set",
+      pattern: "Hole pattern: grid, line, circle (bolt) or rect perimeter",
+      ramp: "Bore stepdown: step (plunge + flat circle) or helix (linearized G1 ramp)"
     };
     getDesc = (f) => DESCRIPTIONS[f.toLowerCase()] || `The ${f} parameter`;
     optionsFor = (def, field3) => {
@@ -2899,6 +2957,10 @@ var init_bridge = __esm({
     ];
     _Blockly = null;
     getBlockly = () => _Blockly;
+    DEF_BY_TYPE = {};
+    PALETTE.forEach((d) => {
+      DEF_BY_TYPE[d.type] = d;
+    });
     shadow = (v6) => ({ shadow: { type: "math_number", fields: { NUM: Number(v6) || 0 } } });
   }
 });
@@ -6036,9 +6098,11 @@ function drillStack(params = {}) {
   };
   const helical = params.method === "helical";
   const hole = newBlock(helical ? "bore" : "drill");
-  hole.params = helical ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) } : { x: 0, y: 0, depth: num(params.depth, 5), peck: num(params.peck, 5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) };
+  hole.params = helical ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), ramp: params.ramp || "step", feed: num(params.feed, 100), clearance: num(params.clearance, 5) } : { x: 0, y: 0, depth: num(params.depth, 5), peck: num(params.peck, 5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) };
   arr.children = [hole];
-  return [makeStart(params), arr, makeEnd(params)];
+  const wcs = newBlock("wcs");
+  wcs.params = { wcs: params.wcs || "active" };
+  return [makeStart(params), wcs, arr, makeEnd(params)];
 }
 var DrillWizard;
 var init_drillWizard = __esm({
@@ -7100,6 +7164,7 @@ __export(settingsPanel_exports, {
   probeSrc: () => probeSrc,
   probeSrcAvailable: () => probeSrcAvailable,
   resolveProbeSources: () => resolveProbeSources,
+  saveSettings: () => saveSettings,
   setProbeSrc: () => setProbeSrc,
   syncIO: () => syncIO
 });
@@ -7324,7 +7389,6 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="general" data-target="set_tab_compose">Editor</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_program">Program</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_macros">Macros</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_gateway">Gateway</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
@@ -7490,23 +7554,7 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
-                <!-- GENERAL: MACROS (custom M-codes + K-buttons; part of the profile) -->
-                <div id="set_tab_macros" style="display:none">
-                    <div class="settings-section">
-                        <div class="settings-section-title">CUSTOM M-CODES</div>
-                        <div class="settings-hint">Macros called <b>from a program</b> \u2014 O100nn \u21C4 <b>M<i>nn</i></b> (e.g. M15 tool-break check). Build one with a wizard in Studio, then <b>\uFF0B Add from editor</b>. <b>Generate</b> wraps it as the installable O100nn block. Saved with your Profile.</div>
-                        <div id="mcodes_list"></div>
-                        <div class="settings-row" style="margin-top:8px;">
-                            <button class="toolbar-btn settings-io" id="mcodes_add_editor">\uFF0B Add from editor</button>
-                            <button class="toolbar-btn settings-io" id="mcodes_add_blank">\uFF0B Add blank</button>
-                        </div>
-                    </div>
-                    <div class="settings-section">
-                        <div class="settings-section-title">K-BUTTONS (K1\u2013K7)</div>
-                        <div class="settings-hint">The 7 panel buttons \u2014 each runs <b>key-<i>N</i>.nc</b> when pressed. Type/paste a body or <b>\u21EA From editor</b>, then <b>Generate</b> for the install file. Empty = unused.</div>
-                        <div id="kbuttons_list"></div>
-                    </div>
-                </div>
+                <!-- (Macros + CAM Builder promoted to the MACROS main tab \u2014 see ui/macrosApp.js) -->
 
                 <!-- GENERAL: ABOUT -->
                 <div id="set_tab_about" style="display:none">
@@ -8787,209 +8835,6 @@ function wireSettingsOverlay(ov) {
       }
     }));
   }
-  function macrosArr() {
-    return _ddcsSettings.macros || (_ddcsSettings.macros = []);
-  }
-  function editorText() {
-    const e = document.getElementById("editor");
-    return e ? e.value : "";
-  }
-  function macroFileText(m) {
-    const name = (m.name || "macro").trim();
-    const body = String(m.body || "").replace(/\r/g, "").replace(/\s+$/, "");
-    const t = m.trigger || {};
-    const hasEnd = /\b(M99|M30|M0?2)\b/.test(body);
-    if (t.kind === "mcode") {
-      const n = Math.max(0, parseInt(t.code, 10) || 0);
-      return `O${1e4 + n} ( ${name} \u2014 M${n} )
-${body}${hasEnd ? "" : "\nM99"}
-`;
-    }
-    if (t.kind === "kbutton") {
-      const k = Math.min(7, Math.max(1, parseInt(t.key, 10) || 1));
-      return `( save as key-${k}.nc on SYSDISK \u2014 K${k} button )
-${body}${hasEnd ? "" : "\nM30"}
-`;
-    }
-    return `( save as ${(name || "macro").replace(/[^\w-]+/g, "_")}.nc )
-${body}${hasEnd ? "" : "\nM30"}
-`;
-  }
-  const insertToEditor = (txt) => {
-    const em = window.ddcsStudio && window.ddcsStudio.editorManager || window.editorManager;
-    if (em && typeof em.insert === "function") em.insert(txt);
-    else alert("Editor not available.");
-  };
-  const findKbtn = (k) => macrosArr().find((m) => (m.trigger || {}).kind === "kbutton" && (m.trigger || {}).key === k);
-  const ensureKbtn = (k) => {
-    let m = findKbtn(k);
-    if (!m) {
-      m = { name: "", trigger: { kind: "kbutton", key: k }, body: "" };
-      macrosArr().push(m);
-    }
-    return m;
-  };
-  async function pushMcode(m) {
-    const n = parseInt((m.trigger || {}).code, 10) || 0;
-    const oNum = "O" + (1e4 + n);
-    if (!confirm(`Merge M${n} (${oNum}) into the controller's macro library (slib-m.nc)?
-
-The existing slib-m.nc is backed up first (slib-m.nc.bak). You must REBOOT the controller afterward for it to load.`)) return;
-    try {
-      const cur = await makeClient().readSysfile("slib-m.nc");
-      if (!cur || cur.ok === false) {
-        alert("Could not read slib-m.nc \u2014 needs the gateway/desktop app + a connected controller." + (cur && cur.error ? "\n(" + cur.error + ")" : ""));
-        return;
-      }
-      if (new RegExp("(^|\\s)" + oNum + "(\\s|$)").test(cur.content || "")) {
-        alert(`${oNum} is already in slib-m.nc \u2014 remove it on the controller first so it isn't duplicated, then push again.`);
-        return;
-      }
-      const res = await makeClient().writeSysfile("slib-m.nc", "\n" + macroFileText(m), "append");
-      if (res && res.ok) alert(`Merged ${oNum} (M${n}) into slib-m.nc${res.backup ? " \u2014 backup " + res.backup : ""}.
-
-Reboot the controller to load it; then M${n} is callable from a program.`);
-      else alert("Push failed: " + (res && res.error || "unknown"));
-    } catch (err) {
-      alert("Push failed: " + (err && err.message ? err.message : err));
-    }
-  }
-  async function pushKbutton(k, m) {
-    if (!confirm(`Write key-${k}.nc to the controller (the K${k} button)?
-
-The existing key-${k}.nc is backed up first (key-${k}.nc.bak).`)) return;
-    try {
-      const res = await makeClient().writeSysfile("key-" + k + ".nc", macroFileText(m), "write");
-      if (res && res.ok) alert(`Wrote key-${k}.nc${res.backup ? " \u2014 backup " + res.backup : ""}.
-Press K${k} to run it (reboot if the controller doesn't pick it up).`);
-      else alert("Push failed: " + (res && res.error || "needs the gateway/desktop app + a connected controller"));
-    } catch (err) {
-      alert("Push failed: " + (err && err.message ? err.message : err));
-    }
-  }
-  function renderMcodes() {
-    const host = q("mcodes_list");
-    if (!host) return;
-    const rows = macrosArr().map((m, i) => ({ m, i })).filter((x) => (x.m.trigger || {}).kind === "mcode");
-    if (!rows.length) {
-      host.innerHTML = '<div class="settings-hint">No custom M-codes yet \u2014 \u201C\uFF0B Add from editor\u201D or \u201C\uFF0B Add blank\u201D.</div>';
-      return;
-    }
-    host.innerHTML = rows.map(({ m, i }) => `<div class="macro-card" data-i="${i}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
-            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                <label style="font-size:11px; color:var(--text-dim);">M<input type="number" class="mc-f" data-f="num" value="${(m.trigger || {}).code != null ? m.trigger.code : 15}" min="0" max="99" style="width:52px; margin-left:2px;"></label>
-                <input class="mc-f" data-f="name" value="${String(m.name || "").replace(/"/g, "&quot;")}" placeholder="Name" style="flex:1; min-width:120px;">
-                <span class="mc-o" style="font-size:10px; color:var(--text-dim);">\u2192 O${1e4 + (parseInt((m.trigger || {}).code, 10) || 0)}</span>
-            </div>
-            <textarea class="mc-f" data-f="body" spellcheck="false" placeholder="macro body (G-code)" style="width:100%; height:110px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${String(m.body || "").replace(/</g, "&lt;")}</textarea>
-            <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="gen">\u2B07 Generate</button><button class="toolbar-btn settings-io" data-act="push">\u2B06 Push to controller</button><span style="flex:1"></span><button class="op-btn" data-act="del" title="Delete">\u2715</button></div>
-        </div>`).join("");
-  }
-  function renderKbuttons() {
-    const host = q("kbuttons_list");
-    if (!host) return;
-    let html = "";
-    for (let k = 1; k <= 7; k++) {
-      const m = findKbtn(k);
-      html += `<div class="kbtn-row" data-k="${k}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <b style="width:30px;">K${k}</b>
-                    <input class="kb-f" data-f="name" value="${m ? String(m.name || "").replace(/"/g, "&quot;") : ""}" placeholder="(unused)" style="flex:1;">
-                    <span style="font-size:10px; color:var(--text-dim);">key-${k}.nc</span>
-                </div>
-                <textarea class="kb-f" data-f="body" spellcheck="false" placeholder="button macro body" style="width:100%; height:80px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${m ? String(m.body || "").replace(/</g, "&lt;") : ""}</textarea>
-                <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="ked">\u21EA From editor</button><button class="toolbar-btn settings-io" data-act="kgen">\u2B07 Generate</button><button class="toolbar-btn settings-io" data-act="kpush">\u2B06 Push</button><span style="flex:1"></span><button class="op-btn" data-act="kclr" title="Clear">\u2715</button></div>
-            </div>`;
-    }
-    host.innerHTML = html;
-  }
-  const mch = q("mcodes_list");
-  if (mch) {
-    mch.addEventListener("input", (e) => {
-      const c2 = e.target.closest(".macro-card");
-      if (!c2 || !e.target.dataset.f) return;
-      const m = macrosArr()[+c2.dataset.i];
-      if (!m) return;
-      const f = e.target.dataset.f;
-      if (f === "name") m.name = e.target.value;
-      else if (f === "body") m.body = e.target.value;
-      else if (f === "num") {
-        m.trigger = m.trigger || { kind: "mcode" };
-        m.trigger.kind = "mcode";
-        m.trigger.code = parseInt(e.target.value, 10) || 0;
-        const s = c2.querySelector(".mc-o");
-        if (s) s.textContent = "\u2192 O" + (1e4 + m.trigger.code);
-      }
-      saveSettings();
-    });
-    mch.addEventListener("click", (e) => {
-      const c2 = e.target.closest(".macro-card");
-      if (!c2) return;
-      const i = +c2.dataset.i;
-      const a = e.target.dataset.act;
-      if (a === "del") {
-        macrosArr().splice(i, 1);
-        saveSettings();
-        renderMcodes();
-      } else if (a === "gen") insertToEditor(macroFileText(macrosArr()[i]));
-      else if (a === "push") pushMcode(macrosArr()[i]);
-    });
-  }
-  const kbh = q("kbuttons_list");
-  if (kbh) {
-    kbh.addEventListener("input", (e) => {
-      const r = e.target.closest(".kbtn-row");
-      if (!r || !e.target.dataset.f) return;
-      const m = ensureKbtn(+r.dataset.k);
-      if (e.target.dataset.f === "name") m.name = e.target.value;
-      else m.body = e.target.value;
-      saveSettings();
-    });
-    kbh.addEventListener("click", (e) => {
-      const r = e.target.closest(".kbtn-row");
-      if (!r) return;
-      const k = +r.dataset.k;
-      const a = e.target.dataset.act;
-      if (a === "ked") {
-        ensureKbtn(k).body = editorText().trim();
-        saveSettings();
-        renderKbuttons();
-      } else if (a === "kgen") {
-        const m = findKbtn(k);
-        if (!m || !String(m.body).trim()) {
-          alert("K" + k + " is empty.");
-          return;
-        }
-        insertToEditor(macroFileText(m));
-      } else if (a === "kpush") {
-        const m = findKbtn(k);
-        if (!m || !String(m.body).trim()) {
-          alert("K" + k + " is empty.");
-          return;
-        }
-        pushKbutton(k, m);
-      } else if (a === "kclr") {
-        const i = macrosArr().findIndex((x) => (x.trigger || {}).kind === "kbutton" && (x.trigger || {}).key === k);
-        if (i >= 0) macrosArr().splice(i, 1);
-        saveSettings();
-        renderKbuttons();
-      }
-    });
-  }
-  const _mcAddEd = q("mcodes_add_editor");
-  if (_mcAddEd) _mcAddEd.addEventListener("click", () => {
-    macrosArr().push({ name: "New M-code", trigger: { kind: "mcode", code: 15 }, body: editorText().trim() });
-    saveSettings();
-    renderMcodes();
-  });
-  const _mcAddBlank = q("mcodes_add_blank");
-  if (_mcAddBlank) _mcAddBlank.addEventListener("click", () => {
-    macrosArr().push({ name: "New M-code", trigger: { kind: "mcode", code: 15 }, body: "" });
-    saveSettings();
-    renderMcodes();
-  });
-  renderMcodes();
-  renderKbuttons();
   const genTnc = q("atc_gen_tnc");
   if (genTnc) genTnc.addEventListener("click", () => {
     const nc = generateToolChangeNc(_ddcsSettings.atc, getOutputs());
@@ -9026,7 +8871,6 @@ Press K${k} to run it (reboot if the controller doesn't pick it up).`);
     "set_tab_compose",
     "set_tab_variables",
     "set_tab_program",
-    "set_tab_macros",
     "set_tab_feedback",
     "set_tab_gateway",
     "set_tab_cloud",
@@ -9319,6 +9163,8 @@ function pocketStack(params = {}) {
   const ox = num(params.originX, 0), oy = num(params.originY, 0);
   const raster = (params.strategy || "spiral") === "raster";
   const depth = num(params.depth, 4), by = num(params.stepdown, 1.5);
+  const wcs = newBlock("wcs");
+  wcs.params = { wcs: params.wcs || "active" };
   let region = newBlock("region"), tooSmall, cx, cy;
   if (shape === "circle") {
     const Rc = num(params.dia, 50) / 2 - r;
@@ -9336,7 +9182,7 @@ function pocketStack(params = {}) {
   if (tooSmall) {
     const hole = newBlock("drill");
     hole.params = { x: cx, y: cy, depth, peck: by, feed: plunge, clearance: clr };
-    return [makeStart(params), hole, makeEnd(params)];
+    return [makeStart(params), wcs, hole, makeEnd(params)];
   }
   const over = newBlock("stepover");
   over.params = { region, stepover: so, strategy: raster ? "parallel" : "concentric", direction: "bothways", z: "z", feed, plunge, clearance: clr };
@@ -9348,7 +9194,7 @@ function pocketStack(params = {}) {
     wall.params = { region, z: "z", feed, plunge, clearance: clr };
     down.children.push(wall);
   }
-  return [makeStart(params), down, makeEnd(params)];
+  return [makeStart(params), wcs, down, makeEnd(params)];
 }
 var PocketWizard;
 var init_pocketWizard = __esm({
@@ -9383,7 +9229,9 @@ function slotStack(params = {}) {
     plunge: num(params.plunge, 150),
     clearance: num(params.clearance, 5)
   };
-  return [makeStart(params), slot, makeEnd(params)];
+  const wcs = newBlock("wcs");
+  wcs.params = { wcs: params.wcs || "active" };
+  return [makeStart(params), wcs, slot, makeEnd(params)];
 }
 var SlotWizard;
 var init_slotWizard = __esm({
@@ -9415,7 +9263,9 @@ function surfacingStack(params = {}) {
   const down = newBlock("stepdown");
   down.params = { to: num(params.depth, 0.5), by: num(params.stepdown, 0.5) };
   down.children = [over];
-  return [makeStart(params), down, makeEnd(params)];
+  const wcs = newBlock("wcs");
+  wcs.params = { wcs: params.wcs || "active" };
+  return [makeStart(params), wcs, down, makeEnd(params)];
 }
 var SurfacingWizard;
 var init_surfacingWizard = __esm({
@@ -11147,8 +10997,12 @@ function tokenizeWords(line2) {
       const letter = ch.toUpperCase();
       i += 1;
       let value = "";
-      while (i < n && !isLetter(line2[i])) {
-        value += line2[i];
+      let depth = 0;
+      while (i < n && !(depth === 0 && isLetter(line2[i]))) {
+        const c2 = line2[i];
+        if (c2 === "[") depth += 1;
+        else if (c2 === "]") depth = Math.max(0, depth - 1);
+        value += c2;
         i += 1;
       }
       words.push({ letter, value: value.trim() });
@@ -11517,6 +11371,23 @@ var init_GcodeExecutionEngine = __esm({
           if (gotoMatch) {
             return;
           }
+          const whileMatch = stripped.match(/^WHILE\s+(.+?)\s+DO\s*[123]\s*$/i);
+          if (whileMatch) {
+            if (!validateCondition(whileMatch[1].trim().replace(/^\[|\]$/g, ""))) {
+              reportError(lineIndex, "Invalid WHILE condition syntax");
+            }
+            return;
+          }
+          if (/^END\s*[123]\s*$/i.test(stripped)) {
+            return;
+          }
+          const ifThenMatch = stripped.match(/^IF\s+(.+?)\s+THEN\s+(.+)$/i);
+          if (ifThenMatch) {
+            if (!validateCondition(ifThenMatch[1].trim().replace(/^\[|\]$/g, ""))) {
+              reportError(lineIndex, "Invalid IF condition syntax");
+            }
+            return;
+          }
           if (/^(M30|M02|M2|M99)\b/i.test(stripped)) {
             return;
           }
@@ -11593,6 +11464,37 @@ var init_GcodeExecutionEngine = __esm({
         this.program = program;
         this.labels = labels;
         this.totalLines = totalLines;
+        this._matchLoops();
+      }
+      /**
+       * Pre-match `WHILE <cond> DOn` ↔ `ENDn` (n = 1|2|3, FANUC-style) by structural nesting, tagging each
+       * step so the executor can jump in O(1): the WHILE gets `whileN`/`whileCond`/`loopEnd` (program index of
+       * its END), the END gets `endN`/`loopStart` (index of its WHILE). DDCS macros loop with WHILE/END, which
+       * the IF/GOTO core can't express — this is what lets a generated CAM slot macro run in the simulator.
+       */
+      _matchLoops() {
+        const stacks = { 1: [], 2: [], 3: [] };
+        for (let i = 0; i < this.program.length; i++) {
+          const s = this.program[i];
+          const line2 = s && s.stripped;
+          if (!line2) continue;
+          const wm = line2.match(/^WHILE\b\s*(.+?)\s*\bDO\s*([123])\b\s*$/i);
+          if (wm) {
+            s.whileN = Number(wm[2]);
+            s.whileCond = wm[1].trim().replace(/^\[|\]$/g, "");
+            stacks[s.whileN].push(i);
+            continue;
+          }
+          const em = line2.match(/^END\s*([123])\b\s*$/i);
+          if (em) {
+            s.endN = Number(em[1]);
+            const open = stacks[s.endN].pop();
+            if (open != null) {
+              s.loopStart = open;
+              this.program[open].loopEnd = i;
+            }
+          }
+        }
       }
       run(text) {
         this.stop();
@@ -11789,11 +11691,15 @@ var init_GcodeExecutionEngine = __esm({
           return;
         }
         if (typeof this.onPositionChange === "function") {
-          this.onPositionChange({
-            x: mv.from.x + (mv.to.x - mv.from.x) * t,
-            y: mv.from.y + (mv.to.y - mv.from.y) * t,
-            z: mv.from.z + (mv.to.z - mv.from.z) * t
-          });
+          let p;
+          if (mv.path) {
+            const segs = mv.path.length - 1, f = t * segs, i = Math.min(segs - 1, Math.floor(f)), u = f - i;
+            const a = mv.path[i], b2 = mv.path[i + 1];
+            p = { x: a.x + (b2.x - a.x) * u, y: a.y + (b2.y - a.y) * u, z: a.z + (b2.z - a.z) * u };
+          } else {
+            p = { x: mv.from.x + (mv.to.x - mv.from.x) * t, y: mv.from.y + (mv.to.y - mv.from.y) * t, z: mv.from.z + (mv.to.z - mv.from.z) * t };
+          }
+          this.onPositionChange(p);
         }
         this._nextDelayMs = 16;
       }
@@ -11868,6 +11774,29 @@ var init_GcodeExecutionEngine = __esm({
           return false;
         }
         if (/^\s*[();]/.test(step.raw.trim())) {
+          this.ip += 1;
+          return false;
+        }
+        if (step.whileN != null) {
+          if (step.loopEnd != null && !this._evaluateCondition(step.whileCond)) this.ip = step.loopEnd + 1;
+          else this.ip += 1;
+          return false;
+        }
+        if (step.endN != null) {
+          this.ip = step.loopStart != null ? step.loopStart : this.ip + 1;
+          return false;
+        }
+        const ifThen = line2.match(/^IF\s+(.+?)\s+THEN\s+(.+)$/i);
+        if (ifThen) {
+          if (this._evaluateCondition(ifThen[1].trim().replace(/^\[|\]$/g, ""))) {
+            const stmt = ifThen[2].trim();
+            const g = stmt.match(/^GOTO\s*(\d+)$/i);
+            if (g && this.labels.has(Number.parseInt(g[1], 10))) {
+              this.ip = this.labels.get(Number.parseInt(g[1], 10));
+              return false;
+            }
+            if (/^#/.test(stmt)) this._handleAssignment(stmt);
+          }
           this.ip += 1;
           return false;
         }
@@ -12175,7 +12104,27 @@ var init_GcodeExecutionEngine = __esm({
             this.pos = target;
           }
         } else {
-          this.stats.skipped += 1;
+          const off = { I: wm.I, J: wm.J, K: wm.K, R: wm.R };
+          const anyNull = ["I", "J", "K", "R"].some((k) => wm[k] != null && !Number.isFinite(wm[k]));
+          const pts = anyNull ? null : arcPoints(this.pos, target, off, effMotion, this.plane, this.unitScale);
+          if (!pts || pts.length < 3) {
+            this.stats.skipped += 1;
+          } else {
+            let len = 0;
+            for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y, pts[i].z - pts[i - 1].z);
+            const rate = this.feedVal > 0 ? this.feedVal : 600;
+            const realMs = rate > 0 ? len / rate * 6e4 : 0;
+            const speed = this.simSpeed > 0 ? this.simSpeed : 1;
+            if (realMs / speed > 50) {
+              this._move = { from: { ...pts[0] }, to: { ...pts[pts.length - 1] }, path: pts, durMs: realMs, elapsed: 0, last: null, touchName: null };
+              this._setStatus(`${effMotion === 2 ? "G2 cw" : "G3 ccw"} arc ${len.toFixed(1)} mm at F${rate} \u2014 ${(realMs / 1e3).toFixed(1)} s${speed !== 1 ? ` @ ${speed}\xD7` : ""}`, true);
+              this._nextDelayMs = 16;
+              this.ip += 1;
+              return false;
+            }
+            this.pos = target;
+            if (typeof this.onPositionChange === "function") this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
+          }
         }
         this.ip += 1;
         return false;
@@ -13380,8 +13329,9 @@ var init_opStacks = __esm({
       surfacing(prog) {
         const down = find(prog, "stepdown"), over = down && down.children && down.children[0], rg = over && over.params && over.params.region;
         if (!down || !over || !rg || !rg.params) return null;
-        const tool = formNum("sf_toolDia", 12);
+        const tool = formNum("sf_toolDia", 12), wb = find(prog, "wcs");
         return {
+          sf_wcs: wb && wb.params && wb.params.wcs || "active",
           sf_originX: rg.params.x,
           sf_originY: rg.params.y,
           sf_w: rg.params.w,
@@ -13398,8 +13348,9 @@ var init_opStacks = __esm({
       slot(prog) {
         const s = find(prog, "slot");
         if (!s || !s.params) return null;
-        const p = s.params;
+        const p = s.params, wb = find(prog, "wcs");
         return {
+          sl_wcs: wb && wb.params && wb.params.wcs || "active",
           sl_ax: p.x0,
           sl_ay: p.y0,
           sl_bx: p.x1,
@@ -13419,8 +13370,9 @@ var init_opStacks = __esm({
         if (!down || !Array.isArray(down.children)) return null;
         const over = down.children.find((c2) => c2.type === "stepover"), rg = over && over.params && over.params.region;
         if (!over || !rg || !rg.params) return null;
-        const tool = formNum("p_toolDia", 6), r = tool / 2;
+        const tool = formNum("p_toolDia", 6), r = tool / 2, wb = find(prog, "wcs");
         const f = {
+          p_wcs: wb && wb.params && wb.params.wcs || "active",
           p_shape: rg.params.shape,
           p_depth: down.params.to,
           p_stepdown: down.params.by,
@@ -13445,8 +13397,8 @@ var init_opStacks = __esm({
       drill(prog) {
         const arr = find(prog, "array");
         if (!arr || !arr.params) return null;
-        const p = arr.params, hole = arr.children && arr.children[0];
-        const f = { d_pattern: p.pattern, d_originX: p.x0, d_originY: p.y0, d_skip: p.skip || "" };
+        const p = arr.params, hole = arr.children && arr.children[0], wb = find(prog, "wcs");
+        const f = { d_pattern: p.pattern, d_originX: p.x0, d_originY: p.y0, d_skip: p.skip || "", d_wcs: wb && wb.params && wb.params.wcs || "active" };
         if (p.pattern === "circle") {
           f.d_dia = p.dia;
           f.d_count = p.count;
@@ -13476,6 +13428,7 @@ var init_opStacks = __esm({
             f.d_holeDia = h.holeDia;
             f.d_toolDia = h.toolDia;
             f.d_pitch = h.pitch;
+            f.d_ramp = h.ramp;
           } else f.d_peck = h.peck;
         }
         return f;
@@ -16535,6 +16488,7 @@ var drillView = {
     "d_skip",
     "d_originX",
     "d_originY",
+    "d_wcs",
     "d_cols",
     "d_rows",
     "d_dx",
@@ -16554,6 +16508,7 @@ var drillView = {
     "d_peck",
     "d_toolDia",
     "d_pitch",
+    "d_ramp",
     "d_depth",
     "d_clearance",
     "d_feed",
@@ -16561,6 +16516,18 @@ var drillView = {
   ],
   probeSrcFields: {},
   // not a probe wizard — keep the shared controller-source decorator a no-op
+  // Variant entries (Drill vs Bore): one form, two menu entries. Lock the method + hide its selector so the
+  // op's identity is fixed by which entry opened it — no toggle to silently turn a drill into a bore.
+  variants: [{ id: "drill", label: "Drill" }, { id: "bore", label: "Bore" }],
+  applyVariant(variant) {
+    const m = el("d_method");
+    if (m && variant === "bore") m.value = "helical";
+    else if (m && variant === "drill") m.value = "peck";
+    ["d_method_cell", "d_method_label"].forEach((id) => {
+      const e = el(id);
+      if (e) e.style.display = "none";
+    });
+  },
   // Custom params → form (pattern variants: `count` lives in d_count for circle but d_lcount for line, so a
   // flat map can't express it). The inverse of update()'s reads; used by wizardManager._seedForm on edit.
   setForm(p = {}) {
@@ -16573,6 +16540,7 @@ var drillView = {
     set2("d_skip", p.skip);
     set2("d_originX", p.originX);
     set2("d_originY", p.originY);
+    set2("d_wcs", p.wcs);
     set2("d_depth", p.depth);
     set2("d_clearance", p.clearance);
     set2("d_feed", p.feed);
@@ -16581,6 +16549,7 @@ var drillView = {
     set2("d_peck", p.peck);
     set2("d_toolDia", p.toolDia);
     set2("d_pitch", p.pitch);
+    set2("d_ramp", p.ramp);
     if (p.pattern === "grid") {
       set2("d_cols", p.cols);
       set2("d_rows", p.rows);
@@ -16623,6 +16592,7 @@ var drillView = {
       pattern,
       method,
       skip: v("d_skip") || "",
+      wcs: v("d_wcs") || "active",
       originX,
       originY,
       cx: originX,
@@ -16637,6 +16607,7 @@ var drillView = {
       peck: v("d_peck"),
       toolDia: v("d_toolDia"),
       pitch: v("d_pitch"),
+      ramp: v("d_ramp"),
       spindle: s.spindle,
       head: s.head,
       endProgram: s.endProgram
@@ -16732,6 +16703,7 @@ var pocketView = {
     "p_w",
     "p_h",
     "p_dia",
+    "p_wcs",
     "p_strategy",
     "p_toolDia",
     "p_stepoverPct",
@@ -16766,6 +16738,7 @@ var pocketView = {
       w: v2("p_w"),
       h: v2("p_h"),
       dia: v2("p_dia"),
+      wcs: v2("p_wcs") || "active",
       toolDia: v2("p_toolDia"),
       stepoverPct: v2("p_stepoverPct"),
       depth: v2("p_depth"),
@@ -16874,6 +16847,7 @@ var slotView = {
     "sl_bx",
     "sl_by",
     "sl_width",
+    "sl_wcs",
     "sl_toolDia",
     "sl_stepoverPct",
     "sl_depth",
@@ -16903,6 +16877,7 @@ var slotView = {
       bx: v3("sl_bx"),
       by: v3("sl_by"),
       width: v3("sl_width"),
+      wcs: v3("sl_wcs") || "active",
       toolDia: v3("sl_toolDia"),
       stepoverPct: v3("sl_stepoverPct"),
       depth: v3("sl_depth"),
@@ -16985,6 +16960,7 @@ var surfacingView = {
     "sf_originY",
     "sf_w",
     "sf_h",
+    "sf_wcs",
     "sf_strategy",
     "sf_toolDia",
     "sf_stepoverPct",
@@ -17017,6 +16993,7 @@ var surfacingView = {
       originY: v4("sf_originY"),
       w: v4("sf_w"),
       h: v4("sf_h"),
+      wcs: v4("sf_wcs") || "active",
       strategy: v4("sf_strategy") || "raster",
       toolDia: v4("sf_toolDia"),
       stepoverPct: v4("sf_stepoverPct"),
@@ -17639,7 +17616,7 @@ var WizardManager = class {
       return e && e.style.display !== "none";
     }) || null;
   }
-  open(type) {
+  open(type, variant) {
     playClick();
     this._activeType = type;
     closeTemplatesPopover();
@@ -17673,6 +17650,7 @@ var WizardManager = class {
     const wizElem = el("wiz_" + type);
     if (wizElem) {
       wizElem.style.display = "block";
+      if (view && typeof view.applyVariant === "function") view.applyVariant(variant);
       if (view && typeof view.onShow === "function") view.onShow(this);
       decorateProbeSrc(view);
       this.applyProbeDefaults();
@@ -18515,7 +18493,8 @@ Type: ${v6.t || ""}`));
                     <div class="toolbar-dropdown">
                         <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.mill}</span><span class="btn-tx">Mill</span><span class="btn-caret">\u25BC</span></button>
                         <div class="toolbar-dropdown-content">
-                            <button onclick="openWiz && openWiz('drill')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" fill="#1e293b" stroke="none"/></svg>Drill / holes</button>
+                            <button onclick="openWiz && openWiz('drill','drill')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" fill="#1e293b" stroke="none"/></svg>Drill</button>
+                            <button onclick="openWiz && openWiz('drill','bore')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" stroke="#94a3b8" stroke-width="2"/><circle cx="12" cy="12" r="2" fill="#1e293b" stroke="none"/></svg>Bore</button>
                             <button onclick="openWiz && openWiz('pocket')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="5" width="18" height="14" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><rect x="7" y="9" width="10" height="6" rx="1" fill="#1e293b" stroke="none"/></svg>Pocket</button>
                             <button onclick="openWiz && openWiz('slot')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="9" width="18" height="6" rx="3" stroke="#94a3b8" stroke-width="2.5"/><line x1="7" y1="12" x2="17" y2="12" stroke="#1e293b" stroke-width="2" stroke-linecap="round"/></svg>Slot</button>
                             <button onclick="openWiz && openWiz('surfacing')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="4" width="18" height="16" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><path d="M5 8h14M5 12h14M5 16h14" stroke="#1e293b" stroke-width="1.5"/></svg>Surfacing</button>

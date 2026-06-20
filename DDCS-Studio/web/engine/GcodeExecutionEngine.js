@@ -88,6 +88,26 @@ export class GcodeExecutionEngine {
                 return;
             }
 
+            const whileMatch = stripped.match(/^WHILE\s+(.+?)\s+DO\s*[123]\s*$/i);
+            if (whileMatch) {
+                if (!validateCondition(whileMatch[1].trim().replace(/^\[|\]$/g, ''))) {
+                    reportError(lineIndex, 'Invalid WHILE condition syntax');
+                }
+                return;
+            }
+
+            if (/^END\s*[123]\s*$/i.test(stripped)) {
+                return;
+            }
+
+            const ifThenMatch = stripped.match(/^IF\s+(.+?)\s+THEN\s+(.+)$/i);
+            if (ifThenMatch) {
+                if (!validateCondition(ifThenMatch[1].trim().replace(/^\[|\]$/g, ''))) {
+                    reportError(lineIndex, 'Invalid IF condition syntax');
+                }
+                return;
+            }
+
             if (/^(M30|M02|M2|M99)\b/i.test(stripped)) {
                 return;
             }
@@ -170,6 +190,35 @@ export class GcodeExecutionEngine {
         this.program = program;
         this.labels = labels;
         this.totalLines = totalLines;
+        this._matchLoops();
+    }
+
+    /**
+     * Pre-match `WHILE <cond> DOn` ↔ `ENDn` (n = 1|2|3, FANUC-style) by structural nesting, tagging each
+     * step so the executor can jump in O(1): the WHILE gets `whileN`/`whileCond`/`loopEnd` (program index of
+     * its END), the END gets `endN`/`loopStart` (index of its WHILE). DDCS macros loop with WHILE/END, which
+     * the IF/GOTO core can't express — this is what lets a generated CAM slot macro run in the simulator.
+     */
+    _matchLoops() {
+        const stacks = { 1: [], 2: [], 3: [] };
+        for (let i = 0; i < this.program.length; i++) {
+            const s = this.program[i];
+            const line = s && s.stripped;
+            if (!line) continue;
+            const wm = line.match(/^WHILE\b\s*(.+?)\s*\bDO\s*([123])\b\s*$/i);
+            if (wm) {
+                s.whileN = Number(wm[2]);
+                s.whileCond = wm[1].trim().replace(/^\[|\]$/g, '');
+                stacks[s.whileN].push(i);
+                continue;
+            }
+            const em = line.match(/^END\s*([123])\b\s*$/i);
+            if (em) {
+                s.endN = Number(em[1]);
+                const open = stacks[s.endN].pop();
+                if (open != null) { s.loopStart = open; this.program[open].loopEnd = i; }
+            }
+        }
     }
 
     run(text) {
@@ -464,6 +513,32 @@ export class GcodeExecutionEngine {
         }
 
         if (/^\s*[();]/.test(step.raw.trim())) {
+            this.ip += 1;
+            return false;
+        }
+
+        // WHILE <cond> DOn — pre-matched to its ENDn at load. Enter the body if the condition holds,
+        // otherwise jump past the matching END. (Unmatched WHILE: just enter, the cap guards runaways.)
+        if (step.whileN != null) {
+            if (step.loopEnd != null && !this._evaluateCondition(step.whileCond)) this.ip = step.loopEnd + 1;
+            else this.ip += 1;
+            return false;
+        }
+        // ENDn — loop back to its WHILE to re-test the condition.
+        if (step.endN != null) {
+            this.ip = step.loopStart != null ? step.loopStart : this.ip + 1;
+            return false;
+        }
+
+        // IF <cond> THEN <assignment|GOTO> — inline conditional (distinct from the IF…GOTO form below).
+        const ifThen = line.match(/^IF\s+(.+?)\s+THEN\s+(.+)$/i);
+        if (ifThen) {
+            if (this._evaluateCondition(ifThen[1].trim().replace(/^\[|\]$/g, ''))) {
+                const stmt = ifThen[2].trim();
+                const g = stmt.match(/^GOTO\s*(\d+)$/i);
+                if (g && this.labels.has(Number.parseInt(g[1], 10))) { this.ip = this.labels.get(Number.parseInt(g[1], 10)); return false; }
+                if (/^#/.test(stmt)) this._handleAssignment(stmt);
+            }
             this.ip += 1;
             return false;
         }

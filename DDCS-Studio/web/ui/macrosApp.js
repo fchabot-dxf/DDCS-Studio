@@ -9,9 +9,10 @@ import { makeClient } from '../shared/js/client.js';
 import * as camPack from '../data/camPack.js';
 import { bmpDataUrl } from '../data/bmp.js';
 import { openIconEditor } from './iconEditor.js';
-import { slotFromOp, sharedSub } from '../data/opToSlot.js';
+import { slotFromOp } from '../data/opToSlot.js';
 import { auditMacroVars } from '../data/varMap.js';
 import { makeZip, downloadBytes } from '../data/zip.js';
+import { createPreviewPanel } from '../viz/createPreviewPanel.js';
 
 let _wired = false;
 
@@ -45,7 +46,7 @@ export function initMacrosApp() {
                 <div class="settings-section">
                     <div class="settings-section-title">CAM PACK BUILDER</div>
                     <div class="settings-hint">Author a DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's CAM page — to share with the community. Each slot = a <b>form</b> + a <b>macro</b> that reads the form live (the <code>#2600+</code> mirrors). Studio auto-allocates the shared <code>#1100–1499</code> form params and flags collisions. <i>Phase 1: form designer + macro + plain export. Icons + eng-merge install come next.</i></div>
-                    <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + shared subs + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button><button class="toolbar-btn settings-io" id="cam_subs" title="Export the shared per-hole subs (M_drillhole / M_borehole) to the editor — install once on the controller; every generated slot's ➕ Add op calls them.">⬇ Shared subs</button></div>
+                    <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button></div>
                     <div id="cam_validate" class="settings-hint" style="margin-top:6px;"></div>
                     <div id="cam_slots" style="margin-top:6px;"></div>
                 </div>
@@ -201,7 +202,7 @@ export function initMacrosApp() {
                 <div class="settings-row" style="margin-top:4px;"><button class="toolbar-btn settings-io" data-act="addf">＋ Add field</button><button class="toolbar-btn settings-io" data-act="refresh" title="Re-scan the macro body's #2600 mirror reads and regenerate the field list — keeps any default/range you've edited.">🔄 Refresh fields from macro</button><span style="flex:1"></span><select class="cam-op"><option value="drill">Drill</option><option value="bore">Bore</option><option value="slot">Slot</option></select><select class="cam-op-pat"><option value="circle">bolt circle</option><option value="grid">grid</option><option value="line">line</option><option value="rect">rectangle</option></select><button class="toolbar-btn settings-io" data-act="addop" title="Generate an op into this slot — fills a blank slot, or APPENDS another op (multi-op: drill + bore on the same pattern).">➕ Add op</button></div>
                 <textarea class="cs" data-f="body" spellcheck="false" placeholder="macro body — declare fields as  #1=#2600 ;Label [mm] =0 [min~max]  then reference each Var (#1, #2 …)" style="width:100%; height:130px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${camEsc(slot.body)}</textarea>
                 ${(() => { const a = auditMacroVars(slot.body); return a.danger.length ? `<div class="settings-hint" style="color:#ff6b6b; margin-top:4px;">⚠ macro writes persistent vars — ${a.danger.map(camEsc).join('; ')}</div>` : ''; })()}
-                <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button></div>
+                <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="sim" title="Run this slot's macro in the simulator with each field seeded from its default — verify the toolpath before publishing.">▶ Simulate</button><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button></div>
             </div>`;
         }).join('');
     }
@@ -240,6 +241,35 @@ export function initMacrosApp() {
             img.src = blobUrl;
         } catch (e) { alert('Palette icon failed: ' + (e && e.message ? e.message : e)); }
     }
+    // Simulate a slot: run its macro through the shared preview panel with the #2600 mirrors SEEDED from each
+    // field's default (mirror = #param + 1500). Lets the pack author verify the toolpath before publishing —
+    // the same engine + 2D/3D view the editor preview uses, in a throwaway modal.
+    function simulateSlot(slot) {
+        if (window.ddcsStopPreview) window.ddcsStopPreview();   // only one engine runs at a time
+        const macro = camPack.slotMacro(slot);
+        const seed = new Map();
+        (slot.fields || []).forEach((f) => { const v = Number(f.def); seed.set(camPack.mirrorVar(f.idx), Number.isFinite(v) ? v : 0); });
+        const overlay = document.createElement('div');
+        overlay.className = 'cam-sim-overlay';
+        overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center;';
+        overlay.innerHTML = `<div style="width:min(1100px,92vw); height:min(760px,88vh); background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px; display:flex; flex-direction:column; overflow:hidden;">
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--border);">
+                <b style="flex:1">▶ Simulate — ${camEsc(slot.name || ('CAM slot ' + slot.slot))}</b>
+                <span class="settings-hint" style="margin:0">form values seeded from field defaults</span>
+                <button class="toolbar-btn settings-io" data-sim-close>✕ Close</button>
+            </div>
+            <div class="cam-sim-host" style="flex:1; position:relative; min-height:0;"></div>
+        </div>`;
+        document.body.appendChild(overlay);
+        const panel = createPreviewPanel(overlay.querySelector('.cam-sim-host'), { getGcode: () => macro, createVarStore: () => new Map(seed) });
+        panel.setActive(true);
+        const close = () => { try { panel.stop(); panel.setActive(false); } catch (_) { /* noop */ } overlay.remove(); document.removeEventListener('keydown', onKey); };
+        const onKey = (e) => { if (e.key === 'Escape') close(); };
+        overlay.querySelector('[data-sim-close]').addEventListener('click', close);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        document.addEventListener('keydown', onKey);
+    }
+
     const camHost = q('cam_slots');
     if (camHost) {
         camHost.addEventListener('input', (e) => {
@@ -281,6 +311,7 @@ export function initMacrosApp() {
                 slot.fields = scanned.map((s, i) => { const e = byIdx.get(s.idx); return e ? { ...e, label: s.label || e.label, var: s.var || e.var } : { ...s, var: s.var || ('#' + (i + 1)) }; });
                 saveCamPack(); renderCamBuilder();
             }
+            else if (a === 'sim') { simulateSlot(slot); }
             else if (a === 'exp') { insertToEditor('( ===== eng form lines — MERGE into the controller eng language file ===== )\n' + camPack.slotEng(slot) + '\n\n' + camPack.slotMacro(slot)); }
         });
     }
@@ -289,37 +320,30 @@ export function initMacrosApp() {
     const nextSlotNum = () => { const base = (_camPack.meta && _camPack.meta.baseSlot) || 22; const used = new Set(_camPack.slots.map((s) => +s.slot)); let n = base; while (used.has(n)) n++; return n; };
     const _camAddSlot = q('cam_add_slot');
     if (_camAddSlot) _camAddSlot.addEventListener('click', () => { _camPack.slots.push({ slot: nextSlotNum(), name: 'New slot', fields: [], body: '' }); saveCamPack(); renderCamBuilder(); });
-    const _camSubs = q('cam_subs');
-    if (_camSubs) _camSubs.addEventListener('click', () => insertToEditor('( ===== shared per-hole subs — install ONCE (slib-m / O-subs); every generated CAM slot calls them ===== )\n\n' + sharedSub('drill') + '\n' + sharedSub('bore')));
-
-    // Pack export: bundle the whole pack into a USB-ready .zip (CAM/ folder + eng-merge + shared subs + README).
+    // Pack export: bundle the whole pack into a USB-ready .zip (CAM/ folder + eng-merge + README).
     const packBytes = (dataUrl) => { const bin = atob(String(dataUrl || '').split(',')[1] || ''); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
-    const readmeText = (hasSubs, name) => [name, '',
+    const readmeText = (name) => [name, '',
         'INSTALL (DDCS Expert / M350):',
         '1. Copy the CAM/ folder onto a FAT32 USB stick.',
         '2. Power off the controller, insert the USB, power on, wait for restart.',
         '3. F2 -> Program -> F1 (select U-disk) -> cursor on the CAM folder -> F4 (copy to local).',
         '   Macros MUST run from internal storage — running from USB silently does nothing.',
         '4. MERGE eng-additions.txt into the controller eng (and chs) language file — do NOT replace it.',
-        hasSubs ? '5. APPEND slib-additions.nc to slib-m.nc, then REBOOT so the shared subs load.' : '',
-        '', 'The new operations then appear on the CAM page.'].filter((x) => x !== '').join('\n') + '\n';
+        '', 'The new operations then appear on the CAM page.'].join('\n') + '\n';
     const _camExport = q('cam_export_pack');
     if (_camExport) _camExport.addEventListener('click', () => {
         if (!_camPack.slots.length) { alert('No slots to export — add a slot first.'); return; }
         const v = camPack.validatePack(_camPack);
         if (!v.ok && !confirm('This pack has problems:\n\n' + v.errors.join('\n') + '\n\nExport anyway?')) return;
-        const files = [], eng = [], subs = new Set();
+        const files = [], eng = [];
         _camPack.slots.forEach((slot) => {
             files.push({ name: `CAM/macro_cam${slot.slot}.nc`, data: camPack.slotMacro(slot) });
             if (slot.icon && slot.icon.data) files.push({ name: `CAM/cam${slot.slot}.bmp`, data: packBytes(slot.icon.data) });
             eng.push(`( ===== cam${slot.slot} — ${slot.name || ''} ===== )`, camPack.slotEng(slot), '');
-            if (/\bM_borehole\b/.test(slot.body)) subs.add('bore');
-            if (/\bM_drillhole\b/.test(slot.body)) subs.add('drill');
         });
         files.push({ name: 'eng-additions.txt', data: '( MERGE these lines into the controller eng/chs language file — do NOT replace it. )\n\n' + eng.join('\n') });
-        if (subs.size) files.push({ name: 'slib-additions.nc', data: '( APPEND these shared subs to slib-m.nc, then REBOOT so they load. )\n\n' + [...subs].map((m) => sharedSub(m)).join('\n') });
         const name = (_camPack.meta && _camPack.meta.name) || 'CAM pack';
-        files.push({ name: 'README.txt', data: readmeText(subs.size > 0, name) });
+        files.push({ name: 'README.txt', data: readmeText(name) });
         downloadBytes(name.replace(/[^\w-]+/g, '_') + '.zip', makeZip(files));
     });
     renderCamBuilder();

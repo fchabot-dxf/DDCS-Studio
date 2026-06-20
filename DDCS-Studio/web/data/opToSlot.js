@@ -3,10 +3,13 @@
  *
  * This is the wizard→CAM bridge ("Add from op"): instead of hand-entering form fields, pick an op + pattern
  * and get a filled slot — form fields (label/units/default/min/max/var) + a small, EDITABLE macro body that
- * reads the #2600 mirrors and calls a shared per-hole sub (M_drillhole / M_borehole). The author then tweaks.
+ * reads the #2600 mirrors and cuts each hole inline. The author then tweaks.
  *
- * Per the project priority (friendliness/customization first): one small per-slot loop per pattern + a shared
- * cut sub — no monolithic dispatcher. See the cam-menu-architecture memory + docs/CAM-MENU-RESEARCH.md.
+ * Per the project priority (friendliness/customization first): one small SELF-CONTAINED per-slot loop per
+ * pattern, with the per-hole cut inlined — no shared sub to install, no monolithic dispatcher. DDCS has no
+ * named M-codes (M-codes are numeric: M15 → O10015), so a "sub" would be a numeric O-program the operator must
+ * install separately — fragile and easy to forget; inlining keeps every slot runnable on its own.
+ * See the cam-menu-architecture memory + docs/CAM-MENU-RESEARCH.md.
  */
 import { nextParam, mirrorVar } from './camPack.js';
 
@@ -63,45 +66,51 @@ const PATTERN_FIELDS = { circle: ['dia', 'count', 'startAngle'], grid: ['cols', 
 const HOLE_FIELDS = { drill: ['holeDia', 'depth', 'peck'], bore: ['holeDia', 'toolDia', 'depth', 'pitch'] };
 const PATTERN_LABEL = { circle: 'bolt circle', grid: 'grid', line: 'line', rect: 'rectangle' };
 
-/** The shared per-hole sub text (installed once; the slot macros call it). Reads working vars #30+ at current X/Y. */
-export function sharedSub(method) {
+/** The inline per-hole cut at the CURRENT X/Y — no named sub (DDCS has no named M-codes). `doN` is the DO/END
+ *  number for the cut's own inner loop; it must be deeper than the surrounding pattern loop's nesting (the cut
+ *  sits inside DO1 → use DO2, inside DO2 → use DO3). Uses scratch #40/#41 only (volatile, never persisted). */
+function cutLines(method, v, doN) {
     if (method === 'bore') {
-        // Position-INDEPENDENT (called centred at each hole): incremental XY ring so it works at any centre.
-        return ['( M_borehole — bore ONE hole centred at the current X/Y. Reads #30=holeDia #31=toolDia',
-            '  #32=depth #33=pitch #34=feed #35=clearance. Ring-step, no helical G3. Assumes holeDia >= toolDia. )',
-            '#40=[#30-#31]/2          ;cut radius', '#41=0',
-            'G90 G0 Z#35', 'G91 G0 X#40 Y0          ;out to cut radius (relative to centre)',
-            'WHILE #41 LT #32 DO1', '  #41=#41+#33', '  IF #41 GT #32 THEN #41=#32',
-            '  G90 G1 Z[-#41] F#34', '  G91 G3 X0 Y0 I[-#40] J0 F#34   ;full circle', 'END1',
-            'G90 G0 Z#35', 'G91 G0 X[-#40] Y0       ;back to centre', 'G90', 'M99'].join('\n') + '\n';
+        // Ring-step: plunge in Z (G1) then a planar full-circle G3 at that depth — no helical G3. holeDia >= toolDia.
+        return ['( bore one hole at current X/Y — ring-step down, no helical G3. Assumes hole Ø >= tool Ø. )',
+            `#40=[${v.holeDia}-${v.toolDia}]/2   ;cut radius`, '#41=0',
+            `G90 G0 Z${v.clearance}`, 'G91 G0 X#40 Y0   ;out to cut radius (relative to centre)',
+            `WHILE #41 LT ${v.depth} DO${doN}`, `  #41=#41+${v.pitch}`, `  IF #41 GT ${v.depth} THEN #41=${v.depth}`,
+            `  G90 G1 Z[-#41] F${v.feed}`, `  G91 G3 X0 Y0 I[-#40] J0 F${v.feed}   ;full circle`, `END${doN}`,
+            `G90 G0 Z${v.clearance}`, 'G91 G0 X[-#40] Y0   ;back to centre', 'G90'];
     }
-    return ['( M_drillhole — peck-drill ONE hole at the current X/Y. Reads #30=holeDia #31=depth',
-        '  #32=peck #33=feed #34=clearance )',
-        '#41=0', 'G90 G0 Z#34',
-        'WHILE #41 LT #31 DO1', '  #41=#41+#32', '  IF #41 GT #31 THEN #41=#31',
-        '  G1 Z[-#41] F#33', '  G0 Z#34   ;full retract to clear chips', 'END1',
-        'M99'].join('\n') + '\n';
+    return ['( peck-drill one hole at current X/Y — full retract each peck to clear chips )',
+        '#41=0', `G90 G0 Z${v.clearance}`,
+        `WHILE #41 LT ${v.depth} DO${doN}`, `  #41=#41+${v.peck}`, `  IF #41 GT ${v.depth} THEN #41=${v.depth}`,
+        `  G1 Z[-#41] F${v.feed}`, `  G0 Z${v.clearance}   ;full retract to clear chips`, `END${doN}`];
 }
 
-/** The pattern loop body (uses the var map; positions each point + calls the shared sub `call`). */
-function loopBody(pattern, v, call) {
+const indent = (lines, pad) => lines.map((l) => pad + l);
+
+/** The pattern loop body (uses the var map; positions each point + inlines the per-hole cut). */
+function loopBody(pattern, v, method) {
     if (pattern === 'circle') {
         return ['#50=0', `WHILE #50 LT ${v.count} DO1`, `  #51=${v.startAngle}+#50*360/${v.count}`,
-            `  G0 X[${v.posX}+[${v.dia}/2]*COS[#51]] Y[${v.posY}+[${v.dia}/2]*SIN[#51]]`, `  ${call}`, '  #50=#50+1', 'END1'].join('\n');
+            `  G0 X[${v.posX}+[${v.dia}/2]*COS[#51]] Y[${v.posY}+[${v.dia}/2]*SIN[#51]]`,
+            ...indent(cutLines(method, v, 2), '  '), '  #50=#50+1', 'END1'].join('\n');
     }
     if (pattern === 'line') {
         return ['#50=0', `WHILE #50 LT ${v.count} DO1`,
-            `  G0 X[${v.posX}+#50*${v.spacing}*COS[${v.angle}]] Y[${v.posY}+#50*${v.spacing}*SIN[${v.angle}]]`, `  ${call}`, '  #50=#50+1', 'END1'].join('\n');
+            `  G0 X[${v.posX}+#50*${v.spacing}*COS[${v.angle}]] Y[${v.posY}+#50*${v.spacing}*SIN[${v.angle}]]`,
+            ...indent(cutLines(method, v, 2), '  '), '  #50=#50+1', 'END1'].join('\n');
     }
     if (pattern === 'grid') {
         return ['#52=0', `WHILE #52 LT ${v.rows} DO1`, '  #50=0', `  WHILE #50 LT ${v.cols} DO2`,
-            `    G0 X[${v.posX}+#50*${v.dx}] Y[${v.posY}+#52*${v.dy}]`, `    ${call}`, '    #50=#50+1', '  END2', '  #52=#52+1', 'END1'].join('\n');
+            `    G0 X[${v.posX}+#50*${v.dx}] Y[${v.posY}+#52*${v.dy}]`,
+            ...indent(cutLines(method, v, 3), '    '), '    #50=#50+1', '  END2', '  #52=#52+1', 'END1'].join('\n');
     }
     // rect perimeter: top+bottom rows (nx each), then interior left+right columns (ny, skip shared corners)
     return ['#50=0', `WHILE #50 LT ${v.nx} DO1`, `  #53=${v.posX}+${v.w}*#50/[${v.nx}-1]`,
-        `  G0 X#53 Y${v.posY}`, `  ${call}`, `  G0 X#53 Y[${v.posY}+${v.h}]`, `  ${call}`, '  #50=#50+1', 'END1',
+        `  G0 X#53 Y${v.posY}`, ...indent(cutLines(method, v, 2), '  '),
+        `  G0 X#53 Y[${v.posY}+${v.h}]`, ...indent(cutLines(method, v, 2), '  '), '  #50=#50+1', 'END1',
         '#52=1', `WHILE #52 LT [${v.ny}-1] DO1`, `  #54=${v.posY}+${v.h}*#52/[${v.ny}-1]`,
-        `  G0 X${v.posX} Y#54`, `  ${call}`, `  G0 X[${v.posX}+${v.w}] Y#54`, `  ${call}`, '  #52=#52+1', 'END1'].join('\n');
+        `  G0 X${v.posX} Y#54`, ...indent(cutLines(method, v, 2), '  '),
+        `  G0 X[${v.posX}+${v.w}] Y#54`, ...indent(cutLines(method, v, 2), '  '), '  #52=#52+1', 'END1'].join('\n');
 }
 
 /**
@@ -116,7 +125,8 @@ export function slotFromOp(method, pattern, used = new Set(), varOffset = 0) {
     const fields = order.map((key, i) => {
         const idx = nextParam(taken); if (idx != null) taken.add(idx);
         const s = SPEC[key];
-        const def = key === 'holeDia' && method === 'drill' ? 6 : s.def;
+        // Bore needs hole Ø > tool Ø (else the cut radius is 0); drill bores at tool Ø.
+        const def = key === 'holeDia' ? (method === 'bore' ? 12 : 6) : s.def;
         return { key, idx, var: '#' + (varOffset + i + 1), label: s.label, units: s.units, def, min: s.min, max: s.max, type: s.type };
     });
     const v = {}; fields.forEach((f) => { v[f.key] = f.var; });
@@ -125,15 +135,10 @@ export function slotFromOp(method, pattern, used = new Set(), varOffset = 0) {
         const body = [`( ${std.label} )`, ...reads, '', std.body(v)].join('\n');
         return { name: std.label, fields, body };
     }
-    const call = method === 'bore' ? 'M_borehole' : 'M_drillhole';
-    // copy the hole params (+ feed/clearance) into the sub's working vars #30+, then run the pattern loop.
-    const wv = method === 'bore'
-        ? `#30=${v.holeDia} #31=${v.toolDia} #32=${v.depth} #33=${v.pitch} #34=${v.feed} #35=${v.clearance}   ;-> ${call} working vars (#30-#35, scratch)`
-        : `#30=${v.holeDia} #31=${v.depth} #32=${v.peck} #33=${v.feed} #34=${v.clearance}   ;-> ${call} working vars (#30-#34, scratch)`;
     // The body IS the scannable macro: structured mirror-read header (so "Refresh fields" can re-derive the
-    // form) + working-var copy + the pattern loop. All scratch vars (#1-#54) are < #500 = safe/volatile.
+    // form) + the pattern loop with the per-hole cut inlined. All scratch vars (#1-#54) are < #500 = safe/volatile.
     const reads = fields.map((f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`);
-    const body = [`( ${method} ${PATTERN_LABEL[pattern]} — needs the ${call} sub installed )`, ...reads, '', wv, loopBody(pattern, v, call)].join('\n');
+    const body = [`( ${method} ${PATTERN_LABEL[pattern]} — self-contained, no sub to install )`, ...reads, '', loopBody(pattern, v, method)].join('\n');
     const name = method === 'bore' ? `Bore — ${PATTERN_LABEL[pattern]}` : `Drill — ${PATTERN_LABEL[pattern]}`;
     return { name, fields, body };
 }

@@ -2234,7 +2234,6 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="general" data-target="set_tab_compose">Editor</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_program">Program</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_macros">Macros</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_gateway">Gateway</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
@@ -2400,23 +2399,7 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
-                <!-- GENERAL: MACROS (custom M-codes + K-buttons; part of the profile) -->
-                <div id="set_tab_macros" style="display:none">
-                    <div class="settings-section">
-                        <div class="settings-section-title">CUSTOM M-CODES</div>
-                        <div class="settings-hint">Macros called <b>from a program</b> \u2014 O100nn \u21C4 <b>M<i>nn</i></b> (e.g. M15 tool-break check). Build one with a wizard in Studio, then <b>\uFF0B Add from editor</b>. <b>Generate</b> wraps it as the installable O100nn block. Saved with your Profile.</div>
-                        <div id="mcodes_list"></div>
-                        <div class="settings-row" style="margin-top:8px;">
-                            <button class="toolbar-btn settings-io" id="mcodes_add_editor">\uFF0B Add from editor</button>
-                            <button class="toolbar-btn settings-io" id="mcodes_add_blank">\uFF0B Add blank</button>
-                        </div>
-                    </div>
-                    <div class="settings-section">
-                        <div class="settings-section-title">K-BUTTONS (K1\u2013K7)</div>
-                        <div class="settings-hint">The 7 panel buttons \u2014 each runs <b>key-<i>N</i>.nc</b> when pressed. Type/paste a body or <b>\u21EA From editor</b>, then <b>Generate</b> for the install file. Empty = unused.</div>
-                        <div id="kbuttons_list"></div>
-                    </div>
-                </div>
+                <!-- (Macros + CAM Builder promoted to the MACROS main tab \u2014 see ui/macrosApp.js) -->
 
                 <!-- GENERAL: ABOUT -->
                 <div id="set_tab_about" style="display:none">
@@ -3697,209 +3680,6 @@ function wireSettingsOverlay(ov) {
       }
     }));
   }
-  function macrosArr() {
-    return _ddcsSettings.macros || (_ddcsSettings.macros = []);
-  }
-  function editorText() {
-    const e = document.getElementById("editor");
-    return e ? e.value : "";
-  }
-  function macroFileText(m) {
-    const name = (m.name || "macro").trim();
-    const body = String(m.body || "").replace(/\r/g, "").replace(/\s+$/, "");
-    const t = m.trigger || {};
-    const hasEnd = /\b(M99|M30|M0?2)\b/.test(body);
-    if (t.kind === "mcode") {
-      const n = Math.max(0, parseInt(t.code, 10) || 0);
-      return `O${1e4 + n} ( ${name} \u2014 M${n} )
-${body}${hasEnd ? "" : "\nM99"}
-`;
-    }
-    if (t.kind === "kbutton") {
-      const k = Math.min(7, Math.max(1, parseInt(t.key, 10) || 1));
-      return `( save as key-${k}.nc on SYSDISK \u2014 K${k} button )
-${body}${hasEnd ? "" : "\nM30"}
-`;
-    }
-    return `( save as ${(name || "macro").replace(/[^\w-]+/g, "_")}.nc )
-${body}${hasEnd ? "" : "\nM30"}
-`;
-  }
-  const insertToEditor = (txt) => {
-    const em = window.ddcsStudio && window.ddcsStudio.editorManager || window.editorManager;
-    if (em && typeof em.insert === "function") em.insert(txt);
-    else alert("Editor not available.");
-  };
-  const findKbtn = (k) => macrosArr().find((m) => (m.trigger || {}).kind === "kbutton" && (m.trigger || {}).key === k);
-  const ensureKbtn = (k) => {
-    let m = findKbtn(k);
-    if (!m) {
-      m = { name: "", trigger: { kind: "kbutton", key: k }, body: "" };
-      macrosArr().push(m);
-    }
-    return m;
-  };
-  async function pushMcode(m) {
-    const n = parseInt((m.trigger || {}).code, 10) || 0;
-    const oNum = "O" + (1e4 + n);
-    if (!confirm(`Merge M${n} (${oNum}) into the controller's macro library (slib-m.nc)?
-
-The existing slib-m.nc is backed up first (slib-m.nc.bak). You must REBOOT the controller afterward for it to load.`)) return;
-    try {
-      const cur = await makeClient().readSysfile("slib-m.nc");
-      if (!cur || cur.ok === false) {
-        alert("Could not read slib-m.nc \u2014 needs the gateway/desktop app + a connected controller." + (cur && cur.error ? "\n(" + cur.error + ")" : ""));
-        return;
-      }
-      if (new RegExp("(^|\\s)" + oNum + "(\\s|$)").test(cur.content || "")) {
-        alert(`${oNum} is already in slib-m.nc \u2014 remove it on the controller first so it isn't duplicated, then push again.`);
-        return;
-      }
-      const res = await makeClient().writeSysfile("slib-m.nc", "\n" + macroFileText(m), "append");
-      if (res && res.ok) alert(`Merged ${oNum} (M${n}) into slib-m.nc${res.backup ? " \u2014 backup " + res.backup : ""}.
-
-Reboot the controller to load it; then M${n} is callable from a program.`);
-      else alert("Push failed: " + (res && res.error || "unknown"));
-    } catch (err) {
-      alert("Push failed: " + (err && err.message ? err.message : err));
-    }
-  }
-  async function pushKbutton(k, m) {
-    if (!confirm(`Write key-${k}.nc to the controller (the K${k} button)?
-
-The existing key-${k}.nc is backed up first (key-${k}.nc.bak).`)) return;
-    try {
-      const res = await makeClient().writeSysfile("key-" + k + ".nc", macroFileText(m), "write");
-      if (res && res.ok) alert(`Wrote key-${k}.nc${res.backup ? " \u2014 backup " + res.backup : ""}.
-Press K${k} to run it (reboot if the controller doesn't pick it up).`);
-      else alert("Push failed: " + (res && res.error || "needs the gateway/desktop app + a connected controller"));
-    } catch (err) {
-      alert("Push failed: " + (err && err.message ? err.message : err));
-    }
-  }
-  function renderMcodes() {
-    const host = q("mcodes_list");
-    if (!host) return;
-    const rows = macrosArr().map((m, i) => ({ m, i })).filter((x) => (x.m.trigger || {}).kind === "mcode");
-    if (!rows.length) {
-      host.innerHTML = '<div class="settings-hint">No custom M-codes yet \u2014 \u201C\uFF0B Add from editor\u201D or \u201C\uFF0B Add blank\u201D.</div>';
-      return;
-    }
-    host.innerHTML = rows.map(({ m, i }) => `<div class="macro-card" data-i="${i}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
-            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                <label style="font-size:11px; color:var(--text-dim);">M<input type="number" class="mc-f" data-f="num" value="${(m.trigger || {}).code != null ? m.trigger.code : 15}" min="0" max="99" style="width:52px; margin-left:2px;"></label>
-                <input class="mc-f" data-f="name" value="${String(m.name || "").replace(/"/g, "&quot;")}" placeholder="Name" style="flex:1; min-width:120px;">
-                <span class="mc-o" style="font-size:10px; color:var(--text-dim);">\u2192 O${1e4 + (parseInt((m.trigger || {}).code, 10) || 0)}</span>
-            </div>
-            <textarea class="mc-f" data-f="body" spellcheck="false" placeholder="macro body (G-code)" style="width:100%; height:110px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${String(m.body || "").replace(/</g, "&lt;")}</textarea>
-            <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="gen">\u2B07 Generate</button><button class="toolbar-btn settings-io" data-act="push">\u2B06 Push to controller</button><span style="flex:1"></span><button class="op-btn" data-act="del" title="Delete">\u2715</button></div>
-        </div>`).join("");
-  }
-  function renderKbuttons() {
-    const host = q("kbuttons_list");
-    if (!host) return;
-    let html = "";
-    for (let k = 1; k <= 7; k++) {
-      const m = findKbtn(k);
-      html += `<div class="kbtn-row" data-k="${k}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <b style="width:30px;">K${k}</b>
-                    <input class="kb-f" data-f="name" value="${m ? String(m.name || "").replace(/"/g, "&quot;") : ""}" placeholder="(unused)" style="flex:1;">
-                    <span style="font-size:10px; color:var(--text-dim);">key-${k}.nc</span>
-                </div>
-                <textarea class="kb-f" data-f="body" spellcheck="false" placeholder="button macro body" style="width:100%; height:80px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${m ? String(m.body || "").replace(/</g, "&lt;") : ""}</textarea>
-                <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="ked">\u21EA From editor</button><button class="toolbar-btn settings-io" data-act="kgen">\u2B07 Generate</button><button class="toolbar-btn settings-io" data-act="kpush">\u2B06 Push</button><span style="flex:1"></span><button class="op-btn" data-act="kclr" title="Clear">\u2715</button></div>
-            </div>`;
-    }
-    host.innerHTML = html;
-  }
-  const mch = q("mcodes_list");
-  if (mch) {
-    mch.addEventListener("input", (e) => {
-      const c2 = e.target.closest(".macro-card");
-      if (!c2 || !e.target.dataset.f) return;
-      const m = macrosArr()[+c2.dataset.i];
-      if (!m) return;
-      const f = e.target.dataset.f;
-      if (f === "name") m.name = e.target.value;
-      else if (f === "body") m.body = e.target.value;
-      else if (f === "num") {
-        m.trigger = m.trigger || { kind: "mcode" };
-        m.trigger.kind = "mcode";
-        m.trigger.code = parseInt(e.target.value, 10) || 0;
-        const s = c2.querySelector(".mc-o");
-        if (s) s.textContent = "\u2192 O" + (1e4 + m.trigger.code);
-      }
-      saveSettings();
-    });
-    mch.addEventListener("click", (e) => {
-      const c2 = e.target.closest(".macro-card");
-      if (!c2) return;
-      const i = +c2.dataset.i;
-      const a = e.target.dataset.act;
-      if (a === "del") {
-        macrosArr().splice(i, 1);
-        saveSettings();
-        renderMcodes();
-      } else if (a === "gen") insertToEditor(macroFileText(macrosArr()[i]));
-      else if (a === "push") pushMcode(macrosArr()[i]);
-    });
-  }
-  const kbh = q("kbuttons_list");
-  if (kbh) {
-    kbh.addEventListener("input", (e) => {
-      const r = e.target.closest(".kbtn-row");
-      if (!r || !e.target.dataset.f) return;
-      const m = ensureKbtn(+r.dataset.k);
-      if (e.target.dataset.f === "name") m.name = e.target.value;
-      else m.body = e.target.value;
-      saveSettings();
-    });
-    kbh.addEventListener("click", (e) => {
-      const r = e.target.closest(".kbtn-row");
-      if (!r) return;
-      const k = +r.dataset.k;
-      const a = e.target.dataset.act;
-      if (a === "ked") {
-        ensureKbtn(k).body = editorText().trim();
-        saveSettings();
-        renderKbuttons();
-      } else if (a === "kgen") {
-        const m = findKbtn(k);
-        if (!m || !String(m.body).trim()) {
-          alert("K" + k + " is empty.");
-          return;
-        }
-        insertToEditor(macroFileText(m));
-      } else if (a === "kpush") {
-        const m = findKbtn(k);
-        if (!m || !String(m.body).trim()) {
-          alert("K" + k + " is empty.");
-          return;
-        }
-        pushKbutton(k, m);
-      } else if (a === "kclr") {
-        const i = macrosArr().findIndex((x) => (x.trigger || {}).kind === "kbutton" && (x.trigger || {}).key === k);
-        if (i >= 0) macrosArr().splice(i, 1);
-        saveSettings();
-        renderKbuttons();
-      }
-    });
-  }
-  const _mcAddEd = q("mcodes_add_editor");
-  if (_mcAddEd) _mcAddEd.addEventListener("click", () => {
-    macrosArr().push({ name: "New M-code", trigger: { kind: "mcode", code: 15 }, body: editorText().trim() });
-    saveSettings();
-    renderMcodes();
-  });
-  const _mcAddBlank = q("mcodes_add_blank");
-  if (_mcAddBlank) _mcAddBlank.addEventListener("click", () => {
-    macrosArr().push({ name: "New M-code", trigger: { kind: "mcode", code: 15 }, body: "" });
-    saveSettings();
-    renderMcodes();
-  });
-  renderMcodes();
-  renderKbuttons();
   const genTnc = q("atc_gen_tnc");
   if (genTnc) genTnc.addEventListener("click", () => {
     const nc = generateToolChangeNc(_ddcsSettings.atc, getOutputs());
@@ -3936,7 +3716,6 @@ Press K${k} to run it (reboot if the controller doesn't pick it up).`);
     "set_tab_compose",
     "set_tab_variables",
     "set_tab_program",
-    "set_tab_macros",
     "set_tab_feedback",
     "set_tab_gateway",
     "set_tab_cloud",
@@ -5487,8 +5266,12 @@ function tokenizeWords(line) {
       const letter = ch.toUpperCase();
       i += 1;
       let value = "";
-      while (i < n && !isLetter(line[i])) {
-        value += line[i];
+      let depth = 0;
+      while (i < n && !(depth === 0 && isLetter(line[i]))) {
+        const c2 = line[i];
+        if (c2 === "[") depth += 1;
+        else if (c2 === "]") depth = Math.max(0, depth - 1);
+        value += c2;
         i += 1;
       }
       words.push({ letter, value: value.trim() });
@@ -5824,6 +5607,23 @@ var GcodeExecutionEngine = class _GcodeExecutionEngine {
       if (gotoMatch) {
         return;
       }
+      const whileMatch = stripped.match(/^WHILE\s+(.+?)\s+DO\s*[123]\s*$/i);
+      if (whileMatch) {
+        if (!validateCondition(whileMatch[1].trim().replace(/^\[|\]$/g, ""))) {
+          reportError(lineIndex, "Invalid WHILE condition syntax");
+        }
+        return;
+      }
+      if (/^END\s*[123]\s*$/i.test(stripped)) {
+        return;
+      }
+      const ifThenMatch = stripped.match(/^IF\s+(.+?)\s+THEN\s+(.+)$/i);
+      if (ifThenMatch) {
+        if (!validateCondition(ifThenMatch[1].trim().replace(/^\[|\]$/g, ""))) {
+          reportError(lineIndex, "Invalid IF condition syntax");
+        }
+        return;
+      }
       if (/^(M30|M02|M2|M99)\b/i.test(stripped)) {
         return;
       }
@@ -5900,6 +5700,37 @@ var GcodeExecutionEngine = class _GcodeExecutionEngine {
     this.program = program;
     this.labels = labels;
     this.totalLines = totalLines;
+    this._matchLoops();
+  }
+  /**
+   * Pre-match `WHILE <cond> DOn` ↔ `ENDn` (n = 1|2|3, FANUC-style) by structural nesting, tagging each
+   * step so the executor can jump in O(1): the WHILE gets `whileN`/`whileCond`/`loopEnd` (program index of
+   * its END), the END gets `endN`/`loopStart` (index of its WHILE). DDCS macros loop with WHILE/END, which
+   * the IF/GOTO core can't express — this is what lets a generated CAM slot macro run in the simulator.
+   */
+  _matchLoops() {
+    const stacks = { 1: [], 2: [], 3: [] };
+    for (let i = 0; i < this.program.length; i++) {
+      const s = this.program[i];
+      const line = s && s.stripped;
+      if (!line) continue;
+      const wm = line.match(/^WHILE\b\s*(.+?)\s*\bDO\s*([123])\b\s*$/i);
+      if (wm) {
+        s.whileN = Number(wm[2]);
+        s.whileCond = wm[1].trim().replace(/^\[|\]$/g, "");
+        stacks[s.whileN].push(i);
+        continue;
+      }
+      const em = line.match(/^END\s*([123])\b\s*$/i);
+      if (em) {
+        s.endN = Number(em[1]);
+        const open = stacks[s.endN].pop();
+        if (open != null) {
+          s.loopStart = open;
+          this.program[open].loopEnd = i;
+        }
+      }
+    }
   }
   run(text) {
     this.stop();
@@ -6096,11 +5927,15 @@ var GcodeExecutionEngine = class _GcodeExecutionEngine {
       return;
     }
     if (typeof this.onPositionChange === "function") {
-      this.onPositionChange({
-        x: mv.from.x + (mv.to.x - mv.from.x) * t,
-        y: mv.from.y + (mv.to.y - mv.from.y) * t,
-        z: mv.from.z + (mv.to.z - mv.from.z) * t
-      });
+      let p;
+      if (mv.path) {
+        const segs = mv.path.length - 1, f = t * segs, i = Math.min(segs - 1, Math.floor(f)), u = f - i;
+        const a = mv.path[i], b2 = mv.path[i + 1];
+        p = { x: a.x + (b2.x - a.x) * u, y: a.y + (b2.y - a.y) * u, z: a.z + (b2.z - a.z) * u };
+      } else {
+        p = { x: mv.from.x + (mv.to.x - mv.from.x) * t, y: mv.from.y + (mv.to.y - mv.from.y) * t, z: mv.from.z + (mv.to.z - mv.from.z) * t };
+      }
+      this.onPositionChange(p);
     }
     this._nextDelayMs = 16;
   }
@@ -6175,6 +6010,29 @@ var GcodeExecutionEngine = class _GcodeExecutionEngine {
       return false;
     }
     if (/^\s*[();]/.test(step.raw.trim())) {
+      this.ip += 1;
+      return false;
+    }
+    if (step.whileN != null) {
+      if (step.loopEnd != null && !this._evaluateCondition(step.whileCond)) this.ip = step.loopEnd + 1;
+      else this.ip += 1;
+      return false;
+    }
+    if (step.endN != null) {
+      this.ip = step.loopStart != null ? step.loopStart : this.ip + 1;
+      return false;
+    }
+    const ifThen = line.match(/^IF\s+(.+?)\s+THEN\s+(.+)$/i);
+    if (ifThen) {
+      if (this._evaluateCondition(ifThen[1].trim().replace(/^\[|\]$/g, ""))) {
+        const stmt = ifThen[2].trim();
+        const g = stmt.match(/^GOTO\s*(\d+)$/i);
+        if (g && this.labels.has(Number.parseInt(g[1], 10))) {
+          this.ip = this.labels.get(Number.parseInt(g[1], 10));
+          return false;
+        }
+        if (/^#/.test(stmt)) this._handleAssignment(stmt);
+      }
       this.ip += 1;
       return false;
     }
@@ -6482,7 +6340,27 @@ var GcodeExecutionEngine = class _GcodeExecutionEngine {
         this.pos = target;
       }
     } else {
-      this.stats.skipped += 1;
+      const off = { I: wm.I, J: wm.J, K: wm.K, R: wm.R };
+      const anyNull = ["I", "J", "K", "R"].some((k) => wm[k] != null && !Number.isFinite(wm[k]));
+      const pts = anyNull ? null : arcPoints(this.pos, target, off, effMotion, this.plane, this.unitScale);
+      if (!pts || pts.length < 3) {
+        this.stats.skipped += 1;
+      } else {
+        let len = 0;
+        for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y, pts[i].z - pts[i - 1].z);
+        const rate = this.feedVal > 0 ? this.feedVal : 600;
+        const realMs = rate > 0 ? len / rate * 6e4 : 0;
+        const speed = this.simSpeed > 0 ? this.simSpeed : 1;
+        if (realMs / speed > 50) {
+          this._move = { from: { ...pts[0] }, to: { ...pts[pts.length - 1] }, path: pts, durMs: realMs, elapsed: 0, last: null, touchName: null };
+          this._setStatus(`${effMotion === 2 ? "G2 cw" : "G3 ccw"} arc ${len.toFixed(1)} mm at F${rate} \u2014 ${(realMs / 1e3).toFixed(1)} s${speed !== 1 ? ` @ ${speed}\xD7` : ""}`, true);
+          this._nextDelayMs = 16;
+          this.ip += 1;
+          return false;
+        }
+        this.pos = target;
+        if (typeof this.onPositionChange === "function") this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
+      }
     }
     this.ip += 1;
     return false;
