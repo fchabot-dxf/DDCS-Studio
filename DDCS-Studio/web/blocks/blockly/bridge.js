@@ -34,7 +34,9 @@ const SELECTS = {
     dist: ['abs', 'inc'],
     stop: ['M0', 'M1'],
     cycle: ['drill', 'dwell', 'peck', 'bore'],
-    state: ['on', 'off']
+    state: ['on', 'off'],
+    pattern: ['grid', 'line', 'circle', 'rect'],   // array (drill/bore) hole pattern
+    ramp: ['step', 'helix']                          // bore stepdown
 };
 const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/\s+/g, '');
 export const FN = (field) => field.toUpperCase();   // Blockly input/field name from an op field
@@ -94,7 +96,9 @@ const DESCRIPTIONS = {
     dir: "Spindle direction (CW / CCW)",
     coolant: "Coolant (Flood / Mist / Off)",
     tool: "Tool Number (T)",
-    value: "Value to set"
+    value: "Value to set",
+    pattern: "Hole pattern: grid, line, circle (bolt) or rect perimeter",
+    ramp: "Bore stepdown: step (plunge + flat circle) or helix (linearized G1 ramp)"
 };
 const getDesc = (f) => DESCRIPTIONS[f.toLowerCase()] || `The ${f} parameter`;
 
