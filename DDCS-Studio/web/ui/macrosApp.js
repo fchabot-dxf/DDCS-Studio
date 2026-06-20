@@ -9,6 +9,7 @@ import { makeClient } from '../shared/js/client.js';
 import * as camPack from '../data/camPack.js';
 import { bmpDataUrl } from '../data/bmp.js';
 import { openIconEditor } from './iconEditor.js';
+import { slotFromOp, sharedSub } from '../data/opToSlot.js';
 
 let _wired = false;
 
@@ -42,7 +43,15 @@ export function initMacrosApp() {
                 <div class="settings-section">
                     <div class="settings-section-title">CAM PACK BUILDER</div>
                     <div class="settings-hint">Author a DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's CAM page — to share with the community. Each slot = a <b>form</b> + a <b>macro</b> that reads the form live (the <code>#2600+</code> mirrors). Studio auto-allocates the shared <code>#1100–1499</code> form params and flags collisions. <i>Phase 1: form designer + macro + plain export. Icons + eng-merge install come next.</i></div>
-                    <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button></div>
+                    <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add blank slot</button></div>
+                    <div class="settings-row" style="margin-top:4px;">
+                        <label>From op
+                            <select id="cam_op"><option value="drill">Drill</option><option value="bore">Bore</option></select>
+                        </label>
+                        <select id="cam_op_pat"><option value="circle">bolt circle</option><option value="grid">grid</option><option value="line">line</option><option value="rect">rectangle</option></select>
+                        <button class="toolbar-btn settings-io" id="cam_add_op">➕ Add from op</button>
+                        <button class="toolbar-btn settings-io" id="cam_subs" title="Export the shared per-hole subs (M_drillhole / M_borehole) to the editor — install once on the controller; every generated slot calls them.">⬇ Shared subs</button>
+                    </div>
                     <div id="cam_validate" class="settings-hint" style="margin-top:6px;"></div>
                     <div id="cam_slots" style="margin-top:6px;"></div>
                 </div>
@@ -262,8 +271,17 @@ export function initMacrosApp() {
     }
     const _camName = q('cam_pack_name');
     if (_camName) _camName.addEventListener('input', () => { _camPack.meta = _camPack.meta || {}; _camPack.meta.name = _camName.value; saveCamPack(); });
+    const nextSlotNum = () => { const base = (_camPack.meta && _camPack.meta.baseSlot) || 22; const used = new Set(_camPack.slots.map((s) => +s.slot)); let n = base; while (used.has(n)) n++; return n; };
     const _camAddSlot = q('cam_add_slot');
-    if (_camAddSlot) _camAddSlot.addEventListener('click', () => { const base = (_camPack.meta && _camPack.meta.baseSlot) || 22; const used = new Set(_camPack.slots.map((s) => +s.slot)); let n = base; while (used.has(n)) n++; _camPack.slots.push({ slot: n, name: 'New slot', fields: [], body: '' }); saveCamPack(); renderCamBuilder(); });
+    if (_camAddSlot) _camAddSlot.addEventListener('click', () => { _camPack.slots.push({ slot: nextSlotNum(), name: 'New slot', fields: [], body: '' }); saveCamPack(); renderCamBuilder(); });
+    const _camAddOp = q('cam_add_op');
+    if (_camAddOp) _camAddOp.addEventListener('click', () => {
+        const gen = slotFromOp(q('cam_op').value, q('cam_op_pat').value, camPack.usedParams(_camPack));
+        _camPack.slots.push({ slot: nextSlotNum(), name: gen.name, fields: gen.fields, body: gen.body });
+        saveCamPack(); renderCamBuilder();
+    });
+    const _camSubs = q('cam_subs');
+    if (_camSubs) _camSubs.addEventListener('click', () => insertToEditor('( ===== shared per-hole subs — install ONCE (slib-m / O-subs); every generated CAM slot calls them ===== )\n\n' + sharedSub('drill') + '\n' + sharedSub('bore')));
     renderCamBuilder();
 }
 
