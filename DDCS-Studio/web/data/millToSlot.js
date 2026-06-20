@@ -52,20 +52,22 @@ const SURFACE_FIELDS = [
     SPINDLE_FIELD,
 ];
 
-/** Shared raster params from the allocated field map. */
-const rasterOpts = (v, bounds, wall) => ({
+/** Shared raster params from the allocated field map. `dir` = 'x'|'y' raster row axis. */
+const rasterOpts = (v, bounds, wall, dir) => ({
     ...bounds, depth: v.depth, stepdown: v.stepdown, stepover: v.stepover,
-    feed: v.feed, plunge: v.plunge, clearance: v.clearance, wall,
+    feed: v.feed, plunge: v.plunge, clearance: v.clearance, wall, dir: dir === 'y' ? 'y' : 'x',
 });
+/** Human label for a raster direction, for the body header comment. */
+const dirLabel = (dir) => (dir === 'y' ? 'rows ∥ Y' : 'rows ∥ X');
 
 /**
  * Build the "Pocket (rect)" CAM slot — raster-clear a rectangular pocket layer by layer, then a wall finish
  * pass. Parametric: rows + Z layers recompute from the form. Tool-centre region inset by the tool radius.
  */
-export function pocketSlot(used = new Set(), varOffset = 0) {
+export function pocketSlot(used = new Set(), varOffset = 0, dir = 'x') {
     const { fields, v } = allocFields(POCKET_FIELDS, used, varOffset);
     const body = [
-        '( Rectangular pocket — raster clear + wall finish, layer by layer. Runs at the WCS origin corner. )',
+        `( Rectangular pocket — raster clear (${dirLabel(dir)}) + wall finish, layer by layer. Runs at the WCS origin corner. )`,
         '( Spindle must already be running. Edit #20/#21 to offset the pocket within the WCS. )',
         ...fields.map(readLine),
         '',
@@ -82,7 +84,7 @@ export function pocketSlot(used = new Set(), varOffset = 0) {
         'IF #26 LE #25 GOTO 8',
         '',
         ...spindleOn(v.rpm),
-        ...rasterClear(rasterOpts(v, { x0: '#23', x1: '#24', y0: '#25', y1: '#26' }, true)),
+        ...rasterClear(rasterOpts(v, { x0: '#23', x1: '#24', y0: '#25', y1: '#26' }, true, dir)),
         ...spindleOff(),
         'GOTO 9',
         '( error )',
@@ -98,10 +100,11 @@ export function pocketSlot(used = new Set(), varOffset = 0) {
  * Build the "Pocket (circle)" CAM slot — concentric-ring clear of a round pocket, layer by layer. Tool-centre
  * paths inset by the tool radius so the finished bore Ø = the form value. Runs at the WCS origin (centre).
  */
-export function circlePocketSlot(used = new Set(), varOffset = 0) {
+export function circlePocketSlot(used = new Set(), varOffset = 0, arc = 'G3') {
     const { fields, v } = allocFields(CIRCLE_POCKET_FIELDS, used, varOffset);
+    const dirName = arc === 'G2' ? 'CW / conventional' : 'CCW / climb';
     const body = [
-        '( Round pocket — concentric-ring clear, layer by layer. Runs at the WCS origin (pocket centre). )',
+        `( Round pocket — concentric-ring clear (${dirName}), layer by layer. Runs at the WCS origin (pocket centre). )`,
         '( Spindle must already be running. Edit #20/#21 to offset the centre within the WCS. )',
         ...fields.map(readLine),
         '',
@@ -111,7 +114,7 @@ export function circlePocketSlot(used = new Set(), varOffset = 0) {
         'IF #22 LE 0 GOTO 8',
         '',
         ...spindleOn(v.rpm),
-        ...ringClear({ cx: '#20', cy: '#21', maxR: '#22', depth: v.depth, stepdown: v.stepdown, stepover: v.stepover, feed: v.feed, plunge: v.plunge, clearance: v.clearance }),
+        ...ringClear({ cx: '#20', cy: '#21', maxR: '#22', depth: v.depth, stepdown: v.stepdown, stepover: v.stepover, feed: v.feed, plunge: v.plunge, clearance: v.clearance, arc: arc === 'G2' ? 'G2' : 'G3' }),
         ...spindleOff(),
         'GOTO 9',
         '( error )',
@@ -128,10 +131,10 @@ export function circlePocketSlot(used = new Set(), varOffset = 0) {
  * radius inset (the area is the tool-CENTRE sweep, so the tool overhangs the edges and faces the whole top)
  * and NO wall pass. Shallow Z (skim). Runs at the WCS origin corner; spindle assumed running.
  */
-export function surfacingSlot(used = new Set(), varOffset = 0) {
+export function surfacingSlot(used = new Set(), varOffset = 0, dir = 'x') {
     const { fields, v } = allocFields(SURFACE_FIELDS, used, varOffset);
     const body = [
-        '( Surface / face mill — raster the top flat. Tool-centre sweeps Area X x Y; the tool overhangs the edges. )',
+        `( Surface / face mill — raster the top flat (${dirLabel(dir)}). Tool-centre sweeps Area X x Y; the tool overhangs the edges. )`,
         '( Spindle must already be running. Edit #20/#21 to offset within the WCS. )',
         ...fields.map(readLine),
         '',
@@ -146,7 +149,7 @@ export function surfacingSlot(used = new Set(), varOffset = 0) {
         'IF #26 LE #25 GOTO 8',
         '',
         ...spindleOn(v.rpm),
-        ...rasterClear(rasterOpts(v, { x0: '#23', x1: '#24', y0: '#25', y1: '#26' }, false)),
+        ...rasterClear(rasterOpts(v, { x0: '#23', x1: '#24', y0: '#25', y1: '#26' }, false, dir)),
         ...spindleOff(),
         'GOTO 9',
         '( error )',

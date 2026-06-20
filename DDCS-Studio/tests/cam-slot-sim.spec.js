@@ -244,6 +244,37 @@ test('surfacing slot: rasters the full area with no inset and no wall pass', asy
   expect(r.minZ, 'shallow skim').toBeCloseTo(-0.5, 2);
 });
 
+test('mill variants: raster direction rotates the rows (same coverage); circle arc direction is selectable', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { pocketSlot, circlePocketSlot } = await import('/data/millToSlot.js');
+    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
+    const trace = (s) => {
+      const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
+      const seed = new Map(); s.fields.forEach((f) => seed.set(mirrorVar(f.idx), Number(f.def)));
+      const t = new GcodeExecutionEngine({ createVarStore: () => new Map(seed) }).trace(macro);
+      return { macro, maxX: t.bounds.maxX, maxY: t.bounds.maxY, minZ: t.bounds.minZ, capped: t.stats.capped };
+    };
+    const py = trace(pocketSlot(new Set(), 0, 'y'));     // raster rows along Y instead of X
+    const cg2 = trace(circlePocketSlot(new Set(), 0, 'G2'));  // conventional rings
+    return {
+      py, cg2maxX: cg2.maxX, cg2cap: cg2.capped,
+      g2arcs: /\bG2 X/.test(cg2.macro), noG3: !/\bG3 X/.test(cg2.macro),
+    };
+  });
+  // Y-raster still clears the whole 80×60 pocket to the inset walls — same coverage, rows just run the other way.
+  expect(r.py.capped).toBe(false);
+  expect(r.py.maxX, 'far X wall still cleared').toBeCloseTo(77, 0);
+  expect(r.py.maxY, 'far Y wall still cleared').toBeCloseTo(57, 0);
+  expect(r.py.minZ, 'full depth').toBeCloseTo(-4, 1);
+  // Circle pocket honours the conventional (G2) arc direction — every ring flips, none left as G3.
+  expect(r.g2arcs, 'G2 rings emitted').toBe(true);
+  expect(r.noG3, 'no G3 ring left when conventional chosen').toBe(true);
+  expect(r.cg2cap).toBe(false);
+  expect(r.cg2maxX, 'still clears to Ø/2 − tool radius').toBeCloseTo(27, 0);
+});
+
 test('cutting slots manage the spindle with the proven Expert forms (M3 S[#var], G04 P ms, M5)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {

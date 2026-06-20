@@ -169,6 +169,26 @@ export function initMacrosApp() {
     let _camPack = loadCamPack();
     const saveCamPack = () => { try { localStorage.setItem(CAMPACK_KEY, JSON.stringify(_camPack)); } catch (e) { /* */ } };
     const camEsc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    // The op's SECOND build-time dropdown is context-aware (no dead greyed control): point pattern for
+    // drill/bore, raster direction for the rect mill ops, arc direction for the round pocket. The probes (and
+    // the standalone slot mill) have no build-time choice — their discrete options are runtime form fields — so
+    // the dropdown is hidden for them. The chosen value is passed to the generator as its variant arg.
+    const SECOND_CTL = {
+        drill:   { title: 'Point pattern the holes are arranged in', opts: [['circle', 'bolt circle'], ['grid', 'grid'], ['line', 'line'], ['rect', 'rectangle']] },
+        bore:    { title: 'Point pattern the bores are arranged in', opts: [['circle', 'bolt circle'], ['grid', 'grid'], ['line', 'line'], ['rect', 'rectangle']] },
+        pocket:  { title: 'Raster direction — which axis the clearing rows run along', opts: [['x', 'rows ∥ X'], ['y', 'rows ∥ Y']] },
+        surface: { title: 'Raster direction — which axis the facing rows run along', opts: [['x', 'rows ∥ X'], ['y', 'rows ∥ Y']] },
+        cpocket: { title: 'Ring direction (CW spindle): climb = CCW/G3, conventional = CW/G2', opts: [['G3', 'climb (G3)'], ['G2', 'conventional (G2)']] },
+    };
+    const secondCtlOpts = (method) => (SECOND_CTL[method] ? SECOND_CTL[method].opts.map(([val, lbl]) => `<option value="${val}">${lbl}</option>`).join('') : '');
+    const secondCtlTitle = (method) => (SECOND_CTL[method] ? SECOND_CTL[method].title : '');
+    // Rebuild the second dropdown's options + tooltip for a method, hiding it when the op has no build-time choice.
+    function applySecondCtl(sel, method) {
+        const has = !!SECOND_CTL[method];
+        sel.innerHTML = secondCtlOpts(method);
+        sel.title = secondCtlTitle(method);
+        sel.style.display = has ? '' : 'none';
+    }
     function renderCamBuilder() {
         const host = q('cam_slots'); if (!host) return;
         const nameEl = q('cam_pack_name'); if (nameEl && document.activeElement !== nameEl) nameEl.value = (_camPack.meta && _camPack.meta.name) || '';
@@ -202,7 +222,7 @@ export function initMacrosApp() {
                     <button class="toolbar-btn settings-io" data-act="icon">🖼 Import BMP</button>
                 </div>
                 <table style="width:100%; font-size:11.5px; margin-top:6px; border-collapse:collapse;"><thead><tr style="color:var(--text-dim); font-size:10px; text-align:left;"><th>Label</th><th>Units</th><th>Default</th><th>Min</th><th>Max</th><th>Var</th><th>#param→#2600</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-                <div class="settings-row" style="margin-top:4px;"><button class="toolbar-btn settings-io" data-act="addf">＋ Add field</button><button class="toolbar-btn settings-io" data-act="refresh" title="Rebuild the field table from the macro's #2600 mirror-read comments — label, units, default and min~max all come from the macro (field type is preserved). Edit a read-line comment, then refresh to apply it.">🔄 Refresh fields from macro</button><span style="flex:1"></span><select class="cam-op"><option value="drill">Drill</option><option value="bore">Bore</option><option value="slot">Slot</option><option value="pocket">Pocket (rect)</option><option value="cpocket">Pocket (circle)</option><option value="surface">Surface / face</option><option value="corner">Probe corner</option><option value="edge">Probe edge</option><option value="zprobe">Probe Z surface</option><option value="inside">Probe inside centre</option><option value="boss">Probe boss centre</option><option value="align">Probe alignment</option></select><select class="cam-op-pat"><option value="circle">bolt circle</option><option value="grid">grid</option><option value="line">line</option><option value="rect">rectangle</option></select><button class="toolbar-btn settings-io" data-act="addop" title="Generate an op into this slot — fills a blank slot, or APPENDS another op (multi-op: drill + bore on the same pattern).">➕ Add op</button></div>
+                <div class="settings-row" style="margin-top:4px;"><button class="toolbar-btn settings-io" data-act="addf">＋ Add field</button><button class="toolbar-btn settings-io" data-act="refresh" title="Rebuild the field table from the macro's #2600 mirror-read comments — label, units, default and min~max all come from the macro (field type is preserved). Edit a read-line comment, then refresh to apply it.">🔄 Refresh fields from macro</button><span style="flex:1"></span><select class="cam-op"><option value="drill">Drill</option><option value="bore">Bore</option><option value="slot">Slot</option><option value="pocket">Pocket (rect)</option><option value="cpocket">Pocket (circle)</option><option value="surface">Surface / face</option><option value="corner">Probe corner</option><option value="edge">Probe edge</option><option value="zprobe">Probe Z surface</option><option value="inside">Probe inside centre</option><option value="boss">Probe boss centre</option><option value="align">Probe alignment</option></select><select class="cam-op-pat" title="${secondCtlTitle('drill')}">${secondCtlOpts('drill')}</select><button class="toolbar-btn settings-io" data-act="addop" title="Generate an op into this slot — fills a blank slot, or APPENDS another op (multi-op: drill + bore on the same pattern).">➕ Add op</button></div>
                 <textarea class="cs" data-f="body" spellcheck="false" placeholder="macro body — declare fields as  #1=#2600 ;Label [mm] =0 [min~max]  then reference each Var (#1, #2 …)" style="width:100%; height:130px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${camEsc(slot.body)}</textarea>
                 ${(() => { const a = auditMacroVars(slot.body); return a.danger.length ? `<div class="settings-hint" style="color:#ff6b6b; margin-top:4px;">⚠ macro writes persistent vars — ${a.danger.map(camEsc).join('; ')}</div>` : ''; })()}
                 <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="sim" title="Run this slot's macro in the simulator with each field seeded from its default — verify the toolpath before publishing.">▶ Simulate</button><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button></div>
@@ -300,12 +320,13 @@ export function initMacrosApp() {
             else if (a === 'icon') { importCamIcon(slot); }
             else if (a === 'delicon') { slot.icon = null; saveCamPack(); renderCamBuilder(); }
             else if (a === 'addop') {
-                const method = card.querySelector('.cam-op').value, pattern = card.querySelector('.cam-op-pat').value;
+                const method = card.querySelector('.cam-op').value, variant = card.querySelector('.cam-op-pat').value;
                 const empty = !(slot.fields && slot.fields.length) && !String(slot.body || '').trim();
                 const off = empty ? 0 : (slot.fields || []).length;
-                // Probe ops (corner/edge, …) are single self-positioning sequences, not point-patterns — they ignore the pattern select.
+                // The second dropdown's value is the op's VARIANT: pattern for drill/bore, raster dir ('x'/'y') for
+                // pocket/surface, arc dir ('G3'/'G2') for the round pocket. Probes ignore it (runtime form fields).
                 const GEN = { corner: cornerSlot, edge: edgeSlot, zprobe: probeZSlot, inside: insideCentreSlot, boss: bossCentreSlot, align: alignmentSlot, pocket: pocketSlot, cpocket: circlePocketSlot, surface: surfacingSlot };
-                const gen = GEN[method] ? GEN[method](camPack.usedParams(_camPack), off) : slotFromOp(method, pattern, camPack.usedParams(_camPack), off);
+                const gen = GEN[method] ? GEN[method](camPack.usedParams(_camPack), off, variant) : slotFromOp(method, variant, camPack.usedParams(_camPack), off);
                 if (empty) {
                     slot.name = gen.name; slot.fields = gen.fields; slot.body = gen.body;
                     // Auto-seed a labelled icon so a fresh slot isn't blank (editable via the icon editor).
@@ -331,11 +352,11 @@ export function initMacrosApp() {
             else if (a === 'sim') { simulateSlot(slot); }
             else if (a === 'exp') { insertToEditor('( ===== eng form lines — MERGE into the controller eng language file ===== )\n' + camPack.slotEng(slot) + '\n\n' + camPack.slotMacro(slot)); }
         });
-        // The pattern selector only applies to point-pattern ops (drill/bore) — grey it for slot/probe ops.
+        // Selecting an op rebuilds its second dropdown into the relevant build-time setting (or hides it).
         camHost.addEventListener('change', (e) => {
             if (!e.target.classList.contains('cam-op')) return;
-            const pat = e.target.parentElement.querySelector('.cam-op-pat');
-            if (pat) pat.disabled = (e.target.value !== 'drill' && e.target.value !== 'bore');
+            const sel = e.target.parentElement.querySelector('.cam-op-pat');
+            if (sel) applySecondCtl(sel, e.target.value);
         });
     }
     const _camName = q('cam_pack_name');
