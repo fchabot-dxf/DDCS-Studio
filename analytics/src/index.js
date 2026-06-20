@@ -41,6 +41,7 @@ export default {
           clip(ev.os, 32),           // blob6: platform
           clip(cf.city, 64),         // blob7: city (edge-derived)
           clip(cf.region, 64),       // blob8: region (edge-derived)
+          clip(ev.dev, 1),           // blob9: "1" = the developer's own traffic (filter out for real users)
         ],
         doubles: [1],                // one event
         indexes: [anon || clip(cf.country, 4)],   // sampling key — spreads by visitor

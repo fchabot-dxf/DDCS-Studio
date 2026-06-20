@@ -119,10 +119,14 @@ def _beacon_launch():
     if "REPLACE-ME" in ANALYTICS_URL or os.environ.get("DDCS_NO_ANALYTICS") == "1":
         return
     try:
+        # dev=1 for your own runs: a non-frozen run (python fairy_gateway.py) or env DDCS_DEV=1 — so your
+        # testing across any PC is filterable out of the numbers. A released exe is frozen → counts as real.
+        is_dev = (not getattr(sys, "frozen", False)) or os.environ.get("DDCS_DEV") == "1"
         body = json.dumps({
             "event": "app_launch", "app": "exe", "id": _install_id(),
             "version": _studio_version(),
             "os": f"{platform.system()} {platform.release()}".strip()[:32],
+            "dev": 1 if is_dev else 0,
         }).encode("utf-8")
         req = urllib.request.Request(ANALYTICS_URL, data=body,
                                      headers={"content-type": "text/plain"}, method="POST")

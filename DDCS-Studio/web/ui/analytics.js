@@ -51,12 +51,26 @@ function isExe() {
   } catch (_) { return false; }
 }
 
+// Visiting any page with "?dev=1" marks THIS browser as the developer's own (persisted across visits);
+// "?dev=0" clears it. Your events are still recorded, but tagged dev=1 so you can filter your own
+// testing out of the numbers (do this once per browser you test from — it's per-browser, not per-network).
+try {
+  const q = new URLSearchParams(location.search);
+  if (q.get('dev') === '1') localStorage.setItem('ddcs_dev', '1');
+  if (q.get('dev') === '0') localStorage.removeItem('ddcs_dev');
+} catch (_) { /* storage blocked — ignore */ }
+
+function isDev() {
+  try { return localStorage.getItem('ddcs_dev') === '1'; } catch (_) { return false; }
+}
+
 export function track(event, name = '') {
   const url = endpoint();
   if (!url || off()) return;
   const body = JSON.stringify({
     event, name, id: anonId(), app: isExe() ? 'exe' : 'web',
     version: version(), os: (navigator.platform || navigator.userAgent || '').slice(0, 32),
+    dev: isDev() ? 1 : 0,
   });
   try {
     // text/plain → a CORS "simple request" (no preflight); fire-and-forget, survives page unload.
