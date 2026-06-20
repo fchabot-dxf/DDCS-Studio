@@ -19,7 +19,7 @@ export function setupGlobalFunctions(app) {
         window.editorManager = app.editorManager;
 
         // Wizard functions
-        window.openWiz = (type) => app.wizardManager.open(type);
+        window.openWiz = (type, variant) => app.wizardManager.open(type, variant);
         window.openCornerWiz = () => app.wizardManager.openCorner();
         window.openMiddleWiz = () => app.wizardManager.openMiddle();
         window.CornerVizAnimator = CornerVizAnimator;

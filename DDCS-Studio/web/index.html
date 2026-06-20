@@ -840,9 +840,9 @@
                     <div><span class="label">SPINDLE RPM</span><input id="d_rpm" value="" title="Overrides the Head's default RPM for this op. Leave blank to use the Head setting. Picking a tool fills this from the library."/></div>
                 </div>
 
-                <span class="section-label">METHOD</span>
+                <span class="section-label" id="d_method_label">METHOD</span>
                 <div class="grid-2">
-                    <div><span class="label">METHOD</span>
+                    <div id="d_method_cell"><span class="label">METHOD</span>
                         <select id="d_method" value="peck">
                             <option value="peck">Peck drill (hole = tool)</option>
                             <option value="helical">Bore (end mill, hole ≥ tool)</option>

@@ -111,6 +111,16 @@ export const drillView = {
     ],
     probeSrcFields: {},   // not a probe wizard — keep the shared controller-source decorator a no-op
 
+    // Variant entries (Drill vs Bore): one form, two menu entries. Lock the method + hide its selector so the
+    // op's identity is fixed by which entry opened it — no toggle to silently turn a drill into a bore.
+    variants: [{ id: 'drill', label: 'Drill / holes' }, { id: 'bore', label: 'Bore / helical' }],
+    applyVariant(variant) {
+        const m = el('d_method');
+        if (m && variant === 'bore') m.value = 'helical';
+        else if (m && variant === 'drill') m.value = 'peck';   // (no variant = edit: keep the seeded method)
+        ['d_method_cell', 'd_method_label'].forEach((id) => { const e = el(id); if (e) e.style.display = 'none'; });
+    },
+
     // Custom params → form (pattern variants: `count` lives in d_count for circle but d_lcount for line, so a
     // flat map can't express it). The inverse of update()'s reads; used by wizardManager._seedForm on edit.
     setForm(p = {}) {

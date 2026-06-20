@@ -161,7 +161,7 @@ export class WizardManager {
         }) || null;
     }
 
-    open(type) {
+    open(type, variant) {
         // play a feedback sound whenever a wizard is opened
         playClick();
         this._activeType = type;   // for the Templates popover (save/load this op's parameter templates)
@@ -205,6 +205,9 @@ export class WizardManager {
         const wizElem = el('wiz_' + type);
         if (wizElem) {
             wizElem.style.display = 'block';
+            // Variant entry: a view may declare identity-splitting variants (e.g. drill vs bore) that share one
+            // form. The view locks the variant param + hides its selector so the menu choice fixes the identity.
+            if (view && typeof view.applyVariant === 'function') view.applyVariant(variant);
             if (view && typeof view.onShow === 'function') view.onShow(this);
             decorateProbeSrc(view);   // controller/Studio source chips (before first generate)
             this.applyProbeDefaults();   // seed probe fields from the global 3D-probe defaults
