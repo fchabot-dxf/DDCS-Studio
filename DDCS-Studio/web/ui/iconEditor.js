@@ -7,15 +7,40 @@
 import { bmpDataUrl } from '../data/bmp.js';
 
 const W = 360, H = 180, ZOOM = 2;
-const TILES = [['corner', 'Corner'], ['edge', 'Edge'], ['middle', 'Middle'], ['align', 'Align']];
-const tileCache = {};
+// Current tileset = the structured viz SVGs; a future custom tileset just adds files here (or a user import).
+const TILESET_FILES = ['cornerViz', 'edgeViz', 'middleViz', 'alignViz'];
+let _tileCache = null;
 
-async function tileDataUri(name) {
-    if (tileCache[name]) return tileCache[name];
-    const resp = await fetch('assets/svg/' + name + 'Viz.svg');
-    let svg = (await resp.text()).replace(/width="100%"/, 'width="465"').replace(/height="100%"/, 'height="465"');
-    const uri = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-    tileCache[name] = uri; return uri;
+// Extract each id'd group from a source SVG as a cropped tile. The full SVG is kept (so transforms / defs
+// stay correct); unrelated id-groups are hidden and the viewBox is cropped to the group's rendered bbox,
+// measured in a hidden 465px mount (1px = 1 user unit, so the client rect maps straight to viewBox coords).
+async function extractTiles(file) {
+    const resp = await fetch('assets/svg/' + file + '.svg');
+    const text = (await resp.text()).replace(/width="100%"/, 'width="465"').replace(/height="100%"/, 'height="465"');
+    const mount = document.createElement('div');
+    mount.style.cssText = 'position:absolute;left:-99999px;top:0;width:465px;height:465px;overflow:hidden;';
+    mount.innerHTML = text; document.body.appendChild(mount);
+    const svg = mount.querySelector('svg'); const tiles = [];
+    try {
+        const sr = svg.getBoundingClientRect();
+        svg.querySelectorAll('g[id]').forEach((g) => {
+            let gr; try { gr = g.getBoundingClientRect(); } catch (e) { return; }
+            if (gr.width < 4 || gr.height < 4) return;
+            const pad = 4, x = gr.left - sr.left - pad, y = gr.top - sr.top - pad;
+            const clone = svg.cloneNode(true);
+            let tgt = null; try { tgt = clone.querySelector('#' + (window.CSS && CSS.escape ? CSS.escape(g.id) : g.id)); } catch (e) { /* */ }
+            if (tgt) clone.querySelectorAll('g[id]').forEach((c) => { if (c !== tgt && !c.contains(tgt) && !tgt.contains(c)) c.style.display = 'none'; });
+            clone.setAttribute('viewBox', `${x.toFixed(1)} ${y.toFixed(1)} ${(gr.width + 2 * pad).toFixed(1)} ${(gr.height + 2 * pad).toFixed(1)}`);
+            clone.removeAttribute('width'); clone.removeAttribute('height');
+            tiles.push({ id: g.id, source: file, uri: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(clone.outerHTML), w: gr.width, h: gr.height });
+        });
+    } finally { document.body.removeChild(mount); }
+    return tiles;
+}
+async function loadAllTiles() {
+    if (_tileCache) return _tileCache;
+    const all = []; for (const f of TILESET_FILES) { try { all.push(...await extractTiles(f)); } catch (e) { /* skip */ } }
+    _tileCache = all; return all;
 }
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -48,6 +73,10 @@ export function openIconEditor(initial, onSave) {
         #iconed-modal .ie-panel{background:var(--panel);color:var(--text-main);border:1px solid var(--border);border-radius:8px;width:min(880px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 14px 48px rgba(0,0,0,.5);}
         #iconed-modal .ie-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;}
         #iconed-modal .ie-head button{background:transparent;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;}
+        #iconed-modal .ie-toolbar{display:flex;gap:6px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);overflow-x:auto;overflow-y:hidden;min-height:58px;}
+        #iconed-modal .ie-tile{flex:0 0 auto;width:48px;height:48px;padding:3px;border:1px solid var(--border);border-radius:5px;background:#000;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+        #iconed-modal .ie-tile:hover{border-color:#0ea5e9;}
+        #iconed-modal .ie-tile img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none;}
         #iconed-modal .ie-body{display:flex;gap:12px;padding:12px 14px;overflow:auto;}
         #iconed-modal .ie-stage{flex:0 0 auto;width:${W * ZOOM}px;height:${H * ZOOM}px;border:1px solid var(--border);background:#000;touch-action:none;}
         #iconed-modal .ie-stage svg{width:100%;height:100%;display:block;}
@@ -65,11 +94,11 @@ export function openIconEditor(initial, onSave) {
     </style>
     <div class="ie-panel">
         <div class="ie-head"><span>🖼 Icon editor — 360×180</span><button data-ie="x">✕</button></div>
+        <div class="ie-toolbar" id="ie_tiles" title="Tileset — click a tile to drop it on the canvas"><span style="font-size:11px;color:var(--text-dim);">Loading tiles…</span></div>
         <div class="ie-body">
             <div class="ie-stage" id="ie_stage"></div>
             <div class="ie-side">
                 <div class="ie-grp"><h4>Add</h4><div class="ie-row">
-                    ${TILES.map(([k, lbl]) => `<button class="toolbar-btn settings-io" data-add="tile" data-tile="${k}">${lbl}</button>`).join('')}
                     <button class="toolbar-btn settings-io" data-add="text">＋ Text</button>
                     <button class="toolbar-btn settings-io" data-add="rect">▭</button>
                     <button class="toolbar-btn settings-io" data-add="line">／</button>
@@ -85,6 +114,20 @@ export function openIconEditor(initial, onSave) {
     document.body.appendChild(m);
     const $ = (id) => m.querySelector('#' + id);
     const stage = $('ie_stage');
+
+    // Tile toolbar: extract the tileset's id-groups and preview each as a clickable thumbnail.
+    loadAllTiles().then((tiles) => {
+        const bar = $('ie_tiles'); if (!bar) return;
+        if (!tiles.length) { bar.innerHTML = '<span style="font-size:11px;color:var(--text-dim);">No tiles found in the current tileset.</span>'; return; }
+        bar.innerHTML = tiles.map((t, i) => `<div class="ie-tile" data-ti="${i}" title="${esc(t.id)}  ·  ${esc(t.source)}"><img src="${t.uri}" alt=""></div>`).join('');
+        bar.querySelectorAll('[data-ti]').forEach((b) => b.addEventListener('click', () => addTile(tiles[+b.dataset.ti])));
+    }).catch(() => { const bar = $('ie_tiles'); if (bar) bar.innerHTML = '<span style="font-size:11px;color:var(--text-dim);">Tileset failed to load.</span>'; });
+
+    function addTile(t) {
+        const aspect = (t.w && t.h) ? t.w / t.h : 1; const h0 = 100, w0 = Math.max(8, Math.round(h0 * aspect));
+        const L = { type: 'tile', tile: t.id, uri: t.uri, x: (W - w0) / 2, y: (H - h0) / 2, w: w0, h: h0, scale: 1, rot: 0, bw: w0, bh: h0 };
+        layers.push(L); sel = layers.length - 1; refresh();
+    }
 
     function renderStage() { stage.innerHTML = stageSvg(layers, sel); }
     function renderLayers() {
@@ -110,14 +153,10 @@ export function openIconEditor(initial, onSave) {
         if (type === 'line' || type === 'arrow') return { w: 120, h: 20 };
         return { w: 90, h: 60 };
     }
-    function applyScale(L) {   // scale stored separately; w/h are the on-stage box (scale baked into w/h on change)
-        // keep simple: w/h are live; scale slider multiplies a stored base. Store base on add.
-    }
-    async function add(type, tile) {
+    function add(type) {
         const s = baseSize(type); const L = { type, x: (W - s.w) / 2, y: (H - s.h) / 2, w: s.w, h: s.h, scale: 1, rot: 0, bw: s.w, bh: s.h };
-        if (type === 'tile') { L.tile = tile; L.uri = await tileDataUri(tile); }
         if (type === 'text') { L.text = 'TEXT'; L.size = 20; L.color = '#ffd23f'; }
-        if (type !== 'tile' && type !== 'text') { L.color = '#33ccff'; L.sw = 3; L.fill = 'none'; }
+        else { L.color = '#33ccff'; L.sw = 3; L.fill = 'none'; }
         layers.push(L); sel = layers.length - 1; refresh();
     }
 
@@ -126,7 +165,7 @@ export function openIconEditor(initial, onSave) {
         const ie = e.target.dataset.ie;
         if (ie === 'x' || ie === 'cancel') { m.remove(); return; }
         if (ie === 'save') { saveIcon(); return; }
-        const addT = e.target.dataset.add; if (addT) { add(addT, e.target.dataset.tile); return; }
+        const addT = e.target.dataset.add; if (addT) { add(addT); return; }
         const li = e.target.closest('.ie-lyr'); if (li) { const i = +li.dataset.li; const mv = e.target.dataset.mv;
             if (mv === 'del') { layers.splice(i, 1); sel = Math.min(sel, layers.length - 1); refresh(); }
             else if (mv === 'up') { if (i < layers.length - 1) { [layers[i], layers[i + 1]] = [layers[i + 1], layers[i]]; sel = i + 1; refresh(); } }
