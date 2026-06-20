@@ -245,6 +245,30 @@ test('cutting slots manage the spindle with the proven Expert forms (M3 S[#var],
   }
 });
 
+test('probe-Z slot: two-pass Z touch down, writes WCS Z so the touch reads as Surface = Z', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { probeZSlot } = await import('/data/probeToSlot.js');
+    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
+    const s = probeZSlot();
+    const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
+    const seed = new Map(); s.fields.forEach((f) => seed.set(mirrorVar(f.idx), Number(f.def)));
+    const t = new GcodeExecutionEngine({ createVarStore: () => new Map(seed) }).trace(macro);
+    const probes = t.segments.filter((g) => g.probe).map((g) => 'Z' + (g.z2 - g.z1 < 0 ? '-' : '+'));
+    const lefts = (macro.match(/\[/g) || []).length, rights = (macro.match(/\]/g) || []).length;
+    return {
+      balanced: lefts === rights, capped: t.stats.capped, probes,
+      // WCS Z offset = trigger − surfaceZ, written to the Z slot of the WCS table (#70+2)
+      wcsMath: /#50=\[#1927-#\d+\]/.test(macro.replace(/\s/g, '')), writesZ: /#73=\[#70\+2\]/.test(macro.replace(/\s/g, '')),
+    };
+  });
+  expect(r.balanced).toBe(true); expect(r.capped).toBe(false);
+  expect(r.probes, 'two-pass Z touch down').toEqual(['Z-', 'Z-']);
+  expect(r.wcsMath, 'WCS Z = trigger − surfaceZ').toBe(true);
+  expect(r.writesZ, 'writes the Z slot of the WCS table').toBe(true);
+});
+
 test('auto-icon renders a valid 360x180 BMP from the op name/kind', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {

@@ -149,6 +149,54 @@ export function cornerSlot(used = new Set(), varOffset = 0) {
     return { name: 'Probe corner', fields, body };
 }
 
+const ZPROBE_FIELDS = [
+    { key: 'wcs', label: 'WCS (0act 1-6 G54-G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
+    { key: 'maxProbe', label: 'Max probe down', units: 'mm', def: 50, min: 1, max: 9999, type: 1 },
+    { key: 'retract', label: 'Retract', units: 'mm', def: 2, min: 0.1, max: 999, type: 1 },
+    { key: 'safeZ', label: 'Safe Z lift', units: 'mm', def: 10, min: 0.1, max: 999, type: 1 },
+    { key: 'surfaceZ', label: 'Surface = Z', units: 'mm', def: 0, min: -9999, max: 9999, type: 1 },
+    { key: 'fast', label: 'Fast feed', units: 'mm/min', def: 200, min: 1, max: 9999, type: 0 },
+    { key: 'slow', label: 'Slow feed', units: 'mm/min', def: 50, min: 1, max: 9999, type: 0 },
+    { key: 'port', label: 'Probe port P', units: '', def: 3, min: 0, max: 99, type: 0 },
+    { key: 'level', label: 'Trigger level L (0 1)', units: '', def: 0, min: 0, max: 1, type: 0 },
+];
+
+/**
+ * Build the "Probe Z surface" CAM slot — touch Z down to a surface (part top or a setter block) and set the
+ * WCS Z datum. Two-pass G31 down; WCS Z = trigger − (trigger − surfaceZ), i.e. the touched point reads as the
+ * `Surface = Z` value (default 0 → touch is Z0). Position the probe over the surface, press Enter.
+ */
+export function probeZSlot(used = new Set(), varOffset = 0) {
+    const { fields, v } = allocFields(ZPROBE_FIELDS, used, varOffset);
+    const body = [
+        '( Probe Z down to a surface → set the WCS Z datum. Position the probe over the surface, press Enter. )',
+        ...fields.map(readLine),
+        '',
+        '( WCS base address — 0 = read the active WCS from #578 )',
+        ...wcsBase(v.wcs),
+        '',
+        `#93=[0-${v.maxProbe}]   ;Z probe target (down)`,
+        `#95=${v.retract}   ;Z retract (up)`,
+        '',
+        `#1505=1   ;Position the probe over the surface, press Enter`,
+        'G91   ( incremental )',
+        ...twoPassProbe('Z', { tgt: '#93', ret: '#95', fast: v.fast, slow: v.slow, port: v.port, level: v.level }),
+        `#50=[${PROBE.Z.result}-${v.surfaceZ}]   ;WCS Z offset so the touch reads as Surface = Z`,
+        ...writeAxis(2, '#50', 'write WCS Z'),
+        `G0 Z${v.safeZ}   ;lift clear`,
+        'G90   ( absolute )',
+        '#1505=-5000   ;Z datum set',
+        'GOTO 2',
+        '( error handler )',
+        'N1',
+        'G90',
+        '#1505=1   ;ERROR: probe did not trigger',
+        'N2',
+        'M30',
+    ].join('\n');
+    return { name: 'Probe Z surface', fields, body };
+}
+
 const EDGE_FIELDS = [
     { key: 'axis', label: 'Axis (0X 1Y)', units: '', def: 0, min: 0, max: 1, type: 0 },
     { key: 'dir', label: 'Direction (0pos 1neg)', units: '', def: 0, min: 0, max: 1, type: 0 },
