@@ -17,6 +17,7 @@ let _tileCache = null;
 // be a whole _token, so plain words aren't truncated) so repeated variants collapse to one. e.g. all of
 // middle_probe_pocket_{X_pos,Y_pos,X_neg,…}_miniprobe → middle_probe_pocket_miniprobe; corner_BL → corner.
 function baseId(id) {
+    if (/^(badge|num|digit)/i.test(id)) return String(id).toLowerCase();   // numbered tiles stay distinct (badge_0..9)
     return String(id).toLowerCase()
         .replace(/[_-](x|y|z)(?=[_-]|$)/g, '_')
         .replace(/[_-](pos|neg|plus|minus|top|bottom|left|right|front|back|up|down|cw|ccw|xy|yx|zfirst|zlast|bl|br|fl|fr|tl|tr|tc|bc|lc|rc|ne|nw|se|sw|[nsew])(?=[_-]|$)/g, '_')
@@ -37,17 +38,20 @@ function isolate(clone, tgt) {
 }
 
 // Extract each id'd group from a source SVG as a cropped tile. The full SVG is kept (so transforms / defs
-// stay correct); unrelated id-groups are hidden and the viewBox is cropped to the group's rendered bbox,
-// measured in a hidden 465px mount (1px = 1 user unit, so the client rect maps straight to viewBox coords).
+// stay correct); unrelated id-groups are hidden and the viewBox is cropped to the group's rendered bbox.
+// The SVG is mounted at its native viewBox size (1px = 1 user unit), so any canvas size works.
 async function extractTiles(file) {
     const resp = await fetch('assets/svg/' + file + '.svg');
-    const text = (await resp.text()).replace(/width="100%"/, 'width="465"').replace(/height="100%"/, 'height="465"');
     const mount = document.createElement('div');
-    mount.style.cssText = 'position:absolute;left:-99999px;top:0;width:465px;height:465px;overflow:hidden;';
-    mount.innerHTML = text; document.body.appendChild(mount);
+    mount.style.cssText = 'position:absolute;left:-99999px;top:0;overflow:hidden;';
+    mount.innerHTML = await resp.text(); document.body.appendChild(mount);
     const svg = mount.querySelector('svg'); const tiles = [];
     const isShape = (el) => /^(path|rect|circle|ellipse|polygon|polyline|line)$/i.test(el.tagName || '');
     try {
+        const vb = (svg.getAttribute('viewBox') || '0 0 465 465').split(/[\s,]+/).map(Number);
+        const vw = vb[2] || 465, vh = vb[3] || 465;          // render at the SVG's native viewBox size → 1 unit = 1px
+        svg.setAttribute('width', vw); svg.setAttribute('height', vh);
+        mount.style.width = vw + 'px'; mount.style.height = vh + 'px';
         const sr = svg.getBoundingClientRect();
         // These viz files are probe-sequence diagrams: the leaf groups are all mini-probes / wcs glyphs, while
         // the actual SHAPES (corner, edge, pocket, boss, quad) are CONTAINER groups. So surface both —
@@ -81,14 +85,10 @@ async function extractTiles(file) {
 async function loadAllTiles() {
     if (_tileCache) return _tileCache;
     const all = []; for (const f of TILESET_FILES) { try { all.push(...await extractTiles(f)); } catch (e) { /* skip */ } }
-    // De-dup across the whole tileset: leaf primitives by TYPE (one mini-probe, one wcs… regardless of which
-    // probe/corner they came from); outline shapes by family (one corner, one pocket, one boss…).
-    const out = [], seenPrim = new Set(), seenFam = new Set();
-    for (const t of all) {
-        const key = t.kind === 'leaf' ? 'p:' + t.prim : 'f:' + t.fam;
-        const seen = t.kind === 'leaf' ? seenPrim : seenFam;
-        if (seen.has(key)) continue; seen.add(key); out.push(t);
-    }
+    // De-dup by family id: unique names stay (a curated tileset keeps every object); auto-variant probe SVGs
+    // still collapse (corner_BL/BR… → corner). Badges are exempt in baseId so badge_0..9 all survive.
+    const out = [], seen = new Set();
+    for (const t of all) { if (seen.has(t.fam)) continue; seen.add(t.fam); out.push(t); }
     _tileCache = out; return out;
 }
 

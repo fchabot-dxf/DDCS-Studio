@@ -3,81 +3,75 @@
   DDCS CAM icon TILESET — source of the editor's tile palette (ui/iconEditor.js → TILESET_FILES).
 
   HOW IT'S USED
-    The editor extracts every leaf <g id="…"> as one tile, cropped to its bounding box. You draw
-    reusable OBJECTS here; in the editor you place / rotate / flip / scale / recolour-by-redraw them
-    to compose 360×180 CAM-menu icons.
+    The editor extracts every leaf <g id="…"> (and loose id'd shapes) as one tile, cropped to its
+    bounding box. You draw reusable OBJECTS here; in the editor you place / rotate / flip / scale them
+    to compose 360×180 CAM-menu icons. These are STARTERS — edit the geometry/colours to your liking.
 
   RULES (so each object extracts as a clean tile)
-    • Keep the root exactly as below: viewBox="0 0 465 465", width/height="100%".
-      The extractor mounts this at 465px, so 1 unit = 1px and crops land correctly. Don't change it.
-    • One object = ONE <g id="name"> of plain shapes (path/rect/circle/line). NO nested <g id> inside
-      an object (a group that contains another id-group is treated as a container, not a tile).
-    • Make each object ONCE. No _BL/_BR or X+/Y- copies — the editor rotates/flips, so duplicates just
-      clutter the palette. One corner, one arrow, one probe.
-    • Style lives on the <g> (children inherit): fill:none; stroke; stroke-width; round caps/joins.
-      Objects render on a BLACK icon background, so use light/coloured strokes (not black).
-    • Self-contained: no shared <defs>/gradients/clipPaths (a cropped tile loses them).
-    • Spread objects out so they're easy to author; overlap is fine for extraction (siblings are hidden
-      per tile) but messy to draw.
-    • Names: stock_rect, bore, boss_round, slot, corner, edge, arrow, arrow_double, crosshair,
-      probe_ball, stylus_side, endmill_top, endmill_side, tool_setter, wcs_origin, axis_arrow,
-      datum_corner, jogpath, touch_spark, dim_line, angle_arc, centerline, plus, minus, bolt_circle …
-      (see the chat list — add the rest following the examples below).
-
-  NOTE: edit this file then RELOAD the page to see changes (tiles are cached per page load).
+    • Keep the root as-is: viewBox="0 0 880 560". The extractor mounts at the viewBox size (1 unit = 1px),
+      so any canvas size works — just keep width/height matching the viewBox aspect (or use 100%).
+    • One object = ONE <g id="name"> of plain shapes (path/rect/circle/line/text). NO nested <g id> inside
+      an object (a group containing another id-group is treated as a container outline, not a primitive).
+    • Make each object ONCE. No _BL/_BR or X+/Y- copies — the editor rotates/flips. EXCEPTION: badge_0..9
+      are kept distinct (the de-dup exempts badge_/num_/digit_ ids).
+    • Style on the <g> (children inherit): fill:none; stroke; stroke-width; round caps/joins. Objects sit on
+      a BLACK icon background → use light/coloured strokes, never black.
+    • Self-contained: no shared <defs>/gradients/clipPaths.
+    • <text> rasterizes fine (default sans-serif). NOTE: edit this file then RELOAD the page to see changes.
 -->
-<svg width="100%" height="100%" viewBox="0 0 465 465" version="1.1"
-     xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-     style="stroke-linejoin:round;stroke-linecap:round;">
+<svg width="100%" height="100%" viewBox="0 0 880 560" version="1.1"
+     xmlns="http://www.w3.org/2000/svg" style="stroke-linejoin:round;stroke-linecap:round;">
 
-    <!-- ============ ROW 1 ============ -->
+    <!-- ===================== ROW 1 — stock / features (top view) ===================== -->
+    <g id="stock_rect" style="fill:none;stroke:#ffffff;stroke-width:4;"><rect x="23" y="33" width="64" height="54"/></g>
+    <g id="stock_round" style="fill:none;stroke:#ffffff;stroke-width:4;"><circle cx="165" cy="60" r="30"/></g>
+    <g id="pocket_rect" style="fill:none;stroke:#ffffff;stroke-width:4;"><rect x="243" y="33" width="64" height="54" rx="9"/></g>
+    <g id="bore" style="fill:none;stroke:#ffffff;stroke-width:4;"><circle cx="385" cy="60" r="28"/><path d="M385,46 L385,74 M371,60 L399,60"/></g>
+    <g id="boss_rect" style="fill:none;stroke:#ffffff;stroke-width:4;"><rect x="463" y="31" width="64" height="58"/><rect x="473" y="41" width="44" height="38"/></g>
+    <g id="boss_round" style="fill:none;stroke:#ffffff;stroke-width:4;"><circle cx="605" cy="60" r="30"/><circle cx="605" cy="60" r="17"/></g>
+    <g id="slot" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M692,70 A10,10 0 0 1 692,50 L738,50 A10,10 0 0 1 738,70 Z"/></g>
+    <g id="step" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M798,87 L798,53 L825,53 L825,33 L852,33"/></g>
 
-    <!-- Rectangular stock / plate (top view) -->
-    <g id="stock_rect" style="fill:none;stroke:#ffffff;stroke-width:4;">
-        <rect x="20" y="100" width="76" height="60"/>
-    </g>
+    <!-- ===================== ROW 2 — reference / annotation ===================== -->
+    <g id="corner" style="fill:none;stroke:#ffffff;stroke-width:5;"><path d="M30,177 L30,123 L84,123"/></g>
+    <g id="edge" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M138,150 L192,150 M146,150 L142,160 M162,150 L158,160 M178,150 L174,160"/></g>
+    <g id="datum_corner" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M250,177 L250,127 L304,127"/><circle cx="250" cy="177" r="4" style="fill:#ffffff;stroke:none;"/></g>
+    <g id="bolt_circle" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="385" cy="150" r="28"/><g style="fill:#ffffff;stroke:none;"><circle cx="413" cy="150" r="4"/><circle cx="399" cy="174" r="4"/><circle cx="371" cy="174" r="4"/><circle cx="357" cy="150" r="4"/><circle cx="371" cy="126" r="4"/><circle cx="399" cy="126" r="4"/></g></g>
+    <g id="angle_arc" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M470,175 L525,175 M470,175 L512,140 M500,175 A30,30 0 0 0 494,159"/></g>
+    <g id="centerline" style="fill:none;stroke:#ffffff;stroke-width:3;stroke-dasharray:16 5 3 5;"><path d="M575,150 L635,150"/></g>
+    <g id="dim_line" style="fill:none;stroke:#ffffff;stroke-width:3;"><path d="M690,150 L740,150 M690,140 L690,160 M740,140 L740,160 M700,144 L690,150 L700,156 M730,144 L740,150 L730,156"/></g>
+    <g id="crosshair" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M825,118 L825,182 M793,150 L857,150"/><circle cx="825" cy="150" r="9"/></g>
 
-    <!-- Round hole / bore (top view) with centre mark -->
-    <g id="bore" style="fill:none;stroke:#ffffff;stroke-width:4;">
-        <circle cx="174" cy="130" r="37"/>
-        <path d="M174,116 L174,144 M160,130 L188,130"/>
-    </g>
+    <!-- ===================== ROW 3 — motion / datum / signs ===================== -->
+    <g id="arrow" style="fill:none;stroke:#33ccff;stroke-width:4;"><path d="M28,240 L82,240 M70,230 L83,240 L70,250"/></g>
+    <g id="arrow_double" style="fill:none;stroke:#33ccff;stroke-width:4;"><path d="M140,240 L190,240 M152,230 L140,240 L152,250 M178,230 L190,240 L178,250"/></g>
+    <g id="jogpath" style="fill:none;stroke:#33ccff;stroke-width:3;stroke-dasharray:7 5;"><path d="M248,257 L275,257 L275,223 L302,223"/></g>
+    <g id="touch_spark" style="fill:none;stroke:#ffd23f;stroke-width:3;"><path d="M385,215 L385,265 M360,240 L410,240 M367,222 L403,258 M403,222 L367,258"/><circle cx="385" cy="240" r="5" style="fill:#ffd23f;stroke:none;"/></g>
+    <g id="plus" style="fill:none;stroke:#ffffff;stroke-width:5;"><path d="M495,218 L495,262 M473,240 L517,240"/></g>
+    <g id="minus" style="fill:none;stroke:#ffffff;stroke-width:5;"><path d="M583,240 L627,240"/></g>
+    <g id="wcs_origin" style="fill:none;stroke-width:4;"><path d="M695,262 L745,262 M736,255 L746,262 L736,269" style="stroke:#ff6b6b;fill:none;"/><path d="M695,262 L695,215 M688,224 L695,214 L702,224" style="stroke:#4ade80;fill:none;"/><circle cx="695" cy="262" r="4" style="fill:#ffffff;stroke:none;"/></g>
+    <g id="axis_arrow" style="fill:none;stroke:#33ccff;stroke-width:4;"><path d="M798,240 L852,240 M840,230 L853,240 L840,250 M798,232 L798,248"/></g>
 
-    <!-- Outside corner bracket — rotate/flip in the editor for the other 3 corners -->
-    <g id="corner" style="fill:none;stroke:#ffffff;stroke-width:5;">
-        <path d="M256,168 L256,92 L324,92"/>
-    </g>
+    <!-- ===================== ROW 4 — probe / tool (some side views) ===================== -->
+    <g id="probe_ball" style="fill:none;stroke:#ff6b6b;stroke-width:3;"><circle cx="55" cy="330" r="28"/><circle cx="55" cy="330" r="17"/><circle cx="55" cy="330" r="8" style="fill:#ff6b6b;stroke:none;"/></g>
+    <g id="stylus_side" style="fill:none;stroke:#cfd6dd;stroke-width:4;"><rect x="155" y="300" width="20" height="8"/><path d="M165,308 L165,348"/><circle cx="165" cy="356" r="9" style="fill:#ff6b6b;stroke:#ff6b6b;"/></g>
+    <g id="endmill_top" style="fill:none;stroke:#cfd6dd;stroke-width:4;"><circle cx="275" cy="330" r="28"/><path d="M255,310 L295,350 M295,310 L255,350"/></g>
+    <g id="endmill_side" style="fill:none;stroke:#cfd6dd;stroke-width:4;"><rect x="372" y="304" width="26" height="38"/><path d="M372,342 L378,350 L384,342 L390,350 L396,342"/></g>
+    <g id="tool_setter" style="fill:none;stroke:#cfd6dd;stroke-width:4;"><rect x="468" y="342" width="54" height="14"/><rect x="488" y="322" width="14" height="20"/><path d="M495,322 L495,314"/></g>
+    <g id="surface" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M580,346 L630,346 M605,312 L605,344 M598,334 L605,345 L612,334"/></g>
+    <g id="hatch" style="fill:none;stroke:#ffffff;stroke-width:3;"><path d="M695,352 L718,329 M705,352 L728,329 L728,329 M715,352 L738,329"/></g>
+    <g id="ring" style="fill:none;stroke:#ffffff;stroke-width:4;"><circle cx="825" cy="330" r="26"/><circle cx="825" cy="330" r="6" style="fill:#ffffff;stroke:none;"/></g>
 
-    <!-- Direction arrow — the workhorse; rotate for X+/X-/Y+/Y- etc. -->
-    <g id="arrow" style="fill:none;stroke:#33ccff;stroke-width:4;">
-        <path d="M372,130 L430,130 M418,119 L431,130 L418,141"/>
-    </g>
-
-    <!-- ============ ROW 2 ============ -->
-
-    <!-- Centre / target crosshair -->
-    <g id="crosshair" style="fill:none;stroke:#ffffff;stroke-width:4;">
-        <path d="M58,286 L58,354 M24,320 L92,320"/>
-        <circle cx="58" cy="320" r="9"/>
-    </g>
-
-    <!-- Touch-probe ruby tip (top view) — concentric rings + core -->
-    <g id="probe_ball" style="fill:none;stroke:#ff6b6b;stroke-width:3;">
-        <circle cx="174" cy="320" r="26"/>
-        <circle cx="174" cy="320" r="17"/>
-        <circle cx="174" cy="320" r="8" style="fill:#ff6b6b;stroke:none;"/>
-    </g>
-
-    <!-- WCS / datum origin — X (red) + Y (green) axis triad with origin dot -->
-    <g id="wcs_origin" style="fill:none;stroke-width:4;">
-        <path d="M268,350 L330,350 M320,343 L331,350 L320,357" style="stroke:#ff6b6b;fill:none;"/>
-        <path d="M268,350 L268,288 M261,298 L268,287 L275,298" style="stroke:#4ade80;fill:none;"/>
-        <circle cx="268" cy="350" r="4" style="fill:#ffffff;stroke:none;"/>
-    </g>
-
-    <!-- Dimension line with end ticks + inward arrowheads -->
-    <g id="dim_line" style="fill:none;stroke:#ffffff;stroke-width:3;">
-        <path d="M378,320 L434,320 M378,309 L378,331 M434,309 L434,331 M389,314 L378,320 L389,326 M423,314 L434,320 L423,326"/>
-    </g>
+    <!-- ===================== ROW 5 & 6 — number badges (kept distinct from de-dup) ===================== -->
+    <g id="badge_0" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="55" cy="435" r="20"/><text x="55" y="444" style="fill:#ffffff;stroke:none;font:bold 26px sans-serif;text-anchor:middle;">0</text></g>
+    <g id="badge_1" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="165" cy="435" r="20"/><text x="165" y="444" style="fill:#ffffff;stroke:none;font:bold 26px sans-serif;text-anchor:middle;">1</text></g>
+    <g id="badge_2" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="275" cy="435" r="20"/><text x="275" y="444" style="fill:#ffffff;stroke:none;font:bold 26px sans-serif;text-anchor:middle;">2</text></g>
+    <g id="badge_3" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="385" cy="435" r="20"/><text x="385" y="444" style="fill:#ffffff;stroke:none;font:bold 26px sans-serif;text-anchor:middle;">3</text></g>
+    <g id="badge_4" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="495" cy="435" r="20"/><text x="495" y="444" style="fill:#ffffff;stroke:none;font:bold 26px sans-serif;text-anchor:middle;">4</text></g>
+    <g id="badge_5" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="605" cy="435" r="20"/><text x="605" y="444" style="fill:#ffffff;stroke:none;font:bold 26px sans-serif;text-anchor:middle;">5</text></g>
+    <g id="badge_6" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="715" cy="435" r="20"/><text x="715" y="444" style="fill:#ffffff;stroke:none;font:bold 26px sans-serif;text-anchor:middle;">6</text></g>
+    <g id="badge_7" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="825" cy="435" r="20"/><text x="825" y="444" style="fill:#ffffff;stroke:none;font:bold 26px sans-serif;text-anchor:middle;">7</text></g>
+    <g id="badge_8" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="55" cy="510" r="20"/><text x="55" y="519" style="fill:#ffffff;stroke:none;font:bold 26px sans-serif;text-anchor:middle;">8</text></g>
+    <g id="badge_9" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="165" cy="510" r="20"/><text x="165" y="519" style="fill:#ffffff;stroke:none;font:bold 26px sans-serif;text-anchor:middle;">9</text></g>
 
 </svg>
