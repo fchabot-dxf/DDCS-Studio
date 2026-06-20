@@ -219,6 +219,34 @@ test('surfacing slot: rasters the full area with no inset and no wall pass', asy
   expect(r.minZ, 'shallow skim').toBeCloseTo(-0.5, 2);
 });
 
+test('cutting slots manage the spindle with the proven Expert forms (M3 S[#var], G04 P seconds, M5)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { slotFromOp } = await import('/data/opToSlot.js');
+    const { pocketSlot, surfacingSlot } = await import('/data/millToSlot.js');
+    const { slotMacro } = await import('/data/camPack.js');
+    const macros = {
+      drill: slotMacro({ slot: 22, ...slotFromOp('drill', 'circle') }),
+      slot: slotMacro({ slot: 22, ...slotFromOp('slot') }),
+      pocket: slotMacro({ slot: 22, ...pocketSlot() }),
+      surface: slotMacro({ slot: 22, ...surfacingSlot() }),
+    };
+    const check = (m) => ({
+      on: /M3 S\[#\d+\]/.test(m),          // bracketed var, not S#var
+      dwellSeconds: /G04 P2\b/.test(m),     // seconds (P2), not the ms-assumption P2000
+      off: /\bM5\b/.test(m),
+      noMsDwell: !/G04 P2000/.test(m),
+    });
+    return Object.fromEntries(Object.entries(macros).map(([k, m]) => [k, check(m)]));
+  });
+  for (const op of ['drill', 'slot', 'pocket', 'surface']) {
+    expect(r[op].on, `${op}: M3 S[#var]`).toBe(true);
+    expect(r[op].dwellSeconds, `${op}: G04 P seconds`).toBe(true);
+    expect(r[op].off, `${op}: M5`).toBe(true);
+    expect(r[op].noMsDwell, `${op}: no P2000 ms dwell`).toBe(true);
+  }
+});
+
 test('preview panel mounts on a seeded slot macro without throwing', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const ok = await page.evaluate(async () => {

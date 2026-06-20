@@ -8,6 +8,14 @@
  * Scratch-var convention these helpers own: WCS #70 (base) #71 (idx) #73 (addr); raster #27-#32.
  */
 
+/** Spindle RPM field to append to a cutting slot's form, + the start/stop lines that bracket the toolpath. */
+export const SPINDLE_FIELD = { key: 'rpm', label: 'Spindle RPM', units: 'rpm', def: 8000, min: 1, max: 60000, type: 0 };
+// Forms verified against a real Expert macro (SYSDISK/key-7.nc): spindle speed is a BRACKETED var `S[#var]`
+// and G04 P is in SECONDS (key-7: `G04 P[#142]`, #142=30 → "30 seconds"), not milliseconds.
+/** Spindle on CW at the form RPM, with a short spin-up dwell (P = seconds). */
+export const spindleOn = (rpmVar) => [`M3 S[${rpmVar}]   ( spindle on )`, 'G04 P2   ( spin-up dwell, seconds )'];
+export const spindleOff = () => ['M5   ( spindle off )'];
+
 /** Per-axis DDCS probe system vars: status (2=success) + trigger position (machine coord). */
 export const PROBE = {
     X: { status: '#1920', result: '#1925' },

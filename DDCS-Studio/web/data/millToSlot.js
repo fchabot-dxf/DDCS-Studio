@@ -12,7 +12,7 @@
  * See [[cam-probing-and-simulate]], [[cam-menu-architecture]], [[priorities-friendliness-over-perf]].
  */
 import { allocFields, readLine } from './probeToSlot.js';
-import { rasterClear } from './camMacroKit.js';
+import { rasterClear, SPINDLE_FIELD, spindleOn, spindleOff } from './camMacroKit.js';
 
 const POCKET_FIELDS = [
     { key: 'w', label: 'Width (X)', units: 'mm', def: 80, min: 1, max: 99999, type: 1 },
@@ -24,6 +24,7 @@ const POCKET_FIELDS = [
     { key: 'feed', label: 'Feed', units: 'mm/min', def: 600, min: 1, max: 99999, type: 0 },
     { key: 'plunge', label: 'Plunge feed', units: 'mm/min', def: 150, min: 1, max: 99999, type: 0 },
     { key: 'clearance', label: 'Clearance Z', units: 'mm', def: 5, min: 0, max: 9999, type: 1 },
+    SPINDLE_FIELD,
 ];
 
 const SURFACE_FIELDS = [
@@ -36,6 +37,7 @@ const SURFACE_FIELDS = [
     { key: 'feed', label: 'Feed', units: 'mm/min', def: 800, min: 1, max: 99999, type: 0 },
     { key: 'plunge', label: 'Plunge feed', units: 'mm/min', def: 200, min: 1, max: 99999, type: 0 },
     { key: 'clearance', label: 'Clearance Z', units: 'mm', def: 5, min: 0, max: 9999, type: 1 },
+    SPINDLE_FIELD,
 ];
 
 /** Shared raster params from the allocated field map. */
@@ -66,7 +68,10 @@ export function pocketSlot(used = new Set(), varOffset = 0) {
         '( guard: the pocket must be larger than the tool )',
         'IF #24 LE #23 GOTO 8',
         'IF #26 LE #25 GOTO 8',
+        '',
+        ...spindleOn(v.rpm),
         ...rasterClear(rasterOpts(v, { x0: '#23', x1: '#24', y0: '#25', y1: '#26' }, true)),
+        ...spindleOff(),
         'GOTO 9',
         '( error )',
         'N8',
@@ -98,7 +103,10 @@ export function surfacingSlot(used = new Set(), varOffset = 0) {
         `#26=[#21+${v.h}]   ;y1`,
         'IF #24 LE #23 GOTO 8',
         'IF #26 LE #25 GOTO 8',
+        '',
+        ...spindleOn(v.rpm),
         ...rasterClear(rasterOpts(v, { x0: '#23', x1: '#24', y0: '#25', y1: '#26' }, false)),
+        ...spindleOff(),
         'GOTO 9',
         '( error )',
         'N8',

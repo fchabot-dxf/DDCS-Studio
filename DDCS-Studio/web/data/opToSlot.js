@@ -12,6 +12,7 @@
  * See the cam-menu-architecture memory + docs/CAM-MENU-RESEARCH.md.
  */
 import { nextParam, mirrorVar } from './camPack.js';
+import { spindleOn, spindleOff } from './camMacroKit.js';
 
 // Field specs: label / units / default / min / max / type (1=decimal, 0=integer). `def` may depend on method.
 const SPEC = {
@@ -42,13 +43,14 @@ const SPEC = {
     bx: { label: 'B — X', units: 'mm', def: 60, min: -99999, max: 99999, type: 1 },
     by: { label: 'B — Y', units: 'mm', def: 0, min: -99999, max: 99999, type: 1 },
     stepdown: { label: 'Stepdown', units: 'mm', def: 1.5, min: 0.1, max: 9999, type: 1 },
+    rpm: { label: 'Spindle RPM', units: 'rpm', def: 8000, min: 1, max: 60000, type: 0 },
 };
 
 // Standalone ops (not point-patterns) — each: the form fields it exposes + a parametric body builder(v).
 const STANDALONE = {
     slot: {
         label: 'Slot',
-        fields: ['ax', 'ay', 'bx', 'by', 'depth', 'stepdown', 'feed', 'clearance'],
+        fields: ['ax', 'ay', 'bx', 'by', 'depth', 'stepdown', 'feed', 'clearance', 'rpm'],
         body: (v) => ['( slot A->B centerline, stepping down. For width > tool, add perpendicular offset passes. )',
             '#50=0',
             `WHILE #50 LT ${v.depth} DO1`,
@@ -120,7 +122,7 @@ function loopBody(pattern, v, method) {
  */
 export function slotFromOp(method, pattern, used = new Set(), varOffset = 0) {
     const std = STANDALONE[method];
-    const order = std ? std.fields : ['posX', 'posY', ...PATTERN_FIELDS[pattern], ...HOLE_FIELDS[method], 'feed', 'clearance'];
+    const order = std ? std.fields : ['posX', 'posY', ...PATTERN_FIELDS[pattern], ...HOLE_FIELDS[method], 'feed', 'clearance', 'rpm'];
     const taken = new Set(used);
     const fields = order.map((key, i) => {
         const idx = nextParam(taken); if (idx != null) taken.add(idx);
@@ -130,15 +132,15 @@ export function slotFromOp(method, pattern, used = new Set(), varOffset = 0) {
         return { key, idx, var: '#' + (varOffset + i + 1), label: s.label, units: s.units, def, min: s.min, max: s.max, type: s.type };
     });
     const v = {}; fields.forEach((f) => { v[f.key] = f.var; });
-    if (std) {   // standalone op (slot/pocket/surfacing) — no pattern, no shared sub
+    if (std) {   // standalone op (slot) — no pattern, no shared sub
         const reads = fields.map((f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`);
-        const body = [`( ${std.label} )`, ...reads, '', std.body(v)].join('\n');
+        const body = [`( ${std.label} )`, ...reads, '', ...spindleOn(v.rpm), '', std.body(v), ...spindleOff()].join('\n');
         return { name: std.label, fields, body };
     }
     // The body IS the scannable macro: structured mirror-read header (so "Refresh fields" can re-derive the
     // form) + the pattern loop with the per-hole cut inlined. All scratch vars (#1-#54) are < #500 = safe/volatile.
     const reads = fields.map((f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`);
-    const body = [`( ${method} ${PATTERN_LABEL[pattern]} — self-contained, no sub to install )`, ...reads, '', loopBody(pattern, v, method)].join('\n');
+    const body = [`( ${method} ${PATTERN_LABEL[pattern]} — self-contained, no sub to install )`, ...reads, '', ...spindleOn(v.rpm), '', loopBody(pattern, v, method), ...spindleOff()].join('\n');
     const name = method === 'bore' ? `Bore — ${PATTERN_LABEL[pattern]}` : `Drill — ${PATTERN_LABEL[pattern]}`;
     return { name, fields, body };
 }
