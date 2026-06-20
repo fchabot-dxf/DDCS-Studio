@@ -267,6 +267,33 @@ All tests attended-only (live-CNC ground rule). Community distribution still = U
 
 ---
 
+## 5d. REVIVED 2026-06-19 — building the CAM Pack Builder (track 3)
+
+Decision: **build it.** Rationale changed since §5b: the Macros tab (custom M-codes + K-buttons)
+and the **SMB sysfile push** (`/api/sysfile`, whitelisted + backed-up write/append) now exist, so
+the macro-authoring + deployment plumbing is already paid for. The CAM Pack Builder reuses them; the
+only genuinely new work is the **form-field designer + `#11xx`/`-m` collision detection**, the **icon
+encoder**, and the **`eng` merge** — and the first of those is the impossible-by-hand killer feature.
+
+Scope = §5b track 3 (tool the community authors; channel-agnostic), phased so the unblocked value
+ships first and the open questions (§7) only gate the later phases:
+
+- **Phase 1 (unblocked):** pack model + form-field designer with **`#11xx` auto-allocation +
+  in-pack collision detection** + the macro **`#1100+k`→`#2600+k` mirror wiring** + **simulate**
+  (reuse the sim) + **plain-`.nc` export**. Needs none of the §7 open questions.
+- **Phase 2:** icon tool — draw / import / SVG-template (`cornerViz.svg` …) → 360×180 24-bit BMP.
+- **Phase 3:** `eng` **merge** (never replace) + full `CAM/` bundle + USB packager / SMB push;
+  gated on the §7 answers (BMP bit-depth, `-t/-p/-a` semantics, max rows, `#11xx` sharing, V1/V2) —
+  resolve via one attended bench test or the FB "CAM Function instructions" doc.
+
+Collision detection scope grows by phase: Phase 1 = within the pack; later = against the known
+community packs (cam10–21) + factory usage (needs a small known-param database).
+
+Implementation: `web/data/camPack.js` (pure logic — eng lines, allocation, collision, macro/eng
+export) + a **CAM Builder** Settings tab. `camsetting` is **never written** (firmware-owned).
+
+---
+
 ## 6. Techniques worth adopting (from `Cam13_Corner_Average`, Brad Goldbeck)
 
 The strongest macro in the collection — patterns Studio's generators should absorb:

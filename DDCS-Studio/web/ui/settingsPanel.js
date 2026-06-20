@@ -14,6 +14,7 @@ import { listPosts, getActivePostId, setActivePostId, isPostVerified, getDialect
 import { makeClient } from '../shared/js/client.js';
 import { renderIoTable, renderMagazineTable } from './ioTable.js';
 import { toolProfileSvg } from '../viz/toolProfile.js';
+import * as camPack from '../data/camPack.js';
 import { THEMES } from './themes.js';
 import { generateToolChangeNc } from '../data/atcGenerator.js';
 import { renderCloudLogin } from './cloudAccount.js';
@@ -332,6 +333,7 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_program">Program</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_macros">Macros</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_cam">CAM Builder</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_gateway">Gateway</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
@@ -512,6 +514,17 @@ function buildSettingsOverlay() {
                         <div class="settings-section-title">K-BUTTONS (K1–K7)</div>
                         <div class="settings-hint">The 7 panel buttons — each runs <b>key-<i>N</i>.nc</b> when pressed. Type/paste a body or <b>⇪ From editor</b>, then <b>Generate</b> for the install file. Empty = unused.</div>
                         <div id="kbuttons_list"></div>
+                    </div>
+                </div>
+
+                <!-- GENERAL: CAM PACK BUILDER (author CAM-menu slots for distribution; Phase 1) -->
+                <div id="set_tab_cam" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">CAM PACK BUILDER</div>
+                        <div class="settings-hint">Author a DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's CAM page — to share with the community. Each slot = a <b>form</b> + a <b>macro</b> that reads the form live (the <code>#2600+</code> mirrors). Studio auto-allocates the shared <code>#1100–1499</code> form params and flags collisions. <i>Phase 1: form designer + macro + plain export. Icons + eng-merge install come next.</i></div>
+                        <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button></div>
+                        <div id="cam_validate" class="settings-hint" style="margin-top:6px;"></div>
+                        <div id="cam_slots" style="margin-top:6px;"></div>
                     </div>
                 </div>
 
@@ -1800,6 +1813,73 @@ function wireSettingsOverlay(ov) {
     if (_mcAddBlank) _mcAddBlank.addEventListener('click', () => { macrosArr().push({ name: 'New M-code', trigger: { kind: 'mcode', code: 15 }, body: '' }); saveSettings(); renderMcodes(); });
     renderMcodes(); renderKbuttons();
 
+    // --- CAM Pack Builder (Phase 1): author CAM-menu slots (form + macro), auto-allocate #11xx, export. ---
+    const CAMPACK_KEY = 'ddcs_campack';
+    function loadCamPack() { try { const p = JSON.parse(localStorage.getItem(CAMPACK_KEY)); if (p && Array.isArray(p.slots)) return p; } catch (e) { /* */ } return { meta: { name: 'My CAM pack', baseSlot: 22 }, slots: [] }; }
+    let _camPack = loadCamPack();
+    const saveCamPack = () => { try { localStorage.setItem(CAMPACK_KEY, JSON.stringify(_camPack)); } catch (e) { /* */ } };
+    const camEsc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    function renderCamBuilder() {
+        const host = q('cam_slots'); if (!host) return;
+        const nameEl = q('cam_pack_name'); if (nameEl && document.activeElement !== nameEl) nameEl.value = (_camPack.meta && _camPack.meta.name) || '';
+        const v = camPack.validatePack(_camPack);
+        const vEl = q('cam_validate');
+        if (vEl) vEl.innerHTML = [...v.errors.map((e) => '⛔ ' + e), ...v.warnings.map((w) => '⚠ ' + w)].join('<br>') || ('✓ No collisions · ' + camPack.usedParams(_camPack).size + '/400 form params used.');
+        if (!_camPack.slots.length) { host.innerHTML = '<div class="settings-hint">No slots yet — “＋ Add slot”. Slots default to cam' + ((_camPack.meta && _camPack.meta.baseSlot) || 22) + '+ (cam0–21 are factory / community).</div>'; return; }
+        host.innerHTML = _camPack.slots.map((slot, si) => {
+            const fields = slot.fields || [];
+            const rows = fields.map((f, fi) => `<tr data-si="${si}" data-fi="${fi}">
+                <td><input class="cf" data-f="label" value="${camEsc(f.label)}" placeholder="Label" style="width:100%;"></td>
+                <td><input class="cf" data-f="units" value="${camEsc(f.units)}" placeholder="mm" style="width:46px;"></td>
+                <td><input class="cf" data-f="def" type="number" value="${f.def != null ? f.def : 0}" style="width:62px;"></td>
+                <td><input class="cf" data-f="min" type="number" value="${f.min != null ? f.min : 0}" style="width:62px;"></td>
+                <td><input class="cf" data-f="max" type="number" value="${f.max != null ? f.max : 0}" style="width:62px;"></td>
+                <td><input class="cf" data-f="var" value="${camEsc(f.var || '#' + (fi + 1))}" style="width:42px;"></td>
+                <td style="color:var(--text-dim); font-size:10px; white-space:nowrap;">#${f.idx} → #${camPack.mirrorVar(f.idx)}</td>
+                <td><button class="op-btn" data-act="delf" title="Remove field">✕</button></td>
+            </tr>`).join('');
+            return `<div class="cam-slot" data-si="${si}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:10px;">
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <label style="font-size:11px; color:var(--text-dim);">cam<input type="number" class="cs" data-f="slot" value="${slot.slot}" min="0" max="9999" style="width:60px; margin-left:2px;"></label>
+                    <input class="cs" data-f="name" value="${camEsc(slot.name)}" placeholder="Slot name" style="flex:1; min-width:120px;">
+                    <span style="font-size:10px; color:var(--text-dim);">form group -m${camPack.slotGroup(slot.slot)}</span>
+                    <button class="op-btn" data-act="dels" title="Remove slot">✕</button>
+                </div>
+                <table style="width:100%; font-size:11.5px; margin-top:6px; border-collapse:collapse;"><thead><tr style="color:var(--text-dim); font-size:10px; text-align:left;"><th>Label</th><th>Units</th><th>Default</th><th>Min</th><th>Max</th><th>Var</th><th>#param→#2600</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+                <div class="settings-row" style="margin-top:4px;"><button class="toolbar-btn settings-io" data-act="addf">＋ Add field</button></div>
+                <textarea class="cs" data-f="body" spellcheck="false" placeholder="macro body — reference each field's Var (#1, #2 …)" style="width:100%; height:110px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${camEsc(slot.body)}</textarea>
+                <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button></div>
+            </div>`;
+        }).join('');
+    }
+    const camHost = q('cam_slots');
+    if (camHost) {
+        camHost.addEventListener('input', (e) => {
+            const t = e.target; const card = t.closest('.cam-slot'); if (!card) return; const slot = _camPack.slots[+card.dataset.si]; if (!slot) return;
+            if (t.classList.contains('cf')) {
+                const f = (slot.fields || [])[+t.closest('tr').dataset.fi]; if (!f) return; const fld = t.dataset.f;
+                f[fld] = (fld === 'label' || fld === 'units' || fld === 'var') ? t.value : (t.value === '' ? '' : parseFloat(t.value));
+                saveCamPack();
+            } else if (t.classList.contains('cs')) {
+                const fld = t.dataset.f;
+                if (fld === 'slot') { slot.slot = parseInt(t.value, 10) || 0; saveCamPack(); renderCamBuilder(); }
+                else { slot[fld] = t.value; saveCamPack(); if (fld !== 'body') renderCamBuilder(); }
+            }
+        });
+        camHost.addEventListener('click', (e) => {
+            const card = e.target.closest('.cam-slot'); if (!card) return; const si = +card.dataset.si; const slot = _camPack.slots[si]; if (!slot) return; const a = e.target.dataset.act;
+            if (a === 'addf') { slot.fields = slot.fields || []; const idx = camPack.nextParam(camPack.usedParams(_camPack)); if (idx == null) { alert('The #1100–1499 form-param pool is full.'); return; } slot.fields.push({ idx, label: '', units: '', def: 0, min: 0, max: 0, type: 1, var: '#' + (slot.fields.length + 1) }); saveCamPack(); renderCamBuilder(); }
+            else if (a === 'delf') { slot.fields.splice(+e.target.closest('tr').dataset.fi, 1); saveCamPack(); renderCamBuilder(); }
+            else if (a === 'dels') { _camPack.slots.splice(si, 1); saveCamPack(); renderCamBuilder(); }
+            else if (a === 'exp') { insertToEditor('( ===== eng form lines — MERGE into the controller eng language file ===== )\n' + camPack.slotEng(slot) + '\n\n' + camPack.slotMacro(slot)); }
+        });
+    }
+    const _camName = q('cam_pack_name');
+    if (_camName) _camName.addEventListener('input', () => { _camPack.meta = _camPack.meta || {}; _camPack.meta.name = _camName.value; saveCamPack(); });
+    const _camAddSlot = q('cam_add_slot');
+    if (_camAddSlot) _camAddSlot.addEventListener('click', () => { const base = (_camPack.meta && _camPack.meta.baseSlot) || 22; const used = new Set(_camPack.slots.map((s) => +s.slot)); let n = base; while (used.has(n)) n++; _camPack.slots.push({ slot: n, name: 'New slot', fields: [], body: '' }); saveCamPack(); renderCamBuilder(); });
+    renderCamBuilder();
+
     // ATC: generate a T.nc tool-change macro from the magazine table (client-side; review before running).
     const genTnc = q('atc_gen_tnc');
     if (genTnc) genTnc.addEventListener('click', () => {
@@ -1824,7 +1904,7 @@ function wireSettingsOverlay(ov) {
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
     const sideTabs = [...ov.querySelectorAll('.settings-sidebar .settings-tab')];
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
-        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_program', 'set_tab_macros', 'set_tab_feedback', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_about',
+        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_program', 'set_tab_macros', 'set_tab_cam', 'set_tab_feedback', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_about',
                      'set_tab_machine', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
