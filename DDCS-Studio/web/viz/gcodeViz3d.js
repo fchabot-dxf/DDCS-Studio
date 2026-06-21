@@ -101,13 +101,17 @@ export class GcodeViz3D {
 
     _initStaticScene() {
         const THREE = this.THREE;
-        const grid = new THREE.GridHelper(200, 20, 0x2a4866, 0x16242f);
+        const grid = new THREE.GridHelper(200, 20, 0x16242f, 0x16242f); // uniform — no built-in centre crosshair
         grid.rotation.x = Math.PI / 2; // GridHelper is XZ by default → lay it in XY (Z up)
         this.grid = grid;
         this.scene.add(grid);
         const axes = new THREE.AxesHelper(25); // X red, Y green, Z blue
         this.axes = axes;
         this.scene.add(axes);
+        // Floor axis lines through the ORIGIN (scene 0 = part-zero): X at y=0, Y at x=0. Re-laid in fit().
+        const og = new THREE.BufferGeometry(); og.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12), 3));
+        this._originCross = new THREE.LineSegments(og, new THREE.LineBasicMaterial({ color: 0x3a6ea5, transparent: true, opacity: 0.6 }));
+        this.scene.add(this._originCross);
         // Direction labels on the grid edges (repositioned to the footprint in setSegments)
         this._gridLabels = {
             xp: this._makeTextSprite('+X'), xn: this._makeTextSprite('-X'),
@@ -710,19 +714,33 @@ export class GcodeViz3D {
         // Rescale the floor grid to roughly match the part footprint. Anchor it to the stock bottom
         // (the table) so the stock always rests on the grid — otherwise a deep move (e.g. Z-first probe
         // in the corner wizard) drags b.minZ below the stock bottom and the stock appears to float.
-        const span = Math.max(sx, sy, 10);
-        const floorZ = (this._stock && this._stock.show && this._stock.z > 0) ? -this._stock.z : b.minZ;
-        if (this.grid) {
-            this.grid.scale.setScalar(span / 200);
-            this.grid.position.set(cx, cy, floorZ);
+        // Floor grid + axis labels FOLLOW THE MACHINE ENVELOPE when it's shown (centre + footprint + floor);
+        // otherwise they track the part/stock footprint.
+        const m = this._machine;
+        let gCx = cx, gCy = cy, gSpan = Math.max(sx, sy, 10);
+        let gFloor = (this._stock && this._stock.show && this._stock.z > 0) ? -this._stock.z : b.minZ;
+        if (m && m.show && m.x && m.y && m.z) {
+            const w = m.workOrigin || {}, wx = w.x || 0, wy = w.y || 0, wz = w.z || 0;
+            gCx = m.x / 2 - wx; gCy = m.y / 2 - wy;             // envelope XY centre in scene
+            gSpan = Math.max(Math.abs(m.x), Math.abs(m.y));     // envelope footprint
+            gFloor = Math.min(0, m.z) - wz;                     // envelope bottom (machine Z min) in scene
         }
-        if (this.axes) this.axes.scale.setScalar(Math.max(1, span / 200));
+        if (this.grid) { this.grid.scale.setScalar(gSpan / 200); this.grid.position.set(gCx, gCy, gFloor); }
+        if (this.axes) this.axes.scale.setScalar(Math.max(1, gSpan / 200));
         if (this._gridLabels) {
-            const half = span / 2, off = span * 0.07, lw = span * 0.14, z = floorZ;
+            const half = gSpan / 2, off = gSpan * 0.07, lw = gSpan * 0.14;
             const L = this._gridLabels;
-            L.xp.position.set(cx + half + off, cy, z); L.xn.position.set(cx - half - off, cy, z);
-            L.yp.position.set(cx, cy + half + off, z); L.yn.position.set(cx, cy - half - off, z);
+            L.xp.position.set(gCx + half + off, gCy, gFloor); L.xn.position.set(gCx - half - off, gCy, gFloor);
+            L.yp.position.set(gCx, gCy + half + off, gFloor); L.yn.position.set(gCx, gCy - half - off, gFloor);
             for (const k in L) L[k].scale.set(lw, lw / 2, 1);
+        }
+        // Axis crosshair through the ORIGIN (scene 0 = part-zero), spanning the grid at the floor.
+        if (this._originCross) {
+            const x0 = gCx - gSpan / 2, x1 = gCx + gSpan / 2, y0 = gCy - gSpan / 2, y1 = gCy + gSpan / 2;
+            const p = this._originCross.geometry.attributes.position;
+            p.setXYZ(0, x0, 0, gFloor); p.setXYZ(1, x1, 0, gFloor);   // X axis (y=0)
+            p.setXYZ(2, 0, y0, gFloor); p.setXYZ(3, 0, y1, gFloor);   // Y axis (x=0)
+            p.needsUpdate = true;
         }
 
         this._applyCamera();
