@@ -84,9 +84,9 @@ export function openStockEditor(anchor) {
                 <div id="se_datum_pick" class="se-datum-pick" title="Click the box point of the stock that is your part-zero / program origin"></div>
                 <span id="se_datum_name" style="font-size:10px; color:#9fb4cc; text-align:center;"></span>
             </label>
-            <label class="col">Pin to
-                <select id="se_pin">
-                    <option value="origin">Origin (program zero)</option>
+            <label class="col">Sits at WCS
+                <select id="se_pin" title="Where this stock sits in the machine: the program zero, or pinned to a WCS offset from the table (Settings → Hardware → WCS). This is the stock's WCS — the op runs from its datum.">
+                    <option value="origin">Program zero</option>
                     <option value="g54">G54</option><option value="g55">G55</option><option value="g56">G56</option>
                     <option value="g57">G57</option><option value="g58">G58</option><option value="g59">G59</option>
                 </select>
