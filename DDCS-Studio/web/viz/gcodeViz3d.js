@@ -101,10 +101,12 @@ export class GcodeViz3D {
 
     _initStaticScene() {
         const THREE = this.THREE;
-        const grid = new THREE.GridHelper(200, 20, 0x16242f, 0x16242f); // uniform — no built-in centre crosshair
-        grid.rotation.x = Math.PI / 2; // GridHelper is XZ by default → lay it in XY (Z up)
-        this.grid = grid;
-        this.scene.add(grid);
+        // Floor grid — a custom rectangular LineSegments LINKED TO THE ENVELOPE footprint (rebuilt in fit). Lines
+        // run at multiples of the increment FROM THE ORIGIN and are CLIPPED to the envelope. A GridHelper is always
+        // square so it can't match a non-square envelope; this can. `_gridStep` 0 = auto nice-step, else fixed mm.
+        this.grid = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x16242f }));
+        this.scene.add(this.grid);
+        this._gridStep = 0;
         // Floor axis lines through the ORIGIN (scene 0 = part-zero), SPANNING THE ENVELOPE — these ARE the X / Y
         // axes (no separate part-zero triad, which would just duplicate them): X red along y=0, Y green along x=0.
         // Re-laid each fit(). The machine-zero marker (setMachine) still shows a full XYZ gizmo at home.
@@ -734,11 +736,15 @@ export class GcodeViz3D {
             gSpan = Math.max(Math.abs(m.x), Math.abs(m.y));     // envelope footprint
             gFloor = Math.min(0, m.z) - wz;                     // envelope bottom (machine Z min) in scene
         }
-        if (this.grid) { this.grid.scale.setScalar(gSpan / 200); this.grid.position.set(gCx, gCy, gFloor); }
-        if (this.axes) this.axes.scale.setScalar(Math.max(1, gSpan / 200));
+        const useMch = m && m.show && m.x && m.y && m.z;
+        // Floor grid LINKED TO THE ENVELOPE footprint (else the part/stock footprint), rebuilt with the configured
+        // increment, lines starting at the origin and clipped to the envelope.
+        const gW = useMch ? Math.abs(m.x) : Math.max(sx, 10);
+        const gH = useMch ? Math.abs(m.y) : Math.max(sy, 10);
+        this._gridParams = { cx: gCx, cy: gCy, floor: gFloor, w: gW, h: gH };
+        this._layoutGrid(gCx, gCy, gFloor, gW, gH);
         // PER-AXIS half-extent: when the envelope is shown the X axis spans |travelX| and Y spans |travelY|
         // (centred on gCx/gCy), so neither line nor label overshoots the box on the shorter axis. Else use the grid.
-        const useMch = m && m.show && m.x && m.y && m.z;
         const halfX = useMch ? Math.abs(m.x) / 2 : gSpan / 2;
         const halfY = useMch ? Math.abs(m.y) / 2 : gSpan / 2;
         if (this._gridLabels) {
@@ -773,6 +779,51 @@ export class GcodeViz3D {
         }
 
         this._applyCamera();
+    }
+
+    // A "nice" grid increment (1/2/5 × 10^n) targeting ~14 cells across the larger footprint — unless the user
+    // pinned a fixed mm increment in Preview settings (_gridStep > 0).
+    _niceGridStep(span) {
+        if (this._gridStep > 0) return this._gridStep;
+        const raw = (span || 100) / 14;
+        const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+        const n = raw / pow;
+        return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * pow;
+    }
+
+    // Rebuild the floor grid for a width×height footprint centred at (cx,cy) on the z=floor plane. Lines run at
+    // multiples of the increment FROM THE ORIGIN (scene 0 → a line lands on each axis) and are CLIPPED to the
+    // footprint, plus a border so the grid is always bounded. Geometry only rebuilds when the layout changes.
+    _layoutGrid(cx, cy, floor, width, height) {
+        if (!this.grid) return;
+        const THREE = this.THREE;
+        const step = this._niceGridStep(Math.max(width, height));
+        this.grid.position.set(cx, cy, floor);
+        const key = [cx, cy, floor, width, height, step].map((v) => Math.round(v * 100)).join('|');
+        if (this._gridKey === key) return;
+        this._gridKey = key;
+        const hw = width / 2, hh = height / 2;
+        const xMin = cx - hw, xMax = cx + hw, yMin = cy - hh, yMax = cy + hh;
+        const pts = [];
+        for (let k = Math.ceil(xMin / step - 1e-9); k <= Math.floor(xMax / step + 1e-9); k++) {
+            const x = k * step - cx; pts.push(x, yMin - cy, 0, x, yMax - cy, 0);
+        }
+        for (let j = Math.ceil(yMin / step - 1e-9); j <= Math.floor(yMax / step + 1e-9); j++) {
+            const y = j * step - cy; pts.push(xMin - cx, y, 0, xMax - cx, y, 0);
+        }
+        pts.push(-hw, -hh, 0, hw, -hh, 0, hw, -hh, 0, hw, hh, 0, hw, hh, 0, -hw, hh, 0, -hw, hh, 0, -hw, -hh, 0); // border
+        const g = this.grid.geometry;
+        g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3));
+        g.computeBoundingSphere();
+    }
+
+    // Preview → grid spacing (mm; 0 = auto). Re-lays the grid in place (no camera change).
+    setGridStep(step) {
+        const s = Number(step) || 0;
+        if (s === this._gridStep) return;
+        this._gridStep = s; this._gridKey = null;
+        const p = this._gridParams;
+        if (p) { this._layoutGrid(p.cx, p.cy, p.floor, p.w, p.h); this.render(); }
     }
 
     _growBounds(b, x0, y0, z0, x1, y1, z1) {

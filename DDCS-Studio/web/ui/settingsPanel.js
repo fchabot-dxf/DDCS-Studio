@@ -98,7 +98,7 @@ const SETTINGS_DEFAULTS = {
     // users can configure for accurate simulation; a controller profile just presets these.
     hardwareTabs: { probes: true, atc: false, limits: true, spindle: false },
     // 3D/2D toolpath preview (read by viz/createPreviewPanel via window.ddcsGetSettings().preview).
-    preview: { followDamp: 50, showRapids: true, defaultView: '3d', defaultSpeed: 1, followDefault: true, autoLoop: true },
+    preview: { followDamp: 50, showRapids: true, defaultView: '3d', defaultSpeed: 1, followDefault: true, autoLoop: true, gridStep: 0 },
     // Composing assists (Blocks suggestions, Studio editor autocomplete, ghost next-block).
     compose: { suggestions: true, autocomplete: true, ghost: true },
     // ATC: tool-length probe defaults (consumed by the Tool Length wizard) + the tool-offset table.
@@ -397,6 +397,17 @@ function buildSettingsOverlay() {
                             <select id="set_pv_speed"><option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select>
                         </div>
                         <label class="settings-check"><input type="checkbox" id="set_pv_rapids"> Show rapid moves (yellow) in the 3D view</label>
+                        <div class="settings-field" style="margin-top:10px">Grid spacing
+                            <select id="set_pv_gridstep" title="Floor-grid line spacing. The grid is linked to the machine envelope; Auto picks a tidy step for its size.">
+                                <option value="0">Auto</option>
+                                <option value="5">5 mm</option>
+                                <option value="10">10 mm</option>
+                                <option value="20">20 mm</option>
+                                <option value="25">25 mm</option>
+                                <option value="50">50 mm</option>
+                                <option value="100">100 mm</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">FOLLOW CAMERA</div>
@@ -874,6 +885,7 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_view')) q('set_pv_view').value = pv.defaultView || '3d';
         if (q('set_pv_speed')) q('set_pv_speed').value = String(pv.defaultSpeed || 1);
         if (q('set_pv_rapids')) q('set_pv_rapids').checked = pv.showRapids !== false;
+        if (q('set_pv_gridstep')) q('set_pv_gridstep').value = String(pv.gridStep || 0);
         if (q('set_pv_follow_default')) q('set_pv_follow_default').checked = pv.followDefault !== false;
         if (q('set_pv_autoloop')) q('set_pv_autoloop').checked = pv.autoLoop !== false;
         const cp = s.compose || (s.compose = { ...SETTINGS_DEFAULTS.compose });
@@ -1501,6 +1513,7 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_view')) pv.defaultView = q('set_pv_view').value;
         if (q('set_pv_speed')) pv.defaultSpeed = num(q('set_pv_speed').value, 1);
         if (q('set_pv_rapids')) pv.showRapids = q('set_pv_rapids').checked;
+        if (q('set_pv_gridstep')) pv.gridStep = num(q('set_pv_gridstep').value, 0);
         if (q('set_pv_follow_default')) pv.followDefault = q('set_pv_follow_default').checked;
         if (q('set_pv_autoloop')) pv.autoLoop = q('set_pv_autoloop').checked;
         const cp = s.compose || (s.compose = { ...SETTINGS_DEFAULTS.compose });

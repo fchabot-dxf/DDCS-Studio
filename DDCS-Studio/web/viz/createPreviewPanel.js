@@ -102,6 +102,7 @@ export function createPreviewPanel(container, opts = {}) {
         const damp = Number.isFinite(pv.followDamp) ? pv.followDamp : 50;        // 0 = snappy … 100 = very damped
         if (viz.setFollowLerp) viz.setFollowLerp(0.32 - (damp / 100) * 0.30);
         if (viz.setShowRapids) viz.setShowRapids(pv.showRapids !== false);
+        if (viz.setGridStep) viz.setGridStep(pv.gridStep);   // Preview → grid spacing (mm; 0/'' = auto)
     }
     const nearest2d = (pos) => {
         let bi = 0, bd = Infinity;
