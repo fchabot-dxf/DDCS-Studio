@@ -21,19 +21,19 @@ test('Tool Change wizard: manual ↔ auto modes generate the right dialect', asy
   })));
   await openWizard(page, 'atc_change');
 
-  // Manual (default): park prompt, no drawbar codes
-  await expect(page.locator('#wiz_atc_change_code')).toContainText('Manual Tool Change');
-  await expect(page.locator('#wiz_atc_change_code')).not.toContainText('M154');
-  await expect(page.locator('#atc_change_manual_params')).toBeVisible();
-
-  // Auto: T.nc-style pick & place with drawbar + sensor waits (literal pocket coords from the magazine)
-  await page.locator('#atc_change_mode').selectOption('auto');
+  // Auto (default): T.nc-style pick & place with drawbar + sensor waits (literal pocket coords from the magazine)
   await expect(page.locator('#atc_change_auto_params')).toBeVisible();
-  await expect(page.locator('#atc_change_manual_params')).toBeHidden();
   const code = page.locator('#wiz_atc_change_code');
   await expect(code).toContainText('M154');
   await expect(code).toContainText('M302');
   await expect(code).toContainText('#1504');
+
+  // Manual: park prompt, no drawbar codes
+  await page.locator('#atc_change_mode').selectOption('manual');
+  await expect(page.locator('#atc_change_manual_params')).toBeVisible();
+  await expect(page.locator('#atc_change_auto_params')).toBeHidden();
+  await expect(page.locator('#wiz_atc_change_code')).toContainText('Manual Tool Change');
+  await expect(page.locator('#wiz_atc_change_code')).not.toContainText('M154');
 });
 
 test('ATC Test wizard: drawbar and pocket modes', async ({ page }) => {
