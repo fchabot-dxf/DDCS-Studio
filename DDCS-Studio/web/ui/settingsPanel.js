@@ -393,6 +393,7 @@ function buildSettingsOverlay() {
                 <div style="display: flex; align-items: center; gap: 16px;">
                     <div class="settings-tabs" style="display: flex; gap: 8px;">
                         <button class="settings-main-tab active" data-group="general">General</button>
+                        <button class="settings-main-tab" data-group="controller">Controller</button>
                         <button class="settings-main-tab" data-group="hardware">Hardware</button>
                     </div>
                 </div>
@@ -401,17 +402,18 @@ function buildSettingsOverlay() {
             <div class="settings-body">
                 <div class="settings-sidebar">
                     <div class="sidebar-group-label" data-group-label="general">General</div>
-                    <button class="settings-tab active" data-group="general" data-target="set_tab_profile">Profile</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_appearance">Appearance</button>
+                    <button class="settings-tab active" data-group="general" data-target="set_tab_appearance">Appearance</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_preview">Preview</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_compose">Editor</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_program">Program</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_gateway">Gateway</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_faq">FAQ</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_about">About</button>
+                    <div class="sidebar-group-label" data-group-label="controller" style="display:none;">Controller</div>
+                    <button class="settings-tab" data-group="controller" data-target="set_tab_profile">Profile</button>
+                    <button class="settings-tab" data-group="controller" data-target="set_tab_variables">Variables</button>
+                    <button class="settings-tab" data-group="controller" data-target="set_tab_program">Program</button>
+                    <button class="settings-tab" data-group="controller" data-target="set_tab_gateway">Gateway</button>
                     <div class="sidebar-group-label" data-group-label="hardware" style="display:none;">Hardware</div>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_machine" style="display:none;">Machine</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_spindle" style="display:none;">Head</button>
