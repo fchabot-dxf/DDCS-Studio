@@ -306,13 +306,18 @@ export class GcodeViz3D {
         const THREE = this.THREE;
         if (this._animTool) { this.scene.remove(this._animTool); this._animTool.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
         const tool = this._simTool || { type: 'endmill', dia: 6 };
-        const tr = Math.max(0.5, (Number(tool.dia) || 6) / 2);
-        const tlen = Math.max(tr * 4, Number(tool.length) || tr * 8);
+        const half = toolHalfProfile(tool);
+        const tr = Math.max(0.5, (Number(tool.dia) || 6) / 2);          // shank radius (what the collet clamps)
+        const topZ = Math.max(0.1, ...half.map((p) => p[1]));           // the tool's TOP (the shank) — sets the clamp height
         const part = (geo, color, op, name) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true, opacity: op })); m.name = name; return m; };
-        const tgeo = new THREE.LatheGeometry(toolHalfProfile(tool).map((q) => new THREE.Vector2(Math.max(0.001, q[0]), q[1])), 24); tgeo.rotateX(Math.PI / 2);   // TOOL — real profile, tip at origin
-        const ch = Math.max(14, tr * 4), cgeo = new THREE.CylinderGeometry(tr + 4, tr + 1.5, ch, 20); cgeo.rotateX(Math.PI / 2); cgeo.translate(0, 0, tlen + ch / 2 - 2);   // COLLET — tapered holder
-        const sh = Math.max(28, tr * 6), sr = tr + 7, sgeo = new THREE.CylinderGeometry(sr, sr, sh, 24); sgeo.rotateX(Math.PI / 2); sgeo.translate(0, 0, tlen + ch + sh / 2 - 4);   // SPINDLE — body
-        this._animParts = { tool: part(tgeo, 0xffab40, 0.9, 'tool'), collet: part(cgeo, 0x9aa6b2, 0.85, 'collet'), spindle: part(sgeo, 0x6b7682, 0.8, 'spindle') };
+        const tgeo = new THREE.LatheGeometry(half.map((q) => new THREE.Vector2(Math.max(0.001, q[0]), q[1])), 24); tgeo.rotateX(Math.PI / 2);   // TOOL — real profile, tip at origin
+        // COLLET — CLAMPS the shank top (overlaps it), tapering down toward the shank Ø; always wider than the shank.
+        const colletR = Math.max(8, tr + 5), ch = 18, colletBot = topZ - 6;
+        const cgeo = new THREE.CylinderGeometry(colletR, Math.max(tr + 1, colletR * 0.55), ch, 20); cgeo.rotateX(Math.PI / 2); cgeo.translate(0, 0, colletBot + ch / 2);
+        // SPINDLE — a FIXED-size nose above the collet (a spindle is a spindle, not scaled to the cutter).
+        const spR = 28, sh = 44, spBot = colletBot + ch - 3;
+        const sgeo = new THREE.CylinderGeometry(spR, spR, sh, 28); sgeo.rotateX(Math.PI / 2); sgeo.translate(0, 0, spBot + sh / 2);
+        this._animParts = { tool: part(tgeo, 0xffab40, 0.9, 'tool'), collet: part(cgeo, 0x9aa6b2, 0.9, 'collet'), spindle: part(sgeo, 0x6b7682, 0.85, 'spindle') };
         const grp = new THREE.Group();
         grp.add(this._animParts.spindle, this._animParts.collet, this._animParts.tool);
         grp.renderOrder = 25; grp.visible = !!this._animOn;

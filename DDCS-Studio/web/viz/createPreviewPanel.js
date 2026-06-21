@@ -26,6 +26,7 @@ import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock mo
 // Stock button (you set the workpiece where you see it). The modal persists to the shared stock store and
 // broadcasts ddcs:settings-changed; every panel reads it here + re-renders, so all previews show the same stock.
 const stockForViz = () => { const s = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null; return (s && s.show) ? s : null; };
+const toolsForViz = () => { const a = (window.ddcsGetSettings && window.ddcsGetSettings().atc) || {}; return Array.isArray(a.tools) ? a.tools : []; };   // tool table → sim tool spec
 const wcsForViz = () => { const m = (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null; return (m && m.workOrigin) ? m.workOrigin : null; };   // work origin in MACHINE coords → G53 moves draw in the part frame
 const machineForViz = () => (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null;   // envelope: travel + show + ox/oy/oz (drawn by viz.setMachine, gated on machine.show)
 const previewPrefs = () => (window.ddcsGetSettings && window.ddcsGetSettings().preview) || {};   // Settings → Preview tab
@@ -154,6 +155,19 @@ export function createPreviewPanel(container, opts = {}) {
     // Render the static route in the active view from the fed G-code (engine.trace resolves #vars/loops/probes).
     // The operator start the wizard reads on insert: a 2D-handle drag (curStart) wins, else the 3D marker, else inferred.
     const getStartPos = () => curStart || (viz && viz.starts && viz.starts[0]) || get('getStart') || null;
+    // The sim tool, RESPECTING THE TOOL TABLE: the host's op tool (getTool) wins; else the program's active T#
+    // looked up in the tool table (settings.atc.tools → type/Ø/length); else infer from the path (probe → touch
+    // probe); else a default endmill.
+    function simTool(code, parsed) {
+        const ht = get('getTool'); if (ht) return ht;
+        const m = /\bT(\d+)\b/.exec(code || '');
+        if (m) {
+            const t = toolsForViz().find((x) => parseInt(x && x.num, 10) === parseInt(m[1], 10));
+            if (t) return { type: t.type || 'endmill', dia: Number(t.dia) || 6, length: Number(t.length) || undefined };
+        }
+        if ((parsed && parsed.stats && parsed.stats.probe) > 0) return { type: 'probe', dia: 6 };
+        return { type: 'endmill', dia: 6 };
+    }
     function setGcode(text) {
         const code = text != null ? text : (get('getGcode') || '');
         // Inferred operator start (wizard preview): probes test from the real tool position so an incremental
@@ -171,9 +185,7 @@ export function createPreviewPanel(container, opts = {}) {
                 // Place the origin marker before setSegments so the (origin-relative) route offsets to it.
                 if (st && v.starts) v.starts[0] = { x: +st.x || 0, y: +st.y || 0, z: +st.z || 0 };
                 v.setSegments(parsed, !fitted); fitted = true;
-                // Per-op tool for the spindle assembly: the op's tool if the host provides one (getTool), else infer
-                // the MODEL from the toolpath — probe present → 3D touch-probe, else endmill. (Exact dims via getTool.)
-                if (v.setSimTool) v.setSimTool(get('getTool') || { type: ((parsed.stats && parsed.stats.probe) > 0) ? 'probe' : 'endmill', dia: 6 });
+                if (v.setSimTool) v.setSimTool(simTool(code, parsed));   // per-op tool from the tool table (see simTool)
             }
         }
         const s = parsed.stats || {};

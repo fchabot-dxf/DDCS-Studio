@@ -50,7 +50,7 @@ export function toolHalfProfile(tool) {
             const rball = Math.max(1, r * 0.5);     // ruby ball
             const rsty = Math.max(0.5, r * 0.22);   // stylus shaft
             const styL = Math.max(len, r * 7);      // stylus length (20–50 mm range)
-            const rbody = Math.max(r * 5, 18);      // electronics body disc (Ø ~39)
+            const rbody = 15;                       // electronics body disc (~Ø30)
             const bodyL = Math.max(r * 6, 28);
             const shankL = Math.max(r * 3, 16);
             const pts = []; const segs = 12;
