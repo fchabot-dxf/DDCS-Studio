@@ -27,7 +27,7 @@ const PORT = '#1078', LEVEL = '#1080';
 // so the mirror-read comment stays parseable by fieldsFromMacro ("Refresh fields").
 const CORNER_FIELDS = [
     { key: 'corner', label: 'Corner (1FL 2FR 3BL 4BR)', units: '', def: 1, min: 1, max: 4, type: 0 },
-    { key: 'wcs', label: 'WCS (0act 1-6 G54-G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
+    { key: 'wcs', label: 'WCS (0act 1G54 2G55 3G56 4G57 5G58 6G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
     { key: 'probeZ', label: 'Probe Z first (0no 1yes)', units: '', def: 0, min: 0, max: 1, type: 0 },
     { key: 'seq', label: 'Wall order (0 YX 1 XY)', units: '', def: 0, min: 0, max: 1, type: 0 },
     { key: 'maxProbe', label: 'Max probe', units: 'mm', def: 100, min: 1, max: 9999, type: 1 },
@@ -155,7 +155,7 @@ export function cornerSlot(used = new Set(), varOffset = 0) {
 }
 
 const ZPROBE_FIELDS = [
-    { key: 'wcs', label: 'WCS (0act 1-6 G54-G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
+    { key: 'wcs', label: 'WCS (0act 1G54 2G55 3G56 4G57 5G58 6G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
     { key: 'maxProbe', label: 'Max probe down', units: 'mm', def: 50, min: 1, max: 9999, type: 1 },
     { key: 'retract', label: 'Retract', units: 'mm', def: 2, min: 0.1, max: 999, type: 1 },
     { key: 'safeZ', label: 'Safe Z lift', units: 'mm', def: 10, min: 0.1, max: 999, type: 1 },
@@ -204,7 +204,7 @@ export function probeZSlot(used = new Set(), varOffset = 0) {
 const EDGE_FIELDS = [
     { key: 'axis', label: 'Axis (0X 1Y)', units: '', def: 0, min: 0, max: 1, type: 0 },
     { key: 'dir', label: 'Direction (0pos 1neg)', units: '', def: 0, min: 0, max: 1, type: 0 },
-    { key: 'wcs', label: 'WCS (0act 1-6 G54-G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
+    { key: 'wcs', label: 'WCS (0act 1G54 2G55 3G56 4G57 5G58 6G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
     { key: 'maxProbe', label: 'Max probe', units: 'mm', def: 100, min: 1, max: 9999, type: 1 },
     { key: 'retract', label: 'Retract', units: 'mm', def: 5, min: 0.1, max: 999, type: 1 },
     { key: 'radius', label: 'Stylus radius', units: 'mm', def: 2, min: 0.001, max: 99, type: 1 },
@@ -266,7 +266,7 @@ export function edgeSlot(used = new Set(), varOffset = 0) {
 }
 
 const INSIDE_FIELDS = [
-    { key: 'wcs', label: 'WCS (0act 1-6 G54-G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
+    { key: 'wcs', label: 'WCS (0act 1G54 2G55 3G56 4G57 5G58 6G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
     { key: 'maxProbe', label: 'Max probe', units: 'mm', def: 25, min: 1, max: 9999, type: 1 },
     { key: 'retract', label: 'Retract', units: 'mm', def: 2, min: 0.1, max: 999, type: 1 },
     { key: 'safeZ', label: 'Safe Z lift', units: 'mm', def: 10, min: 0.1, max: 999, type: 1 },
@@ -341,7 +341,7 @@ export function insideCentreSlot(used = new Set(), varOffset = 0) {
 }
 
 const BOSS_FIELDS = [
-    { key: 'wcs', label: 'WCS (0act 1-6 G54-G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
+    { key: 'wcs', label: 'WCS (0act 1G54 2G55 3G56 4G57 5G58 6G59)', units: '', def: 0, min: 0, max: 6, type: 0 },
     { key: 'maxProbe', label: 'Max probe', units: 'mm', def: 50, min: 1, max: 9999, type: 1 },
     { key: 'retract', label: 'Retract', units: 'mm', def: 2, min: 0.1, max: 999, type: 1 },
     { key: 'safeZ', label: 'Safe Z lift', units: 'mm', def: 15, min: 0.1, max: 999, type: 1 },
