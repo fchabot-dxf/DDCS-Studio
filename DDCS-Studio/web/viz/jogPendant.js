@@ -18,8 +18,8 @@ export function setupJogPendant(viz) {
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; color: #888; margin-bottom: 6px;">
                     <span style="color:#9fb4c8;">Step</span>
-                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="1"> 1.0</label>
-                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="10" checked> 10</label>
+                    <button class="toolbar-btn jog-step-cycle" data-step="10" title="Click to cycle the jog step: 0.1 → 1 → 10 → 100" style="min-width:46px; padding:2px 8px; font-weight:bold;">10</button>
+                    <span style="color:#5f6b7a; font-size:10px;">mm</span>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 32px 32px; gap: 6px;">
                     <button class="toolbar-btn" data-axis="z" data-dir="-1" style="font-weight:bold; padding:0;">Z-</button>
@@ -28,10 +28,6 @@ export function setupJogPendant(viz) {
                     <button class="toolbar-btn" data-axis="x" data-dir="-1" style="font-weight:bold; padding:0;">X-</button>
                     <button class="toolbar-btn" data-axis="y" data-dir="-1" style="font-weight:bold; padding:0;">Y-</button>
                     <button class="toolbar-btn" data-axis="x" data-dir="1" style="font-weight:bold; padding:0;">X+</button>
-                </div>
-                <div style="display: flex; gap: 6px; margin-top: 6px;">
-                    <button class="toolbar-btn" data-axis="xy" data-dir="0" style="flex:1; height:24px; padding:0; background:#2b3340; border-color:#555; color:#e6ecf2;" title="Reset X/Y to 0">0 XY</button>
-                    <button class="toolbar-btn" data-axis="z" data-dir="0" style="flex:1; height:24px; padding:0; background:#2b3340; border-color:#555; color:#e6ecf2;" title="Reset Z to 0">0 Z</button>
                 </div>
             </div>
         `;
@@ -47,8 +43,8 @@ export function setupJogPendant(viz) {
             btn.addEventListener('click', (e) => {
                 const axis = btn.getAttribute('data-axis');
                 const dir = parseFloat(btn.getAttribute('data-dir'));
-                const stepInput = div.querySelector('input[type="radio"]:checked');
-                const step = stepInput ? parseFloat(stepInput.value) : 1;
+                const stepBtn = div.querySelector('.jog-step-cycle');
+                const step = stepBtn ? parseFloat(stepBtn.dataset.step) : 1;
                 
                 const idx = viz.selectedStart || 0;
                 if (viz.starts && viz.starts[idx]) {
@@ -56,8 +52,6 @@ export function setupJogPendant(viz) {
                     if (axis === 'x') s.x += dir * step;
                     if (axis === 'y') s.y += dir * step;
                     if (axis === 'z') s.z += dir * step;
-                    if (axis === 'xy' && dir === 0) { s.x = 0; s.y = 0; }
-                    if (axis === 'z' && dir === 0) { s.z = 0; }
                     
                     viz._positionMarkers();
                     viz._rebuild();
@@ -65,6 +59,16 @@ export function setupJogPendant(viz) {
                     if (typeof viz.onStartChange === 'function') viz.onStartChange(viz.starts);
                 }
             });
+        });
+
+        // Step is a single CYCLE-TOGGLE button: 0.1 → 1 → 10 → 100 → (wrap). Brings back the fine (0.1) and
+        // coarse (100) steps without four radios cluttering the row.
+        const STEPS = [0.1, 1, 10, 100];
+        const stepBtn = div.querySelector('.jog-step-cycle');
+        if (stepBtn) stepBtn.addEventListener('click', () => {
+            const i = (STEPS.indexOf(parseFloat(stepBtn.dataset.step)) + 1) % STEPS.length;
+            stepBtn.dataset.step = String(STEPS[i]);
+            stepBtn.textContent = String(STEPS[i]);
         });
 
         // Start selector — pick which start marker the jog buttons drive. Multi-pass programs
