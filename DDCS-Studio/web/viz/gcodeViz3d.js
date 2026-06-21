@@ -939,14 +939,9 @@ export class GcodeViz3D {
             if (!/^[ncp]{3}$/.test(dcode)) dcode = OLD_DATUM[dcode] || 'nnp';
             const dfrac = { n: 0, c: 0.5, p: 1 };
             const D = [dfrac[dcode[0]] * stock.x, dfrac[dcode[1]] * stock.y, dfrac[dcode[2]] * stock.z];   // [Dx,Dy,Dz] from min corner (Dz: 0=bottom, z=top)
-            let pinX = 0, pinY = 0, pinZ = 0;
-            const mw = this._machine, wt = mw && mw.wcs && mw.wcs.table;
-            if (stock.pin && stock.pin !== 'origin' && wt) {
-                const gi = parseInt(String(stock.pin).replace(/[^0-9]/g, ''), 10) - 54;   // 'g54' → 0
-                const t = wt[gi], wo = mw.workOrigin || {};
-                if (t) { pinX = (Number(t.x) || 0) - (wo.x || 0); pinY = (Number(t.y) || 0) - (wo.y || 0); pinZ = (Number(t.z) || 0) - (wo.z || 0); }
-            }
-            pg.position.set(stock.x / 2 - D[0] + pinX, stock.y / 2 - D[1] + pinY, stock.z / 2 - D[2] + pinZ);
+            // Positioned by its DATUM only (part-zero at part-local 0); the PART frame carries it to the stock's WCS
+            // (see _partShift), so op + stock share one offset and never double-count.
+            pg.position.set(stock.x / 2 - D[0], stock.y / 2 - D[1], stock.z / 2 - D[2]);
             mesh.position.sub(C);
             edges.position.sub(C);
             this.stockMesh = mesh; pg.add(mesh);
@@ -961,6 +956,7 @@ export class GcodeViz3D {
             bed.renderOrder = -1;
             this.tableMesh = bed; this.partFrame.add(bed);   // (step 1: bed rides the part; becomes the fixed machine floor next)
         }
+        this.partFrame.update(this._partShift());   // stock pin / WCS may have changed → re-place op+stock at the stock's WCS
     }
 
     // Tool Setter Block
@@ -986,11 +982,26 @@ export class GcodeViz3D {
         }
     }
 
-    // Wireframe machine envelope (scene = machine − workOrigin) + axis lines at machine-zero (home / limits).
+    // The part-frame offset = machine coords of part-zero. The whole setup (op + stock) sits at the STOCK's WCS
+    // (its "Sits at WCS" pin, looked up in the WCS table) when the machine envelope is shown; else 0 (part-zero at
+    // scene 0, the per-op view). ONE source for op + stock so they never diverge. See machine-frame-sim-spec.
+    _partShift() {
+        const m = this._machine, s = this._stock;
+        if (!(m && m.show && m.x && m.y && m.z)) return { x: 0, y: 0, z: 0 };
+        const pin = s && s.pin, wt = m.wcs && m.wcs.table;
+        if (pin && pin !== 'origin' && Array.isArray(wt)) {
+            const t = wt[parseInt(String(pin).replace(/[^0-9]/g, ''), 10) - 54];   // 'g54' → table[0]
+            if (t) return { x: Number(t.x) || 0, y: Number(t.y) || 0, z: Number(t.z) || 0 };
+        }
+        return { x: 0, y: 0, z: 0 };   // stock at the program zero (machine origin)
+    }
+
+    // Wireframe machine envelope (fixed machine coords; home at scene 0) + machine-zero axes. The PART frame carries
+    // op/stock to the stock's WCS instead, so the envelope never moves.
     setMachine(machine) {
         const THREE = this.THREE;
         this._machine = machine || null;
-        this.partFrame.update(machine);   // machine frame shown → part shifts to +workOrigin; else 0 (part-zero at scene 0)
+        this.partFrame.update(this._partShift());   // op + stock ride the STOCK's WCS (machine view); else part-zero at scene 0
         if (this.machineBox) { this.scene.remove(this.machineBox); this.machineBox.geometry.dispose(); this.machineBox.material.dispose(); this.machineBox = null; }
         if (this.machineAxes) { this.scene.remove(this.machineAxes); if (this.machineAxes.geometry) this.machineAxes.geometry.dispose(); if (this.machineAxes.material) this.machineAxes.material.dispose(); this.machineAxes = null; }
         const sx = machine ? machine.x : 0, sy = machine ? machine.y : 0, sz = machine ? machine.z : 0;
@@ -999,15 +1010,14 @@ export class GcodeViz3D {
             const eg = new THREE.EdgesGeometry(src);
             src.dispose();
             const box = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x6c7a8c, transparent: true, opacity: 0.4 }));
-            const w = machine.workOrigin || { x: 0, y: 0, z: 0 };
+            const sh = this.partFrame.shift;   // part-zero offset (the stock's WCS) — home shows when it's separate
             // Envelope spans machine 0..travel (signed) in MACHINE coords — home stays at scene 0 (fixed); the PART
-            // frame shifts to +workOrigin instead, so the envelope never moves when the WCS changes.
+            // frame shifts to the stock's WCS instead, so the envelope never moves when the WCS changes.
             box.position.set(sx / 2, sy / 2, sz / 2);
             this.machineBox = box; this.scene.add(box);
-            // Machine-zero (home) marker — ONLY when it is SEPARATE from part-zero. With the default work origin
-            // (0,0,0), machine-zero sits exactly on the origin axes and would just read as a redundant triad, so we
-            // skip it. With a real WCS offset it marks home at its own spot (X red / Y green / Z blue, +dirs).
-            if (w.x || w.y || w.z) {
+            // Machine-zero (home) marker — ONLY when it is SEPARATE from part-zero (the part rides a non-zero WCS);
+            // at the origin it would just duplicate the part-zero axes. Marks home at scene 0 (X red / Y green / Z blue).
+            if (sh.x || sh.y || sh.z) {
                 const axLen = (Math.min(Math.abs(sx), Math.abs(sy), Math.abs(sz)) * 0.3) || 40;
                 const ax = new THREE.AxesHelper(axLen);
                 ax.position.set(0, 0, 0);   // machine home at scene 0 (part-zero rides the part frame at +workOrigin)

@@ -24,11 +24,10 @@ export class PartFrame {
     /** Add an object to the moving part frame (instead of scene.add). */
     add(obj) { this.group.add(obj); return obj; }
 
-    /** Offset = the active WCS (machine coords of part-zero) when a machine envelope is shown; else 0 (part-zero at
-     *  scene 0). Returns true if the offset changed. */
-    update(machine) {
-        const on = !!(machine && machine.show && machine.x && machine.y && machine.z);
-        const o = (on && machine.workOrigin) ? machine.workOrigin : { x: 0, y: 0, z: 0 };
+    /** Set the part-frame offset = machine coords of part-zero (the STOCK's WCS in machine view, else 0). The viz
+     *  computes it (stock pin + WCS table) so op + stock share ONE source. Returns true if it changed. */
+    update(shift) {
+        const o = shift || { x: 0, y: 0, z: 0 };
         const nx = o.x || 0, ny = o.y || 0, nz = o.z || 0;
         const changed = nx !== this.shift.x || ny !== this.shift.y || nz !== this.shift.z;
         this.shift = { x: nx, y: ny, z: nz };
