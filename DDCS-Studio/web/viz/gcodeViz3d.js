@@ -297,17 +297,23 @@ export class GcodeViz3D {
     }
 
 
-    _ensureAnimTool() {
-        if (this._animTool) return;
+    _ensureAnimTool() { if (!this._animTool) this._buildAnimTool(); }
+    // The moving sim tool = the ACTUAL tool PROFILE (toolHalfProfile, revolved) — the same builder as the ATC
+    // magazine — sized by the PER-OP tool (setSimTool); defaults to a 6 mm endmill. Tip at the local origin so
+    // setToolPosition places the cutting point on the path; body extends up (+Z) toward the spindle.
+    _buildAnimTool() {
         const THREE = this.THREE;
-        this._animTool = new THREE.Mesh(
-            new THREE.SphereGeometry(2.5, 16, 16),
-            new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })
-        );
-        this._animTool.renderOrder = 25; // above the toolpath (20) so the dot stays visible
-        this._animTool.visible = false;
+        if (this._animTool) { this.scene.remove(this._animTool); this._animTool.geometry.dispose(); this._animTool.material.dispose(); }
+        const tool = this._simTool || { type: 'endmill', dia: 6 };
+        const pts = toolHalfProfile(tool).map((q) => new THREE.Vector2(Math.max(0.001, q[0]), q[1]));
+        const geo = new THREE.LatheGeometry(pts, 24); geo.rotateX(Math.PI / 2);   // Lathe revolves around Y → rotate to Z (Z-up; tip at origin)
+        this._animTool = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffab40, depthTest: false, transparent: true, opacity: 0.9 }));
+        this._animTool.renderOrder = 25; // above the toolpath (20) so the tool stays visible
+        this._animTool.visible = !!this._animOn;
         this.scene.add(this._animTool);
     }
+    // Set the PER-OP tool { type, dia, length } → rebuild the moving tool to its real profile.
+    setSimTool(tool) { this._simTool = tool || null; if (this._animTool) this._buildAnimTool(); }
 
     // Toggle a tool dot that travels the whole path in execution order, feed-true (real program time)
     setAnimate(on) {
