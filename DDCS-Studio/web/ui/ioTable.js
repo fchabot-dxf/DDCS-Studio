@@ -154,9 +154,12 @@ export function renderMagazineTable(container, atc, onChange) {
     const rerender = () => renderMagazineTable(container, atc, onChange);
     container.innerHTML = '';
 
-    atc.magType = 'straight';   // carousel/disk magazines aren't used on these controllers — straight/linear only
     const ctl = document.createElement('div');
     ctl.style.cssText = 'display:flex; gap:16px; align-items:flex-end; margin-bottom:12px; flex-wrap:wrap;';
+    const typeSel = document.createElement('select');
+    [['straight', 'Straight / linear'], ['disk', 'Disk / carousel']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if ((atc.magType || 'straight') === v) o.selected = true; typeSel.appendChild(o); });
+    typeSel.addEventListener('change', () => { atc.magType = typeSel.value; onChange(); rerender(); });
+    ctl.appendChild(field('Magazine type', typeSel, 150));
     const cnt = document.createElement('input'); cnt.type = 'number'; cnt.min = '0'; cnt.max = '99'; cnt.value = atc.magazine.length;
     cnt.addEventListener('change', () => {
         const n = Math.max(0, Math.min(99, parseInt(cnt.value, 10) || 0));
