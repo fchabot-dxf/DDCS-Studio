@@ -78,7 +78,6 @@ export function createPreviewPanel(container, opts = {}) {
 
     let viz = null;            // GcodeViz3D (lazy — only when 3D is shown and WebGL is available)
     let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false;
-    let lastVizMode = mode === 'io' ? '3d' : mode;   // the 2D/3D view to return to when leaving the docked I/O view
     let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false;
 
     // The 2D canvas only repaints when told to; without this it goes blank if first drawn at a transient/zero
@@ -131,7 +130,7 @@ export function createPreviewPanel(container, opts = {}) {
             onLineChange: ({ lineIndex, raw }) => { if (typeof opts.onLine === 'function') opts.onLine(lineIndex); if (raw) setStatus(`Executing line ${lineIndex + 1}: ${raw.trim()}`); },
             onPositionChange: (pos) => { if (viz && viz.setToolPosition) viz.setToolPosition(pos); if (mode === '2d' && segs.length) t2.seek(nearest2d(pos)); },
             onStatus: ({ message }) => setStatus(message),
-            onWait: (wait) => { if (!window.ioPanel) return; if (mode !== 'io' && wait) window.ioPanel.show(); window.ioPanel.setWait(wait); },   // docked I/O view already shows it; else float
+            onWait: (wait) => { if (!window.ioPanel) return; if (wait) window.ioPanel.show(); window.ioPanel.setWait(wait); },   // float the I/O panel during a probe/M-code wait
             onFinish: () => {
                 updateRunBtn();
                 if (typeof opts.onLine === 'function') opts.onLine(null);
@@ -213,21 +212,9 @@ export function createPreviewPanel(container, opts = {}) {
     }
 
     function setMode(next) {
-        const ioBtn = q('.pp-io');
-        if (next !== 'io') lastVizMode = next;     // remember the viz to return to
+        if (next === 'io') { toggleIoFloat(); return; }   // I/O is a FLOATING panel now — it never docks over the view
         mode = next;
         stopPlay();
-        // I/O view: dock the shared virtual-I/O panel into the pane in place of the 2D/3D canvas (no toolpath).
-        if (mode === 'io') {
-            if (cv2d) cv2d.style.display = 'none';
-            if (viz) { viz.setActive(false); if (viz.renderer) viz.renderer.domElement.style.display = 'none'; }
-            if (window.ioPanel) window.ioPanel.show(container);
-            if (ioBtn) ioBtn.classList.add('on');
-            syncJog();
-            return;
-        }
-        if (window.ioPanel && window.ioPanel.isVisible()) window.ioPanel.hide();   // release the dock when leaving
-        if (ioBtn) ioBtn.classList.remove('on');
         const mt = q('.pp-mtoggle');
         if (mt) mt.textContent = mode === '2d' ? '2D' : '3D';   // single toggle: label = current view
         if (cv2d) cv2d.style.display = mode === '2d' ? '' : 'none';
@@ -241,6 +228,15 @@ export function createPreviewPanel(container, opts = {}) {
         }
         if (active) setGcode();
         if (mode === '2d') { t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.fit(); }   // frame the full scene on toggle
+        syncJog();
+    }
+    // The I/O button toggles the FLOATING virtual-I/O panel (mounts in <body>, draggable). It OVERLAYS the
+    // preview instead of replacing it, so the 2D/3D view stays put. (Docking it blanked full-screen/portrait
+    // layouts where the embedded panel landed off-screen.)
+    function toggleIoFloat() {
+        if (!window.ioPanel) return;
+        if (window.ioPanel.isVisible()) window.ioPanel.hide(); else window.ioPanel.show();
+        const b = q('.pp-io'); if (b) b.classList.toggle('on', window.ioPanel.isVisible());
     }
 
     function play() {
@@ -282,7 +278,7 @@ export function createPreviewPanel(container, opts = {}) {
     q('.pp-stock').addEventListener('click', (e) => toggleStockEditor(e.currentTarget));
 
     // ---- play / view controls ----
-    q('.pp-mtoggle').addEventListener('click', () => setMode(mode === 'io' ? lastVizMode : (mode === '2d' ? '3d' : '2d')));
+    q('.pp-mtoggle').addEventListener('click', () => setMode(mode === '2d' ? '3d' : '2d'));
     q('.pp-run').addEventListener('click', () => {
         const eng = ensureEngine();
         if (eng.running && !eng.paused) stopPlay();
@@ -304,7 +300,7 @@ export function createPreviewPanel(container, opts = {}) {
         grid.style.display = open ? '' : 'none';
         q('.pp-jog').classList.toggle('on', open);
     });
-    q('.pp-io').addEventListener('click', () => setMode(mode === 'io' ? lastVizMode : 'io'));   // dock/undock the I/O panel as a 3rd view
+    q('.pp-io').addEventListener('click', () => toggleIoFloat());   // toggle the FLOATING I/O panel (overlays; doesn't replace the view)
     q('.pp-follow').addEventListener('click', () => {
         const v = ensureViz(); if (!v || !v.setFollowCam) return;
         const on = !v.followCam;

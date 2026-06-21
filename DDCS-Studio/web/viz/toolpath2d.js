@@ -14,8 +14,22 @@
  */
 import { traceToolpath } from '../engine/trace.js';
 
-const COL = { rapid: '#5a6b7d', feed: '#33b1c9', probe: '#e35c5c' };
-const typeOf = (s) => (s.probe ? 'probe' : (s.rapid ? 'rapid' : (s.type || 'feed')));
+// Colours MATCH THE 3D LEGEND: rapid = yellow (dashed), retract = green, probe = blue (slow = light blue, dotted),
+// feed = a blue→teal gradient by DEPTH (Z) across the path — which also surfaces the Z you can't see top-down.
+const FEED_LOW = 0x0a4fd0, FEED_HIGH = 0x35ffd0;
+const typeOf = (s) => s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed');
+function lerpHex(c1, c2, t) {
+    t = Math.max(0, Math.min(1, t));
+    const r1 = (c1 >> 16) & 255, g1 = (c1 >> 8) & 255, b1 = c1 & 255, r2 = (c2 >> 16) & 255, g2 = (c2 >> 8) & 255, b2 = c2 & 255;
+    return `rgb(${Math.round(r1 + (r2 - r1) * t)},${Math.round(g1 + (g2 - g1) * t)},${Math.round(b1 + (b2 - b1) * t)})`;
+}
+function segColor(s, zMin, zRange, maxPF) {
+    const t = typeOf(s);
+    if (t === 'rapid') return '#ffcc00';
+    if (t === 'retract') return '#33cc55';
+    if (t === 'probe') return ((s.feed || 0) > 0 && (s.feed || 0) < maxPF) ? '#93c5fd' : '#3b82f6';
+    return lerpHex(FEED_LOW, FEED_HIGH, zRange ? (((s.z1 || 0) + (s.z2 || 0)) / 2 - zMin) / zRange : 0.5);
+}
 const OLD_DATUM = { fl: 'nnp', fr: 'pnp', bl: 'npp', br: 'ppp', center: 'ccp' };
 
 // A "nice" step (1/2/5 × 10^n) ~14 cells across a span — the grid increment when not pinned in Preview.
@@ -108,21 +122,26 @@ export function createToolpath2d(canvas) {
         if (foot.minX <= 0 && foot.maxX >= 0) { ctx.strokeStyle = 'rgba(95,211,95,0.6)'; ctx.beginPath(); ctx.moveTo(tx(0), ty(foot.minY)); ctx.lineTo(tx(0), ty(foot.maxY)); ctx.stroke(); }
         ctx.restore();
     }
-    function strokeSegs(ctx, from, to, alpha, width) {
+    function strokeSegs(ctx, from, to, alpha, width, zMin, zRange, maxPF) {
         ctx.globalAlpha = alpha;
         for (let i = from; i < to; i++) {
             const s = segs[i], t = typeOf(s);
-            ctx.strokeStyle = COL[t] || '#888'; ctx.lineWidth = t === 'rapid' ? width * 0.6 : width; ctx.setLineDash(t === 'rapid' ? [4, 3] : []);
+            ctx.strokeStyle = segColor(s, zMin, zRange, maxPF);
+            ctx.lineWidth = t === 'rapid' ? width * 0.6 : width;
+            ctx.setLineDash(t === 'probe' ? [2, 3] : (t === 'rapid' ? [5, 4] : []));   // probe dotted, rapid dashed (match 3D)
             ctx.beginPath(); ctx.moveTo(tx(s.x1), ty(s.y1)); ctx.lineTo(tx(s.x2), ty(s.y2)); ctx.stroke();
         }
         ctx.globalAlpha = 1; ctx.setLineDash([]);
     }
     function drawPath(ctx, k) {
         if (!segs.length) return;
-        if (k == null) { strokeSegs(ctx, 0, segs.length, 1, 2); return; }
+        let zMin = Infinity, zMax = -Infinity, maxPF = 0;   // feed depth-gradient range + the fast-probe feed threshold
+        for (const s of segs) { zMin = Math.min(zMin, s.z1, s.z2); zMax = Math.max(zMax, s.z1, s.z2); if ((s.type === 'probe' || s.probe) && (s.feed || 0) > maxPF) maxPF = s.feed; }
+        const zR = (zMax - zMin) || 1;
+        if (k == null) { strokeSegs(ctx, 0, segs.length, 1, 2, zMin, zR, maxPF); return; }
         const n = Math.max(0, Math.min(k, segs.length));
-        strokeSegs(ctx, n, segs.length, 0.22, 1.5);
-        strokeSegs(ctx, 0, n, 1, 2.6);
+        strokeSegs(ctx, n, segs.length, 0.22, 1.5, zMin, zR, maxPF);
+        strokeSegs(ctx, 0, n, 1, 2.6, zMin, zR, maxPF);
         const head = segs[n - 1] || segs[0]; const hx = tx(n > 0 ? head.x2 : head.x1), hy = ty(n > 0 ? head.y2 : head.y1);
         ctx.fillStyle = '#ffd24a'; ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI * 2); ctx.fill();
     }
@@ -137,14 +156,15 @@ export function createToolpath2d(canvas) {
         for (let j = Math.ceil(foot.minY / step); j <= Math.floor(foot.maxY / step) + 1e-9; j++) { const py = ty(j * step); if (py < 8 || py > h - 12 || last - py < 26) continue; last = py; ctx.fillText(String(Math.round(j * step)), 3, py); }
         ctx.restore();
     }
-    function drawReadout(ctx, c, w, h) {   // tooltip that FOLLOWS the cursor (so it never collides with the status bar)
+    function drawReadout(ctx, c, w, h) {   // tooltip BESIDE the cursor (clear of the pointer graphic + the status bar)
         const txt = `X ${c.x.toFixed(1)}   Y ${c.y.toFixed(1)}`;
         ctx.save(); ctx.font = '11px sans-serif'; ctx.textBaseline = 'top';
         const pad = 6, bw = ctx.measureText(txt).width + pad * 2, bh = 18;
-        let sx = tx(c.x) + 14, sy = ty(c.y) + 16;
-        if (sx + bw > w - 2) sx = tx(c.x) - 14 - bw;   // flip left near the right edge
-        if (sy + bh > h - 2) sy = ty(c.y) - 16 - bh;   // flip up near the bottom edge
-        sx = Math.max(2, sx); sy = Math.max(2, sy);
+        const px = tx(c.x), py = ty(c.y);
+        let sx = px + 18;                                // to the RIGHT of the cursor, clear of the arrow
+        const sy = Math.max(2, Math.min(h - bh - 2, py - bh / 2));   // vertically centred on the cursor
+        if (sx + bw > w - 2) sx = px - 18 - bw;          // flip left near the right edge
+        sx = Math.max(2, sx);
         ctx.fillStyle = 'rgba(13,17,23,0.9)'; ctx.fillRect(sx, sy, bw, bh);
         ctx.strokeStyle = 'rgba(120,140,160,0.4)'; ctx.lineWidth = 1; ctx.strokeRect(sx + 0.5, sy + 0.5, bw - 1, bh - 1);
         ctx.fillStyle = '#cdd9e6'; ctx.textAlign = 'left'; ctx.fillText(txt, sx + pad, sy + 4);
