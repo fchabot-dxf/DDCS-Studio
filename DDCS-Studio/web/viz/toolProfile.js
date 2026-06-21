@@ -27,9 +27,9 @@ export function toolHalfProfile(tool) {
 
     switch (type) {
         case 'ballnose': {                          // hemispherical tip of radius r, then straight shank
-            const pts = []; const segs = 10;
+            const pts = []; const segs = 18;
             for (let i = 0; i <= segs; i++) { const a = (Math.PI / 2) * (i / segs); pts.push([r * Math.sin(a), r - r * Math.cos(a)]); }
-            pts.push([r, Math.max(len, r)]);
+            pts.push([r, Math.max(len, r * 2)]);
             return pts;
         }
         case 'vbit': case 'chamfer': case 'engraver': case 'spotdrill': {   // cone to full Ø, then shank
@@ -52,18 +52,23 @@ export function toolHalfProfile(tool) {
     }
 }
 
-/** SVG string of the tool (mirrored half-profile) fit into w×h px. Tip at the bottom. */
-export function toolProfileSvg(tool, { w = 40, h = 60, color = 'var(--accent, #6cc)', stroke = '#888', bg = 'transparent' } = {}) {
+/** SVG string of the tool (mirrored half-profile) fit into w×h px, tip at the bottom.
+ *  Scaling is UNIFORM (same px/mm on both axes) so the geometry is true — a ballnose reads as a real hemisphere
+ *  and a V-bit keeps its real included angle. A long shank is truncated to `maxAspect`× the tool width so the
+ *  cutter doesn't shrink to a sliver (shank length isn't cutting geometry; the tip is what must be accurate). */
+export function toolProfileSvg(tool, { w = 40, h = 60, color = 'var(--accent, #6cc)', stroke = '#888', bg = 'transparent', maxAspect = 2.6 } = {}) {
     const half = toolHalfProfile(tool);
     const maxR = Math.max(0.1, ...half.map((p) => p[0]));
-    const maxZ = Math.max(0.1, ...half.map((p) => p[1]));
+    const fullZ = Math.max(0.1, ...half.map((p) => p[1]));
+    const drawnZ = Math.min(fullZ, 2 * maxR * maxAspect);             // cap the drawn length for the icon
+    const clipped = half.map((p) => [p[0], Math.min(p[1], drawnZ)]);  // clamp the shank top to the cap
     const pad = 3;
-    const sx = (w / 2 - pad) / maxR;            // px per mm radius (fit width)
-    const sz = (h - 2 * pad) / maxZ;            // px per mm length (fit height) — non-uniform so it always fits
+    const s = Math.min((w / 2 - pad) / maxR, (h - 2 * pad) / drawnZ); // UNIFORM scale, fit within the box
     const cx = w / 2;
-    const toXY = (p, sign) => [(cx + sign * p[0] * sx).toFixed(1), ((h - pad) - p[1] * sz).toFixed(1)];
-    const right = half.map((p) => toXY(p, 1));
-    const left = half.slice().reverse().map((p) => toXY(p, -1));
+    const baseY = (h + drawnZ * s) / 2;                              // vertically centred; tip at the bottom
+    const toXY = (p, sign) => [(cx + sign * p[0] * s).toFixed(1), (baseY - p[1] * s).toFixed(1)];
+    const right = clipped.map((p) => toXY(p, 1));
+    const left = clipped.slice().reverse().map((p) => toXY(p, -1));
     const poly = right.concat(left).map((q) => q[0] + ',' + q[1]).join(' ');
     return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" class="tool-profile" aria-hidden="true">`
         + (bg !== 'transparent' ? `<rect width="${w}" height="${h}" fill="${bg}"/>` : '')
