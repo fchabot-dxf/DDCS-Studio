@@ -355,6 +355,9 @@ function buildSettingsOverlay() {
             #settings-app .settings-head { justify-content: space-between; }
             #settings-app .settings-close { margin-left: auto; background: transparent; border: none; box-shadow: none; text-shadow: none; color: var(--text-dim); font-size: 17px; line-height: 1; cursor: pointer; padding: 4px 8px; min-height: 0; border-radius: var(--radius, 4px); }
             #settings-app .settings-close:hover { color: var(--text-main); background: var(--bg); }
+            #settings-app .settings-foot { justify-content: flex-end; }
+            #settings-app .settings-done { background: var(--accent); color: #fff; border: none; border-radius: var(--radius, 5px); padding: 7px 24px; font-size: 13px; font-weight: 600; cursor: pointer; transition: filter 120ms; }
+            #settings-app .settings-done:hover { filter: brightness(1.12); }
         </style>
             <div class="settings-head">
                 <div style="display: flex; align-items: center; gap: 16px;">
@@ -374,9 +377,10 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="general" data-target="set_tab_compose">Editor</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_program">Program</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_gateway">Gateway</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_faq">FAQ</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_about">About</button>
                     <div class="sidebar-group-label" data-group-label="hardware" style="display:none;">Hardware</div>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_machine" style="display:none;">Machine</button>
@@ -477,6 +481,28 @@ function buildSettingsOverlay() {
                             <button class="toolbar-btn settings-io" id="set_export">⬇ Export CSV</button>
                             <span class="settings-hint" id="set_var_count"></span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- GENERAL: FAQ -->
+                <div id="set_tab_faq" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">FREQUENTLY ASKED</div>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What is DDCS Studio?</summary><div class="settings-hint" style="margin-top:6px;">A companion app for DDCS Expert / M350 controllers: wizards that generate G-code, a CAM-pack builder, a full toolpath simulator, and a gateway to send programs to the machine.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Do I need the desktop app?</summary><div class="settings-hint" style="margin-top:6px;">To talk to a real controller, yes — the desktop app is the <b>gateway</b> (it reaches your machine's CNCDISK share on the LAN). The hosted web page can design + simulate offline, but can't reach a machine.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I send a program to the controller?</summary><div class="settings-hint" style="margin-top:6px;">Open the <b>Gateway</b> tab, point it at your controller share (Settings → Gateway), then Send. System macros (T.nc, key-<i>N</i>.nc, slib-m.nc) are written to SYSDISK and backed up first.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Which controllers are supported?</summary><div class="settings-hint" style="margin-top:6px;">DDCS <b>Expert / M350</b> is the primary, fully-mapped target. V4.1 and a few others have partial support — the post/dialect switches with the selected profile.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I add a probe, ATC, or spindle?</summary><div class="settings-hint" style="margin-top:6px;">Settings → <b>Hardware</b> → use <b>+ Add</b> on the relevant tab. Adding an ATC also seeds the essential drawbar + sensor I/O.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I simulate a program before running it?</summary><div class="settings-hint" style="margin-top:6px;">Press <b>▶</b> in the preview bar. The simulator runs the full G-code through the execution engine — resolving #vars, IF/GOTO loops and probes — so parametric/probe macros play correctly, not just straight moves.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What does "Pull from controller" do?</summary><div class="settings-hint" style="margin-top:6px;">Reads your machine's live settings — WCS table, tool lengths, ATC magazine, travel/soft-limits — into a review modal so you can adopt them. Needs the gateway + a connected controller. It never writes the firmware-owned <code>camsetting</code>.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What is a CAM pack?</summary><div class="settings-hint" style="margin-top:6px;">A DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's on-board CAM page. Build, simulate and export one (USB-ready .zip) in the <b>Macros</b> tab → CAM Pack Builder.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Can I use Studio on my phone?</summary><div class="settings-hint" style="margin-top:6px;">Yes — the UI is responsive. Your desktop app serves Studio on your LAN; open the URL shown in Settings → Gateway from a phone/laptop on the same wifi.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I update Studio?</summary><div class="settings-hint" style="margin-top:6px;">The desktop app shows an in-app banner when a new release is published, with a one-click update. The web version updates automatically on load.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Cloud vs Gateway — what's the difference?</summary><div class="settings-hint" style="margin-top:6px;">The <b>Gateway</b> is the local desktop app that talks to <i>your machine</i> over the LAN (send programs, read settings, write macros). <b>Cloud</b> is optional <i>project storage</i> (e.g. Google Drive), separate from the machine — it syncs your profiles and programs across devices. You can use the Gateway with no Cloud, and Cloud with no machine connected.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What is the virtual I/O panel?</summary><div class="settings-hint" style="margin-top:6px;">The <b>I/O</b> button in the preview bar opens a floating panel showing the controller's inputs/outputs. During a simulation it <b>auto-answers sensors</b> so probe / M-code wait loops terminate hands-free; you can also flip inputs manually to test your logic.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Why does a probe in the sim run to the limit?</summary><div class="settings-hint" style="margin-top:6px;">A probe (G31) traces its full travel until it has <b>stock</b> to stop on. Set the Stock (the 📦 button) so the probe contacts the surface — then it stops at the real face instead of the soft-limit.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Why do some ops need me to jog the start position first?</summary><div class="settings-hint" style="margin-top:6px;">Some ops — especially <b>incremental / relative probes</b> — run <i>from the tool's current position</i>, not an absolute coordinate. Set where it begins by jogging the machine there (or dragging the <b>①</b> start handle in the preview) before running; otherwise the op traces from zero and can probe the wrong spot.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Found a bug or have an idea?</summary><div class="settings-hint" style="margin-top:6px;">Settings → <b>Feedback</b> → <b>🐛 Report a bug</b>. Tell us what you did and what you expected.</div></details>
                     </div>
                 </div>
 
@@ -769,6 +795,10 @@ function buildSettingsOverlay() {
                 </div>
 
                         </div><!-- end settings-content -->
+                </div><!-- end settings-body -->
+                <div class="settings-foot">
+                    <button class="settings-done" type="button" onclick="window.closeSettings && window.closeSettings()">Done</button>
+                </div>
             `;
     wireSettingsOverlay(parent);
 }
@@ -1753,7 +1783,7 @@ function wireSettingsOverlay(ov) {
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
     const sideTabs = [...ov.querySelectorAll('.settings-sidebar .settings-tab')];
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
-        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_program', 'set_tab_feedback', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_about',
+        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_faq', 'set_tab_feedback', 'set_tab_about',
                      'set_tab_machine', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
