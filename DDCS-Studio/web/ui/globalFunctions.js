@@ -5,7 +5,7 @@
 import { el } from './uiUtils.js';
 import { CornerVizAnimator } from '../viz/cornerVizAnimator.js';
 import { resetVirtualIO, setVirtualOutput, getVirtualInput } from '../engine/virtualIO.js';
-import { rotateProgram } from '../data/rotateProgram.js';
+import { rotateProgram, translateProgram } from '../data/rotateProgram.js';
 
 export function setupGlobalFunctions(app) {
         // Expose key functions to global scope for HTML onclick handlers
@@ -158,6 +158,38 @@ export function setupGlobalFunctions(app) {
                 const msg = `Rotated ${r.rotated} move(s) by ${ang}° about (${px}, ${py}).` + (r.hadIncremental ? ' ⚠ G91 incremental moves were left unrotated — check them.' : ' Simulate to verify.');
                 ov.querySelector('[data-rout]').innerHTML = msg;
                 ov.querySelector('[data-rout]').style.color = r.hadIncremental ? '#ff6b6b' : '#3c9';
+            });
+        };
+
+        // Position: translate the whole editor program by dX/dY/dZ — reposition the toolpath on the stock (a
+        // path-placement companion to ⟳ Align). Pure rewrite; ALWAYS simulate the result.
+        window.ddcsPositionTranslate = () => {
+            const ed = el('editor'); if (!ed) return;
+            const ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center;';
+            ov.innerHTML = `<div style="width:min(460px,92vw); background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px;">
+                <b>✥ Position program (translate)</b>
+                <div class="settings-hint" style="margin:0">Shift every absolute move by an offset — reposition the whole toolpath on the stock. Arc offsets and G91/G53 moves are left as-is. <b>Simulate the result before cutting.</b></div>
+                <div class="settings-row"><label style="flex:1">Shift X<input type="number" data-dx value="0" step="0.001" style="width:100%"></label><label style="flex:1">Shift Y<input type="number" data-dy value="0" step="0.001" style="width:100%"></label><label style="flex:1">Shift Z<input type="number" data-dz value="0" step="0.001" style="width:100%"></label></div>
+                <div data-tout class="settings-hint" style="margin:0"></div>
+                <div class="settings-row" style="justify-content:flex-end"><button class="toolbar-btn settings-io" data-tc>Cancel</button><button class="toolbar-btn settings-io" data-tgo>Position editor program</button></div>
+            </div>`;
+            document.body.appendChild(ov);
+            const close = () => ov.remove();
+            ov.querySelector('[data-tc]').addEventListener('click', close);
+            ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+            ov.querySelector('[data-tgo]').addEventListener('click', () => {
+                const dx = parseFloat(ov.querySelector('[data-dx]').value) || 0;
+                const dy = parseFloat(ov.querySelector('[data-dy]').value) || 0;
+                const dz = parseFloat(ov.querySelector('[data-dz]').value) || 0;
+                if (!dx && !dy && !dz) { ov.querySelector('[data-tout]').textContent = 'Enter a non-zero shift.'; return; }
+                const r = translateProgram(ed.value, dx, dy, dz);
+                ed.value = r.text;
+                ed.dispatchEvent(new Event('input', { bubbles: true }));   // refresh highlight + preview
+                window.ddcsTrack?.('feature', 'position-translate');
+                const msg = `Shifted ${r.moved} move(s) by (${dx}, ${dy}, ${dz}).` + (r.hadIncremental ? ' ⚠ G91 incremental moves were left as-is — check them.' : ' Simulate to verify.');
+                ov.querySelector('[data-tout]').innerHTML = msg;
+                ov.querySelector('[data-tout]').style.color = r.hadIncremental ? '#ff6b6b' : '#3c9';
             });
         };
 

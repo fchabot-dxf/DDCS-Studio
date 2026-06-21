@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
-    <title>DDCS Studio V10.24 - Modular</title>
+    <title>DDCS Studio V10.25 - Modular</title>
     
     <!-- Ensure project stylesheet is applied after inline legacy rules -->
     <link rel="stylesheet" href="styles.css">
@@ -92,7 +92,7 @@
             <svg class="logo logo-futuristic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-futuristic"/></svg>
             <svg class="logo logo-organic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-organic"/></svg>
             <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
-            <span class="ver">V10.24</span>
+            <span class="ver">V10.25</span>
         </a>
         <!-- File / quick-actions menu — sits right of the logo (file + settings menus go top-left).
              Opens the file-ops / post-processor / theme / settings popover (ui/headerPost.js). -->
@@ -141,6 +141,7 @@
                 <pre id="editor-highlight" class="editor-layer" aria-hidden="true"></pre>
                 <textarea id="editor" class="editor-layer" spellcheck="false" inputmode="none" placeholder="( System Ready )"></textarea>
                 <button id="align-rotate-btn" type="button" onclick="ddcsAlignRotate()" class="toolbar-btn settings-io" title="Alignment correction — rotate the whole program by a measured fence angle about a pivot (no G68 on DDCS, so Studio does it). Simulate after." style="position:absolute; left:8px; bottom:8px; z-index:3; opacity:.75; font-size:11px; padding:3px 8px;">⟳ Align</button>
+                <button id="position-translate-btn" type="button" onclick="ddcsPositionTranslate()" class="toolbar-btn settings-io" title="Reposition the whole program on the stock — shift every absolute move by X/Y/Z. Companion to Align. Simulate after." style="position:absolute; left:78px; bottom:8px; z-index:3; opacity:.75; font-size:11px; padding:3px 8px;">✥ Position</button>
                 <div id="editor-statusbar" class="editor-statusbar hidden">
                     <button class="editor-status-copy" id="editor-status-copy" type="button" title="Copy errors to the clipboard" aria-label="Copy errors">
                         <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" style="vertical-align:middle" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>

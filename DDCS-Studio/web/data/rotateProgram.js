@@ -55,3 +55,31 @@ export function rotateProgram(gcode, angleDeg, px = 0, py = 0) {
     });
     return { text: out.join('\n'), hadIncremental, rotated };
 }
+
+/**
+ * Translate a program's geometry by (dx,dy,dz) — shift the whole toolpath on the stock (a path-placement companion
+ * to rotateProgram). Absolute (G90) X/Y/Z moves get the delta added; arc offsets I/J/K are RELATIVE vectors (centre
+ * offsets) so they're unchanged; G91 incremental and G53 machine-coord moves are left alone (a shift would move them
+ * wrongly). Per-axis independent, so partial moves carry the already-shifted modal position. Pure; simulate after.
+ * @param {string} gcode @param {number} [dx=0] @param {number} [dy=0] @param {number} [dz=0]
+ * @returns {{ text:string, hadIncremental:boolean, moved:number }}
+ */
+export function translateProgram(gcode, dx = 0, dy = 0, dz = 0) {
+    dx = Number(dx) || 0; dy = Number(dy) || 0; dz = Number(dz) || 0;
+    let abs = true, hadIncremental = false, moved = 0;
+    const out = String(gcode == null ? '' : gcode).split(/\r?\n/).map((raw) => {
+        if (/\bG91\b/.test(raw)) abs = false;
+        if (/\bG90\b/.test(raw)) abs = true;
+        const X = numAfter(raw, 'X'), Y = numAfter(raw, 'Y'), Z = numAfter(raw, 'Z');
+        if (!X && !Y && !Z) return raw;                  // no linear geometry → pass through
+        if (!abs) { hadIncremental = true; return raw; } // incremental moves: a shift doesn't apply
+        if (/\bG53\b/.test(raw)) return raw;             // machine-coord move: don't shift it elsewhere in the machine
+        let line = raw;
+        if (X) line = line.replace(X.token, 'X' + r3(X.val + dx));
+        if (Y) line = line.replace(Y.token, 'Y' + r3(Y.val + dy));
+        if (Z) line = line.replace(Z.token, 'Z' + r3(Z.val + dz));
+        moved += 1;
+        return line;
+    });
+    return { text: out.join('\n'), hadIncremental, moved };
+}
