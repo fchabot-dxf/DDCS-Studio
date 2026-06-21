@@ -268,31 +268,40 @@ window.ddcsProbeSrcAvailable = probeSrcAvailable;
 window.ddcsSetProbeSrc = setProbeSrc;
 window.ddcsResolveProbeSources = resolveProbeSources;
 
-// A live schematic of the spindle HEAD assembly (spindle ▸ collet ▸ a sample tool) for the Preview settings —
-// gives the dimension fields a visual. Diameters are to-scale against each other; lengths are schematic (the real
-// value is labelled, since a 200 mm spindle would otherwise dwarf a 30 mm collet).
-function headSchematicSvg(head) {
-    const h = head || {};
-    const n = (v, d) => { const x = Number(v); return Number.isFinite(x) && x > 0 ? x : d; };
-    const sD = n(h.spindleDia, 80), sL = n(h.spindleLen, 200);
-    const cD = n(h.colletDia, 20), cL = n(h.colletLen, 30);
-    const W = 150, H = 150, cx = 52, maxD = Math.max(sD, cD, 6);
-    const ppm = (W * 0.5) / maxD;                                   // width scale: widest part fits ~half the box
-    const tD = 6, sw = sD * ppm, cw = cD * ppm, tw = Math.max(3, tD * ppm);
-    const sH = 64, cH = 22, tH = 30;                               // schematic heights (lengths are labelled, not to scale)
-    const rect = (w, hh, yy, fill) => `<rect x="${(cx - w / 2).toFixed(1)}" y="${yy}" width="${w.toFixed(1)}" height="${hh}" rx="2" fill="${fill}" stroke="#9fb4c8" stroke-width="0.8"/>`;
-    const label = (txt, yy) => `<text x="${(cx + maxD * ppm / 2 + 8).toFixed(0)}" y="${(yy + 3).toFixed(0)}" fill="#9fb4c8" font-size="9">${txt}</text>`;
-    let y = 12, svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">`;
-    svg += rect(sw, sH, y, '#6b7682') + label(`Spindle Ø${sD}×${sL}`, y + sH / 2); y += sH;
-    svg += rect(cw, cH, y, '#9aa6b2') + label(`Collet Ø${cD}×${cL}`, y + cH / 2); y += cH;
-    svg += rect(tw, tH, y, '#ffab40') + label('tool', y + tH / 2);
-    return svg + '</svg>';
+// Interactive head schematic for Preview settings (Centroid-conversational style): the dimension inputs sit ON the
+// drawing, clamped to their dimension vectors — the diagram IS the input, not a separate form. Diameters are to-scale
+// against each other; lengths are schematic. Editing a field redraws + repositions. See [[wizard-twopane-layout]].
+const _gv = (id, d) => { const el = document.getElementById(id); const n = Number(el && el.value); return Number.isFinite(n) && n > 0 ? n : d; };
+function renderHeadGui() {
+    const svgBox = document.getElementById('set_pv_head_svg'); if (!svgBox) return;
+    const sD = _gv('set_pv_spindle_dia', 80), sL = _gv('set_pv_spindle_len', 200);
+    const cD = _gv('set_pv_collet_dia', 20), cL = _gv('set_pv_collet_len', 30);
+    const W = 248, H = 212, cx = 112, maxD = Math.max(sD, cD, 6), dppm = 104 / maxD;   // Ø scale: widest part ≈104px
+    const sw = sD * dppm, cw = cD * dppm, tw = Math.max(4, 6 * dppm);
+    const tL = 40, availH = 158, lenPpm = availH / Math.max(1, sL + cL + tL);          // length scale: fit the whole stack → proportions stay true, never huge
+    const sH = Math.max(6, sL * lenPpm), cH = Math.max(6, cL * lenPpm), tH = Math.max(8, tL * lenPpm);
+    const ySpinT = 26, yColT = ySpinT + sH, yToolT = yColT + cH;
+    const rect = (w, hh, yy, fill, part) => `<rect data-part="${part}" x="${(cx - w / 2).toFixed(1)}" y="${yy.toFixed(1)}" width="${Math.max(2, w).toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="${fill}" stroke="#9fb4c8" stroke-width="0.8"/>`;
+    const tick = (x1, y1, x2, y2) => `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#5f7286" stroke-width="0.7" stroke-dasharray="2 2"/>`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">`;
+    svg += rect(sw, sH, ySpinT, '#6b7682', 'spindle') + rect(cw, cH, yColT, '#9aa6b2', 'collet') + rect(tw, tH, yToolT, '#ffab40', 'tool');
+    svg += tick(cx, ySpinT, cx, 12);                                   // spindle Ø → top input
+    svg += tick(cx + sw / 2, ySpinT + sH / 2, W - 30, ySpinT + sH / 2); // spindle length → right input
+    svg += tick(cx - cw / 2, yColT + cH / 2, 30, yColT + cH / 2);       // collet Ø → left input
+    svg += tick(cx + cw / 2, yColT + cH / 2, W - 30, yColT + cH / 2);   // collet length → right input
+    svgBox.innerHTML = svg + '</svg>';
+    const place = (id, x, y) => { const el = document.getElementById(id); if (el) { el.style.left = Math.max(0, Math.min(W - 50, x - 25)) + 'px'; el.style.top = (y - 9) + 'px'; } };
+    place('set_pv_spindle_dia', cx, 12);
+    place('set_pv_spindle_len', W - 26, ySpinT + sH / 2);
+    place('set_pv_collet_dia', 30, yColT + cH / 2);
+    place('set_pv_collet_len', W - 26, yColT + cH / 2);
 }
-// Redraw the schematic from the LIVE field values (before save) so it tracks typing.
-function renderHeadSchematic() {
-    const box = document.getElementById('set_pv_head_svg'); if (!box) return;
-    const g = (id, d) => { const el = document.getElementById(id); const n = Number(el && el.value); return Number.isFinite(n) && n > 0 ? n : d; };
-    box.innerHTML = headSchematicSvg({ spindleDia: g('set_pv_spindle_dia', 80), spindleLen: g('set_pv_spindle_len', 200), colletDia: g('set_pv_collet_dia', 20), colletLen: g('set_pv_collet_len', 30) });
+// Commit the on-diagram dims to settings (on change/blur) so an open preview re-pulls them live.
+function commitHeadDims() {
+    const s = getSettings(); if (!s.preview) s.preview = {}; const h = s.preview.head || (s.preview.head = {});
+    h.spindleDia = _gv('set_pv_spindle_dia', 80); h.spindleLen = _gv('set_pv_spindle_len', 200);
+    h.colletDia = _gv('set_pv_collet_dia', 20); h.colletLen = _gv('set_pv_collet_len', 30);
+    saveSettings();
 }
 
 // The WCS table (G54–G59 offsets, machine coords of each part-zero) + which one is active. workOrigin (used by
@@ -388,6 +397,7 @@ function buildSettingsOverlay() {
             #settings-app .settings-foot { justify-content: flex-end; }
             #settings-app .settings-done { background: var(--accent); color: #fff; border: none; border-radius: var(--radius, 5px); padding: 7px 24px; font-size: 13px; font-weight: 600; cursor: pointer; transition: filter 120ms; }
             #settings-app .settings-done:hover { filter: brightness(1.12); }
+            #settings-app .dim-edit { position: absolute; width: 50px; padding: 1px 2px; font-size: 11px; text-align: center; background: var(--panel); color: var(--text-main); border: 1px solid var(--accent); border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.45); }
         </style>
             <div class="settings-head">
                 <div style="display: flex; align-items: center; gap: 16px;">
@@ -457,20 +467,18 @@ function buildSettingsOverlay() {
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">SPINDLE / HEAD (SIM VIEW)</div>
-                        <div class="settings-hint">How the spindle head draws in the simulation — visual only, it never changes the G-code. The cutter/probe shape comes from the <b>tool table</b>; these are the machine's spindle + collet body (see <b>Hardware → Head</b>).</div>
-                        <div class="settings-grid">
-                            <label>Spindle Ø (mm)<input type="number" id="set_pv_spindle_dia" min="0" step="1"></label>
-                            <label>Spindle length (mm)<input type="number" id="set_pv_spindle_len" min="0" step="5"></label>
-                            <label>Collet Ø (mm)<input type="number" id="set_pv_collet_dia" min="0" step="1"></label>
-                            <label>Collet length (mm)<input type="number" id="set_pv_collet_len" min="0" step="1"></label>
+                        <div class="settings-hint">Edit a dimension right on the diagram — the head redraws to match. Visual only (never changes the G-code); the cutter/probe shape comes from the <b>tool table</b>. These are the machine's spindle + collet body (see <b>Hardware → Head</b>) — set them so the sim matches your real machine.</div>
+                        <div id="set_pv_head_gui" style="position:relative; width:248px; height:212px; margin:6px 0;">
+                            <div id="set_pv_head_svg" style="position:absolute; inset:0;"></div>
+                            <input type="number" id="set_pv_spindle_dia" class="dim-edit" min="1" step="1" title="Spindle diameter (mm)">
+                            <input type="number" id="set_pv_spindle_len" class="dim-edit" min="1" step="5" title="Spindle length (mm)">
+                            <input type="number" id="set_pv_collet_dia" class="dim-edit" min="1" step="1" title="Collet diameter (mm)">
+                            <input type="number" id="set_pv_collet_len" class="dim-edit" min="1" step="1" title="Collet length (mm)">
                         </div>
-                        <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;">
-                            <div style="margin-top:6px">Show:
-                                <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_spindle"> Spindle</label>
-                                <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_collet"> Collet</label>
-                                <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_tool"> Tool</label>
-                            </div>
-                            <div id="set_pv_head_svg" title="Live preview of the head assembly — updates as you type" style="margin-left:auto;"></div>
+                        <div style="margin-top:2px">Show:
+                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_spindle"> Spindle</label>
+                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_collet"> Collet</label>
+                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_tool"> Tool</label>
                         </div>
                     </div>
                 </div>
@@ -995,7 +1003,7 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_show_spindle')) q('set_pv_show_spindle').checked = pvp.spindle !== false;
         if (q('set_pv_show_collet')) q('set_pv_show_collet').checked = pvp.collet !== false;
         if (q('set_pv_show_tool')) q('set_pv_show_tool').checked = pvp.tool !== false;
-        renderHeadSchematic();
+        renderHeadGui();
         const cp = s.compose || (s.compose = { ...SETTINGS_DEFAULTS.compose });
         if (q('set_cp_suggestions')) q('set_cp_suggestions').checked = cp.suggestions !== false;
         if (q('set_cp_autocomplete')) q('set_cp_autocomplete').checked = cp.autocomplete !== false;
@@ -1896,8 +1904,8 @@ function wireSettingsOverlay(ov) {
     // Cross-link: Hardware → Head's "sim appearance" jumps to the Preview tab (General) where the head body dims live.
     const _headSimLink = q('set_head_simlink');
     if (_headSimLink) _headSimLink.addEventListener('click', () => { showGroup('general'); showPanel('set_tab_preview'); });
-    // Live head schematic — redraw as the spindle/collet dimension fields are typed.
-    ['set_pv_spindle_dia', 'set_pv_spindle_len', 'set_pv_collet_dia', 'set_pv_collet_len'].forEach(id => { const el = q(id); if (el) el.addEventListener('input', renderHeadSchematic); });
+    // Interactive head GUI: typing redraws/repositions live; on commit (change/blur) persist so an open preview re-pulls.
+    ['set_pv_spindle_dia', 'set_pv_spindle_len', 'set_pv_collet_dia', 'set_pv_collet_len'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderHeadGui); el.addEventListener('change', commitHeadDims); } });
     showGroup('general');
 
     // "+ Add hardware" tool: adds a subsystem category tab + its standard I/O (mirrored + badged).
