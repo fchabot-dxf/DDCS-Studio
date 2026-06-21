@@ -15,6 +15,10 @@ async function openWizard(page, type) {
 }
 
 test('Tool Change wizard: manual ↔ auto modes generate the right dialect', async ({ page }) => {
+  // Auto pick&place only emits the swap when the magazine has pockets — seed a small one.
+  await page.addInitScript(() => localStorage.setItem('ddcs_studio_settings', JSON.stringify({
+    atc: { magType: 'straight', magazine: [{ pocket: 1, tool: 1, x: 10, y: 0, z: -5 }, { pocket: 2, tool: 2, x: 30, y: 0, z: -5 }], tools: [{ num: 1, type: 'endmill', dia: 6, length: 40 }, { num: 2, type: 'ballnose', dia: 6, length: 45 }] },
+  })));
   await openWizard(page, 'atc_change');
 
   // Manual (default): park prompt, no drawbar codes
@@ -22,7 +26,7 @@ test('Tool Change wizard: manual ↔ auto modes generate the right dialect', asy
   await expect(page.locator('#wiz_atc_change_code')).not.toContainText('M154');
   await expect(page.locator('#atc_change_manual_params')).toBeVisible();
 
-  // Auto: T.nc-style with drawbar + sensor waits + pocket tables
+  // Auto: T.nc-style pick & place with drawbar + sensor waits (literal pocket coords from the magazine)
   await page.locator('#atc_change_mode').selectOption('auto');
   await expect(page.locator('#atc_change_auto_params')).toBeVisible();
   await expect(page.locator('#atc_change_manual_params')).toBeHidden();
@@ -30,7 +34,6 @@ test('Tool Change wizard: manual ↔ auto modes generate the right dialect', asy
   await expect(code).toContainText('M154');
   await expect(code).toContainText('M302');
   await expect(code).toContainText('#1504');
-  await expect(code).toContainText('1330+');
 });
 
 test('ATC Test wizard: drawbar and pocket modes', async ({ page }) => {
