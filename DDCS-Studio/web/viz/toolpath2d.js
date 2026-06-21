@@ -47,11 +47,12 @@ function datumXY(s) {
 }
 
 /** Bind a canvas → a 2D top-down scene controller (mirrors the GcodeViz3D inputs that matter in plan view). */
-export function createToolpath2d(canvas) {
+export function createToolpath2d(canvas, opts = {}) {
     let segs = [], machine = null, stock = null, wcs = null, gridStep = 0;
     let view = null;                 // { ox, oy, scale }: screenX = ox + x*scale, screenY = oy - y*scale (Y up)
     let cursor = null;               // program coords under the pointer → readout chip
-    let drag = null;
+    let start = null;                // operator start {x,y,z} → a DRAGGABLE handle (re-traces on release via opts.onStartDrag)
+    let drag = null, dragStart = false;
     const anim = { playing: false, k: 0, raf: null };
 
     const W = () => canvas.clientWidth, H = () => canvas.clientHeight;
@@ -95,6 +96,7 @@ export function createToolpath2d(canvas) {
         if (canvas.width !== nw || canvas.height !== nh) { canvas.width = nw; canvas.height = nh; }   // resize only on real size change
         const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
         if (!view) return;
+        canvas.__t2view = view;   // expose the world→screen transform (debug + tests): sx=ox+x*scale, sy=oy-y*scale
         const foot = footprint(), step = stepFor(foot);
         drawGrid(ctx, foot, step);
         const env = envelopeRect(); if (env) drawRect(ctx, env, 'rgba(108,122,140,0.55)', null);
@@ -102,7 +104,15 @@ export function createToolpath2d(canvas) {
         drawOriginAxes(ctx, foot);
         drawPath(ctx, anim.playing ? Math.floor(anim.k) : null);
         drawLabels(ctx, foot, step, w, h);
+        if (start) drawStartHandle(ctx);
         if (cursor) drawReadout(ctx, cursor, w, h);
+    }
+    function drawStartHandle(ctx) {   // ruby start marker + grab-ring — the draggable operator start (matches the 3D ① marker)
+        const hx = tx(start.x), hy = ty(start.y);
+        ctx.save();
+        ctx.fillStyle = 'rgba(231,76,91,0.9)'; ctx.beginPath(); ctx.arc(hx, hy, 5.5, 0, Math.PI * 2); ctx.fill();
+        ctx.lineWidth = 1.6; ctx.strokeStyle = 'rgba(231,76,91,0.7)'; ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
     }
     function drawGrid(ctx, foot, step) {
         if (!(step > 0)) return;
@@ -188,6 +198,7 @@ export function createToolpath2d(canvas) {
     function setStock(s) { stock = s || null; if (view) paint(); }
     function setWcs(w) { wcs = w || null; }
     function setGridStep(s) { gridStep = Number(s) || 0; if (view) paint(); }
+    function setStart(p) { start = p ? { x: +p.x || 0, y: +p.y || 0, z: +p.z || 0 } : null; if (view) paint(); }
     function setGcode(text) { setSegments(traceToolpath(text).segments); }
 
     // ---- play / progress ----
@@ -205,20 +216,31 @@ export function createToolpath2d(canvas) {
         const ns = Math.max(0.02, Math.min(400, view.scale * Math.exp(-e.deltaY * 0.0015)));
         view.scale = ns; view.ox = sx - wx * ns; view.oy = sy + wy * ns; paint();
     }, { passive: false });
-    canvas.addEventListener('pointerdown', (e) => { if (!view) return; drag = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy }; try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* */ } });
+    const nearHandle = (e) => { if (!start || !view) return false; const r = canvas.getBoundingClientRect(); return Math.hypot(e.clientX - r.left - tx(start.x), e.clientY - r.top - ty(start.y)) <= 12; };
+    canvas.addEventListener('pointerdown', (e) => {
+        if (!view) return;
+        if (nearHandle(e)) { dragStart = true; try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* */ } return; }   // grab the start handle (not a pan)
+        drag = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy }; try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* */ }
+    });
     canvas.addEventListener('pointermove', (e) => {
         if (!view) return;
-        if (drag) { view.ox = drag.ox + (e.clientX - drag.x); view.oy = drag.oy + (e.clientY - drag.y); paint(); return; }
         const r = canvas.getBoundingClientRect();
+        if (dragStart) { start = { x: (e.clientX - r.left - view.ox) / view.scale, y: (view.oy - (e.clientY - r.top)) / view.scale, z: start ? start.z : 0 }; paint(); return; }
+        if (drag) { view.ox = drag.ox + (e.clientX - drag.x); view.oy = drag.oy + (e.clientY - drag.y); paint(); return; }
         cursor = { x: (e.clientX - r.left - view.ox) / view.scale, y: (view.oy - (e.clientY - r.top)) / view.scale };
+        canvas.style.cursor = nearHandle(e) ? 'move' : '';
         if (!anim.playing) paint();
     });
-    const endDrag = (e) => { drag = null; try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* */ } };
+    const endDrag = (e) => {
+        if (dragStart && start && opts.onStartDrag) opts.onStartDrag({ x: start.x, y: start.y, z: start.z });   // re-trace once on release (not per move)
+        dragStart = false; drag = null;
+        try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* */ }
+    };
     canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
     canvas.addEventListener('mouseleave', () => { cursor = null; if (!anim.playing) paint(); });
 
     return {
-        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, redraw, fit, play, stop, toggle, seek,
+        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, redraw, fit, play, stop, toggle, seek,
         get playing() { return anim.playing; },
         get count() { return segs.length; },
     };

@@ -320,8 +320,8 @@ export class WizardManager {
         if (committed || code) {
             // Carry the start position the user set in this wizard's 3D preview over to the main preview.
             try {
-                const v = this._activePanel && this._activePanel.viz;
-                const ws = (v && v.starts) ? v.starts[0] : null;
+                const p = this._activePanel;
+                const ws = (p && p.getStartPos) ? p.getStartPos() : ((p && p.viz && p.viz.starts) ? p.viz.starts[0] : null);
                 if (ws) {
                     window.__pendingSpindleStart = { x: ws.x, y: ws.y, z: ws.z };
                     if (window.ddcsSetSpindleStart) window.ddcsSetSpindleStart(ws.x, ws.y, ws.z, 0);

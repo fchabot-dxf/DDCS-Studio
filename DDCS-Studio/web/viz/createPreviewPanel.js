@@ -73,7 +73,11 @@ export function createPreviewPanel(container, opts = {}) {
     const q = (sel) => container.querySelector(sel);
     const cv2d = q('.pp-2d');
     const statusEl = q('.pp-status');
-    const t2 = createToolpath2d(cv2d);
+    let curStart = null;   // operator start the user dragged (2D handle / 3D marker); getStartPos() reads it
+    const t2 = createToolpath2d(cv2d, {
+        // 2D start-handle drag → record it, mirror to the 3D marker, and re-trace from the new start.
+        onStartDrag: (pos) => { curStart = { x: +pos.x || 0, y: +pos.y || 0, z: +pos.z || 0 }; if (viz && viz.starts) viz.starts[0] = curStart; setGcode(); },
+    });
     t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.setWcs(wcsForViz());   // 2D mirrors the 3D scene
 
     let viz = null;            // GcodeViz3D (lazy — only when 3D is shown and WebGL is available)
@@ -148,15 +152,18 @@ export function createPreviewPanel(container, opts = {}) {
     }
 
     // Render the static route in the active view from the fed G-code (engine.trace resolves #vars/loops/probes).
+    // The operator start the wizard reads on insert: a 2D-handle drag (curStart) wins, else the 3D marker, else inferred.
+    const getStartPos = () => curStart || (viz && viz.starts && viz.starts[0]) || get('getStart') || null;
     function setGcode(text) {
         const code = text != null ? text : (get('getGcode') || '');
         // Inferred operator start (wizard preview): probes test from the real tool position so an incremental
         // probe macro doesn't trace from the origin (on the stock face) and clamp its first probe to zero.
-        const st = get('getStart');
+        const st = getStartPos();
         let parsed; try { parsed = traceToolpath(code, { stock: stockForViz(), start: st, wcsOffset: wcsForViz() }); }
         catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
         segs = parsed.segments || [];
         t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
+        t2.setStart(st);        // the draggable 2D start handle
         if (mode === '3d') {
             const v = ensureViz();
             if (v) {
@@ -244,7 +251,7 @@ export function createPreviewPanel(container, opts = {}) {
         eng.simSpeed = simSpeed();
         eng.autoAnswer = window.ioPanel ? window.ioPanel.isAutoSensors() : true;
         eng.stock = stockForViz();
-        eng._stockOffset = get('getStart') || { x: 0, y: 0, z: 0 };   // probes test from the operator start (see trace.js)
+        eng._stockOffset = getStartPos() || { x: 0, y: 0, z: 0 };   // probes test from the operator start (see trace.js)
         eng._wcsOffset = wcsForViz() || { x: 0, y: 0, z: 0 };          // G53 machine moves draw in the part frame (see trace.js)
         if (mode === '3d') ensureViz();
         if (viz) viz.setAnimate(false);                 // engine drives the tool/trail, not the geometric sweep
@@ -345,5 +352,5 @@ export function createPreviewPanel(container, opts = {}) {
     // with the toggle stuck on "3D" — because `mode` was set but setMode() never ran.
     { const _mt = q('.pp-mtoggle'); if (_mt) _mt.textContent = mode === '2d' ? '2D' : '3D'; if (cv2d) cv2d.style.display = mode === '2d' ? '' : 'none'; }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, get viz() { return viz; }, get engine() { return engine; }, el: container };
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, get viz() { return viz; }, get engine() { return engine; }, el: container };
 }
