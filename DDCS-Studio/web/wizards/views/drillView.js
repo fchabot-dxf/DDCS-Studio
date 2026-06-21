@@ -52,21 +52,21 @@ function buildDrillSpec(params, stock) {
     if (pat === 'circle') {
         const R = num(params.dia, 50) / 2, a0 = num(params.startAngle, 0) * Math.PI / 180;
         items.push({ kind: 'circle', cx: ox, cy: oy, r: R });
-        handles.push({ id: 'ring', x: ox + R * Math.cos(a0), y: oy + R * Math.sin(a0), kind: 'size', label: 'Ø / ∠' });
+        handles.push({ id: 'ring', x: ox + R * Math.cos(a0), y: oy + R * Math.sin(a0), kind: 'size', label: 'Ø', value: num(params.dia, 50) });
     } else if (pat === 'grid') {
         const cols = Math.max(1, Math.round(num(params.cols, 3))), rows = Math.max(1, Math.round(num(params.rows, 3)));
         const dx = num(params.dx, 20), dy = num(params.dy, 20);
         items.push({ kind: 'rect', x: ox, y: oy, w: (cols - 1) * dx, h: (rows - 1) * dy });
-        handles.push({ id: 'size', x: ox + (cols - 1) * dx, y: oy + (rows - 1) * dy, kind: 'size', label: 'spacing' });
+        handles.push({ id: 'size', x: ox + (cols - 1) * dx, y: oy + (rows - 1) * dy, kind: 'size', label: 'dx', value: dx });
     } else if (pat === 'rect') {
         const w = num(params.w, 100), h = num(params.h, 80);
         items.push({ kind: 'rect', x: ox, y: oy, w, h });
-        handles.push({ id: 'size', x: ox + w, y: oy + h, kind: 'size', label: 'W × H' });
+        handles.push({ id: 'size', x: ox + w, y: oy + h, kind: 'size', label: 'W', value: w });
     } else if (pat === 'line') {
         const n = Math.max(1, Math.round(num(params.count, 3))), s = num(params.spacing, 20), a = num(params.angle, 0) * Math.PI / 180;
         const ex = ox + (n - 1) * s * Math.cos(a), ey = oy + (n - 1) * s * Math.sin(a);
         items.push({ kind: 'line', x1: ox, y1: oy, x2: ex, y2: ey });
-        handles.push({ id: 'end', x: ex, y: ey, kind: 'size', label: 'len / ∠' });
+        handles.push({ id: 'end', x: ex, y: ey, kind: 'size', label: 'pitch', value: num(params.spacing, 20) });
     }
 
     const skip = parseSkip(params.skip);
@@ -94,6 +94,14 @@ function buildDrillSpec(params, stock) {
                 if (n > 1) m.d_spacing = Math.max(0, Math.hypot(dx, dy) / (n - 1));
                 setFields(m);
             }
+        },
+        // Type a dimension on its on-canvas label (the Centroid touch) → the matching wizard field. The handle still
+        // drags for the 2-DOF tweak; this sets the primary value precisely.
+        onEdit(id, val) {
+            if (pat === 'circle' && id === 'ring') setFields({ d_dia: Math.max(0, val) });
+            else if (pat === 'grid' && id === 'size') setFields({ d_dx: Math.max(0, val) });
+            else if (pat === 'rect' && id === 'size') setFields({ d_w: Math.max(1, val) });
+            else if (pat === 'line' && id === 'end') setFields({ d_spacing: Math.max(0, val) });
         },
     };
 }

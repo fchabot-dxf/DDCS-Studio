@@ -54,6 +54,7 @@ export class FeatureCanvas {
     _mount(container) {
         if (this.container === container && this.svg) return;
         this.container = container;
+        container.style.position = container.style.position || 'relative';   // anchor the inline dimension-edit input
         container.innerHTML = '';
         const svg = svgEl('svg', { class: 'feature-canvas', width: '100%', height: '100%' });
         svg.style.touchAction = 'none';
@@ -276,9 +277,37 @@ export class FeatureCanvas {
             }
             if (h.label) {
                 const t = svgEl('text', { x: c.x + 10, y: c.y - 8, class: 'fc-handle-label' });
-                t.textContent = h.label;
+                if (h.value != null && this.spec.onEdit) {
+                    // Centroid-style: the dimension shows its VALUE and is click-to-edit (type, don't just drag).
+                    t.textContent = `${h.label} ${r3(h.value)}`;
+                    t.style.cursor = 'text';
+                    t.style.textDecoration = 'underline';
+                    t.style.pointerEvents = 'auto';   // labels may be pointer-events:none; the editable dim must catch clicks
+                    t.addEventListener('pointerdown', (e) => e.stopPropagation());   // don't let the canvas start a pan/drag
+                    t.addEventListener('click', (e) => { e.stopPropagation(); this._editDim(h, c.x + 10, c.y - 8); });   // open AFTER mouseup so focus sticks
+                } else {
+                    t.textContent = h.label;
+                }
                 handles.appendChild(t);
             }
         });
+    }
+
+    /** Inline-edit a dimension's VALUE (click-to-type on its on-canvas label) → spec.onEdit(id, value). Generic, so
+     *  every wizard's handles become typeable just by giving the handle a `value` and the spec an `onEdit`. */
+    _editDim(h, sx, sy) {
+        if (!this.spec || !this.spec.onEdit) return;
+        const old = this.container.querySelector('.fc-dim-edit'); if (old) old.remove();
+        const inp = document.createElement('input');
+        inp.type = 'number'; inp.step = 'any'; inp.value = r3(h.value); inp.className = 'fc-dim-edit';
+        inp.setAttribute('data-handle', h.id);
+        inp.style.cssText = `position:absolute; left:${sx}px; top:${sy - 14}px; width:66px; font-size:12px; padding:1px 3px; z-index:20; background:var(--panel,#161b22); color:var(--text-main,#dfe6ee); border:1px solid var(--accent,#4af); border-radius:4px;`;
+        this.container.appendChild(inp);
+        inp.focus(); inp.select();
+        let done = false;
+        const commit = () => { if (done) return; done = true; const val = parseFloat(inp.value); inp.remove(); if (Number.isFinite(val)) this.spec.onEdit(h.id, val); };
+        const cancel = () => { if (done) return; done = true; inp.remove(); };
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') commit(); else if (e.key === 'Escape') cancel(); });
+        inp.addEventListener('blur', commit);
     }
 }
