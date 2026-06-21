@@ -17,8 +17,16 @@
  */
 import { PALETTE, CATEGORIES } from '../../wizards/ops/index.js';
 
+// The 9 stock points (corners / edge mids / centre) + the default, as readable labels. Code is [X][Y], each
+// n/c/p = min/centre/max; X+ = right, Y+ = back. Used for PlaceOnStock's attach + path-datum fields.
+const STOCK_PTS = [
+    ['Stock datum', ''], ['Front-left', 'nn'], ['Front', 'cn'], ['Front-right', 'pn'],
+    ['Left', 'nc'], ['Centre', 'cc'], ['Right', 'pc'],
+    ['Back-left', 'np'], ['Back', 'cp'], ['Back-right', 'pp'],
+];
 const SELECTS = {
     corner: ['FL', 'FR', 'BL', 'BR'],
+    stockAttach: STOCK_PTS, pathDatum: STOCK_PTS,
     probeSeq: ['XY', 'YX'],
     axis: ['X', 'Y', 'Z', 'A', 'B', 'C'],
     axisDir: ['pos', 'neg'],
