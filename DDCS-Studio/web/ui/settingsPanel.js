@@ -481,6 +481,9 @@ function buildSettingsOverlay() {
                             <button class="toolbar-btn settings-io" id="set_export">⬇ Export CSV</button>
                             <span class="settings-hint" id="set_var_count"></span>
                         </div>
+                        <input type="text" id="set_var_search" placeholder="Filter variables…  (e.g. 1100, drill, feed)" style="width:100%; margin-top:8px; box-sizing:border-box;">
+                        <div class="settings-hint" style="margin:4px 0 0;">Plain text for speed (thousands of vars). Click ⬇ Export CSV for the full file.</div>
+                        <pre id="set_var_list" style="max-height:46vh; overflow:auto; margin-top:6px; font:12px/1.55 monospace; background:#11141a; border:1px solid var(--border); border-radius:6px; padding:8px 10px; white-space:pre; color:#cdd9e6;"></pre>
                     </div>
                 </div>
 
@@ -903,6 +906,16 @@ function wireSettingsOverlay(ov) {
         const db = window.ddcsStudio && window.ddcsStudio.variableDB;
         const el = q('set_var_count');
         if (el && db) el.textContent = `${db.getAll().length} variables loaded`;
+    }
+    // Variable browser: a single <pre> of "id  description" (filtered), built lazily on tab open — text, not
+    // thousands of DOM rows, so it stays fast with a 3000-var DB. db.search() filters by id/description.
+    function renderVarList(filter) {
+        const db = window.ddcsStudio && window.ddcsStudio.variableDB;
+        const pre = q('set_var_list');
+        if (!pre || !db) return;
+        const term = (filter || '').toLowerCase().trim();
+        const rows = term ? db.search(term) : db.getAll();
+        pre.textContent = rows.length ? rows.map((v) => `${String(v.i).padEnd(14)}${v.d || ''}`).join('\n') : 'No variables match.';
     }
 
     function fill() {
@@ -1684,9 +1697,12 @@ function wireSettingsOverlay(ov) {
             if (db) db.loadFromCSV(ev.target.result);
             if (window.refreshDeckVariables) window.refreshDeckVariables();
             updateVarCount();
+            renderVarList(q('set_var_search') ? q('set_var_search').value : '');   // shared DB updated → refresh this view too
         };
         r.readAsText(f);
     });
+    const _varSearch = q('set_var_search');
+    if (_varSearch) _varSearch.addEventListener('input', () => renderVarList(_varSearch.value));
     // CSV export
     q('set_export').addEventListener('click', () => {
         const db = window.ddcsStudio && window.ddcsStudio.variableDB;
@@ -1791,6 +1807,7 @@ function wireSettingsOverlay(ov) {
         if (id === 'set_tab_input') renderIoTable(ov.querySelector('#io_input_table'), 'input', getInputs(), syncIO);
         if (id === 'set_tab_output') renderIoTable(ov.querySelector('#io_output_table'), 'output', getOutputs(), syncIO);
         if (id === 'set_tab_atc') renderMagazineTable(ov.querySelector('#atc_magazine'), _ddcsSettings.atc, atcOnChange);
+        if (id === 'set_tab_variables') renderVarList(q('set_var_search') ? q('set_var_search').value : '');   // build lazily on open
     }
     function showGroup(g) {
         mainTabs.forEach(b => b.classList.toggle('active', b.dataset.group === g));
