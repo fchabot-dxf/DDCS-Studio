@@ -268,6 +268,33 @@ window.ddcsProbeSrcAvailable = probeSrcAvailable;
 window.ddcsSetProbeSrc = setProbeSrc;
 window.ddcsResolveProbeSources = resolveProbeSources;
 
+// A live schematic of the spindle HEAD assembly (spindle ▸ collet ▸ a sample tool) for the Preview settings —
+// gives the dimension fields a visual. Diameters are to-scale against each other; lengths are schematic (the real
+// value is labelled, since a 200 mm spindle would otherwise dwarf a 30 mm collet).
+function headSchematicSvg(head) {
+    const h = head || {};
+    const n = (v, d) => { const x = Number(v); return Number.isFinite(x) && x > 0 ? x : d; };
+    const sD = n(h.spindleDia, 80), sL = n(h.spindleLen, 200);
+    const cD = n(h.colletDia, 20), cL = n(h.colletLen, 30);
+    const W = 150, H = 150, cx = 52, maxD = Math.max(sD, cD, 6);
+    const ppm = (W * 0.5) / maxD;                                   // width scale: widest part fits ~half the box
+    const tD = 6, sw = sD * ppm, cw = cD * ppm, tw = Math.max(3, tD * ppm);
+    const sH = 64, cH = 22, tH = 30;                               // schematic heights (lengths are labelled, not to scale)
+    const rect = (w, hh, yy, fill) => `<rect x="${(cx - w / 2).toFixed(1)}" y="${yy}" width="${w.toFixed(1)}" height="${hh}" rx="2" fill="${fill}" stroke="#9fb4c8" stroke-width="0.8"/>`;
+    const label = (txt, yy) => `<text x="${(cx + maxD * ppm / 2 + 8).toFixed(0)}" y="${(yy + 3).toFixed(0)}" fill="#9fb4c8" font-size="9">${txt}</text>`;
+    let y = 12, svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">`;
+    svg += rect(sw, sH, y, '#6b7682') + label(`Spindle Ø${sD}×${sL}`, y + sH / 2); y += sH;
+    svg += rect(cw, cH, y, '#9aa6b2') + label(`Collet Ø${cD}×${cL}`, y + cH / 2); y += cH;
+    svg += rect(tw, tH, y, '#ffab40') + label('tool', y + tH / 2);
+    return svg + '</svg>';
+}
+// Redraw the schematic from the LIVE field values (before save) so it tracks typing.
+function renderHeadSchematic() {
+    const box = document.getElementById('set_pv_head_svg'); if (!box) return;
+    const g = (id, d) => { const el = document.getElementById(id); const n = Number(el && el.value); return Number.isFinite(n) && n > 0 ? n : d; };
+    box.innerHTML = headSchematicSvg({ spindleDia: g('set_pv_spindle_dia', 80), spindleLen: g('set_pv_spindle_len', 200), colletDia: g('set_pv_collet_dia', 20), colletLen: g('set_pv_collet_len', 30) });
+}
+
 // The WCS table (G54–G59 offsets, machine coords of each part-zero) + which one is active. workOrigin (used by
 // the sim for G53/program placement) is derived from the active row. Pulled from the controller, editable offline.
 const WCS_NAMES = ['G54', 'G55', 'G56', 'G57', 'G58', 'G59'];
@@ -435,10 +462,13 @@ function buildSettingsOverlay() {
                             <label>Collet Ø (mm)<input type="number" id="set_pv_collet_dia" min="0" step="1"></label>
                             <label>Collet length (mm)<input type="number" id="set_pv_collet_len" min="0" step="1"></label>
                         </div>
-                        <div style="margin-top:6px">Show:
-                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_spindle"> Spindle</label>
-                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_collet"> Collet</label>
-                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_tool"> Tool</label>
+                        <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;">
+                            <div style="margin-top:6px">Show:
+                                <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_spindle"> Spindle</label>
+                                <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_collet"> Collet</label>
+                                <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_tool"> Tool</label>
+                            </div>
+                            <div id="set_pv_head_svg" title="Live preview of the head assembly — updates as you type" style="margin-left:auto;"></div>
                         </div>
                     </div>
                 </div>
@@ -963,6 +993,7 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_show_spindle')) q('set_pv_show_spindle').checked = pvp.spindle !== false;
         if (q('set_pv_show_collet')) q('set_pv_show_collet').checked = pvp.collet !== false;
         if (q('set_pv_show_tool')) q('set_pv_show_tool').checked = pvp.tool !== false;
+        renderHeadSchematic();
         const cp = s.compose || (s.compose = { ...SETTINGS_DEFAULTS.compose });
         if (q('set_cp_suggestions')) q('set_cp_suggestions').checked = cp.suggestions !== false;
         if (q('set_cp_autocomplete')) q('set_cp_autocomplete').checked = cp.autocomplete !== false;
@@ -1863,6 +1894,8 @@ function wireSettingsOverlay(ov) {
     // Cross-link: Hardware → Head's "sim appearance" jumps to the Preview tab (General) where the head body dims live.
     const _headSimLink = q('set_head_simlink');
     if (_headSimLink) _headSimLink.addEventListener('click', () => { showGroup('general'); showPanel('set_tab_preview'); });
+    // Live head schematic — redraw as the spindle/collet dimension fields are typed.
+    ['set_pv_spindle_dia', 'set_pv_spindle_len', 'set_pv_collet_dia', 'set_pv_collet_len'].forEach(id => { const el = q(id); if (el) el.addEventListener('input', renderHeadSchematic); });
     showGroup('general');
 
     // "+ Add hardware" tool: adds a subsystem category tab + its standard I/O (mirrored + badged).
