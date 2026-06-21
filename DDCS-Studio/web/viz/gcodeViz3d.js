@@ -1213,8 +1213,9 @@ export class GcodeViz3D {
             if (e) pointers.delete(e.pointerId);
             if (mode === 'pinch' && pointers.size < 2) mode = null;
             if (pointers.size > 0) return;   // other fingers still down
-            if (mode === 'gizmo' && typeof this.onStartChange === 'function') {
-                this.onStartChange(this.starts);
+            if (mode === 'gizmo') {
+                if (typeof this.onStartChange === 'function') this.onStartChange(this.starts);
+                if (this._syncJogPos) this._syncJogPos();   // refresh the precise X/Y/Z start fields after a drag
             }
             // A click (not a drag) on a marker/label selects it for the jog pendant.
             if (mode !== 'gizmo' && this._downMarker >= 0 && e &&
