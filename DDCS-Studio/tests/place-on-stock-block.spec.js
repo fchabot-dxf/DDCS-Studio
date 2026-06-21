@@ -83,12 +83,12 @@ test('PlaceOnStock shows the inline 3×3 corner-grid fields, coloured per datum,
   expect(r.blue, 'the stock-attach picked cell is blue').toBe(true);
   expect(r.amber, 'the path-datum picked cell is amber').toBe(true);
 
-  // Click a cell on the attach grid → it sets the value (the inline interaction works).
-  const picked = await page.evaluate(() => {
-    const blk = window.__blkws.getAllBlocks().find((b) => b.type === 'placeonstock');
-    const cell = blk.getField('STOCKATTACH')._cells['nn'];
-    cell.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-    return blk.getFieldValue('STOCKATTACH');
+  // REAL click through Blockly's gesture (a synthetic dispatch bypasses it and would pass falsely — the actual bug).
+  const box = await page.evaluate(() => {
+    const cell = window.__blkws.getAllBlocks().find((b) => b.type === 'placeonstock').getField('STOCKATTACH')._cells['nn'];
+    const r = cell.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   });
-  expect(picked, 'clicking the front-left cell picks it').toBe('nn');
+  await page.mouse.click(box.x, box.y);
+  await expect.poll(() => page.evaluate(() => window.__blkws.getAllBlocks().find((b) => b.type === 'placeonstock').getFieldValue('STOCKATTACH'))).toBe('nn');
 });

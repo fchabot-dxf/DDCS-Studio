@@ -38,8 +38,10 @@ export function installCornerGridField(Blockly) {
         }
 
         getText() { return this.getValue() || '(stock datum)'; }
+        isClickable() { return true; }   // route clicks through Blockly's gesture → onMouseDown_ (below)
 
-        /** Build the 9 cells once; bind a click on each. */
+        /** Build the 9 cells once. (Clicks are handled in onMouseDown_, NOT native listeners — Blockly's gesture
+         *  system swallows native field listeners, so a real click would never reach them.) */
         initView() {
             const g = this.fieldGroup_;
             for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
@@ -52,12 +54,25 @@ export function installCornerGridField(Blockly) {
                 rect.style.cursor = 'pointer';
                 g.appendChild(rect);
                 this._cells[code] = rect;
-                rect.addEventListener('pointerdown', (e) => {
-                    e.stopPropagation(); e.preventDefault();                 // pick, don't start a block drag
-                    this.setValue(this.getValue() === code ? '' : code);     // re-click the picked cell → follow
-                });
             }
             this._paint();
+        }
+
+        /** Blockly calls this on a field click (bound via bindEvents_). Pick the cell under the pointer; re-clicking
+         *  the picked cell clears back to follow. We DON'T call super (no editor + don't let it start a block drag). */
+        onMouseDown_(e) {
+            const code = this._codeFromEvent(e);
+            if (code != null) { this.setValue(this.getValue() === code ? '' : code); return; }
+            if (super.onMouseDown_) super.onMouseDown_(e);
+        }
+
+        /** Which cell is under the pointer — by each cell's on-screen rect (robust to workspace zoom). */
+        _codeFromEvent(e) {
+            for (const code in this._cells) {
+                const r = this._cells[code].getBoundingClientRect();
+                if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return code;
+            }
+            return null;
         }
 
         /** Tint the picked cell with the datum colour; the rest are faint. */
