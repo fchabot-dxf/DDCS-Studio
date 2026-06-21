@@ -22,4 +22,11 @@ test('Preview head GUI: on-diagram dimension inputs redraw the part and persist'
   expect(Number(w1), 'collet rect widened with the dimension').toBeGreaterThan(Number(w0));
   const head = await page.evaluate(() => window.ddcsGetSettings().preview.head);
   expect(head.colletDia, 'edit persisted to settings').toBe(60);
+
+  // The whole head uses ONE uniform scale, so the spindle's drawn aspect = length / diameter (true proportions).
+  await page.fill('#set_pv_spindle_dia', '80');
+  await page.fill('#set_pv_spindle_len', '200');
+  const sp = await page.locator('#set_pv_head_gui rect[data-part="spindle"]');
+  const sw = Number(await sp.getAttribute('width')), sh = Number(await sp.getAttribute('height'));
+  expect(sh / sw, 'spindle drawn at true 200:80 = 2.5 ratio').toBeCloseTo(2.5, 1);
 });

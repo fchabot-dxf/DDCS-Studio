@@ -276,22 +276,24 @@ function renderHeadGui() {
     const svgBox = document.getElementById('set_pv_head_svg'); if (!svgBox) return;
     const sD = _gv('set_pv_spindle_dia', 80), sL = _gv('set_pv_spindle_len', 200);
     const cD = _gv('set_pv_collet_dia', 20), cL = _gv('set_pv_collet_len', 30);
-    const W = 248, H = 212, cx = 112, maxD = Math.max(sD, cD, 6), dppm = 104 / maxD;   // Ø scale: widest part ≈104px
-    const sw = sD * dppm, cw = cD * dppm, tw = Math.max(4, 6 * dppm);
-    const tL = 40, availH = 158, lenPpm = availH / Math.max(1, sL + cL + tL);          // length scale: fit the whole stack → proportions stay true, never huge
-    const sH = Math.max(6, sL * lenPpm), cH = Math.max(6, cL * lenPpm), tH = Math.max(8, tL * lenPpm);
-    const ySpinT = 26, yColT = ySpinT + sH, yToolT = yColT + cH;
+    const tD = 6, tL = 40;                                                              // sample tool stub (the real cutter comes from the tool table)
+    const W = 248, H = 212, cx = 112, maxD = Math.max(sD, cD, tD), totalL = sL + cL + tL;
+    const scale = Math.min(96 / maxD, 168 / totalL);                                    // ONE uniform scale → the WHOLE head scales together (true proportions) and fits
+    const sw = sD * scale, cw = cD * scale, tw = Math.max(2, tD * scale);
+    const sH = sL * scale, cH = cL * scale, tH = tL * scale;
+    const ySpinT = (H - (sH + cH + tH)) / 2, yColT = ySpinT + sH, yToolT = yColT + cH;  // vertically centred stack
+    const yDia = Math.max(11, ySpinT - 12);
     const rect = (w, hh, yy, fill, part) => `<rect data-part="${part}" x="${(cx - w / 2).toFixed(1)}" y="${yy.toFixed(1)}" width="${Math.max(2, w).toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="${fill}" stroke="#9fb4c8" stroke-width="0.8"/>`;
     const tick = (x1, y1, x2, y2) => `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#5f7286" stroke-width="0.7" stroke-dasharray="2 2"/>`;
     let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">`;
     svg += rect(sw, sH, ySpinT, '#6b7682', 'spindle') + rect(cw, cH, yColT, '#9aa6b2', 'collet') + rect(tw, tH, yToolT, '#ffab40', 'tool');
-    svg += tick(cx, ySpinT, cx, 12);                                   // spindle Ø → top input
+    svg += tick(cx, ySpinT, cx, yDia);                                 // spindle Ø → top input
     svg += tick(cx + sw / 2, ySpinT + sH / 2, W - 30, ySpinT + sH / 2); // spindle length → right input
     svg += tick(cx - cw / 2, yColT + cH / 2, 30, yColT + cH / 2);       // collet Ø → left input
     svg += tick(cx + cw / 2, yColT + cH / 2, W - 30, yColT + cH / 2);   // collet length → right input
     svgBox.innerHTML = svg + '</svg>';
     const place = (id, x, y) => { const el = document.getElementById(id); if (el) { el.style.left = Math.max(0, Math.min(W - 50, x - 25)) + 'px'; el.style.top = (y - 9) + 'px'; } };
-    place('set_pv_spindle_dia', cx, 12);
+    place('set_pv_spindle_dia', cx, yDia);
     place('set_pv_spindle_len', W - 26, ySpinT + sH / 2);
     place('set_pv_collet_dia', 30, yColT + cH / 2);
     place('set_pv_collet_len', W - 26, yColT + cH / 2);
