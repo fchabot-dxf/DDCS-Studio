@@ -426,6 +426,7 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="controller" data-target="set_tab_gateway">Gateway</button>
                     <div class="sidebar-group-label" data-group-label="hardware" style="display:none;">Hardware</div>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_machine" style="display:none;">Machine</button>
+                    <button class="settings-tab" data-group="hardware" data-target="set_tab_wcs" style="display:none;">WCS</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_spindle" style="display:none;">Head</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_input" style="display:none;">Input</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_output" style="display:none;">Output</button>
@@ -663,9 +664,6 @@ function buildSettingsOverlay() {
                             <label>Travel Z<input type="number" id="set_mach_z" step="1"></label>
                         </div>
                         <label class="settings-check"><input type="checkbox" id="set_mach_show"> Show machine envelope in 3D</label>
-                        <div class="settings-section-title sub">WORK COORDINATE SYSTEM (G54–G59)</div>
-                        <div class="settings-hint">Where each part-zero sits in machine coordinates — <b>↧ Pull from controller</b> reads these (no typing). The active WCS positions your program in the envelope and makes <code>G53</code> moves draw correctly.</div>
-                        <div id="set_mach_wcs_table"></div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">AXES</div>
@@ -676,6 +674,15 @@ function buildSettingsOverlay() {
                             <label>B — role<select id="set_axis_b_role"><option value="unused">Unused</option><option value="linear">Linear</option><option value="rotary">Rotary</option></select></label>
                             <label>B — spins around<select id="set_axis_b_around"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></label>
                         </div>
+                    </div>
+                </div>
+
+                <!-- HARDWARE: WCS (work-coordinate offsets) -->
+                <div id="set_tab_wcs" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">WORK COORDINATE SYSTEM (G54–G59)</div>
+                        <div class="settings-hint">Where each part-zero sits in machine coordinates — <b>Controller → Profile → ↧ Pull from controller</b> reads these (no typing). The active WCS positions your program in the envelope and makes <code>G53</code> moves draw correctly.</div>
+                        <div id="set_mach_wcs_table"></div>
                     </div>
                 </div>
 
@@ -1882,7 +1889,7 @@ function wireSettingsOverlay(ov) {
     const sideTabs = [...ov.querySelectorAll('.settings-sidebar .settings-tab')];
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
         const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_faq', 'set_tab_feedback', 'set_tab_about',
-                     'set_tab_machine', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
+                     'set_tab_machine', 'set_tab_wcs', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
         sideTabs.forEach(b => b.classList.toggle('active', b.dataset.target === id));
