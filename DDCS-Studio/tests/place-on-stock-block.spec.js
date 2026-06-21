@@ -31,3 +31,31 @@ test('drill op surfaces the placement as a PlaceOnStock C-block wrapping the pat
   expect(r.isCblock, 'PlaceOnStock is a C-block (has a DO statement mouth)').toBe(true);
   expect(r.attach, 'the attach corner is carried IN the block (semantic)').toBe('pp');
 });
+
+const maxX = (s) => Math.max(...(s.match(/X\s*(-?\d*\.?\d+)/gi) || []).map((t) => parseFloat(t.replace(/X/i, ''))));
+
+test('editing the PlaceOnStock attach corner in Blockly re-emits the placed G-code (snapshot survives)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsGetBlockGcode);
+  await page.evaluate(() => { const s = window.ddcsGetSettings(); s.stock = Object.assign(s.stock || {}, { x: 100, y: 80, z: 20, show: true, datum: 'nnp' }); });
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
+  await page.waitForSelector('#wiz_drill', { state: 'visible' });
+  await page.evaluate(() => {
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = String(v); };
+    set('d_cols', 3); set('d_rows', 1); set('d_dx', 20); set('d_originX', 0); set('d_originY', 0); set('d_stockAttach', 'pp');
+    window.ddcsStudio.wizardManager.update();
+  });
+
+  await page.evaluate(() => window.showApp('blocks'));
+  await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0);
+  await page.waitForTimeout(150);
+  const before = await page.evaluate(() => window.ddcsGetBlockGcode());
+
+  // Change the attach corner to Front-left in Blockly (the snapshot — stock dims/bbox — must ride along for it to work).
+  await page.evaluate(() => window.__blkws.getAllBlocks().find((b) => b.type === 'placeonstock').setFieldValue('nn', 'STOCKATTACH'));
+  await page.waitForTimeout(200);
+  const after = await page.evaluate(() => window.ddcsGetBlockGcode());
+
+  expect(maxX(before), "attached to the stock's far corner → holes reach the far edge").toBeCloseTo(100, 0);
+  expect(maxX(after), 'attached front-left → holes pull to the near corner (attach now takes effect)').toBeCloseTo(40, 0);
+});
