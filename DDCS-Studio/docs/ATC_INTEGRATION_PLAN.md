@@ -177,9 +177,16 @@ table is **parameter writes** (no motion). What landed:
 - **Profile association**: confirmed — `applySettings` restores `atc` (magazine/tools) + `inputs/outputs`, so
   the ATC config travels with a saved/loaded profile.
 
+**Machine-frame redesign — DONE (same day).** Travel is now **signed** (sign = home direction); the redundant
+Limit/Origin `ox/oy/oz` fields are gone; the Machine tab shows the **G54–G59 WCS table** (active radio + XYZ)
+and the active row drives `machine.workOrigin` (the sim's G53/program offset). The 3D envelope uses `|travel|` +
+`workOrigin` (scene = machine − workOrigin) and draws **axis lines at machine-zero** (home/limits). The pull
+reads all 6 WCS (#805+) + the active index; travel sign comes from the homing direction (`geometry.homeDir`
+when the gateway exposes it). So the magazine 3D positions are now in the correct, controller-driven frame.
+
 **Deferred (need hardware or a separate effort)**
 - Disk carousel **rotation indexing** is unverified firmware territory (template only).
-- The **machine-frame redesign** (signed Travel = home direction; drop the Limit/Origin fields; Work-origin →
-  a WCS table pulled from the controller) is confirmed but **not built** — the 3D pocket positions depend on it.
+- **Gateway `geometry.homeDir`** — the web applies the homing-direction sign if the bridge exposes it; the
+  bridge still needs to map the controller's homing-direction param.
 - ATC **simulation** of the drawbar/sensor handshake; the **Macros tab** adopting the Settings General/Hardware
   sub-tab structure.
