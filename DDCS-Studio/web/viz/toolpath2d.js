@@ -89,17 +89,30 @@ export function createToolpath2d(canvas, opts = {}) {
     const footprint = () => envelopeRect() || sceneBounds();
     const stepFor = (foot) => (gridStep > 0 ? gridStep : niceStep(Math.max(foot.maxX - foot.minX, foot.maxY - foot.minY)));
 
-    // Snap the readout to GEOMETRY near the pointer: stock corners + centre, path nodes (segment ends), and the
-    // origin — within a screen-pixel radius. Returns the snapped world point, or null (→ free cursor coord).
+    // Snap the readout to GEOMETRY near the pointer. Two tiers, both within a screen-pixel radius: (1) discrete
+    // POINTS — stock corners + centre, path nodes, the origin — preferred; (2) the nearest point ON AN EDGE —
+    // stock edges or a path segment (perpendicular projection). Returns the snapped world point, or null (→ free).
     function snapPoint(px, py) {
-        const TH = 11;
-        let best = null, bestD = TH * TH;
-        const consider = (wx, wy) => { const dx = tx(wx) - px, dy = ty(wy) - py, d = dx * dx + dy * dy; if (d < bestD) { bestD = d; best = { x: wx, y: wy }; } };
-        consider(0, 0);
+        const TH2 = 11 * 11;
         const sr = stockRect();
-        if (sr) { consider(sr.minX, sr.minY); consider(sr.maxX, sr.minY); consider(sr.minX, sr.maxY); consider(sr.maxX, sr.maxY); consider((sr.minX + sr.maxX) / 2, (sr.minY + sr.maxY) / 2); }
-        for (let i = 0; i < segs.length; i++) { const s = segs[i]; consider(s.x1, s.y1); consider(s.x2, s.y2); }
-        return best;
+        // tier 1: discrete points
+        let bestPt = null, bestPtD = TH2;
+        const pt = (wx, wy) => { const dx = tx(wx) - px, dy = ty(wy) - py, d = dx * dx + dy * dy; if (d < bestPtD) { bestPtD = d; bestPt = { x: wx, y: wy }; } };
+        pt(0, 0);
+        if (sr) { pt(sr.minX, sr.minY); pt(sr.maxX, sr.minY); pt(sr.minX, sr.maxY); pt(sr.maxX, sr.maxY); pt((sr.minX + sr.maxX) / 2, (sr.minY + sr.maxY) / 2); }
+        for (let i = 0; i < segs.length; i++) { const s = segs[i]; pt(s.x1, s.y1); pt(s.x2, s.y2); }
+        if (bestPt) return bestPt;
+        // tier 2: nearest point on an edge (clamped perpendicular projection, in screen space)
+        let bestE = null, bestED = TH2;
+        const edge = (ax, ay, bx, by) => {
+            const asx = tx(ax), asy = ty(ay), dx = tx(bx) - asx, dy = ty(by) - asy, len2 = dx * dx + dy * dy;
+            let t = len2 ? ((px - asx) * dx + (py - asy) * dy) / len2 : 0; t = Math.max(0, Math.min(1, t));
+            const sx = asx + t * dx, sy = asy + t * dy, d = (sx - px) * (sx - px) + (sy - py) * (sy - py);
+            if (d < bestED) { bestED = d; bestE = { x: ax + t * (bx - ax), y: ay + t * (by - ay) }; }
+        };
+        if (sr) { edge(sr.minX, sr.minY, sr.maxX, sr.minY); edge(sr.maxX, sr.minY, sr.maxX, sr.maxY); edge(sr.maxX, sr.maxY, sr.minX, sr.maxY); edge(sr.minX, sr.maxY, sr.minX, sr.minY); }
+        for (let i = 0; i < segs.length; i++) { const s = segs[i]; edge(s.x1, s.y1, s.x2, s.y2); }
+        return bestE;
     }
 
     // ---- drawing ----
