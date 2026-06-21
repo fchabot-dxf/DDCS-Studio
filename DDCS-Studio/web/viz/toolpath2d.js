@@ -1,85 +1,204 @@
 /**
- * viz/toolpath2d.js — the shared 2D toolpath preview (canvas). Used by every preview (Blocks, Studio main,
- * wizards) so they show the SAME 2D view alongside their 3D.
+ * viz/toolpath2d.js — the shared 2D TOP-DOWN scene (canvas). It mirrors the 3D view from straight above:
+ * grid + machine envelope + stock + toolpath + coordinate axes/labels — everything the 3D scene has, flat.
  *
- * The route comes from the EXECUTION ENGINE's trace (engine/trace.js): it resolves #vars, follows IF/GOTO
- * loops and auto-detects probes, so parametric/probe macros draw correctly (a regex parser couldn't resolve
- * `G0 Z#18`). Play shows progress as a TRAIL: the upcoming route is faint/thin, the executed part bold, with
- * a dot at the tool head — so you can read where you are in the program at a glance.
+ * Why 2D earns its place over a 3D top-view: pixels map 1:1 to mm, so COORDINATES are cheap here — a faint
+ * coordinate grid, sparse axis labels and a live cursor X/Y readout, no unprojection. It also needs no WebGL
+ * (the automatic fallback) and is lighter on phones. Coordinates are the program/work frame (part-zero at 0).
  *
- * Colours match the 3D legend (rapid=grey dashed, feed=cyan, probe=red).
+ * The route comes from the EXECUTION ENGINE's trace (engine/trace.js) so parametric/probe macros draw correctly.
+ * Play shows a TRAIL: upcoming faint/thin, executed bold, a dot at the tool head. Colours match the 3D legend.
+ *
+ * View: a pannable/zoomable transform. fit() frames the scene (called on toggle); zoom (wheel) + pan (drag)
+ * persist after that — we do NOT auto-recenter on every redraw, so live wizard edits don't yank the view.
  */
 import { traceToolpath } from '../engine/trace.js';
 
 const COL = { rapid: '#5a6b7d', feed: '#33b1c9', probe: '#e35c5c' };
 const typeOf = (s) => (s.probe ? 'probe' : (s.rapid ? 'rapid' : (s.type || 'feed')));
+const OLD_DATUM = { fl: 'nnp', fr: 'pnp', bl: 'npp', br: 'ppp', center: 'ccp' };
 
-/** Draw segments [from,to) in one style. style = { alpha, width } (rapids are always dashed). */
-function strokeSegs(ctx, segs, from, to, tx, ty, style) {
-    ctx.globalAlpha = style.alpha;
-    for (let i = from; i < to; i++) {
-        const s = segs[i], t = typeOf(s);
-        ctx.strokeStyle = COL[t] || '#888';
-        ctx.lineWidth = t === 'rapid' ? style.width * 0.6 : style.width;
-        ctx.setLineDash(t === 'rapid' ? [4, 3] : []);
-        ctx.beginPath(); ctx.moveTo(tx(s.x1), ty(s.y1)); ctx.lineTo(tx(s.x2), ty(s.y2)); ctx.stroke();
-    }
-    ctx.globalAlpha = 1; ctx.setLineDash([]);
+// A "nice" step (1/2/5 × 10^n) ~14 cells across a span — the grid increment when not pinned in Preview.
+function niceStep(span) {
+    const raw = (span || 1) / 14;
+    const p = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+    const n = raw / p;
+    return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * p;
+}
+// Datum offset (from the stock min corner) for a 3-char [X][Y][Z] code (or a migrated legacy code).
+function datumXY(s) {
+    let dc = s.datum || 'nnp'; if (!/^[ncp]{3}$/.test(dc)) dc = OLD_DATUM[dc] || 'nnp';
+    const f = { n: 0, c: 0.5, p: 1 };
+    return [f[dc[0]] * s.x, f[dc[1]] * s.y];
 }
 
-/**
- * Draw the toolpath onto a canvas, auto-fit. `k` = trail head (count of executed segments):
- *   k == null  → the whole route at normal weight (idle / static view)
- *   k a number → upcoming route faint + executed [0,k) bold + a dot at the tool head (play / progress)
- */
-export function drawToolpath2d(canvas, segs, k) {
-    const dpr = window.devicePixelRatio || 1, W = canvas.clientWidth, H = canvas.clientHeight;
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-    if (!segs.length) return;
-    let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity;
-    segs.forEach((s) => { a = Math.min(a, s.x1, s.x2); c = Math.max(c, s.x1, s.x2); b = Math.min(b, s.y1, s.y2); d = Math.max(d, s.y1, s.y2); });
-    const pad = 22, sc = Math.min((W - 2 * pad) / Math.max(1, c - a), (H - 2 * pad) / Math.max(1, d - b));
-    const tx = (v) => pad + (v - a) * sc, ty = (v) => H - pad - (v - b) * sc;
-
-    if (k == null) {                                   // idle: the full route, normal weight
-        strokeSegs(ctx, segs, 0, segs.length, tx, ty, { alpha: 1, width: 2 });
-        return;
-    }
-    const n = Math.max(0, Math.min(k, segs.length));
-    strokeSegs(ctx, segs, n, segs.length, tx, ty, { alpha: 0.22, width: 1.5 });   // upcoming (faint, thin)
-    strokeSegs(ctx, segs, 0, n, tx, ty, { alpha: 1, width: 2.6 });                // executed trail (bold)
-    const head = segs[n - 1] || segs[0];                                          // tool head dot
-    const hx = tx(n > 0 ? head.x2 : head.x1), hy = ty(n > 0 ? head.y2 : head.y1);
-    ctx.fillStyle = '#ffd24a'; ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI * 2); ctx.fill();
-}
-
-/**
- * Bind a canvas → a 2D toolpath controller.
- *   setGcode(text) — trace + (re)draw the route   · setSegments(segs) — use pre-traced segments (host shares one trace)
- *   redraw() — draw at the current trail position   · seek(k) — set the trail head (engine-driven progress)
- *   play()/stop()/toggle() — progress sweep over the resolved route (returns running state from toggle)
- */
+/** Bind a canvas → a 2D top-down scene controller (mirrors the GcodeViz3D inputs that matter in plan view). */
 export function createToolpath2d(canvas) {
-    let segs = [];
+    let segs = [], machine = null, stock = null, wcs = null, gridStep = 0;
+    let view = null;                 // { ox, oy, scale }: screenX = ox + x*scale, screenY = oy - y*scale (Y up)
+    let cursor = null;               // program coords under the pointer → readout chip
+    let drag = null;
     const anim = { playing: false, k: 0, raf: null };
-    const draw = (k) => drawToolpath2d(canvas, segs, k);
-    function redraw() { draw(anim.playing ? Math.floor(anim.k) : null); }
-    function setSegments(next) { segs = next || []; redraw(); }
-    function setGcode(text) { setSegments(traceToolpath(text).segments); }
-    function stop() { if (anim.playing) { anim.playing = false; if (anim.raf) cancelAnimationFrame(anim.raf); anim.raf = null; } redraw(); }
-    function loop() {
-        if (!anim.playing) return;
-        anim.k += 1.2; if (anim.k >= segs.length) anim.k = 0;
-        draw(Math.floor(anim.k));
-        anim.raf = requestAnimationFrame(loop);
+
+    const W = () => canvas.clientWidth, H = () => canvas.clientHeight;
+    const tx = (x) => view.ox + x * view.scale;
+    const ty = (y) => view.oy - y * view.scale;
+
+    // ---- scene geometry (program/work frame; part-zero at 0,0) ----
+    function envelopeRect() {
+        const m = machine;
+        if (!m || !m.show || !m.x || !m.y || !m.z) return null;
+        const wo = m.workOrigin || {}, wx = wo.x || 0, wy = wo.y || 0;
+        return { minX: Math.min(0, m.x) - wx, maxX: Math.max(0, m.x) - wx, minY: Math.min(0, m.y) - wy, maxY: Math.max(0, m.y) - wy };
     }
+    function stockRect() {
+        const s = stock;
+        if (!s || s.show === false || !(s.x > 0) || !(s.y > 0)) return null;
+        const [Dx, Dy] = datumXY(s);
+        let pinX = 0, pinY = 0;
+        if (s.pin && s.pin !== 'origin' && machine && machine.wcs && machine.wcs.table) {
+            const gi = parseInt(String(s.pin).replace(/[^0-9]/g, ''), 10) - 54;
+            const t = machine.wcs.table[gi], wo = machine.workOrigin || {};
+            if (t) { pinX = (Number(t.x) || 0) - (wo.x || 0); pinY = (Number(t.y) || 0) - (wo.y || 0); }
+        }
+        return { minX: -Dx + pinX, maxX: s.x - Dx + pinX, minY: -Dy + pinY, maxY: s.y - Dy + pinY, shape: s.shape };
+    }
+    function sceneBounds() {
+        let bb = null;
+        const ext = (r) => { if (!r) return; bb = bb ? { minX: Math.min(bb.minX, r.minX), minY: Math.min(bb.minY, r.minY), maxX: Math.max(bb.maxX, r.maxX), maxY: Math.max(bb.maxY, r.maxY) } : { minX: r.minX, minY: r.minY, maxX: r.maxX, maxY: r.maxY }; };
+        ext(envelopeRect()); ext(stockRect());
+        if (segs.length) { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; segs.forEach((s) => { a = Math.min(a, s.x1, s.x2); c = Math.max(c, s.x1, s.x2); b = Math.min(b, s.y1, s.y2); d = Math.max(d, s.y1, s.y2); }); ext({ minX: a, minY: b, maxX: c, maxY: d }); }
+        if (!bb) bb = { minX: 0, minY: 0, maxX: 100, maxY: 100 };
+        return { minX: Math.min(0, bb.minX), minY: Math.min(0, bb.minY), maxX: Math.max(0, bb.maxX), maxY: Math.max(0, bb.maxY) };   // always include the origin
+    }
+    const footprint = () => envelopeRect() || sceneBounds();
+    const stepFor = (foot) => (gridStep > 0 ? gridStep : niceStep(Math.max(foot.maxX - foot.minX, foot.maxY - foot.minY)));
+
+    // ---- drawing ----
+    function paint() {
+        const dpr = window.devicePixelRatio || 1, w = W(), h = H();
+        const nw = Math.round(w * dpr), nh = Math.round(h * dpr);
+        if (canvas.width !== nw || canvas.height !== nh) { canvas.width = nw; canvas.height = nh; }   // resize only on real size change
+        const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+        if (!view) return;
+        const foot = footprint(), step = stepFor(foot);
+        drawGrid(ctx, foot, step);
+        const env = envelopeRect(); if (env) drawRect(ctx, env, 'rgba(108,122,140,0.55)', null);
+        const st = stockRect(); if (st) drawRect(ctx, st, st.shape === 'pocket' ? 'rgba(134,182,255,0.65)' : 'rgba(166,215,124,0.65)', st.shape === 'pocket' ? 'rgba(106,143,190,0.10)' : 'rgba(143,174,106,0.10)');
+        drawOriginAxes(ctx, foot);
+        drawPath(ctx, anim.playing ? Math.floor(anim.k) : null);
+        drawLabels(ctx, foot, step, w, h);
+        if (cursor) drawReadout(ctx, cursor, w, h);
+    }
+    function drawGrid(ctx, foot, step) {
+        if (!(step > 0)) return;
+        ctx.save(); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(94,107,122,0.16)'; ctx.beginPath();
+        for (let k = Math.ceil(foot.minX / step - 1e-9); k <= Math.floor(foot.maxX / step + 1e-9); k++) { const x = tx(k * step); ctx.moveTo(x, ty(foot.minY)); ctx.lineTo(x, ty(foot.maxY)); }
+        for (let j = Math.ceil(foot.minY / step - 1e-9); j <= Math.floor(foot.maxY / step + 1e-9); j++) { const y = ty(j * step); ctx.moveTo(tx(foot.minX), y); ctx.lineTo(tx(foot.maxX), y); }
+        ctx.stroke(); ctx.restore();
+    }
+    function drawRect(ctx, r, line, fill) {
+        const x0 = tx(r.minX), x1 = tx(r.maxX), yTop = ty(r.maxY), yBot = ty(r.minY);
+        if (fill) { ctx.fillStyle = fill; ctx.fillRect(x0, yTop, x1 - x0, yBot - yTop); }
+        if (line) { ctx.strokeStyle = line; ctx.lineWidth = 1.4; ctx.strokeRect(x0, yTop, x1 - x0, yBot - yTop); }
+    }
+    function drawOriginAxes(ctx, foot) {   // X axis (red) at y=0, Y axis (green) at x=0 — matches the 3D colours
+        ctx.save(); ctx.lineWidth = 1.4;
+        if (foot.minY <= 0 && foot.maxY >= 0) { ctx.strokeStyle = 'rgba(255,107,107,0.6)'; ctx.beginPath(); ctx.moveTo(tx(foot.minX), ty(0)); ctx.lineTo(tx(foot.maxX), ty(0)); ctx.stroke(); }
+        if (foot.minX <= 0 && foot.maxX >= 0) { ctx.strokeStyle = 'rgba(95,211,95,0.6)'; ctx.beginPath(); ctx.moveTo(tx(0), ty(foot.minY)); ctx.lineTo(tx(0), ty(foot.maxY)); ctx.stroke(); }
+        ctx.restore();
+    }
+    function strokeSegs(ctx, from, to, alpha, width) {
+        ctx.globalAlpha = alpha;
+        for (let i = from; i < to; i++) {
+            const s = segs[i], t = typeOf(s);
+            ctx.strokeStyle = COL[t] || '#888'; ctx.lineWidth = t === 'rapid' ? width * 0.6 : width; ctx.setLineDash(t === 'rapid' ? [4, 3] : []);
+            ctx.beginPath(); ctx.moveTo(tx(s.x1), ty(s.y1)); ctx.lineTo(tx(s.x2), ty(s.y2)); ctx.stroke();
+        }
+        ctx.globalAlpha = 1; ctx.setLineDash([]);
+    }
+    function drawPath(ctx, k) {
+        if (!segs.length) return;
+        if (k == null) { strokeSegs(ctx, 0, segs.length, 1, 2); return; }
+        const n = Math.max(0, Math.min(k, segs.length));
+        strokeSegs(ctx, n, segs.length, 0.22, 1.5);
+        strokeSegs(ctx, 0, n, 1, 2.6);
+        const head = segs[n - 1] || segs[0]; const hx = tx(n > 0 ? head.x2 : head.x1), hy = ty(n > 0 ? head.y2 : head.y1);
+        ctx.fillStyle = '#ffd24a'; ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI * 2); ctx.fill();
+    }
+    function drawLabels(ctx, foot, step, w, h) {   // sparse coord labels along the bottom (X) + left (Y) frame
+        if (!(step > 0)) return;
+        ctx.save(); ctx.font = '10px sans-serif';
+        // X labels along the bottom — inset from the edge (clear of the toolbar) + a touch brighter so they read.
+        ctx.fillStyle = '#90a0b2'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; let last = -1e9;
+        for (let k = Math.ceil(foot.minX / step); k <= Math.floor(foot.maxX / step) + 1e-9; k++) { const px = tx(k * step); if (px < 16 || px > w - 4 || px - last < 38) continue; last = px; ctx.fillText(String(Math.round(k * step)), px, h - 7); }
+        // Y labels along the left.
+        ctx.fillStyle = '#6b7888'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; last = 1e9;
+        for (let j = Math.ceil(foot.minY / step); j <= Math.floor(foot.maxY / step) + 1e-9; j++) { const py = ty(j * step); if (py < 8 || py > h - 12 || last - py < 26) continue; last = py; ctx.fillText(String(Math.round(j * step)), 3, py); }
+        ctx.restore();
+    }
+    function drawReadout(ctx, c, w, h) {   // tooltip that FOLLOWS the cursor (so it never collides with the status bar)
+        const txt = `X ${c.x.toFixed(1)}   Y ${c.y.toFixed(1)}`;
+        ctx.save(); ctx.font = '11px sans-serif'; ctx.textBaseline = 'top';
+        const pad = 6, bw = ctx.measureText(txt).width + pad * 2, bh = 18;
+        let sx = tx(c.x) + 14, sy = ty(c.y) + 16;
+        if (sx + bw > w - 2) sx = tx(c.x) - 14 - bw;   // flip left near the right edge
+        if (sy + bh > h - 2) sy = ty(c.y) - 16 - bh;   // flip up near the bottom edge
+        sx = Math.max(2, sx); sy = Math.max(2, sy);
+        ctx.fillStyle = 'rgba(13,17,23,0.9)'; ctx.fillRect(sx, sy, bw, bh);
+        ctx.strokeStyle = 'rgba(120,140,160,0.4)'; ctx.lineWidth = 1; ctx.strokeRect(sx + 0.5, sy + 0.5, bw - 1, bh - 1);
+        ctx.fillStyle = '#cdd9e6'; ctx.textAlign = 'left'; ctx.fillText(txt, sx + pad, sy + 4);
+        ctx.restore();
+    }
+
+    // ---- view ----
+    function fit() {
+        const bb = sceneBounds(), w = W(), h = H(), pad = 28;
+        const bw = Math.max(1, bb.maxX - bb.minX), bh = Math.max(1, bb.maxY - bb.minY);
+        const scale = Math.min((w - 2 * pad) / bw, (h - 2 * pad) / bh);
+        const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2;
+        view = { ox: w / 2 - cx * scale, oy: h / 2 + cy * scale, scale };
+        paint();
+    }
+    const redraw = () => { if (view) paint(); else fit(); };
+
+    // ---- inputs ----
+    function setSegments(next) { segs = next || []; if (view) paint(); else fit(); }
+    function setMachine(m) { machine = m || null; if (view) paint(); }
+    function setStock(s) { stock = s || null; if (view) paint(); }
+    function setWcs(w) { wcs = w || null; }
+    function setGridStep(s) { gridStep = Number(s) || 0; if (view) paint(); }
+    function setGcode(text) { setSegments(traceToolpath(text).segments); }
+
+    // ---- play / progress ----
+    function stop() { if (anim.playing) { anim.playing = false; if (anim.raf) cancelAnimationFrame(anim.raf); anim.raf = null; } redraw(); }
+    function loop() { if (!anim.playing) return; anim.k += 1.2; if (anim.k >= segs.length) anim.k = 0; paint(); anim.raf = requestAnimationFrame(loop); }
     function play() { if (anim.playing || !segs.length) return; anim.playing = true; anim.k = 0; loop(); }
     function toggle() { if (anim.playing) { stop(); return false; } play(); return anim.playing; }
-    /** Drive the trail head from outside (e.g. the execution engine's move progress): k = executed segments. */
-    function seek(k) { anim.playing = true; anim.k = k; draw(Math.floor(k)); }
+    function seek(k) { anim.playing = true; anim.k = k; if (view) paint(); else fit(); }
+
+    // ---- interaction: wheel zoom (about cursor) + drag pan + hover readout (pointer events → touch too) ----
+    canvas.addEventListener('wheel', (e) => {
+        if (!view) return; e.preventDefault();
+        const r = canvas.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top;
+        const wx = (sx - view.ox) / view.scale, wy = (view.oy - sy) / view.scale;
+        const ns = Math.max(0.02, Math.min(400, view.scale * Math.exp(-e.deltaY * 0.0015)));
+        view.scale = ns; view.ox = sx - wx * ns; view.oy = sy + wy * ns; paint();
+    }, { passive: false });
+    canvas.addEventListener('pointerdown', (e) => { if (!view) return; drag = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy }; try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* */ } });
+    canvas.addEventListener('pointermove', (e) => {
+        if (!view) return;
+        if (drag) { view.ox = drag.ox + (e.clientX - drag.x); view.oy = drag.oy + (e.clientY - drag.y); paint(); return; }
+        const r = canvas.getBoundingClientRect();
+        cursor = { x: (e.clientX - r.left - view.ox) / view.scale, y: (view.oy - (e.clientY - r.top)) / view.scale };
+        if (!anim.playing) paint();
+    });
+    const endDrag = (e) => { drag = null; try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* */ } };
+    canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('mouseleave', () => { cursor = null; if (!anim.playing) paint(); });
+
     return {
-        setGcode, setSegments, redraw, draw, play, stop, toggle, seek,
+        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, redraw, fit, play, stop, toggle, seek,
         get playing() { return anim.playing; },
         get count() { return segs.length; },
     };

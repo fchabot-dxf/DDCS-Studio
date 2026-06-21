@@ -74,6 +74,7 @@ export function createPreviewPanel(container, opts = {}) {
     const cv2d = q('.pp-2d');
     const statusEl = q('.pp-status');
     const t2 = createToolpath2d(cv2d);
+    t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.setWcs(wcsForViz());   // 2D mirrors the 3D scene
 
     let viz = null;            // GcodeViz3D (lazy — only when 3D is shown and WebGL is available)
     let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false;
@@ -97,8 +98,9 @@ export function createPreviewPanel(container, opts = {}) {
     const simSpeed = () => SPEEDS[speedIx] || 1;
     // Apply the Settings → Preview options to the live viz (follow-cam damping + show-rapids).
     function applyPreviewSettings() {
-        if (!viz) return;
         const pv = previewPrefs();
+        if (t2.setGridStep) t2.setGridStep(pv.gridStep);   // 2D grid spacing — works even without the 3D viz built
+        if (!viz) return;
         const damp = Number.isFinite(pv.followDamp) ? pv.followDamp : 50;        // 0 = snappy … 100 = very damped
         if (viz.setFollowLerp) viz.setFollowLerp(0.32 - (damp / 100) * 0.30);
         if (viz.setShowRapids) viz.setShowRapids(pv.showRapids !== false);
@@ -175,8 +177,11 @@ export function createPreviewPanel(container, opts = {}) {
     // Single bottom bar: the jog grid lives in the 3D viz's pendant; the bar's ✛ Jog button toggles it and only
     // shows when there's a start marker to jog (3D + starts). I/O toggles the shared virtual-I/O panel.
     function syncJog() {
-        const j = q('.pp-jog'); if (j) j.style.display = (mode === '3d' && viz && viz.jogPendant && viz.starts && viz.starts.length > 0) ? '' : 'none';
-        const f = q('.pp-follow'); if (f) f.style.display = (mode === '3d' && viz) ? '' : 'none';   // follow-cam: 3D only
+        // GREY OUT (don't hide) buttons that don't apply, so the toolbar layout never shifts. Jog + follow-cam are
+        // 3D-only; in 2D you nudge the start via its draggable handle instead.
+        const setEnabled = (el, ok) => { if (!el) return; el.style.display = ''; el.style.opacity = ok ? '' : '0.35'; el.style.pointerEvents = ok ? '' : 'none'; el.title = ok ? (el.dataset.t || el.title) : '3D view only'; };
+        setEnabled(q('.pp-jog'), mode === '3d' && viz && viz.jogPendant && viz.starts && viz.starts.length > 0);
+        setEnabled(q('.pp-follow'), mode === '3d' && viz);
     }
 
     // Legend: show ONLY the path types present in the current toolpath (classified like the 3D viz). Probe splits
@@ -235,7 +240,7 @@ export function createPreviewPanel(container, opts = {}) {
             if (v) { if (v.renderer) v.renderer.domElement.style.display = ''; v.setActive(true); }
         }
         if (active) setGcode();
-        if (mode === '2d') t2.redraw();   // re-fit to the now-visible canvas size (toggle / after resize)
+        if (mode === '2d') { t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.fit(); }   // frame the full scene on toggle
     }
 
     function play() {
@@ -273,7 +278,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     // ---- stock: a button that opens the rich Stock modal (ui/stockEditor.js). The modal persists to the shared
     //      store + broadcasts ddcs:settings-changed; renderStock() then pushes it into this panel's viz/engine. ----
-    function renderStock() { if (viz) viz.setStock(stockForViz()); if (engine) engine.stock = stockForViz(); }
+    function renderStock() { if (viz) viz.setStock(stockForViz()); if (engine) engine.stock = stockForViz(); t2.setStock(stockForViz()); }
     q('.pp-stock').addEventListener('click', (e) => toggleStockEditor(e.currentTarget));
 
     // ---- play / view controls ----
@@ -309,7 +314,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     window.addEventListener('ddcs:stop-previews', stopPlay);
     // Stock (or other settings) changed — e.g. the Stock modal — update the workpiece box + re-trace (probe clamp).
-    window.addEventListener('ddcs:settings-changed', () => { renderStock(); if (viz) viz.setMachine(machineForViz()); applyPreviewSettings(); if (active) setGcode(); });
+    window.addEventListener('ddcs:settings-changed', () => { renderStock(); if (viz) viz.setMachine(machineForViz()); t2.setMachine(machineForViz()); applyPreviewSettings(); if (active) setGcode(); });
 
     function setActive(on) {
         active = !!on;
@@ -317,7 +322,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (mode === '3d') { const v = ensureViz(); if (v) v.setActive(true); }
         else if (mode === '2d' && cv2d) cv2d.style.display = '';   // 2D default: ensure the canvas is visible
         setGcode();
-        if (mode === '2d') t2.redraw();   // draw the now-visible 2D path (default-2D had it hidden + unredrawn)
+        if (mode === '2d') t2.fit();   // frame the full 2D scene on activate (default-2D)
         autoStartOnOpen();
     }
 
