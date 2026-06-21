@@ -89,6 +89,19 @@ export function createToolpath2d(canvas, opts = {}) {
     const footprint = () => envelopeRect() || sceneBounds();
     const stepFor = (foot) => (gridStep > 0 ? gridStep : niceStep(Math.max(foot.maxX - foot.minX, foot.maxY - foot.minY)));
 
+    // Snap the readout to GEOMETRY near the pointer: stock corners + centre, path nodes (segment ends), and the
+    // origin — within a screen-pixel radius. Returns the snapped world point, or null (→ free cursor coord).
+    function snapPoint(px, py) {
+        const TH = 11;
+        let best = null, bestD = TH * TH;
+        const consider = (wx, wy) => { const dx = tx(wx) - px, dy = ty(wy) - py, d = dx * dx + dy * dy; if (d < bestD) { bestD = d; best = { x: wx, y: wy }; } };
+        consider(0, 0);
+        const sr = stockRect();
+        if (sr) { consider(sr.minX, sr.minY); consider(sr.maxX, sr.minY); consider(sr.minX, sr.maxY); consider(sr.maxX, sr.maxY); consider((sr.minX + sr.maxX) / 2, (sr.minY + sr.maxY) / 2); }
+        for (let i = 0; i < segs.length; i++) { const s = segs[i]; consider(s.x1, s.y1); consider(s.x2, s.y2); }
+        return best;
+    }
+
     // ---- drawing ----
     function paint() {
         const dpr = window.devicePixelRatio || 1, w = W(), h = H();
@@ -105,7 +118,12 @@ export function createToolpath2d(canvas, opts = {}) {
         drawPath(ctx, anim.playing ? Math.floor(anim.k) : null);
         drawLabels(ctx, foot, step, w, h);
         if (start) drawStartHandle(ctx);
-        if (cursor) drawReadout(ctx, cursor, w, h);
+        canvas.__t2cursor = cursor;   // debug + tests
+        if (cursor) { if (cursor.snapped) drawSnap(ctx, cursor); drawReadout(ctx, cursor, w, h); }
+    }
+    function drawSnap(ctx, c) {   // snapped-to-geometry marker (cyan square) at the exact point
+        const hx = tx(c.x), hy = ty(c.y);
+        ctx.save(); ctx.strokeStyle = '#33d6ff'; ctx.lineWidth = 1.6; ctx.strokeRect(hx - 5, hy - 5, 10, 10); ctx.restore();
     }
     function drawStartHandle(ctx) {   // ruby start marker + grab-ring — the draggable operator start (matches the 3D ① marker)
         const hx = tx(start.x), hy = ty(start.y);
@@ -227,8 +245,9 @@ export function createToolpath2d(canvas, opts = {}) {
         const r = canvas.getBoundingClientRect();
         if (dragStart) { start = { x: (e.clientX - r.left - view.ox) / view.scale, y: (view.oy - (e.clientY - r.top)) / view.scale, z: start ? start.z : 0 }; paint(); return; }
         if (drag) { view.ox = drag.ox + (e.clientX - drag.x); view.oy = drag.oy + (e.clientY - drag.y); paint(); return; }
-        cursor = { x: (e.clientX - r.left - view.ox) / view.scale, y: (view.oy - (e.clientY - r.top)) / view.scale };
-        canvas.style.cursor = nearHandle(e) ? 'move' : '';
+        const px = e.clientX - r.left, py = e.clientY - r.top, snap = snapPoint(px, py);
+        cursor = snap ? { x: snap.x, y: snap.y, snapped: true } : { x: (px - view.ox) / view.scale, y: (view.oy - py) / view.scale, snapped: false };
+        canvas.style.cursor = nearHandle(e) ? 'move' : (snap ? 'crosshair' : '');
         if (!anim.playing) paint();
     });
     const endDrag = (e) => {
