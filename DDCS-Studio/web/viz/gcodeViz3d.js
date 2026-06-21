@@ -743,9 +743,10 @@ export class GcodeViz3D {
         const s = this._stock;
         if (s && s.show && s.x > 0 && s.y > 0 && s.z > 0) b = this._growBounds(b, 0, 0, -s.z, s.x, s.y, 0);
         const m = this._machine;
-        if (m && m.show && m.x > 0 && m.y > 0 && m.z > 0) {
-            const ox = m.ox || 0, oy = m.oy || 0, oz = m.oz || 0;
-            b = this._growBounds(b, -ox, -oy, -oz, m.x - ox, m.y - oy, m.z - oz);
+        if (m && m.show && m.x && m.y && m.z) {
+            const w = m.workOrigin || {}, ox = w.x || 0, oy = w.y || 0, oz = w.z || 0;
+            // envelope corners in scene = machine {0, travel} − workOrigin (travel signed)
+            b = this._growBounds(b, Math.min(0, m.x) - ox, Math.min(0, m.y) - oy, Math.min(0, m.z) - oz, Math.max(0, m.x) - ox, Math.max(0, m.y) - oy, Math.max(0, m.z) - oz);
         }
         if (b) this.fit(b);
         this.render();
@@ -839,21 +840,32 @@ export class GcodeViz3D {
         }
     }
 
-    // Wireframe machine envelope — origin = program-zero offset from the envelope's min corner
+    // Wireframe machine envelope (scene = machine − workOrigin) + axis lines at machine-zero (home / limits).
     setMachine(machine) {
         const THREE = this.THREE;
         this._machine = machine || null;
         if (this.machineBox) { this.scene.remove(this.machineBox); this.machineBox.geometry.dispose(); this.machineBox.material.dispose(); this.machineBox = null; }
-        if (machine && machine.show && machine.x > 0 && machine.y > 0 && machine.z > 0) {
-            const src = new THREE.BoxGeometry(machine.x, machine.y, machine.z);
+        if (this.machineAxes) { this.scene.remove(this.machineAxes); if (this.machineAxes.geometry) this.machineAxes.geometry.dispose(); if (this.machineAxes.material) this.machineAxes.material.dispose(); this.machineAxes = null; }
+        const sx = machine ? machine.x : 0, sy = machine ? machine.y : 0, sz = machine ? machine.z : 0;
+        if (machine && machine.show && sx && sy && sz) {
+            const src = new THREE.BoxGeometry(Math.abs(sx), Math.abs(sy), Math.abs(sz));   // |travel| — the sign is just the home direction
             const eg = new THREE.EdgesGeometry(src);
             src.dispose();
             const box = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x6c7a8c, transparent: true, opacity: 0.4 }));
-            const ox = machine.ox || 0, oy = machine.oy || 0, oz = machine.oz || 0;
-            box.position.set(machine.x / 2 - ox, machine.y / 2 - oy, machine.z / 2 - oz);
+            const w = machine.workOrigin || { x: 0, y: 0, z: 0 };
+            // Envelope spans machine 0..travel (signed); box centre (machine) = travel/2; scene = machine − workOrigin.
+            box.position.set(sx / 2 - (w.x || 0), sy / 2 - (w.y || 0), sz / 2 - (w.z || 0));
             this.machineBox = box; this.scene.add(box);
+            // Machine-zero axes (X red / Y green / Z blue), pointing along the travel — shows home/limits vs part-zero.
+            const axLen = (Math.min(Math.abs(sx), Math.abs(sy), Math.abs(sz)) * 0.3) || 40;
+            const ax = new THREE.AxesHelper(axLen);
+            ax.position.set(-(w.x || 0), -(w.y || 0), -(w.z || 0));   // machine 0 in scene coords
+            ax.scale.set(Math.sign(sx) || 1, Math.sign(sy) || 1, Math.sign(sz) || 1);
+            if (ax.material) { ax.material.transparent = true; ax.material.opacity = 0.85; ax.material.depthTest = false; }
+            ax.renderOrder = 5;
+            this.machineAxes = ax; this.scene.add(ax);
         }
-        if (this._magazine) this.setMagazine(this._magazine);   // re-place pockets when the envelope/origin changes
+        if (this._magazine) this.setMagazine(this._magazine);   // re-place pockets when the envelope/WCS changes
     }
 
     /**
@@ -870,7 +882,7 @@ export class GcodeViz3D {
         }
         this._magazine = (pockets && pockets.length) ? pockets : null;
         if (!this._magazine) { this.render(); return; }
-        const m = this._machine || {}, ox = m.ox || 0, oy = m.oy || 0, oz = m.oz || 0;
+        const m = this._machine || {}, wo = m.workOrigin || {}, ox = wo.x || 0, oy = wo.y || 0, oz = wo.z || 0;
         const n = (v, d) => { const x = Number(v); return Number.isFinite(x) ? x : d; };
         const grp = new THREE.Group();
         this._magazine.forEach((p, i) => {

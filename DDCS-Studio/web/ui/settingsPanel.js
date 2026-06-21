@@ -70,7 +70,9 @@ export const STOCK_TEMPLATES = [
 const SETTINGS_DEFAULTS = {
     stock:   { x: 100, y: 80, z: 20, shape: 'boss', show: true },
     stockTemplates: [],   // user-saved presets: { name, x, y, z, shape }
-    machine: { x: 300, y: 300, z: 120, ox: 0, oy: 0, oz: 0, show: true, workOrigin: { x: 0, y: 0, z: 0 } },
+    // Travel x/y/z are SIGNED (sign = home direction). workOrigin = the active WCS offset (machine coords of
+    // part-zero), kept in sync from wcs.table[active-1]. wcs = the G54–G59 table pulled from the controller.
+    machine: { x: 300, y: 300, z: 120, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } },
     view:    { theta: -1.5708, phi: 1.0472 }, // 3D preview start orientation (front: +X right, +Y back)
     probes:  {
         probePin: 3, probeLevel: 0,        // IN03 = YunKia V6 3D probe (confirmed)
@@ -263,6 +265,43 @@ window.ddcsProbeSrcAvailable = probeSrcAvailable;
 window.ddcsSetProbeSrc = setProbeSrc;
 window.ddcsResolveProbeSources = resolveProbeSources;
 
+// The WCS table (G54–G59 offsets, machine coords of each part-zero) + which one is active. workOrigin (used by
+// the sim for G53/program placement) is derived from the active row. Pulled from the controller, editable offline.
+const WCS_NAMES = ['G54', 'G55', 'G56', 'G57', 'G58', 'G59'];
+function syncWorkOrigin(m) {
+    const w = m.wcs, r = w && w.table && w.table[(w.active || 1) - 1];
+    m.workOrigin = r ? { x: num(r.x, 0), y: num(r.y, 0), z: num(r.z, 0) } : { x: 0, y: 0, z: 0 };
+}
+function renderWcsTable(host, machine) {
+    if (!host) return;
+    machine.wcs = machine.wcs || { active: 1, table: null };
+    const w = machine.wcs;
+    if (!Array.isArray(w.table)) w.table = WCS_NAMES.map(() => ({ x: '', y: '', z: '' }));
+    if (!w.active) w.active = 1;
+    const GRID = 'display:grid; grid-template-columns:30px 42px 1fr 1fr 1fr; gap:6px; align-items:center;';
+    host.innerHTML = '';
+    const head = document.createElement('div');
+    head.style.cssText = GRID + ' font-size:10px; color:var(--text-dim); padding:0 2px 3px;';
+    head.innerHTML = '<span>act</span><span>WCS</span><span>X</span><span>Y</span><span>Z</span>';
+    host.appendChild(head);
+    w.table.forEach((row, i) => {
+        const tr = document.createElement('div');
+        tr.style.cssText = GRID + ' padding:2px;';
+        const rb = document.createElement('input'); rb.type = 'radio'; rb.name = 'wcs_active'; rb.checked = w.active === i + 1;
+        rb.title = 'Active WCS — positions the program in the envelope';
+        rb.addEventListener('change', () => { w.active = i + 1; syncWorkOrigin(machine); saveSettings(); });
+        const lab = document.createElement('span'); lab.textContent = WCS_NAMES[i]; lab.style.cssText = 'font-weight:600; font-size:11px;';
+        tr.appendChild(rb); tr.appendChild(lab);
+        ['x', 'y', 'z'].forEach((k) => {
+            const inp = document.createElement('input'); inp.type = 'number'; inp.step = '0.001'; inp.value = row[k] ?? '';
+            inp.style.cssText = 'width:100%; box-sizing:border-box;';
+            inp.addEventListener('change', () => { row[k] = inp.value === '' ? '' : Number(inp.value); if (w.active === i + 1) syncWorkOrigin(machine); saveSettings(); });
+            tr.appendChild(inp);
+        });
+        host.appendChild(tr);
+    });
+}
+
 let _fillSettingsInputs = null;
 
 // Merge incoming settings (e.g. from an imported / cloud-loaded profile), persist, and refresh the panel.
@@ -313,6 +352,9 @@ function buildSettingsOverlay() {
             #settings-app .settings-sidebar .sidebar-group-label:first-child { padding-top: 2px; }
             #settings-app .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 20px; background: var(--bg); }
             #settings-app .settings-foot { flex: 0 0 auto; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--panel); display: flex; gap: 8px; }
+            #settings-app .settings-head { justify-content: space-between; }
+            #settings-app .settings-close { margin-left: auto; background: transparent; border: none; box-shadow: none; text-shadow: none; color: var(--text-dim); font-size: 17px; line-height: 1; cursor: pointer; padding: 4px 8px; min-height: 0; border-radius: var(--radius, 4px); }
+            #settings-app .settings-close:hover { color: var(--text-main); background: var(--bg); }
         </style>
             <div class="settings-head">
                 <div style="display: flex; align-items: center; gap: 16px;">
@@ -321,6 +363,7 @@ function buildSettingsOverlay() {
                         <button class="settings-main-tab" data-group="hardware">Hardware</button>
                     </div>
                 </div>
+                <button class="settings-close" type="button" title="Close (Esc)" aria-label="Close settings" onclick="window.closeSettings && window.closeSettings()">✕</button>
             </div>
             <div class="settings-body">
                 <div class="settings-sidebar">
@@ -515,26 +558,16 @@ function buildSettingsOverlay() {
                 <div id="set_tab_machine" style="display:none">
                     <div class="settings-section">
                         <div class="settings-section-title">MACHINE ENVELOPE (mm)</div>
+                        <div class="settings-hint">Travel per axis. The <b>sign sets the home direction</b>: <code>X 300</code> homes at one end and travels +X; <code>X -300</code> homes at the other end and travels −X. (Home = machine 0.)</div>
                         <div class="settings-grid">
-                            <label>Travel X<input type="number" id="set_mach_x" min="0" step="1"></label>
-                            <label>Travel Y<input type="number" id="set_mach_y" min="0" step="1"></label>
-                            <label>Travel Z<input type="number" id="set_mach_z" min="0" step="1"></label>
-                        </div>
-                        <div class="settings-section-title sub">LIMIT / ORIGIN POSITION (mm from min corner)</div>
-                        <div class="settings-grid">
-                            <label>Origin X<input type="number" id="set_mach_ox" step="1"></label>
-                            <label>Origin Y<input type="number" id="set_mach_oy" step="1"></label>
-                            <label>Origin Z<input type="number" id="set_mach_oz" step="1"></label>
-                        </div>
-                        <div class="settings-section-title sub">WORK ORIGIN — machine coords of part-zero (mm)</div>
-                        <div class="settings-hint">Where your G54 part-zero sits in machine coordinates (after homing + probing). Makes <code>G53</code> machine-frame moves (safe-Z retract, park) draw correctly in the sim. Leave 0 if program-zero = machine-zero. Auto-filled from a controller dump when available.</div>
-                        <div class="settings-grid">
-                            <label>Work origin X<input type="number" id="set_mach_wx" step="0.001"></label>
-                            <label>Work origin Y<input type="number" id="set_mach_wy" step="0.001"></label>
-                            <label>Work origin Z<input type="number" id="set_mach_wz" step="0.001"></label>
+                            <label>Travel X<input type="number" id="set_mach_x" step="1"></label>
+                            <label>Travel Y<input type="number" id="set_mach_y" step="1"></label>
+                            <label>Travel Z<input type="number" id="set_mach_z" step="1"></label>
                         </div>
                         <label class="settings-check"><input type="checkbox" id="set_mach_show"> Show machine envelope in 3D</label>
-                        <div class="settings-hint">Origin = program zero position within the envelope.</div>
+                        <div class="settings-section-title sub">WORK COORDINATE SYSTEM (G54–G59)</div>
+                        <div class="settings-hint">Where each part-zero sits in machine coordinates — <b>↧ Pull from controller</b> reads these (no typing). The active WCS positions your program in the envelope and makes <code>G53</code> moves draw correctly.</div>
+                        <div id="set_mach_wcs_table"></div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">AXES</div>
@@ -865,10 +898,7 @@ function wireSettingsOverlay(ov) {
         q('set_mach_x').value = s.machine.x;
         q('set_mach_y').value = s.machine.y;
         q('set_mach_z').value = s.machine.z;
-        q('set_mach_ox').value = s.machine.ox;
-        q('set_mach_oy').value = s.machine.oy;
-        q('set_mach_oz').value = s.machine.oz;
-        { const w = s.machine.workOrigin || { x: 0, y: 0, z: 0 }; q('set_mach_wx').value = w.x; q('set_mach_wy').value = w.y; q('set_mach_wz').value = w.z; }
+        renderWcsTable(q('set_mach_wcs_table'), s.machine);
         q('set_mach_show').checked = !!s.machine.show;
         if (q('set_axis_a_role')) {
             const mo = s.motors || {};
@@ -1136,22 +1166,28 @@ function wireSettingsOverlay(ov) {
         }
         if (!lenReadable) notes.push({ group: 'Tool lengths', label: 'Not readable on this controller', value: '—', kind: 'note' });
         else if (!lenCount) notes.push({ group: 'Tool lengths', label: 'None set', value: 'all at default (0)', kind: 'note' });
-        // WCS work offset (active system)
-        const idxO = obj(activeWcsVar); const idx = (idxO && idxO.value >= 1 && idxO.value <= 6) ? Math.round(idxO.value) : 1;
-        const base = wcsBase + (idx - 1) * wcsStride;
-        const wx = obj(base), wy = obj(base + 1), wz = obj(base + 2);
-        if (wx || wy || wz) {
-            if ((wx && wx.value) || (wy && wy.value) || (wz && wz.value))
-                cands.push({ group: 'WCS work offset', label: `G${53 + idx} work origin`, value: `X${wx ? wx.value : 0} Y${wy ? wy.value : 0} Z${wz ? wz.value : 0}`, changed: [wx, wy, wz].some((o) => o && o.userSet), kind: 'wcs', data: { x: wx ? wx.value : 0, y: wy ? wy.value : 0, z: wz ? wz.value : 0 } });
-            else notes.push({ group: 'WCS work offset', label: `G${53 + idx} at default`, value: 'origin = 0', kind: 'note' });
-        } else notes.push({ group: 'WCS work offset', label: 'Not readable', value: '—', kind: 'note' });
+        // WCS table — read all 6 systems (G54–G59) + the active index. Builds the full table for Settings → Machine.
+        const idxO = obj(activeWcsVar); const active = (idxO && idxO.value >= 1 && idxO.value <= 6) ? Math.round(idxO.value) : 1;
+        const table = []; let anyWcs = false;
+        for (let g = 0; g < 6; g++) {
+            const b = wcsBase + g * wcsStride; const gx = obj(b), gy = obj(b + 1), gz = obj(b + 2);
+            if (gx || gy || gz) anyWcs = true;
+            table.push({ x: gx ? gx.value : 0, y: gy ? gy.value : 0, z: gz ? gz.value : 0 });
+        }
+        if (anyWcs) {
+            const ar = table[active - 1] || { x: 0, y: 0, z: 0 };
+            cands.push({ group: 'WCS table (G54–G59)', label: `${WCS_NAMES[active - 1]} active`, value: `X${ar.x} Y${ar.y} Z${ar.z}`, changed: false, kind: 'wcs', data: { table, active } });
+        } else notes.push({ group: 'WCS table (G54–G59)', label: 'Not readable / all zero', value: '—', kind: 'note' });
         // Machine envelope / travel — from the controller's soft-limit params (gateway /api/profile geometry).
         const tv = hwProfile && hwProfile.geometry && hwProfile.geometry.travel;
         const mc = _ddcsSettings.machine || {};
         if (tv && [tv.x, tv.y, tv.z].some((v) => v != null && v > 0)) {
             const tx = (tv.x > 0 ? tv.x : mc.x), ty = (tv.y > 0 ? tv.y : mc.y), tz = (tv.z > 0 ? tv.z : mc.z);
             const changed = (tv.x > 0 && tv.x !== mc.x) || (tv.y > 0 && tv.y !== mc.y) || (tv.z > 0 && tv.z !== mc.z);
-            cands.push({ group: 'Machine envelope', label: 'Travel X/Y/Z', value: `${tx} × ${ty} × ${tz} mm`, changed, kind: 'travel', data: { x: tv.x, y: tv.y, z: tv.z } });
+            // homeDir (±1 per axis) = the homing direction → the travel SIGN. From geometry.homeDir when the gateway
+            // exposes the controller's homing-direction param, else inferred from a signed travel value.
+            const hd = (hwProfile.geometry && hwProfile.geometry.homeDir) || null;
+            cands.push({ group: 'Machine envelope', label: 'Travel X/Y/Z', value: `${tx} × ${ty} × ${tz} mm`, changed, kind: 'travel', data: { x: tv.x, y: tv.y, z: tv.z, homeDir: hd } });
         } else if (hwProfile && hwProfile.id) {
             notes.push({ group: 'Machine envelope', label: 'Not set', value: 'soft limits off — keeping current', kind: 'note' });
         }
@@ -1168,9 +1204,17 @@ function wireSettingsOverlay(ov) {
             mag.forEach((p) => { const tn = Number(p.tool); if (tn > 0 && !a.tools.some((t) => parseInt(t && t.num, 10) === tn)) a.tools.push(normalizeTool({}, tn)); });
         }
         checked.filter((c) => c.kind === 'length').forEach((c) => upsertToolLength(a, c.data.num, c.data.length));
-        const wcs = checked.find((c) => c.kind === 'wcs'); if (wcs) (_ddcsSettings.machine || (_ddcsSettings.machine = {})).workOrigin = wcs.data;
+        const wcs = checked.find((c) => c.kind === 'wcs');
+        if (wcs) { const m = (_ddcsSettings.machine || (_ddcsSettings.machine = {})); m.wcs = { active: wcs.data.active, table: wcs.data.table }; syncWorkOrigin(m); }
         const tvc = checked.find((c) => c.kind === 'travel');
-        if (tvc) { const mm = _ddcsSettings.machine || (_ddcsSettings.machine = {}); if (tvc.data.x > 0) mm.x = tvc.data.x; if (tvc.data.y > 0) mm.y = tvc.data.y; if (tvc.data.z > 0) mm.z = tvc.data.z; }
+        if (tvc) {
+            const mm = _ddcsSettings.machine || (_ddcsSettings.machine = {});
+            const hd = tvc.data.homeDir || {};
+            // Travel SIGN = homing direction: use the pulled homeDir if present, else the pulled value's own sign,
+            // else keep the user's current sign. Magnitude is the controller's soft-limit span.
+            const set = (cur, v, dir) => { const mag = Math.abs(v || 0); if (!mag) return cur; const s = dir || (v < 0 ? -1 : (cur < 0 ? -1 : 1)); return s * mag; };
+            mm.x = set(mm.x, tvc.data.x, hd.x); mm.y = set(mm.y, tvc.data.y, hd.y); mm.z = set(mm.z, tvc.data.z, hd.z);
+        }
         for (const c of checked.filter((c) => c.kind === 'hardware')) { try { await applyHardwareProfile(c.data); } catch (e) { /* ignore */ } }
         saveSettings(); fill();
         const mt = ov.querySelector('#atc_magazine'); if (mt) renderMagazineTable(mt, _ddcsSettings.atc, atcOnChange);
@@ -1480,10 +1524,7 @@ function wireSettingsOverlay(ov) {
         s.machine.x = num(q('set_mach_x').value, s.machine.x);
         s.machine.y = num(q('set_mach_y').value, s.machine.y);
         s.machine.z = num(q('set_mach_z').value, s.machine.z);
-        s.machine.ox = num(q('set_mach_ox').value, s.machine.ox);
-        s.machine.oy = num(q('set_mach_oy').value, s.machine.oy);
-        s.machine.oz = num(q('set_mach_oz').value, s.machine.oz);
-        { const w = s.machine.workOrigin || (s.machine.workOrigin = { x: 0, y: 0, z: 0 }); w.x = num(q('set_mach_wx').value, w.x); w.y = num(q('set_mach_wy').value, w.y); w.z = num(q('set_mach_wz').value, w.z); }
+        // ox/oy/oz removed; workOrigin is derived from the WCS table (renderWcsTable persists it on edit/pull).
         s.machine.show = q('set_mach_show').checked;
 
         s.probes.probePin = num(q('set_probe_pin').value, s.probes.probePin);
@@ -1781,18 +1822,29 @@ function wireSettingsOverlay(ov) {
 
 }
 
+function _settingsEsc(e) { if (e.key === 'Escape') { e.stopPropagation(); closeSettings(); } }
+
 export function openSettings() {
     // Opening setup leaves the Studio preview context — stop any running engine/play (every preview panel +
     // Studio's drawer), any open path, so nothing keeps executing behind the panel.
     window.dispatchEvent(new CustomEvent('ddcs:stop-previews'));
     if (window.ddcsStopPreview) window.ddcsStopPreview();
     buildSettingsOverlay();
-    const app = document.getElementById('settings-app');
-    if (app) app.classList.remove('hidden');
+    const ov = document.getElementById('settings-overlay');
+    if (ov) {
+        ov.classList.add('active');
+        if (!ov.dataset.wired) {                       // scrim click (outside the modal box) closes
+            ov.addEventListener('click', (e) => { if (e.target === ov) closeSettings(); });
+            ov.dataset.wired = '1';
+        }
+    }
+    document.addEventListener('keydown', _settingsEsc, true);
+    window.ddcsTrack?.('feature', 'settings');
 }
 export function closeSettings() {
-    const app = document.getElementById('settings-app');
-    if (app) app.classList.add('hidden');
+    const ov = document.getElementById('settings-overlay');
+    if (ov) ov.classList.remove('active');
+    document.removeEventListener('keydown', _settingsEsc, true);
 }
 
 window.openSettings = openSettings;
