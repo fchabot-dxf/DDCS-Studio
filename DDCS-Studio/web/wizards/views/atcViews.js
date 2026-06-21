@@ -52,17 +52,26 @@ function magazineRackHtml(a, opts = {}) {
     return tools.map((t) => toolTile(t, 'T' + t.num, (t.length !== '' && t.length != null) ? t.length + 'mm' : (t.name || ''), hl != null && Number(t.num) === hl)).join('');
 }
 
-/** Build the 3D-magazine pocket list (machine XYZ + the assigned tool's full shape) for viz.setMagazine. */
+/** Build the 3D-magazine pocket list (machine XYZ + the assigned tool's full shape) for viz.setMagazine. For a
+ *  disk/carousel the pockets have no per-pocket XYZ, so lay them in a ring of the carousel Ø around the pickup. */
 function magazinePockets(a) {
     const byNum = {};
     (a.tools || []).forEach((t) => { if (t && t.num != null && t.num !== '') byNum[Number(t.num)] = t; });
-    return (Array.isArray(a.magazine) ? a.magazine : []).map((p, i) => {
-        const t = byNum[Number(p.tool)] || {};
-        return {
-            x: p.x, y: p.y, z: p.z, pocket: p.pocket != null ? p.pocket : i + 1,
-            tool: { type: t.type || 'endmill', dia: num(t.dia, 6), angle: t.angle, length: num(t.length, 30) },
-        };
-    });
+    const mag = Array.isArray(a.magazine) ? a.magazine : [];
+    const toolOf = (p) => { const t = byNum[Number(p.tool)] || {}; return { type: t.type || 'endmill', dia: num(t.dia, 6), angle: t.angle, length: num(t.length, 30) }; };
+    if (a.magType === 'disk') {
+        // The pickup is a point ON the carousel rim (where the spindle picks up); the disk centre is offset from
+        // it by the radius. Pocket 1 sits at the pickup; the rest ring around the centre.
+        const pk = a.pickup || {};
+        const R = num(a.diskDia, 0) / 2;
+        const cx = num(pk.x, 0), cy = num(pk.y, 0) + R, cz = num(pk.z, 0);   // centre = pickup + R (pickup on the rim)
+        const n = mag.length || 1;
+        return mag.map((p, i) => {
+            const ang = -Math.PI / 2 + (i / n) * Math.PI * 2;   // start at the pickup (bottom of the ring)
+            return { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang), z: cz, pocket: p.pocket != null ? p.pocket : i + 1, tool: toolOf(p) };
+        });
+    }
+    return mag.map((p, i) => ({ x: p.x, y: p.y, z: p.z, pocket: p.pocket != null ? p.pocket : i + 1, tool: toolOf(p) }));
 }
 
 /** Pop the full magazine editor as a modal with a Done button — the wizard's own table stays read-only/compact. */
