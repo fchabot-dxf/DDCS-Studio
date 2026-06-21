@@ -1347,12 +1347,15 @@
                     <div id="atcTableTools" class="tool-rack" style="display:flex;gap:10px;overflow-x:auto;padding:8px 2px;align-items:flex-end;min-height:54px;"></div>
                 </div><!-- /.wiz-visual -->
                 <div class="wiz-controls">
-                <span class="section-label">TOOL TABLE → CONTROLLER</span>
+                <span class="section-label">MAGAZINE — build &amp; organise</span>
+                <div class="settings-hint" style="margin-bottom:6px;">Set the pocket count, pick a tool per pocket from your library, ▲▼ to reorganise which tool sits in which pocket. Saved to Settings → Tool table and reflected in the strip + macro.</div>
+                <div id="atc_table_magazine"></div>
+                <span class="section-label" style="margin-top:10px;">TOOL TABLE → CONTROLLER</span>
                 <div class="param-grid">
                     <label>Tool lengths<input type="checkbox" id="atc_table_lengths" checked></label>
                     <label>Pocket positions<input type="checkbox" id="atc_table_pockets" checked></label>
                 </div>
-                <div class="wiz-note">Reads Settings → Tool table (library + magazine). Generates a macro you <b>run on the controller</b> to write the table — variable writes only, no motion. Pocket writes are unverified; running it is the test.</div>
+                <div class="wiz-note">Generates a macro you <b>run on the controller</b> to write the table — variable writes only, no motion. Pocket writes are unverified; running it is the test.</div>
                 <div class="preview-block">
                     <span class="label">APPLY MACRO <span class="compliant-tag">(RUN ON CONTROLLER)</span></span>
                     <pre id="wiz_atc_table_code"></pre>
@@ -1395,7 +1398,7 @@
                     </div>
                     <div class="param-grid">
                         <label><input type="checkbox" id="atc_change_m300" checked> Wait spindle-stop sensor (M300)</label>
-                        <label><input type="checkbox" id="atc_change_cover"> Dust cover (M305/M306)</label>
+                        <label><input type="checkbox" id="atc_change_cover"> Dust cover (M162/M163)</label>
                         <label><input type="checkbox" id="atc_change_confirm"> Confirm prompt before moving</label>
                     </div>
                     <div class="wiz-usage">Pocket positions come from the controller tables (#1330+ X · #1350+ Y · #1370+ Z) — teach them on the machine first. Drawbar: M154/M155, sensors: M302/M303. Test in the 3D drawer: ▶ Run with Auto sensors, or drive the I/O panel by hand.</div>

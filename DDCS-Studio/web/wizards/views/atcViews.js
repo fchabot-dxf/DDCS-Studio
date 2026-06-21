@@ -2,6 +2,7 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { num } from '../ops/util.js';
 import { toolProfileSvg } from '../../viz/toolProfile.js';
+import { renderMagazineTable } from '../../ui/ioTable.js';
 import { AtcLengthWizard } from '../atcLengthWizard.js';
 import { AtcWarmupWizard } from '../atcWarmupWizard.js';
 import { AtcChangeWizard } from '../atcChangeWizard.js';
@@ -215,6 +216,17 @@ export const atcTableView = {
     large: true,
     twoPane: true,
     inputIds: ['atc_table_lengths', 'atc_table_pockets'],   // include lengths / include pockets
+    onShow(mgr) {
+        // Mount the interactive magazine editor (pocket count + tool-per-pocket + ▲▼ reorganise) right in the
+        // wizard — this is where you BUILD the magazine, so the strip + macro aren't empty. Persists to Settings.
+        const host = el('atc_table_magazine'); if (!host) return;
+        const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+        s.atc = s.atc || {};
+        renderMagazineTable(host, s.atc, () => {
+            if (window.ddcsSaveSettings) window.ddcsSaveSettings();
+            this.update(mgr);   // refresh the apply-macro + rack + status from the edited magazine
+        });
+    },
     update(mgr) {
         const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
         const a = s.atc || {};

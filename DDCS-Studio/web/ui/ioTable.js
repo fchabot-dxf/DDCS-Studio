@@ -214,6 +214,27 @@ export function renderMagazineTable(container, atc, onChange) {
         tr.appendChild(cell('x', 58));
         tr.appendChild(cell('y', 58));
         tr.appendChild(cell('z', 58));
+
+        // Reorganise: ▲/▼ swap the TOOL assignment with the neighbouring pocket (the physical pocket position +
+        // its park XYZ stay put — you're moving which tool lives in which pocket, not moving the pocket).
+        const moves = document.createElement('span');
+        moves.style.cssText = 'display:flex; gap:3px; margin-left:6px;';
+        const mk = (txt, ttl, dir) => {
+            const b = document.createElement('button'); b.className = 'toolbar-btn'; b.textContent = txt; b.title = ttl;
+            b.style.cssText = 'padding:1px 7px; align-self:center;';
+            if ((dir < 0 && i === 0) || (dir > 0 && i === atc.magazine.length - 1)) b.disabled = true;
+            b.addEventListener('click', () => {
+                const j = i + dir; if (j < 0 || j >= atc.magazine.length) return;
+                const a = atc.magazine[i], b2 = atc.magazine[j];
+                [a.tool, b2.tool] = [b2.tool, a.tool];
+                [a.name, b2.name] = [b2.name, a.name];
+                onChange(); rerender();
+            });
+            return b;
+        };
+        moves.appendChild(mk('▲', 'Move this tool up a pocket', -1));
+        moves.appendChild(mk('▼', 'Move this tool down a pocket', 1));
+        tr.appendChild(moves);
         container.appendChild(tr);
     });
 }

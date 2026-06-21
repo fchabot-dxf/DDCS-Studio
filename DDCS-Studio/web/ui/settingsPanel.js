@@ -1776,4 +1776,5 @@ export function closeSettings() {
 window.openSettings = openSettings;
 window.closeSettings = closeSettings;
 window.ddcsGetSettings = getSettings;
+window.ddcsSaveSettings = saveSettings;   // let wizards (e.g. the ATC table magazine editor) persist + broadcast edits
 window.ddcsApplySettings = applySettings;
