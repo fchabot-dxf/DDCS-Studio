@@ -109,6 +109,8 @@ export function createPreviewPanel(container, opts = {}) {
         if (viz.setFollowLerp) viz.setFollowLerp(0.32 - (damp / 100) * 0.30);
         if (viz.setShowRapids) viz.setShowRapids(pv.showRapids !== false);
         if (viz.setGridStep) viz.setGridStep(pv.gridStep);   // Preview → grid spacing (mm; 0/'' = auto)
+        if (viz.setHead) viz.setHead(pv.head);               // Preview → spindle/collet body sizes (sim-only, match the real machine)
+        if (viz.setPartVisible && pv.parts) viz.setPartVisible(pv.parts);   // Preview → which assembly pieces show
     }
     const nearest2d = (pos) => {
         let bi = 0, bd = Infinity;
@@ -186,6 +188,7 @@ export function createPreviewPanel(container, opts = {}) {
                 if (st && v.starts) v.starts[0] = { x: +st.x || 0, y: +st.y || 0, z: +st.z || 0 };
                 v.setSegments(parsed, !fitted); fitted = true;
                 if (v.setSimTool) v.setSimTool(simTool(code, parsed));   // per-op tool from the tool table (see simTool)
+                if (v.setSimMode) v.setSimMode(((parsed.stats && parsed.stats.probe) > 0) ? 'probe' : 'mill');   // probe = translucent stock, mill = solid
             }
         }
         const s = parsed.stats || {};

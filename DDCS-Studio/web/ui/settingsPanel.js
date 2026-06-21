@@ -98,7 +98,10 @@ const SETTINGS_DEFAULTS = {
     // users can configure for accurate simulation; a controller profile just presets these.
     hardwareTabs: { probes: true, atc: false, limits: true, spindle: false },
     // 3D/2D toolpath preview (read by viz/createPreviewPanel via window.ddcsGetSettings().preview).
-    preview: { followDamp: 50, showRapids: true, defaultView: '3d', defaultSpeed: 1, followDefault: true, autoLoop: true, gridStep: 0 },
+    // head = the sim spindle/collet body sizes (VISUAL ONLY — they change the render, never the G-code, so they
+    // live here with the view options, not under Machine). parts = which assembly pieces are shown.
+    preview: { followDamp: 50, showRapids: true, defaultView: '3d', defaultSpeed: 1, followDefault: true, autoLoop: true, gridStep: 0,
+        head: { spindleDia: 80, spindleLen: 200, colletDia: 20, colletLen: 30 }, parts: { spindle: true, collet: true, tool: true } },
     // Composing assists (Blocks suggestions, Studio editor autocomplete, ghost next-block).
     compose: { suggestions: true, autocomplete: true, ghost: true },
     // ATC: tool-length probe defaults (consumed by the Tool Length wizard) + the tool-offset table.
@@ -423,6 +426,21 @@ function buildSettingsOverlay() {
                         </div>
                         <div class="settings-hint">Low = snaps to the tool · High = smooth, gentle follow.</div>
                     </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">SPINDLE / HEAD (SIM VIEW)</div>
+                        <div class="settings-hint">How the spindle head draws in the simulation — visual only, it never changes the G-code. The cutter/probe shape comes from the <b>tool table</b>; these are the machine's spindle + collet body (see <b>Hardware → Head</b>).</div>
+                        <div class="settings-grid">
+                            <label>Spindle Ø (mm)<input type="number" id="set_pv_spindle_dia" min="0" step="1"></label>
+                            <label>Spindle length (mm)<input type="number" id="set_pv_spindle_len" min="0" step="5"></label>
+                            <label>Collet Ø (mm)<input type="number" id="set_pv_collet_dia" min="0" step="1"></label>
+                            <label>Collet length (mm)<input type="number" id="set_pv_collet_len" min="0" step="1"></label>
+                        </div>
+                        <div style="margin-top:6px">Show:
+                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_spindle"> Spindle</label>
+                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_collet"> Collet</label>
+                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_tool"> Tool</label>
+                        </div>
+                    </div>
                 </div>
                 <!-- GENERAL: COMPOSING (authoring assists — Blocks suggestions + Studio editor autocomplete) -->
                 <div id="set_tab_compose" style="display:none;">
@@ -647,6 +665,11 @@ function buildSettingsOverlay() {
                                     <label>Spin-up dwell (s)<input type="number" id="set_spin_up" min="0" step="0.1"></label>
                                     <label>Spin-down dwell (s)<input type="number" id="set_spin_down" min="0" step="0.1"></label>
                                 </div>
+                            </div>
+                            <div class="settings-section">
+                                <div class="settings-section-title">SIM APPEARANCE</div>
+                                <div class="settings-hint">The spindle &amp; collet <b>body sizes used in the simulation</b> live in Preview settings (they're visual only — set them so the sim matches your real machine).</div>
+                                <button class="toolbar-btn" id="set_head_simlink">Spindle / collet sizes → Preview ↗</button>
                             </div>
                         </div>
                         <div id="set_head_plasma" style="display:none">
@@ -931,6 +954,15 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_gridstep')) q('set_pv_gridstep').value = String(pv.gridStep || 0);
         if (q('set_pv_follow_default')) q('set_pv_follow_default').checked = pv.followDefault !== false;
         if (q('set_pv_autoloop')) q('set_pv_autoloop').checked = pv.autoLoop !== false;
+        const pvh = pv.head || (pv.head = { ...SETTINGS_DEFAULTS.preview.head });
+        const pvp = pv.parts || (pv.parts = { ...SETTINGS_DEFAULTS.preview.parts });
+        if (q('set_pv_spindle_dia')) q('set_pv_spindle_dia').value = pvh.spindleDia;
+        if (q('set_pv_spindle_len')) q('set_pv_spindle_len').value = pvh.spindleLen;
+        if (q('set_pv_collet_dia')) q('set_pv_collet_dia').value = pvh.colletDia;
+        if (q('set_pv_collet_len')) q('set_pv_collet_len').value = pvh.colletLen;
+        if (q('set_pv_show_spindle')) q('set_pv_show_spindle').checked = pvp.spindle !== false;
+        if (q('set_pv_show_collet')) q('set_pv_show_collet').checked = pvp.collet !== false;
+        if (q('set_pv_show_tool')) q('set_pv_show_tool').checked = pvp.tool !== false;
         const cp = s.compose || (s.compose = { ...SETTINGS_DEFAULTS.compose });
         if (q('set_cp_suggestions')) q('set_cp_suggestions').checked = cp.suggestions !== false;
         if (q('set_cp_autocomplete')) q('set_cp_autocomplete').checked = cp.autocomplete !== false;
@@ -1559,6 +1591,15 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_gridstep')) pv.gridStep = num(q('set_pv_gridstep').value, 0);
         if (q('set_pv_follow_default')) pv.followDefault = q('set_pv_follow_default').checked;
         if (q('set_pv_autoloop')) pv.autoLoop = q('set_pv_autoloop').checked;
+        const pvh = pv.head || (pv.head = { ...SETTINGS_DEFAULTS.preview.head });
+        const pvp = pv.parts || (pv.parts = { ...SETTINGS_DEFAULTS.preview.parts });
+        if (q('set_pv_spindle_dia')) pvh.spindleDia = num(q('set_pv_spindle_dia').value, 80);
+        if (q('set_pv_spindle_len')) pvh.spindleLen = num(q('set_pv_spindle_len').value, 200);
+        if (q('set_pv_collet_dia')) pvh.colletDia = num(q('set_pv_collet_dia').value, 20);
+        if (q('set_pv_collet_len')) pvh.colletLen = num(q('set_pv_collet_len').value, 30);
+        if (q('set_pv_show_spindle')) pvp.spindle = q('set_pv_show_spindle').checked;
+        if (q('set_pv_show_collet')) pvp.collet = q('set_pv_show_collet').checked;
+        if (q('set_pv_show_tool')) pvp.tool = q('set_pv_show_tool').checked;
         const cp = s.compose || (s.compose = { ...SETTINGS_DEFAULTS.compose });
         if (q('set_cp_suggestions')) cp.suggestions = q('set_cp_suggestions').checked;
         if (q('set_cp_autocomplete')) cp.autocomplete = q('set_cp_autocomplete').checked;
@@ -1819,6 +1860,9 @@ function wireSettingsOverlay(ov) {
     }
     mainTabs.forEach(t => t.addEventListener('click', () => showGroup(t.dataset.group)));
     sideTabs.forEach(t => t.addEventListener('click', () => showPanel(t.dataset.target)));
+    // Cross-link: Hardware → Head's "sim appearance" jumps to the Preview tab (General) where the head body dims live.
+    const _headSimLink = q('set_head_simlink');
+    if (_headSimLink) _headSimLink.addEventListener('click', () => { showGroup('general'); showPanel('set_tab_preview'); });
     showGroup('general');
 
     // "+ Add hardware" tool: adds a subsystem category tab + its standard I/O (mirrored + badged).

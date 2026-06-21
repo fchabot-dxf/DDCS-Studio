@@ -107,6 +107,9 @@ export class GcodeViz3D {
         this.grid = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x16242f }));
         this.scene.add(this.grid);
         this._gridStep = 0;
+        // Lights — only affect SHADED materials (the stock in mill mode); the flat MeshBasic geometry ignores them.
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.68));
+        const _dl = new THREE.DirectionalLight(0xffffff, 0.55); _dl.position.set(0.4, 0.8, 2); this.scene.add(_dl);
         // Floor axis lines through the ORIGIN (scene 0 = part-zero), SPANNING THE ENVELOPE — these ARE the X / Y
         // axes (no separate part-zero triad, which would just duplicate them): X red along y=0, Y green along x=0.
         // Re-laid each fit(). The machine-zero marker (setMachine) still shows a full XYZ gizmo at home.
@@ -311,11 +314,14 @@ export class GcodeViz3D {
         const topZ = Math.max(0.1, ...half.map((p) => p[1]));           // the tool's TOP (the shank) — sets the clamp height
         const part = (geo, color, op, name) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true, opacity: op })); m.name = name; return m; };
         const tgeo = new THREE.LatheGeometry(half.map((q) => new THREE.Vector2(Math.max(0.001, q[0]), q[1])), 24); tgeo.rotateX(Math.PI / 2);   // TOOL — real profile, tip at origin
-        // COLLET — CLAMPS the shank top (overlaps it), tapering down toward the shank Ø; always wider than the shank.
-        const colletR = Math.max(8, tr + 5), ch = 18, colletBot = topZ - 6;
-        const cgeo = new THREE.CylinderGeometry(colletR, Math.max(tr + 1, colletR * 0.55), ch, 20); cgeo.rotateX(Math.PI / 2); cgeo.translate(0, 0, colletBot + ch / 2);
-        // SPINDLE — a FIXED-size nose above the collet (a spindle is a spindle, not scaled to the cutter).
-        const spR = 28, sh = 44, spBot = colletBot + ch - 3;
+        // COLLET + SPINDLE dims come from the machine HEAD settings (pulled by the preview via setHead); the cutter
+        // only sets WHERE the collet clamps (the shank top). Defaults below match a typical spindle if no head is set.
+        const head = this._head || {};
+        // COLLET — a plain CYLINDER clamping the shank top (overlaps it); always wider than the shank.
+        const colletR = Math.max(tr + 1, (Number(head.colletDia) || 20) / 2), ch = Number(head.colletLen) || 30, colletBot = topZ - 6;
+        const cgeo = new THREE.CylinderGeometry(colletR, colletR, ch, 20); cgeo.rotateX(Math.PI / 2); cgeo.translate(0, 0, colletBot + ch / 2);
+        // SPINDLE — a real-size body above the collet (head.spindleDia × head.spindleLen).
+        const spR = (Number(head.spindleDia) || 80) / 2, sh = Number(head.spindleLen) || 200, spBot = colletBot + ch - 3;
         const sgeo = new THREE.CylinderGeometry(spR, spR, sh, 28); sgeo.rotateX(Math.PI / 2); sgeo.translate(0, 0, spBot + sh / 2);
         this._animParts = { tool: part(tgeo, 0xffab40, 0.9, 'tool'), collet: part(cgeo, 0x9aa6b2, 0.9, 'collet'), spindle: part(sgeo, 0x6b7682, 0.85, 'spindle') };
         const grp = new THREE.Group();
@@ -328,6 +334,11 @@ export class GcodeViz3D {
     setPartVisible(parts) { this._partVis = Object.assign({ tool: true, collet: true, spindle: true }, this._partVis, parts); this._applyPartVis(); this.render(); }
     // Set the PER-OP tool { type, dia, length } → rebuild the assembly's tool to its real profile.
     setSimTool(tool) { this._simTool = tool || null; if (this._animTool) this._buildAnimTool(); }
+    // Machine HEAD dims { spindleDia, spindleLen, colletDia, colletLen } (mm) — pulled from settings by the preview.
+    setHead(head) { this._head = head || null; if (this._animTool) this._buildAnimTool(); }
+    // Per-op SIM MODE: 'mill' → solid shaded stock; 'probe' → translucent so the probe/feature shows through.
+    _stockOpacity() { return this._simMode === 'probe' ? 0.16 : 0.72; }
+    setSimMode(mode) { if (mode === this._simMode) return; this._simMode = mode; if (this.stockMesh && this.stockMesh.material) { this.stockMesh.material.opacity = this._stockOpacity(); this.render(); } }
 
     // Toggle a tool dot that travels the whole path in execution order, feed-true (real program time)
     setAnimate(on) {
@@ -885,7 +896,7 @@ export class GcodeViz3D {
             const fillCol = pocket ? 0x6a8fbe : 0x8fae6a;  // pocket = blue, boss = green
             const edgeCol = pocket ? 0x86b6ff : 0xa6d77c;
             let geo;
-            const mat = new THREE.MeshBasicMaterial({ color: fillCol, transparent: true, opacity: 0.12, depthWrite: false });
+            const mat = new THREE.MeshLambertMaterial({ color: fillCol, transparent: true, opacity: this._stockOpacity(), depthWrite: false });   // SHADED (lit) stock; opacity per sim mode
             const mesh = new THREE.Mesh();
             if (pocket) {
                 // Square donut: a frame of material around the cavity. The cavity (the hole,

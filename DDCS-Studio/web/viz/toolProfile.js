@@ -53,10 +53,10 @@ export function toolHalfProfile(tool) {
             const rbody = 15;                       // electronics body disc (~Ø30)
             const bodyL = Math.max(r * 6, 28);
             const shankL = Math.max(r * 3, 16);
-            const pts = []; const segs = 12;
-            for (let i = 0; i <= segs; i++) { const a = (Math.PI / 2) * (i / segs); pts.push([rball * Math.sin(a), rball - rball * Math.cos(a)]); }  // ruby ball tip
-            pts.push([rsty, rball]);                // narrow to the stylus
-            const styTop = rball + styL; pts.push([rsty, styTop]);
+            const pts = []; const segs = 16;
+            for (let i = 0; i <= segs; i++) { const a = Math.PI * (i / segs); pts.push([rball * Math.sin(a), rball - rball * Math.cos(a)]); }  // full ruby sphere (0..π → bottom round to top)
+            pts.push([rsty, 2 * rball]);            // stylus emerges from the top of the ball
+            const styTop = 2 * rball + styL; pts.push([rsty, styTop]);
             pts.push([rbody, styTop]);              // step out to the body
             const bodyTop = styTop + bodyL; pts.push([rbody, bodyTop]);
             pts.push([r, bodyTop]);                 // step in to the shank
