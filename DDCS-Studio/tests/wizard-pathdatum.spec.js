@@ -67,6 +67,22 @@ test('a signed Z offset shifts every Z move; hole diameter never moves the grid'
   expect(xsOf(wide)).toEqual(xsOf(base));
 });
 
+test('the placement persists through insert (baked into the block stack, not a post-translate)', async ({ page }) => {
+  await setup(page);
+  await code(page, { stockDatum: 'nnp', stockAttach: 'pp' });   // attach the path to the stock's max corner
+  const res = await page.evaluate(async () => {
+    await window.ddcsStudio.wizardManager.insert();
+    const prog = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+    const op = prog.find((b) => b && b.type === 'op' && b.opType === 'drill');
+    if (!op) return null;
+    const arr = (op.children || []).find((c) => c.type === 'array');
+    return { attach: op.params && op.params.stockAttach, x0: arr && arr.params && arr.params.x0 };
+  });
+  expect(res, 'a drill op was committed').toBeTruthy();
+  expect(res.attach, 'the op remembers the stock-attach corner (for re-editing)').toBe('pp');
+  expect(res.x0, 'the array origin is BAKED to the placed position (grid 0..40 → max corner at 100)').toBeCloseTo(60, 1);
+});
+
 test('the 3×3 datum picker renders on the layout canvas and a click sets the path datum', async ({ page }) => {
   await setup(page);
   await code(page, { stockDatum: 'nnp', pathDatum: '' });

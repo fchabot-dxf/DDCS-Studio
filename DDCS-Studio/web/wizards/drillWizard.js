@@ -11,52 +11,20 @@ import { recordOp } from '../blocks/opRecord.js';
 import { makeStart, makeEnd } from '../blocks/programFraming.js';
 import { patternPoints } from './ops/index.js';
 import { num } from './ops/util.js';
-import { translateProgram } from '../data/rotateProgram.js';
+import { placementShift, pointsBBox } from './ops/placement.js';
 
 // Re-export so views (drillView) keep importing the pattern geometry from here.
 export { patternPoints };
 
-// 2-char [X][Y] datum code, each n(min)/c(centre)/p(max); robust to a 3-char stock code or empty.
-const code2 = (c) => (String(c || '').replace(/[^ncp]/g, '') + 'nn').slice(0, 2);
-const FRAC = { n: 0, c: 0.5, p: 1 };
-
-/**
- * Toolpath placement. The path has its OWN datum (`pathDatum` — which corner of the pattern's bounding box anchors,
- * measured on hole CENTRES so changing a hole's diameter never moves the grid). That corner attaches to a chosen
- * stock corner (`stockAttach`) — both default to the stock's part-zero datum, so by default the path follows the
- * stock onto it with zero config. A signed offset (originX/originY = X/Y, offZ = Z) nudges it from the attach corner.
- *
- * We shift the whole program (translateProgram) so the path corner lands on (stock-attach corner + offset). The
- * stock corner in part coords: the stock's min corner sits at −D of the stock datum, so corner [sx][sy] is at
- * (frac(sx)−frac(datumX))·w. Pure; simulate after.
- */
-function placeOnStock(text, params) {
-    const pts = patternPoints(params);
-    if (!pts.length) return text;
-    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
-    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-    const at = { n: (a) => a, c: (a, b) => (a + b) / 2, p: (a, b) => b };
-    // Path datum defaults to the stock-attach corner (which defaults to the stock datum) so picking a stock corner
-    // makes the path's matching corner follow onto the stock; an explicit pathDatum overrides.
-    const pc = code2(params.pathDatum || params.stockAttach || params.stockDatum || 'nn');
-    const cornerX = at[pc[0]](minX, maxX), cornerY = at[pc[1]](minY, maxY);
-    // Which stock corner the path attaches to, in part coords (relative to part-zero = the stock datum).
-    const sd = code2(params.stockDatum || 'nn'), sa = code2(params.stockAttach || params.stockDatum || 'nn');
-    const w = num(params.stockW, 0), h = num(params.stockH, 0);
-    const attachX = (FRAC[sa[0]] - FRAC[sd[0]]) * w, attachY = (FRAC[sa[1]] - FRAC[sd[1]]) * h;
-    const dx = attachX + num(params.originX, 0) - cornerX;
-    const dy = attachY + num(params.originY, 0) - cornerY;
-    const dz = num(params.offZ, 0);
-    if (!dx && !dy && !dz) return text;
-    return translateProgram(text, dx, dy, dz).text;
-}
-
 /** Drill params → [ Array{ Drill|Bore } ]. The one source of truth for both displays. */
 export function drillStack(params = {}) {
+    // Placement is BAKED into the stack (the array origin + a hole Z-offset), not post-translated — so the placed
+    // positions ride the block stack and survive commit/emit/edit (a post-translate is dropped on round-trip).
+    const shift = placementShift(pointsBBox(patternPoints(params)), params);
     const arr = newBlock('array');
     arr.params = {
         pattern: params.pattern || 'grid',
-        x0: num(params.x0, 0), y0: num(params.y0, 0),
+        x0: num(params.x0, 0) + shift.x, y0: num(params.y0, 0) + shift.y,
         cols: num(params.cols, 3), rows: num(params.rows, 2), dx: num(params.dx, 20), dy: num(params.dy, 20),
         count: num(params.count, 4), spacing: num(params.spacing, 20), angle: num(params.angle, 0),
         dia: num(params.dia, 50), startAngle: num(params.startAngle, 0),
@@ -66,8 +34,8 @@ export function drillStack(params = {}) {
     const helical = params.method === 'helical';
     const hole = newBlock(helical ? 'bore' : 'drill');
     hole.params = helical
-        ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), ramp: params.ramp || 'step', feed: num(params.feed, 100), clearance: num(params.clearance, 5) }
-        : { x: 0, y: 0, depth: num(params.depth, 5), peck: num(params.peck, 5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) };
+        ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), ramp: params.ramp || 'step', feed: num(params.feed, 100), clearance: num(params.clearance, 5), zOff: shift.z }
+        : { x: 0, y: 0, depth: num(params.depth, 5), peck: num(params.peck, 5), feed: num(params.feed, 100), clearance: num(params.clearance, 5), zOff: shift.z };
     arr.children = [hole];
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
     return [makeStart(params), wcs, arr, makeEnd(params)];
@@ -76,7 +44,7 @@ export function drillStack(params = {}) {
 export class DrillWizard {
     generate(params) {
         recordOp('drill', params);   // let the Blocks tab open this op as its stack
-        return placeOnStock(emitMapped(drillStack(params)).text, params);   // anchor the path to its datum on the stock
+        return emitMapped(drillStack(params)).text;   // placement is baked into the stack (drillStack)
     }
 
     /** Preview/sim start hint (work frame): origin; the pattern is drawn from there. */
