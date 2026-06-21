@@ -18,6 +18,28 @@ const tableWizard = new AtcTableWizard();
 
 const setStatus = (id, text) => { const e = el(id); if (e) e.textContent = text; };
 
+/**
+ * Magazine rack strip: each pocket drawn with its REAL tool profile (type / Ø / length) from Settings → Tool
+ * table. Shared by the ATC wizards so "see the pockets + tools" is the preview. `opts.highlight` = a tool number
+ * to emphasise (e.g. the tool being changed to). Pure HTML; empty state points the user to Settings.
+ */
+function magazineRackHtml(a, opts = {}) {
+    const byNum = {};
+    (a.tools || []).forEach((t) => { if (t && t.num != null && t.num !== '') byNum[Number(t.num)] = t; });
+    const mag = Array.isArray(a.magazine) ? a.magazine : [];
+    if (!mag.length) return '<span style="font-size:11px;color:var(--text-dim);">No pockets — add tools + magazine in Settings → Tool table.</span>';
+    const hl = opts.highlight != null && opts.highlight !== '' ? Number(opts.highlight) : null;
+    return mag.map((p, i) => {
+        const tn = Number(p.tool);
+        const tool = byNum[tn] || { type: 'endmill', dia: 6, length: '' };
+        const len = (tool.length !== '' && tool.length != null) ? tool.length + 'mm' : '';
+        const on = hl != null && tn === hl;
+        return `<div title="${tool.type || 'tool'}${tool.dia ? ' Ø' + tool.dia : ''}" style="text-align:center;flex:0 0 auto;font-size:10px;color:var(--text-dim);padding:2px 5px;border-radius:6px;${on ? 'background:rgba(45,226,255,.14);outline:1px solid var(--accent,#2de2ff);' : ''}">`
+            + toolProfileSvg(tool, on ? { w: 30, h: 46, color: 'var(--accent,#2de2ff)' } : { w: 30, h: 46 })
+            + `<div>P${num(p.pocket, i + 1)}${tn ? ' · T' + tn : ''}</div><div>${len}</div></div>`;
+    }).join('');
+}
+
 export const atcLengthView = {
     type: 'atc_length',
     panelId: 'wiz_atc_length',
@@ -138,6 +160,10 @@ export const atcChangeView = {
         const gcode = changeWizard.generate(params);
         el('wiz_atc_change_code').innerHTML = UIUtils.formatGCode(gcode);
         if (mgr) mgr.preview3D(gcode, 'atcChangeViz');
+        // Magazine strip: show the pockets + tools; in auto mode highlight the fixed test tool being swapped to.
+        const ft = Number(el('atc_change_fixedt')?.value || 0);
+        const rack = el('atcChangeTools');
+        if (rack) rack.innerHTML = magazineRackHtml(s.atc || {}, { highlight: mode === 'auto' && ft > 0 ? ft : '' });
         setStatus('atcChangeVizStatus', mode === 'auto'
             ? 'Auto ATC pick & place · pocket moves come from controller tables (#1330/#1350/#1370)'
             : 'Manual park · ▶ traces the safe-Z retract then the move to the swap position');
@@ -200,26 +226,15 @@ export const atcTableView = {
         };
         const gcode = tableWizard.generate(params);   // the apply-macro the operator RUNS on the controller
         el('wiz_atc_table_code').innerHTML = UIUtils.formatGCode(gcode);
-        // Preview reuses the 3D engine: plot each pocket as a rapid visit so you can review the rack layout.
+        // Programming the table is PARAMETER writes (no motion) — so DON'T plot a rapid path (that stray "single
+        // movement" was just one G0 to a pocket). Keep the 3D on the bare envelope; the magazine strip below is
+        // the real preview (pockets + tools).
         const mag = (Array.isArray(a.magazine) ? a.magazine : []).filter((p) => p && (p.x !== '' || p.y !== '' || p.z !== ''));
-        const pv = ['G90'].concat(mag.map((p) => `G0 X${num(p.x, 0)} Y${num(p.y, 0)} Z${num(p.z, 0)}`)).join('\n');
-        if (mgr) mgr.preview3D(pv, 'atcTableViz');
+        if (mgr) mgr.preview3D('G90', 'atcTableViz');
         // Tool-profile rack strip: each magazine tool drawn at its real shape (type/Ø) + length — review the rack.
-        const byNum = {};
-        (a.tools || []).forEach((t) => { if (t && t.num != null && t.num !== '') byNum[Number(t.num)] = t; });
         const rack = el('atcTableTools');
-        if (rack) {
-            const cells = (Array.isArray(a.magazine) ? a.magazine : []).map((p, i) => {
-                const tn = Number(p.tool);
-                const tool = byNum[tn] || { type: 'endmill', dia: 6, length: '' };
-                const len = (tool.length !== '' && tool.length != null) ? tool.length + 'mm' : '';
-                return '<div style="text-align:center;flex:0 0 auto;font-size:10px;color:var(--text-dim);">'
-                    + toolProfileSvg(tool, { w: 30, h: 46 })
-                    + `<div>P${num(p.pocket, i + 1)}${tn ? ' · T' + tn : ''}</div><div>${len}</div></div>`;
-            }).join('');
-            rack.innerHTML = cells || '<span style="font-size:11px;color:var(--text-dim);">No pockets — add them in Settings → Tool table.</span>';
-        }
+        if (rack) rack.innerHTML = magazineRackHtml(a);
         const lens = (a.tools || []).filter((t) => t && t.length !== '' && t.length != null).map((t) => `T${t.num} ${t.length}`).join(' · ');
-        setStatus('atcTableVizStatus', `${mag.length} pocket${mag.length === 1 ? '' : 's'} plotted${lens ? ' · lengths: ' + lens : ' · no tool lengths set'}`);
+        setStatus('atcTableVizStatus', `Magazine: ${mag.length} pocket${mag.length === 1 ? '' : 's'}${lens ? ' · lengths ' + lens : ' · no tool lengths set'} — writes the table, no motion; review the strip below`);
     },
 };
