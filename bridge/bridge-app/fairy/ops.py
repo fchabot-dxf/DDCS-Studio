@@ -376,6 +376,28 @@ class Ops:
                 return None
             return round(pos - neg, 4)
 
+        def home_sign(i):
+            """Travel SIGN (±1) Studio's sim needs = which side of machine-zero (home) the working envelope
+            sits on. PRIMARY signal = the soft-limit MACHINE coordinates (#161-168): neg/pos are machine
+            coords of the envelope ends, so the side of 0 they fall on IS the travel direction — unambiguous,
+            no polarity guess. Since the machine homes to an extreme, the home end reads ~0 and the far end
+            ~±span, so the envelope midpoint's sign gives the direction. FALLBACK (both ends sentinel/zero):
+            the homing-direction param (#112-114: 0 = home toward the negative end → envelope/travel positive;
+            1 = home toward the positive end → travel negative). Returns +1, -1, or None (undeterminable →
+            Studio keeps the user's current sign). Never returns 0 (the web treats 0 as 'no info')."""
+            neg, pos = at(self._SOFT_NEG[i], -self._SENTINEL), at(self._SOFT_POS[i], self._SENTINEL)
+            neg_ok, pos_ok = abs(neg) < self._SENTINEL, abs(pos) < self._SENTINEL
+            if neg_ok and pos_ok and (neg + pos) != 0:
+                return 1 if (neg + pos) > 0 else -1
+            if pos_ok and pos != 0:
+                return 1 if pos > 0 else -1
+            if neg_ok and neg != 0:
+                return 1 if neg > 0 else -1
+            hd = at(self._HOMING_DIR[i], None)
+            if hd is None:
+                return None
+            return 1 if int(hd) == 0 else -1
+
         active = at(self._ACTIVE_WCS, 1.0)
         active = int(active) if 1 <= active <= 6 else 1
         base = self._WCS_BASE + (active - 1) * self._WCS_STRIDE
@@ -394,6 +416,9 @@ class Ops:
                            "zMin": at(self._SOFT_NEG[2]), "zMax": at(self._SOFT_POS[2])},
             "homingDir": {"x": int(at(self._HOMING_DIR[0])), "y": int(at(self._HOMING_DIR[1])),
                           "z": int(at(self._HOMING_DIR[2]))},
+            # homeDir = the derived ±1 travel sign Studio consumes (geometry.homeDir); homingDir above is the
+            # raw 0/1 param it's derived from, kept for debugging.
+            "homeDir": {"x": home_sign(0), "y": home_sign(1), "z": home_sign(2)},
             "machZero": {"x": at(self._MACH_ZERO[0]), "y": at(self._MACH_ZERO[1]), "z": at(self._MACH_ZERO[2])},
         }
         prof["wcs"] = {
