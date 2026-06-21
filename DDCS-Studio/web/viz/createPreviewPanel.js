@@ -315,7 +315,9 @@ export function createPreviewPanel(container, opts = {}) {
         active = !!on;
         if (!active) { stopPlay(); autoStarted = false; if (viz) viz.setActive(false); return; }
         if (mode === '3d') { const v = ensureViz(); if (v) v.setActive(true); }
+        else if (mode === '2d' && cv2d) cv2d.style.display = '';   // 2D default: ensure the canvas is visible
         setGcode();
+        if (mode === '2d') t2.redraw();   // draw the now-visible 2D path (default-2D had it hidden + unredrawn)
         autoStartOnOpen();
     }
 
@@ -336,6 +338,11 @@ export function createPreviewPanel(container, opts = {}) {
             play();
         }
     }
+
+    // Reflect the initial view (Settings → default view) in the toggle label + 2D-canvas visibility WITHOUT
+    // building the lazy 3D viz (it builds on first activation). Without this, a 2D default opened to a blank pane
+    // with the toggle stuck on "3D" — because `mode` was set but setMode() never ran.
+    { const _mt = q('.pp-mtoggle'); if (_mt) _mt.textContent = mode === '2d' ? '2D' : '3D'; if (cv2d) cv2d.style.display = mode === '2d' ? '' : 'none'; }
 
     return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, get viz() { return viz; }, get engine() { return engine; }, el: container };
 }
