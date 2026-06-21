@@ -16,17 +16,13 @@
  * mouth; everything else → a statement (prev/next). Requires window.Blockly (vendored UMD).
  */
 import { PALETTE, CATEGORIES } from '../../wizards/ops/index.js';
+import { installCornerGridField } from './cornerGridField.js';
 
-// The 9 stock points (corners / edge mids / centre) + the default, as readable labels. Code is [X][Y], each
-// n/c/p = min/centre/max; X+ = right, Y+ = back. Used for PlaceOnStock's attach + path-datum fields.
-const STOCK_PTS = [
-    ['Stock datum', ''], ['Front-left', 'nn'], ['Front', 'cn'], ['Front-right', 'pn'],
-    ['Left', 'nc'], ['Centre', 'cc'], ['Right', 'pc'],
-    ['Back-left', 'np'], ['Back', 'cp'], ['Back-right', 'pp'],
-];
+// Fields that render as the inline 3×3 corner-grid picker (field_cornergrid), tinted per datum so PlaceOnStock's
+// stock-attach (blue) and path-datum (amber) glyphs read apart — matching the 2D canvas pickers.
+const CORNER_COLOUR = { stockAttach: '#4ab3ff', pathDatum: '#ffcf3a' };
 const SELECTS = {
     corner: ['FL', 'FR', 'BL', 'BR'],
-    stockAttach: STOCK_PTS, pathDatum: STOCK_PTS,
     probeSeq: ['XY', 'YX'],
     axis: ['X', 'Y', 'Z', 'A', 'B', 'C'],
     axisDir: ['pos', 'neg'],
@@ -124,6 +120,7 @@ const optionsFor = (def, field) => {
 
 /** Classify a field → how it renders in Blockly. */
 export function fieldKind(def, field) {
+    if (CORNER_COLOUR[field]) return 'cornergrid';   // PlaceOnStock attach / path-datum → inline 3×3 picker
     if (optionsFor(def, field)) return 'dropdown';
     const sock = def.sockets && def.sockets[field];
     if (sock === 'region') return 'region';
@@ -142,7 +139,8 @@ function jsonDef(def) {
         const k = fieldKind(def, f);
         message += ` ${f} %${++n}`;
         const desc = getDesc(f);
-        if (k === 'dropdown') args.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });
+        if (k === 'cornergrid') args.push({ type: 'field_cornergrid', name: FN(f), value: String(def.defaults[f] ?? ''), colour: CORNER_COLOUR[f], tooltip: desc });
+        else if (k === 'dropdown') args.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });
         else if (k === 'checkbox') args.push({ type: 'field_checkbox', name: FN(f), checked: def.defaults[f] !== false, tooltip: desc });
         else if (k === 'text') args.push({ type: 'field_input', name: FN(f), text: String(def.defaults[f] ?? ''), tooltip: desc });
         else if (k === 'region') args.push({ type: 'input_value', name: FN(f), check: 'Region', tooltip: desc });
@@ -280,6 +278,7 @@ function registerDynExtension(Blockly) {
 
 export function installBlockly(Blockly) {
     _Blockly = Blockly;
+    installCornerGridField(Blockly);   // register field_cornergrid BEFORE the blocks that reference it
     registerDynExtension(Blockly);
     Blockly.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), ...OP_BLOCKS]);
 }

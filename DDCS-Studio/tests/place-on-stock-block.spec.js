@@ -59,3 +59,36 @@ test('editing the PlaceOnStock attach corner in Blockly re-emits the placed G-co
   expect(maxX(before), "attached to the stock's far corner → holes reach the far edge").toBeCloseTo(100, 0);
   expect(maxX(after), 'attached front-left → holes pull to the near corner (attach now takes effect)').toBeCloseTo(40, 0);
 });
+
+test('PlaceOnStock shows the inline 3×3 corner-grid fields, coloured per datum, click-to-pick', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+  await page.evaluate(() => { const s = window.ddcsGetSettings(); s.stock = Object.assign(s.stock || {}, { x: 100, y: 80, z: 20, show: true, datum: 'nnp' }); });
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
+  await page.waitForSelector('#wiz_drill', { state: 'visible' });
+  await page.evaluate(() => {
+    document.getElementById('d_stockAttach').value = 'pp';   // attach picked → a blue cell
+    document.getElementById('d_pathDatum').value = 'cc';     // path datum picked → an amber cell
+    window.ddcsStudio.wizardManager.update();
+  });
+  await page.evaluate(() => window.showApp('blocks'));
+  await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0);
+  await page.waitForTimeout(150);
+
+  const r = await page.evaluate(() => {
+    const cells = [...document.querySelectorAll('rect[data-code]')].map((c) => (c.getAttribute('fill') || '').toLowerCase());
+    return { n: cells.length, blue: cells.includes('#4ab3ff'), amber: cells.includes('#ffcf3a') };
+  });
+  expect(r.n, 'two inline 3×3 grids = 18 cells rendered on the block').toBe(18);
+  expect(r.blue, 'the stock-attach picked cell is blue').toBe(true);
+  expect(r.amber, 'the path-datum picked cell is amber').toBe(true);
+
+  // Click a cell on the attach grid → it sets the value (the inline interaction works).
+  const picked = await page.evaluate(() => {
+    const blk = window.__blkws.getAllBlocks().find((b) => b.type === 'placeonstock');
+    const cell = blk.getField('STOCKATTACH')._cells['nn'];
+    cell.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    return blk.getFieldValue('STOCKATTACH');
+  });
+  expect(picked, 'clicking the front-left cell picks it').toBe('nn');
+});
