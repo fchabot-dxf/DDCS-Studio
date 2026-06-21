@@ -46,6 +46,23 @@ export function toolHalfProfile(tool) {
         }
         case 'face': case 'surfacing':              // wide, short body (face/fly cutter)
             return [[r, 0], [r, Math.max(len * 0.35, r * 0.6)]];
+        case 'probe': {                             // 3D touch probe: ruby ball ▸ thin stylus ▸ wide body ▸ shank (dia = shank Ø)
+            const rball = Math.max(1, r * 0.5);     // ruby ball
+            const rsty = Math.max(0.5, r * 0.22);   // stylus shaft
+            const styL = Math.max(len, r * 7);      // stylus length (20–50 mm range)
+            const rbody = Math.max(r * 5, 18);      // electronics body disc (Ø ~39)
+            const bodyL = Math.max(r * 6, 28);
+            const shankL = Math.max(r * 3, 16);
+            const pts = []; const segs = 12;
+            for (let i = 0; i <= segs; i++) { const a = (Math.PI / 2) * (i / segs); pts.push([rball * Math.sin(a), rball - rball * Math.cos(a)]); }  // ruby ball tip
+            pts.push([rsty, rball]);                // narrow to the stylus
+            const styTop = rball + styL; pts.push([rsty, styTop]);
+            pts.push([rbody, styTop]);              // step out to the body
+            const bodyTop = styTop + bodyL; pts.push([rbody, bodyTop]);
+            pts.push([r, bodyTop]);                 // step in to the shank
+            pts.push([r, bodyTop + shankL]);
+            return pts;
+        }
         case 'tap': case 'reamer':
         case 'endmill': default:                    // straight flat-bottom cylinder
             return [[r, 0], [r, len]];

@@ -298,21 +298,30 @@ export class GcodeViz3D {
 
 
     _ensureAnimTool() { if (!this._animTool) this._buildAnimTool(); }
-    // The moving sim tool = the ACTUAL tool PROFILE (toolHalfProfile, revolved) — the same builder as the ATC
-    // magazine — sized by the PER-OP tool (setSimTool); defaults to a 6 mm endmill. Tip at the local origin so
-    // setToolPosition places the cutting point on the path; body extends up (+Z) toward the spindle.
+    // The moving SPINDLE ASSEMBLY: spindle (body) ▸ collet (holder) ▸ tool (the actual revolved profile, the same
+    // builder as the ATC magazine) — SEPARATE meshes in one group, used for EVERY op (probe + mill), so ATC can
+    // later move the tool independently of the collet. Tool tip at the local origin (setToolPosition puts it on the
+    // path); the collet + spindle stack up (+Z) toward the machine spindle. Each part is toggle-able (setPartVisible).
     _buildAnimTool() {
         const THREE = this.THREE;
-        if (this._animTool) { this.scene.remove(this._animTool); this._animTool.geometry.dispose(); this._animTool.material.dispose(); }
+        if (this._animTool) { this.scene.remove(this._animTool); this._animTool.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
         const tool = this._simTool || { type: 'endmill', dia: 6 };
-        const pts = toolHalfProfile(tool).map((q) => new THREE.Vector2(Math.max(0.001, q[0]), q[1]));
-        const geo = new THREE.LatheGeometry(pts, 24); geo.rotateX(Math.PI / 2);   // Lathe revolves around Y → rotate to Z (Z-up; tip at origin)
-        this._animTool = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffab40, depthTest: false, transparent: true, opacity: 0.9 }));
-        this._animTool.renderOrder = 25; // above the toolpath (20) so the tool stays visible
-        this._animTool.visible = !!this._animOn;
-        this.scene.add(this._animTool);
+        const tr = Math.max(0.5, (Number(tool.dia) || 6) / 2);
+        const tlen = Math.max(tr * 4, Number(tool.length) || tr * 8);
+        const part = (geo, color, op, name) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true, opacity: op })); m.name = name; return m; };
+        const tgeo = new THREE.LatheGeometry(toolHalfProfile(tool).map((q) => new THREE.Vector2(Math.max(0.001, q[0]), q[1])), 24); tgeo.rotateX(Math.PI / 2);   // TOOL — real profile, tip at origin
+        const ch = Math.max(14, tr * 4), cgeo = new THREE.CylinderGeometry(tr + 4, tr + 1.5, ch, 20); cgeo.rotateX(Math.PI / 2); cgeo.translate(0, 0, tlen + ch / 2 - 2);   // COLLET — tapered holder
+        const sh = Math.max(28, tr * 6), sr = tr + 7, sgeo = new THREE.CylinderGeometry(sr, sr, sh, 24); sgeo.rotateX(Math.PI / 2); sgeo.translate(0, 0, tlen + ch + sh / 2 - 4);   // SPINDLE — body
+        this._animParts = { tool: part(tgeo, 0xffab40, 0.9, 'tool'), collet: part(cgeo, 0x9aa6b2, 0.85, 'collet'), spindle: part(sgeo, 0x6b7682, 0.8, 'spindle') };
+        const grp = new THREE.Group();
+        grp.add(this._animParts.spindle, this._animParts.collet, this._animParts.tool);
+        grp.renderOrder = 25; grp.visible = !!this._animOn;
+        this._animTool = grp; this._applyPartVis(); this.scene.add(grp);
     }
-    // Set the PER-OP tool { type, dia, length } → rebuild the moving tool to its real profile.
+    _applyPartVis() { const v = this._partVis || {}; if (this._animParts) for (const k of ['tool', 'collet', 'spindle']) if (this._animParts[k]) this._animParts[k].visible = v[k] !== false; }
+    // Show/hide spindle / collet / tool independently, e.g. setPartVisible({ spindle: false }).
+    setPartVisible(parts) { this._partVis = Object.assign({ tool: true, collet: true, spindle: true }, this._partVis, parts); this._applyPartVis(); this.render(); }
+    // Set the PER-OP tool { type, dia, length } → rebuild the assembly's tool to its real profile.
     setSimTool(tool) { this._simTool = tool || null; if (this._animTool) this._buildAnimTool(); }
 
     // Toggle a tool dot that travels the whole path in execution order, feed-true (real program time)

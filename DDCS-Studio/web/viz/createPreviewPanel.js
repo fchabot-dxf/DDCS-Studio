@@ -171,6 +171,9 @@ export function createPreviewPanel(container, opts = {}) {
                 // Place the origin marker before setSegments so the (origin-relative) route offsets to it.
                 if (st && v.starts) v.starts[0] = { x: +st.x || 0, y: +st.y || 0, z: +st.z || 0 };
                 v.setSegments(parsed, !fitted); fitted = true;
+                // Per-op tool for the spindle assembly: the op's tool if the host provides one (getTool), else infer
+                // the MODEL from the toolpath — probe present → 3D touch-probe, else endmill. (Exact dims via getTool.)
+                if (v.setSimTool) v.setSimTool(get('getTool') || { type: ((parsed.stats && parsed.stats.probe) > 0) ? 'probe' : 'endmill', dia: 6 });
             }
         }
         const s = parsed.stats || {};
