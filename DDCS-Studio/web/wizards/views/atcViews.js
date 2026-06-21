@@ -19,26 +19,37 @@ const tableWizard = new AtcTableWizard();
 
 const setStatus = (id, text) => { const e = el(id); if (e) e.textContent = text; };
 
+/** One tool tile: the real tool profile (now-accurate shapes) + a label + sub-line. `on` = highlighted. */
+function toolTile(tool, label, sub, on) {
+    const t = tool || { type: 'endmill', dia: 6, length: '' };
+    return `<div title="${t.type || 'tool'}${t.dia ? ' Ø' + t.dia : ''}" style="text-align:center;flex:0 0 auto;font-size:10px;color:var(--text-dim);padding:2px 5px;border-radius:6px;${on ? 'background:rgba(45,226,255,.14);outline:1px solid var(--accent,#2de2ff);' : ''}">`
+        + toolProfileSvg(t, on ? { w: 30, h: 46, color: 'var(--accent,#2de2ff)' } : { w: 30, h: 46 })
+        + `<div>${label}</div><div>${sub || ''}</div></div>`;
+}
+
 /**
- * Magazine rack strip: each pocket drawn with its REAL tool profile (type / Ø / length) from Settings → Tool
- * table. Shared by the ATC wizards so "see the pockets + tools" is the preview. `opts.highlight` = a tool number
- * to emphasise (e.g. the tool being changed to). Pure HTML; empty state points the user to Settings.
+ * Magazine rack strip — the "see the pockets + tools" preview, shared by the ATC wizards. If a magazine is built,
+ * it shows one tile per POCKET (with the assigned tool's real profile). If no magazine yet but the library has
+ * tools, it shows the TOOL LIBRARY so you still SEE your tools (build the magazine to assign pockets).
+ * `opts.highlight` = a tool number to emphasise (e.g. the tool being changed to).
  */
 function magazineRackHtml(a, opts = {}) {
     const byNum = {};
     (a.tools || []).forEach((t) => { if (t && t.num != null && t.num !== '') byNum[Number(t.num)] = t; });
     const mag = Array.isArray(a.magazine) ? a.magazine : [];
-    if (!mag.length) return '<span style="font-size:11px;color:var(--text-dim);">No pockets — add tools + magazine in Settings → Tool table.</span>';
     const hl = opts.highlight != null && opts.highlight !== '' ? Number(opts.highlight) : null;
-    return mag.map((p, i) => {
-        const tn = Number(p.tool);
-        const tool = byNum[tn] || { type: 'endmill', dia: 6, length: '' };
-        const len = (tool.length !== '' && tool.length != null) ? tool.length + 'mm' : '';
-        const on = hl != null && tn === hl;
-        return `<div title="${tool.type || 'tool'}${tool.dia ? ' Ø' + tool.dia : ''}" style="text-align:center;flex:0 0 auto;font-size:10px;color:var(--text-dim);padding:2px 5px;border-radius:6px;${on ? 'background:rgba(45,226,255,.14);outline:1px solid var(--accent,#2de2ff);' : ''}">`
-            + toolProfileSvg(tool, on ? { w: 30, h: 46, color: 'var(--accent,#2de2ff)' } : { w: 30, h: 46 })
-            + `<div>P${num(p.pocket, i + 1)}${tn ? ' · T' + tn : ''}</div><div>${len}</div></div>`;
-    }).join('');
+    if (mag.length) {
+        return mag.map((p, i) => {
+            const tn = Number(p.tool);
+            const tool = byNum[tn] || { type: 'endmill', dia: 6, length: '' };
+            const len = (tool.length !== '' && tool.length != null) ? tool.length + 'mm' : '';
+            return toolTile(tool, `P${num(p.pocket, i + 1)}${tn ? ' · T' + tn : ''}`, len, hl != null && tn === hl);
+        }).join('');
+    }
+    // No magazine pockets yet — still show the tool LIBRARY so the user sees the tools they added.
+    const tools = (a.tools || []).filter((t) => t && t.num != null && t.num !== '');
+    if (!tools.length) return '<span style="font-size:11px;color:var(--text-dim);">No tools yet — add them in Settings → Tool table (＋ Tool library).</span>';
+    return tools.map((t) => toolTile(t, 'T' + t.num, (t.length !== '' && t.length != null) ? t.length + 'mm' : (t.name || ''), hl != null && Number(t.num) === hl)).join('');
 }
 
 export const atcLengthView = {
