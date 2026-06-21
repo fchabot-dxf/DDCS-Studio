@@ -68,7 +68,7 @@ export const STOCK_TEMPLATES = [
     { name: 'Rotary cylinder Ø3″', x: 150, y: 76.2, z: 76.2, shape: 'cylinder' },
 ];
 const SETTINGS_DEFAULTS = {
-    stock:   { x: 100, y: 80, z: 20, shape: 'boss', show: true },
+    stock:   { x: 100, y: 80, z: 20, shape: 'boss', show: true, datum: 'fl', pin: 'origin' },
     stockTemplates: [],   // user-saved presets: { name, x, y, z, shape }
     // Travel x/y/z are SIGNED (sign = home direction). workOrigin = the active WCS offset (machine coords of
     // part-zero), kept in sync from wcs.table[active-1]. wcs = the G54–G59 table pulled from the controller.

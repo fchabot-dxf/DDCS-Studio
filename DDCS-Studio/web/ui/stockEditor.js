@@ -56,6 +56,11 @@ export function openStockEditor(anchor) {
                 <button id="se_tpl_save" class="toolbar-btn" style="flex:1; padding:3px 5px; font-size:11px;" title="Save current settings as a template">⭐ Save template</button>
                 <button id="se_tpl_del" class="toolbar-btn" style="flex:1; padding:3px 5px; font-size:11px; display:none;" title="Delete selected template">🗑 Delete</button>
             </div>
+            <div id="se_tpl_saverow" style="display:none; gap:6px; margin-top:6px;">
+                <input id="se_tpl_name" type="text" placeholder="Template name…" style="flex:1;">
+                <button id="se_tpl_ok" class="toolbar-btn" style="padding:3px 9px;" title="Save">✓</button>
+                <button id="se_tpl_cancel" class="toolbar-btn" style="padding:3px 9px;" title="Cancel">✕</button>
+            </div>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px;">
             <label class="col">X<input id="se_x" type="number" min="0" step="1"></label>
@@ -69,6 +74,24 @@ export function openStockEditor(anchor) {
                 <option value="cylinder">Cylinder — rotary stock</option>
             </select>
         </label>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+            <label class="col">Part-zero (datum)
+                <select id="se_datum">
+                    <option value="fl">Front-left corner</option>
+                    <option value="fr">Front-right corner</option>
+                    <option value="bl">Back-left corner</option>
+                    <option value="br">Back-right corner</option>
+                    <option value="center">Centre</option>
+                </select>
+            </label>
+            <label class="col">Pin to
+                <select id="se_pin">
+                    <option value="origin">Origin (program zero)</option>
+                    <option value="g54">G54</option><option value="g55">G55</option><option value="g56">G56</option>
+                    <option value="g57">G57</option><option value="g58">G58</option><option value="g59">G59</option>
+                </select>
+            </label>
+        </div>
         <label style="display:flex; align-items:center; gap:6px; cursor:pointer; width:auto;"><input id="se_show" type="checkbox" style="width:auto;"> Show stock in 3D</label>
         <div style="margin-top:10px; color:#7f8a99; font-size:11px;">Cylinder lies along the rotary axis (Y = diameter, X = length).</div>
     `;
@@ -81,6 +104,8 @@ export function openStockEditor(anchor) {
     q('se_y').value = s.y ?? '';
     q('se_z').value = s.z ?? '';
     q('se_shape').value = s.shape || 'boss';
+    q('se_datum').value = s.datum || 'fl';
+    q('se_pin').value = s.pin || 'origin';
     q('se_show').checked = s.show !== false;
 
     const updateTplDel = () => {
@@ -109,10 +134,12 @@ export function openStockEditor(anchor) {
         y: parseFloat(q('se_y').value) || 0,
         z: parseFloat(q('se_z').value) || 0,
         shape: q('se_shape').value,
+        datum: q('se_datum').value,
+        pin: q('se_pin').value,
         show: q('se_show').checked,
     } });
 
-    ['se_x', 'se_y', 'se_z', 'se_shape', 'se_show'].forEach((id) => {
+    ['se_x', 'se_y', 'se_z', 'se_shape', 'se_datum', 'se_pin', 'se_show'].forEach((id) => {
         q(id).addEventListener('input', commit);
         q(id).addEventListener('change', commit);
     });
@@ -125,12 +152,17 @@ export function openStockEditor(anchor) {
         const t = all[i].t;
         q('se_x').value = t.x; q('se_y').value = t.y; q('se_z').value = t.z;
         q('se_shape').value = t.shape || 'boss';
+        if (t.datum) q('se_datum').value = t.datum;
+        if (t.pin) q('se_pin').value = t.pin;
         commit();
     });
 
-    q('se_tpl_save').addEventListener('click', () => {
-        const name = (prompt('Save current stock as a template — name?') || '').trim();
-        if (!name) return;
+    const saverow = q('se_tpl_saverow');
+    q('se_tpl_save').addEventListener('click', () => { saverow.style.display = 'flex'; const n = q('se_tpl_name'); n.value = ''; n.focus(); });
+    q('se_tpl_cancel').addEventListener('click', () => { saverow.style.display = 'none'; });
+    const doSaveTpl = () => {
+        const name = (q('se_tpl_name').value || '').trim();
+        if (!name) { q('se_tpl_name').focus(); return; }
         const currentTemplates = getSettings().stockTemplates || [];
         const newTemplate = {
             name,
@@ -138,11 +170,15 @@ export function openStockEditor(anchor) {
             y: parseFloat(q('se_y').value) || 0,
             z: parseFloat(q('se_z').value) || 0,
             shape: q('se_shape').value || 'boss',
+            datum: q('se_datum').value, pin: q('se_pin').value,
         };
         const updated = [...currentTemplates, newTemplate];
         applySettings({ stockTemplates: updated });
+        saverow.style.display = 'none';
         rebuildTplDropdown(STOCK_TEMPLATES.length + updated.length - 1);
-    });
+    };
+    q('se_tpl_ok').addEventListener('click', doSaveTpl);
+    q('se_tpl_name').addEventListener('keydown', (e) => { if (e.key === 'Enter') doSaveTpl(); else if (e.key === 'Escape') saverow.style.display = 'none'; });
 
     q('se_tpl_del').addEventListener('click', () => {
         const sel = q('se_tpl');

@@ -827,7 +827,18 @@ export class GcodeViz3D {
             // Pivot the part group on the stock centre, then offset the meshes into its local
             // space, so partGroup.rotation spins the stock about its own centre axis.
             const C = new THREE.Vector3(stock.x / 2, stock.y / 2, -stock.z / 2);
-            pg.position.copy(C);
+            // Datum = which point of the stock is part-zero (default front-left-top corner). Pin = place that datum
+            // at a WCS offset (else the origin). pg.position = the stock centre in scene; the mesh stays centred on
+            // it so a rotary move still spins about the part axis.
+            const D = { fl: [0, 0], fr: [stock.x, 0], bl: [0, stock.y], br: [stock.x, stock.y], center: [stock.x / 2, stock.y / 2] }[stock.datum || 'fl'] || [0, 0];
+            let pinX = 0, pinY = 0, pinZ = 0;
+            const mw = this._machine, wt = mw && mw.wcs && mw.wcs.table;
+            if (stock.pin && stock.pin !== 'origin' && wt) {
+                const gi = parseInt(String(stock.pin).replace(/[^0-9]/g, ''), 10) - 54;   // 'g54' → 0
+                const t = wt[gi], wo = mw.workOrigin || {};
+                if (t) { pinX = (Number(t.x) || 0) - (wo.x || 0); pinY = (Number(t.y) || 0) - (wo.y || 0); pinZ = (Number(t.z) || 0) - (wo.z || 0); }
+            }
+            pg.position.set(stock.x / 2 - D[0] + pinX, stock.y / 2 - D[1] + pinY, -stock.z / 2 + pinZ);
             mesh.position.sub(C);
             edges.position.sub(C);
             this.stockMesh = mesh; pg.add(mesh);
@@ -884,6 +895,7 @@ export class GcodeViz3D {
             this.machineAxes = ax; this.scene.add(ax);
         }
         if (this._magazine) this.setMagazine(this._magazine);   // re-place pockets when the envelope/WCS changes
+        if (this._stock && this._stock.pin && this._stock.pin !== 'origin') this.setStock(this._stock);   // re-pin the stock to its WCS
     }
 
     /**
