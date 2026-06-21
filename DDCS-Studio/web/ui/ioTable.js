@@ -170,12 +170,34 @@ export function renderMagazineTable(container, atc, onChange) {
     ctl.appendChild(field('Pockets', cnt, 60));
     container.appendChild(ctl);
 
+    const isDisk = atc.magType === 'disk';
+    if (isDisk) {
+        // Disk/carousel: ONE fixed pickup; the carousel rotates each pocket to it by index. So no per-pocket XYZ —
+        // just the shared pickup + which tool is in each pocket.
+        atc.pickup = atc.pickup || { x: '', y: '', z: '' };
+        const pkr = document.createElement('div');
+        pkr.style.cssText = 'display:flex; gap:16px; align-items:flex-end; margin-bottom:10px; flex-wrap:wrap;';
+        const pcell = (key) => { const inp = document.createElement('input'); inp.type = 'number'; inp.step = '0.1'; inp.value = atc.pickup[key] ?? ''; inp.addEventListener('change', () => { atc.pickup[key] = inp.value === '' ? '' : Number(inp.value); onChange(); }); return inp; };
+        pkr.appendChild(field('Pickup X', pcell('x'), 70));
+        pkr.appendChild(field('Pickup Y', pcell('y'), 70));
+        pkr.appendChild(field('Pickup Z', pcell('z'), 70));
+        const dia = document.createElement('input'); dia.type = 'number'; dia.step = '1'; dia.min = '0'; dia.value = atc.diskDia ?? '';
+        dia.addEventListener('change', () => { atc.diskDia = dia.value === '' ? '' : Number(dia.value); onChange(); });
+        pkr.appendChild(field('Carousel Ø', dia, 80));
+        container.appendChild(pkr);
+        const note = document.createElement('div'); note.className = 'settings-hint';
+        note.textContent = 'Disk: one fixed pickup — the carousel (Ø) rotates each pocket to it by index, so per-pocket XYZ aren’t needed (just the pickup + which tool is in each pocket).';
+        container.appendChild(note);
+    }
+
     if (!atc.magazine.length) {
         const e = document.createElement('div'); e.className = 'settings-hint'; e.textContent = 'Set the pocket count to build the magazine table.'; container.appendChild(e);
         return;
     }
 
-    const COLS = [['Pocket', 46], ['Tool', 168], ['Description', 150], ['Park X', 66], ['Park Y', 66], ['Park Z', 66]];
+    const COLS = isDisk
+        ? [['Pocket', 46], ['Tool', 168], ['Description', 150]]
+        : [['Pocket', 46], ['Tool', 168], ['Description', 150], ['Park X', 66], ['Park Y', 66], ['Park Z', 66]];
     const head = document.createElement('div');
     head.style.cssText = 'display:flex; gap:8px; font-size:10px; color:#6b6150; font-weight:600; padding:2px;';
     COLS.forEach(([h, w]) => { const s = document.createElement('span'); s.textContent = h; s.style.width = w + 'px'; head.appendChild(s); });
@@ -206,9 +228,7 @@ export function renderMagazineTable(container, atc, onChange) {
             inp.addEventListener('change', () => { row[key] = inp.value === '' ? '' : Number(inp.value); onChange(); });
             return inp;
         };
-        tr.appendChild(cell('x', 58));
-        tr.appendChild(cell('y', 58));
-        tr.appendChild(cell('z', 58));
+        if (!isDisk) { tr.appendChild(cell('x', 58)); tr.appendChild(cell('y', 58)); tr.appendChild(cell('z', 58)); }
 
         // Reorganise: ▲/▼ swap the TOOL assignment with the neighbouring pocket (the physical pocket position +
         // its park XYZ stay put — you're moving which tool lives in which pocket, not moving the pocket).
