@@ -221,6 +221,8 @@ export const atcChangeView = {
             dustCover: el('atc_change_cover')?.checked === true,
             confirm: el('atc_change_confirm')?.checked === true,
             magazine: (s.atc && s.atc.magazine) || [],   // pockets + park XYZ come from Settings → Tool table
+            magType: s.atc && s.atc.magType,             // 'disk' → rotate-to-pocket change; else per-pocket moves
+            pickup: s.atc && s.atc.pickup,               // disk: the fixed pickup XYZ
         };
         const gcode = changeWizard.generate(params);
         el('wiz_atc_change_code').innerHTML = UIUtils.formatGCode(gcode);

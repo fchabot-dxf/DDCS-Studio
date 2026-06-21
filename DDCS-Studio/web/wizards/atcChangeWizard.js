@@ -141,8 +141,68 @@ function autoStack(params) {
     return S;
 }
 
+// DISK / CAROUSEL auto change: all pockets share one fixed PICKUP; the carousel rotates the target pocket to it.
+// The rotation primitive is firmware-specific (rotate output + M303/M304 index sensor on the Expert), so this is
+// a TEMPLATE — the "rotate carousel to pocket N" step is left explicit for the operator to wire + VERIFY.
+function diskAutoStack(params) {
+    const d = getDialect();
+    const S = []; const { C, A, IF, GO, LB, SPOFF, COOLOFF, MM, MC, CF, MSG, END } = H(S);
+    const atc = d && d.vars && d.vars.atc;
+    if (!atc) { C('ATC | Automatic Tool Change (disk)'); C(`Not available on ${d ? d.name : 'this controller'}.`); END(); return S; }
+    const pk = params.pickup || {};
+    const zClear = num(params.zClear, 0), fixedT = num(params.fixedT, 0);
+    const useM300 = params.waitSpindle !== false, useCover = params.dustCover === true, confirm = params.confirm === true;
+    const mag = (Array.isArray(params.magazine) ? params.magazine : []).filter((p) => p && p.tool !== '' && p.tool != null);
+    const cur = '#' + atc.currentTool, tgt = fixedT > 0 ? String(fixedT) : '#' + atc.targetTool;
+
+    C('ATC | Automatic Tool Change — DISK / CAROUSEL (rotate pocket to a fixed pickup)');
+    C('TEMPLATE — carousel indexing is firmware-specific; VERIFY the rotation on the machine before trusting this.');
+    C(fixedT > 0 ? `TEST MODE: fixed target tool T${fixedT}` : `Target tool from ${tgt} — set by M6 Txx; save as T.nc`);
+    if (!mag.length) { C('!! Magazine EMPTY — build it in Settings → Tool table.'); END(); return S; }
+
+    C('=== CONFIGURATION ===');
+    A('#100', tgt, 'Target tool'); A('#101', cur, 'Current tool, 0 = empty'); A('#102', String(zClear), 'Z change height (machine)');
+    A('#103', String(num(pk.x, 0)), 'Pickup X'); A('#104', String(num(pk.y, 0)), 'Pickup Y'); A('#105', String(num(pk.z, 0)), 'Pickup Z');
+    IF('#100', '==', '#101', 900);
+    if (confirm) { A('#1510', '#100', 'Show target tool'); CF('Change to this tool? Press Enter', 999); }
+
+    C('=== SPINDLE OFF + RETRACT ===');
+    SPOFF(); COOLOFF(); if (useM300) MC(300, 'Wait: spindle-stopped'); if (useCover) MC(162, 'Dust cover OPEN');
+    MM('Z', '#102');
+
+    C('=== PUT AWAY CURRENT TOOL (rotate its pocket to the pickup, release) ===');
+    IF('#101', '<', '1', 20);
+    mag.forEach((p, i) => IF('#101', '==', String(num(p.tool, 0)), 100 + i));
+    GO(20);
+    mag.forEach((p, i) => {
+        LB(100 + i); C(`Return T${num(p.tool, 0)} → rotate carousel to pocket ${num(p.pocket, i + 1)}, then swap at pickup`);
+        A('#106', String(num(p.pocket, i + 1)), 'Target pocket index');
+        C('>> Rotate carousel to pocket #106 here (rotate output + M303/M304 index sensor). VERIFY on the machine.');
+        MM('X', '#103'); MM('Y', '#104'); MM('Z', '#105');   // to the fixed pickup
+        MC(154, 'Drawbar RELEASE'); MC(301, 'Wait: drawbar-released');
+        MM('Z', '#102'); A(cur, '0', 'Spindle empty'); GO(20);
+    });
+
+    LB(20); C('=== PICK UP TARGET TOOL (rotate its pocket to the pickup, lock) ===');
+    mag.forEach((p, i) => IF('#100', '==', String(num(p.tool, 0)), 200 + i));
+    A('#1505', '1', 'ERROR: target tool not in the magazine'); GO(999);
+    mag.forEach((p, i) => {
+        LB(200 + i); C(`Fetch T${num(p.tool, 0)} → rotate carousel to pocket ${num(p.pocket, i + 1)}, then pick at pickup`);
+        A('#106', String(num(p.pocket, i + 1)), 'Target pocket index');
+        C('>> Rotate carousel to pocket #106 here. VERIFY on the machine.');
+        MM('X', '#103'); MM('Y', '#104');
+        MC(154, 'Collet OPEN'); MC(301, 'Wait: released');
+        MM('Z', '#105'); MC(155, 'Drawbar LOCK'); MC(302, 'Wait: locked');
+        MM('Z', '#102'); if (useCover) MC(163, 'Dust cover CLOSE');
+        A(cur, '#100', 'Current = target'); MSG('Tool change complete'); GO(999);
+    });
+    C('=== HANDLERS ==='); LB(900); MSG('Tool already in spindle'); GO(999); LB(999); END();
+    return S;
+}
+
 export function atcChangeStack(params = {}) {
-    return (params.mode === 'auto') ? autoStack(params) : manualStack(params);
+    if (params.mode === 'auto') return (params.magType === 'disk') ? diskAutoStack(params) : autoStack(params);
+    return manualStack(params);
 }
 
 export class AtcChangeWizard {
