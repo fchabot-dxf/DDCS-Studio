@@ -184,6 +184,10 @@ export function renderMagazineTable(container, atc, onChange) {
         const dia = document.createElement('input'); dia.type = 'number'; dia.step = '1'; dia.min = '0'; dia.value = atc.diskDia ?? '';
         dia.addEventListener('change', () => { atc.diskDia = dia.value === '' ? '' : Number(dia.value); onChange(); });
         pkr.appendChild(field('Carousel Ø', dia, 80));
+        const axSel = document.createElement('select');
+        [['+y', '+Y'], ['-y', '-Y'], ['+x', '+X'], ['-x', '-X']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if ((atc.diskAxis || '+y') === v) o.selected = true; axSel.appendChild(o); });
+        axSel.addEventListener('change', () => { atc.diskAxis = axSel.value; onChange(); });
+        pkr.appendChild(field('Disk toward', axSel, 64));
         container.appendChild(pkr);
         const note = document.createElement('div'); note.className = 'settings-hint';
         note.textContent = 'Disk: one fixed pickup — the carousel (Ø) rotates each pocket to it by index, so per-pocket XYZ aren’t needed (just the pickup + which tool is in each pocket).';

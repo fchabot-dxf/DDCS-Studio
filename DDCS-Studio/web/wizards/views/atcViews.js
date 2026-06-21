@@ -64,10 +64,13 @@ function magazinePockets(a) {
         // it by the radius. Pocket 1 sits at the pickup; the rest ring around the centre.
         const pk = a.pickup || {};
         const R = num(a.diskDia, 0) / 2;
-        const cx = num(pk.x, 0), cy = num(pk.y, 0) + R, cz = num(pk.z, 0);   // centre = pickup + R (pickup on the rim)
+        const dirs = { '+x': [1, 0], '-x': [-1, 0], '+y': [0, 1], '-y': [0, -1] };
+        const o = dirs[a.diskAxis] || dirs['+y'];              // pickup → centre direction (the carousel axis)
+        const cx = num(pk.x, 0) + R * o[0], cy = num(pk.y, 0) + R * o[1], cz = num(pk.z, 0);
+        const ang0 = Math.atan2(-o[1], -o[0]);                // angle from centre back to the pickup = pocket 1
         const n = mag.length || 1;
         return mag.map((p, i) => {
-            const ang = -Math.PI / 2 + (i / n) * Math.PI * 2;   // start at the pickup (bottom of the ring)
+            const ang = ang0 + (i / n) * Math.PI * 2;
             return { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang), z: cz, pocket: p.pocket != null ? p.pocket : i + 1, tool: toolOf(p) };
         });
     }
