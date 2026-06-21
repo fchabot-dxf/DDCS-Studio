@@ -141,6 +141,9 @@ export class DockManager {
         } catch (err) {
             console.warn('DockManager sanity guard failed', err);
         }
+
+        // Corsair-style key lighting (reactive press flash + ambient matrix rain) — futuristic only.
+        import('./keyFx.js').then((m) => m.initKeyFx()).catch(() => {});
     }
 
     clear() {

@@ -26,6 +26,7 @@ const HQ_ICONS = {
     copy:   { c: '#6366f1', d: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>' },
     clear:  { c: '#ef4444', d: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>' },
     export: { c: '#0ea5e9', d: '<path d="M16 9h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2"/><line x1="12" y1="14" x2="12" y2="3"/><polyline points="8 7 12 3 16 7"/>' },
+    settings: { c: '#94a3b8', d: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>' },
 };
 // data-act → the existing handler it proxies (file ops are window globals; Open/Save click their header buttons).
 const HQ_ACTIONS = [
@@ -48,6 +49,7 @@ function runQuickAction(act) {
         case 'copy':   window.copyCode?.(); break;
         case 'clear':  window.clearCode?.(); break;
         case 'export': window.downloadFile?.(); break;
+        case 'settings': window.openSettings?.(); break;
     }
 }
 
@@ -71,11 +73,15 @@ export function initHeaderPost() {
 
     // Build the quick-actions popover: Program (file ops) · Post-processor (dialect) · Theme. The dialect
     // and theme rows carry a ✓ on the active one; the chevron's tooltip names the active post.
+    let postSubOpen = false;    // Post-processor + Theme are collapsible submenus (start collapsed)
+    let themeSubOpen = false;
+
     const fillMenu = () => {
         const machinePost = getDialect(getActiveProfile().id);
         const active = getActivePostId();
         const autoLabel = `Auto · ${machinePost.name}`;
         const curTheme = document.body.getAttribute('data-theme') || 'studio';
+        const activeName = active === 'auto' ? autoLabel : (listPosts().find((p) => p.id === active)?.name || active);
 
         const actionRow = (a) =>
             `<button type="button" role="menuitem" class="hdr-quick-item" data-act="${a.act}">`
@@ -93,15 +99,30 @@ export function initHeaderPost() {
             + `<span class="hq-swatch" style="background:${HQ_THEME_SWATCH[name] || '#888'}"></span>`
             + `<span class="hdr-quick-lbl">${name[0].toUpperCase() + name.slice(1)}</span></button>`;
 
+        // Post-processor + Theme are collapsible SUBMENUS: the row shows the active value; click expands.
+        const sub = (key, label, cur, open, body) =>
+            `<button type="button" class="hdr-quick-item hdr-quick-sub${open ? ' is-open' : ''}" data-sub="${key}" aria-expanded="${open}">`
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>'
+            + `<span class="hdr-quick-lbl">${label}<span class="hq-cur"> · ${esc(cur)}</span></span>`
+            + '<span class="hq-caret" aria-hidden="true">▸</span></button>'
+            + `<div class="hdr-quick-subitems" data-subitems="${key}"${open ? '' : ' hidden'}>${body}</div>`;
+
+        const postSub = sub('post', 'Post-processor', activeName, postSubOpen,
+            postRow('auto', autoLabel, false) + listPosts().map((p) => postRow(p.id, p.name, !p.verified)).join(''));
+        const themeSub = sub('theme', 'Theme', curTheme[0].toUpperCase() + curTheme.slice(1), themeSubOpen,
+            THEMES.map(themeRow).join(''));
+
+        const settingsRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="settings">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('settings')
+            + '<span class="hdr-quick-lbl">Settings…</span></button>';
+
         menu.innerHTML = '<div class="hdr-quick-head">Program</div>'
             + HQ_ACTIONS.map(actionRow).join('')
-            + '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Post-processor</div>'
-            + postRow('auto', autoLabel, false)
-            + listPosts().map((p) => postRow(p.id, p.name, !p.verified)).join('')
-            + '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Theme</div>'
-            + THEMES.map(themeRow).join('');
+            + '<div class="hdr-quick-sep"></div>' + postSub
+            + '<div class="hdr-quick-sep"></div>' + themeSub
+            + '<div class="hdr-quick-sep"></div>' + settingsRow;
 
-        const activeName = active === 'auto' ? autoLabel : (listPosts().find((p) => p.id === active)?.name || active);
         btn.title = `Quick actions — open / save / load / export, post-processor (${activeName}), theme. Click to open.`;
         btn.setAttribute('aria-label', `Quick actions (post-processor: ${activeName})`);
     };
@@ -192,6 +213,19 @@ export function initHeaderPost() {
     menu.addEventListener('click', (e) => {
         const it = e.target.closest('.hdr-quick-item');
         if (!it) return;
+
+        // A submenu header toggles its list open/closed and keeps the menu open.
+        if (it.dataset.sub) {
+            const list = menu.querySelector(`.hdr-quick-subitems[data-subitems="${it.dataset.sub}"]`);
+            const willOpen = list ? list.hidden : false;
+            if (list) list.hidden = !willOpen;
+            it.classList.toggle('is-open', willOpen);
+            it.setAttribute('aria-expanded', String(willOpen));
+            if (it.dataset.sub === 'post') postSubOpen = willOpen;
+            if (it.dataset.sub === 'theme') themeSubOpen = willOpen;
+            return;
+        }
+
         closeMenu();
         if (it.dataset.act) { runQuickAction(it.dataset.act); return; }
         if (it.dataset.theme) { setQuickTheme(it.dataset.theme); return; }

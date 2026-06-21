@@ -466,23 +466,24 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 /* Global post-processor (dialect) selector — a discreet chevron quick-action in the header (ui/headerPost.js).
    Icon-only at every width. The `.hdr-controls button.hdr-quick-btn` specificity (0,2,1) beats the per-theme
    `button` skin so the chevron stays flat, not a beveled pill. */
-.hdr-quick { position: relative; display: inline-flex; }
-.hdr-controls button.hdr-quick-btn {
+.hdr-quick { position: relative; display: inline-flex; align-items: center; }
+.app-header button.hdr-quick-btn {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 28px; height: 26px; min-height: 0; padding: 0;
+    width: 20px; height: 20px; min-height: 0; padding: 0;
     border: 1px solid transparent; border-radius: var(--radius, 6px);
     background: transparent; color: var(--text-main, #e6edf3);
-    cursor: pointer; opacity: .75; transition: opacity .12s ease, background .12s ease, border-color .12s ease;
+    cursor: pointer; opacity: .7; transition: opacity .12s ease, background .12s ease, border-color .12s ease;
     box-shadow: none; text-shadow: none;
 }
-.hdr-controls button.hdr-quick-btn:hover { opacity: 1; background: var(--panel2, rgba(255,255,255,.10)); border-color: var(--border, rgba(255,255,255,.18)); }
-.hdr-controls button.hdr-quick-btn[aria-expanded="true"] { opacity: 1; background: var(--panel2, rgba(255,255,255,.10)); }
-.hdr-controls button.hdr-quick-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
-.hdr-quick-btn svg { transition: transform .15s ease; }
+.app-header button.hdr-quick-btn svg { width: 13px; height: 13px; transition: transform .15s ease; }
+.app-header button.hdr-quick-btn:hover { opacity: 1; background: var(--panel2, rgba(255,255,255,.10)); border-color: var(--border, rgba(255,255,255,.18)); }
+.app-header button.hdr-quick-btn[aria-expanded="true"] { opacity: 1; background: var(--panel2, rgba(255,255,255,.10)); }
+.app-header button.hdr-quick-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
 
 /* Popover menu (reuses .scale-pop chrome) — themed like the keyboard: same translucent "glass" material
    (--kbd-glass / --kbd-blur / --kbd-edge tokens). Items are buttons → override the per-theme skin via (0,2,0). */
 .hdr-quick-menu {
+    left: 0; right: auto;                 /* the chevron now sits LEFT (by the logo) → menu opens leftward-anchored */
     min-width: 226px; max-height: min(72vh, 560px); overflow-y: auto;
     padding: 6px; display: flex; flex-direction: column; gap: 2px;
     background: var(--kbd-glass, var(--panel, #1e1e1e));
@@ -521,14 +522,19 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 
 /* Editor op hover-to-edit: highlight the hovered op's lines (in the #editor-highlight overlay) + a float chip. */
 #editor-highlight .g-line.op-hover { background: rgba(14, 165, 233, 0.16); border-radius: 2px; }
-.op-edit-chip {
+/* Scoped under .editor-container (0,2,0) so the ACCENT fill out-ranks the per-theme `button` skin
+   (which otherwise made the chip a subdued dark pill). Accent fill + a soft accent halo = it reads
+   as the live "edit this op" affordance across every theme. */
+.editor-container .op-edit-chip {
     position: absolute; left: 12px; z-index: 12;
-    font: 600 11px/1 inherit; padding: 3px 9px; border-radius: 999px; cursor: pointer;
-    background: var(--accent, #0ea5e9); color: #fff; border: none; box-shadow: 0 2px 8px rgba(0,0,0,.35);
-    white-space: nowrap; opacity: .95;
+    font: 700 11px/1 inherit; padding: 4px 11px; border-radius: 999px; cursor: pointer;
+    background: var(--accent, #0ea5e9); color: #fff;
+    border: 1px solid color-mix(in srgb, var(--accent, #0ea5e9) 55%, #ffffff);
+    box-shadow: 0 2px 10px rgba(0,0,0,.42), 0 0 0 3px color-mix(in srgb, var(--accent, #0ea5e9) 30%, transparent);
+    text-shadow: 0 1px 1px rgba(0,0,0,.35); white-space: nowrap; opacity: 1;
 }
-.op-edit-chip:hover { opacity: 1; filter: brightness(1.08); }
-.op-edit-chip:disabled { background: var(--panel, #334); color: var(--text-dim, #9aa); cursor: default; box-shadow: none; }
+.editor-container .op-edit-chip:hover { filter: brightness(1.1); box-shadow: 0 2px 13px rgba(0,0,0,.48), 0 0 0 4px color-mix(in srgb, var(--accent, #0ea5e9) 42%, transparent); }
+.editor-container .op-edit-chip:disabled { background: var(--panel, #334); color: var(--text-dim, #9aa); cursor: default; box-shadow: none; border-color: transparent; }
 .op-edit-chip[hidden] { display: none; }
 
 /* Studio editor autocomplete — phone-autocorrect-style float at the caret. */
@@ -2069,6 +2075,23 @@ button.primary:hover {
     z-index: 10001;
 }
 
+/* Settings MODAL — a wide/tall flex modal hosted in an .overlay (ui/settingsPanel.js renders its
+   flex head/body/foot inside #settings-app). z above wizards so the ⚙ gear opens it ON TOP of a wizard. */
+.settings-overlay { z-index: 12000; }
+.settings-modal {
+    width: min(1180px, 95vw);
+    height: min(860px, 92vh);
+    display: flex; flex-direction: column;
+    background: var(--bg, #111);
+    border: 1px solid var(--outline, var(--border, #444));
+    border-radius: var(--radius, 10px);
+    box-shadow: var(--elev-2, 0 12px 40px rgba(0,0,0,.55));
+    overflow: hidden;
+}
+@media (max-width: 600px) {
+    .settings-modal { width: 100vw; height: 100vh; max-width: none; border-radius: 0; border: none; }
+}
+
 /* ============================================
    RESPONSIVE
    ============================================ */
@@ -2677,18 +2700,11 @@ Middle (handle) {
 /* Big wizard buttons get a brighter cyan instrument edge */
 [data-theme="futuristic"] .wizard-btn { border-color: rgba(45,226,255,.7) !important; }
 
-/* Keyboard dock = a framed scope: inner top glow + glowing cyan corner brackets */
+/* Keyboard dock: subtle inner top glow (corner brackets removed — read as clutter) */
 [data-theme="futuristic"] #controller-dock.controller-dock {
-    box-shadow: 0 -10px 34px rgba(0,0,0,.55), inset 0 1px 0 rgba(45,226,255,.3);
-    border-top: 1px solid rgba(45,226,255,.5);
+    box-shadow: 0 -10px 34px rgba(0,0,0,.55), inset 0 1px 0 rgba(45,226,255,.22);
+    border-top: 1px solid rgba(45,226,255,.4);
 }
-[data-theme="futuristic"] #controller-dock::before,
-[data-theme="futuristic"] #controller-dock::after {
-    content: ""; position: absolute; top: 5px; width: 20px; height: 20px; z-index: 4; pointer-events: none;
-    border-top: 2px solid rgba(45,226,255,.85); filter: drop-shadow(0 0 4px rgba(45,226,255,.6));
-}
-[data-theme="futuristic"] #controller-dock::before { left: 5px;  border-left: 2px solid rgba(45,226,255,.85); }
-[data-theme="futuristic"] #controller-dock::after  { right: 5px; border-right: 2px solid rgba(45,226,255,.85); }
 
 /* 3D preview = a targeting scope: neon frame + inner glow */
 [data-theme="futuristic"] .viz3d-drawer {
@@ -2704,46 +2720,91 @@ Middle (handle) {
 /* ============================================
    THEME: ORGANIC (Earth Tones)
    ============================================ */
+/* ===== SKIN: "BIOMORPH" (organic) — a biomorphic command deck. Dark visceral body, bone-ivory
+   keycaps (the exoskeleton), sinew seams, coral/arterial accents. Giger-ish anatomical command. ===== */
 [data-theme="organic"] {
-    --bg: #f4f1e8;
-    --panel: #faf8f3;
-    --accent: #6b8e23;
-    --text: #3d3d2f;
-    --text-main: #2d2d20;
-    --text-dim: #7d7d6f;
-    --border: #d4d1c8;
-    --radius: 12px;
+    --bg: #15110d;            /* visceral dark body */
+    --panel: #241c15;         /* sinew / bone-shadow */
+    --panel2: #2f261c;
+    --accent: #d97a5c;        /* coral / arterial */
+    --text: #e9dcc4;          /* bone */
+    --text-main: #f8eed8;
+    --text-dim: #9d8a6b;      /* aged bone */
+    --border: #5a4836;        /* sinew seam */
+    --radius: 16px;           /* organic curvature */
+    --success: #8aa15a;       /* muscle green */
+    --danger:  #c0473a;       /* arterial */
+    --warn:    #d99a3a;
 
     /* header */
-    --hdr-bg: #faf8f3;
-    --hdr-ink: #2d2d20;
-    --hdr-dim: #7d7d6f;
-    --accent-studio: #6b8e23;
-    --accent-gateway: #8e6b23;
+    --hdr-bg: #1d160f;
+    --hdr-ink: #f3e8d0;
+    --hdr-dim: #9d8a6b;
+    --accent-studio: #d97a5c;
+    --accent-gateway: #8aa15a;
+
+    /* contract */
+    --surface-1: #241c15; --surface-2: #15110d; --outline: #5a4836;
+    --scrim: rgba(12,8,5,.72);
+    --screen: #120d09;        /* the body-cavity editor */
 }
 
-[data-theme="organic"] .wizard {
-    background: rgba(100, 100, 80, 0.75);
-}
+[data-theme="organic"] .wizard { background: rgba(14,9,6,.82); }
+[data-theme="organic"] .wiz-box { border: 1px solid #6e5840; box-shadow: 0 12px 44px rgba(0,0,0,.6), 0 0 0 1px rgba(217,122,92,.20); }
 
-[data-theme="organic"] .wiz-box {
-    border: 2px solid #6b8e23;
-    box-shadow: 0 4px 24px rgba(107, 142, 35, 0.2);
-}
-
+/* Bone keycaps / buttons: ivory cap, sinew rim, soft organic shadow, big curvature */
 [data-theme="organic"] .toolbar-btn,
 [data-theme="organic"] button {
-    background: linear-gradient(180deg, #e8e5dc, #d4d1c8);
-    border: 1px solid #a0a090;
-    color: #3d3d2f;
-    border-radius: 12px;
+    background: linear-gradient(180deg, #e7dbc0, #ccbd99);
+    border: 1px solid #8a7657;
+    color: #2a2117;
+    border-radius: 14px;
+    box-shadow: 0 2px 5px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.5);
+    text-shadow: none;
 }
-
 [data-theme="organic"] .toolbar-btn:hover,
 [data-theme="organic"] button:hover {
-    background: linear-gradient(180deg, #6b8e23, #556b1c);
-    color: white;
+    background: linear-gradient(180deg, #f1c6af, #d98a6f);
+    border-color: #d97a5c; color: #2a1712;
 }
+
+/* Editor = the body cavity; bone text, coral caret, arterial line-numbers */
+[data-theme="organic"] .editor-container { background: var(--screen); }
+[data-theme="organic"] #editor-highlight { background-color: var(--screen) !important; color: #e9dcc4; }
+[data-theme="organic"] #editor-gutter { background: var(--screen); color: #6e5b42; }
+[data-theme="organic"] #editor { caret-color: #d97a5c; }
+[data-theme="organic"] #editor::selection,
+[data-theme="organic"] #editor-highlight ::selection { background: rgba(217,122,92,.32); color: #fff; }
+[data-theme="organic"] #editor-highlight .g-comment, [data-theme="organic"] .g-comment { color: #8aa15a !important; }
+[data-theme="organic"] #editor-highlight .g-num  { color: #e4a06a; }
+[data-theme="organic"] #editor-highlight .g-word { color: #ecdcb4; }
+[data-theme="organic"] #editor-highlight .g-ln   { color: #d97a5c; }
+
+/* Header = bone/sinew bar; the program toolbar = a muscle-tissue band the bone keys sit on */
+[data-theme="organic"] .app-header { border-bottom: 1px solid #5a4836; box-shadow: 0 1px 12px rgba(0,0,0,.45); }
+[data-theme="organic"] .app-header .brand .logo { filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
+[data-theme="organic"] .top-dock-header {
+    background: linear-gradient(180deg, #bf6850, #8d4533);
+    border-top: 1px solid rgba(255,205,180,.16);
+    border-bottom: 1px solid #4a3a2a;
+}
+
+/* Biomorph SHAPES — organic & asymmetric (not boxy): blob panels + pebble keys with varied radii,
+   so the deck reads like a grown exoskeleton rather than a grid of rectangles. */
+[data-theme="organic"] .dock-body .deck-tab-panel { border-radius: 0 30px 36px 32px; }
+[data-theme="organic"] .wiz-box { border-radius: 30px 12px 30px 12px; }
+[data-theme="organic"] #controller-dock .dock-body .toolbar-btn { border-radius: 18px 26px 16px 22px; }
+[data-theme="organic"] #controller-dock .dock-body .toolbar-btn:nth-child(2n) { border-radius: 26px 16px 22px 18px; }
+[data-theme="organic"] #controller-dock .dock-body .toolbar-btn:nth-child(3n) { border-radius: 16px 22px 28px 14px; }
+[data-theme="organic"] #controller-dock .dock-body .var-item { border-radius: 14px 20px 12px 18px; }
+[data-theme="organic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role="back"]  { border-radius: 28px 16px 22px 18px !important; }
+[data-theme="organic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role="space"] { border-radius: 18px 26px 16px 26px !important; }
+[data-theme="organic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role="enter"] { border-radius: 16px 28px 18px 24px !important; }
+/* the deck folder-tabs get a soft organic top */
+[data-theme="organic"] .dock-body .deck-tab { border-radius: 16px 16px 0 0 !important; }
+/* the whole keyboard frame: organic rounded top corners (the dock + its handle lip together) */
+[data-theme="organic"] #controller-dock.controller-dock { border-radius: 44px 32px 0 0; }
+[data-theme="organic"] #controller-dock .header-handle { border-radius: 44px 32px 0 0; }
 
 /* Added classes to replace inline styles in commandDeck.js */
 
@@ -3438,11 +3499,13 @@ svg [id$="_wcs"] { display: none; }
    colour-mix can't fall through to transparent — the active tab + its panel are one tinted surface. */
 .dock-body .deck-tab[data-deck-tab="move"]      { --tab-color: #3b82f6; }
 .dock-body .deck-tab[data-deck-tab="gm"]        { --tab-color: #f59e0b; }
-.dock-body .deck-tab[data-deck-tab="macro"]     { --tab-color: #a855f7; }
+.dock-body .deck-tab[data-deck-tab="math"]      { --tab-color: #14b8a6; }
+.dock-body .deck-tab[data-deck-tab="logic"]     { --tab-color: #a855f7; }
 .dock-body .deck-tab[data-deck-tab="variables"] { --tab-color: #10b981; }
 .dock-body .deck-tab[data-deck-tab="move"].active      { background: color-mix(in srgb, var(--panel) 90%, #3b82f6) !important; border-top-color: #3b82f6 !important; }
 .dock-body .deck-tab[data-deck-tab="gm"].active        { background: color-mix(in srgb, var(--panel) 90%, #f59e0b) !important; border-top-color: #f59e0b !important; }
-.dock-body .deck-tab[data-deck-tab="macro"].active     { background: color-mix(in srgb, var(--panel) 90%, #a855f7) !important; border-top-color: #a855f7 !important; }
+.dock-body .deck-tab[data-deck-tab="math"].active      { background: color-mix(in srgb, var(--panel) 90%, #14b8a6) !important; border-top-color: #14b8a6 !important; }
+.dock-body .deck-tab[data-deck-tab="logic"].active     { background: color-mix(in srgb, var(--panel) 90%, #a855f7) !important; border-top-color: #a855f7 !important; }
 .dock-body .deck-tab[data-deck-tab="variables"].active { background: color-mix(in srgb, var(--panel) 90%, #10b981) !important; border-top-color: #10b981 !important; }
 
 /* Studio keyboard tabs use the SAME folder-tab styling as every other theme (active fill = panel
@@ -3462,7 +3525,8 @@ svg [id$="_wcs"] { display: none; }
 }
 #deck-tab-move      { --tab-color: #3b82f6; background: color-mix(in srgb, var(--panel) 90%, #3b82f6); }
 #deck-tab-gm        { --tab-color: #f59e0b; background: color-mix(in srgb, var(--panel) 90%, #f59e0b); }
-#deck-tab-macro     { --tab-color: #a855f7; background: color-mix(in srgb, var(--panel) 90%, #a855f7); }
+#deck-tab-math      { --tab-color: #14b8a6; background: color-mix(in srgb, var(--panel) 90%, #14b8a6); }
+#deck-tab-logic     { --tab-color: #a855f7; background: color-mix(in srgb, var(--panel) 90%, #a855f7); }
 #deck-tab-variables { --tab-color: #10b981; background: color-mix(in srgb, var(--panel) 90%, #10b981); }
 
 /* ============================================================================
@@ -3493,18 +3557,20 @@ svg [id$="_wcs"] { display: none; }
 /* FUTURISTIC — "the super coder": cold cyan HUD glass. MOST see-through, low blur (sharp code),
    scanline pattern, translucent keys so code peeks through everything. */
 [data-theme="futuristic"] {
-    /* glass-screen: very clear panel so the code/grid reads right through it, faint scanlines, light frost */
+    /* glass-screen: clear panel so the code/grid reads through it (a touch more opaque now), faint scanlines */
     --kbd-glass:
-        linear-gradient(180deg, rgba(10,16,30,.16), rgba(8,12,24,.24)),
+        linear-gradient(180deg, rgba(10,16,30,.24), rgba(8,12,24,.34)),
         repeating-linear-gradient(0deg, rgba(45,212,191,.04) 0 1px, transparent 1px 3px);
     --kbd-blur: 0.5px;
-    --kbd-handle: linear-gradient(180deg, rgba(0,255,255,.10), rgba(8,12,24,.52));
-    --kbd-grip: rgba(0,255,255,.7);
-    --kbd-edge: rgba(0,255,255,.45);
-    /* translucent glass keys (sheen added in the keys rule) */
-    --kbd-key: rgba(22,34,56,.26);
+    --kbd-handle: linear-gradient(180deg, rgba(36,68,104,.45), rgba(8,12,24,.6));
+    --kbd-grip: rgba(150,195,220,.5);          /* soft steel — not garish neon cyan */
+    --kbd-edge: rgba(45,226,255,.40);
+    /* translucent glass keys (sheen added in the keys rule). --kbd-key-glow = the glow colour as r,g,b;
+       per-category key classes (axis-blue / m-red / m-green) override these to keep the ORIGINAL colours. */
+    --kbd-key: rgba(22,34,56,.34);
     --kbd-key-bd: rgba(0,255,255,.42);
     --kbd-key-ink: #cffafe;
+    --kbd-key-glow: 45,226,255;
 }
 
 /* STEAMPUNK — smoked brass. LEAST see-through overall (opaque keys), but the translucent
@@ -3533,18 +3599,17 @@ svg [id$="_wcs"] { display: none; }
     --kbd-edge: var(--bv-dark);
 }
 
-/* ORGANIC — living sage glass. The MOST see-through theme (a thin botanical veil over the code),
-   with its own character: a green diagonal weave + dappled "cell" texture. Distinct from the other
-   light themes. Keys stay opaque (cream) for legibility; code glows through the green gutters. */
+/* ORGANIC → BIOMORPH — a ribcage panel: dark sinew body with bone-coloured rib striations; the
+   bone keycaps (organic button skin) sit on it like an exoskeleton, code shows in the cavity gutters. */
 [data-theme="organic"] {
     --kbd-glass:
-        linear-gradient(160deg, rgba(107,142,35,.15), rgba(61,90,20,.40)),
-        repeating-linear-gradient(60deg, rgba(150,180,80,.07) 0 3px, transparent 3px 10px),
-        repeating-radial-gradient(circle at 30% 15%, rgba(190,210,130,.06) 0 2px, transparent 2px 15px);
+        linear-gradient(180deg, rgba(58,46,33,.50), rgba(24,18,12,.80)),
+        repeating-linear-gradient(90deg, rgba(222,206,170,.06) 0 2px, transparent 2px 11px),
+        repeating-linear-gradient(0deg, rgba(0,0,0,.06) 0 1px, transparent 1px 7px);
     --kbd-blur: 4px;
-    --kbd-handle: linear-gradient(180deg, rgba(150,180,80,.55), rgba(61,90,20,.72));
-    --kbd-grip: rgba(245,250,230,.8);
-    --kbd-edge: rgba(107,142,35,.55);
+    --kbd-handle: linear-gradient(180deg, #4a3b2a, #211a12);
+    --kbd-grip: rgba(231,219,192,.65);     /* bone grip */
+    --kbd-edge: #6e5840;                    /* sinew seam */
 }
 
 /* NORMAL — clean white frost. LEAST see-through (a light bg needs density to stay legible). */
@@ -3606,21 +3671,41 @@ svg [id$="_wcs"] { display: none; }
     background: linear-gradient(135deg, rgba(255,255,255,.13), rgba(255,255,255,0) 42%), var(--kbd-key) !important;
     border: 1px solid var(--kbd-key-bd) !important;
     color: var(--kbd-key-ink) !important;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 12px rgba(45,226,255,.05) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 12px rgba(var(--kbd-key-glow,45,226,255),.06), 0 0 9px rgba(var(--kbd-key-glow,45,226,255),.22) !important;
     position: relative; overflow: hidden;
+}
+
+/* Keep the ORIGINAL colour-coded keys: each category sets the glass tokens (fill/border/ink/glow) the
+   rule above + the press-flash read — so axis keys stay blue, m-red red, m-green green, all as glowing glass. */
+[data-theme="futuristic"] #controller-dock .dock-body .axis-blue {
+    --kbd-key: rgba(40,82,150,.30); --kbd-key-bd: rgba(96,165,250,.6); --kbd-key-ink: #d6e6ff; --kbd-key-glow: 96,165,250;
+}
+[data-theme="futuristic"] #controller-dock .dock-body .m-red {
+    --kbd-key: rgba(150,48,48,.28); --kbd-key-bd: rgba(248,113,113,.6); --kbd-key-ink: #ffdada; --kbd-key-glow: 248,113,113;
+}
+[data-theme="futuristic"] #controller-dock .dock-body .m-green {
+    --kbd-key: rgba(40,130,72,.26); --kbd-key-bd: rgba(74,222,128,.6); --kbd-key-ink: #d8ffe5; --kbd-key-glow: 74,222,128;
 }
 
 /* ===== OPERATOR CONSOLE — the futuristic keyboard as a living sci-fi command deck ===== */
 [data-theme="futuristic"] #controller-dock .dock-body { position: relative; }
 
 /* a cyan light SWEEPS across the keypad on a loop (compositor-friendly transform) */
-[data-theme="futuristic"] #controller-dock .dock-body::after {
-    content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 34%;
-    pointer-events: none; z-index: 5;
-    background: linear-gradient(90deg, transparent, rgba(45,226,255,.10) 50%, transparent);
-    animation: op-keysweep 4.2s linear infinite;
+/* Reactive per-key glow (Corsair-style): on press a key flashes bright then fades over ~520ms.
+   Uses `filter` (brightness + drop-shadow) so it isn't blocked by the keys' !important box-shadow.
+   The .kp-flash class is added on pointerdown by ui/keyFlash.js (re-added each press to retrigger). */
+@keyframes kp-flash {
+    0%   { filter: brightness(1.8)  drop-shadow(0 0 14px rgba(var(--kbd-key-glow,45,226,255),1)); }
+    55%  { filter: brightness(1.6)  drop-shadow(0 0 12px rgba(var(--kbd-key-glow,45,226,255),.85)); }   /* hold the glow longer */
+    100% { filter: brightness(1)    drop-shadow(0 0 0 rgba(var(--kbd-key-glow,45,226,255),0)); }
 }
-@keyframes op-keysweep { 0% { transform: translateX(-130%); } 100% { transform: translateX(420%); } }
+[data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn.kp-flash {
+    animation: kp-flash 2200ms ease-out;
+}
+[data-theme="futuristic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role].kp-flash {
+    animation: kp-flash 2200ms ease-out;
+}
+
 
 /* HUD readout tag, top-right of the deck */
 [data-theme="futuristic"] #controller-dock .dock-body::before {
@@ -3630,10 +3715,6 @@ svg [id$="_wcs"] { display: none; }
 }
 
 /* keys: a HUD corner tick + edge light on hover, full bloom on press */
-[data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn:not([data-ddcs-role])::after {
-    content: ""; position: absolute; top: 3px; right: 3px; width: 5px; height: 5px;
-    border-top: 1px solid rgba(45,226,255,.65); border-right: 1px solid rgba(45,226,255,.65);
-}
 [data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn:not([data-ddcs-role]):hover {
     border-color: rgba(45,226,255,.95) !important;
     box-shadow: 0 0 12px rgba(45,226,255,.4), inset 0 0 8px rgba(45,226,255,.12) !important;
@@ -3645,20 +3726,41 @@ svg [id$="_wcs"] { display: none; }
     color: #ffffff !important;
 }
 
+/* BACK / SPACE / ENTER — keep their colour tint but as translucent glass that glows (was solid) */
+[data-theme="futuristic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role="back"] {
+    --kbd-key-glow: 248,113,113;
+    background: rgba(239,68,68,.20) !important; border: 1px solid rgba(248,113,113,.7) !important; color: #ffdada !important;
+    box-shadow: 0 0 15px rgba(239,68,68,.42), inset 0 0 14px rgba(239,68,68,.16) !important; text-shadow: 0 0 9px rgba(239,68,68,.55) !important;
+}
+[data-theme="futuristic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role="space"] {
+    --kbd-key-glow: 203,213,225;
+    background: rgba(148,163,184,.18) !important; border: 1px solid rgba(203,213,225,.65) !important; color: #eaf0f7 !important;
+    box-shadow: 0 0 15px rgba(148,163,184,.36), inset 0 0 14px rgba(148,163,184,.16) !important; text-shadow: 0 0 9px rgba(148,163,184,.5) !important;
+}
+[data-theme="futuristic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role="enter"] {
+    --kbd-key-glow: 96,165,250;
+    background: rgba(59,130,246,.20) !important; border: 1px solid rgba(96,165,250,.72) !important; color: #d9e8ff !important;
+    box-shadow: 0 0 15px rgba(59,130,246,.46), inset 0 0 14px rgba(59,130,246,.18) !important; text-shadow: 0 0 9px rgba(59,130,246,.55) !important;
+}
+[data-theme="futuristic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role]:hover { filter: brightness(1.18); }
+
 @media (prefers-reduced-motion: reduce) {
-    [data-theme="futuristic"] #controller-dock .dock-body::after { animation: none; opacity: .5; }
+    [data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn.kp-flash,
+    [data-theme="futuristic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role].kp-flash { animation: none; }
 }
 
 /* The tabbed-deck surfaces go glass too — translucent COLOURED panels + tabs so code shows through them
    (the panel behind the keys was the last opaque layer). Each keeps its accent identity as a colour cast. */
 #deck-tab-move      { background: color-mix(in srgb, #3b82f6 14%, transparent); }
 #deck-tab-gm        { background: color-mix(in srgb, #f59e0b 14%, transparent); }
-#deck-tab-macro     { background: color-mix(in srgb, #a855f7 14%, transparent); }
+#deck-tab-math      { background: color-mix(in srgb, #14b8a6 14%, transparent); }
+#deck-tab-logic     { background: color-mix(in srgb, #a855f7 14%, transparent); }
 #deck-tab-variables { background: color-mix(in srgb, #10b981 14%, transparent); }
 #controller-dock .dock-body .deck-tab { background: color-mix(in srgb, var(--panel) 24%, transparent) !important; }
 #controller-dock .dock-body .deck-tab[data-deck-tab="move"].active      { background: color-mix(in srgb, #3b82f6 26%, transparent) !important; }
 #controller-dock .dock-body .deck-tab[data-deck-tab="gm"].active        { background: color-mix(in srgb, #f59e0b 26%, transparent) !important; }
-#controller-dock .dock-body .deck-tab[data-deck-tab="macro"].active     { background: color-mix(in srgb, #a855f7 26%, transparent) !important; }
+#controller-dock .dock-body .deck-tab[data-deck-tab="math"].active      { background: color-mix(in srgb, #14b8a6 26%, transparent) !important; }
+#controller-dock .dock-body .deck-tab[data-deck-tab="logic"].active     { background: color-mix(in srgb, #a855f7 26%, transparent) !important; }
 #controller-dock .dock-body .deck-tab[data-deck-tab="variables"].active { background: color-mix(in srgb, #10b981 26%, transparent) !important; }
 /* labels stay legible over the moving code behind them */
 #controller-dock .group-header, #controller-dock .section-label,

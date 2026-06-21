@@ -46,15 +46,17 @@ export function initGatewayStatus() {
 
     async function showApp(which) {
         window.ddcsTrack?.('feature', 'tab:' + which);
+
+        // Settings is a MODAL, not an app view — open it over whatever's showing and return.
+        if (which === 'settings') { (await import('./settingsPanel.js')).openSettings(); return; }
+
         const studioApp = document.getElementById('studio-app');
         const gatewayApp = document.getElementById('gateway-app');
-        const settingsApp = document.getElementById('settings-app');
         const blocksApp = document.getElementById('blocks-app');
         const macrosApp = document.getElementById('macros-app');
 
         const isStudio = which === 'studio';
         const isGateway = which === 'gateway';
-        const isSettings = which === 'settings';
         const isBlocks = which === 'blocks';
         const isMacros = which === 'macros';
 
@@ -72,11 +74,6 @@ export function initGatewayStatus() {
             try { (await import('./gatewayPanel.js')).setGatewayPanelVisible(false); } catch { /* not loaded */ }
         }
 
-        if (isSettings) {
-            const mod = await import('./settingsPanel.js');
-            mod.openSettings();
-        }
-
         if (isMacros) {
             const mod = await import('./macrosApp.js');
             mod.initMacrosApp();
@@ -87,13 +84,11 @@ export function initGatewayStatus() {
 
         studioApp?.classList.toggle('hidden', !isStudio);
         gatewayApp?.classList.toggle('hidden', !isGateway);
-        settingsApp?.classList.toggle('hidden', !isSettings);
         blocksApp?.classList.toggle('hidden', !isBlocks);
         macrosApp?.classList.toggle('hidden', !isMacros);
 
         studioTab?.classList.toggle('active', isStudio);
         tab?.classList.toggle('active', isGateway);
-        settingsTab?.classList.toggle('active', isSettings);
         blocksTab?.classList.toggle('active', isBlocks);
         macrosTab?.classList.toggle('active', isMacros);
 

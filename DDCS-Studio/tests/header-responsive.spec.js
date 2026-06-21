@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('phone (390): header fits, Open/Save stay, post-selector hidden (it lives in Settings)', async ({ page }) => {
+test('phone (390): header fits; chevron quick-menu visible; standalone Open/Save hidden (in the chevron)', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
@@ -13,15 +13,15 @@ test('phone (390): header fits, Open/Save stay, post-selector hidden (it lives i
       overflow: h.scrollWidth - h.clientWidth,
       docScrollW: document.documentElement.scrollWidth,
       vw: window.innerWidth,
-      postHidden: document.getElementById('hdrPostBtn').offsetParent === null,
-      macroVisible: macro.offsetParent !== null && macro.closest('.app-header') !== null,
+      chevronVisible: document.getElementById('hdrPostBtn').offsetParent !== null,
+      macroHidden: macro.offsetParent === null,
       noBurger: document.getElementById('hdrBurger') === null,
     };
   });
-  expect(s.overflow, 'header fits without the post selector').toBeLessThanOrEqual(0);
+  expect(s.overflow, 'header fits on phone').toBeLessThanOrEqual(0);
   expect(s.docScrollW, 'no horizontal page scroll').toBeLessThanOrEqual(s.vw + 1);
-  expect(s.postHidden, 'post selector hidden on phone (set in Settings)').toBe(true);
-  expect(s.macroVisible, 'Open/Save stay visible in the header').toBe(true);
+  expect(s.chevronVisible, 'quick-menu chevron visible on phone').toBe(true);
+  expect(s.macroHidden, 'standalone Open/Save hidden on phone (now in the chevron)').toBe(true);
   expect(s.noBurger, 'no ☰ burger').toBe(true);
   await page.screenshot({ path: 'tests/_header-390.png', clip: { x: 0, y: 0, width: 390, height: 60 } });
 });
@@ -61,8 +61,10 @@ test('quick-menu chevron: icon-only; opens Program actions + Post-processor + Th
   expect(await page.getAttribute('#hdrPostBtn', 'aria-expanded')).toBe('true');
 
   // Program file-actions present (Open/Save moved in, plus load/insert/copy/clear/export).
-  const actions = await page.locator('#hdrPostMenu .hdr-quick-item[data-act]').count();
-  expect(actions, 'seven program actions').toBe(7);
+  const programActions = await page.locator('#hdrPostMenu .hdr-quick-item[data-act]:not([data-act="settings"])').count();
+  expect(programActions, 'seven program file-actions').toBe(7);
+  // Settings opens as a modal from the menu.
+  expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="settings"]').count(), 'Settings… row present').toBe(1);
   // Exactly one active post and one active theme are checked.
   const postChecked = await page.locator('#hdrPostMenu .hdr-quick-item[data-post][aria-checked="true"]').count();
   const themeChecked = await page.locator('#hdrPostMenu .hdr-quick-item[data-theme][aria-checked="true"]').count();
@@ -73,8 +75,9 @@ test('quick-menu chevron: icon-only; opens Program actions + Post-processor + Th
   await page.keyboard.press('Escape');
   expect(await page.locator('#hdrPostMenu').isHidden()).toBe(true);
 
-  // Reopen and pick a theme → it applies and the menu closes.
+  // Reopen, expand the Theme submenu, pick a theme → it applies and the menu closes.
   await page.click('#hdrPostBtn');
+  await page.click('#hdrPostMenu .hdr-quick-sub[data-sub="theme"]');
   await page.click('#hdrPostMenu .hdr-quick-item[data-theme="futuristic"]');
   expect(await page.getAttribute('body', 'data-theme')).toBe('futuristic');
   expect(await page.locator('#hdrPostMenu').isHidden()).toBe(true);
