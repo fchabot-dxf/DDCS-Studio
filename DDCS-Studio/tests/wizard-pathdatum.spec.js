@@ -75,12 +75,14 @@ test('the placement persists through insert (baked into the block stack, not a p
     const prog = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
     const op = prog.find((b) => b && b.type === 'op' && b.opType === 'drill');
     if (!op) return null;
-    const arr = (op.children || []).find((c) => c.type === 'array');
-    return { attach: op.params && op.params.stockAttach, x0: arr && arr.params && arr.params.x0 };
+    const place = (op.children || []).find((c) => c.type === 'placeonstock');
+    const arr = place && (place.children || []).find((c) => c.type === 'array');
+    return { opAttach: op.params && op.params.stockAttach, blockAttach: place && place.params && place.params.stockAttach, hasArray: !!arr };
   });
   expect(res, 'a drill op was committed').toBeTruthy();
-  expect(res.attach, 'the op remembers the stock-attach corner (for re-editing)').toBe('pp');
-  expect(res.x0, 'the array origin is BAKED to the placed position (grid 0..40 → max corner at 100)').toBeCloseTo(60, 1);
+  expect(res.opAttach, 'op.params remembers the attach (wizard re-edit)').toBe('pp');
+  expect(res.blockAttach, 'the PlaceOnStock C-block carries the attach (visible/editable in Blocks)').toBe('pp');
+  expect(res.hasArray, 'the pattern is wrapped inside the PlaceOnStock block').toBe(true);
 });
 
 test('the 3×3 datum picker renders on the layout canvas and a click sets the path datum', async ({ page }) => {

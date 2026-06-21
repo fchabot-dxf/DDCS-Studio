@@ -20,6 +20,8 @@
 import { BLOCKS, evalExpr, depthLevels } from '../wizards/ops/index.js';
 import { getDialect, DEFAULT_DIALECT, getCaps } from '../wizards/dialects/index.js';
 import { num, r3 } from '../wizards/ops/util.js';
+import { placeShiftFromParams } from '../wizards/ops/placement.js';
+import { translateProgram } from '../data/rotateProgram.js';
 
 let _seq = 0;
 /** Fresh block record from a registry type, seeded with that primitive's defaults. */
@@ -27,7 +29,7 @@ export function newBlock(type) {
     const def = BLOCKS[type];
     if (!def) throw new Error(`unknown block type: ${type}`);
     const b = { id: `${type}${++_seq}`, type, params: { ...def.defaults } };
-    if (['container', 'path', 'loop', 'cond', 'depth', 'fill'].includes(def.kind)) b.children = [];
+    if (['container', 'path', 'loop', 'cond', 'depth', 'fill', 'place'].includes(def.kind)) b.children = [];
     return b;
 }
 
@@ -139,6 +141,15 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     }
 
     const p = resolveParams(block.params, scope);   // motion blocks: resolve expressions → numbers, then kernel
+
+    if (def.kind === 'place') {                // PLACE ON STOCK: emit the wrapped op, then TRANSLATE its output so
+        const inner = [];                      // the path's datum corner lands on the stock-attach corner (+ offset).
+        (block.children || []).forEach((c) => inner.push(...emit(c, dx, dy, own, scope, dialect)));
+        const s = placeShiftFromParams(p);     // {x,y,z} from the block's own bbox + stock snapshot (self-contained)
+        if (!s.x && !s.y && !s.z) return inner;
+        const moved = translateProgram(inner.map((t) => t.line).join('\n'), s.x, s.y, s.z).text.split('\n');
+        return inner.map((t, i) => ({ line: moved[i], src: t.src }));   // keep each line's provenance (1:1 translate)
+    }
 
     if (def.kind === 'container') {            // STAMP child(ren) at each point (skip 1-based indices in p.skip)
         const pts = def.points(p);

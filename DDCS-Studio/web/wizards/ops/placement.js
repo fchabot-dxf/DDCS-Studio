@@ -59,3 +59,12 @@ export function stockDatumOffset(params = {}) {
     const sd = code2(params.stockDatum || 'nn');
     return { x: -FRAC[sd[0]] * numv(params.stockW), y: -FRAC[sd[1]] * numv(params.stockH) };
 }
+
+/** Placement shift for a PlaceOnStock atom, from its FLAT snapshot params (bbox bminX.. + stock + intent). Used by
+ *  the emit fold so the block is self-contained. */
+export function placeShiftFromParams(p = {}) {
+    return placementShift(
+        { minX: numv(p.bminX), maxX: numv(p.bmaxX), minY: numv(p.bminY), maxY: numv(p.bmaxY) },
+        { pathDatum: p.pathDatum, stockAttach: p.stockAttach, stockDatum: p.stockDatum, stockW: p.stockW, stockH: p.stockH, originX: p.offX, originY: p.offY, offZ: p.offZ },
+    );
+}

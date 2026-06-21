@@ -11,20 +11,17 @@ import { recordOp } from '../blocks/opRecord.js';
 import { makeStart, makeEnd } from '../blocks/programFraming.js';
 import { patternPoints } from './ops/index.js';
 import { num } from './ops/util.js';
-import { placementShift, pointsBBox } from './ops/placement.js';
+import { pointsBBox } from './ops/placement.js';
 
 // Re-export so views (drillView) keep importing the pattern geometry from here.
 export { patternPoints };
 
-/** Drill params → [ Array{ Drill|Bore } ]. The one source of truth for both displays. */
+/** Drill params → [ PlaceOnStock{ Array{ Drill|Bore } } ]. The one source of truth for both displays. */
 export function drillStack(params = {}) {
-    // Placement is BAKED into the stack (the array origin + a hole Z-offset), not post-translated — so the placed
-    // positions ride the block stack and survive commit/emit/edit (a post-translate is dropped on round-trip).
-    const shift = placementShift(pointsBBox(patternPoints(params)), params);
     const arr = newBlock('array');
     arr.params = {
         pattern: params.pattern || 'grid',
-        x0: num(params.x0, 0) + shift.x, y0: num(params.y0, 0) + shift.y,
+        x0: num(params.x0, 0), y0: num(params.y0, 0),
         cols: num(params.cols, 3), rows: num(params.rows, 2), dx: num(params.dx, 20), dy: num(params.dy, 20),
         count: num(params.count, 4), spacing: num(params.spacing, 20), angle: num(params.angle, 0),
         dia: num(params.dia, 50), startAngle: num(params.startAngle, 0),
@@ -34,11 +31,22 @@ export function drillStack(params = {}) {
     const helical = params.method === 'helical';
     const hole = newBlock(helical ? 'bore' : 'drill');
     hole.params = helical
-        ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), ramp: params.ramp || 'step', feed: num(params.feed, 100), clearance: num(params.clearance, 5), zOff: shift.z }
-        : { x: 0, y: 0, depth: num(params.depth, 5), peck: num(params.peck, 5), feed: num(params.feed, 100), clearance: num(params.clearance, 5), zOff: shift.z };
+        ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), ramp: params.ramp || 'step', feed: num(params.feed, 100), clearance: num(params.clearance, 5) }
+        : { x: 0, y: 0, depth: num(params.depth, 5), peck: num(params.peck, 5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) };
     arr.children = [hole];
+    // PLACE the pattern on the stock — a C-block carrying the intent + a bbox/stock SNAPSHOT (placeOnStock.js); the
+    // emit fold (kind:'place') translates the wrapped op so its datum corner lands on the stock-attach corner.
+    const bbox = pointsBBox(patternPoints(params)) || { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+    const place = newBlock('placeonstock');
+    place.params = {
+        stockAttach: params.stockAttach || '', pathDatum: params.pathDatum || '',
+        offX: num(params.originX, 0), offY: num(params.originY, 0), offZ: num(params.offZ, 0),
+        stockW: num(params.stockW, 0), stockH: num(params.stockH, 0), stockDatum: params.stockDatum || 'nnp',
+        bminX: bbox.minX, bmaxX: bbox.maxX, bminY: bbox.minY, bmaxY: bbox.maxY,
+    };
+    place.children = [arr];
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
-    return [makeStart(params), wcs, arr, makeEnd(params)];
+    return [makeStart(params), wcs, place, makeEnd(params)];
 }
 
 export class DrillWizard {
