@@ -79,6 +79,22 @@ op rect IN the host). Invisible to plain headless render tests, which call `show
 | `ws.getAllBlocks()` / `ws.getBlockById(id)` / `block.select()` | tests + `applySelection` |
 | `ws.zoomToFit()` / `ws.clear()` / `ws.getCanvas()` | `blocksApp.js` framing, tests |
 | `block.getHeightWidth()` | `tests/blocks-render.spec.js` — assert blocks actually rendered |
+| `Blockly.fieldRegistry.register` + custom `Field` subclass | `cornerGridField.js` — inline 3×3 corner picker (`field_cornergrid`) |
+
+## Custom fields (first one: `field_cornergrid`)
+
+`blocks/blockly/cornerGridField.js` is the project's first CUSTOM field — an inline 3×3 grid drawn on the block
+(PlaceOnStock's attach / path-datum pickers). The v12.5.1 recipe that works:
+- `class X extends Blockly.Field`; `static fromJson(opts)` → `new X(opts.value, undefined, opts)`; set
+  `this.SERIALIZABLE = true` and `this.size_ = new Blockly.utils.Size(w,h)` in the ctor.
+- `initView()` builds the SVG into `this.fieldGroup_` (do NOT call `super.initView()` — it adds an unwanted text
+  element). `render_()` repaints + re-sets `size_`; `doClassValidation_(v)` constrains the value.
+- Inline interaction (no popup editor): bind native `pointerdown` on each cell and `e.stopPropagation()` so the
+  click PICKS instead of starting a block drag. (No `showEditor_` → not a dropdown field.)
+- Register in `installBlockly()` BEFORE `defineBlocksWithJsonArray`; reference from a JSON block def as
+  `{ type:'field_cornergrid', name, value, colour }`. The bridge routes a field to it via `fieldKind()==='cornergrid'`
+  (see `CORNER_COLOUR`); the value round-trips as a plain string field (`getFieldValue`/`setFieldValue`).
+- Guard: `tests/place-on-stock-block.spec.js` (cells render, per-datum colour, click-to-pick, value re-emits).
 
 ## How to verify a Blockly API before using it (our "version tooling")
 
