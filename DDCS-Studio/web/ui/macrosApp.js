@@ -24,44 +24,86 @@ export function initMacrosApp() {
     if (!root || _wired) return; _wired = true;
 
     root.innerHTML = `
-        <div style="padding:16px; overflow:auto; height:100%; box-sizing:border-box;">
-            <div style="display:flex; gap:8px; margin-bottom:14px; border-bottom:1px solid var(--border); padding-bottom:8px;">
-                <button class="toolbar-btn settings-io macros-sub active" data-msub="m">Macros — M-codes &amp; K-buttons</button>
-                <button class="toolbar-btn settings-io macros-sub" data-msub="c">CAM Pack Builder</button>
+        <style>
+            #macros-app { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
+            #macros-app .settings-head { padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--panel); flex: 0 0 auto; display: flex; align-items: center; }
+            #macros-app .settings-main-tab, #macros-app .settings-main-tab:hover, #macros-app .settings-main-tab:active { position: relative; padding: 6px 6px; font-size: 12.5px; font-weight: 700; letter-spacing: 1px; font-family: inherit; color: var(--text-dim); background: transparent; border: none; border-radius: 0; box-shadow: none; text-shadow: none; filter: none; transform: none; cursor: pointer; transition: 120ms; }
+            #macros-app .settings-main-tab:hover, #macros-app .settings-main-tab.active { color: var(--text-main); }
+            #macros-app .settings-main-tab.active::after { content: ''; position: absolute; left: 4px; right: 4px; bottom: -8px; height: 3px; background: var(--accent); border-radius: var(--radius, 3px) var(--radius, 3px) 0 0; }
+            #macros-app .settings-body { display: flex; flex-direction: row; flex: 1; min-height: 0; overflow: hidden; }
+            #macros-app .settings-sidebar { width: 160px; flex: 0 0 160px; display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; }
+            #macros-app .settings-sidebar .settings-tab { display: block; width: 100%; text-align: left; padding: 7px 12px; font-size: 12.5px; font-weight: 600; border-radius: var(--radius, 4px); border: none; background: transparent; color: var(--text-dim); cursor: pointer; transition: 120ms; }
+            #macros-app .settings-sidebar .settings-tab:hover { background: var(--bg); color: var(--text-main); }
+            #macros-app .settings-sidebar .settings-tab.active { background: var(--bg); color: var(--text-main); border-left: 3px solid var(--accent); padding-left: 9px; }
+            #macros-app .settings-sidebar .sidebar-group-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); padding: 8px 12px 4px; opacity: .6; }
+            #macros-app .settings-sidebar .sidebar-group-label:first-child { padding-top: 2px; }
+            #macros-app .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 20px; background: var(--bg); }
+        </style>
+        <div class="settings-head">
+            <div class="settings-tabs" style="display: flex; gap: 8px;">
+                <button class="settings-main-tab active" data-group="controller">Controller macros</button>
+                <button class="settings-main-tab" data-group="cam">CAM packs</button>
             </div>
-            <div id="macros_sub_m">
-                <div class="settings-section">
-                    <div class="settings-section-title">CUSTOM M-CODES</div>
-                    <div class="settings-hint">Macros called <b>from a program</b> — O100nn ⇄ <b>M<i>nn</i></b> (e.g. M15 tool-break check). Build one with a wizard in Studio, then <b>＋ Add from editor</b>. <b>Generate</b> wraps it as the installable O100nn block. Saved with your Profile.</div>
-                    <div id="mcodes_list"></div>
-                    <div class="settings-row" style="margin-top:8px;">
-                        <button class="toolbar-btn settings-io" id="mcodes_add_editor">＋ Add from editor</button>
-                        <button class="toolbar-btn settings-io" id="mcodes_add_blank">＋ Add blank</button>
+        </div>
+        <div class="settings-body">
+            <div class="settings-sidebar">
+                <div class="sidebar-group-label" data-group-label="controller">Controller macros</div>
+                <button class="settings-tab active" data-group="controller" data-target="macros_panel_mcode">M-codes</button>
+                <button class="settings-tab" data-group="controller" data-target="macros_panel_kbtn">K-buttons</button>
+                <div class="sidebar-group-label" data-group-label="cam" style="display:none;">CAM packs</div>
+                <button class="settings-tab" data-group="cam" data-target="macros_panel_cam" style="display:none;">CAM Pack Builder</button>
+            </div>
+            <div class="settings-content">
+                <div id="macros_panel_mcode">
+                    <div class="settings-section">
+                        <div class="settings-section-title">CUSTOM M-CODES</div>
+                        <div class="settings-hint">Macros called <b>from a program</b> — O100nn ⇄ <b>M<i>nn</i></b> (e.g. M15 tool-break check). Build one with a wizard in Studio, then <b>＋ Add from editor</b>. <b>Generate</b> wraps it as the installable O100nn block. Saved with your Profile.</div>
+                        <div id="mcodes_list"></div>
+                        <div class="settings-row" style="margin-top:8px;">
+                            <button class="toolbar-btn settings-io" id="mcodes_add_editor">＋ Add from editor</button>
+                            <button class="toolbar-btn settings-io" id="mcodes_add_blank">＋ Add blank</button>
+                        </div>
                     </div>
                 </div>
-                <div class="settings-section">
-                    <div class="settings-section-title">K-BUTTONS (K1–K7)</div>
-                    <div class="settings-hint">The 7 panel buttons — each runs <b>key-<i>N</i>.nc</b> when pressed. Type/paste a body or <b>⇪ From editor</b>, then <b>Generate</b> for the install file. Empty = unused.</div>
-                    <div id="kbuttons_list"></div>
+                <div id="macros_panel_kbtn" style="display:none;">
+                    <div class="settings-section">
+                        <div class="settings-section-title">K-BUTTONS (K1–K7)</div>
+                        <div class="settings-hint">The 7 panel buttons — each runs <b>key-<i>N</i>.nc</b> when pressed. Type/paste a body or <b>⇪ From editor</b>, then <b>Generate</b> for the install file. Empty = unused.</div>
+                        <div id="kbuttons_list"></div>
+                    </div>
                 </div>
-            </div>
-            <div id="macros_sub_c" style="display:none">
-                <div class="settings-section">
-                    <div class="settings-section-title">CAM PACK BUILDER</div>
-                    <div class="settings-hint">Author a DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's CAM page — to share with the community. Each slot = a <b>form</b> + a <b>macro</b> that reads the form live (the <code>#2600+</code> mirrors). Studio auto-allocates the shared <code>#1100–1499</code> form params and flags collisions. <i>Phase 1: form designer + macro + plain export. Icons + eng-merge install come next.</i></div>
-                    <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button><button class="toolbar-btn settings-io" id="cam_merge_eng" title="Paste the controller's CURRENT eng file → get a safely-merged eng (your pack appended, #param / -m group collisions flagged). Avoids the community full-replace mistake.">🔗 Merge eng</button></div>
-                    <div id="cam_validate" class="settings-hint" style="margin-top:6px;"></div>
-                    <div id="cam_slots" style="margin-top:6px;"></div>
+                <div id="macros_panel_cam" style="display:none;">
+                    <div class="settings-section">
+                        <div class="settings-section-title">CAM PACK BUILDER</div>
+                        <div class="settings-hint">Author a DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's CAM page — to share with the community. Each slot = a <b>form</b> + a <b>macro</b> that reads the form live (the <code>#2600+</code> mirrors). Studio auto-allocates the shared <code>#1100–1499</code> form params and flags collisions. <i>Phase 1: form designer + macro + plain export. Icons + eng-merge install come next.</i></div>
+                        <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button><button class="toolbar-btn settings-io" id="cam_merge_eng" title="Paste the controller's CURRENT eng file → get a safely-merged eng (your pack appended, #param / -m group collisions flagged). Avoids the community full-replace mistake.">🔗 Merge eng</button></div>
+                        <div id="cam_validate" class="settings-hint" style="margin-top:6px;"></div>
+                        <div id="cam_slots" style="margin-top:6px;"></div>
+                    </div>
                 </div>
             </div>
         </div>`;
 
     const q = (id) => root.querySelector('#' + id);
-    root.querySelectorAll('[data-msub]').forEach((b) => b.addEventListener('click', () => {
-        root.querySelectorAll('[data-msub]').forEach((x) => x.classList.toggle('active', x === b));
-        q('macros_sub_m').style.display = b.dataset.msub === 'm' ? '' : 'none';
-        q('macros_sub_c').style.display = b.dataset.msub === 'c' ? '' : 'none';
-    }));
+    // Two-level tabs (mirrors Settings): L1 main (Controller macros | CAM packs) → filters the L2 sidebar.
+    const PANEL_IDS = ['macros_panel_mcode', 'macros_panel_kbtn', 'macros_panel_cam'];
+    const mMainTabs = [...root.querySelectorAll('.settings-main-tab')];
+    const mSideTabs = [...root.querySelectorAll('.settings-sidebar .settings-tab')];
+    const mSideLabels = [...root.querySelectorAll('.settings-sidebar .sidebar-group-label')];
+    const mShowPanel = (id) => {
+        PANEL_IDS.forEach((p) => { const el = q(p); if (el) el.style.display = (p === id) ? '' : 'none'; });
+        mSideTabs.forEach((b) => b.classList.toggle('active', b.dataset.target === id));
+    };
+    const mShowGroup = (g) => {
+        mMainTabs.forEach((b) => b.classList.toggle('active', b.dataset.group === g));
+        mSideTabs.forEach((b) => { b.style.display = (b.dataset.group === g) ? '' : 'none'; });
+        mSideLabels.forEach((l) => { l.style.display = (l.dataset.groupLabel === g) ? '' : 'none'; });
+        const first = mSideTabs.find((b) => b.dataset.group === g && b.style.display !== 'none');
+        if (first) mShowPanel(first.dataset.target);
+    };
+    mMainTabs.forEach((t) => t.addEventListener('click', () => mShowGroup(t.dataset.group)));
+    mSideTabs.forEach((t) => t.addEventListener('click', () => mShowPanel(t.dataset.target)));
+    mShowGroup('controller');
 
     // --- Macros: author controller macros (M-code O100nn / K-button key-N); saved in the profile. ---
     const macrosArr = () => (getSettings().macros || (getSettings().macros = []));
