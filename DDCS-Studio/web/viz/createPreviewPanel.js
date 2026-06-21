@@ -29,6 +29,19 @@ const stockForViz = () => { const s = (window.ddcsGetSettings && window.ddcsGetS
 const toolsForViz = () => { const a = (window.ddcsGetSettings && window.ddcsGetSettings().atc) || {}; return Array.isArray(a.tools) ? a.tools : []; };   // tool table → sim tool spec
 const wcsForViz = () => { const m = (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null; return (m && m.workOrigin) ? m.workOrigin : null; };   // work origin in MACHINE coords → G53 moves draw in the part frame
 const machineForViz = () => (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null;   // envelope: travel + show + ox/oy/oz (drawn by viz.setMachine, gated on machine.show)
+// The work origin (machine coords of part-zero) the preview positions everything by: the WCS the PROGRAM selects
+// (G54..G59, read from the code) looked up in the pulled WCS table; else the machine's active work origin. This is
+// what makes selecting a WCS in a wizard MOVE the part within the envelope (and frame G53 correctly).
+const wcsOriginFor = (code) => {
+    const m = (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null;
+    if (!m) return null;
+    const wm = /\bG5([4-9])\b/.exec(code || '');
+    if (wm && m.wcs && Array.isArray(m.wcs.table)) {
+        const row = m.wcs.table[parseInt(wm[1], 10) - 4];   // G54→0 … G59→5
+        if (row) return { x: Number(row.x) || 0, y: Number(row.y) || 0, z: Number(row.z) || 0 };
+    }
+    return m.workOrigin || null;
+};
 const previewPrefs = () => (window.ddcsGetSettings && window.ddcsGetSettings().preview) || {};   // Settings → Preview tab
 
 // Custom transport icons (currentColor → inherit the button's text colour), in place of emoji.
@@ -175,7 +188,8 @@ export function createPreviewPanel(container, opts = {}) {
         // Inferred operator start (wizard preview): probes test from the real tool position so an incremental
         // probe macro doesn't trace from the origin (on the stock face) and clamp its first probe to zero.
         const st = getStartPos();
-        let parsed; try { parsed = traceToolpath(code, { stock: stockForViz(), start: st, wcsOffset: wcsForViz() }); }
+        const wo = wcsOriginFor(code);   // WCS the program selects → machine offset (positions the envelope + frames G53)
+        let parsed; try { parsed = traceToolpath(code, { stock: stockForViz(), start: st, wcsOffset: wo }); }
         catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
         segs = parsed.segments || [];
         t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
@@ -194,6 +208,8 @@ export function createPreviewPanel(container, opts = {}) {
                 v.setSegments(parsed, !fitted); fitted = true;
                 if (v.setSimTool) v.setSimTool(simTool(code, parsed));   // per-op tool from the tool table (see simTool)
                 if (v.setSimMode) v.setSimMode(((parsed.stats && parsed.stats.probe) > 0) ? 'probe' : 'mill');   // probe = translucent stock, mill = solid
+                // Position the machine envelope by the program's WCS, so picking a WCS moves the part within the box.
+                if (v.setMachine) { const mv = machineForViz(); if (mv) v.setMachine({ ...mv, workOrigin: wo || mv.workOrigin }); }
             }
         }
         const s = parsed.stats || {};
