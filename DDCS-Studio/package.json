@@ -1,6 +1,6 @@
 {
   "name": "ddcs-studio",
-  "version": "9.49.78",
+  "version": "10.24.0",
   "description": "Modular G-code Generator for DDCS Expert M350 CNC Controller",
   "type": "module",
   "main": "app.js",
