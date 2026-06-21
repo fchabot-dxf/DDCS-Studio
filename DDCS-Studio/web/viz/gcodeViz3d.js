@@ -105,29 +105,38 @@ export class GcodeViz3D {
         grid.rotation.x = Math.PI / 2; // GridHelper is XZ by default → lay it in XY (Z up)
         this.grid = grid;
         this.scene.add(grid);
-        const axes = new THREE.AxesHelper(25); // X red, Y green, Z blue
-        this.axes = axes;
-        this.scene.add(axes);
-        // Floor axis lines through the ORIGIN (scene 0 = part-zero): X at y=0, Y at x=0. Re-laid in fit().
-        const og = new THREE.BufferGeometry(); og.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12), 3));
-        this._originCross = new THREE.LineSegments(og, new THREE.LineBasicMaterial({ color: 0x3a6ea5, transparent: true, opacity: 0.6 }));
-        this.scene.add(this._originCross);
+        // Floor axis lines through the ORIGIN (scene 0 = part-zero), SPANNING THE ENVELOPE — these ARE the X / Y
+        // axes (no separate part-zero triad, which would just duplicate them): X red along y=0, Y green along x=0.
+        // Re-laid each fit(). The machine-zero marker (setMachine) still shows a full XYZ gizmo at home.
+        const mkAxisLine = (color) => {
+            const g = new THREE.BufferGeometry();
+            g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+            const ln = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 }));
+            this.scene.add(ln);
+            return ln;
+        };
+        this._axisLineX = mkAxisLine(0xff6b6b);
+        this._axisLineY = mkAxisLine(0x5fd35f);
+        this._axisLineZ = mkAxisLine(0x6b9bff);   // vertical Z axis at the origin column, spanning the envelope height
         // Direction labels on the grid edges (repositioned to the footprint in setSegments)
         this._gridLabels = {
-            xp: this._makeTextSprite('+X'), xn: this._makeTextSprite('-X'),
-            yp: this._makeTextSprite('+Y'), yn: this._makeTextSprite('-Y'),
+            xp: this._makeTextSprite('+X', '#ff6b6b'), xn: this._makeTextSprite('-X', '#ff6b6b'),
+            yp: this._makeTextSprite('+Y', '#5fd35f'), yn: this._makeTextSprite('-Y', '#5fd35f'),
         };
         for (const k in this._gridLabels) this.scene.add(this._gridLabels[k]);
     }
 
-    _makeTextSprite(text) {
+    _makeTextSprite(text, color) {
         const THREE = this.THREE;
         const c = document.createElement('canvas');
         c.width = 128; c.height = 64;
         const ctx = c.getContext('2d');
-        ctx.fillStyle = '#7fa8cc';
-        ctx.font = 'bold 48px sans-serif';
+        ctx.font = 'bold 46px sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        // Dark outline so the label stays legible over the grid / toolpath, then the axis-tint fill.
+        ctx.lineJoin = 'round'; ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+        ctx.strokeText(text, 64, 36);
+        ctx.fillStyle = color || '#7fa8cc';
         ctx.fillText(text, 64, 36);
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
         sp.renderOrder = 1;
@@ -727,20 +736,40 @@ export class GcodeViz3D {
         }
         if (this.grid) { this.grid.scale.setScalar(gSpan / 200); this.grid.position.set(gCx, gCy, gFloor); }
         if (this.axes) this.axes.scale.setScalar(Math.max(1, gSpan / 200));
+        // PER-AXIS half-extent: when the envelope is shown the X axis spans |travelX| and Y spans |travelY|
+        // (centred on gCx/gCy), so neither line nor label overshoots the box on the shorter axis. Else use the grid.
+        const useMch = m && m.show && m.x && m.y && m.z;
+        const halfX = useMch ? Math.abs(m.x) / 2 : gSpan / 2;
+        const halfY = useMch ? Math.abs(m.y) / 2 : gSpan / 2;
         if (this._gridLabels) {
-            const half = gSpan / 2, off = gSpan * 0.07, lw = gSpan * 0.14;
+            const off = gSpan * 0.07, lw = gSpan * 0.14;
             const L = this._gridLabels;
-            L.xp.position.set(gCx + half + off, gCy, gFloor); L.xn.position.set(gCx - half - off, gCy, gFloor);
-            L.yp.position.set(gCx, gCy + half + off, gFloor); L.yn.position.set(gCx, gCy - half - off, gFloor);
+            // Signs point in the TRUE coordinate directions (where the DRO grows): +X / +Y always at the +scene
+            // end — NOT flipped by the home/travel sign (the envelope's position already shows home direction).
+            // Labels sit at the CENTRE of each envelope edge: +X/-X at the mid of the right/left edges, +Y/-Y at
+            // the mid of the back/front edges — each offset just past its OWN extent (no overshoot).
+            L.xp.position.set(gCx + halfX + off, gCy, gFloor); L.xn.position.set(gCx - halfX - off, gCy, gFloor);
+            L.yp.position.set(gCx, gCy + halfY + off, gFloor); L.yn.position.set(gCx, gCy - halfY - off, gFloor);
             for (const k in L) L[k].scale.set(lw, lw / 2, 1);
         }
-        // Axis crosshair through the ORIGIN (scene 0 = part-zero), spanning the grid at the floor.
-        if (this._originCross) {
-            const x0 = gCx - gSpan / 2, x1 = gCx + gSpan / 2, y0 = gCy - gSpan / 2, y1 = gCy + gSpan / 2;
-            const p = this._originCross.geometry.attributes.position;
-            p.setXYZ(0, x0, 0, gFloor); p.setXYZ(1, x1, 0, gFloor);   // X axis (y=0)
-            p.setXYZ(2, 0, y0, gFloor); p.setXYZ(3, 0, y1, gFloor);   // Y axis (x=0)
-            p.needsUpdate = true;
+        // Axis lines through the ORIGIN (scene 0 = part-zero), spanning ONLY their own envelope extent (no outward
+        // overshoot): X red along y=0 over gCx ± halfX, Y green along x=0 over gCy ± halfY.
+        if (this._axisLineX) {
+            const px = this._axisLineX.geometry.attributes.position;
+            px.setXYZ(0, gCx - halfX, 0, gFloor); px.setXYZ(1, gCx + halfX, 0, gFloor);
+            px.needsUpdate = true;
+        }
+        if (this._axisLineY) {
+            const py = this._axisLineY.geometry.attributes.position;
+            py.setXYZ(0, 0, gCy - halfY, gFloor); py.setXYZ(1, 0, gCy + halfY, gFloor);
+            py.needsUpdate = true;
+        }
+        // Blue Z axis: vertical at the origin column (x=0, y=0), rising from the floor over the envelope height.
+        if (this._axisLineZ) {
+            const zTop = useMch ? gFloor + Math.abs(m.z) : Math.max(gFloor + gSpan * 0.3, b ? b.maxZ : 0);
+            const pz = this._axisLineZ.geometry.attributes.position;
+            pz.setXYZ(0, 0, 0, gFloor); pz.setXYZ(1, 0, 0, zTop);
+            pz.needsUpdate = true;
         }
 
         this._applyCamera();
@@ -830,7 +859,14 @@ export class GcodeViz3D {
             // Datum = which point of the stock is part-zero (default front-left-top corner). Pin = place that datum
             // at a WCS offset (else the origin). pg.position = the stock centre in scene; the mesh stays centred on
             // it so a rotary move still spins about the part axis.
-            const D = { fl: [0, 0], fr: [stock.x, 0], bl: [0, stock.y], br: [stock.x, stock.y], center: [stock.x / 2, stock.y / 2] }[stock.datum || 'fl'] || [0, 0];
+            // Datum = which BOX POINT of the stock is part-zero: a 3-char code [X][Y][Z], each n(min)/c(centre)/
+            // p(max). Migrate the legacy XY-only fl/fr/bl/br/center (all top-Z). Dx/Dy/Dz = the datum's offset
+            // from the stock's min corner, so pg.position places that point at the origin (or the WCS pin).
+            const OLD_DATUM = { fl: 'nnp', fr: 'pnp', bl: 'npp', br: 'ppp', center: 'ccp' };
+            let dcode = stock.datum || 'nnp';
+            if (!/^[ncp]{3}$/.test(dcode)) dcode = OLD_DATUM[dcode] || 'nnp';
+            const dfrac = { n: 0, c: 0.5, p: 1 };
+            const D = [dfrac[dcode[0]] * stock.x, dfrac[dcode[1]] * stock.y, dfrac[dcode[2]] * stock.z];   // [Dx,Dy,Dz] from min corner (Dz: 0=bottom, z=top)
             let pinX = 0, pinY = 0, pinZ = 0;
             const mw = this._machine, wt = mw && mw.wcs && mw.wcs.table;
             if (stock.pin && stock.pin !== 'origin' && wt) {
@@ -838,7 +874,7 @@ export class GcodeViz3D {
                 const t = wt[gi], wo = mw.workOrigin || {};
                 if (t) { pinX = (Number(t.x) || 0) - (wo.x || 0); pinY = (Number(t.y) || 0) - (wo.y || 0); pinZ = (Number(t.z) || 0) - (wo.z || 0); }
             }
-            pg.position.set(stock.x / 2 - D[0] + pinX, stock.y / 2 - D[1] + pinY, -stock.z / 2 + pinZ);
+            pg.position.set(stock.x / 2 - D[0] + pinX, stock.y / 2 - D[1] + pinY, stock.z / 2 - D[2] + pinZ);
             mesh.position.sub(C);
             edges.position.sub(C);
             this.stockMesh = mesh; pg.add(mesh);
@@ -885,14 +921,17 @@ export class GcodeViz3D {
             // Envelope spans machine 0..travel (signed); box centre (machine) = travel/2; scene = machine − workOrigin.
             box.position.set(sx / 2 - (w.x || 0), sy / 2 - (w.y || 0), sz / 2 - (w.z || 0));
             this.machineBox = box; this.scene.add(box);
-            // Machine-zero axes (X red / Y green / Z blue), pointing along the travel — shows home/limits vs part-zero.
-            const axLen = (Math.min(Math.abs(sx), Math.abs(sy), Math.abs(sz)) * 0.3) || 40;
-            const ax = new THREE.AxesHelper(axLen);
-            ax.position.set(-(w.x || 0), -(w.y || 0), -(w.z || 0));   // machine 0 in scene coords
-            ax.scale.set(Math.sign(sx) || 1, Math.sign(sy) || 1, Math.sign(sz) || 1);
-            if (ax.material) { ax.material.transparent = true; ax.material.opacity = 0.85; ax.material.depthTest = false; }
-            ax.renderOrder = 5;
-            this.machineAxes = ax; this.scene.add(ax);
+            // Machine-zero (home) marker — ONLY when it is SEPARATE from part-zero. With the default work origin
+            // (0,0,0), machine-zero sits exactly on the origin axes and would just read as a redundant triad, so we
+            // skip it. With a real WCS offset it marks home at its own spot (X red / Y green / Z blue, +dirs).
+            if (w.x || w.y || w.z) {
+                const axLen = (Math.min(Math.abs(sx), Math.abs(sy), Math.abs(sz)) * 0.3) || 40;
+                const ax = new THREE.AxesHelper(axLen);
+                ax.position.set(-(w.x || 0), -(w.y || 0), -(w.z || 0));   // machine 0 in scene coords
+                if (ax.material) { ax.material.transparent = true; ax.material.opacity = 0.85; ax.material.depthTest = false; }
+                ax.renderOrder = 5;
+                this.machineAxes = ax; this.scene.add(ax);
+            }
         }
         if (this._magazine) this.setMagazine(this._magazine);   // re-place pockets when the envelope/WCS changes
         if (this._stock && this._stock.pin && this._stock.pin !== 'origin') this.setStock(this._stock);   // re-pin the stock to its WCS

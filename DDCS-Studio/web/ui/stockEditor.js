@@ -41,6 +41,11 @@ export function openStockEditor(anchor) {
         <style>
             .stock-editor-pop input, .stock-editor-pop select { width:100%; box-sizing:border-box; background:#11141a; color:#e6ecf2; border:1px solid #3a414d; border-radius:4px; padding:3px 5px; }
             .stock-editor-pop label.col { display:flex; flex-direction:column; gap:2px; }
+            .se-datum-pick { background:#11141a; border:1px solid #3a414d; border-radius:4px; padding:3px; }
+            .se-datum-pick svg { display:block; width:100%; height:auto; }
+            .se-datum-pick circle { fill:#2a3340; stroke:#5a6675; stroke-width:1; cursor:pointer; transition:fill 80ms; }
+            .se-datum-pick circle:hover { fill:#3a4655; }
+            .se-datum-pick circle.sel { fill:#ffb454; stroke:#ffe0b0; stroke-width:1.6; }
         </style>
         <div class="stock-editor-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <span style="font-weight:bold; letter-spacing:1px; color:#9fb4cc;">STOCK</span>
@@ -76,13 +81,8 @@ export function openStockEditor(anchor) {
         </label>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
             <label class="col">Part-zero (datum)
-                <select id="se_datum">
-                    <option value="fl">Front-left corner</option>
-                    <option value="fr">Front-right corner</option>
-                    <option value="bl">Back-left corner</option>
-                    <option value="br">Back-right corner</option>
-                    <option value="center">Centre</option>
-                </select>
+                <div id="se_datum_pick" class="se-datum-pick" title="Click the box point of the stock that is your part-zero / program origin"></div>
+                <span id="se_datum_name" style="font-size:10px; color:#9fb4cc; text-align:center;"></span>
             </label>
             <label class="col">Pin to
                 <select id="se_pin">
@@ -100,11 +100,49 @@ export function openStockEditor(anchor) {
     makeDraggable(pop, pop.querySelector('.stock-editor-head'));
 
     const q = (id) => pop.querySelector('#' + id);
+    // Visual datum picker: a 3D stock box with the 26 BOX POINTS (8 corners + 12 edge mids + 6 face centres;
+    // the body centre is excluded). The chosen point is a 3-char code [X][Y][Z], each n(min)/c(centre)/p(max).
+    const datumPick = q('se_datum_pick');
+    const CH = ['n', 'c', 'p'];
+    const X_W = { n: 'left', c: '', p: 'right' }, Y_W = { n: 'front', c: '', p: 'back' }, Z_W = { n: 'bottom', c: '', p: 'top' };
+    const OLD_DATUM = { fl: 'nnp', fr: 'pnp', bl: 'npp', br: 'ppp', center: 'ccp' };
+    const migrateDatum = (d) => (d && /^[ncp]{3}$/.test(d)) ? d : (OLD_DATUM[d] || 'nnp');
+    const datumName = (code) => {
+        const w = [Z_W[code[2]], Y_W[code[1]], X_W[code[0]]].filter(Boolean).join(' ');
+        return w ? w[0].toUpperCase() + w.slice(1) : 'Centre';
+    };
+    const projDatum = (a, b, c) => [60 + 24 * (a - b), 78 + 14 * (a + b) - 30 * c];   // iso: X↘  Y↙  Z↑
+    const getDatum = () => migrateDatum(datumPick && datumPick.dataset.datum);
+    const renderDatumPicker = (sel) => {
+        if (!datumPick) return;
+        const corners = [];
+        for (const a of [0, 2]) for (const b of [0, 2]) for (const c of [0, 2]) corners.push([a, b, c]);
+        let edges = '';
+        for (let i = 0; i < corners.length; i++) for (let j = i + 1; j < corners.length; j++) {
+            const diff = (corners[i][0] !== corners[j][0]) + (corners[i][1] !== corners[j][1]) + (corners[i][2] !== corners[j][2]);
+            if (diff === 1) { const p1 = projDatum(...corners[i]), p2 = projDatum(...corners[j]); edges += `<line x1="${p1[0]}" y1="${p1[1]}" x2="${p2[0]}" y2="${p2[1]}" stroke="#414c5a" stroke-width="1"></line>`; }
+        }
+        let dots = '';
+        for (let c = 0; c < 3; c++) for (let b = 0; b < 3; b++) for (let a = 0; a < 3; a++) {
+            if (a === 1 && b === 1 && c === 1) continue;   // exclude the body centre → 26 points
+            const code = CH[a] + CH[b] + CH[c];
+            const [px, py] = projDatum(a, b, c);
+            dots += `<circle data-d="${code}" cx="${px}" cy="${py}" r="5"${code === sel ? ' class="sel"' : ''}></circle>`;
+        }
+        datumPick.dataset.datum = sel;
+        datumPick.innerHTML = `<svg viewBox="0 0 120 152" aria-label="Datum picker">
+            <text x="110" y="116" fill="#ff8a8a" font-size="9" font-weight="bold" text-anchor="middle">X</text>
+            <text x="10" y="116" fill="#8fe08f" font-size="9" font-weight="bold" text-anchor="middle">Y</text>
+            <text x="60" y="12" fill="#8ab4ff" font-size="9" font-weight="bold" text-anchor="middle">Z</text>
+            ${edges}${dots}</svg>`;
+        const nm = q('se_datum_name'); if (nm) nm.textContent = datumName(sel);
+    };
+    const setDatum = (v) => renderDatumPicker(migrateDatum(v));
     q('se_x').value = s.x ?? '';
     q('se_y').value = s.y ?? '';
     q('se_z').value = s.z ?? '';
     q('se_shape').value = s.shape || 'boss';
-    q('se_datum').value = s.datum || 'fl';
+    setDatum(s.datum);
     q('se_pin').value = s.pin || 'origin';
     q('se_show').checked = s.show !== false;
 
@@ -134,15 +172,17 @@ export function openStockEditor(anchor) {
         y: parseFloat(q('se_y').value) || 0,
         z: parseFloat(q('se_z').value) || 0,
         shape: q('se_shape').value,
-        datum: q('se_datum').value,
+        datum: getDatum(),
         pin: q('se_pin').value,
         show: q('se_show').checked,
     } });
 
-    ['se_x', 'se_y', 'se_z', 'se_shape', 'se_datum', 'se_pin', 'se_show'].forEach((id) => {
+    ['se_x', 'se_y', 'se_z', 'se_shape', 'se_pin', 'se_show'].forEach((id) => {
         q(id).addEventListener('input', commit);
         q(id).addEventListener('change', commit);
     });
+    // Datum dots are re-rendered on each pick, so delegate the click to the container.
+    if (datumPick) datumPick.addEventListener('click', (e) => { const c = e.target.closest('circle[data-d]'); if (!c) return; setDatum(c.dataset.d); commit(); });
 
     q('se_tpl').addEventListener('change', () => {
         const i = q('se_tpl').value === '' ? -1 : parseInt(q('se_tpl').value, 10);
@@ -152,7 +192,7 @@ export function openStockEditor(anchor) {
         const t = all[i].t;
         q('se_x').value = t.x; q('se_y').value = t.y; q('se_z').value = t.z;
         q('se_shape').value = t.shape || 'boss';
-        if (t.datum) q('se_datum').value = t.datum;
+        if (t.datum) setDatum(t.datum);
         if (t.pin) q('se_pin').value = t.pin;
         commit();
     });
@@ -170,7 +210,7 @@ export function openStockEditor(anchor) {
             y: parseFloat(q('se_y').value) || 0,
             z: parseFloat(q('se_z').value) || 0,
             shape: q('se_shape').value || 'boss',
-            datum: q('se_datum').value, pin: q('se_pin').value,
+            datum: getDatum(), pin: q('se_pin').value,
         };
         const updated = [...currentTemplates, newTemplate];
         applySettings({ stockTemplates: updated });
