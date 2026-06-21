@@ -14,6 +14,7 @@
 import { initCube, cubeFaceAt, highlightCubeFace, pickCube } from './navCube.js';
 import { setupJogPendant } from './jogPendant.js';
 import { toolHalfProfile } from './toolProfile.js';
+import { PartFrame } from './sceneFrame.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
 
 export class GcodeViz3D {
@@ -77,8 +78,11 @@ export class GcodeViz3D {
         this._anchorToStart = true;
         this._downMarker = -1;    // marker under a pending click (selected on pointer-up)
         this._axisMat = {};        // `${pass}:${axis}` -> { mat, base }
+        // Machine frame (envelope/grid/table/home) stays in the scene; the PART frame (op/stock/tool/markers/WCS
+        // axes) shifts to +workOrigin so the setup sits at its WCS spot inside the fixed envelope. See sceneFrame.js.
+        this.partFrame = new PartFrame(this.scene, THREE);
         this.pathGroup = new THREE.Group();
-        this.scene.add(this.pathGroup);
+        this.partFrame.add(this.pathGroup);
         this.raycaster = new THREE.Raycaster();
         this.onStartChange = null; // optional callback(starts)
         this.showRapids = true;
@@ -121,7 +125,7 @@ export class GcodeViz3D {
             const g = new THREE.BufferGeometry();
             g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
             const ln = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 }));
-            this.scene.add(ln);
+            this.partFrame.add(ln);   // the origin axes mark part-zero / the WCS → ride the part frame
             return ln;
         };
         this._axisLineX = mkAxisLine(0xff6b6b);
@@ -199,13 +203,13 @@ export class GcodeViz3D {
     // Recreate markers only when the pass count changes
     _ensureMarkers() {
         if (this.spindleMarkers.length === this._passCount) return;
-        for (const m of this.spindleMarkers) this.scene.remove(m);
+        for (const m of this.spindleMarkers) this.partFrame.group.remove(m);
         this.spindleMarkers = [];
         this._hoverKey = undefined;
         for (let p = 0; p < this._passCount; p++) {
             const m = this._makeMarker(p);
             this.spindleMarkers.push(m);
-            this.scene.add(m);
+            this.partFrame.add(m);   // start markers ride the part frame
         }
         if (this.selectedStart >= this._passCount) this.selectedStart = 0;
         if (this._renderJogStarts) this._renderJogStarts();   // refresh the jog pendant's start selector
@@ -311,7 +315,7 @@ export class GcodeViz3D {
     // path); the collet + spindle stack up (+Z) toward the machine spindle. Each part is toggle-able (setPartVisible).
     _buildAnimTool() {
         const THREE = this.THREE;
-        if (this._animTool) { this.scene.remove(this._animTool); this._animTool.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
+        if (this._animTool) { this.partFrame.group.remove(this._animTool); this._animTool.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
         const tool = this._simTool || { type: 'endmill', dia: 6 };
         const half = toolHalfProfile(tool);
         const tr = Math.max(0.5, (Number(tool.dia) || 6) / 2);          // shank radius (what the collet clamps)
@@ -331,7 +335,7 @@ export class GcodeViz3D {
         const grp = new THREE.Group();
         grp.add(this._animParts.spindle, this._animParts.collet, this._animParts.tool);
         grp.renderOrder = 25; grp.visible = !!this._animOn;
-        this._animTool = grp; this._applyPartVis(); this.scene.add(grp);
+        this._animTool = grp; this._applyPartVis(); this.partFrame.add(grp);   // tool rides the part frame
     }
     _applyPartVis() { const v = this._partVis || {}; if (this._animParts) for (const k of ['tool', 'collet', 'spindle']) if (this._animParts[k]) this._animParts[k].visible = v[k] !== false; }
     // Show/hide spindle / collet / tool independently, e.g. setPartVisible({ spindle: false }).
@@ -765,55 +769,34 @@ export class GcodeViz3D {
         // Floor grid + axis labels FOLLOW THE MACHINE ENVELOPE when it's shown (centre + footprint + floor);
         // otherwise they track the part/stock footprint.
         const m = this._machine;
-        let gCx = cx, gCy = cy, gSpan = Math.max(sx, sy, 10);
-        let gFloor = (this._stock && this._stock.show && this._stock.z > 0) ? -this._stock.z : b.minZ;
-        if (m && m.show && m.x && m.y && m.z) {
-            const w = m.workOrigin || {}, wx = w.x || 0, wy = w.y || 0, wz = w.z || 0;
-            gCx = m.x / 2 - wx; gCy = m.y / 2 - wy;             // envelope XY centre in scene
-            gSpan = Math.max(Math.abs(m.x), Math.abs(m.y));     // envelope footprint
-            gFloor = Math.min(0, m.z) - wz;                     // envelope bottom (machine Z min) in scene
-        }
         const useMch = m && m.show && m.x && m.y && m.z;
-        // Floor grid LINKED TO THE ENVELOPE footprint (else the part/stock footprint), rebuilt with the configured
-        // increment, lines starting at the origin and clipped to the envelope.
-        const gW = useMch ? Math.abs(m.x) : Math.max(sx, 10);
-        const gH = useMch ? Math.abs(m.y) : Math.max(sy, 10);
+        // PART-frame layout (the axis lines mark part-zero and ride the part frame → always part-local coords).
+        const pSpan = Math.max(sx, sy, 10), pHalf = pSpan / 2;
+        const pFloor = (this._stock && this._stock.show && this._stock.z > 0) ? -this._stock.z : b.minZ;
+        // GRID + edge labels live in the SCENE: linked to the ENVELOPE footprint in MACHINE coords (home at scene 0,
+        // fixed) when the envelope is shown, else the part/stock footprint.
+        let gCx = cx, gCy = cy, gFloor = pFloor, gW = Math.max(sx, 10), gH = Math.max(sy, 10);
+        let gHalfX = pHalf, gHalfY = pHalf, gSpan = pSpan;
+        if (useMch) {
+            gCx = m.x / 2; gCy = m.y / 2;                       // envelope centre (MACHINE coords)
+            gFloor = Math.min(0, m.z);                          // envelope bottom (machine Z min)
+            gW = Math.abs(m.x); gH = Math.abs(m.y);
+            gHalfX = Math.abs(m.x) / 2; gHalfY = Math.abs(m.y) / 2; gSpan = Math.max(Math.abs(m.x), Math.abs(m.y));
+        }
         this._gridParams = { cx: gCx, cy: gCy, floor: gFloor, w: gW, h: gH };
         this._layoutGrid(gCx, gCy, gFloor, gW, gH);
-        // PER-AXIS half-extent: when the envelope is shown the X axis spans |travelX| and Y spans |travelY|
-        // (centred on gCx/gCy), so neither line nor label overshoots the box on the shorter axis. Else use the grid.
-        const halfX = useMch ? Math.abs(m.x) / 2 : gSpan / 2;
-        const halfY = useMch ? Math.abs(m.y) / 2 : gSpan / 2;
         if (this._gridLabels) {
-            const off = gSpan * 0.07, lw = gSpan * 0.14;
-            const L = this._gridLabels;
-            // Signs point in the TRUE coordinate directions (where the DRO grows): +X / +Y always at the +scene
-            // end — NOT flipped by the home/travel sign (the envelope's position already shows home direction).
-            // Labels sit at the CENTRE of each envelope edge: +X/-X at the mid of the right/left edges, +Y/-Y at
-            // the mid of the back/front edges — each offset just past its OWN extent (no overshoot).
-            L.xp.position.set(gCx + halfX + off, gCy, gFloor); L.xn.position.set(gCx - halfX - off, gCy, gFloor);
-            L.yp.position.set(gCx, gCy + halfY + off, gFloor); L.yn.position.set(gCx, gCy - halfY - off, gFloor);
+            const off = gSpan * 0.07, lw = gSpan * 0.14, L = this._gridLabels;
+            // +X / +Y at the +scene end (true coordinate directions); labels at the centre of each envelope/grid edge.
+            L.xp.position.set(gCx + gHalfX + off, gCy, gFloor); L.xn.position.set(gCx - gHalfX - off, gCy, gFloor);
+            L.yp.position.set(gCx, gCy + gHalfY + off, gFloor); L.yn.position.set(gCx, gCy - gHalfY - off, gFloor);
             for (const k in L) L[k].scale.set(lw, lw / 2, 1);
         }
-        // Axis lines through the ORIGIN (scene 0 = part-zero), spanning ONLY their own envelope extent (no outward
-        // overshoot): X red along y=0 over gCx ± halfX, Y green along x=0 over gCy ± halfY.
-        if (this._axisLineX) {
-            const px = this._axisLineX.geometry.attributes.position;
-            px.setXYZ(0, gCx - halfX, 0, gFloor); px.setXYZ(1, gCx + halfX, 0, gFloor);
-            px.needsUpdate = true;
-        }
-        if (this._axisLineY) {
-            const py = this._axisLineY.geometry.attributes.position;
-            py.setXYZ(0, 0, gCy - halfY, gFloor); py.setXYZ(1, 0, gCy + halfY, gFloor);
-            py.needsUpdate = true;
-        }
-        // Blue Z axis: vertical at the origin column (x=0, y=0), rising from the floor over the envelope height.
-        if (this._axisLineZ) {
-            const zTop = useMch ? gFloor + Math.abs(m.z) : Math.max(gFloor + gSpan * 0.3, b ? b.maxZ : 0);
-            const pz = this._axisLineZ.geometry.attributes.position;
-            pz.setXYZ(0, 0, 0, gFloor); pz.setXYZ(1, 0, 0, zTop);
-            pz.needsUpdate = true;
-        }
+        // Axis lines mark PART-ZERO — part-local (they ride the part frame, which offsets them to +workOrigin in
+        // machine view): X red along y=0, Y green along x=0, over the part footprint at the part floor.
+        if (this._axisLineX) { const px = this._axisLineX.geometry.attributes.position; px.setXYZ(0, -pHalf, 0, pFloor); px.setXYZ(1, pHalf, 0, pFloor); px.needsUpdate = true; }
+        if (this._axisLineY) { const py = this._axisLineY.geometry.attributes.position; py.setXYZ(0, 0, -pHalf, pFloor); py.setXYZ(1, 0, pHalf, pFloor); py.needsUpdate = true; }
+        if (this._axisLineZ) { const zTop = Math.max(pFloor + pSpan * 0.3, b ? b.maxZ : 0); const pz = this._axisLineZ.geometry.attributes.position; pz.setXYZ(0, 0, 0, pFloor); pz.setXYZ(1, 0, 0, zTop); pz.needsUpdate = true; }
 
         this._applyCamera();
     }
@@ -873,15 +856,15 @@ export class GcodeViz3D {
     // Frame the union of toolpath + stock + machine envelope (whichever are present)
     fitAll() {
         let b = null;
+        const m = this._machine, useMch = m && m.show && m.x && m.y && m.z;
+        const sh = this.partFrame ? this.partFrame.shift : { x: 0, y: 0, z: 0 };   // part-frame offset (+WCS in machine view, else 0)
         const d = this._dataBounds;
-        if (d) b = this._growBounds(b, d.minX, d.minY, d.minZ, d.maxX, d.maxY, d.maxZ);
+        if (d) b = this._growBounds(b, d.minX + sh.x, d.minY + sh.y, d.minZ + sh.z, d.maxX + sh.x, d.maxY + sh.y, d.maxZ + sh.z);
         const s = this._stock;
-        if (s && s.show && s.x > 0 && s.y > 0 && s.z > 0) b = this._growBounds(b, 0, 0, -s.z, s.x, s.y, 0);
-        const m = this._machine;
-        if (m && m.show && m.x && m.y && m.z) {
-            const w = m.workOrigin || {}, ox = w.x || 0, oy = w.y || 0, oz = w.z || 0;
-            // envelope corners in scene = machine {0, travel} − workOrigin (travel signed)
-            b = this._growBounds(b, Math.min(0, m.x) - ox, Math.min(0, m.y) - oy, Math.min(0, m.z) - oz, Math.max(0, m.x) - ox, Math.max(0, m.y) - oy, Math.max(0, m.z) - oz);
+        if (s && s.show && s.x > 0 && s.y > 0 && s.z > 0) b = this._growBounds(b, sh.x, sh.y, sh.z - s.z, sh.x + s.x, sh.y + s.y, sh.z);
+        if (useMch) {
+            // envelope corners in MACHINE coords (home at scene 0; the part rides +workOrigin)
+            b = this._growBounds(b, Math.min(0, m.x), Math.min(0, m.y), Math.min(0, m.z), Math.max(0, m.x), Math.max(0, m.y), Math.max(0, m.z));
         }
         if (b) this.fit(b);
         this.render();
@@ -892,12 +875,12 @@ export class GcodeViz3D {
         const THREE = this.THREE;
         this._stock = stock || null;
         // The stock lives in a part group so a rotary move can spin it about its own axis.
-        if (!this._partGroup) { this._partGroup = new THREE.Group(); this.scene.add(this._partGroup); }
+        if (!this._partGroup) { this._partGroup = new THREE.Group(); this.partFrame.add(this._partGroup); }   // stock rides the part frame
         const pg = this._partGroup;
         pg.rotation.set(0, 0, 0); // at rest; the play loop re-applies the angle each frame
         if (this.stockMesh) { pg.remove(this.stockMesh); this.stockMesh.geometry.dispose(); this.stockMesh.material.dispose(); this.stockMesh = null; }
         if (this.stockEdges) { pg.remove(this.stockEdges); this.stockEdges.geometry.dispose(); this.stockEdges.material.dispose(); this.stockEdges = null; }
-        if (this.tableMesh) { this.scene.remove(this.tableMesh); this.tableMesh.geometry.dispose(); this.tableMesh.material.dispose(); this.tableMesh = null; }
+        if (this.tableMesh) { this.partFrame.group.remove(this.tableMesh); this.tableMesh.geometry.dispose(); this.tableMesh.material.dispose(); this.tableMesh = null; }
         if (stock && stock.show && stock.x > 0 && stock.y > 0 && stock.z > 0) {
             const pocket = stock.shape === 'pocket';
             const fillCol = pocket ? 0x6a8fbe : 0x8fae6a;  // pocket = blue, boss = green
@@ -976,7 +959,7 @@ export class GcodeViz3D {
                 new THREE.MeshBasicMaterial({ color: 0x2a3138, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
             bed.position.set(pg.position.x, pg.position.y, pg.position.z - stock.z / 2);
             bed.renderOrder = -1;
-            this.tableMesh = bed; this.scene.add(bed);
+            this.tableMesh = bed; this.partFrame.add(bed);   // (step 1: bed rides the part; becomes the fixed machine floor next)
         }
     }
 
@@ -1007,6 +990,7 @@ export class GcodeViz3D {
     setMachine(machine) {
         const THREE = this.THREE;
         this._machine = machine || null;
+        this.partFrame.update(machine);   // machine frame shown → part shifts to +workOrigin; else 0 (part-zero at scene 0)
         if (this.machineBox) { this.scene.remove(this.machineBox); this.machineBox.geometry.dispose(); this.machineBox.material.dispose(); this.machineBox = null; }
         if (this.machineAxes) { this.scene.remove(this.machineAxes); if (this.machineAxes.geometry) this.machineAxes.geometry.dispose(); if (this.machineAxes.material) this.machineAxes.material.dispose(); this.machineAxes = null; }
         const sx = machine ? machine.x : 0, sy = machine ? machine.y : 0, sz = machine ? machine.z : 0;
@@ -1016,8 +1000,9 @@ export class GcodeViz3D {
             src.dispose();
             const box = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x6c7a8c, transparent: true, opacity: 0.4 }));
             const w = machine.workOrigin || { x: 0, y: 0, z: 0 };
-            // Envelope spans machine 0..travel (signed); box centre (machine) = travel/2; scene = machine − workOrigin.
-            box.position.set(sx / 2 - (w.x || 0), sy / 2 - (w.y || 0), sz / 2 - (w.z || 0));
+            // Envelope spans machine 0..travel (signed) in MACHINE coords — home stays at scene 0 (fixed); the PART
+            // frame shifts to +workOrigin instead, so the envelope never moves when the WCS changes.
+            box.position.set(sx / 2, sy / 2, sz / 2);
             this.machineBox = box; this.scene.add(box);
             // Machine-zero (home) marker — ONLY when it is SEPARATE from part-zero. With the default work origin
             // (0,0,0), machine-zero sits exactly on the origin axes and would just read as a redundant triad, so we
@@ -1025,7 +1010,7 @@ export class GcodeViz3D {
             if (w.x || w.y || w.z) {
                 const axLen = (Math.min(Math.abs(sx), Math.abs(sy), Math.abs(sz)) * 0.3) || 40;
                 const ax = new THREE.AxesHelper(axLen);
-                ax.position.set(-(w.x || 0), -(w.y || 0), -(w.z || 0));   // machine 0 in scene coords
+                ax.position.set(0, 0, 0);   // machine home at scene 0 (part-zero rides the part frame at +workOrigin)
                 if (ax.material) { ax.material.transparent = true; ax.material.opacity = 0.85; ax.material.depthTest = false; }
                 ax.renderOrder = 5;
                 this.machineAxes = ax; this.scene.add(ax);
