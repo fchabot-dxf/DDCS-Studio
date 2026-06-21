@@ -306,6 +306,46 @@ function commitHeadDims() {
     saveSettings();
 }
 
+// Signed field getter — travel can be negative (the sign is the home direction).
+const _gvs = (id, d) => { const el = document.getElementById(id); const n = Number(el && el.value); return Number.isFinite(n) && n !== 0 ? n : d; };
+// Interactive MACHINE ENVELOPE: an isometric box drawn from the SIGNED travels, so home (machine 0) sits at the
+// corner the signs dictate and each axis edge points the travel direction. The travel inputs sit on their axis edge.
+function renderMachineGui() {
+    const svgBox = document.getElementById('set_mach_env_svg'); if (!svgBox) return;
+    const X = _gvs('set_mach_x', 300), Y = _gvs('set_mach_y', 300), Z = _gvs('set_mach_z', 120);
+    const W = 260, H = 200, c = Math.cos(Math.PI / 6), s = Math.sin(Math.PI / 6);
+    const P = (x, y, z) => [(x - y) * c, (x + y) * s - z];          // iso: +X right-down, +Y left-down, +Z up
+    const all = []; for (const x of [0, X]) for (const y of [0, Y]) for (const z of [0, Z]) all.push(P(x, y, z));
+    const xs = all.map((p) => p[0]), ys = all.map((p) => p[1]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys), pad = 38;
+    const scale = Math.min((W - 2 * pad) / Math.max(1, maxX - minX), (H - 2 * pad) / Math.max(1, maxY - minY));
+    const ox = (W - (minX + maxX) * scale) / 2, oy = (H - (minY + maxY) * scale) / 2;
+    const S = (x, y, z) => { const p = P(x, y, z); return [ox + p[0] * scale, oy + p[1] * scale]; };
+    const k = (i, j, l) => S(i ? X : 0, j ? Y : 0, l ? Z : 0);
+    const O = k(0, 0, 0), c100 = k(1, 0, 0), c010 = k(0, 1, 0), c001 = k(0, 0, 1),
+          c110 = k(1, 1, 0), c101 = k(1, 0, 1), c011 = k(0, 1, 1), c111 = k(1, 1, 1);
+    const ln = (a, b, col, w) => `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${col}" stroke-width="${w}"/>`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">`;
+    [[c100, c110], [c100, c101], [c010, c110], [c010, c011], [c001, c101], [c001, c011], [c110, c111], [c101, c111], [c011, c111]]
+        .forEach(([a, b]) => { svg += ln(a, b, '#465666', 1); });   // 9 non-origin edges
+    svg += ln(O, c100, '#e0564f', 2.4) + ln(O, c010, '#5fbf6a', 2.4) + ln(O, c001, '#5a8fe0', 2.4);   // travels: X red, Y green, Z blue
+    const away = (p, d) => { const dx = p[0] - O[0], dy = p[1] - O[1], L = Math.hypot(dx, dy) || 1; return [p[0] + dx / L * d, p[1] + dy / L * d]; };
+    const ax = (t, p, col) => { const q = away(p, 9); return `<text x="${q[0].toFixed(0)}" y="${q[1].toFixed(0)}" fill="${col}" font-size="9" font-weight="bold" text-anchor="middle">${t}</text>`; };
+    svg += ax('X', c100, '#e0564f') + ax('Y', c010, '#5fbf6a') + ax('Z', c001, '#5a8fe0');
+    svg += `<circle cx="${O[0].toFixed(1)}" cy="${O[1].toFixed(1)}" r="3.4" fill="#ffd24a" stroke="#111" stroke-width="0.7"/>`;   // home (machine 0)
+    svgBox.innerHTML = svg + '</svg>';
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const place = (id, p) => { const el = document.getElementById(id); if (el) { el.style.left = Math.max(0, Math.min(W - 46, p[0] - 23)) + 'px'; el.style.top = Math.max(0, Math.min(H - 18, p[1] - 9)) + 'px'; } };
+    place('set_mach_x', mid(O, c100)); place('set_mach_y', mid(O, c010)); place('set_mach_z', mid(O, c001));
+}
+function commitMachine() {
+    const s = getSettings(); if (!s.machine) s.machine = {};
+    s.machine.x = _gvs('set_mach_x', s.machine.x || 300);
+    s.machine.y = _gvs('set_mach_y', s.machine.y || 300);
+    s.machine.z = _gvs('set_mach_z', s.machine.z || 120);
+    saveSettings();
+}
+
 // The WCS table (G54–G59 offsets, machine coords of each part-zero) + which one is active. workOrigin (used by
 // the sim for G53/program placement) is derived from the active row. Pulled from the controller, editable offline.
 const WCS_NAMES = ['G54', 'G55', 'G56', 'G57', 'G58', 'G59'];
@@ -659,11 +699,12 @@ function buildSettingsOverlay() {
                 <div id="set_tab_machine" style="display:none">
                     <div class="settings-section">
                         <div class="settings-section-title">MACHINE ENVELOPE (mm)</div>
-                        <div class="settings-hint">Travel per axis. The <b>sign sets the home direction</b>: <code>X 300</code> homes at one end and travels +X; <code>X -300</code> homes at the other end and travels −X. (Home = machine 0.)</div>
-                        <div class="settings-grid">
-                            <label>Travel X<input type="number" id="set_mach_x" step="1"></label>
-                            <label>Travel Y<input type="number" id="set_mach_y" step="1"></label>
-                            <label>Travel Z<input type="number" id="set_mach_z" step="1"></label>
+                        <div class="settings-hint">Travel per axis, edited on the envelope. The <b>sign sets the home direction</b>: <code>X 300</code> homes at one end and travels +X; <code>X -300</code> homes at the other and travels −X. The ⬤ marks home (machine 0); the coloured edges are the travels.</div>
+                        <div id="set_mach_env_gui" style="position:relative; width:260px; height:200px; margin:6px 0;">
+                            <div id="set_mach_env_svg" style="position:absolute; inset:0;"></div>
+                            <input type="number" id="set_mach_x" class="dim-edit" step="1" title="X travel (mm) — sign sets the home direction">
+                            <input type="number" id="set_mach_y" class="dim-edit" step="1" title="Y travel (mm) — sign sets the home direction">
+                            <input type="number" id="set_mach_z" class="dim-edit" step="1" title="Z travel (mm) — sign sets the home direction">
                         </div>
                         <label class="settings-check"><input type="checkbox" id="set_mach_show"> Show machine envelope in 3D</label>
                     </div>
@@ -1035,6 +1076,7 @@ function wireSettingsOverlay(ov) {
         q('set_mach_x').value = s.machine.x;
         q('set_mach_y').value = s.machine.y;
         q('set_mach_z').value = s.machine.z;
+        renderMachineGui();
         renderWcsTable(q('set_mach_wcs_table'), s.machine);
         q('set_mach_show').checked = !!s.machine.show;
         if (q('set_axis_a_role')) {
@@ -1915,6 +1957,8 @@ function wireSettingsOverlay(ov) {
     if (_headSimLink) _headSimLink.addEventListener('click', () => { showGroup('general'); showPanel('set_tab_preview'); });
     // Interactive head GUI: typing redraws/repositions live; on commit (change/blur) persist so an open preview re-pulls.
     ['set_pv_spindle_dia', 'set_pv_spindle_len', 'set_pv_collet_dia', 'set_pv_collet_len'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderHeadGui); el.addEventListener('change', commitHeadDims); } });
+    // Machine envelope GUI: typing redraws the iso box (origin follows the signs); on commit persist so the 3D updates.
+    ['set_mach_x', 'set_mach_y', 'set_mach_z'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderMachineGui); el.addEventListener('change', commitMachine); } });
     showGroup('general');
 
     // "+ Add hardware" tool: adds a subsystem category tab + its standard I/O (mirrored + badged).
