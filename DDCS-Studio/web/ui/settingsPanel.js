@@ -715,6 +715,8 @@ function buildSettingsOverlay() {
                             <div class="settings-row" style="margin-top:12px;">
                                 <button class="toolbar-btn settings-io" id="atc_gen_tnc">⚙ Generate T.nc</button>
                                 <button class="toolbar-btn settings-io" id="atc_dl_tnc" style="display:none">⬇ Download T.nc</button>
+                                <span style="flex:1"></span>
+                                <button class="toolbar-btn settings-io" id="set_atc_remove_btn" title="Remove the ATC subsystem and its drawbar + sensor I/O rows">🗑 Remove tool changer</button>
                             </div>
                             <div class="settings-hint">Builds the tool-change macro from the table above. Save it as <b>T.nc</b> on the controller — review &amp; dry-run first (generated template).</div>
                             <textarea id="atc_tnc_out" readonly spellcheck="false" style="display:none; width:100%; height:240px; margin-top:8px; font:12px/1.45 monospace; background:#1a1a1a; color:#d8d8d8; border:1px solid #888; border-radius:4px; padding:8px; box-sizing:border-box;"></textarea>
@@ -1723,8 +1725,15 @@ function wireSettingsOverlay(ov) {
         if (kind === 'atc') {
             _ddcsSettings.hardwareTabs = _ddcsSettings.hardwareTabs || {};
             _ddcsSettings.hardwareTabs.atc = true;
-            const outs = getOutputs();
+            // Seed the ESSENTIAL ATC I/O every tool changer needs: the drawbar output + the three sensors the
+            // change sequence waits on (drawbar released M301, clamped M302, spindle stopped M300). Pins are left
+            // blank for the user to assign. (Disk/carousel adds rotate + index on top, via atcOnChange.)
+            const outs = getOutputs(), ins = getInputs();
             if (!outs.some(o => o.type === 'drawbar')) outs.push({ id: 'drawbar_atc', type: 'drawbar', label: 'Drawbar (ATC)', pin: '', onCode: 'M154', offCode: 'M155', group: 'atc' });
+            const addIn = (id, label) => { if (!ins.some(i => i.id === id)) ins.push({ id, type: 'sensor', label, pin: '', level: 0, group: 'atc' }); };
+            addIn('drawbar_released_atc', 'Drawbar released (M301)');
+            addIn('drawbar_clamped_atc', 'Drawbar clamped (M302)');
+            addIn('spindle_stopped_atc', 'Spindle stopped (M300)');
             saveSettings();
             applyHardwareTabs();
             showPanel('set_tab_atc');
@@ -1742,6 +1751,19 @@ function wireSettingsOverlay(ov) {
     if (_spinAddBtn) _spinAddBtn.addEventListener('click', () => addSubsystem('spindle'));
     const _atcAddBtn = q('set_atc_add_btn');
     if (_atcAddBtn) _atcAddBtn.addEventListener('click', () => addSubsystem('atc'));
+    // Remove a subsystem: hide its tab + strip the I/O rows it owns (group-tagged). The tool table/magazine data
+    // is left intact (it lives under atc.*), so re-adding restores everything.
+    function removeSubsystem(kind) {
+        if (!window.confirm('Remove the ' + kind.toUpperCase() + ' subsystem and its I/O rows? (Your magazine + tool table are kept.)')) return;
+        _ddcsSettings.hardwareTabs = _ddcsSettings.hardwareTabs || {};
+        _ddcsSettings.hardwareTabs[kind] = false;
+        const outs = getOutputs(), ins = getInputs();
+        for (let i = outs.length - 1; i >= 0; i--) if (outs[i].group === kind) outs.splice(i, 1);
+        for (let i = ins.length - 1; i >= 0; i--) if (ins[i].group === kind) ins.splice(i, 1);
+        saveSettings(); applyHardwareTabs(); showGroup('general');
+    }
+    const _atcRemoveBtn = q('set_atc_remove_btn');
+    if (_atcRemoveBtn) _atcRemoveBtn.addEventListener('click', () => removeSubsystem('atc'));
 
     // Persist ATC magazine edits; disk auto-adds (and straight removes) the carousel-rotate / index I/O.
     function atcOnChange() {
