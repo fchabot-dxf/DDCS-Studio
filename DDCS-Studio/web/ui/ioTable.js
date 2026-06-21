@@ -154,12 +154,9 @@ export function renderMagazineTable(container, atc, onChange) {
     const rerender = () => renderMagazineTable(container, atc, onChange);
     container.innerHTML = '';
 
+    atc.magType = 'straight';   // carousel/disk magazines aren't used on these controllers — straight/linear only
     const ctl = document.createElement('div');
     ctl.style.cssText = 'display:flex; gap:16px; align-items:flex-end; margin-bottom:12px; flex-wrap:wrap;';
-    const typeSel = document.createElement('select');
-    [['straight', 'Straight / linear'], ['disk', 'Disk / carousel']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if ((atc.magType || 'straight') === v) o.selected = true; typeSel.appendChild(o); });
-    typeSel.addEventListener('change', () => { atc.magType = typeSel.value; onChange(); rerender(); });
-    ctl.appendChild(field('Magazine type', typeSel, 150));
     const cnt = document.createElement('input'); cnt.type = 'number'; cnt.min = '0'; cnt.max = '99'; cnt.value = atc.magazine.length;
     cnt.addEventListener('change', () => {
         const n = Math.max(0, Math.min(99, parseInt(cnt.value, 10) || 0));
@@ -170,11 +167,6 @@ export function renderMagazineTable(container, atc, onChange) {
     ctl.appendChild(field('Pockets', cnt, 60));
     container.appendChild(ctl);
 
-    if (atc.magType === 'disk') {
-        const note = document.createElement('div'); note.className = 'settings-hint';
-        note.textContent = 'Disk: a carousel-rotate output + pocket-index sensor input were added (Output / Input). One fixed pickup; the magazine rotates each pocket to it.';
-        container.appendChild(note);
-    }
     if (!atc.magazine.length) {
         const e = document.createElement('div'); e.className = 'settings-hint'; e.textContent = 'Set the pocket count to build the magazine table.'; container.appendChild(e);
         return;

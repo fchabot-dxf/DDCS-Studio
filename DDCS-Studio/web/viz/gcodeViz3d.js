@@ -883,16 +883,16 @@ export class GcodeViz3D {
             const pts = toolHalfProfile(td).map((q) => new THREE.Vector2(Math.max(0.001, q[0]), q[1]));
             const geo = new THREE.LatheGeometry(pts, 24); geo.rotateX(Math.PI / 2);
             const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, depthWrite: false }));
-            mesh.position.set(px, py, pz);
+            mesh.position.set(px, py, pz - len);   // align tool TOPS at the pocket Z (holder reference); tips hang down by length
             grp.add(mesh);
             // Pocket bounding box: a wireframe slot enclosing the tool, marking the pocket extent on the envelope.
             const bw = Math.max(dia * 1.8, 14), bh = len;
             const bgeo = new THREE.BoxGeometry(bw, bw, bh);
             const box = new THREE.LineSegments(new THREE.EdgesGeometry(bgeo), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.5 }));
-            box.position.set(px, py, pz + bh / 2); grp.add(box);
+            box.position.set(px, py, pz - bh / 2); grp.add(box);
             bgeo.dispose();
             const sp = this._makeNumberSprite(p.pocket != null ? p.pocket : i + 1);
-            sp.position.set(px, py, pz + len + 7); grp.add(sp);
+            sp.position.set(px, py, pz + 7); grp.add(sp);
         });
         this._magGroup = grp; this.scene.add(grp);
         this.render();
