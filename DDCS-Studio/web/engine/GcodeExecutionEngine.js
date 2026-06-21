@@ -180,6 +180,7 @@ export class GcodeExecutionEngine {
             probe: 0,
             skipped: 0,
             steps: 0,
+            absolute: false,   // did the program ever establish an ABSOLUTE position (G90 move / G53)? → path is start-INDEPENDENT
         };
         this.totalLines = 0;
         this._started = false;
@@ -282,7 +283,7 @@ export class GcodeExecutionEngine {
         return {
             segments,
             bounds: segments.length ? b : null,
-            stats: { feed, rapid, probe, retract: 0, passes: 1, skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped },
+            stats: { feed, rapid, probe, retract: 0, passes: 1, skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped, absolute: this.stats.absolute },
         };
     }
 
@@ -745,6 +746,11 @@ export class GcodeExecutionEngine {
             this.ip += 1;
             return false;
         }
+
+        // A move made in ABSOLUTE mode (G90) or G53 establishes a fixed position → the path no longer depends on the
+        // operator start. A purely-incremental (G91) program is start-relative. The preview uses this to decide
+        // whether moving the start drags the toolpath (probe macros) or not (mill). See gcodeViz3d _anchorToStart.
+        if (this.absolute || g53) this.stats.absolute = true;
 
         const isProbe = gcodes.includes(31) || this._probeArmed;   // G31, or a G01 inside a DM500 M101/M102 cycle
         const effMotion = isProbe ? 1 : this.motion;

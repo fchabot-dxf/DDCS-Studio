@@ -71,6 +71,10 @@ export class GcodeViz3D {
         this.starts = [{ x: 0, y: 0, z: 0 }];
         this.spindleMarkers = [];
         this.selectedStart = 0;   // which start the jog pendant drives
+        // Whether the toolpath is anchored to the start MARKER. true = incremental/probe (the macro emanates from the
+        // operator start). false = absolute/mill (the path sits at its own coords; the start is independent — moving
+        // it must NOT drag the path). Set per-op by createPreviewPanel; default true preserves probe behaviour.
+        this._anchorToStart = true;
         this._downMarker = -1;    // marker under a pending click (selected on pointer-up)
         this._axisMat = {};        // `${pass}:${axis}` -> { mat, base }
         this.pathGroup = new THREE.Group();
@@ -392,10 +396,9 @@ export class GcodeViz3D {
         if (!pos || (!Number.isFinite(pos.x) && !Number.isFinite(pos.y) && !Number.isFinite(pos.z))) return;
         this._ensureAnimTool();
         this._animTool.visible = true;
-        // The toolpath is drawn offset by the spindle-start marker (starts[0]); the engine reports
-        // RAW program coords, so apply the same offset or the dot floats off the path. Matches the
-        // geometric play, which already places the tool at offset (start + delta) coords.
-        const o = this.starts[0] || { x: 0, y: 0, z: 0 };
+        // The toolpath is drawn offset by the spindle-start marker (starts[0]) ONLY when anchored (probe/incremental);
+        // for absolute/mill the route sits at its own coords, so no offset (else the dot floats off the path).
+        const o = this._anchorToStart ? (this.starts[0] || { x: 0, y: 0, z: 0 }) : { x: 0, y: 0, z: 0 };
         this._animTool.position.set((pos.x || 0) + o.x, (pos.y || 0) + o.y, (pos.z || 0) + o.z);
         // Engine-driven trail: bold the executed route up to the tool head (option B — what you see is the path
         // the engine actually ran). Enable trail mode lazily; setAnimate(false)/ddcsStopPreview restores it.
@@ -594,8 +597,11 @@ export class GcodeViz3D {
         for (let p = 0; p < this._passCount; p++) {
             const segs = byPass[p] || [];
             const mk = this.starts[p] || { x: 0, y: 0, z: 0 };
-            // manual jog from the previous pass's end to this pass's start marker
-            if (prevEnd) { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(mk.x, mk.y, mk.z); pushSeg(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z, 6000, 0, 0, 0, 0, 0xff9a0d); }
+            // Route anchor: probe ops draw from the start MARKER (the incremental macro emanates from the real tool
+            // position); mill/absolute programs draw at their own coords so moving the start does NOT drag the path.
+            const off = this._anchorToStart ? mk : { x: 0, y: 0, z: 0 };
+            // manual jog from the previous pass's end to this pass's start anchor
+            if (prevEnd) { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, off.x, off.y, off.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(off.x, off.y, off.z); pushSeg(prevEnd.x, prevEnd.y, prevEnd.z, off.x, off.y, off.z, 6000, 0, 0, 0, 0, 0xff9a0d); }
             let cur = { x: 0, y: 0, z: 0 }; // pass-local, relative to the marker
             for (const s of segs) {
                 const dx = s.x2 - s.x1, dy = s.y2 - s.y1, dz = s.z2 - s.z1;
@@ -607,8 +613,8 @@ export class GcodeViz3D {
                 // faces register on approach from outside; for a pocket, the cavity walls also
                 // register when probing from inside the hole, so every face is a valid collision.
                 if (type === 'probe' && box) {
-                    const Aw = { x: start.x + mk.x, y: start.y + mk.y, z: start.z + mk.z };
-                    const Bw = { x: end.x + mk.x, y: end.y + mk.y, z: end.z + mk.z };
+                    const Aw = { x: start.x + off.x, y: start.y + off.y, z: start.z + off.z };
+                    const Bw = { x: end.x + off.x, y: end.y + off.y, z: end.z + off.z };
                     let tt = null;
                     const ro = this._boxRange(Aw, Bw, box.min, box.max);
                     if (ro.hit && ro.tEnter > 1e-6 && ro.tEnter < 1 - 1e-6) tt = ro.tEnter;   // enter the block
@@ -621,8 +627,8 @@ export class GcodeViz3D {
                     if (tt != null) { end = { x: start.x + dx * tt, y: start.y + dy * tt, z: start.z + dz * tt }; }
                 }
 
-                const ax = start.x + mk.x, ay = start.y + mk.y, az = start.z + mk.z;
-                const bx = end.x + mk.x, by = end.y + mk.y, bz = end.z + mk.z;
+                const ax = start.x + off.x, ay = start.y + off.y, az = start.z + off.z;
+                const bx = end.x + off.x, by = end.y + off.y, bz = end.z + off.z;
                 grow(ax, ay, az); grow(bx, by, bz);
                 const slowProbe = type === 'probe' && (s.feed || 0) > 0 && (s.feed || 0) < maxProbeFeed;
                 const arr = type === 'rapid' ? rapidPos
@@ -636,7 +642,7 @@ export class GcodeViz3D {
                 pushSeg(ax, ay, az, bx, by, bz, (type === 'rapid' || type === 'retract') ? 6000 : (s.feed > 0 ? s.feed : 600), s.a1, s.b1, s.a2, s.b2, col);
                 cur = end;
             }
-            prevEnd = { x: cur.x + mk.x, y: cur.y + mk.y, z: cur.z + mk.z };
+            prevEnd = { x: cur.x + off.x, y: cur.y + off.y, z: cur.z + off.z };
         }
 
         // Ordered segments + total program time for the play animation

@@ -184,7 +184,12 @@ export function createPreviewPanel(container, opts = {}) {
             const v = ensureViz();
             if (v) {
                 v.setActive(true);
-                // Place the origin marker before setSegments so the (origin-relative) route offsets to it.
+                // Op-aware route anchor, driven by G90/G91: a purely INCREMENTAL program (no absolute position
+                // established — e.g. an incremental probe macro) is start-relative, so the route emanates from the
+                // start marker. An ABSOLUTE program (G90/G53 — mill) sits at its own coords; the start is independent
+                // and moving it must not drag the path. Set BEFORE setSegments so _rebuild uses it.
+                v._anchorToStart = !(parsed.stats && parsed.stats.absolute);
+                // Place the origin marker before setSegments so an anchored (probe) route offsets to it.
                 if (st && v.starts) v.starts[0] = { x: +st.x || 0, y: +st.y || 0, z: +st.z || 0 };
                 v.setSegments(parsed, !fitted); fitted = true;
                 if (v.setSimTool) v.setSimTool(simTool(code, parsed));   // per-op tool from the tool table (see simTool)
