@@ -1392,8 +1392,7 @@
                 <div id="atc_change_auto_params" style="display:none">
                     <div class="param-grid">
                         <label>Z change height (mach)<input type="number" id="atc_change_zclear" value="0" class="num-input"></label>
-                        <label>Magazine pockets<input type="number" id="atc_change_capacity" value="8" min="1" max="20" class="num-input"></label>
-                        <label title="0 = take the target from #1504 (M6 Txx). Set a tool number to generate a standalone test change.">Fixed test tool (0 = #1504)<input type="number" id="atc_change_fixedt" value="0" min="0" max="20" class="num-input"></label>
+                        <label title="Which tool to change to. 'From program' uses the M6 Txx target (#1504); or pick a tool from the magazine to generate a standalone test change.">Change to tool<select id="atc_change_fixedt"><option value="0">From program (M6 Txx)</option></select></label>
                     </div>
                     <div class="param-grid">
                         <label><input type="checkbox" id="atc_change_m300" checked> Wait spindle-stop sensor (M300)</label>

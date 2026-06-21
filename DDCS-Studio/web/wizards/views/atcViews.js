@@ -174,12 +174,22 @@ export const atcChangeView = {
     inputIds: [
         'atc_change_mode',
         'atc_change_x', 'atc_change_y', 'atc_change_z',
-        'atc_change_zclear', 'atc_change_capacity', 'atc_change_fixedt',
+        'atc_change_zclear', 'atc_change_fixedt',
         'atc_change_m300', 'atc_change_cover', 'atc_change_confirm',
     ],
     update(mgr) {
         const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
         const mode = el('atc_change_mode')?.value || 'manual';
+        // Populate the "change to tool" selector from the magazine tools (preserve the current choice).
+        const ftSel = el('atc_change_fixedt');
+        if (ftSel && ftSel.tagName === 'SELECT') {
+            const cur = ftSel.value;
+            const byNum = {}; (s.atc?.tools || []).forEach((t) => { if (t && t.num != null && t.num !== '') byNum[Number(t.num)] = t; });
+            const opts = ['<option value="0">From program (M6 Txx)</option>'];
+            (s.atc?.magazine || []).forEach((p) => { if (p.tool !== '' && p.tool != null) { const t = byNum[Number(p.tool)]; opts.push(`<option value="${p.tool}">T${p.tool}${t && t.name ? ' · ' + t.name : ''} (P${p.pocket})</option>`); } });
+            ftSel.innerHTML = opts.join('');
+            if ([...ftSel.options].some((o) => o.value === cur)) ftSel.value = cur;
+        }
         // Mode-specific parameter rows
         const manualRow = el('atc_change_manual_params');
         const autoRow = el('atc_change_auto_params');
@@ -284,8 +294,19 @@ export const atcTableView = {
         if (host) {
             const magAll = Array.isArray(a.magazine) ? a.magazine : [];
             const byNum = {}; (a.tools || []).forEach((t) => { if (t && t.num != null && t.num !== '') byNum[Number(t.num)] = t; });
-            const list = magAll.map((p, i) => { const t = byNum[Number(p.tool)]; return `P${p.pocket != null ? p.pocket : i + 1}·${p.tool ? 'T' + p.tool + (t && t.name ? ' ' + t.name : '') : '—'}`; }).join('   ');
-            host.innerHTML = `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><button class="toolbar-btn settings-io" data-edit-mag>✎ Edit table…</button><span class="settings-hint" style="margin:0;">${magAll.length ? magAll.length + ' pocket' + (magAll.length === 1 ? '' : 's') + ' · ' + (a.magType === 'disk' ? 'disk / carousel' : 'linear') : 'No pockets — click Edit table to build the magazine.'}</span></div>${list ? `<div class="settings-hint" style="margin:5px 0 0;">${list}</div>` : ''}`;
+            const td = 'padding:3px 7px; border-bottom:1px solid var(--border);';
+            const rows = magAll.map((p, i) => {
+                const t = byNum[Number(p.tool)] || {};
+                const has = p.tool !== '' && p.tool != null;
+                const name = has ? (t.name || [t.type, t.dia ? 'Ø' + t.dia : ''].filter(Boolean).join(' ') || '—') : '(empty)';
+                const len = (has && t.length !== '' && t.length != null) ? t.length + 'mm' : '';
+                const icon = has ? toolProfileSvg({ type: t.type || 'endmill', dia: num(t.dia, 6), angle: t.angle, length: num(t.length, 30) }, { w: 18, h: 26 }) : '';
+                return `<tr><td style="${td} color:var(--text-dim);">P${p.pocket != null ? p.pocket : i + 1}</td><td style="${td} width:22px; text-align:center;">${icon}</td><td style="${td} font-weight:600;">${has ? 'T' + p.tool : '—'}</td><td style="${td}">${name}</td><td style="${td} color:var(--text-dim);">${len}</td></tr>`;
+            }).join('');
+            const table = magAll.length
+                ? `<table style="width:100%; border-collapse:collapse; font-size:11px; margin-top:6px;"><thead><tr style="color:var(--text-dim); text-align:left; font-size:10px;"><th style="padding:0 7px 3px;">Pocket</th><th></th><th style="padding:0 7px 3px;">Tool</th><th style="padding:0 7px 3px;">Description</th><th style="padding:0 7px 3px;">Length</th></tr></thead><tbody>${rows}</tbody></table>`
+                : '<div class="settings-hint" style="margin:6px 0 0;">No pockets yet — click Edit table to build the magazine.</div>';
+            host.innerHTML = `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><button class="toolbar-btn settings-io" data-edit-mag>✎ Edit table…</button><span class="settings-hint" style="margin:0;">${magAll.length} pocket${magAll.length === 1 ? '' : 's'} · ${a.magType === 'disk' ? 'disk / carousel' : 'linear'}</span></div>${table}`;
             host.querySelector('[data-edit-mag]').addEventListener('click', () => openMagazineModal(() => this.update(mgr)));
         }
         const lens = (a.tools || []).filter((t) => t && t.length !== '' && t.length != null).map((t) => `T${t.num} ${t.length}`).join(' · ');

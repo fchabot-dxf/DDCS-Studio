@@ -48,7 +48,7 @@ const PARAM_FIELDS = {
     comm: { type: 'c_type', msg: 'c_msg', val: 'c_val', cycle: 'c_cycle', popupMode: 'c_popup_mode', id: 'c_id', dest: 'c_dest', slot1: 'c_slot1', slot2: 'c_slot2', slot3: 'c_slot3', slot4: 'c_slot4', statusColor: 'c_status_color', statusMode: 'c_status_mode', statusDwell: 'c_status_dwell' },
     atc_check: { tolerance: 'atc_check_tol' },
     atc_warmup: { rpm1: 'atc_warmup_rpm1', time1: 'atc_warmup_time1', rpm2: 'atc_warmup_rpm2', time2: 'atc_warmup_time2' },
-    atc_change: { mode: 'atc_change_mode', x: 'atc_change_x', y: 'atc_change_y', z: 'atc_change_z', zClear: 'atc_change_zclear', capacity: 'atc_change_capacity', fixedT: 'atc_change_fixedt', waitSpindle: 'atc_change_m300', dustCover: 'atc_change_cover', confirm: 'atc_change_confirm' },
+    atc_change: { mode: 'atc_change_mode', x: 'atc_change_x', y: 'atc_change_y', z: 'atc_change_z', zClear: 'atc_change_zclear', fixedT: 'atc_change_fixedt', waitSpindle: 'atc_change_m300', dustCover: 'atc_change_cover', confirm: 'atc_change_confirm' },
     atc_test: { mode: 'atc_test_mode', cycles: 'atc_test_cycles', dwellMs: 'atc_test_dwell', first: 'atc_test_first', count: 'atc_test_count', zClear: 'atc_test_zclear', descend: 'atc_test_descend' },
     atc_table: { lengths: 'atc_table_lengths', pockets: 'atc_table_pockets' },
 };
@@ -206,6 +206,7 @@ export class WizardManager {
         const wizElem = el('wiz_' + type);
         if (wizElem) {
             wizElem.style.display = 'block';
+            this._setupSplitter(wizElem);   // draggable form/preview divider (all two-pane wizards)
             // Variant entry: a view may declare identity-splitting variants (e.g. drill vs bore) that share one
             // form. The view locks the variant param + hides its selector so the menu choice fixes the identity.
             if (view && typeof view.applyVariant === 'function') view.applyVariant(variant);
@@ -383,6 +384,34 @@ export class WizardManager {
         const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
         const viz = host && host.__panel && host.__panel.viz;
         if (viz && viz.setMagazine) viz.setMagazine(pockets || []);
+    }
+
+    // Draggable splitter between the form (.wiz-controls, left) and the preview (.wiz-visual, right) for every
+    // two-pane wizard. Drag resizes the form width; the 3D viz auto-resizes (its own ResizeObserver). The chosen
+    // width is remembered across wizards. Idempotent per wizard body.
+    _setupSplitter(wizElem) {
+        const pane = wizElem && wizElem.querySelector('.wiz-2pane');
+        if (!pane || pane.__split) return;
+        const controls = pane.querySelector(':scope > .wiz-controls');
+        const visual = pane.querySelector(':scope > .wiz-visual');
+        if (!controls || !visual) return;
+        pane.__split = true;
+        controls.style.order = '1'; visual.style.order = '3';
+        const sp = document.createElement('div');
+        sp.className = 'wiz-splitter';
+        sp.style.cssText = 'order:2; flex:0 0 6px; align-self:stretch; cursor:col-resize; border-radius:4px; background:var(--border,#444); opacity:.45; touch-action:none; transition:opacity .12s;';
+        sp.title = 'Drag to resize the form / preview';
+        pane.appendChild(sp);
+        let drag = false;
+        const setW = (px) => { const r = pane.getBoundingClientRect(); controls.style.flex = '0 0 ' + Math.max(220, Math.min(r.width - 260, px)) + 'px'; };
+        const stored = parseFloat(localStorage.getItem('ddcs_wiz_split_px'));
+        if (Number.isFinite(stored)) requestAnimationFrame(() => setW(stored));
+        sp.addEventListener('pointerdown', (e) => { drag = true; sp.setPointerCapture(e.pointerId); sp.style.opacity = '.95'; e.preventDefault(); });
+        sp.addEventListener('pointermove', (e) => { if (!drag) return; setW(e.clientX - pane.getBoundingClientRect().left); });
+        const end = (e) => { if (!drag) return; drag = false; sp.style.opacity = '.45'; try { sp.releasePointerCapture(e.pointerId); } catch (_) { /* noop */ } localStorage.setItem('ddcs_wiz_split_px', String(controls.getBoundingClientRect().width)); };
+        sp.addEventListener('pointerup', end); sp.addEventListener('pointercancel', end);
+        sp.addEventListener('pointerenter', () => { if (!drag) sp.style.opacity = '.8'; });
+        sp.addEventListener('pointerleave', () => { if (!drag) sp.style.opacity = '.45'; });
     }
 
     // Old private name kept as an alias for any external callers
