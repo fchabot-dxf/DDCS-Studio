@@ -897,6 +897,7 @@ export class GcodeViz3D {
         pg.rotation.set(0, 0, 0); // at rest; the play loop re-applies the angle each frame
         if (this.stockMesh) { pg.remove(this.stockMesh); this.stockMesh.geometry.dispose(); this.stockMesh.material.dispose(); this.stockMesh = null; }
         if (this.stockEdges) { pg.remove(this.stockEdges); this.stockEdges.geometry.dispose(); this.stockEdges.material.dispose(); this.stockEdges = null; }
+        if (this.tableMesh) { this.scene.remove(this.tableMesh); this.tableMesh.geometry.dispose(); this.tableMesh.material.dispose(); this.tableMesh = null; }
         if (stock && stock.show && stock.x > 0 && stock.y > 0 && stock.z > 0) {
             const pocket = stock.shape === 'pocket';
             const fillCol = pocket ? 0x6a8fbe : 0x8fae6a;  // pocket = blue, boss = green
@@ -967,6 +968,15 @@ export class GcodeViz3D {
             edges.position.sub(C);
             this.stockMesh = mesh; pg.add(mesh);
             this.stockEdges = edges; pg.add(edges);
+            // TABLE/BED: the stock always rests on the machine table. Draw a surface at the stock's BOTTOM (Z0 for a
+            // table-zero datum, -height for a stock-top-zero datum) so it sits on something, wherever part-zero is.
+            // Lives in the scene (fixed) — a rotary move spins the part on it. renderOrder<0 so it draws behind.
+            const bed = new THREE.Mesh(
+                new THREE.PlaneGeometry(stock.x * 1.6, stock.y * 1.6),
+                new THREE.MeshBasicMaterial({ color: 0x2a3138, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+            bed.position.set(pg.position.x, pg.position.y, pg.position.z - stock.z / 2);
+            bed.renderOrder = -1;
+            this.tableMesh = bed; this.scene.add(bed);
         }
     }
 
