@@ -818,9 +818,11 @@
                         </select>
                     </div>
                     <div><span class="label">SKIP HOLES</span><input id="d_skip" value="" title="1-based hole numbers to omit (as shown in the preview), e.g. 5, 9"/></div>
-                    <div><span class="label">POSITION X</span><input id="d_originX" value="0" title="Pattern position in the active WCS (drag the square handle in the 2D layout)."/></div>
-                    <div><span class="label">POSITION Y</span><input id="d_originY" value="0" title="Pattern position in the active WCS (drag the square handle in the 2D layout)."/></div>
-                    <input id="d_pathDatum" type="hidden" value=""/><!-- path-datum corner; set by the 3×3 picker on the 2D layout (empty = follow the stock datum) -->
+                    <div><span class="label">OFFSET X</span><input id="d_originX" value="0" title="Signed X offset of the path from the stock-attach corner (drag the square handle in the 2D layout)."/></div>
+                    <div><span class="label">OFFSET Y</span><input id="d_originY" value="0" title="Signed Y offset of the path from the stock-attach corner (drag the square handle in the 2D layout)."/></div>
+                    <div><span class="label">OFFSET Z</span><input id="d_offZ" value="0" title="Signed Z offset of the whole path (shifts every Z move; 0 = part-zero plane)."/></div>
+                    <input id="d_pathDatum" type="hidden" value=""/><!-- path-datum corner (PATH ⌖ widget); empty = follow the stock datum -->
+                    <input id="d_stockAttach" type="hidden" value=""/><!-- stock corner the path attaches to (markers on the stock); empty = the stock datum -->
                     <div><span class="label">WORK WCS</span><select id="d_wcs" title="Run in the Active WCS (whatever G54–G59 is selected on the controller) or force a specific one. Positions are in the chosen frame."><option value="active">Active</option><option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option><option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option></select></div>
                 </div>
                 <div id="d_pat_grid" class="grid-2" style="display:none">

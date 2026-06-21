@@ -72,11 +72,17 @@ export class FeatureCanvas {
         const svg = this.svg;
         svg.addEventListener('pointerdown', (e) => {
             if (!this.spec || !this._tf || e.button !== 0) return;
-            // The 3×3 path-datum picker is a fixed screen-space widget → test it in viewBox units before world hits.
+            // The PATH ⌖ datum picker is a fixed screen-space widget → test it in viewBox units before world hits.
             const cell = this._hitDatum(this._clientToVB(e.clientX, e.clientY));
             if (cell) { if (this.spec.onPathDatum) this.spec.onPathDatum(cell.code); e.preventDefault(); return; }
+            const w = this._toWorld(e);
+            const hit = this._hit(w);
+            if (!hit) {
+                // Stock-attach markers sit on the stock's corners/edges (world space) → click one to set the corner.
+                const att = this._hitAttach(w);
+                if (att) { if (this.spec.onStockAttach) this.spec.onStockAttach(att.code); e.preventDefault(); return; }
+            }
             try { svg.setPointerCapture(e.pointerId); } catch (_) {}
-            const hit = this._hit(this._toWorld(e));
             if (hit) this.active = { id: hit.id };           // grab a handle
             else this.pan = this._clientToVB(e.clientX, e.clientY); // else pan the background
             svg.style.cursor = 'grabbing';
@@ -296,6 +302,35 @@ export class FeatureCanvas {
         });
 
         this._drawDatumWidget(spec, VW, VH);
+        this._drawStockAttach(spec);
+    }
+
+    /** Stock-attach markers — small squares on the stock's 9 points (corners/edges/centre). Click one to choose which
+     *  stock corner the path attaches to. Filled = current; green ring = the stock's own datum (the default attach). */
+    _drawStockAttach(spec) {
+        this._attachPts = null;
+        if (!spec || !spec.onStockAttach || !spec.stock || !(spec.stock.w > 0) || !(spec.stock.h > 0)) return;
+        const handles = this.gHandles;
+        const w = spec.stock.w, h = spec.stock.h;
+        const xc = ['n', 'c', 'p'], xs = [0, w / 2, w], ys = [0, h / 2, h];
+        const cur = String(spec.stockAttach || spec.stockDatum || 'nn'), stk = String(spec.stockDatum || 'nn');
+        const pts = [];
+        for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+            const code = xc[i] + xc[j], c = this._S(xs[i], ys[j]);
+            const isCur = code === cur, isStk = code === stk;
+            handles.appendChild(svgEl('rect', { x: c.x - 5, y: c.y - 5, width: 10, height: 10, rx: 2, 'data-attach': code, fill: isCur ? '#4ab3ff' : 'rgba(120,160,200,0.16)', stroke: isStk ? '#5fd06a' : '#5a6f86', 'stroke-width': isStk ? 2 : 1, style: 'cursor:pointer' }));
+            pts.push({ x: xs[i], y: ys[j], code });
+        }
+        this._attachPts = pts;
+    }
+
+    /** Hit-test the stock-attach markers in world units → the nearest marker or null. */
+    _hitAttach(w) {
+        if (!this._attachPts || !w) return null;
+        const tol = 11 / this._tf.scale;
+        let best = null, bd = tol;
+        this._attachPts.forEach((p) => { const d = Math.hypot(p.x - w.x, p.y - w.y); if (d <= bd) { bd = d; best = p; } });
+        return best;
     }
 
     /** 3×3 path-datum picker — a fixed screen-space widget (top-left). Each cell = which corner of the pattern

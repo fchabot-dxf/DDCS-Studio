@@ -16,14 +16,19 @@ import { translateProgram } from '../data/rotateProgram.js';
 // Re-export so views (drillView) keep importing the pattern geometry from here.
 export { patternPoints };
 
+// 2-char [X][Y] datum code, each n(min)/c(centre)/p(max); robust to a 3-char stock code or empty.
+const code2 = (c) => (String(c || '').replace(/[^ncp]/g, '') + 'nn').slice(0, 2);
+const FRAC = { n: 0, c: 0.5, p: 1 };
+
 /**
- * Path-datum placement. The toolpath has its OWN datum (which corner of the pattern anchors), and it sits on the
- * stock at that corner — so the path FOLLOWS the stock datum onto the stock instead of always running +X/+Y off it.
+ * Toolpath placement. The path has its OWN datum (`pathDatum` — which corner of the pattern's bounding box anchors,
+ * measured on hole CENTRES so changing a hole's diameter never moves the grid). That corner attaches to a chosen
+ * stock corner (`stockAttach`) — both default to the stock's part-zero datum, so by default the path follows the
+ * stock onto it with zero config. A signed offset (originX/originY = X/Y, offZ = Z) nudges it from the attach corner.
  *
- * `pathDatum` is a 2-char [X][Y] code (n=min / c=centre / p=max of the pattern's bounding box); it defaults to the
- * stock's datum, so by default the path's matching corner lands where the stock datum is. We shift the whole program
- * so that corner lands on the pos anchor (originX/originY) = the signed offset from the stock datum (= part-zero).
- * XY only — Z stays the part-zero plane (the stock-datum Z handles stock-top vs table zero). Pure; simulate after.
+ * We shift the whole program (translateProgram) so the path corner lands on (stock-attach corner + offset). The
+ * stock corner in part coords: the stock's min corner sits at −D of the stock datum, so corner [sx][sy] is at
+ * (frac(sx)−frac(datumX))·w. Pure; simulate after.
  */
 function placeOnStock(text, params) {
     const pts = patternPoints(params);
@@ -31,11 +36,19 @@ function placeOnStock(text, params) {
     const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
     const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
     const at = { n: (a) => a, c: (a, b) => (a + b) / 2, p: (a, b) => b };
-    const code = String(params.pathDatum || params.stockDatum || 'nn').replace(/[^ncp]/g, '').padEnd(2, 'n');
-    const cornerX = (at[code[0]] || at.n)(minX, maxX), cornerY = (at[code[1]] || at.n)(minY, maxY);
-    const dx = num(params.originX, 0) - cornerX, dy = num(params.originY, 0) - cornerY;
-    if (!dx && !dy) return text;
-    return translateProgram(text, dx, dy, 0).text;
+    // Path datum defaults to the stock-attach corner (which defaults to the stock datum) so picking a stock corner
+    // makes the path's matching corner follow onto the stock; an explicit pathDatum overrides.
+    const pc = code2(params.pathDatum || params.stockAttach || params.stockDatum || 'nn');
+    const cornerX = at[pc[0]](minX, maxX), cornerY = at[pc[1]](minY, maxY);
+    // Which stock corner the path attaches to, in part coords (relative to part-zero = the stock datum).
+    const sd = code2(params.stockDatum || 'nn'), sa = code2(params.stockAttach || params.stockDatum || 'nn');
+    const w = num(params.stockW, 0), h = num(params.stockH, 0);
+    const attachX = (FRAC[sa[0]] - FRAC[sd[0]]) * w, attachY = (FRAC[sa[1]] - FRAC[sd[1]]) * h;
+    const dx = attachX + num(params.originX, 0) - cornerX;
+    const dy = attachY + num(params.originY, 0) - cornerY;
+    const dz = num(params.offZ, 0);
+    if (!dx && !dy && !dz) return text;
+    return translateProgram(text, dx, dy, dz).text;
 }
 
 /** Drill params → [ Array{ Drill|Bore } ]. The one source of truth for both displays. */
