@@ -198,6 +198,15 @@ export function buildActiveOpStack() {
     return { blocks: (start && end) ? [start, opC, end] : [opC] };
 }
 
+/** Seed the Blocks model from the active wizard op — a PREVIEW (not committed into the program), used when the tab
+ *  opens onto an empty model. Builds the op's stack and loads it so it renders; a no-op when there's nothing portable
+ *  to show or the same op is already loaded. (blocksApp calls this; it lived only as a call site before — restored.) */
+export function previewActiveOp() {
+    const r = buildActiveOpStack();
+    if (r && r.blocks && typeof window !== 'undefined' && window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(r.blocks);
+    return r;
+}
+
 /**
  * Commit the active (just-generated) op INTO the shared program — so wizard inserts ACCUMULATE instead of
  * concatenating whole framed programs (which would put an M30 mid-file and lose all but the last in Blocks).
