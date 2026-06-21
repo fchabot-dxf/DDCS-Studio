@@ -507,6 +507,15 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .hq-swatch { width: 12px; height: 12px; flex: 0 0 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.3); }
 .hdr-quick-sep { height: 1px; margin: 5px 4px; background: var(--kbd-edge, var(--border, #444)); opacity: .6; }
 
+/* Collapsible submenus (Post-processor, Theme): a header row + an indented, togglable list */
+.hdr-quick-sub { font-weight: 700; }
+.hq-cur { font-weight: 400; opacity: .55; }
+.hq-caret { margin-left: auto; flex: 0 0 auto; opacity: .55; transition: transform .12s ease; }
+.hdr-quick-sub.is-open .hq-caret { transform: rotate(90deg); }
+.hdr-quick-subitems { display: flex; flex-direction: column; gap: 2px; margin: 1px 0 2px; }
+.hdr-quick-subitems[hidden] { display: none; }
+.hdr-quick-menu .hdr-quick-subitems .hdr-quick-item { padding-left: 16px; font-weight: 500; }
+
 .hdr-post-warn { color: #e0a020; font-size: 15px; cursor: help; user-select: none; }
 .hdr-post-warn[hidden] { display: none; }
 
@@ -2601,7 +2610,14 @@ Middle (handle) {
 
 /* Editor = the HUD screen: deep navy, cyan caret/selection, data-coloured syntax */
 [data-theme="futuristic"] .editor-container { background: var(--screen); }
-[data-theme="futuristic"] #editor-highlight { background-color: var(--screen) !important; color: var(--code-text); }
+/* HUD grid screen — a faint cyan graticule so the glass keyboard ALWAYS has something to reveal
+   (transparency reads even over an empty program) and the editor feels like an instrument screen */
+[data-theme="futuristic"] #editor-highlight {
+    background-color: var(--screen) !important; color: var(--code-text);
+    background-image:
+        repeating-linear-gradient(0deg, rgba(45,226,255,.05) 0 1px, transparent 1px 30px),
+        repeating-linear-gradient(90deg, rgba(45,226,255,.05) 0 1px, transparent 1px 30px) !important;
+}
 [data-theme="futuristic"] #editor-gutter { background: var(--screen); color: #3c5a82; }
 [data-theme="futuristic"] #editor { caret-color: var(--accent); }
 [data-theme="futuristic"] #editor::selection,
@@ -2640,6 +2656,50 @@ Middle (handle) {
 }
 [data-theme="futuristic"] .toolbar-btn:active,
 [data-theme="futuristic"] button:active { transform: translateY(1px); }
+
+/* ===== OPERATOR · heavy detailing — make it feel like a real HUD device, not a recolor ===== */
+
+/* The editor is a CRT console: horizontal scanlines + a soft edge vignette over the whole screen.
+   z-index 5 sits above the code/drawer (z1–4) but below the dock handle (z6); pointer-events:none so
+   typing + 3D-orbit still work. */
+[data-theme="futuristic"] .editor-container::after {
+    content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none;
+    background:
+        repeating-linear-gradient(0deg, rgba(0,0,0,.14) 0 1px, transparent 1px 3px),
+        radial-gradient(135% 95% at 50% 32%, transparent 60%, rgba(0,10,22,.5) 100%);
+}
+
+/* HUD chip labels: uppercase + spaced, like instrument legends */
+[data-theme="futuristic"] .toolbar-btn .btn-tx,
+[data-theme="futuristic"] .op-btn .op-label,
+[data-theme="futuristic"] .app-header .tab .app-tx { text-transform: uppercase; letter-spacing: .08em; }
+
+/* Big wizard buttons get a brighter cyan instrument edge */
+[data-theme="futuristic"] .wizard-btn { border-color: rgba(45,226,255,.7) !important; }
+
+/* Keyboard dock = a framed scope: inner top glow + glowing cyan corner brackets */
+[data-theme="futuristic"] #controller-dock.controller-dock {
+    box-shadow: 0 -10px 34px rgba(0,0,0,.55), inset 0 1px 0 rgba(45,226,255,.3);
+    border-top: 1px solid rgba(45,226,255,.5);
+}
+[data-theme="futuristic"] #controller-dock::before,
+[data-theme="futuristic"] #controller-dock::after {
+    content: ""; position: absolute; top: 5px; width: 20px; height: 20px; z-index: 4; pointer-events: none;
+    border-top: 2px solid rgba(45,226,255,.85); filter: drop-shadow(0 0 4px rgba(45,226,255,.6));
+}
+[data-theme="futuristic"] #controller-dock::before { left: 5px;  border-left: 2px solid rgba(45,226,255,.85); }
+[data-theme="futuristic"] #controller-dock::after  { right: 5px; border-right: 2px solid rgba(45,226,255,.85); }
+
+/* 3D preview = a targeting scope: neon frame + inner glow */
+[data-theme="futuristic"] .viz3d-drawer {
+    border-left: 1px solid rgba(45,226,255,.6);
+    box-shadow: -6px 0 24px rgba(0,0,0,.6), inset 0 0 36px rgba(45,226,255,.07);
+}
+
+/* Active tab breathes; respects reduced-motion */
+@keyframes op-pulse { 0%,100% { box-shadow: 0 0 6px var(--tab-accent, var(--accent)); } 50% { box-shadow: 0 0 15px var(--tab-accent, var(--accent)); } }
+[data-theme="futuristic"] .app-header .tab.active::after { animation: op-pulse 2.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { [data-theme="futuristic"] .app-header .tab.active::after { animation: none; } }
 
 /* ============================================
    THEME: ORGANIC (Earth Tones)
@@ -3269,6 +3329,28 @@ svg [id$="_wcs"] { display: none; }
 /* Wizard usage instructions */
 .wiz-usage { font-size: 10px; color: var(--text-dim); padding: 6px 8px; margin: 4px 0 6px; border-left: 2px solid var(--accent); background: rgba(255,255,255,0.03); line-height: 1.5; }
 
+/* Wizard parameter forms (ATC + others) — these were unstyled, so they inherited the modal's large default
+   font and read as a "block of text". Lay fields out in a compact responsive grid; notes are small. */
+.param-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 6px 12px;
+    margin: 4px 0 8px;
+    align-items: end;
+}
+.param-grid > label {
+    display: flex; flex-direction: column; gap: 3px;
+    font-size: 10px; color: var(--text-dim);
+}
+.param-grid > label:has(input[type="checkbox"]) {   /* checkbox rows read inline, not stacked */
+    flex-direction: row; align-items: center; gap: 6px; font-size: 11px;
+}
+.wiz-note {
+    font-size: 10.5px; color: var(--text-dim); line-height: 1.45;
+    margin: 4px 0 8px; padding: 6px 8px;
+    border-left: 2px solid var(--border); background: rgba(127,127,127,0.05); border-radius: 0 4px 4px 0;
+}
+
 /* ============================================
    VIEW TOGGLE FAB  (3D / CODE)  +  3D PREVIEW
    ============================================ */
@@ -3411,15 +3493,16 @@ svg [id$="_wcs"] { display: none; }
 /* FUTURISTIC — "the super coder": cold cyan HUD glass. MOST see-through, low blur (sharp code),
    scanline pattern, translucent keys so code peeks through everything. */
 [data-theme="futuristic"] {
+    /* glass-screen: very clear panel so the code/grid reads right through it, faint scanlines, light frost */
     --kbd-glass:
-        linear-gradient(180deg, rgba(10,16,30,.24), rgba(8,12,24,.64)),
-        repeating-linear-gradient(0deg, rgba(45,212,191,.05) 0 1px, transparent 1px 3px);
-    --kbd-blur: 3px;
-    --kbd-handle: linear-gradient(180deg, rgba(0,255,255,.12), rgba(8,12,24,.74));
+        linear-gradient(180deg, rgba(10,16,30,.16), rgba(8,12,24,.24)),
+        repeating-linear-gradient(0deg, rgba(45,212,191,.04) 0 1px, transparent 1px 3px);
+    --kbd-blur: 0.5px;
+    --kbd-handle: linear-gradient(180deg, rgba(0,255,255,.10), rgba(8,12,24,.52));
     --kbd-grip: rgba(0,255,255,.7);
     --kbd-edge: rgba(0,255,255,.45);
-    /* translucent keys (applied below, futuristic only) */
-    --kbd-key: rgba(17,24,39,.48);
+    /* translucent glass keys (sheen added in the keys rule) */
+    --kbd-key: rgba(22,34,56,.26);
     --kbd-key-bd: rgba(0,255,255,.42);
     --kbd-key-ink: #cffafe;
 }
@@ -3507,14 +3590,63 @@ svg [id$="_wcs"] { display: none; }
     opacity: .5; pointer-events: none;
 }
 
+/* Key labels ADAPT to the keyboard size — a taller deck → bigger keys → bigger type (drag the handle).
+   Driven by --dock-h (on <html>); clamped so it stays legible at the extremes. */
+#controller-dock .dock-body .toolbar-btn { font-size: clamp(11px, calc(var(--dock-h, 300px) / 21), 21px); }
+#controller-dock .dock-body .toolbar-btn .btn-tx { font-size: inherit; }
+#controller-dock .editor-keys-row .toolbar-btn,
+#controller-dock .editor-keys-row button { font-size: clamp(13px, calc(var(--dock-h, 300px) / 15), 27px) !important; }
+#controller-dock .var-item .var-id { font-size: clamp(10px, calc(var(--dock-h, 300px) / 26), 16px); }
+
 /* FUTURISTIC only: keys go translucent (crisp neon outlines keep them legible) */
 [data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn:not([data-ddcs-role]),
 [data-theme="futuristic"] #controller-dock .dock-body button:not([data-ddcs-role]),
 [data-theme="futuristic"] #controller-dock .var-item {
-    background: var(--kbd-key) !important;
+    /* glass keycap: a top-left sheen over the translucent fill, hairline cyan rim, inner light */
+    background: linear-gradient(135deg, rgba(255,255,255,.13), rgba(255,255,255,0) 42%), var(--kbd-key) !important;
     border: 1px solid var(--kbd-key-bd) !important;
     color: var(--kbd-key-ink) !important;
-    box-shadow: none !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 12px rgba(45,226,255,.05) !important;
+    position: relative; overflow: hidden;
+}
+
+/* ===== OPERATOR CONSOLE — the futuristic keyboard as a living sci-fi command deck ===== */
+[data-theme="futuristic"] #controller-dock .dock-body { position: relative; }
+
+/* a cyan light SWEEPS across the keypad on a loop (compositor-friendly transform) */
+[data-theme="futuristic"] #controller-dock .dock-body::after {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 34%;
+    pointer-events: none; z-index: 5;
+    background: linear-gradient(90deg, transparent, rgba(45,226,255,.10) 50%, transparent);
+    animation: op-keysweep 4.2s linear infinite;
+}
+@keyframes op-keysweep { 0% { transform: translateX(-130%); } 100% { transform: translateX(420%); } }
+
+/* HUD readout tag, top-right of the deck */
+[data-theme="futuristic"] #controller-dock .dock-body::before {
+    content: "\25C9 OPERATOR \00b7 SYS NOMINAL"; position: absolute; top: 5px; right: 14px; z-index: 6;
+    font: 700 9px/1 var(--font-code); letter-spacing: .16em; color: rgba(45,226,255,.62);
+    text-shadow: 0 0 7px rgba(45,226,255,.5); pointer-events: none;
+}
+
+/* keys: a HUD corner tick + edge light on hover, full bloom on press */
+[data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn:not([data-ddcs-role])::after {
+    content: ""; position: absolute; top: 3px; right: 3px; width: 5px; height: 5px;
+    border-top: 1px solid rgba(45,226,255,.65); border-right: 1px solid rgba(45,226,255,.65);
+}
+[data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn:not([data-ddcs-role]):hover {
+    border-color: rgba(45,226,255,.95) !important;
+    box-shadow: 0 0 12px rgba(45,226,255,.4), inset 0 0 8px rgba(45,226,255,.12) !important;
+    color: #eafdff !important;
+}
+[data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn:not([data-ddcs-role]):active {
+    background: rgba(45,226,255,.22) !important;
+    box-shadow: 0 0 18px rgba(45,226,255,.6), inset 0 0 10px rgba(45,226,255,.25) !important;
+    color: #ffffff !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-theme="futuristic"] #controller-dock .dock-body::after { animation: none; opacity: .5; }
 }
 
 /* The tabbed-deck surfaces go glass too — translucent COLOURED panels + tabs so code shows through them
@@ -3532,21 +3664,29 @@ svg [id$="_wcs"] { display: none; }
 #controller-dock .group-header, #controller-dock .section-label,
 #controller-dock .deck-tabs .deck-tab { text-shadow: 0 1px 2px rgba(0,0,0,.35); }
 
-/* Desktop & tablet: FLOAT the keyboard over the editor so the live code shows behind it.
-   The editor pads its scroll by the keyboard height so the active line always clears the keys. */
-@media (min-width: 700px) {
+/* LANDSCAPE (desktop + landscape tablets): FLOAT the keyboard over the editor so the live code shows
+   behind it. Scoped to landscape so PORTRAIT (phones / portrait tablets) keeps the in-flow keyboard and
+   its own bottom-pull 3D drawer — no collision. --kbd-clear = how much the floating keyboard covers; the
+   editor pads its scroll by it, and the 3D drawer + toggle button stay ABOVE it. */
+@media (min-width: 700px) and (orientation: landscape) {
     #controller-dock.controller-dock {
         position: absolute; left: 0; right: 0; bottom: 0;
         box-shadow: 0 -10px 30px rgba(0,0,0,.28);
     }
-    /* collapsed: clear the floating handle. (gutter padded too → line numbers stay aligned) */
-    #editor, #editor-highlight, #editor-gutter { padding-bottom: 58px !important; }
-    /* expanded: clear the whole keyboard (handle + resizable body). --dock-h lives on <html>. */
-    .app-shell:has(#controller-dock.is-expanded) #editor,
-    .app-shell:has(#controller-dock.is-expanded) #editor-highlight,
-    .app-shell:has(#controller-dock.is-expanded) #editor-gutter {
-        padding-bottom: calc(var(--dock-h, 320px) + 58px) !important;
-    }
+    /* --kbd-clear = the EXACT keyboard height (handle = 42px), so the 3D drawer / divider meet the
+       keyboard edge with no floating gap. The editor scroll adds its own breathing margin below. */
+    .app-shell { --kbd-clear: 42px; }                                                  /* collapsed: just the handle */
+    .app-shell:has(#controller-dock.is-expanded) { --kbd-clear: calc(var(--dock-h, 320px) + 42px); }
+
+    /* editor scroll clears the keys + a little breathing room (gutter too → line numbers stay aligned) */
+    #editor, #editor-highlight, #editor-gutter { padding-bottom: calc(var(--kbd-clear, 42px) + 14px) !important; }
+
+    /* keep the 3D preview drawer + its toggle button ABOVE the floating keyboard, flush to its top edge.
+       !important: the base .viz3d-drawer{bottom:0} rule is later in the file and would win otherwise. */
+    .viz3d-drawer { bottom: var(--kbd-clear, 42px) !important; height: auto !important; }
+    .editor-container .viz3d-handle { top: calc((100% - var(--kbd-clear, 0px)) / 2) !important; }
+    /* the ⟳ Align editor-overlay control is pinned bottom:8px (inline) → lift it just above the keys */
+    #align-rotate-btn { bottom: calc(var(--kbd-clear, 42px) + 8px) !important; }
 }
 
 /* Variables tab — search row + Filters button */
@@ -3921,8 +4061,9 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 @media (max-width: 600px) {
     .app-header.is-mini .hdr-tabs .tab { padding: 0 8px; }
     .hdr-controls { gap: 6px; }
-    .hdr-quick, #hdrPostWarn { display: none; }   /* quick menu hidden on phone (post lives in Settings) */
-    .macro-bar { display: flex; }                  /* …so Open/Save return to the header on phone */
+    /* The chevron quick-menu stays visible on phone — it's the single quick-access point everywhere
+       (Open/Save/Load/Insert/Copy/Clear/Export + post + theme). The standalone macro-bar stays hidden
+       (its Open/Save now live in the chevron). */
 }
 
 /* ===== Portrait / mobile: 3D drawer pulls UP from the bottom of the editor ===== */

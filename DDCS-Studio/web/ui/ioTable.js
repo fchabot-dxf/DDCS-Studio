@@ -203,6 +203,29 @@ export function renderMagazineTable(container, atc, onChange) {
     COLS.forEach(([h, w]) => { const s = document.createElement('span'); s.textContent = h; s.style.width = w + 'px'; head.appendChild(s); });
     container.appendChild(head);
 
+    // Linear racks sit on a LINE: keep pocket 1, then step each pocket by a fixed pitch along one axis. The
+    // controller still stores each pocket individually (#1330+ tables, usually taught by jogging / pulled), so
+    // you can fine-tune any row after — this just saves typing the evenly-spaced ones.
+    if (!isDisk && atc.magazine.length > 1) {
+        const lf = document.createElement('div');
+        lf.style.cssText = 'display:flex; gap:8px; align-items:flex-end; margin:6px 0 4px; flex-wrap:wrap;';
+        const axSel = document.createElement('select');
+        [['x', 'X'], ['y', 'Y'], ['z', 'Z']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; axSel.appendChild(o); });
+        const pitch = document.createElement('input'); pitch.type = 'number'; pitch.step = '1'; pitch.value = atc._linePitch ?? 50;
+        pitch.addEventListener('change', () => { atc._linePitch = Number(pitch.value) || 0; });
+        const btn = document.createElement('button'); btn.className = 'toolbar-btn settings-io'; btn.textContent = '↳ Fill line from P1';
+        btn.title = 'Pockets are on a line: keep pocket 1, then step each pocket by the pitch along the axis. Edit any row after, or Pull the taught positions from the controller.';
+        btn.addEventListener('click', () => {
+            const ax = axSel.value, pp = Number(pitch.value) || 0, p0 = atc.magazine[0];
+            atc.magazine.forEach((row, i) => { if (i === 0) return; row.x = p0.x; row.y = p0.y; row.z = p0.z; row[ax] = (Number(p0[ax]) || 0) + i * pp; });
+            onChange(); rerender();
+        });
+        lf.appendChild(field('Line axis', axSel, 56));
+        lf.appendChild(field('Pitch (mm)', pitch, 70));
+        lf.appendChild(btn);
+        container.appendChild(lf);
+    }
+
     atc.magazine.forEach((row, i) => {
         row.pocket = i + 1;
         const tr = document.createElement('div');

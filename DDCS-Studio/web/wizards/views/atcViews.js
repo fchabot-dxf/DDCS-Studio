@@ -65,6 +65,24 @@ function magazinePockets(a) {
     });
 }
 
+/** Pop the full magazine editor as a modal with a Done button — the wizard's own table stays read-only/compact. */
+function openMagazineModal(refresh) {
+    const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+    s.atc = s.atc || {};
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center;';
+    ov.innerHTML = `<div style="width:min(900px,95vw); max-height:88vh; overflow:auto; background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px;">
+        <b>Edit tool magazine</b>
+        <div class="mag-edit-host"></div>
+        <div style="display:flex; justify-content:flex-end; gap:8px;"><button class="toolbar-btn settings-io" data-mag-done>✓ Done</button></div>
+    </div>`;
+    document.body.appendChild(ov);
+    renderMagazineTable(ov.querySelector('.mag-edit-host'), s.atc, () => { if (window.ddcsSaveSettings) window.ddcsSaveSettings(); if (refresh) refresh(); });
+    const close = () => ov.remove();
+    ov.querySelector('[data-mag-done]').addEventListener('click', close);
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+}
+
 export const atcLengthView = {
     type: 'atc_length',
     panelId: 'wiz_atc_length',
@@ -241,17 +259,6 @@ export const atcTableView = {
     large: true,
     twoPane: true,
     inputIds: ['atc_table_lengths', 'atc_table_pockets'],   // include lengths / include pockets
-    onShow(mgr) {
-        // Mount the interactive magazine editor (pocket count + tool-per-pocket + ▲▼ reorganise) right in the
-        // wizard — this is where you BUILD the magazine, so the strip + macro aren't empty. Persists to Settings.
-        const host = el('atc_table_magazine'); if (!host) return;
-        const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
-        s.atc = s.atc || {};
-        renderMagazineTable(host, s.atc, () => {
-            if (window.ddcsSaveSettings) window.ddcsSaveSettings();
-            this.update(mgr);   // refresh the apply-macro + rack + status from the edited magazine
-        });
-    },
     update(mgr) {
         const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
         const a = s.atc || {};
@@ -272,6 +279,15 @@ export const atcTableView = {
         // Tool-profile rack strip: each magazine tool drawn at its real shape (type/Ø) + length — review the rack.
         const rack = el('atcTableTools');
         if (rack) rack.innerHTML = magazineRackHtml(a);
+        // The wizard's magazine view is READ-ONLY + compact; "✎ Edit table…" pops the full editor as a modal (Done).
+        const host = el('atc_table_magazine');
+        if (host) {
+            const magAll = Array.isArray(a.magazine) ? a.magazine : [];
+            const byNum = {}; (a.tools || []).forEach((t) => { if (t && t.num != null && t.num !== '') byNum[Number(t.num)] = t; });
+            const list = magAll.map((p, i) => { const t = byNum[Number(p.tool)]; return `P${p.pocket != null ? p.pocket : i + 1}·${p.tool ? 'T' + p.tool + (t && t.name ? ' ' + t.name : '') : '—'}`; }).join('   ');
+            host.innerHTML = `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><button class="toolbar-btn settings-io" data-edit-mag>✎ Edit table…</button><span class="settings-hint" style="margin:0;">${magAll.length ? magAll.length + ' pocket' + (magAll.length === 1 ? '' : 's') + ' · ' + (a.magType === 'disk' ? 'disk / carousel' : 'linear') : 'No pockets — click Edit table to build the magazine.'}</span></div>${list ? `<div class="settings-hint" style="margin:5px 0 0;">${list}</div>` : ''}`;
+            host.querySelector('[data-edit-mag]').addEventListener('click', () => openMagazineModal(() => this.update(mgr)));
+        }
         const lens = (a.tools || []).filter((t) => t && t.length !== '' && t.length != null).map((t) => `T${t.num} ${t.length}`).join(' · ');
         setStatus('atcTableVizStatus', `Magazine: ${mag.length} pocket${mag.length === 1 ? '' : 's'}${lens ? ' · lengths ' + lens : ' · no tool lengths set'} — writes the table, no motion; review the strip below`);
     },
