@@ -51,6 +51,7 @@ export const WIZARD_VIEWS = [
     atcWarmupView,
     atcChangeView,
     atcTestView,
+    atcTableView,
 ];
 
 export const viewByType = new Map(WIZARD_VIEWS.map((v) => [v.type, v]));
