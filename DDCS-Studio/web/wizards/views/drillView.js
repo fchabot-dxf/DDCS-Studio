@@ -72,9 +72,15 @@ function buildDrillSpec(params, stock) {
     const skip = parseSkip(params.skip);
     patternPoints(params).forEach((p, i) => items.push({ kind: 'hole', x: p.x, y: p.y, n: i + 1, r: holeR, skipped: skip.has(i + 1) }));
 
+    const datXY = (c) => String(c || '').replace(/[^ncp]/g, '').slice(0, 2);
+    const stockDat = datXY(stock && stock.datum) || 'nn';
     return {
         stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y } : null,
         items, handles,
+        // Path-datum picker (3×3 on the canvas): which pattern corner anchors on the stock. Highlighted = current
+        // (falls back to the stock datum); ringed = the stock's own datum, so you can see the default.
+        pathDatum: datXY(params.pathDatum) || stockDat, stockDatum: stockDat,
+        onPathDatum(code) { const e = el('d_pathDatum'); if (!e) return; e.value = code; e.dispatchEvent(new Event('input', { bubbles: true })); },
         onDrag(id, w) {
             if (id === 'origin') { setFields({ d_originX: w.x, d_originY: w.y }); return; }
             if (pat === 'circle') {
@@ -113,7 +119,7 @@ export const drillView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'd_pattern', 'd_skip', 'd_originX', 'd_originY', 'd_wcs', 'd_cols', 'd_rows', 'd_dx', 'd_dy', 'd_dia', 'd_count', 'd_startAngle',
+        'd_pattern', 'd_skip', 'd_originX', 'd_originY', 'd_pathDatum', 'd_wcs', 'd_cols', 'd_rows', 'd_dx', 'd_dy', 'd_dia', 'd_count', 'd_startAngle',
         'd_w', 'd_h', 'd_nx', 'd_ny', 'd_lcount', 'd_spacing', 'd_angle',
         'd_method', 'd_holeDia', 'd_peck', 'd_toolDia', 'd_pitch', 'd_ramp', 'd_depth', 'd_clearance', 'd_feed', 'd_rpm',
     ],
@@ -134,7 +140,7 @@ export const drillView = {
     setForm(p = {}) {
         const set = (id, val) => { const e = el(id); if (e && val != null) e.value = val; };
         set('d_pattern', p.pattern); set('d_method', p.method); set('d_skip', p.skip);
-        set('d_originX', p.originX); set('d_originY', p.originY); set('d_wcs', p.wcs);
+        set('d_originX', p.originX); set('d_originY', p.originY); set('d_pathDatum', p.pathDatum); set('d_wcs', p.wcs);
         set('d_depth', p.depth); set('d_clearance', p.clearance); set('d_feed', p.feed); set('d_rpm', p.rpm);
         set('d_holeDia', p.holeDia); set('d_peck', p.peck); set('d_toolDia', p.toolDia); set('d_pitch', p.pitch); set('d_ramp', p.ramp);
         if (p.pattern === 'grid') { set('d_cols', p.cols); set('d_rows', p.rows); set('d_dx', p.dx); set('d_dy', p.dy); }
@@ -171,6 +177,9 @@ export const drillView = {
             depth: v('d_depth'), clearance: v('d_clearance'), feed: v('d_feed'), rpm: v('d_rpm'),
             holeDia: v('d_holeDia'), peck: v('d_peck'), toolDia: v('d_toolDia'), pitch: v('d_pitch'), ramp: v('d_ramp'),
             spindle: s.spindle, head: s.head, endProgram: s.endProgram,
+            // Path datum: which corner of the pattern anchors on the stock. Default = the stock's datum, so the path
+            // follows the stock onto it (see placeOnStock). The picker on the 2D canvas sets d_pathDatum.
+            stockDatum: (s.stock && s.stock.datum) || 'nnp', pathDatum: v('d_pathDatum') || '',
         };
         if (pattern === 'grid') Object.assign(params, { cols: v('d_cols'), rows: v('d_rows'), dx: v('d_dx'), dy: v('d_dy') });
         else if (pattern === 'circle') Object.assign(params, { dia: v('d_dia'), count: v('d_count'), startAngle: v('d_startAngle') });

@@ -72,6 +72,9 @@ export class FeatureCanvas {
         const svg = this.svg;
         svg.addEventListener('pointerdown', (e) => {
             if (!this.spec || !this._tf || e.button !== 0) return;
+            // The 3×3 path-datum picker is a fixed screen-space widget → test it in viewBox units before world hits.
+            const cell = this._hitDatum(this._clientToVB(e.clientX, e.clientY));
+            if (cell) { if (this.spec.onPathDatum) this.spec.onPathDatum(cell.code); e.preventDefault(); return; }
             try { svg.setPointerCapture(e.pointerId); } catch (_) {}
             const hit = this._hit(this._toWorld(e));
             if (hit) this.active = { id: hit.id };           // grab a handle
@@ -291,6 +294,40 @@ export class FeatureCanvas {
                 handles.appendChild(t);
             }
         });
+
+        this._drawDatumWidget(spec, VW, VH);
+    }
+
+    /** 3×3 path-datum picker — a fixed screen-space widget (top-left). Each cell = which corner of the pattern
+     *  anchors on the stock. Filled = the current path datum; ringed = the stock's own datum (the default). Clicking
+     *  a cell calls spec.onPathDatum(code) where code is [X][Y] of n(min)/c(centre)/p(max). */
+    _drawDatumWidget(spec, VW, VH) {
+        this._datumCells = null;
+        if (!spec || !spec.onPathDatum) return;
+        const handles = this.gHandles;
+        const cs = 16, gx = 12, gy = 26, pad = 5;
+        // panel + title
+        handles.appendChild(svgEl('rect', { x: gx - pad, y: 8, width: cs * 3 + pad * 2, height: cs * 3 + 18 + pad, rx: 4, fill: 'rgba(8,12,18,0.72)', stroke: '#2c3a4a', 'stroke-width': 1 }));
+        const title = svgEl('text', { x: gx - pad + 4, y: 20, class: 'fc-handle-label', 'font-size': 9, fill: '#9fb3c8' });
+        title.textContent = 'PATH ⌖'; handles.appendChild(title);
+        const colC = ['n', 'c', 'p'], rowC = ['p', 'c', 'n'];   // left→right = minX..maxX ; top→bottom = maxY..minY
+        const cur = String(spec.pathDatum || spec.stockDatum || 'nn');
+        const stk = String(spec.stockDatum || 'nn');
+        const cells = [];
+        for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+            const code = colC[c] + rowC[r];
+            const x = gx + c * cs, y = gy + r * cs;
+            const isCur = code === cur, isStk = code === stk;
+            handles.appendChild(svgEl('rect', { x: x + 1, y: y + 1, width: cs - 2, height: cs - 2, rx: 2, fill: isCur ? '#ffcf3a' : 'rgba(120,150,180,0.12)', stroke: isStk ? '#5fd06a' : '#4a5a6a', 'stroke-width': isStk ? 2 : 1, style: 'cursor:pointer' }));
+            cells.push({ x, y, w: cs, h: cs, code });
+        }
+        this._datumCells = cells;
+    }
+
+    /** Hit-test the datum widget in viewBox units → the clicked cell or null. */
+    _hitDatum(vb) {
+        if (!this._datumCells || !vb) return null;
+        return this._datumCells.find((c) => vb.x >= c.x && vb.x <= c.x + c.w && vb.y >= c.y && vb.y <= c.y + c.h) || null;
     }
 
     /** Inline-edit a dimension's VALUE (click-to-type on its on-canvas label) → spec.onEdit(id, value). Generic, so
