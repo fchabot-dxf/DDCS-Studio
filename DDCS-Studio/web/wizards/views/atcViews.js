@@ -52,6 +52,19 @@ function magazineRackHtml(a, opts = {}) {
     return tools.map((t) => toolTile(t, 'T' + t.num, (t.length !== '' && t.length != null) ? t.length + 'mm' : (t.name || ''), hl != null && Number(t.num) === hl)).join('');
 }
 
+/** Build the 3D-magazine pocket list (machine XYZ + the assigned tool's full shape) for viz.setMagazine. */
+function magazinePockets(a) {
+    const byNum = {};
+    (a.tools || []).forEach((t) => { if (t && t.num != null && t.num !== '') byNum[Number(t.num)] = t; });
+    return (Array.isArray(a.magazine) ? a.magazine : []).map((p, i) => {
+        const t = byNum[Number(p.tool)] || {};
+        return {
+            x: p.x, y: p.y, z: p.z, pocket: p.pocket != null ? p.pocket : i + 1,
+            tool: { type: t.type || 'endmill', dia: num(t.dia, 6), angle: t.angle, length: num(t.length, 30) },
+        };
+    });
+}
+
 export const atcLengthView = {
     type: 'atc_length',
     panelId: 'wiz_atc_length',
@@ -172,6 +185,7 @@ export const atcChangeView = {
         const gcode = changeWizard.generate(params);
         el('wiz_atc_change_code').innerHTML = UIUtils.formatGCode(gcode);
         if (mgr) mgr.preview3D(gcode, 'atcChangeViz');
+        if (mgr) mgr.previewMagazine('atcChangeViz', magazinePockets(s.atc || {}));   // pockets + tools in 3D on the envelope
         // Magazine strip: show the pockets + tools; in auto mode highlight the fixed test tool being swapped to.
         const ft = Number(el('atc_change_fixedt')?.value || 0);
         const rack = el('atcChangeTools');
@@ -254,6 +268,7 @@ export const atcTableView = {
         // the real preview (pockets + tools).
         const mag = (Array.isArray(a.magazine) ? a.magazine : []).filter((p) => p && (p.x !== '' || p.y !== '' || p.z !== ''));
         if (mgr) mgr.preview3D('G90', 'atcTableViz');
+        if (mgr) mgr.previewMagazine('atcTableViz', magazinePockets(a));   // pockets + tools in 3D on the envelope
         // Tool-profile rack strip: each magazine tool drawn at its real shape (type/Ø) + length — review the rack.
         const rack = el('atcTableTools');
         if (rack) rack.innerHTML = magazineRackHtml(a);

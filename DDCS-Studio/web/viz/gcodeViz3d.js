@@ -13,6 +13,7 @@
  */
 import { initCube, cubeFaceAt, highlightCubeFace, pickCube } from './navCube.js';
 import { setupJogPendant } from './jogPendant.js';
+import { toolHalfProfile } from './toolProfile.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
 
 export class GcodeViz3D {
@@ -852,6 +853,49 @@ export class GcodeViz3D {
             box.position.set(machine.x / 2 - ox, machine.y / 2 - oy, machine.z / 2 - oz);
             this.machineBox = box; this.scene.add(box);
         }
+        if (this._magazine) this.setMagazine(this._magazine);   // re-place pockets when the envelope/origin changes
+    }
+
+    /**
+     * ATC magazine in 3D on the envelope: a tool stub + pocket ring + number at each pocket's MACHINE position.
+     * Scene coords = machine − origin(ox/oy/oz), same frame as the envelope box. pockets = [{x,y,z,dia,length,
+     * color,pocket,tool}] (machine coords). Pass [] / null to clear.
+     */
+    setMagazine(pockets) {
+        const THREE = this.THREE;
+        if (this._magGroup) {
+            this.scene.remove(this._magGroup);
+            this._magGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((mm) => mm.dispose && mm.dispose()); });
+            this._magGroup = null;
+        }
+        this._magazine = (pockets && pockets.length) ? pockets : null;
+        if (!this._magazine) { this.render(); return; }
+        const m = this._machine || {}, ox = m.ox || 0, oy = m.oy || 0, oz = m.oz || 0;
+        const n = (v, d) => { const x = Number(v); return Number.isFinite(x) ? x : d; };
+        const grp = new THREE.Group();
+        this._magazine.forEach((p, i) => {
+            const px = n(p.x, 0) - ox, py = n(p.y, 0) - oy, pz = n(p.z, 0) - oz;
+            const td = p.tool || { type: 'endmill', dia: n(p.dia, 6), length: Math.max(15, n(p.length, 30)) };
+            const dia = n(td.dia, 6), len = Math.max(15, n(td.length, 30));
+            const col = (p.color != null) ? p.color : 0xffab40;   // amber — distinct from stock + the cyan toolpath
+            // Real tool: revolve its accurate half-profile (round ballnose, pointed V-bit) — tip at the pocket Z,
+            // body extends up. Lathe revolves around Y, so rotate Y→Z for the Z-up scene.
+            const pts = toolHalfProfile(td).map((q) => new THREE.Vector2(Math.max(0.001, q[0]), q[1]));
+            const geo = new THREE.LatheGeometry(pts, 24); geo.rotateX(Math.PI / 2);
+            const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, depthWrite: false }));
+            mesh.position.set(px, py, pz);
+            grp.add(mesh);
+            // Pocket bounding box: a wireframe slot enclosing the tool, marking the pocket extent on the envelope.
+            const bw = Math.max(dia * 1.8, 14), bh = len;
+            const bgeo = new THREE.BoxGeometry(bw, bw, bh);
+            const box = new THREE.LineSegments(new THREE.EdgesGeometry(bgeo), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.5 }));
+            box.position.set(px, py, pz + bh / 2); grp.add(box);
+            bgeo.dispose();
+            const sp = this._makeNumberSprite(p.pocket != null ? p.pocket : i + 1);
+            sp.position.set(px, py, pz + len + 7); grp.add(sp);
+        });
+        this._magGroup = grp; this.scene.add(grp);
+        this.render();
     }
 
     // Re-pivot the orbit on the point under the cursor (the stock surface if hovered,

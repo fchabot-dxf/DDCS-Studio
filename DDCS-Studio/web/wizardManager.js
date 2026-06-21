@@ -376,6 +376,15 @@ export class WizardManager {
         if (ln) ln.classList.add('active-line');   // no scrollIntoView — the CODE PREVIEW must not jump while playing; the line just pulses (CSS animation)
     }
 
+    // Draw the ATC magazine (pockets + tool stubs) in the 3D preview on the machine envelope. Opt-in (ATC wizards
+    // only) — call AFTER preview3D so the panel/viz exists. pockets = [{x,y,z,dia,length,pocket,tool,color}].
+    previewMagazine(containerId, pockets) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const viz = host && host.__panel && host.__panel.viz;
+        if (viz && viz.setMagazine) viz.setMagazine(pockets || []);
+    }
+
     // Old private name kept as an alias for any external callers
     _preview3D(gcode, containerId) { return this.preview3D(gcode, containerId); }
 
