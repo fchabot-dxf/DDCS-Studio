@@ -3,6 +3,7 @@ import { el, UIUtils } from '../../ui/uiUtils.js';
 import { DrillWizard, patternPoints } from '../drillWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { toolOptionsHTML, getTool } from '../toolPicker.js';
+import { placementShift, pointsBBox, stockDatumOffset } from '../ops/placement.js';
 
 const wizard = new DrillWizard();
 const layout = new FeatureCanvas();
@@ -74,8 +75,12 @@ function buildDrillSpec(params, stock) {
 
     const datXY = (c) => String(c || '').replace(/[^ncp]/g, '').slice(0, 2);
     const stockDat = datXY(stock && stock.datum) || 'nn';
+    // Same placement the G-code is baked with (placementShift) → the 2D pattern renders exactly where the 3D path is.
+    const shift = placementShift(pointsBBox(patternPoints(params)), params);
+    const sOff = stockDatumOffset(params);
     return {
-        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y } : null,
+        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: sOff.x, oy: sOff.y } : null,
+        placement: { x: shift.x, y: shift.y },
         items, handles,
         // Path-datum picker (3×3 PATH ⌖ widget): which pattern corner anchors. Highlighted = current (falls back to
         // the stock datum). Stock-attach picker (markers on the stock corners): which stock corner the path attaches

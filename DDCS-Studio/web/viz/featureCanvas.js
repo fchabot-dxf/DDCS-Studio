@@ -91,7 +91,8 @@ export class FeatureCanvas {
         svg.addEventListener('pointermove', (e) => {
             if (!this.spec || !this._tf) return;
             if (this.active) {
-                if (this.spec.onDrag) this.spec.onDrag(this.active.id, this._toWorld(e));
+                // Handles live in the pattern's build frame; the view draws them placed → undo the placement here.
+                if (this.spec.onDrag) { const w = this._toWorld(e), p = this._placement || { x: 0, y: 0 }; this.spec.onDrag(this.active.id, { x: w.x - (p.x || 0), y: w.y - (p.y || 0) }); }
                 e.preventDefault();
             } else if (this.pan) {
                 const v = this._clientToVB(e.clientX, e.clientY);
@@ -165,15 +166,18 @@ export class FeatureCanvas {
             if (!any) { x0 = x1 = x; y0 = y1 = y; any = true; }
             else { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
         };
+        // Stock is datum-positioned (ox/oy); the pattern items + handles ride the placement (px/py) — same as drawn.
+        const pl = spec.placement || { x: 0, y: 0 }, px = pl.x || 0, py = pl.y || 0;
+        const sox = (spec.stock && spec.stock.ox) || 0, soy = (spec.stock && spec.stock.oy) || 0;
         acc(0, 0);
-        if (spec.stock) { acc(0, 0); acc(spec.stock.w, spec.stock.h); }
+        if (spec.stock) { acc(sox, soy); acc(sox + spec.stock.w, soy + spec.stock.h); }
         (spec.items || []).forEach((it) => {
-            if (it.kind === 'hole') acc(it.x, it.y);
-            else if (it.kind === 'line') { acc(it.x1, it.y1); acc(it.x2, it.y2); }
-            else if (it.kind === 'circle') { acc(it.cx - it.r, it.cy - it.r); acc(it.cx + it.r, it.cy + it.r); }
-            else if (it.kind === 'rect') { acc(it.x, it.y); acc(it.x + it.w, it.y + it.h); }
+            if (it.kind === 'hole') acc(it.x + px, it.y + py);
+            else if (it.kind === 'line') { acc(it.x1 + px, it.y1 + py); acc(it.x2 + px, it.y2 + py); }
+            else if (it.kind === 'circle') { acc(it.cx - it.r + px, it.cy - it.r + py); acc(it.cx + it.r + px, it.cy + it.r + py); }
+            else if (it.kind === 'rect') { acc(it.x + px, it.y + py); acc(it.x + it.w + px, it.y + it.h + py); }
         });
-        (spec.handles || []).forEach((h) => acc(h.x, h.y));
+        (spec.handles || []).forEach((h) => acc(h.x + px, h.y + py));
         let w = x1 - x0, h = y1 - y0;
         if (!(w > 1)) { x0 -= 50; x1 += 50; w = x1 - x0; }
         if (!(h > 1)) { y0 -= 50; y1 += 50; h = y1 - y0; }
@@ -183,6 +187,9 @@ export class FeatureCanvas {
 
     _S(x, y) { const t = this._tf; return { x: t.cx + (x - t.cxw) * t.scale, y: t.cy - (y - t.cyw) * t.scale }; }
     _W(sx, sy) { const t = this._tf; return { x: t.cxw + (sx - t.cx) / t.scale, y: t.cyw - (sy - t.cy) / t.scale }; }
+    /** World→screen WITH the toolpath placement applied. Pattern items/handles ride the placement (they're authored
+     *  in the build frame); the stock + its attach markers do NOT (they're already in part coords). */
+    _disp(x, y) { const p = this._placement || { x: 0, y: 0 }; return this._S(x + (p.x || 0), y + (p.y || 0)); }
 
     /** client (CSS px) → viewBox units, accounting for viewBox scaling. */
     _clientToVB(clientX, clientY) {
@@ -196,12 +203,14 @@ export class FeatureCanvas {
         return this._W(v.x, v.y);
     }
 
-    /** Nearest handle within a ~12px tolerance, or null. */
+    /** Nearest handle within a ~12px tolerance, or null. Handles are authored in the build frame, drawn placed → map
+     *  the world point back by the placement before comparing. */
     _hit(w) {
-        const tol = 13 / this._tf.scale;
+        const tol = 13 / this._tf.scale, p = this._placement || { x: 0, y: 0 };
+        const wx = w.x - (p.x || 0), wy = w.y - (p.y || 0);
         let best = null, bd = tol;
         (this.spec.handles || []).forEach((h) => {
-            const d = Math.hypot(h.x - w.x, h.y - w.y);
+            const d = Math.hypot(h.x - wx, h.y - wy);
             if (d <= bd) { bd = d; best = h; }
         });
         return best;
@@ -210,6 +219,7 @@ export class FeatureCanvas {
     _draw(spec, VW, VH) {
         const grid = this.gGrid, items = this.gItems, handles = this.gHandles;
         grid.replaceChildren(); items.replaceChildren(); handles.replaceChildren();
+        this._placement = spec.placement || { x: 0, y: 0 };   // pattern items/handles ride this; stock is datum-fixed
 
         // --- grid ---------------------------------------------------------
         const tl = this._W(0, 0), br = this._W(VW, VH);
@@ -230,9 +240,10 @@ export class FeatureCanvas {
             }
         }
 
-        // --- stock --------------------------------------------------------
+        // --- stock (datum-positioned: its datum corner sits at part-zero, the origin) ---------------------
         if (spec.stock && spec.stock.w > 0 && spec.stock.h > 0) {
-            const o = this._S(0, spec.stock.h);
+            const sox = spec.stock.ox || 0, soy = spec.stock.oy || 0;
+            const o = this._S(sox, soy + spec.stock.h);
             items.appendChild(svgEl('rect', {
                 x: o.x, y: o.y, width: spec.stock.w * this._tf.scale, height: spec.stock.h * this._tf.scale,
                 class: 'fc-stock', rx: 2,
@@ -247,13 +258,13 @@ export class FeatureCanvas {
         // --- guides (rings / bounding rects / paths) ---------------------
         (spec.items || []).forEach((it) => {
             if (it.kind === 'circle') {
-                const c = this._S(it.cx, it.cy);
+                const c = this._disp(it.cx, it.cy);
                 items.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: it.r * this._tf.scale, class: 'fc-guide' }));
             } else if (it.kind === 'line') {
-                const a = this._S(it.x1, it.y1), b = this._S(it.x2, it.y2);
+                const a = this._disp(it.x1, it.y1), b = this._disp(it.x2, it.y2);
                 items.appendChild(svgEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'fc-guide' }));
             } else if (it.kind === 'rect') {
-                const p = this._S(it.x, it.y + it.h);
+                const p = this._disp(it.x, it.y + it.h);
                 items.appendChild(svgEl('rect', { x: p.x, y: p.y, width: it.w * this._tf.scale, height: it.h * this._tf.scale, class: 'fc-guide' }));
             }
         });
@@ -261,7 +272,7 @@ export class FeatureCanvas {
         // --- holes (drawn last so they sit on top of guides) -------------
         (spec.items || []).forEach((it) => {
             if (it.kind !== 'hole') return;
-            const c = this._S(it.x, it.y);
+            const c = this._disp(it.x, it.y);
             const rad = Math.max(3, (it.r || 0) * this._tf.scale);
             items.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: rad, class: it.skipped ? 'fc-hole-skip' : 'fc-hole' }));
             if (it.skipped) {
@@ -278,7 +289,7 @@ export class FeatureCanvas {
 
         // --- handles (top layer, always above holes) ---------------------
         (spec.handles || []).forEach((h) => {
-            const c = this._S(h.x, h.y);
+            const c = this._disp(h.x, h.y);
             if (h.kind === 'move') {
                 handles.appendChild(svgEl('rect', { x: c.x - 6, y: c.y - 6, width: 12, height: 12, class: 'fc-handle fc-handle-move', rx: 2 }));
             } else {
@@ -311,8 +322,8 @@ export class FeatureCanvas {
         this._attachPts = null;
         if (!spec || !spec.onStockAttach || !spec.stock || !(spec.stock.w > 0) || !(spec.stock.h > 0)) return;
         const handles = this.gHandles;
-        const w = spec.stock.w, h = spec.stock.h;
-        const xc = ['n', 'c', 'p'], xs = [0, w / 2, w], ys = [0, h / 2, h];
+        const w = spec.stock.w, h = spec.stock.h, sox = spec.stock.ox || 0, soy = spec.stock.oy || 0;
+        const xc = ['n', 'c', 'p'], xs = [sox, sox + w / 2, sox + w], ys = [soy, soy + h / 2, soy + h];
         const cur = String(spec.stockAttach || spec.stockDatum || 'nn'), stk = String(spec.stockDatum || 'nn');
         const pts = [];
         for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {

@@ -103,6 +103,20 @@ test('the 3×3 datum picker renders on the layout canvas and a click sets the pa
   await expect.poll(() => page.evaluate(() => document.getElementById('d_pathDatum').value)).toBe('np');
 });
 
+test('the 2D layout renders the pattern PLACED on the stock (matches the 3D)', async ({ page }) => {
+  await setup(page);
+  // Attach to the max corner → the pattern's far hole must sit on the stock's far (max-X) edge in the LAYOUT too.
+  await code(page, { stockDatum: 'nnp', stockAttach: 'pp' });
+  const m = await page.evaluate(() => {
+    const svg = document.querySelector('#drillLayoutCanvas svg');
+    const stock = svg.querySelector('rect.fc-stock');
+    const holes = [...svg.querySelectorAll('circle.fc-hole')];
+    return { stockRight: stock.x.baseVal.value + stock.width.baseVal.value, maxHole: Math.max(...holes.map((c) => c.cx.baseVal.value)), n: holes.length };
+  });
+  expect(m.n).toBeGreaterThan(0);
+  expect(Math.abs(m.maxHole - m.stockRight), 'the far hole renders on the stock far edge (2D pattern is placed)').toBeLessThan(8);
+});
+
 test('stock-attach markers sit on the stock corners and a click sets the attach corner', async ({ page }) => {
   await setup(page);
   await code(page, { stockDatum: 'nnp' });
