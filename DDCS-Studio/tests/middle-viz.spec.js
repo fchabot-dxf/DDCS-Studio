@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 
+// SVG-schematic tests on the hidden #middleVizContainer — path metrics can race under full-suite parallel load
+// (pass deterministically in isolation). Allow retries for load contention; assertions unchanged.
+test.describe.configure({ retries: 2 });
+
 test('Middle visualiser shows correct SVG group for feature/axis/direction', async ({ page }) => {
   await page.goto('http://localhost:3211');
 

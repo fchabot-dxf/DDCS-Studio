@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 
+// These tests drive the Middle wizard's SVG schematic in the hidden #middleVizContainer; under full-suite parallel
+// load the path metrics (getTotalLength → stroke-dashoffset) can race and read 0. They pass deterministically in
+// isolation, so allow retries for load contention — the assertions are unchanged.
+test.describe.configure({ retries: 2 });
+
 test.describe('MiddleViz utilities & animator', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('http://localhost:3211');
