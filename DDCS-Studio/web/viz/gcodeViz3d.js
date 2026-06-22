@@ -781,18 +781,13 @@ export class GcodeViz3D {
             ? (this._stockFloorZ != null ? this._stockFloorZ : -this._stock.z) : b.minZ;
         // GRID + edge labels live in the SCENE: linked to the ENVELOPE footprint in MACHINE coords (home at scene 0,
         // fixed) when the envelope is shown, else the part/stock footprint.
-        const stockShown = !!(this._stock && this._stock.show && this._stock.z > 0);
         let gCx = cx, gCy = cy, gFloor = pFloor, gW = Math.max(sx, 10), gH = Math.max(sy, 10);
         let gHalfX = pHalf, gHalfY = pHalf, gSpan = pSpan;
         if (useMch) {
             gCx = m.x / 2; gCy = m.y / 2;                       // envelope centre (MACHINE coords)
             gW = Math.abs(m.x); gH = Math.abs(m.y);
             gHalfX = Math.abs(m.x) / 2; gHalfY = Math.abs(m.y) / 2; gSpan = Math.max(Math.abs(m.x), Math.abs(m.y));
-            // Floor (the grid/table is in the fixed MACHINE frame, so its Z is in SCENE coords): when a stock is shown
-            // it sits at the stock's BOTTOM in scene coords (shift.z + part-local floor) so the stock always rests on
-            // the table at its WCS height; with no stock it's the envelope bottom (machine Z min).
-            const sh = this.partFrame ? this.partFrame.shift : { x: 0, y: 0, z: 0 };
-            gFloor = stockShown ? (sh.z || 0) + pFloor : Math.min(0, m.z);
+            gFloor = Math.min(0, m.z);                          // machine table — FIXED; the part rides the WCS (_partShift)
         }
         // The grid/table OVERHANGS the envelope (or stock) footprint by a few cm so it isn't flush with the machine
         // walls — like a real table extending past the travel limits. Labels stay at the true coordinate extent
@@ -1018,12 +1013,19 @@ export class GcodeViz3D {
     _partShift() {
         const m = this._machine, s = this._stock;
         if (!(m && m.show && m.x && m.y && m.z)) return { x: 0, y: 0, z: 0 };
+        // XY — always the stock's WCS (G54 XY): the persistent fixture position. Z (wcsZ) read too, used only when forced.
+        let x = 0, y = 0, wcsZ = 0;
         const pin = s && s.pin, wt = m.wcs && m.wcs.table;
         if (pin && pin !== 'origin' && Array.isArray(wt)) {
             const t = wt[parseInt(String(pin).replace(/[^0-9]/g, ''), 10) - 54];   // 'g54' → table[0]
-            if (t) return { x: Number(t.x) || 0, y: Number(t.y) || 0, z: Number(t.z) || 0 };
+            if (t) { x = Number(t.x) || 0; y = Number(t.y) || 0; wcsZ = Number(t.z) || 0; }
         }
-        return { x: 0, y: 0, z: 0 };   // stock at the program zero (machine origin)
+        // Z — DEFAULT: the stock rests on the fixed machine table (you re-zero Z per part, so the stored WCS-Z is
+        // ignored); Z0 then floats at the datum height. FORCE WCS-Z: place the work zero at the stored WCS-Z (absolute
+        // machine height) — for travel/clearance/G53 checks. Sim placement only; the generated G-code is identical.
+        const tableFloor = Math.min(0, m.z), stockShown = s && s.show && s.z > 0 && this._stockFloorZ != null;
+        const z = (s && s.useWcsZ) ? wcsZ : (stockShown ? tableFloor - this._stockFloorZ : wcsZ);
+        return { x, y, z };
     }
 
     // Wireframe machine envelope (fixed machine coords; home at scene 0) + machine-zero axes. The PART frame carries
