@@ -8,7 +8,10 @@
 export function frameWizardSections(root) {
     if (!root) return;
     const containers = new Set();   // the parents that hold section-labels (.wiz-controls, or the body for 1-pane wizards)
-    root.querySelectorAll('.section-label').forEach((lbl) => { if (lbl.parentElement) containers.add(lbl.parentElement); });
+    root.querySelectorAll('.section-label').forEach((lbl) => {
+        if (lbl.closest('.wiz-visual')) return;   // the VISUALIZATION header isn't a form category — never frame the preview pane
+        if (lbl.parentElement) containers.add(lbl.parentElement);
+    });
     containers.forEach((controls) => {
         if (controls.dataset.framed) return;
         controls.dataset.framed = '1';
