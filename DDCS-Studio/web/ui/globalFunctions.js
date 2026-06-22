@@ -8,6 +8,7 @@ import { resetVirtualIO, setVirtualOutput, getVirtualInput } from '../engine/vir
 import { rotateProgram, translateProgram } from '../data/rotateProgram.js';
 import { parseGcode } from '../gcodeParser.js';
 import { FeatureCanvas } from '../viz/featureCanvas.js';
+import { makeRotate } from '../blocks/programFraming.js';
 
 export function setupGlobalFunctions(app) {
         // Expose key functions to global scope for HTML onclick handlers
@@ -206,13 +207,27 @@ export function setupGlobalFunctions(app) {
             });
             ov.querySelector('[data-rgo]').addEventListener('click', () => {
                 if (!st.ang) { ov.querySelector('[data-rout]').textContent = 'Set a non-zero angle (drag the handle or type one).'; return; }
+                const o = ov.querySelector('[data-rout]');
+                // Preferred ATOM path: wrap the block program in a Rotate atom — non-lossy, reversible, round-trips in
+                // the Blocks tab. The preview rotated the CURRENTLY shown geometry, so we always nest a fresh wrapper
+                // (two alignments compose, and preview == result). Only when the editor still matches the live
+                // projection (else the stack is stale and re-emitting would clobber a hand-edit).
+                const stack = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+                const proj = (window.ddcsGetBlockGcode && window.ddcsGetBlockGcode()) || '';
+                if (stack.length && proj.trim() && proj === ed.value && window.ddcsLoadBlockStack) {
+                    window.ddcsLoadBlockStack([makeRotate({ angle: st.ang, pivotX: st.px, pivotY: st.py }, stack)]);
+                    window.ddcsTrack?.('feature', 'align-rotate-atom');
+                    close();   // done — the editor + preview now show the rotated result; the Rotate atom is in Blocks
+                    return;
+                }
+                // Fallback: in-place text rewrite (raw G-code with no block program, or a not-yet-reconciled edit). Lossy.
                 const r = rotateProgram(ed.value, st.ang, st.px, st.py);
                 ed.value = r.text;
                 ed.dispatchEvent(new Event('input', { bubbles: true }));   // refresh highlight + preview
                 window.ddcsTrack?.('feature', 'align-rotate');
-                const msg = `Rotated ${r.rotated} move(s) by ${st.ang}° about (${st.px}, ${st.py}).` + (r.hadIncremental ? ' ⚠ G91 incremental moves were left unrotated — check them.' : ' Simulate to verify.');
-                ov.querySelector('[data-rout]').innerHTML = msg;
-                ov.querySelector('[data-rout]').style.color = r.hadIncremental ? '#ff6b6b' : '#3c9';
+                const msg = `Rotated ${r.rotated} move(s) by ${st.ang}° about (${st.px}, ${st.py}). ⚠ Text rewrite (no block program to wrap) — not reversible.` + (r.hadIncremental ? ' G91 incremental moves were left unrotated — check them.' : ' Simulate to verify.');
+                o.innerHTML = msg;
+                o.style.color = r.hadIncremental ? '#ff6b6b' : '#fd0';
             });
         };
 
