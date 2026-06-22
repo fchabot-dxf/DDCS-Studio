@@ -1629,6 +1629,16 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     margin-top: 12px;
 }
 
+/* Per-category frames — frameWizardSections() (ui/wizardSections.js) wraps each section-label + its fields in a
+   .wiz-section, so the form reads as grouped, framed categories. Theme-aware via the skin tokens. */
+.wiz-section {
+    border: 1px solid var(--outline, var(--border, #2c3a4a));
+    border-radius: var(--radius, 6px);
+    padding: 8px 11px 11px;
+    margin: 10px 0;
+}
+.wiz-section > .section-label:first-child { margin-top: 0; }
+
 /* Button Grids */
 .grid-2 {
     display: grid;

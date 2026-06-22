@@ -13,6 +13,7 @@ import { playClick, playClickReverse } from './ui/sound.js';  // audio helper fo
 import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
 import { createPreviewPanel } from './viz/createPreviewPanel.js';   // THE shared preview (identical to Blocks/Studio), fed the wizard's op code
 import { openTemplatesPopover, closeTemplatesPopover } from './ui/wizardTemplates.js';   // per-op save/load templates (local + cloud)
+import { frameWizardSections } from './ui/wizardSections.js';   // group each form's fields into framed categories
 
 // Map the touch-probe wizards' per-op input fields to the global 3D-probe defaults
 // (settings.probes). open() pre-fills these so every wizard starts from the configured
@@ -226,6 +227,7 @@ export class WizardManager {
         const wizElem = el('wiz_' + type);
         if (wizElem) {
             wizElem.style.display = 'block';
+            frameWizardSections(wizElem);   // group the form's fields into framed categories (idempotent)
             this._setupSplitter(wizElem);   // draggable form/preview divider (all two-pane wizards)
             // Variant entry: a view may declare identity-splitting variants (e.g. drill vs bore) that share one
             // form. The view locks the variant param + hides its selector so the menu choice fixes the identity.
