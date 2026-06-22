@@ -162,6 +162,26 @@ export class WizardManager {
         }) || null;
     }
 
+    /**
+     * Reverse-sync: pull the (possibly block-edited) active op back into the OPEN wizard's form, so editing the
+     * PlaceOnStock cornergrid / params in the Blocks tab shows up here. Wired to the tab switch back to Studio
+     * (gatewayStatus.showApp). No-op unless a wizard is open AND it matches the op the Blocks tab is showing.
+     */
+    async pullFromBlocks() {
+        const view = this.activeView();
+        if (!view || !this.wizardElement || !this.wizardElement.classList.contains('active')) return;
+        let reconcileActiveOp;
+        try { ({ reconcileActiveOp } = await import('./blocks/opStacks.js')); } catch (_) { return; }
+        const r = reconcileActiveOp();
+        if (!r || r.type !== view.type || !r.fields) return;
+        for (const id in r.fields) {
+            const e = el(id), val = r.fields[id];
+            if (!e || val == null || String(e.value) === String(val)) continue;
+            e.value = String(val);
+            e.dispatchEvent(new Event('input', { bubbles: true }));   // refresh the form's anchor pickers + re-run the wizard
+        }
+    }
+
     open(type, variant) {
         // play a feedback sound whenever a wizard is opened
         playClick();

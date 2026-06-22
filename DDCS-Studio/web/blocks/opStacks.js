@@ -97,30 +97,46 @@ const formNum = (id, d) => {
     return e ? num(e.value, d) : d;
 };
 
+// The PlaceOnStock wrapper carries the placement intent; its params are the exact inverse of makePlace
+// (offX ← originX, etc.), so reading them back is correct whatever coordinates the wrapped geometry is built in.
+// `offX`/`offY` name THIS op's offset fields — follow-datum ops use originX/Y; opt-in slot/text use offX/Y.
+function placeFields(prog, prefix, offX, offY) {
+    const pb = find(prog, 'placeonstock');
+    if (!pb || !pb.params) return {};
+    const p = pb.params;
+    return {
+        [prefix + 'stockAttach']: p.stockAttach || '',
+        [prefix + 'pathDatum']: p.pathDatum || '',
+        [prefix + offX]: num(p.offX, 0),
+        [prefix + offY]: num(p.offY, 0),
+        [prefix + 'offZ']: num(p.offZ, 0),
+    };
+}
+
 const RECONCILERS = {
     surfacing(prog) {
         const down = find(prog, 'stepdown'), over = down && down.children && down.children[0], rg = over && over.params && over.params.region;
         if (!down || !over || !rg || !rg.params) return null;
         const tool = formNum('sf_toolDia', 12), wb = find(prog, 'wcs');   // un-derive stepover% from the absolute StepOver value
-        return {
+        return Object.assign({
             sf_wcs: (wb && wb.params && wb.params.wcs) || 'active',
             sf_originX: rg.params.x, sf_originY: rg.params.y, sf_w: rg.params.w, sf_h: rg.params.h,
             sf_depth: down.params.to, sf_stepdown: down.params.by,
             sf_strategy: over.params.strategy === 'parallel' ? 'raster' : 'spiral',
             sf_stepoverPct: tool > 0 ? r3((num(over.params.stepover, 0) / tool) * 100) : undefined,
             sf_feed: over.params.feed, sf_plunge: over.params.plunge, sf_clearance: over.params.clearance,
-        };
+        }, placeFields(prog, 'sf_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper, not the region
     },
     slot(prog) {
         const s = find(prog, 'slot');
         if (!s || !s.params) return null;
         const p = s.params, wb = find(prog, 'wcs');
-        return {
+        return Object.assign({
             sl_wcs: (wb && wb.params && wb.params.wcs) || 'active',
             sl_ax: p.x0, sl_ay: p.y0, sl_bx: p.x1, sl_by: p.y1, sl_width: p.width,
             sl_toolDia: p.tool, sl_stepoverPct: p.stepoverPct, sl_depth: p.depth, sl_stepdown: p.stepdown,
             sl_feed: p.feed, sl_plunge: p.plunge, sl_clearance: p.clearance,
-        };
+        }, placeFields(prog, 'sl_', 'offX', 'offY'));   // opt-in placement: A↔B stays absolute, offset/anchors ride the wrapper
     },
     pocket(prog) {
         const down = find(prog, 'stepdown');
@@ -142,7 +158,7 @@ const RECONCILERS = {
             f.p_w = r3(num(rg.params.w, 0) + tool); f.p_h = r3(num(rg.params.h, 0) + tool);
             f.p_originX = r3(num(rg.params.x, 0) - r); f.p_originY = r3(num(rg.params.y, 0) - r);
         }
-        return f;
+        return Object.assign(f, placeFields(prog, 'p_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper
     },
     drill(prog) {
         const arr = find(prog, 'array');
@@ -160,7 +176,7 @@ const RECONCILERS = {
             if (hole.type === 'bore') { f.d_holeDia = h.holeDia; f.d_toolDia = h.toolDia; f.d_pitch = h.pitch; f.d_ramp = h.ramp; }
             else f.d_peck = h.peck;
         }
-        return f;
+        return Object.assign(f, placeFields(prog, 'd_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper, not the array
     },
 };
 

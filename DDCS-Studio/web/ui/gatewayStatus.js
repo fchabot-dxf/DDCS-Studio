@@ -79,8 +79,10 @@ export function initGatewayStatus() {
             mod.initMacrosApp();
         }
 
-        // (Blocks → STUDIO round-trip is now LIVE: the Blocks tab projects its G-code straight into the editor
-        // on every change — see blocksApp.reproject. No tab-switch copy/reconcile needed here.)
+        // (Blocks → STUDIO editor round-trip is LIVE: the Blocks tab projects its G-code straight into the editor
+        // on every change — see blocksApp.reproject.) The open WIZARD's FORM is pulled back here, on the way in, so
+        // block edits to the PlaceOnStock cornergrid / params show up on the form too (reverse-sync).
+        if (isStudio) { try { window.ddcsStudio?.wizardManager?.pullFromBlocks?.(); } catch (_) { /* not ready */ } }
 
         studioApp?.classList.toggle('hidden', !isStudio);
         gatewayApp?.classList.toggle('hidden', !isGateway);

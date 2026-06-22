@@ -98,3 +98,27 @@ test('PlaceOnStock shows the inline 3×3 corner-grid fields, coloured per datum,
   await page.mouse.click(box.x, box.y);
   await expect.poll(() => page.evaluate(() => window.__blkws.getAllBlocks().find((b) => b.type === 'placeonstock').getFieldValue('STOCKATTACH'))).toBe('nn');
 });
+
+test('block→wizard reverse-sync: editing the PlaceOnStock anchor in Blocks flows back to the wizard form', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+  await page.evaluate(() => { const s = window.ddcsGetSettings(); s.stock = Object.assign(s.stock || {}, { x: 100, y: 80, z: 20, show: true, datum: 'nnp' }); });
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
+  await page.waitForSelector('#wiz_drill', { state: 'visible' });
+  await page.evaluate(() => { document.getElementById('d_stockAttach').value = ''; window.ddcsStudio.wizardManager.update(); });
+
+  // View as blocks, then edit the PlaceOnStock stock-attach corner to 'pp'.
+  await page.evaluate(() => window.showApp('blocks'));
+  await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().some((b) => b.type === 'placeonstock'));
+  await page.evaluate(() => window.__blkws.getAllBlocks().find((b) => b.type === 'placeonstock').getField('STOCKATTACH').setValue('pp'));
+  // The edit must reach the program stack the reconciler reads.
+  await expect.poll(() => page.evaluate(() => {
+    const find = (p) => { for (const b of (p || [])) { if (b.type === 'placeonstock') return b; if (b.children) { const f = find(b.children); if (f) return f; } } return null; };
+    const pb = find(window.ddcsGetBlockProgram && window.ddcsGetBlockProgram());
+    return pb && pb.params ? pb.params.stockAttach : null;
+  })).toBe('pp');
+
+  // Switch back to Studio → the OPEN wizard's form reflects the block edit.
+  await page.evaluate(() => window.showApp('studio'));
+  await expect.poll(() => page.evaluate(() => document.getElementById('d_stockAttach').value)).toBe('pp');
+});
