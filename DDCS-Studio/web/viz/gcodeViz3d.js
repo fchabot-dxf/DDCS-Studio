@@ -1148,7 +1148,12 @@ export class GcodeViz3D {
         if (!this.followCam || !this.active) { this._followRaf = null; return; }
         if (this._animTool && this._animTool.visible) {
             const before = this.target.clone();
-            this.target.lerp(this._animTool.position, this.followLerp);   // ease the orbit centre onto the tool
+            // The tool rides the partFrame (shifted by +workOrigin to the WCS spot), so .position is its LOCAL coord;
+            // lerping the world-space orbit target onto it centres on where the tool would be at machine origin (the
+            // reported bug). Use the tool's WORLD position so the lock follows the actual spindle.
+            this._animTool.updateWorldMatrix(true, false);
+            const tw = this._animTool.getWorldPosition(this._followV3 || (this._followV3 = new THREE.Vector3()));
+            this.target.lerp(tw, this.followLerp);
             if (this.target.distanceToSquared(before) > 1e-5) { this._applyCamera(); this.render(); }
         }
         this._followRaf = requestAnimationFrame(() => this._followTick());
