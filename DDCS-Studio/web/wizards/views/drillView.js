@@ -4,6 +4,7 @@ import { DrillWizard, patternPoints } from '../drillWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { toolOptionsHTML, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams, pointsBBox } from '../ops/placement.js';
+import { mountPathAnchor } from '../../ui/pathAnchorField.js';
 
 const wizard = new DrillWizard();
 const layout = new FeatureCanvas();
@@ -162,6 +163,7 @@ export const drillView = {
                 sel.addEventListener('change', () => applyTool());
             }
         }
+        mountPathAnchor('d_');   // PATH ANCHOR override (collapsed; follows the stock attach until opened)
         ctx.update();
     },
 

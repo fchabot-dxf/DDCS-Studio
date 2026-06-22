@@ -821,8 +821,9 @@
                     <div><span class="label">OFFSET X</span><input id="d_originX" value="0" title="Signed X offset of the path from the stock-attach corner (drag the square handle in the 2D layout)."/></div>
                     <div><span class="label">OFFSET Y</span><input id="d_originY" value="0" title="Signed Y offset of the path from the stock-attach corner (drag the square handle in the 2D layout)."/></div>
                     <div><span class="label">OFFSET Z</span><input id="d_offZ" value="0" title="Signed Z offset of the whole path (shifts every Z move; 0 = part-zero plane)."/></div>
-                    <input id="d_pathDatum" type="hidden" value=""/><!-- path-datum corner (PATH ⌖ widget); empty = follow the stock datum -->
+                    <input id="d_pathDatum" type="hidden" value=""/><!-- path-datum corner; set by the PATH ANCHOR form widget (empty = follow the stock attach) -->
                     <input id="d_stockAttach" type="hidden" value=""/><!-- stock corner the path attaches to (markers on the stock); empty = the stock datum -->
+                    <div class="pa-mount" data-prefix="d_"></div>
                     <div><span class="label">WORK WCS</span><select id="d_wcs" title="Run in the Active WCS (whatever G54–G59 is selected on the controller) or force a specific one. Positions are in the chosen frame."><option value="active">Active</option><option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option><option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option></select></div>
                 </div>
                 <div id="d_pat_grid" class="grid-2" style="display:none">
@@ -932,6 +933,7 @@
                     <div><span class="label">OFFSET Y</span><input id="p_originY" value="0" title="Signed Y offset of the pocket from the stock-attach corner."/></div>
                     <div><span class="label">OFFSET Z</span><input id="p_offZ" value="0" title="Signed Z offset of the whole pocket (shifts every Z move; 0 = part-zero plane)."/></div>
                     <input id="p_pathDatum" type="hidden" value=""/><input id="p_stockAttach" type="hidden" value=""/>
+                    <div class="pa-mount" data-prefix="p_"></div>
                 </div>
                 <div id="p_dim_rect" class="grid-2">
                     <div><span class="label">WIDTH</span><input id="p_w" value="80"/></div>
@@ -1004,6 +1006,7 @@
                     <div><span class="label">OFFSET Y</span><input id="sl_offY" value="0" title="Signed Y nudge of the whole slot."/></div>
                     <div><span class="label">OFFSET Z</span><input id="sl_offZ" value="0" title="Signed Z offset (shifts every Z move; 0 = part-zero plane)."/></div>
                     <input id="sl_pathDatum" type="hidden" value=""/><input id="sl_stockAttach" type="hidden" value=""/>
+                    <div class="pa-mount" data-prefix="sl_"></div>
                 </div>
 
                 <span class="section-label">TOOL</span>
@@ -1064,6 +1067,7 @@
                     <div><span class="label">OFFSET Y</span><input id="sf_originY" value="0" title="Signed Y offset of the faced area from the stock-attach corner."/></div>
                     <div><span class="label">OFFSET Z</span><input id="sf_offZ" value="0" title="Signed Z offset of the whole pass (shifts every Z move; 0 = part-zero plane)."/></div>
                     <input id="sf_pathDatum" type="hidden" value=""/><input id="sf_stockAttach" type="hidden" value=""/>
+                    <div class="pa-mount" data-prefix="sf_"></div>
                     <div><span class="label">WIDTH</span><input id="sf_w" value="100"/></div>
                     <div><span class="label">HEIGHT</span><input id="sf_h" value="80"/></div>
                 </div>
@@ -1143,6 +1147,7 @@
                     <div><span class="label">OFFSET Y</span><input id="tx_offY" value="0" title="Signed Y nudge of the label."/></div>
                     <div><span class="label">OFFSET Z</span><input id="tx_offZ" value="0" title="Signed Z offset (shifts every Z move; 0 = part-zero plane)."/></div>
                     <input id="tx_pathDatum" type="hidden" value=""/><input id="tx_stockAttach" type="hidden" value=""/>
+                    <div class="pa-mount" data-prefix="tx_"></div>
                     <div><span class="label">LETTER SPACING</span><input id="tx_spacing" value="1.2" title="Extra gap between letters (mm)."/></div>
                 </div>
 

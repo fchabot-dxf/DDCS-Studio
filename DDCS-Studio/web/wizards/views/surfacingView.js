@@ -4,6 +4,7 @@ import { SurfacingWizard, surfacingBBox } from '../surfacingWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams } from '../ops/placement.js';
+import { mountPathAnchor } from '../../ui/pathAnchorField.js';
 
 const wizard = new SurfacingWizard();
 const layout = new FeatureCanvas();
@@ -64,6 +65,7 @@ export const surfacingView = {
         const sel = el('sf_tool');
         if (sel) { populateToolSelect(sel); if (!sel.dataset.wired) { sel.dataset.wired = '1'; sel.addEventListener('change', applyTool); } }
         const st = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
+        mountPathAnchor('sf_');
         if (st && st.x > 0 && st.y > 0) setFields({ sf_originX: 0, sf_originY: 0, sf_w: st.x, sf_h: st.y });
         else ctx.update();
     },

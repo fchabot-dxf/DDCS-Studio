@@ -85,24 +85,20 @@ test('the placement persists through insert (baked into the block stack, not a p
   expect(res.hasArray, 'the pattern is wrapped inside the PlaceOnStock block').toBe(true);
 });
 
-test('the 3×3 datum picker renders on the layout canvas and a click sets the path datum', async ({ page }) => {
+test('the form anchor pickers set the PATH and STOCK anchors (3×3 cells)', async ({ page }) => {
   await setup(page);
   await code(page, { stockDatum: 'nnp', pathDatum: '' });
-  const svg = page.locator('#drillLayoutCanvas svg');
-  await expect(svg).toBeVisible();
-  // The widget title is drawn as an SVG text node.
-  await expect(svg.locator('text', { hasText: 'PATH' })).toBeVisible();
-  // Click the top-left cell (= minX/maxY = 'np') and confirm it writes d_pathDatum.
-  const hit = await page.evaluate(() => {
-    const svg = document.querySelector('#drillLayoutCanvas svg');
-    const r = svg.getBoundingClientRect();
-    const vb = svg.viewBox.baseVal;   // 0 0 VW VH
-    const sx = r.left + (20 / vb.width) * r.width;   // cell 'np' centre ≈ viewBox (20,34)
-    const sy = r.top + (34 / vb.height) * r.height;
-    return { sx, sy };
-  });
-  await page.mouse.click(hit.sx, hit.sy);
+  const mount = page.locator('.pa-mount[data-prefix="d_"]');
+  await expect(mount, 'the STOCK + PATH anchor pickers are in the drill form').toBeVisible();
+  // PATH ANCHOR picker → pick the back-left corner ('np').
+  await mount.locator('.ap[data-field="d_pathDatum"] rect[data-code="np"]').click();
   await expect.poll(() => page.evaluate(() => document.getElementById('d_pathDatum').value)).toBe('np');
+  // STOCK ANCHOR picker → pick the front-right corner ('pn').
+  await mount.locator('.ap[data-field="d_stockAttach"] rect[data-code="pn"]').click();
+  await expect.poll(() => page.evaluate(() => document.getElementById('d_stockAttach').value)).toBe('pn');
+  // Re-clicking the picked PATH cell clears back to "follow".
+  await mount.locator('.ap[data-field="d_pathDatum"] rect[data-code="np"]').click();
+  await expect.poll(() => page.evaluate(() => document.getElementById('d_pathDatum').value)).toBe('');
 });
 
 test('the 2D layout renders the pattern PLACED on the stock (matches the 3D)', async ({ page }) => {

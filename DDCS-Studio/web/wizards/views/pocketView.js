@@ -4,6 +4,7 @@ import { PocketWizard, pocketBBox } from '../pocketWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams } from '../ops/placement.js';
+import { mountPathAnchor } from '../../ui/pathAnchorField.js';
 
 const wizard = new PocketWizard();
 const layout = new FeatureCanvas();
@@ -69,6 +70,7 @@ export const pocketView = {
     onOpen(ctx) {
         const sel = el('p_tool');
         if (sel) { populateToolSelect(sel); if (!sel.dataset.wired) { sel.dataset.wired = '1'; sel.addEventListener('change', applyTool); } }
+        mountPathAnchor('p_');
         ctx.update();
     },
 

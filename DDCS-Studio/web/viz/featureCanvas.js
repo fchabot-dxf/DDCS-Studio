@@ -72,13 +72,11 @@ export class FeatureCanvas {
         const svg = this.svg;
         svg.addEventListener('pointerdown', (e) => {
             if (!this.spec || !this._tf || e.button !== 0) return;
-            // The PATH ⌖ datum picker is a fixed screen-space widget → test it in viewBox units before world hits.
-            const cell = this._hitDatum(this._clientToVB(e.clientX, e.clientY));
-            if (cell) { if (this.spec.onPathDatum) this.spec.onPathDatum(cell.code); e.preventDefault(); return; }
             const w = this._toWorld(e);
             const hit = this._hit(w);
             if (!hit) {
-                // Stock-attach markers sit on the stock's corners/edges (world space) → click one to set the corner.
+                // Stock-attach markers sit on the stock's corners (a quick alternative to the form's STOCK ANCHOR
+                // picker). The PATH anchor lives only in the form pickers — so the canvas never superposes two sets.
                 const att = this._hitAttach(w);
                 if (att) { if (this.spec.onStockAttach) this.spec.onStockAttach(att.code); e.preventDefault(); return; }
             }
@@ -312,12 +310,12 @@ export class FeatureCanvas {
             }
         });
 
-        this._drawDatumWidget(spec, VW, VH);
         this._drawStockAttach(spec);
     }
 
     /** Stock-attach markers — small squares on the stock's 9 points (corners/edges/centre). Click one to choose which
-     *  stock corner the path attaches to. Filled = current; green ring = the stock's own datum (the default attach). */
+     *  stock corner the path attaches to (mirrors the form's STOCK ANCHOR picker). Filled = current; green ring = the
+     *  stock's own datum (the default attach). The PATH anchor is form-only, so the canvas never shows two marker sets. */
     _drawStockAttach(spec) {
         this._attachPts = null;
         if (!spec || !spec.onStockAttach || !spec.stock || !(spec.stock.w > 0) || !(spec.stock.h > 0)) return;
@@ -342,38 +340,6 @@ export class FeatureCanvas {
         let best = null, bd = tol;
         this._attachPts.forEach((p) => { const d = Math.hypot(p.x - w.x, p.y - w.y); if (d <= bd) { bd = d; best = p; } });
         return best;
-    }
-
-    /** 3×3 path-datum picker — a fixed screen-space widget (top-left). Each cell = which corner of the pattern
-     *  anchors on the stock. Filled = the current path datum; ringed = the stock's own datum (the default). Clicking
-     *  a cell calls spec.onPathDatum(code) where code is [X][Y] of n(min)/c(centre)/p(max). */
-    _drawDatumWidget(spec, VW, VH) {
-        this._datumCells = null;
-        if (!spec || !spec.onPathDatum) return;
-        const handles = this.gHandles;
-        const cs = 16, gx = 12, gy = 26, pad = 5;
-        // panel + title
-        handles.appendChild(svgEl('rect', { x: gx - pad, y: 8, width: cs * 3 + pad * 2, height: cs * 3 + 18 + pad, rx: 4, fill: 'rgba(8,12,18,0.72)', stroke: '#2c3a4a', 'stroke-width': 1 }));
-        const title = svgEl('text', { x: gx - pad + 4, y: 20, class: 'fc-handle-label', 'font-size': 9, fill: '#9fb3c8' });
-        title.textContent = 'PATH ⌖'; handles.appendChild(title);
-        const colC = ['n', 'c', 'p'], rowC = ['p', 'c', 'n'];   // left→right = minX..maxX ; top→bottom = maxY..minY
-        const cur = String(spec.pathDatum || spec.stockDatum || 'nn');
-        const stk = String(spec.stockDatum || 'nn');
-        const cells = [];
-        for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
-            const code = colC[c] + rowC[r];
-            const x = gx + c * cs, y = gy + r * cs;
-            const isCur = code === cur, isStk = code === stk;
-            handles.appendChild(svgEl('rect', { x: x + 1, y: y + 1, width: cs - 2, height: cs - 2, rx: 2, fill: isCur ? '#ffcf3a' : 'rgba(120,150,180,0.12)', stroke: isStk ? '#5fd06a' : '#4a5a6a', 'stroke-width': isStk ? 2 : 1, style: 'cursor:pointer' }));
-            cells.push({ x, y, w: cs, h: cs, code });
-        }
-        this._datumCells = cells;
-    }
-
-    /** Hit-test the datum widget in viewBox units → the clicked cell or null. */
-    _hitDatum(vb) {
-        if (!this._datumCells || !vb) return null;
-        return this._datumCells.find((c) => vb.x >= c.x && vb.x <= c.x + c.w && vb.y >= c.y && vb.y <= c.y + c.h) || null;
     }
 
     /** Inline-edit a dimension's VALUE (click-to-type on its on-canvas label) → spec.onEdit(id, value). Generic, so

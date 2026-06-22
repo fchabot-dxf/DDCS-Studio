@@ -4,6 +4,7 @@ import { TextWizard, layoutText, textBBox } from '../textWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams } from '../ops/placement.js';
+import { mountPathAnchor } from '../../ui/pathAnchorField.js';
 
 const wizard = new TextWizard();
 const layout = new FeatureCanvas();
@@ -67,6 +68,7 @@ export const textView = {
     onOpen(ctx) {
         const sel = el('tx_tool');
         if (sel) { populateToolSelect(sel); if (!sel.dataset.wired) { sel.dataset.wired = '1'; sel.addEventListener('change', applyTool); } }
+        mountPathAnchor('tx_');
         ctx.update();
     },
 

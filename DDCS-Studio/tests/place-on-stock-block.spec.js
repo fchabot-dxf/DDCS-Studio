@@ -76,10 +76,12 @@ test('PlaceOnStock shows the inline 3×3 corner-grid fields, coloured per datum,
   await page.waitForTimeout(150);
 
   const r = await page.evaluate(() => {
-    const cells = [...document.querySelectorAll('rect[data-code]')].map((c) => (c.getAttribute('fill') || '').toLowerCase());
+    // Scope to the Blockly workspace SVG — the wizard form's pickers draw the SAME cornergrid graphic, so an
+    // unscoped rect[data-code] would also count those 18 cells.
+    const cells = [...document.querySelectorAll('.blocklySvg rect[data-code]')].map((c) => (c.getAttribute('fill') || '').toLowerCase());
     return {
       n: cells.length, blue: cells.includes('#4ab3ff'), amber: cells.includes('#ffcf3a'),
-      darkCross: document.querySelectorAll('line[stroke="#10151b"]').length,   // bold crosshair on the picked cells
+      darkCross: document.querySelectorAll('.blocklySvg line[stroke="#10151b"]').length,   // bold crosshair on the picked cells
     };
   });
   expect(r.n, 'two inline 3×3 grids = 18 cells rendered on the block').toBe(18);

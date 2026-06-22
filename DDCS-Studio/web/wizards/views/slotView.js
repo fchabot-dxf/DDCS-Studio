@@ -4,6 +4,7 @@ import { SlotWizard, slotBBox } from '../slotWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams } from '../ops/placement.js';
+import { mountPathAnchor } from '../../ui/pathAnchorField.js';
 
 const wizard = new SlotWizard();
 const layout = new FeatureCanvas();
@@ -77,6 +78,7 @@ export const slotView = {
     onOpen(ctx) {
         const sel = el('sl_tool');
         if (sel) { populateToolSelect(sel); if (!sel.dataset.wired) { sel.dataset.wired = '1'; sel.addEventListener('change', applyTool); } }
+        mountPathAnchor('sl_');
         ctx.update();
     },
 
