@@ -92,7 +92,9 @@ export class FeatureCanvas {
                 if (att) { if (this.spec.onStockAttach) this.spec.onStockAttach(att.code); e.preventDefault(); return; }
             }
             try { svg.setPointerCapture(e.pointerId); } catch (_) {}
-            if (hit) this.active = { id: hit.id };           // grab a handle
+            // Grab a handle. For a POSITION handle, precompute the snap "from" points (the handle itself + the path's
+            // 9 bbox anchors) so any path corner/edge/centre can snap onto a stock anchor while dragging.
+            if (hit) this.active = { id: hit.id, kind: hit.kind, snapOffsets: hit.kind === 'move' ? this._snapOffsets(hit) : null };
             else this.pan = this._clientToVB(e.clientX, e.clientY); // else pan the background
             svg.style.cursor = 'grabbing';
             e.preventDefault();
@@ -101,7 +103,16 @@ export class FeatureCanvas {
             if (!this.spec || !this._tf) return;
             if (this.active) {
                 // Handles live in the pattern's build frame; the view draws them placed → undo the placement here.
-                if (this.spec.onDrag) { const w = this._toWorld(e), p = this._placement || { x: 0, y: 0 }; this.spec.onDrag(this.active.id, { x: w.x - (p.x || 0), y: w.y - (p.y || 0) }); }
+                if (this.spec.onDrag) {
+                    let w = this._toWorld(e);
+                    // A POSITION ('move') handle snaps onto a stock anchor (corner/edge/centre) or part-zero when close,
+                    // so you can drop the path exactly on a stock feature. Other handles (size/width) don't snap.
+                    const sn = (this.active.kind === 'move') ? this._snapToAnchor(w) : null;
+                    this._snap = sn ? { x: sn.target.x, y: sn.target.y } : null;   // ring on the stock anchor that caught it
+                    if (sn) w = { x: sn.x, y: sn.y };
+                    const p = this._placement || { x: 0, y: 0 };
+                    this.spec.onDrag(this.active.id, { x: w.x - (p.x || 0), y: w.y - (p.y || 0) });
+                }
                 e.preventDefault();
             } else if (this.pan) {
                 const v = this._clientToVB(e.clientX, e.clientY);
@@ -121,8 +132,10 @@ export class FeatureCanvas {
             else if (this.pan) { this.pan = null; }
             else return;
             this.svg.style.cursor = 'default';
+            const hadSnap = !!this._snap; this._snap = null;
             try { this.svg.releasePointerCapture(e.pointerId); } catch (_) {}
             if (id != null && this.spec && this.spec.onDragEnd) this.spec.onDragEnd(id);
+            if (hadSnap && this.spec) this._draw(this.spec, this._vw, this._vh);   // clear the snap ring
         };
         svg.addEventListener('pointerup', end);
         svg.addEventListener('pointercancel', end);
@@ -334,6 +347,14 @@ export class FeatureCanvas {
         });
 
         this._drawStockAttach(spec);
+
+        // Snap feedback: a green lock-ring + centre dot on the stock anchor (or part-zero) the dragged position handle
+        // is locked onto — so it's obvious when the magnet caught (and which anchor).
+        if (this._snap) {
+            const c = this._S(this._snap.x, this._snap.y);
+            handles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 9, fill: 'none', stroke: '#5fd06a', 'stroke-width': 2, style: 'pointer-events:none' }));
+            handles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 2.6, fill: '#5fd06a', stroke: 'none', style: 'pointer-events:none' }));
+        }
     }
 
     /** Stock-attach markers — small squares on the stock's 9 points (corners/edges/centre). Click one to choose which
@@ -362,6 +383,51 @@ export class FeatureCanvas {
         const tol = 11 / this._tf.scale;
         let best = null, bd = tol;
         this._attachPts.forEach((p) => { const d = Math.hypot(p.x - w.x, p.y - w.y); if (d <= bd) { bd = d; best = p; } });
+        return best;
+    }
+
+    /** Build-frame bounding box of the path geometry (items + paths), or null if empty. */
+    _itemsBBox(spec) {
+        let x0 = 0, y0 = 0, x1 = 0, y1 = 0, any = false;
+        const acc = (x, y) => { if (!isFinite(x) || !isFinite(y)) return; if (!any) { x0 = x1 = x; y0 = y1 = y; any = true; } else { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } };
+        (spec.items || []).forEach((it) => {
+            if (it.kind === 'hole') acc(it.x, it.y);
+            else if (it.kind === 'line') { acc(it.x1, it.y1); acc(it.x2, it.y2); }
+            else if (it.kind === 'circle') { acc(it.cx - it.r, it.cy - it.r); acc(it.cx + it.r, it.cy + it.r); }
+            else if (it.kind === 'rect') { acc(it.x, it.y); acc(it.x + it.w, it.y + it.h); }
+        });
+        (spec.paths || []).forEach((p) => (p.pts || []).forEach((pt) => acc(pt.x, pt.y)));
+        return any ? { minX: x0, minY: y0, maxX: x1, maxY: y1 } : null;
+    }
+
+    /** Snap-FROM offsets for a dragged position handle (relative to the handle): the handle itself + the path bbox's
+     *  9 anchor points (corners / edge mids / centre). Lets ANY path anchor be the point that lands on a stock anchor,
+     *  while you still drag only the one position handle. */
+    _snapOffsets(handle) {
+        const offs = [{ x: 0, y: 0 }];   // the handle point itself
+        const b = this._itemsBBox(this.spec);
+        if (b) {
+            const xs = [b.minX, (b.minX + b.maxX) / 2, b.maxX], ys = [b.minY, (b.minY + b.maxY) / 2, b.maxY];
+            for (const ax of xs) for (const ay of ys) offs.push({ x: ax - handle.x, y: ay - handle.y });
+        }
+        return offs;
+    }
+
+    /** Snap the dragged position to a stock anchor (or part-zero): try every (snap-from path anchor → stock anchor)
+     *  pair and return the handle world point that lands the closest pair within tolerance, plus the target anchor for
+     *  the highlight ring. null = no snap (free drag). */
+    _snapToAnchor(w) {
+        if (!w || !this._tf) return null;
+        const tol = 7 / this._tf.scale;   // a SMALL magnetic radius (px) — only catches when the cursor is genuinely close
+        const targets = (this._attachPts || []).slice();
+        targets.push({ x: 0, y: 0, code: 'origin' });   // part-zero is an anchor too
+        const offs = (this.active && this.active.snapOffsets) || [{ x: 0, y: 0 }];
+        let best = null, bd = tol;
+        for (const t of targets) for (const o of offs) {
+            const cx = t.x - o.x, cy = t.y - o.y;   // handle world that lands path-anchor `o` exactly on target `t`
+            const d = Math.hypot(cx - w.x, cy - w.y);
+            if (d <= bd) { bd = d; best = { x: cx, y: cy, target: t }; }
+        }
         return best;
     }
 
