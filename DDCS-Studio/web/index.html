@@ -336,7 +336,7 @@
                 <div class="grid-2">
                     <div>
                         <span class="label">FEATURE TYPE</span>
-                        <select id="m_type" title="Pocket: probe from center outward to both walls. Boss: probe from outside each side (requires manual repositioning between passes)." value="pocket">
+                        <select id="m_type" title="Pocket: probe from center outward to both walls. Boss: probe each outside wall — Auto crosses over the part hands-free, Manual jog pauses to reposition." value="pocket">
                             <option value="pocket">pocket</option>
                             <option value="boss">boss</option>
                         </select>
@@ -347,6 +347,20 @@
                             <option value="X">X</option>
                             <option value="Y">Y</option>
                         </select>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div>
+                        <span class="label">PROBE MODE</span>
+                        <select id="m_approach" title="Auto: hands-free — probes both walls (a boss is crossed over automatically). Manual jog: pauses so you can jog to each wall before the touch.">
+                            <option value="auto">auto (hands-free)</option>
+                            <option value="manual">manual jog (pause to adjust)</option>
+                        </select>
+                    </div>
+                    <div id="m_clear_block" class="hidden">
+                        <span class="label">TRAVERSE HEIGHT (mm)</span>
+                        <input id="m_clear" value="15" title="Boss auto only: how high to lift before crossing over the part to the far wall. Set it to clear the top of your boss with margin. Stored as #18."/>
                     </div>
                 </div>
 

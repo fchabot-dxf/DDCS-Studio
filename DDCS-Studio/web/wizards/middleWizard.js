@@ -22,6 +22,7 @@ const sgn = (plus) => (plus ? 'pos' : 'neg');
 /** Middle params → its probe-macro block stack. The one source of truth for both displays. */
 export function middleStack(params = {}) {
     const featureType = params.featureType === 'boss' ? 'boss' : 'pocket';
+    const approach = params.approach === 'manual' ? 'manual' : 'auto';   // hands-free cycle vs operator-jogged repositions
     const axis = params.axis === 'Y' ? 'Y' : 'X';
     const dir1Plus = (params.dir1 || 'pos') === 'pos';
     const twoAxis = !!params.twoAxis || !!params.findBoth;
@@ -30,6 +31,7 @@ export function middleStack(params = {}) {
     const dir2Plus = resolvedDir2 === 'pos';
     const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
     const dist = num(params.dist, 20), retract = num(params.retract, 2), safeZ = num(params.safeZ, 10);
+    const clearOver = num(params.clearOver, 15);   // boss AUTO: how high to lift before crossing over the part
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
 
     const S = [];
@@ -52,9 +54,19 @@ export function middleStack(params = {}) {
         PR(ax, pv, '#4'); CK(ax, 1); A(resultVar, av.result); MV(ax, rv);
     };
     const reposition = () => { A('#57', '#882'); MV('Z', '#17'); A('#1505', '1', 'Press Enter when repositioned'); IF('#1505', '==', '0', 2); MM('Z', '#57'); };
+    // Boss, AUTO: clear over the feature to the far side, hands-free. Uses the max probe distance #1 as the
+    // over-estimate of the feature width (the operator already sets it >= the feature for the probes to reach),
+    // so traversing #1+retract past the first face lands beyond the second; then drop back to probe height.
+    const traverseOver = (ax, firstPlus) => { MV('Z', '#18'); MV(ax, firstPlus ? '[#1+#2]' : '[0-#1-#2]'); MV('Z', '[0-#18]'); };
+    const between = (ax, firstPlus) => {
+        // The two opposite walls. POCKET probes both from the centre (no move). BOSS needs the 2nd face from the
+        // far side: MANUAL pauses for the operator to jog over; AUTO traverses over hands-free.
+        if (featureType !== 'boss') { if (approach === 'manual') reposition(); return; }
+        if (approach === 'manual') reposition(); else traverseOver(ax, firstPlus);
+    };
     const seq = (ax, firstPlus, base) => {
         twoPass(ax, firstPlus, `#${base}`);
-        if (featureType === 'boss') reposition();          // boss: 2nd side from outside needs a move-over
+        between(ax, firstPlus);
         twoPass(ax, !firstPlus, `#${base + 1}`);
         A(`#${base + 2}`, `[#${base}+#${base + 1}]/2`);     // centre = midpoint of the two walls
     };
@@ -65,6 +77,7 @@ export function middleStack(params = {}) {
     A('#54', 0, 'Wall 3 pos'); A('#55', 0, 'Wall 4 pos'); A('#56', 0, 'Center pos 2');
     A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
     A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract'); A('#17', safeZ, 'Safe Z retract');
+    A('#18', clearOver, 'Traverse-over clearance (boss auto: lift this high to clear the part before crossing)');
     if (wcs === 'active') { A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'); A('#72', '[#71-1]', 'Zero-based index'); A('#70', '[805+[#72*5]]', 'Base WCS address'); }
     else A('#70', WCS_BASE[wcs]);
     A('#1505', '1', 'Press Enter to probe - ESC=cancel'); IF('#1505', '==', '0', 2); DM('inc');
