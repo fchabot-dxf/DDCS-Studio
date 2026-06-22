@@ -10,6 +10,8 @@ import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
+import { patternPoints } from './ops/array.js';
+import { pointsBBox } from './ops/placement.js';
 
 /** The slot channel's footprint (A↔B widened by the cut width) — used by PlaceOnStock (when you attach to a corner)
  *  + the 2D view. */
@@ -22,7 +24,28 @@ export function slotBBox(params = {}) {
     return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
 }
 
-/** Slot params → [ Program Start, Slot, Program End ]. The one source of truth for both displays. */
+/** True when params ask for a repeated slot (a real pattern, not a single slot). */
+export function slotPatterned(params = {}) {
+    const p = params.pattern || 'single';
+    return p !== 'single' && p !== '';
+}
+
+/** The array's pattern OFFSETS (origin 0,0 → relative shifts the slot is stamped at). */
+export function slotPatternPoints(params = {}) {
+    return patternPoints({ ...params, x0: 0, y0: 0, cx: 0, cy: 0 });
+}
+
+/** Footprint of the whole slot array = the base slot's bbox spread over the pattern offsets (Minkowski sum of
+ *  axis-aligned boxes → add the mins/maxes). Used for PlaceOnStock when the array attaches to a stock corner. */
+export function slotArrayBBox(params = {}) {
+    const sb = slotBBox(params);
+    if (!slotPatterned(params)) return sb;
+    const pb = pointsBBox(slotPatternPoints(params));
+    if (!pb) return sb;
+    return { minX: sb.minX + pb.minX, maxX: sb.maxX + pb.maxX, minY: sb.minY + pb.minY, maxY: sb.maxY + pb.maxY };
+}
+
+/** Slot params → [ Program Start, WCS, PlaceOnStock{ Slot | Array{ Slot } }, Program End ]. One source of truth. */
 export function slotStack(params = {}) {
     const slot = newBlock('slot');
     slot.params = {
@@ -31,8 +54,23 @@ export function slotStack(params = {}) {
         stepoverPct: num(params.stepoverPct, 40), depth: num(params.depth, 4), stepdown: num(params.stepdown, 1.5),
         feed: num(params.feed, 600), plunge: num(params.plunge, 150), clearance: num(params.clearance, 5),
     };
+    // Repeat the slot in a pattern: wrap it in an Array container (origin 0,0 → offsets), exactly like drill = array(hole).
+    let op = slot, bbox = slotBBox(params);
+    if (slotPatterned(params)) {
+        const arr = newBlock('array');
+        arr.params = {
+            pattern: params.pattern, x0: 0, y0: 0,
+            cols: num(params.cols, 2), rows: num(params.rows, 2), dx: num(params.dx, 40), dy: num(params.dy, 30),
+            count: num(params.count, 6), spacing: num(params.spacing, 30), angle: num(params.angle, 0),
+            dia: num(params.dia, 80), startAngle: num(params.startAngle, 0),
+            w: num(params.w, 100), h: num(params.h, 80), nx: num(params.nx, 3), ny: num(params.ny, 2),
+            skip: params.skip || '',
+        };
+        arr.children = [slot];
+        op = arr; bbox = slotArrayBBox(params);
+    }
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
-    return [makeStart(params), wcs, makePlace(params, slotBBox(params), slot), makeEnd(params)];   // opt-in placement
+    return [makeStart(params), wcs, makePlace(params, bbox, op), makeEnd(params)];   // opt-in placement
 }
 
 export class SlotWizard {

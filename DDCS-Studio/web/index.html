@@ -1009,6 +1009,42 @@
                     <div class="pa-mount" data-prefix="sl_"></div>
                 </div>
 
+                <span class="section-label">REPEAT (array)</span>
+                <div class="grid-2">
+                    <div><span class="label">PATTERN</span>
+                        <select id="sl_pattern" title="Repeat the slot in a pattern. Single = one slot (A↔B). The slot shape is fixed; the pattern offsets copies of it.">
+                            <option value="single">Single slot</option>
+                            <option value="grid">Grid</option>
+                            <option value="line">Line</option>
+                            <option value="circle">Circle</option>
+                            <option value="rect">Rectangle</option>
+                        </select>
+                    </div>
+                    <div><span class="label">SKIP</span><input id="sl_skip" value="" title="1-based slot numbers to omit, e.g. 2, 4"/></div>
+                </div>
+                <div id="sl_pat_grid" class="grid-2" style="display:none">
+                    <div><span class="label">COLUMNS</span><input id="sl_cols" value="2"/></div>
+                    <div><span class="label">ROWS</span><input id="sl_rows" value="2"/></div>
+                    <div><span class="label">X SPACING</span><input id="sl_dx" value="40"/></div>
+                    <div><span class="label">Y SPACING</span><input id="sl_dy" value="30"/></div>
+                </div>
+                <div id="sl_pat_line" class="grid-2" style="display:none">
+                    <div><span class="label">COUNT</span><input id="sl_lcount" value="3"/></div>
+                    <div><span class="label">SPACING</span><input id="sl_spacing" value="30"/></div>
+                    <div><span class="label">ANGLE</span><input id="sl_angle" value="0"/></div>
+                </div>
+                <div id="sl_pat_circle" class="grid-2" style="display:none">
+                    <div><span class="label">CIRCLE Ø</span><input id="sl_dia" value="80"/></div>
+                    <div><span class="label">COUNT</span><input id="sl_count" value="6"/></div>
+                    <div><span class="label">START ANGLE</span><input id="sl_startAngle" value="0"/></div>
+                </div>
+                <div id="sl_pat_rect" class="grid-2" style="display:none">
+                    <div><span class="label">WIDTH</span><input id="sl_w" value="100"/></div>
+                    <div><span class="label">HEIGHT</span><input id="sl_h" value="80"/></div>
+                    <div><span class="label">PER WIDTH</span><input id="sl_nx" value="3"/></div>
+                    <div><span class="label">PER HEIGHT</span><input id="sl_ny" value="2"/></div>
+                </div>
+
                 <span class="section-label">TOOL</span>
                 <div class="grid-2">
                     <div><span class="label">FROM LIBRARY</span>
