@@ -2014,6 +2014,9 @@ button.primary:hover {
 .feature-canvas .fc-axis-y { stroke: #3b7a48; stroke-width: 1.5; }
 .feature-canvas .fc-stock { fill: rgba(80,110,150,0.08); stroke: #46566a; stroke-width: 1.5; }
 .feature-canvas .fc-guide { fill: none; stroke: #2e8b9a; stroke-width: 1; stroke-dasharray: 4 3; }
+.feature-canvas .fc-path-ghost { fill: none; stroke: #43525f; stroke-width: 1.2; }   /* original path (before rotate) */
+.feature-canvas .fc-path { fill: none; stroke: #4ab3ff; stroke-width: 1.8; }          /* rotated result — cut moves */
+.feature-canvas .fc-path-rapid { fill: none; stroke: #4ab3ff; stroke-width: 1; stroke-dasharray: 4 3; opacity: .5; }
 .feature-canvas .fc-hole { fill: rgba(63,182,255,0.18); stroke: #3fb6ff; stroke-width: 1.5; }
 .feature-canvas .fc-hole-skip { fill: none; stroke: #5a6470; stroke-width: 1.2; stroke-dasharray: 3 2; }
 .feature-canvas .fc-hole-label { fill: #9fd8ff; font: 10px var(--mono, monospace); text-anchor: middle; }

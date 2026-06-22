@@ -187,6 +187,7 @@ export class FeatureCanvas {
             else if (it.kind === 'rect') { acc(it.x + px, it.y + py); acc(it.x + it.w + px, it.y + it.h + py); }
         });
         (spec.handles || []).forEach((h) => acc(h.x + px, h.y + py));
+        (spec.paths || []).forEach((pth) => (pth.pts || []).forEach((p) => acc(p.x + px, p.y + py)));
         let w = x1 - x0, h = y1 - y0;
         if (!(w > 1)) { x0 -= 50; x1 += 50; w = x1 - x0; }
         if (!(h > 1)) { y0 -= 50; y1 += 50; h = y1 - y0; }
@@ -263,6 +264,17 @@ export class FeatureCanvas {
         const og = this._S(0, 0);
         grid.appendChild(svgEl('line', { x1: og.x - 9, y1: og.y, x2: og.x + 9, y2: og.y, class: 'fc-axis-x' }));
         grid.appendChild(svgEl('line', { x1: og.x, y1: og.y - 9, x2: og.x, y2: og.y + 9, class: 'fc-axis-y' }));
+
+        // --- paths (generic polylines, e.g. a parsed G-code toolpath outline) — each {pts,cls} drawn as one <path> --
+        (spec.paths || []).forEach((pth) => {
+            if (!pth || !pth.pts || pth.pts.length < 2) return;
+            let d = '';
+            for (let i = 0; i < pth.pts.length; i++) {
+                const s = this._disp(pth.pts[i].x, pth.pts[i].y);
+                d += (i ? 'L' : 'M') + r3(s.x) + ' ' + r3(s.y) + ' ';
+            }
+            items.appendChild(svgEl('path', { d, class: pth.cls || 'fc-guide', fill: 'none' }));
+        });
 
         // --- guides (rings / bounding rects / paths) ---------------------
         (spec.items || []).forEach((it) => {
