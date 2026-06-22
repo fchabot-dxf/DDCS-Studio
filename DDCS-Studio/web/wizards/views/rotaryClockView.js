@@ -1,6 +1,7 @@
 /** views/rotaryClockView.js — Rotary clock (A0 to a feature) wizard view. */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { RotaryClockWizard } from '../rotaryClockWizard.js';
+import { activateCylinderStock } from './rotaryCenterView.js';
 
 const wizard = new RotaryClockWizard();
 
@@ -18,6 +19,7 @@ export const rotaryClockView = {
     probeSrcFields: { rcl_feed_fast: 'fastFeed', rcl_retract: 'retract' },
 
     onOpen(ctx) {
+        activateCylinderStock();           // rotary probing → round-bar stock
         setTimeout(() => { ctx.update(); }, 50);
     },
 
