@@ -27,10 +27,13 @@ export function contourBBox(params = {}) {
     return Number.isFinite(minX) ? { minX, maxX, minY, maxY } : { minX: 0, maxX: 0, minY: 0, maxY: 0 };
 }
 
-/** The TRUE profile region (rect = corner+size, circle = centre±R) — NOT inset (the Contour atom offsets it). */
+/** The TRUE profile region (rect = corner+size, circle/polygon = centre±R, ellipse = centre±(rx,ry)) — NOT inset
+ *  (the Contour atom offsets it by the side). */
 function regionParams(params = {}) {
-    const ox = num(params.originX, 0), oy = num(params.originY, 0);
-    if ((params.shape || 'rect') === 'circle') return { shape: 'circle', x: ox, y: oy, w: num(params.dia, 50) };
+    const ox = num(params.originX, 0), oy = num(params.originY, 0), shape = params.shape || 'rect';
+    if (shape === 'circle') return { shape: 'circle', x: ox, y: oy, w: num(params.dia, 50) };
+    if (shape === 'polygon') return { shape: 'polygon', x: ox, y: oy, w: num(params.dia, 50), sides: num(params.sides, 6) };
+    if (shape === 'ellipse') return { shape: 'ellipse', x: ox, y: oy, w: num(params.w, 80), h: num(params.h, 60) };
     return { shape: 'rect', x: ox, y: oy, w: num(params.w, 80), h: num(params.h, 60) };
 }
 

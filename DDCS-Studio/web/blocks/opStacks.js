@@ -13,8 +13,10 @@ import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } };
 import { surfacingStack } from '../wizards/surfacingWizard.js';
-import { pocketStack } from '../wizards/pocketWizard.js';
+import { pocketStack, regionParamsFromDesc } from '../wizards/pocketWizard.js';
 import { contourStack } from '../wizards/contourWizard.js';
+import { regionDesc } from '../wizards/ops/region.js';
+import { offsetRegion } from '../wizards/ops/contour.js';
 import { slotStack } from '../wizards/slotWizard.js';
 import { drillStack } from '../wizards/drillWizard.js';
 import { wcsStack } from '../wizards/wcsWizard.js';
@@ -155,23 +157,23 @@ const RECONCILERS = {
         if (!down || !Array.isArray(down.children)) return null;   // too-small fallback (drill) → no reverse
         const over = down.children.find((c) => c.type === 'stepover'), rg = over && over.params && over.params.region;
         if (!over || !rg || !rg.params) return null;
-        // The Region is inset by (tool radius − wall offset) — un-inset it by that to recover the typed size. tool +
-        // wallOffset are form-side params (like the tool), so read them from the form; they aren't reverse-synced.
+        // The Region is inset by (tool radius − wall offset). Un-inset it with offsetRegion(+inset) (the same kernel
+        // that built it, so all 4 shapes round-trip incl. the polygon cos(π/n) term) → the TRUE descriptor → typed
+        // dims. tool + wallOffset are form-side params (like the tool), read from the form; not reverse-synced.
         const tool = formNum('p_toolDia', 6), r = tool / 2, inset = r - formNum('p_wallOffset', 0), wb = find(prog, 'wcs');
+        const trueP = regionParamsFromDesc(offsetRegion(regionDesc(rg.params), inset));   // un-inset → typed region params
         const f = {
             p_wcs: (wb && wb.params && wb.params.wcs) || 'active',
-            p_shape: rg.params.shape,
+            p_shape: trueP.shape,
             p_depth: down.params.to, p_stepdown: down.params.by,
             p_strategy: over.params.strategy === 'parallel' ? 'raster' : 'spiral',
             p_stepoverPct: tool > 0 ? r3((num(over.params.stepover, 0) / tool) * 100) : undefined,
             p_feed: over.params.feed, p_plunge: over.params.plunge, p_clearance: over.params.clearance,
         };
-        if (rg.params.shape === 'circle') {
-            f.p_dia = r3(num(rg.params.w, 0) + 2 * inset); f.p_originX = rg.params.x; f.p_originY = rg.params.y;
-        } else {
-            f.p_w = r3(num(rg.params.w, 0) + 2 * inset); f.p_h = r3(num(rg.params.h, 0) + 2 * inset);
-            f.p_originX = r3(num(rg.params.x, 0) - inset); f.p_originY = r3(num(rg.params.y, 0) - inset);
-        }
+        f.p_originX = r3(trueP.x); f.p_originY = r3(trueP.y);
+        if (trueP.shape === 'circle') { f.p_dia = r3(trueP.w); }
+        else if (trueP.shape === 'polygon') { f.p_dia = r3(trueP.w); f.p_sides = trueP.sides; }
+        else { f.p_w = r3(trueP.w); f.p_h = r3(trueP.h); }   // rect + ellipse
         return Object.assign(f, placeFields(prog, 'p_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper
     },
     contour(prog) {
@@ -187,8 +189,10 @@ const RECONCILERS = {
             ct_depth: down.params.to, ct_stepdown: down.params.by,
             ct_feed: c.params.feed, ct_plunge: c.params.plunge, ct_clearance: c.params.clearance,
         };
-        if (rg.params.shape === 'circle') { f.ct_dia = rg.params.w; f.ct_originX = rg.params.x; f.ct_originY = rg.params.y; }
-        else { f.ct_w = rg.params.w; f.ct_h = rg.params.h; f.ct_originX = rg.params.x; f.ct_originY = rg.params.y; }
+        f.ct_originX = rg.params.x; f.ct_originY = rg.params.y;
+        if (rg.params.shape === 'circle') { f.ct_dia = rg.params.w; }
+        else if (rg.params.shape === 'polygon') { f.ct_dia = rg.params.w; f.ct_sides = rg.params.sides; }
+        else { f.ct_w = rg.params.w; f.ct_h = rg.params.h; }   // rect + ellipse
         return Object.assign(f, placeFields(prog, 'ct_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper
     },
     drill(prog) {

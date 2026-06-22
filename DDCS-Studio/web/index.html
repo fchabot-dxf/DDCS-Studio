@@ -921,6 +921,8 @@
                         <select id="p_shape" value="rect">
                             <option value="rect">Rectangle</option>
                             <option value="circle">Circle</option>
+                            <option value="polygon">Polygon</option>
+                            <option value="ellipse">Ellipse</option>
                         </select>
                     </div>
                     <div><span class="label">STRATEGY</span>
@@ -941,6 +943,7 @@
                 </div>
                 <div id="p_dim_circle" class="grid-2" style="display:none">
                     <div><span class="label">DIAMETER</span><input id="p_dia" value="50"/></div>
+                    <div id="p_dim_sides" style="display:none"><span class="label">SIDES</span><input id="p_sides" value="6" title="Number of sides for a regular polygon (≥ 3)."/></div>
                 </div>
 
                 <span class="section-label">TOOL</span>
@@ -1001,6 +1004,8 @@
                         <select id="ct_shape" value="rect">
                             <option value="rect">Rectangle</option>
                             <option value="circle">Circle</option>
+                            <option value="polygon">Polygon</option>
+                            <option value="ellipse">Ellipse</option>
                         </select>
                     </div>
                     <div><span class="label">OFFSET X</span><input id="ct_originX" value="0" title="Signed X offset of the profile from the stock-attach corner (drag the square handle)."/></div>
@@ -1016,6 +1021,7 @@
                 </div>
                 <div id="ct_dim_circle" class="grid-2" style="display:none">
                     <div><span class="label">DIAMETER</span><input id="ct_dia" value="50"/></div>
+                    <div id="ct_dim_sides" style="display:none"><span class="label">SIDES</span><input id="ct_sides" value="6" title="Number of sides for a regular polygon (≥ 3)."/></div>
                 </div>
 
                 <span class="section-label">SIDE &amp; TOOL</span>

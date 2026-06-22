@@ -28,10 +28,12 @@ function applyTool() {
     if (Object.keys(m).length) setFields(m);
 }
 
-/** The TRUE profile region params (rect = corner+size, circle = centre±R). */
+/** The TRUE profile region params (rect = corner+size, circle/polygon = centre±R, ellipse = centre±(rx,ry)). */
 function regionParams(params) {
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
     if (params.shape === 'circle') return { shape: 'circle', x: ox, y: oy, w: num(params.dia, 50) };
+    if (params.shape === 'polygon') return { shape: 'polygon', x: ox, y: oy, w: num(params.dia, 50), sides: num(params.sides, 6) };
+    if (params.shape === 'ellipse') return { shape: 'ellipse', x: ox, y: oy, w: num(params.w, 80), h: num(params.h, 60) };
     return { shape: 'rect', x: ox, y: oy, w: num(params.w, 80), h: num(params.h, 60) };
 }
 
@@ -45,6 +47,13 @@ function buildContourSpec(params, stock) {
         const R = num(params.dia, 50) / 2;
         items.push({ kind: 'circle', cx: ox, cy: oy, r: R });
         handles.push({ id: 'size', x: ox + R, y: oy, kind: 'size', label: 'Ø' });
+    } else if (params.shape === 'polygon' || params.shape === 'ellipse') {
+        // No SVG primitive for polygon/ellipse — draw the TRUE boundary ring from the region kernel's contour.
+        const brg = regionDesc(regionParams(params));
+        const ring = (brg.contour && brg.contour[0]) || [];
+        if (ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((p) => ({ x: p.x, y: p.y })), cls: 'fc-guide' });
+        if (params.shape === 'polygon') { const R = num(params.dia, 50) / 2; handles.push({ id: 'size', x: ox + R, y: oy, kind: 'size', label: 'Ø' }); }
+        else { const rx = num(params.w, 80) / 2, ry = num(params.h, 60) / 2; handles.push({ id: 'size', x: ox + rx, y: oy + ry, kind: 'size', label: 'W × H' }); }
     } else {
         const w = num(params.w, 80), h = num(params.h, 60);
         items.push({ kind: 'rect', x: ox, y: oy, w, h });
@@ -67,6 +76,8 @@ function buildContourSpec(params, stock) {
         onDrag(id, w) {
             if (id === 'origin') { setFields({ ct_originX: w.x, ct_originY: w.y }); return; }
             if (params.shape === 'circle') setFields({ ct_dia: Math.max(1, 2 * Math.hypot(w.x - ox, w.y - oy)) });
+            else if (params.shape === 'polygon') setFields({ ct_dia: Math.max(1, 2 * Math.hypot(w.x - ox, w.y - oy)) });
+            else if (params.shape === 'ellipse') setFields({ ct_w: Math.max(1, 2 * (w.x - ox)), ct_h: Math.max(1, 2 * (w.y - oy)) });
             else setFields({ ct_w: Math.max(1, w.x - ox), ct_h: Math.max(1, w.y - oy) });
         },
     };
@@ -79,7 +90,7 @@ export const contourView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'ct_shape', 'ct_originX', 'ct_originY', 'ct_offZ', 'ct_pathDatum', 'ct_stockAttach', 'ct_w', 'ct_h', 'ct_dia', 'ct_wcs',
+        'ct_shape', 'ct_originX', 'ct_originY', 'ct_offZ', 'ct_pathDatum', 'ct_stockAttach', 'ct_w', 'ct_h', 'ct_dia', 'ct_sides', 'ct_wcs',
         'ct_side', 'ct_toolDia', 'ct_depth', 'ct_stepdown', 'ct_clearance', 'ct_feed', 'ct_plunge', 'ct_rpm',
     ],
     probeSrcFields: {},
@@ -98,7 +109,7 @@ export const contourView = {
         const side = v('ct_side') || 'outside';
         const params = {
             shape, originX, originY,
-            w: v('ct_w'), h: v('ct_h'), dia: v('ct_dia'), wcs: v('ct_wcs') || 'active',
+            w: v('ct_w'), h: v('ct_h'), dia: v('ct_dia'), sides: v('ct_sides'), wcs: v('ct_wcs') || 'active',
             side, toolDia: v('ct_toolDia'),
             depth: v('ct_depth'), stepdown: v('ct_stepdown'), clearance: v('ct_clearance'),
             feed: v('ct_feed'), plunge: v('ct_plunge'), rpm: v('ct_rpm'),
@@ -106,9 +117,10 @@ export const contourView = {
             ...placementParams('ct_', s.stock),   // placement (footprint attaches to a stock corner + offset)
         };
 
-        // Show only the active shape's dimension fields.
-        if (el('ct_dim_rect')) el('ct_dim_rect').style.display = (shape === 'rect') ? '' : 'none';
-        if (el('ct_dim_circle')) el('ct_dim_circle').style.display = (shape === 'circle') ? '' : 'none';
+        // Show only the active shape's dimension fields. rect/ellipse → W×H; circle/polygon → Ø (polygon adds SIDES).
+        if (el('ct_dim_rect')) el('ct_dim_rect').style.display = (shape === 'rect' || shape === 'ellipse') ? '' : 'none';
+        if (el('ct_dim_circle')) el('ct_dim_circle').style.display = (shape === 'circle' || shape === 'polygon') ? '' : 'none';
+        if (el('ct_dim_sides')) el('ct_dim_sides').style.display = (shape === 'polygon') ? '' : 'none';
 
         const gcode = wizard.generate(params);
         el('wiz_contour_code').innerHTML = UIUtils.formatGCode(gcode);
