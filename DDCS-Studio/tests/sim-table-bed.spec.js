@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 
-// The stock always rests on a table/bed, drawn at the stock's BOTTOM — so it sits on a surface wherever part-zero
-// is: at Z0 for a table-zero datum (bottom-Z), a height below Z0 for a stock-top-zero datum (top-Z).
+// The grid IS the table: a single floor (machine frame) at the stock's BOTTOM — so the stock always rests ON it
+// wherever part-zero is: Z0 for a table-zero datum (bottom-Z), a height below Z0 for a stock-top-zero datum (top-Z).
+// (Replaced the old part-riding bed; the floor is now the grid/table plane — see gcodeViz3d _layoutGrid + fit.)
 test.use({ viewport: { width: 1280, height: 900 } });
 
-test('table/bed sits at the stock bottom for any datum', async ({ page }) => {
+test('grid/table floor sits at the stock bottom for any datum', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
@@ -14,10 +15,12 @@ test('table/bed sits at the stock bottom for any datum', async ({ page }) => {
 
   const r = await page.evaluate(() => {
     const viz = window.ddcsStudio.wizardManager._activePanel.viz;
-    const z = (datum) => { viz.setStock({ x: 60, y: 40, z: 25, show: true, datum }); return viz.tableMesh ? viz.tableMesh.position.z : null; };
+    // setStock records the datum-aware floor; fitAll lays the grid/table out → read the actual floor + the table mesh.
+    const z = (datum) => { viz.setStock({ x: 60, y: 40, z: 25, show: true, datum }); viz.fitAll(); return { floor: viz._gridParams ? viz._gridParams.floor : null, tableVisible: !!(viz.tableMesh && viz.tableMesh.visible) }; };
     return { top: z('ccp'), table: z('ccn') };
   });
 
-  expect(r.top, 'stock-top zero: table a full height below Z0').toBeCloseTo(-25, 1);
-  expect(r.table, 'table zero: table at Z0').toBeCloseTo(0, 1);
+  expect(r.top.floor, 'stock-top zero: floor a full height below Z0').toBeCloseTo(-25, 1);
+  expect(r.table.floor, 'table zero: floor at Z0').toBeCloseTo(0, 1);
+  expect(r.top.tableVisible && r.table.tableVisible, 'the grid/table surface is shown under the stock').toBe(true);
 });

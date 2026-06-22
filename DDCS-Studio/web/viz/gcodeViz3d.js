@@ -775,19 +775,32 @@ export class GcodeViz3D {
         // doesn't overshoot (the green-line-outward bug). pSpan stays the overall span for grid/label sizing.
         const pSpan = Math.max(sx, sy, 10), pHalf = pSpan / 2;
         const pHalfX = Math.max(sx, 10) / 2, pHalfY = Math.max(sy, 10) / 2;
-        const pFloor = (this._stock && this._stock.show && this._stock.z > 0) ? -this._stock.z : b.minZ;
+        // Floor = the stock's BOTTOM in part-local Z (datum-aware: 0 for a table-zero datum, -height for a top-zero
+        // datum) so the stock always rests ON the grid/table; falls back to -height, then the data bounds.
+        const pFloor = (this._stock && this._stock.show && this._stock.z > 0)
+            ? (this._stockFloorZ != null ? this._stockFloorZ : -this._stock.z) : b.minZ;
         // GRID + edge labels live in the SCENE: linked to the ENVELOPE footprint in MACHINE coords (home at scene 0,
         // fixed) when the envelope is shown, else the part/stock footprint.
+        const stockShown = !!(this._stock && this._stock.show && this._stock.z > 0);
         let gCx = cx, gCy = cy, gFloor = pFloor, gW = Math.max(sx, 10), gH = Math.max(sy, 10);
         let gHalfX = pHalf, gHalfY = pHalf, gSpan = pSpan;
         if (useMch) {
             gCx = m.x / 2; gCy = m.y / 2;                       // envelope centre (MACHINE coords)
-            gFloor = Math.min(0, m.z);                          // envelope bottom (machine Z min)
             gW = Math.abs(m.x); gH = Math.abs(m.y);
             gHalfX = Math.abs(m.x) / 2; gHalfY = Math.abs(m.y) / 2; gSpan = Math.max(Math.abs(m.x), Math.abs(m.y));
+            // Floor (the grid/table is in the fixed MACHINE frame, so its Z is in SCENE coords): when a stock is shown
+            // it sits at the stock's BOTTOM in scene coords (shift.z + part-local floor) so the stock always rests on
+            // the table at its WCS height; with no stock it's the envelope bottom (machine Z min).
+            const sh = this.partFrame ? this.partFrame.shift : { x: 0, y: 0, z: 0 };
+            gFloor = stockShown ? (sh.z || 0) + pFloor : Math.min(0, m.z);
         }
-        this._gridParams = { cx: gCx, cy: gCy, floor: gFloor, w: gW, h: gH };
-        this._layoutGrid(gCx, gCy, gFloor, gW, gH);
+        // The grid/table OVERHANGS the envelope (or stock) footprint by a few cm so it isn't flush with the machine
+        // walls — like a real table extending past the travel limits. Labels stay at the true coordinate extent
+        // (gHalfX/gHalfY below); only the floor/table is enlarged.
+        const GRID_OVERHANG = 30;   // ~3 cm each side
+        const tW = gW + GRID_OVERHANG * 2, tH = gH + GRID_OVERHANG * 2;
+        this._gridParams = { cx: gCx, cy: gCy, floor: gFloor, w: tW, h: tH };
+        this._layoutGrid(gCx, gCy, gFloor, tW, tH);
         if (this._gridLabels) {
             const off = gSpan * 0.07, lw = gSpan * 0.14, L = this._gridLabels;
             // +X / +Y at the +scene end (true coordinate directions); labels at the centre of each envelope/grid edge.
@@ -830,6 +843,18 @@ export class GcodeViz3D {
         const THREE = this.THREE;
         const step = this._niceGridStep(Math.max(width, height));
         this.grid.position.set(cx, cy, floor);
+        // The grid IS the table: a solid surface fixed in the MACHINE frame, coincident with the grid lines and
+        // sized to the same (overhung) footprint, so the stock visibly rests on it. (Replaces the old part-riding
+        // bed — one floor, not two.) Shown whenever a stock or machine envelope is present.
+        if (!this.tableMesh) {
+            this.tableMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+                new THREE.MeshBasicMaterial({ color: 0x222a31, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+            this.tableMesh.renderOrder = -1;   // behind the stock / toolpath
+            this.scene.add(this.tableMesh);
+        }
+        this.tableMesh.position.set(cx, cy, floor - 0.05);   // just under the grid lines (avoid z-fighting)
+        this.tableMesh.scale.set(width, height, 1);
+        this.tableMesh.visible = !!((this._machine && this._machine.show) || (this._stock && this._stock.show && this._stock.z > 0));
         const key = [cx, cy, floor, width, height, step].map((v) => Math.round(v * 100)).join('|');
         if (this._gridKey === key) return;
         this._gridKey = key;
@@ -885,13 +910,13 @@ export class GcodeViz3D {
     setStock(stock) {
         const THREE = this.THREE;
         this._stock = stock || null;
+        this._stockFloorZ = null;   // stock bottom in part-local Z (datum-aware) → the table/grid floor; set below
         // The stock lives in a part group so a rotary move can spin it about its own axis.
         if (!this._partGroup) { this._partGroup = new THREE.Group(); this.partFrame.add(this._partGroup); }   // stock rides the part frame
         const pg = this._partGroup;
         pg.rotation.set(0, 0, 0); // at rest; the play loop re-applies the angle each frame
         if (this.stockMesh) { pg.remove(this.stockMesh); this.stockMesh.geometry.dispose(); this.stockMesh.material.dispose(); this.stockMesh = null; }
         if (this.stockEdges) { pg.remove(this.stockEdges); this.stockEdges.geometry.dispose(); this.stockEdges.material.dispose(); this.stockEdges = null; }
-        if (this.tableMesh) { this.partFrame.group.remove(this.tableMesh); this.tableMesh.geometry.dispose(); this.tableMesh.material.dispose(); this.tableMesh = null; }
         if (stock && stock.show && stock.x > 0 && stock.y > 0 && stock.z > 0) {
             const pocket = stock.shape === 'pocket';
             const fillCol = pocket ? 0x6a8fbe : 0x8fae6a;  // pocket = blue, boss = green
@@ -953,19 +978,13 @@ export class GcodeViz3D {
             // Positioned by its DATUM only (part-zero at part-local 0); the PART frame carries it to the stock's WCS
             // (see _partShift), so op + stock share one offset and never double-count.
             pg.position.set(stock.x / 2 - D[0], stock.y / 2 - D[1], stock.z / 2 - D[2]);
+            this._stockFloorZ = pg.position.z - stock.z / 2;   // datum-aware stock bottom → where the table/grid sits
             mesh.position.sub(C);
             edges.position.sub(C);
             this.stockMesh = mesh; pg.add(mesh);
             this.stockEdges = edges; pg.add(edges);
-            // TABLE/BED: the stock always rests on the machine table. Draw a surface at the stock's BOTTOM (Z0 for a
-            // table-zero datum, -height for a stock-top-zero datum) so it sits on something, wherever part-zero is.
-            // Lives in the scene (fixed) — a rotary move spins the part on it. renderOrder<0 so it draws behind.
-            const bed = new THREE.Mesh(
-                new THREE.PlaneGeometry(stock.x * 1.6, stock.y * 1.6),
-                new THREE.MeshBasicMaterial({ color: 0x2a3138, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
-            bed.position.set(pg.position.x, pg.position.y, pg.position.z - stock.z / 2);
-            bed.renderOrder = -1;
-            this.tableMesh = bed; this.partFrame.add(bed);   // (step 1: bed rides the part; becomes the fixed machine floor next)
+            // The table the stock rests on is the GRID floor (a fixed machine-frame surface — see _layoutGrid), not a
+            // per-stock bed. So nothing extra to draw here.
         }
         this.partFrame.update(this._partShift());   // stock pin / WCS may have changed → re-place op+stock at the stock's WCS
     }

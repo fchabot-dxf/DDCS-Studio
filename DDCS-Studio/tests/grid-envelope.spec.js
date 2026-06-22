@@ -32,13 +32,15 @@ test('grid matches the envelope footprint and honours the spacing setting', asyn
     return { s50: read(50), s100: read(100) };
   });
 
-  // Footprint = the envelope (600 × 300), centred on the envelope centre (300,150) at the floor (z=0, since travelZ>0).
-  expect(r.s50.maxX - r.s50.minX, 'grid width = |travelX|').toBeCloseTo(600, 1);
-  expect(r.s50.maxY - r.s50.minY, 'grid height = |travelY| (rectangular, not square)').toBeCloseTo(300, 1);
+  // Footprint = the envelope (600 × 300) OVERHUNG a few cm each side (the grid IS the table — it extends past the
+  // machine walls, not flush), centred on the envelope centre (300,150) at the floor (z=0, since travelZ>0).
+  const OVERHANG = 30;   // GRID_OVERHANG in gcodeViz3d.fit() — ~3 cm each side
+  expect(r.s50.maxX - r.s50.minX, 'grid width = |travelX| + overhang both sides').toBeCloseTo(600 + 2 * OVERHANG, 1);
+  expect(r.s50.maxY - r.s50.minY, 'grid height = |travelY| + overhang (rectangular, not square)').toBeCloseTo(300 + 2 * OVERHANG, 1);
   expect(r.s50.pos.x).toBeCloseTo(300, 1);
   expect(r.s50.pos.y).toBeCloseTo(150, 1);
-  // A vertical gridline lands on the origin (scene x=0 → local x = -gCx = -300), i.e. lines start at the origin.
-  expect(r.s50.minX, 'left edge / origin line at local -300').toBeCloseTo(-300, 1);
+  // The grid overhangs symmetrically about the envelope centre → left/border edge at local -(300 + overhang).
+  expect(r.s50.minX, 'left edge overhangs the envelope: local -(300+overhang)').toBeCloseTo(-(300 + OVERHANG), 1);
   // Finer spacing → more vertices.
   expect(r.s50.count, '50mm grid is denser than 100mm').toBeGreaterThan(r.s100.count);
 });
