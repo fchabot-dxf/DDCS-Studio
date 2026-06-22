@@ -16,6 +16,7 @@ import { srcVal, srcNote } from './probeBlocks.js';
 
 export function rotaryCenterStack(params = {}) {
     const method = params.method === 'fit' ? 'fit' : 'known';
+    const approach = params.approach === 'guided' ? 'guided' : 'auto';   // known-method flanks: hands-free cycle vs operator-jogged
     const datum = params.datum === 'top' ? 'top' : 'center';
     const level = num(params.level, 0), diameter = num(params.diameter, 76.2), dist = num(params.dist, 30);
     const retract = num(params.retract, 2), safeZ = num(params.safeZ, 15), fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
@@ -67,13 +68,29 @@ export function rotaryCenterStack(params = {}) {
     DM('inc');
 
     if (method === 'known') {
-        C('=== Known diameter: top + two flanks ===');
+        C(`=== Known diameter: top + two flanks (${approach === 'auto' ? 'auto-centring' : 'operator-guided'}) ===`);
+        A('#55', `${diameter}/2`, 'R = known diameter / 2');
+        A('#11', '[#55+#2]', 'Flank approach = R + retract (lateral offset AND top->centreline drop)');
+        // A solid bar can't be probed from its axis — approach each flank from OUTSIDE at the centreline.
+        // Traverses run at top height (the OD curves away, so the part is clear); drops happen beside the bar
+        // in free space. #11 = R+retract = both the lateral offset to clear the OD and the drop to the centre.
+        // GUIDED = the same motion + a confirm gate before each touch (so the operator verifies / fine-jogs the
+        // position); AUTO runs hands-free. Both simulate identically (the gate auto-answers in the preview).
+        const gate = (msg) => { if (approach === 'guided') CF(msg, 2); };
         C('Probe top (Z down)'); pp('Z', false, '#50');
-        C('Probe +Y flank'); pp('Y', true, '#52');
-        C('Probe -Y flank'); pp('Y', false, '#53');
+        C('+Y flank: traverse over the +Y side, drop to the centreline, probe inward');
+        MV('Y', '#11');              // over to the +Y side, beyond the OD (still above the top)
+        MV('Z', '[0-#11]');          // drop to the centreline (Ztop - R), beside the bar
+        gate('At the +Y side, centreline height - Enter to probe (jog to adjust), ESC=cancel');
+        pp('Y', false, '#52');       // probe -Y -> the +Y OD surface
+        C('-Y flank: raise clear, cross to the -Y side, drop, probe inward');
+        MV('Z', '#11');              // raise back above the top
+        MV('Y', '[0-#11-#11]');      // cross to the -Y side, beyond the OD
+        MV('Z', '[0-#11]');          // drop to the centreline
+        gate('At the -Y side, centreline height - Enter to probe (jog to adjust), ESC=cancel');
+        pp('Y', true, '#53');        // probe +Y -> the -Y OD surface
         C('Centre + radius');
         A('#54', '[#52+#53]/2', 'Yc = midpoint of flanks');
-        A('#55', `${diameter}/2`, 'R = known diameter / 2');
         A('#56', '[#50-#55]', 'Zc = top - R');
     } else {
         C('=== 3-point circle fit (no diameter) === ADVANCED: verify on machine');

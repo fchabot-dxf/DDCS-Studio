@@ -11,7 +11,7 @@ export const rotaryCenterView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'rc_method', 'rc_datum', 'rc_diameter', 'rc_wcs',
+        'rc_method', 'rc_approach', 'rc_datum', 'rc_diameter', 'rc_wcs',
         'rc_dist', 'rc_retract', 'rc_safe_z', 'rc_feed_fast', 'rc_feed_slow', 'rc_q',
     ],
     // Controller-source chips (PROBE-CONFIG-SOURCE.md)
@@ -26,6 +26,7 @@ export const rotaryCenterView = {
         const method = el('rc_method')?.value || 'known';
         const params = {
             method,
+            approach: el('rc_approach')?.value || 'auto',
             datum: el('rc_datum')?.value || 'center',
             diameter: el('rc_diameter')?.value || '76.2',
             wcs: el('rc_wcs')?.value || 'active',
@@ -40,9 +41,11 @@ export const rotaryCenterView = {
             sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
-        // Diameter only applies to the known-diameter method
+        // Diameter + flank-approach only apply to the known-diameter method (fit uses its own reposition pauses)
         const diaBlock = el('rc_diameter_block');
         if (diaBlock) diaBlock.classList.toggle('hidden', method !== 'known');
+        const appBlock = el('rc_approach_block');
+        if (appBlock) appBlock.classList.toggle('hidden', method !== 'known');
 
         const desc = el('rc_desc');
         if (desc) {
