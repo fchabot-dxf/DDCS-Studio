@@ -1,8 +1,9 @@
 /** views/textView.js — Text / label engraving wizard view (Mill group). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
-import { TextWizard, layoutText } from '../textWizard.js';
+import { TextWizard, layoutText, textBBox } from '../textWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
+import { placementSpec, placementParams } from '../ops/placement.js';
 
 const wizard = new TextWizard();
 const layout = new FeatureCanvas();
@@ -34,13 +35,16 @@ function buildTextSpec(params, stock) {
             items.push({ kind: 'line', x1: poly[i][0], y1: poly[i][1], x2: poly[i + 1][0], y2: poly[i + 1][1] });
         }
     }
+    const pl = placementSpec(params, textBBox(params), 'tx_');   // opt-in: stays at x/y unless you pick a stock corner
     return {
-        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y } : null,
-        items,
+        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
+        placement: pl.placement, items,
         handles: [
             { id: 'origin', x: ox, y: oy, kind: 'move', label: 'pos' },
             { id: 'height', x: ox, y: oy + H, kind: 'size', label: 'height' },
         ],
+        pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
+        onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
         onDrag(id, w) {
             if (id === 'origin') setFields({ tx_x: w.x, tx_y: w.y });
             else setFields({ tx_height: Math.max(2, w.y - oy) });
@@ -55,7 +59,7 @@ export const textView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'tx_text', 'tx_x', 'tx_y', 'tx_height', 'tx_spacing', 'tx_align', 'tx_strokeWidth',
+        'tx_text', 'tx_x', 'tx_y', 'tx_offX', 'tx_offY', 'tx_offZ', 'tx_pathDatum', 'tx_stockAttach', 'tx_height', 'tx_spacing', 'tx_align', 'tx_strokeWidth',
         'tx_toolDia', 'tx_stepoverPct', 'tx_depth', 'tx_stepdown', 'tx_clearance', 'tx_feed', 'tx_plunge', 'tx_rpm',
     ],
     probeSrcFields: {},
@@ -75,6 +79,9 @@ export const textView = {
             depth: v('tx_depth'), stepdown: v('tx_stepdown'), clearance: v('tx_clearance'),
             feed: v('tx_feed'), plunge: v('tx_plunge'), rpm: v('tx_rpm'),
             spindle: s.spindle, head: s.head, endProgram: s.endProgram,
+            // Opt-in placement: x/y positions the label; offset nudges it; pick a stock corner to drop it in a corner.
+            originX: num(v('tx_offX'), 0), originY: num(v('tx_offY'), 0),
+            ...placementParams('tx_', s.stock, true),
         };
 
         const gcode = wizard.generate(params);

@@ -1,8 +1,9 @@
 /** views/slotView.js — Slot milling wizard view (Mill group). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
-import { SlotWizard } from '../slotWizard.js';
+import { SlotWizard, slotBBox } from '../slotWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
+import { placementSpec, placementParams } from '../ops/placement.js';
 
 const wizard = new SlotWizard();
 const layout = new FeatureCanvas();
@@ -44,9 +45,12 @@ function buildSlotSpec(params, stock) {
         { id: 'width', x: mx + nx * hw, y: my + ny * hw, kind: 'size', label: 'width' },
     ];
 
+    const pl = placementSpec(params, slotBBox(params), 'sl_');   // opt-in: stays at A↔B unless you pick a stock corner
     return {
-        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y } : null,
-        items, handles,
+        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
+        placement: pl.placement, items, handles,
+        pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
+        onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
         onDrag(id, w) {
             if (id === 'a') { setFields({ sl_ax: w.x, sl_ay: w.y }); return; }
             if (id === 'b') { setFields({ sl_bx: w.x, sl_by: w.y }); return; }
@@ -65,7 +69,7 @@ export const slotView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'sl_ax', 'sl_ay', 'sl_bx', 'sl_by', 'sl_width', 'sl_wcs',
+        'sl_ax', 'sl_ay', 'sl_bx', 'sl_by', 'sl_width', 'sl_offX', 'sl_offY', 'sl_offZ', 'sl_pathDatum', 'sl_stockAttach', 'sl_wcs',
         'sl_toolDia', 'sl_stepoverPct', 'sl_depth', 'sl_stepdown', 'sl_clearance', 'sl_feed', 'sl_plunge', 'sl_rpm',
     ],
     probeSrcFields: {},
@@ -84,6 +88,9 @@ export const slotView = {
             depth: v('sl_depth'), stepdown: v('sl_stepdown'), clearance: v('sl_clearance'),
             feed: v('sl_feed'), plunge: v('sl_plunge'), rpm: v('sl_rpm'),
             spindle: s.spindle, head: s.head, endProgram: s.endProgram,
+            // Opt-in placement: A↔B positions the slot; offset (sl_offX/Y/Z) nudges it; pick a stock corner to attach.
+            originX: num(v('sl_offX'), 0), originY: num(v('sl_offY'), 0),
+            ...placementParams('sl_', s.stock, true),
         };
 
         const gcode = wizard.generate(params);

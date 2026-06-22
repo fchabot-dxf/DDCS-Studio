@@ -999,6 +999,12 @@
                     <div><span class="label">B — X</span><input id="sl_bx" value="60"/></div>
                     <div><span class="label">B — Y</span><input id="sl_by" value="0"/></div>
                 </div>
+                <div class="grid-3">
+                    <div><span class="label">OFFSET X</span><input id="sl_offX" value="0" title="Signed X nudge of the whole slot (A↔B positions it; pick a stock corner in the 2D layout to attach instead)."/></div>
+                    <div><span class="label">OFFSET Y</span><input id="sl_offY" value="0" title="Signed Y nudge of the whole slot."/></div>
+                    <div><span class="label">OFFSET Z</span><input id="sl_offZ" value="0" title="Signed Z offset (shifts every Z move; 0 = part-zero plane)."/></div>
+                    <input id="sl_pathDatum" type="hidden" value=""/><input id="sl_stockAttach" type="hidden" value=""/>
+                </div>
 
                 <span class="section-label">TOOL</span>
                 <div class="grid-2">
@@ -1131,8 +1137,12 @@
                             <option value="right">Right</option>
                         </select>
                     </div>
-                    <div><span class="label">POSITION X</span><input id="tx_x" value="0"/></div>
+                    <div><span class="label">POSITION X</span><input id="tx_x" value="0" title="Text baseline-left position (drag the square handle). Pick a stock corner in the 2D layout to drop the label in a corner instead."/></div>
                     <div><span class="label">POSITION Y</span><input id="tx_y" value="0"/></div>
+                    <div><span class="label">OFFSET X</span><input id="tx_offX" value="0" title="Signed X nudge of the label (from x/y, or from the attached stock corner)."/></div>
+                    <div><span class="label">OFFSET Y</span><input id="tx_offY" value="0" title="Signed Y nudge of the label."/></div>
+                    <div><span class="label">OFFSET Z</span><input id="tx_offZ" value="0" title="Signed Z offset (shifts every Z move; 0 = part-zero plane)."/></div>
+                    <input id="tx_pathDatum" type="hidden" value=""/><input id="tx_stockAttach" type="hidden" value=""/>
                     <div><span class="label">LETTER SPACING</span><input id="tx_spacing" value="1.2" title="Extra gap between letters (mm)."/></div>
                 </div>
 

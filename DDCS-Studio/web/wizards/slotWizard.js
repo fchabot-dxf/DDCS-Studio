@@ -8,8 +8,19 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
-import { makeStart, makeEnd } from '../blocks/programFraming.js';
+import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
+
+/** The slot channel's footprint (A↔B widened by the cut width) — used by PlaceOnStock (when you attach to a corner)
+ *  + the 2D view. */
+export function slotBBox(params = {}) {
+    const ax = num(params.ax, 0), ay = num(params.ay, 0), bx = num(params.bx, 60), by = num(params.by, 0);
+    const W = Math.max(num(params.toolDia, 6), num(params.width, num(params.toolDia, 6)));
+    const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+    const px = (-dy / len) * (W / 2), py = (dx / len) * (W / 2);   // half-width, perpendicular to the centreline
+    const xs = [ax + px, ax - px, bx + px, bx - px], ys = [ay + py, ay - py, by + py, by - py];
+    return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+}
 
 /** Slot params → [ Program Start, Slot, Program End ]. The one source of truth for both displays. */
 export function slotStack(params = {}) {
@@ -21,7 +32,7 @@ export function slotStack(params = {}) {
         feed: num(params.feed, 600), plunge: num(params.plunge, 150), clearance: num(params.clearance, 5),
     };
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
-    return [makeStart(params), wcs, slot, makeEnd(params)];
+    return [makeStart(params), wcs, makePlace(params, slotBBox(params), slot), makeEnd(params)];   // opt-in placement
 }
 
 export class SlotWizard {
