@@ -13,6 +13,7 @@ import { evalExpr, validateExpression } from './core/expression.js';
 import { evaluateCondition, validateCondition } from './core/condition.js';
 import { loadProgram as loadProgramText, stripLine } from './core/program.js';
 import { arcPoints } from './core/arc.js';
+import { rayBox, rotaryAxisOf, stockProbeStop } from './probeGeometry.js';
 
 export class GcodeExecutionEngine {
     constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
@@ -457,24 +458,6 @@ export class GcodeExecutionEngine {
         setTimeout(() => injectVirtualInput(pinName, false), 400);
     }
 
-    // Slab ray/segment-vs-AABB. Returns the entry/exit params along A→B (0..1 spans the move).
-    // Identical to gcodeViz3d._boxRange so the engine's probe collision matches what the 3D view draws.
-    _rayBox(A, B, min, max) {
-        const d = { x: B.x - A.x, y: B.y - A.y, z: B.z - A.z };
-        let tEnter = -Infinity, tExit = Infinity;
-        for (const ax of ['x', 'y', 'z']) {
-            if (Math.abs(d[ax]) < 1e-9) {
-                if (A[ax] < min[ax] - 1e-6 || A[ax] > max[ax] + 1e-6) return { hit: false };
-            } else {
-                let t1 = (min[ax] - A[ax]) / d[ax], t2 = (max[ax] - A[ax]) / d[ax];
-                if (t1 > t2) { const t = t1; t1 = t2; t2 = t; }
-                if (t1 > tEnter) tEnter = t1;
-                if (t2 < tExit) tExit = t2;
-            }
-        }
-        return { hit: tEnter <= tExit, tEnter, tExit };
-    }
-
     // Track the input pin execution is parked on (null = not waiting) and notify the UI.
     _setWaitPin(wait) {
         const prev = this._waitPin;
@@ -774,67 +757,47 @@ export class GcodeExecutionEngine {
                 const probePort = wm.P;
                 const probes = typeof window !== 'undefined' && window.ddcsGetSettings ? window.ddcsGetSettings().probes : null;
                 
-                let boxMin = null;
-                let boxMax = null;
-                let cavMin = null, cavMax = null;   // pocket only: the inset hole, whose walls are valid collisions too
-
-                if (probes && probePort === probes.setterPin) {
-                    boxMin = { x: probes.setterX - probes.setterW/2, y: probes.setterY - probes.setterH/2, z: probes.setterZ - 0.01 }; // Thin plate at Z
-                    boxMax = { x: probes.setterX + probes.setterW/2, y: probes.setterY + probes.setterH/2, z: probes.setterZ + 0.01 };
-                } else if (this.stock && (this.stock.x > 0 || this.stock.y > 0 || this.stock.z > 0)) {
-                    boxMin = { x: 0, y: 0, z: -this.stock.z };
-                    boxMax = { x: this.stock.x, y: this.stock.y, z: 0 };
-                    if (this.stock.shape === 'pocket') {   // a hole in the block — same inset the 3D view renders (gcodeViz3d _rebuild)
-                        const w = Math.max(8, Math.min(this.stock.x, this.stock.y) * 0.25);
-                        cavMin = { x: w, y: w, z: -this.stock.z };
-                        cavMax = { x: this.stock.x - w, y: this.stock.y - w, z: 0 };
-                    }
-                }
-
                 // Probe-vs-stock geometry runs in STOCK space: the tool's real position is the operator start
                 // (_stockOffset) + the local pos. The recorded route stays origin-relative (the viz offsets it
                 // by the start marker), so dir is the same in both frames — only the start point shifts.
                 const O = this._stockOffset || { x: 0, y: 0, z: 0 };
-                if (boxMin && boxMax) {
-                    // Geometry-based collision — a probe stops at the FIRST surface it hits, with no
-                    // internal/external special-casing (mirrors gcodeViz3d._rebuild). Same frame as the route:
-                    // STOCK space (operator start + local pos); the recorded target stays origin-relative.
-                    const aStart = { x: O.x + this.pos.x, y: O.y + this.pos.y, z: O.z + this.pos.z };
-                    const bEnd = { x: O.x + target.x, y: O.y + target.y, z: O.z + target.z };
-                    const dir = { x: target.x - this.pos.x, y: target.y - this.pos.y, z: target.z - this.pos.z };
-                    let tt = null;
-                    const consider = (t) => { if (t != null && t > 1e-6 && t <= 1 && (tt == null || t < tt)) tt = t; };
-                    const ro = this._rayBox(aStart, bEnd, boxMin, boxMax);
-                    if (ro.hit) {
-                        if (ro.tEnter > 1e-6) consider(ro.tEnter);                       // enter the block from outside (edge/corner/boss)
-                        else if (ro.tExit > 1e-6 && ro.tExit <= 1) consider(ro.tExit);   // started on/inside a SOLID block → far face (keeps "first probe moves")
-                    }
-                    if (cavMin && cavMax) {
-                        const rc = this._rayBox(aStart, bEnd, cavMin, cavMax);
-                        if (rc.hit && rc.tEnter <= 1e-6 && rc.tExit > 1e-6) consider(rc.tExit);   // probing from inside the hole → stop at its wall (always closer than the outer face)
-                    }
-                    if (tt != null) {
-                        // Clamp the recorded target to the contact surface (in LOCAL coords).
-                        target.x = this.pos.x + dir.x * tt;
-                        target.y = this.pos.y + dir.y * tt;
-                        target.z = this.pos.z + dir.z * tt;
-                        triggerProbeCollision();
+                const aStart = { x: O.x + this.pos.x, y: O.y + this.pos.y, z: O.z + this.pos.z };
+                const bEnd = { x: O.x + target.x, y: O.y + target.y, z: O.z + target.z };
+                const dir = { x: target.x - this.pos.x, y: target.y - this.pos.y, z: target.z - this.pos.z };
+                let tt = null;
+                if (probes && probePort === probes.setterPin) {
+                    // Tool-setter plate — a thin box at the configured setter XY/Z (not the stock).
+                    const sMin = { x: probes.setterX - probes.setterW / 2, y: probes.setterY - probes.setterH / 2, z: probes.setterZ - 0.01 };
+                    const sMax = { x: probes.setterX + probes.setterW / 2, y: probes.setterY + probes.setterH / 2, z: probes.setterZ + 0.01 };
+                    const ro = rayBox(aStart, bEnd, sMin, sMax);
+                    if (ro.hit) { if (ro.tEnter > 1e-6 && ro.tEnter <= 1) tt = ro.tEnter; else if (ro.tExit > 1e-6 && ro.tExit <= 1) tt = ro.tExit; }
+                } else {
+                    // Stock — boss (outer box), pocket (box + cavity wall) or cylinder (round OD). Shared with the
+                    // 3D preview via probeGeometry, so the simulated touch matches what the viz draws.
+                    const motors = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings().motors : null;
+                    tt = stockProbeStop(aStart, bEnd, this.stock, rotaryAxisOf(motors));
+                }
+                if (tt != null) {
+                    // Clamp the recorded target to the contact surface (in LOCAL coords).
+                    target.x = this.pos.x + dir.x * tt;
+                    target.y = this.pos.y + dir.y * tt;
+                    target.z = this.pos.z + dir.z * tt;
+                    triggerProbeCollision();
 
-                        // Flip the actual probe input pin so the I/O panel shows the touch:
-                        // the G31 P pin if given, else the configured 3D-probe pin. Fired when
-                        // the (feedrate-paced) move reaches the contact point.
-                        const touchPin = Number.isFinite(probePort) ? probePort : (probes ? probes.probePin : null);
-                        if (touchPin != null && Number.isFinite(touchPin)) {
-                            touchName = resolveVirtualPin(touchPin, 'IN');
-                        }
-
-                        // DDCS: 2 = detected the signal; #1925-1927 = trigger position in machine coords
-                        // (stock space = operator start + local target).
-                        for (const a of scannedAxes) this.vars.set(PROBE_STATUS_VAR[a], 2);
-                        this.vars.set(1925, O.x + target.x);
-                        this.vars.set(1926, O.y + target.y);
-                        this.vars.set(1927, O.z + target.z);
+                    // Flip the actual probe input pin so the I/O panel shows the touch:
+                    // the G31 P pin if given, else the configured 3D-probe pin. Fired when
+                    // the (feedrate-paced) move reaches the contact point.
+                    const touchPin = Number.isFinite(probePort) ? probePort : (probes ? probes.probePin : null);
+                    if (touchPin != null && Number.isFinite(touchPin)) {
+                        touchName = resolveVirtualPin(touchPin, 'IN');
                     }
+
+                    // DDCS: 2 = detected the signal; #1925-1927 = trigger position in machine coords
+                    // (stock space = operator start + local target).
+                    for (const a of scannedAxes) this.vars.set(PROBE_STATUS_VAR[a], 2);
+                    this.vars.set(1925, O.x + target.x);
+                    this.vars.set(1926, O.y + target.y);
+                    this.vars.set(1927, O.z + target.z);
                 }
                 if (this._traceSink) {
                     // Trace/preview: a virtual probe always "detects" at its landing point, so macros take

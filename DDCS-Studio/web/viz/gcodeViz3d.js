@@ -16,6 +16,7 @@ import { setupJogPendant } from './jogPendant.js';
 import { toolHalfProfile } from './toolProfile.js';
 import { PartFrame } from './sceneFrame.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
+import { stockProbeStop } from '../engine/probeGeometry.js';
 
 export class GcodeViz3D {
     constructor(container) {
@@ -561,16 +562,8 @@ export class GcodeViz3D {
         this.lineGroups = {};
 
         const st = this._stock;
-        const pocket = !!(st && st.shape === 'pocket');
-        let box = null;       // outer block — valid collision for every stock shape (all 6 outer faces)
-        let cavity = null;    // pocket only: the inset hole, whose walls are also valid collisions
-        if (st && st.show && st.x > 0 && st.y > 0 && st.z > 0) {
-            box = { min: { x: 0, y: 0, z: -st.z }, max: { x: st.x, y: st.y, z: 0 } };
-            if (pocket) {
-                const w = Math.max(8, Math.min(st.x, st.y) * 0.25);   // matches the rendered pocket wall
-                cavity = { min: { x: w, y: w, z: -st.z }, max: { x: st.x - w, y: st.y - w, z: 0 } };
-            }
-        }
+        const probeable = !!(st && st.show && st.x > 0 && st.y > 0 && st.z > 0);   // a stock to collide a probe against
+        const rotaryAxis = Object.values(getRotaryAxes())[0] || 'x';              // cylinder lies along this (matches setStock)
         const CAP = 20; // fallback probe length when it never contacts the stock
 
         const byPass = [];
@@ -613,21 +606,13 @@ export class GcodeViz3D {
                 const start = cur;
                 let end = { x: start.x + dx, y: start.y + dy, z: start.z + dz };
 
-                // Probe collision with the stock — stop at the first material surface hit. Outer
-                // faces register on approach from outside; for a pocket, the cavity walls also
-                // register when probing from inside the hole, so every face is a valid collision.
-                if (type === 'probe' && box) {
+                // Probe collision with the stock — stop at the first material surface hit (shared with the
+                // execution engine via probeGeometry, so the preview and the simulated run agree): outer box for
+                // boss, box + inner cavity wall for a pocket, the round OD for a rotary cylinder.
+                if (type === 'probe' && probeable) {
                     const Aw = { x: start.x + off.x, y: start.y + off.y, z: start.z + off.z };
                     const Bw = { x: end.x + off.x, y: end.y + off.y, z: end.z + off.z };
-                    let tt = null;
-                    const ro = this._boxRange(Aw, Bw, box.min, box.max);
-                    if (ro.hit && ro.tEnter > 1e-6 && ro.tEnter < 1 - 1e-6) tt = ro.tEnter;   // enter the block
-                    if (cavity) {
-                        const rc = this._boxRange(Aw, Bw, cavity.min, cavity.max);
-                        if (rc.hit && rc.tEnter <= 1e-6 && rc.tExit > 1e-6 && rc.tExit < 1 - 1e-6) {
-                            if (tt == null || rc.tExit < tt) tt = rc.tExit;   // exit the cavity → hit its wall
-                        }
-                    }
+                    const tt = stockProbeStop(Aw, Bw, st, rotaryAxis);
                     if (tt != null) { end = { x: start.x + dx * tt, y: start.y + dy * tt, z: start.z + dz * tt }; }
                 }
 
@@ -728,24 +713,6 @@ export class GcodeViz3D {
         if (opt.dashed || opt.dotted) lines.computeLineDistances();
         this.pathGroup.add(lines);
         return lines;
-    }
-
-    // Parametric range [tEnter, tExit] where the line A→B crosses an axis-aligned box.
-    _boxRange(A, B, boxMin, boxMax) {
-        const d = { x: B.x - A.x, y: B.y - A.y, z: B.z - A.z };
-        let tEnter = -Infinity, tExit = Infinity;
-        for (const ax of ['x', 'y', 'z']) {
-            if (Math.abs(d[ax]) < 1e-9) {
-                if (A[ax] < boxMin[ax] - 1e-6 || A[ax] > boxMax[ax] + 1e-6) return { hit: false };
-            } else {
-                let t1 = (boxMin[ax] - A[ax]) / d[ax];
-                let t2 = (boxMax[ax] - A[ax]) / d[ax];
-                if (t1 > t2) { const t = t1; t1 = t2; t2 = t; }
-                if (t1 > tEnter) tEnter = t1;
-                if (t2 < tExit) tExit = t2;
-            }
-        }
-        return { hit: tEnter <= tExit, tEnter, tExit };
     }
 
     fit(b) {
