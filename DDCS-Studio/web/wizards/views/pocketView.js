@@ -3,7 +3,7 @@ import { el, UIUtils } from '../../ui/uiUtils.js';
 import { PocketWizard, pocketBBox } from '../pocketWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
-import { placementShift, stockDatumOffset } from '../ops/placement.js';
+import { placementSpec, placementParams } from '../ops/placement.js';
 
 const wizard = new PocketWizard();
 const layout = new FeatureCanvas();
@@ -40,18 +40,12 @@ function buildPocketSpec(params, stock) {
         handles.push({ id: 'size', x: ox + w, y: oy + h, kind: 'size', label: 'W × H' });
     }
 
-    const datXY = (c) => String(c || '').replace(/[^ncp]/g, '').slice(0, 2);
-    const stockDat = datXY(stock && stock.datum) || 'nn';
-    const shift = placementShift(pocketBBox(params), params);   // same placement the G-code is baked with
-    const sOff = stockDatumOffset(params);
+    const pl = placementSpec(params, pocketBBox(params), 'p_');
     return {
-        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: sOff.x, oy: sOff.y } : null,
-        placement: { x: shift.x, y: shift.y },
-        items, handles,
-        pathDatum: datXY(params.pathDatum) || datXY(params.stockAttach) || stockDat, stockDatum: stockDat,
-        stockAttach: datXY(params.stockAttach) || stockDat,
-        onPathDatum(code) { const e = el('p_pathDatum'); if (!e) return; e.value = code; e.dispatchEvent(new Event('input', { bubbles: true })); },
-        onStockAttach(code) { const e = el('p_stockAttach'); if (!e) return; e.value = code; e.dispatchEvent(new Event('input', { bubbles: true })); },
+        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
+        placement: pl.placement, items, handles,
+        pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
+        onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
         onDrag(id, w) {
             if (id === 'origin') { setFields({ p_originX: w.x, p_originY: w.y }); return; }
             if (params.shape === 'circle') setFields({ p_dia: Math.max(1, 2 * Math.hypot(w.x - ox, w.y - oy)) });
@@ -90,10 +84,7 @@ export const pocketView = {
             depth: v('p_depth'), stepdown: v('p_stepdown'), clearance: v('p_clearance'),
             feed: v('p_feed'), plunge: v('p_plunge'), rpm: v('p_rpm'),
             spindle: s.spindle, head: s.head, endProgram: s.endProgram,
-            // Placement (see placeOnStock): pocket footprint attaches to a stock corner + signed offset.
-            stockDatum: (s.stock && s.stock.datum) || 'nnp', pathDatum: v('p_pathDatum') || '',
-            stockAttach: v('p_stockAttach') || '', offZ: num(v('p_offZ'), 0),
-            stockW: (s.stock && s.stock.x) || 0, stockH: (s.stock && s.stock.y) || 0,
+            ...placementParams('p_', s.stock),   // placement (footprint attaches to a stock corner + offset)
         };
 
         // Show only the active shape's dimension fields.

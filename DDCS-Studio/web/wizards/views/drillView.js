@@ -3,7 +3,7 @@ import { el, UIUtils } from '../../ui/uiUtils.js';
 import { DrillWizard, patternPoints } from '../drillWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { toolOptionsHTML, getTool } from '../toolPicker.js';
-import { placementShift, pointsBBox, stockDatumOffset } from '../ops/placement.js';
+import { placementSpec, placementParams, pointsBBox } from '../ops/placement.js';
 
 const wizard = new DrillWizard();
 const layout = new FeatureCanvas();
@@ -73,22 +73,14 @@ function buildDrillSpec(params, stock) {
     const skip = parseSkip(params.skip);
     patternPoints(params).forEach((p, i) => items.push({ kind: 'hole', x: p.x, y: p.y, n: i + 1, r: holeR, skipped: skip.has(i + 1) }));
 
-    const datXY = (c) => String(c || '').replace(/[^ncp]/g, '').slice(0, 2);
-    const stockDat = datXY(stock && stock.datum) || 'nn';
-    // Same placement the G-code is baked with (placementShift) → the 2D pattern renders exactly where the 3D path is.
-    const shift = placementShift(pointsBBox(patternPoints(params)), params);
-    const sOff = stockDatumOffset(params);
+    // Shared placement fragment — same shift the G-code is baked with, the stock datum offset, + the two corner
+    // pickers (PATH ⌖ widget = path datum; markers on the stock corners = stock attach). One drop-in per wizard.
+    const pl = placementSpec(params, pointsBBox(patternPoints(params)) || { minX: 0, maxX: 0, minY: 0, maxY: 0 }, 'd_');
     return {
-        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: sOff.x, oy: sOff.y } : null,
-        placement: { x: shift.x, y: shift.y },
-        items, handles,
-        // Path-datum picker (3×3 PATH ⌖ widget): which pattern corner anchors. Highlighted = current (falls back to
-        // the stock datum). Stock-attach picker (markers on the stock corners): which stock corner the path attaches
-        // to; ringed marker = the stock's own datum (the default). Both default to the stock datum.
-        pathDatum: datXY(params.pathDatum) || datXY(params.stockAttach) || stockDat, stockDatum: stockDat,
-        stockAttach: datXY(params.stockAttach) || stockDat,
-        onPathDatum(code) { const e = el('d_pathDatum'); if (!e) return; e.value = code; e.dispatchEvent(new Event('input', { bubbles: true })); },
-        onStockAttach(code) { const e = el('d_stockAttach'); if (!e) return; e.value = code; e.dispatchEvent(new Event('input', { bubbles: true })); },
+        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
+        placement: pl.placement, items, handles,
+        pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
+        onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
         onDrag(id, w) {
             if (id === 'origin') { setFields({ d_originX: w.x, d_originY: w.y }); return; }
             if (pat === 'circle') {
@@ -186,12 +178,9 @@ export const drillView = {
             depth: v('d_depth'), clearance: v('d_clearance'), feed: v('d_feed'), rpm: v('d_rpm'),
             holeDia: v('d_holeDia'), peck: v('d_peck'), toolDia: v('d_toolDia'), pitch: v('d_pitch'), ramp: v('d_ramp'),
             spindle: s.spindle, head: s.head, endProgram: s.endProgram,
-            // Placement (see placeOnStock): the path's datum corner (d_pathDatum, the PATH ⌖ widget) attaches to a
-            // stock corner (d_stockAttach, the markers on the stock) + a signed offset (originX/Y = X/Y, offZ = Z).
-            // Both datums default to the stock's part-zero datum, so the path follows the stock with zero config.
-            stockDatum: (s.stock && s.stock.datum) || 'nnp', pathDatum: v('d_pathDatum') || '',
-            stockAttach: v('d_stockAttach') || '', offZ: num(v('d_offZ'), 0),
-            stockW: (s.stock && s.stock.x) || 0, stockH: (s.stock && s.stock.y) || 0,
+            // Placement params (datum/attach/offZ/stock dims). Drill is origin-relative → follows the stock datum by
+            // default; originX/originY above double as its signed offset. See placeOnStock + placementParams.
+            ...placementParams('d_', s.stock),
         };
         if (pattern === 'grid') Object.assign(params, { cols: v('d_cols'), rows: v('d_rows'), dx: v('d_dx'), dy: v('d_dy') });
         else if (pattern === 'circle') Object.assign(params, { dia: v('d_dia'), count: v('d_count'), startAngle: v('d_startAngle') });

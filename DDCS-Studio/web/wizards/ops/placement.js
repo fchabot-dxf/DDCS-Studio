@@ -33,6 +33,11 @@ export function pointsBBox(points) {
  */
 export function placementShift(bbox, params = {}) {
     if (!bbox) return { x: 0, y: 0, z: 0 };
+    // Opt-in ops (slot/text — absolute A↔B / baseline geometry): DON'T follow the stock datum. Stay where drawn +
+    // a signed offset; only ATTACH to a stock corner once one is picked (then fall through to the placement below).
+    if (params.optIn && !params.stockAttach && !params.pathDatum) {
+        return { x: numv(params.originX), y: numv(params.originY), z: numv(params.offZ) };
+    }
     const at = { n: (a) => a, c: (a, b) => (a + b) / 2, p: (a, b) => b };
     // Path datum follows the stock-attach corner (which follows the stock datum) unless explicitly set.
     const pc = code2(params.pathDatum || params.stockAttach || params.stockDatum || 'nn');
@@ -60,11 +65,39 @@ export function stockDatumOffset(params = {}) {
     return { x: -FRAC[sd[0]] * numv(params.stockW), y: -FRAC[sd[1]] * numv(params.stockH) };
 }
 
+/** Read a wizard's placement params from its form (prefix-scoped) + the settings stock — merge into the wizard
+ *  params. Does NOT set originX/originY (the offset): area ops already carry those as their position; opt-in ops
+ *  (slot/text) set them from their own offX/offY fields. `optIn` true = absolute-geometry op (stay-put default). */
+export function placementParams(prefix, stock, optIn) {
+    const v = (id) => { const e = (typeof document !== 'undefined') && document.getElementById(prefix + id); return e ? e.value : undefined; };
+    return {
+        stockDatum: (stock && stock.datum) || 'nnp',
+        pathDatum: v('pathDatum') || '', stockAttach: v('stockAttach') || '', offZ: numv(v('offZ')),
+        stockW: (stock && stock.x) || 0, stockH: (stock && stock.y) || 0, optIn: !!optIn,
+    };
+}
+
+/** The placement fragment for a 2D-layout spec: the SAME shift the G-code is baked with, the stock datum offset
+ *  (stockOx/stockOy → spec.stock), and the two corner pickers (path datum + stock attach). One drop-in for every
+ *  wizard's buildSpec — spread it into the returned spec. */
+export function placementSpec(params, bbox, prefix) {
+    const datXY = (c) => String(c || '').replace(/[^ncp]/g, '').slice(0, 2);
+    const stockDat = datXY(params.stockDatum) || 'nn';
+    const shift = placementShift(bbox, params), sOff = stockDatumOffset(params);
+    const setF = (id, code) => { const e = (typeof document !== 'undefined') && document.getElementById(prefix + id); if (e) { e.value = code; e.dispatchEvent(new Event('input', { bubbles: true })); } };
+    return {
+        placement: { x: shift.x, y: shift.y }, stockOx: sOff.x, stockOy: sOff.y,
+        pathDatum: datXY(params.pathDatum) || datXY(params.stockAttach) || stockDat,
+        stockDatum: stockDat, stockAttach: datXY(params.stockAttach) || stockDat,
+        onPathDatum: (code) => setF('pathDatum', code), onStockAttach: (code) => setF('stockAttach', code),
+    };
+}
+
 /** Placement shift for a PlaceOnStock atom, from its FLAT snapshot params (bbox bminX.. + stock + intent). Used by
  *  the emit fold so the block is self-contained. */
 export function placeShiftFromParams(p = {}) {
     return placementShift(
         { minX: numv(p.bminX), maxX: numv(p.bmaxX), minY: numv(p.bminY), maxY: numv(p.bmaxY) },
-        { pathDatum: p.pathDatum, stockAttach: p.stockAttach, stockDatum: p.stockDatum, stockW: p.stockW, stockH: p.stockH, originX: p.offX, originY: p.offY, offZ: p.offZ },
+        { pathDatum: p.pathDatum, stockAttach: p.stockAttach, stockDatum: p.stockDatum, stockW: p.stockW, stockH: p.stockH, originX: p.offX, originY: p.offY, offZ: p.offZ, optIn: p.optIn },
     );
 }

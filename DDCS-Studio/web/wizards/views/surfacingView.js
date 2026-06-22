@@ -3,7 +3,7 @@ import { el, UIUtils } from '../../ui/uiUtils.js';
 import { SurfacingWizard, surfacingBBox } from '../surfacingWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
-import { placementShift, stockDatumOffset } from '../ops/placement.js';
+import { placementSpec, placementParams } from '../ops/placement.js';
 
 const wizard = new SurfacingWizard();
 const layout = new FeatureCanvas();
@@ -29,22 +29,17 @@ function applyTool() {
 function buildSurfacingSpec(params, stock) {
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
     const w = num(params.w, 100), h = num(params.h, 80);
-    const datXY = (c) => String(c || '').replace(/[^ncp]/g, '').slice(0, 2);
-    const stockDat = datXY(stock && stock.datum) || 'nn';
-    const shift = placementShift(surfacingBBox(params), params);
-    const sOff = stockDatumOffset(params);
+    const pl = placementSpec(params, surfacingBBox(params), 'sf_');
     return {
-        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: sOff.x, oy: sOff.y } : null,
-        placement: { x: shift.x, y: shift.y },
+        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
+        placement: pl.placement,
         items: [{ kind: 'rect', x: ox, y: oy, w, h }],
         handles: [
             { id: 'origin', x: ox, y: oy, kind: 'move', label: 'pos' },
             { id: 'size', x: ox + w, y: oy + h, kind: 'size', label: 'W × H' },
         ],
-        pathDatum: datXY(params.pathDatum) || datXY(params.stockAttach) || stockDat, stockDatum: stockDat,
-        stockAttach: datXY(params.stockAttach) || stockDat,
-        onPathDatum(code) { const e = el('sf_pathDatum'); if (!e) return; e.value = code; e.dispatchEvent(new Event('input', { bubbles: true })); },
-        onStockAttach(code) { const e = el('sf_stockAttach'); if (!e) return; e.value = code; e.dispatchEvent(new Event('input', { bubbles: true })); },
+        pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
+        onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
         onDrag(id, p) {
             if (id === 'origin') setFields({ sf_originX: p.x, sf_originY: p.y });
             else setFields({ sf_w: Math.max(1, p.x - ox), sf_h: Math.max(1, p.y - oy) });
@@ -82,10 +77,7 @@ export const surfacingView = {
             depth: v('sf_depth'), stepdown: v('sf_stepdown'), clearance: v('sf_clearance'),
             feed: v('sf_feed'), plunge: v('sf_plunge'), rpm: v('sf_rpm'),
             spindle: s.spindle, head: s.head, endProgram: s.endProgram,
-            // Placement (see placeOnStock): faced area attaches to a stock corner + signed offset.
-            stockDatum: (s.stock && s.stock.datum) || 'nnp', pathDatum: v('sf_pathDatum') || '',
-            stockAttach: v('sf_stockAttach') || '', offZ: num(v('sf_offZ'), 0),
-            stockW: (s.stock && s.stock.x) || 0, stockH: (s.stock && s.stock.y) || 0,
+            ...placementParams('sf_', s.stock),   // placement (faced area attaches to a stock corner + offset)
         };
 
         const gcode = wizard.generate(params);
