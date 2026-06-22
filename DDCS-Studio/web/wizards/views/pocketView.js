@@ -63,7 +63,7 @@ export const pocketView = {
     twoPane: true,
     inputIds: [
         'p_shape', 'p_originX', 'p_originY', 'p_offZ', 'p_pathDatum', 'p_stockAttach', 'p_w', 'p_h', 'p_dia', 'p_wcs',
-        'p_strategy', 'p_toolDia', 'p_stepoverPct', 'p_depth', 'p_stepdown', 'p_clearance', 'p_feed', 'p_plunge', 'p_rpm',
+        'p_strategy', 'p_toolDia', 'p_stepoverPct', 'p_wallOffset', 'p_depth', 'p_stepdown', 'p_clearance', 'p_feed', 'p_plunge', 'p_rpm',
     ],
     probeSrcFields: {},
 
@@ -82,7 +82,7 @@ export const pocketView = {
             shape, strategy: v('p_strategy') || 'spiral',
             originX, originY,
             w: v('p_w'), h: v('p_h'), dia: v('p_dia'), wcs: v('p_wcs') || 'active',
-            toolDia: v('p_toolDia'), stepoverPct: v('p_stepoverPct'),
+            toolDia: v('p_toolDia'), stepoverPct: v('p_stepoverPct'), wallOffset: num(v('p_wallOffset'), 0),
             depth: v('p_depth'), stepdown: v('p_stepdown'), clearance: v('p_clearance'),
             feed: v('p_feed'), plunge: v('p_plunge'), rpm: v('p_rpm'),
             spindle: s.spindle, head: s.head, endProgram: s.endProgram,

@@ -154,7 +154,9 @@ const RECONCILERS = {
         if (!down || !Array.isArray(down.children)) return null;   // too-small fallback (drill) → no reverse
         const over = down.children.find((c) => c.type === 'stepover'), rg = over && over.params && over.params.region;
         if (!over || !rg || !rg.params) return null;
-        const tool = formNum('p_toolDia', 6), r = tool / 2, wb = find(prog, 'wcs');   // the Region is inset by the tool radius — un-inset it
+        // The Region is inset by (tool radius − wall offset) — un-inset it by that to recover the typed size. tool +
+        // wallOffset are form-side params (like the tool), so read them from the form; they aren't reverse-synced.
+        const tool = formNum('p_toolDia', 6), r = tool / 2, inset = r - formNum('p_wallOffset', 0), wb = find(prog, 'wcs');
         const f = {
             p_wcs: (wb && wb.params && wb.params.wcs) || 'active',
             p_shape: rg.params.shape,
@@ -164,10 +166,10 @@ const RECONCILERS = {
             p_feed: over.params.feed, p_plunge: over.params.plunge, p_clearance: over.params.clearance,
         };
         if (rg.params.shape === 'circle') {
-            f.p_dia = r3(num(rg.params.w, 0) + tool); f.p_originX = rg.params.x; f.p_originY = rg.params.y;
+            f.p_dia = r3(num(rg.params.w, 0) + 2 * inset); f.p_originX = rg.params.x; f.p_originY = rg.params.y;
         } else {
-            f.p_w = r3(num(rg.params.w, 0) + tool); f.p_h = r3(num(rg.params.h, 0) + tool);
-            f.p_originX = r3(num(rg.params.x, 0) - r); f.p_originY = r3(num(rg.params.y, 0) - r);
+            f.p_w = r3(num(rg.params.w, 0) + 2 * inset); f.p_h = r3(num(rg.params.h, 0) + 2 * inset);
+            f.p_originX = r3(num(rg.params.x, 0) - inset); f.p_originY = r3(num(rg.params.y, 0) - inset);
         }
         return Object.assign(f, placeFields(prog, 'p_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper
     },

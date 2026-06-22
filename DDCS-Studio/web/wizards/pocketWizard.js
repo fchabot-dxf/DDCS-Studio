@@ -35,15 +35,17 @@ export function pocketStack(params = {}) {
     const depth = num(params.depth, 4), by = num(params.stepdown, 1.5);
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
 
-    // tool-centre region (inset by the tool radius) + too-small detection
+    // tool-centre region, inset by the tool radius MINUS the wall offset (signed): +offset = bigger pocket (cut
+    // oversize), −offset = smaller pocket (leave stock). offset 0 = exact typed size. + too-small detection.
+    const off = num(params.wallOffset, 0), inset = r - off;
     let region = newBlock('region'), tooSmall, cx, cy;
     if (shape === 'circle') {
-        const Rc = num(params.dia, 50) / 2 - r; tooSmall = Rc <= 0; cx = ox; cy = oy;
+        const Rc = num(params.dia, 50) / 2 - inset; tooSmall = Rc <= 0; cx = ox; cy = oy;
         region.params = { shape: 'circle', x: ox, y: oy, w: 2 * Rc };
     } else {
-        const w = num(params.w, 80), h = num(params.h, 60), iw = w - 2 * r, ih = h - 2 * r;
+        const w = num(params.w, 80), h = num(params.h, 60), iw = w - 2 * inset, ih = h - 2 * inset;
         tooSmall = iw <= 0 || ih <= 0; cx = ox + w / 2; cy = oy + h / 2;
-        region.params = { shape: 'rect', x: ox + r, y: oy + r, w: iw, h: ih };
+        region.params = { shape: 'rect', x: ox + inset, y: oy + inset, w: iw, h: ih };
     }
 
     if (tooSmall) {   // pocket smaller than the tool → a single centre plunge, pecking to depth
