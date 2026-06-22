@@ -131,12 +131,23 @@ const RECONCILERS = {
         const s = find(prog, 'slot');
         if (!s || !s.params) return null;
         const p = s.params, wb = find(prog, 'wcs');
-        return Object.assign({
+        const f = {
             sl_wcs: (wb && wb.params && wb.params.wcs) || 'active',
             sl_ax: p.x0, sl_ay: p.y0, sl_bx: p.x1, sl_by: p.y1, sl_width: p.width,
             sl_toolDia: p.tool, sl_stepoverPct: p.stepoverPct, sl_depth: p.depth, sl_stepdown: p.stepdown,
             sl_feed: p.feed, sl_plunge: p.plunge, sl_clearance: p.clearance,
-        }, placeFields(prog, 'sl_', 'offX', 'offY'));   // opt-in placement: A↔B stays absolute, offset/anchors ride the wrapper
+        };
+        // REPEAT (array): if the slot is wrapped in an Array, reverse-sync the pattern fields too (else it's single).
+        const arr = find(prog, 'array');
+        if (arr && arr.params) {
+            const a = arr.params;
+            f.sl_pattern = a.pattern; f.sl_skip = a.skip || '';
+            if (a.pattern === 'circle') { f.sl_dia = a.dia; f.sl_count = a.count; f.sl_startAngle = a.startAngle; }
+            else if (a.pattern === 'line') { f.sl_lcount = a.count; f.sl_spacing = a.spacing; f.sl_angle = a.angle; }
+            else if (a.pattern === 'rect') { f.sl_w = a.w; f.sl_h = a.h; f.sl_nx = a.nx; f.sl_ny = a.ny; }
+            else { f.sl_cols = a.cols; f.sl_rows = a.rows; f.sl_dx = a.dx; f.sl_dy = a.dy; }
+        } else { f.sl_pattern = 'single'; }
+        return Object.assign(f, placeFields(prog, 'sl_', 'offX', 'offY'));   // opt-in placement: A↔B stays absolute, offset/anchors ride the wrapper
     },
     pocket(prog) {
         const down = find(prog, 'stepdown');

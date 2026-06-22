@@ -32,3 +32,25 @@ test('slot array repeats the slot across the pattern; single = one slot', async 
   // The array footprint spreads the slot bbox by the pattern (base maxX≈40 + 2·30 = 100).
   expect(r.bbox.maxX, 'array bbox spans all copies').toBeGreaterThan(95);
 });
+
+test('block→wizard reverse-sync: editing the slot array pattern in Blocks flows back to the form', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('slot'));
+  await page.waitForSelector('#wiz_slot', { state: 'visible' });
+  await page.evaluate(() => { document.getElementById('sl_pattern').value = 'line'; window.ddcsStudio.wizardManager.update(); });
+
+  // View as blocks → the slot is wrapped in an Array; flip its pattern to grid.
+  await page.evaluate(() => window.showApp('blocks'));
+  await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().some((b) => b.type === 'array'));
+  await page.evaluate(() => window.__blkws.getAllBlocks().find((b) => b.type === 'array').getField('PATTERN').setValue('grid'));
+  await expect.poll(() => page.evaluate(() => {
+    const find = (p) => { for (const b of (p || [])) { if (b.type === 'array') return b; if (b.children) { const f = find(b.children); if (f) return f; } } return null; };
+    const a = find(window.ddcsGetBlockProgram && window.ddcsGetBlockProgram());
+    return a && a.params ? a.params.pattern : null;
+  })).toBe('grid');
+
+  // Back to Studio → the open wizard's pattern field reflects the block edit.
+  await page.evaluate(() => window.showApp('studio'));
+  await expect.poll(() => page.evaluate(() => document.getElementById('sl_pattern').value)).toBe('grid');
+});
