@@ -83,7 +83,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     let viz = null;            // GcodeViz3D (lazy — only when 3D is shown and WebGL is available)
     let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false;
-    let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false;
+    let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false, liveTimer = null;
 
     // The 2D canvas only repaints when told to; without this it goes blank if first drawn at a transient/zero
     // size (drawer slide-in) or after the panel is resized. Re-fit the 2D route whenever the container resizes.
@@ -200,8 +200,20 @@ export function createPreviewPanel(container, opts = {}) {
         setStatus(!s.drawable ? 'No drawable moves' : [s.feed && `${s.feed} cuts`, s.probe && `${s.probe} probes`, s.rapid && `${s.rapid} rapids`].filter(Boolean).join(' · '));
         syncJog();
         renderLegend(parsed);
+        if (engine && engine.running) scheduleLiveRestart();   // live edit while playing → re-run on the new path
     }
     const refresh = () => setGcode();
+
+    // A param/stock edit landed WHILE the animation is running: the static route already redrew above; restart the
+    // moving tool so it follows the change immediately (instead of finishing the stale pass first, then looping).
+    // Debounced so a continuous drag / typing settles before the re-run, and skipped if the G-code didn't change.
+    function scheduleLiveRestart() {
+        if (liveTimer) clearTimeout(liveTimer);
+        liveTimer = setTimeout(() => {
+            liveTimer = null;
+            if (engine && engine.running && (get('getGcode') || '') !== lastRunCode) { stopPlay(); play(); }
+        }, 180);
+    }
 
     // Single bottom bar: the jog grid lives in the 3D viz's pendant; the bar's ✛ Jog button toggles it and only
     // shows when there's a start marker to jog (3D + starts). I/O toggles the shared virtual-I/O panel.
@@ -284,6 +296,7 @@ export function createPreviewPanel(container, opts = {}) {
     }
     function stopPlay() {
         if (loopTimer) { clearTimeout(loopTimer); loopTimer = null; }
+        if (liveTimer) { clearTimeout(liveTimer); liveTimer = null; }   // drop a queued live-restart (harmless on the restart path: it nulls liveTimer first)
         if (engine && engine.running) engine.stop();
         t2.stop();
         if (viz) viz.setAnimate(false);
