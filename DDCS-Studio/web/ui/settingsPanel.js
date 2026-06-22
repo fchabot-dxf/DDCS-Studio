@@ -434,8 +434,9 @@ function buildSettingsOverlay() {
             #settings-app .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 20px; background: var(--bg); }
             #settings-app .settings-foot { flex: 0 0 auto; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--panel); display: flex; gap: 8px; }
             #settings-app .settings-head { justify-content: space-between; }
-            #settings-app .settings-close { margin-left: auto; background: transparent; border: none; box-shadow: none; text-shadow: none; color: var(--text-dim); font-size: 17px; line-height: 1; cursor: pointer; padding: 4px 8px; min-height: 0; border-radius: var(--radius, 4px); }
-            #settings-app .settings-close:hover { color: var(--text-main); background: var(--bg); }
+            #settings-app .settings-close { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; cursor: pointer; color: #fff; font-size: 14px; font-weight: 700; line-height: 1; border-radius: 6px; border: 1px solid #8e1408; background: linear-gradient(180deg, #ff8276 0%, #ef4d33 45%, #d62311 50%, #e6431c 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 2px rgba(0,0,0,.35); text-shadow: 0 1px 1px rgba(0,0,0,.35); padding: 0; min-height: 0; }
+            #settings-app .settings-close:hover { filter: brightness(1.08); background: linear-gradient(180deg, #ff8276 0%, #ef4d33 45%, #d62311 50%, #e6431c 100%); }
+            #settings-app .settings-close:active { transform: translateY(1px); box-shadow: inset 0 1px 2px rgba(0,0,0,.3); }
             #settings-app .settings-foot { justify-content: flex-end; }
             #settings-app .settings-done { background: var(--accent); color: #fff; border: none; border-radius: var(--radius, 5px); padding: 7px 24px; font-size: 13px; font-weight: 600; cursor: pointer; transition: filter 120ms; }
             #settings-app .settings-done:hover { filter: brightness(1.12); }

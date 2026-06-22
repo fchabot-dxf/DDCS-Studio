@@ -18692,11 +18692,8 @@ Type: ${v6.t || ""}`));
     if (rightTarget) {
       rightTarget.innerHTML = `
                 <div style="display:flex; gap:6px; align-items:center;">
-                    <button class="toolbar-btn" onclick="loadGcodeFile && loadGcodeFile()" title="Load a G-code / .nc file into the editor (replaces the current program)"><span class="btn-ico">${HEADER_ICONS.load}</span><span class="btn-tx">Load</span></button>
-                    <button class="toolbar-btn" onclick="insertGcodeFile && insertGcodeFile()" title="Insert a G-code file at the cursor \u2014 keeps your current program"><span class="btn-ico">${HEADER_ICONS.insert}</span><span class="btn-tx">Insert</span></button>
-                    <button class="toolbar-btn" onclick="copyCode && copyCode()" title="Copy editor to clipboard"><span class="btn-ico">${HEADER_ICONS.copy}</span><span class="btn-tx">Copy</span></button>
-                    <button class="toolbar-btn" onclick="clearCode && clearCode()" title="Clear the editor"><span class="btn-ico">${HEADER_ICONS.clear}</span><span class="btn-tx">Clear</span></button>
-                    <button class="toolbar-btn" onclick="downloadFile && downloadFile()" title="Export / download the program"><span class="btn-ico">${HEADER_ICONS.export}</span><span class="btn-tx">Export</span></button>
+                    <button class="toolbar-btn icon-only" onclick="copyCode && copyCode()" title="Copy editor to clipboard" aria-label="Copy"><span class="btn-ico">${HEADER_ICONS.copy}</span></button>
+                    <button class="toolbar-btn icon-only" onclick="clearCode && clearCode()" title="Clear the editor" aria-label="Clear"><span class="btn-ico">${HEADER_ICONS.clear}</span></button>
                 </div>
             `;
     }

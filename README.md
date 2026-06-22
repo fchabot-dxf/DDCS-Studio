@@ -14,7 +14,9 @@ DDCS controllers are capable but their on-machine workflow is cramped — tiny s
 - **Real simulation, not a preview** — a G-code execution engine drives a 2D and 3D view from the exact program you'll run: it traces probe moves, evaluates `IF/GOTO` and `WHILE` loops, dwells, and a **virtual-I/O panel** so you can exercise sensor-wait branches by hand before touching metal.
 - **Personalised machine frame** — the simulator renders in *your* machine's real coordinate frame (travels, work origin, limit polarity) decoded from the controller's own configuration dump, so `G53` moves and WCS offsets look the way they will on the machine.
 - **Blocks view** — every wizard's output *is* a stack of dialect-aware atoms; the **Blocks** tab renders that stack as Blockly so you can read and edit the logic structurally, then round-trip it back to G-code.
-- **Multi-controller dialects** — the same operation emits native G-code for whichever controller you've selected; fields a controller can't support are greyed (with a tooltip explaining why) rather than silently producing bad code.
+- **Views that can't drift** — the Blocks tab, the 2D/3D canvas, and the wizard forms all read from the same atom stack; G-code is a write-once output that nothing in the app reads back. No parser infers intent from generated text, so the three views are always in exact agreement — no accumulated approximation across edit cycles.
+- **What you simulate is what runs** — the canvas and simulator are driven from the same atom stack as the G-code emitter, not reconstructed from the output. There is no step where the app re-parses its own G-code to show you a picture of it, so the preview cannot diverge from what the machine receives.
+- **Multi-controller dialects** — the same operation emits native G-code for whichever controller you've selected; fields a controller can't support are greyed (with a tooltip explaining why) rather than silently producing bad code. Switching dialects mid-session re-emits the same atoms through a different dialect — no G-code is re-parsed, nothing is lost.
 - **Machine gateway** — a small local server connects to the controller's network share (and Modbus), can **scan the LAN** to find controllers, exposes live status, and uploads programs — so the cloud/PC *authors* and the gateway *controls*.
 - **Bring-your-own cloud** — projects (and Drive sign-in) use your own Google Drive via a desktop OAuth flow; there's no central account or server holding your data.
 
@@ -56,6 +58,8 @@ Each controller's behaviour is verified against real dumps and bench tests, not 
 ```
 
 Every operation is a **stack of small atoms** (move, probe, set-output, wait-input, dwell, jump, …). Atoms are **dialect-aware**: the active controller's *dialect* turns each atom into that controller's exact G-code (e.g. a "wait for input" emits a `WHILE [#[1520+N]…] DO1 … END1` poll on the Expert, or folds to an honest hint on a controller that can't do it). The same atom stack feeds the editor, the Blocks view, and the simulator — so the three stay in sync and round-trip.
+
+**G-code is a terminal output — nothing reads it back.** The Blocks view, the 2D layout canvas, and the wizard forms all read directly from the atom stack (the structured IR), never from the G-code text. No part of the UI parses or infers intent from generated G-code: the stack *is* the intent, and G-code is just one rendering of it. This means the Blocks view always exactly matches the wizard (no parse ambiguity), the 2D canvas tracks the same path the machine will actually run, and round-trips are lossless.
 
 ---
 

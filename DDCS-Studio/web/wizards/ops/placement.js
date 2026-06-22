@@ -93,6 +93,19 @@ export function placementSpec(params, bbox, prefix) {
     };
 }
 
+/** WCS pin offset for a stock in work coords: how far the stock's datum corner is from the program origin
+ *  when the stock is pinned to a WCS (G54–G59) rather than program zero.
+ *  Returns {x:0, y:0} when no pin is active, no table row exists, or machine data is absent. */
+export function stockPinXY(stock, machine) {
+    if (!stock || !stock.pin || stock.pin === 'origin') return { x: 0, y: 0 };
+    if (!machine || !machine.wcs || !machine.wcs.table) return { x: 0, y: 0 };
+    const gi = parseInt(String(stock.pin).replace(/[^0-9]/g, ''), 10) - 54;
+    const t = machine.wcs.table[gi];
+    if (!t) return { x: 0, y: 0 };
+    const wo = machine.workOrigin || {};
+    return { x: (Number(t.x) || 0) - (wo.x || 0), y: (Number(t.y) || 0) - (wo.y || 0) };
+}
+
 /** Placement shift for a PlaceOnStock atom, from its FLAT snapshot params (bbox bminX.. + stock + intent). Used by
  *  the emit fold so the block is self-contained. */
 export function placeShiftFromParams(p = {}) {
