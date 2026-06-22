@@ -92,6 +92,7 @@ export const rotaryCenterView = {
         const gcode = wizard.generate(params);
         el('wiz_rotary_center_code').innerHTML = UIUtils.formatGCode(gcode);
         ctx.preview3D(gcode, 'rotaryCenterVizContainer', wizard.inferStart(params, stock));
+        ctx.previewRotaryFixture('rotaryCenterVizContainer', true);   // op-specific: show the 4th-axis rig
 
         const status = el('rotaryCenterVizStatus');
         if (status) status.textContent = `Rotary centre: ${method} | Z0 ${params.datum} | ${params.wcs}`;

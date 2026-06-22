@@ -56,6 +56,7 @@ export const rotaryClockView = {
         el('wiz_rotary_clock_code').innerHTML = UIUtils.formatGCode(gcode);
         const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
         ctx.preview3D(gcode, 'rotaryClockVizContainer', wizard.inferStart(params, stock));
+        ctx.previewRotaryFixture('rotaryClockVizContainer', true);   // op-specific: show the 4th-axis rig
 
         const status = el('rotaryClockVizStatus');
         if (status) status.textContent = `Rotary clock: ${action} | ref ${params.reference} | ${params.wcs}`;

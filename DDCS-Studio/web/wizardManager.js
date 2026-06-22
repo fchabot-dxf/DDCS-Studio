@@ -409,6 +409,15 @@ export class WizardManager {
         if (viz && viz.setMagazine) viz.setMagazine(pockets || []);
     }
 
+    // Show/hide the 4th-axis rig (chuck + tailstock) around a cylinder stock in the 3D preview. Opt-in (rotary
+    // probe wizards only) — call AFTER preview3D so the panel/viz exists.
+    previewRotaryFixture(containerId, on) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const viz = host && host.__panel && host.__panel.viz;
+        if (viz && viz.setRotaryFixture) viz.setRotaryFixture(on);
+    }
+
     // Draggable splitter between the form (.wiz-controls, left) and the preview (.wiz-visual, right) for every
     // two-pane wizard. Drag resizes the form width; the 3D viz auto-resizes (its own ResizeObserver). The chosen
     // width is remembered across wizards. Idempotent per wizard body.
