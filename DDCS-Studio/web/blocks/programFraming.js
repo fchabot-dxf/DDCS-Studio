@@ -17,6 +17,23 @@ export function makeStart(params = {}) {
     return b;
 }
 
+/** Wrap an op's cutting block(s) in a PlaceOnStock atom that sits the op on the stock — its path-datum corner
+ *  attaches to the chosen stock corner + signed offset (see ops/placeOnStock.js + ops/placement.js). The geometry
+ *  bbox {minX,maxX,minY,maxY} + stock dims/datum are SNAPSHOTTED so the block is self-contained and stable, and the
+ *  2D layout uses the SAME bbox so 2D and 3D agree. `children` may be one block or an array. */
+export function makePlace(params = {}, bbox, children) {
+    const bb = bbox || { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+    const b = newBlock('placeonstock');
+    b.params = {
+        stockAttach: params.stockAttach || '', pathDatum: params.pathDatum || '',
+        offX: num(params.originX, 0), offY: num(params.originY, 0), offZ: num(params.offZ, 0),
+        stockW: num(params.stockW, 0), stockH: num(params.stockH, 0), stockDatum: params.stockDatum || 'nnp',
+        bminX: bb.minX, bmaxX: bb.maxX, bminY: bb.minY, bmaxY: bb.maxY,
+    };
+    b.children = Array.isArray(children) ? children : [children];
+    return b;
+}
+
 /** Program End from wizard params: the configured end-of-program routine. */
 export function makeEnd(params = {}) {
     const ep = params.endProgram || {};

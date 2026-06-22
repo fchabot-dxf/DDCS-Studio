@@ -8,7 +8,7 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
-import { makeStart, makeEnd } from '../blocks/programFraming.js';
+import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { patternPoints } from './ops/index.js';
 import { num } from './ops/util.js';
 import { pointsBBox } from './ops/placement.js';
@@ -36,17 +36,8 @@ export function drillStack(params = {}) {
     arr.children = [hole];
     // PLACE the pattern on the stock — a C-block carrying the intent + a bbox/stock SNAPSHOT (placeOnStock.js); the
     // emit fold (kind:'place') translates the wrapped op so its datum corner lands on the stock-attach corner.
-    const bbox = pointsBBox(patternPoints(params)) || { minX: 0, maxX: 0, minY: 0, maxY: 0 };
-    const place = newBlock('placeonstock');
-    place.params = {
-        stockAttach: params.stockAttach || '', pathDatum: params.pathDatum || '',
-        offX: num(params.originX, 0), offY: num(params.originY, 0), offZ: num(params.offZ, 0),
-        stockW: num(params.stockW, 0), stockH: num(params.stockH, 0), stockDatum: params.stockDatum || 'nnp',
-        bminX: bbox.minX, bmaxX: bbox.maxX, bminY: bbox.minY, bmaxY: bbox.maxY,
-    };
-    place.children = [arr];
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
-    return [makeStart(params), wcs, place, makeEnd(params)];
+    return [makeStart(params), wcs, makePlace(params, pointsBBox(patternPoints(params)), arr), makeEnd(params)];
 }
 
 export class DrillWizard {

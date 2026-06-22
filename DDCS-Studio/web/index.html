@@ -928,8 +928,10 @@
                             <option value="raster">Raster (zig-zag)</option>
                         </select>
                     </div>
-                    <div><span class="label">POSITION X</span><input id="p_originX" value="0" title="Pocket position in the active WCS (drag the square handle). Rect = min-XY corner; circle = centre."/></div>
-                    <div><span class="label">POSITION Y</span><input id="p_originY" value="0"/></div>
+                    <div><span class="label">OFFSET X</span><input id="p_originX" value="0" title="Signed X offset of the pocket from the stock-attach corner (drag the square handle)."/></div>
+                    <div><span class="label">OFFSET Y</span><input id="p_originY" value="0" title="Signed Y offset of the pocket from the stock-attach corner."/></div>
+                    <div><span class="label">OFFSET Z</span><input id="p_offZ" value="0" title="Signed Z offset of the whole pocket (shifts every Z move; 0 = part-zero plane)."/></div>
+                    <input id="p_pathDatum" type="hidden" value=""/><input id="p_stockAttach" type="hidden" value=""/>
                 </div>
                 <div id="p_dim_rect" class="grid-2">
                     <div><span class="label">WIDTH</span><input id="p_w" value="80"/></div>
@@ -1052,8 +1054,10 @@
 
                 <span class="section-label">AREA</span>
                 <div class="grid-2">
-                    <div><span class="label">POSITION X</span><input id="sf_originX" value="0"/></div>
-                    <div><span class="label">POSITION Y</span><input id="sf_originY" value="0"/></div>
+                    <div><span class="label">OFFSET X</span><input id="sf_originX" value="0" title="Signed X offset of the faced area from the stock-attach corner (drag the square handle)."/></div>
+                    <div><span class="label">OFFSET Y</span><input id="sf_originY" value="0" title="Signed Y offset of the faced area from the stock-attach corner."/></div>
+                    <div><span class="label">OFFSET Z</span><input id="sf_offZ" value="0" title="Signed Z offset of the whole pass (shifts every Z move; 0 = part-zero plane)."/></div>
+                    <input id="sf_pathDatum" type="hidden" value=""/><input id="sf_stockAttach" type="hidden" value=""/>
                     <div><span class="label">WIDTH</span><input id="sf_w" value="100"/></div>
                     <div><span class="label">HEIGHT</span><input id="sf_h" value="80"/></div>
                 </div>

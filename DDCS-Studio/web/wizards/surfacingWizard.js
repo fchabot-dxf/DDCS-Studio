@@ -9,8 +9,14 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
-import { makeStart, makeEnd } from '../blocks/programFraming.js';
+import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
+
+/** The faced area's footprint on the stock — shared by the stack (PlaceOnStock snapshot) + the 2D view. */
+export function surfacingBBox(params = {}) {
+    const ox = num(params.originX, 0), oy = num(params.originY, 0);
+    return { minX: ox, maxX: ox + num(params.w, 100), minY: oy, maxY: oy + num(params.h, 80) };
+}
 
 /** Surfacing params → [ StepDown{ StepOver(Region) } ]. The one source of truth for both displays. */
 export function surfacingStack(params = {}) {
@@ -30,7 +36,7 @@ export function surfacingStack(params = {}) {
     down.params = { to: num(params.depth, 0.5), by: num(params.stepdown, 0.5) };
     down.children = [over];
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
-    return [makeStart(params), wcs, down, makeEnd(params)];   // Program Start … WCS … op … Program End
+    return [makeStart(params), wcs, makePlace(params, surfacingBBox(params), down), makeEnd(params)];   // Start … WCS … placed op … End
 }
 
 export class SurfacingWizard {

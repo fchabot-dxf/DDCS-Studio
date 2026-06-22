@@ -1,8 +1,9 @@
 /** views/pocketView.js — Pocket clearing wizard view (Mill group). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
-import { PocketWizard } from '../pocketWizard.js';
+import { PocketWizard, pocketBBox } from '../pocketWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
+import { placementShift, stockDatumOffset } from '../ops/placement.js';
 
 const wizard = new PocketWizard();
 const layout = new FeatureCanvas();
@@ -39,9 +40,18 @@ function buildPocketSpec(params, stock) {
         handles.push({ id: 'size', x: ox + w, y: oy + h, kind: 'size', label: 'W × H' });
     }
 
+    const datXY = (c) => String(c || '').replace(/[^ncp]/g, '').slice(0, 2);
+    const stockDat = datXY(stock && stock.datum) || 'nn';
+    const shift = placementShift(pocketBBox(params), params);   // same placement the G-code is baked with
+    const sOff = stockDatumOffset(params);
     return {
-        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y } : null,
+        stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: sOff.x, oy: sOff.y } : null,
+        placement: { x: shift.x, y: shift.y },
         items, handles,
+        pathDatum: datXY(params.pathDatum) || datXY(params.stockAttach) || stockDat, stockDatum: stockDat,
+        stockAttach: datXY(params.stockAttach) || stockDat,
+        onPathDatum(code) { const e = el('p_pathDatum'); if (!e) return; e.value = code; e.dispatchEvent(new Event('input', { bubbles: true })); },
+        onStockAttach(code) { const e = el('p_stockAttach'); if (!e) return; e.value = code; e.dispatchEvent(new Event('input', { bubbles: true })); },
         onDrag(id, w) {
             if (id === 'origin') { setFields({ p_originX: w.x, p_originY: w.y }); return; }
             if (params.shape === 'circle') setFields({ p_dia: Math.max(1, 2 * Math.hypot(w.x - ox, w.y - oy)) });
@@ -57,7 +67,7 @@ export const pocketView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'p_shape', 'p_originX', 'p_originY', 'p_w', 'p_h', 'p_dia', 'p_wcs',
+        'p_shape', 'p_originX', 'p_originY', 'p_offZ', 'p_pathDatum', 'p_stockAttach', 'p_w', 'p_h', 'p_dia', 'p_wcs',
         'p_strategy', 'p_toolDia', 'p_stepoverPct', 'p_depth', 'p_stepdown', 'p_clearance', 'p_feed', 'p_plunge', 'p_rpm',
     ],
     probeSrcFields: {},
@@ -80,6 +90,10 @@ export const pocketView = {
             depth: v('p_depth'), stepdown: v('p_stepdown'), clearance: v('p_clearance'),
             feed: v('p_feed'), plunge: v('p_plunge'), rpm: v('p_rpm'),
             spindle: s.spindle, head: s.head, endProgram: s.endProgram,
+            // Placement (see placeOnStock): pocket footprint attaches to a stock corner + signed offset.
+            stockDatum: (s.stock && s.stock.datum) || 'nnp', pathDatum: v('p_pathDatum') || '',
+            stockAttach: v('p_stockAttach') || '', offZ: num(v('p_offZ'), 0),
+            stockW: (s.stock && s.stock.x) || 0, stockH: (s.stock && s.stock.y) || 0,
         };
 
         // Show only the active shape's dimension fields.

@@ -9,8 +9,20 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
-import { makeStart, makeEnd } from '../blocks/programFraming.js';
+import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
+
+/** The pocket's outer footprint on the stock (rect = corner+size, circle = centre±R) — shared by the stack (for
+ *  PlaceOnStock's snapshot) and the 2D view, so 2D and 3D place identically. */
+export function pocketBBox(params = {}) {
+    const ox = num(params.originX, 0), oy = num(params.originY, 0);
+    if ((params.shape || 'rect') === 'circle') {
+        const R = num(params.dia, 50) / 2;
+        return { minX: ox - R, maxX: ox + R, minY: oy - R, maxY: oy + R };
+    }
+    const w = num(params.w, 80), h = num(params.h, 60);
+    return { minX: ox, maxX: ox + w, minY: oy, maxY: oy + h };
+}
 
 /** Pocket params → its block stack. The one source of truth for both displays. */
 export function pocketStack(params = {}) {
@@ -37,7 +49,7 @@ export function pocketStack(params = {}) {
     if (tooSmall) {   // pocket smaller than the tool → a single centre plunge, pecking to depth
         const hole = newBlock('drill');
         hole.params = { x: cx, y: cy, depth, peck: by, feed: plunge, clearance: clr };
-        return [makeStart(params), wcs, hole, makeEnd(params)];
+        return [makeStart(params), wcs, makePlace(params, pocketBBox(params), hole), makeEnd(params)];
     }
 
     const over = newBlock('stepover');
@@ -50,7 +62,7 @@ export function pocketStack(params = {}) {
         wall.params = { region, z: 'z', feed, plunge, clearance: clr };
         down.children.push(wall);
     }
-    return [makeStart(params), wcs, down, makeEnd(params)];
+    return [makeStart(params), wcs, makePlace(params, pocketBBox(params), down), makeEnd(params)];
 }
 
 export class PocketWizard {
