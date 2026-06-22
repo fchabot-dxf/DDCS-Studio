@@ -57,9 +57,9 @@ export function pocketStack(params = {}) {
     const down = newBlock('stepdown');
     down.params = { to: depth, by };
     down.children = [over];
-    if (raster) {   // raster leaves the wall un-finished → a contour pass (arc for circles, polygon for rect)
-        const wall = newBlock('wall');
-        wall.params = { region, z: 'z', feed, plunge, clearance: clr };
+    if (raster) {   // raster leaves the wall un-finished → a Contour finish pass (arc for circles, polygon for rect)
+        const wall = newBlock('contour');   // side 'on': the region is already inset, so this is the inside finish
+        wall.params = { region, side: 'on', tool, z: 'z', feed, plunge, clearance: clr };
         down.children.push(wall);
     }
     return [makeStart(params), wcs, makePlace(params, pocketBBox(params), down), makeEnd(params)];
