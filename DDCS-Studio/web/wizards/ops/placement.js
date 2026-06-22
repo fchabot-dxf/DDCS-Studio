@@ -33,10 +33,16 @@ export function pointsBBox(points) {
  */
 export function placementShift(bbox, params = {}) {
     if (!bbox) return { x: 0, y: 0, z: 0 };
-    // Opt-in ops (slot/text — absolute A↔B / baseline geometry): DON'T follow the stock datum. Stay where drawn +
+    // Datum-Z (CODE-affecting): the ops author depths from the TOP (Z0 at top, cuts negative). Re-reference them to
+    // the stock datum's Z — bottom datum shifts the whole path UP by the stock height (Z-5 → Z+15), centre by half,
+    // top by 0 — so a bottom datum truly references the bottom. Cuts + retracts shift together (rigid), preserving
+    // the cut; arc I/J are unaffected. (See the placement Z thread — datum Z is no longer sim-only.)
+    const dz = String(params.stockDatum || '').replace(/[^ncp]/g, '')[2];
+    const zShift = numv(params.offZ) + (1 - ((dz in FRAC) ? FRAC[dz] : 1)) * numv(params.stockZ);
+    // Opt-in ops (slot/text — absolute A↔B / baseline geometry): DON'T follow the stock datum in XY. Stay where drawn +
     // a signed offset; only ATTACH to a stock corner once one is picked (then fall through to the placement below).
     if (params.optIn && !params.stockAttach && !params.pathDatum) {
-        return { x: numv(params.originX), y: numv(params.originY), z: numv(params.offZ) };
+        return { x: numv(params.originX), y: numv(params.originY), z: zShift };   // Z still re-references the datum
     }
     const at = { n: (a) => a, c: (a, b) => (a + b) / 2, p: (a, b) => b };
     // Path datum follows the stock-attach corner (which follows the stock datum) unless explicitly set.
@@ -48,7 +54,7 @@ export function placementShift(bbox, params = {}) {
     return {
         x: attachX + numv(params.originX) - cornerX,
         y: attachY + numv(params.originY) - cornerY,
-        z: numv(params.offZ),
+        z: zShift,
     };
 }
 
@@ -73,7 +79,7 @@ export function placementParams(prefix, stock, optIn) {
     return {
         stockDatum: (stock && stock.datum) || 'nnp',
         pathDatum: v('pathDatum') || '', stockAttach: v('stockAttach') || '', offZ: numv(v('offZ')),
-        stockW: (stock && stock.x) || 0, stockH: (stock && stock.y) || 0, optIn: !!optIn,
+        stockW: (stock && stock.x) || 0, stockH: (stock && stock.y) || 0, stockZ: (stock && stock.z) || 0, optIn: !!optIn,
     };
 }
 
@@ -111,6 +117,6 @@ export function stockPinXY(stock, machine) {
 export function placeShiftFromParams(p = {}) {
     return placementShift(
         { minX: numv(p.bminX), maxX: numv(p.bmaxX), minY: numv(p.bminY), maxY: numv(p.bmaxY) },
-        { pathDatum: p.pathDatum, stockAttach: p.stockAttach, stockDatum: p.stockDatum, stockW: p.stockW, stockH: p.stockH, originX: p.offX, originY: p.offY, offZ: p.offZ, optIn: p.optIn },
+        { pathDatum: p.pathDatum, stockAttach: p.stockAttach, stockDatum: p.stockDatum, stockW: p.stockW, stockH: p.stockH, stockZ: p.stockZ, originX: p.offX, originY: p.offY, offZ: p.offZ, optIn: p.optIn },
     );
 }

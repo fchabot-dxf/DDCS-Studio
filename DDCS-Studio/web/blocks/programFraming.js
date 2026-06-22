@@ -27,7 +27,7 @@ export function makePlace(params = {}, bbox, children) {
     b.params = {
         stockAttach: params.stockAttach || '', pathDatum: params.pathDatum || '',
         offX: num(params.originX, 0), offY: num(params.originY, 0), offZ: num(params.offZ, 0), optIn: !!params.optIn,
-        stockW: num(params.stockW, 0), stockH: num(params.stockH, 0), stockDatum: params.stockDatum || 'nnp',
+        stockW: num(params.stockW, 0), stockH: num(params.stockH, 0), stockZ: num(params.stockZ, 0), stockDatum: params.stockDatum || 'nnp',
         bminX: bb.minX, bmaxX: bb.maxX, bminY: bb.minY, bmaxY: bb.maxY,
     };
     b.children = Array.isArray(children) ? children : [children];

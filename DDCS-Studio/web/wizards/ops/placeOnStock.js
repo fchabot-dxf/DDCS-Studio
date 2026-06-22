@@ -13,6 +13,6 @@
  */
 export const placeOnStockBlock = {
     type: 'placeonstock', label: 'Place on Stock', kind: 'place', category: 'Modify',
-    defaults: { stockAttach: '', pathDatum: '', offX: 0, offY: 0, offZ: 0, optIn: false, stockW: 0, stockH: 0, stockDatum: 'nnp', bminX: 0, bmaxX: 0, bminY: 0, bmaxY: 0 },
+    defaults: { stockAttach: '', pathDatum: '', offX: 0, offY: 0, offZ: 0, optIn: false, stockW: 0, stockH: 0, stockZ: 0, stockDatum: 'nnp', bminX: 0, bmaxX: 0, bminY: 0, bmaxY: 0 },
     fields: ['stockAttach', 'pathDatum', 'offX', 'offY', 'offZ'],   // the editable intent; the snapshot params ride along
 };
