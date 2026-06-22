@@ -14,6 +14,7 @@ import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } };
 import { surfacingStack } from '../wizards/surfacingWizard.js';
 import { pocketStack } from '../wizards/pocketWizard.js';
+import { contourStack } from '../wizards/contourWizard.js';
 import { slotStack } from '../wizards/slotWizard.js';
 import { drillStack } from '../wizards/drillWizard.js';
 import { wcsStack } from '../wizards/wcsWizard.js';
@@ -34,7 +35,7 @@ import { rotaryCenterStack } from '../wizards/rotaryCenterWizard.js';
 import { textStack } from '../wizards/textWizard.js';
 
 const BUILDERS = {
-    surfacing: surfacingStack, pocket: pocketStack, slot: slotStack, drill: drillStack,
+    surfacing: surfacingStack, pocket: pocketStack, contour: contourStack, slot: slotStack, drill: drillStack,
     wcs: wcsStack, edge: edgeStack, comm: commStack, middle: middleStack, corner: cornerStack, alignment: alignmentStack,
     atc_length: atcLengthStack, atc_check: atcToolCheckStack, atc_warmup: atcWarmupStack, atc_change: atcChangeStack, atc_test: atcTestStack, atc_table: atcTableStack,
     circular: circularStack, rotary_clock: rotaryClockStack, rotary_center: rotaryCenterStack, text: textStack,
@@ -57,7 +58,7 @@ const find = (prog, type) => {
 // blocks/blockModel.js). `requires` is derived from the atoms the op uses: #var atoms → 'vars', flow atoms →
 // 'flow' (both absent on grbl). params ride along for op-form editing. See REMINDERS "Op-containers".
 const OP_LABELS = {
-    surfacing: 'Surfacing', pocket: 'Pocket', slot: 'Slot', drill: 'Drill', text: 'Text',
+    surfacing: 'Surfacing', pocket: 'Pocket', contour: 'Contour', slot: 'Slot', drill: 'Drill', text: 'Text',
     wcs: 'WCS', edge: 'Edge Probe', middle: 'Middle Probe', corner: 'Corner Probe', alignment: 'Alignment',
     circular: 'Circular Probe', rotary_clock: 'Rotary Clock', rotary_center: 'Rotary Centre', comm: 'Communication',
     atc_length: 'Tool Length', atc_check: 'Tool Check', atc_warmup: 'Spindle Warmup', atc_change: 'Tool Change', atc_test: 'ATC Test',
@@ -172,6 +173,23 @@ const RECONCILERS = {
             f.p_originX = r3(num(rg.params.x, 0) - inset); f.p_originY = r3(num(rg.params.y, 0) - inset);
         }
         return Object.assign(f, placeFields(prog, 'p_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper
+    },
+    contour(prog) {
+        const down = find(prog, 'stepdown');
+        if (!down || !Array.isArray(down.children)) return null;
+        const c = down.children.find((b) => b.type === 'contour'), rg = c && c.params && c.params.region;
+        if (!c || !rg || !rg.params) return null;
+        // The Region IS the TRUE profile boundary (the Contour atom applies the side offset), so read it straight.
+        const wb = find(prog, 'wcs');
+        const f = {
+            ct_wcs: (wb && wb.params && wb.params.wcs) || 'active',
+            ct_shape: rg.params.shape, ct_side: c.params.side || 'outside', ct_toolDia: c.params.tool,
+            ct_depth: down.params.to, ct_stepdown: down.params.by,
+            ct_feed: c.params.feed, ct_plunge: c.params.plunge, ct_clearance: c.params.clearance,
+        };
+        if (rg.params.shape === 'circle') { f.ct_dia = rg.params.w; f.ct_originX = rg.params.x; f.ct_originY = rg.params.y; }
+        else { f.ct_w = rg.params.w; f.ct_h = rg.params.h; f.ct_originX = rg.params.x; f.ct_originY = rg.params.y; }
+        return Object.assign(f, placeFields(prog, 'ct_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper
     },
     drill(prog) {
         const arr = find(prog, 'array');

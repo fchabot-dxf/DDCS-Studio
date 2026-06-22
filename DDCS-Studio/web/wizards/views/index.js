@@ -27,6 +27,7 @@ import { alignmentView } from './alignmentView.js';
 import { atcLengthView, atcWarmupView, atcChangeView, atcTestView, atcCheckView, atcTableView } from './atcViews.js';
 import { drillView } from './drillView.js';
 import { pocketView } from './pocketView.js';
+import { contourView } from './contourView.js';
 import { slotView } from './slotView.js';
 import { surfacingView } from './surfacingView.js';
 import { textView } from './textView.js';
@@ -43,6 +44,7 @@ export const WIZARD_VIEWS = [
     alignmentView,
     drillView,
     pocketView,
+    contourView,
     slotView,
     surfacingView,
     textView,

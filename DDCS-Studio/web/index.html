@@ -976,6 +976,81 @@
               </div><!-- /.wiz-2pane -->
             </div>
 
+            <!-- Contour / profile cut Wizard (Mill group) -->
+            <div id="wiz_contour" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="contourLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="contourLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="contourVizStatus" class="viz-status"></div>
+                        <div id="contourVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Traces a rectangular or circular profile with an end mill in the active WCS. The boundary you type is the FINISHED edge; the toolpath is offset to a side (outside / inside / on) by the tool radius and stepped down to depth. Drag the handles in the 2D layout (square = place, round = size); the dashed line is the boundary, the solid line is the tool-centre path. Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">SHAPE</span>
+                <div class="grid-2">
+                    <div><span class="label">SHAPE</span>
+                        <select id="ct_shape" value="rect">
+                            <option value="rect">Rectangle</option>
+                            <option value="circle">Circle</option>
+                        </select>
+                    </div>
+                    <div><span class="label">OFFSET X</span><input id="ct_originX" value="0" title="Signed X offset of the profile from the stock-attach corner (drag the square handle)."/></div>
+                    <div><span class="label">OFFSET Y</span><input id="ct_originY" value="0" title="Signed Y offset of the profile from the stock-attach corner."/></div>
+                    <div><span class="label">OFFSET Z</span><input id="ct_offZ" value="0" title="Signed Z offset of the whole profile (shifts every Z move; 0 = part-zero plane)."/></div>
+                    <input id="ct_pathDatum" type="hidden" value=""/><input id="ct_stockAttach" type="hidden" value=""/>
+                    <div class="pa-mount" data-prefix="ct_"></div>
+                    <div><span class="label">WORK WCS</span><select id="ct_wcs" title="Run in the Active WCS or force G54–G59. Positions are in the chosen frame."><option value="active">Active</option><option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option><option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option></select></div>
+                </div>
+                <div id="ct_dim_rect" class="grid-2">
+                    <div><span class="label">WIDTH</span><input id="ct_w" value="80"/></div>
+                    <div><span class="label">HEIGHT</span><input id="ct_h" value="60"/></div>
+                </div>
+                <div id="ct_dim_circle" class="grid-2" style="display:none">
+                    <div><span class="label">DIAMETER</span><input id="ct_dia" value="50"/></div>
+                </div>
+
+                <span class="section-label">SIDE &amp; TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">SIDE</span>
+                        <select id="ct_side" value="outside" title="Which side of the boundary the tool runs on: OUTSIDE (cut the part out — finished edge = boundary), INSIDE (cut a hole — finished edge = boundary), or ON (tool centre on the boundary).">
+                            <option value="outside">Outside</option>
+                            <option value="inside">Inside</option>
+                            <option value="on">On line</option>
+                        </select>
+                    </div>
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="ct_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">TOOL Ø</span><input id="ct_toolDia" value="6"/></div>
+                    <div><span class="label">SPINDLE RPM</span><input id="ct_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="ct_depth" value="4"/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="ct_stepdown" value="1.5" title="Z step-down per pass (mm)."/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="ct_clearance" value="5"/></div>
+                    <div><span class="label">FEED</span><input id="ct_feed" value="400"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="ct_plunge" value="200" title="Z plunge feedrate (mm/min) — usually slower than the cutting feed."/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_contour_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
             <!-- Slot milling Wizard (Mill group) -->
             <div id="wiz_slot" class="wiz-body" style="display:none">
               <div class="wiz-2pane">
