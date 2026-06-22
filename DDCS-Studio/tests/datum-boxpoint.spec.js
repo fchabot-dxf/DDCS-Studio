@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
 
-// Part-zero datum = a 3D BOX POINT (26 of them: 8 corners + 12 edge mids + 6 face centres). The stock-editor
-// shows them on an isometric box; setStock places the chosen point at the origin across X/Y/Z. Legacy XY-only
-// codes (fl/fr/bl/br/center, all top-Z) migrate to the 3-char [X][Y][Z] form.
+// Part-zero datum = a 3D BOX POINT, a 3-char [X][Y][Z] code (n/c/p). The stock-editor picks it in 2D: a TOP-VIEW
+// 3×3 grid for XY (the shared cornergrid) + a Top/Center/Bottom HEIGHT selector for Z. setStock places the chosen
+// point at the origin across X/Y/Z. Legacy XY-only codes (fl/fr/bl/br/center, all top-Z) migrate to the 3-char form.
 test.use({ viewport: { width: 1280, height: 900 } });
 
-test('datum picker renders 26 box points and selection drives setStock across X/Y/Z', async ({ page }) => {
+test('datum picker (2D XY grid + height selector) drives setStock across X/Y/Z', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('http://localhost:3211');
@@ -41,32 +41,41 @@ test('datum picker renders 26 box points and selection drives setStock across X/
   expect(geom.legacyFl).toEqual(geom.topFrontLeft);       // legacy fl migrates to nnp
   expect(geom.legacyCenter).toEqual(geom.centreTop);      // legacy center migrates to ccp
 
-  // --- The popover picker: 26 dots, one selected, clicking another updates the datum + caption + settings. ---
+  // --- The popover picker (2D): a top-view 3×3 XY grid + Top/Center/Bottom height selector. ---
   await page.evaluate(() => {
     const panel = window.ddcsStudio.wizardManager._activePanel;
     const btn = panel.el.querySelector('.pp-stock');
     if (btn) btn.click();
   });
-  await page.waitForSelector('#se_datum_pick circle[data-d]');
+  await page.waitForSelector('#se_datum_pick rect[data-code]');
   const ui = await page.evaluate(() => {
     const pick = document.getElementById('se_datum_pick');
-    const dots = pick.querySelectorAll('circle[data-d]');
-    const sel = pick.querySelector('circle.sel');
-    return { count: dots.length, selected: sel && sel.getAttribute('data-d'), name: (document.getElementById('se_datum_name') || {}).textContent };
+    return {
+      cells: pick.querySelectorAll('rect[data-code]').length,
+      zbtns: pick.querySelectorAll('button[data-z]').length,
+      selCell: pick.querySelector('rect[data-code].on')?.getAttribute('data-code'),
+      selZ: pick.querySelector('button[data-z].on')?.getAttribute('data-z'),
+    };
   });
-  expect(ui.count, '26 box points').toBe(26);
-  expect(ui.selected, 'one point is selected').toBeTruthy();
+  expect(ui.cells, '3×3 XY top-view grid').toBe(9);
+  expect(ui.zbtns, 'top / center / bottom height selector').toBe(3);
+  expect(ui.selCell, 'an XY cell is selected').toBeTruthy();
+  expect(ui.selZ, 'a height is selected').toBeTruthy();
 
-  // Click the back-right-bottom corner (ppn) → datum + caption + persisted settings update.
-  await page.evaluate(() => document.querySelector('#se_datum_pick circle[data-d="ppn"]').dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  // Pick back-right (XY 'pp') + Bottom (Z 'n') → datum 'ppn'; caption + persisted settings update.
+  await page.evaluate(() => document.querySelector('#se_datum_pick rect[data-code="pp"]').dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  await page.evaluate(() => document.querySelector('#se_datum_pick button[data-z="n"]').dispatchEvent(new MouseEvent('click', { bubbles: true })));
   await page.waitForTimeout(60);
   const after = await page.evaluate(() => ({
-    selected: document.querySelector('#se_datum_pick circle.sel')?.getAttribute('data-d'),
+    selCell: document.querySelector('#se_datum_pick rect[data-code].on')?.getAttribute('data-code'),
+    selZ: document.querySelector('#se_datum_pick button[data-z].on')?.getAttribute('data-z'),
     name: document.getElementById('se_datum_name').textContent,
     saved: window.ddcsGetSettings().stock.datum,
   }));
-  expect(after.selected).toBe('ppn');
-  expect(after.saved, 'datum persisted to settings').toBe('ppn');
+  expect(after.selCell, 'XY back-right cell picked').toBe('pp');
+  expect(after.selZ, 'Bottom height picked').toBe('n');
+  expect(after.saved, 'datum persisted to settings as [X][Y][Z]').toBe('ppn');
   expect(after.name.toLowerCase()).toContain('bottom');
+  expect(after.name.toLowerCase()).toContain('right');
   expect(errors, 'no page errors').toEqual([]);
 });

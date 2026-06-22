@@ -9,6 +9,9 @@
  */
 import { getSettings, applySettings, STOCK_TEMPLATES } from './settingsPanel.js';
 import { makeDraggable } from './uiUtils.js';
+import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
+
+const SVGNS = 'http://www.w3.org/2000/svg';
 
 let _pop = null;
 let _anchor = null;
@@ -41,11 +44,16 @@ export function openStockEditor(anchor) {
         <style>
             .stock-editor-pop input, .stock-editor-pop select { width:100%; box-sizing:border-box; background:#11141a; color:#e6ecf2; border:1px solid #3a414d; border-radius:4px; padding:3px 5px; }
             .stock-editor-pop label.col { display:flex; flex-direction:column; gap:2px; }
-            .se-datum-pick { background:#11141a; border:1px solid #3a414d; border-radius:4px; padding:3px; }
-            .se-datum-pick svg { display:block; width:100%; height:auto; }
-            .se-datum-pick circle { fill:#2a3340; stroke:#5a6675; stroke-width:1; cursor:pointer; transition:fill 80ms; }
-            .se-datum-pick circle:hover { fill:#3a4655; }
-            .se-datum-pick circle.sel { fill:#ffb454; stroke:#ffe0b0; stroke-width:1.6; }
+            .se-datum-pick { display:flex; gap:12px; align-items:center; justify-content:center; background:#11141a; border:1px solid #3a414d; border-radius:4px; padding:8px; }
+            .se-datum-pick svg { display:block; }
+            .se-datum-pick rect[data-code] { cursor:pointer; }
+            .se-datum-pick rect[data-code]:not(.on) { stroke:#9fb3c8; stroke-width:.8; }
+            .se-zsel { display:flex; flex-direction:column; gap:4px; }   /* height selector: top / center / bottom */
+            .se-zsel button { display:flex; align-items:center; gap:6px; font-size:10px; padding:3px 9px 3px 6px; background:#2a3340; color:#9fb4cc; border:1px solid #3a414d; border-radius:3px; cursor:pointer; }
+            .se-zsel button:hover { background:#3a4655; }
+            .se-zsel button.on { background:#ffb454; color:#1a1a1a; border-color:#ffe0b0; font-weight:bold; }
+            .se-zsel .se-zdot { width:7px; height:7px; border-radius:50%; background:#5a6675; border:1px solid #7a8699; }
+            .se-zsel button.on .se-zdot { background:#1a1a1a; border-color:#1a1a1a; }
         </style>
         <div class="stock-editor-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <span style="font-weight:bold; letter-spacing:1px; color:#9fb4cc;">STOCK</span>
@@ -100,10 +108,11 @@ export function openStockEditor(anchor) {
     makeDraggable(pop, pop.querySelector('.stock-editor-head'));
 
     const q = (id) => pop.querySelector('#' + id);
-    // Visual datum picker: a 3D stock box with the 26 BOX POINTS (8 corners + 12 edge mids + 6 face centres;
-    // the body centre is excluded). The chosen point is a 3-char code [X][Y][Z], each n(min)/c(centre)/p(max).
+    // Visual datum picker (2D): a TOP-VIEW 3×3 grid for the XY box point (reuses the shared cornergrid — same graphic
+    // as the path/stock anchor pickers) + a Top/Center/Bottom HEIGHT selector for Z. The datum is a 3-char code
+    // [X][Y][Z], each n(min)/c(centre)/p(max). (Replaces the old isometric 26-dot cube, where corners projected to
+    // ambiguous overlapping positions — hard to click; see git history.)
     const datumPick = q('se_datum_pick');
-    const CH = ['n', 'c', 'p'];
     const X_W = { n: 'left', c: '', p: 'right' }, Y_W = { n: 'front', c: '', p: 'back' }, Z_W = { n: 'bottom', c: '', p: 'top' };
     const OLD_DATUM = { fl: 'nnp', fr: 'pnp', bl: 'npp', br: 'ppp', center: 'ccp' };
     const migrateDatum = (d) => (d && /^[ncp]{3}$/.test(d)) ? d : (OLD_DATUM[d] || 'nnp');
@@ -111,33 +120,29 @@ export function openStockEditor(anchor) {
         const w = [Z_W[code[2]], Y_W[code[1]], X_W[code[0]]].filter(Boolean).join(' ');
         return w ? w[0].toUpperCase() + w.slice(1) : 'Centre';
     };
-    const projDatum = (a, b, c) => [60 + 24 * (a - b), 78 + 14 * (a + b) - 30 * c];   // iso: X↘  Y↙  Z↑
     const getDatum = () => migrateDatum(datumPick && datumPick.dataset.datum);
-    const renderDatumPicker = (sel) => {
+    // Build the XY grid + Z height selector ONCE; setDatum() just repaints.
+    let _xyCells = null, _xyCross = null, _zBtns = null;
+    const XY_NAME = { nn: 'front-left', cn: 'front', pn: 'front-right', nc: 'left', cc: 'centre', pc: 'right', np: 'back-left', cp: 'back', pp: 'back-right' };
+    if (datumPick) {
+        const grid = document.createElementNS(SVGNS, 'svg');
+        grid.setAttribute('width', CG.SPAN); grid.setAttribute('height', CG.SPAN); grid.setAttribute('viewBox', `0 0 ${CG.SPAN} ${CG.SPAN}`);
+        grid.setAttribute('title', 'Top view — click the XY box point that is your part-zero');
+        const built = buildCornerCells(grid);
+        _xyCells = built.cells; _xyCross = built.cross;
+        for (const code in _xyCells) { const t = document.createElementNS(SVGNS, 'title'); t.textContent = XY_NAME[code]; _xyCells[code].appendChild(t); }
+        const zsel = document.createElement('div'); zsel.className = 'se-zsel';
+        zsel.innerHTML = ['p', 'c', 'n'].map((z) => `<button type="button" data-z="${z}"><span class="se-zdot"></span>${{ p: 'Top', c: 'Center', n: 'Bottom' }[z]}</button>`).join('');
+        datumPick.append(grid, zsel);
+        _zBtns = zsel.querySelectorAll('button');
+    }
+    const paintDatum = (code) => {
         if (!datumPick) return;
-        const corners = [];
-        for (const a of [0, 2]) for (const b of [0, 2]) for (const c of [0, 2]) corners.push([a, b, c]);
-        let edges = '';
-        for (let i = 0; i < corners.length; i++) for (let j = i + 1; j < corners.length; j++) {
-            const diff = (corners[i][0] !== corners[j][0]) + (corners[i][1] !== corners[j][1]) + (corners[i][2] !== corners[j][2]);
-            if (diff === 1) { const p1 = projDatum(...corners[i]), p2 = projDatum(...corners[j]); edges += `<line x1="${p1[0]}" y1="${p1[1]}" x2="${p2[0]}" y2="${p2[1]}" stroke="#414c5a" stroke-width="1"></line>`; }
-        }
-        let dots = '';
-        for (let c = 0; c < 3; c++) for (let b = 0; b < 3; b++) for (let a = 0; a < 3; a++) {
-            if (a === 1 && b === 1 && c === 1) continue;   // exclude the body centre → 26 points
-            const code = CH[a] + CH[b] + CH[c];
-            const [px, py] = projDatum(a, b, c);
-            dots += `<circle data-d="${code}" cx="${px}" cy="${py}" r="5"${code === sel ? ' class="sel"' : ''}></circle>`;
-        }
-        datumPick.dataset.datum = sel;
-        datumPick.innerHTML = `<svg viewBox="0 0 120 152" aria-label="Datum picker">
-            <text x="110" y="116" fill="#ff8a8a" font-size="9" font-weight="bold" text-anchor="middle">X</text>
-            <text x="10" y="116" fill="#8fe08f" font-size="9" font-weight="bold" text-anchor="middle">Y</text>
-            <text x="60" y="12" fill="#8ab4ff" font-size="9" font-weight="bold" text-anchor="middle">Z</text>
-            ${edges}${dots}</svg>`;
-        const nm = q('se_datum_name'); if (nm) nm.textContent = datumName(sel);
+        paintCornerGrid(_xyCells, _xyCross, '#ffb454', code[0] + code[1]);          // XY top-view grid
+        _zBtns.forEach((b) => b.classList.toggle('on', b.dataset.z === code[2]));    // Z height selector
+        const nm = q('se_datum_name'); if (nm) nm.textContent = datumName(code);
     };
-    const setDatum = (v) => renderDatumPicker(migrateDatum(v));
+    const setDatum = (v) => { const code = migrateDatum(v); if (datumPick) datumPick.dataset.datum = code; paintDatum(code); };
     q('se_x').value = s.x ?? '';
     q('se_y').value = s.y ?? '';
     q('se_z').value = s.z ?? '';
@@ -181,8 +186,14 @@ export function openStockEditor(anchor) {
         q(id).addEventListener('input', commit);
         q(id).addEventListener('change', commit);
     });
-    // Datum dots are re-rendered on each pick, so delegate the click to the container.
-    if (datumPick) datumPick.addEventListener('click', (e) => { const c = e.target.closest('circle[data-d]'); if (!c) return; setDatum(c.dataset.d); commit(); });
+    // Datum: an XY top-view cell sets [X][Y] (keeps the current height); a Z button sets the height (keeps XY).
+    if (datumPick) datumPick.addEventListener('click', (e) => {
+        const cur = getDatum();
+        const cell = e.target && e.target.getAttribute && e.target.getAttribute('data-code');   // crosshair lines are pointer-transparent
+        if (cell) { setDatum(cell + cur[2]); commit(); return; }
+        const zb = e.target.closest && e.target.closest('button[data-z]');
+        if (zb) { setDatum(cur[0] + cur[1] + zb.dataset.z); commit(); }
+    });
 
     q('se_tpl').addEventListener('change', () => {
         const i = q('se_tpl').value === '' ? -1 : parseInt(q('se_tpl').value, 10);
