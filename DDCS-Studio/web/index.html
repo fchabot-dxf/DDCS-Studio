@@ -1134,16 +1134,8 @@
                 <div class="grid-3">
                     <div><span class="label">HEIGHT</span><input id="tx_height" value="12" title="Cap height (mm)."/></div>
                     <div><span class="label">STROKE WIDTH</span><input id="tx_strokeWidth" value="2.5" title="Letter boldness (mm). Use ≥ the tool Ø so the fill is clean."/></div>
-                    <div><span class="label">ALIGN</span>
-                        <select id="tx_align" value="left">
-                            <option value="left">Left</option>
-                            <option value="center">Center</option>
-                            <option value="right">Right</option>
-                        </select>
-                    </div>
-                    <div><span class="label">POSITION X</span><input id="tx_x" value="0" title="Text baseline-left position (drag the square handle). Pick a stock corner in the 2D layout to drop the label in a corner instead."/></div>
-                    <div><span class="label">POSITION Y</span><input id="tx_y" value="0"/></div>
-                    <div><span class="label">OFFSET X</span><input id="tx_offX" value="0" title="Signed X nudge of the label (from x/y, or from the attached stock corner)."/></div>
+                    <input id="tx_x" type="hidden" value="0"/><input id="tx_y" type="hidden" value="0"/><!-- position is driven by the 2D drag handle + the anchor/offset; not shown as inputs -->
+                    <div><span class="label">OFFSET X</span><input id="tx_offX" value="0" title="Signed X nudge of the label (from the attached stock corner, or origin)."/></div>
                     <div><span class="label">OFFSET Y</span><input id="tx_offY" value="0" title="Signed Y nudge of the label."/></div>
                     <div><span class="label">OFFSET Z</span><input id="tx_offZ" value="0" title="Signed Z offset (shifts every Z move; 0 = part-zero plane)."/></div>
                     <input id="tx_pathDatum" type="hidden" value=""/><input id="tx_stockAttach" type="hidden" value=""/>
