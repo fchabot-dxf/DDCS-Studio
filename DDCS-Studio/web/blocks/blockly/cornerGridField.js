@@ -13,7 +13,7 @@
 const SVGNS = 'http://www.w3.org/2000/svg';
 const COLS = ['n', 'c', 'p'];          // left → right  = minX..maxX
 const ROWS = ['p', 'c', 'n'];          // top  → bottom = maxY..minY (SVG y points down)
-const CELL = 6, GAP = 2, PAD = 3;      // px
+const CELL = 11, GAP = 2, PAD = 3;     // px — big enough for a datum crosshair per cell
 const SPAN = CELL * 3 + GAP * 2 + PAD * 2;
 
 /** Register `field_cornergrid` on a Blockly instance (idempotent). */
@@ -25,7 +25,8 @@ export function installCornerGridField(Blockly) {
             super(value == null ? '' : value, validator, config);
             this.SERIALIZABLE = true;
             this.colour_ = (config && (config.colour || config.color)) || '#ffcf3a';
-            this._cells = {};
+            this._cells = {};      // code → cell rect (hit target + fill)
+            this._cross = {};      // code → [hLine, vLine] datum crosshair
             this.size_ = new Size(SPAN, SPAN);
         }
 
@@ -44,16 +45,25 @@ export function installCornerGridField(Blockly) {
          *  system swallows native field listeners, so a real click would never reach them.) */
         initView() {
             const g = this.fieldGroup_;
+            const mkLine = (x1, y1, x2, y2) => {
+                const l = document.createElementNS(SVGNS, 'line');
+                l.setAttribute('x1', x1); l.setAttribute('y1', y1); l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+                l.setAttribute('stroke-linecap', 'round'); l.style.pointerEvents = 'none';
+                g.appendChild(l); return l;
+            };
             for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
                 const code = COLS[c] + ROWS[r];
+                const x = PAD + c * (CELL + GAP), y = PAD + r * (CELL + GAP);
                 const rect = document.createElementNS(SVGNS, 'rect');
-                rect.setAttribute('x', PAD + c * (CELL + GAP));
-                rect.setAttribute('y', PAD + r * (CELL + GAP));
-                rect.setAttribute('width', CELL); rect.setAttribute('height', CELL); rect.setAttribute('rx', 1);
+                rect.setAttribute('x', x); rect.setAttribute('y', y);
+                rect.setAttribute('width', CELL); rect.setAttribute('height', CELL); rect.setAttribute('rx', 1.5);
                 rect.setAttribute('data-code', code);
                 rect.style.cursor = 'pointer';
                 g.appendChild(rect);
                 this._cells[code] = rect;
+                // a little datum crosshair in the cell centre, so each cell reads as a datum position
+                const cx = x + CELL / 2, cy = y + CELL / 2, a = CELL * 0.28;
+                this._cross[code] = [mkLine(cx - a, cy, cx + a, cy), mkLine(cx, cy - a, cx, cy + a)];
             }
             this._paint();
         }
@@ -75,14 +85,18 @@ export function installCornerGridField(Blockly) {
             return null;
         }
 
-        /** Tint the picked cell with the datum colour; the rest are faint. */
+        /** Tint the picked cell with the datum colour + a bold dark crosshair; the rest are faint datum marks. */
         _paint() {
             const cur = this.getValue();
             for (const code in this._cells) {
                 const on = code === cur, el = this._cells[code];
-                el.setAttribute('fill', on ? this.colour_ : 'rgba(170,190,210,0.18)');
-                el.setAttribute('stroke', on ? this.colour_ : 'rgba(0,0,0,0.4)');
-                el.setAttribute('stroke-width', '0.6');
+                el.setAttribute('fill', on ? this.colour_ : 'rgba(170,190,210,0.10)');
+                el.setAttribute('stroke', on ? this.colour_ : 'rgba(0,0,0,0.30)');
+                el.setAttribute('stroke-width', on ? '1' : '0.6');
+                (this._cross[code] || []).forEach((l) => {
+                    l.setAttribute('stroke', on ? '#10151b' : 'rgba(120,140,160,0.65)');   // dark on the picked cell so it pops
+                    l.setAttribute('stroke-width', on ? '1.2' : '0.7');
+                });
             }
         }
 

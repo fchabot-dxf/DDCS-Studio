@@ -77,11 +77,15 @@ test('PlaceOnStock shows the inline 3×3 corner-grid fields, coloured per datum,
 
   const r = await page.evaluate(() => {
     const cells = [...document.querySelectorAll('rect[data-code]')].map((c) => (c.getAttribute('fill') || '').toLowerCase());
-    return { n: cells.length, blue: cells.includes('#4ab3ff'), amber: cells.includes('#ffcf3a') };
+    return {
+      n: cells.length, blue: cells.includes('#4ab3ff'), amber: cells.includes('#ffcf3a'),
+      darkCross: document.querySelectorAll('line[stroke="#10151b"]').length,   // bold crosshair on the picked cells
+    };
   });
   expect(r.n, 'two inline 3×3 grids = 18 cells rendered on the block').toBe(18);
   expect(r.blue, 'the stock-attach picked cell is blue').toBe(true);
   expect(r.amber, 'the path-datum picked cell is amber').toBe(true);
+  expect(r.darkCross, 'each picked cell shows a bold datum crosshair (2 selected × 2 lines)').toBeGreaterThanOrEqual(4);
 
   // REAL click through Blockly's gesture (a synthetic dispatch bypasses it and would pass falsely — the actual bug).
   const box = await page.evaluate(() => {
