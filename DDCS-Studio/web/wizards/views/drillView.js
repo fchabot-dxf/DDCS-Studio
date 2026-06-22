@@ -90,8 +90,8 @@ function buildDrillSpec(params, stock) {
             } else if (pat === 'grid') {
                 const cols = Math.max(1, Math.round(num(params.cols, 3))), rows = Math.max(1, Math.round(num(params.rows, 3)));
                 const m = {};
-                if (cols > 1) m.d_dx = Math.max(0, (w.x - ox) / (cols - 1));
-                if (rows > 1) m.d_dy = Math.max(0, (w.y - oy) / (rows - 1));
+                if (cols > 1) m.d_dx = (w.x - ox) / (cols - 1);   // signed — drag left/down for a -X/-Y grid
+                if (rows > 1) m.d_dy = (w.y - oy) / (rows - 1);
                 setFields(m);
             } else if (pat === 'rect') {
                 setFields({ d_w: Math.max(1, w.x - ox), d_h: Math.max(1, w.y - oy) });

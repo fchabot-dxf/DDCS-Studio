@@ -66,6 +66,17 @@ export class FeatureCanvas {
         svg.append(this.gGrid, this.gItems, this.gHandles);
         container.appendChild(svg);
         this._bind();
+        // Re-render when the container resizes (modal grows on open, splitter drag, window resize). The viewBox is
+        // set 1:1 to the pixel size at render time, so a stale viewBox maps client→world at the wrong (and, if the
+        // aspect changed, non-uniform) scale — the cause of "drag scaled/inverted". rAF-throttled; no resize loop
+        // because render() only changes the viewBox, not the pixel size.
+        if (this._ro) this._ro.disconnect();
+        this._ro = new ResizeObserver(() => {
+            if (this._roPending || !this.spec || !this.container) return;
+            this._roPending = true;
+            requestAnimationFrame(() => { this._roPending = false; if (this.spec && this.container) this.render(this.container, this.spec); });
+        });
+        this._ro.observe(container);
     }
 
     _bind() {
