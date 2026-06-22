@@ -2883,6 +2883,12 @@ Middle (handle) {
 /* Dropdowns size to their content (a lower minimum), not the full cell — they were too wide. Capped at the cell. */
 .wiz-body select { width: auto; min-width: 0; max-width: 100%; box-sizing: border-box; }
 
+/* Fields flex to fill their grid cell but may shrink BELOW their intrinsic width — grid items default to
+   min-width:auto (≈ the input's ~150px natural width), which makes grid-3/grid-4 overflow a narrow panel and clip.
+   min-width:0 on the cells + inputs lets the 1fr columns shrink to fit, keeping them flexible. (Across all wizards.) */
+.wiz-body .grid-2 > *, .wiz-body .grid-3 > *, .wiz-body .grid-4 > *, .wiz-body .row-2 > * { min-width: 0; }
+.wiz-body input[type="text"], .wiz-body input[type="number"], .wiz-body input:not([type]) { min-width: 0; max-width: 100%; }
+
 /* Labels - Tighter Spacing */
 .label {
     font-size: 8px;
