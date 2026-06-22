@@ -40,7 +40,8 @@ const SELECTS = {
     cycle: ['drill', 'dwell', 'peck', 'bore'],
     state: ['on', 'off'],
     pattern: ['grid', 'line', 'circle', 'rect'],   // array (drill/bore) hole pattern
-    ramp: ['step', 'helix']                          // bore stepdown
+    ramp: ['step', 'helix'],                         // bore stepdown
+    side: ['outside', 'inside', 'on']                // contour/profile cutter side
 };
 const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/\s+/g, '');
 export const FN = (field) => field.toUpperCase();   // Blockly input/field name from an op field
