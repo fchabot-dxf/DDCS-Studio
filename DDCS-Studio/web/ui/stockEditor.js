@@ -54,14 +54,6 @@ export function openStockEditor(anchor) {
             .se-zsel button.on { background:#ffb454; color:#1a1a1a; border-color:#ffe0b0; font-weight:bold; }
             .se-zsel .se-zdot { width:7px; height:7px; border-radius:50%; background:#5a6675; border:1px solid #7a8699; }
             .se-zsel button.on .se-zdot { background:#1a1a1a; border-color:#1a1a1a; }
-            .se-zmode { margin:8px 0; display:flex; flex-direction:column; gap:3px; }
-            .se-seg { display:inline-flex; align-self:flex-start; border:1px solid #3a414d; border-radius:4px; overflow:hidden; }
-            .se-seg button { font-size:11px; padding:4px 10px; background:#2a3340; color:#9fb4cc; border:none; border-right:1px solid #3a414d; cursor:pointer; }
-            .se-seg button:last-child { border-right:none; }
-            .se-seg button:hover { background:#3a4655; }
-            .se-seg button.on { background:#3d6ea8; color:#fff; font-weight:bold; }   /* blue — distinct from the orange datum highlight */
-            .se-zmode.disabled { opacity:.45; }
-            .se-zmode.disabled .se-seg button { cursor:not-allowed; }
         </style>
         <div class="stock-editor-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <span style="font-weight:bold; letter-spacing:1px; color:#9fb4cc;">STOCK</span>
@@ -107,14 +99,6 @@ export function openStockEditor(anchor) {
                     <option value="g57">G57</option><option value="g58">G58</option><option value="g59">G59</option>
                 </select>
             </label>
-        </div>
-        <div class="se-zmode" title="Affects ONLY where the stock sits in machine space — its Z height in the 3D / 2D view. It does NOT change the generated G-code, the toolpath, or the cut depths.">
-            <span style="font-size:11px; color:#9fb4cc;">Z in sim</span>
-            <div class="se-seg" id="se_zmode">
-                <button type="button" data-zmode="table">Stock on table</button>
-                <button type="button" data-zmode="wcs">Use WCS-Z</button>
-            </div>
-            <span style="font-size:10px; color:#7f8a99; line-height:1.3;"><b>Stock on table</b> rests it on the table with Z0 at your datum (you re-zero). <b>Use WCS-Z</b> places it at the stored absolute machine height (travel / clearance checks). Sim view only — the G-code is identical.</span>
         </div>
         <label style="display:flex; align-items:center; gap:6px; cursor:pointer; width:auto;"><input id="se_show" type="checkbox" style="width:auto;"> Show stock in 3D</label>
         <div style="margin-top:10px; color:#7f8a99; font-size:11px;">Cylinder lies along the rotary axis (Y = diameter, X = length).</div>
@@ -165,12 +149,6 @@ export function openStockEditor(anchor) {
     q('se_shape').value = s.shape || 'boss';
     setDatum(s.datum);
     q('se_pin').value = s.pin || 'origin';
-    const zmode = q('se_zmode');
-    const setZMode = (useWcs) => zmode.querySelectorAll('button').forEach((b) => b.classList.toggle('on', (b.dataset.zmode === 'wcs') === !!useWcs));
-    // "Use WCS-Z" only means something when a WCS (with a stored Z) is pinned — grey the whole toggle for Program zero.
-    const updateZModeEnabled = () => { const off = q('se_pin').value === 'origin'; zmode.classList.toggle('disabled', off); zmode.querySelectorAll('button').forEach((b) => { b.disabled = off; }); };
-    setZMode(!!s.useWcsZ);
-    updateZModeEnabled();
     q('se_show').checked = s.show !== false;
 
     const updateTplDel = () => {
@@ -201,7 +179,6 @@ export function openStockEditor(anchor) {
         shape: q('se_shape').value,
         datum: getDatum(),
         pin: q('se_pin').value,
-        useWcsZ: zmode.querySelector('button.on') ? zmode.querySelector('button.on').dataset.zmode === 'wcs' : false,   // sim Z placement only (no code change)
         show: q('se_show').checked,
     } });
 
@@ -209,8 +186,6 @@ export function openStockEditor(anchor) {
         q(id).addEventListener('input', commit);
         q(id).addEventListener('change', commit);
     });
-    q('se_pin').addEventListener('change', updateZModeEnabled);   // grey "Z in sim" when there's no WCS to use
-    zmode.addEventListener('click', (e) => { const b = e.target.closest('button[data-zmode]'); if (!b || b.disabled) return; setZMode(b.dataset.zmode === 'wcs'); commit(); });
     // Datum: an XY top-view cell sets [X][Y] (keeps the current height); a Z button sets the height (keeps XY).
     if (datumPick) datumPick.addEventListener('click', (e) => {
         const cur = getDatum();

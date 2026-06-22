@@ -1013,18 +1013,18 @@ export class GcodeViz3D {
     _partShift() {
         const m = this._machine, s = this._stock;
         if (!(m && m.show && m.x && m.y && m.z)) return { x: 0, y: 0, z: 0 };
-        // XY — always the stock's WCS (G54 XY): the persistent fixture position. Z (wcsZ) read too, used only when forced.
+        // XY — always the stock's WCS (G54 XY): the persistent fixture position.
         let x = 0, y = 0, wcsZ = 0;
         const pin = s && s.pin, wt = m.wcs && m.wcs.table;
         if (pin && pin !== 'origin' && Array.isArray(wt)) {
             const t = wt[parseInt(String(pin).replace(/[^0-9]/g, ''), 10) - 54];   // 'g54' → table[0]
             if (t) { x = Number(t.x) || 0; y = Number(t.y) || 0; wcsZ = Number(t.z) || 0; }
         }
-        // Z — DEFAULT: the stock rests on the fixed machine table (you re-zero Z per part, so the stored WCS-Z is
-        // ignored); Z0 then floats at the datum height. FORCE WCS-Z: place the work zero at the stored WCS-Z (absolute
-        // machine height) — for travel/clearance/G53 checks. Sim placement only; the generated G-code is identical.
+        // Z — the stock rests on the FIXED machine table; Z0 floats at the datum height (you re-zero Z per part, so
+        // the stored WCS-Z is ignored — it's volatile). Real Z control is per-path code (offZ + the datum-Z offset),
+        // not the sim placement. No stock → just the WCS-Z. (Absolute-machine-Z view is deferred to machine-frame fidelity.)
         const tableFloor = Math.min(0, m.z), stockShown = s && s.show && s.z > 0 && this._stockFloorZ != null;
-        const z = (s && s.useWcsZ) ? wcsZ : (stockShown ? tableFloor - this._stockFloorZ : wcsZ);
+        const z = stockShown ? tableFloor - this._stockFloorZ : wcsZ;
         return { x, y, z };
     }
 
