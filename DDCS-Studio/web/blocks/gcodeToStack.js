@@ -96,8 +96,12 @@ export function parseLine(line, opts = {}) {
     if (code === 'M1') return { type: 'stop', params: { stop: 'M1' } };   // optional stop atom
     if (M(98)) { const p = w('P'); if (typeof p === 'number') return { type: 'call', params: { prog: p } }; }   // numeric P only (a #var P can't round-trip through call.emit)
     if (M(99)) return { type: 'return', params: {} };
-    const mm = code.match(/\bM0*(\d+)\b/i);
-    if (mm) return { type: 'mcode', params: { code: Number(mm[1]) } };
+    // Generic M-code → M-Code atom, but ONLY when the atom can reproduce the line: a bare `M<n>` (optionally
+    // with a note). The atom emits just `M<code> ( note )`, so a line carrying ARGUMENTS (e.g. `M10 P4`,
+    // `M31 P12`) would silently lose them on re-projection — fall through to the verbatim `raw` block instead so
+    // the round-trip stays byte-exact and the sim still sees the P word.
+    const mm = code.match(/^M0*(\d+)$/i);
+    if (mm) return { type: 'mcode', params: comment ? { code: Number(mm[1]), note: comment } : { code: Number(mm[1]) } };
 
     // Feed-only line (F with no G/M word)
     if (/^F/i.test(code) && w('F') !== undefined) return { type: 'feed', params: { rate: w('F') } };

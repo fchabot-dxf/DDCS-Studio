@@ -1811,8 +1811,11 @@ button.primary:hover {
     .wiz-box.two-pane { width: min(96vw, 560px); height: auto; }
     .two-pane .wiz-body { overflow-y: auto; }
     .wiz-2pane { flex-direction: column; height: auto; }
-    .wiz-2pane > .wiz-controls { order: 2; flex: 0 0 auto; overflow: visible; width: 100%; padding: 0; }
-    .wiz-2pane > .wiz-visual { order: 1; flex: 0 0 auto; min-height: 0; }     /* visuals on top, content-sized */
+    /* !important beats the splitter's inline order (controls:1 / visual:3) so the preview stacks on TOP and can
+       stay sticky; the side-by-side drag splitter is meaningless in a single column, so hide it. */
+    .wiz-2pane > .wiz-controls { order: 2 !important; flex: 0 0 auto; overflow: visible; width: 100%; padding: 0; }
+    .wiz-2pane > .wiz-visual { order: 1 !important; flex: 0 0 auto; min-height: 0; }     /* visuals on top, content-sized */
+    .wiz-2pane > .wiz-splitter { display: none; }
     .wiz-2pane > .wiz-visual > .viz-container { flex: 0 0 auto; min-height: 0; }
     .wiz-2pane .wiz-visual .wiz-viz3d { flex: 0 0 auto; height: 240px !important; min-height: 240px; }
     .wiz-2pane .wiz-visual .viz-split { flex-direction: row; }               /* drill: 2D | 3D side-by-side */

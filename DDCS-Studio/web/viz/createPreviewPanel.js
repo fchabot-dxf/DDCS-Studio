@@ -122,6 +122,8 @@ export function createPreviewPanel(container, opts = {}) {
         if (viz) return viz;
         try { viz = new GcodeViz3D(container); viz._gizmoPx = 36; viz._animOn = false; viz.setStock(stockForViz()); viz.setMachine(machineForViz()); applyPreviewSettings(); }
         catch (e) { console.warn('preview 3D unavailable — using 2D', e); viz = null; setMode('2d'); }
+        // Dragging the 3D start marker is a user override (like the 2D handle) — record it so getStartPos() reads it.
+        if (viz) viz.onStartChange = (starts) => { const s = starts && starts[0]; if (s) { curStart = { x: +s.x || 0, y: +s.y || 0, z: +s.z || 0 }; setGcode(); } };
         return viz;
     }
 
@@ -155,8 +157,10 @@ export function createPreviewPanel(container, opts = {}) {
     }
 
     // Render the static route in the active view from the fed G-code (engine.trace resolves #vars/loops/probes).
-    // The operator start the wizard reads on insert: a 2D-handle drag (curStart) wins, else the 3D marker, else inferred.
-    const getStartPos = () => curStart || (viz && viz.starts && viz.starts[0]) || get('getStart') || null;
+    // The operator start the wizard reads on insert: a drag (curStart, set by either the 2D handle or the 3D marker)
+    // wins, else the wizard-inferred start, else the viz default. The inferred start must beat viz.starts[0] because
+    // that defaults to a truthy {0,0,0} which would otherwise shadow it on the first render.
+    const getStartPos = () => curStart || get('getStart') || (viz && viz.starts && viz.starts[0]) || null;
     // The sim tool, RESPECTING THE TOOL TABLE: the host's op tool (getTool) wins; else the program's active T#
     // looked up in the tool table (settings.atc.tools → type/Ø/length); else infer from the path (probe → touch
     // probe); else a default endmill.

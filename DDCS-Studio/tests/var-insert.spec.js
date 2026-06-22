@@ -26,9 +26,9 @@ test('variable chip click inserts exactly once; command-deck keys insert once', 
   expect(hashMatches1).toBeGreaterThanOrEqual(1); // at least one variable inserted
   expect(hashMatches1).toBe(1); // exactly one insertion from single click
 
-  // Now test command-deck SPACE (should insert a single space) — lives on the BASIC tab
+  // Now test command-deck SPACE (should insert a single space) — lives on the persistent
+  // BACK/SPACE/ENTER editor-keys row above the tab strip (visible on every tab).
   await page.fill('#editor', '');
-  await page.click('[data-deck-tab="basic"]');
   const spaceBtn = page.locator('[data-ddcs-role="space"]');
   await expect(spaceBtn).toBeVisible();
   await spaceBtn.click();

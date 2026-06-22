@@ -771,7 +771,10 @@ export class GcodeViz3D {
         const m = this._machine;
         const useMch = m && m.show && m.x && m.y && m.z;
         // PART-frame layout (the axis lines mark part-zero and ride the part frame → always part-local coords).
+        // Each axis line spans only ITS OWN extent (pHalfX/pHalfY) — not the larger span — so the shorter axis
+        // doesn't overshoot (the green-line-outward bug). pSpan stays the overall span for grid/label sizing.
         const pSpan = Math.max(sx, sy, 10), pHalf = pSpan / 2;
+        const pHalfX = Math.max(sx, 10) / 2, pHalfY = Math.max(sy, 10) / 2;
         const pFloor = (this._stock && this._stock.show && this._stock.z > 0) ? -this._stock.z : b.minZ;
         // GRID + edge labels live in the SCENE: linked to the ENVELOPE footprint in MACHINE coords (home at scene 0,
         // fixed) when the envelope is shown, else the part/stock footprint.
@@ -794,9 +797,17 @@ export class GcodeViz3D {
         }
         // Axis lines mark PART-ZERO — part-local (they ride the part frame, which offsets them to +workOrigin in
         // machine view): X red along y=0, Y green along x=0, over the part footprint at the part floor.
-        if (this._axisLineX) { const px = this._axisLineX.geometry.attributes.position; px.setXYZ(0, -pHalf, 0, pFloor); px.setXYZ(1, pHalf, 0, pFloor); px.needsUpdate = true; }
-        if (this._axisLineY) { const py = this._axisLineY.geometry.attributes.position; py.setXYZ(0, 0, -pHalf, pFloor); py.setXYZ(1, 0, pHalf, pFloor); py.needsUpdate = true; }
-        if (this._axisLineZ) { const zTop = Math.max(pFloor + pSpan * 0.3, b ? b.maxZ : 0); const pz = this._axisLineZ.geometry.attributes.position; pz.setXYZ(0, 0, 0, pFloor); pz.setXYZ(1, 0, 0, zTop); pz.needsUpdate = true; }
+        if (this._axisLineX) { const px = this._axisLineX.geometry.attributes.position; px.setXYZ(0, -pHalfX, 0, pFloor); px.setXYZ(1, pHalfX, 0, pFloor); px.needsUpdate = true; }
+        if (this._axisLineY) { const py = this._axisLineY.geometry.attributes.position; py.setXYZ(0, 0, -pHalfY, pFloor); py.setXYZ(1, 0, pHalfY, pFloor); py.needsUpdate = true; }
+        // Z line: spans the ENVELOPE Z extent (its own travel) when the envelope is shown — so it matches the X/Y
+        // lines and doesn't overshoot the real travel. Otherwise it rides the part frame: from the part floor up the
+        // Z extent (sz), with a small min so a flat part still shows a stub. Min is tied to the Z extent, NOT the XY
+        // span — else a wide footprint inflates the Z axis.
+        if (this._axisLineZ) {
+            const zBot = useMch ? Math.min(0, m.z) : pFloor;
+            const zTop = useMch ? Math.max(0, m.z) : Math.max(pFloor + Math.max(sz, 10) * 0.3, b ? b.maxZ : 0);
+            const pz = this._axisLineZ.geometry.attributes.position; pz.setXYZ(0, 0, 0, zBot); pz.setXYZ(1, 0, 0, zTop); pz.needsUpdate = true;
+        }
 
         this._applyCamera();
     }

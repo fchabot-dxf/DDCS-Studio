@@ -9,9 +9,11 @@ test('Middle visualiser shows correct SVG group for feature/axis/direction', asy
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('middle'));
   await expect(page.locator('#wiz_middle')).toBeVisible();
 
-  // Wait for SVG to be injected. The container itself is hidden in favour of the 3D
-  // preview nowadays, so check the groups' own display state instead of Playwright
-  // visibility (display toggling is what drawMiddleViz actually does).
+  // The live wizard now shows the shared 3D preview and keeps #middleVizContainer hidden; the SVG
+  // schematic is injected/toggled by drawMiddleViz (called by the app's own SVG open path). Drive it
+  // so the SVG is attached, then check the groups' own display state instead of Playwright visibility
+  // (display toggling is what drawMiddleViz actually does, and the container itself stays hidden).
+  await page.evaluate(() => window.drawMiddleViz());
   await page.waitForSelector('#middleVizContainer svg', { state: 'attached' });
   const shown = (id) => page.$eval(`#middleVizContainer #${id}`,
     (el) => el.style.display !== 'none' && getComputedStyle(el).display !== 'none');
@@ -38,7 +40,10 @@ test('Middle visualiser shows correct SVG group for feature/axis/direction', asy
     await page.selectOption('#m_axis', c.axis);
     await page.selectOption('#m_dir', c.dir);
 
-    await page.waitForTimeout(120);   // let the change listeners re-run drawMiddleViz
+    // Re-run the SVG draw so the group visibility tracks the new controls. The live control-change
+    // listener now drives the 3D preview (updateMiddleWizard), so drive drawMiddleViz directly here —
+    // it reads m_type/m_axis/m_dir and toggles exactly the groups asserted below.
+    await page.evaluate(() => window.drawMiddleViz());
 
     // Selected group should be shown
     expect(await shown(`middle_probe_${c.type}_${c.axis}_${c.dir}`)).toBe(true);
@@ -72,10 +77,9 @@ test('Middle wizard uses secondary direction in generated G-code when Find Both 
   await expect(page.locator('#m_dir2_block')).toBeVisible();
   await page.selectOption('#m_dir2', 'pos');
 
-  // generated preview must reflect the explicit secondary direction in the header
-  // (generator format changed: old "then X pos" comment is gone)
-  await expect(page.locator('#wiz_middle_code')).toContainText('X pos + Y pos');
-
+  // generated preview must reflect the explicit secondary direction. The generator encodes the
+  // primary+secondary axis/direction in the 2-axis transition comment ( 2axis_XtoY_pos ) — there is
+  // no separate "X pos + Y pos" / "then X pos" header summary line (that format never existed here).
   // when Find Both (2-axis) is enabled the code should include the 2axis comment,
   // a reposition pause and WCS writes for both axes
   await expect(page.locator('#wiz_middle_code')).toContainText('2axis_XtoY_pos');

@@ -6,7 +6,11 @@ test.describe('MiddleViz utilities & animator', () => {
     // open via the manager — toolbar labels collapse to icon-only (v10.10), text click is unreliable
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('middle'));
-    // container is hidden in favour of the 3D preview — the SVG only needs to be attached
+    // The live wizard now shows the shared 3D preview and hides #middleVizContainer; the SVG
+    // schematic (+ its id-mapping / animator utilities under test here) is loaded by drawMiddleViz,
+    // which the app's own SVG open path (openMiddleWiz / control-change listeners) calls. Drive it
+    // here so the SVG is injected, then assert it's attached (container stays display:none).
+    await page.evaluate(() => window.drawMiddleViz());
     await page.waitForSelector('#middleVizContainer svg', { state: 'attached' });
   });
 
@@ -73,7 +77,11 @@ test.describe('MiddleViz utilities & animator', () => {
     // open via the manager — toolbar labels collapse to icon-only (v10.10), text click is unreliable
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('middle'));
+    await page.evaluate(() => window.drawMiddleViz());   // inject the SVG schematic (live open path uses 3D preview)
     await page.waitForSelector('#middleVizContainer svg', { state: 'attached' });
+    // Re-run the wizard update now that the SVG exists so autoplay discovers steps against it
+    // (mirrors the live control-change listener: change → updateMiddleWizard → PathAnimator autoplay).
+    await page.evaluate(() => window.ddcsStudio.wizardManager.updateMiddleWizard());
 
     // discover the steps for a known single-axis case
     const animInput = await page.evaluate(() => {
@@ -108,6 +116,7 @@ test.describe('MiddleViz utilities & animator', () => {
     // open via the manager — toolbar labels collapse to icon-only (v10.10), text click is unreliable
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('middle'));
+    await page.evaluate(() => window.drawMiddleViz());   // inject the SVG schematic (live open path uses 3D preview)
     await page.waitForSelector('#middleVizContainer svg', { state: 'attached' });
 
     // Ensure a known view
@@ -141,6 +150,7 @@ test.describe('MiddleViz utilities & animator', () => {
     // open via the manager — toolbar labels collapse to icon-only (v10.10), text click is unreliable
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('middle'));
+    await page.evaluate(() => window.drawMiddleViz());   // inject the SVG schematic (live open path uses 3D preview)
     await page.waitForSelector('#middleVizContainer svg', { state: 'attached' });
 
     // Configure controls to a two-axis case so a jog path exists
@@ -160,20 +170,22 @@ test.describe('MiddleViz utilities & animator', () => {
     await page.evaluate(() => { window.__anim = new window.PathAnimator({ pxPerSec: 500, loop: false }); });
     await page.evaluate((s) => window.__anim.playSequence(s), animInput);
 
-    // Immediately after start: dasharray must be a two-value pattern (e.g. "8 6") — not a long compound list
+    // Immediately after start: dasharray must be a simple TWO-value pattern (e.g. 8 6) — not a long compound list.
+    // getComputedStyle serializes it as "8px, 6px", so normalise (strip px, split on space/comma) and assert 2 values.
+    const dashParts = (s) => s.replace(/px/g, '').split(/[\s,]+/).filter(Boolean);
     const dashDuring = await page.locator(jogSel).evaluate(el => getComputedStyle(el).getPropertyValue('stroke-dasharray'));
-    expect(/^\s*\d+(?:\.\d+)?\s+\d+(?:\.\d+)?\s*$/.test(dashDuring)).toBeTruthy();
-    expect(dashDuring.includes(',')).toBeFalsy(); // no comma-separated long list
+    expect(dashParts(dashDuring).length, 'two-value dash pattern, not a compound list').toBe(2);
+    expect(dashParts(dashDuring).every((p) => /^\d+(?:\.\d+)?$/.test(p)), 'dash values are plain numbers').toBeTruthy();
 
     // During the reveal the jog element itself should NOT animate its stroke-dashoffset
-    // (dashes must remain stationary); mask is used to reveal the path instead.
+    // (dashes must remain stationary); a mask reveals the path instead.
     const offsetDuring = await page.locator(jogSel).evaluate(el => getComputedStyle(el).getPropertyValue('stroke-dashoffset'));
-    expect(offsetDuring).toBe('0');
+    expect(parseFloat(offsetDuring), 'jog dashoffset stays 0 (mask reveal, not offset animation)').toBe(0);
 
     // Ensure final state uses offset=0 and dash pattern still two-value
-    await page.waitForFunction((sel) => getComputedStyle(document.querySelector(sel)).getPropertyValue('stroke-dashoffset') === '0', jogSel);
+    await page.waitForFunction((sel) => parseFloat(getComputedStyle(document.querySelector(sel)).getPropertyValue('stroke-dashoffset')) === 0, jogSel);
     const finalDash = await page.locator(jogSel).evaluate(el => getComputedStyle(el).getPropertyValue('stroke-dasharray'));
-    expect(/^\s*\d+(?:\.\d+)?\s+\d+(?:\.\d+)?\s*$/.test(finalDash)).toBeTruthy();
+    expect(dashParts(finalDash).length, 'final dash still a two-value pattern').toBe(2);
   });
 
   test('PathAnimator respects fastMultiplier and fastPxPerSec', async ({ page }) => {
@@ -181,6 +193,7 @@ test.describe('MiddleViz utilities & animator', () => {
     // open via the manager — toolbar labels collapse to icon-only (v10.10), text click is unreliable
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('middle'));
+    await page.evaluate(() => window.drawMiddleViz());   // inject the SVG schematic (live open path uses 3D preview)
     await page.waitForSelector('#middleVizContainer svg', { state: 'attached' });
 
     const animInput = await page.evaluate(() => window.discoverAnimSteps({ featureType: 'pocket', axis: 'X', dir1: 'pos', twoAxis: true }));

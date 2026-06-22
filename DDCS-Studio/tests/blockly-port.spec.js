@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 // Blockly port keystone: every op is a Blockly block (derived from the ops registry), and the workspace
 // converts to our {type,params,children} stack which runs through the PROVEN emitMapped fold — no separate
-// Blockly generator. Proven by round-tripping a real cutting op (Program Start + StepDown{ StepOver(Region) }
-// + Program End) through the workspace and asserting the emitted G-code is unchanged.
+// Blockly generator. Proven by round-tripping a real cutting op (Program Start + WCS + PlaceOnStock{ StepDown{
+// StepOver(Region) } } + Program End) through the workspace and asserting the emitted G-code is unchanged.
 test('Blockly bridge: stack ⇄ workspace round-trips and emits via emitMapped', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -14,7 +14,7 @@ test('Blockly bridge: stack ⇄ workspace round-trips and emits via emitMapped',
   const cats = await page.$$eval('.blocklyToolboxCategory, .blocklyTreeRow', (els) =>
     els.map((e) => e.textContent.trim()).filter(Boolean));
   expect(cats.join('|')).toMatch(/Move/);
-  expect(cats.join('|')).toMatch(/Machine/);
+  expect(cats.join('|')).toMatch(/Coordinates/);
   expect(cats.join('|')).toMatch(/Ops/);
 
   const r = await page.evaluate(async () => {
@@ -31,7 +31,7 @@ test('Blockly bridge: stack ⇄ workspace round-trips and emits via emitMapped',
     return { before, after, types: back.map((b) => b.type) };
   });
 
-  expect(r.types, 'round-trip preserves the top-level op sequence').toEqual(['progstart', 'stepdown', 'progend']);
+  expect(r.types, 'round-trip preserves the top-level op sequence').toEqual(['progstart', 'wcs', 'placeonstock', 'progend']);
   expect(r.after, 'emit after a workspace round-trip equals emit before').toBe(r.before);
   expect(errors, errors.join('\n')).toEqual([]);
 });

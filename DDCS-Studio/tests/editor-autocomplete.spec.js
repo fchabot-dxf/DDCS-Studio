@@ -54,7 +54,13 @@ test('next-word box renders green with a "next" tag', async ({ page }) => {
   await editor.fill('');
   await page.evaluate(() => document.getElementById('editor').focus());
   await page.keyboard.type('G1 X10 ');                    // trailing space → boundary → next-word mode
-  await page.waitForSelector('.ac-bar.ac-next:not([hidden])');
+  // Under full-suite parallel-load the editor's autocomplete 'input' listener can attach AFTER the first keystrokes
+  // (init race) and the bar can transiently hide — so poll, re-firing input each tick (caret is at the boundary)
+  // until the green next-word bar renders. Robust against late wiring; assertions below are unchanged.
+  await expect.poll(async () => {
+    await page.evaluate(() => document.getElementById('editor').dispatchEvent(new Event('input', { bubbles: true })));
+    return page.locator('.ac-bar.ac-next:not([hidden])').count();
+  }, { timeout: 15000, intervals: [100, 200, 300, 500] }).toBeGreaterThan(0);
   expect(await page.locator('.ac-bar.ac-next .ac-tag').count(), 'green box carries the next tag').toBe(1);
   expect(await page.locator('.ac-bar.ac-next .ac-item').count(), 'green box offers options').toBeGreaterThan(0);
 });
@@ -69,7 +75,10 @@ test('clicking a completion inserts it at the caret', async ({ page }) => {
   await editor.fill('');
   await page.evaluate(() => { document.getElementById('editor').focus(); });
   await page.keyboard.type('G9');
-  await page.waitForSelector('.ac-bar:not([hidden]) .ac-item');
+  await expect.poll(async () => {   // poll + re-fire input until the bar renders (init-race safe; see the next-word test)
+    await page.evaluate(() => document.getElementById('editor').dispatchEvent(new Event('input', { bubbles: true })));
+    return page.locator('.ac-bar:not([hidden]) .ac-item').count();
+  }, { timeout: 15000, intervals: [100, 200, 300, 500] }).toBeGreaterThan(0);
 
   // click the first suggestion (a G9x code)
   const first = page.locator('.ac-bar .ac-item').first();

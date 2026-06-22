@@ -207,8 +207,8 @@ export function discoverAnimSteps({ featureType = 'pocket', axis = 'X', dir1 = '
   // Jog path between axes (for 2-axis / Find Both mode)
   let jogPath = null;
   if (twoAxis) {
-    // Pattern: middle_probe_{type}_jogpath_{axis}_{dir1}_to_{axis2}_{dir2}
-    const jogId = `${root}_jogpath_${axis}_${dir1}_to_${oppositeAxis}_${axis2Dir}`;
+    // Pattern: middle_probe_{type}_{axis}_{dir1}_to_{axis2}_{dir2}_jogpath  (jogpath is a SUFFIX — see middleViz.svg)
+    const jogId = `${root}_${axis}_${dir1}_to_${oppositeAxis}_${axis2Dir}_jogpath`;
     const jogEl = doc.getElementById(jogId);
     if (jogEl) {
       jogPath = { selector: `#${jogId}`, type: 'jog', stepNum: 0 };
