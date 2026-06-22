@@ -72,23 +72,26 @@ export function rotaryCenterStack(params = {}) {
         A('#55', `${diameter}/2`, 'R = known diameter / 2');
         A('#11', '[#55+#2]', 'Flank approach = R + retract (lateral offset AND top->centreline drop)');
         // A solid bar can't be probed from its axis — approach each flank from OUTSIDE at the centreline.
-        // Traverses run at top height (the OD curves away, so the part is clear); drops happen beside the bar
-        // in free space. #11 = R+retract = both the lateral offset to clear the OD and the drop to the centre.
-        // GUIDED = the same motion + a confirm gate before each touch (so the operator verifies / fine-jogs the
-        // position); AUTO runs hands-free. Both simulate identically (the gate auto-answers in the preview).
+        // Traverses run at a SAFE height clear above the bar (#17 over the top, so the rapid never skims the OD);
+        // drops land beside the bar in free space. #11 = R+retract = lateral offset (clears the OD); #12 = safeZ+R
+        // = the drop from the traverse height down to the centreline. GUIDED = the same motion + a confirm gate
+        // before each touch (operator verifies / fine-jogs); AUTO runs hands-free. Both simulate identically.
         const gate = (msg) => { if (approach === 'guided') CF(msg, 2); };
+        A('#12', '[#17+#55]', 'Traverse height -> centreline drop = safeZ + R');
         C('Probe top (Z down)'); pp('Z', false, '#50');
-        C('+Y flank: traverse over the +Y side, drop to the centreline, probe inward');
-        MV('Y', '#11');              // over to the +Y side, beyond the OD (still above the top)
-        MV('Z', '[0-#11]');          // drop to the centreline (Ztop - R), beside the bar
+        MV('Z', '[#17-#2]');         // lift from the top (Ztop+retract) to the safe traverse height (Ztop+safeZ)
+        C('+Y flank: cross clear to the +Y side, drop to the centreline, probe inward');
+        MV('Y', '#11');              // over to the +Y side, beyond the OD (well above the top)
+        MV('Z', '[0-#12]');          // drop to the centreline (Ztop - R), beside the bar
         gate('At the +Y side, centreline height - Enter to probe (jog to adjust), ESC=cancel');
         pp('Y', false, '#52');       // probe -Y -> the +Y OD surface
         C('-Y flank: raise clear, cross to the -Y side, drop, probe inward');
-        MV('Z', '#11');              // raise back above the top
-        MV('Y', '[0-#11-#11]');      // cross to the -Y side, beyond the OD
-        MV('Z', '[0-#11]');          // drop to the centreline
+        MV('Z', '#12');              // raise back to the traverse height
+        MV('Y', '[0-#11-#11]');      // cross to the -Y side, beyond the OD (well above the top)
+        MV('Z', '[0-#12]');          // drop to the centreline
         gate('At the -Y side, centreline height - Enter to probe (jog to adjust), ESC=cancel');
         pp('Y', true, '#53');        // probe +Y -> the -Y OD surface
+        MV('Z', '#12');              // raise clear of the bar before the final retract
         C('Centre + radius');
         A('#54', '[#52+#53]/2', 'Yc = midpoint of flanks');
         A('#56', '[#50-#55]', 'Zc = top - R');
