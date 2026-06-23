@@ -257,20 +257,20 @@ export class GcodeViz3D {
         return best;
     }
 
-    // Keep each gizmo a constant on-screen size (independent of zoom): world size ∝ the
-    // world-per-pixel at the marker (camera distance for perspective, frustum for ortho).
+    // Keep on-screen gizmos a CONSTANT screen size (independent of zoom): world size ∝ the world-per-pixel at the
+    // object (camera distance for perspective, frustum for ortho). Applies to the start markers AND the axis labels.
     _scaleMarkers() {
-        if (!this.spindleMarkers.length) return;
         const H = this.container.clientHeight || 1;
-        const targetPx = this._gizmoPx || 90, base = 26; // base = the arrow length at scale 1
         const ortho = this.camera.isOrthographicCamera;
         const tanHalf = Math.tan((this.persp.fov * Math.PI / 180) / 2);
-        for (const m of this.spindleMarkers) {
-            const worldPerPx = ortho
-                ? (this.camera.top - this.camera.bottom) / H
-                : (2 * this.camera.position.distanceTo(m.position) * tanHalf) / H;
-            m.scale.setScalar(Math.max(1e-4, (targetPx * worldPerPx) / base));
-        }
+        const worldPerPxAt = (pos) => ortho
+            ? (this.camera.top - this.camera.bottom) / H
+            : (2 * this.camera.position.distanceTo(pos) * tanHalf) / H;
+        const targetPx = this._gizmoPx || 90, base = 26; // base = the arrow length at scale 1
+        for (const m of this.spindleMarkers) m.scale.setScalar(Math.max(1e-4, (targetPx * worldPerPxAt(m.position)) / base));
+        // Direction labels (+X/-X/+Y/-Y): constant on-screen width too (canvas is 2:1), so they don't grow with zoom.
+        const L = this._gridLabels;
+        if (L) for (const k in L) { const w = Math.max(1e-4, 55 * worldPerPxAt(L[k].position)); L[k].scale.set(w, w / 2, 1); }
         if (this.jogPendant) {
             this.jogPendant.style.display = (this.starts && this.starts.length > 0) ? 'block' : 'none';
         }
@@ -764,11 +764,11 @@ export class GcodeViz3D {
         this._gridParams = { cx: gCx, cy: gCy, floor: gFloor, w: tW, h: tH };
         this._layoutGrid(gCx, gCy, gFloor, tW, tH);
         if (this._gridLabels) {
-            const off = gSpan * 0.07, lw = gSpan * 0.14, L = this._gridLabels;
+            const off = gSpan * 0.07, L = this._gridLabels;
             // +X / +Y at the +scene end (true coordinate directions); labels at the centre of each envelope/grid edge.
+            // Scale is applied per-frame in _scaleMarkers (constant on-screen size, independent of zoom).
             L.xp.position.set(gCx + gHalfX + off, gCy, gFloor); L.xn.position.set(gCx - gHalfX - off, gCy, gFloor);
             L.yp.position.set(gCx, gCy + gHalfY + off, gFloor); L.yn.position.set(gCx, gCy - gHalfY - off, gFloor);
-            for (const k in L) L[k].scale.set(lw, lw / 2, 1);
         }
         // Axis lines mark PART-ZERO — part-local (they ride the part frame, which offsets them to +workOrigin in
         // machine view): X red along y=0, Y green along x=0, over the part footprint at the part floor.
