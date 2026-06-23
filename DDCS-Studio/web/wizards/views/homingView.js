@@ -8,7 +8,7 @@ const wizard = new HomingWizard();
 
 const AX_LIST = ['x', 'y', 'z', 'a', 'b'];
 const AX_LABEL = { x: 'X', y: 'Y', z: 'Z', a: 'A', b: 'B' };
-const METHOD_LABEL = { native: 'native', seek: 'switch-seek', setzero: 'set-zero', dual: 'dual-square' };
+const METHOD_LABEL = { native: 'native', seek: 'switch-seek', setzero: 'set-zero' };
 
 const getHoming = () => { const s = window.ddcsGetSettings ? window.ddcsGetSettings() : {}; return s.homing || { axes: {} }; };
 

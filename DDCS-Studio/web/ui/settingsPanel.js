@@ -141,27 +141,22 @@ const SETTINGS_DEFAULTS = {
     },
     // Persisted machine HOMING profile — authored in the Homing Setup modal, consumed by the Homing wizard.
     // PER-AXIS: enable, order (1..N — lower homes first), method, direction, feeds, back-off, home offset.
-    //   method: 'native'  — controller built-in M98 P501 X<idx> (safest; uses the controller's own config)
+    //   method: 'native'  — controller built-in M98 P501 X<idx> (safest; uses the controller's own config + flag)
     //           'seek'     — low-level switch-seek + back-off + slow re-seek (M98 P503), composed in the macro
     //           'setzero'  — set current position AS home (#[880+N]=0, #[1515+N]=1) — NO motion
-    //           'dual'     — dual-motor gantry squaring (master+slave switch-seek, square, re-sync)
-    //   dual:   { slaveIdx, square, skew } — only meaningful when method='dual'
+    //   slaveFollows: ''|axisIdx — a dual-axis gantry SLAVE; homing this (master) axis syncs the slave coord +
+    //                 marks it homed (#883=#881; #1518=1). Gantry SQUARING is manual — Studio emits no auto-square.
     //   rotary: 'setzero' | 'switch' ; continuous = mod-360 wrap (A/B/C)
-    // order philosophy: 'zfirst' (Z, then X, then Y carrying slaves) | 'sequential' (by the order field) | 'simultaneous'
+    // order philosophy: 'sequential' (by the order field — default; Z(1) X(2) Y(3) per fndzero.nc) | 'simultaneous'
     // Defaults mirror fndzero.nc: Z first (order 1), X (2), Y (3, A slaved). softLimits = re-enable #655 after homing.
     homing: {
-        philosophy: 'zfirst', softLimits: true,
+        philosophy: 'sequential', softLimits: true,
         axes: {
-            x: { enable: true,  order: 2, method: 'native', dir: '-', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0,
-                 dual: { slaveIdx: 3, square: false, skew: 0 }, slaveFollows: '', rotary: 'switch', continuous: false },
-            y: { enable: true,  order: 3, method: 'native', dir: '-', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0,
-                 dual: { slaveIdx: 3, square: false, skew: 0 }, slaveFollows: '', rotary: 'switch', continuous: false },
-            z: { enable: true,  order: 1, method: 'native', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0,
-                 dual: { slaveIdx: 3, square: false, skew: 0 }, slaveFollows: '', rotary: 'switch', continuous: false },
-            a: { enable: false, order: 4, method: 'setzero', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0,
-                 dual: { slaveIdx: 3, square: false, skew: 0 }, slaveFollows: '', rotary: 'setzero', continuous: true },
-            b: { enable: false, order: 5, method: 'setzero', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0,
-                 dual: { slaveIdx: 3, square: false, skew: 0 }, rotary: 'setzero', continuous: true }
+            x: { enable: true,  order: 2, method: 'native', dir: '-', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
+            y: { enable: true,  order: 3, method: 'native', dir: '-', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
+            z: { enable: true,  order: 1, method: 'native', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
+            a: { enable: false, order: 4, method: 'setzero', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'setzero', continuous: true },
+            b: { enable: false, order: 5, method: 'setzero', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'setzero', continuous: true }
         }
     }
 };
@@ -208,14 +203,22 @@ function syncFlatFromIO(s) {
     }
 }
 
-// Deep-merge a persisted homing config over the defaults: top-level scalars, then per-axis (each axis's
-// fields incl. the nested dual{} block), so a partial save can't drop fields. Idempotent.
+// Deep-merge a persisted homing config over the defaults: top-level scalars, then per-axis fields, so a partial
+// save can't drop fields. Idempotent. A legacy 'zfirst' philosophy maps to 'sequential' (the order field now
+// drives the sequence); a legacy per-axis method:'dual' (auto-squaring, removed) falls back to native + its slave.
 function mergeHoming(p) {
     const D = SETTINGS_DEFAULTS.homing;
-    const out = { philosophy: (p && p.philosophy) || D.philosophy, softLimits: p ? p.softLimits !== false : D.softLimits, axes: {} };
+    const philosophy = (p && p.philosophy === 'simultaneous') ? 'simultaneous' : 'sequential';
+    const out = { philosophy, softLimits: p ? p.softLimits !== false : D.softLimits, axes: {} };
     for (const ax of ['x', 'y', 'z', 'a', 'b']) {
         const da = D.axes[ax], pa = (p && p.axes && p.axes[ax]) || {};
-        out.axes[ax] = { ...da, ...pa, dual: { ...da.dual, ...(pa.dual || {}) } };
+        const merged = { ...da, ...pa };
+        delete merged.dual;                                        // drop the removed auto-squaring sub-config
+        if (merged.method === 'dual') {                            // legacy dual → native master; keep its slave sync
+            merged.method = 'native';
+            if (!merged.slaveFollows && pa.dual && pa.dual.slaveIdx != null) merged.slaveFollows = String(pa.dual.slaveIdx);
+        }
+        out.axes[ax] = merged;
     }
     return out;
 }
@@ -426,12 +429,13 @@ function commitMachine() {
 
 // ── HOMING profile (Machine tab section) ──────────────────────────────────────────────────────────────────
 // Per-axis homing config, rendered + edited inline (no separate modal). Travel/home-direction reference the
-// envelope above (machine.x/y/z); this section only adds per-axis method/feeds/back-off/offset + sequence
-// order + dual-motor squaring + rotary mode. Commits live to _ddcsSettings.homing via saveSettings().
+// envelope above (machine.x/y/z); this section adds per-axis method/feeds/back-off/offset + sequence order +
+// dual-axis SLAVE SYNC ("Slave follows") + rotary mode. (Auto-squaring is NOT emitted — the operator squares the
+// gantry manually; Studio only syncs the slave coordinate when the master homes.) Commits live via saveSettings().
 const HOMING_AX_IDX = { x: 0, y: 1, z: 2, a: 3, b: 4 }, HOMING_AX_LABEL = { x: 'X', y: 'Y', z: 'Z', a: 'A', b: 'B' };
 const HOMING_METHODS = [
     { v: 'native', label: 'Native (M98 P501)' }, { v: 'seek', label: 'Switch-seek (M98 P503)' },
-    { v: 'setzero', label: 'Set current as home' }, { v: 'dual', label: 'Dual-motor squaring' },
+    { v: 'setzero', label: 'Set current as home' },
 ];
 function homingConfiguredAxes() {
     const m = (_ddcsSettings.motors) || {};
@@ -463,8 +467,6 @@ function renderHomingGui() {
         const dis = !expert && m.v !== 'native';
         return `<option value="${m.v}"${m.v === sel ? ' selected' : ''}${dis ? ' disabled title="Unverified on this post"' : ''}>${m.label}</option>`;
     }).join('');
-    const slaveOpts = (sel) => list.filter((a) => a !== 'z').concat(['a', 'b']).filter((v, i, arr) => arr.indexOf(v) === i)
-        .map((a) => `<option value="${HOMING_AX_IDX[a]}"${HOMING_AX_IDX[a] === sel ? ' selected' : ''}>${HOMING_AX_LABEL[a]} (idx ${HOMING_AX_IDX[a]})</option>`).join('');
     const followOpts = (sel) => `<option value="">none</option>` + list.map((a) => `<option value="${HOMING_AX_IDX[a]}"${String(HOMING_AX_IDX[a]) === String(sel) ? ' selected' : ''}>${HOMING_AX_LABEL[a]} (idx ${HOMING_AX_IDX[a]})</option>`).join('');
 
     host.innerHTML = ordered.map((ax, pos) => {
@@ -484,12 +486,9 @@ function renderHomingGui() {
                 <label>Back-off <input type="number" class="hm-backoff" value="${num(c.backoff, 5)}" step="0.5" style="width:54px;"></label>
                 <label>Slow feed <input type="number" class="hm-slowfeed" value="${num(c.slowFeed, 100)}" style="width:60px;"></label>
                 <label>Home offset <input type="number" class="hm-offset" value="${num(c.offset, 0)}" step="0.5" style="width:54px;"></label>
-                <label>Slave follows <select class="hm-follow">${followOpts(c.slaveFollows)}</select></label>
             </div>
-            <div class="hm-dual" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
-                <label>Slave idx <select class="hm-slaveidx">${slaveOpts(num((c.dual || {}).slaveIdx, 3))}</select></label>
-                <label><input type="checkbox" class="hm-square" ${(c.dual || {}).square ? 'checked' : ''}/> square</label>
-                <label>Skew <input type="number" class="hm-skew" value="${num((c.dual || {}).skew, 0)}" step="0.1" style="width:54px;"></label>
+            <div class="hm-slave" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <label title="Dual-axis gantry: homing this axis syncs the slave's coordinate and marks it homed. Squaring is done manually by the operator.">Slave axis follows <select class="hm-follow">${followOpts(c.slaveFollows)}</select></label>
             </div>
             ${rotary ? `<div class="hm-rotary" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
                 <label>Rotary <select class="hm-rotmode"><option value="setzero"${(c.rotary || 'setzero') === 'setzero' ? ' selected' : ''}>set zero</option><option value="switch"${(c.rotary || 'setzero') === 'switch' ? ' selected' : ''}>switch home</option></select></label>
@@ -501,9 +500,8 @@ function renderHomingGui() {
     host.querySelectorAll('.homing-axis-row').forEach((row) => {
         const methodSel = row.querySelector('.hm-method');
         const sync = () => {
-            const m = methodSel.value;
-            row.querySelector('.hm-motion').style.display = (m === 'seek' || m === 'dual') ? 'flex' : 'none';
-            row.querySelector('.hm-dual').style.display = m === 'dual' ? 'flex' : 'none';
+            // Seek-path motion params (feeds/back-off) only matter for the switch-seek method.
+            row.querySelector('.hm-motion').style.display = methodSel.value === 'seek' ? 'flex' : 'none';
         };
         sync();
         // Any field change commits + re-renders (so visibility tracks the method); reorder swaps order then commits.
@@ -529,7 +527,6 @@ function commitHoming() {
             slowFeed: num(g('.hm-slowfeed').value, prev.slowFeed || 100),
             offset: num(g('.hm-offset').value, prev.offset || 0),
             slaveFollows: g('.hm-follow').value,
-            dual: { slaveIdx: num(g('.hm-slaveidx').value, (prev.dual || {}).slaveIdx || 3), square: g('.hm-square').checked, skew: num(g('.hm-skew').value, (prev.dual || {}).skew || 0) },
             rotary: g('.hm-rotmode') ? g('.hm-rotmode').value : (prev.rotary || 'setzero'),
             continuous: g('.hm-continuous') ? g('.hm-continuous').checked : !!prev.continuous,
         };
@@ -937,7 +934,7 @@ function buildSettingsOverlay() {
                     </div>
                     <div class="settings-section" id="set_homing_section">
                         <div class="settings-section-title">HOMING</div>
-                        <div class="settings-hint">Per-axis homing profile, used by the <b>Homing wizard</b>. Travel + home direction come from the envelope above. <b>Native</b> runs the controller's built-in home (safest). The numbered list sets the home <b>sequence</b> (▲▼ to reorder; default Z→X→Y, slave follows its master). Advanced methods (switch-seek / dual-motor squaring) are DDCS Expert M350 only.</div>
+                        <div class="settings-hint">Per-axis homing profile, used by the <b>Homing wizard</b>. Travel + home direction come from the envelope above. <b>Native</b> runs the controller's built-in home (safest). The numbered list sets the home <b>sequence</b> (▲▼ to reorder; default Z→X→Y). For a dual-axis gantry, set the master's <b>slave axis follows</b> so homing the master syncs the slave (squaring stays manual). The switch-seek method is DDCS Expert M350 only.</div>
                         <div id="set_homing_tag" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
                         <label class="settings-check" style="margin-bottom:6px;"><input type="checkbox" id="set_homing_simul"> Simultaneous (emit calls back-to-back, still in this order)</label>
                         <div id="set_homing_axes"></div>
