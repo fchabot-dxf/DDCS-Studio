@@ -1789,6 +1789,34 @@
                 </div>
             </div>
 
+            <!-- Homing Wizard -->
+            <div id="wiz_homing" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-container">
+                    <div id="homingVizStatus" class="viz-status"></div>
+                    <div id="homingVizContainer" class="viz-canvas"></div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Generate a safe machine-homing macro. Each axis homes by its method from <b>Homing Setup</b> (native = the controller's built-in home, the safest default). Tick the axes to home this run; the sequence follows your saved order. The 3D preview runs a motion model of the homing (the emitted macro uses the controller's M98 home subs).</div>
+
+                <span class="section-label">HOME THIS RUN</span>
+                <div id="homing_axes" class="grid-3" style="margin-top:8px; gap:8px;"></div>
+
+                <div style="margin-top:10px;">
+                    <button id="homing_open_setup" type="button">⚙ Homing Setup…</button>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span id="homing_status" class="compliant-tag"></span></span>
+                    <pre id="wiz_homing_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
             <!-- FOOTER: Action buttons -->
             <div class="wiz-foot">
                 <button onclick="closeWiz()">CANCEL</button>

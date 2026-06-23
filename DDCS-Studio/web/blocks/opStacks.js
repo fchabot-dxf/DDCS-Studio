@@ -35,12 +35,14 @@ import { circularStack } from '../wizards/circularWizard.js';
 import { rotaryClockStack } from '../wizards/rotaryClockWizard.js';
 import { rotaryCenterStack } from '../wizards/rotaryCenterWizard.js';
 import { textStack } from '../wizards/textWizard.js';
+import { homingStack } from '../wizards/homingWizard.js';
 
 const BUILDERS = {
     surfacing: surfacingStack, pocket: pocketStack, contour: contourStack, slot: slotStack, drill: drillStack,
     wcs: wcsStack, edge: edgeStack, comm: commStack, middle: middleStack, corner: cornerStack, alignment: alignmentStack,
     atc_length: atcLengthStack, atc_check: atcToolCheckStack, atc_warmup: atcWarmupStack, atc_change: atcChangeStack, atc_test: atcTestStack, atc_table: atcTableStack,
     circular: circularStack, rotary_clock: rotaryClockStack, rotary_center: rotaryCenterStack, text: textStack,
+    homing: homingStack,
 };
 // (No bare flag — framing is now Program Start/End BLOCKS in the stack; a snippet just omits them.)
 // find() recurses into block children (incl. op-containers), so reconcilers locate their inner blocks
@@ -64,6 +66,7 @@ const OP_LABELS = {
     wcs: 'WCS', edge: 'Edge Probe', middle: 'Middle Probe', corner: 'Corner Probe', alignment: 'Alignment',
     circular: 'Circular Probe', rotary_clock: 'Rotary Clock', rotary_center: 'Rotary Centre', comm: 'Communication',
     atc_length: 'Tool Length', atc_check: 'Tool Check', atc_warmup: 'Spindle Warmup', atc_change: 'Tool Change', atc_test: 'ATC Test',
+    homing: 'Homing',
 };
 const VAR_ATOMS = new Set(['assign', 'probe', 'proberead', 'readmachine', 'setworkoffset', 'tooloffset', 'machinemove']);
 const FLOW_ATOMS = new Set(['ifgoto', 'goto', 'label']);

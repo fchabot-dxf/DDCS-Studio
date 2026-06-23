@@ -31,10 +31,12 @@ import { contourView } from './contourView.js';
 import { slotView } from './slotView.js';
 import { surfacingView } from './surfacingView.js';
 import { textView } from './textView.js';
+import { homingView } from './homingView.js';
 
 export const WIZARD_VIEWS = [
     commView,
     wcsView,
+    homingView,
     cornerView,
     middleView,
     circularView,

@@ -547,6 +547,7 @@ export class CommandDeck {
                         <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.probe}</span><span class="btn-tx">Probe</span><span class="btn-caret">▼</span></button>
                         <div class="toolbar-dropdown-content">
                             <button onclick="openWiz && openWiz('wcs')">⊕ WCS / work offsets</button>
+                            <button onclick="openWiz && openWiz('homing')">⌖ Homing</button>
                             <button onclick="openCornerWiz && openCornerWiz()">📐 Corner</button>
                             <button onclick="openMiddleWiz && openMiddleWiz()">🎯 Middle</button>
                             <button onclick="openWiz && openWiz('circular')">⭕ Bore/Boss</button>
