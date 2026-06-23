@@ -137,8 +137,32 @@ export class RotaryCenterWizard {
 
     /** Preview start (stock frame): above the cylinder top, centred, ready to probe down. */
     inferStart(params, stock) {
+        return this.inferStarts(params, stock)[0];
+    }
+
+    /**
+     * Per-pass preview starts (one draggable marker per manual REPOSITION). The KNOWN method is a single hands-free
+     * pass (1 start). The FIT method repositions twice → 3 passes, so spread the 3 starts to DISTINCT points around
+     * the bar (the cylinder lies along X, cross-section in Y-Z; the preview is top-at-0, so the centreline is at
+     * Z = -R) — else all three probes start at the same spot, hit the same point, and the circle solve is degenerate:
+     *   pass 0 = over the bar TOP at the centreline (probe down in Z)
+     *   pass 1 = the +Y flank, at centreline height (probe in Y)
+     *   pass 2 = the -Y flank, at centreline height (probe in Y)
+     */
+    inferStarts(params, stock) {
         const n = (v, d) => num(v, d);
-        const sy = n(stock && stock.y, 76), sz = n(stock && stock.z, 76);
-        return { x: n(stock && stock.x, 150) / 2, y: sy / 2, z: Math.min(5, sz * 0.5) };
+        const sx = n(stock && stock.x, 150), sy = n(stock && stock.y, 76), sz = n(stock && stock.z, 76);
+        const cx = sx / 2, cy = sy / 2;
+        const R = Math.min(sy, sz) / 2;                 // bar radius (cross-section = min of the two cross dims)
+        const retract = n(params && params.retract, 2);
+        const top = { x: cx, y: cy, z: Math.min(5, sz * 0.5) };   // above the top, ready to probe down
+        const method = (params && params.method) === 'fit' ? 'fit' : 'known';
+        if (method !== 'fit') return [top];
+        const flankZ = -R;                              // centreline height in the top-at-0 preview frame
+        return [
+            top,
+            { x: cx, y: cy + R + retract, z: flankZ },  // +Y flank, beside the bar at centreline height
+            { x: cx, y: cy - R - retract, z: flankZ },  // -Y flank
+        ];
     }
 }

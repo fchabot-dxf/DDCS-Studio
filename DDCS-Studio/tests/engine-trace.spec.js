@@ -94,6 +94,53 @@ test('trace linearizes G2/G3 arcs into chord segments', async ({ page }) => {
   expect(Math.abs(r.endX - 10) < 0.2 && Math.abs(r.endY) < 0.2, 'arc ends at its programmed endpoint').toBe(true);
 });
 
+test('trace counts manual-REPOSITION passes (rotary 3-point fit → 3 passes, distinct probes)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { GcodeExecutionEngine } = await import('/engine/index.js');
+    const { rotaryCenterStack } = await import('/wizards/rotaryCenterWizard.js');
+    const { emitMapped } = await import('/blocks/blockModel.js');
+    const code = emitMapped(rotaryCenterStack({ method: 'fit' })).text;
+    const eng = new GcodeExecutionEngine({ autoAnswer: true });
+    const t = eng.trace(code);
+    // Probe segments grouped by pass; offset each pass by a per-pass start (as the viz does) and take the
+    // probe ENDPOINT (the touch) — they must be distinct, not all the degenerate single-start point.
+    const starts = [{ x: 75, y: 38, z: 5 }, { x: 75, y: 76, z: -38 }, { x: 75, y: 0, z: -38 }];
+    const tips = [];
+    for (let p = 0; p < 3; p++) {
+      const seg = t.segments.filter((s) => s.probe && (s.pass | 0) === p).pop();
+      const o = starts[p];
+      if (seg) tips.push({ x: seg.x2 + o.x, y: seg.y2 + o.y, z: seg.z2 + o.z });
+    }
+    const distinct = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) > 1;
+    return {
+      passes: t.stats.passes,
+      passSet: [...new Set(t.segments.map((s) => s.pass | 0))].sort(),
+      tipCount: tips.length,
+      allDistinct: tips.length === 3 && distinct(tips[0], tips[1]) && distinct(tips[1], tips[2]) && distinct(tips[0], tips[2]),
+    };
+  });
+  expect(r.passes, 'two repositions → three passes').toBe(3);
+  expect(r.passSet, 'segments carry pass 0/1/2').toEqual([0, 1, 2]);
+  expect(r.tipCount, 'a probe touch in each of the three passes').toBe(3);
+  expect(r.allDistinct, 'the three probes hit distinct points once offset by their per-pass starts').toBe(true);
+});
+
+test('trace counts the alignment reposition (point A + B → 2 passes)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { GcodeExecutionEngine } = await import('/engine/index.js');
+    const { alignmentStack } = await import('/wizards/alignmentWizard.js');
+    const { emitMapped } = await import('/blocks/blockModel.js');
+    const code = emitMapped(alignmentStack({ checkAxis: 'X' })).text;
+    const eng = new GcodeExecutionEngine({ autoAnswer: true });
+    const t = eng.trace(code);
+    return { passes: t.stats.passes, passSet: [...new Set(t.segments.map((s) => s.pass | 0))].sort() };
+  });
+  expect(r.passes, 'one reposition (jog A→B) → two passes').toBe(2);
+  expect(r.passSet, 'segments carry pass 0 and 1').toEqual([0, 1]);
+});
+
 test('trace resolves a direct #var coordinate', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {

@@ -228,8 +228,21 @@ export function createPreviewPanel(container, opts = {}) {
                     t2.setMachine(anchor ? null : machineForViz());    // 2D mirrors
                     lastAnchor = anchor;
                 }
-                // Place the origin marker before setSegments so an anchored (probe) route offsets to it.
-                if (st && v.starts) v.starts[0] = { x: +st.x || 0, y: +st.y || 0, z: +st.z || 0 };
+                // Place EVERY pass's start marker before setSegments so each anchored (probe) pass offsets to its own
+                // start. A multi-point probe (rotary 3-point fit, alignment A/B) repositions between touches → one pass
+                // each; the wizard supplies a per-pass hint array (getStartHints) so the passes land at DISTINCT points
+                // (else all passes default to the same start and the circle solve is degenerate). Pass 0 also honours a
+                // user drag (curStart, via st). setSegments has already grown viz.starts to passCount.
+                if (v.starts) {
+                    const hints = get('getStartHints');
+                    const hint = (p) => Array.isArray(hints) ? (hints[p] || hints[0]) : null;
+                    const passCount = (parsed.stats && parsed.stats.passes) || 1;
+                    for (let p = 0; p < passCount; p++) {
+                        // pass 0 honours the user's drag (st); every pass falls back to its hint, then its existing start.
+                        const h = (p === 0 && st) || hint(p) || v.starts[p] || { x: 0, y: 0, z: 0 };
+                        v.starts[p] = { x: +h.x || 0, y: +h.y || 0, z: +h.z || 0 };
+                    }
+                }
                 v.setSegments(parsed, !fitted); fitted = true;
                 if (v.setSimTool) v.setSimTool(simTool(code, parsed));   // per-op tool from the tool table (see simTool)
                 if (v.setSimMode) v.setSimMode(((parsed.stats && parsed.stats.probe) > 0) ? 'probe' : 'mill');   // probe = translucent stock, mill = solid

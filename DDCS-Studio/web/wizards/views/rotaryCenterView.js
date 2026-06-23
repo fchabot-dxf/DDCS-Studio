@@ -106,7 +106,9 @@ export const rotaryCenterView = {
 
         const gcode = wizard.generate(params);
         el('wiz_rotary_center_code').innerHTML = UIUtils.formatGCode(gcode);
-        ctx.preview3D(gcode, 'rotaryCenterVizContainer', wizard.inferStart(params, stock));
+        // Per-pass start hints: the FIT method repositions twice → 3 starts (top + ±Y flanks) so the 3 probes hit
+        // DISTINCT points and the circle solves; the KNOWN method is a single pass (one start).
+        ctx.preview3D(gcode, 'rotaryCenterVizContainer', wizard.inferStart(params, stock), wizard.inferStarts(params, stock));
         ctx.previewRotaryFixture('rotaryCenterVizContainer', true);   // op-specific: show the 4th-axis rig
 
         const status = el('rotaryCenterVizStatus');

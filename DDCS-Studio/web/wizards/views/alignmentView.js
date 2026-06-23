@@ -65,7 +65,9 @@ export const alignmentView = {
 
         const gcode = wizard.generate(params);
         el('wiz_alignment_code').innerHTML = UIUtils.formatGCode(gcode);
-        ctx.preview3D(gcode, 'alignmentVizContainer');
+        // Two starts (point A + point B) spread along the fence so both probes are placed at distinct points.
+        const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
+        ctx.preview3D(gcode, 'alignmentVizContainer', wizard.inferStart(params, stock), wizard.inferStarts(params, stock));
 
         const probeAxis = params.checkAxis === 'X' ? 'Y' : 'X';
         const status = el('alignmentVizStatus');

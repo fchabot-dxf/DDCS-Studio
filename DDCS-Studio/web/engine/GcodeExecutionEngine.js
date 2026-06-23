@@ -209,6 +209,8 @@ export class GcodeExecutionEngine {
         this._move = null;     // in-flight timed move (interpolated at the programmed feedrate)
         this._probeArmed = false;   // DM500 move-until-input: M101 arms, the next G01 is a probe, M102 disarms
         this._traceSink = null;   // when non-null (trace()), moves snap + push a segment here instead of animating
+        this._pass = 0;           // manual-REPOSITION pass index (mirrors gcodeParser): each reposition starts a new pass
+        this._maxPass = 0;        // highest pass reached → stats.passes = _maxPass + 1
         this.timer = null;
         this.stats = {
             feed: 0,
@@ -319,7 +321,7 @@ export class GcodeExecutionEngine {
         return {
             segments,
             bounds: segments.length ? b : null,
-            stats: { feed, rapid, probe, retract: 0, passes: 1, skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped, absolute: this.stats.absolute },
+            stats: { feed, rapid, probe, retract: 0, passes: this._maxPass + 1, skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped, absolute: this.stats.absolute },
         };
     }
 
@@ -562,6 +564,15 @@ export class GcodeExecutionEngine {
     _executeStep(step) {
         const line = step.stripped;
         this.stats.steps += 1;
+
+        // Manual REPOSITION (uniform "REPOSITION:" comment the wizards emit): the operator re-parks the probe by
+        // hand → start a new pass at the program origin, exactly as gcodeParser does, so each pass is start-anchored
+        // and the preview gives it its own draggable start marker. Detected on the RAW line (it's a comment).
+        if (/reposition:/i.test(step.raw)) {
+            this._pass += 1;
+            if (this._pass > this._maxPass) this._maxPass = this._pass;
+            this.pos = { x: 0, y: 0, z: 0 };
+        }
 
         if (!line) {
             this.ip += 1;
@@ -931,6 +942,7 @@ export class GcodeExecutionEngine {
                     x1: this.pos.x, y1: this.pos.y, z1: this.pos.z,
                     x2: target.x, y2: target.y, z2: target.z,
                     rapid, probe: isProbe, type: isProbe ? 'probe' : (rapid ? 'rapid' : 'feed'), feed: this.feedVal,
+                    pass: this._pass,       // manual-REPOSITION pass → one draggable start marker per pass (see _ensureMarkers)
                     line: step.lineIndex,   // source line → lets the preview seek the tool to a clicked code line
                 });
                 this.pos = target;
@@ -974,6 +986,7 @@ export class GcodeExecutionEngine {
                     this._traceSink.push({
                         x1: prev.x, y1: prev.y, z1: prev.z, x2: pts[i].x, y2: pts[i].y, z2: pts[i].z,
                         rapid: false, probe: false, type: 'feed', feed: this.feedVal,
+                        pass: this._pass,
                         line: step.lineIndex,
                     });
                     prev = pts[i];

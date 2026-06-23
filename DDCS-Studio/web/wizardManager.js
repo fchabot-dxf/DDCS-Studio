@@ -374,7 +374,7 @@ export class WizardManager {
     // Render the wizard's generated G-code in the active wizard's viz area using THE shared preview panel
     // (identical code + UI to Studio main + Blocks). The SVG schematic is hidden (kept in wizards/views/* +
     // _svgPreview.bak.js for the DDCS CAM-menu thumbnails). The wizard feeds its own op code + inferred start.
-    preview3D(gcode, containerId, start) {
+    preview3D(gcode, containerId, start, startHints) {
         const svgCont = document.getElementById(containerId);
         if (!svgCont || !svgCont.parentElement) return;
         const parent = svgCont.parentElement; // .viz-container
@@ -390,12 +390,16 @@ export class WizardManager {
             host.__panel = createPreviewPanel(host, {
                 getGcode: () => host.__gcode || '',
                 getStart: () => host.__start,
+                // Per-pass start hints (multi-point probe): one start per manual REPOSITION so 3-point/A-B probes
+                // land at DISTINCT points (else the degenerate single-start solve). Optional (most ops are 1-pass).
+                getStartHints: () => host.__startHints,
                 onLine: (i) => this._highlightWizLine(host, i),   // play → highlight the executing line in the CODE PREVIEW (like Studio main)
             });
         }
         svgCont.style.display = 'none';
         host.__gcode = gcode || '';
         host.__start = start || null;
+        host.__startHints = Array.isArray(startHints) ? startHints : null;
         this._activePanel = host.__panel;   // for insert(): read the start the user set/dragged in this preview
         host.__panel.setActive(true);        // mark active + render this op's code
     }
