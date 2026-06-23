@@ -225,7 +225,7 @@ html, body { overflow-x: clip; }
 
 /* App-switcher tabs (STUDIO / GATEWAY) — visual stubs, no navigation yet.
    The :hover/:active resets shield them from the per-theme global `button` skins. */
-.hdr-tabs { display: flex; align-items: stretch; }
+.hdr-tabs { display: flex; align-items: stretch; margin-left: 16px; }
 /* Custom app icons so STUDIO / GATEWAY can collapse to icon-only when the header is tight */
 .hdr-tabs .tab .app-ico { display: inline-flex; flex: 0 0 auto; }
 .hdr-tabs .tab .app-ico svg { width: 17px; height: 17px; display: block; }
@@ -4215,7 +4215,7 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .app-header.is-compact .hdr-controls { gap: 6px; }
 .app-header.is-mini .hdr-tabs .tab .app-tx { display: none; }
 .app-header.is-mini .hdr-tabs .tab .app-ico { margin-left: 0; }
-.app-header.is-mini .hdr-tabs .tab { padding: 0 12px; letter-spacing: 0; }   /* icon-only, full header height */
+.app-header.is-mini .hdr-tabs .tab { padding: 0 18px; letter-spacing: 0; }   /* icon-only, full header height */
 .app-header.is-mini .ver { display: none; }
 @media (max-width: 520px) {
     .app-header .brand { padding: 0 8px; gap: 6px; }
@@ -4224,7 +4224,7 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 /* The post-processor chevron is icon-only at every width; on PHONE hide it entirely (set it in
    Settings → Post processor). Project Open/Save (macro-bar) stay in the header. */
 @media (max-width: 600px) {
-    .app-header.is-mini .hdr-tabs .tab { padding: 0 8px; }
+    .app-header.is-mini .hdr-tabs .tab { padding: 0 13px; }
     .hdr-controls { gap: 6px; }
     /* The chevron quick-menu stays visible on phone — it's the single quick-access point everywhere
        (Open/Save/Load/Insert/Copy/Clear/Export + post + theme). The standalone macro-bar stays hidden
