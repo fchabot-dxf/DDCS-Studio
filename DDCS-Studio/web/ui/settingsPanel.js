@@ -101,7 +101,10 @@ const SETTINGS_DEFAULTS = {
     // head = the sim spindle/collet body sizes (VISUAL ONLY — they change the render, never the G-code, so they
     // live here with the view options, not under Machine). parts = which assembly pieces are shown.
     preview: { followDamp: 50, showRapids: true, defaultView: '3d', defaultSpeed: 1, followDefault: true, autoLoop: true, gridStep: 0,
-        head: { spindleDia: 80, spindleLen: 200, colletDia: 20, colletLen: 30 }, parts: { spindle: true, collet: true, tool: true } },
+        head: { spindleDia: 80, spindleLen: 200, colletDia: 20, colletLen: 30 }, parts: { spindle: true, collet: true, tool: true },
+        // 3D touch probe SIM body sizes (VISUAL ONLY — same contract as head: change the render, never the G-code; the
+        // probing radius comes from the Stylus radius field under 3D PROBE DEFAULTS). ballDia defaults to 2× a typical 1mm stylus radius.
+        probe: { bodyDia: 40, bodyLen: 90, stylusLen: 30, ballDia: 4 } },
     // Composing assists (Blocks suggestions, Studio editor autocomplete, ghost next-block).
     compose: { suggestions: true, autocomplete: true, ghost: true },
     // ATC: tool-length probe defaults (consumed by the Tool Length wizard) + the tool-offset table.
@@ -303,6 +306,43 @@ function commitHeadDims() {
     const s = getSettings(); if (!s.preview) s.preview = {}; const h = s.preview.head || (s.preview.head = {});
     h.spindleDia = _gv('set_pv_spindle_dia', 80); h.spindleLen = _gv('set_pv_spindle_len', 200);
     h.colletDia = _gv('set_pv_collet_dia', 20); h.colletLen = _gv('set_pv_collet_len', 30);
+    saveSettings();
+}
+
+// Interactive PROBE schematic — mirrors renderHeadGui: a touch-trigger probe drawn body (top) ▸ stylus (thin) ▸ ruby
+// ball (tip), with the dimension inputs sitting ON the drawing at the tick ends. Visual only (never the G-code).
+function renderProbeGui() {
+    const svgBox = document.getElementById('set_pv_probe_svg'); if (!svgBox) return;
+    const bD = _gv('set_pv_probe_body_dia', 40), bL = _gv('set_pv_probe_body_len', 90);
+    const stL = _gv('set_pv_probe_stylus_len', 30), ballD = _gv('set_pv_probe_ball_dia', 4);
+    const stD = Math.max(2, ballD * 0.6);                                               // stylus shaft (schematic, thinner than the ball)
+    const W = 248, H = 212, cx = 112, maxD = Math.max(bD, stD, ballD), totalL = bL + stL + ballD;
+    const scale = Math.min(96 / maxD, 168 / totalL);                                    // ONE uniform scale → the WHOLE probe scales together and fits
+    const bw = bD * scale, sw = Math.max(2, stD * scale), ballR = (ballD * scale) / 2;
+    const bH = bL * scale, sH = stL * scale, ballH = ballD * scale;
+    const yBodyT = (H - (bH + sH + ballH)) / 2, yStyT = yBodyT + bH, yBallT = yStyT + sH; // vertically centred stack
+    const yDia = Math.max(11, yBodyT - 12);
+    const rect = (w, hh, yy, fill, part) => `<rect data-part="${part}" x="${(cx - w / 2).toFixed(1)}" y="${yy.toFixed(1)}" width="${Math.max(2, w).toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="${fill}" stroke="#9fb4c8" stroke-width="0.8"/>`;
+    const tick = (x1, y1, x2, y2) => `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#5f7286" stroke-width="0.7" stroke-dasharray="2 2"/>`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">`;
+    svg += rect(bw, bH, yBodyT, '#6b7682', 'body') + rect(sw, sH, yStyT, '#9aa6b2', 'stylus');
+    svg += `<circle data-part="ball" cx="${cx.toFixed(1)}" cy="${(yBallT + ballR).toFixed(1)}" r="${Math.max(2, ballR).toFixed(1)}" fill="#e11d48" stroke="#9fb4c8" stroke-width="0.8"/>`;  // ruby ball
+    svg += tick(cx, yBodyT, cx, yDia);                                  // body Ø → top input
+    svg += tick(cx + bw / 2, yBodyT + bH / 2, W - 30, yBodyT + bH / 2);  // body length → right input
+    svg += tick(cx + sw / 2, yStyT + sH / 2, W - 30, yStyT + sH / 2);    // stylus length → right input
+    svg += tick(cx - ballR, yBallT + ballR, 30, yBallT + ballR);         // ball Ø → left input
+    svgBox.innerHTML = svg + '</svg>';
+    const place = (id, x, y) => { const el = document.getElementById(id); if (el) { el.style.left = Math.max(0, Math.min(W - 50, x - 25)) + 'px'; el.style.top = (y - 9) + 'px'; } };
+    place('set_pv_probe_body_dia', cx, yDia);
+    place('set_pv_probe_body_len', W - 26, yBodyT + bH / 2);
+    place('set_pv_probe_stylus_len', W - 26, yStyT + sH / 2);
+    place('set_pv_probe_ball_dia', 30, yBallT + ballR);
+}
+// Commit the on-diagram probe dims to settings (on change/blur). Visual only — stored under preview.probe.
+function commitProbeDims() {
+    const s = getSettings(); if (!s.preview) s.preview = {}; const p = s.preview.probe || (s.preview.probe = {});
+    p.bodyDia = _gv('set_pv_probe_body_dia', 40); p.bodyLen = _gv('set_pv_probe_body_len', 90);
+    p.stylusLen = _gv('set_pv_probe_stylus_len', 30); p.ballDia = _gv('set_pv_probe_ball_dia', 4);
     saveSettings();
 }
 
@@ -521,6 +561,17 @@ function buildSettingsOverlay() {
                             <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_spindle"> Spindle</label>
                             <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_collet"> Collet</label>
                             <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_tool"> Tool</label>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">3D PROBE (SIM VIEW)</div>
+                        <div class="settings-hint">Edit a dimension right on the diagram — the probe redraws to match. Visual only (never changes the G-code); the probing radius comes from the <b>Stylus radius</b> field above (3D Probe defaults). These are the touch-probe body sizes so the sim matches your real probe.</div>
+                        <div id="set_pv_probe_gui" style="position:relative; width:248px; height:212px; margin:6px 0;">
+                            <div id="set_pv_probe_svg" style="position:absolute; inset:0;"></div>
+                            <input type="number" id="set_pv_probe_body_dia" class="dim-edit" min="1" step="1" title="Probe body diameter (mm)">
+                            <input type="number" id="set_pv_probe_body_len" class="dim-edit" min="1" step="5" title="Probe body length (mm)">
+                            <input type="number" id="set_pv_probe_stylus_len" class="dim-edit" min="1" step="1" title="Stylus length (mm)">
+                            <input type="number" id="set_pv_probe_ball_dia" class="dim-edit" min="0.5" step="0.5" title="Ruby ball diameter (mm)">
                         </div>
                     </div>
                 </div>
@@ -1053,6 +1104,12 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_show_collet')) q('set_pv_show_collet').checked = pvp.collet !== false;
         if (q('set_pv_show_tool')) q('set_pv_show_tool').checked = pvp.tool !== false;
         renderHeadGui();
+        const pvpr = pv.probe || (pv.probe = { ...SETTINGS_DEFAULTS.preview.probe });
+        if (q('set_pv_probe_body_dia')) q('set_pv_probe_body_dia').value = pvpr.bodyDia;
+        if (q('set_pv_probe_body_len')) q('set_pv_probe_body_len').value = pvpr.bodyLen;
+        if (q('set_pv_probe_stylus_len')) q('set_pv_probe_stylus_len').value = pvpr.stylusLen;
+        if (q('set_pv_probe_ball_dia')) q('set_pv_probe_ball_dia').value = pvpr.ballDia;
+        renderProbeGui();
         const cp = s.compose || (s.compose = { ...SETTINGS_DEFAULTS.compose });
         if (q('set_cp_suggestions')) q('set_cp_suggestions').checked = cp.suggestions !== false;
         if (q('set_cp_autocomplete')) q('set_cp_autocomplete').checked = cp.autocomplete !== false;
@@ -1691,6 +1748,11 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_show_spindle')) pvp.spindle = q('set_pv_show_spindle').checked;
         if (q('set_pv_show_collet')) pvp.collet = q('set_pv_show_collet').checked;
         if (q('set_pv_show_tool')) pvp.tool = q('set_pv_show_tool').checked;
+        const pvpr = pv.probe || (pv.probe = { ...SETTINGS_DEFAULTS.preview.probe });
+        if (q('set_pv_probe_body_dia')) pvpr.bodyDia = num(q('set_pv_probe_body_dia').value, 40);
+        if (q('set_pv_probe_body_len')) pvpr.bodyLen = num(q('set_pv_probe_body_len').value, 90);
+        if (q('set_pv_probe_stylus_len')) pvpr.stylusLen = num(q('set_pv_probe_stylus_len').value, 30);
+        if (q('set_pv_probe_ball_dia')) pvpr.ballDia = num(q('set_pv_probe_ball_dia').value, 4);
         const cp = s.compose || (s.compose = { ...SETTINGS_DEFAULTS.compose });
         if (q('set_cp_suggestions')) cp.suggestions = q('set_cp_suggestions').checked;
         if (q('set_cp_autocomplete')) cp.autocomplete = q('set_cp_autocomplete').checked;
@@ -1956,6 +2018,8 @@ function wireSettingsOverlay(ov) {
     if (_headSimLink) _headSimLink.addEventListener('click', () => { showGroup('general'); showPanel('set_tab_preview'); });
     // Interactive head GUI: typing redraws/repositions live; on commit (change/blur) persist so an open preview re-pulls.
     ['set_pv_spindle_dia', 'set_pv_spindle_len', 'set_pv_collet_dia', 'set_pv_collet_len'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderHeadGui); el.addEventListener('change', commitHeadDims); } });
+    // Interactive probe GUI: typing redraws/repositions live; on commit (change/blur) persist (visual only).
+    ['set_pv_probe_body_dia', 'set_pv_probe_body_len', 'set_pv_probe_stylus_len', 'set_pv_probe_ball_dia'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderProbeGui); el.addEventListener('change', commitProbeDims); } });
     // Machine envelope GUI: typing redraws the iso box (origin follows the signs); on commit persist so the 3D updates.
     ['set_mach_x', 'set_mach_y', 'set_mach_z'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderMachineGui); el.addEventListener('change', commitMachine); } });
     showGroup('general');
