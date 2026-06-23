@@ -353,7 +353,7 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 
 /* Sub-tab bar unified with Settings + Macros: a .settings-head row of shared .settings-main-tab buttons
    (underline-active). The .settings-main-tab look itself is defined globally above. */
-.gateway-app .settings-head { padding: 8px 0; border-bottom: 1px solid var(--border); margin: 0 0 14px; display: flex; align-items: center; }
+.gateway-app .settings-head { padding: 8px 0; border-bottom: 1px solid var(--border); margin: 0 0 14px; display: flex; align-items: center; background: var(--panel); color: var(--text-main); }
 .gateway-app .settings-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .gateway-app table { width: 100%; border-collapse: collapse; font-size: 13px; }
