@@ -736,7 +736,10 @@ export class GcodeExecutionEngine {
         if (this.absolute || g53) this.stats.absolute = true;
 
         const isProbe = gcodes.includes(31) || this._probeArmed;   // G31, or a G01 inside a DM500 M101/M102 cycle
-        const effMotion = isProbe ? 1 : this.motion;
+        // G53 (machine-coord positioning, e.g. the end "safe Z" park) is a RAPID, not a cut — but on DDCS it's
+        // written bare (`G53 Z#v`, no G0), so it would otherwise inherit a preceding G1 and draw as a slow feed
+        // (e.g. a pocket's wall-finish leaves G1 active → the retract looked like a cut to the floor). Force rapid.
+        const effMotion = isProbe ? 1 : (g53 ? 0 : this.motion);
 
         if (effMotion === 0 || effMotion === 1) {
             let touchName = null;   // probe input to flip when the tool reaches the contact point
