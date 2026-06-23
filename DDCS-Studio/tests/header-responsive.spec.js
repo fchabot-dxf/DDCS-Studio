@@ -60,9 +60,9 @@ test('quick-menu chevron: icon-only; opens Program actions + Post-processor + Th
   expect(await page.locator('#hdrPostMenu').isHidden()).toBe(false);
   expect(await page.getAttribute('#hdrPostBtn', 'aria-expanded')).toBe('true');
 
-  // Program file-actions present (Open/Save moved in, plus load/insert/copy/clear/export).
+  // Program file-actions present (Open/Save moved in, plus load/insert/copy/clear/export/standalone).
   const programActions = await page.locator('#hdrPostMenu .hdr-quick-item[data-act]:not([data-act="settings"])').count();
-  expect(programActions, 'seven program file-actions').toBe(7);
+  expect(programActions, 'eight program file-actions').toBe(8);
   // Settings opens as a modal from the menu.
   expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="settings"]').count(), 'Settings… row present').toBe(1);
   // Exactly one active post and one active theme are checked.
