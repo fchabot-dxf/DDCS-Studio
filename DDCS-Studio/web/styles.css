@@ -287,7 +287,7 @@ html, body { overflow-x: clip; }
    the outline wraps the foot. Applies to studio/steampunk/organic; futuristic (square) + normal (flat) opt out. --- */
 .app-header .tab.active::before, .app-header .tab.active::after,
 .settings-tabs .settings-main-tab.active::before, .settings-tabs .settings-main-tab.active::after {
-    content: ''; position: absolute; bottom: 0; width: var(--tab-flare, 0); height: var(--tab-flare, 0); pointer-events: none;
+    content: ''; position: absolute; bottom: 0; width: calc(var(--tab-flare, 0) + 1px); height: var(--tab-flare, 0); pointer-events: none;
 }
 .app-header .tab.active::before, .settings-tabs .settings-main-tab.active::before {
     left: calc(-1 * var(--tab-flare, 0));
