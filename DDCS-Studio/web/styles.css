@@ -225,7 +225,7 @@ html, body { overflow-x: clip; }
 
 /* App-switcher tabs (STUDIO / GATEWAY) — visual stubs, no navigation yet.
    The :hover/:active resets shield them from the per-theme global `button` skins. */
-.hdr-tabs { display: flex; align-items: stretch; margin-left: 16px; }
+.hdr-tabs { display: flex; align-items: stretch; margin-left: 16px; align-self: flex-end; height: 44px; }   /* bottom-aligned: a bit of space above the tab tops, feet still meet the bar below */
 /* Custom app icons so STUDIO / GATEWAY can collapse to icon-only when the header is tight */
 .hdr-tabs .tab .app-ico { display: inline-flex; flex: 0 0 auto; }
 .hdr-tabs .tab .app-ico svg { width: 17px; height: 17px; display: block; }
@@ -234,13 +234,13 @@ html, body { overflow-x: clip; }
 
 /* Underline-style app-switcher tabs (the original look): flat, transparent, with a coloured accent
    bar under the active tab. Icons kept so they collapse to icon-only on narrow screens. */
-/* Per-theme tab corner roundness — one var drives both header tabs + sub-tabs. Soft on studio/organic, crisp on
-   futuristic, medium on steampunk/normal. */
-:root, [data-theme="steampunk"] { --tab-radius: 8px; }
-[data-theme="studio"]     { --tab-radius: 13px; }
-[data-theme="organic"]    { --tab-radius: 16px; }
-[data-theme="futuristic"] { --tab-radius: 2px; }
-[data-theme="normal"]     { --tab-radius: 5px; }
+/* Per-theme tab shape: --tab-radius = TOP-corner rounding; --tab-flare = OUTWARD bottom-corner "feet" radius
+   (the classic browser-tab curve into the bar); --tab-edge = the outline colour that traces both. */
+:root, [data-theme="steampunk"] { --tab-radius: 8px;  --tab-flare: 7px;  --tab-edge: var(--border); }
+[data-theme="studio"]     { --tab-radius: 13px; --tab-flare: 9px;  --tab-edge: var(--border); }
+[data-theme="organic"]    { --tab-radius: 16px; --tab-flare: 11px; --tab-edge: var(--border); }
+[data-theme="futuristic"] { --tab-radius: 0;    --tab-flare: 0;    --tab-edge: rgba(45,226,255,.7); }  /* square */
+[data-theme="normal"]     { --tab-radius: 5px;  --tab-flare: 0;    --tab-edge: var(--border); }          /* flat, no feet */
 
 .app-header .tab,
 .app-header .tab:hover,
@@ -269,8 +269,8 @@ html, body { overflow-x: clip; }
    every app: studio wizard bar, macros/gateway/settings sub-tab head). So it reads as merged with the body, and
    that "body colour below the header" is identical for every tab in a given theme. margin-bottom:-1px punches it
    through the header's bottom border so there's no separating line. */
-.app-header .tab.active { color: var(--hdr-ink, var(--text-main)); background: var(--panel); margin-bottom: -1px;
-    box-shadow: inset 0 1px 0 var(--border), inset 1px 0 0 var(--border), inset -1px 0 0 var(--border); }
+.app-header .tab.active { --tab-fill: var(--panel); color: var(--hdr-ink, var(--text-main)); background: var(--tab-fill); margin-bottom: -1px;
+    box-shadow: inset 0 1px 0 var(--tab-edge), inset 1px 0 0 var(--tab-edge), inset -1px 0 0 var(--tab-edge); }
 /* Organic theme: the connecting tab AND the bar below the header are pink (theme accent), kept matching so the
    active tab still merges into the bar. */
 [data-theme="organic"] .app-header .tab.active,
@@ -281,6 +281,29 @@ html, body { overflow-x: clip; }
 /* Organic's bars are a saturated colour → inactive tab labels need lighter, higher-contrast text. */
 [data-theme="organic"] .settings-tabs .settings-main-tab:not(.active) { color: rgba(255,255,255,0.82); }
 [data-theme="organic"] .app-header .tab:not(.active) { color: rgba(255,255,255,0.7); }
+
+/* --- Active-tab outward "feet": concave quarter-curves at the bottom-outer corners that flare into the bar.
+   Sized by --tab-flare; filled with --tab-fill (the tab colour) with a 1px --tab-edge ring tracing the curve so
+   the outline wraps the foot. Applies to studio/steampunk/organic; futuristic (square) + normal (flat) opt out. --- */
+.app-header .tab.active::before, .app-header .tab.active::after,
+.settings-tabs .settings-main-tab.active::before, .settings-tabs .settings-main-tab.active::after {
+    content: ''; position: absolute; bottom: 0; width: var(--tab-flare, 0); height: var(--tab-flare, 0); pointer-events: none;
+}
+.app-header .tab.active::before, .settings-tabs .settings-main-tab.active::before {
+    left: calc(-1 * var(--tab-flare, 0));
+    background: radial-gradient(circle at top left, transparent var(--tab-flare, 0), var(--tab-edge) var(--tab-flare, 0), var(--tab-edge) calc(var(--tab-flare, 0) + 1px), var(--tab-fill) calc(var(--tab-flare, 0) + 1px));
+}
+.app-header .tab.active::after, .settings-tabs .settings-main-tab.active::after {
+    right: calc(-1 * var(--tab-flare, 0));
+    background: radial-gradient(circle at top right, transparent var(--tab-flare, 0), var(--tab-edge) var(--tab-flare, 0), var(--tab-edge) calc(var(--tab-flare, 0) + 1px), var(--tab-fill) calc(var(--tab-flare, 0) + 1px));
+}
+/* futuristic = square, normal = flat → no feet (also kills any 0-size pseudo artifact from old futuristic ::after). */
+[data-theme="futuristic"] .app-header .tab.active::before, [data-theme="futuristic"] .app-header .tab.active::after,
+[data-theme="futuristic"] .settings-tabs .settings-main-tab.active::before, [data-theme="futuristic"] .settings-tabs .settings-main-tab.active::after,
+[data-theme="normal"] .app-header .tab.active::before, [data-theme="normal"] .app-header .tab.active::after,
+[data-theme="normal"] .settings-tabs .settings-main-tab.active::before, [data-theme="normal"] .settings-tabs .settings-main-tab.active::after { content: none; }
+/* Organic header-tab feet flare into the green bar (match the tab fill). */
+[data-theme="organic"] .app-header .tab.active { --tab-fill: #6f9b4d; }
 /* Studio depth: the toolbar's bevel is RAISED (light top edge), so it sits ABOVE the header in the
    colour hierarchy — toolbar lightest (sv-1), header darker (sv-3). Active tab = toolbar colour,
    inactive tab = header colour. */
@@ -2562,8 +2585,8 @@ Middle (handle) {
     box-shadow: none; text-shadow: none; filter: none; transform: none; cursor: pointer; transition: 120ms;
 }
 .settings-tabs .settings-main-tab:hover { color: var(--text-main); background: color-mix(in srgb, var(--bg) 45%, transparent); }
-.settings-tabs .settings-main-tab.active { color: var(--text-main); background: var(--bg);
-    box-shadow: inset 0 1px 0 var(--border), inset 1px 0 0 var(--border), inset -1px 0 0 var(--border); }
+.settings-tabs .settings-main-tab.active { --tab-fill: var(--bg); color: var(--text-main); background: var(--tab-fill);
+    box-shadow: inset 0 1px 0 var(--tab-edge), inset 1px 0 0 var(--tab-edge), inset -1px 0 0 var(--tab-edge); }
 /* Sub-tab bar connects to the body: drop its bottom border (the colored line) + bottom padding so the active
    tab's var(--bg) fill meets the content with no seam. body-prefixed to beat the per-app .settings-head rules. */
 body #macros-app .settings-head, body #settings-app .settings-head, body .gateway-app .settings-head {
