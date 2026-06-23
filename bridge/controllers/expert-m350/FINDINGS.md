@@ -468,9 +468,19 @@ behavior → provably no motion; human-gated on header=G59 + Abs==Mach). Forms:
   so literal-G53 acceptance changes no generated code. `[NOT PURSUED]`
 ⇒ **Net V3 verdict:** `G53 <axis>#var` is accepted **with or without G0** — dialect emit form CONFIRMED. The
   linter's bare-const-G53 warning can stay (literals unverified, and `#var` is house style anyway).
-- ⚠️ **Spin-off `[HYPOTHESIS]`:** **IF comparison against a negative decimal literal may misbehave** (suspected
-  cause of the V3c/V3d aborts). If true, the dialect's `ifGoto` should avoid emitting `IF ... <op> -<decimal>`
-  — prime the literal into a `#var` and compare vars. **Worth a dedicated 2-line test before relying on it.**
+- ✅ **Spin-off RESOLVED:** the "IF vs negative-decimal misbehaves" hypothesis was **REFUTED** on machine
+  (2026-06-23, `IF_neg_test.nc`) — negative-decimal compares evaluate correctly. `ifGoto` may emit them. The
+  V3c/V3d aborts were the guard/Z-position/Esc, not a parser bug. See CORE_TRUTH discrepancies below.
+
+## V5 RESULT — soft-limit ±9999 = per-axis "no limit" sentinel `[CONFIRMED on machine 2026-06-23, fw 2025-06-19-00]`
+Ran `verify/V5_read_softlimits.nc` (read-only, macro `+500` copies of the soft-limit params). Read:
+**`#655 enable = 1`** (soft limits **globally ON**), yet **`#661 negX = −9999.0`, `#663 negZ = −9999.0`,
+`#668 posZ = +9999.0`** — all the ±9999 sentinel. Matches the dump exactly. ⇒ **±9999 is a per-axis
+"this end is unbounded" sentinel that holds EVEN when the global enable (`#655`) is 1** — the global flag
+does not imply every axis end is bounded. **Phase-2 envelope rule: treat ±9999 as "no limit" (do NOT draw a
+±9999 box); read each end's value, not just `#655`.** Also confirms the macro-space `+500` mapping
+(`setting #155→macro #655`, `#161/#163/#168 → #661/#663/#668`). Real (non-sentinel) travel values, if any,
+live on the *other* ends (e.g. profile-diff candidates `#162`/`#166`) — not read here. `[CONFIRMED]`
 
 ### CORE_TRUTH (skill) vs factory-firmware reality — discrepancies the linter exposed
 - **G10:** skill says "G10 is broken." **V1 (above) CONFIRMS broken + dangerous on this fw** (`G10 L20 P6 X25`
@@ -479,6 +489,19 @@ behavior → provably no motion; human-gated on header=G59 + Abs==Mach). Forms:
 - **`#2070` range:** skill says "only #50–#499," but factory `key-4.nc` does `#2070=800` → silent-failure is specific to **persistent** targets, not all >499.
 - **Priming bug:** skill says wash the RHS (`#1153=#880+0`); production `O_Save_Safe_Park.nc` instead **primes the target first** (`#1153=1` then `#1153=#880`). Two working approaches — linter accepts both.
 - **Real bug found:** skill's `macro_Thread_milling.nc:72` has a bracket imbalance (`FUP[[[[…]/2-#71]/#57]` = 4 `[` vs 3 `]`).
+- **FANUC word operator `EQ` WORKS `[CONFIRMED on machine 2026-06-23, V10_operators.nc]`:** `IF #100 EQ 5 GOTO1`
+  branched correctly (`EQ_branched=1`). Contradicts the skill's "`EQ`/`NE` unreliable — use C-style only." At
+  least `EQ` is valid here; `NE`/`LT`/`GT` untested. Dialect can keep emitting symbolic `==`/`!=` (also proven),
+  but the linter should NOT flag `EQ` as an error on the Expert. (`NE` still worth a 1-line check before relying.)
+- **`GOTO <space> <label>` is ACCEPTED `[CONFIRMED on machine 2026-06-23, V11_gotospace.nc]`:** `IF #100==5 GOTO 1`
+  (space before the label) branched (`gotospace_ran=1`). Contradicts the linter's `E-GOTOSPACE` rule — the Expert
+  parser tolerates the space. Keep emitting the no-space `GOTO1` house style for portability, but **`E-GOTOSPACE`
+  should be a warning at most on the Expert, not an error.**
+- **Negative-decimal `IF` compare WORKS — hypothesis REFUTED `[CONFIRMED on machine 2026-06-23, IF_neg_test.nc]`:**
+  with `#100=-5`, both `IF #100>-4.99` and `IF #100<-5.01` evaluated correctly (FALSE → no branch; `Afired=0
+  Bfired=0`). ⇒ the parser handles `IF … <op> -<decimal>` fine; **`ifGoto` may emit negative-decimal operands.**
+  So the V3c/V3d literal-G53 aborts were the guard/Z-position/Esc, **not** a parser bug (and literal-G53 stays
+  low-value since the dialect emits `#var`). (First run hit a nested-paren COMMENT bug — my error — now fixed.)
 
 ## Error-readback options (ranked)
 1. **Serial Modbus (best):** a `sysstart`/dispatcher macro periodically `MSETDATA`s the alarm/status
