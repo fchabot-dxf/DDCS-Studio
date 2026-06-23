@@ -605,6 +605,11 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 }
 .editor-container .op-edit-chip:hover { filter: brightness(1.1); box-shadow: 0 2px 13px rgba(0,0,0,.48), 0 0 0 4px color-mix(in srgb, var(--accent, #0ea5e9) 42%, transparent); }
 .editor-container .op-edit-chip:disabled { background: var(--panel, #334); color: var(--text-dim, #9aa); cursor: default; box-shadow: none; border-color: transparent; }
+/* Mobile: the 3D preview slides up from the bottom and covered the bottom-left Transform button — move it to the
+   top-right, clear of the preview (!important beats the button's inline left/bottom/z-index). */
+@media (max-width: 860px) {
+    #align-rotate-btn { left: auto !important; right: 8px !important; top: 8px !important; bottom: auto !important; z-index: 14 !important; }
+}
 .op-edit-chip[hidden] { display: none; }
 
 /* Studio editor autocomplete — phone-autocorrect-style float at the caret. */
