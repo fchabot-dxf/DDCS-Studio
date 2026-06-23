@@ -41,6 +41,14 @@ test('drill 2D layout canvas: renders + drag handle drives a field', async ({ pa
 
   console.log('CONSOLE ERRORS:', JSON.stringify(errors, null, 2));
   expect(handleCount).toBeGreaterThan(0);
+
+  // FIX B: the unhelpful raw "dx" delta readout is dropped. Switch back to the grid pattern (which carried it),
+  // and confirm no on-canvas handle label shows the "dx" text — while the useful named labels (Ø) still render.
+  await page.selectOption('#d_pattern', 'grid');
+  await page.waitForTimeout(80);
+  const labels = await page.locator('#drillLayoutCanvas .fc-handle-label').allTextContents();
+  console.log('grid handle labels:', JSON.stringify(labels));
+  expect(labels.some((t) => /\bdx\b/i.test(t)), 'no raw dx delta readout label').toBeFalsy();
   expect(Number(diaAfter)).not.toBe(Number(diaBefore));
   expect(errors).toEqual([]);
 });

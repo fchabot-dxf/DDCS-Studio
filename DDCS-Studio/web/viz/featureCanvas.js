@@ -329,7 +329,11 @@ export class FeatureCanvas {
             } else {
                 handles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 6, class: 'fc-handle' }));
             }
-            if (h.label) {
+            // Raw axis-delta readouts (the grid "dx"/"dy" labels) are unhelpful clutter — the handle stays
+            // draggable (it still drives its field), we just drop its on-canvas text. Useful named dimensions
+            // (Ø, W, pitch, …) keep their click-to-edit value label.
+            const rawDelta = /^d[xy]$/i.test(String(h.label || ''));
+            if (h.label && !rawDelta) {
                 const t = svgEl('text', { x: c.x + 10, y: c.y - 8, class: 'fc-handle-label' });
                 if (h.value != null && this.spec.onEdit) {
                     // Centroid-style: the dimension shows its VALUE and is click-to-edit (type, don't just drag).

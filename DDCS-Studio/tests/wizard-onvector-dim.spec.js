@@ -9,13 +9,15 @@ test('drill canvas dimension label shows the value and is click-to-edit', async 
   await page.waitForFunction(() => window.ddcsStudio);
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
   await page.waitForSelector('#wiz_drill', { state: 'visible' });
+  // Use the bolt-circle Ø dimension — a useful NAMED click-to-edit label (the raw grid "dx" delta readout was
+  // dropped as unhelpful clutter, but the click-to-edit mechanism itself is what this test covers).
   await page.evaluate(() => {
-    const e = document.getElementById('d_pattern'); if (e) { e.value = 'grid'; e.dispatchEvent(new Event('input', { bubbles: true })); }
+    const e = document.getElementById('d_pattern'); if (e) { e.value = 'circle'; e.dispatchEvent(new Event('input', { bubbles: true })); }
     window.ddcsStudio.wizardManager.update();
   });
 
-  // the spacing dimension shows its value on the canvas
-  const dim = page.locator('#drillLayoutCanvas .fc-handle-label', { hasText: 'dx' });
+  // the diameter dimension shows its value on the canvas
+  const dim = page.locator('#drillLayoutCanvas .fc-handle-label', { hasText: 'Ø' });
   await expect(dim).toHaveCount(1);
 
   // click it → inline editor → type a precise value → the field updates
@@ -24,5 +26,5 @@ test('drill canvas dimension label shows the value and is click-to-edit', async 
   await expect(inp).toHaveCount(1);
   await inp.fill('35');
   await inp.press('Enter');
-  await expect(page.locator('#d_dx')).toHaveValue('35');
+  await expect(page.locator('#d_dia')).toHaveValue('35');
 });
