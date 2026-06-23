@@ -2546,12 +2546,22 @@ Middle (handle) {
 [data-theme="studio"] .settings-subtabs button.settings-tab:active {
     background: rgba(255,255,255,0.14);
     border: 1px solid rgba(255,255,255,0.45);
-    color: #fff; border-radius: 5px;
+    color: #1a1205; border-radius: 5px;
     text-shadow: none; box-shadow: none; transform: none;
 }
 [data-theme="studio"] button.settings-main-tab:not(.active),
 [data-theme="studio"] .settings-subtabs button.settings-tab:not(.active) {
-    background: transparent; border-color: transparent; color: rgba(255,255,255,0.7);
+    background: transparent; border-color: transparent; color: rgba(0,0,0,0.55);
+}
+
+/* Every OTHER theme: the top-bar tabs are UNDERLINE-ONLY — strip the theme's generic button border/fill/shadow
+   so only the .active ::after underline shows. Shared by Settings, Macros AND the Gateway. (Un-scoping the base
+   rule dropped its specificity below `[data-theme="x"] button`, which is why the button skin leaked through.) */
+[data-theme="steampunk"] button.settings-main-tab,  [data-theme="steampunk"] button.settings-main-tab:hover,  [data-theme="steampunk"] button.settings-main-tab:active,
+[data-theme="normal"] button.settings-main-tab,     [data-theme="normal"] button.settings-main-tab:hover,     [data-theme="normal"] button.settings-main-tab:active,
+[data-theme="futuristic"] button.settings-main-tab, [data-theme="futuristic"] button.settings-main-tab:hover, [data-theme="futuristic"] button.settings-main-tab:active,
+[data-theme="organic"] button.settings-main-tab,    [data-theme="organic"] button.settings-main-tab:hover,    [data-theme="organic"] button.settings-main-tab:active {
+    background: transparent; border: none; box-shadow: none; text-shadow: none; transform: none; filter: none;
 }
 
 /* --- Virtual numpad (comm wizard) → electric-blue keys --- */
