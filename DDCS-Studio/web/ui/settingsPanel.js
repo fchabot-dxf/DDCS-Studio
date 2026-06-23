@@ -138,6 +138,26 @@ const SETTINGS_DEFAULTS = {
         x: { role: 'linear' }, y: { role: 'linear' }, z: { role: 'linear' },
         a: { role: 'unused', around: 'x' },
         b: { role: 'unused', around: 'y' }
+    },
+    // Persisted machine HOMING profile — authored in the Homing Setup modal, consumed by the Homing wizard.
+    // PER-AXIS: enable, order (1..N — lower homes first), method, direction, feeds, back-off, home offset.
+    //   method: 'native'  — controller built-in M98 P501 X<idx> (safest; uses the controller's own config + flag)
+    //           'seek'     — low-level switch-seek + back-off + slow re-seek (M98 P503), composed in the macro
+    //           'setzero'  — set current position AS home (#[880+N]=0, #[1515+N]=1) — NO motion
+    //   slaveFollows: ''|axisIdx — a dual-axis gantry SLAVE; homing this (master) axis syncs the slave coord +
+    //                 marks it homed (#883=#881; #1518=1). Gantry SQUARING is manual — Studio emits no auto-square.
+    //   rotary: 'setzero' | 'switch' ; continuous = mod-360 wrap (A/B/C)
+    // order philosophy: 'sequential' (by the order field — default; Z(1) X(2) Y(3) per fndzero.nc) | 'simultaneous'
+    // Defaults mirror fndzero.nc: Z first (order 1), X (2), Y (3, A slaved). softLimits = re-enable #655 after homing.
+    homing: {
+        philosophy: 'sequential', softLimits: true,
+        axes: {
+            x: { enable: true,  order: 2, method: 'native', dir: '-', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
+            y: { enable: true,  order: 3, method: 'native', dir: '-', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
+            z: { enable: true,  order: 1, method: 'native', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
+            a: { enable: false, order: 4, method: 'setzero', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'setzero', continuous: true },
+            b: { enable: false, order: 5, method: 'setzero', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'setzero', continuous: true }
+        }
     }
 };
 
@@ -183,6 +203,26 @@ function syncFlatFromIO(s) {
     }
 }
 
+// Deep-merge a persisted homing config over the defaults: top-level scalars, then per-axis fields, so a partial
+// save can't drop fields. Idempotent. A legacy 'zfirst' philosophy maps to 'sequential' (the order field now
+// drives the sequence); a legacy per-axis method:'dual' (auto-squaring, removed) falls back to native + its slave.
+function mergeHoming(p) {
+    const D = SETTINGS_DEFAULTS.homing;
+    const philosophy = (p && p.philosophy === 'simultaneous') ? 'simultaneous' : 'sequential';
+    const out = { philosophy, softLimits: p ? p.softLimits !== false : D.softLimits, axes: {} };
+    for (const ax of ['x', 'y', 'z', 'a', 'b']) {
+        const da = D.axes[ax], pa = (p && p.axes && p.axes[ax]) || {};
+        const merged = { ...da, ...pa };
+        delete merged.dual;                                        // drop the removed auto-squaring sub-config
+        if (merged.method === 'dual') {                            // legacy dual → native master; keep its slave sync
+            merged.method = 'native';
+            if (!merged.slaveFollows && pa.dual && pa.dual.slaveIdx != null) merged.slaveFollows = String(pa.dual.slaveIdx);
+        }
+        out.axes[ax] = merged;
+    }
+    return out;
+}
+
 let _ddcsSettings = loadSettings();
 // Migrate any legacy dense / bare-number tool storage to the sparse library shape (one pass, idempotent).
 if (_ddcsSettings.atc) _ddcsSettings.atc.tools = libraryTools(_ddcsSettings.atc);
@@ -209,6 +249,7 @@ function loadSettings() {
                 spindle: { ...SETTINGS_DEFAULTS.spindle, ...(p.spindle || {}) },
                 endProgram: { ...SETTINGS_DEFAULTS.endProgram, ...(p.endProgram || {}) },
                 motors: { ...SETTINGS_DEFAULTS.motors, ...(p.motors || {}) },
+                homing: mergeHoming(p.homing),
                 inputs: Array.isArray(p.inputs) ? p.inputs : [],
                 outputs: Array.isArray(p.outputs) ? p.outputs : [],
                 macros: Array.isArray(p.macros) ? p.macros : [],
@@ -386,6 +427,127 @@ function commitMachine() {
     saveSettings();
 }
 
+// ── HOMING profile (Machine tab section) ──────────────────────────────────────────────────────────────────
+// Per-axis homing config, rendered + edited inline (no separate modal). Travel/home-direction reference the
+// envelope above (machine.x/y/z); this section adds per-axis method/feeds/back-off/offset + sequence order +
+// dual-axis SLAVE SYNC ("Slave follows") + rotary mode. (Auto-squaring is NOT emitted — the operator squares the
+// gantry manually; Studio only syncs the slave coordinate when the master homes.) Commits live via saveSettings().
+const HOMING_AX_IDX = { x: 0, y: 1, z: 2, a: 3, b: 4 }, HOMING_AX_LABEL = { x: 'X', y: 'Y', z: 'Z', a: 'A', b: 'B' };
+const HOMING_METHODS = [
+    { v: 'native', label: 'Native (M98 P501)' }, { v: 'seek', label: 'Switch-seek (M98 P503)' },
+    { v: 'setzero', label: 'Set current as home' },
+];
+function homingConfiguredAxes() {
+    const m = (_ddcsSettings.motors) || {};
+    const out = ['x', 'y', 'z'];
+    if (m.a && m.a.role && m.a.role !== 'unused') out.push('a');
+    if (m.b && m.b.role && m.b.role !== 'unused') out.push('b');
+    return out;
+}
+function homingPostIsExpert() {
+    try {
+        const ap = localStorage.getItem('ddcs_active_post');
+        if (ap && ap !== 'auto') return ap === 'ddcs-expert-m350';
+        return (localStorage.getItem('ddcs_controller_profile') || 'ddcs-expert-m350') === 'ddcs-expert-m350';
+    } catch (_) { return true; }
+}
+function renderHomingGui() {
+    const host = document.getElementById('set_homing_axes'); if (!host) return;
+    const h = _ddcsSettings.homing || (_ddcsSettings.homing = JSON.parse(JSON.stringify(SETTINGS_DEFAULTS.homing)));
+    const cfg = h.axes || {};
+    const expert = homingPostIsExpert();
+    const list = homingConfiguredAxes();
+    const tag = document.getElementById('set_homing_tag');
+    if (tag) tag.textContent = expert ? 'DDCS Expert M350 — full methods available.' : 'Active post is unverified for homing — native home only; advanced methods are disabled.';
+    if (document.getElementById('set_homing_simul')) document.getElementById('set_homing_simul').checked = h.philosophy === 'simultaneous';
+    if (document.getElementById('set_homing_softlimits')) document.getElementById('set_homing_softlimits').checked = h.softLimits !== false;
+
+    const ordered = [...list].sort((p, q) => ((cfg[p] || {}).order || HOMING_AX_IDX[p] + 1) - ((cfg[q] || {}).order || HOMING_AX_IDX[q] + 1));
+    const methodOpts = (sel) => HOMING_METHODS.map((m) => {
+        const dis = !expert && m.v !== 'native';
+        return `<option value="${m.v}"${m.v === sel ? ' selected' : ''}${dis ? ' disabled title="Unverified on this post"' : ''}>${m.label}</option>`;
+    }).join('');
+    const followOpts = (sel) => `<option value="">none</option>` + list.map((a) => `<option value="${HOMING_AX_IDX[a]}"${String(HOMING_AX_IDX[a]) === String(sel) ? ' selected' : ''}>${HOMING_AX_LABEL[a]} (idx ${HOMING_AX_IDX[a]})</option>`).join('');
+
+    host.innerHTML = ordered.map((ax, pos) => {
+        const c = cfg[ax] || {}, rotary = ax === 'a' || ax === 'b';
+        return `<div class="homing-axis-row" data-axis="${ax}" style="border:1px solid var(--border); border-radius:6px; padding:8px 10px; margin-bottom:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-size:11px; font-weight:700;">${pos + 1}</span>
+                <button type="button" class="hm-up" title="Home earlier" style="cursor:pointer;">▲</button>
+                <button type="button" class="hm-down" title="Home later" style="cursor:pointer;">▼</button>
+                <label style="font-weight:600;"><input type="checkbox" class="hm-enable" ${c.enable !== false ? 'checked' : ''}/> ${HOMING_AX_LABEL[ax]}</label>
+                <input type="hidden" class="hm-order" value="${pos + 1}">
+                <label style="font-size:12px;">Method <select class="hm-method">${methodOpts(c.method || 'native')}</select></label>
+                <label style="font-size:12px;">Dir <select class="hm-dir"><option value="+"${(c.dir || '-') === '+' ? ' selected' : ''}>+</option><option value="-"${(c.dir || '-') === '-' ? ' selected' : ''}>−</option></select></label>
+            </div>
+            <div class="hm-motion" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <label>Seek feed <input type="number" class="hm-seekfeed" value="${num(c.seekFeed, 800)}" style="width:60px;"></label>
+                <label>Back-off <input type="number" class="hm-backoff" value="${num(c.backoff, 5)}" step="0.5" style="width:54px;"></label>
+                <label>Slow feed <input type="number" class="hm-slowfeed" value="${num(c.slowFeed, 100)}" style="width:60px;"></label>
+                <label>Home offset <input type="number" class="hm-offset" value="${num(c.offset, 0)}" step="0.5" style="width:54px;"></label>
+            </div>
+            <div class="hm-slave" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <label title="Dual-axis gantry: homing this axis syncs the slave's coordinate and marks it homed. Squaring is done manually by the operator.">Slave axis follows <select class="hm-follow">${followOpts(c.slaveFollows)}</select></label>
+            </div>
+            ${rotary ? `<div class="hm-rotary" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <label>Rotary <select class="hm-rotmode"><option value="setzero"${(c.rotary || 'setzero') === 'setzero' ? ' selected' : ''}>set zero</option><option value="switch"${(c.rotary || 'setzero') === 'switch' ? ' selected' : ''}>switch home</option></select></label>
+                <label><input type="checkbox" class="hm-continuous" ${c.continuous ? 'checked' : ''}/> continuous (mod 360)</label>
+            </div>` : ''}
+        </div>`;
+    }).join('');
+
+    host.querySelectorAll('.homing-axis-row').forEach((row) => {
+        const methodSel = row.querySelector('.hm-method');
+        const sync = () => {
+            // Seek-path motion params (feeds/back-off) only matter for the switch-seek method.
+            row.querySelector('.hm-motion').style.display = methodSel.value === 'seek' ? 'flex' : 'none';
+        };
+        sync();
+        // Any field change commits + re-renders (so visibility tracks the method); reorder swaps order then commits.
+        row.querySelectorAll('input,select').forEach((f) => f.addEventListener('change', () => { commitHoming(); renderHomingGui(); }));
+        row.querySelector('.hm-up').addEventListener('click', () => homingMove(row.getAttribute('data-axis'), -1));
+        row.querySelector('.hm-down').addEventListener('click', () => homingMove(row.getAttribute('data-axis'), +1));
+    });
+}
+function commitHoming() {
+    const host = document.getElementById('set_homing_axes'); if (!host) return;
+    const h = _ddcsSettings.homing || (_ddcsSettings.homing = JSON.parse(JSON.stringify(SETTINGS_DEFAULTS.homing)));
+    const axes = h.axes || (h.axes = {});
+    host.querySelectorAll('.homing-axis-row').forEach((row, idx) => {
+        const ax = row.getAttribute('data-axis'), g = (s) => row.querySelector(s), prev = axes[ax] || {};
+        axes[ax] = {
+            ...prev,
+            enable: g('.hm-enable').checked,
+            order: num(g('.hm-order').value, idx + 1),
+            method: g('.hm-method').value,
+            dir: g('.hm-dir').value,
+            seekFeed: num(g('.hm-seekfeed').value, prev.seekFeed || 800),
+            backoff: num(g('.hm-backoff').value, prev.backoff || 5),
+            slowFeed: num(g('.hm-slowfeed').value, prev.slowFeed || 100),
+            offset: num(g('.hm-offset').value, prev.offset || 0),
+            slaveFollows: g('.hm-follow').value,
+            rotary: g('.hm-rotmode') ? g('.hm-rotmode').value : (prev.rotary || 'setzero'),
+            continuous: g('.hm-continuous') ? g('.hm-continuous').checked : !!prev.continuous,
+        };
+    });
+    const simul = document.getElementById('set_homing_simul'), soft = document.getElementById('set_homing_softlimits');
+    h.philosophy = (simul && simul.checked) ? 'simultaneous' : 'sequential';
+    h.softLimits = soft ? soft.checked : true;
+    saveSettings();
+}
+function homingMove(ax, delta) {
+    commitHoming();
+    const h = _ddcsSettings.homing, cfg = h.axes;
+    const list = homingConfiguredAxes().sort((p, q) => (cfg[p].order || 9) - (cfg[q].order || 9));
+    const i = list.indexOf(ax), j = i + delta;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    const a = cfg[list[i]], b = cfg[list[j]], t = a.order; a.order = b.order; b.order = t;
+    saveSettings();
+    renderHomingGui();
+}
+const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
+
 // The WCS table (G54–G59 offsets, machine coords of each part-zero) + which one is active. workOrigin (used by
 // the sim for G53/program placement) is derived from the active row. Pulled from the controller, editable offline.
 const WCS_NAMES = ['G54', 'G55', 'G56', 'G57', 'G58', 'G59'];
@@ -424,6 +586,7 @@ function renderWcsTable(host, machine) {
 }
 
 let _fillSettingsInputs = null;
+let _settingsNavTo = null;   // (group, panelId) → deep-link a tab (set after the overlay is built)
 
 // Merge incoming settings (e.g. from an imported / cloud-loaded profile), persist, and refresh the panel.
 // Restores the FULL persisted config (mirrors the load-merge) so a loaded profile brings back the magazine,
@@ -440,6 +603,7 @@ export function applySettings(incoming) {
     if (incoming.spindle) S.spindle = { ...D.spindle, ...S.spindle, ...incoming.spindle };
     if (incoming.endProgram) S.endProgram = { ...D.endProgram, ...S.endProgram, ...incoming.endProgram };
     if (incoming.motors) S.motors = { ...D.motors, ...S.motors, ...incoming.motors };
+    if (incoming.homing) S.homing = mergeHoming({ ...S.homing, ...incoming.homing, axes: { ...((S.homing || {}).axes || {}), ...((incoming.homing || {}).axes || {}) } });
     if (incoming.hardwareTabs) S.hardwareTabs = { ...D.hardwareTabs, ...S.hardwareTabs, ...incoming.hardwareTabs };
     if (incoming.preview) S.preview = { ...D.preview, ...S.preview, ...incoming.preview };
     if (incoming.compose) S.compose = { ...D.compose, ...S.compose, ...incoming.compose };
@@ -766,6 +930,17 @@ function buildSettingsOverlay() {
                             <label>A — spins around<select id="set_axis_a_around"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></label>
                             <label>B — role<select id="set_axis_b_role"><option value="unused">Unused</option><option value="linear">Linear</option><option value="rotary">Rotary</option></select></label>
                             <label>B — spins around<select id="set_axis_b_around"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></label>
+                        </div>
+                    </div>
+                    <div class="settings-section" id="set_homing_section">
+                        <div class="settings-section-title">HOMING</div>
+                        <div class="settings-hint">Per-axis homing profile, used by the <b>Homing wizard</b>. Travel + home direction come from the envelope above. <b>Native</b> runs the controller's built-in home (safest). The numbered list sets the home <b>sequence</b> (▲▼ to reorder; default Z→X→Y). For a dual-axis gantry, set the master's <b>slave axis follows</b> so homing the master syncs the slave (squaring stays manual). The switch-seek method is DDCS Expert M350 only.</div>
+                        <div id="set_homing_tag" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
+                        <label class="settings-check" style="margin-bottom:6px;"><input type="checkbox" id="set_homing_simul"> Simultaneous (emit calls back-to-back, still in this order)</label>
+                        <div id="set_homing_axes"></div>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;">
+                            <button class="toolbar-btn settings-io" id="set_homing_reset" type="button">↺ Safe default (Z → X → Y)</button>
+                            <label class="settings-check"><input type="checkbox" id="set_homing_softlimits"> Re-enable soft limits after homing (#655)</label>
                         </div>
                     </div>
                 </div>
@@ -1133,6 +1308,7 @@ function wireSettingsOverlay(ov) {
         q('set_mach_y').value = s.machine.y;
         q('set_mach_z').value = s.machine.z;
         renderMachineGui();
+        renderHomingGui();
         renderWcsTable(q('set_mach_wcs_table'), s.machine);
         q('set_mach_show').checked = !!s.machine.show;
         if (q('set_axis_a_role')) {
@@ -1998,6 +2174,7 @@ function wireSettingsOverlay(ov) {
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
         sideTabs.forEach(b => b.classList.toggle('active', b.dataset.target === id));
+        if (id === 'set_tab_machine') { renderMachineGui(); renderHomingGui(); }   // axis list tracks motors; re-render on open
         if (id === 'set_tab_input') renderIoTable(ov.querySelector('#io_input_table'), 'input', getInputs(), syncIO);
         if (id === 'set_tab_output') renderIoTable(ov.querySelector('#io_output_table'), 'output', getOutputs(), syncIO);
         if (id === 'set_tab_atc') renderMagazineTable(ov.querySelector('#atc_magazine'), _ddcsSettings.atc, atcOnChange);
@@ -2013,6 +2190,9 @@ function wireSettingsOverlay(ov) {
     }
     mainTabs.forEach(t => t.addEventListener('click', () => showGroup(t.dataset.group)));
     sideTabs.forEach(t => t.addEventListener('click', () => showPanel(t.dataset.target)));
+    // Expose group+panel navigation so callers (e.g. the Homing wizard's "⚙ Homing setup" link) can deep-link
+    // to Settings → Hardware → Machine where the homing section now lives.
+    _settingsNavTo = (group, panelId) => { showGroup(group); if (panelId) showPanel(panelId); };
     // Cross-link: Hardware → Head's "sim appearance" jumps to the Preview tab (General) where the head body dims live.
     const _headSimLink = q('set_head_simlink');
     if (_headSimLink) _headSimLink.addEventListener('click', () => { showGroup('general'); showPanel('set_tab_preview'); });
@@ -2022,6 +2202,15 @@ function wireSettingsOverlay(ov) {
     ['set_pv_probe_body_dia', 'set_pv_probe_body_len', 'set_pv_probe_stylus_len', 'set_pv_probe_ball_dia'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderProbeGui); el.addEventListener('change', commitProbeDims); } });
     // Machine envelope GUI: typing redraws the iso box (origin follows the signs); on commit persist so the 3D updates.
     ['set_mach_x', 'set_mach_y', 'set_mach_z'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderMachineGui); el.addEventListener('change', commitMachine); } });
+    // Homing section: the two top-level toggles commit on change; Reset renumbers the order to the safe Z→X→Y.
+    ['set_homing_simul', 'set_homing_softlimits'].forEach(id => { const el = q(id); if (el) el.addEventListener('change', commitHoming); });
+    const _homingReset = q('set_homing_reset');
+    if (_homingReset) _homingReset.addEventListener('click', () => {
+        commitHoming();
+        const cfg = (_ddcsSettings.homing || {}).axes || {}, rank = { z: 1, x: 2, y: 3, a: 4, b: 5 };
+        for (const ax in cfg) cfg[ax].order = rank[ax] || 9;
+        saveSettings(); renderHomingGui();
+    });
     showGroup('general');
 
     // "+ Add hardware" tool: adds a subsystem category tab + its standard I/O (mirrored + badged).
@@ -2087,7 +2276,7 @@ function wireSettingsOverlay(ov) {
 
 function _settingsEsc(e) { if (e.key === 'Escape') { e.stopPropagation(); closeSettings(); } }
 
-export function openSettings() {
+export function openSettings(nav) {
     // Opening setup leaves the Studio preview context — stop any running engine/play (every preview panel +
     // Studio's drawer), any open path, so nothing keeps executing behind the panel.
     window.dispatchEvent(new CustomEvent('ddcs:stop-previews'));
@@ -2101,8 +2290,17 @@ export function openSettings() {
             ov.dataset.wired = '1';
         }
     }
+    // Optional deep-link: { group, panel } — e.g. open straight to Hardware → Machine (homing section).
+    if (nav && _settingsNavTo) { try { _settingsNavTo(nav.group, nav.panel); } catch (_) { /* noop */ } }
     document.addEventListener('keydown', _settingsEsc, true);
     window.ddcsTrack?.('feature', 'settings');
+}
+
+/** Open Settings at the Machine tab and scroll to the homing section (the wizard's "⚙ Homing setup" link). */
+export function openHomingSetup() {
+    if (window.showApp) { try { window.showApp('settings'); } catch (_) { /* noop */ } }
+    openSettings({ group: 'hardware', panel: 'set_tab_machine' });
+    setTimeout(() => { const s = document.getElementById('set_homing_section'); if (s && s.scrollIntoView) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
 }
 export function closeSettings() {
     const ov = document.getElementById('settings-overlay');
