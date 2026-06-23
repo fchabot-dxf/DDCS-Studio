@@ -35,6 +35,12 @@ export function setupJogPendant(viz) {
                     <button class="toolbar-btn" data-axis="y" data-dir="-1" style="font-weight:bold; padding:0;">Y-</button>
                     <button class="toolbar-btn" data-axis="x" data-dir="1" style="font-weight:bold; padding:0;">X+</button>
                 </div>
+                <div class="jog-a-row" style="display: none; align-items: center; gap: 6px; margin-top: 6px;">
+                    <span style="color:#9fb4c8;">A</span>
+                    <button class="toolbar-btn" data-axis="a" data-dir="-1" title="Rotate the part about the 4th axis (− degrees)" style="font-weight:bold; padding:2px 10px;">A−</button>
+                    <button class="toolbar-btn" data-axis="a" data-dir="1" title="Rotate the part about the 4th axis (+ degrees)" style="font-weight:bold; padding:2px 10px;">A+</button>
+                    <span style="color:#5f6b7a; font-size:10px;">deg</span>
+                </div>
             </div>
         `;
         viz.container.appendChild(div);
@@ -51,7 +57,10 @@ export function setupJogPendant(viz) {
                 const dir = parseFloat(btn.getAttribute('data-dir'));
                 const stepBtn = div.querySelector('.jog-step-cycle');
                 const step = stepBtn ? parseFloat(stepBtn.dataset.step) : 1;
-                
+
+                // A = manual 4th-axis rotation (degrees), not a start-marker move. Spins the part in the preview.
+                if (axis === 'a') { if (viz.rotaryJogA) viz.rotaryJogA(dir * step); return; }
+
                 const idx = viz.selectedStart || 0;
                 if (viz.starts && viz.starts[idx]) {
                     const s = viz.starts[idx]; // jog the selected start (see the Start selector)

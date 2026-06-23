@@ -483,6 +483,15 @@ export class GcodeViz3D {
         this._animRaf = requestAnimationFrame(() => this._animTick());
     }
 
+    // Manual A-axis jog: spin the part by deltaDeg about the rotary axis (no program needed). Accumulates into
+    // _jogA; programs still override the rotation during playback (the play loop calls _applyPartRotation each
+    // frame). Re-applied after setStock so a stock rebuild keeps the jogged angle.
+    rotaryJogA(deltaDeg) {
+        this._jogA = (this._jogA || 0) + (Number(deltaDeg) || 0);
+        this._applyPartRotation(this._jogA, 0);
+        this.render();
+    }
+
     // Spin the part group to the given rotary angles (degrees). A spins around its declared
     // Cartesian axis (getRotaryAxes), defaulting to X; B around its declared axis, if any.
     _applyPartRotation(a, b) {
@@ -971,6 +980,7 @@ export class GcodeViz3D {
             // per-stock bed. So nothing extra to draw here.
         }
         this.partFrame.update(this._partShift());   // stock pin / WCS may have changed → re-place op+stock at the stock's WCS
+        if (this._jogA) this._applyPartRotation(this._jogA, 0);   // keep a manual A jog after a stock rebuild (set above to rest)
     }
 
     /**
@@ -1034,9 +1044,17 @@ export class GcodeViz3D {
      *  Only the rotary probe wizards turn this on (mirrors setMagazine for ATC), so it never appears elsewhere. */
     setRotaryFixture(on) {
         on = !!on;
+        this._showRotaryJog(on);   // rotary op → reveal the manual A± jog row (hidden for non-rotary ops)
         if (on === this._showRotaryFixture) return;
         this._showRotaryFixture = on;
         if (this._stock) this.setStock(this._stock);   // rebuild the stock so the rig appears/disappears
+    }
+
+    /** Show/hide the manual A-axis jog row in the jog pendant. Only rotary ops (which set the 4th-axis fixture)
+     *  show it, so a non-rotary op never offers an A jog. The pendant wires it (setupJogPendant). */
+    _showRotaryJog(on) {
+        const row = this.jogPendant && this.jogPendant.querySelector('.jog-a-row');
+        if (row) row.style.display = on ? '' : 'none';
     }
 
     // Tool Setter Block
