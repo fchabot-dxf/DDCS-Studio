@@ -192,6 +192,21 @@ class Ops:
         if self._detect_cache and self._detect_cache[0] == dest:
             return self._detect_cache[1]
         result = self._fingerprint_sysdisk(self._sysdisk_path())
+        if result.get("family") == "unknown":
+            # Firmware `.out` missing/ambiguous → fall back to the `setting` param COUNT, a reliable
+            # discriminator the validator already relies on: a V4.1's setting has ~1500 params, an
+            # Expert/M350's ~1000 (see controllers/v4.1 + _EXPECTED_PARAM_COUNT). Keeps a V4.1 from
+            # defaulting to the Expert baseline (which then false-flags a profile MISMATCH).
+            try:
+                params = self._read_setting_params()
+            except Exception:
+                params = None
+            if params is not None:
+                n = len(params)
+                fam = "v4.1" if n >= 1400 else "expert-m350" if 900 <= n <= 1100 else "unknown"
+                if fam != "unknown":
+                    result = {**result, "family": fam,
+                              "signals": {**result.get("signals", {}), "paramCount": n, "via": "param-count"}}
         self._detect_cache = (dest, result)
         return result
 
@@ -440,6 +455,11 @@ class Ops:
         sanity-checks the decode via known anchors, so a wrong share / wrong-size dump / ATC-misconfig
         surfaces (at startup and in the UI) instead of silently feeding Studio bad data. Pass `params`
         to reuse an already-read `setting` (profile() does this); otherwise it reads once."""
+        # The M350 baseline (1000 params + probes/limits + M350 anchors) doesn't apply to a V4.1: it has a
+        # different setting schema (~1500 params, different I/O indices) and serves its own builtin baseline,
+        # so validating it against the Expert profile would always false-flag a mismatch. Skip it.
+        if self.detect_controller().get("family") == "v4.1":
+            return {"ok": None, "reason": "V4.1 controller — uses its builtin baseline, not the M350 profile check"}
         if params is None:
             params = self._read_setting_params()
         if params is None:
