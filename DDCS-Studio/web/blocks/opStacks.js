@@ -262,21 +262,38 @@ const RECONCILERS = {
     atc_change(prog) {
         const all = flat(prog);
         const asn = (v) => all.find((b) => b.type === 'assign' && b.params && b.params.var === v);
-        const manual = all.some((b) => b.type === 'comment' && /Manual Tool Change/.test((b.params && b.params.text) || ''));
-        if (manual) {
+        const hasMcode = (c) => all.some((b) => b.type === 'mcode' && num(b.params.code, 0) === c);
+        const rawHas = (re) => all.some((b) => b.type === 'raw' && re.test((b.params && b.params.text) || ''));
+        const fixedFrom = (tgt) => { const tv = String((tgt && tgt.params.value) || '').trim(); return /^#/.test(tv) ? 0 : Math.round(num(tv, 0)); };
+
+        // FIRMWARE: raw O10102 push station (G53 Z#1306 + the #1320-1326 stations).
+        if (rawHas(/O10102/) || rawHas(/Z#1306/)) {
+            return { atc_change_method: 'firmware', atc_change_orient: hasMcode(19) };
+        }
+        // MANUAL: park XYZ in #1/#2/#3.
+        if (all.some((b) => b.type === 'comment' && /Manual Tool Change/.test((b.params && b.params.text) || ''))) {
             const x = asn('#1'), y = asn('#2'), z = asn('#3');
             if (!x || !y || !z) return null;
-            return { atc_change_mode: 'manual', atc_change_x: num(x.params.value, 100), atc_change_y: num(y.params.value, 100), atc_change_z: num(z.params.value, 0) };
+            return { atc_change_method: 'manual', atc_change_x: num(x.params.value, 100), atc_change_y: num(y.params.value, 100), atc_change_z: num(z.params.value, 0) };
         }
+        // M6: delegate to the controller (an M6 atom + change-position #103/#104; no #100 target table).
+        if (hasMcode(6) && !asn('#100')) {
+            const zc = asn('#102');
+            // fixedT is carried on the M6 note (T<n>) when a literal tool was chosen, else 0 (from program).
+            const m6 = all.find((b) => b.type === 'mcode' && num(b.params.code, 0) === 6);
+            const mt = /\bT(\d+)\b/.exec((m6 && m6.params.note) || '');
+            const f = { atc_change_method: 'm6', atc_change_fixedt: mt ? Math.round(num(mt[1], 0)) : 0 };
+            if (zc) f.atc_change_zclear = num(zc.params.value, 0);
+            return f;
+        }
+        // GENERIC / DISK: ASSUMED magazine pick & place (#100 target table).
         const tgt = asn('#100'), zc = asn('#102');
-        if (!tgt) return null;   // not an auto-change op (e.g. the "not available" stub)
-        // fixedT: a literal target tool was typed; a #var means "From program (M6 Txx)" → field value 0.
-        const tv = String(tgt.params.value || '').trim();
-        const fixedT = /^#/.test(tv) ? 0 : Math.round(num(tv, 0));
+        if (!tgt) return null;   // not a change op (e.g. the "not available" stub)
+        const disk = all.some((b) => b.type === 'comment' && /DISK \/ CAROUSEL/.test((b.params && b.params.text) || ''));
         const f = {
-            atc_change_mode: 'auto', atc_change_fixedt: fixedT,
-            atc_change_m300: all.some((b) => b.type === 'mcode' && num(b.params.code, 0) === 300),
-            atc_change_cover: all.some((b) => b.type === 'mcode' && num(b.params.code, 0) === 162),
+            atc_change_method: disk ? 'disk' : 'generic', atc_change_fixedt: fixedFrom(tgt),
+            atc_change_m300: hasMcode(300),
+            atc_change_cover: hasMcode(162),
             atc_change_confirm: all.some((b) => b.type === 'confirm'),
         };
         if (zc) f.atc_change_zclear = num(zc.params.value, 0);

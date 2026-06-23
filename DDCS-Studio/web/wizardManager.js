@@ -50,7 +50,7 @@ const PARAM_FIELDS = {
     comm: { type: 'c_type', msg: 'c_msg', val: 'c_val', cycle: 'c_cycle', popupMode: 'c_popup_mode', id: 'c_id', dest: 'c_dest', slot1: 'c_slot1', slot2: 'c_slot2', slot3: 'c_slot3', slot4: 'c_slot4', statusColor: 'c_status_color', statusMode: 'c_status_mode', statusDwell: 'c_status_dwell' },
     atc_check: { tolerance: 'atc_check_tol' },
     atc_warmup: { rpm1: 'atc_warmup_rpm1', time1: 'atc_warmup_time1', rpm2: 'atc_warmup_rpm2', time2: 'atc_warmup_time2' },
-    atc_change: { mode: 'atc_change_mode', x: 'atc_change_x', y: 'atc_change_y', z: 'atc_change_z', zClear: 'atc_change_zclear', fixedT: 'atc_change_fixedt', waitSpindle: 'atc_change_m300', dustCover: 'atc_change_cover', confirm: 'atc_change_confirm' },
+    atc_change: { method: 'atc_change_method', x: 'atc_change_x', y: 'atc_change_y', z: 'atc_change_z', zClear: 'atc_change_zclear', fixedT: 'atc_change_fixedt', orient: 'atc_change_orient', waitSpindle: 'atc_change_m300', dustCover: 'atc_change_cover', confirm: 'atc_change_confirm' },
     atc_test: { mode: 'atc_test_mode', cycles: 'atc_test_cycles', dwellMs: 'atc_test_dwell', first: 'atc_test_first', count: 'atc_test_count', zClear: 'atc_test_zclear', descend: 'atc_test_descend' },
     atc_table: { lengths: 'atc_table_lengths', pockets: 'atc_table_pockets' },
 };
@@ -277,7 +277,13 @@ export class WizardManager {
         const op = prog.find((b) => b && b.type === 'op' && b.id === opId);
         if (!op || !op.opType) return;
         this.open(op.opType);                          // normal open (clears editing + glow, seeds defaults)
-        this._seedForm(op.opType, op.params);          // params → form (the single source of truth)
+        let params = op.params;
+        // Back-compat: old atc_change ops carry mode/magType, not method — derive method so the form shows right.
+        if (op.opType === 'atc_change' && params && !params.method) {
+            const method = params.mode === 'auto' ? (params.magType === 'disk' ? 'disk' : 'generic') : 'manual';
+            params = { ...params, method };
+        }
+        this._seedForm(op.opType, params);             // params → form (the single source of truth)
         this.update();                                 // re-render preview + code from the seeded values
         this.editingOpId = opId;                       // now mark as editing this op
         const box = document.querySelector('.wiz-box'); if (box) box.classList.add('editing');  // accent glow

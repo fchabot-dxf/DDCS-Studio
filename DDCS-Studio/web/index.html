@@ -1542,32 +1542,44 @@
                 <div class="wiz-controls">
                 <span class="section-label">TOOL CHANGE</span>
                 <div class="param-grid">
-                    <label>Mode
-                        <select id="atc_change_mode">
-                            <option value="auto" selected>Automatic — ATC pick &amp; place (T.nc)</option>
+                    <label>Method
+                        <select id="atc_change_method">
+                            <option value="m6" selected>M6 — delegate to controller (recommended)</option>
+                            <option value="firmware">Firmware push station (O10102 — verify)</option>
                             <option value="manual">Manual — park + swap prompt</option>
+                            <option value="generic">Generic pick &amp; place (ASSUMED — verify)</option>
+                            <option value="disk">Disk / carousel (ASSUMED template — verify)</option>
                         </select>
                     </label>
                 </div>
-                <div class="param-grid" id="atc_change_manual_params">
+                <div class="param-grid" id="atc_change_manual_params" style="display:none">
                     <label>Park X (mm)<input type="number" id="atc_change_x" value="100" class="num-input"></label>
                     <label>Park Y (mm)<input type="number" id="atc_change_y" value="100" class="num-input"></label>
                     <label>Park Z (mm)<input type="number" id="atc_change_z" value="0" class="num-input"></label>
                 </div>
-                <div id="atc_change_auto_params" style="display:none">
+                <div id="atc_change_m6_params">
                     <div class="param-grid">
                         <label>Z change height (mach)<input type="number" id="atc_change_zclear" value="0" class="num-input"></label>
                         <label title="Which tool to change to. 'From program' uses the M6 Txx target (#1504); or pick a tool from the magazine to generate a standalone test change.">Change to tool<select id="atc_change_fixedt"><option value="0">From program (M6 Txx)</option></select></label>
                     </div>
+                    <div class="wiz-usage">Parks safely (G53 Z to the change height, then G53 X/Y to the change position) then emits a bare <b>M6</b> — the controller runs its own working tool-change handler. The change position reuses Park X/Y from the magazine settings.</div>
+                </div>
+                <div id="atc_change_fw_params" style="display:none">
+                    <div class="param-grid">
+                        <label title="A rigid spindle should be oriented (M19) before the unclamp. Default on for the firmware push path."><input type="checkbox" id="atc_change_orient" checked> Spindle orient (M19) before unclamp</label>
+                    </div>
+                    <div class="wiz-usage">Firmware-accurate FIXED-STATION PUSH from <b>slib-m.nc O10102</b>: #1306 highest Z → push start #1320/#1321 → dwell #1322 → push end #1323/#1324 (F#1327) → retreat #1325/#1326, with the real pneumatic M-codes (M159/M157/M160/M163/M156/M161). ASSUMED to be taught on your controller — <b>verify before running</b>.</div>
+                </div>
+                <div id="atc_change_auto_params" style="display:none">
                     <div class="param-grid">
                         <label><input type="checkbox" id="atc_change_m300" checked> Wait spindle-stop sensor (M300)</label>
                         <label><input type="checkbox" id="atc_change_cover"> Dust cover (M162/M163)</label>
                         <label><input type="checkbox" id="atc_change_confirm"> Confirm prompt before moving</label>
                     </div>
-                    <div class="wiz-usage">Pocket positions come from the controller tables (#1330+ X · #1350+ Y · #1370+ Z) — teach them on the machine first. Drawbar: M154/M155, sensors: M302/M303. Test in the 3D drawer: ▶ Run with Auto sensors, or drive the I/O panel by hand.</div>
+                    <div class="wiz-usage"><b>ASSUMED model</b> — the real M350 O10102 is a pneumatic push station, not this drawbar changer. Pocket positions come from the controller tables (#1330+ X · #1350+ Y · #1370+ Z) — teach them first. <b>Verify on your machine before trusting this.</b></div>
                 </div>
                 <div class="preview-block">
-                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(VERIFY ON YOUR MACHINE)</span></span>
                     <pre id="wiz_atc_change_code"></pre>
                 </div>
                 </div><!-- /.wiz-controls -->

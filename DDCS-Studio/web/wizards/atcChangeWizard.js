@@ -1,14 +1,25 @@
 /**
- * DDCS Studio - Tool Change Wizard (Manual park / Automatic ATC).
+ * DDCS Studio - Tool Change Wizard.
  *
  * REWRITTEN AS A BLOCK STACK: `atcChangeStack(params)` from granular atoms (Comment / Set# / Spindle /
- * Coolant / Machine Move / M-Code / Confirm / Pause / Message / If Goto / Goto / Label / End Program). The
- * G53 machine moves render per post (Expert/DM500 `G53 …`, V4.1 `G0 G53 …`) and the operator prompts fold on
- * controllers with no scripted HMI — so the same stack is native across posts.
+ * Coolant / Machine Move / M-Code / Confirm / Pause / Message / If Goto / Goto / Label / End Program / Raw).
+ * The G53 machine moves render per post (Expert/DM500 `G53 …`, V4.1 `G0 G53 …`) and the operator prompts fold
+ * on controllers with no scripted HMI — so the same stack is native across posts.
  *
- * MANUAL mode: stop spindle, park the head (G53), M00 pause for a hand swap.
- * AUTO mode: T.nc-style pick & place using the controller's ATC model — drawbar M154/M155, sensor waits
- * M301/M302, pocket tables #1330/#1350/#1370. VERIFY the first run with no tool + a hand on the e-stop.
+ * CHANGE METHOD (params.method — see backward-compat map in atcChangeStack):
+ *   m6       — RECOMMENDED for automatic: park (safe G53 Z, then G53 X/Y to the change position) then emit a
+ *              bare M6 and let the controller run its own working tool-change handler. Minimal + safe.
+ *   firmware — the O10102-accurate FIXED-STATION PUSH sequence (slib-m.nc O10102): #1306 highest-Z, push
+ *              start #1320/#1321 → dwell #1322 → push end #1323/#1324 (F#1327) → retreat #1325/#1326, with the
+ *              real pneumatic M-code order (M159 vacuum-off, M157 pin-close, M160 pusher-open, M163 dust-off,
+ *              M156 pin-open, M161 pusher-close) and an M19 spindle orient before unclamp.
+ *   manual   — stop spindle, park the head (G53), M00 pause for a hand swap.
+ *   generic  — ASSUMED magazine pick & place (NOT proven on real DDCS firmware — verify on your machine).
+ *   disk     — ASSUMED disk/carousel TEMPLATE (rotate-to-pocket indexing is firmware-specific — verify).
+ *
+ * GROUND TRUTH: the real M350 O10102 is a pneumatic FIXED-STATION PUSH/EJECT station (vacuum pump + locating
+ * cylinder + pusher cylinder + dust collector), NOT a pull-stud spindle changer. The drawbar/grab pick&place
+ * model below (generic/disk) is an ASSUMPTION carried from earlier guesses — kept only for backward-compat.
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
@@ -30,6 +41,7 @@ function H(S) {
         COOLOFF: () => { const b = newBlock('coolant'); b.params = { flow: 'off' }; S.push(b); },
         MM: (axis, to) => { const b = newBlock('machinemove'); b.params = { axis, to }; S.push(b); },
         MC: (code, note) => { const b = newBlock('mcode'); b.params = { code, note }; S.push(b); },
+        RAW: (text) => { const b = newBlock('raw'); b.params = { text }; S.push(b); },
         CF: (msg, cancel) => { const b = newBlock('confirm'); b.params = { msg, cancel }; S.push(b); },
         PAUSE: () => S.push(newBlock('pause')),
         MSG: (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); },
@@ -65,12 +77,13 @@ function autoStack(params) {
     const d = getDialect();
     const S = []; const { C, A, IF, GO, LB, SPOFF, COOLOFF, MM, MC, CF, MSG, END } = H(S);
 
-    // Auto pick & place needs the controller's tool-changer firmware vars — only the Expert has a confirmed model.
+    // ASSUMED pick & place model (NOT proven on real DDCS firmware). The real O10102 is a pneumatic push
+    // station, not a drawbar changer — this drawbar/grab model is a guess carried for backward-compat.
     const atc = d && d.vars && d.vars.atc;
     if (!atc) {
-        C('ATC | Automatic Tool Change');
-        C(`Not available on ${d ? d.name : 'this controller'} — no confirmed ATC firmware model.`);
-        C('Use Manual mode, or select the DDCS Expert post.');
+        C('ATC | Tool Change (Generic — ASSUMED)');
+        C(`No ASSUMED magazine model for ${d ? d.name : 'this controller'}.`);
+        C('Use the M6 or Manual method, or select the DDCS Expert post.');
         END();
         return S;
     }
@@ -82,7 +95,8 @@ function autoStack(params) {
     const cur = '#' + atc.currentTool;                                   // tool in spindle (#1300)
     const tgt = fixedT > 0 ? String(fixedT) : '#' + atc.targetTool;      // requested tool (#1504 from M6 Txx)
 
-    C('ATC | Automatic Tool Change — magazine pick & place');
+    C('ATC | Tool Change — magazine pick & place (Generic — ASSUMED, verify on your machine)');
+    C('ASSUMED model — the real M350 O10102 is a pneumatic push station, not this drawbar changer.');
     C('Pockets + park XYZ come from Settings → Tool table magazine');
     C(fixedT > 0 ? `TEST MODE: fixed target tool T${fixedT}` : `Target tool from ${tgt} — set by M6 Txx; save as T.nc`);
     C('VERIFY FIRST RUN with no tool in spindle + hand on e-stop');
@@ -141,22 +155,22 @@ function autoStack(params) {
     return S;
 }
 
-// DISK / CAROUSEL auto change: all pockets share one fixed PICKUP; the carousel rotates the target pocket to it.
-// The rotation primitive is firmware-specific (rotate output + M303/M304 index sensor on the Expert), so this is
-// a TEMPLATE — the "rotate carousel to pocket N" step is left explicit for the operator to wire + VERIFY.
+// DISK / CAROUSEL auto change (ASSUMED TEMPLATE — NOT proven on real DDCS firmware): all pockets share one
+// fixed PICKUP; the carousel rotates the target pocket to it. The rotation primitive is firmware-specific
+// (rotate output + index sensor), so the "rotate carousel to pocket N" step is left explicit to wire + VERIFY.
 function diskAutoStack(params) {
     const d = getDialect();
     const S = []; const { C, A, IF, GO, LB, SPOFF, COOLOFF, MM, MC, CF, MSG, END } = H(S);
     const atc = d && d.vars && d.vars.atc;
-    if (!atc) { C('ATC | Automatic Tool Change (disk)'); C(`Not available on ${d ? d.name : 'this controller'}.`); END(); return S; }
+    if (!atc) { C('ATC | Tool Change (Disk — ASSUMED template)'); C(`No ASSUMED disk model for ${d ? d.name : 'this controller'}.`); END(); return S; }
     const pk = params.pickup || {};
     const zClear = num(params.zClear, 0), fixedT = num(params.fixedT, 0);
     const useM300 = params.waitSpindle !== false, useCover = params.dustCover === true, confirm = params.confirm === true;
     const mag = (Array.isArray(params.magazine) ? params.magazine : []).filter((p) => p && p.tool !== '' && p.tool != null);
     const cur = '#' + atc.currentTool, tgt = fixedT > 0 ? String(fixedT) : '#' + atc.targetTool;
 
-    C('ATC | Automatic Tool Change — DISK / CAROUSEL (rotate pocket to a fixed pickup)');
-    C('TEMPLATE — carousel indexing is firmware-specific; VERIFY the rotation on the machine before trusting this.');
+    C('ATC | Tool Change — DISK / CAROUSEL (ASSUMED template — rotate pocket to a fixed pickup)');
+    C('ASSUMED — carousel indexing is firmware-specific; VERIFY the rotation on the machine before trusting this.');
     C(fixedT > 0 ? `TEST MODE: fixed target tool T${fixedT}` : `Target tool from ${tgt} — set by M6 Txx; save as T.nc`);
     if (!mag.length) { C('!! Magazine EMPTY — build it in Settings → Tool table.'); END(); return S; }
 
@@ -200,9 +214,73 @@ function diskAutoStack(params) {
     return S;
 }
 
+// M6 (RECOMMENDED for automatic): park safely (G53 Z to the change height, then G53 X/Y to the change
+// position) and delegate the actual swap to the controller's own M6 handler. Minimal + safe + post-portable.
+function m6Stack(params) {
+    const x = num(params.x, 100), y = num(params.y, 100);
+    const zClear = num(params.zClear, 0), fixedT = num(params.fixedT, 0);
+    const S = []; const { C, A, SPOFF, COOLOFF, MM, MC, MSG, END } = H(S);
+    C('ATC | Tool Change — delegate to the controller (M6)');
+    C('Park clear (safe Z, then XY) then call M6 — the controller runs its own working change handler.');
+    C(fixedT > 0 ? `Change to T${fixedT}` : 'Target tool from the program (M6 Txx)');
+    C('=== CONFIGURATION ===');
+    A('#102', String(zClear), 'Z change height - MACHINE coords');
+    A('#103', String(x), 'Change-position X (machine)');
+    A('#104', String(y), 'Change-position Y (machine)');
+    C('Stop spindle + coolant, retract to the change height, move to the change position');
+    SPOFF(); COOLOFF();
+    MM('Z', '#102');                          // safe Z first
+    MM('X', '#103'); MM('Y', '#104');         // then XY to the change position
+    if (fixedT > 0) MC(6, `M6 T${fixedT} — controller tool change`);
+    else MC(6, 'M6 — controller tool change (tool from program)');
+    MSG('Tool change complete');
+    END();
+    return S;
+}
+
+// FIRMWARE: the O10102-accurate FIXED-STATION PUSH sequence (slib-m.nc O10102, decoded). This is the REAL
+// M350 change body — a pneumatic push/eject station, not a pull-stud changer. Emitted verbatim (raw lines) so
+// the G53 combined-axis moves + feeds (#563/#1327) + dwell (#1322) match the controller byte-for-byte. An M19
+// spindle orient is added before the unclamp (a rigid spindle should be oriented before it is released).
+function firmwareStack(params) {
+    const orient = params.orient !== false;   // M19 orient default ON for the firmware path
+    const S = []; const { C, MC, RAW, END } = H(S);
+    C('ATC | Tool Change — firmware-accurate fixed-station PUSH (O10102)');
+    C('Source: SYSDISK/slib-m.nc O10102 — pneumatic push/eject (vacuum + locating pin + pusher + dust cover).');
+    C('Driven by #1306 (highest Z) + #1320-1326 (push start/end/retreat), feeds #563/#1327, dwell #1322.');
+    C('VERIFY on the machine: these G53 stations + #1306/#1320-1326 must be taught in the controller first.');
+    if (orient) MC(19, 'Spindle orient (M19) before unclamp');
+    RAW('M159  ( vacuum pump OFF )');
+    RAW('M157  ( locating cylinder CLOSE )');
+    RAW('G53 Z#1306 F#563  ( highest Z when changing )');
+    RAW('G53 X#1320 Y#1321 F#563  ( move to push start )');
+    RAW('M160  ( pusher OPEN )');
+    RAW('G04 P#1322  ( pusher dwell )');
+    RAW('G53 X#1323 Y#1324 F#1327  ( move to push end )');
+    RAW('M163  ( dust collector OFF )');
+    RAW('G53 X#1325 Y#1326 F#563  ( retreat position after push )');
+    RAW('M156  ( locating cylinder OPEN )');
+    RAW('M161  ( pusher CLOSE )');
+    END();
+    return S;
+}
+
+// Map a saved op onto a change METHOD. New ops carry params.method directly; OLD saved ops (params.mode /
+// params.magType, no method) map on so existing blocks/files keep emitting the same stack.
+function resolveMethod(params) {
+    if (params.method) return params.method;
+    if (params.mode === 'auto') return (params.magType === 'disk') ? 'disk' : 'generic';
+    return 'manual';   // legacy default (mode unset or 'manual')
+}
+
 export function atcChangeStack(params = {}) {
-    if (params.mode === 'auto') return (params.magType === 'disk') ? diskAutoStack(params) : autoStack(params);
-    return manualStack(params);
+    switch (resolveMethod(params)) {
+        case 'm6': return m6Stack(params);
+        case 'firmware': return firmwareStack(params);
+        case 'disk': return diskAutoStack(params);
+        case 'generic': return autoStack(params);
+        default: return manualStack(params);
+    }
 }
 
 export class AtcChangeWizard {

@@ -187,14 +187,14 @@ export const atcChangeView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'atc_change_mode',
+        'atc_change_method',
         'atc_change_x', 'atc_change_y', 'atc_change_z',
-        'atc_change_zclear', 'atc_change_fixedt',
+        'atc_change_zclear', 'atc_change_fixedt', 'atc_change_orient',
         'atc_change_m300', 'atc_change_cover', 'atc_change_confirm',
     ],
     update(mgr) {
         const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
-        const mode = el('atc_change_mode')?.value || 'manual';
+        const method = el('atc_change_method')?.value || 'm6';
         // Populate the "change to tool" selector from the magazine tools (preserve the current choice).
         const ftSel = el('atc_change_fixedt');
         if (ftSel && ftSel.tagName === 'SELECT') {
@@ -205,21 +205,28 @@ export const atcChangeView = {
             ftSel.innerHTML = opts.join('');
             if ([...ftSel.options].some((o) => o.value === cur)) ftSel.value = cur;
         }
-        // Mode-specific parameter rows
-        const manualRow = el('atc_change_manual_params');
-        const autoRow = el('atc_change_auto_params');
-        if (manualRow) manualRow.style.display = mode === 'manual' ? '' : 'none';
-        if (autoRow) autoRow.style.display = mode === 'auto' ? '' : 'none';
+        // Method-specific parameter rows
+        const manualRow = el('atc_change_manual_params');   // park XYZ
+        const m6Row = el('atc_change_m6_params');           // change position + target
+        const autoRow = el('atc_change_auto_params');       // generic/disk magazine toggles
+        const fwRow = el('atc_change_fw_params');           // firmware M19 toggle
+        if (manualRow) manualRow.style.display = method === 'manual' ? '' : 'none';
+        if (m6Row) m6Row.style.display = method === 'm6' ? '' : 'none';
+        if (autoRow) autoRow.style.display = (method === 'generic' || method === 'disk') ? '' : 'none';
+        if (fwRow) fwRow.style.display = method === 'firmware' ? '' : 'none';
 
         const params = {
-            mode,
-            // manual
+            method,
+            // manual park
             x: el('atc_change_x')?.value || '100',
             y: el('atc_change_y')?.value || '100',
             z: el('atc_change_z')?.value || '0',
-            // auto
+            // m6 / generic
             zClear: el('atc_change_zclear')?.value || '0',
             fixedT: el('atc_change_fixedt')?.value || '0',
+            // firmware
+            orient: el('atc_change_orient')?.checked !== false,
+            // generic / disk
             waitSpindle: el('atc_change_m300')?.checked !== false,
             dustCover: el('atc_change_cover')?.checked === true,
             confirm: el('atc_change_confirm')?.checked === true,
@@ -232,13 +239,19 @@ export const atcChangeView = {
         if (mgr) mgr.preview3D(gcode, 'atcChangeViz');
         if (mgr) mgr.previewMachine('atcChangeViz', true);   // ATC = machine-frame: always show the envelope
         if (mgr) mgr.previewMagazine('atcChangeViz', magazinePockets(s.atc || {}));   // pockets + tools in 3D on the envelope
-        // Magazine strip: show the pockets + tools; in auto mode highlight the fixed test tool being swapped to.
+        // Magazine strip: show the pockets + tools; highlight the fixed test tool being swapped to.
         const ft = Number(el('atc_change_fixedt')?.value || 0);
         const rack = el('atcChangeTools');
-        if (rack) rack.innerHTML = magazineRackHtml(s.atc || {}, { highlight: mode === 'auto' && ft > 0 ? ft : '' });
-        setStatus('atcChangeVizStatus', mode === 'auto'
-            ? 'Auto ATC pick & place · pocket moves come from controller tables (#1330/#1350/#1370)'
-            : 'Manual park · ▶ traces the safe-Z retract then the move to the swap position');
+        const showRack = method === 'm6' || method === 'generic' || method === 'disk';
+        if (rack) rack.innerHTML = magazineRackHtml(s.atc || {}, { highlight: showRack && ft > 0 ? ft : '' });
+        const STATUS = {
+            m6: 'Delegate to controller M6 · ▶ traces the safe-Z retract + move to the change position, then M6',
+            firmware: 'Firmware push station (O10102) · #1306/#1320-1326 G53 stations + M19 orient — verify on the machine',
+            manual: 'Manual park · ▶ traces the safe-Z retract then the move to the swap position',
+            generic: 'Generic ASSUMED pick & place · verify on your machine before trusting it',
+            disk: 'Disk ASSUMED template · carousel indexing is firmware-specific — verify on your machine',
+        };
+        setStatus('atcChangeVizStatus', STATUS[method] || STATUS.m6);
     },
 };
 
