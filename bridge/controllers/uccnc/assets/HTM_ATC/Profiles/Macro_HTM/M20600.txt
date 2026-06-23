@@ -1,0 +1,100 @@
+// M20600 - HTM_ATC macro - by SeB
+// ATC Setup Page - macro called for slots setup. It is called by ***M20601-M20610*** macros
+
+myEvar = Evar;
+
+RunMacro(Convert.ToInt32(Evar)); //Evar este nr slotului
+
+#Events
+
+double? myEvar;
+
+static bool isMacroRunning = false; // Variabila globală pentru a verifica starea macro-ului
+
+public void RunMacro(int slotNo) {
+    if (!isMacroRunning) {
+
+        isMacroRunning = true; // Setăm starea că macro-ul este în execuție
+		//exec.AddStatusmessage("slotNo = " + slotNo);
+		
+		int oldTool = 0; // scula existenta in slot
+        var varSlot = Plugininterface.Datatypes.Tooltablecolumnname.Slot; // variabila care sa gestioneze slotul sculei atat ptr citire cat si ptr scriere
+		bool slotStatus = AS3.Getbuttonstate(slotNo+20600);
+
+		// texte ptr ferestrele de confirmari
+		string messageDisable = "Are you sure you want to DISABLE Slot #" + slotNo + "?\n\nExisting tool will be also removed from slot!";
+		string messageEnable = "Are you sure you want to ENABLE Slot #" + slotNo + "?";
+		string title = "Slot Management";
+
+		//preluam scula din slot in baza tooltable. cautam scula care are fieldul SlotXX si determinam XX care este nr sculei
+		for (int i = 1; i < 97; i++) {
+			int y = Convert.ToInt32(exec.Readtooltablecell(i, varSlot)); // nr slotului din campul SlotXX
+			if (y == slotNo) {
+				oldTool = i;
+				i = 97; //iesim cand gasim scula aferenta slotului slotNo
+			}
+		}
+
+		if (slotStatus) 	//daca slotul este activat
+		{ 
+			DialogResult result = MessageBox.Show(messageDisable, title, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2, MessageBoxOptions.ServiceNotification);
+			
+			if (result == DialogResult.Yes) {
+				//scriem in tooltable noul slot ptr scula veche
+				exec.Writetooltablecell(oldTool, varSlot, "0"); // adica 0 ptr ca scula a fost scoasa din rack
+				if (oldTool > 0) exec.AddStatusmessage("T" + oldTool + " removed from Slot " + slotNo );
+
+				AS3.Switchbutton(false, slotNo+20600);	//dezactivam slotul - butonul acestuia, din pagina de setup
+				exec.Writekey("UserTextfields", Convert.ToString(slotNo+20600), "0"); // salvam starea slotului prin scriere 0 in profile
+				exec.AddStatusmessage("Slot " + slotNo + " Disbled!");
+			
+				// AS3.Setfield(0,slotNo+20500); // scriem 0 in campul slotului dezactivat - adica se sterge scula din slotul dezactivat
+
+				// AS3.Setfieldtext("", slotNo+20510); // dezactivam slotul stergem afisarea
+				// AS3.Validatefield(slotNo+20520); // validam inputul
+
+				// AS3.Setfieldtext("", slotNo+20520); // dezactivam slotul stergem afisarea 
+				// AS3.Validatefield(slotNo+20520); // validam inputul
+				
+				AS3.SetLED(false, (slotNo+800)); //LED disable - ledurile sunt de la 801 la 810	
+				AS3.SetLED(false, (slotNo+810)); //LED disable - ledurile sunt de la 801 la 810	
+				AS3.SetLED(false, (slotNo+820)); //LED disable - ledurile sunt de la 801 la 810	
+                exec.Callbutton(780); // Apelarea butonului pentru salvarea tooltable-ului
+			}
+		}
+		else 	//daca slotul este dezactivat
+		{
+			DialogResult result = MessageBox.Show(messageEnable, title, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1, MessageBoxOptions.ServiceNotification);
+
+			if (result == DialogResult.Yes) {
+				AS3.Switchbutton(true, slotNo+20600);
+				AS3.Setfieldtext("0", slotNo+20500); // scriem 0 in slot deactivat
+				AS3.Validatefield(slotNo+20500); 
+				exec.Writekey("UserTextfields", Convert.ToString(slotNo+20600), "1");
+				exec.AddStatusmessage("Slot " + slotNo + " Enabled!");
+				AS3.SetLED(true, (slotNo+800)); //ledurile sunt de la 801 la 810	
+				}
+		}
+				// resetam afisarea atat la dezactivare cat si la activare. la activare, slotul nu are scula
+				AS3.Setfield(0,slotNo+20500); // scriem 0 in campul slotului dezactivat - adica se sterge scula din slotul dezactivat
+				AS3.Validatefield(slotNo+20500); // validam inputul
+
+				AS3.Setfieldtext("", slotNo+20510); // dezactivam slotul stergem afisarea
+				AS3.Validatefield(slotNo+20510); // validam inputul
+
+				AS3.Setfieldtext("", slotNo+20520); // dezactivam slotul stergem afisarea 
+				AS3.Validatefield(slotNo+20520); // validam inputul
+				
+				AS3.SetLED(false, (slotNo+810)); //dezactivam ledurile de RH
+				AS3.SetLED(false, (slotNo+820)); //dezactivam ledurile de active tool
+
+
+        // Resetăm starea macro-ului
+        isMacroRunning = false; 
+		// aici se termina codul macro
+		
+    } else {
+        exec.AddStatusmessage("Macro already running! Ignoring!");
+        return;
+    }
+}

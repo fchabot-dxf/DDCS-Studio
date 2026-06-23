@@ -1,0 +1,9 @@
+# Build dependencies for the desktop exe (PyInstaller onefile via build_fairy.ps1).
+# Single source for both CI workflows: desktop-build-check.yml (verify) + desktop-release.yml (release).
+pyinstaller
+pywebview
+pythonnet
+pymodbus==3.6.9
+pyserial
+websockets>=12
+qrcode               # LAN-access QR (pure-python SVG, no PIL) — server-side /api/lan-qr

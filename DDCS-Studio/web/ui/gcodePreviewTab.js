@@ -1,124 +1,85 @@
 /**
- * DDCS Studio — EDITOR / 3D tab controller
+ * DDCS Studio — EDITOR / 3D preview drawer (thin wrapper around the shared preview panel).
  *
- * Wires the top-level [ EDITOR | 3D ] tab strip. Switching to 3D swaps the main
- * area to a three.js toolpath preview of whatever is in the editor, and keeps it
- * live (debounced) while that tab is active. The 3D viewer is created lazily on
- * first use so the cost is only paid when the user opens it.
+ * The preview itself is the shared createPreviewPanel — IDENTICAL code + UI to the Blocks tab and the wizards.
+ * This module owns only the Studio-editor chrome: the slide-in drawer (open/close via the pull-tab) and the
+ * edge-resize grip, plus the spindle-start window hooks. The panel is fed the editor's program (getGcode),
+ * highlights the executing line in the editor (onLine), consumes a wizard hand-off start (getStart), and seeds
+ * controller params for the trace/engine (createVarStore). Run/Step/Loop, 2D/3D, stock, status, trail all live
+ * in the panel, so a tweak there changes every preview at once.
  */
-import { parseGcode } from '../gcodeParser.js';
-import { GcodeViz3D } from '../viz/gcodeViz3d.js';
-import { GcodeExecutionEngine } from '../engine/index.js';
+import { createPreviewPanel } from '../viz/createPreviewPanel.js';
 
-let gpViz = null;
-let gpEngine = null;
-let gpView = 'editor';
-let gpDebounce = null;
-let gpRunButton = null;
-
-function gpEls() {
-    return {
-        toggle: document.getElementById('view-toggle'),
-        vizContainer: document.getElementById('gcodeViz3dContainer'),
-        editor: document.getElementById('editor'),
-        status: document.getElementById('viz3dStatus'),
-        copyBtn: document.getElementById('viz3dStatusCopy'),
-    };
-}
-
-// Keep the in-canvas stock controls in sync with settings
-function gpSyncControls() {
-    const sel = document.getElementById('viz3dStockShape');
-    const s = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
-    if (sel && s && s.stock) sel.value = s.stock.shape || 'boss';
-}
-
-/** Set the status bar text, optionally flagging it as an error (red + copy button). */
-function gpSetStatus(statusEl, text, isError = false) {
-    if (!statusEl) return;
-    statusEl.textContent = text;
-    statusEl.classList.toggle('has-error', isError);
-    const copyBtn = document.getElementById('viz3dStatusCopy');
-    if (copyBtn) copyBtn.classList.toggle('visible', !!(text && text.length > 0));
-}
-
-function gpRenderFromEditor() {
-    const { editor, status } = gpEls();
-    if (!gpViz || !editor) return;
-    const parsed = parseGcode(editor.value);
-    // Stock + machine envelope from Settings (set before setSegments so the fit includes them)
+// Seed controller parameter vars from Settings so "read from controller" macros (F#632 P#1078 L#1080 … —
+// PROBE-CONFIG-SOURCE.md) resolve as a controller whose parameter page matches the Settings panel.
+function gpSeededVarStore() {
+    const m = new Map();
     const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
-    if (cfg) { gpViz.setStock(cfg.stock); gpViz.setMachine(cfg.machine); gpViz.setProbes(cfg.probes); }
-    gpViz.setSegments(parsed);
-    // A wizard insert can hand off the start position it was previewing — apply it once, then clear.
-    if (window.__pendingSpindleStart && typeof gpViz.setStart === 'function') {
-        const ps = window.__pendingSpindleStart;
-        gpViz.setStart(ps.x, ps.y, ps.z, 0);
-        window.__pendingSpindleStart = null;
-    }
-    if (!status) return;
-    const s = parsed.stats;
-    gpSetStatus(status, !s.drawable
-        ? 'No drawable moves in this program'
-        : (() => {
-            const b = (gpViz && gpViz._dataBounds) || parsed.bounds;
-            const r = (n) => n.toFixed(1).replace(/\.0$/, '');
-            const parts = [];
-            if (s.feed) parts.push(`${s.feed} cuts`);
-            if (s.probe) parts.push(`${s.probe} probes`);
-            if (s.rapid) parts.push(`${s.rapid} rapids`);
-            if (s.retract) parts.push(`${s.retract} retracts`);
-            if (s.passes > 1) parts.push(`${s.passes} passes`);
-            if (s.skipped) parts.push(`${s.skipped} skipped`);
-            return parts.join(' · ') +
-                `   X[${r(b.minX)} ${r(b.maxX)}] Y[${r(b.minY)} ${r(b.maxY)}] Z[${r(b.minZ)} ${r(b.maxZ)}] mm`;
-        })(),
-    false);
+    const p = (cfg && cfg.probes) || {};
+    const a = (cfg && cfg.atc) || {};
+    m.set(631, 1);                                  // Pr131 probe detection times
+    m.set(632, Number(a.fFast) || 200);             // Pr132 probing speed
+    m.set(633, Number(a.blockHeight) || 50);        // Pr133 setter block thickness
+    m.set(640, Number(a.retract) || 2);             // Pr140 retraction after probe
+    m.set(1075, Number(p.setterPin) || 0);          // Pr575 fixed probe port
+    m.set(1077, Number(p.setterLevel) || 0);        // Pr577 fixed probe level
+    m.set(1078, Number(p.probePin) || 0);           // Pr578 floating probe port
+    m.set(1080, Number(p.probeLevel) || 0);         // Pr580 floating probe level
+    return m;
+}
+
+let gpPanel = null;
+let gpView = 'editor';   // drawer open ('3d') vs closed ('editor')
+
+const gpEls = () => ({
+    toggle: document.getElementById('view-toggle'),
+    vizContainer: document.getElementById('gcodeViz3dContainer'),
+    host: document.getElementById('viz3d-panel-host'),
+    editor: document.getElementById('editor'),
+});
+
+function ensurePanel() {
+    if (gpPanel) return gpPanel;
+    const els = gpEls();
+    if (!els.host || !els.editor) return null;
+    gpPanel = createPreviewPanel(els.host, {
+        getGcode: () => (els.editor ? els.editor.value : ''),
+        onLine: (i) => {
+            const em = window.editorManager; if (!em) return;
+            if (i == null) { if (em.clearActiveLine) em.clearActiveLine(); }
+            else if (em.setActiveLine) em.setActiveLine(i);
+        },
+        // A wizard insert hands off the start it was previewing — consume it once.
+        getStart: () => { const ps = window.__pendingSpindleStart; window.__pendingSpindleStart = null; return ps; },
+        createVarStore: gpSeededVarStore,
+    });
+    // Spindle / program-zero start hooks (read/write the panel's draggable 3D marker) — used by the wizard insert.
+    window.ddcsSetSpindleStart = (x, y, z, pass) => { const v = gpPanel && gpPanel.viz; if (v && v.setStart) v.setStart(x, y, z, pass || 0); };
+    window.ddcsGetSpindleStart = () => { const v = gpPanel && gpPanel.viz; return (v && v.starts && v.starts[0]) ? { ...v.starts[0] } : null; };
+    window.ddcsGetStarts = () => { const v = gpPanel && gpPanel.viz; return v ? v.starts.map((s) => ({ ...s })) : null; };
+    window.__gpPanel = gpPanel;   // debug accessor
+    return gpPanel;
 }
 
 export function setGcodeView(view) {
     const els = gpEls();
     gpView = view;
-    const is3d = view === '3d';
-
-    // Drawer slides in/out; the code editor stays visible underneath either way.
+    const is3d = view === '3d';   // open the preview drawer
     if (els.vizContainer) els.vizContainer.classList.toggle('open', is3d);
     if (els.toggle) {
-        els.toggle.classList.toggle('open', is3d); // slide the pull-tab onto the drawer edge
-        els.toggle.title = is3d ? 'Hide the 3D preview' : 'Show 3D toolpath preview';
+        els.toggle.classList.toggle('open', is3d);   // slide the pull-tab onto the drawer edge
+        els.toggle.title = is3d ? 'Hide the toolpath preview' : 'Show the toolpath preview';
     }
-
-    if (!is3d) {
-        if (gpViz) gpViz.setActive(false);
-        return;
-    }
-    if (!gpViz) {
-        try {
-            gpViz = new GcodeViz3D(els.vizContainer);
-            window.__gpViz = gpViz; // debug accessor
-            // Spindle / program-zero start (draggable in the view; also settable programmatically)
-            window.ddcsSetSpindleStart = (x, y, z, pass) => { if (gpViz) gpViz.setStart(x, y, z, pass || 0); };
-            window.ddcsGetSpindleStart = () => (gpViz && gpViz.starts[0] ? { ...gpViz.starts[0] } : null);
-            window.ddcsGetStarts = () => (gpViz ? gpViz.starts.map((s) => ({ ...s })) : null);
-        } catch (err) {
-            console.error('3D preview init failed', err);
-            if (els.status) els.status.textContent = '3D unavailable: ' + err.message;
-            return;
-        }
-    }
-    gpViz.setActive(true);
-    gpRenderFromEditor();
-    gpSyncControls();
+    if (!is3d) { if (gpPanel) gpPanel.setActive(false); return; }   // closed → pause/stop the panel
+    const panel = ensurePanel();
+    if (panel) panel.setActive(true);                               // open → mount/activate + render the editor program
 }
 
 function gpInit() {
     const els = gpEls();
-    if (els.toggle) {
-        els.toggle.addEventListener('click', () => setGcodeView(gpView === '3d' ? 'editor' : '3d'));
-    }
-    // Drag the edge grip to resize the 3D drawer (mouse + touch via Pointer Events). It sets
-    // --viz3d-size on the editor-container, which drives the drawer's width/height AND the toggle's
-    // resting edge; the viz canvas auto-refits via its ResizeObserver.
+    if (els.toggle) els.toggle.addEventListener('click', () => setGcodeView(gpView === '3d' ? 'editor' : '3d'));
+
+    // Edge-resize grip → --viz3d-size (drawer width/height); the panel auto-refits via its ResizeObservers.
     const grip = els.vizContainer ? els.vizContainer.querySelector('.viz3d-resize') : null;
     const ec = els.vizContainer ? els.vizContainer.closest('.editor-container') : null;
     if (grip && ec) {
@@ -137,214 +98,34 @@ function gpInit() {
             if (pid === null || e.pointerId !== pid) return;
             const cr = ec.getBoundingClientRect();
             const maxPx = Math.round((vertical ? cr.height : cr.width) * 0.92);
-            // the drawer is anchored bottom-right, so dragging the grip toward the editor (left / up) grows it
             const raw = vertical ? (startPx - (e.clientY - startY)) : (startPx - (e.clientX - startX));
-            const size = Math.max(MIN_PX, Math.min(maxPx, raw));
-            ec.style.setProperty('--viz3d-size', size + 'px');
+            ec.style.setProperty('--viz3d-size', Math.max(MIN_PX, Math.min(maxPx, raw)) + 'px');
             e.preventDefault();
         });
-        const endResize = () => {
-            if (pid === null) return;
-            try { grip.releasePointerCapture(pid); } catch (_) { /* ignore */ }
-            pid = null;
-            ec.classList.remove('viz3d-resizing');
-        };
+        const endResize = () => { if (pid === null) return; try { grip.releasePointerCapture(pid); } catch (_) { /* ignore */ } pid = null; ec.classList.remove('viz3d-resizing'); };
         grip.addEventListener('pointerup', endResize);
         grip.addEventListener('pointercancel', endResize);
     }
+
+    // Live update while the drawer is open (the panel debounces its own renders internally).
+    if (els.editor) els.editor.addEventListener('input', () => { if (gpView === '3d' && gpPanel) gpPanel.setGcode(els.editor.value); });
+
+    // Click / move the caret in the editor → place the tool in the preview at that line (when not playing).
     if (els.editor) {
-        els.editor.addEventListener('input', () => {
-            if (gpView !== '3d') return;
-            clearTimeout(gpDebounce);
-            gpDebounce = setTimeout(gpRenderFromEditor, 300);
-        });
-    }
-    // Stock-shape selector that lives in the 3D canvas
-    const shapeSel = document.getElementById('viz3dStockShape');
-    if (shapeSel) {
-        shapeSel.addEventListener('change', () => {
-            if (window.ddcsApplySettings) window.ddcsApplySettings({ stock: { shape: shapeSel.value } });
-        });
-    }
-    // View-snap buttons (Top / Front / Right / Iso)
-    document.querySelectorAll('#gcodeViz3dContainer .viz3d-views button').forEach((btn) => {
-        btn.addEventListener('click', () => { if (gpViz) gpViz.setView(btn.dataset.view); });
-    });
-    // Run / Step / Loop / I/O controls for the execution engine
-    const runBtn = document.getElementById('viz3dAnimate');
-    const stepBtn = document.getElementById('viz3dStep');
-    const loopBtn = document.getElementById('viz3dLoop');
-    const ioBtn = document.getElementById('viz3dIO');
-    gpRunButton = runBtn;
-    let gpLoopTimer = null;
-    let gpLastRunCode = null;   // code of the last continuous Run (loop restarts this, never a stepped run)
-    const gpCancelLoop = () => { if (gpLoopTimer) { clearTimeout(gpLoopTimer); gpLoopTimer = null; } };
-
-    const speedSel = document.getElementById('viz3dSpeed');
-    const gpSimSpeed = () => {
-        const v = speedSel ? parseFloat(speedSel.value) : 1;
-        return Number.isFinite(v) && v > 0 ? v : 1;
-    };
-
-    function ensureEngine() {
-        if (gpEngine) return gpEngine;
-        const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
-        gpEngine = new GcodeExecutionEngine({
-            stock: cfg && cfg.stock ? cfg.stock : null,
-            autoAnswer: window.ioPanel ? window.ioPanel.isAutoSensors() : true,
-            simSpeed: gpSimSpeed(),
-            onLineChange: ({ lineIndex, raw }) => {
-                if (window.editorManager && typeof window.editorManager.setActiveLine === 'function') {
-                    window.editorManager.setActiveLine(lineIndex);
-                }
-                if (els.status) {
-                    els.status.textContent = `Executing line ${lineIndex + 1}/${gpEngine.totalLines}: ${raw.trim()}`;
-                }
-            },
-            onPositionChange: (pos) => {
-                if (gpViz && typeof gpViz.setToolPosition === 'function') {
-                    gpViz.setToolPosition(pos);
-                }
-            },
-            onStatus: ({ message }) => {
-                gpSetStatus(els.status, message, false);
-            },
-            onWait: (wait) => {
-                // Parked on a sensor wait → surface the I/O panel and pulse the pin
-                if (window.ioPanel) {
-                    if (wait) window.ioPanel.show();
-                    window.ioPanel.setWait(wait);
-                }
-            },
-            onFinish: ({ stats }) => {
-                gpUpdateRunButton();
-                if (window.editorManager && typeof window.editorManager.clearActiveLine === 'function') {
-                    window.editorManager.clearActiveLine();
-                }
-                // One "program done" beep — only if it actually executed something
-                if (stats && stats.steps > 1 && gpViz && typeof gpViz._beep === 'function') gpViz._beep();
-                // Loop: restart the last continuous Run after a short pause
-                if (loopBtn && loopBtn.classList.contains('on') && gpLastRunCode != null) {
-                    gpCancelLoop();
-                    gpLoopTimer = setTimeout(() => {
-                        gpLoopTimer = null;
-                        gpEngine.run(gpLastRunCode);
-                        gpUpdateRunButton();
-                    }, 800);
-                }
-            },
-        });
-        return gpEngine;
+        const seekToCaret = () => {
+            if (gpView !== '3d' || !gpPanel || !gpPanel.seekLine || (gpPanel.engine && gpPanel.engine.running)) return;
+            const line = els.editor.value.slice(0, els.editor.selectionStart).split('\n').length - 1;
+            gpPanel.seekLine(line);
+        };
+        els.editor.addEventListener('click', seekToCaret);
+        els.editor.addEventListener('keyup', (e) => { if (e.key && e.key.indexOf('Arrow') === 0) seekToCaret(); });
     }
 
-    // Validate before any run/step; show errors in the status bar
-    function gpValidate(code) {
-        const validation = ensureEngine().verifySyntax(code);
-        if (!validation.valid) {
-            const errText = validation.errors.map((err) => `Ln ${err.lineIndex + 1}: ${err.message}`).join('\n');
-            gpSetStatus(els.status, errText, true);
-            return false;
-        }
-        return true;
-    }
-
-    if (runBtn) {
-        runBtn.classList.remove('on');
-        runBtn.textContent = '▶ Run';
-        runBtn.title = 'Run the program through the execution engine';
-        runBtn.addEventListener('click', () => {
-            const code = els.editor ? els.editor.value : '';
-            const eng = ensureEngine();
-            if (eng.running && !eng.paused) {
-                gpCancelLoop();
-                gpLastRunCode = null;   // explicit stop also stops looping
-                eng.stop();
-            } else if (eng.running && eng.paused) {
-                eng.resume();
-            } else {
-                if (!gpValidate(code)) return;
-                // Disable the independent animation loop; engine drives tool position instead
-                if (gpViz) gpViz.setAnimate(false);
-                gpLastRunCode = code;
-                eng.run(code);
-            }
-            gpUpdateRunButton();
-        });
-    }
-    if (stepBtn) {
-        stepBtn.addEventListener('click', () => {
-            const code = els.editor ? els.editor.value : '';
-            const eng = ensureEngine();
-            gpCancelLoop();
-            gpLastRunCode = null;       // stepping is interactive — don't loop it
-            if (!eng.running && !gpValidate(code)) return;
-            if (!eng.running && gpViz) gpViz.setAnimate(false);
-            eng.step(code);   // starts paused from the top, or pauses a continuous run
-            gpUpdateRunButton();
-        });
-    }
-    if (loopBtn) {
-        loopBtn.addEventListener('click', () => {
-            loopBtn.classList.toggle('on');
-            if (!loopBtn.classList.contains('on')) gpCancelLoop();
-        });
-    }
-    if (ioBtn) {
-        ioBtn.addEventListener('click', () => {
-            if (window.ioPanel) window.ioPanel.toggle();
-        });
-    }
-    // The I/O panel's "Auto sensors" checkbox drives the engine's virtual-sensor answers
-    window.addEventListener('ddcs:auto-sensors-changed', (e) => {
-        if (gpEngine) gpEngine.autoAnswer = !!(e.detail && e.detail.on);
-    });
-    // Speed multiplier — takes effect immediately, even mid-move
-    if (speedSel) {
-        speedSel.addEventListener('change', () => {
-            if (gpEngine) gpEngine.simSpeed = gpSimSpeed();
-        });
-    }
-    gpSyncControls();
-
-    function gpUpdateRunButton() {
-        if (!gpRunButton) return;
-        const running = !!(gpEngine && gpEngine.running);
-        const paused = !!(gpEngine && gpEngine.paused);
-        gpRunButton.classList.toggle('on', running && !paused);
-        gpRunButton.textContent = !running ? '▶ Run' : (paused ? '▶ Resume' : '⏸ Stop');
-        gpRunButton.title = !running ? 'Run the program through the execution engine'
-            : (paused ? 'Resume continuous execution' : 'Stop execution');
-    }
-    // Stock / machine settings changed → redraw if the 3D drawer is open
-    window.addEventListener('ddcs:settings-changed', () => {
-        gpSyncControls();
-        if (gpView === '3d' && gpViz) gpRenderFromEditor();
-    });
     window.setGcodeView = setGcodeView;
-
-    // Wire the copy button
-    const copyBtn = gpEls().copyBtn;
-    if (copyBtn) {
-        copyBtn.addEventListener('click', () => {
-            const status = gpEls().status;
-            if (!status || !status.textContent) return;
-            navigator.clipboard.writeText(status.textContent).then(() => {
-                copyBtn.textContent = '✓ Copied';
-                setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 1500);
-            }).catch(() => {
-                // Fallback: select the text
-                const range = document.createRange();
-                range.selectNodeContents(status);
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(range);
-            });
-        });
-    }
+    // Leaving the preview context stops the run (the panel also listens to ddcs:stop-previews); covers the
+    // drawer-close + legacy callers (showApp/wizard/settings).
+    window.ddcsStopPreview = () => { if (gpPanel) gpPanel.stop(); };
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', gpInit);
-} else {
-    gpInit();
-}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', gpInit);
+else gpInit();

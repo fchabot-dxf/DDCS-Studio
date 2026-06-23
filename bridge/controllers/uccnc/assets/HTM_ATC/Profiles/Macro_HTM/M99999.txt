@@ -1,0 +1,7 @@
+//This is the destructor macro which executes once, on the application close event
+
+// salvam scula incarcata in spindle ptr preluare la pornirea urmatoarei sesiuni uccnc
+exec.Writekey("UserTextfields", "20222", (AS3.Getfield(897))); // salvam starea slotului prin scriere 0 in profile
+
+// salvam viteza de jog manual (procent din maxim)
+exec.Writekey("UserTextfields", "20913", (AS3jog.Getfield(913))); // salvam starea slotului prin scriere 0 in profile

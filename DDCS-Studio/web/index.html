@@ -2,35 +2,129 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
-    <title>DDCS Studio V9.63 - Modular</title>
+    <title>DDCS Studio V10.28 - Modular</title>
     
     <!-- Ensure project stylesheet is applied after inline legacy rules -->
     <link rel="stylesheet" href="styles.css">
     <!-- App favicon (X/Y + chevron) -->
     <link rel="icon" href="assets/svg/favicon.svg" type="image/svg+xml">
-    <script src="https://apploader.pages.dev/fred-host.js" defer></script>
     <!-- three.js (global window.THREE) for the 3D toolpath preview. Vendored locally so
          the standalone download / future pywebview .exe works fully offline. -->
     <script defer src="assets/vendor/three.min.js"></script>
 </head>
 <body data-theme="studio">
 
+    <!-- Per-theme DDCS marks — one is shown at a time, switched by [data-theme] CSS -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+
+      <!-- NORMAL: clean wordmark -->
+      <symbol id="mark-normal" viewBox="0 0 150 36">
+        <text x="0" y="23" font-family="'Arial Black',Arial,sans-serif" font-size="26"
+          font-weight="900" font-style="italic" fill="#C7A900"
+          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
+        <text x="0" y="34" font-family="Arial,sans-serif" font-size="8.5" font-weight="600"
+          fill="#666666" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
+      </symbol>
+
+      <!-- STUDIO: engraved nameplate — stamped into the silver chassis -->
+      <symbol id="mark-studio" viewBox="0 0 150 36">
+        <text x="1" y="24" font-family="'Arial Black',Arial,sans-serif" font-size="26"
+          font-weight="900" font-style="italic" fill="#f0eee8"
+          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
+        <text x="0" y="23" font-family="'Arial Black',Arial,sans-serif" font-size="26"
+          font-weight="900" font-style="italic" fill="#55514a"
+          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
+        <text x="0.7" y="34.7" font-family="Arial,sans-serif" font-size="8.5" font-weight="600"
+          fill="#f0eee8" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
+        <text x="0" y="34" font-family="Arial,sans-serif" font-size="8.5" font-weight="600"
+          fill="#55514a" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
+      </symbol>
+
+      <!-- FUTURISTIC: neon glow wordmark -->
+      <symbol id="mark-futuristic" viewBox="0 0 150 36">
+        <defs>
+          <filter id="neon" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="1.6" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <text x="0" y="23" font-family="'Arial Black',Arial,sans-serif" font-size="26"
+          font-weight="900" font-style="italic" fill="#FFF100" filter="url(#neon)"
+          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
+        <text x="0" y="34" font-family="Arial,sans-serif" font-size="8.5" font-weight="600"
+          fill="#8892b0" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
+      </symbol>
+
+      <!-- ORGANIC: humanist wordmark -->
+      <symbol id="mark-organic" viewBox="0 0 150 36">
+        <text x="0" y="23" font-family="Georgia,'Times New Roman',serif" font-size="26"
+          font-weight="bold" font-style="italic" fill="#A89000"
+          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
+        <text x="0" y="34" font-family="Georgia,serif" font-size="8.5" font-weight="600"
+          fill="#7d7d6f" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
+      </symbol>
+
+      <!-- STEAMPUNK: brass serif wordmark -->
+      <symbol id="mark-steampunk" viewBox="0 0 150 36">
+        <defs>
+          <linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#F0CC3A"/><stop offset="55%" stop-color="#C89B2A"/>
+            <stop offset="100%" stop-color="#8b6914"/>
+          </linearGradient>
+        </defs>
+        <text x="0" y="23" font-family="Georgia,'Times New Roman',serif" font-size="26"
+          font-weight="bold" fill="url(#brass)"
+          textLength="146" lengthAdjust="spacingAndGlyphs">DDCS</text>
+        <text x="0" y="34" font-family="Georgia,serif" font-size="8.5" font-weight="600"
+          fill="#8b7355" textLength="146" lengthAdjust="spacingAndGlyphs">CNC MACRO STUDIO</text>
+      </symbol>
+
+    </svg>
+
     <header class="app-header">
         <span data-fred-home-mount></span>
-        <div class="hdr-title" style="display:flex;align-items:center;gap:12px">
-            <span class="hdr-text">DDCS STUDIO V9.63</span>
+        <a class="brand" href="https://ddcs-studio.pages.dev" target="_blank" rel="noopener"
+           title="Open DDCS Studio online — ddcs-studio.pages.dev">
+            <svg class="logo logo-normal" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-normal"/></svg>
+            <svg class="logo logo-studio" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-studio"/></svg>
+            <svg class="logo logo-futuristic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-futuristic"/></svg>
+            <svg class="logo logo-organic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-organic"/></svg>
+            <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
+            <span class="ver">V10.28</span>
+        </a>
+        <!-- File / quick-actions menu — sits right of the logo (file + settings menus go top-left).
+             Opens the file-ops / post-processor / theme / settings popover (ui/headerPost.js). -->
+        <div class="hdr-quick" id="hdrQuick">
+            <button type="button" id="hdrPostBtn" class="hdr-quick-btn" aria-haspopup="menu" aria-expanded="false"
+                    title="Menu — open / save / export, post-processor, theme, settings">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div id="hdrPostMenu" class="scale-pop hdr-quick-menu" role="menu" hidden></div>
         </div>
-            <div class="hdr-controls" style="display:flex;gap:10px;align-items:center">
-            <button onclick="(window.toggleStyle && window.toggleStyle())" id="styleBtn" class="op-btn" title="Switch Theme"><span class="op-icon">🎨</span><span class="op-label">NORMAL</span></button>
-            <button onclick="(window.toggleScale && window.toggleScale())" id="scaleBtn" class="op-btn scale-btn" title="Toggle Zoom (AUTO)"><span class="op-icon">🔍</span><span class="op-label">AUTO</span></button>
-            <button onclick="(window.openSettings && window.openSettings())" class="op-btn" id="settingsBtn" title="Settings — stock, machine envelope, variable CSV"><span class="op-icon">⚙</span><span class="op-label">SETTINGS</span></button>
-            <button onclick="(window.saveDefaults && window.saveDefaults())" class="op-btn" title="Download app with new defaults"><span class="op-icon">💾</span><span class="op-label">DOWNLOAD</span></button>
+        <span id="hdrPostWarn" class="hdr-post-warn" hidden title="">⚠</span>
+        <!-- Project Manager: 📂 Open (drawer) / ⤓ Save (modal). Wired by ui/macroBar.js -->
+        <div class="macro-bar" id="macroBar">
+            <button class="op-btn" id="projOpenBtn" title="Open / manage projects (.mjson)"><span class="op-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span></button>
+            <button class="op-btn" id="projSaveBtn" title="Save the current program as a project (.mjson)"><span class="op-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></span></button>
+        </div>
+        <!-- App-switcher: STUDIO ↔ GATEWAY ↔ SETTINGS. Wired by ui/gatewayStatus.js -->
+        <nav class="hdr-tabs" aria-label="App switcher">
+            <button type="button" class="tab active" data-app="studio" onclick="window.showApp && window.showApp('studio')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span><span class="app-tx">STUDIO</span></button>
+            <button type="button" class="tab" data-app="blocks" title="Blocks" onclick="window.showApp && window.showApp('blocks')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="5" rx="1"/><rect x="4" y="10" width="16" height="5" rx="1"/><rect x="4" y="17" width="16" height="4" rx="1"/></svg></span><span class="app-tx">BLOCKS</span></button>
+            <button type="button" class="tab" data-app="macros" title="Macros — M-codes, K-buttons, CAM packs" onclick="window.showApp && window.showApp('macros')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#f472b6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4H7a2 2 0 0 0-2 2v3a2 2 0 0 1-2 2 2 2 0 0 1 2 2v3a2 2 0 0 0 2 2h1"/><path d="M16 4h1a2 2 0 0 1 2 2v3a2 2 0 0 0 2 2 2 2 0 0 0-2 2v3a2 2 0 0 1-2 2h-1"/></svg></span><span class="app-tx">MACROS</span></button>
+            <button type="button" class="tab" data-app="gateway" title="Gateway"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg></span><span class="app-tx">GATEWAY</span><span id="gateway-led" class="gateway-led" title="Gateway status"></span></button>
+            <!-- Settings is no longer a tab — it opens as a modal from the header chevron quick-menu
+                 (ui/headerPost.js → window.openSettings) and from each wizard's ⚙ gear. -->
+
+        </nav>
+        <div class="hdr-controls">
+            <button class="op-btn hidden" id="transferBtn" title="Send the current program to the machine"><span class="op-icon">📡</span><span class="op-label">TRANSFER</span></button>
         </div>
     </header>
 
-    <div class="app-shell">
+    <div id="studio-app" class="app-shell">
         <!-- Top action bar: program + wizard buttons (moved up from the dock header).
              Wrapped in .dock-header so the existing .dock-header .header-controls CSS still applies. -->
         <div class="dock-header top-dock-header">
@@ -46,40 +140,17 @@
             <div class="editor-container">
                 <pre id="editor-highlight" class="editor-layer" aria-hidden="true"></pre>
                 <textarea id="editor" class="editor-layer" spellcheck="false" inputmode="none" placeholder="( System Ready )"></textarea>
+                <button id="align-rotate-btn" type="button" onclick="ddcsAlignRotate()" class="toolbar-btn settings-io" title="Alignment correction — rotate the whole program by a measured fence angle about a pivot (no G68 on DDCS, so Studio does it). Simulate after." style="position:absolute; left:8px; bottom:8px; z-index:3; opacity:.75; font-size:11px; padding:3px 8px;">⟳ Transform</button>
+                <div id="editor-statusbar" class="editor-statusbar hidden">
+                    <button class="editor-status-copy" id="editor-status-copy" type="button" title="Copy errors to the clipboard" aria-label="Copy errors">
+                        <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" style="vertical-align:middle" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>
+                    </button>
+                    <div id="editor-status-text" class="editor-status-text"></div>
+                </div>
                 <!-- 3D toolpath preview — slides in as a drawer from the right; the editor stays visible -->
                 <aside id="gcodeViz3dContainer" class="viz3d-drawer">
                     <div class="viz3d-resize" title="Drag to resize the preview"></div>
-                    <div id="viz3dStatus" class="viz3d-status"></div>
-                    <button id="viz3dStatusCopy" class="viz3d-status-copy" title="Copy status to clipboard">📋 Copy</button>
-                    <div class="viz3d-controls">
-                        <label>Stock
-                            <select id="viz3dStockShape" title="Stock shape">
-                                <option value="boss">Boss</option>
-                                <option value="pocket">Pocket</option>
-                            </select>
-                        </label>
-                        <label>Speed
-                            <select id="viz3dSpeed" title="Simulation speed — 1× plays at the programmed feedrates (slow probes crawl, rapids zip)">
-                                <option value="1" selected>1×</option>
-                                <option value="2">2×</option>
-                                <option value="5">5×</option>
-                                <option value="10">10×</option>
-                                <option value="1000">MAX</option>
-                            </select>
-                        </label>
-                        <button id="viz3dAnimate" type="button" title="Animate the toolpath in execution order">▶ Play</button>
-                        <button id="viz3dStep" type="button" title="Execute one line at a time (pauses a running program)">⏭ Step</button>
-                        <button id="viz3dLoop" type="button" title="Loop: restart the program automatically when it completes">⟳ Loop</button>
-                        <button id="viz3dIO" type="button" title="Show/hide the virtual I/O panel (sensors and outputs)">I/O</button>
-                    </div>
-                    <div class="viz3d-legend">
-                        <span><i style="background:#3b82f6"></i>Probe</span>
-                        <span><i style="background:#93c5fd"></i>Probe slow</span>
-                        <span><i style="background:#facc15"></i>Retract</span>
-                        <span><i style="background:#ff9a0d"></i>Jog</span>
-                        <span><i style="background:#00cc00"></i>Rapid</span>
-                    </div>
-                    <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan · shift+middle orbit</div>
+                    <div id="viz3d-panel-host"></div>   <!-- the shared createPreviewPanel mounts here (same as Blocks + wizards) -->
                 </aside>
                 <!-- Side pull-tab on the right edge: slides the 3D drawer open/closed -->
                 <button id="view-toggle" class="viz3d-handle" title="Toggle 3D toolpath preview" aria-label="Toggle 3D toolpath preview">
@@ -99,7 +170,6 @@
                 <div id="deck-panel" class="deck-panel"></div>
             </div>
         </div>
-    </div>
 
     <!-- Wizard overlay -->
     <div id="wizard" class="overlay">
@@ -108,13 +178,16 @@
             <div class="wiz-head">
                 <span id="wizTitle">GENERATOR</span>
                 <span class="wiz-head-actions" style="display:flex; gap:14px; align-items:center;">
-                    <span style="cursor:pointer" title="Settings — stock, probe, machine (live updates this preview)" onclick="window.openSettings && window.openSettings()">⚙</span>
-                    <span style="cursor:pointer" onclick="closeWiz()">✕</span>
+                    <span class="wiz-templates" title="Templates — save / load this op's settings" role="button" tabindex="0">📑</span>
+                    <span class="wiz-gear" title="Settings — stock, probe, machine (live updates this preview)" onclick="window.openSettings && window.openSettings()">⚙</span>
+                    <span class="wiz-close" onclick="closeWiz()" title="Close">✕</span>
                 </span>
             </div>
 
             <!-- WIZARD BODIES: One per wizard type, only one visible at a time -->
             <div id="wiz_corner" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <!-- Visualization container -->
                 <div class="viz-container">
@@ -130,14 +203,9 @@
                     <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
                 </div>
 
-                <!-- Animation toggle -->
-                <div style="margin: 8px 0; padding: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <input type="checkbox" id="c_animate" checked/>
-                        <span class="label" style="margin: 0;">ANIMATE PATHS</span>
-                    </label>
-                </div>
 
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <div class="wiz-usage">Use for <b>outside corners</b> (boss). Park probe in the open space near the corner at scan depth — clear of both walls. Macro probes each wall and sets WCS X and Y (and optionally Z) to the corner.</div>
 
                 <!-- Form controls in grid layouts -->
@@ -176,7 +244,7 @@
                 <div>
                     <span class="section-label">GEOMETRY</span>
                     <div class="grid-3">
-                        <div><span class="label">MAX PROBE</span><input type="number" id="c_dist" value="500" title="Max probe travel distance (mm). Stored as #1. Used in G31 as #7=[0-#1] (neg) or #8=#1 (pos)."/></div>
+                        <div><span class="label">MAX PROBE</span><input type="number" id="c_dist" value="100" title="Max probe travel distance (mm). Stored as #1. Used in G31 as #7=[0-#1] (neg) or #8=#1 (pos)."/></div>
                         <div><span class="label">RETRACT</span><input type="number" id="c_retract" value="5" title="Retract distance after fast probe, before slow pass (mm). Stored as #2. Used as #9=[0-#2] (neg) or #10=#2 (pos)."/></div>
                         <div><span class="label">PROBE RADIUS</span><input type="number" id="c_radius" value="2.0" step="0.001" title="Radius of the probe stylus ruby tip. Used for coordinate compensation."/></div>
                         <div><span class="label">SAFE Z</span><input type="number" id="c_safe_z" value="10" title="Z lift distance for moves between walls (mm). Stored as #19. Also used in plunge: #17=safeZ+scanDepth."/></div>
@@ -233,10 +301,14 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_corner_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- Middle Wizard -->
             <div id="wiz_middle" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <!-- Visualization container -->
                 <div class="viz-container">
@@ -252,14 +324,9 @@
                     <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
                 </div>
 
-                <!-- Animation toggle -->
-                <div style="margin: 8px 0; padding: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <input type="checkbox" id="m_animate" checked/>
-                        <span class="label" style="margin: 0;">ANIMATE PATHS</span>
-                    </label>
-                </div>
 
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <div id="middle_desc" class="wiz-usage"></div>
 
 
@@ -268,7 +335,7 @@
                 <div class="grid-2">
                     <div>
                         <span class="label">FEATURE TYPE</span>
-                        <select id="m_type" title="Pocket: probe from center outward to both walls. Boss: probe from outside each side (requires manual repositioning between passes)." value="pocket">
+                        <select id="m_type" title="Pocket: probe from center outward to both walls. Boss: probe each outside wall — Auto crosses over the part hands-free, Manual jog pauses to reposition." value="pocket">
                             <option value="pocket">pocket</option>
                             <option value="boss">boss</option>
                         </select>
@@ -284,6 +351,20 @@
 
                 <div class="grid-2">
                     <div>
+                        <span class="label">PROBE MODE</span>
+                        <select id="m_approach" title="Auto: hands-free — probes both walls (a boss is crossed over automatically). Manual jog: pauses so you can jog to each wall before the touch.">
+                            <option value="auto">auto (hands-free)</option>
+                            <option value="manual">manual jog (pause to adjust)</option>
+                        </select>
+                    </div>
+                    <div id="m_clear_block" class="hidden">
+                        <span class="label">TRAVERSE HEIGHT (mm)</span>
+                        <input id="m_clear" value="15" title="Boss auto only: how high to lift before crossing over the part to the far wall. Set it to clear the top of your boss with margin. Stored as #18."/>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div>
                         <span class="label">1ST AXIS DIR</span>
                         <select id="m_dir" title="Probe direction for the first axis (the AXIS selected above). The opposite wall is probed automatically. First edge → #51, second → #52, center → #53." value="pos">
                             <option value="pos">pos</option>
@@ -293,6 +374,13 @@
                     <div>
                         <span class="label">PROBE BOTH AXES</span>
                         <input type="checkbox" id="m_both" title="Find center on both axes. Probes primary axis first (#51/#52 → #53), then secondary axis (#54/#55 → #56). Both written to WCS."/>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div>
+                        <span class="label">CIRCULAR (round bore/boss)</span>
+                        <input type="checkbox" id="m_circular" title="Round feature: report the DIAMETER (opposite-touch span → #58, mean #60 in 2-axis) and, in 2-axis, re-centre to the found X centre before the Y probes so they cross the true diameter, not a chord. Absorbs the standalone Circular wizard."/>
                     </div>
                 </div>
 
@@ -322,7 +410,7 @@
                 <div>
                     <span class="section-label">GEOMETRY</span>
                     <div class="grid-3">
-                        <div><span class="label">MAX PROBE</span><input id="m_dist" value="500" title="Max probe travel distance (mm). Stored as #1. Used as #7=[0-#1] (neg) or #8=#1 (pos) in G31."/></div>
+                        <div><span class="label">MAX PROBE</span><input id="m_dist" value="100" title="Max probe travel distance (mm). Stored as #1. Used as #7=[0-#1] (neg) or #8=#1 (pos) in G31."/></div>
                         <div><span class="label">RETRACT</span><input id="m_retract" value="2" title="Retract between fast and slow probe passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)."/></div>
                         <div><span class="label">SAFE Z</span><input id="m_safe_z" value="10" title="Z retract height between probing moves (mm). Stored as #17. Used as G0 Z#17."/></div>
                     </div>
@@ -368,10 +456,261 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_middle_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Circular (bore/boss) Wizard -->
+            <div id="wiz_circular" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-container">
+                    <div id="circularVizStatus" class="viz-status"></div>
+                    <div id="circularVizContainer" class="viz-canvas"></div>
+                </div>
+
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div id="circ_desc" class="wiz-usage"></div>
+
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">FEATURE TYPE</span>
+                        <select id="circ_type" title="Bore: probe outward across an inside hole. Boss: probe each outside face (reposition pauses between faces).">
+                            <option value="bore">bore (inside)</option>
+                            <option value="boss">boss (outside)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">WCS TARGET</span>
+                        <select id="circ_wcs" title="Target WCS for the found centre. Active: reads #578. Fixed: G54..G59 directly.">
+                            <option value="active">Active WCS</option>
+                            <option value="G54">G54</option>
+                            <option value="G55">G55</option>
+                            <option value="G56">G56</option>
+                            <option value="G57">G57</option>
+                            <option value="G58">G58</option>
+                            <option value="G59">G59</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-3">
+                        <div><span class="label">MAX PROBE</span><input id="circ_dist" value="100" title="Max probe travel per touch (mm). #1; used as #7=[0-#1]/#8=#1 in G31."/></div>
+                        <div><span class="label">RETRACT</span><input id="circ_retract" value="2" title="Retract between fast and slow passes (mm). #2."/></div>
+                        <div><span class="label">SAFE Z</span><input id="circ_safe_z" value="10" title="Z retract height between moves (mm). #17; used as G0 Z#17."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input id="circ_feed_fast" value="200" title="Fast probe feedrate (mm/min). #3."/></div>
+                        <div><span class="label">SLOW FEED</span><input id="circ_feed_slow" value="50" title="Slow probe feedrate (mm/min). #4."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-2">
+                        <div><span class="label">STOP (Q)</span>
+                            <select id="circ_q" title="G31 stop mode. Q1=immediate, Q0=decelerate."><option value="1">Immediate (Q1)</option><option value="0">Decel (Q0)</option></select>
+                        </div>
+                        <div><span class="label" style="opacity:.7;">PROBE PORT/LEVEL</span><div class="wiz-usage" style="margin:0;">from Settings → probe input</div></div>
+                    </div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_circular_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Rotary Centreline (4th-axis setup) Wizard -->
+            <div id="wiz_rotary_center" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-container">
+                    <div id="rotaryCenterVizStatus" class="viz-status"></div>
+                    <div id="rotaryCenterVizContainer" class="viz-canvas"></div>
+                </div>
+
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div id="rc_desc" class="wiz-usage"></div>
+
+                <span class="section-label">METHOD</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">FIND CENTRE BY</span>
+                        <select id="rc_method" title="Known: enter the blank diameter, probe top + both flanks. Fit: probe 3 points, solve the circle (no diameter needed, advanced).">
+                            <option value="known">known diameter</option>
+                            <option value="fit">3-point fit</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">Z ZERO AT</span>
+                        <select id="rc_datum" title="Centreline: Z0 on the rotation axis (standard for 4th-axis). Top: Z0 on the cylinder's OD top surface.">
+                            <option value="center">centreline (axis)</option>
+                            <option value="top">OD top</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="rc_approach_block" class="grid-2">
+                    <div>
+                        <span class="label">FLANK APPROACH</span>
+                        <select id="rc_approach" title="Auto: the macro traverses clear, drops to the centreline beside the bar and probes each flank hands-free — fully simulated. Manual jog: same motion, but it pauses at each flank so you can jog to fine-tune before the touch.">
+                            <option value="auto">auto (hands-free)</option>
+                            <option value="guided">manual jog (pause to adjust)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="rc_diameter_block" class="grid-2">
+                    <div>
+                        <span class="label">STOCK DIAMETER (mm)</span>
+                        <input id="rc_diameter" value="76.2" title="Known cylinder diameter. R = diameter/2; centreline Z = top - R."/>
+                    </div>
+                    <div>
+                        <span class="label">WCS TARGET</span>
+                        <select id="rc_wcs" title="Target WCS for the work origin. Active reads #578; or pick a fixed WCS.">
+                            <option value="active">Active WCS</option>
+                            <option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option>
+                            <option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-3">
+                        <div><span class="label">MAX PROBE</span><input id="rc_dist" value="100" title="Max probe travel per touch (mm). #1."/></div>
+                        <div><span class="label">RETRACT</span><input id="rc_retract" value="2" title="Retract between passes (mm). #2."/></div>
+                        <div><span class="label">SAFE Z</span><input id="rc_safe_z" value="15" title="Z retract height (mm). #17."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input id="rc_feed_fast" value="200" title="Fast probe feedrate. #3."/></div>
+                        <div><span class="label">SLOW FEED</span><input id="rc_feed_slow" value="50" title="Slow probe feedrate. #4."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-2">
+                        <div><span class="label">STOP (Q)</span>
+                            <select id="rc_q" title="G31 stop mode. Q1=immediate, Q0=decelerate."><option value="1">Immediate (Q1)</option><option value="0">Decel (Q0)</option></select>
+                        </div>
+                        <div><span class="label" style="opacity:.7;">PROBE PORT/LEVEL</span><div class="wiz-usage" style="margin:0;">from Settings → probe input</div></div>
+                    </div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_rotary_center_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Rotary Clock (A0 to a feature) Wizard -->
+            <div id="wiz_rotary_clock" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-container">
+                    <div id="rotaryClockVizStatus" class="viz-status"></div>
+                    <div id="rotaryClockVizContainer" class="viz-canvas"></div>
+                </div>
+
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div id="rcl_desc" class="wiz-usage"></div>
+
+                <span class="section-label">CLOCK</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">ACTION</span>
+                        <select id="rcl_action" title="Set A0: datum A to the reference without moving. Report: measure tilt only. Rotate to 0: spin the part to the reference, then zero A.">
+                            <option value="set">set A0 (no rotate)</option>
+                            <option value="report">measure / report only</option>
+                            <option value="rotate">rotate to 0</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">REFERENCE (A0 AT)</span>
+                        <select id="rcl_reference" title="Where clock-zero points. Top: flat faces +Z (12 o'clock). +Y side: flat faces +Y (3 o'clock).">
+                            <option value="top">top (+Z)</option>
+                            <option value="side">+Y side (3 o’clock)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div>
+                        <span class="label">FLAT SPAN (mm)</span>
+                        <input id="rcl_span" value="20" title="Y distance between the two probe points across the flat. Bigger span = more accurate tilt. #6; sign sets the +Y direction."/>
+                    </div>
+                    <div>
+                        <span class="label">WCS TARGET</span>
+                        <select id="rcl_wcs" title="Target WCS for the A datum (#[#70+3]).">
+                            <option value="active">Active WCS</option>
+                            <option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option>
+                            <option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-3">
+                        <div><span class="label">MAX PROBE</span><input id="rcl_dist" value="100" title="Max Z probe travel per touch (mm). Must exceed Safe Z. #1."/></div>
+                        <div><span class="label">RETRACT</span><input id="rcl_retract" value="2" title="Retract between passes (mm). #2."/></div>
+                        <div><span class="label">SAFE Z</span><input id="rcl_safe_z" value="10" title="Z clearance for the cross-flat move (mm). #17."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input id="rcl_feed_fast" value="200" title="Fast probe feedrate. #3."/></div>
+                        <div><span class="label">SLOW FEED</span><input id="rcl_feed_slow" value="50" title="Slow probe feedrate. #4."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-2">
+                        <div><span class="label">STOP (Q)</span>
+                            <select id="rcl_q" title="G31 stop mode. Q1=immediate, Q0=decelerate."><option value="1">Immediate (Q1)</option><option value="0">Decel (Q0)</option></select>
+                        </div>
+                        <div><span class="label" style="opacity:.7;">PROBE PORT/LEVEL</span><div class="wiz-usage" style="margin:0;">from Settings → probe input</div></div>
+                    </div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_rotary_clock_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- Edge Wizard -->
             <div id="wiz_edge" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <!-- Visualization container -->
                 <div class="viz-container">
@@ -387,13 +726,9 @@
                     <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
                 </div>
 
-                <div style="margin: 8px 0; padding: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <input type="checkbox" id="p_animate" checked/>
-                        <span class="label" style="margin: 0;">ANIMATE PATHS</span>
-                    </label>
-                </div>
 
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <div class="wiz-usage">Position probe touching or just clear of the edge. Macro probes the wall and sets WCS axis to the contact position.</div>
 
                 <!-- Form controls in grid layouts -->
@@ -432,8 +767,9 @@
                 <div>
                     <span class="section-label">GEOMETRY</span>
                     <div class="grid-2">
-                        <div><span class="label">MAX PROBE</span><input id="p_dist" value="500" title="Max probe travel distance (mm). Stored as #1. #7=[0-#1] (neg), #8=#1 (pos)."/></div>
+                        <div><span class="label">MAX PROBE</span><input id="p_dist" value="100" title="Max probe travel distance (mm). Stored as #1. #7=[0-#1] (neg), #8=#1 (pos)."/></div>
                         <div><span class="label">RETRACT</span><input id="p_retract" value="2" title="Retract between fast and slow passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)."/></div>
+                        <div><span class="label">STYLUS RADIUS</span><input id="p_radius" value="2" title="Probe ball radius (mm). Stored as #6. WCS = trigger ± radius so the datum lands on the edge, not the ball centre."/></div>
                     </div>
 
                 </div>
@@ -478,10 +814,518 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_edge_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Drill / hole-pattern Wizard (Mill group) -->
+            <div id="wiz_drill" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="drillLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="drillLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="drillVizStatus" class="viz-status"></div>
+                        <div id="drillVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Drills/bores a hole pattern in the active WCS. Drag the handles in the 2D layout (left) to set the pattern — round handle sizes it, square handle places it; the 3D view (right) verifies the cut. Peck = plunge (hole Ø = drill); Bore = ring-step an end mill (hole Ø ≥ tool). Spindle start + end-of-program are added from Settings.</div>
+
+                <span class="section-label">PATTERN</span>
+                <div class="grid-2">
+                    <div><span class="label">TYPE</span>
+                        <select id="d_pattern" value="circle">
+                            <option value="grid">Grid</option>
+                            <option value="circle">Bolt circle</option>
+                            <option value="rect">Rectangle</option>
+                            <option value="line">Line</option>
+                        </select>
+                    </div>
+                    <div><span class="label">SKIP HOLES</span><input id="d_skip" value="" title="1-based hole numbers to omit (as shown in the preview), e.g. 5, 9"/></div>
+                    <div><span class="label">OFFSET X</span><input id="d_originX" value="0" title="Signed X offset of the path from the stock-attach corner (drag the square handle in the 2D layout)."/></div>
+                    <div><span class="label">OFFSET Y</span><input id="d_originY" value="0" title="Signed Y offset of the path from the stock-attach corner (drag the square handle in the 2D layout)."/></div>
+                    <div><span class="label">OFFSET Z</span><input id="d_offZ" value="0" title="Signed Z offset of the whole path (shifts every Z move; 0 = part-zero plane)."/></div>
+                    <input id="d_pathDatum" type="hidden" value=""/><!-- path-datum corner; set by the PATH ANCHOR form widget (empty = follow the stock attach) -->
+                    <input id="d_stockAttach" type="hidden" value=""/><!-- stock corner the path attaches to (markers on the stock); empty = the stock datum -->
+                    <div class="pa-mount" data-prefix="d_"></div>
+                    <div><span class="label">WORK WCS</span><select id="d_wcs" title="Run in the Active WCS (whatever G54–G59 is selected on the controller) or force a specific one. Positions are in the chosen frame."><option value="active">Active</option><option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option><option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option></select></div>
+                </div>
+                <div id="d_pat_grid" class="grid-2" style="display:none">
+                    <div><span class="label">COLUMNS</span><input id="d_cols" value="3"/></div>
+                    <div><span class="label">ROWS</span><input id="d_rows" value="3"/></div>
+                    <div><span class="label">X SPACING</span><input id="d_dx" value="20"/></div>
+                    <div><span class="label">Y SPACING</span><input id="d_dy" value="20"/></div>
+                </div>
+                <div id="d_pat_circle" class="grid-2">
+                    <div><span class="label">BOLT-CIRCLE Ø</span><input id="d_dia" value="50"/></div>
+                    <div><span class="label">HOLE COUNT</span><input id="d_count" value="6"/></div>
+                    <div><span class="label">START ANGLE</span><input id="d_startAngle" value="0"/></div>
+                </div>
+                <div id="d_pat_rect" class="grid-2" style="display:none">
+                    <div><span class="label">WIDTH</span><input id="d_w" value="100"/></div>
+                    <div><span class="label">HEIGHT</span><input id="d_h" value="80"/></div>
+                    <div><span class="label">HOLES / WIDTH</span><input id="d_nx" value="3"/></div>
+                    <div><span class="label">HOLES / HEIGHT</span><input id="d_ny" value="2"/></div>
+                </div>
+                <div id="d_pat_line" class="grid-2" style="display:none">
+                    <div><span class="label">HOLE COUNT</span><input id="d_lcount" value="3"/></div>
+                    <div><span class="label">SPACING</span><input id="d_spacing" value="20"/></div>
+                    <div><span class="label">ANGLE</span><input id="d_angle" value="0"/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="d_tool" title="Pick a tool from the library (Settings → Tool table → Tool library) to load its Ø, feed and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="d_rpm" value="" title="Overrides the Head's default RPM for this op. Leave blank to use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label" id="d_method_label">METHOD</span>
+                <div class="grid-2">
+                    <div id="d_method_cell"><span class="label">METHOD</span>
+                        <select id="d_method" value="peck">
+                            <option value="peck">Peck drill (hole = tool)</option>
+                            <option value="helical">Bore (end mill, hole ≥ tool)</option>
+                        </select>
+                    </div>
+                    <div><span class="label">HOLE Ø</span><input id="d_holeDia" value="6" title="Hole diameter. Peck: this is your drill size. Bore: target hole size (must be ≥ tool Ø)."/></div>
+                </div>
+                <div id="d_method_peck" class="grid-2">
+                    <div><span class="label">PECK</span><input id="d_peck" value="3" title="Peck increment (mm) — full retract to clearance each peck to clear chips."/></div>
+                </div>
+                <div id="d_method_bore" class="grid-2" style="display:none">
+                    <div><span class="label">TOOL Ø (end mill)</span><input id="d_toolDia" value="4"/></div>
+                    <div><span class="label">PITCH (Z/turn)</span><input id="d_pitch" value="0.5" title="Z step per full circle (mm)."/></div>
+                    <div><span class="label">RAMP</span>
+                        <select id="d_ramp" value="step" title="Step = plunge then flat circle each level (proven). Helix = continuous descent, linearized to G1 (the controller has no proven helical G2/G3).">
+                            <option value="step">Step (plunge + flat circle)</option>
+                            <option value="helix">Helix (linearized ramp)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="d_depth" value="5"/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="d_clearance" value="5"/></div>
+                    <div><span class="label">FEED</span><input id="d_feed" value="100"/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_drill_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Pocket clearing Wizard (Mill group) -->
+            <div id="wiz_pocket" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="pocketLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="pocketLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="pocketVizStatus" class="viz-status"></div>
+                        <div id="pocketVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Clears a rectangular or circular pocket with an end mill in the active WCS. Drag the handles in the 2D layout (square = place, round = size); the 3D view verifies the cut. Walls are offset inward by the tool radius so the finished pocket matches the size you type. Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">SHAPE</span>
+                <div class="grid-2">
+                    <div><span class="label">SHAPE</span>
+                        <select id="p_shape" value="rect">
+                            <option value="rect">Rectangle</option>
+                            <option value="circle">Circle</option>
+                            <option value="polygon">Polygon</option>
+                            <option value="ellipse">Ellipse</option>
+                        </select>
+                    </div>
+                    <div><span class="label">STRATEGY</span>
+                        <select id="p_strategy" value="spiral">
+                            <option value="spiral">Concentric (spiral)</option>
+                            <option value="raster">Raster (zig-zag)</option>
+                        </select>
+                    </div>
+                    <div><span class="label">OFFSET X</span><input id="p_originX" value="0" title="Signed X offset of the pocket from the stock-attach corner (drag the square handle)."/></div>
+                    <div><span class="label">OFFSET Y</span><input id="p_originY" value="0" title="Signed Y offset of the pocket from the stock-attach corner."/></div>
+                    <div><span class="label">OFFSET Z</span><input id="p_offZ" value="0" title="Signed Z offset of the whole pocket (shifts every Z move; 0 = part-zero plane)."/></div>
+                    <input id="p_pathDatum" type="hidden" value=""/><input id="p_stockAttach" type="hidden" value=""/>
+                    <div class="pa-mount" data-prefix="p_"></div>
+                </div>
+                <div id="p_dim_rect" class="grid-2">
+                    <div><span class="label">WIDTH</span><input id="p_w" value="80"/></div>
+                    <div><span class="label">HEIGHT</span><input id="p_h" value="60"/></div>
+                </div>
+                <div id="p_dim_circle" class="grid-2" style="display:none">
+                    <div><span class="label">DIAMETER</span><input id="p_dia" value="50"/></div>
+                    <div id="p_dim_sides" style="display:none"><span class="label">SIDES</span><input id="p_sides" value="6" title="Number of sides for a regular polygon (≥ 3)."/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="p_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="p_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">TOOL &amp; STEPOVER</span>
+                <div class="grid-3">
+                    <div><span class="label">TOOL Ø</span><input id="p_toolDia" value="6"/></div>
+                    <div><span class="label">STEPOVER %</span><input id="p_stepoverPct" value="40" title="Stepover as a percentage of tool diameter (40% = a 2.4 mm step on a 6 mm tool)."/></div>
+                    <div><span class="label">WALL OFFSET ±</span><input id="p_wallOffset" value="0" title="Signed wall offset (mm): + cuts the pocket OVERSIZE (walls out), − cuts UNDERSIZE / leaves stock. 0 = exact typed size."/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="p_depth" value="4"/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="p_stepdown" value="1.5" title="Z step-down per roughing pass (mm)."/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="p_clearance" value="5"/></div>
+                    <div><span class="label">WORK WCS</span><select id="p_wcs" title="Run in the Active WCS or force G54–G59. Positions are in the chosen frame."><option value="active">Active</option><option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option><option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option></select></div>
+                    <div><span class="label">FEED</span><input id="p_feed" value="600"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="p_plunge" value="150" title="Z plunge feedrate (mm/min) — usually slower than the cutting feed."/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_pocket_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Contour / profile cut Wizard (Mill group) -->
+            <div id="wiz_contour" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="contourLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="contourLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="contourVizStatus" class="viz-status"></div>
+                        <div id="contourVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Traces a rectangular or circular profile with an end mill in the active WCS. The boundary you type is the FINISHED edge; the toolpath is offset to a side (outside / inside / on) by the tool radius and stepped down to depth. Drag the handles in the 2D layout (square = place, round = size); the dashed line is the boundary, the solid line is the tool-centre path. Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">SHAPE</span>
+                <div class="grid-2">
+                    <div><span class="label">SHAPE</span>
+                        <select id="ct_shape" value="rect">
+                            <option value="rect">Rectangle</option>
+                            <option value="circle">Circle</option>
+                            <option value="polygon">Polygon</option>
+                            <option value="ellipse">Ellipse</option>
+                        </select>
+                    </div>
+                    <div><span class="label">OFFSET X</span><input id="ct_originX" value="0" title="Signed X offset of the profile from the stock-attach corner (drag the square handle)."/></div>
+                    <div><span class="label">OFFSET Y</span><input id="ct_originY" value="0" title="Signed Y offset of the profile from the stock-attach corner."/></div>
+                    <div><span class="label">OFFSET Z</span><input id="ct_offZ" value="0" title="Signed Z offset of the whole profile (shifts every Z move; 0 = part-zero plane)."/></div>
+                    <input id="ct_pathDatum" type="hidden" value=""/><input id="ct_stockAttach" type="hidden" value=""/>
+                    <div class="pa-mount" data-prefix="ct_"></div>
+                    <div><span class="label">WORK WCS</span><select id="ct_wcs" title="Run in the Active WCS or force G54–G59. Positions are in the chosen frame."><option value="active">Active</option><option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option><option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option></select></div>
+                </div>
+                <div id="ct_dim_rect" class="grid-2">
+                    <div><span class="label">WIDTH</span><input id="ct_w" value="80"/></div>
+                    <div><span class="label">HEIGHT</span><input id="ct_h" value="60"/></div>
+                </div>
+                <div id="ct_dim_circle" class="grid-2" style="display:none">
+                    <div><span class="label">DIAMETER</span><input id="ct_dia" value="50"/></div>
+                    <div id="ct_dim_sides" style="display:none"><span class="label">SIDES</span><input id="ct_sides" value="6" title="Number of sides for a regular polygon (≥ 3)."/></div>
+                </div>
+
+                <span class="section-label">SIDE &amp; TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">SIDE</span>
+                        <select id="ct_side" value="outside" title="Which side of the boundary the tool runs on: OUTSIDE (cut the part out — finished edge = boundary), INSIDE (cut a hole — finished edge = boundary), or ON (tool centre on the boundary).">
+                            <option value="outside">Outside</option>
+                            <option value="inside">Inside</option>
+                            <option value="on">On line</option>
+                        </select>
+                    </div>
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="ct_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">TOOL Ø</span><input id="ct_toolDia" value="6"/></div>
+                    <div><span class="label">SPINDLE RPM</span><input id="ct_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="ct_depth" value="4"/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="ct_stepdown" value="1.5" title="Z step-down per pass (mm)."/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="ct_clearance" value="5"/></div>
+                    <div><span class="label">FEED</span><input id="ct_feed" value="400"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="ct_plunge" value="200" title="Z plunge feedrate (mm/min) — usually slower than the cutting feed."/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_contour_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Slot milling Wizard (Mill group) -->
+            <div id="wiz_slot" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="slotLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="slotLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="slotVizStatus" class="viz-status"></div>
+                        <div id="slotVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Mills a straight slot from point A to point B in the active WCS. Drag the A / B / width handles in the 2D layout; the 3D view verifies the cut. The tool centre travels A→B, so the slot ends are rounded a tool-radius beyond each point. Width = tool → one pass; width &gt; tool → parallel passes. Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">ENDPOINTS</span>
+                <div class="grid-2">
+                    <div><span class="label">A — X</span><input id="sl_ax" value="0"/></div>
+                    <div><span class="label">A — Y</span><input id="sl_ay" value="0"/></div>
+                    <div><span class="label">B — X</span><input id="sl_bx" value="60"/></div>
+                    <div><span class="label">B — Y</span><input id="sl_by" value="0"/></div>
+                </div>
+                <div class="grid-3">
+                    <div><span class="label">OFFSET X</span><input id="sl_offX" value="0" title="Signed X nudge of the whole slot (A↔B positions it; pick a stock corner in the 2D layout to attach instead)."/></div>
+                    <div><span class="label">OFFSET Y</span><input id="sl_offY" value="0" title="Signed Y nudge of the whole slot."/></div>
+                    <div><span class="label">OFFSET Z</span><input id="sl_offZ" value="0" title="Signed Z offset (shifts every Z move; 0 = part-zero plane)."/></div>
+                    <input id="sl_pathDatum" type="hidden" value=""/><input id="sl_stockAttach" type="hidden" value=""/>
+                    <div class="pa-mount" data-prefix="sl_"></div>
+                </div>
+
+                <span class="section-label">REPEAT (array)</span>
+                <div class="grid-2">
+                    <div><span class="label">PATTERN</span>
+                        <select id="sl_pattern" title="Repeat the slot in a pattern. Single = one slot (A↔B). The slot shape is fixed; the pattern offsets copies of it.">
+                            <option value="single">Single slot</option>
+                            <option value="grid">Grid</option>
+                            <option value="line">Line</option>
+                            <option value="circle">Circle</option>
+                            <option value="rect">Rectangle</option>
+                        </select>
+                    </div>
+                    <div><span class="label">SKIP</span><input id="sl_skip" value="" title="1-based slot numbers to omit, e.g. 2, 4"/></div>
+                </div>
+                <div id="sl_pat_grid" class="grid-2" style="display:none">
+                    <div><span class="label">COLUMNS</span><input id="sl_cols" value="2"/></div>
+                    <div><span class="label">ROWS</span><input id="sl_rows" value="2"/></div>
+                    <div><span class="label">X SPACING</span><input id="sl_dx" value="40"/></div>
+                    <div><span class="label">Y SPACING</span><input id="sl_dy" value="30"/></div>
+                </div>
+                <div id="sl_pat_line" class="grid-2" style="display:none">
+                    <div><span class="label">COUNT</span><input id="sl_lcount" value="3"/></div>
+                    <div><span class="label">SPACING</span><input id="sl_spacing" value="30"/></div>
+                    <div><span class="label">ANGLE</span><input id="sl_angle" value="0"/></div>
+                </div>
+                <div id="sl_pat_circle" class="grid-2" style="display:none">
+                    <div><span class="label">CIRCLE Ø</span><input id="sl_dia" value="80"/></div>
+                    <div><span class="label">COUNT</span><input id="sl_count" value="6"/></div>
+                    <div><span class="label">START ANGLE</span><input id="sl_startAngle" value="0"/></div>
+                </div>
+                <div id="sl_pat_rect" class="grid-2" style="display:none">
+                    <div><span class="label">WIDTH</span><input id="sl_w" value="100"/></div>
+                    <div><span class="label">HEIGHT</span><input id="sl_h" value="80"/></div>
+                    <div><span class="label">PER WIDTH</span><input id="sl_nx" value="3"/></div>
+                    <div><span class="label">PER HEIGHT</span><input id="sl_ny" value="2"/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="sl_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="sl_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">TOOL &amp; WIDTH</span>
+                <div class="grid-3">
+                    <div><span class="label">WIDTH</span><input id="sl_width" value="6" title="Finished slot width (≥ tool Ø). Equal to the tool = a single pass."/></div>
+                    <div><span class="label">TOOL Ø</span><input id="sl_toolDia" value="6"/></div>
+                    <div><span class="label">STEPOVER %</span><input id="sl_stepoverPct" value="40" title="Only used when width &gt; tool. Percentage of tool diameter between parallel passes."/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="sl_depth" value="4"/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="sl_stepdown" value="1.5"/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="sl_clearance" value="5"/></div>
+                    <div><span class="label">WORK WCS</span><select id="sl_wcs" title="Run in the Active WCS or force G54–G59. Positions are in the chosen frame."><option value="active">Active</option><option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option><option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option></select></div>
+                    <div><span class="label">FEED</span><input id="sl_feed" value="600"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="sl_plunge" value="150"/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_slot_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Surfacing / face-mill Wizard (Mill group) -->
+            <div id="wiz_surfacing" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="surfacingLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="surfacingLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="surfacingVizStatus" class="viz-status"></div>
+                        <div id="surfacingVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Skims the top of the stock flat over a rectangular area. Opens sized to the whole stock top; drag the handles to face a sub-area. The tool overhangs the area edge by its radius so the whole top is faced — keep the area within fixture clearance. Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">AREA</span>
+                <div class="grid-2">
+                    <div><span class="label">OFFSET X</span><input id="sf_originX" value="0" title="Signed X offset of the faced area from the stock-attach corner (drag the square handle)."/></div>
+                    <div><span class="label">OFFSET Y</span><input id="sf_originY" value="0" title="Signed Y offset of the faced area from the stock-attach corner."/></div>
+                    <div><span class="label">OFFSET Z</span><input id="sf_offZ" value="0" title="Signed Z offset of the whole pass (shifts every Z move; 0 = part-zero plane)."/></div>
+                    <input id="sf_pathDatum" type="hidden" value=""/><input id="sf_stockAttach" type="hidden" value=""/>
+                    <div class="pa-mount" data-prefix="sf_"></div>
+                    <div><span class="label">WIDTH</span><input id="sf_w" value="100"/></div>
+                    <div><span class="label">HEIGHT</span><input id="sf_h" value="80"/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="sf_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="sf_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">TOOL &amp; STEPOVER</span>
+                <div class="grid-3">
+                    <div><span class="label">STRATEGY</span>
+                        <select id="sf_strategy" value="raster">
+                            <option value="raster">Raster (zig-zag)</option>
+                            <option value="spiral">Concentric (spiral)</option>
+                        </select>
+                    </div>
+                    <div><span class="label">TOOL Ø</span><input id="sf_toolDia" value="12"/></div>
+                    <div><span class="label">STEPOVER %</span><input id="sf_stepoverPct" value="60"/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">SKIM DEPTH</span><input id="sf_depth" value="0.5" title="Total material removed off the top (mm)."/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="sf_stepdown" value="0.5"/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="sf_clearance" value="5"/></div>
+                    <div><span class="label">WORK WCS</span><select id="sf_wcs" title="Run in the Active WCS or force G54–G59. Positions are in the chosen frame."><option value="active">Active</option><option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option><option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option></select></div>
+                    <div><span class="label">FEED</span><input id="sf_feed" value="800"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="sf_plunge" value="200"/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_surfacing_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Text / label engraving Wizard (Mill group) -->
+            <div id="wiz_text" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="textLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="textLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="textVizStatus" class="viz-status"></div>
+                        <div id="textVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Engraves filled text (part tags / labels) in the active WCS. Letters are pocket-filled from a single-stroke font, so the counters (holes in O, A, 8…) come out clean. Drag the pos / height handles in the 2D layout; the 3D verifies the cut. Use a small end mill (or V-bit). Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">TEXT</span>
+                <div><input id="tx_text" value="DDCS-01" style="width:100%" title="Uppercase A–Z, 0–9 and . , - _ : / # + = ( ) ! ? — lowercase is upper-cased."/></div>
+                <div class="grid-3">
+                    <div><span class="label">HEIGHT</span><input id="tx_height" value="12" title="Cap height (mm)."/></div>
+                    <div><span class="label">STROKE WIDTH</span><input id="tx_strokeWidth" value="2.5" title="Letter boldness (mm). Use ≥ the tool Ø so the fill is clean."/></div>
+                    <input id="tx_x" type="hidden" value="0"/><input id="tx_y" type="hidden" value="0"/><!-- position is driven by the 2D drag handle + the anchor/offset; not shown as inputs -->
+                    <div><span class="label">OFFSET X</span><input id="tx_offX" value="0" title="Signed X nudge of the label (from the attached stock corner, or origin)."/></div>
+                    <div><span class="label">OFFSET Y</span><input id="tx_offY" value="0" title="Signed Y nudge of the label."/></div>
+                    <div><span class="label">OFFSET Z</span><input id="tx_offZ" value="0" title="Signed Z offset (shifts every Z move; 0 = part-zero plane)."/></div>
+                    <input id="tx_pathDatum" type="hidden" value=""/><input id="tx_stockAttach" type="hidden" value=""/>
+                    <div class="pa-mount" data-prefix="tx_"></div>
+                    <div><span class="label">LETTER SPACING</span><input id="tx_spacing" value="1.2" title="Extra gap between letters (mm)."/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="tx_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="tx_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">TOOL &amp; FILL</span>
+                <div class="grid-2">
+                    <div><span class="label">TOOL Ø</span><input id="tx_toolDia" value="1.5"/></div>
+                    <div><span class="label">STEPOVER %</span><input id="tx_stepoverPct" value="50"/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="tx_depth" value="0.4"/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="tx_stepdown" value="0.4"/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="tx_clearance" value="4"/></div>
+                    <div><span class="label">FEED</span><input id="tx_feed" value="400"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="tx_plunge" value="120"/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_text_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- Alignment Wizard -->
             <div id="wiz_alignment" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
 
                 <span class="section-label">VISUALIZATION</span>
 
@@ -501,13 +1345,9 @@
                     <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
                 </div>
 
-                <div style="margin: 8px 0; padding: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <input type="checkbox" id="al_animate" checked/>
-                        <span class="label" style="margin: 0;">ANIMATE PATHS</span>
-                    </label>
-                </div>
 
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <div class="wiz-usage">Jog probe to <b>point A</b> along the fence at probe height → Enter. Macro probes fence, lifts Z, pauses. Jog to <b>point B</b> along same fence → Enter. Macro probes again and reports drift, span and angle.</div>
 
 
@@ -534,7 +1374,7 @@
                 <div>
                     <span class="section-label">GEOMETRY</span>
                     <div class="grid-3">
-                        <div><span class="label">MAX PROBE</span><input id="al_dist" type="number" value="20" title="Max probe travel toward fence (mm). Stored as #1. #7=[0-#1], #8=#1."/></div>
+                        <div><span class="label">MAX PROBE</span><input id="al_dist" type="number" value="100" title="Max probe travel toward fence (mm). Stored as #1. #7=[0-#1], #8=#1."/></div>
                         <div><span class="label">RETRACT</span><input id="al_retract" type="number" value="2" title="Retract after each probe pass (mm). Stored as #2. #9=[0-#2], #10=#2."/></div>
                         <div><span class="label">SAFE Z</span><input id="al_safe_z" type="number" value="10" title="Z lift between point A and point B (mm). Stored as #17. Used as G0 Z#17."/></div>
                     </div>
@@ -583,20 +1423,67 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_alignment_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
 
             </div>
 
             <!-- ATC Length Wizard -->
-            <div id="wiz_atc_length" class="wiz-body" style="display:none">
-                <div class="settings-hint" style="margin-bottom:8px;">Tool-length probe parameters come from <b>Settings → ATC</b> (block height, feeds, max distance, retract, Q) and the tool-setter pin/level from <b>Settings → Probes</b>. The preview below reflects those values — edit them in Settings.</div>
+            <div id="wiz_atc_length" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcLengthVizStatus" class="viz-status"></div>
+                        <div id="atcLengthViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="settings-hint" style="margin-bottom:8px;">Tool-length probe parameters come from <b>Settings → ATC</b> (block height, feeds, max distance, retract, Q) and the tool-setter pin/level from <b>Settings → Probes</b>. The preview reflects those values — edit them in Settings. ▶ traces the Z touch on the setter.</div>
                 <div class="preview-block">
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_atc_length_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
-            <!-- ATC Warm-up Wizard -->
-            <div id="wiz_atc_warmup" class="wiz-body" style="display:none">
+            <!-- Tool Breakage / Length Re-check Wizard -->
+            <div id="wiz_atc_check" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcCheckVizStatus" class="viz-status"></div>
+                        <div id="atcCheckViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="settings-hint" style="margin-bottom:8px;">A quick tap on the tool setter that <b>aborts if the tool is broken, missing, or the wrong length</b>. Re-measures and compares to the stored tool-length table (1430+T-1). Setter pin/level from <b>Settings → Probes</b>; block height, feeds, safe Z, max distance from <b>Settings → ATC</b>.</div>
+                <span class="section-label">TOLERANCE</span>
+                <div class="grid-2">
+                    <div><span class="label">LENGTH TOLERANCE (mm)</span><input id="atc_check_tol" value="0.5" title="Max allowed deviation from the stored tool length. Beyond +/- this aborts (broken or wrong tool)."/></div>
+                    <div><span class="label" style="opacity:.7;">CHECKS</span><div class="wiz-usage" style="margin:0;">current tool #1300 vs table 1430+T-1</div></div>
+                </div>
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_atc_check_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Spindle Warm-up Wizard -->
+            <div id="wiz_atc_warmup" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcWarmupVizStatus" class="viz-status"></div>
+                        <div id="atcWarmupViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <span class="section-label">WARM-UP SEQUENCE</span>
                 <div class="param-grid">
                     <label>Stage 1 RPM<input type="number" id="atc_warmup_rpm1" value="6000" class="num-input" step="1000"></label>
@@ -608,45 +1495,107 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_atc_warmup_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- ATC Tool Table Wizard (push lengths + pockets to the controller) -->
+            <div id="wiz_atc_table" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">MAGAZINE PREVIEW</span>
+                    <div class="viz-container">
+                        <div id="atcTableVizStatus" class="viz-status"></div>
+                        <div id="atcTableViz" class="viz-canvas"></div>
+                    </div>
+                    <div id="atcTableTools" class="tool-rack" style="display:flex;gap:10px;overflow-x:auto;padding:8px 2px;align-items:flex-end;min-height:54px;"></div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <span class="section-label">MAGAZINE</span>
+                <div id="atc_table_magazine"></div>
+                <span class="section-label" style="margin-top:10px;">TOOL TABLE → CONTROLLER</span>
+                <div class="param-grid">
+                    <label>Tool lengths<input type="checkbox" id="atc_table_lengths" checked></label>
+                    <label>Pocket positions<input type="checkbox" id="atc_table_pockets" checked></label>
+                </div>
+                <div class="wiz-note">Generates a macro you <b>run on the controller</b> to write the table — variable writes only, no motion. Pocket writes are unverified; running it is the test.</div>
+                <div class="preview-block">
+                    <span class="label">APPLY MACRO <span class="compliant-tag">(RUN ON CONTROLLER)</span></span>
+                    <pre id="wiz_atc_table_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- ATC Tool Change Wizard -->
-            <div id="wiz_atc_change" class="wiz-body" style="display:none">
+            <div id="wiz_atc_change" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">MAGAZINE &amp; TOOL CHANGE</span>
+                    <div class="viz-container">
+                        <div id="atcChangeVizStatus" class="viz-status"></div>
+                        <div id="atcChangeViz" class="viz-canvas"></div>
+                    </div>
+                    <div id="atcChangeTools" class="tool-rack" style="display:flex;gap:10px;overflow-x:auto;padding:8px 2px;align-items:flex-end;min-height:54px;"></div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <span class="section-label">TOOL CHANGE</span>
                 <div class="param-grid">
-                    <label>Mode
-                        <select id="atc_change_mode">
+                    <label>Method
+                        <select id="atc_change_method">
+                            <option value="m6" selected>M6 — delegate to controller (recommended)</option>
+                            <option value="firmware">Firmware push station (O10102 — verify)</option>
                             <option value="manual">Manual — park + swap prompt</option>
-                            <option value="auto">Automatic — ATC pick &amp; place (T.nc)</option>
+                            <option value="generic">Generic pick &amp; place (ASSUMED — verify)</option>
+                            <option value="disk">Disk / carousel (ASSUMED template — verify)</option>
                         </select>
                     </label>
                 </div>
-                <div class="param-grid" id="atc_change_manual_params">
+                <div class="param-grid" id="atc_change_manual_params" style="display:none">
                     <label>Park X (mm)<input type="number" id="atc_change_x" value="100" class="num-input"></label>
                     <label>Park Y (mm)<input type="number" id="atc_change_y" value="100" class="num-input"></label>
                     <label>Park Z (mm)<input type="number" id="atc_change_z" value="0" class="num-input"></label>
                 </div>
-                <div id="atc_change_auto_params" style="display:none">
+                <div id="atc_change_m6_params">
                     <div class="param-grid">
                         <label>Z change height (mach)<input type="number" id="atc_change_zclear" value="0" class="num-input"></label>
-                        <label>Magazine pockets<input type="number" id="atc_change_capacity" value="8" min="1" max="20" class="num-input"></label>
-                        <label title="0 = take the target from #1504 (M6 Txx). Set a tool number to generate a standalone test change.">Fixed test tool (0 = #1504)<input type="number" id="atc_change_fixedt" value="0" min="0" max="20" class="num-input"></label>
+                        <label title="Which tool to change to. 'From program' uses the M6 Txx target (#1504); or pick a tool from the magazine to generate a standalone test change.">Change to tool<select id="atc_change_fixedt"><option value="0">From program (M6 Txx)</option></select></label>
                     </div>
+                    <div class="wiz-usage">Parks safely (G53 Z to the change height, then G53 X/Y to the change position) then emits a bare <b>M6</b> — the controller runs its own working tool-change handler. The change position reuses Park X/Y from the magazine settings.</div>
+                </div>
+                <div id="atc_change_fw_params" style="display:none">
+                    <div class="param-grid">
+                        <label title="A rigid spindle should be oriented (M19) before the unclamp. Default on for the firmware push path."><input type="checkbox" id="atc_change_orient" checked> Spindle orient (M19) before unclamp</label>
+                    </div>
+                    <div class="wiz-usage">Firmware-accurate FIXED-STATION PUSH from <b>slib-m.nc O10102</b>: #1306 highest Z → push start #1320/#1321 → dwell #1322 → push end #1323/#1324 (F#1327) → retreat #1325/#1326, with the real pneumatic M-codes (M159/M157/M160/M163/M156/M161). ASSUMED to be taught on your controller — <b>verify before running</b>.</div>
+                </div>
+                <div id="atc_change_auto_params" style="display:none">
                     <div class="param-grid">
                         <label><input type="checkbox" id="atc_change_m300" checked> Wait spindle-stop sensor (M300)</label>
-                        <label><input type="checkbox" id="atc_change_cover"> Dust cover (M305/M306)</label>
+                        <label><input type="checkbox" id="atc_change_cover"> Dust cover (M162/M163)</label>
                         <label><input type="checkbox" id="atc_change_confirm"> Confirm prompt before moving</label>
                     </div>
-                    <div class="wiz-usage">Pocket positions come from the controller tables (#1330+ X · #1350+ Y · #1370+ Z) — teach them on the machine first. Drawbar: M154/M155, sensors: M302/M303. Test in the 3D drawer: ▶ Run with Auto sensors, or drive the I/O panel by hand.</div>
+                    <div class="wiz-usage"><b>ASSUMED model</b> — the real M350 O10102 is a pneumatic push station, not this drawbar changer. Pocket positions come from the controller tables (#1330+ X · #1350+ Y · #1370+ Z) — teach them first. <b>Verify on your machine before trusting this.</b></div>
                 </div>
                 <div class="preview-block">
-                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(VERIFY ON YOUR MACHINE)</span></span>
                     <pre id="wiz_atc_change_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- ATC Commissioning Test Wizard -->
-            <div id="wiz_atc_test" class="wiz-body" style="display:none">
+            <div id="wiz_atc_test" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcTestVizStatus" class="viz-status"></div>
+                        <div id="atcTestViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
                 <span class="section-label">ATC COMMISSIONING TEST</span>
                 <div class="param-grid">
                     <label>Test
@@ -675,6 +1624,8 @@
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_atc_test_code"></pre>
                 </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
             </div>
 
             <!-- Communication Wizard -->
@@ -838,6 +1789,34 @@
                 </div>
             </div>
 
+            <!-- Homing Wizard -->
+            <div id="wiz_homing" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-container">
+                    <div id="homingVizStatus" class="viz-status"></div>
+                    <div id="homingVizContainer" class="viz-canvas"></div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Generate a safe machine-homing macro. Each axis homes by its method from <b>Homing Setup</b> (native = the controller's built-in home, the safest default). Tick the axes to home this run; the sequence follows your saved order. The 3D preview runs a motion model of the homing (the emitted macro uses the controller's M98 home subs).</div>
+
+                <span class="section-label">HOME THIS RUN</span>
+                <div id="homing_axes" class="grid-3" style="margin-top:8px; gap:8px;"></div>
+
+                <div style="margin-top:10px;">
+                    <button id="homing_open_setup" type="button">⚙ Homing Setup…</button>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span id="homing_status" class="compliant-tag"></span></span>
+                    <pre id="wiz_homing_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
             <!-- FOOTER: Action buttons -->
             <div class="wiz-foot">
                 <button onclick="closeWiz()">CANCEL</button>
@@ -845,7 +1824,58 @@
             </div>
         </div>
     </div>
-    
+
+    </div>
+
+    <!-- GATEWAY app — machine-side views (Queue/Submit/Files/History/Setup), shown via the header
+         app-switcher when a gateway answers. Populated by ui/gatewayPanel.js (lazy-loaded). -->
+    <div id="gateway-app" class="gateway-app hidden"></div>
+
+    <!-- SETTINGS — a wide/tall flex MODAL (ui/settingsPanel.js). Opened from the header chevron quick-menu
+         and each wizard's ⚙ gear; overlays the current view (incl. a wizard) so context is preserved. -->
+    <div id="settings-overlay" class="overlay settings-overlay">
+        <div id="settings-app" class="settings-modal"></div>
+    </div>
+
+    <!-- MACROS app — author controller macros (M-codes / K-buttons) + the CAM Pack Builder.
+         Built by ui/macrosApp.js (lazy-mounted on first open via showApp). -->
+    <div id="macros-app" class="app-shell hidden"></div>
+
+    <!-- BLOCKS app — Codeblocks-for-G-code authoring (stack op-blocks → live G-code + preview).
+         Static shell here; blocks/blocksApp.js (lazy-loaded on first open) builds palette/stage/code. -->
+    <div id="blocks-app" class="app-shell hidden">
+        <!-- Mobile-only: left-edge handle opens the Blockly palette as a drawer over the canvas -->
+        <button id="blkToolsHandle" class="blk-tools-handle" type="button" aria-label="Toggle palette" aria-expanded="false">Blocks</button>
+        <div id="blk-ws" class="blk-ws"></div>   <!-- Blockly workspace (toolbox + canvas); built by blocksApp.js -->
+        <div class="right">
+            <!-- Desktop-only: drag the left edge to resize the preview column -->
+            <div class="blk-col-resize" aria-hidden="true" title="Drag to resize the preview"></div>
+            <!-- Mobile-only: drag the top edge to resize the preview drawer -->
+            <div class="blk-drawer-resize" aria-hidden="true"></div>
+            <!-- Mobile-only drawer header: grip + Preview/G-code toggle + close -->
+            <div class="blk-drawer-head">
+                <span class="blk-grip" aria-hidden="true"></span>
+                <div class="blk-seg">
+                    <button id="blkSegPv" class="on" type="button">Preview</button>
+                    <button id="blkSegCode" type="button">G-code</button>
+                </div>
+                <button id="blkDrawerClose" class="blk-drawer-x" type="button" aria-label="Close preview">✕</button>
+            </div>
+            <div class="pv">
+                <h3 class="pane-h">Preview</h3>
+                <div class="pv-body"><div id="blk-preview-panel"></div></div>   <!-- the shared createPreviewPanel mounts here -->
+            </div>
+            <!-- Desktop: drag to resize the Preview pane vs the Projected G-code pane below it -->
+            <div class="blk-row-resize" aria-hidden="true" title="Drag to resize Preview vs G-code"></div>
+            <div class="gcode">
+                <h3 class="pane-h">Projected G-code</h3>
+                <pre id="blk-gcode"></pre>
+            </div>
+        </div>
+        <!-- Mobile-only: bottom-centre pull-tab opens the preview drawer -->
+        <button id="blkDrawerHandle" class="blk-drawer-handle" type="button" aria-expanded="false">▲ Preview</button>
+    </div>
+
     <!-- Global tooltip -->
     <div id="global-tooltip" style="display:none;"></div>
 
@@ -858,6 +1888,55 @@
             } catch (err) {
                 console.error('Failed to import app.js', err);
             }
+            try {
+                // The Blocks program model (the data) + editor⇄stack sync — wired at startup so editing the
+                // STUDIO editor builds/updates blocks WITHOUT first opening the Blocks tab (the editor is the
+                // primary surface; the Blocks tab is just a view). Must run after app.js created the editor.
+                const { initProgramModel } = await import('./blocks/programModel.js');
+                initProgramModel();
+            } catch (err) { console.error('program model init failed', err); }
+            try {
+                const { initBridgeTransfer } = await import('./ui/bridgeTransfer.js');
+                initBridgeTransfer();             // before gatewayStatus so it catches the first tick
+            } catch (err) { console.error('bridge transfer init failed', err); }
+
+            try {
+                const { initGatewayStatus } = await import('./ui/gatewayStatus.js');
+                initGatewayStatus();
+            } catch (err) { console.error('gateway status init failed', err); }
+
+            try {
+                const { initUpdateCheck } = await import('./ui/updateCheck.js');
+                initUpdateCheck();                // desktop exe only: banner if a newer GitHub release exists
+            } catch (err) { console.error('update check init failed', err); }
+            try {
+                const { initHeaderPost } = await import('./ui/headerPost.js');
+                initHeaderPost();
+            } catch (err) { console.error('header post init failed', err); }
+            try {
+                const { maybeAutoOpenSetupChecklist } = await import('./ui/setupChecklist.js');
+                maybeAutoOpenSetupChecklist();    // first-run health check (auto-opens once unless dismissed); also reopenable from the quick-menu
+            } catch (err) { console.error('setup checklist init failed', err); }
+            try {
+                const { initPostGating } = await import('./ui/postGating.js');
+                initPostGating();                 // grey wizard fields the active post can't use (tooltip-only why)
+            } catch (err) { console.error('post gating init failed', err); }
+            try {
+                const { initMacroBar } = await import('./ui/macroBar.js');
+                initMacroBar();                   // header 📂 Open / 💾 Save project buttons
+            } catch (err) { console.error('macro bar init failed', err); }
+            try {
+                const { initEditorOpHover } = await import('./ui/editorOpHover.js');
+                initEditorOpHover();
+            } catch (err) { console.error('editor op-hover init failed', err); }
+            try {
+                const { initEditorAutocomplete } = await import('./ui/editorAutocomplete.js');
+                initEditorAutocomplete();         // phone-autocorrect-style caret bar (gated by compose.autocomplete)
+            } catch (err) { console.error('editor autocomplete init failed', err); }
+            try {
+                const { initProbeInputSelects } = await import('./ui/probeInputSelect.js');
+                initProbeInputSelects();
+            } catch (err) { console.error('probe-input selects init failed', err); }
         })();
     </script>
     

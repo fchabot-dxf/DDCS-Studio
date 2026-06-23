@@ -1,21 +1,168 @@
 /**
- * DDCS Studio - Corner Wizard
- * Generates G-code for corner probing operations
+ * DDCS Studio - Corner Wizard — find an OUTSIDE corner (boss): probe two walls, set the WCS X & Y (+ optional Z).
  *
- * Probe result codes (DDCS M350):
- *   #1920=X  #1921=Y  #1922=Z
- *   0=no probe, 1=initializing, 2=SUCCESS, 3=neg limit, 4=pos limit
- *   → Always check !=2 for failure (NOT ==1)
+ * REWRITTEN AS A BLOCK STACK: the wizard's only implementation is `cornerStack(params)` — a snippet of
+ * Comment / Set# / Probe / If Goto / Move / Distance / Label / Goto / Raw / End Program atoms. Form and Blocks
+ * view are two editors of the same stack. Same probe logic as the old string builder: optional Z-surface probe,
+ * then the two walls in the chosen order (XY/YX) with radius compensation, an N1/N2 error handler, and M30.
  *
- * Probe trigger positions (machine coords):
- *   #1925=X  #1926=Y  #1927=Z
+ * Functional port (NOT byte-identical to the old generator, same as the edge/middle ports): the atom emitter
+ * drops per-line inline comments + blank separators, fixes Q to Q1 (the probe atom's form), and splits the
+ * combined `G91 G0 Z#17` into `G91` + `G0 Z#17`. Verified vs the captured old output — probe sequence, #var
+ * math, WCS writes and control flow match — and against the M350 ground truth (see ddcs-ground-truth memory).
  *
- * G-code construct lines are emitted through the words.js "post"; static
- * declaration/header/WCS-read blocks remain literal (see middleWizard.js note).
+ * DDCS M350: status #1920/#1921/#1922 (2=SUCCESS, check !=2), trigger pos #1925/#1926/#1927.
  */
-import { w, G, M, N, A, Z, F, P, L, Q, set, line, comment } from './words.js';
-import { ifGoto, goto, wcsBase } from './dialect.js';
-import { toNum as toNumShared } from './probeBlocks.js';
+import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { recordOp } from '../blocks/opRecord.js';
+import { num } from './ops/util.js';
+import { toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
+
+const AX = {
+    X: { status: '#1920', result: '#1925', off: 0 },
+    Y: { status: '#1921', result: '#1926', off: 1 },
+    Z: { status: '#1922', result: '#1927', off: 2 },
+};
+const WCS_BASE = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
+
+/** Corner params → its outside-corner probe-macro block stack. The one source of truth for both displays. */
+export function cornerStack(params = {}) {
+    const corner = params.corner || 'FL';
+    const probeZ = !!params.probeZ;
+    const probeSeq = params.probeSeq === 'YX' ? 'YX' : 'XY';
+    const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
+
+    const dist = num(params.dist, 500), retract = num(params.retract, 5);
+    const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
+    const level = num(params.level, 0), safeZ = num(params.safeZ, 10);
+    const travelDist = num(params.travelDist, 50), scanDepth = num(params.scanDepth, 5), radius = num(params.radius, 2.0);
+    const src = params.sources || {};   // controller-resident probe fields (PROBE-CONFIG-SOURCE.md)
+
+    // corner → probe directions (FL=X+Y+  FR=X−Y+  BL=X+Y−  BR=X−Y−)
+    const [xDir, yDir] = { FL: ['+', '+'], FR: ['-', '+'], BL: ['+', '-'], BR: ['-', '-'] }[corner] || ['+', '+'];
+    const dirLabel = (d) => (d === '+' ? 'pos' : 'neg');
+    const plungeDepth = safeZ + scanDepth, td = travelDist || 0;
+
+    // The two walls in the chosen probe order, each with its direction.
+    const firstAx = probeSeq === 'YX' ? 'Y' : 'X', firstDir = probeSeq === 'YX' ? yDir : xDir;
+    const secondAx = probeSeq === 'YX' ? 'X' : 'Y', secondDir = probeSeq === 'YX' ? xDir : yDir;
+
+    const S = [];
+    const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
+    const A = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; S.push(b); };
+    const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
+    const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
+    const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
+    const PR = (ax, to, feed) => { const b = newBlock('probe'); b.params = { axis: ax, to, feed, port: '#5', level }; S.push(b); };
+    const CK = (ax, goto) => { const b = newBlock('probecheck'); b.params = { axis: ax, goto }; S.push(b); };   // folds where there's no status var
+    const MOVE = (props) => { const b = newBlock('move'); b.params = { mode: 'rapid', ...props }; S.push(b); };
+    const MV = (ax, v) => MOVE({ [ax.toLowerCase()]: v });
+    const RAW = (text) => { const b = newBlock('raw'); b.params = { text }; S.push(b); };
+    const END = () => S.push(newBlock('endprogram'));
+
+    const travelOwn = (d) => (d === '+' ? '#15' : '#16');   // travel IN the probe direction
+    const travelOpp = (d) => (d === '+' ? '#16' : '#15');   // travel the OTHER way (off the far side)
+
+    // Probe one wall: fast touch → check → retract → slow touch → check → radius-comp WCS write → retract + safe-Z.
+    const probeWall = (ax, dir) => {
+        const av = AX[ax], probeVar = dir === '+' ? '#8' : '#7', retractVar = dir === '+' ? '#9' : '#10';
+        const compOp = dir === '+' ? '+' : '-';   // boss: wall is at trigger ± stylus radius
+        PR(ax, probeVar, '#3'); CK(ax, 1); MV(ax, retractVar);
+        PR(ax, probeVar, '#4'); CK(ax, 1);
+        C(`Apply ${ax} WCS with Radius Comp`);
+        if (ax === 'X') {
+            A('#102', `[${av.result} ${compOp} #6]`, `Trigger Pos ${compOp} Radius`);
+            A('#[#70]', '#102', `Save to ${wcsLabel} X`);
+        } else {
+            A('#101', `[${av.result} ${compOp} #6]`, `Trigger Pos ${compOp} Radius`);
+            A('#73', '[#70+1]', 'WCS Y Address');
+            A('#[#73]', '#101', `Save to ${wcsLabel} Y`);
+        }
+        MV(ax, retractVar); MV('Z', '#17');
+    };
+
+    // ── Header ──
+    C(`Corner | ${corner} OUTSIDE | X ${dirLabel(xDir)} Y ${dirLabel(yDir)}${probeZ ? ' + Z Surface' : ''} | ${wcsLabel}`);
+    C(`Probe dist: ${dist}mm | Retract: ${retract}mm | Travel: ${travelDist}mm`);
+    C(`Fast: ${fFast} | Slow: ${fSlow} | SafeZ: ${safeZ}mm | ScanDepth: ${scanDepth}mm`);
+
+    // ── Configuration ──
+    C('=== CONFIGURATION ===');
+    A('#1', dist, 'Max probe distance');
+    A('#2', srcVal(src.retract, retract), srcNote(src.retract, 'Retract distance'));
+    A('#3', srcVal(src.fastFeed, fFast), srcNote(src.fastFeed, 'Fast feedrate'));
+    A('#4', fSlow, 'Slow feedrate');
+    A('#5', srcVal(src.port, port), srcNote(src.port, 'Probe port'));
+    A('#6', radius, 'Probe stylus radius');
+
+    // ── Calculated motions ──
+    C('=== CALCULATED MOTIONS ===');
+    A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
+    A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract');
+    if (td > 0) { A('#15', td, 'Positive travel'); A('#16', `[0-${td}]`, 'Negative travel'); }
+    else { A('#15', 0, 'Travel not used'); A('#16', 0, 'Travel not used'); }
+    A('#17', plungeDepth, 'Plunge depth = safeZ + scanDepth');
+    A('#18', '[0-#17]', 'Negative plunge'); A('#19', safeZ, 'Safe Z retract distance');
+
+    // ── WCS base address ──
+    if (wcs === 'active') {
+        C('Read Active WCS');
+        A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc');
+        A('#72', '[#71-1]', 'Zero-based index');
+        A('#70', '[805+[#72*5]]', 'Base WCS address');
+    } else { C(`Target: ${wcs}`); A('#70', WCS_BASE[wcs], 'Base WCS address'); }
+
+    // ── Confirm + incremental ──
+    C('Confirm Start');
+    A('#1505', '1', `${probeZ ? 'Hover OVER the' : 'Hover OUTSIDE the'} ${corner} corner material. Press Enter`);
+    DM('inc');
+
+    // ── Z surface (optional) ──
+    if (probeZ) {
+        const firstTravelVar = firstDir === '+' ? '#16' : '#15';   // escape OPPOSITE the first wall's probe dir
+        C('Step 1: Z Surface Probe');
+        PR('Z', '#7', '#3'); CK('Z', 1);
+        MV('Z', '#10');
+        PR('Z', '#7', '#4'); CK('Z', 1);
+        A('#73', '[#70+2]', 'WCS Z Address');
+        A('#[#73]', '#1927', `Save ${wcsLabel} Z offset - machine coord`);
+        MV('Z', '#19');
+        MV(firstAx, firstTravelVar);
+    }
+
+    // ── Two walls, in the chosen order ──
+    let step = probeZ ? 2 : 1;
+    C(`Step ${step++}: ${firstAx} Probe`);
+    MV('Z', '#18');                          // plunge to scan depth
+    probeWall(firstAx, firstDir);
+
+    C(`Step ${step++}: Travel past corner and set up for ${secondAx}`);
+    MOVE({ [firstAx.toLowerCase()]: travelOwn(firstDir), [secondAx.toLowerCase()]: travelOpp(secondDir) });
+    MV('Z', '#18');                          // plunge to scan depth
+
+    C(`Step ${step++}: ${secondAx} Probe`);
+    probeWall(secondAx, secondDir);
+
+    // ── Dual-gantry sync (optional) ──
+    if (params.syncA) {
+        const s = params.slave || '3';
+        C('Dual Gantry Sync');
+        DM('abs'); RAW('G1 A0 F#3'); DM('inc');
+        A('#74', `[#70+${s}]`, 'Base WCS + Slave Offset');
+        A('#[#74]', '#883', 'Sync A offset with Y');
+    }
+
+    // ── Footer + error handler ──
+    DM('abs');
+    A('#1505', '-5000', `Corner ${corner} found`);
+    GO(2);
+    C('=== ERROR HANDLER ===');
+    LB(1);
+    DM('inc'); MV('Z', '#17'); DM('abs');
+    A('#1505', '1', 'ERROR: Probe failed to trigger');
+    LB(2); END();
+    return S;
+}
 
 export class CornerWizard {
     constructor() {}
@@ -25,81 +172,14 @@ export class CornerWizard {
     }
 
     generate(params) {
-        const {
-            corner, probeZ, syncA, slave, probeSeq, wcs,
-            dist, retract, f_fast, f_slow, port, level, qStop,
-            safeZ, travelDist, scanDepth, radius
-        } = params;
-
-        const _scanDepth   = this.toNum(scanDepth, 5);
-        const _dist       = this.toNum(dist, 500);
-        const _retract    = this.toNum(retract, 5);
-        const _f_fast     = this.toNum(f_fast, 200);
-        const _f_slow     = this.toNum(f_slow, 50);
-        const _port       = this.toNum(port, 3);
-        const _level      = this.toNum(level, 0);
-        const _qStop      = this.toNum(qStop, 1);
-        const _safeZ      = this.toNum(safeZ, 10);
-        const _travelDist = this.toNum(travelDist, 50);
-        const _radius     = this.toNum(radius, 2.0);
-
-        // Mapping for Outside Corner (Boss):
-        // FL (Front-Left):  Probes X+ and Y+ (moves towards corner from bottom-left)
-        // FR (Front-Right): Probes X- and Y+ (moves towards corner from bottom-right)
-        // BL (Back-Left):   Probes X+ and Y- (moves towards corner from top-left)
-        // BR (Back-Right):  Probes X- and Y- (moves towards corner from top-right)
-        let xDir, yDir;
-        if      (corner === 'FL') { xDir = '+'; yDir = '+'; }
-        else if (corner === 'FR') { xDir = '-'; yDir = '+'; }
-        else if (corner === 'BL') { xDir = '+'; yDir = '-'; }
-        else if (corner === 'BR') { xDir = '-'; yDir = '-'; }
-
-        // WCS variable setup (stride-5 addressing lives in dialect.js)
-        const { code: wcsCode, label: wcsLabel } = wcsBase(wcs);
-
-        let gcode = '';
-        gcode += this.generateHeader(corner, xDir, yDir, probeZ, wcsLabel, _dist, _retract, _travelDist, _f_fast, _f_slow, _safeZ, _scanDepth);
-        gcode += this.generateMotionVariables(_dist, _retract, _f_fast, _f_slow, _port, _radius);
-        gcode += this.generatePrecalcMotionVariables(_safeZ, _travelDist, _scanDepth);
-        gcode += wcsCode;
-        gcode += this.generateConfirmStart(corner, probeZ);
-        gcode += line([G(91)], 'INCREMENTAL MODE') + '\n\n';
-
-        const firstAxis      = probeSeq === 'YX' ? 'Y' : 'X';
-        const firstAxisDir   = probeSeq === 'YX' ? yDir : xDir;
-        // Escape move after Z probe: move OPPOSITE of the probe direction to get off the part
-        const firstTravelVar = firstAxisDir === '+' ? '#16' : '#15';
-
-        let step = 1;
-        if (probeZ) {
-            gcode += this.generateZProbe(step, _level, _qStop, wcsLabel, firstAxis, firstTravelVar, _travelDist);
-            step++;
-        }
-
-        if (probeSeq === 'YX') {
-            gcode += this.generateYXSequence(step, xDir, yDir, probeZ, _level, _qStop, _travelDist, wcsLabel);
-        } else {
-            gcode += this.generateXYSequence(step, xDir, yDir, probeZ, _level, _qStop, _travelDist, wcsLabel);
-        }
-
-        if (syncA) {
-            const s = slave || '3';
-            gcode += comment('Dual Gantry Sync') + '\n';
-            gcode += line([G(90)], 'Absolute for sync move') + '\n';
-            gcode += line([G(1), A('0'), F('#3')], 'Square A axis') + '\n';
-            gcode += line([G(91)], 'Back to incremental') + '\n';
-            gcode += line([set('#74', `[#70+${s}]`)], 'Base WCS + Slave Offset') + '\n';
-            gcode += line([set('#[#74]', '#883')], 'Sync A offset with Y') + '\n\n';
-        }
-
-        gcode += this.generateFooter(corner);
-        return gcode;
+        recordOp('corner', params);   // let the Blocks tab open this op as its stack
+        return emitMapped(cornerStack(params)).text;
     }
 
     /**
      * Infer where the spindle should START for this corner/config, in the 3D-preview stock frame
      * (stock spans X[0..x] Y[0..y], top at Z=0). The macro is incremental, so this start positions the
-     * whole probe path at the chosen corner. Uses the SAME corner→direction convention as generate():
+     * whole probe path at the chosen corner. Uses the SAME corner→direction convention as cornerStack():
      *   - Z-first ("hover OVER the corner material") → just INSIDE the corner, above the top.
      *   - otherwise ("hover OUTSIDE the corner")     → just OUTSIDE the corner, within probe reach.
      * Purely a preview/sim hint — never written to the G-code, never touches the WCS.
@@ -124,184 +204,5 @@ export class CornerWizard {
         const firstIsX = (seq !== 'YX');                                   // YX → Y first, else X first
         const kFor = (isX) => zFirst ? overMat : ((isX === firstIsX) ? -inFront : nearEdge);
         return { x: cornerXY[0] + dir[0] * kFor(true), y: cornerXY[1] + dir[1] * kFor(false), z: safeZ };
-    }
-
-    generateHeader(corner, xDir, yDir, probeZ, wcsLabel, dist, retract, travelDist, f_fast, f_slow, safeZ, scanDepth) {
-        const dirLabel = d => d === '+' ? 'pos' : 'neg';
-        let h = `( Corner | ${corner} OUTSIDE | X ${dirLabel(xDir)} Y ${dirLabel(yDir)}`;
-        if (probeZ) h += ` + Z Surface`;
-        h += ` | ${wcsLabel} )\n`;
-        h += `( Probe dist: ${dist}mm | Retract: ${retract}mm | Travel: ${travelDist}mm )\n`;
-        h += `( Fast: ${f_fast} | Slow: ${f_slow} | SafeZ: ${safeZ}mm | ScanDepth: ${scanDepth}mm )\n\n`;
-        return h;
-    }
-
-    generateMotionVariables(dist, retract, f_fast, f_slow, port, radius) {
-        let v = `( === CONFIGURATION === )\n`;
-        v += `#1=${dist}    ( Max probe distance )\n`;
-        v += `#2=${retract} ( Retract distance )\n`;
-        v += `#3=${f_fast}  ( Fast feedrate )\n`;
-        v += `#4=${f_slow}  ( Slow feedrate )\n`;
-        v += `#5=${port}    ( Probe port )\n`;
-        v += `#6=${radius}   ( Probe stylus radius )\n\n`;
-        return v;
-    }
-
-    generatePrecalcMotionVariables(safeZ, travelDist, scanDepth = 5) {
-        const plungeDepth = parseInt(safeZ) + parseInt(scanDepth);
-        const td = parseInt(travelDist) || 0;
-        let v = `( === CALCULATED MOTIONS === )\n`;
-        v += `#7=[0-#1]  ( Negative max probe )\n`;
-        v += `#8=#1      ( Positive max probe )\n`;
-        v += `#9=[0-#2]  ( Negative retract )\n`;
-        v += `#10=#2     ( Positive retract )\n`;
-        v += (td > 0)
-            ? `#15=${td}      ( Positive travel )\n#16=[0-${td}] ( Negative travel )\n`
-            : `#15=0 ( Travel not used )\n#16=0 ( Travel not used )\n`;
-        v += `#17=${plungeDepth}  ( Plunge depth = safeZ + scanDepth )\n`;
-        v += `#18=[0-#17] ( Negative plunge )\n`;
-        v += `#19=${safeZ}      ( Safe Z retract distance )\n\n`;
-        return v;
-    }
-
-    generateConfirmStart(corner, probeZ) {
-        const verb = probeZ ? 'Hover OVER the' : 'Hover OUTSIDE the';
-        return `( Confirm Start )\n#1505=1 ( ${verb} ${corner} corner material. Press Enter )\n\n`;
-    }
-
-    generateZProbe(step, level, qStop, wcsLabel, firstAxis, firstTravelVar, travelDist) {
-        let c = comment(`Step ${step}: Z Surface Probe`) + '\n';
-        c += line([G(31), Z('#7'), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe down') + '\n';
-        c += ifGoto('#1922', '!=', '2', 1) + '\n';
-        c += line([G(0), Z('#10')], 'Retract up') + '\n';
-        c += line([G(31), Z('#7'), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe') + '\n';
-        c += ifGoto('#1922', '!=', '2', 1) + '\n';
-        c += line([set('#73', '[#70+2]')], 'WCS Z Address') + '\n';
-        c += line([set('#[#73]', '#1927')], `Save ${wcsLabel} Z offset - machine coord`) + '\n';
-        c += line([G(0), Z('#19')], 'Retract to safe Z') + '\n';
-        if (firstAxis && firstTravelVar) {
-            c += line([G(0), w(firstAxis, firstTravelVar)], `Travel ${travelDist}mm toward first wall`) + '\n';
-        }
-        c += `\n`;
-        return c;
-    }
-
-    generateYXSequence(step, xDir, yDir, probeZ, level, qStop, travelDist, wcsLabel) {
-        const yProbe   = yDir === '+' ? '#8' : '#7';
-        const yRetract = yDir === '+' ? '#9' : '#10';
-        const xProbe   = xDir === '+' ? '#8' : '#7';
-        const xRetract = xDir === '+' ? '#9' : '#10';
-        const yTravel  = yDir === '+' ? '#15' : '#16';
-        const xTravelOpp = xDir === '+' ? '#16' : '#15';
-
-        // Radius compensation logic (Boss):
-        // If probing positive (+Y), trigger is center. Wall is at center + radius.
-        // If probing negative (-Y), trigger is center. Wall is at center - radius.
-        const yCompOp = yDir === '+' ? '+' : '-';
-        const xCompOp = xDir === '+' ? '+' : '-';
-
-        let c = '';
-
-        // Step: Y Probe
-        c += comment(`Step ${step}: Y Probe`) + '\n';
-        c += line([G(0), Z('#18')], 'Plunge to scan depth') + '\n';
-        c += line([G(31), w('Y', yProbe), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe Y') + '\n';
-        c += ifGoto('#1921', '!=', '2', 1) + '\n';
-        c += line([G(0), w('Y', yRetract)], 'Retract from Y wall') + '\n\n';
-        c += line([G(31), w('Y', yProbe), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe Y') + '\n';
-        c += ifGoto('#1921', '!=', '2', 1) + '\n\n';
-        c += comment('Apply Y WCS with Radius Comp') + '\n';
-        c += line([set('#101', `[#1926 ${yCompOp} #6]`)], `Trigger Pos ${yCompOp} Radius`) + '\n';
-        c += line([set('#73', '[#70+1]')], 'WCS Y Address') + '\n';
-        c += line([set('#[#73]', '#101')], `Save to ${wcsLabel} Y`) + '\n\n';
-        c += line([G(0), w('Y', yRetract)], 'Retract from Y wall') + '\n';
-        c += line([G(0), Z('#17')], 'SAFELY retract exact plunge distance') + '\n\n';
-        step++;
-
-        // Step: Travel toward X wall
-        c += comment(`Step ${step}: Travel past corner and set up for X`) + '\n';
-        c += line([G(0), w('Y', yTravel), w('X', xTravelOpp)], 'Move Y past edge, X far off side') + '\n';
-        c += line([G(0), Z('#18')], 'Plunge to scan depth') + '\n\n';
-        step++;
-
-        // Step: X Probe
-        c += comment(`Step ${step}: X Probe`) + '\n';
-        c += line([G(31), w('X', xProbe), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe X') + '\n';
-        c += ifGoto('#1920', '!=', '2', 1) + '\n';
-        c += line([G(0), w('X', xRetract)], 'Retract from X wall') + '\n\n';
-        c += line([G(31), w('X', xProbe), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe X') + '\n';
-        c += ifGoto('#1920', '!=', '2', 1) + '\n\n';
-        c += comment('Apply X WCS with Radius Comp') + '\n';
-        c += line([set('#102', `[#1925 ${xCompOp} #6]`)], `Trigger Pos ${xCompOp} Radius`) + '\n';
-        c += line([set('#[#70]', '#102')], `Save to ${wcsLabel} X`) + '\n\n';
-        c += line([G(0), w('X', xRetract)], 'Retract from X wall') + '\n';
-        c += line([G(0), Z('#17')], 'SAFELY retract exact plunge distance') + '\n\n';
-
-        return c;
-    }
-
-    generateXYSequence(step, xDir, yDir, probeZ, level, qStop, travelDist, wcsLabel) {
-        const xProbe   = xDir === '+' ? '#8' : '#7';
-        const xRetract = xDir === '+' ? '#9' : '#10';
-        const yProbe   = yDir === '+' ? '#8' : '#7';
-        const yRetract = yDir === '+' ? '#9' : '#10';
-        const xTravel  = xDir === '+' ? '#15' : '#16';
-        const yTravelOpp = yDir === '+' ? '#16' : '#15';
-
-        // Radius compensation logic (Boss):
-        const xCompOp = xDir === '+' ? '+' : '-';
-        const yCompOp = yDir === '+' ? '+' : '-';
-
-        let c = '';
-
-        // Step: X Probe
-        c += comment(`Step ${step}: X Probe`) + '\n';
-        c += line([G(0), Z('#18')], 'Plunge to scan depth') + '\n';
-        c += line([G(31), w('X', xProbe), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe X') + '\n';
-        c += ifGoto('#1920', '!=', '2', 1) + '\n';
-        c += line([G(0), w('X', xRetract)], 'Retract from X wall') + '\n\n';
-        c += line([G(31), w('X', xProbe), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe X') + '\n';
-        c += ifGoto('#1920', '!=', '2', 1) + '\n\n';
-        c += comment('Apply X WCS with Radius Comp') + '\n';
-        c += line([set('#102', `[#1925 ${xCompOp} #6]`)], `Trigger Pos ${xCompOp} Radius`) + '\n';
-        c += line([set('#[#70]', '#102')], `Save to ${wcsLabel} X`) + '\n\n';
-        c += line([G(0), w('X', xRetract)], 'Retract from X wall') + '\n';
-        c += line([G(0), Z('#17')], 'SAFELY retract exact plunge distance') + '\n\n';
-        step++;
-
-        // Step: Travel toward Y wall
-        c += comment(`Step ${step}: Travel past corner and set up for Y`) + '\n';
-        c += line([G(0), w('X', xTravel), w('Y', yTravelOpp)], 'Move X past edge, Y far off side') + '\n';
-        c += line([G(0), Z('#18')], 'Plunge to scan depth') + '\n\n';
-        step++;
-
-        // Step: Y Probe
-        c += comment(`Step ${step}: Y Probe`) + '\n';
-        c += line([G(31), w('Y', yProbe), F('#3'), P('#5'), L(level), Q(qStop)], 'Fast probe Y') + '\n';
-        c += ifGoto('#1921', '!=', '2', 1) + '\n';
-        c += line([G(0), w('Y', yRetract)], 'Retract from Y wall') + '\n\n';
-        c += line([G(31), w('Y', yProbe), F('#4'), P('#5'), L(level), Q(qStop)], 'Slow probe Y') + '\n';
-        c += ifGoto('#1921', '!=', '2', 1) + '\n\n';
-        c += comment('Apply Y WCS with Radius Comp') + '\n';
-        c += line([set('#101', `[#1926 ${yCompOp} #6]`)], `Trigger Pos ${yCompOp} Radius`) + '\n';
-        c += line([set('#73', '[#70+1]')], 'WCS Y Address') + '\n';
-        c += line([set('#[#73]', '#101')], `Save to ${wcsLabel} Y`) + '\n\n';
-        c += line([G(0), w('Y', yRetract)], 'Retract from Y wall') + '\n';
-        c += line([G(0), Z('#17')], 'SAFELY retract exact plunge distance') + '\n\n';
-
-        return c;
-    }
-
-    generateFooter(corner) {
-        let f = line([G(90)], 'Back to absolute') + '\n';
-        f += line([set('#1505', '-5000')], `Corner ${corner} found`) + '\n';
-        f += goto(2) + '\n\n';
-        f += comment('=== ERROR HANDLER ===') + '\n';
-        f += line([N(1)]) + '\n';
-        f += line([G(91), G(0), Z('#17')], 'Safe Z on failure') + '\n';
-        f += line([G(90)]) + '\n';
-        f += line([set('#1505', '1')], 'ERROR: Probe failed to trigger') + '\n\n';
-        f += line([N(2)]) + '\n' + line([M(30)]) + '\n';
-        return f;
     }
 }

@@ -1,134 +1,98 @@
 /**
  * DDCS Studio - Edge Wizard
- * Generates G-code for single edge probing — probe one wall, set WCS axis to that position.
- * For finding center between two edges, use the Middle Wizard instead.
+ * Probe one wall, set a WCS axis to that position. (For center between two edges, use the Middle Wizard.)
  *
- * Probe result codes (DDCS M350):
- *   #1920=X  #1921=Y  #1922=Z
- *   0=no probe, 1=initializing, 2=SUCCESS, 3=neg limit, 4=pos limit
- *   → Always check !=2 for failure (NOT ==1)
+ * REWRITTEN AS A BLOCK STACK: the wizard's only implementation is `edgeStack(params)` — a snippet of
+ * Comment / Set# / Probe / IfGoto / Move / Distance / Label / Goto / End Program atoms, emitted bare.
+ * Form and Blocks view are two editors of the same stack. The probe macro form (G31 X#8 F#3 P#5 L0 Q1,
+ * single-axis G0 X#9) comes straight from the #var-aware Probe/Move atoms.
  *
- * Probe trigger positions (machine coords):
- *   #1925=X  #1926=Y  #1927=Z
- *
- * G-code construct lines are emitted through the words.js "post"; static
- * declaration/header/WCS-read blocks remain literal (see middleWizard.js note).
+ * DDCS M350: status #1920/#1921 (2=SUCCESS, check !=2), trigger pos #1925/#1926.
  */
-import { w, G, M, N, F, P, L, Q, set, line, comment } from './words.js';
-import { ifGoto, goto, wcsBase } from './dialect.js';
-import { twoPassProbe, toNum as toNumShared } from './probeBlocks.js';
+import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { recordOp } from '../blocks/opRecord.js';
+import { num } from './ops/util.js';
+
+const AX = {
+    X: { status: '#1920', result: '#1925', stop: '#1905', limit: '#1915', off: 0 },
+    Y: { status: '#1921', result: '#1926', stop: '#1906', limit: '#1916', off: 1 },
+};
+const WCS_BASE = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
+
+/** Edge params → its probe-macro block stack. The one source of truth for both displays. */
+export function edgeStack(params = {}) {
+    const axis = params.axis === 'Y' ? 'Y' : 'X', av = AX[axis];
+    const dir = params.dir === 'neg' ? 'neg' : 'pos', plus = dir === 'pos';
+    const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
+    const dist = num(params.dist, 15), retract = num(params.retract, 2), radius = num(params.radius, 2);
+    const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
+    const level = num(params.level, 0);
+    const probeVar = plus ? '#8' : '#7', retractVar = plus ? '#9' : '#10', limitVal = plus ? '2' : '1';
+    const compOp = plus ? '+' : '-';   // edge is at trigger ± stylus radius (toward the probe direction)
+
+    const S = [];
+    const C = (text) => { const b = newBlock('comment'); b.params = { text }; S.push(b); };
+    const A = (v, value, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(value), note: note || '' }; S.push(b); };
+    const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
+    const PR = (to, feed) => { const b = newBlock('probe'); b.params = { axis, to, feed, port: '#5', level }; S.push(b); };
+    const CK = (goto) => { const b = newBlock('probecheck'); b.params = { axis, goto }; S.push(b); };   // folds where there's no status var
+    const IF = (lhs, op, rhs, goto) => { const b = newBlock('ifgoto'); b.params = { lhs, op, rhs, goto }; S.push(b); };
+    const MV = (v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [axis.toLowerCase()]: v }; S.push(b); };
+    const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
+    const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
+    const END = () => { S.push(newBlock('endprogram')); };
+    
+    C('Motion Variables');
+    A('#1', dist, 'Max probe distance'); A('#2', retract, 'Retract distance');
+    A('#3', fFast, 'Fast feedrate'); A('#4', fSlow, 'Slow feedrate'); A('#5', port, 'Probe port');
+    A('#6', radius, 'Probe stylus radius');
+    C('Result storage'); A('#50', 0, 'Edge contact position');
+    C('Pre-calculated motion values');
+    A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
+    A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract');
+    if (wcs === 'active') {
+        C('Read Active WCS');
+        A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc');
+        A('#72', '[#71-1]', 'Zero-based index');
+        A('#70', '[805+[#72*5]]', 'Base WCS address');
+    } else {
+        C(`Target: ${wcs}`); A('#70', WCS_BASE[wcs], 'Base WCS address');
+    }
+    C('Confirm Start');
+    A('#1505', 1, `Press Enter to probe ${axis} ${dir} - ESC=cancel`);
+    IF('#1505', '==', '0', 2);
+    DM('inc');
+    C(`Probe ${axis} ${dir}`);
+    A(av.stop, '0', 'Stop mode: decelerate');
+    A(av.limit, limitVal, `Limit protect: ${plus ? 'positive' : 'negative'}`);
+    PR(probeVar, '#3'); CK(1); MV(retractVar);
+    PR(probeVar, '#4'); CK(1);
+    A('#50', `[${av.result}${compOp}#6]`, 'Edge = trigger +/- stylus radius'); MV(retractVar);
+    C('Write to WCS');
+    A(`#[#70+${av.off}]`, '#50', `Set ${wcsLabel} ${axis} to edge`);
+    DM('abs'); A('#1505', '-5000', 'Edge found'); GO(2);
+    LB(1); DM('abs'); A('#1505', 1, 'Probe failed - no contact');
+    LB(2); END();
+    return S;
+}
 
 export class EdgeWizard {
-    constructor() {}
-
     generate(params) {
-        const {
-            axis, dir, wcs,
-            syncA, slave,
-            level, qStop
-        } = params;
-
-        // Defensive numeric coercion (defaults match the wizard UI)
-        const dist    = toNumShared(params.dist, 15);
-        const retract = toNumShared(params.retract, 2);
-        const f_fast  = toNumShared(params.f_fast, 200);
-        const f_slow  = toNumShared(params.f_slow, 50);
-        const port    = toNumShared(params.port, 3);
-
-        const axisStatus = axis === 'X' ? '#1920' : '#1921';
-        const axisResult = axis === 'X' ? '#1925' : '#1926';
-        const axisOffset = axis === 'X' ? 0 : 1;
-
-        const dirSign     = dir === 'pos' ? '+' : '-';
-        const retractSign = dir === 'pos' ? '-' : '+'; // away from wall
-
-        const { wcsCode, wcsLabel } = this.generateWCSCode(wcs);
-        const retractVar = retractSign === '+' ? '#10' : '#9';
-
-        let gcode = '';
-        gcode += this.generateHeader(axis, dirSign, wcsLabel, dist, retract, f_fast, f_slow);
-        gcode += this.generateMotionVariables(dist, retract, f_fast, f_slow, port);
-        gcode += this.generatePrecalcMotionVariables();
-        gcode += wcsCode;
-        gcode += this.generateConfirmStart(axis, dirSign);
-        gcode += line([G(91)], 'Incremental mode') + '\n\n';
-
-        // Probe the edge
-        gcode += comment(`Probe ${axis} ${dirSign === '+' ? 'pos' : 'neg'}`) + '\n';
-        gcode += this.generateTwoPassProbe(axis, dirSign, retractSign, axisStatus, axisResult, '#50', level, qStop);
-
-        // Write edge position to WCS
-        gcode += comment('Write to WCS') + '\n';
-        gcode += line([set(`#[#70+${axisOffset}]`, '#50')], `Set ${wcsLabel} ${axis} to edge`) + '\n\n';
-
-        if (syncA) {
-            const s = slave || '3';
-            gcode += comment('Dual Gantry Sync') + '\n';
-            gcode += line([set('#74', `[#70+${s}]`)], 'Base WCS + Slave Offset') + '\n';
-            gcode += line([set('#[#74]', '#883')], 'Write sync result to slave offset') + '\n\n';
-        }
-
-        gcode += this.generateFooter();
-        return gcode;
+        recordOp('edge', params);   // let the Blocks tab open this op as its stack
+        return emitMapped(edgeStack(params)).text;   // a snippet: no Program Start/End blocks
     }
 
-    generateTwoPassProbe(axis, dirSign, retractSign, axisStatus, axisResult, resultVar, level, qStop) {
-        return twoPassProbe({
-            axis, dirSign, resultVar, level, qStop,
-            retractVar: retractSign === '+' ? '#10' : '#9',
-            comments: { save: 'Save edge position' },
-        });
-    }
-
-    generateWCSCode(wcs) {
-        const { code, label } = wcsBase(wcs);
-        return { wcsCode: code, wcsLabel: label };
-    }
-
-    generateHeader(axis, dirSign, wcsLabel, dist, retract, f_fast, f_slow) {
-        const dirLabel = dirSign === '+' ? 'pos' : 'neg';
-        let h = `( Edge | ${axis} ${dirLabel} | ${wcsLabel} )\n`;
-        h += `( DDCS M350 - Single edge probe )\n`;
-        h += `( Distance: ${dist}mm | Retract: ${retract}mm | Fast: ${f_fast} | Slow: ${f_slow} )\n\n`;
-        return h;
-    }
-
-    generateMotionVariables(dist, retract, f_fast, f_slow, port) {
-        let v = `( Motion Variables )\n`;
-        v += `#1=${dist}     ( Max probe distance )\n`;
-        v += `#2=${retract}  ( Retract distance )\n`;
-        v += `#3=${f_fast}   ( Fast feedrate )\n`;
-        v += `#4=${f_slow}   ( Slow feedrate )\n`;
-        v += `#5=${port}     ( Probe port )\n`;
-        v += `( Result storage )\n`;
-        v += `#50=0 ( Edge contact position )\n\n`;
-        return v;
-    }
-
-    generatePrecalcMotionVariables() {
-        let v = `( Pre-calculated motion values )\n`;
-        v += `#7=[0-#1]  ( Negative max probe )\n`;
-        v += `#8=#1      ( Positive max probe )\n`;
-        v += `#9=[0-#2]  ( Negative retract )\n`;
-        v += `#10=#2     ( Positive retract )\n\n`;
-        return v;
-    }
-
-    generateConfirmStart(axis, dirSign) {
-        const dirLabel = dirSign === '+' ? 'pos' : 'neg';
-        return comment('Confirm Start') + '\n'
-            + line([set('#1505', '1')], `Press Enter to probe ${axis} ${dirLabel} - ESC=cancel`) + '\n'
-            + ifGoto('#1505', '==', '0', 2) + '\n\n';
-    }
-
-    generateFooter() {
-        let f = line([G(90)], 'Back to absolute') + '\n';
-        f += line([set('#1505', '-5000')], 'Edge found') + '\n';
-        f += goto(2) + '\n\n';
-        f += line([N(1)]) + '\n';
-        f += line([G(90)]) + '\n';
-        f += line([set('#1505', '1')], 'Probe failed - no contact') + '\n\n';
-        f += line([N(2)]) + '\n' + line([M(30)]) + '\n';
-        return f;
+    /** Preview/sim start hint (stock frame): park clear of the wall being probed, perpendicular axis at centre —
+     *  the single-wall version of the Middle/Corner inferStart, so the probe approaches the face from open space.
+     *  dir pos probes +axis (hits the near/0 face from outside); dir neg probes −axis (hits the far face). */
+    inferStart(params, stock) {
+        const n = (v, d) => num(v, d);
+        const sx = n(stock && stock.x, 100), sy = n(stock && stock.y, 80), sz = n(stock && stock.z, 20);
+        const cx = sx / 2, cy = sy / 2, probeZ = -Math.min(5, sz * 0.5);
+        const outset = Math.max(6, Math.min(n(params.dist, 15) * 0.6, 15));
+        const pos = (params.dir || 'pos') !== 'neg';
+        return ((params.axis || 'X') === 'X')
+            ? { x: pos ? -outset : sx + outset, y: cy, z: probeZ }
+            : { x: cx, y: pos ? -outset : sy + outset, z: probeZ };
     }
 }

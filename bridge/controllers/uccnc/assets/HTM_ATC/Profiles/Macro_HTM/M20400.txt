@@ -1,0 +1,57 @@
+// M20400 - HTM_ATC macro - by SeB
+// ATC Page - macro for handling the Edit Tool fields. Is called by PLUS and MINUS buttons for tool selection
+
+myEvar = Evar;
+
+RunMacro(Convert.ToInt32(Evar)); // Evar = increment. 1 for selecting next tool, -1 for selecting previous tool
+
+#Events
+
+double? myEvar;
+
+static bool isMacroRunning = false; // Variabila globală pentru a verifica starea macro-ului
+
+int loadedTool = 0;
+
+public void RunMacro(int increment = 0) {
+    if (!isMacroRunning) {
+        isMacroRunning = true; // Setăm starea că macro-ul este în execuție
+        
+        if (increment == 0) loadedTool = Convert.ToInt32(exec.Readkey("UserTextfields", "20222", "0"));
+        if (increment == 1) { loadedTool = AS3.Getfieldint(20400) + 1; }
+        if (increment == -1) { loadedTool = AS3.Getfieldint(20400) - 1; }
+        
+       // punem scula activa in campul de editare din TOOLS
+        AS3.Setfield(loadedTool,20400);
+        AS3.Validatefield(20400);
+                // Declarăm variabilele de acces tooltable
+                var varLengthInit = Plugininterface.Datatypes.Tooltablecolumnname.Length;
+                var varDiameterInit = Plugininterface.Datatypes.Tooltablecolumnname.Diameter;
+                var varTypeInit = Plugininterface.Datatypes.Tooltablecolumnname.Type;
+                var varDescriptionInit = Plugininterface.Datatypes.Tooltablecolumnname.Description;
+
+                // Obținem valorile tooltable pentru scula curentă
+                double valueLengthInit = Convert.ToDouble(exec.Readtooltablecell(loadedTool, varLengthInit)); // Citim Length ca double
+                double valueDiameterInit = Convert.ToDouble(exec.Readtooltablecell(loadedTool, varDiameterInit)); // Citim Diameter ca double
+                string valueTypeInit = exec.Readtooltablecell(loadedTool, varTypeInit);
+                string valueDescriptionInit = exec.Readtooltablecell(loadedTool, varDescriptionInit);
+        AS3.Setfieldtext(valueDescriptionInit,20401); // camp descriere
+        AS3.Validatefield(20401);
+        AS3.Setfield(valueDiameterInit,20402); // camp descriere
+        AS3.Validatefield(20402);
+        AS3.Setfield(valueLengthInit,20403); // camp descriere
+        AS3.Validatefield(20403);
+		if (valueTypeInit == "RH") {
+			AS3.Switchbutton(true, 20403);
+			} else {
+			AS3.Switchbutton(false, 20403);
+			}		
+	
+        // Resetăm starea macro-ului
+        isMacroRunning = false; 
+		// aici se termina codul macro
+} else {
+        exec.AddStatusmessage("Macro already running! Ignoring!");
+        return;
+    }
+}

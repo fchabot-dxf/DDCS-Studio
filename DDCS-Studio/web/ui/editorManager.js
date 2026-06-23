@@ -22,17 +22,31 @@ export class EditorManager {
     setupSync() {
         if (!this.editor || !this.highlight) return;
 
+        // Line-number gutter (dark grey, left), scroll-synced with the editor.
+        this.gutter = el('editor-gutter');
+        if (!this.gutter && this.editor.parentElement) {
+            this.gutter = document.createElement('div');
+            this.gutter.id = 'editor-gutter';
+            this.gutter.setAttribute('aria-hidden', 'true');
+            this.editor.parentElement.insertBefore(this.gutter, this.editor);
+        }
+
         const syncText = () => {
             let code = this.editor.value;
             // Critical: Add space if ends in newline to prevent cursor disappearance
             if (code.endsWith('\n')) code += ' ';
-            this.highlight.innerHTML = UIUtils.formatGCode(code);
+            // .g-line is display:block, so drop formatGCode's inter-line "\n" — otherwise each
+            // line breaks twice (block + newline) and the highlight no longer aligns with the
+            // single-spaced textarea (the click→cursor mapping drifts).
+            this.highlight.innerHTML = UIUtils.formatGCode(code).replace(/\n/g, '');
+            this._updateGutter();
             this._restoreActiveLine();
         };
 
         const syncScroll = () => {
             this.highlight.scrollTop = this.editor.scrollTop;
             this.highlight.scrollLeft = this.editor.scrollLeft;
+            if (this.gutter) this.gutter.scrollTop = this.editor.scrollTop;
         };
 
         this.editor.addEventListener('input', syncText);
@@ -40,6 +54,12 @@ export class EditorManager {
 
         // Initial sync
         syncText();
+    }
+
+    _updateGutter() {
+        if (!this.gutter) return;
+        const n = Math.max(1, this.editor.value.split('\n').length);
+        this.gutter.textContent = Array.from({ length: n }, (_, i) => i + 1).join('\n');
     }
 
     setupBackspaceButton() {
@@ -136,10 +156,16 @@ export class EditorManager {
 
     clearCode() {
         this.editor.value = '';
+        // The editor is just a VIEW of the block-program model (blocks/programModel.js). Blanking the text alone
+        // leaves the accumulated ops in the model, which then (a) re-projects on blur and (b) gets appended to by
+        // the next Insert — the "clear keeps it in cache" bug. Wipe the model too so Clear actually clears.
+        if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack([]);
         this.editor.dispatchEvent(new Event('input'));
     }
 
-    downloadFile() {
+    // Shared by EXPORT (downloadFile) and TRANSFER (bridgeTransfer.js) so the file on the controller
+    // is byte-identical to the download — same (Title) line, same sanitized <name>.nc.
+    buildProgram() {
         let code = this.editor.value || '';
 
         // Use the first non-empty line (normally the descriptive header) for both title and filename
@@ -168,7 +194,12 @@ export class EditorManager {
         sanitized = sanitized.replace(/^_+|_+$/g, '').slice(0, 60);
         const outName = sanitized.length > 0 ? sanitized : 'program';
 
-        UIUtils.downloadFile(`${outName}.nc`, code);
+        return { name: `${outName}.nc`, code };
+    }
+
+    downloadFile() {
+        const { name, code } = this.buildProgram();
+        UIUtils.downloadFile(name, code);
     }
 
     getValue() {
@@ -191,7 +222,8 @@ export class EditorManager {
         const next = this.highlight.querySelector(`.g-line[data-line-index="${lineIndex}"]`);
         if (next) next.classList.add('active-line');
         this.activeLineIndex = lineIndex;
-        this._scrollToLine(lineIndex);
+        // No _scrollToLine: the editor must not jump while playing (unified with the wizard CODE PREVIEW —
+        // the pulsing highlight tracks the line in place instead of scrolling the text).
     }
 
     clearActiveLine() {

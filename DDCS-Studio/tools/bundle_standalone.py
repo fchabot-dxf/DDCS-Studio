@@ -30,7 +30,9 @@ EXPORT_DEFAULT_EXPR_RE = re.compile(r"export\s+default\s+(.+?);", flags=re.S)
 
 
 def read_text(path):
-    with open(path, 'r', encoding='utf-8') as f:
+    # utf-8-sig: strip any leading BOM so a BOM-prefixed source neither crashes the build (a non-cp1252
+    # char in the debug print) nor leaves a stray BOM in the concatenated bundle.
+    with open(path, 'r', encoding='utf-8-sig') as f:
         return f.read()
 
 

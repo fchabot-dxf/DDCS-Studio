@@ -1,187 +1,150 @@
 /**
- * DDCS Studio - Alignment Wizard
- * Generates G-code for fence/axis alignment verification
+ * DDCS Studio - Alignment Wizard — measure angular misalignment of a fence/edge vs a machine axis.
  *
- * PURPOSE:
- *   Measures angular misalignment of a fence or edge relative to a machine axis.
- *   - "checkAxis" = the axis the fence runs ALONG (e.g. X → fence goes left-right)
- *   - "probeAxis" = the perpendicular axis the probe moves in to touch the fence
- *   Operator positions probe at point A along the fence, macro records fence contact
- *   position. Operator jogs to point B along the fence, macro records again.
- *   Delta = contact_B - contact_A (how much fence wanders in probeAxis over the span)
- *   Span  = machine coord at B - machine coord at A (along checkAxis)
- *   Angle = ATAN(delta / span) → misalignment in degrees
+ * REWRITTEN AS A BLOCK STACK: `alignmentStack(params)` builds the macro from GRANULAR, dialect-aware atoms
+ * (Comment / Set# / Confirm / Distance / Read Machine / Probe / Probe Check / Probe Read / Move / Message /
+ * If Goto / Goto / Label / End Program). Because every controller-specific line goes through an atom, the SAME
+ * stack emits natively for Expert M350 / V4.1 / DM500 (probe form, status check folding, DRO var, HMI prompt
+ * all swap per active post). Form and Blocks view are two editors of this one stack.
  *
- * Probe result codes (DDCS M350):
- *   2=SUCCESS — check !=2 for failure (NOT ==1)
+ * PURPOSE: probe the fence at point A, operator jogs along the fence to point B, probe again. Misalignment
+ * angle = ATAN(delta / span), where delta = contactB − contactA (probe axis), span = machine coord B − A
+ * (check axis). On controllers with no scripted HMI (V4.1/DM500) the Confirm gates fold away — the operator
+ * just positions the tool between runs.
  *
- * Probe trigger positions (machine coords):
- *   #1925=X  #1926=Y  #1927=Z
- *
- * G-code construct lines are emitted through the words.js "post". Padded compute
- * lines and the no-space #1505 popup are kept literal (see middleWizard.js note).
+ * DDCS M350: status #1920/#1921 (2=SUCCESS), trigger pos #1925/#1926, DRO #880/#881 (check-axis machine coord).
  */
-import { w, G, M, N, Z, F, P, L, Q, set, line, comment } from './words.js';
-import { ifGoto, goto } from './dialect.js';
-import { twoPassProbe } from './probeBlocks.js';
+import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { recordOp } from '../blocks/opRecord.js';
+import { num } from './ops/util.js';
+import { srcVal, srcNote } from './probeBlocks.js';
+
+/** Alignment params → its block stack. The one source of truth for both displays, native across posts. */
+export function alignmentStack(params = {}) {
+    const checkAxis = params.checkAxis === 'Y' ? 'Y' : 'X';   // axis the fence runs along
+    const probeAxis = checkAxis === 'X' ? 'Y' : 'X';          // perpendicular axis the probe moves in
+    const dir = params.probeDir === 'neg' ? 'neg' : 'pos', plus = dir === 'pos';
+    const dirLabel = plus ? 'pos' : 'neg';
+    const safeZ = num(params.safeZ, 10), dist = num(params.dist, 20), retract = num(params.retract, 2);
+    const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 20), port = num(params.port, 0);
+    const tolerance = num(params.tolerance, 0);
+    const src = params.sources || {};
+    const probeVar = plus ? '#8' : '#7', retractVar = plus ? '#9' : '#10';   // retract OPPOSITE the probe direction
+
+    const S = [];
+    const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
+    const A = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; S.push(b); };
+    const IF = (l, o, r, g) => { const b = newBlock('ifgoto'); b.params = { lhs: l, op: o, rhs: r, goto: g }; S.push(b); };
+    const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
+    const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
+    const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
+    const CF = (msg, cancel) => { const b = newBlock('confirm'); b.params = { msg, cancel }; S.push(b); };
+    const RM = (axis, v) => { const b = newBlock('readmachine'); b.params = { axis, var: v }; S.push(b); };
+    const PR = (axis, to, feed) => { const b = newBlock('probe'); b.params = { axis, to, feed, port: '#5', level: num(params.level, 0) }; S.push(b); };
+    const CK = (axis, goto) => { const b = newBlock('probecheck'); b.params = { axis, goto }; S.push(b); };
+    const RD = (axis, v) => { const b = newBlock('proberead'); b.params = { axis, var: v }; S.push(b); };
+    const MV = (axis, v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [axis.toLowerCase()]: v }; S.push(b); };
+    const MSG = (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); };
+    const END = () => S.push(newBlock('endprogram'));
+
+    // Two-pass probe of the fence (fast → check → retract → slow → check → read → retract), all granular atoms.
+    const twoPass = (resultVar) => {
+        PR(probeAxis, probeVar, '#3'); CK(probeAxis, 1); MV(probeAxis, retractVar);
+        PR(probeAxis, probeVar, '#4'); CK(probeAxis, 1);
+        RD(probeAxis, resultVar); MV(probeAxis, retractVar);
+    };
+
+    // ── Header ──
+    C(`Alignment | Fence along: ${checkAxis} | Probe: ${probeAxis} ${dirLabel}`);
+    C(`Misalignment = contact_B - contact_A over the span along ${checkAxis}`);
+    C(`Tolerance: ${tolerance}mm | SafeZ: ${safeZ}mm | Fast: ${fFast} | Slow: ${fSlow}`);
+
+    // ── Motion variables ──
+    C('Motion Variables');
+    A('#1', dist, 'Max probe distance');
+    A('#2', srcVal(src.retract, retract), srcNote(src.retract, 'Retract distance'));
+    A('#3', srcVal(src.fastFeed, fFast), srcNote(src.fastFeed, 'Fast feedrate'));
+    A('#4', fSlow, 'Slow feedrate');
+    A('#5', srcVal(src.port, port), srcNote(src.port, 'Probe port'));
+    C('Pre-calculated motion values');
+    A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
+    A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract');
+    A('#19', safeZ, 'Safe Z lift distance - positive'); A('#20', `[0-${safeZ}]`, 'Safe Z descend distance - negative');
+    C('Result storage');
+    A('#50', 0, 'Point A probe contact'); A('#51', 0, 'Point B probe contact');
+    A('#52', 0, 'Delta: B - A wander'); A('#53', 0, 'Span absolute value'); A('#54', 0, 'Misalignment angle degrees');
+    A('#70', 0, 'Point A checkAxis machine coord'); A('#71', 0, 'Point B checkAxis machine coord'); A('#72', 0, 'Span signed: B - A');
+
+    // ── Point A ──
+    C(`===== POINT A: First probe along ${checkAxis} fence =====`);
+    C('Position probe at point A along the fence, at probing height');
+    CF('Press Enter when in position at point A - ESC=cancel', 2);
+    RM(checkAxis, '#70');                          // record check-axis machine coord (dialect DRO var)
+    DM('inc');
+    twoPass('#50');
+    MV('Z', '#19');                               // lift to clear the workpiece for jogging
+    DM('abs');
+
+    // ── Point B ──
+    C(`===== POINT B: Second probe along ${checkAxis} fence =====`);
+    C(`REPOSITION: jog to point B along the ${checkAxis} fence - keep same Y/Z`);
+    CF('Press Enter when in position at point B - ESC=cancel', 2);
+    RM(checkAxis, '#71');
+    A('#72', '[#71-#70]', `Span = B - A along ${checkAxis}`);
+    DM('inc'); MV('Z', '#20');                    // descend back to probe height
+    twoPass('#51');
+    DM('abs');
+
+    // ── Compute alignment ──
+    C('===== COMPUTE ALIGNMENT =====');
+    A('#52', '[#51-#50]', `Delta: fence wander in ${probeAxis} from A to B`);
+    A('#53', 'ABS[#72]', `Absolute span along ${checkAxis}`);
+    IF('#53', '==', '0', 1);                      // abort if A and B are at the same position (zero span)
+    A('#54', 'ATAN[#52]/[#53]', 'Misalignment angle (deg) = atan2(delta, span) — two-operand atan[a]/[b] form');
+    MV('Z', '#19'); DM('abs');
+
+    // ── Results ──
+    C('===== RESULTS =====');
+    A('#1510', '#52', 'Delta: fence wander in probe axis');
+    A('#1511', '#53', 'Span: absolute distance along check axis');
+    A('#1512', '#54', 'Angle: misalignment in degrees');
+    MSG('Drift=#1510mm Span=#1511mm Angle=#1512deg');   // #vars (DDCS substitutes them); printf %.3f isn't — hmiToast on Expert, comment on V4.1/DM500
+
+    // ── Footer + error handler ──
+    GO(2);
+    LB(1); DM('abs'); A('#1505', '1', 'Probe failed or zero span - check position');
+    LB(2); END();
+    return S;
+}
 
 export class AlignmentWizard {
     constructor() {}
 
     generate(params) {
-        const {
-            checkAxis,  // 'X' or 'Y' — axis the fence runs along
-            probeDir,   // 'pos' or 'neg' — direction probe moves to touch fence
-            safeZ,      // safe Z LIFT amount (relative, mm above current Z)
-            tolerance,  // mm — comment only for operator reference
-            dist,       // max probe distance
-            retract,    // retract distance
-            f_fast,     // fast feedrate
-            f_slow,     // slow feedrate
-            port,       // probe input port
-            level,      // probe level (0 or 1)
-            qStop       // stop mode (0 or 1)
-        } = params;
-
-        const _safeZ    = Number(safeZ)    || 10;
-        const _dist     = Number(dist)     || 20;
-        const _retract  = Number(retract)  || 2;
-        const _f_fast   = Number(f_fast)   || 200;
-        const _f_slow   = Number(f_slow)   || 20;
-        const _port     = Number(port)     || 0;
-        const _level    = Number(level)    || 0;
-        const _qStop    = Number(qStop)    || 0;
-
-        // probeAxis is perpendicular to checkAxis
-        const probeAxis  = checkAxis === 'X' ? 'Y' : 'X';
-        const axisStatus = probeAxis === 'X' ? '#1920' : '#1921';
-        const axisResult = probeAxis === 'X' ? '#1925' : '#1926';
-
-        // Machine coordinate variable for checkAxis (to compute span automatically)
-        // #880=X, #881=Y, #882=Z machine positions
-        const coordVar   = checkAxis === 'X' ? '#880' : '#881';
-
-        const dirSign     = probeDir === 'pos' ? '+' : '-';
-        const retractSign = probeDir === 'pos' ? '-' : '+';
-
-        let gcode = '';
-        gcode += this.generateHeader(checkAxis, probeAxis, dirSign, tolerance, _f_fast, _f_slow, _dist, _retract, _safeZ);
-        gcode += this.generateMotionVariables(_dist, _retract, _f_fast, _f_slow, _port, _safeZ);
-
-        // ===== POINT A =====
-        gcode += comment(`===== POINT A: First probe along ${checkAxis} fence =====`) + '\n';
-        gcode += comment('Position probe at point A along the fence, at probing height') + '\n';
-        gcode += line([set('#1505', '1')], 'Press Enter when in position at point A - ESC=cancel') + '\n';
-        gcode += ifGoto('#1505', '==', '0', 2) + '\n\n';
-
-        // Capture checkAxis machine coordinate at A
-        gcode += line([set('#70', coordVar)], `Record point A ${checkAxis} machine coord`) + '\n\n';
-
-        // Probe in G91 incremental
-        gcode += line([G(91)], 'Incremental mode') + '\n\n';
-        gcode += this.generateTwoPassProbe(probeAxis, dirSign, retractSign, axisStatus, axisResult, '#50', _level, _qStop);
-
-        // Lift Z safely (in G91 incremental) before user jogs to point B
-        gcode += line([G(0), Z('#19')], `Lift ${_safeZ}mm to clear workpiece for jogging`) + '\n\n';
-        gcode += line([G(90)], 'Absolute mode') + '\n\n';
-
-        // ===== POINT B =====
-        gcode += comment(`===== POINT B: Second probe along ${checkAxis} fence =====`) + '\n';
-        gcode += comment(`REPOSITION: jog to point B along the ${checkAxis} fence — keep same Y/Z`) + '\n';
-        gcode += line([set('#1505', '1')], 'Press Enter when in position at point B - ESC=cancel') + '\n';
-        gcode += ifGoto('#1505', '==', '0', 2) + '\n\n';
-
-        // Capture checkAxis machine coordinate at B and compute span
-        gcode += line([set('#71', coordVar)], `Record point B ${checkAxis} machine coord`) + '\n';
-        gcode += `#72=[#71-#70]  ( Span = B - A along ${checkAxis} )\n\n`; // padded compute → literal
-
-        // Descend back to probing height (G91 — move DOWN by same safeZ lift amount)
-        gcode += line([G(91)], 'Incremental mode') + '\n';
-        gcode += line([G(0), Z('#20')], 'Descend back to probe height') + '\n\n';
-
-        gcode += this.generateTwoPassProbe(probeAxis, dirSign, retractSign, axisStatus, axisResult, '#51', _level, _qStop);
-
-        gcode += line([G(90)], 'Absolute mode') + '\n\n';
-
-        // ===== COMPUTE RESULTS =====
-        gcode += comment('===== COMPUTE ALIGNMENT =====') + '\n';
-        // Padded compute lines kept literal (hand-aligned comment columns)
-        gcode += `#52=[#51-#50]         ( Delta: fence wander in ${probeAxis} from A to B )\n`;
-        gcode += `#53=ABS[#72]          ( Absolute span along ${checkAxis} )\n`;
-        // Guard against zero span to avoid division by zero
-        gcode += `IF #53==0 GOTO1       ( Abort if A and B are at same position )\n`;
-        gcode += `#54=ATAN[#52/#53]     ( Misalignment angle in degrees )\n\n`;
-
-        // Lift Z before displaying results
-        gcode += line([G(0), Z('#19')], 'Lift to safe height before display') + '\n\n';
-        gcode += line([G(90)], 'Absolute mode') + '\n\n';
-
-        // Single result dialog showing all three values using #1510-#1512 format vars
-        gcode += comment('===== RESULTS =====') + '\n';
-        gcode += line([set('#1510', '#52')], 'Delta: fence wander in probe axis') + '\n';
-        gcode += line([set('#1511', '#53')], 'Span: absolute distance along check axis') + '\n';
-        gcode += line([set('#1512', '#54')], 'Angle: misalignment in degrees') + '\n';
-        gcode += `#1505=-5000(Drift=%.3fmm Span=%.1fmm Angle=%.3fdeg)\n`; // no-space popup → literal
-        gcode += ifGoto('#1505', '==', '1', 2) + '\n\n';
-
-        gcode += this.generateFooter();
-        return gcode;
+        recordOp('alignment', params);   // let the Blocks tab open this op as its stack
+        return emitMapped(alignmentStack(params)).text;
     }
 
-    // Two-pass probe: fast → retract → slow → save → retract
-    // Two-pass probe: fast → retract → slow → save → retract
-    generateTwoPassProbe(probeAxis, dirSign, retractSign, axisStatus, axisResult, resultVar, level, qStop) {
-        return twoPassProbe({
-            axis: probeAxis, dirSign, resultVar, level, qStop,
-            retractVar: retractSign === '+' ? '#10' : '#9',
-            comments: {
-                fast: 'Fast probe toward fence',
-                slow: 'Slow probe for precision',
-                finalRetract: 'Retract from fence',
-            },
-        });
+    /** Preview start (first probe, point A). */
+    inferStart(params, stock) {
+        return this.inferStarts(params, stock)[0];
     }
 
-    generateHeader(checkAxis, probeAxis, dirSign, tolerance, f_fast, f_slow, dist, retract, safeZ) {
-        const dirLabel = dirSign === '+' ? 'pos' : 'neg';
-        let h = `( Alignment | Fence along: ${checkAxis} | Probe: ${probeAxis} ${dirLabel} )\n`;
-        h += `( Misalignment = contact_B - contact_A over the span along ${checkAxis} )\n`;
-        h += `( Tolerance: ${tolerance}mm | SafeZ: ${safeZ}mm | Fast: ${f_fast} | Slow: ${f_slow} )\n\n`;
-        return h;
-    }
-
-    generateMotionVariables(dist, retract, f_fast, f_slow, port, safeZ) {
-        let v = `( Motion Variables )\n`;
-        v += `#1=${dist}    ( Max probe distance )\n`;
-        v += `#2=${retract} ( Retract distance )\n`;
-        v += `#3=${f_fast}  ( Fast feedrate )\n`;
-        v += `#4=${f_slow}  ( Slow feedrate )\n`;
-        v += `#5=${port}    ( Probe port )\n\n`;
-        v += `( Pre-calculated motion values )\n`;
-        v += `#7=[0-#1]  ( Negative max probe )\n`;
-        v += `#8=#1      ( Positive max probe )\n`;
-        v += `#9=[0-#2]  ( Negative retract )\n`;
-        v += `#10=#2     ( Positive retract )\n`;
-        v += `#19=${safeZ}      ( Safe Z lift distance — positive )\n`;
-        v += `#20=[0-${safeZ}] ( Safe Z descend distance — negative )\n\n`;
-        v += `( Result storage )\n`;
-        v += `#50=0 ( Point A ${dist}mm probe contact )\n`;
-        v += `#51=0 ( Point B probe contact )\n`;
-        v += `#52=0 ( Delta: B - A wander )\n`;
-        v += `#53=0 ( Span absolute value )\n`;
-        v += `#54=0 ( Misalignment angle degrees )\n`;
-        v += `#70=0 ( Point A checkAxis machine coord )\n`;
-        v += `#71=0 ( Point B checkAxis machine coord )\n`;
-        v += `#72=0 ( Span signed: B - A )\n\n`;
-        return v;
-    }
-
-    generateFooter() {
-        let f = goto(2) + '\n\n';
-        f += line([N(1)]) + '\n';
-        f += line([G(90)]) + '\n';
-        f += line([set('#1505', '1')], 'Probe failed or zero span - check position') + '\n\n';
-        f += line([N(2)]) + '\n' + line([M(30)]) + '\n';
-        return f;
+    /**
+     * Per-pass preview starts: the alignment macro probes point A, repositions (jog to B along the fence), then
+     * probes point B → 2 passes. Spread the two starts ALONG the fence (the checkAxis) so both markers are placed
+     * at DISTINCT points (else both probes start at the same spot). Probe height = the stock top in the preview.
+     */
+    inferStarts(params, stock) {
+        const n = (v, d) => num(v, d);
+        const sx = n(stock && stock.x, 150), sy = n(stock && stock.y, 100), sz = n(stock && stock.z, 25);
+        const checkAxis = (params && params.checkAxis) === 'Y' ? 'Y' : 'X';   // fence runs along this
+        const z = Math.min(5, sz * 0.5);                                      // just above the top
+        if (checkAxis === 'X') {
+            // Fence along X → A and B differ in X (spread along X), near the +Y edge; probe moves in Y.
+            return [{ x: sx * 0.3, y: sy * 0.85, z }, { x: sx * 0.7, y: sy * 0.85, z }];
+        }
+        // Fence along Y → A and B differ in Y; probe moves in X.
+        return [{ x: sx * 0.85, y: sy * 0.3, z }, { x: sx * 0.85, y: sy * 0.7, z }];
     }
 }

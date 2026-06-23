@@ -1,0 +1,175 @@
+# 3D Preview & Simulation Notes
+
+_How the toolpath preview works today, and what it would take to grow it into a real
+machine simulation (WCS + origin + envelope). June 2026._
+
+---
+
+## How the preview works today
+
+The 3D preview parses the editor G-code and draws the toolpath. It is **automatic**:
+
+- While the 3D view is open, it re-draws as you type — ~300 ms after you stop
+  ([`DDCS-Studio/web/ui/gcodePreviewTab.js`](../DDCS-Studio/web/ui/gcodePreviewTab.js#L156)).
+- Switching **to** the 3D tab re-draws the current editor content
+  ([`gcodePreviewTab.js:241`](../DDCS-Studio/web/ui/gcodePreviewTab.js#L241)).
+- It only re-renders when the 3D view is the active one (`if (gpView !== '3d') return;`).
+
+Everything is drawn in the **active WCS**, with program-zero at world `(0,0,0)`.
+
+### "Nothing shows" ≠ broken code
+
+The preview only draws **motion it can resolve into coordinates**: `G0/G1/G2/G3` moves and
+`G31` probes with X/Y/Z. It legitimately draws **nothing** (and the status bar shows
+**"No drawable moves in this program"** — [`gcodePreviewTab.js:61`](../DDCS-Studio/web/ui/gcodePreviewTab.js#L61))
+when the program is:
+
+- setup / M-codes / comments / `#variable` assignments only — no motion;
+- all moves in **machine coordinates (`G53`)** — skipped, because the machine origin is unknown;
+- moves whose `#variables` can't be resolved to numbers.
+
+So an empty preview means *"there's no toolpath to draw here,"* not *"your code is wrong."*
+A macro that just **waits on a sensor input or toggles an output** (e.g. an ATC / tool-change
+handshake) has no XYZ motion, so its preview is correctly blank.
+
+---
+
+## Do we need WCS + origin simulation?
+
+**Not for the basic toolpath preview.** Cuts and probes are all relative to program-zero, so
+they render fine without a machine frame. That's why the wizard previews work.
+
+**It becomes necessary only for the bigger picture:**
+
+| Want to… | Needs machine frame? |
+|---|---|
+| Show the toolpath relative to the part | ❌ works today |
+| Draw `G53` / machine moves (park, tool-change positions) | ✅ |
+| Show where the part actually sits on the table | ✅ |
+| Check the program against the **envelope / soft limits** | ✅ |
+| Handle multiple work offsets (`G54–G59` / `#805+`) | ✅ |
+| "Test before installing" (the goal from user requests) | ✅ |
+
+---
+
+## We already have the building blocks
+
+Settings (⚙) already store everything the machine frame needs, persisted as JSON:
+
+- **Machine envelope** — travel X/Y/Z.
+- **Origin offset** — `ox/oy/oz` = program-zero position within the envelope.
+- **Stock** — block dimensions + shape (boss/pocket).
+
+So this is an **incremental add, not a rewrite**.
+
+### Proposed "Machine frame" mode (toggle)
+
+Keep the preview program-centric by default; add a toggle that:
+
+1. Anchors the scene to the machine envelope (already drawable).
+2. Places the **WCS origin** at the settings origin → offsets the stock + toolpath there.
+3. Gives `G53` moves a frame → **draw** them instead of skipping.
+4. Flags anything **outside the envelope** (soft-limit check).
+
+### A useful subtlety
+
+For **probing** macros, the WCS is *set by the probe touching the stock* — and the preview
+already simulates that contact (the probe clamping). So the resulting WCS offset is effectively
+known from the contact points; surfacing it is a natural next step.
+
+---
+
+## Connection to I/O simulation (requested on socials)
+
+Users have asked for **test/simulation including the controller's inputs/outputs** — e.g. a
+tool-change that waits for the spindle ATC sensor before proceeding. This is a separate layer
+from geometry:
+
+- The DDCS Expert macro language can poll inputs / drive outputs and branch on them
+  (`IF`/`GOTO`, system `#variables`). _(Confirm exact I/O variable addresses against the
+  variable DB before relying on this.)_
+- Simulating it means stepping the program and letting the user **assert input states** to
+  exercise the `IF`/`GOTO` paths — independent of the toolpath drawing.
+
+The machine-frame work above is the geometric foundation; I/O state-stepping is the logic layer
+on top.
+
+---
+
+## Status / decision
+
+- ☑ **Decided (June 2026):** stay program-centric for now — machine frame deferred.
+- 🔄 **REVERSED (2026-06-17):** machine frame is now **ACTIVE** — a "personalised sim" sourced from the
+  **static controller dump** (envelope + WCS/origin + soft limits). Plan: memory `personalised-sim-from-dump`
+  + root [`VERIFY-AT-MACHINE.md`](VERIFY-AT-MACHINE.md). Fixes the `G53`-drawn-in-WCS-space bug
+  ([`GcodeExecutionEngine.js:650`](../DDCS-Studio/web/engine/GcodeExecutionEngine.js#L650)).
+- ☑ Preview is program-centric (active WCS at origin) — works for cuts + probes.
+- ◐ Machine frame (envelope + origin + `G53` + limit check) — envelope is **drawn** (`gcodeViz3d.setMachine`)
+  but **not yet enforced**; being built per the personalised-sim plan.
+- ☑ **I/O state-stepping (sensor-wait / output simulation) — built.**
+  - Floating **Virtual I/O panel** (draggable, resizable; `I/O` button in the 3D drawer):
+    24 inputs (click-to-toggle) + 24 outputs, replaces the Settings I/O tab.
+  - **⏭ Step** button runs one line at a time; **▶ Run / Resume / ⏸ Stop** for continuous.
+  - `M31/M33` waits park execution, auto-show the panel and pulse the waited pin.
+  - **Auto sensors** (default ON): any waited input is answered by a virtual sensor
+    (~0.8 s) — truth-table handshakes still fire with realistic delays. Turn OFF to
+    hand-drive sensors and exercise `IF`/`GOTO` failure branches.
+  - `G31` probe contact now flips the actual probe input pin on the panel (fired at
+    the moment the paced move reaches the contact point).
+  - Tests: `verification/io-sim-test.mjs` (engine, 5 cases) + `tests/io-sim.spec.js` (e2e, 5 pass).
+- ☑ **Feedrate-true playback.**
+  - Engine Run interpolates each move in real time: distance ÷ programmed `F`
+    (rapids at 6000 mm/min) — slow probes crawl, rapids zip. **Speed** selector in
+    the drawer (1× / 2× / 5× / 10× / MAX), changeable mid-move.
+  - Status shows the move: `G31 probe 10.0 mm at F50 — 12.0 s`.
+  - The looping ▶ Play preview animation is **feed-true (real time)** as of 2026-06-13
+    (was normalised to a ~5 s loop) — see the session entry at the bottom.
+- ☑ **⟳ Loop** toggle — restart the program automatically on completion (Run only).
+- ☑ **ATC generators rebuilt on the real DDCS dialect** (decoded from the variable DB):
+  drawbar = `M154/M155`, sensor waits = `M300/M302/M303/M304`, dust cover `M305/M306`,
+  pockets from controller tables `#1330+/X #1350+/Y #1370+/Z`, target tool `#1504` (M6 Txx).
+  - **Tool Change** wizard: Manual park (no-ATC machines) / **Auto T.nc-style** pick & place.
+  - **ATC Test** wizard (new): drawbar cycle test + pocket dry-run — the commissioning
+    checks a machinist runs before trusting the first automatic change.
+  - Engine simulates the whole dialect (drawbar handshakes in the truth table, `G4` dwell
+    in ms, `M6` → `#1504`), so all generated macros run end-to-end in the sim.
+  - Warmup fix: `G4 P` is **ms** on DDCS — wizard now converts seconds → ms.
+  - Validated: 8-case engine round trip (`verification/atc-gen-test.mjs`) + `ddcs_lint.py`
+    clean on all five generated macros + 2 e2e wizard tests.
+- ☑ Beep fix: the preview loop no longer beeps every cycle; one beep when an
+  engine run completes.
+- ☑ Viewer: middle-drag pans, Shift+middle orbits (CAD-style).
+
+---
+
+## Session 2026-06-13 — wizard UI, viz colours, animation, DDCS V3
+
+- ☑ **Wizard two-pane layout** — the 8 wizards with a 3D preview (corner, middle, circular,
+  rotary×2, edge, drill, alignment) now show **controls left (scrollable) / visuals right**, the
+  3D spanning the pane height; single column on mobile. Responsive modal (`min(96vw, 560px)`,
+  two-pane `≤1180px`) replaced the fixed 520px box (which overflowed phones). Opt-in via
+  `twoPane:true` on the view → `.two-pane` box class.
+- ☑ **Shared 3D, centralised legend** — the preview is one `GcodeViz3D` instance moved between
+  wizards; the path legend is injected once in `preview3D` (Cut · Rapid · Retract · Probe · Jog),
+  **Fusion-aligned**: cut = blue→cyan (depth), rapid = yellow, retract/lead = green,
+  probe = dotted blue, jog = dashed orange.
+- ☑ **Jog pendant** is now a bottom-left **drawer chip** on the 3D box (main viewer + wizards),
+  jog grid collapsed by default. Redundant bottom-right Stock dropdown removed.
+- ☑ **Two animation systems** clarified + fixed — the geometric **play** (cheap, for the looping
+  preview) is now **feed-true real time** (was a ~5 s normalised loop); the **engine** (real macro
+  sim, for the editor) now applies the spindle-start offset in `setToolPosition`, so its tool
+  **no longer floats off the path**. SVG wizard animators confirmed dead (kept, unused).
+- ☑ **Probe collision** — every stock shape collides on all outer faces; a pocket also collides on
+  its cavity walls (stop at the first material surface hit), in `gcodeViz3d._rebuild`.
+- ☑ **Multi-start jog** — multi-pass programs get one draggable ruby per pass; choose which the jog
+  buttons drive via the pendant **Start [1][2]**, by **clicking the numbered badge** (ray-pick), or
+  by dragging a marker. Selected ruby brightens.
+- ☑ **Draggable modals** — generator + stock editor drag by their headers (shared `makeDraggable`
+  in `uiUtils`); the I/O panel already did. Stock + I/O z-index raised above the wizard overlay.
+- ☑ **DDCS V3 / DM500 profile** added (+ V4.1, which had a vars list but no profile entry). Dump in
+  `bridge/controllers/dm500/`; `default_vars_v3.js` generated from the controller's own `eng`
+  parameter table (279 params). Selecting a profile now switches the variable family
+  (Expert / V4.1 / V3). DM500 has a single probe input — no configurable port (unlike Expert).
+- ☑ **2D parametric layout canvas** (`viz/featureCanvas.js`) — drag handles drive op parameters,
+  two-way bound to wizard fields (drill prototype, side-by-side with the 3D); pan/zoom/fit. Built
+  fresh after evaluating + rejecting the b-spline-gen and SketchStudio editors.

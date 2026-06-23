@@ -19,11 +19,18 @@ output/
 **/scripts/tmp_bundle_check.js
 **/tmp_commandDeck_transformed.js
 
-# fairy.exe gateway build (PyInstaller) — artifacts only; build_fairy.ps1 + fairy_gateway.py are tracked
+# Desktop builds (PyInstaller) — artifacts only; build_*.ps1 + fairy_gateway.py are tracked
 /build/
 /dist/
-/fairy.exe
+/DDCS-Studio.exe
+/benchgateway.exe
+*.exe.old
 *.spec
 
 # fairy local-backend runtime data (created when the gateway runs with --backend local)
 /_bridge_data/
+
+# Google OAuth client SECRET — BYO uses only the PUBLIC client ID (baked into providers.js); the secret is
+# NEVER committed or shipped. Keep the downloaded JSON here, ignored.
+/secrets/
+client_secret_*.json

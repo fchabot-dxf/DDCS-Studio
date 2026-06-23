@@ -7,14 +7,16 @@
  * handshake simulation and probe collision detection.
  */
 
-import { resetVirtualIO, setVirtualOutput, getVirtualInput, injectVirtualInput, triggerProbeCollision, resolveVirtualPin } from './virtualIO.js';
+import { resetVirtualIO, setVirtualOutput, getVirtualInput, injectVirtualInput, triggerProbeCollision, resolveVirtualPin, ioState } from './virtualIO.js';
 import { tokenizeWords } from './core/tokenizer.js';
 import { evalExpr, validateExpression } from './core/expression.js';
 import { evaluateCondition, validateCondition } from './core/condition.js';
-import { loadProgram as loadProgramText } from './core/program.js';
+import { loadProgram as loadProgramText, stripLine } from './core/program.js';
+import { arcPoints } from './core/arc.js';
+import { rayBox, rotaryAxisOf, stockProbeStop } from './probeGeometry.js';
 
 export class GcodeExecutionEngine {
-    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
+    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
         this.stepDelay = Number.isFinite(stepDelay) ? stepDelay : 250;
         // Time-true playback: moves take distance/feedrate (rapids at rapidRate),
         // divided by simSpeed (1 = real time). Slow probes crawl, rapids zip.
@@ -33,6 +35,14 @@ export class GcodeExecutionEngine {
         // wait; onWait(null) once it clears — lets the UI pulse the waited sensor.
         this.onWait = onWait;
         this.stock = stock || null;
+        // Operator start in STOCK coords — where the tool is positioned before an (incremental) probe macro
+        // runs. The probe-vs-stock collision test adds this so probes touch the real surface; the recorded
+        // route stays origin-relative (the viz offsets it by the start marker). Default = origin.
+        this._stockOffset = stockOffset || { x: 0, y: 0, z: 0 };
+        // Work origin (active WCS) expressed in MACHINE coords — the machine coordinate of part-zero.
+        // Lets G53 machine-frame moves draw in the part/WCS frame the rest of the route uses:
+        // part = machine - wcsOffset. Default = origin, so when unknown (no dump/profile) G53 is unchanged.
+        this._wcsOffset = wcsOffset || { x: 0, y: 0, z: 0 };
         this.syntaxValidator = typeof syntaxValidator === 'function' ? syntaxValidator : null;
         // Auto-answer: a virtual sensor satisfies any M31/M33 wait after autoAnswerMs,
         // even for pins the truth table doesn't know — so any user's macro completes
@@ -40,7 +50,41 @@ export class GcodeExecutionEngine {
         this.autoAnswer = autoAnswer !== false;
         this.autoAnswerMs = Number.isFinite(autoAnswerMs) ? autoAnswerMs : 800;
         this._autoTimers = new Map();   // pinName -> timeout id
+        // Generic live-input bridge (DDCS Expert I/O-automation dialect). The factory sensor-wait idiom polls
+        // #[1520+N] (N = 0-based pin, so var 1520+N ↔ panel pin N+1). Mirror every virtual input into that var
+        // window so a `WHILE [#[1520+N] != L]` poll actually sees the panel / auto-sensor / truth-table state —
+        // symmetric with how outputs already drive the panel. One listener for the engine's lifetime.
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+            this._onIoChange = (e) => this._mirrorInputVar(e && e.detail && e.detail.pin);
+            window.addEventListener('io_change', this._onIoChange);
+        }
         this.resetState();
+    }
+
+    /**
+     * Mirror a virtual INPUT pin's state into the live-input var window #[1520+N] (N = 0-based, so panel pin
+     * k → var 1519+k). Called on every io_change and when an input wait is first evaluated, so the Expert
+     * `WHILE [#[1520+N] != L]` poll reads the same state the panel / auto-sensor / truth table expose.
+     * `changedName` is the resolved pin name from io_change; null re-syncs every input pin (used at eval time).
+     */
+    _mirrorInputVar(changedName) {
+        if (!this.vars) return;
+        // Re-resolve all 1-based input pins (1..24) and copy the matching virtual-input state into its var.
+        // Cheap, and robust to semantic-name remapping (resolveVirtualPin) — only ever touches the #1520 window.
+        for (let k = 1; k <= 24; k++) {
+            const name = resolveVirtualPin(k, 'IN');
+            if (changedName != null && name !== changedName) continue;
+            this.vars.set(1519 + k, getVirtualInput(name) ? 1 : 0);
+        }
+    }
+
+    /** Detach the io_change listener. Call when discarding a transient engine (e.g. a one-shot trace) so the
+     *  bridge listener doesn't leak across the many engines a live editor spins up. */
+    dispose() {
+        if (this._onIoChange && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+            window.removeEventListener('io_change', this._onIoChange);
+            this._onIoChange = null;
+        }
     }
 
     verifySyntax(text) {
@@ -60,7 +104,7 @@ export class GcodeExecutionEngine {
 
         lines.forEach((raw, lineIndex) => {
             const trimmedRaw = raw.trim();
-            const stripped = raw.replace(/\([^)]*\)/g, ' ').replace(/;.*$/, ' ').trim();
+            const stripped = stripLine(raw);
             if (!stripped) return;
 
             const ifMatch = stripped.match(/^IF\s+(.+?)\s+GOTO\s*(\d+)$/i);
@@ -76,6 +120,26 @@ export class GcodeExecutionEngine {
 
             const gotoMatch = stripped.match(/^GOTO\s*(\d+)$/i);
             if (gotoMatch) {
+                return;
+            }
+
+            const whileMatch = stripped.match(/^WHILE\s+(.+?)\s+DO\s*[123]\s*$/i);
+            if (whileMatch) {
+                if (!validateCondition(whileMatch[1].trim().replace(/^\[|\]$/g, ''))) {
+                    reportError(lineIndex, 'Invalid WHILE condition syntax');
+                }
+                return;
+            }
+
+            if (/^END\s*[123]\s*$/i.test(stripped)) {
+                return;
+            }
+
+            const ifThenMatch = stripped.match(/^IF\s+(.+?)\s+THEN\s+(.+)$/i);
+            if (ifThenMatch) {
+                if (!validateCondition(ifThenMatch[1].trim().replace(/^\[|\]$/g, ''))) {
+                    reportError(lineIndex, 'Invalid IF condition syntax');
+                }
                 return;
             }
 
@@ -128,6 +192,7 @@ export class GcodeExecutionEngine {
         resetVirtualIO();
         this._clearAutoTimers();
         this.vars = this.createVarStore();
+        this._mirrorInputVar(null);   // seed the #[1520+N] input window from the (now-cleared) virtual inputs
         this.pos = { x: 0, y: 0, z: 0 };
         this.absolute = true;
         this.unitScale = 1;
@@ -142,6 +207,10 @@ export class GcodeExecutionEngine {
         this.paused = false;
         this._waitPin = null;
         this._move = null;     // in-flight timed move (interpolated at the programmed feedrate)
+        this._probeArmed = false;   // DM500 move-until-input: M101 arms, the next G01 is a probe, M102 disarms
+        this._traceSink = null;   // when non-null (trace()), moves snap + push a segment here instead of animating
+        this._pass = 0;           // manual-REPOSITION pass index (mirrors gcodeParser): each reposition starts a new pass
+        this._maxPass = 0;        // highest pass reached → stats.passes = _maxPass + 1
         this.timer = null;
         this.stats = {
             feed: 0,
@@ -149,6 +218,7 @@ export class GcodeExecutionEngine {
             probe: 0,
             skipped: 0,
             steps: 0,
+            absolute: false,   // did the program ever establish an ABSOLUTE position (G90 move / G53)? → path is start-INDEPENDENT
         };
         this.totalLines = 0;
         this._started = false;
@@ -159,6 +229,35 @@ export class GcodeExecutionEngine {
         this.program = program;
         this.labels = labels;
         this.totalLines = totalLines;
+        this._matchLoops();
+    }
+
+    /**
+     * Pre-match `WHILE <cond> DOn` ↔ `ENDn` (n = 1|2|3, FANUC-style) by structural nesting, tagging each
+     * step so the executor can jump in O(1): the WHILE gets `whileN`/`whileCond`/`loopEnd` (program index of
+     * its END), the END gets `endN`/`loopStart` (index of its WHILE). DDCS macros loop with WHILE/END, which
+     * the IF/GOTO core can't express — this is what lets a generated CAM slot macro run in the simulator.
+     */
+    _matchLoops() {
+        const stacks = { 1: [], 2: [], 3: [] };
+        for (let i = 0; i < this.program.length; i++) {
+            const s = this.program[i];
+            const line = s && s.stripped;
+            if (!line) continue;
+            const wm = line.match(/^WHILE\b\s*(.+?)\s*\bDO\s*([123])\b\s*$/i);
+            if (wm) {
+                s.whileN = Number(wm[2]);
+                s.whileCond = wm[1].trim().replace(/^\[|\]$/g, '');
+                stacks[s.whileN].push(i);
+                continue;
+            }
+            const em = line.match(/^END\s*([123])\b\s*$/i);
+            if (em) {
+                s.endN = Number(em[1]);
+                const open = stacks[s.endN].pop();
+                if (open != null) { s.loopStart = open; this.program[open].loopEnd = i; }
+            }
+        }
     }
 
     run(text) {
@@ -175,6 +274,55 @@ export class GcodeExecutionEngine {
         this.running = true;
         this._setStatus('Starting execution', true);
         this._scheduleTick();
+    }
+
+    /**
+     * Synchronous "trace" pass — run the whole program to completion (probes auto-detect, input waits
+     * auto-clear, no delays) and return the EXACT path the engine takes: { segments, bounds, stats }.
+     * The preview's drawn route comes from this, so it can never disagree with the played tool — both go
+     * through _executeStep with the same vars + control flow. Arcs are linearized; loops that never resolve
+     * are bounded by a step cap (stats.capped). Leaves the engine reset (ready for a subsequent run()).
+     */
+    trace(text) {
+        this.stop();
+        this.resetState();
+        this.loadProgram(text);
+        // A trace only draws the route — suppress the UI callbacks so it doesn't move the tool dot,
+        // highlight lines, or spam the status bar.
+        const cb = { line: this.onLineChange, pos: this.onPositionChange, status: this.onStatus, wait: this.onWait };
+        this.onLineChange = null; this.onPositionChange = null; this.onStatus = null; this.onWait = null;
+        const sink = [];
+        this._traceSink = sink;
+        this.running = true;
+        const cap = Math.max(this.program.length * 50, 5000);   // bound a loop that never resolves
+        let guard = 0;
+        try {
+            while (this.ip >= 0 && this.ip < this.program.length && guard++ < cap) {
+                const done = this._executeStep(this.program[this.ip]);
+                if (done) break;
+            }
+        } finally {
+            this.running = false;
+            this._traceSink = null;
+            this.onLineChange = cb.line; this.onPositionChange = cb.pos; this.onStatus = cb.status; this.onWait = cb.wait;
+        }
+        return this._buildTraceResult(sink, guard >= cap);
+    }
+
+    _buildTraceResult(segments, capped) {
+        const b = { minX: Infinity, minY: Infinity, minZ: Infinity, maxX: -Infinity, maxY: -Infinity, maxZ: -Infinity };
+        let feed = 0, rapid = 0, probe = 0;
+        for (const s of segments) {
+            b.minX = Math.min(b.minX, s.x1, s.x2); b.maxX = Math.max(b.maxX, s.x1, s.x2);
+            b.minY = Math.min(b.minY, s.y1, s.y2); b.maxY = Math.max(b.maxY, s.y1, s.y2);
+            b.minZ = Math.min(b.minZ, s.z1, s.z2); b.maxZ = Math.max(b.maxZ, s.z1, s.z2);
+            if (s.probe) probe += 1; else if (s.rapid) rapid += 1; else feed += 1;
+        }
+        return {
+            segments,
+            bounds: segments.length ? b : null,
+            stats: { feed, rapid, probe, retract: 0, passes: this._maxPass + 1, skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped, absolute: this.stats.absolute },
+        };
     }
 
     stop() {
@@ -316,11 +464,15 @@ export class GcodeExecutionEngine {
             return;
         }
         if (typeof this.onPositionChange === 'function') {
-            this.onPositionChange({
-                x: mv.from.x + (mv.to.x - mv.from.x) * t,
-                y: mv.from.y + (mv.to.y - mv.from.y) * t,
-                z: mv.from.z + (mv.to.z - mv.from.z) * t,
-            });
+            let p;
+            if (mv.path) {   // arc: interpolate along the linearized polyline (~5° chords → ~constant speed)
+                const segs = mv.path.length - 1, f = t * segs, i = Math.min(segs - 1, Math.floor(f)), u = f - i;
+                const a = mv.path[i], b = mv.path[i + 1];
+                p = { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, z: a.z + (b.z - a.z) * u };
+            } else {
+                p = { x: mv.from.x + (mv.to.x - mv.from.x) * t, y: mv.from.y + (mv.to.y - mv.from.y) * t, z: mv.from.z + (mv.to.z - mv.from.z) * t };
+            }
+            this.onPositionChange(p);
         }
         this._nextDelayMs = 16;   // ~60 fps while travelling
     }
@@ -372,9 +524,55 @@ export class GcodeExecutionEngine {
         this._autoTimers.clear();
     }
 
+    /**
+     * Recognise a DDCS Expert live-input poll WHILE condition: `#[1520+N] <op> L` (N = 0-based pin literal,
+     * L the wanted level). Returns { pin, pinName, want } where pin is the 1-based panel pin (N+1), pinName the
+     * resolved virtual-input name, and want the boolean input level that makes the WHILE condition FALSE (i.e.
+     * the level the loop is waiting for, so we can route it through the same wait/auto-answer path as M31).
+     * Returns null if the condition isn't a bare #[1520+N] input poll (those keep the plain WHILE behaviour).
+     */
+    _inputPollWhile(cond) {
+        if (!cond) return null;
+        const m = String(cond).trim().match(/^#\[\s*1520\s*\+\s*(\d+)\s*\]\s*(==|!=|<=|>=|<|>|=)\s*(-?\d+)\s*$/);
+        if (!m) return null;
+        const n = Number(m[1]);                 // 0-based pin index
+        if (!Number.isFinite(n) || n < 0 || n > 23) return null;
+        const pin = n + 1;                       // 1-based panel pin
+        const pinName = resolveVirtualPin(pin, 'IN');
+        // The awaited level is whichever of 0/1 makes the loop EXIT (condition false). For the factory `!= L`
+        // idiom this is simply L; computing it generally also covers `== L`, `< L`, etc.
+        const op = m[2] === '=' ? '==' : m[2];
+        const rhs = Number(m[3]);
+        const cmp = (lhs) => {
+            switch (op) {
+                case '==': return lhs === rhs;
+                case '!=': return lhs !== rhs;
+                case '<=': return lhs <= rhs;
+                case '>=': return lhs >= rhs;
+                case '<': return lhs < rhs;
+                case '>': return lhs > rhs;
+                default: return false;
+            }
+        };
+        // Want the input level for which the WHILE condition is FALSE (loop exits). If both or neither 0/1
+        // satisfy that, this isn't a level-wait we can answer — fall back to plain WHILE.
+        const want0 = !cmp(0), want1 = !cmp(1);
+        if (want0 === want1) return null;
+        return { pin, pinName, want: want1 };
+    }
+
     _executeStep(step) {
         const line = step.stripped;
         this.stats.steps += 1;
+
+        // Manual REPOSITION (uniform "REPOSITION:" comment the wizards emit): the operator re-parks the probe by
+        // hand → start a new pass at the program origin, exactly as gcodeParser does, so each pass is start-anchored
+        // and the preview gives it its own draggable start marker. Detected on the RAW line (it's a comment).
+        if (/reposition:/i.test(step.raw)) {
+            this._pass += 1;
+            if (this._pass > this._maxPass) this._maxPass = this._pass;
+            this.pos = { x: 0, y: 0, z: 0 };
+        }
 
         if (!line) {
             this.ip += 1;
@@ -382,6 +580,58 @@ export class GcodeExecutionEngine {
         }
 
         if (/^\s*[();]/.test(step.raw.trim())) {
+            this.ip += 1;
+            return false;
+        }
+
+        // WHILE <cond> DOn — pre-matched to its ENDn at load. Enter the body if the condition holds,
+        // otherwise jump past the matching END. (Unmatched WHILE: just enter, the cap guards runaways.)
+        if (step.whileN != null) {
+            // DDCS Expert I/O-automation: a `WHILE [#[1520+N] != L] DO1 / G04 P10 / END1` is the factory
+            // sensor-wait idiom (slib O10300) — it spins until live input N reaches L. That loop never
+            // resolves on its own (nothing in the body changes the input), so instead of letting it run to
+            // the trace cap, PARK on it like an M31 wait: surface the awaited pin (panel banner + pulse),
+            // auto-answer it (virtual sensor) when "Auto sensors" is on, and let a panel click / truth table
+            // satisfy it. The WHILE-EXIT condition is `input N == L`, so we wait for the input to BECOME L.
+            const poll = this._inputPollWhile(step.whileCond);
+            if (poll && !this._evaluateCondition(step.whileCond)) {
+                // Condition false ⇒ the loop would EXIT now ⇒ the input has reached the wanted level: fall through.
+                this.ip = step.loopEnd != null ? step.loopEnd + 1 : this.ip + 1;
+                this._setWaitPin(null);
+                return false;
+            }
+            if (poll) {
+                // Condition true ⇒ the loop would SPIN: the input is not yet at the wanted level → wait for it.
+                if (this._traceSink) {                        // trace: a virtual sensor satisfies the wait at once
+                    injectVirtualInput(poll.pinName, poll.want);
+                    this.ip = step.loopEnd != null ? step.loopEnd + 1 : this.ip + 1;
+                    return false;
+                }
+                this._setStatus(`WHILE waiting for ${poll.pinName} to be ${poll.want ? 'ON' : 'OFF'}...`, true);
+                this._setWaitPin({ pin: poll.pin, pinName: poll.pinName, target: poll.want });
+                if (this.autoAnswer) this._scheduleAutoAnswer(poll.pinName, poll.want);
+                this._nextDelayMs = 50;   // poll gently instead of spinning at the fast-step rate
+                return false;             // do NOT advance — re-test this same WHILE next tick
+            }
+            if (step.loopEnd != null && !this._evaluateCondition(step.whileCond)) this.ip = step.loopEnd + 1;
+            else this.ip += 1;
+            return false;
+        }
+        // ENDn — loop back to its WHILE to re-test the condition.
+        if (step.endN != null) {
+            this.ip = step.loopStart != null ? step.loopStart : this.ip + 1;
+            return false;
+        }
+
+        // IF <cond> THEN <assignment|GOTO> — inline conditional (distinct from the IF…GOTO form below).
+        const ifThen = line.match(/^IF\s+(.+?)\s+THEN\s+(.+)$/i);
+        if (ifThen) {
+            if (this._evaluateCondition(ifThen[1].trim().replace(/^\[|\]$/g, ''))) {
+                const stmt = ifThen[2].trim();
+                const g = stmt.match(/^GOTO\s*(\d+)$/i);
+                if (g && this.labels.has(Number.parseInt(g[1], 10))) { this.ip = this.labels.get(Number.parseInt(g[1], 10)); return false; }
+                if (/^#/.test(stmt)) this._handleAssignment(stmt);
+            }
             this.ip += 1;
             return false;
         }
@@ -458,6 +708,10 @@ export class GcodeExecutionEngine {
                 this._setStatus(`M${m} ${pinName} is ${target ? 'ON' : 'OFF'} (cleared)`, true);
                 return false;
             }
+            if (this._traceSink) {                            // trace: a virtual sensor satisfies the wait at once
+                injectVirtualInput(pinName, target);
+                return false;
+            }
             this._setStatus(`M${m} waiting for ${pinName} to be ${target ? 'ON' : 'OFF'}...`, true);
             this._setWaitPin({ pin, pinName, target });
             if (this.autoAnswer) this._scheduleAutoAnswer(pinName, target);
@@ -509,6 +763,23 @@ export class GcodeExecutionEngine {
                 if (wm.P != null) {
                     if (waitForInput(m, wm.P, resolveVirtualPin(wm.P, 'IN'), m === 31)) waiting = true;
                 }
+            } else if (m >= 50 && m <= 91) {
+                // DDCS Expert generic digital OUTPUT (I/O-automation dialect): M(50+2k) = output k+1 ON,
+                // M(51+2k) = output k+1 OFF (k 0-based; slib O10050-O10091 write #1552+k). Light the panel
+                // (and fire any truth-table handshake) AND mirror the bit into the firmware var #1551+k so a
+                // later `IF #1551+k…` / `WHILE` branch can read its own output back.
+                const k = (m - 50) >> 1;          // 0-based output index
+                const on = (m - 50) % 2 === 0;
+                const pinName = resolveVirtualPin(k + 1, 'OUT');   // panel output is 1-based (k+1)
+                setVirtualOutput(pinName, on);
+                this.vars.set(1551 + k, on ? 1 : 0);
+                this._setStatus(`M${m} → ${pinName} = ${on ? 'ON' : 'OFF'}`, true);
+            } else if (m === 101 || m === 102) {
+                // DM500 move-until-input probe cycle (bridge/controllers/dm500/install/probe.nc): M101 arms
+                // probe-input monitoring, the following G01 feeds until the input triggers (the move stops at
+                // the touch), M102 disarms. The next motion line is treated as a probe so it clamps to the
+                // stock surface like a G31 (DM500 has no G31). No status var on this controller — motion just halts.
+                this._probeArmed = (m === 101);
             }
         }
 
@@ -550,11 +821,11 @@ export class GcodeExecutionEngine {
             return false;
         }
 
-        if (gcodes.includes(53)) {
-            this.stats.skipped += 1;
-            this.ip += 1;
-            return false;
-        }
+        // G53 = one-shot machine-coordinate move, always ABSOLUTE. It used to be SKIPPED (ATC park / tool-change
+        // never drew), then traced as a plain absolute move — but that plotted MACHINE coords in the part/WCS
+        // frame, so a `G53 Z-5` safe-Z retract drew below the part. Now we map machine -> part:
+        // part = machine - wcsOffset (wcsOffset defaults to origin, so it's a no-op until a dump/profile sets it).
+        const g53 = gcodes.includes(53);
 
         const target = { x: this.pos.x, y: this.pos.y, z: this.pos.z };
         let bad = false;
@@ -565,7 +836,9 @@ export class GcodeExecutionEngine {
                 bad = true;
                 return;
             }
-            target[field] = this.absolute ? value * this.unitScale : this.pos[field] + value * this.unitScale;
+            target[field] = g53 ? value * this.unitScale - (this._wcsOffset[field] || 0)
+                          : this.absolute ? value * this.unitScale
+                          : this.pos[field] + value * this.unitScale;
         };
         setAxis('X', 'x');
         setAxis('Y', 'y');
@@ -577,8 +850,16 @@ export class GcodeExecutionEngine {
             return false;
         }
 
-        const isProbe = gcodes.includes(31);
-        const effMotion = isProbe ? 1 : this.motion;
+        // A move made in ABSOLUTE mode (G90) or G53 establishes a fixed position → the path no longer depends on the
+        // operator start. A purely-incremental (G91) program is start-relative. The preview uses this to decide
+        // whether moving the start drags the toolpath (probe macros) or not (mill). See gcodeViz3d _anchorToStart.
+        if (this.absolute || g53) this.stats.absolute = true;
+
+        const isProbe = gcodes.includes(31) || this._probeArmed;   // G31, or a G01 inside a DM500 M101/M102 cycle
+        // G53 (machine-coord positioning, e.g. the end "safe Z" park) is a RAPID, not a cut — but on DDCS it's
+        // written bare (`G53 Z#v`, no G0), so it would otherwise inherit a preceding G1 and draw as a slow feed
+        // (e.g. a pocket's wall-finish leaves G1 active → the retract looked like a cut to the floor). Force rapid.
+        const effMotion = isProbe ? 1 : (g53 ? 0 : this.motion);
 
         if (effMotion === 0 || effMotion === 1) {
             let touchName = null;   // probe input to flip when the tool reaches the contact point
@@ -599,70 +880,80 @@ export class GcodeExecutionEngine {
                 const probePort = wm.P;
                 const probes = typeof window !== 'undefined' && window.ddcsGetSettings ? window.ddcsGetSettings().probes : null;
                 
-                let boxMin = null;
-                let boxMax = null;
-
+                // Probe-vs-stock geometry runs in STOCK space: the tool's real position is the operator start
+                // (_stockOffset) + the local pos. The recorded route stays origin-relative (the viz offsets it
+                // by the start marker), so dir is the same in both frames — only the start point shifts.
+                const O = this._stockOffset || { x: 0, y: 0, z: 0 };
+                const aStart = { x: O.x + this.pos.x, y: O.y + this.pos.y, z: O.z + this.pos.z };
+                const bEnd = { x: O.x + target.x, y: O.y + target.y, z: O.z + target.z };
+                const dir = { x: target.x - this.pos.x, y: target.y - this.pos.y, z: target.z - this.pos.z };
+                let tt = null;
                 if (probes && probePort === probes.setterPin) {
-                    boxMin = { x: probes.setterX - probes.setterW/2, y: probes.setterY - probes.setterH/2, z: probes.setterZ - 0.01 }; // Thin plate at Z
-                    boxMax = { x: probes.setterX + probes.setterW/2, y: probes.setterY + probes.setterH/2, z: probes.setterZ + 0.01 };
-                } else if (this.stock && (this.stock.x > 0 || this.stock.y > 0 || this.stock.z > 0)) {
-                    boxMin = { x: 0, y: 0, z: -this.stock.z };
-                    boxMax = { x: this.stock.x, y: this.stock.y, z: 0 };
+                    // Tool-setter plate — a thin box at the configured setter XY/Z (not the stock).
+                    const sMin = { x: probes.setterX - probes.setterW / 2, y: probes.setterY - probes.setterH / 2, z: probes.setterZ - 0.01 };
+                    const sMax = { x: probes.setterX + probes.setterW / 2, y: probes.setterY + probes.setterH / 2, z: probes.setterZ + 0.01 };
+                    const ro = rayBox(aStart, bEnd, sMin, sMax);
+                    if (ro.hit) { if (ro.tEnter > 1e-6 && ro.tEnter <= 1) tt = ro.tEnter; else if (ro.tExit > 1e-6 && ro.tExit <= 1) tt = ro.tExit; }
+                } else {
+                    // Stock — boss (outer box), pocket (box + cavity wall) or cylinder (round OD). Shared with the
+                    // 3D preview via probeGeometry, so the simulated touch matches what the viz draws.
+                    const motors = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings().motors : null;
+                    tt = stockProbeStop(aStart, bEnd, this.stock, rotaryAxisOf(motors));
                 }
+                if (tt != null) {
+                    // Clamp the recorded target to the contact surface (in LOCAL coords).
+                    target.x = this.pos.x + dir.x * tt;
+                    target.y = this.pos.y + dir.y * tt;
+                    target.z = this.pos.z + dir.z * tt;
+                    triggerProbeCollision();
 
-                if (boxMin && boxMax) {
-                    const start = this.pos;
-                    const dir = { x: target.x - start.x, y: target.y - start.y, z: target.z - start.z };
-                    let tmin = 0.0;
-                    let tmax = 1.0;
-                    let hit = true;
-
-                    for (const axis of ['x', 'y', 'z']) {
-                        if (Math.abs(dir[axis]) < 1e-8) {
-                            if (start[axis] < boxMin[axis] || start[axis] > boxMax[axis]) hit = false;
-                        } else {
-                            const invD = 1.0 / dir[axis];
-                            let t0 = (boxMin[axis] - start[axis]) * invD;
-                            let t1 = (boxMax[axis] - start[axis]) * invD;
-                            if (invD < 0) { const temp = t0; t0 = t1; t1 = temp; }
-                            tmin = Math.max(tmin, t0);
-                            tmax = Math.min(tmax, t1);
-                            if (tmax < tmin) hit = false;
-                        }
+                    // Flip the actual probe input pin so the I/O panel shows the touch:
+                    // the G31 P pin if given, else the configured 3D-probe pin. Fired when
+                    // the (feedrate-paced) move reaches the contact point.
+                    const touchPin = Number.isFinite(probePort) ? probePort : (probes ? probes.probePin : null);
+                    if (touchPin != null && Number.isFinite(touchPin)) {
+                        touchName = resolveVirtualPin(touchPin, 'IN');
                     }
 
-                    if (hit && tmin >= 0 && tmin <= 1) {
-                        // Clamp target to exact intersection surface
-                        target.x = start.x + dir.x * tmin;
-                        target.y = start.y + dir.y * tmin;
-                        target.z = start.z + dir.z * tmin;
-                        triggerProbeCollision();
-
-                        // Flip the actual probe input pin so the I/O panel shows the touch:
-                        // the G31 P pin if given, else the configured 3D-probe pin. Fired when
-                        // the (feedrate-paced) move reaches the contact point.
-                        const touchPin = Number.isFinite(probePort) ? probePort : (probes ? probes.probePin : null);
-                        if (touchPin != null && Number.isFinite(touchPin)) {
-                            touchName = resolveVirtualPin(touchPin, 'IN');
-                        }
-
-                        // DDCS: 2 = detected the signal; #1925-1927 = trigger
-                        // position in machine coordinates.
-                        for (const a of scannedAxes) this.vars.set(PROBE_STATUS_VAR[a], 2);
-                        this.vars.set(1925, target.x);
-                        this.vars.set(1926, target.y);
-                        this.vars.set(1927, target.z);
-                    }
+                    // DDCS: 2 = detected the signal; #1925-1927 = trigger position in machine coords
+                    // (stock space = operator start + local target).
+                    for (const a of scannedAxes) this.vars.set(PROBE_STATUS_VAR[a], 2);
+                    this.vars.set(1925, O.x + target.x);
+                    this.vars.set(1926, O.y + target.y);
+                    this.vars.set(1927, O.z + target.z);
+                }
+                if (this._traceSink) {
+                    // Trace/preview: a virtual probe always "detects" at its landing point, so macros take
+                    // their success branch and probe loops (IF #1920+ax!=2 GOTO …) terminate instead of
+                    // running to the step cap. Same hands-free contract as autoAnswer for M31/M33 waits.
+                    for (const a of scannedAxes) this.vars.set(PROBE_STATUS_VAR[a], 2);
+                    this.vars.set(1925, O.x + target.x);
+                    this.vars.set(1926, O.y + target.y);
+                    this.vars.set(1927, O.z + target.z);
                 }
             } else if (effMotion === 0) {
                 this.stats.feed += 1;
+            }
+            const rapid = effMotion === 0 && !isProbe;
+            // Trace: snap to the target and record the segment (no animation). The drawn route IS the path
+            // the engine takes, so it can never disagree with the played tool (same _executeStep, same vars).
+            if (this._traceSink) {
+                this._traceSink.push({
+                    x1: this.pos.x, y1: this.pos.y, z1: this.pos.z,
+                    x2: target.x, y2: target.y, z2: target.z,
+                    rapid, probe: isProbe, type: isProbe ? 'probe' : (rapid ? 'rapid' : 'feed'), feed: this.feedVal,
+                    pass: this._pass,       // manual-REPOSITION pass → one draggable start marker per pass (see _ensureMarkers)
+                    line: step.lineIndex,   // source line → lets the preview seek the tool to a clicked code line
+                });
+                this.pos = target;
+                this.ip += 1;
+                return false;
             }
             // Time-true playback: the move takes distance/rate (rapids at rapidRate, cuts and
             // probes at the programmed F), scaled by simSpeed. Long moves animate as an
             // in-flight interpolated move; sub-frame ones just jump.
             {
                 const d = Math.hypot(target.x - this.pos.x, target.y - this.pos.y, target.z - this.pos.z);
-                const rapid = effMotion === 0 && !isProbe;
                 const rate = rapid ? this.rapidRate : (this.feedVal > 0 ? this.feedVal : 600);
                 const realMs = rate > 0 ? (d / rate) * 60000 : 0;
                 const speed = this.simSpeed > 0 ? this.simSpeed : 1;
@@ -681,8 +972,51 @@ export class GcodeExecutionEngine {
             if (typeof this.onPositionChange === 'function') {
                 this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
             }
+        } else if (this._traceSink) {
+            // Arc (G2/G3) in a trace: linearize into chord segments so the drawn route shows the curve.
+            // (Real-time play still steps line-by-line and skips arcs — a separate, pre-existing gap.)
+            const off = { I: wm.I, J: wm.J, K: wm.K, R: wm.R };
+            const anyNull = ['I', 'J', 'K', 'R'].some((k) => wm[k] != null && !Number.isFinite(wm[k]));
+            if (anyNull) {
+                this.stats.skipped += 1;
+            } else {
+                const pts = arcPoints(this.pos, target, off, effMotion, this.plane, this.unitScale);
+                let prev = this.pos;
+                for (let i = 1; i < pts.length; i++) {
+                    this._traceSink.push({
+                        x1: prev.x, y1: prev.y, z1: prev.z, x2: pts[i].x, y2: pts[i].y, z2: pts[i].z,
+                        rapid: false, probe: false, type: 'feed', feed: this.feedVal,
+                        pass: this._pass,
+                        line: step.lineIndex,
+                    });
+                    prev = pts[i];
+                }
+                this.pos = target;
+            }
         } else {
-            this.stats.skipped += 1;
+            // Arc (G2/G3) in real-time play: walk the linearized arc so the curve actually animates. Direction
+            // is inherited from arcPoints (it sweeps per the motion code; a full circle start==end sweeps a ring).
+            const off = { I: wm.I, J: wm.J, K: wm.K, R: wm.R };
+            const anyNull = ['I', 'J', 'K', 'R'].some((k) => wm[k] != null && !Number.isFinite(wm[k]));
+            const pts = anyNull ? null : arcPoints(this.pos, target, off, effMotion, this.plane, this.unitScale);
+            if (!pts || pts.length < 3) {
+                this.stats.skipped += 1;
+            } else {
+                let len = 0;
+                for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y, pts[i].z - pts[i - 1].z);
+                const rate = this.feedVal > 0 ? this.feedVal : 600;
+                const realMs = rate > 0 ? (len / rate) * 60000 : 0;
+                const speed = this.simSpeed > 0 ? this.simSpeed : 1;
+                if (realMs / speed > 50) {
+                    this._move = { from: { ...pts[0] }, to: { ...pts[pts.length - 1] }, path: pts, durMs: realMs, elapsed: 0, last: null, touchName: null };
+                    this._setStatus(`${effMotion === 2 ? 'G2 cw' : 'G3 ccw'} arc ${len.toFixed(1)} mm at F${rate} — ${(realMs / 1000).toFixed(1)} s${speed !== 1 ? ` @ ${speed}×` : ''}`, true);
+                    this._nextDelayMs = 16;
+                    this.ip += 1;
+                    return false;   // ticks now advance along the arc; next line runs when it lands
+                }
+                this.pos = target;   // sub-frame arc: jump to the end
+                if (typeof this.onPositionChange === 'function') this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
+            }
         }
 
         this.ip += 1;

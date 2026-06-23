@@ -12,7 +12,6 @@ DDCS Studio is a web-based G-code generator for CNC operations using the DDCS Ex
 DDCS-Studio/web/           # the published app root (Cloudflare serves this)
 ├── app.js                 # Main application entry point
 ├── themes.js              # Theme engine and management
-├── scaleManager.js        # Viewport scaling and zoom
 ├── variableDB.js          # DDCS variable database management
 ├── editorManager.js       # G-code editor functionality
 ├── wizardManager.js       # Wizard dialog coordinator
@@ -51,13 +50,6 @@ Theme engine supporting 5 visual styles:
 - `setCurrent(themeName)` - Set specific theme
 - `getCurrent()` - Get active theme name
 
-#### `scaleManager.js`
-Viewport scaling for different screen sizes.
-
-**Key Class:** `ScaleManager`
-- `toggle()` - Cycle through scale presets
-- `apply()` - Apply current scale
-- Scale sequence: 100%, auto, 150%, 200%, 50%, 75%
 
 #### `variableDB.js`
 Manages DDCS M350 system and user variable catalog.
@@ -281,7 +273,7 @@ SVG visualizations remain in the HTML file and are referenced by the wizard modu
 
 ## Key Design Patterns
 
-1. **Manager Classes**: Each major feature has a manager class (ThemeManager, ScaleManager, etc.)
+1. **Manager Classes**: Each major feature has a manager class (ThemeManager, WizardManager, etc.)
 2. **Separation of Concerns**: UI logic separate from G-code generation
 3. **ES6 Modules**: Clean imports/exports for dependency management
 4. **Global Function Binding**: Maintains compatibility with existing HTML onclick handlers

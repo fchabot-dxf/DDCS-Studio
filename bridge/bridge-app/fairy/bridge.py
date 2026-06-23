@@ -10,6 +10,7 @@ Run from the bridge-app/ directory so `fairy` is importable as a package.
 """
 import argparse
 import datetime
+import os
 import sys
 import time
 
@@ -381,6 +382,10 @@ def self_test():
     good = ops.set_config({"dest": r"\\10.0.0.50\cncdisk", "machine_name": "Bench"})
     check(good.get("ok") and cfg2.expert_dest == r"\\10.0.0.50\cncdisk", "set_config accepts a network share + applies live")
     check(json.load(open(cfg2.config_path, encoding="utf-8")).get("machine_name") == "Bench", "set_config persists to config_path")
+    pset = ops.set_config({"port": 8767})
+    check(pset.get("ok") and pset.get("restart_needed") and cfg2.port == 8767, "set_config accepts a valid serve port (needs restart)")
+    check(json.load(open(cfg2.config_path, encoding="utf-8")).get("port") == 8767, "set_config persists the chosen port")
+    check(ops.set_config({"port": 9999}).get("ok") is False and cfg2.port == 8767, "set_config rejects an out-of-range port")
 
     # --- local HTTP server smoke test ---
     from .server import start_server
@@ -496,7 +501,8 @@ def main(argv):
     ap.add_argument("--serve", action="store_true", help="serve the console + ops API locally")
     ap.add_argument("--host", help="local server bind address (default 127.0.0.1; 0.0.0.0 for the LAN)")
     ap.add_argument("--http-port", dest="port", type=int, help="local server port (default 8765)")
-    ap.add_argument("--console", dest="console_dir", help="static console dir to serve at /")
+    ap.add_argument("--console", dest="console_dir", help="legacy fairy console dir (served at /fairy/ when Studio owns /)")
+    ap.add_argument("--studio", dest="studio_dir", help="Studio web root to serve at / (default: auto-detect <repo>/DDCS-Studio/web)")
     ap.add_argument("--shared", dest="shared_dir", help="monorepo shared/ dir to mount at /shared/")
     ap.add_argument("--ws", dest="enable_ws", action="store_true",
                     help="start the WebSocket Command Center telemetry broadcast (default port 8766)")
@@ -511,7 +517,7 @@ def main(argv):
         com_port=args.com_port, baud=args.baud, slave_id=args.slave_id,
         stall_seconds=args.stall_seconds, poll_interval_s=args.poll_interval_s,
         serve=args.serve or None, host=args.host, port=args.port, console_dir=args.console_dir,
-        shared_dir=args.shared_dir,
+        studio_dir=args.studio_dir, shared_dir=args.shared_dir,
         machine_id=args.machine_id, machine_name=args.machine_name,
         enable_slave=(False if args.no_slave else None),
         open_browser=(True if args.open_browser else None),
@@ -520,6 +526,20 @@ def main(argv):
     )
     if args.provision:
         return provision(cfg, args.machine_id, args.machine_name)
+    # Studio at / by default when serving from the repo tree (COMBINED-APP-PLAN Step 1). Frozen builds
+    # pass --studio explicitly (this relative path doesn't exist inside _MEIPASS).
+    if cfg.serve and not cfg.studio_dir:
+        repo_studio = os.path.normpath(os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "DDCS-Studio", "web"))
+        if os.path.isdir(repo_studio):
+            cfg.studio_dir = repo_studio
+    if cfg.serve and not cfg.console_dir:
+        repo_console = os.path.normpath(os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "web", "ui"))
+        if os.path.isdir(repo_console):
+            cfg.console_dir = repo_console
+    if cfg.studio_dir and not cfg.shared_dir:
+        cfg.shared_dir = os.path.join(cfg.studio_dir, "shared")
     run_loop(cfg)
     return 0
 

@@ -1,63 +1,50 @@
 /**
- * DDCS Studio - ATC Spindle Warm-up Wizard
- * Generates G-code for a multi-stage spindle warmup sequence.
+ * DDCS Studio - ATC Spindle Warm-up Wizard — staged spindle warmup.
+ *
+ * REWRITTEN AS A BLOCK STACK: `atcWarmupStack(params)` builds from granular atoms (Comment / Confirm /
+ * Spindle / Coolant / Dwell / Message / Label / End Program). Native across posts for free: the Dwell units
+ * (ms on Expert/V4.1, seconds on DM500) and the Confirm gate (folds where there's no scripted HMI) come from
+ * the active dialect. Form and Blocks view are two editors of this one stack.
  */
-import { w, G, M, N, S, P, set, line, comment } from './words.js';
-import { ifGoto, goto } from './dialect.js';
-import { toNum as toNumShared } from './probeBlocks.js';
+import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { recordOp } from '../blocks/opRecord.js';
+import { num } from './ops/util.js';
+
+export function atcWarmupStack(params = {}) {
+    const rpm1 = num(params.rpm1, 6000), time1 = num(params.time1, 30);
+    const rpm2 = num(params.rpm2, 12000), time2 = num(params.time2, 30);
+
+    const S = [];
+    const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
+    const CF = (msg, cancel) => { const b = newBlock('confirm'); b.params = { msg, cancel }; S.push(b); };
+    const SP = (rpm) => { const b = newBlock('spindle'); b.params = { rpm, dir: 'cw' }; S.push(b); };
+    const SPOFF = () => { const b = newBlock('spindle'); b.params = { rpm: 0 }; S.push(b); };
+    const COOLOFF = () => { const b = newBlock('coolant'); b.params = { flow: 'off' }; S.push(b); };
+    const DW = (sec) => { const b = newBlock('dwell'); b.params = { sec }; S.push(b); };
+    const MSG = (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); };
+    const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
+    const END = () => S.push(newBlock('endprogram'));
+
+    C('Spindle Warm-up');
+    C(`Stage 1: ${rpm1} RPM for ${time1}s`);
+    C(`Stage 2: ${rpm2} RPM for ${time2}s`);
+    CF('Warm up spindle? Press Enter', 999);
+    SPOFF(); COOLOFF();                       // stop spindle & coolant first
+    C('Stage 1');
+    MSG(`Starting at ${rpm1} RPM`);
+    SP(rpm1); DW(time1);
+    C('Stage 2');
+    MSG(`Ramping to ${rpm2} RPM`);
+    SP(rpm2); DW(time2);
+    SPOFF();
+    MSG('Warmup complete - spindle ready');
+    LB(999); END();
+    return S;
+}
 
 export class AtcWarmupWizard {
-    constructor() {}
-
-    toNum(v, def = 0) {
-        return toNumShared(v, def);
-    }
-
     generate(params) {
-        const _rpm1 = this.toNum(params.rpm1, 6000);
-        const _time1 = this.toNum(params.time1, 30);
-        const _rpm2 = this.toNum(params.rpm2, 12000);
-        const _time2 = this.toNum(params.time2, 30);
-
-        let gcode = '';
-        gcode += `( ATC | Spindle Warm-up )\n`;
-        gcode += `( Stage 1: ${_rpm1} RPM for ${_time1}s )\n`;
-        gcode += `( Stage 2: ${_rpm2} RPM for ${_time2}s )\n\n`;
-
-        gcode += `( === CONFIGURATION === )\n`;
-        gcode += `#140=${_rpm1}     ( Stage 1 RPM )\n`;
-        gcode += `#141=${_time1 * 1000}    ( Stage 1 Duration: ${_time1} s in ms - DDCS G4 P is ms )\n`;
-        gcode += `#142=${_rpm2}    ( Stage 2 RPM )\n`;
-        gcode += `#143=${_time2 * 1000}    ( Stage 2 Duration: ${_time2} s in ms )\n\n`;
-
-        gcode += `( Single confirmation )\n`;
-        gcode += line([set('#1505', '1')], 'Warm up spindle? Press Enter') + '\n';
-        gcode += ifGoto('#1505', '==', '0', 999) + '\n\n';
-
-        gcode += `( Initialize - stop spindle if running )\n`;
-        gcode += line([M(5), M(9)], 'Stop spindle & coolant') + '\n\n';
-
-        gcode += `( === WARMUP SEQUENCE === )\n`;
-        gcode += line([set('#1510', '#140')], 'Display RPM') + '\n';
-        gcode += line([set('#1505', '-5000')], 'Starting at %.0f RPM...') + '\n';
-        gcode += line([M(3), S('#140')], 'Start Stage 1') + '\n';
-        gcode += line([G(4), P('#141')], 'Wait Stage 1') + '\n\n';
-
-        gcode += line([set('#1510', '#142')], 'Display RPM') + '\n';
-        gcode += line([set('#1505', '-5000')], 'Ramping to %.0f RPM...') + '\n';
-        gcode += line([M(3), S('#142')], 'Start Stage 2') + '\n';
-        gcode += line([G(4), P('#143')], 'Wait Stage 2') + '\n\n';
-
-        gcode += `( Stop )\n`;
-        gcode += line([M(5)], 'Stop Spindle') + '\n\n';
-
-        gcode += `( Complete )\n`;
-        gcode += line([set('#1505', '-5000')], 'Warmup complete - Spindle ready!') + '\n\n';
-
-        gcode += `( Normal end )\n`;
-        gcode += line([N(999)]) + '\n';
-        gcode += line([M(30)]) + '\n';
-
-        return gcode;
+        recordOp('atc_warmup', params);
+        return emitMapped(atcWarmupStack(params)).text;
     }
 }

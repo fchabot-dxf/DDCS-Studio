@@ -1,0 +1,59 @@
+// M20101 - HTM_ATC macro - by SeB
+// Read LEDs status for input pins
+// - for slot sensors
+// - for OSSD inputs (UC300ETH-UB1)
+// should be added and enabled in macroloops
+
+
+
+
+// Read the input status of slot sensors LEDs
+// Fixed inputs (Port 5 and Pins 2-11)
+// getting 121-130 LEDs state (page DIAG.)
+for (int i = 0; i < 10; i++) {
+		if (AS3.Getbuttonstate(20202)) { // if sensor is active
+			if (AS3.GetLED(i+801)) {
+				AS3.SetLED((!AS3.GetLED(i+121)), (i+831));
+			}
+		} else {
+			AS3.SetLED(false, (i+831));
+		}				
+	} 	
+	
+// monitored LEDs - return different messages for OSSD inputs
+int[] ledNumbers = { 3, 4, 5, 6, 7 }; // OSSD inputs
+int[] varNumbers = { 903, 904, 905, 906, 907 }; // initiated in M99998 macro
+string[] ledMessagesError = {
+    "E-Stop Button Activated",	    // LED 3 - Port 1, Pin 3
+    "X-Axis Driver Fault",			// LED 4 - Port 1, Pin 4
+    "Z-Axis Driver Fault",			// LED 5 - Port 1, Pin 5
+    "C-Axis Driver Fault",			// LED 6 - Port 1, Pin 6
+    "Power Supply Fault"		    // LED 7 - Port 1, Pin 7
+};
+
+string[] ledMessagesOK = {
+    "E-Stop Button De-Activated",	// LED 3 - Port 1, Pin 3
+    "X-Axis Driver Online",			// LED 4 - Port 1, Pin 4
+    "Z-Axis Driver Online",			// LED 5 - Port 1, Pin 5
+    "C-Axis Driver Online",			// LED 6 - Port 1, Pin 6
+    "Power Supply Restored"		    // LED 7 - Port 1, Pin 7
+};
+
+for (int i = 0; i < ledNumbers.Length; i++) {
+    // Obținem starea curentă a LED-ului
+    bool currentLedState = AS3.GetLED(ledNumbers[i]); // current LED status
+
+    // Obținem starea precedentă a LED-ului din variabila globală corespunzătoare
+    bool previousLedState = exec.Getvar(varNumbers[i]) == 1;
+
+    // Dacă starea LED-ului s-a schimbat, afișăm mesajul corespunzător și actualizăm variabila globală
+    if (currentLedState != previousLedState) {
+        if (currentLedState) {
+            exec.AddStatusmessage(ledMessagesError[i]);
+            exec.Setvar(1, varNumbers[i]);  // Setăm variabila la 1 când LED-ul e aprins
+        } else {
+            exec.AddStatusmessage(ledMessagesOK[i]);
+            exec.Setvar(0, varNumbers[i]);  // Setăm variabila la 0 când LED-ul e stins
+        }
+    }
+}

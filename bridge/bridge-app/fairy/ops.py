@@ -36,6 +36,20 @@ class Ops:
     def __init__(self, backend, config):
         self.backend = backend
         self.cfg = config
+        self._detect_cache = None  # (dest, result): the fingerprint is stable per connected controller
+
+    # Per-controller baseline profiles (the shared shape Studio consumes). detect_controller() picks
+    # which one; the live `setting` derivation below refines the Expert. The V4.1 `setting` schema
+    # differs (1500 params, different I/O indices — see controllers/v4.1), so its live derivation is a
+    # separate, not-yet-mapped step; for now V4.1 serves its builtin baseline.
+    _CONTROLLERS = {
+        "expert-m350": {"id": "ddcs-expert-m350", "name": "DDCS Expert M350", "source": "builtin",
+                        "hardwareTabs": ["probes", "limits"],
+                        "atc": {"toolTableBaseVar": 1430, "defaultToolCount": 10}},
+        "v4.1": {"id": "ddcs-v4.1", "name": "DDCS V4.1", "source": "builtin",
+                 "hardwareTabs": ["probes", "limits"], "atc": None},
+    }
+    _FW_KEYS = ("DDCSV4", "DDCSE", "Expert", "M350", "MSETDATA", "MGETDATA", "Modbus")
 
     # --- jobs ---------------------------------------------------------------
     def submit_job(self, name, nc, mapping=None):
@@ -83,6 +97,50 @@ class Ops:
         except OSError as e:
             return {"ok": False, "error": str(e)}
 
+    # --- SYSDISK macro files: K-button programs (key-N.nc) + the O100nn library (slib-m.nc) ---------
+    # WRITE to the controller's macro disk. Whitelisted names only (no traversal, no firmware files); the
+    # existing file is ALWAYS backed up to <name>.bak before any change. The controller loads slib-m.nc at
+    # boot, so a merged M-code needs a REBOOT to take effect (the UI says so); key-N.nc is a button program.
+    def _sysfile_path(self, name):
+        base = self._sysdisk_path()
+        if not base or not name or not re.match(r"^(key-[1-7]\.nc|slib-m\.nc)$", name):
+            return None
+        return os.path.join(base, name)
+
+    def read_sysfile(self, name):
+        """Read a whitelisted SYSDISK macro file (text) — for previewing / merging slib-m.nc."""
+        if not self.controller_reachable():
+            return {"ok": False, "error": "controller unreachable"}
+        p = self._sysfile_path(name)
+        if not p:
+            return {"ok": False, "error": f"name not allowed: {name!r}"}
+        try:
+            with open(p, "r", encoding="utf-8", errors="replace") as f:
+                return {"ok": True, "name": name, "content": f.read()}
+        except OSError as e:
+            return {"ok": False, "error": str(e)}
+
+    def write_sysfile(self, name, content, mode="write"):
+        """Write (overwrite) or append a whitelisted SYSDISK macro file. Backs the existing file up to
+        <name>.bak first. mode='append' adds to the end — used to merge an O100nn block into slib-m.nc
+        WITHOUT rewriting the factory content (binary-preserved original + appended block)."""
+        if not self.controller_reachable():
+            return {"ok": False, "error": "controller unreachable"}
+        p = self._sysfile_path(name)
+        if not p:
+            return {"ok": False, "error": f"name not allowed: {name!r}"}
+        try:
+            backed = False
+            if os.path.exists(p):
+                with open(p, "rb") as src, open(p + ".bak", "wb") as dst:
+                    dst.write(src.read())
+                backed = True
+            with open(p, "a" if mode == "append" else "w", encoding="utf-8", newline="") as f:
+                f.write(content)
+            return {"ok": True, "name": name, "backup": (name + ".bak") if backed else ""}
+        except OSError as e:
+            return {"ok": False, "error": str(e)}
+
     # --- identity / descriptor ---------------------------------------------
     def controller_reachable(self):
         if not self.cfg.expert_dest:
@@ -95,41 +153,153 @@ class Ops:
     def descriptor(self):
         """Who this gateway is + its live-ish state. Basis for the heartbeat and the Admin view."""
         found = identity.read(self.cfg.expert_dest, self.cfg.identity_filename)
+        det = self.detect_controller()
         return {
             "machine_id": self.cfg.machine_id,
             "machine_name": self.cfg.machine_name,
             "controller_id": found.get("id") if found else None,
             "controller_name": found.get("name") if found else None,
             "controller_connected": self.controller_reachable(),
+            "controller_family": det.get("family"),       # v4.1 | expert-m350 | unknown (read-only fingerprint)
+            "controller_firmware": det.get("firmware"),
             "dest": self.cfg.expert_dest,            # which controller disk this gateway is pointed at
             "backend": self.cfg.backend,
             "version": __version__,
         }
+
+    # --- controller detection (V4.1 vs Expert) -----------------------------
+    @staticmethod
+    def _sysdisk_for(dest):
+        """SYSDISK share path for a given CNCDISK dest (swap the trailing share name). None if no dest.
+        Shared by the connected-controller path and the LAN scan (which fingerprints arbitrary hosts)."""
+        dest = (dest or "").rstrip("\\/")
+        if not dest:
+            return None
+        if dest.upper().endswith("CNCDISK"):
+            return dest[: -len("CNCDISK")] + "SYSDISK"
+        return dest  # already SYSDISK, or an unknown share name — try as-is
+
+    def _sysdisk_path(self):
+        """The SYSDISK share for the connected controller (holds the firmware + `setting`)."""
+        return self._sysdisk_for(self.cfg.expert_dest)
+
+    def detect_controller(self):
+        """Read-only fingerprint of the connected controller (V4.1 vs Expert), from its firmware `.out`
+        on the SYSDISK share — the Python port of controllers/identify-controller.ps1. The filename is
+        decisive in the common case (`ddcsv4.out` = V4.1); only an ambiguous name triggers a string
+        scan of the binary (Modbus is Expert-only). Cached per dest. Read-only; never raises."""
+        dest = self.cfg.expert_dest or ""
+        if self._detect_cache and self._detect_cache[0] == dest:
+            return self._detect_cache[1]
+        result = self._fingerprint_sysdisk(self._sysdisk_path())
+        if result.get("family") == "unknown":
+            # Firmware `.out` missing/ambiguous → fall back to the `setting` param COUNT, a reliable
+            # discriminator the validator already relies on: a V4.1's setting has ~1500 params, an
+            # Expert/M350's ~1000 (see controllers/v4.1 + _EXPECTED_PARAM_COUNT). Keeps a V4.1 from
+            # defaulting to the Expert baseline (which then false-flags a profile MISMATCH).
+            try:
+                params = self._read_setting_params()
+            except Exception:
+                params = None
+            if params is not None:
+                n = len(params)
+                fam = "v4.1" if n >= 1400 else "expert-m350" if 900 <= n <= 1100 else "unknown"
+                if fam != "unknown":
+                    result = {**result, "family": fam,
+                              "signals": {**result.get("signals", {}), "paramCount": n, "via": "param-count"}}
+        self._detect_cache = (dest, result)
+        return result
+
+    def _fingerprint_sysdisk(self, sysdisk):
+        """Family/firmware from a SYSDISK path's `.out` firmware file (`ddcsv4.out` = V4.1; else a filename
+        match, else a read-only string scan as tiebreaker). Read-only; never raises. Shared by
+        detect_controller (connected dest) and scan_controllers (arbitrary LAN hosts)."""
+        result = {"family": "unknown", "firmware": None, "signals": {}}
+        if not (sysdisk and os.path.isdir(sysdisk)):
+            return result
+        fw = None
+        try:
+            outs = [n for n in sorted(os.listdir(sysdisk)) if n.lower().endswith(".out")]
+            fw = outs[0] if outs else None
+        except OSError:
+            fw = None
+        name = (fw or "").lower()
+        family, sig = "unknown", {}
+        if name == "ddcsv4.out":
+            family = "v4.1"
+        elif any(t in name for t in ("ddcse", "expert", "m350")):
+            family = "expert-m350"
+        elif fw:  # ambiguous filename — scan the firmware strings as a tiebreaker (read-only)
+            try:
+                with open(os.path.join(sysdisk, fw), "rb") as f:
+                    text = f.read().decode("ascii", "ignore").lower()
+            except OSError:
+                text = ""
+            sig = {k: (k.lower() in text) for k in self._FW_KEYS}
+            is_v4 = sig.get("DDCSV4", False)
+            is_exp = any(sig.get(k, False) for k in ("DDCSE", "Expert", "M350", "MSETDATA", "MGETDATA", "Modbus"))
+            family = "v4.1" if (is_v4 and not is_exp) else "expert-m350" if (is_exp and not is_v4) else "unknown"
+        return {"family": family, "firmware": fw, "signals": sig}
+
+    def scan_controllers(self, timeout=0.3, workers=64):
+        """Discover DDCS controllers on the gateway PC's local /24: hosts with SMB (445) open that expose a
+        SYSDISK share whose `.out` fingerprints as V4.1/Expert. Read-only; never raises. Windows (UNC).
+        Returns [{ip, dest, family, firmware}] — `dest` is the CNCDISK share to set as expert_dest."""
+        import socket
+        import concurrent.futures
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))   # no packets sent — just learns the primary outbound IP
+            net = ".".join(s.getsockname()[0].split(".")[:3])
+            s.close()
+        except Exception:
+            return []
+
+        def smb_open(host):
+            try:
+                socket.create_connection((host, 445), timeout=timeout).close()
+                return host
+            except Exception:
+                return None
+
+        hosts = ["%s.%d" % (net, i) for i in range(1, 255)]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            live = [h for h in ex.map(smb_open, hosts) if h]
+        found = []
+        for h in live:
+            for share in ("cncdisk", "CNCDISK"):
+                dest = r"\\%s\%s" % (h, share)
+                fp = self._fingerprint_sysdisk(self._sysdisk_for(dest))
+                if fp["family"] != "unknown":
+                    found.append({"ip": h, "dest": dest, "family": fp["family"], "firmware": fp["firmware"]})
+                    break
+        return found
 
     # --- controller profile (shared with Studio) ---------------------------
     def profile(self):
         """Build a controller profile in the SHARED shape DDCS Studio consumes
         (see web/shared/js/profiles/controllerProfiles.js): {id, name, source, hardwareTabs, atc}.
 
-        The controller's persisted config is the `setting` file (1000 × f64, index = param #) on
-        SYSDISK and decodes over SMB. The captured `cfg_utf8` (full param schema) localized the I-O
-        indices and a 2026-06-10 panel cross-check CONFIRMED them (Fixed Probe #575 = IN02, Floating
-        Probe #578 = port 10); see controllers/expert-m350/FINDINGS.md "Profile I/O map". So when a live
-        `setting` is read we derive hardwareTabs + a `pins` block from the real I-O config; otherwise we
-        fall back to the builtin baseline (source = builtin).
+        We FINGERPRINT the connected controller first (detect_controller) and serve the matching
+        baseline. For an Expert we then refine it from the live `setting` file (1000 × f64 on SYSDISK,
+        index = param #): the captured `cfg_utf8` localized the I-O indices and a 2026-06-10 panel
+        cross-check CONFIRMED them (Fixed Probe #575 = IN02, Floating Probe #578 = port 10; see
+        controllers/expert-m350/FINDINGS.md). A V4.1's `setting` schema differs (1500 params, different
+        indices) so its live derivation is not mapped yet — it serves its builtin baseline.
         """
-        prof = {
-            "id": "ddcs-expert-m350",
-            "name": "DDCS Expert M350",
-            "source": "builtin",
-            "hardwareTabs": ["probes", "limits"],
-            "atc": {"toolTableBaseVar": 1430, "defaultToolCount": 10},
-        }
+        det = self.detect_controller()
+        family = det.get("family")
+        if family == "v4.1":
+            prof = {**self._CONTROLLERS["v4.1"], "detected": det}
+            return prof
+        # Expert M350, or unknown → default to the Expert baseline + live-setting refinement (as before).
+        prof = {**self._CONTROLLERS["expert-m350"], "detected": det}
         params = self._read_setting_params()
         if params is not None:
             prof["source"] = "controller"
             prof["paramCount"] = len(params)
             self._map_setting_to_profile(params, prof)
+            self._map_geometry_to_profile(params, prof)
             prof["validation"] = self.validate_profile(params)   # reuse the read; UI shows match/warnings
         return prof
 
@@ -187,6 +357,91 @@ class Ops:
             "limits": {k: v for k, v in limits.items() if v},
         }
 
+    # Machine-frame geometry + WCS offset table from the live `setting` array (param-space; macro = param + 500).
+    # Indices CONFIRMED against cfg_utf8/eng + a live-dump decode (2026-06-17, see VERIFY-AT-MACHINE.md):
+    #   soft limits neg #161-163 / pos #166-168  (±9999 = axis sentinel: "no soft limit on that axis")
+    #   homing dir  #112-114  (0 = negative, 1 = positive)
+    #   mach-zero   #235-237  ("mach pos at the mechanical zero switch")
+    #   active WCS  #78  (1..6 = G54..G59);  WCS offset table base #305 (= macro #805), stride 5 = [X,Y,Z,A,B]
+    # A WCS register holds the MACHINE coordinate of that work origin (direct `#805 = #880` sets G54 X = current
+    # machine X), so workOrigin (the active WCS's X/Y/Z) IS the sim's wcsOffset: part = machine - workOrigin.
+    _SOFT_NEG = (161, 162, 163)
+    _SOFT_POS = (166, 167, 168)
+    _HOMING_DIR = (112, 113, 114)
+    _MACH_ZERO = (235, 236, 237)
+    _ACTIVE_WCS = 78
+    _WCS_BASE = 305
+    _WCS_STRIDE = 5
+    _SENTINEL = 9999.0
+
+    def _map_geometry_to_profile(self, params, prof):
+        """Emit `geometry` (travel / soft-limits / homing / mach-zero) + `wcs` (active index, offset table,
+        and workOrigin = machine coords of part-zero) from the live `setting` array.
+        Read-only; never raises (bad indices fall back to 0 / None)."""
+        def at(i, default=0.0):
+            try:
+                v = params[i]
+                return float(v) if isinstance(v, (int, float)) else default
+            except (IndexError, TypeError):
+                return default
+
+        def span(neg_i, pos_i):  # travel = pos - neg; a ±9999 sentinel on either end means "no soft limit"
+            neg, pos = at(neg_i, -self._SENTINEL), at(pos_i, self._SENTINEL)
+            if abs(neg) >= self._SENTINEL or abs(pos) >= self._SENTINEL or pos <= neg:
+                return None
+            return round(pos - neg, 4)
+
+        def home_sign(i):
+            """Travel SIGN (±1) Studio's sim needs = which side of machine-zero (home) the working envelope
+            sits on. PRIMARY signal = the soft-limit MACHINE coordinates (#161-168): neg/pos are machine
+            coords of the envelope ends, so the side of 0 they fall on IS the travel direction — unambiguous,
+            no polarity guess. Since the machine homes to an extreme, the home end reads ~0 and the far end
+            ~±span, so the envelope midpoint's sign gives the direction. FALLBACK (both ends sentinel/zero):
+            the homing-direction param (#112-114: 0 = home toward the negative end → envelope/travel positive;
+            1 = home toward the positive end → travel negative). Returns +1, -1, or None (undeterminable →
+            Studio keeps the user's current sign). Never returns 0 (the web treats 0 as 'no info')."""
+            neg, pos = at(self._SOFT_NEG[i], -self._SENTINEL), at(self._SOFT_POS[i], self._SENTINEL)
+            neg_ok, pos_ok = abs(neg) < self._SENTINEL, abs(pos) < self._SENTINEL
+            if neg_ok and pos_ok and (neg + pos) != 0:
+                return 1 if (neg + pos) > 0 else -1
+            if pos_ok and pos != 0:
+                return 1 if pos > 0 else -1
+            if neg_ok and neg != 0:
+                return 1 if neg > 0 else -1
+            hd = at(self._HOMING_DIR[i], None)
+            if hd is None:
+                return None
+            return 1 if int(hd) == 0 else -1
+
+        active = at(self._ACTIVE_WCS, 1.0)
+        active = int(active) if 1 <= active <= 6 else 1
+        base = self._WCS_BASE + (active - 1) * self._WCS_STRIDE
+
+        table = {}
+        for w in range(6):
+            b = self._WCS_BASE + w * self._WCS_STRIDE
+            table["g%d" % (54 + w)] = [round(at(b), 4), round(at(b + 1), 4), round(at(b + 2), 4)]
+
+        prof["geometry"] = {
+            "travel": {"x": span(self._SOFT_NEG[0], self._SOFT_POS[0]),
+                       "y": span(self._SOFT_NEG[1], self._SOFT_POS[1]),
+                       "z": span(self._SOFT_NEG[2], self._SOFT_POS[2])},
+            "softLimits": {"xMin": at(self._SOFT_NEG[0]), "xMax": at(self._SOFT_POS[0]),
+                           "yMin": at(self._SOFT_NEG[1]), "yMax": at(self._SOFT_POS[1]),
+                           "zMin": at(self._SOFT_NEG[2]), "zMax": at(self._SOFT_POS[2])},
+            "homingDir": {"x": int(at(self._HOMING_DIR[0])), "y": int(at(self._HOMING_DIR[1])),
+                          "z": int(at(self._HOMING_DIR[2]))},
+            # homeDir = the derived ±1 travel sign Studio consumes (geometry.homeDir); homingDir above is the
+            # raw 0/1 param it's derived from, kept for debugging.
+            "homeDir": {"x": home_sign(0), "y": home_sign(1), "z": home_sign(2)},
+            "machZero": {"x": at(self._MACH_ZERO[0]), "y": at(self._MACH_ZERO[1]), "z": at(self._MACH_ZERO[2])},
+        }
+        prof["wcs"] = {
+            "active": active,
+            "workOrigin": {"x": round(at(base), 4), "y": round(at(base + 1), 4), "z": round(at(base + 2), 4)},
+            "table": table,
+        }
+
     # Expected `setting` shape + anchor sanity for the Expert — used to confirm the live file decoded
     # as aligned f64 params (not garbage / a wrong-controller dump). Anchors are [CONFIRMED] in FINDINGS:
     # #266/#267 baud code, #279 Modbus 0/1, #284 net-boot 0/1/2, #296 parity, #297 stop.
@@ -200,6 +455,11 @@ class Ops:
         sanity-checks the decode via known anchors, so a wrong share / wrong-size dump / ATC-misconfig
         surfaces (at startup and in the UI) instead of silently feeding Studio bad data. Pass `params`
         to reuse an already-read `setting` (profile() does this); otherwise it reads once."""
+        # The M350 baseline (1000 params + probes/limits + M350 anchors) doesn't apply to a V4.1: it has a
+        # different setting schema (~1500 params, different I/O indices) and serves its own builtin baseline,
+        # so validating it against the Expert profile would always false-flag a mismatch. Skip it.
+        if self.detect_controller().get("family") == "v4.1":
+            return {"ok": None, "reason": "V4.1 controller — uses its builtin baseline, not the M350 profile check"}
         if params is None:
             params = self._read_setting_params()
         if params is None:
@@ -264,13 +524,155 @@ class Ops:
                 continue
         return None
 
+    def _read_camsetting(self):
+        """Decode the controller's `camsetting` file as little-endian f64 — the ATC / CAM parameter tables
+        #1000-1499 (slot = #var-1000). Mapping boundary-confirmed by the captured sentinels (#1000/#1050/
+        #1099/#1100/#1300/#1499). Holds current tool #1300, capacity #1301, pocket XYZ #1330/#1350/#1370 and
+        the tool-length table #1430+. On SYSDISK. Returns list[float], or None if unreachable. Never raises."""
+        import struct
+        if not self.controller_reachable():
+            return None
+        for base in (self._sysdisk_path(), self.cfg.expert_dest):
+            if not base:
+                continue
+            try:
+                with open(os.path.join(base, "camsetting"), "rb") as f:
+                    raw = f.read()
+            except OSError:
+                continue
+            n = len(raw) // 8
+            if n:
+                try:
+                    return list(struct.unpack("<%dd" % n, raw[: n * 8]))
+                except struct.error:
+                    continue
+        return None
+
+    def _read_default_setting(self):
+        """Decode `default_setting` — the factory baseline of `setting` (same index = param # layout, 1000×f64).
+        Used to flag which pulled #0-999 params the operator actually changed from default. On SYSDISK. Never raises."""
+        import struct
+        if not self.controller_reachable():
+            return None
+        for base in (self._sysdisk_path(), self.cfg.expert_dest):
+            if not base:
+                continue
+            try:
+                with open(os.path.join(base, "default_setting"), "rb") as f:
+                    raw = f.read()
+            except OSError:
+                continue
+            n = len(raw) // 8
+            if n:
+                try:
+                    return list(struct.unpack("<%dd" % n, raw[: n * 8]))
+                except struct.error:
+                    continue
+        return None
+
+    # --- live variable values (read-only watch list) -----------------------
+    # Values are read from the controller's disk over SMB (read-only snapshot, flushed at run start/end):
+    #   #0-99    locals — RAM-only, never on disk (unavailable)
+    #   #100-549 `uservar`  (slot = #var-100), f64 LE — V4.1 SYSDISK 400 slots / Expert CNCDISK 450 slots
+    #   #100-999 `setting`  (index = #var) — persisted system params: WCS #805+, serial, servo, …
+    #   #1000-1499 `camsetting` (slot = #var-1000) — ATC/CAM tables: current tool, pockets, tool lengths
+    #   #1500+   position/runtime — bench-map pending (unavailable)
+    def _read_uservar(self):
+        import struct
+        if not self.controller_reachable():
+            return None
+        for base in (self._sysdisk_path(), self.cfg.expert_dest):
+            if not base:
+                continue
+            try:
+                with open(os.path.join(base, "uservar"), "rb") as f:
+                    raw = f.read()
+            except OSError:
+                continue
+            n = len(raw) // 8
+            if n:
+                try:
+                    return list(struct.unpack("<%dd" % n, raw[: n * 8]))
+                except struct.error:
+                    continue
+        return None
+
+    def _var_value(self, n, files):
+        uservar, setting, camsetting = files.get("uservar"), files.get("setting"), files.get("camsetting")
+        default_setting = files.get("default_setting")
+        try:
+            n = int(n)
+        except (TypeError, ValueError):
+            return {"available": False, "reason": "not a number"}
+        if 0 <= n <= 99:
+            return {"available": False, "source": "local", "reason": "local var - RAM-only, not on disk"}
+        # uservar: live macro vars #100-549 (slot = #var-100). No factory baseline → userSet = non-zero.
+        if uservar is not None and 100 <= n and (n - 100) < len(uservar):
+            v = uservar[n - 100]
+            return {"available": True, "value": v, "source": "uservar", "userSet": v != 0}
+        # camsetting: ATC/CAM tables #1000-1499 (slot = #var-1000). No default file → userSet = non-zero (untaught = 0).
+        if 1000 <= n <= 1499 and camsetting is not None and (n - 1000) < len(camsetting):
+            v = camsetting[n - 1000]
+            return {"available": True, "value": v, "source": "camsetting", "userSet": v != 0}
+        # setting: persisted system params #0-999 (index = #var) — WCS #805+, serial, servo, … userSet = differs
+        # from the factory `default_setting` baseline (so the import can flag what the operator actually changed).
+        if 100 <= n <= 999 and setting is not None and n < len(setting):
+            v = setting[n]
+            out = {"available": True, "value": v, "source": "setting"}
+            if default_setting is not None and n < len(default_setting):
+                out["default"] = default_setting[n]
+                out["userSet"] = abs(v - default_setting[n]) > 1e-9
+            else:
+                out["userSet"] = v != 0
+            return out
+        if not self.controller_reachable():
+            return {"available": False, "reason": "controller unreachable"}
+        if n >= 1500:
+            return {"available": False, "source": "runtime", "reason": "position/runtime var - bench-map pending"}
+        return {"available": False, "source": "tbd", "reason": "mapping pending bench verification"}
+
+    def read_vars(self, nums):
+        """Read a watch list of variable numbers (read-only). Returns {connected, values:{n:{...}}}.
+        Reads only the disk files a request actually needs (uservar always; setting/camsetting on demand)."""
+        ints = []
+        for x in nums:
+            try:
+                ints.append(int(x))
+            except (TypeError, ValueError):
+                pass
+        files = {"uservar": self._read_uservar()}
+        if any(100 <= v <= 999 for v in ints):
+            files["setting"] = self._read_setting_params()
+            files["default_setting"] = self._read_default_setting()   # factory baseline → userSet diff
+        if any(1000 <= v <= 1499 for v in ints):
+            files["camsetting"] = self._read_camsetting()
+        return {
+            "connected": self.controller_reachable(),
+            "snapshot": "last run start/end",
+            "values": {str(n): self._var_value(n, files) for n in nums},
+        }
+
     # --- gateway setup (the Setup UI; local gateway only — the cloud can't reach in) --------
+    @staticmethod
+    def _lan_ip():
+        """This box's LAN address (for the 'open this on your phone' hint). Best-effort, never raises."""
+        import socket
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))           # no traffic sent — just picks the outbound interface
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except OSError:
+            return ""
+
     def get_config(self):
         c = self.cfg
         return {
             "machine_name": c.machine_name, "machine_id": c.machine_id,
             "dest": c.expert_dest, "com_port": c.com_port,
             "backend": c.backend, "enable_slave": c.enable_slave,
+            "host": c.host, "port": c.port, "lan_ip": self._lan_ip(),
             "is_remote": is_network_share(c.expert_dest),
             "controller_connected": self.controller_reachable(),
         }
@@ -286,14 +688,26 @@ class Ops:
             d = (updates.get("dest") or "").strip()
             if d and not is_network_share(d):
                 return {"ok": False, "error": r"controller disk must be a network share like \\10.0.0.50\cncdisk (not a local folder)"}
+        if "host" in updates and updates["host"] is not None and updates["host"] not in ("127.0.0.1", "0.0.0.0"):
+            return {"ok": False, "error": 'host must be "127.0.0.1" (this PC only) or "0.0.0.0" (LAN)'}
         restart = False
         if "machine_name" in updates: c.machine_name = (updates["machine_name"] or "").strip()
         if "machine_id" in updates: c.machine_id = (updates["machine_id"] or "").strip()
         if "dest" in updates: c.expert_dest = (updates["dest"] or "").strip()
         if updates.get("com_port"): c.com_port = updates["com_port"].strip()
-        for k in ("enable_slave", "backend"):
+        for k in ("enable_slave", "backend", "host"):   # host rebind needs a server restart
             if k in updates and updates[k] is not None and getattr(c, k) != updates[k]:
                 setattr(c, k, updates[k]); restart = True
+        if "port" in updates and updates["port"] is not None:   # serve port: only our registered ports (keeps OAuth JS origins valid)
+            try:
+                p = int(updates["port"])
+            except (TypeError, ValueError):
+                return {"ok": False, "error": "port must be a number"}
+            if p not in (8765, 8766, 8767, 8768, 8769):
+                return {"ok": False, "error": "port must be one of 8765-8769 (keeps the OAuth JS origins valid)"}
+            updates = {**updates, "port": p}             # persist the int
+            if c.port != p:
+                c.port = p; restart = True               # takes effect on next launch (fairy_gateway._preferred_port)
         path = self._config_file()
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)

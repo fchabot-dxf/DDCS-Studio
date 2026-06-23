@@ -62,6 +62,40 @@ export class DockManager {
             // primary listener
             handle.addEventListener('click', (e) => { e.stopPropagation(); console.debug('header-handle clicked'); toggleExpand(); });
             handle.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); console.debug('header-handle key activated', e.key); toggleExpand(); } });
+
+            // Drag the handle up/down to RESIZE the keyboard height. A >4px move counts as a resize
+            // (not a toggle); the height is stored on #controller-dock as --dock-h, persisted, and the
+            // keys flex to fill it. Restore any saved height on load.
+            // --dock-h lives on <html> (not the dock) so the editor can read it too — it pads its scroll
+            // by the keyboard height when the keyboard floats over it (see the glass-keyboard CSS).
+            try { const sh = parseInt(localStorage.getItem('ddcs_dock_h') || '', 10); if (sh) document.documentElement.style.setProperty('--dock-h', sh + 'px'); } catch (_) { /* ignore */ }
+            let dz = false, dzMoved = false, dzY = 0, dzH = 0;
+            const dockBody = () => this.controllerDock.querySelector('.dock-body');
+            handle.style.touchAction = 'none';
+            handle.addEventListener('pointerdown', (e) => {
+                if (e.button !== 0) return;
+                dz = true; dzMoved = false; dzY = e.clientY;
+                dzH = dockBody() ? dockBody().getBoundingClientRect().height : 300;
+                try { handle.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+            });
+            handle.addEventListener('pointermove', (e) => {
+                if (!dz) return;
+                const dy = dzY - e.clientY;                 // drag UP → taller
+                if (Math.abs(dy) > 4) dzMoved = true;
+                if (!dzMoved) return;
+                if (!this.controllerDock.classList.contains('is-expanded')) this.controllerDock.classList.add('is-expanded');
+                const h = Math.max(160, Math.min(Math.round(window.innerHeight * 0.85), Math.round(dzH + dy)));
+                document.documentElement.style.setProperty('--dock-h', h + 'px');
+            });
+            const dzEnd = (e) => {
+                if (!dz) return; dz = false;
+                try { handle.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+                if (dzMoved) { const h = document.documentElement.style.getPropertyValue('--dock-h'); if (h) { try { localStorage.setItem('ddcs_dock_h', h.replace('px', '')); } catch (_) { /* ignore */ } } }
+            };
+            handle.addEventListener('pointerup', dzEnd);
+            handle.addEventListener('pointercancel', dzEnd);
+            // Swallow the click that follows a resize-drag so it doesn't also toggle collapse.
+            handle.addEventListener('click', (e) => { if (dzMoved) { e.stopImmediatePropagation(); e.preventDefault(); dzMoved = false; } }, true);
         }
         // fallback: event delegation in case direct listen fails (covers edge cases)
         const dock = document.getElementById('controller-dock');
@@ -107,6 +141,9 @@ export class DockManager {
         } catch (err) {
             console.warn('DockManager sanity guard failed', err);
         }
+
+        // Corsair-style key lighting (reactive press flash + ambient matrix rain) — futuristic only.
+        import('./keyFx.js').then((m) => m.initKeyFx()).catch(() => {});
     }
 
     clear() {

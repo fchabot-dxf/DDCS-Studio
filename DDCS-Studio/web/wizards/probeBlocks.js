@@ -31,6 +31,16 @@ export function toNum(v, def = 0) {
 }
 
 /**
+ * Probe-config source helpers (PROBE-CONFIG-SOURCE.md). Views pass
+ * params.sources = { field: {ctrl,pr,label} } for the fields the user flipped to
+ * "read from controller" (resolved against the active controller profile).
+ * srcVal picks the runtime var over the literal; srcNote annotates the comment so
+ * generated code documents where each value comes from.
+ */
+export function srcVal(src, literal) { return src ? src.ctrl : literal; }
+export function srcNote(src, note) { return src ? `${note} - controller ${src.pr}` : note; }
+
+/**
  * Two-pass probe block: [safety setup] → fast probe → check → retract →
  * slow probe → check → [save result] → [retract].
  *

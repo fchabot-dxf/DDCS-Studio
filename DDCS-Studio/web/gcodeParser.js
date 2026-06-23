@@ -15,12 +15,33 @@
 
 import { tokenizeWords } from './engine/core/tokenizer.js';
 import { evalExpr } from './engine/core/expression.js';
+import { stripLine } from './engine/core/program.js';
+
+/**
+ * Controller parameter vars seeded from Studio settings, so code generated in
+ * "read from controller" mode (#632/#640/#1078/... — PROBE-CONFIG-SOURCE.md) previews
+ * with sensible values instead of dropping the moves as unresolvable.
+ */
+function ctrlVarSeed() {
+    const cfg = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings() : null;
+    const p = (cfg && cfg.probes) || {}, a = (cfg && cfg.atc) || {};
+    return [
+        [631, 1],                              // Pr131 probe detection times
+        [632, Number(a.fFast) || 200],         // Pr132 probing speed
+        [633, Number(a.blockHeight) || 50],    // Pr133 setter block thickness
+        [640, Number(a.retract) || 2],         // Pr140 retraction after probe
+        [1075, Number(p.setterPin) || 0],      // Pr575 fixed probe port
+        [1077, Number(p.setterLevel) || 0],    // Pr577 fixed probe level
+        [1078, Number(p.probePin) || 0],       // Pr578 floating probe port
+        [1080, Number(p.probeLevel) || 0],     // Pr580 floating probe level
+    ];
+}
 
 export function parseGcode(text) {
-    const segments = []; // { x1,y1,z1, x2,y2,z2, rapid, probe }
-    const vars = new Map();
+    const segments = []; // { x1,y1,z1, x2,y2,z2, a1,b1,a2,b2, rapid, probe }
+    const vars = new Map(ctrlVarSeed());
 
-    let pos = { x: 0, y: 0, z: 0 };
+    let pos = { x: 0, y: 0, z: 0, a: 0, b: 0 }; // a/b = rotary axis angles (degrees)
     let motion = 0;        // 0 rapid, 1 feed, 2 CW arc, 3 CCW arc
     let absolute = true;   // G90 / G91
     let unitScale = 1;     // G20 inch = 25.4, G21 mm = 1 (stored in mm)
@@ -52,17 +73,17 @@ export function parseGcode(text) {
         // the 3D viewer gives each pass its own draggable ruby so it can be placed.
         if (/reposition:/i.test(raw)) {
             pass++;
-            pos = { x: 0, y: 0, z: 0 };
+            pos = { x: 0, y: 0, z: 0, a: 0, b: 0 };
         }
         // Unconditional GOTO = end of the success path; skip failure handlers under N-labels.
         if (raw.trim().toUpperCase().startsWith('GOTO')) break;
         // Retract moves are G0 moves the wizard comments as "Retract"
         const isRetract = /retract/i.test(raw);
 
-        // Strip comments: ( ... ) and ; trailing
-        const line = raw.replace(/\([^)]*\)/g, ' ').replace(/;.*$/, ' ');
-        if (!line.trim()) continue;
-        const trimmed = line.trim();
+        // Strip comments: ( ... ) (incl. nested) and ; trailing
+        const line = stripLine(raw);
+        if (!line) continue;
+        const trimmed = line;
 
         // --- Variable assignment: #N = expr  (or  #[expr] = expr) ---
         if (trimmed[0] === '#') {
@@ -111,13 +132,13 @@ export function parseGcode(text) {
 
         const has = (k) => Object.prototype.hasOwnProperty.call(wm, k);
         if (has('F') && wm.F != null) feedVal = wm.F;  // track modal feed
-        const hasAxis = has('X') || has('Y') || has('Z');
+        const hasAxis = has('X') || has('Y') || has('Z') || has('A') || has('B');
         const hasArcOff = has('I') || has('J') || has('K') || has('R');
         if (!hasAxis && !hasArcOff) continue;          // modal-only / non-motion line
         if (isMachine) { skipped++; continue; }        // G53 machine-coord move — skip
 
         // Resolve target; if any present axis is unresolvable, skip the move
-        const target = { x: pos.x, y: pos.y, z: pos.z };
+        const target = { x: pos.x, y: pos.y, z: pos.z, a: pos.a, b: pos.b };
         let bad = false;
         const axis = (k, lk) => {
             if (!has(k)) return;
@@ -126,6 +147,16 @@ export function parseGcode(text) {
             target[lk] = absolute ? v * unitScale : pos[lk] + v * unitScale;
         };
         axis('X', 'x'); axis('Y', 'y'); axis('Z', 'z');
+        // Rotary words (A/B) are degrees — never unit-scaled. A rotary-only move yields a
+        // zero-length XYZ segment that still carries the angle, so the viewer can spin the
+        // part instead of translating the tool (see gcodeViz3d part group).
+        const rot = (k, lk) => {
+            if (!has(k)) return;
+            const v = wm[k];
+            if (v === null || v === undefined) { bad = true; return; }
+            target[lk] = absolute ? v : pos[lk] + v;
+        };
+        rot('A', 'a'); rot('B', 'b');
         if (bad) { skipped++; continue; }
 
         const effMotion = isProbe ? 1 : motion;        // a probe draws like a feed line
@@ -136,6 +167,7 @@ export function parseGcode(text) {
             segments.push({
                 x1: pos.x, y1: pos.y, z1: pos.z,
                 x2: target.x, y2: target.y, z2: target.z,
+                a1: pos.a, b1: pos.b, a2: target.a, b2: target.b,
                 rapid: effMotion === 0, probe: isProbe, type, pass, feed: feedVal,
             });
             if (isProbe) probeCount++;
@@ -152,7 +184,7 @@ export function parseGcode(text) {
             let prev = pos;
             for (let i = 1; i < pts.length; i++) {
                 const p = pts[i];
-                segments.push({ x1: prev.x, y1: prev.y, z1: prev.z, x2: p.x, y2: p.y, z2: p.z, rapid: false, probe: false, type: 'feed', pass });
+                segments.push({ x1: prev.x, y1: prev.y, z1: prev.z, x2: p.x, y2: p.y, z2: p.z, a1: pos.a, b1: pos.b, a2: pos.a, b2: pos.b, rapid: false, probe: false, type: 'feed', pass });
                 grow(p);
                 prev = p;
             }

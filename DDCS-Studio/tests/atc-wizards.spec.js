@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // right dialect. (Generated-code correctness is covered in depth by
 // verification/atc-gen-test.mjs — engine round trip + DDCS linter.)
 
-const BASE = process.env.STUDIO_URL || 'http://localhost:3210';
+const BASE = process.env.STUDIO_URL || 'http://localhost:3211';
 
 async function openWizard(page, type) {
   await page.goto(BASE);
@@ -14,23 +14,40 @@ async function openWizard(page, type) {
   await page.evaluate((t) => window.openWiz(t), type);
 }
 
-test('Tool Change wizard: manual ↔ auto modes generate the right dialect', async ({ page }) => {
+test('Tool Change wizard: method switching shows the right fields and dialect', async ({ page }) => {
+  // Generic pick&place only emits the swap when the magazine has pockets — seed a small one.
+  await page.addInitScript(() => localStorage.setItem('ddcs_studio_settings', JSON.stringify({
+    atc: { magType: 'straight', magazine: [{ pocket: 1, tool: 1, x: 10, y: 0, z: -5 }, { pocket: 2, tool: 2, x: 30, y: 0, z: -5 }], tools: [{ num: 1, type: 'endmill', dia: 6, length: 40 }, { num: 2, type: 'ballnose', dia: 6, length: 45 }] },
+  })));
   await openWizard(page, 'atc_change');
-
-  // Manual (default): park prompt, no drawbar codes
-  await expect(page.locator('#wiz_atc_change_code')).toContainText('Manual Tool Change');
-  await expect(page.locator('#wiz_atc_change_code')).not.toContainText('M154');
-  await expect(page.locator('#atc_change_manual_params')).toBeVisible();
-
-  // Auto: T.nc-style with drawbar + sensor waits + pocket tables
-  await page.locator('#atc_change_mode').selectOption('auto');
-  await expect(page.locator('#atc_change_auto_params')).toBeVisible();
-  await expect(page.locator('#atc_change_manual_params')).toBeHidden();
   const code = page.locator('#wiz_atc_change_code');
+
+  // M6 (default, recommended): safe park then a bare M6 delegated to the controller.
+  await expect(page.locator('#atc_change_m6_params')).toBeVisible();
+  await expect(code).toContainText('M6');
+  await expect(code).not.toContainText('M154');
+
+  // Firmware: the O10102-accurate fixed-station PUSH (G53 stations + M19 orient).
+  await page.locator('#atc_change_method').selectOption('firmware');
+  await expect(page.locator('#atc_change_fw_params')).toBeVisible();
+  await expect(page.locator('#atc_change_m6_params')).toBeHidden();
+  await expect(code).toContainText('G53 Z#1306');
+  await expect(code).toContainText('X#1320 Y#1321');
+  await expect(code).toContainText('M19');
+
+  // Generic (ASSUMED): T.nc-style pick & place with drawbar + sensor waits.
+  await page.locator('#atc_change_method').selectOption('generic');
+  await expect(page.locator('#atc_change_auto_params')).toBeVisible();
   await expect(code).toContainText('M154');
   await expect(code).toContainText('M302');
   await expect(code).toContainText('#1504');
-  await expect(code).toContainText('1330+');
+
+  // Manual: park prompt, no drawbar codes.
+  await page.locator('#atc_change_method').selectOption('manual');
+  await expect(page.locator('#atc_change_manual_params')).toBeVisible();
+  await expect(page.locator('#atc_change_auto_params')).toBeHidden();
+  await expect(code).toContainText('Manual Tool Change');
+  await expect(code).not.toContainText('M154');
 });
 
 test('ATC Test wizard: drawbar and pocket modes', async ({ page }) => {

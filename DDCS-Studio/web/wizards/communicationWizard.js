@@ -2,6 +2,94 @@
  * DDCS Studio - Communication Wizard
  * Generates G-code for controller communication and UI interactions
  */
+import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { recordOp } from '../blocks/opRecord.js';
+import { resolveActivePost, getCaps } from './dialects/index.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+
+const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
+
+const fmtCtrl = (msg) => String(msg || '').replace(/\r\n|\r|\n/g, ' / ').replace(/\s*\/\s*/g, ' / ').trim();
+const fmtLine = (msg) => String(msg || '').replace(/\r\n|\r|\n/g, ' ').replace(/\s+/g, ' ').trim();
+
+/**
+ * Communication (HMI) params → its block SNIPPET (Comment / Set# / If Goto / Goto / Label / Raw). A snippet —
+ * no Program Start/End — because it's inserted mid-program. The one source of truth for both displays.
+ * #1505 popup / #1503 status / #2070 input / #2042-43 beep — the (msg) goes verbatim in the Set# value.
+ */
+export function commStack(params = {}) {
+    const S = [];
+    const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
+    const A = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; S.push(b); };
+    const IF = (lhs, op, rhs, g) => { const b = newBlock('ifgoto'); b.params = { lhs, op, rhs, goto: g }; S.push(b); };
+    const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
+    const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
+    const RAW = (t) => { const b = newBlock('raw'); b.params = { text: t }; S.push(b); };
+
+    const dialect = getDialect();
+    if (!dialect) { C('Error: No dialect loaded'); return S; }
+    const caps = getCaps(dialect.id);
+
+    const type = params.type;
+    if (['popup', 'status', 'input'].includes(type)) {   // data slots
+        if (params.slot1) A('#1510', params.slot1);
+        if (params.slot2) A('#1511', params.slot2);
+        if (params.slot3) A('#1512', params.slot3);
+        if (params.slot4) A('#1513', params.slot4);
+    }
+    const msg = fmtCtrl(params.msg);
+    if (type === 'popup') {
+        const mode = Number(params.popupMode);
+        if (!caps.hmi) {
+            C(`Fallback: Controller does not support HMI popups`);
+            MSG(msg);
+            if (mode === 1 || mode === 3) RAW('M00 ( Pause for operator acknowledgement )');
+        } else {
+            if (mode === 1) { C('Popup - OK/Cancel'); RAW(dialect.hmiPrompt(msg, 1).join('\n')); IF('#1505', '==', '0', 9); C('--- action if OK ---'); LB(9); }
+            else if (mode === 3) { C('Popup - Binary Choice'); RAW(dialect.hmiPrompt(msg, 3).join('\n')); IF('#1505', '==', '0', 8); C('--- ENTER action ---'); GO(9); LB(8); C('--- ESC action ---'); LB(9); }
+            else { C('Popup - Toast'); RAW(dialect.hmiToast ? dialect.hmiToast(msg).join('\n') : dialect.hmiPrompt(msg, -5000).join('\n')); }
+        }
+    } else if (type === 'status') {
+        const line = fmtLine(params.msg);
+        const useColor = params.statusColor != null && Number(params.statusColor) !== -1;
+        const mode = (params.statusMode != null && params.statusMode !== '') ? Number(params.statusMode) : 1;
+        const dwell = (params.statusDwell && Number(params.statusDwell) > 0) ? Number(params.statusDwell) : 0;
+        C(mode === -3000 ? 'Persistent Status Bar' : 'Status Bar Update');
+        if (!caps.hmi) {
+            C('Fallback: Status bar text not supported');
+            MSG(line);
+        } else {
+            if (useColor) A('#2039', Number(params.statusColor), 'Status bar color - BGR');
+            A('#1503', `${mode}(${line})`); // Still hardcoded for now, but guarded by hmi cap
+            if (useColor) A('#2039', '-1', 'Restore default color');
+            if (dwell > 0 && mode !== -3000) RAW(`G4 P${dwell}  ( Dwell - keep message visible )`);
+        }
+    } else if (type === 'input') {
+        const idNum = Number(String(params.id).replace('#', ''));
+        const useId = (Number.isFinite(idNum) && idNum >= 50 && idNum <= 499) ? idNum : 100;
+        if (!caps.hmi) {
+            C('Fallback: Numeric input not supported');
+            MSG(`Missing input for #${useId}: ${msg}`);
+            RAW('M00 ( Pause to manually edit variable if needed )');
+        } else {
+            C('Numeric Input - DDCS Safe');
+            RAW(dialect.hmiInput ? dialect.hmiInput(`#${useId}`, msg).join('\n') : `#2070=${useId}(${msg})`);
+            if (params.dest && String(params.dest).trim() !== '') A(String(params.dest), `#${useId}`, 'Copy to persistent');
+        }
+    } else if (type === 'beep') {
+        const dur = (params.val != null && params.val !== '') ? params.val : 500;
+        const cyc = (params.cycle != null && params.cycle !== '') ? Number(params.cycle) : 0;
+        if (cyc > 0) { C(`System Beep - ${Math.round(dur / (cyc * 2))} pulses of ${cyc}ms`); A('#2043', cyc, 'Pulse width ms'); A('#2042', dur, 'Total duration ms'); }
+        else { C('System Beep'); A('#2042', dur, 'Beep duration ms'); }
+    } else if (type === 'dwell') {
+        C('Dwell');
+        if (dialect && dialect.dwell) RAW(dialect.dwell(params.val).join('\n'));
+        else RAW(`G4 P${params.val}`);
+    } else {
+        C(`Unknown communication type: ${type}`);
+    }
+    return S;
+}
 
 // CommunicationWizard: Generates UI G-code (popup/status/input/etc.)
 // No runtime verifier is invoked here to keep generation deterministic.
@@ -41,139 +129,8 @@ export class CommunicationWizard {
     }
 
     generate(params) {
-        const {
-            type,        // popup, status, input, beep, alarm, dwell, keywait
-            msg,         // Message text
-            val,         // Value (for beep/dwell)
-            cycle,       // Cycle pulse width ms (for beep type, #2043)
-            popupMode,   // Popup mode (for popup type)
-            id,          // Variable ID (for input type)
-            dest,        // Destination variable (for input type)
-            slot1,       // Data slot 1 (#1510)
-            slot2,       // Data slot 2 (#1511)
-            slot3,       // Data slot 3 (#1512)
-            slot4,       // Data slot 4 (#1513)
-            statusColor, // BGR color value for #2039 (status type only, -1 = default)
-            statusMode,  // 1 = standard, -3000 = persistent
-            statusDwell  // dwell ms after #1503 (standard mode only)
-        } = params;
-
-        let gcode = '';
-
-        // Generate slots code if supported
-        const supportsSlots = ['popup', 'status', 'input'].includes(type);
-        const slotsCode = this.generateSlotsCode(supportsSlots, slot1, slot2, slot3, slot4);
-
-        // Generate specific communication type
-        switch (type) {
-            case 'popup':
-                gcode = this.generatePopup(slotsCode, popupMode, msg);
-                break;
-            case 'status':
-                gcode = this.generateStatus(slotsCode, msg, statusColor, statusMode, statusDwell);
-                break;
-            case 'input':
-                gcode = this.generateInput(slotsCode, id, dest, msg);
-                break;
-            case 'beep':
-                gcode = this.generateBeep(val, cycle);
-                break;
-            case 'dwell':
-                gcode = this.generateDwell(val);
-                break;
-            default:
-                gcode = `( Unknown communication type: ${type} )`;
-        }
-
-        return gcode;
-    }
-
-    generateSlotsCode(supportsSlots, slot1, slot2, slot3, slot4) {
-        if (!supportsSlots) return '';
-
-        let slotsCode = '';
-        if (slot1) slotsCode += `#1510=${slot1}\n`;
-        if (slot2) slotsCode += `#1511=${slot2}\n`;
-        if (slot3) slotsCode += `#1512=${slot3}\n`;
-        if (slot4) slotsCode += `#1513=${slot4}\n`;
-
-        return slotsCode;
-    }
-
-    generatePopup(slotsCode, mode, msg) {
-        const formattedMsg = this.formatMessageForController(msg);
-        const modeNum = Number(mode);
-        if (modeNum === 1) {
-            let gcode = `${slotsCode}( Popup - OK/Cancel )\n`;
-            gcode += `#1505=1(${formattedMsg})\n`;
-            gcode += `IF #1505==0 GOTO9  ( ESC = cancel )\n`;
-            gcode += `( --- action if OK --- )\n`;
-            gcode += `N9 ( end )`;
-            return gcode;
-        }
-        if (modeNum === 3) {
-            let gcode = `${slotsCode}( Popup - Binary Choice )\n`;
-            gcode += `#1505=3(${formattedMsg})\n`;
-            gcode += `IF #1505==0 GOTO8  ( ESC branch )\n`;
-            gcode += `( --- ENTER action --- )\n`;
-            gcode += `GOTO9\n`;
-            gcode += `N8 ( --- ESC action --- )\n`;
-            gcode += `N9 ( end )`;
-            return gcode;
-        }
-        // Toast: -5000, display only, no wait
-        let gcode = `${slotsCode}( Popup - Toast )\n`;
-        gcode += `#1505=-5000(${formattedMsg})`;
-        return gcode;
-    }
-
-    generateStatus(slotsCode, msg, color, mode, dwell) {
-        const formattedMsg = this.formatMessageSingleLine(msg);
-        const useColor = color !== undefined && color !== null && Number(color) !== -1;
-        const modeNum = (mode !== undefined && mode !== null && mode !== '') ? Number(mode) : 1;
-        const dwellVal = (dwell !== undefined && dwell !== null && dwell !== '' && Number(dwell) > 0) ? Number(dwell) : 0;
-        const modeLabel = modeNum === -3000 ? 'Persistent Status Bar' : 'Status Bar Update';
-        let gcode = `${slotsCode}( ${modeLabel} )\n`;
-        if (useColor) gcode += `#2039=${Number(color)}  ( Status bar color — BGR )\n`;
-        gcode += `#1503=${modeNum}(${formattedMsg})`;
-        if (useColor) gcode += `\n#2039=-1  ( Restore default color )`;
-        if (dwellVal > 0 && modeNum !== -3000) gcode += `\nG4 P${dwellVal}  ( Dwell — keep message visible )`;
-        return gcode;
-    }
-
-    generateInput(slotsCode, id, dest, msg) {
-        const formattedMsg = this.formatMessageForController(msg);
-        const idNum = Number(String(id).replace('#', ''));
-        let gcode = `${slotsCode}( Numeric Input - DDCS Safe )\n`;
-        if (Number.isFinite(idNum) && idNum >= 50 && idNum <= 499) {
-            gcode += `#2070=${idNum}(${formattedMsg})`;
-            if (dest && String(dest).trim() !== '') {
-                gcode += `\n${dest}=#${idNum}  ( Copy to persistent )`;
-            }
-        } else {
-            const temp = 100;
-            gcode += `#2070=${temp}(${formattedMsg})`;
-            if (dest && String(dest).trim() !== '') {
-                gcode += `\n${dest}=#${temp}  ( Copy to persistent )`;
-            }
-        }
-        return gcode;
-    }
-
-    generateBeep(val, cycle) {
-        const duration = (val !== undefined && val !== null && val !== '') ? val : 500;
-        const cycleNum = (cycle !== undefined && cycle !== null && cycle !== '') ? Number(cycle) : 0;
-        if (cycleNum > 0) {
-            const pulses = Math.round(duration / (cycleNum * 2));
-            return `( System Beep - ${pulses} pulses of ${cycleNum}ms )\n#2043=${cycleNum}  ( Pulse width ms )\n#2042=${duration}  ( Total duration ms )`;
-        }
-        return `( System Beep )\n#2042=${duration}  ( Beep duration ms )`;
-    }
-
-    generateDwell(val) {
-        // G4 P — units unclear: SPINDLE_WARMUP uses P30 = '30 seconds', Q.G. Zhang uses P3000 for 3s (ms)
-        // Decimal values (P1.0) likely seconds, integer values (P3000) likely milliseconds
-        return `( Dwell )\nG4 P${val}`;
+        recordOp('comm', params);   // let the Blocks tab open this op as its stack
+        return emitMapped(commStack(params)).text;
     }
 
     /**

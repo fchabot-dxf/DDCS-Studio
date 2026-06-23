@@ -1,6 +1,6 @@
 {
   "name": "ddcs-studio",
-  "version": "9.49.78",
+  "version": "10.25.0",
   "description": "Modular G-code Generator for DDCS Expert M350 CNC Controller",
   "type": "module",
   "main": "app.js",
@@ -11,6 +11,7 @@
     "prebundle": "npm run svg:rename-gradients",
     "bundle": "node scripts/bundle.cjs --src web",
     "build": "echo \"no build step: Studio is static; Cloudflare serves web/ as-is\"",
+    "build:exe": "pwsh ../build_fairy.ps1",
     "build:standalone": "npm run bump-version && npm run generate-vars && npm run bundle",
     "bump-version": "node scripts/bump-version.cjs",
     "test:e2e": "playwright test"
@@ -23,7 +24,7 @@
     "probe",
     "ultimate-bee"
   ],
-  "author": "Fr\u00e9d\u00e9ric",
+  "author": "Frédéric",
   "license": "MIT",
   "files": [
     "web/app.js",
@@ -39,6 +40,7 @@
     "@playwright/test": "^1.58.2"
   },
   "dependencies": {
+    "blockly": "^12.5.1",
     "xmldom": "^0.6.0"
   }
 }

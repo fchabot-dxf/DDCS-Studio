@@ -1,6 +1,7 @@
 /** views/cornerView.js — Corner probing wizard view (DOM glue + SVG animator). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { CornerWizard } from '../cornerWizard.js';
+import { restoreBoxStock } from './rotaryCenterView.js';
 
 const wizard = new CornerWizard();
 
@@ -34,19 +35,23 @@ export const cornerView = {
     panelId: 'wiz_corner',
     codeElId: 'wiz_corner_code',
     large: true,
+    twoPane: true,
     inputIds: [
-        'c_corner', 'c_probe_seq', 'c_probe_z_first', 'c_animate', 'c_sync_a', 'c_wcs',
+        'c_corner', 'c_probe_seq', 'c_probe_z_first', 'c_sync_a', 'c_wcs',
         'c_travel_dist', 'c_safe_z', 'c_scan_depth', 'c_radius', 'c_feed_fast', 'c_feed_slow',
         'c_dist', 'c_retract', 'c_port', 'c_level', 'c_q', 'c_slave',
     ],
+    // Controller-source chips (PROBE-CONFIG-SOURCE.md)
+    probeSrcFields: { c_port: 'port', c_level: 'level', c_feed_fast: 'fastFeed', c_retract: 'retract' },
     startAnim: startCornerAnim,
 
     onOpen() {
+        restoreBoxStock();   // not a rotary op → revert a forced cylinder back to the box (no-op if already a box)
         setTimeout(async () => {
-            if (window.drawCornerViz) await window.drawCornerViz();
             startCornerAnim();
         }, 50);
     },
+    // (params → form for editing is the central PARAM_FIELDS.corner map in wizardManager — no per-view setForm.)
 
     update(ctx) {
         const params = {
@@ -67,7 +72,8 @@ export const cornerView = {
             safeZ: el('c_safe_z').value,
             travelDist: el('c_travel_dist').value,
             scanDepth: el('c_scan_depth')?.value || '5',
-            radius: el('c_radius')?.value || '2.0'
+            radius: el('c_radius')?.value || '2.0',
+            sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
         const gcode = wizard.generate(params);
@@ -81,10 +87,7 @@ export const cornerView = {
         const cornerStatus = el('cornerVizStatus');
         if (cornerStatus) cornerStatus.textContent = `Corner: ${params.corner} (${dirMap[params.corner]}) - ${params.probeSeq}` + (params.probeZ ? ' + Z' : '');
 
-        // Update visualization and restart animator
-        if (window.drawCornerViz) {
-            window.drawCornerViz(params.probeZFirst);
-        }
+        // Restart animator
         startCornerAnim();
     },
 };

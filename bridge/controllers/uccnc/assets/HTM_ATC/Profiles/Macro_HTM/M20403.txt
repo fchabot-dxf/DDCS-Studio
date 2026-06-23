@@ -1,0 +1,32 @@
+// M20403 - HTM_ATC macro - by SeB
+// ATC Page - ***RH/NRH*** button. Will change the tool type. RH = Repeatable Holder, NRH = NonRepeatable Holder (need measure when loading)
+
+RunMacro(AS3.Getbuttonstate(20403));
+
+#Events
+
+static bool isMacroRunning = false; // Variabila globală pentru a verifica starea macro-ului
+
+// Metoda principală care rulează macro-ul
+public void RunMacro(bool status) {
+    if (!isMacroRunning) {
+        isMacroRunning = true; // Setăm starea că macro-ul este în execuție
+		if (!status)
+		{
+			// DialogResult result = MessageBox.Show("Set Tool Holder as Repeatable?\nTool will NOT be (re)measured when loaded!\n\nPress Apply if changed.", "Tool Holder Type", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2, MessageBoxOptions.ServiceNotification);
+			// if (result == DialogResult.Yes) { 
+				AS3.Switchbutton(true, 20403); 
+			// }
+		} else {
+			// DialogResult result = MessageBox.Show("Set Tool Holder as Non-Repeatable?\nTool will be (re)measured when loaded!\n\nPress Apply if changed.", "Tool Holder Type", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2, MessageBoxOptions.ServiceNotification);
+			// if (result == DialogResult.Yes) { 
+				AS3.Switchbutton(false, 20403); 
+			// }
+		}
+
+	// Resetăm starea macro-ului
+    isMacroRunning = false; 
+	} else {
+        return;
+    }
+}

@@ -45,6 +45,9 @@ export function getVizIds({ featureType = 'pocket', axis = 'X', dir1 = 'pos', tw
   // step2 = retract after first probe (step1)
   // step4 = retract after second probe (step3) - may not exist yet
   const retract1Candidates = [
+    // Plain sequential form — what middleViz.svg actually uses (e.g. ..._X_pos_retractpath_step2);
+    // without it the resolver missed every retract path and the retract leg never animated
+    `${axisGroupId}_retractpath_step2`,
     // Sequential step2 (NEW)
     `${axisGroupId}_1axis_XY_retractpath_step2`,
     `${axisGroupId}_1axis_XZ_retractpath_step2`,
@@ -58,6 +61,7 @@ export function getVizIds({ featureType = 'pocket', axis = 'X', dir1 = 'pos', tw
     `${axisGroupId}_1axis_XY_retractarrowneg`
   ];
   const retract2Candidates = [
+    `${axisGroupId}_retractpath_step4`,   // plain sequential form (matches the SVG naming)
     // Sequential step4 (NEW) - user will add later
     `${axisGroupId}_1axis_XY_retractpath_step4`,
     `${axisGroupId}_1axis_XZ_retractpath_step4`,
@@ -203,8 +207,8 @@ export function discoverAnimSteps({ featureType = 'pocket', axis = 'X', dir1 = '
   // Jog path between axes (for 2-axis / Find Both mode)
   let jogPath = null;
   if (twoAxis) {
-    // Pattern: middle_probe_{type}_jogpath_{axis}_{dir1}_to_{axis2}_{dir2}
-    const jogId = `${root}_jogpath_${axis}_${dir1}_to_${oppositeAxis}_${axis2Dir}`;
+    // Pattern: middle_probe_{type}_{axis}_{dir1}_to_{axis2}_{dir2}_jogpath  (jogpath is a SUFFIX — see middleViz.svg)
+    const jogId = `${root}_${axis}_${dir1}_to_${oppositeAxis}_${axis2Dir}_jogpath`;
     const jogEl = doc.getElementById(jogId);
     if (jogEl) {
       jogPath = { selector: `#${jogId}`, type: 'jog', stepNum: 0 };

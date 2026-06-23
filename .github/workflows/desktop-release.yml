@@ -1,0 +1,72 @@
+name: Desktop release
+
+# Automates the desktop release that drives the in-app update banner (ui/updateCheck.js):
+# bump the header .ver chip in DDCS-Studio/web/index.html and push → this builds the Windows
+# exe and publishes a GitHub release tagged to match the chip, so every running exe's
+# update-check sees the new tag and notifies the user. No local build / no manual gh release.
+#
+# Idempotent: if a release for the chip's version already exists, the job no-ops (so unrelated
+# index.html edits don't re-release). Trigger manually via the Actions tab too (workflow_dispatch).
+
+on:
+  push:
+    branches: [main]
+    paths: ['DDCS-Studio/web/index.html']   # the version chip lives here
+  workflow_dispatch:
+
+permissions:
+  contents: write                            # create the release + tag
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from the .ver chip
+        id: ver
+        shell: pwsh
+        run: |
+          $html = Get-Content DDCS-Studio/web/index.html -Raw
+          if ($html -notmatch 'class="ver">V([0-9][0-9.]*)<') { throw "no .ver chip found in index.html" }
+          $v = $Matches[1]
+          "version=$v" >> $env:GITHUB_OUTPUT
+          "tag=v$v"     >> $env:GITHUB_OUTPUT
+          Write-Host "chip version: $v"
+
+      - name: Skip if this release already exists
+        id: gate
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "${{ steps.ver.outputs.tag }}" *> $null
+          $exists = ($LASTEXITCODE -eq 0)
+          if ($exists) { "build=false" >> $env:GITHUB_OUTPUT; Write-Host "release ${{ steps.ver.outputs.tag }} exists - nothing to do" }
+          else         { "build=true"  >> $env:GITHUB_OUTPUT; Write-Host "no release ${{ steps.ver.outputs.tag }} yet - building" }
+          exit 0   # 'gh release view' returns non-zero when not found; don't let that fail the step
+
+      - name: Set up Python
+        if: steps.gate.outputs.build == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build deps
+        if: steps.gate.outputs.build == 'true'
+        run: python -m pip install --upgrade -r requirements-build.txt
+
+      - name: Build the exe
+        if: steps.gate.outputs.build == 'true'
+        shell: pwsh
+        run: ./build_fairy.ps1
+
+      - name: Publish release (notifies running exes via the update-check)
+        if: steps.gate.outputs.build == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" ./DDCS-Studio.exe `
+            --title "DDCS Studio ${{ steps.ver.outputs.tag }} (desktop)" `
+            --generate-notes

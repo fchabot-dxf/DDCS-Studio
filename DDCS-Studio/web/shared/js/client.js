@@ -45,6 +45,7 @@ export function makeClient(opts = {}) {
     mode: base ? "remote" : "local",
     descriptor: () => call("/api/descriptor"),
     profile: () => call("/api/profile"),   // controller profile in the shared shape (controllerProfiles.js)
+    readVars: (ns) => call("/api/vars?ns=" + (ns || []).join(",")),   // live watch-list values (read-only)
     listQueue: () => call("/api/queue"),
     listHistory: (limit = 100) => call("/api/history?limit=" + limit),
     getStatus: (id) => call("/api/status?id=" + encodeURIComponent(id)),
@@ -54,6 +55,8 @@ export function makeClient(opts = {}) {
     submitJob: (name, nc, map) => postJSON("/api/jobs", { name, nc, map }),
     getConfig: () => call("/api/config"),
     setConfig: (updates) => postJSON("/api/config", updates),
+    readSysfile: (name) => call("/api/sysfile?name=" + encodeURIComponent(name)),                  // SYSDISK macro file (key-N.nc / slib-m.nc)
+    writeSysfile: (name, content, mode = "write") => postJSON("/api/sysfile", { name, content, mode }),   // backed-up write/append
   };
 }
 

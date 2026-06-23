@@ -1,7 +1,8 @@
 """server.py — the gateway's LOCAL HTTP server (CONFIGS §3 offline/local configs).
 
-Exposes the Ops surface (ops.py) as a small JSON API, serves the static console at `/`, and mounts
-the monorepo `shared/` core at `/shared/` (MONOREPO_PLAN §4 — no-build sharing via serve config).
+Exposes the Ops surface (ops.py) as a small JSON API, serves Studio at `/` (COMBINED-APP-PLAN Step 1
+— the one-app face; the legacy fairy console moves to `/fairy/` until Step 5 retires it), and mounts
+the monorepo `shared/` core at `/shared/` (no-build sharing via serve config).
 This is how the gateway *serves the console* at localhost (offline) or on the LAN (local-network):
 download the gateway, run it, open the browser → the whole local system.
 
@@ -25,6 +26,8 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
+
+from . import oauth   # desktop (loopback) Google OAuth — see oauth.py
 
 # ES modules must be served with a JS MIME type or the browser refuses them. On Windows mimetypes
 # reads the registry, where .js sometimes maps to text/plain — pin .js/.mjs so the console and the
@@ -64,6 +67,14 @@ class _Handler(BaseHTTPRequestHandler):
         except (ValueError, UnicodeDecodeError):
             return {}
 
+    def _send_html(self, html, code=200):
+        body = html.encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def log_message(self, *a):  # keep the gateway log clean
         pass
 
@@ -86,6 +97,10 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send_json(self.ops.descriptor())
         if path == "/api/profile":
             return self._send_json(self.ops.profile())
+        if path == "/api/vars":
+            raw = (q.get("ns") or [""])[0]
+            nums = [x for x in raw.split(",") if x.strip()]
+            return self._send_json(self.ops.read_vars(nums))
         if path == "/api/config":
             return self._send_json(self.ops.get_config())
         if path == "/api/queue":
@@ -103,9 +118,56 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send_json(self.ops.list_files())
         if path == "/api/file":
             return self._send_json(self.ops.read_file((q.get("name") or [""])[0]))
+        if path == "/api/sysfile":
+            return self._send_json(self.ops.read_sysfile((q.get("name") or [""])[0]))
+        if path == "/api/scan":
+            return self._send_json({"controllers": self.ops.scan_controllers()})
+        if path == "/api/lan-qr":
+            try:                              # QR of the LAN URL (pure-python SVG, offline) for the Settings LAN ACCESS panel
+                import io
+                import qrcode
+                import qrcode.image.svg
+                url = "http://%s:%d/" % (self.ops._lan_ip(), self.server.server_address[1])
+                buf = io.BytesIO()
+                qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage).save(buf)
+                svg = buf.getvalue()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/svg+xml")
+                self.send_header("Content-Length", str(len(svg)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(svg)
+            except Exception as e:
+                self._send_json({"error": "qr unavailable: %s" % e}, 500)
+            return
+        # --- desktop Google OAuth (loopback flow; oauth.py). The exe's webview can't run Google's popup,
+        #     so the gateway opens the SYSTEM browser and catches the redirect here, exchanging server-side.
+        if path == "/oauth/google/start":
+            cid = self.ops.cfg.google_client_id
+            if not cid:
+                return self._send_json({"ok": False, "error": "no Google Desktop client id (Setup > Network)"}, 400)
+            redirect = "http://127.0.0.1:%d/oauth/google/callback" % self.server.server_address[1]
+            try:
+                return self._send_json({"ok": True, "url": oauth.start(cid, redirect)})
+            except Exception as e:
+                return self._send_json({"ok": False, "error": str(e)}, 500)
+        if path == "/oauth/google/callback":
+            ok = oauth.callback(self.ops.cfg.google_client_id, self.ops.cfg.google_client_secret, (q.get("state") or [""])[0], (q.get("code") or [""])[0])
+            note = ("Signed in to Google Drive — close this tab and return to DDCS Studio." if ok
+                    else "Sign-in failed — close this tab and try again from DDCS Studio.")
+            return self._send_html("<!doctype html><meta charset=utf-8><title>DDCS Studio</title>"
+                                   "<body style='font:16px system-ui;padding:3em;text-align:center'><h2>%s</h2></body>" % note)
+        if path == "/api/oauth/google/token":
+            cid = self.ops.cfg.google_client_id
+            return self._send_json({"access_token": oauth.access_token(cid, self.ops.cfg.google_client_secret) if cid else "", "connected": oauth.connected()})
+        if path == "/api/oauth/google/status":
+            return self._send_json({"connected": oauth.connected(), "configured": bool(self.ops.cfg.google_client_id)})
         if path.startswith("/shared/"):
             # the monorepo shared/ core (client.js, instrument/, …) — single source, served as-is (no build)
             return self._serve_file(self.server.shared_dir, path[len("/shared/"):])
+        if self.server.studio_dir and (path == "/fairy" or path.startswith("/fairy/")):
+            # legacy fairy console, kept reachable while Studio owns / (retired at COMBINED-APP-PLAN Step 5)
+            return self._serve_file(self.server.console_dir, path[len("/fairy/"):] or "index.html")
         return self._serve_static(path)
 
     def do_POST(self):
@@ -119,11 +181,14 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send_json(self.ops.delete_file(b.get("name", "")))
         if self.path == "/api/config":
             return self._send_json(self.ops.set_config(self._read_body()))
+        if self.path == "/api/sysfile":
+            b = self._read_body()
+            return self._send_json(self.ops.write_sysfile(b.get("name", ""), b.get("content", ""), b.get("mode", "write")))
         return self._send_json({"error": "not found"}, 404)
 
     # -- static console -------------------------------------------------------
     def _serve_static(self, path):
-        root = self.server.console_dir
+        root = self.server.studio_dir or self.server.console_dir
         if not root:
             return self._send_bytes(_PLACEHOLDER, "text/html")
         return self._serve_file(root, path.lstrip("/") or "index.html")
@@ -153,6 +218,7 @@ def start_server(config, ops):
     httpd = ThreadingHTTPServer((config.host, config.port), _Handler)
     httpd.ops = ops
     httpd.console_dir = config.console_dir
+    httpd.studio_dir = config.studio_dir
     httpd.shared_dir = config.shared_dir
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd

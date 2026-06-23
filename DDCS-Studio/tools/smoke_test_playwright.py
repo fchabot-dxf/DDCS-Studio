@@ -133,7 +133,6 @@ with sync_playwright() as p:
     # Click a couple of buttons to see if handlers are wired
     try:
         page.click('#styleBtn')
-        page.click('#scaleBtn')
     except Exception as e:
         OUT['errors'].append('click error: ' + str(e))
 

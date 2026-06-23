@@ -8,9 +8,13 @@
  */
 import { tokenizeWords } from './tokenizer.js';
 
-/** Strip ( ... ) comments and ; trailing comments, and trim. */
+/** Strip ( ... ) comments (incl. nested parens) and ; trailing comments, and trim. */
 export function stripLine(raw) {
-    return String(raw).replace(/\([^)]*\)/g, ' ').replace(/;.*$/, ' ').trim();
+    let s = String(raw), prev;
+    // Remove innermost (...) repeatedly so nested comments like "( Probe top (Z down) )" strip fully —
+    // a single non-nesting pass leaves a stray ")" that reads as an unrecognizable G-code line.
+    do { prev = s; s = s.replace(/\([^()]*\)/g, ' '); } while (s !== prev);
+    return s.replace(/;.*$/, ' ').trim();
 }
 
 /**

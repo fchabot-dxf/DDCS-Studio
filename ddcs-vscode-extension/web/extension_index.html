@@ -1,0 +1,2290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>DDCS VS Code Extension</title>
+    
+    <!-- Shared app styles -->
+    <link rel="stylesheet" href="../../DDCS-Studio/web/styles.css">
+    
+    <!-- Blockly library -->
+    <script src="../../DDCS-Studio/web/vendor/blockly/blockly.min.js"></script>
+    
+    <!-- Extension specific overrides -->
+    <link rel="stylesheet" href="extension_styles.css">
+    
+    <!-- Shared three.js for 3D viz -->
+    <script defer src="../../DDCS-Studio/web/assets/vendor/three.min.js"></script>
+    
+    <style>
+        /* Blockly spike base styles */
+        /* Block-category colors only. Studio's theme system (styles.css + body[data-theme]) owns every
+           app-chrome color — redefining --bg/--panel/etc here is exactly what overrode the theme into a
+           dark, VS-Code-looking skin. The extension's chrome uses private var names; alias them to Studio's
+           theme tokens ON BODY (which carries data-theme) so they track the active theme. */
+        :root { --cat-machine:#64748b; --cat-move:#14b8a6; --cat-ops:#22c55e; --cat-control:#f59e0b;
+                --cat-math:#84cc16; --cat-modify:#a855f7; }
+        body { --ink: var(--text); --line: var(--border); --muted: var(--text-dim); --accent-blue: var(--accent); }
+        html, body { margin:0; height:100%; overflow: hidden; background:var(--bg); color:var(--ink);
+                    font:13px/1.4 ui-sans-serif,system-ui,Segoe UI,sans-serif; }
+        .wrap { display:flex; flex-direction:column; height:100%; }
+        
+        /* The Wizard Bar */
+        .wizard-bar { display:flex; align-items:center; gap:12px; padding:8px 14px; background:var(--panel);
+                 border-bottom:1px solid var(--line); }
+        .wizard-bar h1 { font-size:14px; margin:0; letter-spacing:.04em; color: var(--accent-blue); font-style: italic; }
+        .wizard-bar button { padding: 6px 12px; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 4px; cursor: pointer; }
+        .wizard-bar button:hover { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        
+        /* The Blockly Canvas */
+        .main { display:flex; flex-direction:column; flex:1; min-height:0; }
+        #ws { flex:1; min-height:0; position:relative; }
+
+        /* Main-UI tab bar (extension shell). Header is 54px so the forked .app-shell/.gateway-app panels
+           (position:absolute; top:54px) sit flush beneath it. */
+        .wizard-bar { min-height:54px; box-sizing:border-box; }
+        .ext-tabs { display:flex; gap:4px; }
+        .ext-tab { padding:6px 14px; background:transparent; border:1px solid transparent; color:var(--muted);
+                   border-radius:4px; cursor:pointer; font-weight:600; letter-spacing:.03em; font-size:12px; }
+        .ext-tab:hover { color:var(--ink); }
+        .ext-tab.active { color:var(--ink); background:var(--bg); border-color:var(--border); }
+        .wiz-launchers { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line); }
+        .wiz-launchers button { padding:6px 12px; background:#26303d; border:1px solid #39465a; color:#cbd5e1; border-radius:4px; cursor:pointer; font-size:12px; }
+        .wiz-sep { width:1px; align-self:stretch; background:var(--line); margin:2px 4px; }
+        
+        /* Modals for wizards */
+        #wizard { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
+        #wizard .wiz-box { max-height: 90vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body>
+  <!-- ════ SEAM: EXTENSION SHELL (extension-owned chrome + mount points) ══════════════════════════
+       This wrap (wizard-bar + #ws Blockly canvas) is the extension's own minimal chrome — safe to
+       restyle/replace without touching Studio. Mount points the bundle needs: #ws (Blockly canvas),
+       #gw-status (status chip), and #wizard (overlay, below). ═══════════════════════════════════════ -->
+  <div class="wrap">
+    <!-- WIZARD BAR -->
+    <header class="wizard-bar">
+      <h1>DDCS Extension</h1>
+      <nav class="ext-tabs" role="tablist">
+        <button type="button" class="ext-tab active" data-app="blocks" onclick="window.showApp('blocks')">BLOCKS</button>
+        <button type="button" class="ext-tab" data-app="gateway" onclick="window.showApp('gateway')">GATEWAY</button>
+        <button type="button" class="ext-tab" data-app="settings" onclick="window.showApp('settings')">SETTINGS</button>
+      </nav>
+      <button type="button" class="ext-tab" onclick="window.openPreview && window.openPreview()" title="Open a 3D toolpath preview in a separate window">👁 Preview</button>
+      <select id="hdrPost" class="hdr-post" style="margin-left:auto;" title="Post-processor — which controller's G-code to generate. 'Auto' follows the machine profile (Settings → Profile)."></select>
+      <span id="gw-status" style="font:12px/1 ui-monospace,SFMono-Regular,monospace; color:#8b97a6;">gateway: …</span>
+    </header>
+    
+    <!-- WIZARD LAUNCHER SUB-BAR (row 2, under the tabs) + BLOCKLY CANVAS -->
+    <div class="main">
+      <!-- Toolbar built from source by commandDeck.renderHeader() — these are the empty mount points it
+           populates (Comm/WCS/Warm-up + Probe/ATC/Mill dropdowns). Reusing the real builder keeps the
+           launcher bar in sync with Studio instead of being a hand-maintained list. Same .dock-header
+           wrapper Studio uses, so styles.css styles it identically. -->
+      <div class="dock-header top-dock-header">
+        <div class="header-controls">
+          <div class="header-left" aria-label="Left controls"></div>
+          <div class="header-center" aria-label="Center wizards"></div>
+          <div class="header-right" aria-label="Right controls"></div>
+        </div>
+      </div>
+      <div id="ws"></div>
+    </div>
+  </div>
+
+  <!-- ════ SEAM: SHARED WIZARD BODY (forked from DDCS-Studio/web/index.html) ══════════════════════
+       Everything from #wizard down to #global-tooltip is a fork of Studio's wizard markup (38 wizard
+       forms + their #wiz_*_code outputs + viz containers). The wizards in bundle.js read/write these
+       IDs, so it is LOAD-BEARING — do NOT strip it. It is the drift surface: when Studio adds/edits a
+       wizard, this copy goes stale. De-fork path: generate this region from the canonical index.html
+       at build time, or splice it in DdcsEditorProvider — see docs/HTML_SEAMS.md. ════════════════════ -->
+  <!-- THE WIZARDS (Hidden by default) -->
+  <!-- Wizard overlay -->
+    <div id="wizard" class="overlay">
+        <div class="wiz-box">
+            <!-- HEADER: Blue bar with title and close button -->
+            <div class="wiz-head">
+                <span id="wizTitle">GENERATOR</span>
+                <span class="wiz-head-actions" style="display:flex; gap:14px; align-items:center;">
+                    <span class="wiz-templates" title="Templates — save / load this op's settings" role="button" tabindex="0">📑</span>
+                    <span class="wiz-gear" title="Settings — stock, probe, machine (live updates this preview)" onclick="window.openSettings && window.openSettings()">⚙</span>
+                    <span class="wiz-close" onclick="closeWiz()" title="Close">✕</span>
+                </span>
+            </div>
+
+            <!-- WIZARD BODIES: One per wizard type, only one visible at a time -->
+            <div id="wiz_corner" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <!-- Visualization container -->
+                <div class="viz-container">
+                    <div id="cornerVizStatus" class="viz-status"></div>
+                    <div id="cornerVizContainer" class="viz-canvas"></div>
+                </div>
+                
+                <!-- Viz Legend -->
+                <div class="viz-legend">
+                    <div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
+                </div>
+
+
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Use for <b>outside corners</b> (boss). Park probe in the open space near the corner at scan depth — clear of both walls. Macro probes each wall and sets WCS X and Y (and optionally Z) to the corner.</div>
+
+                <!-- Form controls in grid layouts -->
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-3">
+                    <div>
+                        <span class="label">CORNER LOCATION</span>
+                        <select id="c_corner" title="Corner to probe. Sets X/Y probe directions.&#10;FL: X+, Y+  FR: X-, Y+  BL: X+, Y-  BR: X-, Y-" value="FL"><option>FL</option><option>FR</option><option>BL</option><option>BR</option></select>
+                    </div>
+                    <div>
+                        <span class="label">PROBE SEQUENCE</span>
+                        <select id="c_probe_seq" title="Probe order. YX: probe Y wall first, travel to X wall. XY: probe X wall first, travel to Y wall." value="YX"><option>YX</option><option>XY</option></select>
+                    </div>
+                    <div>
+                        <span class="label">PROBE Z FIRST</span>
+                        <label style="font-size:12px;" title="Probe Z surface before XY walls. Contact pos saved to #1927, written to #[#70+2] (WCS Z offset)."><input type="checkbox" id="c_probe_z_first"/> Probe Z First</label>
+                    </div>
+                </div>
+
+                <!-- WCS Target -->
+                <div>
+                    <span class="section-label">WCS</span>
+                    <span class="label">WCS TARGET</span>
+                    <select id="c_wcs" title="Target WCS for probe results. Active: reads #578 to get index, computes base address as #70=[805+([#578]-1)*5]. Fixed: #70=805..830 directly." value="active">
+                        <option value="active">Active WCS</option>
+                        <option value="G54">G54</option>
+                        <option value="G55">G55</option>
+                        <option value="G56">G56</option>
+                        <option value="G57">G57</option>
+                        <option value="G58">G58</option>
+                        <option value="G59">G59</option>
+                    </select>
+                </div>
+                
+                <!-- Section groups with headers -->
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-3">
+                        <div><span class="label">MAX PROBE</span><input type="number" id="c_dist" value="100" title="Max probe travel distance (mm). Stored as #1. Used in G31 as #7=[0-#1] (neg) or #8=#1 (pos)."/></div>
+                        <div><span class="label">RETRACT</span><input type="number" id="c_retract" value="5" title="Retract distance after fast probe, before slow pass (mm). Stored as #2. Used as #9=[0-#2] (neg) or #10=#2 (pos)."/></div>
+                        <div><span class="label">PROBE RADIUS</span><input type="number" id="c_radius" value="2.0" step="0.001" title="Radius of the probe stylus ruby tip. Used for coordinate compensation."/></div>
+                        <div><span class="label">SAFE Z</span><input type="number" id="c_safe_z" value="10" title="Z lift distance for moves between walls (mm). Stored as #19. Also used in plunge: #17=safeZ+scanDepth."/></div>
+                        <div><span class="label">TRAVEL</span><input type="number" id="c_travel_dist" value="50" title="Distance to travel along first wall before probing second wall (mm). Stored as #15 (pos) / #16=[0-travel] (neg)."/></div>
+                        <div><span class="label">SCAN DEPTH</span><input type="number" id="c_scan_depth" value="5" title="Extra Z plunge below safeZ before probing a wall (mm). #17=safeZ+scanDepth. #18=[0-#17]."/></div>
+                    </div>
+                </div>
+                
+                <!-- Feed Rates -->
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input type="number" id="c_feed_fast" value="200" title="Fast probe feedrate (mm/min). Stored as #3. Used in first G31 pass."/></div>
+                        <div><span class="label">SLOW FEED</span><input type="number" id="c_feed_slow" value="50" title="Slow probe feedrate (mm/min). Stored as #4. Used in second G31 pass after retract."/></div>
+                    </div>
+                </div>
+
+                <!-- Probe Settings -->
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-3">
+                        <div><span class="label">INPUT PORT (P)</span><input type="number" id="c_port" value="3" title="Probe input port number. Stored as #5. Used as P parameter in G31 (e.g. G31 X#7 F#3 P#5)."/></div>
+                        <div><span class="label">LEVEL (L)</span>
+                            <select id="c_level" title="Probe trigger signal level. L0=active low (NPN/normally-open). L1=active high (PNP/normally-closed). Used as L parameter in G31." value="0">
+                                <option value="0">Low (0)</option>
+                                <option value="1">High (1)</option>
+                            </select>
+                        </div>
+                        <div><span class="label">STOP (Q)</span>
+                            <select id="c_q" title="Probe stop mode. Q1=immediate stop on trigger. Q0=decelerate to stop. Used as Q parameter in G31." value="1">
+                                <option value="1">Immediate (Q1)</option>
+                                <option value="0">Decel (Q0)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Options -->
+                <div>
+                    <span class="section-label">OPTIONS</span>
+                    <div class="grid-3">
+                        <div>
+                            <label style="font-size:12px;" title="Dual gantry only — writes A machine position to WCS slave offset. Disable if A is a rotary axis."><input type="checkbox" id="c_sync_a" checked/> Sync A Axis (Dual Gantry)</label>
+                        </div>
+                        <div>
+                            <span class="label">SLAVE</span>
+                            <select id="c_slave" title="WCS offset index for the slave axis. A=offset 3 (#[#70+3]), B=offset 4 (#[#70+4])."><option value="3">A</option><option value="4">B</option></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview block -->
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_corner_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Middle Wizard -->
+            <div id="wiz_middle" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <!-- Visualization container -->
+                <div class="viz-container">
+                    <div id="middleVizStatus" class="viz-status"></div>
+                    <div id="middleVizContainer" class="viz-canvas"></div>
+                </div>
+
+                <!-- Viz Legend -->
+                <div class="viz-legend">
+                    <div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
+                </div>
+
+
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div id="middle_desc" class="wiz-usage"></div>
+
+
+                <!-- Form controls in grid layouts -->
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">FEATURE TYPE</span>
+                        <select id="m_type" title="Pocket: probe from center outward to both walls. Boss: probe from outside each side (requires manual repositioning between passes)." value="pocket">
+                            <option value="pocket">pocket</option>
+                            <option value="boss">boss</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">AXIS</span>
+                        <select id="m_axis" title="Axis to find center on. Result stored in #53 (primary) or #56 (secondary). Written to #[#70+0] for X or #[#70+1] for Y." value="X">
+                            <option value="X">X</option>
+                            <option value="Y">Y</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div>
+                        <span class="label">1ST AXIS DIR</span>
+                        <select id="m_dir" title="Probe direction for the first axis (the AXIS selected above). The opposite wall is probed automatically. First edge → #51, second → #52, center → #53." value="pos">
+                            <option value="pos">pos</option>
+                            <option value="neg">neg</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">PROBE BOTH AXES</span>
+                        <input type="checkbox" id="m_both" title="Find center on both axes. Probes primary axis first (#51/#52 → #53), then secondary axis (#54/#55 → #56). Both written to WCS."/>
+                    </div>
+                </div>
+
+                <!-- Second-axis direction shown only when Probe Both Axes is checked -->
+                <div id="m_dir2_block" class="hidden" style="margin-top:8px;">
+                    <span class="label">2ND AXIS DIR</span>
+                    <select id="m_dir2" title="Probe direction for the second axis (2-axis mode). Its opposite wall is probed automatically. Edges → #54 and #55, center → #56.">
+                        <option value="pos">pos</option>
+                        <option value="neg">neg</option>
+                    </select>
+                </div>
+
+                <div>
+                    <span class="section-label">WCS</span>
+                    <span class="label">WCS TARGET</span>
+                    <select id="m_wcs" title="Target WCS for probe results. Active: reads #578, computes #70=[805+([#578]-1)*5]. Fixed: #70=805..830 directly." value="active">
+                        <option value="active">Active WCS</option>
+                        <option value="G54">G54</option>
+                        <option value="G55">G55</option>
+                        <option value="G56">G56</option>
+                        <option value="G57">G57</option>
+                        <option value="G58">G58</option>
+                        <option value="G59">G59</option>
+                    </select>
+                </div>
+
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-3">
+                        <div><span class="label">MAX PROBE</span><input id="m_dist" value="100" title="Max probe travel distance (mm). Stored as #1. Used as #7=[0-#1] (neg) or #8=#1 (pos) in G31."/></div>
+                        <div><span class="label">RETRACT</span><input id="m_retract" value="2" title="Retract between fast and slow probe passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)."/></div>
+                        <div><span class="label">SAFE Z</span><input id="m_safe_z" value="10" title="Z retract height between probing moves (mm). Stored as #17. Used as G0 Z#17."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input id="m_feed_fast" value="200" title="Fast probe feedrate (mm/min). Stored as #3. Used in first G31 pass."/></div>
+                        <div><span class="label">SLOW FEED</span><input id="m_feed_slow" value="50" title="Slow probe feedrate (mm/min). Stored as #4. Used in second G31 pass after retract."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-3">
+                        <div><span class="label">INPUT PORT (P)</span><input id="m_port" value="3" title="Probe input port number. Stored as #5. Used as P parameter in G31."/></div>
+                        <div><span class="label">LEVEL (L)</span>
+                            <select id="m_level" title="Probe trigger level. L0=active low (NPN). L1=active high (PNP). L parameter in G31." value="0"><option value="0">Low (0)</option><option value="1">High (1)</option></select>
+                        </div>
+                        <div><span class="label">STOP (Q)</span>
+                            <select id="m_q" title="Stop mode on trigger. Q1=immediate. Q0=decelerate. Q parameter in G31." value="1"><option value="1">Immediate (Q1)</option><option value="0">Decel (Q0)</option></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Options -->
+                <div>
+                    <span class="section-label">OPTIONS</span>
+                    <div class="grid-2">
+                        <div>
+                            <label style="font-size:12px;" title="Dual gantry only — writes A machine position to WCS slave offset. Disable if A is a rotary axis."><input type="checkbox" id="m_sync_a" checked/> Sync A Axis (Dual Gantry)</label>
+                        </div>
+                        <div>
+                            <span class="label">SLAVE</span>
+                            <select id="m_slave" title="WCS offset index for slave axis. A=offset 3 (#[#70+3]), B=offset 4 (#[#70+4])."><option value="3">A</option><option value="4">B</option></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview block -->
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_middle_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Circular (bore/boss) Wizard -->
+            <div id="wiz_circular" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-container">
+                    <div id="circularVizStatus" class="viz-status"></div>
+                    <div id="circularVizContainer" class="viz-canvas"></div>
+                </div>
+
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div id="circ_desc" class="wiz-usage"></div>
+
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">FEATURE TYPE</span>
+                        <select id="circ_type" title="Bore: probe outward across an inside hole. Boss: probe each outside face (reposition pauses between faces).">
+                            <option value="bore">bore (inside)</option>
+                            <option value="boss">boss (outside)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">WCS TARGET</span>
+                        <select id="circ_wcs" title="Target WCS for the found centre. Active: reads #578. Fixed: G54..G59 directly.">
+                            <option value="active">Active WCS</option>
+                            <option value="G54">G54</option>
+                            <option value="G55">G55</option>
+                            <option value="G56">G56</option>
+                            <option value="G57">G57</option>
+                            <option value="G58">G58</option>
+                            <option value="G59">G59</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-3">
+                        <div><span class="label">MAX PROBE</span><input id="circ_dist" value="100" title="Max probe travel per touch (mm). #1; used as #7=[0-#1]/#8=#1 in G31."/></div>
+                        <div><span class="label">RETRACT</span><input id="circ_retract" value="2" title="Retract between fast and slow passes (mm). #2."/></div>
+                        <div><span class="label">SAFE Z</span><input id="circ_safe_z" value="10" title="Z retract height between moves (mm). #17; used as G0 Z#17."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input id="circ_feed_fast" value="200" title="Fast probe feedrate (mm/min). #3."/></div>
+                        <div><span class="label">SLOW FEED</span><input id="circ_feed_slow" value="50" title="Slow probe feedrate (mm/min). #4."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-2">
+                        <div><span class="label">STOP (Q)</span>
+                            <select id="circ_q" title="G31 stop mode. Q1=immediate, Q0=decelerate."><option value="1">Immediate (Q1)</option><option value="0">Decel (Q0)</option></select>
+                        </div>
+                        <div><span class="label" style="opacity:.7;">PROBE PORT/LEVEL</span><div class="wiz-usage" style="margin:0;">from Settings → probe input</div></div>
+                    </div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_circular_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Rotary Centreline (4th-axis setup) Wizard -->
+            <div id="wiz_rotary_center" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-container">
+                    <div id="rotaryCenterVizStatus" class="viz-status"></div>
+                    <div id="rotaryCenterVizContainer" class="viz-canvas"></div>
+                </div>
+
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div id="rc_desc" class="wiz-usage"></div>
+
+                <span class="section-label">METHOD</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">FIND CENTRE BY</span>
+                        <select id="rc_method" title="Known: enter the blank diameter, probe top + both flanks. Fit: probe 3 points, solve the circle (no diameter needed, advanced).">
+                            <option value="known">known diameter</option>
+                            <option value="fit">3-point fit</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">Z ZERO AT</span>
+                        <select id="rc_datum" title="Centreline: Z0 on the rotation axis (standard for 4th-axis). Top: Z0 on the cylinder's OD top surface.">
+                            <option value="center">centreline (axis)</option>
+                            <option value="top">OD top</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="rc_diameter_block" class="grid-2">
+                    <div>
+                        <span class="label">STOCK DIAMETER (mm)</span>
+                        <input id="rc_diameter" value="76.2" title="Known cylinder diameter. R = diameter/2; centreline Z = top - R."/>
+                    </div>
+                    <div>
+                        <span class="label">WCS TARGET</span>
+                        <select id="rc_wcs" title="Target WCS for the work origin. Active reads #578; or pick a fixed WCS.">
+                            <option value="active">Active WCS</option>
+                            <option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option>
+                            <option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-3">
+                        <div><span class="label">MAX PROBE</span><input id="rc_dist" value="100" title="Max probe travel per touch (mm). #1."/></div>
+                        <div><span class="label">RETRACT</span><input id="rc_retract" value="2" title="Retract between passes (mm). #2."/></div>
+                        <div><span class="label">SAFE Z</span><input id="rc_safe_z" value="15" title="Z retract height (mm). #17."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input id="rc_feed_fast" value="200" title="Fast probe feedrate. #3."/></div>
+                        <div><span class="label">SLOW FEED</span><input id="rc_feed_slow" value="50" title="Slow probe feedrate. #4."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-2">
+                        <div><span class="label">STOP (Q)</span>
+                            <select id="rc_q" title="G31 stop mode. Q1=immediate, Q0=decelerate."><option value="1">Immediate (Q1)</option><option value="0">Decel (Q0)</option></select>
+                        </div>
+                        <div><span class="label" style="opacity:.7;">PROBE PORT/LEVEL</span><div class="wiz-usage" style="margin:0;">from Settings → probe input</div></div>
+                    </div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_rotary_center_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Rotary Clock (A0 to a feature) Wizard -->
+            <div id="wiz_rotary_clock" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-container">
+                    <div id="rotaryClockVizStatus" class="viz-status"></div>
+                    <div id="rotaryClockVizContainer" class="viz-canvas"></div>
+                </div>
+
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div id="rcl_desc" class="wiz-usage"></div>
+
+                <span class="section-label">CLOCK</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">ACTION</span>
+                        <select id="rcl_action" title="Set A0: datum A to the reference without moving. Report: measure tilt only. Rotate to 0: spin the part to the reference, then zero A.">
+                            <option value="set">set A0 (no rotate)</option>
+                            <option value="report">measure / report only</option>
+                            <option value="rotate">rotate to 0</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">REFERENCE (A0 AT)</span>
+                        <select id="rcl_reference" title="Where clock-zero points. Top: flat faces +Z (12 o'clock). +Y side: flat faces +Y (3 o'clock).">
+                            <option value="top">top (+Z)</option>
+                            <option value="side">+Y side (3 o’clock)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div>
+                        <span class="label">FLAT SPAN (mm)</span>
+                        <input id="rcl_span" value="20" title="Y distance between the two probe points across the flat. Bigger span = more accurate tilt. #6; sign sets the +Y direction."/>
+                    </div>
+                    <div>
+                        <span class="label">WCS TARGET</span>
+                        <select id="rcl_wcs" title="Target WCS for the A datum (#[#70+3]).">
+                            <option value="active">Active WCS</option>
+                            <option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option>
+                            <option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-3">
+                        <div><span class="label">MAX PROBE</span><input id="rcl_dist" value="100" title="Max Z probe travel per touch (mm). Must exceed Safe Z. #1."/></div>
+                        <div><span class="label">RETRACT</span><input id="rcl_retract" value="2" title="Retract between passes (mm). #2."/></div>
+                        <div><span class="label">SAFE Z</span><input id="rcl_safe_z" value="10" title="Z clearance for the cross-flat move (mm). #17."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input id="rcl_feed_fast" value="200" title="Fast probe feedrate. #3."/></div>
+                        <div><span class="label">SLOW FEED</span><input id="rcl_feed_slow" value="50" title="Slow probe feedrate. #4."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-2">
+                        <div><span class="label">STOP (Q)</span>
+                            <select id="rcl_q" title="G31 stop mode. Q1=immediate, Q0=decelerate."><option value="1">Immediate (Q1)</option><option value="0">Decel (Q0)</option></select>
+                        </div>
+                        <div><span class="label" style="opacity:.7;">PROBE PORT/LEVEL</span><div class="wiz-usage" style="margin:0;">from Settings → probe input</div></div>
+                    </div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_rotary_clock_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Edge Wizard -->
+            <div id="wiz_edge" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <!-- Visualization container -->
+                <div class="viz-container">
+                    <div id="edgeVizStatus" class="viz-status"></div>
+                    <div id="probeVizContainer" class="viz-canvas"><svg id="probeViz" width="100%" height="160" viewBox="0 0 400 140" xmlns="http://www.w3.org/2000/svg"></svg></div>
+                </div>
+
+                <!-- Viz Legend -->
+                <div class="viz-legend">
+                    <div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
+                </div>
+
+
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Position probe touching or just clear of the edge. Macro probes the wall and sets WCS axis to the contact position.</div>
+
+                <!-- Form controls in grid layouts -->
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">AXIS</span>
+                        <select id="p_axis" title="Axis to probe. X: result from #1925 written to #[#70+0]. Y: result from #1926 written to #[#70+1]." value="X">
+                            <option value="X">X</option>
+                            <option value="Y">Y</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">DIRECTION</span>
+                        <select id="p_dir" title="Probe direction toward wall on the selected axis. pos: G31 [axis]#8 (toward +). neg: G31 [axis]#7 (toward -). Retract is opposite direction." value="pos">
+                            <option value="pos">pos</option>
+                            <option value="neg">neg</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">WCS</span>
+                    <span class="label">WCS TARGET</span>
+                    <select id="p_wcs" title="Target WCS for probe result. Active: reads #578, computes #70=[805+([#578]-1)*5]. Fixed: #70=805..830 directly." value="active">
+                        <option value="active">Active WCS</option>
+                        <option value="G54">G54</option>
+                        <option value="G55">G55</option>
+                        <option value="G56">G56</option>
+                        <option value="G57">G57</option>
+                        <option value="G58">G58</option>
+                        <option value="G59">G59</option>
+                    </select>
+                </div>
+
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-2">
+                        <div><span class="label">MAX PROBE</span><input id="p_dist" value="100" title="Max probe travel distance (mm). Stored as #1. #7=[0-#1] (neg), #8=#1 (pos)."/></div>
+                        <div><span class="label">RETRACT</span><input id="p_retract" value="2" title="Retract between fast and slow passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)."/></div>
+                    </div>
+
+                </div>
+
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input id="p_feed_fast" value="200" title="Fast probe feedrate (mm/min). Stored as #3. First G31 pass."/></div>
+                        <div><span class="label">SLOW FEED</span><input id="p_feed_slow" value="50" title="Slow probe feedrate (mm/min). Stored as #4. Second G31 pass after retract."/></div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-3">
+                        <div><span class="label">INPUT PORT (P)</span><input id="p_port" value="3" title="Probe input port. Stored as #5. P parameter in G31."/></div>
+                        <div><span class="label">LEVEL (L)</span>
+                            <select id="p_level" title="Trigger level. L0=active low (NPN). L1=active high (PNP). L parameter in G31." value="0"><option value="0">Low (0)</option><option value="1">High (1)</option></select>
+                        </div>
+                        <div><span class="label">STOP (Q)</span>
+                            <select id="p_q" title="Stop mode on trigger. Q1=immediate. Q0=decelerate. Q parameter in G31." value="1"><option value="1">Immediate (Q1)</option><option value="0">Decel (Q0)</option></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Options -->
+                <div>
+                    <span class="section-label">OPTIONS</span>
+                    <div class="grid-2">
+                        <div>
+                            <label style="font-size:12px;" title="Dual gantry only — writes A machine position to WCS slave offset. Disable if A is a rotary axis."><input type="checkbox" id="p_sync_a" checked/> Sync A Axis (Dual Gantry)</label>
+                        </div>
+                        <div>
+                            <span class="label">SLAVE</span>
+                            <select id="p_slave" title="WCS offset index for slave axis. A=offset 3 (#[#70+3]), B=offset 4 (#[#70+4])."><option value="3">A</option><option value="4">B</option></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview block -->
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_edge_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Drill / hole-pattern Wizard (Mill group) -->
+            <div id="wiz_drill" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="drillLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="drillLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="drillVizStatus" class="viz-status"></div>
+                        <div id="drillVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Drills/bores a hole pattern in the active WCS. Drag the handles in the 2D layout (left) to set the pattern — round handle sizes it, square handle places it; the 3D view (right) verifies the cut. Peck = plunge (hole Ø = drill); Bore = ring-step an end mill (hole Ø ≥ tool). Spindle start + end-of-program are added from Settings.</div>
+
+                <span class="section-label">PATTERN</span>
+                <div class="grid-2">
+                    <div><span class="label">TYPE</span>
+                        <select id="d_pattern" value="circle">
+                            <option value="grid">Grid</option>
+                            <option value="circle">Bolt circle</option>
+                            <option value="rect">Rectangle</option>
+                            <option value="line">Line</option>
+                        </select>
+                    </div>
+                    <div><span class="label">SKIP HOLES</span><input id="d_skip" value="" title="1-based hole numbers to omit (as shown in the preview), e.g. 5, 9"/></div>
+                    <div><span class="label">POSITION X</span><input id="d_originX" value="0" title="Pattern position in the active WCS (drag the square handle in the 2D layout)."/></div>
+                    <div><span class="label">POSITION Y</span><input id="d_originY" value="0" title="Pattern position in the active WCS (drag the square handle in the 2D layout)."/></div>
+                </div>
+                <div id="d_pat_grid" class="grid-2" style="display:none">
+                    <div><span class="label">COLUMNS</span><input id="d_cols" value="3"/></div>
+                    <div><span class="label">ROWS</span><input id="d_rows" value="3"/></div>
+                    <div><span class="label">X SPACING</span><input id="d_dx" value="20"/></div>
+                    <div><span class="label">Y SPACING</span><input id="d_dy" value="20"/></div>
+                </div>
+                <div id="d_pat_circle" class="grid-2">
+                    <div><span class="label">BOLT-CIRCLE Ø</span><input id="d_dia" value="50"/></div>
+                    <div><span class="label">HOLE COUNT</span><input id="d_count" value="6"/></div>
+                    <div><span class="label">START ANGLE</span><input id="d_startAngle" value="0"/></div>
+                </div>
+                <div id="d_pat_rect" class="grid-2" style="display:none">
+                    <div><span class="label">WIDTH</span><input id="d_w" value="100"/></div>
+                    <div><span class="label">HEIGHT</span><input id="d_h" value="80"/></div>
+                    <div><span class="label">HOLES / WIDTH</span><input id="d_nx" value="3"/></div>
+                    <div><span class="label">HOLES / HEIGHT</span><input id="d_ny" value="2"/></div>
+                </div>
+                <div id="d_pat_line" class="grid-2" style="display:none">
+                    <div><span class="label">HOLE COUNT</span><input id="d_lcount" value="3"/></div>
+                    <div><span class="label">SPACING</span><input id="d_spacing" value="20"/></div>
+                    <div><span class="label">ANGLE</span><input id="d_angle" value="0"/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="d_tool" title="Pick a tool from the library (Settings → Tool table → Tool library) to load its Ø, feed and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="d_rpm" value="" title="Overrides the Head's default RPM for this op. Leave blank to use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">METHOD</span>
+                <div class="grid-2">
+                    <div><span class="label">METHOD</span>
+                        <select id="d_method" value="peck">
+                            <option value="peck">Peck drill (hole = tool)</option>
+                            <option value="helical">Bore (end mill, hole ≥ tool)</option>
+                        </select>
+                    </div>
+                    <div><span class="label">HOLE Ø</span><input id="d_holeDia" value="6" title="Hole diameter. Peck: this is your drill size. Bore: target hole size (must be ≥ tool Ø)."/></div>
+                </div>
+                <div id="d_method_peck" class="grid-2">
+                    <div><span class="label">PECK</span><input id="d_peck" value="3" title="Peck increment (mm) — full retract to clearance each peck to clear chips."/></div>
+                </div>
+                <div id="d_method_bore" class="grid-2" style="display:none">
+                    <div><span class="label">TOOL Ø (end mill)</span><input id="d_toolDia" value="4"/></div>
+                    <div><span class="label">PITCH (Z/rev)</span><input id="d_pitch" value="0.5" title="Z step per full circle (mm)."/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="d_depth" value="5"/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="d_clearance" value="5"/></div>
+                    <div><span class="label">FEED</span><input id="d_feed" value="100"/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_drill_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Pocket clearing Wizard (Mill group) -->
+            <div id="wiz_pocket" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="pocketLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="pocketLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="pocketVizStatus" class="viz-status"></div>
+                        <div id="pocketVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Clears a rectangular or circular pocket with an end mill in the active WCS. Drag the handles in the 2D layout (square = place, round = size); the 3D view verifies the cut. Walls are offset inward by the tool radius so the finished pocket matches the size you type. Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">SHAPE</span>
+                <div class="grid-2">
+                    <div><span class="label">SHAPE</span>
+                        <select id="p_shape" value="rect">
+                            <option value="rect">Rectangle</option>
+                            <option value="circle">Circle</option>
+                        </select>
+                    </div>
+                    <div><span class="label">STRATEGY</span>
+                        <select id="p_strategy" value="spiral">
+                            <option value="spiral">Concentric (spiral)</option>
+                            <option value="raster">Raster (zig-zag)</option>
+                        </select>
+                    </div>
+                    <div><span class="label">POSITION X</span><input id="p_originX" value="0" title="Pocket position in the active WCS (drag the square handle). Rect = min-XY corner; circle = centre."/></div>
+                    <div><span class="label">POSITION Y</span><input id="p_originY" value="0"/></div>
+                </div>
+                <div id="p_dim_rect" class="grid-2">
+                    <div><span class="label">WIDTH</span><input id="p_w" value="80"/></div>
+                    <div><span class="label">HEIGHT</span><input id="p_h" value="60"/></div>
+                </div>
+                <div id="p_dim_circle" class="grid-2" style="display:none">
+                    <div><span class="label">DIAMETER</span><input id="p_dia" value="50"/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="p_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="p_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">TOOL &amp; STEPOVER</span>
+                <div class="grid-2">
+                    <div><span class="label">TOOL Ø</span><input id="p_toolDia" value="6"/></div>
+                    <div><span class="label">STEPOVER %</span><input id="p_stepoverPct" value="40" title="Stepover as a percentage of tool diameter (40% = a 2.4 mm step on a 6 mm tool)."/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="p_depth" value="4"/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="p_stepdown" value="1.5" title="Z step-down per roughing pass (mm)."/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="p_clearance" value="5"/></div>
+                    <div><span class="label">FEED</span><input id="p_feed" value="600"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="p_plunge" value="150" title="Z plunge feedrate (mm/min) — usually slower than the cutting feed."/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_pocket_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Slot milling Wizard (Mill group) -->
+            <div id="wiz_slot" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="slotLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="slotLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="slotVizStatus" class="viz-status"></div>
+                        <div id="slotVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Mills a straight slot from point A to point B in the active WCS. Drag the A / B / width handles in the 2D layout; the 3D view verifies the cut. The tool centre travels A→B, so the slot ends are rounded a tool-radius beyond each point. Width = tool → one pass; width &gt; tool → parallel passes. Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">ENDPOINTS</span>
+                <div class="grid-2">
+                    <div><span class="label">A — X</span><input id="sl_ax" value="0"/></div>
+                    <div><span class="label">A — Y</span><input id="sl_ay" value="0"/></div>
+                    <div><span class="label">B — X</span><input id="sl_bx" value="60"/></div>
+                    <div><span class="label">B — Y</span><input id="sl_by" value="0"/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="sl_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="sl_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">TOOL &amp; WIDTH</span>
+                <div class="grid-3">
+                    <div><span class="label">WIDTH</span><input id="sl_width" value="6" title="Finished slot width (≥ tool Ø). Equal to the tool = a single pass."/></div>
+                    <div><span class="label">TOOL Ø</span><input id="sl_toolDia" value="6"/></div>
+                    <div><span class="label">STEPOVER %</span><input id="sl_stepoverPct" value="40" title="Only used when width &gt; tool. Percentage of tool diameter between parallel passes."/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="sl_depth" value="4"/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="sl_stepdown" value="1.5"/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="sl_clearance" value="5"/></div>
+                    <div><span class="label">FEED</span><input id="sl_feed" value="600"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="sl_plunge" value="150"/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_slot_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Surfacing / face-mill Wizard (Mill group) -->
+            <div id="wiz_surfacing" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="surfacingLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="surfacingLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="surfacingVizStatus" class="viz-status"></div>
+                        <div id="surfacingVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Skims the top of the stock flat over a rectangular area. Opens sized to the whole stock top; drag the handles to face a sub-area. The tool overhangs the area edge by its radius so the whole top is faced — keep the area within fixture clearance. Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">AREA</span>
+                <div class="grid-2">
+                    <div><span class="label">POSITION X</span><input id="sf_originX" value="0"/></div>
+                    <div><span class="label">POSITION Y</span><input id="sf_originY" value="0"/></div>
+                    <div><span class="label">WIDTH</span><input id="sf_w" value="100"/></div>
+                    <div><span class="label">HEIGHT</span><input id="sf_h" value="80"/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="sf_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="sf_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">TOOL &amp; STEPOVER</span>
+                <div class="grid-3">
+                    <div><span class="label">STRATEGY</span>
+                        <select id="sf_strategy" value="raster">
+                            <option value="raster">Raster (zig-zag)</option>
+                            <option value="spiral">Concentric (spiral)</option>
+                        </select>
+                    </div>
+                    <div><span class="label">TOOL Ø</span><input id="sf_toolDia" value="12"/></div>
+                    <div><span class="label">STEPOVER %</span><input id="sf_stepoverPct" value="60"/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">SKIM DEPTH</span><input id="sf_depth" value="0.5" title="Total material removed off the top (mm)."/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="sf_stepdown" value="0.5"/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="sf_clearance" value="5"/></div>
+                    <div><span class="label">FEED</span><input id="sf_feed" value="800"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="sf_plunge" value="200"/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_surfacing_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Text / label engraving Wizard (Mill group) -->
+            <div id="wiz_text" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="textLayoutStatus" class="viz-status">LAYOUT</div>
+                        <div id="textLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="textVizStatus" class="viz-status"></div>
+                        <div id="textVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Engraves filled text (part tags / labels) in the active WCS. Letters are pocket-filled from a single-stroke font, so the counters (holes in O, A, 8…) come out clean. Drag the pos / height handles in the 2D layout; the 3D verifies the cut. Use a small end mill (or V-bit). Spindle start + end-of-program come from Settings.</div>
+
+                <span class="section-label">TEXT</span>
+                <div><input id="tx_text" value="DDCS-01" style="width:100%" title="Uppercase A–Z, 0–9 and . , - _ : / # + = ( ) ! ? — lowercase is upper-cased."/></div>
+                <div class="grid-3">
+                    <div><span class="label">HEIGHT</span><input id="tx_height" value="12" title="Cap height (mm)."/></div>
+                    <div><span class="label">STROKE WIDTH</span><input id="tx_strokeWidth" value="2.5" title="Letter boldness (mm). Use ≥ the tool Ø so the fill is clean."/></div>
+                    <div><span class="label">ALIGN</span>
+                        <select id="tx_align" value="left">
+                            <option value="left">Left</option>
+                            <option value="center">Center</option>
+                            <option value="right">Right</option>
+                        </select>
+                    </div>
+                    <div><span class="label">POSITION X</span><input id="tx_x" value="0"/></div>
+                    <div><span class="label">POSITION Y</span><input id="tx_y" value="0"/></div>
+                    <div><span class="label">LETTER SPACING</span><input id="tx_spacing" value="1.2" title="Extra gap between letters (mm)."/></div>
+                </div>
+
+                <span class="section-label">TOOL</span>
+                <div class="grid-2">
+                    <div><span class="label">FROM LIBRARY</span>
+                        <select id="tx_tool" title="Pick a tool from the library to load its Ø, feed, plunge and RPM."><option value="">Tool… (from library)</option></select>
+                    </div>
+                    <div><span class="label">SPINDLE RPM</span><input id="tx_rpm" value="" title="Overrides the Head's default RPM for this op. Blank = use the Head setting. Picking a tool fills this from the library."/></div>
+                </div>
+
+                <span class="section-label">TOOL &amp; FILL</span>
+                <div class="grid-2">
+                    <div><span class="label">TOOL Ø</span><input id="tx_toolDia" value="1.5"/></div>
+                    <div><span class="label">STEPOVER %</span><input id="tx_stepoverPct" value="50"/></div>
+                </div>
+
+                <span class="section-label">DEPTH &amp; FEED</span>
+                <div class="grid-3">
+                    <div><span class="label">DEPTH</span><input id="tx_depth" value="0.4"/></div>
+                    <div><span class="label">DEPTH / PASS</span><input id="tx_stepdown" value="0.4"/></div>
+                    <div><span class="label">CLEARANCE Z</span><input id="tx_clearance" value="4"/></div>
+                    <div><span class="label">FEED</span><input id="tx_feed" value="400"/></div>
+                    <div><span class="label">PLUNGE FEED</span><input id="tx_plunge" value="120"/></div>
+                </div>
+
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_text_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Alignment Wizard -->
+            <div id="wiz_alignment" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+
+                <span class="section-label">VISUALIZATION</span>
+
+                <!-- Viz placeholder -->
+                <div class="viz-container">
+                    <div id="alignmentVizStatus" class="viz-status"></div>
+                    <div id="alignmentVizContainer" class="viz-canvas">
+                        <!-- Alignment viz — SVG to be added in a future pass -->
+                    </div>
+                </div>
+
+                <!-- Viz Legend -->
+                <div class="viz-legend">
+                    <div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>
+                    <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
+                </div>
+
+
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage">Jog probe to <b>point A</b> along the fence at probe height → Enter. Macro probes fence, lifts Z, pauses. Jog to <b>point B</b> along same fence → Enter. Macro probes again and reports drift, span and angle.</div>
+
+
+                <!-- Axis and probe geometry -->
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">CHECK AXIS</span>
+                        <select id="al_check_axis" title="Axis being checked for squareness. Two probe points are taken along this axis to measure drift between them.">
+                            <option value="X">X</option>
+                            <option value="Y">Y</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label">PROBE DIRECTION</span>
+                        <select id="al_probe_dir" title="Direction to probe the fence from. Probe moves toward the fence wall: pos=G31 axis#8, neg=G31 axis#7.">
+                            <option value="pos">pos</option>
+                            <option value="neg">neg</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Probe distances -->
+                <div>
+                    <span class="section-label">GEOMETRY</span>
+                    <div class="grid-3">
+                        <div><span class="label">MAX PROBE</span><input id="al_dist" type="number" value="100" title="Max probe travel toward fence (mm). Stored as #1. #7=[0-#1], #8=#1."/></div>
+                        <div><span class="label">RETRACT</span><input id="al_retract" type="number" value="2" title="Retract after each probe pass (mm). Stored as #2. #9=[0-#2], #10=#2."/></div>
+                        <div><span class="label">SAFE Z</span><input id="al_safe_z" type="number" value="10" title="Z lift between point A and point B (mm). Stored as #17. Used as G0 Z#17."/></div>
+                    </div>
+                </div>
+
+                <!-- Tolerance -->
+                <div>
+                    <span class="label">TOLERANCE (mm)</span>
+                    <input id="al_tolerance" type="number" value="0.2" step="0.05" title="Expected max drift between two probe points (mm). Reference only — stored as #20 and reported in output comment. Does not affect motion."/>
+                    <span class="hint">Reference only — shown in output comments</span>
+                </div>
+
+                <!-- Feed rates -->
+                <div>
+                    <span class="section-label">FEED RATES</span>
+                    <div class="grid-2">
+                        <div><span class="label">FAST FEED</span><input id="al_feed_fast" type="number" value="200" title="Fast probe feedrate (mm/min). Stored as #3. First G31 pass."/></div>
+                        <div><span class="label">SLOW FEED</span><input id="al_feed_slow" type="number" value="50" title="Slow probe feedrate (mm/min). Stored as #4. Second G31 pass after retract."/></div>
+                    </div>
+                </div>
+
+                <!-- Advanced -->
+                <div>
+                    <span class="section-label">ADVANCED</span>
+                    <div class="grid-3">
+                        <div><span class="label">INPUT PORT (P)</span><input id="al_port" type="number" value="3" title="Probe input port. Stored as #5. P parameter in G31."/></div>
+                        <div>
+                            <span class="label">LEVEL (L)</span>
+                            <select id="al_level" title="Trigger level. L0=active low (NPN). L1=active high (PNP). L parameter in G31.">
+                                <option value="0">Low (0)</option>
+                                <option value="1">High (1)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="label">STOP (Q)</span>
+                            <select id="al_q" title="Stop mode on trigger. Q1=immediate. Q0=decelerate. Q parameter in G31.">
+                                <option value="1">Immediate (Q1)</option>
+                                <option value="0">Decel (Q0)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview -->
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_alignment_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+
+            </div>
+
+            <!-- ATC Length Wizard -->
+            <div id="wiz_atc_length" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcLengthVizStatus" class="viz-status"></div>
+                        <div id="atcLengthViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="settings-hint" style="margin-bottom:8px;">Tool-length probe parameters come from <b>Settings → ATC</b> (block height, feeds, max distance, retract, Q) and the tool-setter pin/level from <b>Settings → Probes</b>. The preview reflects those values — edit them in Settings. ▶ traces the Z touch on the setter.</div>
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_atc_length_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Tool Breakage / Length Re-check Wizard -->
+            <div id="wiz_atc_check" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcCheckVizStatus" class="viz-status"></div>
+                        <div id="atcCheckViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="settings-hint" style="margin-bottom:8px;">A quick tap on the tool setter that <b>aborts if the tool is broken, missing, or the wrong length</b>. Re-measures and compares to the stored tool-length table (1430+T-1). Setter pin/level from <b>Settings → Probes</b>; block height, feeds, safe Z, max distance from <b>Settings → ATC</b>.</div>
+                <span class="section-label">TOLERANCE</span>
+                <div class="grid-2">
+                    <div><span class="label">LENGTH TOLERANCE (mm)</span><input id="atc_check_tol" value="0.5" title="Max allowed deviation from the stored tool length. Beyond +/- this aborts (broken or wrong tool)."/></div>
+                    <div><span class="label" style="opacity:.7;">CHECKS</span><div class="wiz-usage" style="margin:0;">current tool #1300 vs table 1430+T-1</div></div>
+                </div>
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_atc_check_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Spindle Warm-up Wizard -->
+            <div id="wiz_atc_warmup" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcWarmupVizStatus" class="viz-status"></div>
+                        <div id="atcWarmupViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <span class="section-label">WARM-UP SEQUENCE</span>
+                <div class="param-grid">
+                    <label>Stage 1 RPM<input type="number" id="atc_warmup_rpm1" value="6000" class="num-input" step="1000"></label>
+                    <label>Stage 1 Time (s)<input type="number" id="atc_warmup_time1" value="30" class="num-input" step="5"></label>
+                    <label>Stage 2 RPM<input type="number" id="atc_warmup_rpm2" value="12000" class="num-input" step="1000"></label>
+                    <label>Stage 2 Time (s)<input type="number" id="atc_warmup_time2" value="30" class="num-input" step="5"></label>
+                </div>
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_atc_warmup_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- ATC Tool Change Wizard -->
+            <div id="wiz_atc_change" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcChangeVizStatus" class="viz-status"></div>
+                        <div id="atcChangeViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <span class="section-label">TOOL CHANGE</span>
+                <div class="param-grid">
+                    <label>Mode
+                        <select id="atc_change_mode">
+                            <option value="manual">Manual — park + swap prompt</option>
+                            <option value="auto">Automatic — ATC pick &amp; place (T.nc)</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="param-grid" id="atc_change_manual_params">
+                    <label>Park X (mm)<input type="number" id="atc_change_x" value="100" class="num-input"></label>
+                    <label>Park Y (mm)<input type="number" id="atc_change_y" value="100" class="num-input"></label>
+                    <label>Park Z (mm)<input type="number" id="atc_change_z" value="0" class="num-input"></label>
+                </div>
+                <div id="atc_change_auto_params" style="display:none">
+                    <div class="param-grid">
+                        <label>Z change height (mach)<input type="number" id="atc_change_zclear" value="0" class="num-input"></label>
+                        <label>Magazine pockets<input type="number" id="atc_change_capacity" value="8" min="1" max="20" class="num-input"></label>
+                        <label title="0 = take the target from #1504 (M6 Txx). Set a tool number to generate a standalone test change.">Fixed test tool (0 = #1504)<input type="number" id="atc_change_fixedt" value="0" min="0" max="20" class="num-input"></label>
+                    </div>
+                    <div class="param-grid">
+                        <label><input type="checkbox" id="atc_change_m300" checked> Wait spindle-stop sensor (M300)</label>
+                        <label><input type="checkbox" id="atc_change_cover"> Dust cover (M305/M306)</label>
+                        <label><input type="checkbox" id="atc_change_confirm"> Confirm prompt before moving</label>
+                    </div>
+                    <div class="wiz-usage">Pocket positions come from the controller tables (#1330+ X · #1350+ Y · #1370+ Z) — teach them on the machine first. Drawbar: M154/M155, sensors: M302/M303. Test in the 3D drawer: ▶ Run with Auto sensors, or drive the I/O panel by hand.</div>
+                </div>
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_atc_change_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- ATC Commissioning Test Wizard -->
+            <div id="wiz_atc_test" class="wiz-body" data-cap="toolTable" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                    <span class="section-label">VISUALIZATION</span>
+                    <div class="viz-container">
+                        <div id="atcTestVizStatus" class="viz-status"></div>
+                        <div id="atcTestViz" class="viz-canvas"></div>
+                    </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <span class="section-label">ATC COMMISSIONING TEST</span>
+                <div class="param-grid">
+                    <label>Test
+                        <select id="atc_test_mode">
+                            <option value="drawbar">Drawbar cycle test</option>
+                            <option value="pockets">Pocket dry-run</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="param-grid" id="atc_test_drawbar_params">
+                    <label>Cycles<input type="number" id="atc_test_cycles" value="10" min="1" max="999" class="num-input"></label>
+                    <label>Dwell (ms)<input type="number" id="atc_test_dwell" value="500" min="0" step="100" class="num-input"></label>
+                </div>
+                <div id="atc_test_pocket_params" style="display:none">
+                    <div class="param-grid">
+                        <label>First pocket<input type="number" id="atc_test_first" value="1" min="1" max="20" class="num-input"></label>
+                        <label>Pockets<input type="number" id="atc_test_count" value="8" min="1" max="20" class="num-input"></label>
+                        <label>Z clearance (mach)<input type="number" id="atc_test_zclear" value="0" class="num-input"></label>
+                    </div>
+                    <div class="param-grid">
+                        <label><input type="checkbox" id="atc_test_descend"> Descend to pocket Z at each stop</label>
+                    </div>
+                </div>
+                <div class="wiz-usage">Run these BEFORE the first automatic change: drawbar cycling proves the pneumatics + sensors; the pocket dry-run proves the taught positions. Both simulate in the 3D drawer (▶ Run · I/O panel).</div>
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
+                    <pre id="wiz_atc_test_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
+            <!-- Communication Wizard -->
+            <div id="wiz_comm" class="wiz-body" style="display:none">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-container comm-screen-pixwrap">
+                    <div class="viz-canvas comm-screen" id="comm_screen_preview"></div>
+                </div>
+
+                <div id="comm_desc" class="wiz-usage"></div>
+
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-2">
+                    <div>
+                        <span class="label">TYPE</span>
+                        <select id="c_type">
+                            <option value="popup">Popup</option>
+                            <option value="status">Status</option>
+                            <option value="input">Numeric Input</option>
+                            <option value="beep">Beep</option>
+                            <option value="dwell">Dwell</option>
+                        </select>
+                    </div>
+                    <div id="c_mode_block">
+                        <span class="label" id="c_mode_label">MODE</span>
+                        <select id="c_popup_mode">
+                            <option value="-5000">Toast — no wait (-5000)</option>
+                            <option value="1">OK/Cancel — branching (1)</option>
+                            <option value="3">Binary Choice — branching (3)</option>
+                        </select>
+                        <select id="c_status_mode">
+                            <option value="1">Standard (1)</option>
+                            <option value="-3000">Persistent — stays after macro (-3000)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <span class="section-label">GEOMETRY</span>
+                <div class="grid-2" id="c_val_block">
+                    <div>
+                        <span class="label" id="c_val_label">VALUE</span>
+                        <input id="c_val" />
+                        <span class="hint" id="c_val_hint"></span>
+                    </div>
+                    <div id="c_cycle_block">
+                        <span class="label">CYCLE</span>
+                        <input id="c_cycle" placeholder="0 = single beep" />
+                        <span class="hint">#2043 pulse width ms — ON=cycle, OFF=cycle (100 =&gt; 100ms on, 100ms off)</span>
+                    </div>
+                </div>
+
+                <div id="c_msg_block">
+                    <span class="label">MESSAGE</span>
+                    <input id="c_msg" placeholder="Enter message..." />
+                    <span class="hint">Use <b>/</b> for line breaks in DDCS popup messages (#1505).</span>
+                </div>
+
+                <span class="section-label">ADVANCED</span>
+
+                <div class="grid-2" id="c_var_block">
+                    <div><span class="label">TARGET ID</span><input id="c_id" value="100" /></div>
+                    <div><span class="label">DEST VAR</span><input id="c_dest" placeholder="#200" /></div>
+                </div>
+
+                <div class="grid-2" id="c_color_block">
+                    <div>
+                        <span class="label">STATUS COLOR</span>
+                        <select id="c_status_color">
+                            <option value="-1" selected>Default (green)</option>
+                            <option value="16711680">Blue</option>
+                            <option value="65280">Green</option>
+                            <option value="255">Red</option>
+                            <option value="16776960">Cyan</option>
+                            <option value="16711935">Magenta</option>
+                            <option value="65535">Yellow</option>
+                            <option value="16744576">Light Blue</option>
+                            <option value="8454016">Light Green</option>
+                            <option value="8421631">Light Red</option>
+                            <option value="16777088">Light Cyan</option>
+                            <option value="16744703">Light Magenta</option>
+                            <option value="8454143">Light Yellow</option>
+                            <option value="8388608">Dark Blue</option>
+                            <option value="32768">Dark Green</option>
+                            <option value="128">Dark Red</option>
+                            <option value="8421376">Dark Cyan</option>
+                            <option value="8388736">Dark Magenta</option>
+                            <option value="32896">Dark Yellow</option>
+                            <option value="16777215">White</option>
+                            <option value="13882323">Light Gray</option>
+                            <option value="8421504">Gray</option>
+                            <option value="4210752">Dark Gray</option>
+                            <option value="0">Black</option>
+                        </select>
+                    </div>
+                    <div></div>
+                </div>
+
+                <div id="c_dwell_block" class="grid-2">
+                    <div>
+                        <span class="label">DWELL AFTER</span>
+                        <input id="c_status_dwell" placeholder="0 = no dwell" />
+                        <span class="hint" id="c_status_dwell_hint">milliseconds — e.g. 3000 = 3s</span>
+                    </div>
+                    <div></div>
+                </div>
+
+                <div id="c_slots_block" class="grid-4" style="grid-template-columns:repeat(4,1fr)">
+                    <div><span class="label">SLOT #1510</span><input id="c_slot1" /></div>
+                    <div><span class="label">SLOT #1511</span><input id="c_slot2" /></div>
+                    <div><span class="label">SLOT #1512</span><input id="c_slot3" /></div>
+                    <div><span class="label">SLOT #1513</span><input id="c_slot4" /></div>
+                </div>
+
+                <div class="preview-block" id="comm_preview_block">
+                    <span class="label">CODE PREVIEW</span>
+                    <pre id="wiz_comm_code"></pre>
+                </div>
+            </div>
+
+            <!-- WCS Wizard -->
+            <div id="wiz_wcs" class="wiz-body" style="display:none">
+                <div class="wiz-usage">Zero one or more axes in the selected WCS to the current machine position. Use <b>Active WCS</b> to always target whichever WCS is loaded on the controller.</div>
+
+                <span class="section-label">FEATURE CONTEXT</span>
+                <div class="grid-3" style="margin-top:10px;">
+                    <div><label><input type="checkbox" id="w_x" /> Zero X</label></div>
+                    <div><label><input type="checkbox" id="w_y" /> Zero Y</label></div>
+                    <div><label><input type="checkbox" id="w_z" /> Zero Z</label></div>
+                </div>
+
+                <div class="grid-2">
+                    <div>
+                        <span class="section-label">WCS</span>
+                        <span class="label">WCS SYSTEM</span>
+                        <select id="w_sys">
+                            <option value="0">Active WCS (Auto)</option>
+                            <option value="54">G54</option>
+                            <option value="55">G55</option>
+                            <option value="56">G56</option>
+                            <option value="57">G57</option>
+                            <option value="58">G58</option>
+                            <option value="59">G59</option>
+                        </select>
+                    </div>
+                </div>
+
+                <span class="section-label">OPTIONS</span>
+                <div class="grid-2" style="margin-top:8px;">
+                    <div>
+                        <label class="checkbox-inline" title="Dual gantry only — writes A machine position to WCS slave offset. Disable if A is a rotary axis."><input type="checkbox" id="w_sync" checked /> Sync A Axis (Dual Gantry)</label>
+                    </div>
+                    <div>
+                        <span class="label">SLAVE</span>
+                        <select id="w_slave"><option value="3">A</option><option value="4">B</option></select>
+                    </div>
+                </div>
+
+                <div class="preview-block" id="wcs_preview_block">
+                    <span class="label">CODE PREVIEW <span id="wcsStatus" class="compliant-tag"></span></span>
+                    <pre id="wiz_wcs_code"></pre>
+                </div>
+            </div>
+
+            <!-- FOOTER: Action buttons -->
+            <div class="wiz-foot">
+                <button onclick="closeWiz()">CANCEL</button>
+                <button onclick="insertWiz()" class="primary">INSERT</button>
+            </div>
+        </div>
+    </div>
+
+    </div>
+
+    <!-- GATEWAY app — machine-side views (Queue/Submit/Files/History/Setup), shown via the header
+         app-switcher when a gateway answers. Populated by ui/gatewayPanel.js (lazy-loaded). -->
+    <div id="gateway-app" class="gateway-app hidden"></div>
+
+    <!-- SETTINGS app — full-screen settings view, shown via the header app-switcher. -->
+    <div id="settings-app" class="app-shell hidden"></div>
+
+    <!-- BLOCKS app — Codeblocks-for-G-code authoring (stack op-blocks → live G-code + preview).
+         Static shell here; blocks/blocksApp.js (lazy-loaded on first open) builds palette/stage/code. -->
+    <div id="blocks-app" class="app-shell hidden">
+        <!-- Mobile-only: left-edge handle opens the Blockly palette as a drawer over the canvas -->
+        <button id="blkToolsHandle" class="blk-tools-handle" type="button" aria-label="Toggle palette" aria-expanded="false">Blocks</button>
+        <div id="blk-ws" class="blk-ws"></div>   <!-- Blockly workspace (toolbox + canvas); built by blocksApp.js -->
+        <div class="right">
+            <!-- Desktop-only: drag the left edge to resize the preview column -->
+            <div class="blk-col-resize" aria-hidden="true" title="Drag to resize the preview"></div>
+            <!-- Mobile-only: drag the top edge to resize the preview drawer -->
+            <div class="blk-drawer-resize" aria-hidden="true"></div>
+            <!-- Mobile-only drawer header: grip + Preview/G-code toggle + close -->
+            <div class="blk-drawer-head">
+                <span class="blk-grip" aria-hidden="true"></span>
+                <div class="blk-seg">
+                    <button id="blkSegPv" class="on" type="button">Preview</button>
+                    <button id="blkSegCode" type="button">G-code</button>
+                </div>
+                <button id="blkDrawerClose" class="blk-drawer-x" type="button" aria-label="Close preview">✕</button>
+            </div>
+            <div class="pv">
+                <h3 class="pane-h">Preview</h3>
+                <div class="pv-body"><div id="blk-preview-panel"></div></div>   <!-- the shared createPreviewPanel mounts here -->
+            </div>
+            <div class="gcode">
+                <h3 class="pane-h">Projected G-code</h3>
+                <pre id="blk-gcode"></pre>
+            </div>
+        </div>
+        <!-- Mobile-only: bottom-centre pull-tab opens the preview drawer -->
+        <button id="blkDrawerHandle" class="blk-drawer-handle" type="button" aria-expanded="false">▲ Preview</button>
+    </div>
+
+    <!-- Global tooltip -->
+    <div id="global-tooltip" style="display:none;"></div>
+
+    <!-- ════ SEAM: EXTENSION BOOTSTRAP (host-owned) ═══════════════════════════════════════════════
+         Studio's standalone bootstrap (import ./app.js + ./ui/*.js) was forked in here but is DEAD in
+         the extension — those modules live in DDCS-Studio/web/, not this folder, so every import only
+         threw into its catch. The extension boots from web/src/extensionApp.js → web/dist/bundle.js
+         (loaded at the end of <body>). To surface a Studio init module (gatewayStatus, postGating, …)
+         in the extension, import it from extensionApp.js — not here. ════════════════════════════════ -->
+
+    <!-- ════ SEAM: SHARED WIZARD VIZ (forked from DDCS-Studio/web/index.html) ════════════════════════
+         Inline SVG wizard-visualization helpers (drawCornerViz, drawMiddleViz, …), called via window.*
+         by the wizards in bundle.js — LOAD-BEARING. Same fork/drift caveat as the wizard body above:
+         when Studio edits these, this copy goes stale. De-fork it the same way (see docs/HTML_SEAMS.md). -->
+    <script>
+        // Simple SVG visualization functions (no external libs)
+        function clearSVG(svg) {
+            while (svg.firstChild) svg.removeChild(svg.firstChild);
+        }
+
+        // Prevent SVG defs ID collisions across multiple injected SVGs (gradients, masks, markers, etc.)
+        function namespaceSvgDefs(svgRoot, namespacePrefix) {
+            if (!svgRoot || !svgRoot.querySelectorAll) return;
+            const defsNodes = svgRoot.querySelectorAll('defs [id], linearGradient[id], radialGradient[id], pattern[id], marker[id], clipPath[id], mask[id], filter[id]');
+            if (!defsNodes.length) return;
+
+            const idMap = new Map();
+            defsNodes.forEach((node, idx) => {
+                const oldId = node.getAttribute('id');
+                if (!oldId) return;
+                if (idMap.has(oldId)) return;
+                const safePrefix = (namespacePrefix || 'svg').replace(/[^a-zA-Z0-9_-]/g, '_');
+                idMap.set(oldId, `${safePrefix}__${oldId}__${idx}`);
+            });
+
+            if (!idMap.size) return;
+
+            defsNodes.forEach((node) => {
+                const oldId = node.getAttribute('id');
+                const newId = oldId ? idMap.get(oldId) : null;
+                if (newId) node.setAttribute('id', newId);
+            });
+
+            const attrNames = ['fill', 'stroke', 'filter', 'mask', 'clip-path', 'marker-start', 'marker-mid', 'marker-end', 'href', 'xlink:href', 'style'];
+            const all = svgRoot.querySelectorAll('*');
+            all.forEach((el) => {
+                attrNames.forEach((attr) => {
+                    const val = el.getAttribute(attr);
+                    if (!val) return;
+                    let next = val;
+                    idMap.forEach((newId, oldId) => {
+                        next = next.replace(new RegExp(`url\\(#${oldId}\\)`, 'g'), `url(#${newId})`);
+                        if ((attr === 'href' || attr === 'xlink:href') && next === `#${oldId}`) {
+                            next = `#${newId}`;
+                        }
+                    });
+                    if (next !== val) el.setAttribute(attr, next);
+                });
+            });
+        }
+
+        let cornerSvgLoaded = false;
+        let middleSvgLoaded = false;
+
+        // Load SVG from inlined assets (standalone bundle) or network fetch for dev server.
+        async function fetchSvg(tryPaths, assetKeys) {
+            for (const key of assetKeys) {
+                const val = window.__ASSETS && window.__ASSETS[key];
+                if (val) return val;
+            }
+            // Dev server fallback: fetch and validate it's actually SVG not an HTML redirect
+            for (const p of tryPaths) {
+                try {
+                    const r = await fetch(p);
+                    if (!r || !r.ok) continue;
+                    const text = await r.text();
+                    if (text.trimStart().startsWith('<svg') || text.trimStart().startsWith('<?xml')) return text;
+                } catch (e) { /* ignore */ }
+            }
+            return null;
+        }
+
+        window.drawCornerViz = async function(probeZ) {
+            const container = document.getElementById('cornerVizContainer');
+            if (!container) return;
+
+            // Load SVG once on first call
+            if (!cornerSvgLoaded) {
+                const svgText = await fetchSvg(
+                    ['./assets/svg/cornerViz.svg', './assets/cornerViz.svg'],
+                    ['svg/cornerViz.svg', 'cornerViz.svg']
+                );
+                if (!svgText) {
+                    console.error('drawCornerViz: failed to load cornerViz.svg');
+                    throw new Error('Unable to load cornerViz.svg');
+                }
+                container.innerHTML = svgText;
+                const svgRoot = container.querySelector('svg');
+                namespaceSvgDefs(svgRoot, 'cornerViz');
+                console.debug('drawCornerViz: SVG injected; svgExists=', !!container.querySelector('svg'));
+                cornerSvgLoaded = true;
+            }
+
+            // Get current form values
+            const corner = document.getElementById('c_corner')?.value || 'FL';
+            const probeSeq = document.getElementById('c_probe_seq')?.value || 'YX';
+
+            // Determine probeZ: if argument provided use it, otherwise read checkbox
+            probeZ = (typeof probeZ === 'boolean') ? probeZ : (document.getElementById('c_probe_z_first')?.checked || false);
+
+            // Hide all corner groups
+            ['corner_FL', 'corner_FR', 'corner_BL', 'corner_BR'].forEach(id => {
+                const elem = document.getElementById(id);
+                if (elem) elem.style.display = 'none';
+            });
+
+            // Show selected corner group
+            const cornerElem = document.getElementById('corner_' + corner);
+            if (cornerElem) cornerElem.style.display = 'block';
+
+            // Get sequence groups for active corner
+            const yxSeq = document.getElementById(`corner_${corner}_YX`);
+            const xySeq = document.getElementById(`corner_${corner}_XY`);
+
+            // Show only the selected sequence
+            if (probeSeq === 'YX') {
+                if (yxSeq) yxSeq.style.display = 'block';
+                if (xySeq) xySeq.style.display = 'none';
+            } else {
+                if (xySeq) xySeq.style.display = 'block';
+                if (yxSeq) yxSeq.style.display = 'none';
+            }
+
+            // Toggle Zfirst group within active corner+sequence
+            const zfirstElem = document.getElementById(`corner_${corner}_${probeSeq}_Zfirst`);
+            if (zfirstElem) zfirstElem.style.display = probeZ ? 'block' : 'none';
+
+        };
+
+        window.drawMiddleViz = async function() {
+            console.debug('drawMiddleViz: start');
+            try {
+                const container = document.getElementById('middleVizContainer');
+                if (!container) { console.debug('drawMiddleViz: no container'); return; }
+
+            // Ensure SVG is present — reload if DOM lost the SVG (robustness for HMR / accidental DOM edits)
+            async function ensureSvgLoaded() {
+                console.debug('drawMiddleViz: ensureSvgLoaded — checking existing SVG');
+                const hasSvg = !!container.querySelector('svg');
+                if (!hasSvg) {
+                    const svgText = await fetchSvg(
+                        ['./assets/svg/middleViz.svg', './assets/middleViz.svg'],
+                        ['svg/middleViz.svg', 'middleViz.svg']
+                    );
+                    if (!svgText) {
+                        console.error('drawMiddleViz: failed to load middleViz.svg');
+                        const statusEl = document.getElementById('middleVizStatus');
+                        if (statusEl) statusEl.textContent = 'SVG load failed';
+                        throw new Error('Unable to load middleViz.svg');
+                    }
+                    container.innerHTML = svgText;
+                    namespaceSvgDefs(container.querySelector('svg'), 'middleViz');
+                    middleSvgLoaded = true;
+                    // Wait for next frame to ensure DOM has parsed the SVG
+                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                    console.debug('drawMiddleViz.ensureSvgLoaded: SVG injected; svgRootPresent=', !!container.querySelector('svg'));
+                }
+            }
+            await ensureSvgLoaded();
+
+            // Read current controls (ids: m_type, m_axis, m_dir, m_dir2, m_both)
+            const type = document.getElementById('m_type')?.value || 'pocket';
+            const axis = document.getElementById('m_axis')?.value || 'X';
+            const dir = document.getElementById('m_dir')?.value || 'pos';
+            const findBoth = document.getElementById('m_both')?.checked || false;
+            const dir2ctrl = document.getElementById('m_dir2');
+            const dir2 = dir2ctrl ? (dir2ctrl.value || (dir === 'pos' ? 'neg' : 'pos')) : (dir === 'pos' ? 'neg' : 'pos');
+
+            // Update status label with current config
+            const statusEl = document.getElementById('middleVizStatus');
+            if (statusEl) {
+                const oAxis = axis === 'X' ? 'Y' : 'X';
+                const dirLabel = dir === 'pos' ? '+' : '-';
+                const dir2Label = dir2 === 'pos' ? '+' : '-';
+                statusEl.textContent = findBoth
+                    ? `${type} · ${axis}${dirLabel} → ${oAxis}${dir2Label}`
+                    : `${type} · ${axis}${dirLabel}`;
+            }
+
+            // Feature-level groups in the SVG
+            const pocketGroupId = 'middle_probe_pocket';
+            const bossGroupId = 'middle_probe_boss';
+
+            // Scope hiding to groups inside the SVG only (avoid accidentally hiding unrelated DOM)
+            const svgRoot = container.querySelector('svg') || container;
+            svgRoot.querySelectorAll('[id^="middle_probe_pocket"], [id^="middle_probe_boss"]').forEach(e => e.style.display = 'none');
+
+            // Hide both top-level feature groups, then show only the selected one
+            [pocketGroupId, bossGroupId].forEach(id => {
+                const el = svgRoot.querySelector('#' + id);
+                if (el) el.style.display = 'none';
+            });
+            const activeFeature = svgRoot.querySelector('#' + (type === 'pocket' ? pocketGroupId : bossGroupId));
+            if (activeFeature) {
+                // remove any inline 'display' hiding applied earlier and ensure children are shown
+                activeFeature.style.display = '';
+                activeFeature.style.visibility = 'visible';
+                activeFeature.style.opacity = '1';
+                // also clear display:none on descendants in case they were hidden by previous runs
+                activeFeature.querySelectorAll('[style]').forEach(el => {
+                    if (el.style && el.style.display === 'none') el.style.display = '';
+                });
+            }
+
+            // Hide all axis-direction groups first
+            const axisDirIds = [
+                'middle_probe_pocket_X_pos','middle_probe_pocket_X_neg','middle_probe_pocket_Y_pos','middle_probe_pocket_Y_neg',
+                'middle_probe_boss_X_pos','middle_probe_boss_X_neg','middle_probe_boss_Y_pos','middle_probe_boss_Y_neg'
+            ];
+            axisDirIds.forEach(id => {
+                const el = svgRoot.querySelector('#' + id);
+                if (el) el.style.display = 'none';
+            });
+
+            // Helper: Show axis group
+            const showAxisGroup = (axisEl) => {
+                if (!axisEl) return;
+                axisEl.style.display = 'block';
+                // Show all children (paths, groups, etc.)
+                axisEl.querySelectorAll(':scope > *').forEach(child => {
+                    if (child.style) child.style.display = '';
+                    // Also show nested children
+                    child.querySelectorAll('*').forEach(el => {
+                        if (el.style) el.style.display = '';
+                    });
+                });
+                console.debug(`drawMiddleViz: showing axis group ${axisEl.id}`);
+            };
+
+            // Show primary axis group
+            const selectedAxisDirId = `middle_probe_${type}_${axis}_${dir}`;
+            console.debug('drawMiddleViz: selectedAxisDirId', selectedAxisDirId);
+            const primaryAxisEl = svgRoot.querySelector('#' + selectedAxisDirId);
+            if (primaryAxisEl) {
+                showAxisGroup(primaryAxisEl);
+
+                // Hide all jogpaths by default (shown only when findBoth is checked)
+                // traversepath_step3 stays visible (doesn't match jogpath filter)
+                primaryAxisEl.querySelectorAll('[id*="jogpath"]').forEach(jp => {
+                    if (jp.style) jp.style.display = 'none';
+                });
+            }
+
+            // If "Find Both" is active: show jogpath + opposite axis
+            if (findBoth) {
+                const oppositeAxis = axis === 'X' ? 'Y' : 'X';
+
+                // Show the specific jogpath that matches dir2
+                if (primaryAxisEl) {
+                    // Both pocket and boss: middle_probe_{type}_jogpath_{axis}_{dir}_to_{oppositeAxis}_{dir2}
+                    const jogpathPatterns = [
+                        `middle_probe_${type}_jogpath_${axis}_${dir}_to_${oppositeAxis}_${dir2}`
+                    ];
+
+                    let jogpathFound = false;
+                    for (const pattern of jogpathPatterns) {
+                        const jogpath = svgRoot.querySelector('#' + pattern);
+                        if (jogpath) {
+                            jogpath.style.display = '';
+                            console.debug(`drawMiddleViz: showing ${type} jogpath`, pattern);
+                            jogpathFound = true;
+                            break;
+                        }
+                    }
+                    if (!jogpathFound) {
+                        console.warn(`drawMiddleViz: No matching ${type} jogpath found, tried:`, jogpathPatterns);
+                    }
+                }
+
+                // Show opposite axis group
+                const oppositeAxisId = `middle_probe_${type}_${oppositeAxis}_${dir2}`;
+                const oppositeAxisEl = svgRoot.querySelector('#' + oppositeAxisId);
+                if (oppositeAxisEl) {
+                    showAxisGroup(oppositeAxisEl);
+
+                    // Hide miniprobe in opposite axis (only first sequence shows miniprobe)
+                    const miniprobe = oppositeAxisEl.querySelector('[id*="miniprobe"]');
+                    if (miniprobe) {
+                        miniprobe.style.display = 'none';
+                        console.debug('drawMiddleViz: hiding miniprobe in opposite axis');
+                    }
+
+                    // Hide all jogpaths in opposite axis (not used for transitions)
+                    // traversepath_step3 stays visible (doesn't match jogpath filter)
+                    oppositeAxisEl.querySelectorAll('[id*="jogpath"]').forEach(jp => {
+                        if (jp.style) jp.style.display = 'none';
+                    });
+                }
+            }
+
+            // RECOVERY: if nothing visible inside the SVG (unexpected), unhide the activeFeature top-level group so user sees something
+            const anyVisible = Array.from(svgRoot.querySelectorAll('[id^="middle_probe_"]')).some(el => {
+                const s = el.style.display || '';
+                return s !== 'none';
+            });
+            if (!anyVisible) {
+                console.warn('drawMiddleViz: no middle_probe_* group is visible — falling back to pocket view');
+                const fallback = svgRoot.querySelector('#' + pocketGroupId);
+                if (fallback) fallback.style.display = 'block';
+            }
+
+            // Animation is handled by PathAnimator (via wizardManager).
+            // Clear any leftover inline animation styles so PathAnimator starts clean.
+            if (window.__middleStepTimer) { clearTimeout(window.__middleStepTimer); window.__middleStepTimer = null; }
+
+            const clearAnimStyles = (axisEl) => {
+                if (!axisEl) return;
+                axisEl.querySelectorAll('path').forEach(p => {
+                    p.style.transition = '';
+                    p.style.strokeDasharray = '';
+                    p.style.strokeDashoffset = '';
+                    p.classList.remove('path-draw', 'path-reset');
+                });
+            };
+            clearAnimStyles(primaryAxisEl);
+            if (findBoth) {
+                const oAxis = axis === 'X' ? 'Y' : 'X';
+                clearAnimStyles(svgRoot.querySelector(`#middle_probe_${type}_${oAxis}_${dir2}`));
+                const jp = svgRoot.querySelector(`#middle_probe_${type}_jogpath_${axis}_${dir}_to_${oAxis}_${dir2}`);
+                if (jp) { jp.style.transition = ''; jp.style.strokeDasharray = ''; jp.style.strokeDashoffset = ''; jp.classList.remove('path-draw', 'path-reset'); }
+            }
+            } catch (err) {
+                console.error('drawMiddleViz: unexpected error', err);
+            }
+        };
+
+        window.drawProbeViz = function() {
+            const axis = document.getElementById('p_axis')?.value || 'X';
+            const dir = document.getElementById('p_dir')?.value || 'pos';
+            const clearance = document.getElementById('p_edge_clear')?.value || '';
+            const svg = document.getElementById('probeViz');
+            if (!svg) return;
+            clearSVG(svg);
+            const ns = 'http://www.w3.org/2000/svg';
+
+            // baseline
+            const line = document.createElementNS(ns, 'line');
+            if (axis === 'X') {
+                line.setAttribute('x1', 20); line.setAttribute('y1', 70); line.setAttribute('x2', 380); line.setAttribute('y2', 70);
+            } else {
+                line.setAttribute('x1', 200); line.setAttribute('y1', 10); line.setAttribute('x2', 200); line.setAttribute('y2', 130);
+            }
+            line.setAttribute('stroke', '#60a5fa');
+            line.setAttribute('stroke-width', 3);
+            svg.appendChild(line);
+
+            // arrow for probe direction (red triangle)
+            const arrow = document.createElementNS(ns, 'polygon');
+            if (axis === 'X') {
+                if (dir === 'pos') arrow.setAttribute('points', '360,70 345,62 345,78');
+                else arrow.setAttribute('points', '40,70 55,62 55,78');
+            } else {
+                if (dir === 'pos') arrow.setAttribute('points', '200,20 192,35 208,35');
+                else arrow.setAttribute('points', '200,120 192,105 208,105');
+            }
+            // replace green arrow with yellow for explicit contact/direction
+            arrow.setAttribute('fill', '#facc15');
+            svg.appendChild(arrow);
+
+            // Edge marker (red line) at the contact side — uses SVG templates when available
+            function addEdgeMarker(x, y, rot = 0, id = 'edgeMarker') {
+                const cornerRoot = document.getElementById('cornerVizCorner');
+                // Try to clone a template line from corner SVG if present
+                if (cornerRoot) {
+                    const tpl = cornerRoot.querySelector('[id*="retract"]') || cornerRoot.querySelector('[id*="retractX"]') || cornerRoot.querySelector('[id*="retractY"]');
+                    // fallback to drawing a simple line
+                    if (tpl) {
+                        const clone = tpl.cloneNode(true);
+                        // remove id attributes to avoid duplicates
+                        clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+                        const g = document.createElementNS(ns, 'g');
+                        g.setAttribute('id', id);
+                        g.setAttribute('transform', `translate(${x},${y}) rotate(${rot})`);
+                        g.appendChild(clone);
+                        svg.appendChild(g);
+                        return;
+                    }
+                }
+                // fallback: draw simple line + dot
+                const g = document.createElementNS(ns, 'g');
+                g.setAttribute('id', id);
+                const ln = document.createElementNS(ns, 'line');
+                ln.setAttribute('x1', -10);
+                ln.setAttribute('y1', 0);
+                ln.setAttribute('x2', 10);
+                ln.setAttribute('y2', 0);
+                ln.setAttribute('stroke', '#facc15');
+                ln.setAttribute('stroke-width', 4);
+                ln.setAttribute('transform', `translate(${x},${y}) rotate(${rot})`);
+                g.appendChild(ln);
+                const dot = document.createElementNS(ns, 'circle');
+                dot.setAttribute('cx', x);
+                dot.setAttribute('cy', y);
+                dot.setAttribute('r', 3);
+                dot.setAttribute('fill', '#fff');
+                g.appendChild(dot);
+                svg.appendChild(g);
+            }
+
+            // Mini probe: self-contained circles — no dependency on corner SVG or its gradients
+            function addMiniProbe(x, y, id = 'miniProbe') {
+                const g = document.createElementNS(ns, 'g');
+                g.setAttribute('id', id);
+                const outer = document.createElementNS(ns, 'circle');
+                outer.setAttribute('cx', x);
+                outer.setAttribute('cy', y);
+                outer.setAttribute('r', 14);
+                outer.setAttribute('fill', '#ef4444');
+                outer.setAttribute('fill-opacity', '0.18');
+                g.appendChild(outer);
+                const body = document.createElementNS(ns, 'circle');
+                body.setAttribute('cx', x);
+                body.setAttribute('cy', y);
+                body.setAttribute('r', 9);
+                body.setAttribute('fill', '#ef4444');
+                g.appendChild(body);
+                const eye = document.createElementNS(ns, 'circle');
+                eye.setAttribute('cx', x+3);
+                eye.setAttribute('cy', y-3);
+                eye.setAttribute('r', 2.5);
+                eye.setAttribute('fill', '#fff');
+                g.appendChild(eye);
+                svg.appendChild(g);
+            }
+
+            // place primary edge and probe approach marker (edge oriented perpendicular to probe travel)
+            let probeX = 120, probeY = 70, edgeX = 360, edgeY = 70, edgeRot = 90;
+            if (axis === 'X') {
+                if (dir === 'pos') {
+                    edgeX = 360; edgeY = 70; edgeRot = 90; probeX = 120; probeY = 70;
+                } else {
+                    edgeX = 40; edgeY = 70; edgeRot = 90; probeX = 280; probeY = 70;
+                }
+            } else {
+                if (dir === 'pos') {
+                    edgeX = 200; edgeY = 20; edgeRot = 0; probeX = 200; probeY = 100;
+                } else {
+                    edgeX = 200; edgeY = 120; edgeRot = 0; probeX = 200; probeY = 40;
+                }
+            }
+            addEdgeMarker(edgeX, edgeY, edgeRot, 'edgePrimary');
+            addMiniProbe(probeX, probeY, 'probePrimary');
+
+
+
+            // Blue dashed line for probe move (probe -> edge)
+            const probeLine = document.createElementNS(ns, 'line');
+            probeLine.setAttribute('x1', probeX);
+            probeLine.setAttribute('y1', probeY);
+            probeLine.setAttribute('x2', edgeX);
+            probeLine.setAttribute('y2', edgeY);
+            probeLine.setAttribute('stroke', '#60a5fa');
+            probeLine.setAttribute('stroke-dasharray', '6 4');
+            probeLine.setAttribute('stroke-width', 2);
+            probeLine.setAttribute('opacity', '0.9');
+            probeLine.setAttribute('id', 'probeMoveLine');
+            svg.appendChild(probeLine);
+
+            // Try to use a triangle probe contact graphic from corner SVG, otherwise draw one
+            function addContactTriangle(x, y, id = 'contactTip') {
+                const cornerRoot = document.getElementById('cornerVizCorner');
+                if (cornerRoot) {
+                    const tpl = cornerRoot.querySelector('[id*="triangle"]');
+                    if (tpl) {
+                        const clone = tpl.cloneNode(true);
+                        clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+                        const g = document.createElementNS(ns, 'g');
+                        g.setAttribute('id', id);
+                        // find a reference point in the triangle (use bounding box center)
+                        const ref = clone.querySelector('polygon');
+                        let refX = 0, refY = 0;
+                        if (ref) {
+                            // attempt to compute centroid from points
+                            const pts = ref.getAttribute('points').trim().split(/\s+/).map(p => {
+                                const [px,py] = p.split(',').map(Number);
+                                return {px,py};
+                            });
+                            if (pts.length > 0) {
+                                const avgx = pts.reduce((s,p)=>s+p.px,0)/pts.length;
+                                const avgy = pts.reduce((s,p)=>s+p.py,0)/pts.length;
+                                refX = avgx;
+                                refY = avgy;
+                            }
+                        }
+                        g.setAttribute('transform', `translate(${x - refX}, ${y - refY})`);
+                        g.appendChild(clone);
+                        svg.appendChild(g);
+                        return;
+                    }
+                }
+                // fallback: small red triangle
+                const poly = document.createElementNS(ns, 'polygon');
+                poly.setAttribute('points', `${x},${y-8} ${x+8},${y+8} ${x-8},${y+8}`);
+                poly.setAttribute('fill', '#ef4444');
+                poly.setAttribute('id', id);
+                svg.appendChild(poly);
+            }
+
+            // place contact triangle at primary edge
+            addContactTriangle(edgeX, edgeY, 'contactPrimary');
+
+
+            // Subtitle
+            const t = document.createElementNS(ns, 'text');
+            t.setAttribute('x', 12);
+            t.setAttribute('y', 15);
+            t.setAttribute('fill', '#dbeafe');
+            t.setAttribute('font-size', '12');
+            t.textContent = `Edge | Axis: ${axis} | Dir: ${dir}` + (findBoth ? ' | Find Opposite' : '');
+            svg.appendChild(t);
+
+            if (findBoth) {
+                const note = document.createElementNS(ns, 'text');
+                note.setAttribute('x', 12);
+                note.setAttribute('y', 30);
+                note.setAttribute('fill', '#9ae6b4');
+                note.setAttribute('font-size', '10');
+                note.textContent = `Clearance: ${clearance}`;
+                svg.appendChild(note);
+
+                // draw travel dashed line
+                const travel = document.createElementNS(ns, 'line');
+                if (axis === 'X') {
+                    if (dir === 'pos') {
+                        travel.setAttribute('x1', 80); travel.setAttribute('y1', 70);
+                        travel.setAttribute('x2', 320); travel.setAttribute('y2', 70);
+                        // use perpendicular rotations (90 = vertical)
+                        addEdgeMarker(80,70,90,'edgeOpp');
+                        addEdgeMarker(320,70,90,'edgeOpp2');
+                    } else {
+                        travel.setAttribute('x1', 320); travel.setAttribute('y1', 70);
+                        travel.setAttribute('x2', 80); travel.setAttribute('y2', 70);
+                        addEdgeMarker(320,70,90,'edgeOpp');
+                        addEdgeMarker(80,70,90,'edgeOpp2');
+                    }
+                } else {
+                    if (dir === 'pos') {
+                        travel.setAttribute('x1', 200); travel.setAttribute('y1', 30);
+                        travel.setAttribute('x2', 200); travel.setAttribute('y2', 110);
+                        // horizontal edge markers for Y axis
+                        addEdgeMarker(200,30,0,'edgeOpp');
+                        addEdgeMarker(200,110,0,'edgeOpp2');
+                    } else {
+                        travel.setAttribute('x1', 200); travel.setAttribute('y1', 110);
+                        travel.setAttribute('x2', 200); travel.setAttribute('y2', 30);
+                        addEdgeMarker(200,110,0,'edgeOpp');
+                        addEdgeMarker(200,30,0,'edgeOpp2');
+                    }
+                }
+                travel.setAttribute('stroke', '#fff59e');
+                travel.setAttribute('stroke-dasharray', '4 4');
+                travel.setAttribute('stroke-width', 2);
+                svg.appendChild(travel);
+
+                // width arrow and label
+                const arrowW = document.createElementNS(ns, 'line');
+                if (axis === 'X') {
+                    arrowW.setAttribute('x1', 100); arrowW.setAttribute('y1', 55);
+                    arrowW.setAttribute('x2', 300); arrowW.setAttribute('y2', 55);
+                } else {
+                    arrowW.setAttribute('x1', 220); arrowW.setAttribute('y1', 40);
+                    arrowW.setAttribute('x2', 220); arrowW.setAttribute('y2', 100);
+                }
+                arrowW.setAttribute('stroke', '#60a5fa');
+                // Ensure a red arrow marker exists in this SVG for width arrowheads
+                if (!svg.querySelector('#arrowRed')) {
+                    const defs = document.createElementNS(ns, 'defs');
+                    const marker = document.createElementNS(ns, 'marker');
+                    marker.setAttribute('id', 'arrowRed');
+                    marker.setAttribute('viewBox', '0 0 10 10');
+                    marker.setAttribute('refX', '9');
+                    marker.setAttribute('refY', '5');
+                    marker.setAttribute('markerWidth', '6');
+                    marker.setAttribute('markerHeight', '6');
+                    marker.setAttribute('orient', 'auto-start-reverse');
+                    const mpoly = document.createElementNS(ns, 'polygon');
+                    mpoly.setAttribute('points', '0,0 10,5 0,10');
+                    mpoly.setAttribute('fill', '#facc15');
+                    marker.appendChild(mpoly);
+                    defs.appendChild(marker);
+                    svg.appendChild(defs);
+                }
+                arrowW.setAttribute('marker-end', 'url(#arrowRed)');
+                svg.appendChild(arrowW);
+
+                const label = document.createElementNS(ns, 'text');
+                label.setAttribute('x', 12);
+                label.setAttribute('y', 45);
+                label.setAttribute('fill', '#60a5fa');
+                label.setAttribute('font-size', '10');
+                label.textContent = `Width: (#51 - #50) => #54`;
+                svg.appendChild(label);
+            }
+        };
+
+        let edgeSvgLoaded = false;
+        window.drawEdgeViz = async function() {
+            const container = document.getElementById('probeVizContainer');
+            if (!container) return;
+
+            if (!edgeSvgLoaded) {
+                const svgText = await fetchSvg(
+                    ['./assets/svg/edgeViz.svg', './assets/edgeViz.svg'],
+                    ['svg/edgeViz.svg', 'edgeViz.svg']
+                );
+                if (!svgText) { console.error('drawEdgeViz: failed to load edgeViz.svg'); return; }
+                container.innerHTML = svgText;
+                namespaceSvgDefs(container.querySelector('svg'), 'edgeViz');
+                edgeSvgLoaded = true;
+            }
+
+            // Show the correct edge group for current config
+            const axis = document.getElementById('p_axis')?.value || 'X';
+            const dir = document.getElementById('p_dir')?.value || 'pos';
+
+            // Hide all possible edge groups first
+            ['edge_X_pos','edge_X_neg','edge_Y_pos','edge_Y_neg'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+
+            // Show selected group
+            const selGroup = document.getElementById(`edge_${axis}_${dir}`);
+            if (selGroup) selGroup.style.display = 'block';
+
+            // Ensure the workpiece shape for this group is visible (ids end with _work)
+            try {
+                const workEl = document.getElementById(`edge_${axis}_${dir}_work`);
+                if (workEl) workEl.style.display = '';
+                // Also reveal probe/retract paths in static mode when animation disabled
+                const animate = document.getElementById('p_animate')?.checked !== false;
+                if (!animate) {
+                    const probe = document.getElementById(`edge_${axis}_${dir}_probepath`);
+                    const retract = document.getElementById(`edge_${axis}_${dir}_retractpath`);
+                    if (probe) {
+                        probe.classList.add('path-draw');
+                        const pParent = probe.closest('g'); if (pParent) pParent.classList.add('is-probing');
+                    }
+                    if (retract) {
+                        retract.classList.add('path-draw');
+                        const rParent = retract.closest('g'); if (rParent) rParent.classList.add('is-retracting');
+                    }
+                }
+            } catch (e) { /* noop */ }
+        };
+
+        let alignmentSvgLoaded = false;
+        window.drawAlignmentViz = async function() {
+            const container = document.getElementById('alignmentVizContainer');
+            if (!container) return;
+
+            if (!alignmentSvgLoaded) {
+                const svgText = await fetchSvg(
+                    ['./assets/svg/alignViz.svg', './assets/alignViz.svg'],
+                    ['svg/alignViz.svg', 'alignViz.svg']
+                );
+                if (!svgText) { console.error('drawAlignmentViz: failed to load alignViz.svg'); return; }
+                container.innerHTML = svgText;
+                namespaceSvgDefs(container.querySelector('svg'), 'alignViz');
+                alignmentSvgLoaded = true;
+            }
+
+            const checkAxis = document.getElementById('al_check_axis')?.value || 'X';
+            const probeDir = document.getElementById('al_probe_dir')?.value || 'pos';
+
+            ['align_X_Yneg', 'align_X_Ypos', 'align_Y_Xneg', 'align_Y_Xpos'].forEach(id => {
+                const group = document.getElementById(id);
+                if (group) group.style.display = 'none';
+            });
+
+            const probeAxis = checkAxis === 'X' ? 'Y' : 'X';
+            const groupId = `align_${checkAxis}_${probeAxis}${probeDir}`;
+
+            ['align_X_Yneg', 'align_X_Ypos', 'align_Y_Xneg', 'align_Y_Xpos'].forEach(id => {
+                const group = document.getElementById(id);
+                if (!group) return;
+                group.classList.remove('is-probing', 'is-retracting', 'is-jogging');
+                group.querySelectorAll('[id*="probepath"], [id*="retractpath"], [id*="jogpath"]').forEach(path => {
+                    path.classList.remove('path-draw');
+                });
+            });
+
+            const activeGroup = document.getElementById(groupId);
+            if (activeGroup) activeGroup.style.display = 'block';
+
+            const probe1 = document.getElementById(`${groupId}_probepath1`);
+            const retract1 = document.getElementById(`${groupId}_retractpath1`);
+            const probe2 = document.getElementById(`${groupId}_probepath2`);
+            const retract2 = document.getElementById(`${groupId}_retractpath2`);
+            const jog = document.getElementById(`${groupId}_jogpath`);
+
+            const animate = document.getElementById('al_animate')?.checked !== false;
+            if (!animate) {
+                [probe1, probe2].forEach(path => {
+                    if (!path) return;
+                    path.classList.add('path-draw');
+                    const parent = path.closest('g');
+                    if (parent) parent.classList.add('is-probing');
+                });
+
+                [retract1, retract2].forEach(path => {
+                    if (!path) return;
+                    path.classList.add('path-draw');
+                    const parent = path.closest('g');
+                    if (parent) parent.classList.add('is-retracting');
+                });
+
+                if (jog) {
+                    jog.classList.add('path-draw');
+                    const parent = jog.closest('g');
+                    if (parent) parent.classList.add('is-jogging');
+                }
+            }
+        };
+    </script>
+
+    <!-- ════ SEAM: EXTENSION ENTRYPOINT ════════════════════════════════════════════════════════════
+         The single bundle that boots the extension webview (esbuild of web/src/extensionApp.js). It
+         replaces Studio's removed ./app.js bootstrap and natively imports the shared DDCS-Studio/web
+         modules, wires the client.js gateway seam, and the VS Code document sync. ═════════════════════ -->
+    <!-- UI Bundle -->
+    <script type="module" src="dist/bundle.js"></script>
+</body>
+</html>

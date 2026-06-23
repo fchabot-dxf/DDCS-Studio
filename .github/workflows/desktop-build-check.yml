@@ -1,0 +1,73 @@
+name: Desktop build (+ rolling release)
+
+# Builds the Windows exe on every push to main (and on PRs / on demand) so PyInstaller / import /
+# packaging breakage is caught early. On push to main it ALSO publishes the exe as a rolling
+# "latest" PRE-RELEASE — so there's always a freshly-built DDCS-Studio.exe to download from the
+# Releases page, with no version bump needed.
+#
+# It does NOT notify running exes: the in-app update banner (ui/updateCheck.js) asks GitHub's
+# "releases/latest" API, which EXCLUDES pre-releases — so users are only nudged by the stable,
+# chip-bumped releases from desktop-release.yml. PRs only build + upload an artifact (no release).
+# Only the paths that ship inside the exe trigger it (docs-only pushes are skipped — same exe).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'DDCS-Studio/web/**'
+      - 'bridge/bridge-app/**'
+      - 'fairy_gateway.py'
+      - 'build_fairy.ps1'
+      - 'requirements-build.txt'
+      - '.github/workflows/desktop-build-check.yml'
+  pull_request:
+    paths:
+      - 'DDCS-Studio/web/**'
+      - 'bridge/bridge-app/**'
+      - 'fairy_gateway.py'
+      - 'build_fairy.ps1'
+      - 'requirements-build.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write                            # publish the rolling 'latest' pre-release (push / dispatch only)
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'requirements-build.txt'
+
+      - name: Install build deps
+        run: python -m pip install --upgrade -r requirements-build.txt
+
+      - name: Build the exe
+        shell: pwsh
+        run: ./build_fairy.ps1
+
+      - name: Upload exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DDCS-Studio-exe
+          path: ./DDCS-Studio.exe
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish rolling 'latest' pre-release
+        if: github.event_name != 'pull_request'    # push to main + manual dispatch only; never on PRs
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes --cleanup-tag   # drop the previous rolling build (no-op on first run)
+          gh release create latest ./DDCS-Studio.exe `
+            --prerelease `
+            --target ${{ github.sha }} `
+            --title "Latest build (main)" `
+            --notes "Rolling build of main @ ${{ github.sha }}. Pre-release (not an update notification). For the stable, update-notified release, grab the newest v* release."

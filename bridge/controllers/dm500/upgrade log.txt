@@ -1,0 +1,11 @@
+升级日志20260408：
+对刀动作的次序是：
+Z到达固定对刀安全高度 -- XY运动到对刀初始位置 -- Z运动到对刀初始位置 -- 开始固定对刀
+
+增加了新的参数：#2049 -t1 -s1"固定对刀安全高度" -s2"unit" -m9 -min=-9999.000 -max=9999.000（机械坐标）
+
+Upgrade log 20260408:
+The sequence of fix probe is:
+Z axis safe height of probe -- XY move to Initial probe position --  Z move to Initial probe position -- Start to fix probe
+
+Added new parameters: #2049 -t1 -s1"Z axis safe height of probe" -s2"unit" -m4 -min=-9999.00 -max=9999.000 (Mach coordinates)

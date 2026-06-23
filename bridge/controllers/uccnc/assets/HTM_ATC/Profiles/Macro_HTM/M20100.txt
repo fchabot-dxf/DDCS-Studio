@@ -1,0 +1,50 @@
+
+// M20100 - HTM_ATC macro - by SeB
+// Float formatting macroloop - getting the Position DROs decimals (updown field 195) from Settings->Gen.Setup page
+
+// should be added and enabled in macroloops
+
+string decimals = AS3.Getfield(195); //Settings->Gen.Setup->Position DROs decimals (updown field 195)
+
+double droValue = 0;
+string slotStatus;
+
+// formatting ATC setup fields (30010 to 30009)
+for (int i = 30010; i < 30030; i++)
+{
+	droValue = AS3.Getfielddouble(i);
+	if (i == 30018 || i == 30019)
+	{
+		AS3.Setfieldtext(droValue.ToString("F0"), i);
+	}
+	else
+	{
+		AS3.Setfieldtext(droValue.ToString("F" + decimals), i);
+	}
+	AS3.Validatefield(i);
+}
+
+// formatting ATC page fields (20400 to 20403)
+for (int i = 20400; i < 20404; i++)
+{
+	droValue = AS3.Getfielddouble(i);
+	if (i != 20401)
+	{ // excluded fields, maybe text fields
+		if (i == 20400)
+		{ // integers
+			AS3.Setfieldtext(droValue.ToString("F0"), i);
+		}
+		else
+		{ // float formatting for the rest of fields
+			AS3.Setfieldtext(droValue.ToString("F" + decimals), i);
+		}
+	}
+	AS3.Validatefield(i);
+}
+
+for (int i = 20511; i <= 20530; i++)
+{
+	droValue = AS3.Getfielddouble(i);
+	AS3.Setfieldtext(droValue.ToString("F" + decimals), i);
+	AS3.Validatefield(i);
+}

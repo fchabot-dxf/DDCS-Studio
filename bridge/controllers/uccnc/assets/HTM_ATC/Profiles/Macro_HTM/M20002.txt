@@ -1,0 +1,183 @@
+// Created by ValhallaCNC Ver 1.00 8-18-21
+// This is a Modbus M20002 macro and is running in a macro loop must be set to autorun.
+// Need New M3 Macro to work with uptospeed in this macro, thanks to A_Camera this macro
+// Set Your M3 start delay to zero if you want to use this feature
+
+// UCCNC screen additions you must add these for the macro to work properly
+// This is used on UCCNC Ver. 1.2113
+// Add LED object to the main screen, 800 for UptospeedLED
+// The 800 LED use pict #280 already in default BMP's
+
+// Modbus Connection Settings USB to RS485
+// Serial RTU, VFD & SPINDLE, 19200, 8 - N - 1, Retry 1, timeout 300, loop 25
+
+// Modbus Communication Settings Ethernet to RS485
+// Modbus Connection settings for USR-DR302
+// TCP
+// IP Address 10.10.10.15
+// Port 503
+// 3-25-100
+
+// USR-DR302 Device settings ( My settings yours may be different)
+// Static IP 		10.10.10.15
+// Subnet mask 		255.255.255.0
+// Gateway 		10.10.10.10
+// DNS 			0.0.0.0
+// TCP Server (Slave) 	10.10.10.50 greyed out
+// Remote Port 		502 greyed out
+// For VFD - 19200, 8 - none - 1, Local port 503, short comm 3, TCP count 4
+// IN web setup page (10.10.10.15) need to check box RS485
+
+// Modbus Master function settings using UCCNC registers 0 - 8 
+// Function ON-OFF-RESET - write single register  - slave 1 - modbus start 4096  - modbus count 1 - UCCNC start register 0
+// Function VFD Speed    - write single register  - slave 1 - modbus start 8192  - modbus count 1 - UCCNC start register 1
+// Function VFD Error    - read holding registers - slave 1 - modbus start 4097  - modbus count 1 - UCCNC start register 2
+// Function VFD Status   - read holding registers - slave 1 - modbus start 12291 - modbus count 5 - UCCNC start register 3
+
+// Huanyang GT inverter settings
+// For Modbus Control P0.01 = 2, P0.07 = 7
+// GT inverter PC.00 - PC.02 must match UCCNC modbus master communication setup
+// For communication alarm PC.05 = 0 this alerts macro to a fault
+// Two wire control for modbus connect to RS485+, RS485-
+
+// It checks Set Spindle Speed and the Spindle Speed Override DRO, calculate the matching frequency
+// Checks the state of SPINDLE ON LED and will send the necessary VFD commands.
+// Will Check for VFD Errors with Popup msgbox for resetting
+// Last it will read some VFD parameters and display in UCCNC.
+
+// Constant spindle commands
+
+ushort RunSpindleCW 		= 1;   	// RUN CW command
+ushort RunSpindleCCW 		= 2;   	// RUN CCW command
+ushort StopSpindle 			= 5;   	// STOP command
+ushort ResetVFD 			= 7;	// Reset VFD command
+ushort ReleaseResetVFD 		= 0;	// Releases Reset
+
+// My max is 24000, yours may be different
+double MaximumRPM 		= 24000;
+
+// UCCNC screen fields existing
+
+ushort MaxSpindleSpeedDRO	= 178;
+ushort UptospeedLED			= 800;	
+ushort VFDcommfaultLED		= 801;
+ushort SactDRO 				= 870; 
+ushort SoverrideDRO			= 2451; 
+
+// UCCNC screen additions you must add these for the macro to work properly
+// NEW UCCNC screen fields these are showfieldnb type objects and must be added
+		
+int VoltageDRO			= 20010;
+int CurrentDRO			= 20011;
+int SpeedDRO			= 20012;
+int PowerDRO			= 20013;
+int TorqueDRO			= 20014;
+
+// UCCNC register to write
+
+ushort SpindleRunReg		= 0;		
+ushort VFDFrequencyReg	 	= 1;
+
+// Variables
+
+double OutputPowerKW ;
+double SSpeedHz;
+ushort ErrorHere ;
+ushort []ReadUCCNCregisters ;
+ushort Uptospeed ;
+ushort Setspeed ;
+int SSplus ;
+int SSminus ;
+
+// Declarați o variabilă pentru durata de așteptare (dwell) între verificările de viteză
+int dwellDuration = 1000; // 500 ms (ajustabil după necesitate)
+
+
+
+//-----------------PROGRAM STARTS HERE---------------------
+
+// Gets screen values for speed control
+
+	MaximumRPM = AS3.Getfielddouble(MaxSpindleSpeedDRO);
+	SSpeedHz = ( AS3.Getfielddouble(SoverrideDRO));
+
+	if (SSpeedHz > MaximumRPM)
+		{SSpeedHz = MaximumRPM;}	// Force maximum RPM to prevent exception
+
+// Calculate the matching RPM frequency and sends the value to Modbus register.
+// The 2.4 value is calculated from my displayed RPM / register 1  variable table
+ 
+	exec.SetModbusregister(VFDFrequencyReg, (ushort) Convert.ToUInt16(SSpeedHz / 2.4));
+
+
+// Reads multiple UCCNC register via modbus start at Address 0 - Reads to register 8 (Thats a total of nine) 
+// UCCNC Registers  Start-Stop-Reset[0], Speed[1], Fault[2], Current[3], Volatge[4], Speed[5], Power[6], Torque[7]
+
+	exec.GetModbusregisters(0,8,out ReadUCCNCregisters); 
+
+// Looks for VFD error, MSGBOX for resetting
+
+	ErrorHere = ReadUCCNCregisters[2];
+			
+	if (ErrorHere == 4)
+		{MessageBox.Show(exec.mainform,"Reset VFD Fault !", "VFD Fault", MessageBoxButtons.OK,MessageBoxIcon.Question );
+			exec.SetModbusregister(SpindleRunReg, ResetVFD); //Resets VFD Error (7)				
+				Thread.Sleep(2000);
+					exec.SetModbusregister(SpindleRunReg, ReleaseResetVFD);} //Releases Reset (0) to accept commands 
+																				
+	else
+		{}
+
+
+//-------------- Send start/stop command for the spindle --------------------------------------------------------
+//
+//   Check the CW and CCW LEDs and convert the state to spindle control commands.
+//   The command is set in the Modbus register which is sent to VFD using the UCCNC Modbus internal handler.
+//
+//   Check CW and CCW LEDs, start or stop the spindle based on LED states.
+//   After exiting this macro the Modbus register is set up for CW, CCW or Stop
+//
+	if ( AS3.GetLED(50) == true )  // If the RUN CW LED is active
+		{exec.SetModbusregister(SpindleRunReg, RunSpindleCW);} 
+   
+    else
+   
+   	if ( AS3.GetLED(51) == true ) // If the RUN CCW LED is active
+		{exec.SetModbusregister(SpindleRunReg, RunSpindleCCW);} 
+   
+   else // CW and CCW LEDs are off, send turn spindle OFF commnad
+   {exec.SetModbusregister(SpindleRunReg, StopSpindle);}
+
+
+// Get the parameters from the UCCNC register and outputs to screen
+				
+//		AS3.Setfield(ReadUCCNCregisters[4], VoltageDRO);
+
+//			AS3.Setfield(ReadUCCNCregisters[3], CurrentDRO);
+
+				AS3.Setfield(ReadUCCNCregisters[5], SactDRO);
+
+//					OutputPowerKW = (ReadUCCNCregisters[3] * ReadUCCNCregisters[2]);	
+//					AS3.Setfield(OutputPowerKW, PowerDRO);
+
+//						AS3.Setfield(ReadUCCNCregisters[6], TorqueDRO);
+
+// Sets status of uptospeed LED
+// The +- 3 is a range, my actual RPM are within one RPM of my set RPM
+
+	Uptospeed = ReadUCCNCregisters[5];
+	Setspeed = ReadUCCNCregisters[1];
+	
+	Setspeed = (ushort) Convert.ToUInt16(Setspeed * 2.4);
+
+	SSplus = Setspeed + 3;
+	SSminus = Setspeed -3;
+	
+	if(SSminus <= Uptospeed && Uptospeed <= SSplus)
+
+		{AS3.SetLED(true, UptospeedLED);}
+		
+	else {
+		AS3.SetLED(false, UptospeedLED);
+	}
+	

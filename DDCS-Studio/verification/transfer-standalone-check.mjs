@@ -1,0 +1,13 @@
+﻿import { chromium } from '@playwright/test';
+const browser = await chromium.launch();
+const page = await browser.newPage();
+const errors = [];
+page.on('pageerror', (e) => errors.push(e.message));
+await page.goto('http://127.0.0.1:3017', { waitUntil: 'networkidle' });
+await page.waitForTimeout(1500);
+console.log('TRANSFER greyed standalone:  ' + (await page.locator('#transferBtn').evaluate((n) => n.classList.contains('unavailable'))));
+await page.locator('#transferBtn').click();
+await page.waitForTimeout(400);
+console.log('click does nothing (no toast): ' + ((await page.locator('.toast').count()) === 0));
+if (errors.length) console.log('PAGE ERRORS:\n' + errors.join('\n'));
+await browser.close();

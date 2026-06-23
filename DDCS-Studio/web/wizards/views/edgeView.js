@@ -1,6 +1,7 @@
 /** views/edgeView.js — Edge probing wizard view (DOM glue + SVG animator). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { EdgeWizard } from '../edgeWizard.js';
+import { restoreBoxStock } from './rotaryCenterView.js';
 
 const wizard = new EdgeWizard();
 
@@ -29,17 +30,18 @@ export const edgeView = {
     panelId: 'wiz_edge',
     codeElId: 'wiz_edge_code',
     large: true,
+    twoPane: true,
     inputIds: [
-        'p_axis', 'p_dir', 'p_dist', 'p_feed_fast', 'p_feed_slow',
+        'p_axis', 'p_dir', 'p_dist', 'p_radius', 'p_feed_fast', 'p_feed_slow',
         'p_retract', 'p_port', 'p_level', 'p_q', 'p_sync_a', 'p_wcs', 'p_slave',
     ],
+    // Controller-source chips: which inputs map to which probe-config field (PROBE-CONFIG-SOURCE.md)
+    probeSrcFields: { p_port: 'port', p_level: 'level', p_feed_fast: 'fastFeed', p_retract: 'retract' },
     startAnim: startEdgeAnim,
 
     onOpen(ctx) {
+        restoreBoxStock();   // not a rotary op → revert a forced cylinder back to the box (no-op if already a box)
         setTimeout(() => {
-            // prefer specialized edge SVG loader when available
-            if (window.drawEdgeViz) window.drawEdgeViz();
-            else if (window.drawProbeViz) window.drawProbeViz();
             ctx.update();
             // start animator similar to corner animator
             setTimeout(() => { startEdgeAnim(); }, 60);
@@ -52,6 +54,7 @@ export const edgeView = {
             dir: el('p_dir')?.value || 'pos',
             wcs: el('p_wcs')?.value || 'active',
             dist: el('p_dist')?.value || '15',
+            radius: el('p_radius')?.value || '2',
             retract: el('p_retract')?.value || '2',
             syncA: el('p_sync_a')?.checked || false,
             slave: el('p_slave')?.value || '3',
@@ -59,12 +62,14 @@ export const edgeView = {
             f_slow: el('p_feed_slow')?.value || '50',
             qStop: el('p_q')?.value || '1',
             port: window.ddcsGetSettings().probes.probePin,
-            level: window.ddcsGetSettings().probes.probeLevel
+            level: window.ddcsGetSettings().probes.probeLevel,
+            sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
         console.debug('edgeView.update', params);
         const gcode = wizard.generate(params);
-        ctx.preview3D(gcode, 'probeVizContainer');
+        const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
+        ctx.preview3D(gcode, 'probeVizContainer', wizard.inferStart(params, stock));
         console.debug('edge generate => containsG31=', /G31/.test(gcode));
         el('wiz_edge_code').innerHTML = UIUtils.formatGCode(gcode);
 
@@ -72,11 +77,5 @@ export const edgeView = {
         const edgeStatus = el('edgeVizStatus');
         if (edgeStatus) edgeStatus.textContent = `Edge: ${params.axis}${params.dir === 'pos' ? '+' : '-'}`;
 
-        // Update visualization: prefer specialized edge SVG loader if available
-        if (window.drawEdgeViz) {
-            window.drawEdgeViz();
-        } else if (window.drawProbeViz) {
-            window.drawProbeViz();
-        }
     },
 };

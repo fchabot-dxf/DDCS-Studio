@@ -15,7 +15,11 @@
  *     name:         string,                       // human label shown in the selector
  *     source:       "builtin" | "manual" | "controller",   // where it came from
  *     hardwareTabs: Array<"probes"|"atc"|"limits">,        // hardware tabs shown by default
- *     atc:          { toolTableBaseVar: number, defaultToolCount: number }
+ *     atc:          { toolTableBaseVar: number, defaultToolCount: number },
+ *     probeVars:    { [field]: { ctrl, pr, label } }       // controller-resident probe config the
+ *                                                          // generators may read at runtime (see
+ *                                                          // PROBE-CONFIG-SOURCE.md). Absent field =
+ *                                                          // no native var on this controller.
  *   }
  * The user's actual VALUES (pins, tool lengths, probe params) persist in settings, not the profile.
  */
@@ -29,6 +33,47 @@ export const CONTROLLER_PROFILES = {
         // ATC is left OFF by default (most setups are manual tool change) — the user can toggle it on.
         hardwareTabs: ['probes', 'limits'],
         atc: { toolTableBaseVar: 1430, defaultToolCount: 10 },
+        // Probe config with a native controller variable (Pr+500 macro mirror, Expert-confirmed).
+        // #1078/#1080/#632 are production-proven (community macro_cam13); the rest are from the
+        // official Variables-ENG list. Fields with no native var (slow feed, scan stroke, safe Z)
+        // are deliberately absent — they stay Studio-side.
+        probeVars: {
+            port:        { ctrl: '#1078', pr: 'Pr578', label: 'Floating probe port' },
+            level:       { ctrl: '#1080', pr: 'Pr580', label: 'Floating probe level' },
+            fastFeed:    { ctrl: '#632',  pr: 'Pr132', label: 'Probing speed' },
+            retract:     { ctrl: '#640',  pr: 'Pr140', label: 'Retraction after probe' },
+            setterPort:  { ctrl: '#1075', pr: 'Pr575', label: 'Fixed probe port' },
+            setterLevel: { ctrl: '#1077', pr: 'Pr577', label: 'Fixed probe level' },
+            blockHeight: { ctrl: '#633',  pr: 'Pr133', label: 'Probe block thickness' },
+        },
+    },
+    'ddcs-v41': {
+        id: 'ddcs-v41',
+        name: 'DDCS V4.1',
+        source: 'builtin',
+        varFamily: 'v4.1',                       // which default_vars list to load (variableDB)
+        hardwareTabs: ['probes', 'limits'],
+        atc: { toolTableBaseVar: 1430, defaultToolCount: 10 },
+        // The V4.1 macro-address offset for its config params isn't confirmed (see default_vars_v41.js),
+        // so probe config stays Studio-side until verified on hardware. Reference: bridge/controllers/v4.1/.
+        probeVars: {},
+    },
+    'ddcs-v3-dm500': {
+        id: 'ddcs-v3-dm500',
+        name: 'DDCS V3 / DM500',
+        source: 'builtin',
+        varFamily: 'v3',
+        hardwareTabs: ['probes', 'limits'],
+        atc: { toolTableBaseVar: 1430, defaultToolCount: 10 },   // TODO: verify ATC base var on a real DM500
+        // Probe config sourced from the DM500's own parameter table (bridge/controllers/dm500/install/eng).
+        // The DM500 has a single probe input — no configurable port. Verify these #NNNN are macro-readable
+        // at runtime before trusting them on real hardware (the user has no DM500 — this is reference/sim).
+        probeVars: {
+            level:       { ctrl: '#70',   label: 'Probe signal electric level' },
+            fastFeed:    { ctrl: '#2011', label: 'Probe feedrate' },
+            retract:     { ctrl: '#75',   label: 'Back distance after probe' },
+            blockHeight: { ctrl: '#69',   label: 'Thickness of tool sensor' },
+        },
     },
     'generic': {
         id: 'generic',
@@ -36,6 +81,7 @@ export const CONTROLLER_PROFILES = {
         source: 'builtin',
         hardwareTabs: [],          // unknown controller — show only the basic tabs until identified
         atc: { toolTableBaseVar: 1430, defaultToolCount: 10 },
+        probeVars: {},             // unknown controller — nothing is safely controller-resident
     },
 };
 

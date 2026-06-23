@@ -1,123 +1,106 @@
 /**
- * DDCS Studio - ATC Commissioning Test Wizard
+ * DDCS Studio - ATC Commissioning Test Wizard (drawbar cycle / pocket dry-run).
  *
- * The two checks a machinist runs when building/commissioning a tool changer,
- * BEFORE trusting an automatic change with a real tool:
+ * REWRITTEN AS A BLOCK STACK: `atcTestStack(params)` from granular atoms (Comment / Set# / Spindle / Coolant /
+ * Machine Move / M-Code / Dwell / Confirm / Message / If Goto / Goto / Label / End Program). G53 moves + dwell
+ * units render per post, so the same stack is native across posts.
  *
- *   DRAWBAR mode — cycle the drawbar N times (M154 release / M155 lock) and
- *   verify both sensors answer every cycle (M303 tool-open, M302 tool-locked).
- *   A sticky pneumatic or misadjusted sensor shows up as a hang on the exact
- *   wait — visible live on the Studio I/O panel, and on the machine.
- *
- *   POCKETS mode — visit every magazine pocket at clearance height using the
- *   controller's own pocket tables (#1330+/X #1350+/Y #1370+/Z) and pause at
- *   each for a visual alignment check. Optional descend to pocket Z per stop.
- *   No drawbar action, run with NO tool in the spindle.
- *
- * Both run unmodified in the Studio simulator (Run + Auto sensors) so the
- * logic can be proven before the first powered test.
+ * DRAWBAR mode — cycle the drawbar N times (M154/M155) and verify the sensors (M301/M302) every cycle.
+ * POCKETS mode — visit every magazine pocket at clearance height (tables #1330/#1350/#1370) for a visual check.
+ * Both run in the Studio simulator (Run + Auto sensors) before the first powered test.
  */
-import { G, M, N, X, Y, Z, P, set, line, comment } from './words.js';
-import { ifGoto, goto, g53 } from './dialect.js';
-import { toNum as toNumShared } from './probeBlocks.js';
+import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { recordOp } from '../blocks/opRecord.js';
+import { num } from './ops/util.js';
+import { resolveActivePost } from './dialects/index.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+
+const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
+
+function H(S) {
+    return {
+        C: (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); },
+        A: (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; S.push(b); },
+        IF: (l, o, r, g) => { const b = newBlock('ifgoto'); b.params = { lhs: l, op: o, rhs: r, goto: g }; S.push(b); },
+        LB: (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); },
+        SPOFF: () => { const b = newBlock('spindle'); b.params = { rpm: 0 }; S.push(b); },
+        COOLOFF: () => { const b = newBlock('coolant'); b.params = { flow: 'off' }; S.push(b); },
+        MM: (axis, to) => { const b = newBlock('machinemove'); b.params = { axis, to }; S.push(b); },
+        MC: (code, note) => { const b = newBlock('mcode'); b.params = { code, note }; S.push(b); },
+        DW: (sec) => { const b = newBlock('dwell'); b.params = { sec }; S.push(b); },
+        CF: (msg, cancel) => { const b = newBlock('confirm'); b.params = { msg, cancel }; S.push(b); },
+        MSG: (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); },
+        END: () => S.push(newBlock('endprogram')),
+    };
+}
+
+function drawbarStack(params) {
+    const cycles = Math.max(1, num(params.cycles, 10));
+    const dwellSec = Math.max(0, num(params.dwellMs, 500)) / 1000;   // dwell atom takes seconds → native units per post
+    const S = []; const { C, A, IF, LB, SPOFF, COOLOFF, MC, DW, MSG, END } = H(S);
+    C('ATC | Drawbar Cycle Test - commissioning');
+    C(`${cycles} release/lock cycles - sensors M301/M302 verified each cycle`);
+    C('NO tool in the spindle. A hang on a wait = that sensor/valve needs adjusting');
+    C('=== CONFIGURATION ===');
+    A('#100', 1, 'Cycle counter'); A('#101', cycles, 'Cycles');
+    SPOFF(); COOLOFF();
+    MC(300, 'Wait: spindle-stopped sensor');
+    LB(10); C('CYCLE START');
+    MSG('Cycle #100: RELEASE');
+    MC(154, 'Drawbar RELEASE'); MC(301, 'Wait: drawbar-released sensor'); DW(dwellSec);
+    MSG('Cycle #100: LOCK');
+    MC(155, 'Drawbar LOCK'); MC(302, 'Wait: tool-locked sensor'); DW(dwellSec);
+    A('#100', '[#100+1]', 'Next cycle');
+    IF('#100', '<=', '#101', 10);
+    C('Complete - drawbar left LOCKED');
+    MSG('Drawbar test complete');
+    END();
+    return S;
+}
+
+function pocketsStack(params) {
+    const d = getDialect();
+    const S = []; const { C, A, LB, SPOFF, COOLOFF, MM, CF, MSG, END } = H(S);
+    const atc = d && d.vars && d.vars.atc;
+    // Pockets come from the Settings → Tool table magazine (literal coords); first/count slice it.
+    const mag = (Array.isArray(params.magazine) ? params.magazine : []).filter((p) => p && p.tool !== '' && p.tool != null);
+    const first = Math.max(1, num(params.first, 1));
+    const count = Math.max(1, num(params.count, mag.length || 1));
+    const sel = mag.slice(first - 1, first - 1 + count);
+    const zClear = num(params.zClear, 0);
+    const descend = params.descend === true;
+
+    C('ATC | Pocket Dry-Run - commissioning');
+    C('Visits each taught magazine pocket (Settings → Tool table) at clearance Z');
+    C('NO tool in spindle, NO drawbar action - visual alignment check at each stop');
+    if (!atc) { C(`Not available on ${d ? d.name : 'this controller'} — select the DDCS Expert post.`); END(); return S; }
+    if (!sel.length) { C('!! Magazine is EMPTY — add pockets in Settings → Tool table (or Import from controller).'); END(); return S; }
+
+    C('=== CONFIGURATION ===');
+    A('#102', String(zClear), 'Z clearance height - MACHINE coords');
+    SPOFF(); COOLOFF();
+    MM('Z', '#102');                          // retract to clearance
+    sel.forEach((p, i) => {
+        C(`Pocket ${first + i} — T${num(p.tool, 0)}`);
+        A('#110', String(num(p.x, 0)), 'Pocket X'); A('#111', String(num(p.y, 0)), 'Pocket Y');
+        MM('X', '#110'); MM('Y', '#111');     // over the pocket
+        if (descend) { A('#112', String(num(p.z, 0)), 'Pocket Z'); MM('Z', '#112'); }   // descend to pocket height
+        CF(`Pocket ${first + i} — verify alignment. Enter = next`, 999);
+        if (descend) MM('Z', '#102');         // back to clearance
+    });
+    C('Complete');
+    MSG('Pocket dry-run complete');
+    LB(999); END();
+    return S;
+}
+
+export function atcTestStack(params = {}) {
+    return (params.mode === 'pockets') ? pocketsStack(params) : drawbarStack(params);
+}
 
 export class AtcTestWizard {
-    constructor() {}
-
-    toNum(v, def = 0) {
-        return toNumShared(v, def);
-    }
-
     generate(params) {
-        return (params.mode === 'pockets') ? this.generatePockets(params) : this.generateDrawbar(params);
-    }
-
-    // ------------------------------------------------------------------
-    // DRAWBAR: cycle release/lock N times, sensors verified every cycle
-    // ------------------------------------------------------------------
-    generateDrawbar(params) {
-        const _cycles = Math.max(1, this.toNum(params.cycles, 10));
-        const _dwell  = Math.max(0, this.toNum(params.dwellMs, 500));
-
-        let gcode = '';
-        gcode += `( ATC | Drawbar Cycle Test - commissioning )\n`;
-        gcode += `( ${_cycles} release/lock cycles - sensors M303/M302 verified each cycle )\n`;
-        gcode += `( NO tool in the spindle. A hang on a wait = that sensor/valve needs adjusting )\n\n`;
-
-        gcode += `( === CONFIGURATION === )\n`;
-        gcode += `#100=1    ( Cycle counter )\n`;
-        gcode += `#101=${_cycles}    ( Cycles )\n`;
-        gcode += `#102=${_dwell}    ( Dwell between actions, ms )\n\n`;
-
-        gcode += line([M(5), M(9)], 'Spindle & coolant off') + '\n';
-        gcode += line([M(300)], 'Wait: spindle-stopped sensor') + '\n\n';
-
-        gcode += line([N(10)], 'CYCLE START') + '\n';
-        gcode += line([set('#1510', '#100')], 'Message arg') + '\n';
-        gcode += line([set('#1505', '-5000')], 'Cycle %.0f: RELEASE') + '\n';
-        gcode += line([M(154)], 'Drawbar RELEASE') + '\n';
-        gcode += line([M(303)], 'Wait: tool-open sensor') + '\n';
-        gcode += line([G(4), P('#102')], 'Dwell') + '\n';
-        gcode += line([set('#1505', '-5000')], 'Cycle %.0f: LOCK') + '\n';
-        gcode += line([M(155)], 'Drawbar LOCK') + '\n';
-        gcode += line([M(302)], 'Wait: tool-locked sensor') + '\n';
-        gcode += line([G(4), P('#102')], 'Dwell') + '\n';
-        gcode += line([set('#100', '[#100+1]')], 'Next cycle') + '\n';
-        gcode += ifGoto('#100', '<=', '#101', 10) + '\n\n';
-
-        gcode += `( Complete - drawbar left LOCKED )\n`;
-        gcode += line([set('#1510', '#101')], 'Message arg') + '\n';
-        gcode += line([set('#1505', '-5000')], 'Drawbar test complete: %.0f cycles OK') + '\n';
-        gcode += line([M(30)]) + '\n';
-
-        return gcode;
-    }
-
-    // ------------------------------------------------------------------
-    // POCKETS: dry-run over every pocket position for alignment checks
-    // ------------------------------------------------------------------
-    generatePockets(params) {
-        const _first   = Math.max(1, this.toNum(params.first, 1));
-        const _count   = Math.max(1, this.toNum(params.count, 8));
-        const _zClear  = this.toNum(params.zClear, 0);
-        const descend  = params.descend === true;
-
-        let gcode = '';
-        gcode += `( ATC | Pocket Dry-Run - commissioning )\n`;
-        gcode += `( Visits pockets ${_first}..${_first + _count - 1} from tables #1330/#1350/#1370 )\n`;
-        gcode += `( NO tool in spindle, NO drawbar action - visual alignment check at each stop )\n\n`;
-
-        gcode += `( === CONFIGURATION === )\n`;
-        gcode += `#100=${_first}    ( First pocket )\n`;
-        gcode += `#101=${_first + _count - 1}    ( Last pocket )\n`;
-        gcode += `#102=${_zClear}    ( Z clearance height - MACHINE coords )\n\n`;
-
-        gcode += line([M(5), M(9)], 'Spindle & coolant off') + '\n';
-        gcode += g53('Z', '#102', 'Retract to clearance') + '\n\n';
-
-        gcode += line([N(10)], 'NEXT POCKET') + '\n';
-        gcode += line([set('#105', '[1330+#100-1]')], 'Pocket X table address') + '\n';
-        gcode += line([set('#106', '[1350+#100-1]')], 'Pocket Y table address') + '\n';
-        gcode += line([set('#110', '#[#105]')], 'Pocket X') + '\n';
-        gcode += line([set('#111', '#[#106]')], 'Pocket Y') + '\n';
-        gcode += line([G(53), X('#110'), Y('#111')], 'Over the pocket') + '\n';
-        if (descend) {
-            gcode += line([set('#107', '[1370+#100-1]')], 'Pocket Z table address') + '\n';
-            gcode += line([set('#112', '#[#107]')], 'Pocket Z') + '\n';
-            gcode += g53('Z', '#112', 'Descend to pocket height') + '\n';
-        }
-        gcode += line([set('#1510', '#100')], 'Message arg') + '\n';
-        gcode += line([set('#1505', '1')], 'Pocket %.0f - verify alignment. Enter = next') + '\n';
-        if (descend) {
-            gcode += g53('Z', '#102', 'Back to clearance') + '\n';
-        }
-        gcode += line([set('#100', '[#100+1]')], 'Next pocket') + '\n';
-        gcode += ifGoto('#100', '<=', '#101', 10) + '\n\n';
-
-        gcode += `( Complete )\n`;
-        gcode += line([set('#1505', '-5000')], 'Pocket dry-run complete') + '\n';
-        gcode += line([M(30)]) + '\n';
-
-        return gcode;
+        recordOp('atc_test', params);
+        return emitMapped(atcTestStack(params)).text;
     }
 }

@@ -140,6 +140,18 @@ client + `EnableInsecureGuestLogons $true` + `BlockNTLM $false` (admin + reboot)
   SMB (operator test writes 111/222/…/888 landed exactly on `#150,#151,#200,#250,#350,#450,#520,#521`).
   ⇒ **Expert `uservar` range = #100–#549** (450 slots; bigger than V4.1's #100–#499). The PC reads controller
   state by decoding this file as little-endian f64 — `[CONFIRMED readback 2026-06-06]`. Slot 0 = byte 0 (no header).
+- **System params live in two more SYSDISK f64 files — the PC can read #0–#1499 over SMB, not just `uservar`:**
+  - **`SYSDISK/setting`** (8000 B = **1000×f64, index == param #**) → persisted system params #0–#999: WCS offsets
+    `#805+[WCS−1]*5`, serial/servo/feed params, etc. Mapping `[CONFIRMED]` by `tools/diff_setting.py` differential
+    toggles. **`SYSDISK/default_setting`** is the factory baseline of the same layout → diff `setting` vs
+    `default_setting` = **which params the operator actually changed** (160 differ on the studio rig).
+  - **`SYSDISK/camsetting`** (4000 B = **500×f64, slot = #var − 1000**) → the ATC/CAM tables #1000–#1499:
+    current tool `#1300`, capacity `#1301`, pocket X/Y/Z `#1330/#1350/#1370`, tool-length table `#1430+`.
+    Slot map `[CONFIRMED]` by the captured boundary sentinels (`#1000`=222.111 · `#1050`=222.222 · `#1099`=222.333 ·
+    `#1100`=333.111 · `#1300`=333.222 · `#1499`=333.333) in `assets/capture/20260610T163337Z/SYSDISK/camsetting`.
+  - ⇒ `ops.py read_vars` decodes uservar (#100–549) + setting (#0–999, with `default_setting` → `userSet` flag) +
+    camsetting (#1000–1499); #1500+ stays runtime/unreadable. Studio's "Pull from controller" import reads pockets,
+    tool lengths and WCS from these. Same lazy-snapshot caveat as `uservar` (flush at run start/end — Save before pull).
 - Run-state hidden files exist on SYSDISK: per-program **`.<name>.nc.pos`** (60 B each) and **`.break0/.break1`**
   (breakpoint-resume) — same family as the V4.1 run-state files. `[TO TEST what they track]`
 - ⚠️ **`uservar` file ↔ RAM is TWO-WAY ISOLATED while running (A9-a `[CONFIRMED 2026-06-10]`):**
@@ -242,6 +254,20 @@ PROFILE_BUILD_TASK predicted (Ultimate Bee = manual tool change). Other useful s
 filter time. The decision logic is general (these param #s are firmware-defined; the *values* are per-machine
 wiring) — so the gateway can map any same-firmware Expert, and the values here are this machine's truth.
 
+### Macro I/O dialect — read input / set output / wait `[CONFIRMED from slib-m.nc factory M-code library 2026-06-18]`
+The Expert exposes I/O to a **running program** directly — this is what the V4.1 lacks (HL-TNC told a customer "4.1 no, Expert yes", and a Facebook thread confirmed it). The `-m16` params above are the pin *assignment*; the live *state* is a separate variable range:
+- **Read input N (live state):** `#[1520 + N − 1]`  (IN01=`#1520` … IN24=`#1543`). So `IF #1536==1 GOTO10` reads IN17 — exactly the "`IF #xxxx==1 GOTO`" people ask for.
+- **Set output N:** `#[1551 + N] = 1` (on) / `= 0` (off) — proven by `O10050`(=M50)→`#1552=1`, `O10051`→`#1552=0`, … (OUT01=`#1552` … OUT20=`#1571`).
+- **Wait-for-input idiom** (verbatim from the built-in sensor-waits `O10300`–`O10307`):
+  ```
+  WHILE [#[1520+N-1] != L] DO1
+    G04 P10            ( poll )
+  END1
+  ```
+  ⇒ the Expert has a real **`WHILE … DO1 … END1`** loop, not just `IF/GOTO`.
+- **Named sensor-waits** (block until a *function* input matches, port/enable/level read from a param triple then the WHILE-poll above): `M300` spindle-stopped · `M301/2` drawbar released/clamped · `M303/4` magazine open/closed · `M305/6` **gripper open/closed** · `M307` servo in-pos.
+⇒ This **supersedes the "inputs are config-only" framing above.** The forum gripper case (actuate output + wait IN17/IN18, no motion) IS doable on the Expert. Open item: `G04 P` units (`P10` poll vs `P1.0`=1 s elsewhere) — confirm on-machine. This dialect is the basis for Studio's planned **I/O atoms** (`setOutput`/`waitInput`/`dwell`/`jump`) → general automation builder, Expert-capability-gated.
+
 > ⚠️ **Namespace caution:** these are **`setting`-file param indices**, a DIFFERENT address space from the
 > runtime **macro `#` variables**. E.g. `setting#578` = *Floating Probe port*, but macro `#578` = *active WCS
 > number* (below); `setting#576` = *Fixed-Probe level*, but panel Pr76/macro `#576` = *Macro Enable*. Don't
@@ -249,7 +275,7 @@ wiring) — so the gateway can map any same-firmware Expert, and the values here
 
 ## System / macro variables (read off the operator's live macros 2026-06-06) `[CONFIRMED on machine]`
 From `READ_VAR.nc`, `COPY_WCS.nc`, `SAVE_WCS_XY_AUTO.nc`, `sysstart.nc` on this machine:
-- `#578` = **active WCS number** (1=G54 … 6=G59).
+- `#578` = **active WCS number** (1=G54 … 6=G59). **WRITABLE — `#578=2` switches WCS** (V4, 2026-06-19).
 - `#880` / `#881` = **current machine X / Y position**. (`sysstart` does `#883=#881` for gantry A←Y sync.)
 - **WCS offset block:** base `= 805 + [WCS−1]*5`; within a block **X=base, Y=base+1, A=base+3**
   (G54 = #805–809, G55 = #810–814, …). `#1518` = "A homed" flag.
@@ -258,7 +284,8 @@ From `READ_VAR.nc`, `COPY_WCS.nc`, `SAVE_WCS_XY_AUTO.nc`, `sysstart.nc` on this 
 - Indirect addressing works: `#[#100]` reads the var whose number is in `#100` (used for the var-reader).
 - More vars from `slib-m.nc`: `#1506` = current M-code indicator, `#1620` = **feed-hold/pause flag**,
   `#701/#702/#703` = counter / counter / limit (M47 count macro), `#730` = end-of-program return mode
-  (0/1/2), `#569` = safe-Z return height, `#624` = G53 Z return. `IF/GOTO/Nlabel` + `G04 P<ms>` dwell.
+  (0/1/2 — **this machine = 0 ⇒ M30 does NOT move**, 2026-06-19), `#569` = safe-Z return height (**=5.0 here**),
+  `#624` = G53 Z return. `IF/GOTO/Nlabel` + `G04 P<ms>` dwell.
 
 ## Control
 - ⭐ `#2037` **virtual buttons** press any of 201 panel functions from a running macro
@@ -381,8 +408,74 @@ the analyzer wedge), + warnings (FANUC ops, G10, bare-const G53, `#2070`→persi
 ### Pr76 / #0076 / #576 "Macro Enable" — REQUIRED to run macros `[CONFIRMED]`
 Must be **Open**; machine reads **#576 = 1 (Open)** ✓. Numbering: panel **Pr76** = ENG **#0076** = macro-addr **#576**.
 
+## ⚠️⚠️ V1 RESULT — `G10 L20` is BROKEN **and DANGEROUS** (axis word → motion) `[CONFIRMED on machine 2026-06-19, fw 2025-06-19-00]`
+Ran `verify/V1_G10_WCS.nc` (motion-free by design, scratch G59 P6, save/restore `#830`). It **moved the
+machine unexpectedly.** The on-screen numbers settle it:
+- Pre-`G10`, machine X = **5.000** (message showed `expect = #880−25 = −20.0000`).
+- The single line **`G10 L20 P6 X25`** drove Mach X **5.000 → 73.286**, Abs X → **25.000** on **G54**
+  (G54 X offset ≈ 48.286, so the move went to *work* X25 = 48.286+25 = 73.286).
+- `#495` read `#830 = 42.65` ≠ machine−25 ⇒ **G10 wrote NO offset to G59.**
+⇒ **The Expert does not honor `G10 L20 P<n>` as a work-offset write.** It ignores `G10/L20/P`, and under
+the active **G90/G01** modal the leftover **`X25` executes as a positioning move**. This is worse than a
+no-op — **an emitted `G10 L20 … X..` MOVES the axis.** Confirms the skill's "G10 broken" and upgrades it to
+**unsafe**. ⇒ **Dialect rule: NEVER emit `G10 L20`/`G10 L2` with axis words.** Set WCS offsets by **direct
+register write** (`#[805+(WCS−1)*5] = #880 − target`), the COPY_WCS/SAVE_WCS_XY_AUTO house style.
+- **Methodology note:** there is **no safe way to test G10's offset-write with an axis word** — the axis word
+  always risks motion. The G59-scratch/save-restore guard protects the *offset registers* but **cannot
+  prevent the motion** the stray axis word triggers. Future G10 probing must be done with the axis already
+  parked AT the target (zero-distance move) or not at all.
+- ⚠️ **Reconcile the dump's probe macros (`3D PROBE G55.nc`, `key-5/6.nc` use `G10 L20 P2 Z[..]`):** by this
+  result those lines would *move Z*. Either they are latent-dangerous, or they run only when Z is already at
+  the target (zero move), or L2-vs-L20/context differs. **Re-examine before trusting any on-controller G10.**
+- ⚠️ **`M30` end-motion hazard re-noted:** aborted via Esc+Reset rather than Enter precisely because `M30`
+  (`O10030`) can retract Z→`#569` and go X0/Y0 per `#730` — don't let a test program reach `M30` blind.
+
+## ✅ V4 RESULT — `#578` (active WCS) is WRITABLE → software can switch WCS `[CONFIRMED on machine 2026-06-19, fw 2025-06-19-00]`
+Ran `verify/V4_active_wcs.nc` (motion-free, save/restore `#578`). Original WCS = **1** (G54); after `#578 = 2`
+the readback was **2**; after restore the readback was **1** (back on G54). ⇒ **`#578` accepts a direct write
+and reports the written value** — the dialect can select a WCS by **variable write** (enables computed/indirect
+selection, e.g. `#578 = #100`), not only the literal `G55` command. No motion, state restored cleanly.
+- **Caveat (one optional follow-up):** confirmed the *variable* is writable + reads back; did NOT *visually*
+  confirm the write re-applies offsets (header→G55, Abs recompute) because restore was immediate. To make it
+  airtight: write `#578=2`, pause on a message, eyeball the header/Abs, then restore. `[strong but unobserved]`
+- ⚠️⚠️ **`#578` does NOT track a G-code WCS command — case (b) CONFIRMED `[CONFIRMED on machine 2026-06-19,
+  DIAG_g53setup.nc]`:** ran `G59` (the command); the screen **header switched to G59 and Abs == Mach
+  (73.286 / −5.000)** — proving the **G-word DID switch the active runtime frame** — yet **`#578` still read 1**.
+  So WCS-select-by-G-command works, but **`#578` only reflects the panel/variable selection, not the modal
+  G-word frame.** Direct register write also re-confirmed (`#832=0` read back 0). ⚠️⚠️ **Dialect implications:**
+  (1) `readActiveWcs: #578` is **STALE after an in-program `G54..G59`** — do NOT use `#578` to learn the frame a
+  running program selected via G-word. (2) Conversely, V4 showed writing `#578` changes the variable, but it is
+  now unclear whether a `#578` *write* moves the *modal* frame the G-word controls — **the G-word is the
+  reliable way to switch the active frame; `#578` is a separate (panel) selector.** Prefer emitting `G54..G59`
+  to switch, and treat `#578` as read-only-ish state that may disagree with the modal frame.
+- **`M30` end-move RESOLVED `[CONFIRMED on machine 2026-06-19]`:** `READ_endmode.nc` reported **`#730 = 0`**
+  (end-program return mode) and **`#569 = 5.0`** (safe-Z). ⇒ **`M30` does NOT move the machine on this setup** —
+  with `#730=0` the `M30`/`O10030` conditional return to `Z#569`/`X0Y0` is skipped. Future test macros may run
+  to completion without the Esc-before-M30 guard. (Re-check `#730` if the operator changes the end-program mode;
+  `#730`=1/2 would re-enable the retract-to-`#569`-then-X0Y0 move.)
+
+## V3 RESULT — accepted `G53` form (end-program footer / park) `[on machine 2026-06-19, fw 2025-06-19-00]`
+Tested in a borrowed **zero-offset G59 scratch frame** (so the commanded Z = current Z under either G53
+behavior → provably no motion; human-gated on header=G59 + Abs==Mach). Forms:
+- **`G53 Z#var` (variable, no G0) → ✅ ACCEPTED** (V3a, ran clean). Matches the dump `snippets.nc` (`G53 Z#99`)
+  and the dialect's `machineMove` emit. `[CONFIRMED]`
+- **`G53 G0 Z#var` (variable, +G0) → ✅ ACCEPTED** (V3b, ran clean). So **`G0` is optional, not rejected** —
+  the skill's `G53 G0 Z#var` and the dump's no-G0 `G53 Z#var` are BOTH valid. `[CONFIRMED]`
+- `G53 Z-5` / `G53 G0 Z-5` (literals) → **INCONCLUSIVE** (V3c/V3d). Both safely **aborted at a guard** (no
+  motion). Most likely the test's own **range guard** (`IF #487>-4.99` / `IF #487<-5.01`) — a comparison vs a
+  **negative DECIMAL literal**, a form not in any confirmed IF example — evaluated always-true → always abort;
+  alternatively Mach Z had drifted off −5. **Deprioritized:** the dialect emits `#var`, never a bare literal,
+  so literal-G53 acceptance changes no generated code. `[NOT PURSUED]`
+⇒ **Net V3 verdict:** `G53 <axis>#var` is accepted **with or without G0** — dialect emit form CONFIRMED. The
+  linter's bare-const-G53 warning can stay (literals unverified, and `#var` is house style anyway).
+- ⚠️ **Spin-off `[HYPOTHESIS]`:** **IF comparison against a negative decimal literal may misbehave** (suspected
+  cause of the V3c/V3d aborts). If true, the dialect's `ifGoto` should avoid emitting `IF ... <op> -<decimal>`
+  — prime the literal into a `#var` and compare vars. **Worth a dedicated 2-line test before relying on it.**
+
 ### CORE_TRUTH (skill) vs factory-firmware reality — discrepancies the linter exposed
-- **G10:** skill says "G10 is broken," but factory `key-5.nc`/`key-6.nc` **use** it → not universally broken; context-specific.
+- **G10:** skill says "G10 is broken." **V1 (above) CONFIRMS broken + dangerous on this fw** (`G10 L20 P6 X25`
+  emitted motion, wrote no offset). Factory `key-5.nc`/`key-6.nc`/`3D PROBE G55.nc` *use* `G10 L20 P2` — so
+  either context-guarded (zero-distance) or latent-buggy; **re-examine, do not assume safe.**
 - **`#2070` range:** skill says "only #50–#499," but factory `key-4.nc` does `#2070=800` → silent-failure is specific to **persistent** targets, not all >499.
 - **Priming bug:** skill says wash the RHS (`#1153=#880+0`); production `O_Save_Safe_Park.nc` instead **primes the target first** (`#1153=1` then `#1153=#880`). Two working approaches — linter accepts both.
 - **Real bug found:** skill's `macro_Thread_milling.nc:72` has a bracket imbalance (`FUP[[[[…]/2-#71]/#57]` = 4 `[` vs 3 `]`).
@@ -416,6 +509,18 @@ Off-site pass over the Phase-1 capture (`assets/capture/20260610T163337Z/`): dif
 - `#670–#676` = `1, 50, 5, 10, −5, 400, 20` — **candidate tool-setter / probe config block**
   (`#671=50` ≈ our default block height, `#675=400` ≈ a probe feed). `[HYPOTHESIS]`
 
+**Machine-frame `geometry.homeDir` (travel sign) — DERIVATION** (gateway `Ops._map_geometry_to_profile`,
+2026-06-21): Studio's sim needs a **signed** travel per axis (sign = which side of machine-zero / home the
+working envelope sits on). The gateway emits `geometry.homeDir` = ±1 per axis, derived from the **sign of
+the soft-limit machine coordinates** (`#161-168` neg/pos): the home end reads ~0 and the far end ~±span, so
+the envelope-midpoint sign IS the travel direction — unambiguous, no homing-polarity guess (e.g. this
+capture's `#166`=+756 → +X envelope, `#162`=−776 → −Y envelope). `[CONFIRMED logic; soft-limit addressing
+CONFIRMED 2026-06-17]`. **Fallback** when an axis has soft limits disabled (±9999 sentinel → the travel span
+is null, so Studio ignores the sign for that axis anyway): the homing-direction param `#112-114` (0 = home
+toward the neg end → travel +, 1 = home toward the pos end → travel −). That polarity is `[TO TEST at
+machine]`, but it only ever feeds an axis Studio doesn't use, so a wrong guess can't flip a real envelope.
+The raw `homingDir` (0/1) is still emitted alongside for debugging.
+
 **`uservar` probe/setter slots** (meaning fixed by the captured NC; range #100–#549, slot = #var−100):
 `#101/#102` = saved Sensor X/Y · `#110–#113` = 3D-probe ball-R(Z) / ball-R(XY) / max-search / clearance ·
 `#120–#122` = last-probed Z/X/Y machine pos. **All 0 in this capture** (no sensor pos saved / probe
@@ -448,8 +553,9 @@ section) — so once indices are known, "push config to the controller" becomes 
       `setting` confirmed on **SYSDISK** (8000 B/1000×f64), anchors re-validated. **Next (desk, no machine):**
       label the probe / tool-setter / limit `setting` indices from the manual, then fill `Ops.profile()`.
 - [ ] Stand up a PC Modbus slave (`pymodbus`); confirm `MSETDATA` pushes #200+ to it.
-- [ ] **`G10 L20 P2` — really broken?** The validator warns "G10 broken", but on-controller macros
-      (`key-5.nc`, `key-6.nc`, `3D PROBE G55.nc`) use `G10 L20 P2` to set G55. Run `key-6` and check it
-      sets G55 with no spurious motion; if OK, narrow the `W-G10` rule. See CONFORMANCE_CORPUS static pass.
+- [x] ~~**`G10 L20 P2` — really broken?**~~ — **ANSWERED 2026-06-19 (V1): BROKEN + DANGEROUS.** `G10 L20 P6 X25`
+      wrote no offset and **moved the axis** (X 5.000→73.286). Do NOT narrow `W-G10` — **harden it: forbid
+      `G10 L20/L2` with axis words.** Still open: re-examine why `key-5/6.nc` & `3D PROBE G55.nc` use it (latent
+      bug vs zero-distance context). See the "V1 RESULT" section above.
 - [ ] Find the system var holding the live alarm code → log *which* error.
 - [ ] Port the V4.1 `M47` dispatcher to `sysstart.nc` here (file-reload trick over SMB) — **safety first** (E-stop).

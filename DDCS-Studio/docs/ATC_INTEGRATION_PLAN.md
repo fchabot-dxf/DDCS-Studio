@@ -140,3 +140,53 @@ pneumatic ATC, tagged [HYPOTHESIS] — not used by the (manual) tool-change wiza
 - No spindle/coolant modal tracking (`M3/M4/M5`, `M7/M8/M9`) — silently ignored (fine for motion sim).
 - No `G4/G04` dwell handling — IO-settle delays in real macros are skipped.
 - Discrete DDCS output M-codes (`M50/M51 …`) unhandled — same root as the convention decision above.
+
+---
+
+## Implementation status — 2026-06-21 (ATC UI/UX + magazine overhaul)
+
+The 6 ATC wizards (length / check / warmup / **table** / **change** / test) are wired and tidied. Ground truth
+for the macros is `bridge/controllers/expert-m350/DDCS-ATC-WORKFLOW.md` (the dump): `T2 M6` → firmware sets
+`#1504`, runs `T.nc`; tool lengths `#[1430+T-1]`, pockets `#1330+/#1350+/#1370+`; I/O is parameter-driven; the
+table is **parameter writes** (no motion). What landed:
+
+**Wizards / UI**
+- **Tool-table wizard** was unregistered (rendered empty) → registered (`views/index.js`) + `PARAM_FIELDS`. The
+  magazine is a **read-only table of tools** (pocket · profile icon · T# · name · length) + **"✎ Edit table…"**
+  that pops the full editor as a **modal with Done**.
+- **Magazine editor** (`ui/ioTable.js`): tool-per-pocket picker, ▲▼ reorganise, **straight vs disk**. Straight
+  keeps per-pocket Park XYZ + an optional **"Fill line from P1"** (axis + pitch) helper. Disk shows a shared
+  **pickup XYZ + carousel Ø + "Disk toward" axis** (no per-pocket XYZ).
+- **3D magazine on the envelope**: each pocket = the **real revolved tool** (accurate ballnose/V-bit) in a
+  wireframe pocket box, amber (distinct from stock/toolpath), **tops aligned**, tips hang by length. Disk lays
+  the pockets in a **ring** of Ø with the **pickup on the rim** (pocket 1 at the pickup). `viz.setMagazine` +
+  `mgr.previewMagazine`. Caveat: positions are only meaningful once **taught/pulled**, and use the current
+  origin (ox/oy/oz) model pending the machine-frame redesign.
+- **Tool-change wizard**: "Fixed test tool" number → a **"Change to tool"** dropdown from the magazine; dropped
+  the unused "Magazine pockets" input; dust-cover label fixed to **M162/M163** (M305/M306 are gripper sensors).
+- **Disk change macro**: branches to a **rotate-to-pocket** sequence (rotate carousel → swap at the fixed
+  pickup). The carousel-index step is firmware-specific → emitted as a flagged **TEMPLATE** to wire + VERIFY.
+- **Forms**: `.param-grid` / `.wiz-note` were unstyled (inherited the large modal font → "block of text") →
+  compact responsive grid + small notes (`styles.css`). All two-pane wizards get a **draggable form/preview
+  splitter** (remembered width).
+
+**Settings / I/O / profile**
+- **Add tool changer** seeds the **essential I/O**: drawbar output (M154/M155) + sensors drawbar-released
+  (M301), drawbar-clamped (M302), spindle-stopped (M300). Added a **"🗑 Remove tool changer"** that strips the
+  ATC-group I/O + hides the tab (magazine data kept).
+- **Profile association**: confirmed — `applySettings` restores `atc` (magazine/tools) + `inputs/outputs`, so
+  the ATC config travels with a saved/loaded profile.
+
+**Machine-frame redesign — DONE (same day).** Travel is now **signed** (sign = home direction); the redundant
+Limit/Origin `ox/oy/oz` fields are gone; the Machine tab shows the **G54–G59 WCS table** (active radio + XYZ)
+and the active row drives `machine.workOrigin` (the sim's G53/program offset). The 3D envelope uses `|travel|` +
+`workOrigin` (scene = machine − workOrigin) and draws **axis lines at machine-zero** (home/limits). The pull
+reads all 6 WCS (#805+) + the active index; travel sign comes from the homing direction (`geometry.homeDir`
+when the gateway exposes it). So the magazine 3D positions are now in the correct, controller-driven frame.
+
+**Deferred (need hardware or a separate effort)**
+- Disk carousel **rotation indexing** is unverified firmware territory (template only).
+- **Gateway `geometry.homeDir`** — the web applies the homing-direction sign if the bridge exposes it; the
+  bridge still needs to map the controller's homing-direction param.
+- ATC **simulation** of the drawbar/sensor handshake; the **Macros tab** adopting the Settings General/Hardware
+  sub-tab structure.

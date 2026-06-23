@@ -45,11 +45,19 @@ class Config:
     machine_name: str = ""                  # human label, e.g. "Ultimate Bee"
     identity_filename: str = ".bridge-machine.json"   # written on the controller's disk
 
+    # --- BYO cloud (desktop OAuth; oauth.py) -------------------------------
+    google_client_id: str = ""              # Google "Desktop app" OAuth client id — enables the loopback Drive
+                                            # sign-in inside the exe; empty = desktop Google disabled
+    google_client_secret: str = ""          # the Desktop client's secret (non-confidential for installed apps);
+                                            # sent in the token exchange when set (Google's Desktop flow expects it)
+
     # --- local server (offline / local configs: serve the console + ops API) ------
     serve: bool = False                     # run the local HTTP server (server.py)
-    host: str = "127.0.0.1"                 # bind address (0.0.0.0 to reach from the LAN)
+    host: str = "0.0.0.0"                   # bind address — DEFAULT 0.0.0.0 so the exe is reachable from the LAN
+                                            # (phone/tablet on the same wifi); set "127.0.0.1" in config.json for localhost-only
     port: int = 8765
-    console_dir: str = ""                   # static console files to serve at / (empty = none yet)
+    console_dir: str = ""                   # legacy fairy console; at / unless studio_dir is set (then /fairy/)
+    studio_dir: str = ""                    # Studio web root (DDCS-Studio/web) served at / — the one-app face
     shared_dir: str = ""                    # monorepo shared/ dir, mounted at /shared/ (empty = no mount)
     open_browser: bool = False              # --open: pop the console in the default browser on start
     config_path: str = ""                   # where Setup persists config (empty -> ~/.ddcs-bridge/config.json)
@@ -62,6 +70,9 @@ class Config:
     _PERSIST_KEYS = {
         "dest": "expert_dest", "machine_name": "machine_name", "machine_id": "machine_id",
         "com_port": "com_port", "backend": "backend", "enable_slave": "enable_slave",
+        "host": "host",   # LAN serving toggle ("127.0.0.1" | "0.0.0.0") — COMBINED-APP-PLAN Step 3
+        "google_client_id": "google_client_id",   # Google Desktop OAuth client id (BYO cloud / Drive sign-in)
+        "google_client_secret": "google_client_secret",
     }
 
     @staticmethod

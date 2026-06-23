@@ -1,6 +1,7 @@
 /** views/middleView.js — Middle (pocket/boss centre) wizard view. */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { MiddleWizard } from '../middleWizard.js';
+import { restoreBoxStock } from './rotaryCenterView.js';
 
 const wizard = new MiddleWizard();
 
@@ -9,13 +10,17 @@ export const middleView = {
     panelId: 'wiz_middle',
     codeElId: 'wiz_middle_code',
     large: true,
+    twoPane: true,
     inputIds: [
-        'm_type', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_sync_a', 'm_wcs', 'm_slave',
-        'm_dist', 'm_retract', 'm_safe_z',
+        'm_type', 'm_approach', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_circular', 'm_sync_a', 'm_wcs', 'm_slave',
+        'm_dist', 'm_retract', 'm_safe_z', 'm_clear',
         'm_feed_fast', 'm_feed_slow', 'm_port', 'm_level', 'm_q',
     ],
+    // Controller-source chips (PROBE-CONFIG-SOURCE.md)
+    probeSrcFields: { m_port: 'port', m_level: 'level', m_feed_fast: 'fastFeed', m_retract: 'retract' },
 
     onOpen(ctx) {
+        restoreBoxStock();   // not a rotary op → revert a forced cylinder back to the box (no-op if already a box)
         setTimeout(() => { ctx.update(); }, 50);
     },
 
@@ -25,10 +30,13 @@ export const middleView = {
 
         const params = {
             featureType: el('m_type')?.value || 'pocket',
+            approach: el('m_approach')?.value || 'auto',
+            clearOver: el('m_clear')?.value || '15',
             axis: el('m_axis')?.value || 'X',
             dir1: dir1val,
             dir2: dir2val,
             findBoth: el('m_both')?.checked || false,
+            circular: el('m_circular')?.checked || false,
             syncA: el('m_sync_a')?.checked || false,
             slave: el('m_slave')?.value || '3',
             wcs: el('m_wcs')?.value || 'active',
@@ -40,7 +48,8 @@ export const middleView = {
             f_slow: el('m_feed_slow')?.value || '50',
             qStop: el('m_q')?.value || '1',
             port: window.ddcsGetSettings().probes.probePin,
-            level: window.ddcsGetSettings().probes.probeLevel
+            level: window.ddcsGetSettings().probes.probeLevel,
+            sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
         const middleDesc = el('middle_desc');
@@ -52,9 +61,13 @@ export const middleView = {
                 ? 'With <b>Probe Both Axes</b> enabled, it performs the two-edge cycle on the selected axis, then repeats on the perpendicular axis (with reposition pauses where required).'
                 : 'With <b>Probe Both Axes</b> disabled, it performs <b>two opposite-edge probes on the selected axis</b> and computes midpoint/offset from that axis only.';
 
-            middleDesc.innerHTML = params.featureType === 'boss'
+            const circularDetail = params.circular
+                ? ` <b>Circular</b> is on: the opposite-touch span is reported as the <b>diameter</b> (#58, plus the mean #60 in 2-axis)${params.findBoth ? ', and the tool re-centres to the found X centre before the Y probes so they cross the true diameter rather than a chord' : ''}.`
+                : '';
+
+            middleDesc.innerHTML = (params.featureType === 'boss'
                 ? `<b>Boss (outside feature):</b> Start with the probe near one external wall of the boss at probe height. Keep approach clear so the stylus can move away for retract and return safely. ${bossDetail}`
-                : `<b>Pocket (inside feature):</b> Start near the pocket center so there is travel room in both directions on the chosen axis. The macro performs internal wall touches and retract moves to establish center/offset safely. ${pocketDetail}`;
+                : `<b>Pocket (inside feature):</b> Start near the pocket center so there is travel room in both directions on the chosen axis. The macro performs internal wall touches and retract moves to establish center/offset safely. ${pocketDetail}`) + circularDetail;
         }
 
         // Show/hide secondary direction control when Find Both is enabled
@@ -63,43 +76,21 @@ export const middleView = {
         if (dir2Block) dir2Block.classList.toggle('hidden', !params.findBoth);
         if (params.findBoth && dir2El) dir2El.value = dir2val;
 
+        // Traverse-over clearance only applies to a BOSS probed in AUTO mode (it crosses over the part).
+        const clearBlock = el('m_clear_block');
+        if (clearBlock) clearBlock.classList.toggle('hidden', !(params.featureType === 'boss' && params.approach === 'auto'));
+
         const gcode = wizard.generate(params);
         el('wiz_middle_code').innerHTML = UIUtils.formatGCode(gcode);
-        ctx.preview3D(gcode, 'middleVizContainer');
+        // Infer the spindle start (pocket → centre; boss → outside the first side) so the preview begins right.
+        const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
+        ctx.preview3D(gcode, 'middleVizContainer', wizard.inferStart(params, stock));
 
         // Update middle status label
         const middleStatus = el('middleVizStatus');
         const dirLabel = params.dir1 === 'pos' ? 'pos' : 'neg';
         const bothLabel = params.findBoth ? ` (both: ${params.dir1}/${params.dir2})` : '';
         if (middleStatus) middleStatus.textContent = `Middle: ${params.featureType} | ${params.axis} ${dirLabel}${bothLabel}`;
-
-        // Update visualization if function exists — await SVG injection so autoplay can find elements
-        if (window.drawMiddleViz) {
-            console.debug('middleView.update: calling drawMiddleViz and awaiting completion');
-            await window.drawMiddleViz();
-            console.debug('middleView.update: drawMiddleViz complete');
-
-            // Diagnostic: show available SVG IDs and resolved selectors in the status area
-            try {
-                const svgRoot = document.getElementById('middleVizContainer')?.querySelector('svg');
-                const statusEl = document.getElementById('middleVizStatus');
-                if (!svgRoot) {
-                    if (statusEl) statusEl.textContent = 'ERROR: SVG not injected into middleVizContainer';
-                    console.warn('middleView.update: svgRoot missing after drawMiddleViz');
-                } else {
-                    const ids = Array.from(svgRoot.querySelectorAll('[id]')).map(e => e.id);
-                    if (statusEl) {
-                        // Show the first non-empty line of the generated G-code (the current configC)
-                        const firstLine = (gcode || '').split(/\r?\n/).find(l => l.trim().length > 0)
-                            || `Middle: ${params.featureType} | ${params.axis} ${dirLabel}${bothLabel}`;
-                        const title = firstLine.length > 80 ? firstLine.slice(0, 77) + '...' : firstLine;
-                        // Only show the config (do not append SVG element counts)
-                        statusEl.textContent = title;
-                    }
-                    console.debug('middleView.update: SVG element IDs (first 60)=', ids.slice(0, 60));
-                }
-            } catch (e) { console.warn('middleView.update: diagnostics failed', e); }
-        }
 
         // Autoplay simulation when Middle wizard is opened — use discoverAnimSteps + PathAnimator
         if (window.discoverAnimSteps && window.PathAnimator) {

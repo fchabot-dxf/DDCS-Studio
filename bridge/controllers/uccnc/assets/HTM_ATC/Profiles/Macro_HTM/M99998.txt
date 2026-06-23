@@ -1,0 +1,180 @@
+//This is the Constructor macro which executes once when the application gets loaded
+
+
+//set ossd monitoring variable (for macroloop)
+exec.Setvar(0, 903); // for E-Stop
+exec.Setvar(0, 904); // for X Driver alarm
+exec.Setvar(0, 905); // for Z Driver alarm
+exec.Setvar(0, 906); // for C Driver alarm
+exec.Setvar(0, 907); // for Power Supply
+
+
+// getting ATC settings
+string rackOrientation = AS3.Getfield(30000);
+
+//exec.AddStatusmessage( "rackOrientation = " + rackOrientation );
+if (rackOrientation == "X") {
+	AS3.Switchbutton(true, 20200);
+	AS3.Switchbutton(false, 20201);
+	AS3.Setfieldtext("X", 30000); // step X
+	AS3.Validatefield(30000); 
+	AS3.Setfieldtext("Y", 30001); // clear Y
+	AS3.Validatefield(30001); 
+	}
+else if (rackOrientation == "Y") {
+	AS3.Switchbutton(false, 20200);
+	AS3.Switchbutton(true, 20201);
+	AS3.Setfieldtext("Y", 30000); // step Y
+	AS3.Validatefield(30000); 
+	AS3.Setfieldtext("X", 30001); // clear X
+	AS3.Validatefield(30001); 
+	}
+else {
+	exec.AddStatusmessage( "rackOrientation not defined" );
+	}
+
+
+
+// preluam scula activa si o setam in spindle
+int savedTool = Convert.ToInt32(exec.Readkey("UserTextfields", "20222", "0"));
+exec.Setcurrenttool(Convert.ToInt32(savedTool));
+exec.Code("G43 H" + savedTool);
+
+if (savedTool > 0) {
+// punem scula activa in campul de editare din TOOLS
+AS3.Setfield(savedTool,20400);
+AS3.Validatefield(20400);
+        // Declarăm variabilele de acces tooltable
+        var varLengthInit = Plugininterface.Datatypes.Tooltablecolumnname.Length;
+        var varDiameterInit = Plugininterface.Datatypes.Tooltablecolumnname.Diameter;
+        var varTypeInit = Plugininterface.Datatypes.Tooltablecolumnname.Type;
+        var varDescriptionInit = Plugininterface.Datatypes.Tooltablecolumnname.Description;
+
+        // Obținem valorile tooltable pentru scula curentă
+        double valueLengthInit = Convert.ToDouble(exec.Readtooltablecell(savedTool, varLengthInit)); // Citim Length ca double
+        double valueDiameterInit = Convert.ToDouble(exec.Readtooltablecell(savedTool, varDiameterInit)); // Citim Diameter ca double
+        string valueTypeInit = exec.Readtooltablecell(savedTool, varTypeInit);
+        string valueDescriptionInit = exec.Readtooltablecell(savedTool, varDescriptionInit);
+AS3.Setfieldtext(valueDescriptionInit,20401); // camp descriere
+AS3.Validatefield(20401);
+AS3.Setfield(valueDiameterInit,20402); // camp descriere
+AS3.Validatefield(20402);
+AS3.Setfield(valueLengthInit,20403); // camp descriere
+AS3.Validatefield(20403);
+// exec.AddStatusmessage("type = " + valueTypeInit);
+if (valueTypeInit == "RH") {
+	// AS3.SetLED(true, 934);
+	AS3.Switchbutton(true, 20403);
+	} else {
+	// AS3.SetLED(false, 934);
+	AS3.Switchbutton(false, 20403);
+	}		
+}	
+		
+// preluam ultima viteza de jog (procent)
+AS3jog.Setfieldtext(exec.Readkey("UserTextfields", "20913", "25"), 913); // Set Jog Percent
+AS3jog.Validatefield(913);
+	
+
+// // preluam pozitia TCP-TP salvata de macro M20330
+// AS3.Setfield(Convert.ToDouble(exec.Readkey("UserTextfields", "20330", "")), 20330); // Set Jog Percent
+// AS3.Validatefield(20330);
+// preluam pozitia TCP-TP salvata de macro M20330
+var TPmcZpos = exec.Readkey("UserTextfields", "20330", "0");  // reading TCP-TP mcZpos
+if (TPmcZpos == "") TPmcZpos = "0"; // if not defined, define it as 0
+AS3.Setfield(Convert.ToDouble(TPmcZpos), 20330);
+AS3.Validatefield(20330);
+
+// butonul ptr activare senzori la sloturi
+if (exec.Readkey("UserTextfields", "20202", "false")=="true") AS3.Switchbutton(true, 20202);
+// butonul ptr activare air blow
+if (exec.Readkey("UserTextfields", "20203", "false")=="true") AS3.Switchbutton(true, 20203);
+
+// citim variabilele la pornirea programului si le afisam in fields-uri
+for (int i = 30010; i < 30030; i++) {
+string setupValue = exec.Readkey("UserTextfields", Convert.ToString(i), "0");
+AS3.Setfieldtext(setupValue,i);
+AS3.Validatefield(i);
+}
+
+
+
+
+
+
+// citim checkbox-urile
+for (int i = 30000; i < 30030; i++) {
+bool setupValue = Convert.ToBoolean(exec.Readkey("UserCheckboxes", Convert.ToString(i), "False"));
+// exec.AddStatusmessage("checkbox" + i + " = " + setupValue);
+AS3.Setcheckboxstate(setupValue, i); 
+//AS3.Validatefield(i);
+}
+
+// citim sensors pins and ports la pornirea programului si le afisam in fields-uri
+for (int i = 20611; i < 20699; i++) {
+string setupValue = exec.Readkey("UserTextfields", Convert.ToString(i), "0");
+AS3.Setfieldtext(setupValue, i); 
+AS3.Validatefield(i);
+}
+
+// citim starea sloturilor pornirea programului si gestionam starea sloturilor
+for ( int slotNo = 1; slotNo < 11; slotNo++) 
+{
+	// citima starea sloturilor - enabled/disabled
+	string slotStatus = exec.Readkey("UserTextfields", Convert.ToString(slotNo+20600), "0");
+
+
+	if (slotStatus == "1") {
+		AS3.Switchbutton(true, (slotNo+20600)); // setam slotul ca fiind activ
+		AS3.SetLED(true, (slotNo+800)); //ledurile sunt de la 801 la 810
+
+		// initiem campurile cu 0. rescriem valoarea daca regasim scula alocata slotului
+		AS3.Setfieldtext("0", slotNo+20500);
+		//AS3.Setfieldtext("0", slotNo+20510);
+		//AS3.Setfieldtext("0", slotNo+20520);
+		
+		// acum cautam daca slotNo se regaseste in vreo variabila tool (SlotXX) din tooltable
+		for (int i = 1; i < 97; i++) {
+			
+			// variabile ptr preluarea slotului aferent sculei si detaliile sculei
+			var varSlot = Plugininterface.Datatypes.Tooltablecolumnname.Slot;
+			var varLength = Plugininterface.Datatypes.Tooltablecolumnname.Length;
+			var varDiameter = Plugininterface.Datatypes.Tooltablecolumnname.Diameter;
+			var varType = Plugininterface.Datatypes.Tooltablecolumnname.Type;
+			
+			int valueSlot = Convert.ToInt32(exec.Readtooltablecell(i, varSlot)); //SlotXX
+			string valueLength = exec.Readtooltablecell(i, varLength); //LengthXX
+			string valueDiameter = exec.Readtooltablecell(i, varDiameter); //DiameterXX
+			string valueType = exec.Readtooltablecell(i, varType); //TypeXX
+			
+			if (valueSlot == slotNo) // daca slotNo se regaseste setat ptr o anumita scula, afisam scula in acel slotNo
+				{
+					AS3.Setfieldtext(Convert.ToString(i), slotNo+20500); // punem scula in slotul respectiv
+					AS3.Validatefield(slotNo+20500); // validam inputul
+					
+					AS3.Setfieldtext(valueDiameter, slotNo+20510); // afisam diametrul sculei din slot
+					AS3.Validatefield(slotNo+20520); // validam inputul
+
+					AS3.Setfieldtext(valueLength, slotNo+20520); // afisam lungimea sculei din slot
+					AS3.Validatefield(slotNo+20520); // validam inputul
+					
+					if (valueType == "RH") {
+						AS3.SetLED(true, (slotNo+810)); //ledurile sunt de la 801 la 810
+					} else {
+						AS3.SetLED(false, (slotNo+810)); //ledurile sunt de la 801 la 810
+					}
+					
+					if (i ==  exec.Getcurrenttool()) AS3.SetLED(true, (slotNo+820)); //activam ledul de scula activa
+						
+					i = 97; //iesim din cautare imediat ce am gasit slotul alocat unei anumite scule
+				} 
+			AS3.Validatefield(slotNo); // validam inputul
+		}
+	} else if (slotStatus == "0") { 
+		AS3.Switchbutton(false, (slotNo+20600)); 
+		AS3.SetLED(false, (slotNo+800)); //ledurile sunt de la 801 la 810
+	}
+
+}
+
+exec.AddStatusmessage("Ready!");

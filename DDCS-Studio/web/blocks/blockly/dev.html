@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<!--
+  blocks/blockly/dev.html — the REAL Blockly Blocks tab, in development (Phase 1 of the migration).
+  Mounts the full palette DERIVED from the ops registry (bridge.js) with our theme (theme.js) and the
+  custom G-code generator. Standalone dev harness — does not touch the live hand-rolled tab. Once it
+  reaches parity it folds into the STUDIO tab (blocksApp.js is retired). Open /blocks/blockly/dev.html.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>DDCS Blocks (Blockly) — dev</title>
+  <script src="../../vendor/blockly/blockly.min.js"></script>
+  <style>
+    * { box-sizing:border-box; }
+    html,body { margin:0; height:100%; background:#0d1117; color:#e6edf3;
+                font:13px/1.4 ui-sans-serif,system-ui,Segoe UI,sans-serif; }
+    .wrap { display:grid; grid-template-rows:auto 1fr; height:100%; }
+    header { display:flex; align-items:center; gap:12px; padding:8px 14px; background:#161d28; border-bottom:1px solid #26303d; }
+    header h1 { font-size:13px; margin:0; letter-spacing:.04em; }
+    header .tag { font-size:11px; color:#8b97a6; }
+    header .r { margin-left:auto; font-size:11px; color:#8b97a6; }
+    .main { display:grid; grid-template-columns:1fr 340px; min-height:0; }
+    #ws { position:relative; }
+    .code { display:flex; flex-direction:column; border-left:1px solid #26303d; background:#000; min-width:0; }
+    .code h2 { margin:0; padding:7px 12px; font-size:11px; letter-spacing:.08em; color:#8b97a6; text-transform:uppercase; border-bottom:1px solid #26303d; }
+    .code pre { margin:0; padding:12px; overflow:auto; flex:1; color:#9fe7dd; font:12px/1.5 ui-monospace,Consolas,monospace; white-space:pre; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>DDCS Blocks — Blockly</h1>
+      <span class="tag">palette derived from the ops registry · generator reuses the emit kernels</span>
+      <span class="r" id="rlabel"></span>
+    </header>
+    <div class="main">
+      <div id="ws"></div>
+      <div class="code"><h2>Generated G-code</h2><pre id="out">( drag blocks to begin )</pre></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { ddcsTheme } from './theme.js';
+    import { installBlockly, buildToolbox } from './bridge.js';
+    import { workspaceToStack } from './stackBridge.js';
+    import { emitMapped } from '../blockModel.js';
+    import { DEFAULT_DIALECT } from '../../wizards/dialects/index.js';
+
+    const RENDERER = 'geras';   // ← one-line look swap (geras | zelos | thrasos | minimalist | custom later)
+    const B = window.Blockly;
+    installBlockly(B);          // define every op as a Blockly block (emit is via the converter, not a generator)
+    const ws = B.inject('ws', {
+      toolbox: buildToolbox(), theme: ddcsTheme(B), renderer: RENDERER,
+      grid: { spacing: 26, length: 2, colour: '#1b2733', snap: true },
+      zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { smoothScroll: true },
+    });
+    document.getElementById('rlabel').textContent = 'renderer: ' + RENDERER + ' · theme: ddcs';
+    const out = document.getElementById('out');
+    // Reuse path: workspace → our stack → the proven emitMapped fold (NOT a Blockly generator).
+    const regen = () => { try { out.textContent = emitMapped(workspaceToStack(ws), { dialect: DEFAULT_DIALECT }).text.trim() || '( empty )'; }
+                          catch (e) { out.textContent = '( gen error: ' + e.message + ' )'; } };
+    ws.addChangeListener((e) => { if (!e.isUiEvent) regen(); });
+    window.__bk = { B, ws, regen };
+    regen();
+  </script>
+</body>
+</html>

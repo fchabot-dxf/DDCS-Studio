@@ -26,7 +26,6 @@ with sync_playwright() as p:
         'editor_visible': q("(function(){const e=document.getElementById('editor'); if(!e) return false; const cs=getComputedStyle(e); return cs.display!=='none' && cs.visibility!=='hidden' && e.clientHeight>0 && e.clientWidth>0; })()"),
         'wizard_display': q("(function(){const w=document.getElementById('wizard'); if(!w) return 'missing'; return getComputedStyle(w).display; })()"),
         'app_attached': q("typeof window.ddcsStudio !== 'undefined'"),
-        'body_scale': q("document.body.getAttribute('data-scale')"),
         'secondary_toolbar_height': q("(function(){const el=document.querySelector('.secondary-toolbar .secondary-toolbar-row'); return el ? parseInt(getComputedStyle(el).height) : null; })()"),
         'editor_client_height': q("document.getElementById('editor') ? document.getElementById('editor').clientHeight : null"),
         'app_shell_transform': q("getComputedStyle(document.querySelector('.app-shell')).transform"),

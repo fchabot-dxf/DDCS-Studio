@@ -1,0 +1,31 @@
+// Go to Park position 1 macro - defined as TCP in HTM_ATC screenset (TCP = Tool Change Position)
+
+double parkX = Convert.ToDouble(exec.Readkey("UserTextfields", "30020", "0"));
+double parkY = Convert.ToDouble(exec.Readkey("UserTextfields", "30021", "0"));
+double parkZ = Convert.ToDouble(exec.Readkey("UserTextfields", "30022", "0"));
+
+double FeedRate = AS3.Getfielddouble(30017);
+
+if(!exec.GetLED(56)||!exec.GetLED(57)||!exec.GetLED(58)) // If machine was not homed then it is unsafe to move in machine coordinates, stop here...
+{
+  MessageBox.Show("The machine was not yet homed, home the machine before run to parking position!");
+  exec.Stop();
+  return;
+}
+
+int originalmodalmode = exec.actualmodal; // remember the modal mode
+
+while(exec.IsMoving()){}
+
+exec.Code("G01 F" + FeedRate + " G53 Z"+ parkZ); // Move Z up first to park1 Z position
+while(exec.IsMoving()){}
+
+exec.Code("G01 F" + FeedRate + " G53 X" + parkX +" Y" + parkY); // Move to XY park1 position
+while(exec.IsMoving()){}
+
+exec.Code("G" + originalmodalmode); // Set system back to the original distance mode
+
+
+
+
+

@@ -10,8 +10,8 @@ export default defineConfig({
     actionTimeout: 5_000,
   },
   webServer: {
-    command: 'npm start',
-    port: 3000,
+    command: 'npx http-server ./web -p 3211 --silent',
+    port: 3211,
     reuseExistingServer: !process.env.CI,
   },
 });

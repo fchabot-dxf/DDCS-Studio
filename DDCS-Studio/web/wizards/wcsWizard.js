@@ -1,133 +1,74 @@
 /**
  * DDCS Studio - WCS (Work Coordinate System) Wizard
- * Generates G-code for zeroing WCS offsets
  * V9.20 - DDCS Compliant (Direct #805+ writes, NO G10)
  *
- * Lines are emitted through the words.js "post" (comments + assignments), so
- * comment/EOL formatting is controlled centrally (see middleWizard.js note).
+ * REWRITTEN AS A BLOCK STACK: the wizard's only implementation is `wcsStack(params)` → a snippet of Comment +
+ * Set# (assign) atoms, emitted bare (no program header/footer — it's a macro snippet, not a cutting program).
+ * The form and the Blocks view are two editors of this one stack. No motion: pure #805+ register writes.
  */
-import { set, line, comment } from './words.js';
+import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { recordOp } from '../blocks/opRecord.js';
+import { resolveActivePost } from './dialects/index.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
-// WCSWizard: Generates WCS zeroing G-code. No runtime verifier invoked here to keep generation deterministic.
+const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
+
+/** WCS params → [ Comment | Set# … ]. The one source of truth for both displays. */
+export function wcsStack(params = {}) {
+    const auto = params.sys === '0';
+    const axes = [];
+    if (params.axisX) axes.push({ off: 0, var: '#880' });
+    if (params.axisY) axes.push({ off: 1, var: '#881' });
+    if (params.axisZ) axes.push({ off: 2, var: '#882' });
+
+    const S = [];
+    const C = (text) => { const b = newBlock('comment'); b.params = { text }; S.push(b); };
+    const A = (v, value, note) => { const b = newBlock('assign'); b.params = { var: v, value, note: note || '' }; S.push(b); };
+
+    C('WCS | Direct register writes');
+    const dialect = getDialect();
+    if (!dialect) { C('Error: No dialect loaded'); return S; }
+    const { wcsBase, wcsStride } = dialect.vars;
+    if (!wcsBase || !wcsStride) { C('Error: Dialect does not support direct WCS register writes'); return S; }
+
+    C('M350 Ready - G10 not used');
+    if (auto) {
+        C('Auto-detect active WCS from #578');
+        A('#150', '#578');
+        A('#151', `${wcsBase}+[#150-1]*${wcsStride}`);
+        C('Zero selected axes');
+        axes.forEach((a) => A(`#[#151+${a.off}]`, a.var));
+    } else {
+        const base = wcsBase + (parseInt(params.sys, 10) - 53 - 1) * wcsStride;
+        C(`Fixed WCS: G${params.sys} - Base address #${base}`);
+        C('Zero selected axes');
+        axes.forEach((a) => A(`#${base + a.off}`, a.var));
+    }
+    if (params.sync) {
+        const slave = params.slave, slaveOffset = slave === '3' ? 3 : 4;
+        C(`Dual Gantry Sync - Slave ${slave === '3' ? 'A' : 'B'}`);
+        if (auto) {
+            A('#152', `[#151+${slaveOffset}]`, 'Base WCS + Slave Offset');
+            A('#[#152]', `#88${slave}`);
+        } else {
+            const base = wcsBase + (parseInt(params.sys, 10) - 53 - 1) * wcsStride;
+            A(`#${base + slaveOffset}`, `#88${slave}`);
+        }
+    }
+    return S;
+}
+
 export class WCSWizard {
     constructor() {
-        // WCS base addresses for G54-G59
-        this.wcsBaseMap = {
-            '54': 805,  // G54
-            '55': 810,  // G55
-            '56': 815,  // G56
-            '57': 820,  // G57
-            '58': 825,  // G58
-            '59': 830   // G59
-        };
+        this.wcsBaseMap = { '54': 805, '55': 810, '56': 815, '57': 820, '58': 825, '59': 830 };
     }
 
     generate(params) {
-        const {
-            sys,        // WCS system: "0" for auto-detect, or "54"-"59" for specific
-            axisX,      // Zero X axis
-            axisY,      // Zero Y axis
-            axisZ,      // Zero Z axis
-            sync,       // Enable dual gantry sync
-            slave       // Slave axis: "3" for A, "4" for B
-        } = params;
-
-        const auto = (sys === "0");
-        
-        // Build axis list
-        const axes = [];
-        if (axisX) axes.push({ axis: "X", offset: 0, var: "#880" });
-        if (axisY) axes.push({ axis: "Y", offset: 1, var: "#881" });
-        if (axisZ) axes.push({ axis: "Z", offset: 2, var: "#882" });
-
-        let gcode = this.generateHeader();
-
-        if (auto) {
-            gcode += this.generateAutoWCS(axes);
-        } else {
-            gcode += this.generateFixedWCS(sys, axes);
-        }
-
-        if (sync) {
-            gcode += this.generateDualGantrySync(auto, sys, slave);
-        }
-
-        // Generation complete - no verifier run here (verifier module is paused)
-
-        return gcode;
+        recordOp('wcs', params);   // let the Blocks tab open this op as its stack
+        return emitMapped(wcsStack(params)).text;   // a snippet: no Program Start/End blocks
     }
 
-    generateHeader() {
-        let header = comment('WCS | Direct #805+ writes') + '\n';
-        header += comment('M350 Ready - G10 not used') + '\n\n';
-        return header;
-    }
-
-    generateAutoWCS(axes) {
-        let gcode = comment('Auto-detect active WCS from #578') + '\n';
-        gcode += line([set('#150', '#578')]) + '\n';
-        gcode += line([set('#151', '805+[#150-1]*5')]) + '\n\n';
-        gcode += comment('Zero selected axes') + '\n';
-
-        axes.forEach(a => {
-            gcode += line([set(`#[#151+${a.offset}]`, a.var)]) + '\n';
-        });
-
-        return gcode;
-    }
-
-    generateFixedWCS(sys, axes) {
-        const wcsIndex = parseInt(sys) - 53;
-        const base = 805 + (wcsIndex - 1) * 5;
-
-        let gcode = comment(`Fixed WCS: G${sys} - Base address #${base}`) + '\n';
-        gcode += comment('Zero selected axes') + '\n';
-
-        axes.forEach(a => {
-            gcode += line([set(`#${base + a.offset}`, a.var)]) + '\n';
-        });
-
-        return gcode;
-    }
-
-    generateDualGantrySync(auto, sys, slave) {
-        const slaveOffset = (slave === "3") ? 3 : 4;
-        const slaveChar = (slave === "3") ? "A" : "B";
-
-        let gcode = '\n' + comment(`Dual Gantry Sync - Slave ${slaveChar}`) + '\n';
-
-        if (auto) {
-            gcode += line([set('#152', `[#151+${slaveOffset}]`)], 'Base WCS + Slave Offset') + '\n';
-            gcode += line([set('#[#152]', `#88${slave}`)]) + '\n';
-        } else {
-            const wcsIndex = parseInt(sys) - 53;
-            const base = 805 + (wcsIndex - 1) * 5;
-            gcode += line([set(`#${base + slaveOffset}`, `#88${slave}`)]) + '\n';
-        }
-
-        return gcode;
-    }
-
-    /**
-     * Get WCS system name for display
-     */
-    getWCSName(sys) {
-        if (sys === "0") return "Active WCS";
-        return `G${sys}`;
-    }
-
-    /**
-     * Get WCS base address
-     */
-    getWCSBase(sys) {
-        if (sys === "0") return "Auto-detected";
-        return this.wcsBaseMap[sys] || "Unknown";
-    }
-
-    /**
-     * Validate WCS system number
-     */
-    isValidWCS(sys) {
-        return sys === "0" || (sys >= "54" && sys <= "59");
-    }
+    getWCSName(sys) { return sys === '0' ? 'Active WCS' : `G${sys}`; }
+    getWCSBase(sys) { return sys === '0' ? 'Auto-detected' : (this.wcsBaseMap[sys] || 'Unknown'); }
+    isValidWCS(sys) { return sys === '0' || (sys >= '54' && sys <= '59'); }
 }

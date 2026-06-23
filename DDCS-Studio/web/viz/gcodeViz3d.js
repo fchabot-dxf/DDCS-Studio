@@ -13,6 +13,10 @@
  */
 import { initCube, cubeFaceAt, highlightCubeFace, pickCube } from './navCube.js';
 import { setupJogPendant } from './jogPendant.js';
+import { toolHalfProfile } from './toolProfile.js';
+import { PartFrame } from './sceneFrame.js';
+import { getRotaryAxes } from '../ui/settingsPanel.js';
+import { stockProbeStop } from '../engine/probeGeometry.js';
 
 export class GcodeViz3D {
     constructor(container) {
@@ -46,6 +50,11 @@ export class GcodeViz3D {
         // Orbit state (Z-up spherical around target)
         this.target = new THREE.Vector3(0, 0, 0);
         this.radius = 200;
+        // Follow-cam: while playing, smoothly slide the orbit target onto the moving tool (centre-lock). followLerp
+        // is the per-frame smoothing (small = damped/laggy, large = snappy); a separate rAF runs while on.
+        this.followCam = false;
+        this.followLerp = 0.16;
+        this._followRaf = null;
         this.theta = -Math.PI / 2;  // azimuth in XY (front view: +X right, +Y back)
         this.phi = Math.PI / 3;     // polar from +Z
 
@@ -63,13 +72,23 @@ export class GcodeViz3D {
         // macro begins a new pass, placed relative to its own start so you can park it.
         this.starts = [{ x: 0, y: 0, z: 0 }];
         this.spindleMarkers = [];
+        this.selectedStart = 0;   // which start the jog pendant drives
+        // Whether the toolpath is anchored to the start MARKER. true = incremental/probe (the macro emanates from the
+        // operator start). false = absolute/mill (the path sits at its own coords; the start is independent — moving
+        // it must NOT drag the path). Set per-op by createPreviewPanel; default true preserves probe behaviour.
+        this._anchorToStart = true;
+        this._downMarker = -1;    // marker under a pending click (selected on pointer-up)
         this._axisMat = {};        // `${pass}:${axis}` -> { mat, base }
+        // Machine frame (envelope/grid/table/home) stays in the scene; the PART frame (op/stock/tool/markers/WCS
+        // axes) shifts to +workOrigin so the setup sits at its WCS spot inside the fixed envelope. See sceneFrame.js.
+        this.partFrame = new PartFrame(this.scene, THREE);
         this.pathGroup = new THREE.Group();
-        this.scene.add(this.pathGroup);
+        this.partFrame.add(this.pathGroup);
         this.raycaster = new THREE.Raycaster();
         this.onStartChange = null; // optional callback(starts)
         this.showRapids = true;
         this._animOn = true;   // play by default
+        this._animSimSpeed = 1;   // feed-true playback: 1 = real time (matches the engine)
         this._animPaused = false;
         this._gizmoPx = 60;    // on-screen gizmo size (smaller still in the compact wizard preview)
         this._animRaf = null;
@@ -91,29 +110,68 @@ export class GcodeViz3D {
 
     _initStaticScene() {
         const THREE = this.THREE;
-        const grid = new THREE.GridHelper(200, 20, 0x2a4866, 0x16242f);
-        grid.rotation.x = Math.PI / 2; // GridHelper is XZ by default → lay it in XY (Z up)
-        this.grid = grid;
-        this.scene.add(grid);
-        const axes = new THREE.AxesHelper(25); // X red, Y green, Z blue
-        this.axes = axes;
-        this.scene.add(axes);
+        // Floor grid — a custom rectangular LineSegments LINKED TO THE ENVELOPE footprint (rebuilt in fit). Lines
+        // run at multiples of the increment FROM THE ORIGIN and are CLIPPED to the envelope. A GridHelper is always
+        // square so it can't match a non-square envelope; this can. `_gridStep` 0 = auto nice-step, else fixed mm.
+        this.grid = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x16242f }));
+        this.scene.add(this.grid);
+        this._gridStep = 0;
+        // Lights — only affect SHADED materials (the stock in mill mode); the flat MeshBasic geometry ignores them.
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.68));
+        const _dl = new THREE.DirectionalLight(0xffffff, 0.55); _dl.position.set(0.4, 0.8, 2); this.scene.add(_dl);
+        // Floor axis lines through the ORIGIN (scene 0 = part-zero), SPANNING THE ENVELOPE — these ARE the X / Y
+        // axes (no separate part-zero triad, which would just duplicate them): X red along y=0, Y green along x=0.
+        // Re-laid each fit(). The machine-zero marker (setMachine) still shows a full XYZ gizmo at home.
+        const mkAxisLine = (color) => {
+            const g = new THREE.BufferGeometry();
+            g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+            const ln = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 }));
+            this.partFrame.add(ln);   // the origin axes mark part-zero / the WCS → ride the part frame
+            return ln;
+        };
+        this._axisLineX = mkAxisLine(0xff6b6b);
+        this._axisLineY = mkAxisLine(0x5fd35f);
+        this._axisLineZ = mkAxisLine(0x6b9bff);   // vertical Z axis at the origin column, spanning the envelope height
+        // Labelled WORK-ORIGIN gizmo at part-zero (the WCS). The thin axis LINES above span the footprint, but the
+        // datum itself is easy to miss — so add a small constant-screen-size crosshair + dot + "WCS" label that rides
+        // the part frame (same datum tracking as the axis lines). Scaled per-frame in _scaleMarkers so it never grows
+        // with zoom. Built in part-local units (base size ~1mm); _scaleMarkers sets the group scale for ~constant px.
+        const og = new THREE.Group();
+        og.renderOrder = 14;
+        const omat = new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.95, depthTest: false });
+        const ogeo = new THREE.BufferGeometry();
+        // a 3D crosshair (±X, ±Y, ±Z) of unit half-length — one mm at scale 1
+        ogeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+            -1, 0, 0, 1, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, -1, 0, 0, 1,
+        ]), 3));
+        const cross = new THREE.LineSegments(ogeo, omat); cross.renderOrder = 14; og.add(cross);
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffe08a, depthTest: false }));
+        dot.renderOrder = 14; og.add(dot);
+        const olabel = this._makeTextSprite('WCS', '#ffe08a');
+        olabel.position.set(1.2, 1.2, 0.2);   // float up-right of the dot (re-scaled with the group)
+        og.add(olabel);
+        this._originGizmo = og;
+        this._originLabel = olabel;
+        this.partFrame.add(og);   // rides the part frame → tracks the datum exactly like the axis lines
         // Direction labels on the grid edges (repositioned to the footprint in setSegments)
         this._gridLabels = {
-            xp: this._makeTextSprite('+X'), xn: this._makeTextSprite('-X'),
-            yp: this._makeTextSprite('+Y'), yn: this._makeTextSprite('-Y'),
+            xp: this._makeTextSprite('+X', '#ff6b6b'), xn: this._makeTextSprite('-X', '#ff6b6b'),
+            yp: this._makeTextSprite('+Y', '#5fd35f'), yn: this._makeTextSprite('-Y', '#5fd35f'),
         };
         for (const k in this._gridLabels) this.scene.add(this._gridLabels[k]);
     }
 
-    _makeTextSprite(text) {
+    _makeTextSprite(text, color) {
         const THREE = this.THREE;
         const c = document.createElement('canvas');
         c.width = 128; c.height = 64;
         const ctx = c.getContext('2d');
-        ctx.fillStyle = '#7fa8cc';
-        ctx.font = 'bold 48px sans-serif';
+        ctx.font = 'bold 46px sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        // Dark outline so the label stays legible over the grid / toolpath, then the axis-tint fill.
+        ctx.lineJoin = 'round'; ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+        ctx.strokeText(text, 64, 36);
+        ctx.fillStyle = color || '#7fa8cc';
         ctx.fillText(text, 64, 36);
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
         sp.renderOrder = 1;
@@ -167,14 +225,16 @@ export class GcodeViz3D {
     // Recreate markers only when the pass count changes
     _ensureMarkers() {
         if (this.spindleMarkers.length === this._passCount) return;
-        for (const m of this.spindleMarkers) this.scene.remove(m);
+        for (const m of this.spindleMarkers) this.partFrame.group.remove(m);
         this.spindleMarkers = [];
         this._hoverKey = undefined;
         for (let p = 0; p < this._passCount; p++) {
             const m = this._makeMarker(p);
             this.spindleMarkers.push(m);
-            this.scene.add(m);
+            this.partFrame.add(m);   // start markers ride the part frame
         }
+        if (this.selectedStart >= this._passCount) this.selectedStart = 0;
+        if (this._renderJogStarts) this._renderJogStarts();   // refresh the jog pendant's start selector
     }
 
     _positionMarkers() {
@@ -182,22 +242,65 @@ export class GcodeViz3D {
             const s = this.starts[p] || { x: 0, y: 0, z: 0 };
             this.spindleMarkers[p].position.set(s.x, s.y, s.z);
         }
+        this._highlightSelectedStart();
     }
 
-    // Keep each gizmo a constant on-screen size (independent of zoom): world size ∝ the
-    // world-per-pixel at the marker (camera distance for perspective, frustum for ortho).
+    // Choose which start the jog pendant drives (and which ruby is highlighted).
+    selectStart(i) {
+        const n = this.spindleMarkers.length || 1;
+        this.selectedStart = Math.max(0, Math.min(n - 1, i | 0));
+        this._highlightSelectedStart();
+        if (this._renderJogStarts) this._renderJogStarts();
+        this.render();
+    }
+
+    // Brighten the selected ruby, dim the rest, so it's clear which start the pendant jogs.
+    _highlightSelectedStart() {
+        for (let p = 0; p < this.spindleMarkers.length; p++) {
+            const ruby = this.spindleMarkers[p].children[0];
+            if (!ruby || !ruby.material) continue;
+            const sel = p === this.selectedStart;
+            ruby.material.color.setHex(sel ? 0xff2a44 : 0xc4122e);
+            ruby.material.transparent = !sel;
+            ruby.material.opacity = sel ? 1 : 0.5;
+        }
+    }
+
+    // Ray-pick a start marker (ruby + numbered badge) under the pointer; returns pass index or -1.
+    _pickMarker(e) {
+        if (!this.spindleMarkers.length) return -1;
+        this.raycaster.setFromCamera(this._ndc(e), this.camera);
+        let best = -1, bestDist = Infinity;
+        for (let p = 0; p < this.spindleMarkers.length; p++) {
+            const hit = this.raycaster.intersectObject(this.spindleMarkers[p], true)[0];
+            if (hit && hit.distance < bestDist) { bestDist = hit.distance; best = p; }
+        }
+        return best;
+    }
+
+    // Keep on-screen gizmos a CONSTANT screen size (independent of zoom): world size ∝ the world-per-pixel at the
+    // object (camera distance for perspective, frustum for ortho). Applies to the start markers AND the axis labels.
     _scaleMarkers() {
-        if (!this.spindleMarkers.length) return;
         const H = this.container.clientHeight || 1;
-        const targetPx = this._gizmoPx || 90, base = 26; // base = the arrow length at scale 1
         const ortho = this.camera.isOrthographicCamera;
         const tanHalf = Math.tan((this.persp.fov * Math.PI / 180) / 2);
-        for (const m of this.spindleMarkers) {
-            const worldPerPx = ortho
-                ? (this.camera.top - this.camera.bottom) / H
-                : (2 * this.camera.position.distanceTo(m.position) * tanHalf) / H;
-            m.scale.setScalar(Math.max(1e-4, (targetPx * worldPerPx) / base));
+        const worldPerPxAt = (pos) => ortho
+            ? (this.camera.top - this.camera.bottom) / H
+            : (2 * this.camera.position.distanceTo(pos) * tanHalf) / H;
+        const targetPx = this._gizmoPx || 90, base = 26; // base = the arrow length at scale 1
+        for (const m of this.spindleMarkers) m.scale.setScalar(Math.max(1e-4, (targetPx * worldPerPxAt(m.position)) / base));
+        // Work-origin gizmo: constant on-screen size. Group crosshair is ±1mm at scale 1, so scale it so the cross
+        // spans ~36px; the label sprite (a group child) is counter-scaled so the "WCS" text stays a fixed px width
+        // (canvas is 2:1) instead of compounding with the group scale.
+        if (this._originGizmo) {
+            const wpp = worldPerPxAt(this._originGizmo.getWorldPosition(this._ogV3 || (this._ogV3 = new this.THREE.Vector3())));
+            const gs = Math.max(1e-4, 18 * wpp);   // ±18px crosshair half-length
+            this._originGizmo.scale.setScalar(gs);
+            if (this._originLabel) { const w = Math.max(1e-4, 48 * wpp / gs); this._originLabel.scale.set(w, w / 2, 1); }
         }
+        // Direction labels (+X/-X/+Y/-Y): constant on-screen width too (canvas is 2:1), so they don't grow with zoom.
+        const L = this._gridLabels;
+        if (L) for (const k in L) { const w = Math.max(1e-4, 55 * worldPerPxAt(L[k].position)); L[k].scale.set(w, w / 2, 1); }
         if (this.jogPendant) {
             this.jogPendant.style.display = (this.starts && this.starts.length > 0) ? 'block' : 'none';
         }
@@ -236,23 +339,52 @@ export class GcodeViz3D {
     }
 
 
-    _ensureAnimTool() {
-        if (this._animTool) return;
+    _ensureAnimTool() { if (!this._animTool) this._buildAnimTool(); }
+    // The moving SPINDLE ASSEMBLY: spindle (body) ▸ collet (holder) ▸ tool (the actual revolved profile, the same
+    // builder as the ATC magazine) — SEPARATE meshes in one group, used for EVERY op (probe + mill), so ATC can
+    // later move the tool independently of the collet. Tool tip at the local origin (setToolPosition puts it on the
+    // path); the collet + spindle stack up (+Z) toward the machine spindle. Each part is toggle-able (setPartVisible).
+    _buildAnimTool() {
         const THREE = this.THREE;
-        this._animTool = new THREE.Mesh(
-            new THREE.SphereGeometry(2.5, 16, 16),
-            new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })
-        );
-        this._animTool.renderOrder = 25; // above the toolpath (20) so the dot stays visible
-        this._animTool.visible = false;
-        this.scene.add(this._animTool);
+        if (this._animTool) { this.partFrame.group.remove(this._animTool); this._animTool.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
+        const tool = this._simTool || { type: 'endmill', dia: 6 };
+        const half = toolHalfProfile(tool);
+        const tr = Math.max(0.5, (Number(tool.dia) || 6) / 2);          // shank radius (what the collet clamps)
+        const topZ = Math.max(0.1, ...half.map((p) => p[1]));           // the tool's TOP (the shank) — sets the clamp height
+        const part = (geo, color, op, name) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true, opacity: op })); m.name = name; return m; };
+        const tgeo = new THREE.LatheGeometry(half.map((q) => new THREE.Vector2(Math.max(0.001, q[0]), q[1])), 24); tgeo.rotateX(Math.PI / 2);   // TOOL — real profile, tip at origin
+        // COLLET + SPINDLE dims come from the machine HEAD settings (pulled by the preview via setHead); the cutter
+        // only sets WHERE the collet clamps (the shank top). Defaults below match a typical spindle if no head is set.
+        const head = this._head || {};
+        // COLLET — a plain CYLINDER clamping the shank top (overlaps it); always wider than the shank.
+        const colletR = Math.max(tr + 1, (Number(head.colletDia) || 20) / 2), ch = Number(head.colletLen) || 30, colletBot = topZ - 6;
+        const cgeo = new THREE.CylinderGeometry(colletR, colletR, ch, 20); cgeo.rotateX(Math.PI / 2); cgeo.translate(0, 0, colletBot + ch / 2);
+        // SPINDLE — a real-size body above the collet (head.spindleDia × head.spindleLen).
+        const spR = (Number(head.spindleDia) || 80) / 2, sh = Number(head.spindleLen) || 200, spBot = colletBot + ch - 3;
+        const sgeo = new THREE.CylinderGeometry(spR, spR, sh, 28); sgeo.rotateX(Math.PI / 2); sgeo.translate(0, 0, spBot + sh / 2);
+        this._animParts = { tool: part(tgeo, 0xffab40, 0.9, 'tool'), collet: part(cgeo, 0x9aa6b2, 0.9, 'collet'), spindle: part(sgeo, 0x6b7682, 0.85, 'spindle') };
+        const grp = new THREE.Group();
+        grp.add(this._animParts.spindle, this._animParts.collet, this._animParts.tool);
+        grp.renderOrder = 25; grp.visible = !!this._animOn;
+        this._animTool = grp; this._applyPartVis(); this.partFrame.add(grp);   // tool rides the part frame
     }
+    _applyPartVis() { const v = this._partVis || {}; if (this._animParts) for (const k of ['tool', 'collet', 'spindle']) if (this._animParts[k]) this._animParts[k].visible = v[k] !== false; }
+    // Show/hide spindle / collet / tool independently, e.g. setPartVisible({ spindle: false }).
+    setPartVisible(parts) { this._partVis = Object.assign({ tool: true, collet: true, spindle: true }, this._partVis, parts); this._applyPartVis(); this.render(); }
+    // Set the PER-OP tool { type, dia, length } → rebuild the assembly's tool to its real profile.
+    setSimTool(tool) { this._simTool = tool || null; if (this._animTool) this._buildAnimTool(); }
+    // Machine HEAD dims { spindleDia, spindleLen, colletDia, colletLen } (mm) — pulled from settings by the preview.
+    setHead(head) { this._head = head || null; if (this._animTool) this._buildAnimTool(); }
+    // Per-op SIM MODE: 'mill' → solid shaded stock; 'probe' → translucent so the probe/feature shows through.
+    _stockOpacity() { return this._simMode === 'probe' ? 0.16 : 0.72; }
+    setSimMode(mode) { if (mode === this._simMode) return; this._simMode = mode; if (this.stockMesh && this.stockMesh.material) { this.stockMesh.material.opacity = this._stockOpacity(); this.render(); } }
 
-    // Toggle a tool dot that travels the whole path in execution order (~5s loop)
+    // Toggle a tool dot that travels the whole path in execution order, feed-true (real program time)
     setAnimate(on) {
         this._animOn = !!on;
         this._ensureAnimTool();
         this._animTool.visible = this._animOn;
+        this._dimRoute(this._animOn);   // play: route faint + bold trail revealed; stop: restore the full route
         if (this._animOn) {
             this._animDist = 0;
             this._animLast = 0;
@@ -260,8 +392,38 @@ export class GcodeViz3D {
         } else {
             if (this._animRaf) cancelAnimationFrame(this._animRaf);
             this._animRaf = null;
+            this._applyPartRotation(0, 0); // return the part to rest when the play stops
             this.render();
         }
+    }
+
+    // Trail mode: while playing, keep the full route (the type-grouped lines) visible but faint — a thin 50%
+    // "ghost" of the whole path — and reveal the bold solid "executed" overlay up to the tool head, so you can
+    // read where you are against where you're going. Restores the original opacity on stop.
+    _dimRoute(on) {
+        this._trailOn = on;
+        for (const k in this.lineGroups) {
+            const o = this.lineGroups[k]; if (!o) continue;
+            if (on) {
+                if (o.material.__op0 == null) o.material.__op0 = o.material.opacity != null ? o.material.opacity : 1;
+                o.material.transparent = true; o.material.opacity = 0.5;   // always-visible faint guide
+            } else if (o.material.__op0 != null) {
+                o.material.opacity = o.material.__op0; o.material.transparent = o.material.__op0 < 1;
+            }
+        }
+        if (this._trailLine) {
+            this._trailLine.visible = on;
+            if (!on) {
+                // Restore any partial tip vertex so the geometry is clean for the next run, then hide the trail.
+                if (this._trailTipIdx != null && this._trailTipOrig) {
+                    const o = this._trailTipOrig, pa = this._trailLine.geometry.getAttribute('position');
+                    pa.setXYZ(this._trailTipIdx, o.x, o.y, o.z); pa.needsUpdate = true;
+                }
+                this._trailTipIdx = null; this._trailTipOrig = null;
+                this._trailLine.geometry.setDrawRange(0, 0);
+            }
+        }
+        this.render();
     }
 
     // Called by execution engine to update tool position during execution
@@ -269,8 +431,50 @@ export class GcodeViz3D {
         if (!pos || (!Number.isFinite(pos.x) && !Number.isFinite(pos.y) && !Number.isFinite(pos.z))) return;
         this._ensureAnimTool();
         this._animTool.visible = true;
-        this._animTool.position.set(pos.x || 0, pos.y || 0, pos.z || 0);
+        // The toolpath is drawn offset by the spindle-start marker (starts[0]) ONLY when anchored (probe/incremental);
+        // for absolute/mill the route sits at its own coords, so no offset (else the dot floats off the path).
+        const o = this._anchorToStart ? (this.starts[0] || { x: 0, y: 0, z: 0 }) : { x: 0, y: 0, z: 0 };
+        this._animTool.position.set((pos.x || 0) + o.x, (pos.y || 0) + o.y, (pos.z || 0) + o.z);
+        // Engine-driven trail: bold the executed route up to the tool head (option B — what you see is the path
+        // the engine actually ran). Enable trail mode lazily; setAnimate(false)/ddcsStopPreview restores it.
+        if (this._trailLine && this._animSegs && this._animSegs.length) {
+            if (!this._trailOn) this._dimRoute(true);
+            this._updateTrailTip(this._animTool.position);
+        }
         this.render();
+    }
+
+    // Grow the bold trail so its tip sits EXACTLY on the tool head, drawing a partial current segment instead of
+    // revealing whole segments (which read as a visibility toggle). Completed segments draw fully; the current
+    // segment is shortened to a→toolhead by temporarily moving its end vertex (restored when the tip advances).
+    _updateTrailTip(tp) {
+        const line = this._trailLine, segs = this._animSegs;
+        if (!line || !segs || !segs.length) return;
+        const pos = line.geometry.getAttribute('position');
+        // Restore the segment we shortened last frame to its true end before choosing a new tip.
+        if (this._trailTipIdx != null && this._trailTipOrig) {
+            const o = this._trailTipOrig;
+            pos.setXYZ(this._trailTipIdx, o.x, o.y, o.z);
+        }
+        // Current segment = the one whose [a,b] span the tool head projects onto closest (clamped).
+        let ci = 0, best = Infinity, qx = 0, qy = 0, qz = 0;
+        for (let i = 0; i < segs.length; i++) {
+            const s = segs[i];
+            const dx = s.bx - s.ax, dy = s.by - s.ay, dz = s.bz - s.az;
+            const len2 = dx * dx + dy * dy + dz * dz || 1e-9;
+            let t = ((tp.x - s.ax) * dx + (tp.y - s.ay) * dy + (tp.z - s.az) * dz) / len2;
+            t = t < 0 ? 0 : t > 1 ? 1 : t;
+            const cx = s.ax + dx * t, cy = s.ay + dy * t, cz = s.az + dz * t;
+            const dd = (tp.x - cx) ** 2 + (tp.y - cy) ** 2 + (tp.z - cz) ** 2;
+            if (dd < best) { best = dd; ci = i; qx = cx; qy = cy; qz = cz; }
+        }
+        // Shorten segment ci to end at the tool head (its end vertex is index 2*ci+1, since each seg = a,b pair).
+        const vIdx = 2 * ci + 1;
+        this._trailTipOrig = { x: pos.getX(vIdx), y: pos.getY(vIdx), z: pos.getZ(vIdx) };
+        this._trailTipIdx = vIdx;
+        pos.setXYZ(vIdx, qx, qy, qz);
+        pos.needsUpdate = true;
+        line.geometry.setDrawRange(0, 2 * (ci + 1));
     }
 
     _animTick() {
@@ -280,11 +484,12 @@ export class GcodeViz3D {
             const now = (typeof performance !== 'undefined' ? performance.now() : 0);
             const dt = this._animLast ? Math.min(0.1, (now - this._animLast) / 1000) : 0;
             this._animLast = now;
-            // Advance in program time: the whole path loops in ~5 s, but each segment's
-            // share of it ∝ length/feedrate — slow probes crawl, rapids zip.
+            // Advance in REAL program time (feed-true): dt seconds → dt*1000 ms of program time,
+            // scaled by _animSimSpeed (1 = real time). Each segment's ms ∝ length/feedrate, so the
+            // tool moves at the programmed speed — slow probes crawl, rapids zip, like the engine.
             const total = this._animMs || 1;
             if (!this._animPaused) {
-                this._animDist += (total / 5) * dt;
+                this._animDist += dt * 1000 * (this._animSimSpeed || 1);
                 if (this._animDist >= total) {       // reached the end → hold 1s, then loop (no beep — it loops forever)
                     this._animDist = total;
                     this._animPaused = true;
@@ -297,6 +502,8 @@ export class GcodeViz3D {
                 if (d <= sg.ms || i === segs.length - 1) {
                     const t = sg.ms > 0 ? Math.min(1, d / sg.ms) : 1;
                     this._animTool.position.set(sg.ax + (sg.bx - sg.ax) * t, sg.ay + (sg.by - sg.ay) * t, sg.az + (sg.bz - sg.az) * t);
+                    this._applyPartRotation(sg.a1 + (sg.a2 - sg.a1) * t, sg.b1 + (sg.b2 - sg.b1) * t);
+                    if (this._trailLine) this._trailLine.geometry.setDrawRange(0, 2 * i);   // bold the executed segments behind the tool
                     break;
                 }
                 d -= sg.ms;
@@ -304,6 +511,27 @@ export class GcodeViz3D {
             this.render();
         }
         this._animRaf = requestAnimationFrame(() => this._animTick());
+    }
+
+    // Manual A-axis jog: spin the part by deltaDeg about the rotary axis (no program needed). Accumulates into
+    // _jogA; programs still override the rotation during playback (the play loop calls _applyPartRotation each
+    // frame). Re-applied after setStock so a stock rebuild keeps the jogged angle.
+    rotaryJogA(deltaDeg) {
+        this._jogA = (this._jogA || 0) + (Number(deltaDeg) || 0);
+        this._applyPartRotation(this._jogA, 0);
+        this.render();
+    }
+
+    // Spin the part group to the given rotary angles (degrees). A spins around its declared
+    // Cartesian axis (getRotaryAxes), defaulting to X; B around its declared axis, if any.
+    _applyPartRotation(a, b) {
+        const pg = this._partGroup;
+        if (!pg) return;
+        const rax = this._rotaryAxes || {};
+        const deg = Math.PI / 180;
+        pg.rotation.set(0, 0, 0);
+        pg.rotation[rax.a || 'x'] = (a || 0) * deg;
+        if (rax.b) pg.rotation[rax.b] = (b || 0) * deg;
     }
 
     // Short beep at the end of each animation loop (Web Audio; silent until a user gesture)
@@ -335,6 +563,10 @@ export class GcodeViz3D {
         return null;
     }
 
+    _setHighlight(pass, axis) {
+        // no-op since gizmo picking is disabled
+    }
+
     // t along axisDir (unit) from lineOrigin to the point closest to the pointer ray
     _closestAxisT(ray, lineOrigin, axisDir) {
         const d = axisDir.dot(w0);
@@ -344,7 +576,7 @@ export class GcodeViz3D {
         return (b * e - c * d) / denom;
     }
 
-    setSegments(parsed) {
+    setSegments(parsed, fit = true) {
         this._segs = (parsed && parsed.segments) || [];
         this._passCount = Math.max(1, (parsed && parsed.stats && parsed.stats.passes) || 1);
         // one draggable start per pass (keep existing positions; new passes default to origin)
@@ -352,7 +584,9 @@ export class GcodeViz3D {
         this.starts.length = this._passCount;
         this._ensureMarkers();
         this._rebuild();
-        this.fitAll();
+        // fit re-frames the camera; skip it on live re-renders (e.g. wizard input changes) so the
+        // user's orbit/zoom is preserved — just redraw the new path with the current camera.
+        if (fit) this.fitAll(); else this.render();
     }
 
     // Walk each pass, clamping probes to the stock so they stop at the wall instead of
@@ -367,17 +601,8 @@ export class GcodeViz3D {
         this.lineGroups = {};
 
         const st = this._stock;
-        const pocket = !!(st && st.shape === 'pocket');
-        let box = null;
-        if (st && st.show && st.x > 0 && st.y > 0 && st.z > 0) {
-            if (pocket) {
-                // probe cavity = the inset hole (matches the rendered pocket)
-                const w = Math.max(8, Math.min(st.x, st.y) * 0.25);
-                box = { min: { x: w, y: w, z: -st.z }, max: { x: st.x - w, y: st.y - w, z: 0 } };
-            } else {
-                box = { min: { x: 0, y: 0, z: -st.z }, max: { x: st.x, y: st.y, z: 0 } };
-            }
-        }
+        const probeable = !!(st && st.show && st.x > 0 && st.y > 0 && st.z > 0);   // a stock to collide a probe against
+        const rotaryAxis = Object.values(getRotaryAxes())[0] || 'x';              // cylinder lies along this (matches setStock)
         const CAP = 20; // fallback probe length when it never contacts the stock
 
         const byPass = [];
@@ -391,10 +616,15 @@ export class GcodeViz3D {
         // (length / programmed feedrate) so the loop shows slow probes crawling and
         // rapids zipping — relative speeds match the program.
         const animSegs = [];
-        const pushSeg = (ax, ay, az, bx, by, bz, rate) => {
+        const ROT_DEG_PER_MIN = 3600; // nominal rotary speed for sim timing of a rotary-only move (60°/s)
+        const pushSeg = (ax, ay, az, bx, by, bz, rate, a1, b1, a2, b2, col) => {
+            a1 = a1 || 0; b1 = b1 || 0; a2 = a2 || 0; b2 = b2 || 0;
             const len = Math.hypot(bx - ax, by - ay, bz - az);
-            if (len < 1e-9) return;
-            animSegs.push({ ax, ay, az, bx, by, bz, ms: (len / (rate > 0 ? rate : 600)) * 60000 });
+            const da = Math.abs(a2 - a1) + Math.abs(b2 - b1);
+            if (len < 1e-9 && da < 1e-9) return;   // truly stationary → skip
+            // A rotary-only move has no XYZ length: time it by its angle so the spin actually plays.
+            const ms = len >= 1e-9 ? (len / (rate > 0 ? rate : 600)) * 60000 : (da / ROT_DEG_PER_MIN) * 60000;
+            animSegs.push({ ax, ay, az, bx, by, bz, ms, a1, b1, a2, b2, col: col != null ? col : 0xffe14d });
         };
         let bounds = null;
         const grow = (x, y, z) => { bounds = this._growBounds(bounds, x, y, z, x, y, z); };
@@ -403,8 +633,11 @@ export class GcodeViz3D {
         for (let p = 0; p < this._passCount; p++) {
             const segs = byPass[p] || [];
             const mk = this.starts[p] || { x: 0, y: 0, z: 0 };
-            // manual jog from the previous pass's end to this pass's start marker
-            if (prevEnd) { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(mk.x, mk.y, mk.z); pushSeg(prevEnd.x, prevEnd.y, prevEnd.z, mk.x, mk.y, mk.z, 6000); }
+            // Route anchor: probe ops draw from the start MARKER (the incremental macro emanates from the real tool
+            // position); mill/absolute programs draw at their own coords so moving the start does NOT drag the path.
+            const off = this._anchorToStart ? mk : { x: 0, y: 0, z: 0 };
+            // manual jog from the previous pass's end to this pass's start anchor
+            if (prevEnd) { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, off.x, off.y, off.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(off.x, off.y, off.z); pushSeg(prevEnd.x, prevEnd.y, prevEnd.z, off.x, off.y, off.z, 6000, 0, 0, 0, 0, 0xff9a0d); }
             let cur = { x: 0, y: 0, z: 0 }; // pass-local, relative to the marker
             for (const s of segs) {
                 const dx = s.x2 - s.x1, dy = s.y2 - s.y1, dz = s.z2 - s.z1;
@@ -412,36 +645,38 @@ export class GcodeViz3D {
                 const start = cur;
                 let end = { x: start.x + dx, y: start.y + dy, z: start.z + dz };
 
-                // Probe collision with stock bounds
-                if (type === 'probe' && box) {
-                    const Aw = { x: start.x + mk.x, y: start.y + mk.y, z: start.z + mk.z };
-                    const Bw = { x: end.x + mk.x, y: end.y + mk.y, z: end.z + mk.z };
-                    const r = this._boxRange(Aw, Bw, box.min, box.max);
-                    if (r.hit) {
-                        let tt = null;
-                        if (pocket) { if (r.tEnter <= 1e-6 && r.tExit > 1e-6 && r.tExit < 1 - 1e-6) tt = r.tExit; }
-                        else { if (r.tEnter > 1e-6 && r.tEnter < 1 - 1e-6) tt = r.tEnter; }
-                        if (tt != null) { end = { x: start.x + dx * tt, y: start.y + dy * tt, z: start.z + dz * tt }; }
-                    }
+                // Probe collision with the stock — stop at the first material surface hit (shared with the
+                // execution engine via probeGeometry, so the preview and the simulated run agree): outer box for
+                // boss, box + inner cavity wall for a pocket, the round OD for a rotary cylinder.
+                if (type === 'probe' && probeable) {
+                    const Aw = { x: start.x + off.x, y: start.y + off.y, z: start.z + off.z };
+                    const Bw = { x: end.x + off.x, y: end.y + off.y, z: end.z + off.z };
+                    const tt = stockProbeStop(Aw, Bw, st, rotaryAxis);
+                    if (tt != null) { end = { x: start.x + dx * tt, y: start.y + dy * tt, z: start.z + dz * tt }; }
                 }
 
-                const ax = start.x + mk.x, ay = start.y + mk.y, az = start.z + mk.z;
-                const bx = end.x + mk.x, by = end.y + mk.y, bz = end.z + mk.z;
+                const ax = start.x + off.x, ay = start.y + off.y, az = start.z + off.z;
+                const bx = end.x + off.x, by = end.y + off.y, bz = end.z + off.z;
                 grow(ax, ay, az); grow(bx, by, bz);
+                const slowProbe = type === 'probe' && (s.feed || 0) > 0 && (s.feed || 0) < maxProbeFeed;
                 const arr = type === 'rapid' ? rapidPos
                     : type === 'retract' ? retractPos
-                    : type === 'probe' ? (((s.feed || 0) > 0 && (s.feed || 0) < maxProbeFeed) ? probeSlowPos : probeFastPos)
+                    : type === 'probe' ? (slowProbe ? probeSlowPos : probeFastPos)
                     : feedPos;
+                // trail colour = the route move-type colour, so the bold executed trail isn't always amber
+                const col = type === 'rapid' ? 0xffcc00 : type === 'retract' ? 0x33cc55
+                    : type === 'probe' ? (slowProbe ? 0x93c5fd : 0x3b82f6) : 0x35ffd0;
                 arr.push(ax, ay, az, bx, by, bz);
-                pushSeg(ax, ay, az, bx, by, bz, (type === 'rapid' || type === 'retract') ? 6000 : (s.feed > 0 ? s.feed : 600));
+                pushSeg(ax, ay, az, bx, by, bz, (type === 'rapid' || type === 'retract') ? 6000 : (s.feed > 0 ? s.feed : 600), s.a1, s.b1, s.a2, s.b2, col);
                 cur = end;
             }
-            prevEnd = { x: cur.x + mk.x, y: cur.y + mk.y, z: cur.z + mk.z };
+            prevEnd = { x: cur.x + off.x, y: cur.y + off.y, z: cur.z + off.z };
         }
 
         // Ordered segments + total program time for the play animation
         this._animSegs = animSegs;
         this._animMs = animSegs.reduce((t, s) => t + s.ms, 0);
+        this._rotaryAxes = getRotaryAxes(); // which Cartesian axis each rotary axis (a/b) spins around
 
         // Cuts: blue→cyan gradient by depth across the whole scene
         let feedCol = null;
@@ -453,12 +688,41 @@ export class GcodeViz3D {
         }
         // Colours match the wizard visualiser
         this.lineGroups.feed = this._addLine(feedPos, { vertexColors: feedCol });
-        this.lineGroups.rapid = this._addLine(rapidPos, { color: 0x00cc00, opacity: 0.55 });
+        this.lineGroups.rapid = this._addLine(rapidPos, { color: 0xffcc00, opacity: 0.6 });   // rapid = solid yellow (Fusion)
         if (this.lineGroups.rapid) this.lineGroups.rapid.visible = this.showRapids;
-        this.lineGroups.retract = this._addLine(retractPos, { color: 0xfacc15, opacity: 0.85 });
-        this.lineGroups.probe = this._addLine(probeFastPos, { color: 0x3b82f6 });      // fast probe (blue)
+        this.lineGroups.retract = this._addLine(retractPos, { color: 0x33cc55, opacity: 0.85 });  // retract/lead-out = green (Fusion)
+        this.lineGroups.probe = this._addLine(probeFastPos, { color: 0x3b82f6, dotted: true });      // probe = dotted blue
         this.lineGroups.probeSlow = this._addLine(probeSlowPos, { color: 0x93c5fd });  // slow re-probe (light blue)
         this.lineGroups.jog = this._addLine(jogPos, { color: 0xff9a0d, opacity: 0.95, dashed: true });
+
+        // Ordered "executed trail" overlay: the whole route as one bold line, in travel order, revealed up to
+        // the tool head via setDrawRange while playing (see _animTick / _dimRoute). The type-grouped lines above
+        // are the faint route underneath. Amber matches the tool marker.
+        if (this._trailLine) { this.pathGroup.remove(this._trailLine); this._trailLine.geometry.dispose(); this._trailLine.material.dispose(); this._trailLine = null; }
+        // New geometry → the old tip indices/orig are stale; clear them, and drop _trailOn so a rebuild during
+        // play re-arms the trail (re-dims the route + un-hides the bold line) on the next setToolPosition.
+        this._trailTipIdx = null; this._trailTipOrig = null; this._trailOn = false; this._trailFat = null;
+        if (animSegs.length) {
+            const tp = [], tc = [], C = new THREE.Color();
+            for (const s of animSegs) {
+                tp.push(s.ax, s.ay, s.az, s.bx, s.by, s.bz);
+                C.set(s.col != null ? s.col : 0xffe14d);
+                tc.push(C.r, C.g, C.b, C.r, C.g, C.b);   // bold trail coloured per move-type (probe blue, rapid yellow, …)
+            }
+            const g = new THREE.BufferGeometry();
+            g.setAttribute('position', new THREE.Float32BufferAttribute(tp, 3));
+            g.setAttribute('color', new THREE.Float32BufferAttribute(tc, 3));
+            g.setDrawRange(0, 0);
+            const mat = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 6 }); mat.depthTest = false;   // 2× bolder; linewidth best-effort (ANGLE caps at 1px → see _trailTube for true thickness)
+            const line = new THREE.LineSegments(g, mat); line.renderOrder = 22; line.visible = false;
+            this.pathGroup.add(line);
+            this._trailLine = line;
+            // Fat copies: children of the trail line, sharing g + mat → they inherit its draw-range, tip edits,
+            // per-vertex colours and visibility. _layoutTrailFat() offsets them ±right/±up for a thick line.
+            this._trailFat = [];
+            for (let k = 0; k < 4; k++) { const c = new THREE.LineSegments(g, mat); c.renderOrder = 21; line.add(c); this._trailFat.push(c); }
+            this._layoutTrailFat();
+        }
 
         this._positionMarkers();
         this._dataBounds = bounds;
@@ -474,8 +738,10 @@ export class GcodeViz3D {
         if (opt.vertexColors) {
             g.setAttribute('color', new THREE.Float32BufferAttribute(opt.vertexColors, 3));
             mat = new THREE.LineBasicMaterial({ vertexColors: true });
-        } else if (opt.dashed) {
-            mat = new THREE.LineDashedMaterial({ color: opt.color, transparent: opt.opacity < 1, opacity: opt.opacity, dashSize: 3, gapSize: 2 });
+        } else if (opt.dashed || opt.dotted) {
+            const op = opt.opacity != null ? opt.opacity : 1;
+            const dashSize = opt.dotted ? 0.6 : 3, gapSize = opt.dotted ? 1.4 : 2;   // dotted = tiny dashes
+            mat = new THREE.LineDashedMaterial({ color: opt.color, transparent: op < 1, opacity: op, dashSize, gapSize });
         } else {
             const op = opt.opacity != null ? opt.opacity : 1;
             mat = new THREE.LineBasicMaterial({ color: opt.color, transparent: op < 1, opacity: op });
@@ -483,27 +749,9 @@ export class GcodeViz3D {
         mat.depthTest = false;            // draw the toolpath on top of the gizmo / stock
         const lines = new THREE.LineSegments(g, mat);
         lines.renderOrder = 20;           // above the gizmo (11–13); the anim tool (25) stays on top
-        if (opt.dashed) lines.computeLineDistances();
+        if (opt.dashed || opt.dotted) lines.computeLineDistances();
         this.pathGroup.add(lines);
         return lines;
-    }
-
-    // Parametric range [tEnter, tExit] where the line A→B crosses an axis-aligned box.
-    _boxRange(A, B, boxMin, boxMax) {
-        const d = { x: B.x - A.x, y: B.y - A.y, z: B.z - A.z };
-        let tEnter = -Infinity, tExit = Infinity;
-        for (const ax of ['x', 'y', 'z']) {
-            if (Math.abs(d[ax]) < 1e-9) {
-                if (A[ax] < boxMin[ax] - 1e-6 || A[ax] > boxMax[ax] + 1e-6) return { hit: false };
-            } else {
-                let t1 = (boxMin[ax] - A[ax]) / d[ax];
-                let t2 = (boxMax[ax] - A[ax]) / d[ax];
-                if (t1 > t2) { const t = t1; t1 = t2; t2 = t; }
-                if (t1 > tEnter) tEnter = t1;
-                if (t2 < tExit) tExit = t2;
-            }
-        }
-        return { hit: tEnter <= tExit, tEnter, tExit };
     }
 
     fit(b) {
@@ -524,22 +772,117 @@ export class GcodeViz3D {
         // Rescale the floor grid to roughly match the part footprint. Anchor it to the stock bottom
         // (the table) so the stock always rests on the grid — otherwise a deep move (e.g. Z-first probe
         // in the corner wizard) drags b.minZ below the stock bottom and the stock appears to float.
-        const span = Math.max(sx, sy, 10);
-        const floorZ = (this._stock && this._stock.show && this._stock.z > 0) ? -this._stock.z : b.minZ;
-        if (this.grid) {
-            this.grid.scale.setScalar(span / 200);
-            this.grid.position.set(cx, cy, floorZ);
+        // Floor grid + axis labels FOLLOW THE MACHINE ENVELOPE when it's shown (centre + footprint + floor);
+        // otherwise they track the part/stock footprint.
+        const m = this._machine;
+        const useMch = m && m.show && m.x && m.y && m.z;
+        // PART-frame layout (the axis lines mark part-zero and ride the part frame → always part-local coords).
+        // Each axis line spans only ITS OWN extent (pHalfX/pHalfY) — not the larger span — so the shorter axis
+        // doesn't overshoot (the green-line-outward bug). pSpan stays the overall span for grid/label sizing.
+        const pSpan = Math.max(sx, sy, 10), pHalf = pSpan / 2;
+        const pHalfX = Math.max(sx, 10) / 2, pHalfY = Math.max(sy, 10) / 2;
+        // Floor = the stock's BOTTOM in part-local Z (datum-aware: 0 for a table-zero datum, -height for a top-zero
+        // datum) so the stock always rests ON the grid/table; falls back to -height, then the data bounds.
+        const pFloor = (this._stock && this._stock.show && this._stock.z > 0)
+            ? (this._stockFloorZ != null ? this._stockFloorZ : -this._stock.z) : b.minZ;
+        // GRID + edge labels live in the SCENE: linked to the ENVELOPE footprint in MACHINE coords (home at scene 0,
+        // fixed) when the envelope is shown, else the part/stock footprint.
+        let gCx = cx, gCy = cy, gFloor = pFloor, gW = Math.max(sx, 10), gH = Math.max(sy, 10);
+        let gHalfX = pHalf, gHalfY = pHalf, gSpan = pSpan;
+        if (useMch) {
+            gCx = m.x / 2; gCy = m.y / 2;                       // envelope centre (MACHINE coords)
+            gW = Math.abs(m.x); gH = Math.abs(m.y);
+            gHalfX = Math.abs(m.x) / 2; gHalfY = Math.abs(m.y) / 2; gSpan = Math.max(Math.abs(m.x), Math.abs(m.y));
+            gFloor = Math.min(0, m.z);                          // machine table — FIXED; the part rides the WCS (_partShift)
         }
-        if (this.axes) this.axes.scale.setScalar(Math.max(1, span / 200));
+        // The grid/table OVERHANGS the envelope (or stock) footprint by a few cm so it isn't flush with the machine
+        // walls — like a real table extending past the travel limits. Labels stay at the true coordinate extent
+        // (gHalfX/gHalfY below); only the floor/table is enlarged.
+        const GRID_OVERHANG = 30;   // ~3 cm each side
+        const tW = gW + GRID_OVERHANG * 2, tH = gH + GRID_OVERHANG * 2;
+        this._gridParams = { cx: gCx, cy: gCy, floor: gFloor, w: tW, h: tH };
+        this._layoutGrid(gCx, gCy, gFloor, tW, tH);
         if (this._gridLabels) {
-            const half = span / 2, off = span * 0.07, lw = span * 0.14, z = floorZ;
-            const L = this._gridLabels;
-            L.xp.position.set(cx + half + off, cy, z); L.xn.position.set(cx - half - off, cy, z);
-            L.yp.position.set(cx, cy + half + off, z); L.yn.position.set(cx, cy - half - off, z);
-            for (const k in L) L[k].scale.set(lw, lw / 2, 1);
+            const off = gSpan * 0.07, L = this._gridLabels;
+            // +X / +Y at the +scene end (true coordinate directions); labels at the centre of each envelope/grid edge.
+            // Scale is applied per-frame in _scaleMarkers (constant on-screen size, independent of zoom).
+            L.xp.position.set(gCx + gHalfX + off, gCy, gFloor); L.xn.position.set(gCx - gHalfX - off, gCy, gFloor);
+            L.yp.position.set(gCx, gCy + gHalfY + off, gFloor); L.yn.position.set(gCx, gCy - gHalfY - off, gFloor);
         }
+        // Axis lines mark PART-ZERO — part-local (they ride the part frame, which offsets them to +workOrigin in
+        // machine view): X red along y=0, Y green along x=0, over the part footprint at the part floor.
+        if (this._axisLineX) { const px = this._axisLineX.geometry.attributes.position; px.setXYZ(0, -pHalfX, 0, pFloor); px.setXYZ(1, pHalfX, 0, pFloor); px.needsUpdate = true; }
+        if (this._axisLineY) { const py = this._axisLineY.geometry.attributes.position; py.setXYZ(0, 0, -pHalfY, pFloor); py.setXYZ(1, 0, pHalfY, pFloor); py.needsUpdate = true; }
+        // Z line: spans the ENVELOPE Z extent (its own travel) when the envelope is shown — so it matches the X/Y
+        // lines and doesn't overshoot the real travel. Otherwise it rides the part frame: from the part floor up the
+        // Z extent (sz), with a small min so a flat part still shows a stub. Min is tied to the Z extent, NOT the XY
+        // span — else a wide footprint inflates the Z axis.
+        if (this._axisLineZ) {
+            const zBot = useMch ? Math.min(0, m.z) : pFloor;
+            const zTop = useMch ? Math.max(0, m.z) : Math.max(pFloor + Math.max(sz, 10) * 0.3, b ? b.maxZ : 0);
+            const pz = this._axisLineZ.geometry.attributes.position; pz.setXYZ(0, 0, 0, zBot); pz.setXYZ(1, 0, 0, zTop); pz.needsUpdate = true;
+        }
+        // Work-origin gizmo sits at the X/Y axis-line crossing (part-zero, at the datum floor Z) so it marks the WCS.
+        if (this._originGizmo) this._originGizmo.position.set(0, 0, pFloor);
 
         this._applyCamera();
+    }
+
+    // A "nice" grid increment (1/2/5 × 10^n) targeting ~14 cells across the larger footprint — unless the user
+    // pinned a fixed mm increment in Preview settings (_gridStep > 0).
+    _niceGridStep(span) {
+        if (this._gridStep > 0) return this._gridStep;
+        const raw = (span || 100) / 14;
+        const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+        const n = raw / pow;
+        return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * pow;
+    }
+
+    // Rebuild the floor grid for a width×height footprint centred at (cx,cy) on the z=floor plane. Lines run at
+    // multiples of the increment FROM THE ORIGIN (scene 0 → a line lands on each axis) and are CLIPPED to the
+    // footprint, plus a border so the grid is always bounded. Geometry only rebuilds when the layout changes.
+    _layoutGrid(cx, cy, floor, width, height) {
+        if (!this.grid) return;
+        const THREE = this.THREE;
+        const step = this._niceGridStep(Math.max(width, height));
+        this.grid.position.set(cx, cy, floor);
+        // The grid IS the table: a solid surface fixed in the MACHINE frame, coincident with the grid lines and
+        // sized to the same (overhung) footprint, so the stock visibly rests on it. (Replaces the old part-riding
+        // bed — one floor, not two.) Shown whenever a stock or machine envelope is present.
+        if (!this.tableMesh) {
+            this.tableMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+                new THREE.MeshBasicMaterial({ color: 0x222a31, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+            this.tableMesh.renderOrder = -1;   // behind the stock / toolpath
+            this.scene.add(this.tableMesh);
+        }
+        this.tableMesh.position.set(cx, cy, floor - 0.05);   // just under the grid lines (avoid z-fighting)
+        this.tableMesh.scale.set(width, height, 1);
+        this.tableMesh.visible = !!((this._machine && this._machine.show) || (this._stock && this._stock.show && this._stock.z > 0));
+        const key = [cx, cy, floor, width, height, step].map((v) => Math.round(v * 100)).join('|');
+        if (this._gridKey === key) return;
+        this._gridKey = key;
+        const hw = width / 2, hh = height / 2;
+        const xMin = cx - hw, xMax = cx + hw, yMin = cy - hh, yMax = cy + hh;
+        const pts = [];
+        for (let k = Math.ceil(xMin / step - 1e-9); k <= Math.floor(xMax / step + 1e-9); k++) {
+            const x = k * step - cx; pts.push(x, yMin - cy, 0, x, yMax - cy, 0);
+        }
+        for (let j = Math.ceil(yMin / step - 1e-9); j <= Math.floor(yMax / step + 1e-9); j++) {
+            const y = j * step - cy; pts.push(xMin - cx, y, 0, xMax - cx, y, 0);
+        }
+        pts.push(-hw, -hh, 0, hw, -hh, 0, hw, -hh, 0, hw, hh, 0, hw, hh, 0, -hw, hh, 0, -hw, hh, 0, -hw, -hh, 0); // border
+        const g = this.grid.geometry;
+        g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3));
+        g.computeBoundingSphere();
+    }
+
+    // Preview → grid spacing (mm; 0 = auto). Re-lays the grid in place (no camera change).
+    setGridStep(step) {
+        const s = Number(step) || 0;
+        if (s === this._gridStep) return;
+        this._gridStep = s; this._gridKey = null;
+        const p = this._gridParams;
+        if (p) { this._layoutGrid(p.cx, p.cy, p.floor, p.w, p.h); this.render(); }
     }
 
     _growBounds(b, x0, y0, z0, x1, y1, z1) {
@@ -552,14 +895,15 @@ export class GcodeViz3D {
     // Frame the union of toolpath + stock + machine envelope (whichever are present)
     fitAll() {
         let b = null;
+        const m = this._machine, useMch = m && m.show && m.x && m.y && m.z;
+        const sh = this.partFrame ? this.partFrame.shift : { x: 0, y: 0, z: 0 };   // part-frame offset (+WCS in machine view, else 0)
         const d = this._dataBounds;
-        if (d) b = this._growBounds(b, d.minX, d.minY, d.minZ, d.maxX, d.maxY, d.maxZ);
+        if (d) b = this._growBounds(b, d.minX + sh.x, d.minY + sh.y, d.minZ + sh.z, d.maxX + sh.x, d.maxY + sh.y, d.maxZ + sh.z);
         const s = this._stock;
-        if (s && s.show && s.x > 0 && s.y > 0 && s.z > 0) b = this._growBounds(b, 0, 0, -s.z, s.x, s.y, 0);
-        const m = this._machine;
-        if (m && m.show && m.x > 0 && m.y > 0 && m.z > 0) {
-            const ox = m.ox || 0, oy = m.oy || 0, oz = m.oz || 0;
-            b = this._growBounds(b, -ox, -oy, -oz, m.x - ox, m.y - oy, m.z - oz);
+        if (s && s.show && s.x > 0 && s.y > 0 && s.z > 0) b = this._growBounds(b, sh.x, sh.y, sh.z - s.z, sh.x + s.x, sh.y + s.y, sh.z);
+        if (useMch) {
+            // envelope corners in MACHINE coords (home at scene 0; the part rides +workOrigin)
+            b = this._growBounds(b, Math.min(0, m.x), Math.min(0, m.y), Math.min(0, m.z), Math.max(0, m.x), Math.max(0, m.y), Math.max(0, m.z));
         }
         if (b) this.fit(b);
         this.render();
@@ -569,14 +913,24 @@ export class GcodeViz3D {
     setStock(stock) {
         const THREE = this.THREE;
         this._stock = stock || null;
-        if (this.stockMesh) { this.scene.remove(this.stockMesh); this.stockMesh.geometry.dispose(); this.stockMesh.material.dispose(); this.stockMesh = null; }
-        if (this.stockEdges) { this.scene.remove(this.stockEdges); this.stockEdges.geometry.dispose(); this.stockEdges.material.dispose(); this.stockEdges = null; }
+        this._stockFloorZ = null;   // stock bottom in part-local Z (datum-aware) → the table/grid floor; set below
+        // The stock lives in a part group so a rotary move can spin it about its own axis.
+        if (!this._partGroup) { this._partGroup = new THREE.Group(); this.partFrame.add(this._partGroup); }   // stock rides the part frame
+        const pg = this._partGroup;
+        pg.rotation.set(0, 0, 0); // at rest; the play loop re-applies the angle each frame
+        if (this.stockMesh) { pg.remove(this.stockMesh); this.stockMesh.geometry.dispose(); this.stockMesh.material.dispose(); this.stockMesh = null; }
+        if (this.stockEdges) { pg.remove(this.stockEdges); this.stockEdges.geometry.dispose(); this.stockEdges.material.dispose(); this.stockEdges = null; }
+        if (this._rotaryFixture) {   // dark chuck + tailstock "4th-axis" rig (purely visual) — rebuilt below for any shown stock when the rig is on
+            pg.remove(this._rotaryFixture);
+            this._rotaryFixture.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+            this._rotaryFixture = null;
+        }
         if (stock && stock.show && stock.x > 0 && stock.y > 0 && stock.z > 0) {
             const pocket = stock.shape === 'pocket';
             const fillCol = pocket ? 0x6a8fbe : 0x8fae6a;  // pocket = blue, boss = green
             const edgeCol = pocket ? 0x86b6ff : 0xa6d77c;
             let geo;
-            const mat = new THREE.MeshBasicMaterial({ color: fillCol, transparent: true, opacity: 0.12, depthWrite: false });
+            const mat = new THREE.MeshLambertMaterial({ color: fillCol, transparent: true, opacity: this._stockOpacity(), depthWrite: false });   // SHADED (lit) stock; opacity per sim mode
             const mesh = new THREE.Mesh();
             if (pocket) {
                 // Square donut: a frame of material around the cavity. The cavity (the hole,
@@ -594,17 +948,145 @@ export class GcodeViz3D {
                 shape.holes.push(hole);
                 geo = new THREE.ExtrudeGeometry(shape, { depth: stock.z, bevelEnabled: false });
                 mesh.position.set(0, 0, -stock.z); // extrude [0,z] → world [-z,0], top at the table
+            } else if (stock.shape === 'cylinder') {
+                // Rotary cylinder — lies along the declared rotary axis (around X = horizontal
+                // 4th axis, around Z = vertical table). Defaults to X (horizontal) when no rotary
+                // axis is declared: the templates store length in X, and a 4th axis is typically
+                // along X. Diameter = the smaller of the two cross-section dims.
+                const axis = Object.values(getRotaryAxes())[0] || 'x';
+                const dims = { x: stock.x, y: stock.y, z: stock.z };
+                const cross = axis === 'x' ? [dims.y, dims.z] : axis === 'y' ? [dims.x, dims.z] : [dims.x, dims.y];
+                const r = Math.min(cross[0], cross[1]) / 2;
+                geo = new THREE.CylinderGeometry(r, r, dims[axis], 48); // three.js cylinders run along Y
+                if (axis === 'x') geo.rotateZ(Math.PI / 2);
+                else if (axis === 'z') geo.rotateX(Math.PI / 2);
+                mesh.position.set(stock.x / 2, stock.y / 2, -stock.z / 2);
             } else {
                 geo = new THREE.BoxGeometry(stock.x, stock.y, stock.z);
                 mesh.position.set(stock.x / 2, stock.y / 2, -stock.z / 2);
             }
             mesh.geometry = geo;
             mesh.material = mat;
-            this.stockMesh = mesh; this.scene.add(mesh);
             const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: edgeCol, transparent: true, opacity: 0.55 }));
             edges.position.copy(mesh.position);
-            this.stockEdges = edges; this.scene.add(edges);
+            // Pivot the part group on the stock centre, then offset the meshes into its local
+            // space, so partGroup.rotation spins the stock about its own centre axis.
+            const C = new THREE.Vector3(stock.x / 2, stock.y / 2, -stock.z / 2);
+            // Datum = which point of the stock is part-zero (default front-left-top corner). Pin = place that datum
+            // at a WCS offset (else the origin). pg.position = the stock centre in scene; the mesh stays centred on
+            // it so a rotary move still spins about the part axis.
+            // Datum = which BOX POINT of the stock is part-zero: a 3-char code [X][Y][Z], each n(min)/c(centre)/
+            // p(max). Migrate the legacy XY-only fl/fr/bl/br/center (all top-Z). Dx/Dy/Dz = the datum's offset
+            // from the stock's min corner, so pg.position places that point at the origin (or the WCS pin).
+            const OLD_DATUM = { fl: 'nnp', fr: 'pnp', bl: 'npp', br: 'ppp', center: 'ccp' };
+            let dcode = stock.datum || 'nnp';
+            if (!/^[ncp]{3}$/.test(dcode)) dcode = OLD_DATUM[dcode] || 'nnp';
+            const dfrac = { n: 0, c: 0.5, p: 1 };
+            const D = [dfrac[dcode[0]] * stock.x, dfrac[dcode[1]] * stock.y, dfrac[dcode[2]] * stock.z];   // [Dx,Dy,Dz] from min corner (Dz: 0=bottom, z=top)
+            // XY follows the datum (the stock's WCS-XY pin — for convenience). Z is the subtle one: an
+            // incremental / start-anchored op (a probe) is operator-relative — it references the stock SURFACE, not
+            // the datum (the datum is a mill/WCS-Z concept) — so present the stock TOP-AT-0 regardless of datum, so
+            // render == collision == start marker == path. ABSOLUTE (mill) stays datum-aware: the datum-Z there is a
+            // real feature (a bottom datum offsets the path up by the stock height for a precision height cut).
+            // See docs/probe-preview-frame-issues.md.
+            const dzCol = this._anchorToStart ? stock.z : D[2];   // start-anchored → top-at-0; mill → datum-aware
+            pg.position.set(stock.x / 2 - D[0], stock.y / 2 - D[1], stock.z / 2 - dzCol);
+            this._stockFloorZ = pg.position.z - stock.z / 2;   // stock bottom → where the table/grid sits
+            mesh.position.sub(C);
+            edges.position.sub(C);
+            this.stockMesh = mesh; pg.add(mesh);
+            this.stockEdges = edges; pg.add(edges);
+            // The 4th-axis rig (chuck + tailstock) is a SEPARATE op-specific overlay (opt-in, like ATC's magazine),
+            // INDEPENDENT of the stock SHAPE — so it frames a round bar OR a rectangular part on the rotary axis
+            // (e.g. the rotary clock clocks a flat on a box). pg origin is the stock centre, so place() aligns either way.
+            if (this._showRotaryFixture) {
+                const fAxis = Object.values(getRotaryAxes())[0] || 'x';
+                const fd = { x: stock.x, y: stock.y, z: stock.z };
+                const fCross = fAxis === 'x' ? [fd.y, fd.z] : fAxis === 'y' ? [fd.x, fd.z] : [fd.x, fd.y];
+                // round bar = the inscribed Ø (min cross); a box = the larger cross so the chuck/jaws wrap the part.
+                const fr = (stock.shape === 'cylinder' ? Math.min(fCross[0], fCross[1]) : Math.max(fCross[0], fCross[1])) / 2;
+                // round bar → 3-jaw self-centring; rectangular part → 4-jaw independent on the flat faces (cu/cv).
+                this._buildRotaryFixture(pg, fAxis, fr, fd[fAxis] / 2, { jaws: stock.shape === 'cylinder' ? 3 : 4, cu: fCross[0], cv: fCross[1] });
+            }
+            // The table the stock rests on is the GRID floor (a fixed machine-frame surface — see _layoutGrid), not a
+            // per-stock bed. So nothing extra to draw here.
         }
+        this.partFrame.update(this._partShift());   // stock pin / WCS may have changed → re-place op+stock at the stock's WCS
+        if (this._jogA) this._applyPartRotation(this._jogA, 0);   // keep a manual A jog after a stock rebuild (set above to rest)
+    }
+
+    /**
+     * A purely-visual rotary "4th-axis" rig framing a cylinder bar so it reads as a real lathe-style fixture:
+     * a dark metallic CHUCK (disc + 3 jaws) gripping the LO end (axis −L) and a TAILSTOCK (body + live-centre
+     * cone) supporting the HI end (axis +L). Built directly into the part group (pg-local origin = bar centre),
+     * so it rides the datum/WCS and spins with the stock. `axis` = the rotary Cartesian axis ('x'|'y'|'z'),
+     * `r` = bar radius, `L` = half the bar length along the axis. Does NOT affect probe collision.
+     */
+    _buildRotaryFixture(pg, axis, r, L, opts = {}) {
+        const THREE = this.THREE;
+        const grp = new THREE.Group();
+        // Orient a Y-aligned geometry to the bar axis the SAME way the cylinder stock is oriented.
+        const orientToAxis = (geo) => { if (axis === 'x') geo.rotateZ(Math.PI / 2); else if (axis === 'z') geo.rotateX(Math.PI / 2); return geo; };
+        // Send a Y-aligned cone's natural tip (+Y) to point along −axis (back AT the bar): x→−X, y→−Y, z→−Z.
+        const aimConeAtBar = (geo) => { if (axis === 'x') geo.rotateZ(Math.PI / 2); else if (axis === 'y') geo.rotateZ(Math.PI); else geo.rotateX(-Math.PI / 2); return geo; };
+        // (axisCoord, u, v) → pg-local Vector3, where u,v are the two cross-plane coords in the SAME order as the
+        // cylinder's cross dims (x→[y,z], y→[x,z], z→[x,y]).
+        const place = (a, u, v) => axis === 'x' ? new THREE.Vector3(a, u, v) : axis === 'y' ? new THREE.Vector3(u, a, v) : new THREE.Vector3(u, v, a);
+        const chuckMat = () => new THREE.MeshLambertMaterial({ color: 0x5a626c, transparent: true, opacity: 0.9 });
+        const jawMat = () => new THREE.MeshLambertMaterial({ color: 0x8a929c, transparent: true, opacity: 0.9 });
+
+        // --- CHUCK at the LO end (axis −L): a dark disc just outside the bar end, + 3 jaws on its inner face ---
+        const chuckDepth = r * 0.7;
+        const disc = new THREE.Mesh(orientToAxis(new THREE.CylinderGeometry(r * 1.6, r * 1.6, chuckDepth, 32)), chuckMat());
+        disc.position.copy(place(-L - chuckDepth / 2, 0, 0));
+        grp.add(disc);
+        const jawA = -L + r * 0.15;   // jaws sit on the chuck's inner face, reaching onto the bar end
+        const axisVec = new THREE.Vector3(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0);
+        // Jaw COUNT follows the part: a round bar → 3-jaw self-centring (120°); a rectangular part → 4-jaw
+        // independent (90°), each jaw on a flat FACE (face half-widths cu/cv, not a single radius).
+        const jaws = opts.jaws === 4 ? 4 : 3, cu = opts.cu || 2 * r, cv = opts.cv || 2 * r;
+        for (let i = 0; i < jaws; i++) {
+            const ang = (i * 2 * Math.PI) / jaws;
+            const ru = jaws === 4 ? (i % 2 === 0 ? cu / 2 : cv / 2) * 0.98 : r * 0.92;   // 4-jaw rides each face; 3-jaw a circle
+            const jaw = new THREE.Mesh(orientToAxis(new THREE.BoxGeometry(r * 0.5, r * 0.4, r * 0.3)), jawMat());
+            jaw.position.copy(place(jawA, Math.cos(ang) * ru, Math.sin(ang) * ru));
+            jaw.rotateOnWorldAxis(axisVec, ang);   // spin each jaw to face the centre → a symmetric array (not same-facing slabs)
+            grp.add(jaw);
+        }
+
+        // --- TAILSTOCK at the HI end (axis +L): a live-centre CONE protruding toward the bar, body BEHIND it ---
+        const coneLen = r * 0.9;
+        const cone = new THREE.Mesh(aimConeAtBar(new THREE.ConeGeometry(r * 0.45, coneLen, 24)), jawMat());
+        // Tip points toward −axis and lands ~at the bar end (axis = L). Cone is centred on its own length,
+        // so its centre sits coneLen/2 OUTSIDE the bar end → tip at +L.
+        cone.position.copy(place(L + coneLen / 2, 0, 0));
+        grp.add(cone);
+        const bodyLen = r * 0.8;
+        const body = new THREE.Mesh(orientToAxis(new THREE.CylinderGeometry(r * 0.8, r * 0.8, bodyLen, 24)), chuckMat());
+        // Body sits BEHIND the cone base (axis = L+coneLen) so the light live-centre cone protrudes from it instead
+        // of being buried inside the dark body (which read as a grey cone-in-a-box before).
+        body.position.copy(place(L + coneLen + bodyLen / 2, 0, 0));
+        grp.add(body);
+
+        this._rotaryFixture = grp;
+        pg.add(grp);
+    }
+
+    /** Opt-in op-specific preview: show/hide the 4th-axis rig (chuck + tailstock) around a cylinder stock.
+     *  Only the rotary probe wizards turn this on (mirrors setMagazine for ATC), so it never appears elsewhere. */
+    setRotaryFixture(on) {
+        on = !!on;
+        this._showRotaryJog(on);   // rotary op → reveal the manual A± jog row (hidden for non-rotary ops)
+        if (on === this._showRotaryFixture) return;
+        this._showRotaryFixture = on;
+        if (this._stock) this.setStock(this._stock);   // rebuild the stock so the rig appears/disappears
+    }
+
+    /** Show/hide the manual A-axis jog row in the jog pendant. Only rotary ops (which set the 4th-axis fixture)
+     *  show it, so a non-rotary op never offers an A jog. The pendant wires it (setupJogPendant). */
+    _showRotaryJog(on) {
+        const row = this.jogPendant && this.jogPendant.querySelector('.jog-a-row');
+        if (row) row.style.display = on ? '' : 'none';
     }
 
     // Tool Setter Block
@@ -630,20 +1112,101 @@ export class GcodeViz3D {
         }
     }
 
-    // Wireframe machine envelope — origin = program-zero offset from the envelope's min corner
+    // The part-frame offset = machine coords of part-zero. The whole setup (op + stock) sits at the STOCK's WCS
+    // (its "Sits at WCS" pin, looked up in the WCS table) when the machine envelope is shown; else 0 (part-zero at
+    // scene 0, the per-op view). ONE source for op + stock so they never diverge. See machine-frame-sim-spec.
+    _partShift() {
+        const m = this._machine, s = this._stock;
+        if (!(m && m.show && m.x && m.y && m.z)) return { x: 0, y: 0, z: 0 };
+        // XY — always the stock's WCS (G54 XY): the persistent fixture position.
+        let x = 0, y = 0, wcsZ = 0;
+        const pin = s && s.pin, wt = m.wcs && m.wcs.table;
+        if (pin && pin !== 'origin' && Array.isArray(wt)) {
+            const t = wt[parseInt(String(pin).replace(/[^0-9]/g, ''), 10) - 54];   // 'g54' → table[0]
+            if (t) { x = Number(t.x) || 0; y = Number(t.y) || 0; wcsZ = Number(t.z) || 0; }
+        }
+        // Z — the stock rests on the FIXED machine table; Z0 floats at the datum height (you re-zero Z per part, so
+        // the stored WCS-Z is ignored — it's volatile). Real Z control is per-path code (offZ + the datum-Z offset),
+        // not the sim placement. No stock → just the WCS-Z. (Absolute-machine-Z view is deferred to machine-frame fidelity.)
+        const tableFloor = Math.min(0, m.z), stockShown = s && s.show && s.z > 0 && this._stockFloorZ != null;
+        const z = stockShown ? tableFloor - this._stockFloorZ : wcsZ;
+        return { x, y, z };
+    }
+
+    // Wireframe machine envelope (fixed machine coords; home at scene 0) + machine-zero axes. The PART frame carries
+    // op/stock to the stock's WCS instead, so the envelope never moves.
     setMachine(machine) {
         const THREE = this.THREE;
         this._machine = machine || null;
+        this.partFrame.update(this._partShift());   // op + stock ride the STOCK's WCS (machine view); else part-zero at scene 0
         if (this.machineBox) { this.scene.remove(this.machineBox); this.machineBox.geometry.dispose(); this.machineBox.material.dispose(); this.machineBox = null; }
-        if (machine && machine.show && machine.x > 0 && machine.y > 0 && machine.z > 0) {
-            const src = new THREE.BoxGeometry(machine.x, machine.y, machine.z);
+        if (this.machineAxes) { this.scene.remove(this.machineAxes); if (this.machineAxes.geometry) this.machineAxes.geometry.dispose(); if (this.machineAxes.material) this.machineAxes.material.dispose(); this.machineAxes = null; }
+        const sx = machine ? machine.x : 0, sy = machine ? machine.y : 0, sz = machine ? machine.z : 0;
+        if (machine && machine.show && sx && sy && sz) {
+            const src = new THREE.BoxGeometry(Math.abs(sx), Math.abs(sy), Math.abs(sz));   // |travel| — the sign is just the home direction
             const eg = new THREE.EdgesGeometry(src);
             src.dispose();
             const box = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x6c7a8c, transparent: true, opacity: 0.4 }));
-            const ox = machine.ox || 0, oy = machine.oy || 0, oz = machine.oz || 0;
-            box.position.set(machine.x / 2 - ox, machine.y / 2 - oy, machine.z / 2 - oz);
+            const sh = this.partFrame.shift;   // part-zero offset (the stock's WCS) — home shows when it's separate
+            // Envelope spans machine 0..travel (signed) in MACHINE coords — home stays at scene 0 (fixed); the PART
+            // frame shifts to the stock's WCS instead, so the envelope never moves when the WCS changes.
+            box.position.set(sx / 2, sy / 2, sz / 2);
             this.machineBox = box; this.scene.add(box);
+            // Machine-zero (home) marker — ONLY when it is SEPARATE from part-zero (the part rides a non-zero WCS);
+            // at the origin it would just duplicate the part-zero axes. Marks home at scene 0 (X red / Y green / Z blue).
+            if (sh.x || sh.y || sh.z) {
+                const axLen = (Math.min(Math.abs(sx), Math.abs(sy), Math.abs(sz)) * 0.3) || 40;
+                const ax = new THREE.AxesHelper(axLen);
+                ax.position.set(0, 0, 0);   // machine home at scene 0 (part-zero rides the part frame at +workOrigin)
+                if (ax.material) { ax.material.transparent = true; ax.material.opacity = 0.85; ax.material.depthTest = false; }
+                ax.renderOrder = 5;
+                this.machineAxes = ax; this.scene.add(ax);
+            }
         }
+        if (this._magazine) this.setMagazine(this._magazine);   // re-place pockets when the envelope/WCS changes
+        if (this._stock && this._stock.pin && this._stock.pin !== 'origin') this.setStock(this._stock);   // re-pin the stock to its WCS
+    }
+
+    /**
+     * ATC magazine in 3D on the envelope: a tool stub + pocket ring + number at each pocket's MACHINE position.
+     * Scene coords = machine − origin(ox/oy/oz), same frame as the envelope box. pockets = [{x,y,z,dia,length,
+     * color,pocket,tool}] (machine coords). Pass [] / null to clear.
+     */
+    setMagazine(pockets) {
+        const THREE = this.THREE;
+        if (this._magGroup) {
+            this.scene.remove(this._magGroup);
+            this._magGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((mm) => mm.dispose && mm.dispose()); });
+            this._magGroup = null;
+        }
+        this._magazine = (pockets && pockets.length) ? pockets : null;
+        if (!this._magazine) { this.render(); return; }
+        const m = this._machine || {}, wo = m.workOrigin || {}, ox = wo.x || 0, oy = wo.y || 0, oz = wo.z || 0;
+        const n = (v, d) => { const x = Number(v); return Number.isFinite(x) ? x : d; };
+        const grp = new THREE.Group();
+        this._magazine.forEach((p, i) => {
+            const px = n(p.x, 0) - ox, py = n(p.y, 0) - oy, pz = n(p.z, 0) - oz;
+            const td = p.tool || { type: 'endmill', dia: n(p.dia, 6), length: Math.max(15, n(p.length, 30)) };
+            const dia = n(td.dia, 6), len = Math.max(15, n(td.length, 30));
+            const col = (p.color != null) ? p.color : 0xffab40;   // amber — distinct from stock + the cyan toolpath
+            // Real tool: revolve its accurate half-profile (round ballnose, pointed V-bit) — tip at the pocket Z,
+            // body extends up. Lathe revolves around Y, so rotate Y→Z for the Z-up scene.
+            const pts = toolHalfProfile(td).map((q) => new THREE.Vector2(Math.max(0.001, q[0]), q[1]));
+            const geo = new THREE.LatheGeometry(pts, 24); geo.rotateX(Math.PI / 2);
+            const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, depthWrite: false }));
+            mesh.position.set(px, py, pz - len);   // align tool TOPS at the pocket Z (holder reference); tips hang down by length
+            grp.add(mesh);
+            // Pocket bounding box: a wireframe slot enclosing the tool, marking the pocket extent on the envelope.
+            const bw = Math.max(dia * 1.8, 14), bh = len;
+            const bgeo = new THREE.BoxGeometry(bw, bw, bh);
+            const box = new THREE.LineSegments(new THREE.EdgesGeometry(bgeo), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.5 }));
+            box.position.set(px, py, pz - bh / 2); grp.add(box);
+            bgeo.dispose();
+            const sp = this._makeNumberSprite(p.pocket != null ? p.pocket : i + 1);
+            sp.position.set(px, py, pz + 7); grp.add(sp);
+        });
+        this._magGroup = grp; this.scene.add(grp);
+        this.render();
     }
 
     // Re-pivot the orbit on the point under the cursor (the stock surface if hovered,
@@ -691,6 +1254,46 @@ export class GcodeViz3D {
             this.camera.updateProjectionMatrix();
         }
         this.camera.updateMatrixWorld();
+        this._layoutTrailFat();
+    }
+
+    // Fat trail: 4 offset copies of the trail line (children of _trailLine → they share its geometry, draw-range,
+    // tip edits, colours and visibility) nudged ±right/±up in SCREEN space, so the bold executed path renders a
+    // few px thick on any GPU (GL linewidth is capped at 1px on ANGLE). Offsets recompute here so the thickness
+    // stays ~constant on screen through zoom.
+    _layoutTrailFat() {
+        const fat = this._trailFat; if (!fat || !fat.length) return;
+        const THREE = this.THREE, cam = this.camera;
+        const h = (this.renderer && this.renderer.domElement.clientHeight) || 600;
+        const fov = ((cam.fov || (this.persp && this.persp.fov) || 45) * Math.PI) / 180;
+        const o = ((2 * this.radius * Math.tan(fov / 2)) / h) * 1.1;   // ≈1.1 px (world units at the target distance)
+        const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0).normalize();
+        const up = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1).normalize();
+        fat[0].position.copy(right).multiplyScalar(o);
+        fat[1].position.copy(right).multiplyScalar(-o);
+        fat[2].position.copy(up).multiplyScalar(o);
+        fat[3].position.copy(up).multiplyScalar(-o);
+    }
+
+    /** Centre-lock the camera on the tool. on → a rAF loop eases the orbit target onto the tool each frame. */
+    setFollowCam(on) {
+        this.followCam = !!on;
+        if (this.followCam) { if (!this._followRaf) this._followTick(); }
+    }
+    setFollowLerp(v) { const n = +v; if (Number.isFinite(n)) this.followLerp = Math.max(0.01, Math.min(0.6, n)); }
+    _followTick() {
+        if (!this.followCam || !this.active) { this._followRaf = null; return; }
+        if (this._animTool && this._animTool.visible) {
+            const before = this.target.clone();
+            // The tool rides the partFrame (shifted by +workOrigin to the WCS spot), so .position is its LOCAL coord;
+            // lerping the world-space orbit target onto it centres on where the tool would be at machine origin (the
+            // reported bug). Use the tool's WORLD position so the lock follows the actual spindle.
+            this._animTool.updateWorldMatrix(true, false);
+            const tw = this._animTool.getWorldPosition(this._followV3 || (this._followV3 = new THREE.Vector3()));
+            this.target.lerp(tw, this.followLerp);
+            if (this.target.distanceToSquared(before) > 1e-5) { this._applyCamera(); this.render(); }
+        }
+        this._followRaf = requestAnimationFrame(() => this._followTick());
     }
 
     _toPerspective() {
@@ -757,9 +1360,16 @@ export class GcodeViz3D {
             if (e) pointers.delete(e.pointerId);
             if (mode === 'pinch' && pointers.size < 2) mode = null;
             if (pointers.size > 0) return;   // other fingers still down
-            if (mode === 'gizmo' && typeof this.onStartChange === 'function') {
-                this.onStartChange(this.starts);
+            if (mode === 'gizmo') {
+                if (typeof this.onStartChange === 'function') this.onStartChange(this.starts);
+                if (this._syncJogPos) this._syncJogPos();   // refresh the precise X/Y/Z start fields after a drag
             }
+            // A click (not a drag) on a marker/label selects it for the jog pendant.
+            if (mode !== 'gizmo' && this._downMarker >= 0 && e &&
+                Math.hypot(e.clientX - this._downX, e.clientY - this._downY) < 5) {
+                this.selectStart(this._downMarker);
+            }
+            this._downMarker = -1;
             mode = null;
             try { if (this._pid != null) el.releasePointerCapture(this._pid); } catch (_) {}
             this._pid = null;
@@ -786,6 +1396,7 @@ export class GcodeViz3D {
             if (g) {
                 mode = 'gizmo';
                 this._dragPass = g.pass;
+                this.selectStart(g.pass);   // dragging a marker also selects it for the jog pendant
                 this._dragDir = g.axis === 'x' ? new THREE.Vector3(1, 0, 0)
                     : g.axis === 'y' ? new THREE.Vector3(0, 1, 0)
                     : new THREE.Vector3(0, 0, 1);
@@ -796,6 +1407,10 @@ export class GcodeViz3D {
                 this._setHighlight(g.pass, g.axis);
                 this.renderer.domElement.style.cursor = 'grabbing';
             } else {
+                // Click a numbered marker/label to select it for the jog pendant (applied on
+                // pointer-up only if it was a click, not an orbit-drag).
+                this._downMarker = (e.button === 0 && !e.shiftKey) ? this._pickMarker(e) : -1;
+                this._downX = e.clientX; this._downY = e.clientY;
                 // CAD-style: middle = pan, Shift+middle = orbit; left = orbit, right/Shift+left = pan
                 if (e.button === 1) mode = e.shiftKey ? 'rot' : 'pan';
                 else mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot';
@@ -814,9 +1429,9 @@ export class GcodeViz3D {
         el.addEventListener('pointermove', (e) => {
             if (mode) return;
             const faceIdx = this._cubeFaceAt(e);
-            if (faceIdx !== -2) { // over the ViewCube
+            if (faceIdx !== -2) { // over the ViewCube — the whole square is clickable (near-miss snaps to nearest face)
                 this._highlightCubeFace(faceIdx);
-                el.style.cursor = faceIdx >= 0 ? 'pointer' : 'default';
+                el.style.cursor = 'pointer';
                 this._setHighlight(null, null);
                 return;
             }
@@ -882,20 +1497,9 @@ export class GcodeViz3D {
             if (this._ro) { this._ro.disconnect(); this._ro.observe(container); }
         }
         
-        // Move jog pendant
-        if (this.jogPendant) {
-            const wizBody = container.closest('.wiz-body');
-            if (wizBody) {
-                const legend = wizBody.querySelector('.viz-legend');
-                if (legend) {
-                    legend.insertAdjacentElement('afterend', this.jogPendant);
-                } else {
-                    wizBody.appendChild(this.jogPendant);
-                }
-            } else {
-                container.appendChild(this.jogPendant);
-            }
-        }
+        // Keep the jog pendant overlaid at the bottom of the 3D box (same as the main viewer),
+        // rather than dumping it at the bottom of the wizard form.
+        if (this.jogPendant) container.appendChild(this.jogPendant);
         
         this._resize();
     }

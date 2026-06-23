@@ -107,6 +107,9 @@ export default {
     const destField = el("input", { type: "text", value: dest, placeholder: "\\\\10.0.0.50\\cncdisk", style: "width:100%" });
     const beacons = el("input", { type: "checkbox" });
     beacons.checked = !!cfg.enable_slave;
+    const PORTS = [8765, 8766, 8767, 8768, 8769];
+    const portSel = el("select", {}, PORTS.map((p) => el("option", { value: String(p) }, String(p))));
+    portSel.value = String(cfg.port || 8765);
     const save = el("button", { class: "primary" }, "Save");
     const info = el("div", { class: "hint" });
 
@@ -115,11 +118,12 @@ export default {
       try {
         const r = await ctx.client.setConfig({
           machine_name: name.value, dest: destField.value.trim(), enable_slave: beacons.checked,
+          port: parseInt(portSel.value, 10),
         });
         if (!r.ok) { toast(r.error || "save failed", true); info.textContent = r.error || ""; }
         else {
           toast("Saved");
-          info.textContent = r.restart_needed ? "Saved. Beacons change needs a gateway restart." : "Saved + applied.";
+          info.textContent = r.restart_needed ? "Saved — restart the gateway to apply." : "Saved + applied.";
           await this.render(ctx);
         }
       } catch (e) { toast("save failed: " + e.message, true); }

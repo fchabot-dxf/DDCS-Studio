@@ -1,0 +1,625 @@
+/* ///////////////////////////////////////////////////////
+* 				M6 HTM_ATC Macro - by Seb
+* 2024.11.05	- adding CheckSlot function with while loops for waitTime
+*				- adding config options for ATC
+*					- show ATC page during TC operation
+*					- apply G43 for new loaded tools (G49 if not)
+*					- back to initial position after TC 
+* 2024.11.06	- adding "Ismacrostopped" check
+*				- adding G43 (if checked) even is the same tool
+*				- adding specific messages for OSSD inputs in macroloop M20101. Vars declared in M99998
+*				- checking spindle stopped with waitTime declared in Spindle settings.
+*
+*/
+
+	exec.Stopspin(); 	//Make sure the spindle is OFF
+	exec.Code("M09"); 	//Make sure coolant is OFF
+
+	//defining error sound
+	System.Media.SoundPlayer errorSound = new System.Media.SoundPlayer(Application.StartupPath + @"\Flashscreen\SOUND\error.wav");
+	
+	if(!exec.GetLED(56)||!exec.GetLED(57)||!exec.GetLED(58)) // If machine was not homed then it is unsafe to move in machine coordina	tes, stop here...
+	{
+		exec.AddStatusmessage("ATC - Cannot start! One or more axis are NOT REFERENCED");
+		errorSound.Play();
+		exec.Stop();
+		return;
+	}
+
+	// checking spindle
+	int	WaitTimeDRO	= 2761;	// Spindle WaitTime taken from Spindle Setup
+	int	SactDRO	= 870;  // Actspindlespeed field number
+	int maximumWaitTime = Convert.ToInt32(AS3.Getfield(WaitTimeDRO))*1000;
+	
+	while ((Convert.ToDouble(AS3.Getfield(SactDRO)) > 0) && (maximumWaitTime > 0))	{ // Loop until the spindle is stopped
+			exec.Wait(100);		// Wait 50ms
+			maximumWaitTime = maximumWaitTime - 100;	// Decrement timeout counter
+			if (maximumWaitTime <= 0) {
+				exec.AddStatusmessage("ATC - Error! Spindle not stopped!");
+				errorSound.Play();
+				exec.Stop();
+				return;
+			}
+	}
+
+	// verificam daca exista aer in instalatie, iesim din script daca nu
+	//daca senzorul este activat, adica portul este diferit de 0
+	if (AS3.Getbuttonstate(20202)) { // daca senzorii sunt activati
+		if ((AS3.Getfieldint(20654)==0) || (AS3.Getfieldint(20655)==0)) {
+			exec.AddStatusmessage("ATC - Invalid Pressure Sensor Config!");
+			errorSound.Play();
+			exec.Stop();
+			return;
+		}			
+		if (Getinpin(AS3.Getfieldint(20654),AS3.Getfieldint(20655))) {
+			exec.AddStatusmessage("ATC - Cannot start! No Air Pressure");
+			errorSound.Play();
+			exec.Stop();
+			return;
+		}
+	}
+	
+		
+	//declarare variabile
+  	int newtool;		//scula noua ceruta in spindle
+  	int oldtool;		//scula existenta in spindle
+	
+	int manualConfirm = 0; // pentru operatiuni cu senzorii sloturilor
+	
+	// spindle outputs
+	int drawbarPort = AS3.Getfieldint(20650);
+	int drawbarPin = AS3.Getfieldint(20651);
+	int airPort = AS3.Getfieldint(20652);
+	int airPin = AS3.Getfieldint(20653);
+	
+  	int newSlot = 0;		//slotul in care se regaseste newtool, daca exista
+  	int oldSlot = 0;		//slotul in care se regaseste oldtool, daca exista
+	
+  	int err_lvl;
+	
+	//Dim cnt As Integer		'variabila ptr generare timeout in asteptarea semnalelor de la spindle
+	
+	int rackSize = 10;	//variabila ptr setarea numarului total de sloturi in magazie
+
+	// variabile ptr determinarea initLayer si initParent
+	int initLayer = 1;
+	int initParent = 1;
+	
+	bool updateDetails = false;
+	
+	string rackAxis = AS3.Getfield(30000);	//determinam pe ce axa este aliniata magazia de scule (X sau Y)
+	string rackAxis2 = AS3.Getfield(30001);	//determinam pe ce axa este aliniata magazia de scule (X sau Y)
+	double rackX = AS3.Getfielddouble(30010);		//pozitia initiala (slot 1) de schimbare a sculelor pe axa X
+	double rackY = AS3.Getfielddouble(30011);		//pozitia de schimbare a sculelor pe axa Y
+	double rackZ = AS3.Getfielddouble(30012);		//pozitia in care se elibereaza/incarca scula pe axa Z
+	double stepRack = AS3.Getfielddouble(30013);		//pasul de indexare ptr fiecare slot in parte
+	double clearRack = AS3.Getfielddouble(30014);		//pozitia pe Y (sau X) ptr returnare scula (inainte de intrare in clema
+	double safeZ = AS3.Getfielddouble(30015);		//pozitia pe Z ptr incarcare scula (clearance pe deasupra conurilor)
+	double emptyZ = AS3.Getfielddouble(30016);		//pozitia pe Z unde se ridica spindle gol, fara scula, ptr traversarea pe deasupra sculelor si incarcarea noii scule
+	double tcfeed = AS3.Getfielddouble(30017);		//feedrate la care se face schimbarea sculelor
+	double checkZ = AS3.Getfielddouble(30023);		//daca checkZ <> rackZ atunci oprim la checkZ ptr verificare senzor stare slot
+	int delay = Convert.ToInt32(AS3.Getfield(30018));		//delay intre operatiuni
+	
+	// bool sensorsOn = AS3.Getbuttonstate(20202);
+	bool showATCpage = AS3.Getcheckboxstate(30006);
+	bool applyG43 = AS3.Getcheckboxstate(30005);
+	bool backToXY = AS3.Getcheckboxstate(30004);
+	bool measureNRH = AS3.Getcheckboxstate(30003);
+	
+	// Define position vars for return to this position at the end of the macro
+	double Xoriginalpos = exec.GetXmachpos();
+	double Yoriginalpos= exec.GetYmachpos();
+	double Zoriginalpos= exec.GetZmachpos();
+	//exec.AddStatusmessage("X" + Xoriginalpos + " - Y" + Yoriginalpos + " - Z" + Zoriginalpos);
+
+	var varSlot = Plugininterface.Datatypes.Tooltablecolumnname.Slot; // variabila care sa gestioneze slotul sculei atat ptr citire cat si ptr scriere
+	var varLength = Plugininterface.Datatypes.Tooltablecolumnname.Length;
+	var varDiameter = Plugininterface.Datatypes.Tooltablecolumnname.Diameter;
+	var varType = Plugininterface.Datatypes.Tooltablecolumnname.Type;
+
+	// preluam layernumber si parentnumber din care s-a initiat comanda M6 ptr intoarcere dupa M6
+	List<Plugininterface.Datatypes.Layerdatastruct> Ldata = exec.Getlayerslist(true);
+
+	if (showATCpage) { // daca checkboxul ptr afisare pagina atc este bifat
+		for (int i = 1; i < 50; i++)
+		{
+		//MessageBox.Show("" + Ldata[1].Isactive); //Shows the Isactive property of the first layer in the List.
+			if (Ldata[i].Isactive) {
+				if (Ldata[i].Parentnumber > 1){
+					// exec.AddStatusmessage ("1Layernumber = " + Ldata[i].Layernumber);
+					// exec.AddStatusmessage ("1Parentnumber = " + Ldata[i].Parentnumber);
+					// exec.AddStatusmessage ("1Parent Parentnumber = " + Ldata[Ldata[i].Parentnumber].Parentnumber);
+					i = 1000;
+				} else {
+					// exec.AddStatusmessage ("2Layernumber = " + Ldata[i].Layernumber);
+					initLayer = Ldata[i].Layernumber;
+					// exec.AddStatusmessage ("2Parentnumber = " + Ldata[i].Parentnumber);
+					initParent = Ldata[i].Parentnumber;
+					i = 1000;
+				}
+			}
+		}
+	}
+	
+	//checking for invalid values (unconfigured ATC system)
+	if ((stepRack == 0) || (safeZ == rackZ) || (tcfeed == 0)) { 
+		exec.AddStatusmessage("ATC Setup - Invalid ATC Settings - Check Setup");
+		errorSound.Play();
+		exec.Stop();
+		return;
+	}		
+
+	int currentTool = exec.Getcurrenttool(); // Preluăm scula curentă - oldtool in scriptul Mach
+	int newTool = exec.Getnewtool(); // scula nou ceruta prin M6 - newtool in scriptul Mach
+
+	if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+
+//////////////////////////////////////////////////////////////////////////////
+// case 0 - requested tool already loaded - don't have to load same tool again
+	if(newTool == currentTool) { // Same tool was requested
+		if (applyG43) { exec.Code("G43 H" + currentTool); } else { exec.Code("G49"); }
+		return;
+	}
+
+	if (showATCpage) { // daca checkboxul ptr afisare pagina atc este bifat
+		// ne mutam in pagina de ATC
+		AS3.selectlayer(5); // prima data in 5 (parentlayer-ul lui 57)
+		AS3.selectlayer(57);	
+	}
+
+// case 1 - not same tool, searching if currentTool have own slot already (was previously declared in rack)
+	// cautam, daca exista deja, pozitia lui currentTool in sloturi
+	for (int i = 20501; i < 20511; i++) {
+		// atribuim valoare lui oldSlot in caz ca gasim scula in rack, slotul nu este disabled si scula existenta > 0 
+		if ((currentTool == AS3.Getfielddouble(i)) && (AS3.GetLED(i-19700)) && currentTool > 0) { 
+			oldSlot = (i-20500);
+			// exec.AddStatusmessage("slot existent ptr oldTool = " + oldSlot);
+		}
+	}
+		
+//case 2 - currentTool does not have own slot, searching for (first) free slot in rack => currentTool return to first free slot in rack 
+	//daca oldtool nu are slot propriu cautam slot liber 
+	if ((oldSlot == 0) && (currentTool > 0)) {
+		//exec.AddStatusmessage("status OK");
+		for (int i = 20501; i < 20511; i++) {
+			if ((AS3.Getfielddouble(i) == 0) && (AS3.GetLED(i-19700))) {  // daca slotul nu este ocupat - field = 0 - si slotul nu este disabled LED 80x = true
+				oldSlot = (i-20500);
+				// exec.AddStatusmessage("slot gasit liber ptr oldTool = " + oldSlot);
+				updateDetails = true;
+				i = 20511; // iesim din bucla la primul slot liber gasit
+			}
+		}
+		// exec.AddStatusmessage("ATC - Found Free Slot = " + oldSlot);
+
+	}
+
+////////////////////////////////////////////////////////////////////////////////
+//tool have own slot, returning to it => oldslot = first free slot in rack (110x)
+	//daca oldtool > 0 si are slot propriu (sau exista slot liber declarat anterior) in magazie, 
+	//returnam scula in slotul aferent
+	if ((oldSlot > 0) && (currentTool > 0)) {
+		// exec.AddStatusmessage("ATC - Returning Tool T" + currentTool + " to Slot #" + oldSlot);
+		
+		// moving spindle to safeZ for ATC operations
+		exec.Code("G00 G53 Z"+ safeZ); // Move Z up
+		if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+		while(exec.IsMoving()){}
+		exec.Wait(delay); // Wait 500msec
+
+		// Get current XY machine coordinates to return to this position at the end of the macro
+		Xoriginalpos = exec.GetXmachpos();
+		Yoriginalpos = exec.GetYmachpos();
+		Zoriginalpos = exec.GetZmachpos();
+		
+		// // moving spindle in front of receiver slot
+		// //exec.AddStatusmessage("Moving in front of slot at " + rackAxis + (rackX+(oldSlot-1)*stepRack));
+		// exec.Code("G00 G53 " + rackAxis + (rackX+(oldSlot-1)*stepRack) + rackAxis2 + clearRack); 
+		// if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); return;}
+		// while(exec.IsMoving()){}
+		// exec.Wait(delay); // Wait 500msec
+
+		exec.Code("G00 G53 " + rackAxis + (rackX+(oldSlot-1)*stepRack)); 
+		if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+		while(exec.IsMoving()){}
+		exec.Wait(delay); // Wait 500msec
+
+		exec.Code("G00 G53 " + rackAxis2 + clearRack); 
+		if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+		while(exec.IsMoving()){}
+		exec.Wait(delay); // Wait 500msec
+
+
+		if (!CheckSlot(oldSlot, false)) {  // checking slot sensor (false = empty slot). abort if not as desired
+			exec.AddStatusmessage("Slot " + oldSlot + " reporting error - Aborting!");
+			return;
+		}
+		
+		// Air Blow			
+		if (AS3.Getbuttonstate(20203)) exec.Setoutpin(airPort, airPin); // Blowing air for cleaning
+		
+		//lowering spindle to releasing Z position (rackZ)
+		exec.Code("G01 G53 Z" + rackZ + " F" + tcfeed); 
+		if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+		while(exec.IsMoving()){}
+		exec.Wait(delay); // Wait 500msec
+		
+		//moving spindle into final docking position
+		exec.Code("G01 G53 " + rackAxis2 + rackY + " F" + tcfeed); 
+		if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+		while(exec.IsMoving()){}
+		exec.Wait(delay); // Wait 500msec
+		
+		//activating drawbar for tool release
+		exec.Setoutpin(drawbarPort, drawbarPin); // Open the chuck with pneumatic valve
+		exec.Wait(delay); // Wait 500msec
+
+		if (checkZ != rackZ) exec.Code("G01 G53 Z" + checkZ + " F" + tcfeed);
+		if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+		while(exec.IsMoving()){}
+		exec.Wait(delay); // Wait 500msec
+
+		if (!CheckSlot(oldSlot, true)) {  // checking slot sensor (false = empty slot). abort if not as desired
+			exec.AddStatusmessage("Slot " + oldSlot + " reporting error - Aborting!");
+			return;
+		}
+
+		if (AS3.Getbuttonstate(20203)) exec.Clroutpin(airPort, airPin); // Stop blowing air for cleaning
+
+		// move to emptyZ - no tool in spindle so we don't have to raise to safeZ
+		if (emptyZ != safeZ) {
+			exec.Code("G01 G53 Z" + emptyZ + " F" + tcfeed); 
+		} else { // when emptyZ == safeZ
+			exec.Code("G01 G53 Z" + safeZ + " F" + tcfeed); 
+		}
+		if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+		while(exec.IsMoving()){}
+		exec.Wait(delay); // Wait 500msec
+		
+		exec.Clroutpin(drawbarPort, drawbarPin); // Close the chuck with pneumatic valve
+
+		
+		//daca nu incarcam alta scula (newtool = 0) revenim pe clearY ptr intoarcere directa in TCP
+		// exec.Code("G00 G53 " + rackAxis2 + clearRack); 
+		// while(exec.IsMoving()){}
+				
+		exec.Writekey("UserTextfields", Convert.ToString(oldSlot+20500), Convert.ToString(currentTool)); // scriem-salvam noua valoare in profile
+		AS3.SetLED(false, (oldSlot+820)); // stingem LED de scula activa pe oldSlot
+		AS3.Setfield(currentTool, (oldSlot+20500)); //afisam numarul sculei in slot
+
+		if (updateDetails) { // daca scula a fost returnata in slot liber, actualizam slotul si parametrii sculei (SlotXX)
+			//scriem in tooltable noul slot ptr scula nou alocata 
+			exec.Writetooltablecell(currentTool, varSlot, Convert.ToString(oldSlot)); // 
+
+			string valueDiameter = exec.Readtooltablecell(currentTool, varDiameter); //DiameterXX
+			AS3.Setfieldtext(valueDiameter, oldSlot+20510); // afisam diametrul sculei din slot
+			AS3.Validatefield(oldSlot+20520); // validam inputul
+
+			string valueLength = exec.Readtooltablecell(currentTool, varLength); //LengthXX
+			AS3.Setfieldtext(valueLength, oldSlot+20520); // afisam lungimea sculei din slot
+			AS3.Validatefield(oldSlot+20520); // validam inputul		
+
+			string valueType = exec.Readtooltablecell(currentTool, varType); //TypeXX
+			if (valueType == "RH") {
+				AS3.SetLED(true, (oldSlot+810)); //ledurile sunt de la 801 la 810
+			} else {
+				AS3.SetLED(false, (oldSlot+810)); //ledurile sunt de la 801 la 810
+			}
+					
+			// salvam tooltable-ul
+			exec.Callbutton(780); // Apelarea butonului pentru salvarea tooltable-ului
+		}
+
+		// scriem slotul in care a fost lasata scula si in Tooltable, field-ul SlotXX, unde XX este numarul sculei
+		string currentToolSlot = "Slot" + currentTool; // formatam stringul aferent campului unde se seteaza slotul sculei ce a fost in spindle - currentTool
+
+		//si facem scrierea in tooltable 
+		exec.Writekey("Tooltablevalues", currentToolSlot, Convert.ToString(oldSlot)); //scriem nr slotului in campul slotului sculei nou alocate slotului activ, oldSlot
+
+		// aici avem spindle empty, deci setam tool 0
+		exec.Setcurrenttool(0); //Spindle empty! Set the current tool -> 0
+		
+
+	}
+
+// if no free slot found, go to TCP for manual removing the currentTool
+	if ((oldSlot == 0) && (currentTool > 0)) {
+		// exec.AddStatusmessage("No free slot! Go to TCP! Tool removed!");
+		exec.Code("M200"); //macro ce muta masina in TCP
+		if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+		while(exec.IsMoving()){}
+		exec.Wait(delay); // Wait 500msec
+		
+	DialogResult result = MessageBox.Show(
+		"Manually remove Tool " + currentTool + " from spindle!\n\nPress OK when done or Cancel to abort!", 
+		"Remove Tool!", 
+		MessageBoxButtons.OKCancel, 
+		MessageBoxIcon.Warning, 
+		MessageBoxDefaultButton.Button1, 
+		MessageBoxOptions.ServiceNotification
+		);
+
+	if (result == DialogResult.OK) {			
+			exec.Setcurrenttool(0); //Spindle empty! Set the current tool -> 0
+		} else if (result == DialogResult.Cancel) {
+			exec.AddStatusmessage("ATC - TC Aborted");
+			errorSound.Play();		
+			exec.Stop();
+			return;
+		}
+	}
+	
+//newtool loading code
+//run only if newtool is not 0
+
+	if (newTool > 0) {
+		
+		//searching newtool no in slots
+		for (int i = 1; i < 11; i++) {
+			if (AS3.GetLED(i+800)) {  // cautam doar in sloturile active
+				if (newTool == Convert.ToInt32(AS3.Getfield(i+20500))) {
+					newSlot = (i);
+					// exec.AddStatusmessage("ATC - T" + newTool + " found in Slot #" + newSlot);
+					i = 11; // getting out of loop once the requested tool was found in rack.
+				}
+			}
+		}
+		
+		// rulam codul de incarcare doar cand scula ceruta se regaseste in rack, deci newSlot > 0
+		if (newSlot > 0) { 
+			//aici trebuie adaugata coborarea la "emptyZ", cota de deplasare a spindle-ului gol ptr incarcarea noi sculle existente in magazie
+			if (emptyZ != safeZ) {
+				exec.Code("G01 G53 Z" + emptyZ + " F" + tcfeed); 
+			} else { // when emptyZ == safeZ
+				exec.Code("G01 G53 Z" + safeZ + " F" + tcfeed); 
+			}
+			if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+			while(exec.IsMoving()){}
+			exec.Wait(delay); // Wait 500msec
+			
+			// moving spindle above emmiter slot
+			// exec.Code("G00 G53 " + rackAxis + (rackX+(newSlot-1)*stepRack) + rackAxis2 + rackY); 
+			exec.Code("G00 G53 " + rackAxis + (rackX+(newSlot-1)*stepRack)); 
+			if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+			while(exec.IsMoving()){}
+			exec.Wait(delay); // Wait 500msec		
+
+			exec.Code("G00 G53 " + rackAxis2 + rackY); 
+			if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+			while(exec.IsMoving()){}
+			exec.Wait(delay); // Wait 500msec		
+
+			if (!CheckSlot(newSlot, true)) {  // checking slot sensor (false = empty slot). abort if not as desired
+				exec.AddStatusmessage("Slot " + oldSlot + " reporting error - Aborting!");
+				return;
+			}
+		
+			if (AS3.Getbuttonstate(20203)) exec.Setoutpin(airPort, airPin); // Blowing air for cleaning
+
+			//activating drawbar for loading tool
+			exec.Setoutpin(drawbarPort, drawbarPin); // Open the chuck with pneumatic valve
+
+			//lowering spindle to loading Z position (rackZ)
+			exec.Code("G01 G53 Z" + rackZ + " F" + tcfeed); 
+			if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+			while(exec.IsMoving()){}
+			exec.Wait(delay); // Wait 500msec
+
+			exec.Clroutpin(drawbarPort, drawbarPin); // Close the chuck with pneumatic valve
+			
+			if (AS3.Getbuttonstate(20203)) exec.Clroutpin(airPort, airPin); // Stop blowing air for cleaning
+			exec.Wait(delay); // Wait 500msec
+			
+			if (checkZ != rackZ) exec.Code("G01 G53 Z" + checkZ + " F" + tcfeed);
+			if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+			while(exec.IsMoving()){}
+			exec.Wait(delay); // Wait 500msec		
+			
+			if (!CheckSlot(newSlot, false)) {  // checking slot sensor (false = empty slot). abort if not as desired
+				exec.AddStatusmessage("Slot " + oldSlot + " reporting error - Aborting!");
+				return;
+			}			
+			
+			// moving spindle to clearRack
+			exec.Code("G01 G53 " + rackAxis2 + clearRack); 
+			if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+			while(exec.IsMoving()){}
+			exec.Wait(delay); // Wait 500msec
+
+			// moving spindle to clear Z for ATC operations
+			exec.Code("G00 G53 Z"+ safeZ); // Move Z up
+			if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+			while(exec.IsMoving()){}
+			exec.Wait(delay); // Wait 500msec
+	
+			exec.Setcurrenttool(newTool); //Set the current tool -> the new tool
+			// salvam scula din spindle	
+			exec.Writekey("UserTextfields", "20222", Convert.ToString(newTool)); // salvam starea slotului prin scriere 0 in profile	
+			exec.Code("M20400"); // preluam scula curenta in campurile de editare din pagina ATC
+
+			AS3.SetLED(true, (newSlot+820)); // aprindem LED de scula activa pe oldSlot
+			
+		} // aici se termina codul de incarcare a sculei din slot regasit in rack
+		else if (newSlot == 0)//cod care ruleaza cand scula ceruta nu este in rack si trebuie incarcata manual din TCP
+		{ 
+			//ne mutam in TCP
+			exec.Code("M200"); // rulam macro M200 care muta masina in TCP
+			
+			//cerem confirmarea ptr incarcare manuala a sculei
+			DialogResult result = MessageBox.Show(
+				"Manually load Tool " + newTool + " in spindle!\n\nPress OK when done or Cancel to abort!", 
+				"Remove Tool!", 
+				MessageBoxButtons.OKCancel, 
+				MessageBoxIcon.Warning, 
+				MessageBoxDefaultButton.Button1, 
+				MessageBoxOptions.ServiceNotification
+				);
+
+			if (result == DialogResult.OK) {			
+					exec.AddStatusmessage("ATC - T" + newTool + " Manually Loaded!");
+					exec.Setcurrenttool(newTool); //Incarcam noua scula in spindle
+					exec.Writekey("UserTextfields", "20222", Convert.ToString(newTool)); // salvam starea slotului prin scriere 0 in profile	
+					exec.Code("M20400");
+				} else if (result == DialogResult.Cancel) {
+					exec.AddStatusmessage("ATC - T" + newTool + " Not Loaded!");
+					errorSound.Play();		
+					exec.Stop();
+					return;
+				}	
+		}				
+	}
+	
+	string newType = exec.Readtooltablecell(newTool, varType); //TypeXX
+	// exec.AddStatusmessage("newType = " + newType);
+	
+
+	
+	if (measureNRH && newType != "RH") { exec.AddStatusmessage("Calling M20331"); exec.Code("M20331"); exec.AddStatusmessage("M20331 Finished"); }
+	if (applyG43) { exec.Code("G43 H" + newTool); } else { exec.Code("G49"); }
+	if (backToXY) exec.Code("G00 G53 X" + Xoriginalpos + " Y" + Yoriginalpos); // + " Z" + Zoriginalpos);
+	if(exec.Ismacrostopped()){exec.AddStatusmessage("ATC - TC Aborted!"); exec.Clroutpin(airPort, airPin); exec.Clroutpin(drawbarPort, drawbarPin); return;}
+	while(exec.IsMoving()){}
+
+
+	if (showATCpage) { // daca checkboxul ptr afisare pagina atc este bifat
+		// ne intoarcem in screen-ul din care a fost initiata comanda M6 
+		AS3.selectlayer(initParent); // prima data in 5 (parentlayer-ul lui 57)
+		AS3.selectlayer(initLayer);	
+	}
+	
+// exec.AddStatusmessage("M6 Finished");
+return;
+
+
+
+
+#Events
+
+bool Getinpin(int port,int pin) {
+   bool pinread = AS3.GetLED(LEDnum(port,pin));
+   return pinread;
+}
+
+int LEDnum(int port,int pin) {
+  //Port #1 Pin 1 - 17 = LED   1 - 17
+  //Port #2 Pin 1 - 17 = LED  69 - 85
+  //Port #3 Pin 1 - 17 = LED  86 - 102
+  //Port #4 Pin 1 - 17 = LED 103 - 119
+  //Port #5 Pin 1 - 17 = LED 120 - 136
+  int LED = 0;
+   
+  if ((port < 1) || (port > 5) || (pin < 1) || (pin > 17)) {
+	 LED = -1;
+  } else {
+	  if (port == 2) { LED = 68; }
+	  if (port == 3) { LED = 85; }
+	  if (port == 4) { LED = 102; }
+	  if (port == 5) { LED = 119; }
+ 
+	  LED += pin;
+  }
+  return LED;
+}
+
+
+
+//public 
+bool CheckSlot(int slotNo, bool requestedStatus)
+{
+	if (AS3.Getbuttonstate(20202)) { 
+
+		// Verificăm inițial starea LED-ului
+		bool currentStatus = AS3.GetLED(slotNo + 830);
+		if (currentStatus == requestedStatus)
+		{
+			return true;
+		}
+
+		// Preluăm timpul de așteptare din variabila configurată
+		int waitTime = Convert.ToInt32(AS3.Getfield(30019));
+		int elapsedTime = 0;
+		int debounceTime = 1000; // Timpul de debounce în milisecunde
+		int debounceElapsed = 0;
+		int checkInterval = 100; // Intervalul de verificare mai frecvent pentru debounce
+
+		// Buclă de așteptare până se atinge timpul total de așteptare sau până starea devine cea dorită
+		while (elapsedTime < waitTime)
+		{
+			System.Threading.Thread.Sleep(checkInterval);
+			elapsedTime += checkInterval;
+
+			// Verificăm starea LED-ului
+			currentStatus = AS3.GetLED(slotNo + 830);
+
+			if (currentStatus == requestedStatus)
+			{
+				// Dacă starea este cea dorită, începem temporizatorul de debounce
+				debounceElapsed += checkInterval;
+
+				if (debounceElapsed >= debounceTime)
+				{
+					// Dacă starea este stabilă pentru perioada de debounce, considerăm validat
+					return true;
+				}
+			}
+			else
+			{
+				// Dacă starea nu este cea dorită, resetăm temporizatorul de debounce
+				debounceElapsed = 0;
+			}
+		}
+
+		// Dacă starea LED-ului nu se potrivește după timpul de așteptare, afișăm dialogul Abort/Retry/Ignore
+		while (true)
+		{
+			DialogResult result = MessageBox.Show(
+				"Slot " + slotNo + " Sensor report " + !requestedStatus + "\n" +
+				"Expecting " + requestedStatus + "!!",
+				"Slot Status Mismatch",
+				MessageBoxButtons.AbortRetryIgnore,
+				MessageBoxIcon.Warning,
+				MessageBoxDefaultButton.Button1,
+				MessageBoxOptions.DefaultDesktopOnly
+			);
+
+			// Gestionăm răspunsul utilizatorului
+			if (result == DialogResult.Abort)
+			{
+				exec.Stop();  // Oprește execuția întregului macro
+				return false; // Returnăm false pentru a semnaliza că a fost oprit
+			}
+			else if (result == DialogResult.Ignore)
+			{
+				return true; // Ignorăm discrepanța și continuăm macro-ul
+			}
+
+			// Dacă se selectează Retry, bucla de așteptare se repetă
+			// Resetăm `elapsedTime` și reîncepem verificarea
+			elapsedTime = 0;
+			debounceElapsed = 0; // Resetăm și debounce-ul
+			while (elapsedTime < waitTime)
+			{
+				System.Threading.Thread.Sleep(checkInterval);
+				elapsedTime += checkInterval;
+
+				currentStatus = AS3.GetLED(slotNo + 830);
+				if (currentStatus == requestedStatus)
+				{
+					debounceElapsed += checkInterval;
+
+					if (debounceElapsed >= debounceTime)
+					{
+						return true;
+					}
+				}
+				else
+				{
+					debounceElapsed = 0;
+				}
+			}
+		}
+	} else {
+		return true; // returnam true in caz ca senzorii sunt dezactivati
+	}
+}
+
+

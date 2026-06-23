@@ -30,11 +30,14 @@ export const alignmentView = {
     panelId: 'wiz_alignment',
     codeElId: 'wiz_alignment_code',
     large: true,
+    twoPane: true,
     inputIds: [
-        'al_check_axis', 'al_probe_dir', 'al_animate',
+        'al_check_axis', 'al_probe_dir',
         'al_tolerance', 'al_dist', 'al_retract', 'al_safe_z',
         'al_feed_fast', 'al_feed_slow', 'al_port', 'al_level', 'al_q',
     ],
+    // Controller-source chips (PROBE-CONFIG-SOURCE.md)
+    probeSrcFields: { al_port: 'port', al_level: 'level', al_feed_fast: 'fastFeed', al_retract: 'retract' },
     startAnim: startAlignmentAnim,
 
     onOpen(ctx) {
@@ -56,12 +59,15 @@ export const alignmentView = {
             f_slow:     el('al_feed_slow')?.value    || '50',
             qStop:      el('al_q')?.value            || '1',
             port:       window.ddcsGetSettings().probes.probePin,
-            level:      window.ddcsGetSettings().probes.probeLevel
+            level:      window.ddcsGetSettings().probes.probeLevel,
+            sources:    window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
         const gcode = wizard.generate(params);
         el('wiz_alignment_code').innerHTML = UIUtils.formatGCode(gcode);
-        ctx.preview3D(gcode, 'alignmentVizContainer');
+        // Two starts (point A + point B) spread along the fence so both probes are placed at distinct points.
+        const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
+        ctx.preview3D(gcode, 'alignmentVizContainer', wizard.inferStart(params, stock), wizard.inferStarts(params, stock));
 
         const probeAxis = params.checkAxis === 'X' ? 'Y' : 'X';
         const status = el('alignmentVizStatus');
@@ -69,18 +75,6 @@ export const alignmentView = {
             status.textContent = `Alignment | Check: ${params.checkAxis} | Probe: ${probeAxis}`;
         }
 
-        // Update alignment visualization
-        if (window.drawAlignmentViz) {
-            try {
-                const drawResult = window.drawAlignmentViz();
-                if (drawResult && typeof drawResult.then === 'function') {
-                    drawResult.then(() => startAlignmentAnim()).catch(() => {});
-                } else {
-                    startAlignmentAnim();
-                }
-            } catch (e) { console.warn('drawAlignmentViz failed', e); }
-        } else {
-            startAlignmentAnim();
-        }
+        startAlignmentAnim();
     },
 };

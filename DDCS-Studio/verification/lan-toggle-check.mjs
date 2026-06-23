@@ -1,0 +1,16 @@
+﻿import { chromium } from '@playwright/test';
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto('http://127.0.0.1:8799', { waitUntil: 'networkidle' });
+await page.waitForTimeout(1500);
+await page.locator('.hdr-tabs .tab[data-app="gateway"]').click();
+await page.waitForTimeout(400);
+await page.locator('#gateway-app .tabs .tab', { hasText: 'Setup' }).click();
+await page.waitForTimeout(600);
+const lanLabel = page.locator('#gateway-app label', { hasText: 'Allow other devices' });
+await lanLabel.locator('input').check();
+await page.waitForTimeout(300);
+const hints = await page.locator('#gateway-app .hint').allTextContents();
+console.log('hints: ' + JSON.stringify(hints));
+console.log('LAN URL shown: ' + hints.some((h) => h.includes('http://10.0.0.34:8799')));
+await browser.close();
