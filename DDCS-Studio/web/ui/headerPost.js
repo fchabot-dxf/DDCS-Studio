@@ -16,6 +16,7 @@ import { listPosts, getActivePostId, setActivePostId, getDialect, resolveActiveP
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { validate, summarize } from '../shared/js/validate/validate.js';
 import { THEMES } from './themes.js';
+import { EXE_DOWNLOAD_URL } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page)
 
 // Quick-menu glyphs (24×24 stroke grid) — mirror the dock toolbar icons so the menu reads consistently.
 const HQ_ICONS = {
@@ -52,10 +53,9 @@ function runQuickAction(act) {
         case 'clear':  window.clearCode?.(); break;
         case 'export': window.downloadFile?.(); break;
         case 'standalone':
-            // Client-side single-file build (always current; works on the deployed web where output/ is unreachable).
-            import('./bundleStandalone.js')
-                .then((m) => m.downloadStandalone())
-                .catch((err) => { console.error('standalone bundle failed', err); alert('Could not build the standalone file: ' + err.message); });
+            // The "standalone" IS the desktop EXE (bundles the gateway, runs fully offline) — open the SAME
+            // release link the Gateway page uses (gatewayStatus.EXE_DOWNLOAD_URL → the latest GitHub release).
+            window.open(EXE_DOWNLOAD_URL, '_blank', 'noopener');
             break;
         case 'settings': window.openSettings?.(); break;
     }
