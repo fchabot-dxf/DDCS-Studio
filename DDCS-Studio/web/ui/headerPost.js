@@ -102,11 +102,11 @@ export function initHeaderPost() {
             + `<span class="hdr-quick-lbl">${esc(label)}</span>`
             + (warn ? '<span class="hdr-quick-warn" title="Not yet verified">⚠</span>' : '')
             + '</button>';
-        const themeRow = (name) =>
-            `<button type="button" role="menuitemradio" class="hdr-quick-item" data-theme="${name}" aria-checked="${curTheme === name}">`
-            + `<span class="hdr-quick-check" aria-hidden="true">${curTheme === name ? '✓' : ''}</span>`
-            + `<span class="hq-swatch" style="background:${HQ_THEME_SWATCH[name] || '#888'}"></span>`
-            + `<span class="hdr-quick-lbl">${name[0].toUpperCase() + name.slice(1)}</span></button>`;
+        // Theme picker = a horizontal row of colour chips (tooltip = theme name); the active one gets a ring.
+        const themeRow = (name) => {
+            const label = name[0].toUpperCase() + name.slice(1);
+            return `<button type="button" role="menuitemradio" class="hq-theme-chip${curTheme === name ? ' active' : ''}" data-theme="${name}" title="${label}" aria-label="${label} theme" aria-checked="${curTheme === name}" style="--chip:${HQ_THEME_SWATCH[name] || '#888'}"></button>`;
+        };
 
         // Post-processor + Theme are collapsible SUBMENUS: the row shows the active value; click expands.
         const sub = (key, label, cur, open, body) =>
@@ -118,8 +118,9 @@ export function initHeaderPost() {
 
         const postSub = sub('post', 'Post-processor', activeName, postSubOpen,
             postRow('auto', autoLabel, false) + listPosts().map((p) => postRow(p.id, p.name, !p.verified)).join(''));
-        const themeSub = sub('theme', 'Theme', curTheme[0].toUpperCase() + curTheme.slice(1), themeSubOpen,
-            THEMES.map(themeRow).join(''));
+        // Theme picker is no longer collapsed — the chips are compact, so show them directly under a heading.
+        const themeSection = '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Theme</div>'
+            + `<div class="hdr-quick-subitems" data-subitems="theme">${THEMES.map(themeRow).join('')}</div>`;
 
         const settingsRow =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="settings">'
@@ -131,7 +132,7 @@ export function initHeaderPost() {
             + '<div class="hdr-quick-sep"></div>'
             + actionRow(HQ_STANDALONE)
             + '<div class="hdr-quick-sep"></div>' + postSub
-            + '<div class="hdr-quick-sep"></div>' + themeSub
+            + themeSection
             + '<div class="hdr-quick-sep"></div>' + settingsRow;
 
         btn.title = `Quick actions — open / save / load / export, post-processor (${activeName}), theme. Click to open.`;
@@ -222,7 +223,7 @@ export function initHeaderPost() {
 
     // Route a menu click: a file action, a theme, or a post pick (the post path keeps the old <select> effects).
     menu.addEventListener('click', (e) => {
-        const it = e.target.closest('.hdr-quick-item');
+        const it = e.target.closest('.hdr-quick-item, .hq-theme-chip');
         if (!it) return;
 
         // A submenu header toggles its list open/closed and keeps the menu open.
@@ -237,9 +238,9 @@ export function initHeaderPost() {
             return;
         }
 
+        if (it.dataset.theme) { setQuickTheme(it.dataset.theme); fillMenu(); return; }   // chips stay open; just refresh the active ring
         closeMenu();
         if (it.dataset.act) { runQuickAction(it.dataset.act); return; }
-        if (it.dataset.theme) { setQuickTheme(it.dataset.theme); return; }
 
         setActivePostId(it.dataset.post);                           // persist the active post (override or 'auto')
 

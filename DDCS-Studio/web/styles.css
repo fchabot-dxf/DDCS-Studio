@@ -555,6 +555,23 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 .hdr-quick-subitems { display: flex; flex-direction: column; gap: 2px; margin: 1px 0 2px; }
 .hdr-quick-subitems[hidden] { display: none; }
 .hdr-quick-menu .hdr-quick-subitems .hdr-quick-item { padding-left: 16px; font-weight: 500; }
+/* Theme picker = a horizontal row of small chips, each PREVIEWING its own theme's style (shape/fill/outline/
+   bevel/glow) regardless of the active theme. Scoped + !important so the per-theme button skin can't hijack them. */
+.hdr-quick-subitems[data-subitems="theme"] { flex-direction: row !important; flex-wrap: wrap; gap: 10px; padding: 9px 12px 7px; }
+.hdr-quick-subitems .hq-theme-chip {
+    width: 26px !important; height: 26px !important; min-width: 0 !important; flex: 0 0 auto; padding: 0 !important;
+    cursor: pointer; text-shadow: none !important; transform: none; transition: transform .12s ease !important;
+    border: 1px solid transparent !important; border-radius: 6px !important; background: #888 !important;
+}
+.hdr-quick-subitems .hq-theme-chip:hover { transform: translateY(-1px) scale(1.08); }
+/* per-theme previews — roundness + fill + outline/border + bevel(neumorphic)/glow(futuristic)/flat(normal) */
+.hdr-quick-subitems .hq-theme-chip[data-theme="studio"]     { border-radius: 7px !important; background: linear-gradient(180deg,#e7e3db,#cfcabf 60%,#bdb8ac) !important; border-color: #b0aa9d !important; box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.25) !important; }
+.hdr-quick-subitems .hq-theme-chip[data-theme="steampunk"]  { border-radius: 6px !important; background: linear-gradient(180deg,#c79a2e,#8b6914 65%,#6b500f) !important; border-color: #4a3608 !important; box-shadow: inset 0 1px 0 rgba(255,224,150,.5), 0 1px 2px rgba(0,0,0,.4) !important; }
+.hdr-quick-subitems .hq-theme-chip[data-theme="organic"]    { border-radius: 50% !important; background: radial-gradient(circle at 35% 30%,#86b562,#6f9b4d 70%) !important; border-color: #4c6b34 !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.3) !important; }
+.hdr-quick-subitems .hq-theme-chip[data-theme="futuristic"] { border-radius: 2px !important; background: #0c1422 !important; border-color: rgba(45,226,255,.8) !important; box-shadow: 0 0 7px rgba(45,226,255,.55), inset 0 0 6px rgba(45,226,255,.25) !important; }
+.hdr-quick-subitems .hq-theme-chip[data-theme="normal"]     { border-radius: 4px !important; background: #f4f4f4 !important; border-color: #b9b9b9 !important; box-shadow: none !important; }
+/* active selection ring — sits OUTSIDE the chip so each theme's own look stays intact */
+.hdr-quick-subitems .hq-theme-chip.active { outline: 2px solid var(--text-main, #fff) !important; outline-offset: 2px; }
 
 /* Profile/post capability warning — a prominent amber badge (was an easy-to-miss 15px glyph) that gently
    pulses to draw the eye; only ever shown when there's a real warning (hidden otherwise). */
