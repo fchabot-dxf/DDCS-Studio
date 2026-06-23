@@ -6,6 +6,8 @@ import { applySettings } from '../../ui/settingsPanel.js';
 
 const wizard = new RotaryCenterWizard();
 
+let _savedBoxStock = null;   // the rectangular stock in effect before a rotary op forced the round bar (for revert)
+
 /** Rotary probing is for a round bar — make the stock a cylinder so the preview, the probe collision and the
  *  Ø-pull all match. Keeps the axial LENGTH but squares up the two cross dimensions to a single diameter, so a
  *  block (mismatched cross dims) doesn't become a thin rod lost in its bounding box. Skips if already a cylinder. */
@@ -13,12 +15,25 @@ export function activateCylinderStock() {
     const get = window.ddcsGetSettings ? window.ddcsGetSettings() : {};
     const cur = get.stock || {};
     if (cur.shape === 'cylinder' && cur.show) return;
+    _savedBoxStock = { ...cur };   // remember the rectangular stock so non-round ops can switch back to it
     const axis = rotaryAxisOf(get.motors);
     const cross = axis === 'x' ? ['y', 'z'] : axis === 'y' ? ['x', 'z'] : ['x', 'y'];
     const dims = { x: cur.x || 150, y: cur.y || 76.2, z: cur.z || 76.2 };
     const D = Math.max(dims[cross[0]], dims[cross[1]]) || 76.2;   // diameter = the larger cross dim (fills the stock)
     dims[cross[0]] = D; dims[cross[1]] = D;
     applySettings({ stock: { datum: 'nnp', pin: 'origin', ...cur, ...dims, shape: 'cylinder', show: true } });
+}
+
+/** Inverse of activateCylinderStock: revert to RECTANGULAR stock. Non-round ops (rotary clock, which clocks a
+ *  flat; middle/corner/edge) call this so they don't inherit the round bar a prior rotary-centre op forced. Restores
+ *  the remembered box dims if we have them, else just flips the shape back to a box. No-op if already rectangular. */
+export function restoreBoxStock() {
+    const get = window.ddcsGetSettings ? window.ddcsGetSettings() : {};
+    const cur = get.stock || {};
+    if (cur.shape !== 'cylinder') return;   // already rectangular — leave the operator's stock alone
+    const box = _savedBoxStock || { ...cur };
+    applySettings({ stock: { ...cur, ...box, shape: 'box' } });
+    _savedBoxStock = null;
 }
 
 export const rotaryCenterView = {

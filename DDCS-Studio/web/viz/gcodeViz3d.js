@@ -879,7 +879,7 @@ export class GcodeViz3D {
         pg.rotation.set(0, 0, 0); // at rest; the play loop re-applies the angle each frame
         if (this.stockMesh) { pg.remove(this.stockMesh); this.stockMesh.geometry.dispose(); this.stockMesh.material.dispose(); this.stockMesh = null; }
         if (this.stockEdges) { pg.remove(this.stockEdges); this.stockEdges.geometry.dispose(); this.stockEdges.material.dispose(); this.stockEdges = null; }
-        if (this._rotaryFixture) {   // dark chuck + tailstock "4th-axis" rig (purely visual) — rebuilt below only for a shown cylinder
+        if (this._rotaryFixture) {   // dark chuck + tailstock "4th-axis" rig (purely visual) — rebuilt below for any shown stock when the rig is on
             pg.remove(this._rotaryFixture);
             this._rotaryFixture.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
             this._rotaryFixture = null;
@@ -920,9 +920,6 @@ export class GcodeViz3D {
                 if (axis === 'x') geo.rotateZ(Math.PI / 2);
                 else if (axis === 'z') geo.rotateX(Math.PI / 2);
                 mesh.position.set(stock.x / 2, stock.y / 2, -stock.z / 2);
-                // The 4th-axis rig (chuck + tailstock) is an OPT-IN, op-specific preview — only the rotary probe
-                // wizards turn it on (like ATC's magazine), so a plain cylinder elsewhere stays a plain bar.
-                if (this._showRotaryFixture) this._buildRotaryFixture(pg, axis, r, dims[axis] / 2);
             } else {
                 geo = new THREE.BoxGeometry(stock.x, stock.y, stock.z);
                 mesh.position.set(stock.x / 2, stock.y / 2, -stock.z / 2);
@@ -958,6 +955,18 @@ export class GcodeViz3D {
             edges.position.sub(C);
             this.stockMesh = mesh; pg.add(mesh);
             this.stockEdges = edges; pg.add(edges);
+            // The 4th-axis rig (chuck + tailstock) is a SEPARATE op-specific overlay (opt-in, like ATC's magazine),
+            // INDEPENDENT of the stock SHAPE — so it frames a round bar OR a rectangular part on the rotary axis
+            // (e.g. the rotary clock clocks a flat on a box). pg origin is the stock centre, so place() aligns either way.
+            if (this._showRotaryFixture) {
+                const fAxis = Object.values(getRotaryAxes())[0] || 'x';
+                const fd = { x: stock.x, y: stock.y, z: stock.z };
+                const fCross = fAxis === 'x' ? [fd.y, fd.z] : fAxis === 'y' ? [fd.x, fd.z] : [fd.x, fd.y];
+                // round bar = the inscribed Ø (min cross); a box = the larger cross so the chuck/jaws wrap the part.
+                const fr = (stock.shape === 'cylinder' ? Math.min(fCross[0], fCross[1]) : Math.max(fCross[0], fCross[1])) / 2;
+                // round bar → 3-jaw self-centring; rectangular part → 4-jaw independent on the flat faces (cu/cv).
+                this._buildRotaryFixture(pg, fAxis, fr, fd[fAxis] / 2, { jaws: stock.shape === 'cylinder' ? 3 : 4, cu: fCross[0], cv: fCross[1] });
+            }
             // The table the stock rests on is the GRID floor (a fixed machine-frame surface — see _layoutGrid), not a
             // per-stock bed. So nothing extra to draw here.
         }
@@ -971,7 +980,7 @@ export class GcodeViz3D {
      * so it rides the datum/WCS and spins with the stock. `axis` = the rotary Cartesian axis ('x'|'y'|'z'),
      * `r` = bar radius, `L` = half the bar length along the axis. Does NOT affect probe collision.
      */
-    _buildRotaryFixture(pg, axis, r, L) {
+    _buildRotaryFixture(pg, axis, r, L, opts = {}) {
         const THREE = this.THREE;
         const grp = new THREE.Group();
         // Orient a Y-aligned geometry to the bar axis the SAME way the cylinder stock is oriented.
@@ -990,24 +999,32 @@ export class GcodeViz3D {
         disc.position.copy(place(-L - chuckDepth / 2, 0, 0));
         grp.add(disc);
         const jawA = -L + r * 0.15;   // jaws sit on the chuck's inner face, reaching onto the bar end
-        for (let i = 0; i < 3; i++) {
-            const ang = (i * 2 * Math.PI) / 3;
-            const jaw = new THREE.Mesh(orientToAxis(new THREE.BoxGeometry(r * 0.5, r * 0.45, r * 0.3)), jawMat());
-            jaw.position.copy(place(jawA, Math.cos(ang) * r * 0.9, Math.sin(ang) * r * 0.9));
+        const axisVec = new THREE.Vector3(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0);
+        // Jaw COUNT follows the part: a round bar → 3-jaw self-centring (120°); a rectangular part → 4-jaw
+        // independent (90°), each jaw on a flat FACE (face half-widths cu/cv, not a single radius).
+        const jaws = opts.jaws === 4 ? 4 : 3, cu = opts.cu || 2 * r, cv = opts.cv || 2 * r;
+        for (let i = 0; i < jaws; i++) {
+            const ang = (i * 2 * Math.PI) / jaws;
+            const ru = jaws === 4 ? (i % 2 === 0 ? cu / 2 : cv / 2) * 0.98 : r * 0.92;   // 4-jaw rides each face; 3-jaw a circle
+            const jaw = new THREE.Mesh(orientToAxis(new THREE.BoxGeometry(r * 0.5, r * 0.4, r * 0.3)), jawMat());
+            jaw.position.copy(place(jawA, Math.cos(ang) * ru, Math.sin(ang) * ru));
+            jaw.rotateOnWorldAxis(axisVec, ang);   // spin each jaw to face the centre → a symmetric array (not same-facing slabs)
             grp.add(jaw);
         }
 
-        // --- TAILSTOCK at the HI end (axis +L): a body just outside the bar end + a live-centre cone aimed at the bar ---
-        const bodyLen = r * 0.8;
-        const body = new THREE.Mesh(orientToAxis(new THREE.CylinderGeometry(r * 0.8, r * 0.8, bodyLen, 24)), chuckMat());
-        body.position.copy(place(L + bodyLen / 2, 0, 0));
-        grp.add(body);
+        // --- TAILSTOCK at the HI end (axis +L): a live-centre CONE protruding toward the bar, body BEHIND it ---
         const coneLen = r * 0.9;
         const cone = new THREE.Mesh(aimConeAtBar(new THREE.ConeGeometry(r * 0.45, coneLen, 24)), jawMat());
-        // Tip points toward −axis and should land ~at the bar end (axis = L). Cone is centred on its own length,
+        // Tip points toward −axis and lands ~at the bar end (axis = L). Cone is centred on its own length,
         // so its centre sits coneLen/2 OUTSIDE the bar end → tip at +L.
         cone.position.copy(place(L + coneLen / 2, 0, 0));
         grp.add(cone);
+        const bodyLen = r * 0.8;
+        const body = new THREE.Mesh(orientToAxis(new THREE.CylinderGeometry(r * 0.8, r * 0.8, bodyLen, 24)), chuckMat());
+        // Body sits BEHIND the cone base (axis = L+coneLen) so the light live-centre cone protrudes from it instead
+        // of being buried inside the dark body (which read as a grey cone-in-a-box before).
+        body.position.copy(place(L + coneLen + bodyLen / 2, 0, 0));
+        grp.add(body);
 
         this._rotaryFixture = grp;
         pg.add(grp);
