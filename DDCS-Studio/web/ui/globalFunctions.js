@@ -25,7 +25,7 @@ export function setupGlobalFunctions(app) {
         window.editorManager = app.editorManager;
 
         // Wizard functions
-        window.openWiz = (type, variant) => { window.ddcsTrack?.('feature', 'wizard:' + type); return app.wizardManager.open(type, variant); };
+        window.openWiz = (type, variant, bypassPrereq) => { window.ddcsTrack?.('feature', 'wizard:' + type); return app.wizardManager.open(type, variant, bypassPrereq); };
         window.openCornerWiz = () => { window.ddcsTrack?.('feature', 'wizard:corner'); return app.wizardManager.openCorner(); };
         window.openMiddleWiz = () => { window.ddcsTrack?.('feature', 'wizard:middle'); return app.wizardManager.openMiddle(); };
         window.CornerVizAnimator = CornerVizAnimator;
