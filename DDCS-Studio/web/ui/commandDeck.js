@@ -524,9 +524,17 @@ export class CommandDeck {
         if (leftTarget) {
             leftTarget.innerHTML = `
                 <div style="display:flex; gap:6px; align-items:center;">
-                    <button class="toolbar-btn" onclick="openWiz && openWiz('comm')" title="Comm / MDI console"><span class="btn-ico">${HEADER_ICONS.comm}</span><span class="btn-tx">Comm</span></button>
-                    <button class="toolbar-btn" onclick="openWiz && openWiz('wcs')" title="Work coordinate systems"><span class="btn-ico">${HEADER_ICONS.wcs}</span><span class="btn-tx">WCS</span></button>
-                    <button class="toolbar-btn" onclick="openWiz && openWiz('atc_warmup')" title="Spindle warm-up sequence"><span class="btn-ico">${HEADER_ICONS.warmup}</span><span class="btn-tx">Warm-up</span></button>
+                    <div class="toolbar-dropdown">
+                        <button class="toolbar-btn wizard-btn" title="Setup — Comm, Warm-up, I/O"><span class="btn-ico">${HEADER_ICONS.comm}</span><span class="btn-tx">Setup</span><span class="btn-caret">▼</span></button>
+                        <div class="toolbar-dropdown-content">
+                            <button onclick="openWiz && openWiz('comm')">💬 Comm / MDI</button>
+                            <button onclick="openWiz && openWiz('atc_warmup')">🔥 Warm-up</button>
+                            <div style="padding:4px 12px; font-size:10px; opacity:.55; text-transform:uppercase; letter-spacing:1px;">I/O</div>
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('outpin')">⚡ Set Output</button>
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('waitinput')">⏱ Wait Input</button>
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('dwell')">⏳ Dwell</button>
+                        </div>
+                    </div>
                 </div>
             `;
         }
@@ -538,6 +546,7 @@ export class CommandDeck {
                     <div class="toolbar-dropdown">
                         <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.probe}</span><span class="btn-tx">Probe</span><span class="btn-caret">▼</span></button>
                         <div class="toolbar-dropdown-content">
+                            <button onclick="openWiz && openWiz('wcs')">⊕ WCS / work offsets</button>
                             <button onclick="openCornerWiz && openCornerWiz()">📐 Corner</button>
                             <button onclick="openMiddleWiz && openMiddleWiz()">🎯 Middle</button>
                             <button onclick="openWiz && openWiz('circular')">⭕ Bore/Boss</button>
@@ -573,26 +582,17 @@ export class CommandDeck {
                         </div>
                     </div>
 
-                    <div class="toolbar-dropdown">
-                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.io}</span><span class="btn-tx">I/O</span><span class="btn-caret">▼</span></button>
-                        <div class="toolbar-dropdown-content">
-                            <button onclick="ddcsInsertIo && ddcsInsertIo('outpin')">⚡ Set Output</button>
-                            <button onclick="ddcsInsertIo && ddcsInsertIo('waitinput')">⏱ Wait Input</button>
-                            <button onclick="ddcsInsertIo && ddcsInsertIo('dwell')">⏳ Dwell</button>
-                        </div>
-                    </div>
-
-                    <!-- Comm and WCS buttons are provided in the left header; avoid duplicates here -->
+                    <!-- I/O actions moved to the left "Setup" dropdown; WCS moved into Probe (above). -->
                 </div>
             `;
             
             // Add click-to-toggle support for mobile/touch
-            centerTarget.querySelectorAll('.toolbar-dropdown > button').forEach(btn => {
+            document.querySelectorAll('.dock-header .toolbar-dropdown > button').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const parent = btn.parentElement;
                     // close all others
-                    centerTarget.querySelectorAll('.toolbar-dropdown').forEach(d => {
+                    document.querySelectorAll('.dock-header .toolbar-dropdown').forEach(d => {
                         if (d !== parent) {
                             d.classList.remove('active');
                             const cc = d.querySelector('.toolbar-dropdown-content');
@@ -636,7 +636,7 @@ export class CommandDeck {
             });
             // close dropdowns on outside click and clear inline positioning
             document.addEventListener('click', () => {
-                centerTarget.querySelectorAll('.toolbar-dropdown').forEach(d => {
+                document.querySelectorAll('.dock-header .toolbar-dropdown').forEach(d => {
                     d.classList.remove('active');
                     const cc = d.querySelector('.toolbar-dropdown-content');
                     if (cc) {
