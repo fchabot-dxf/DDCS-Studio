@@ -509,6 +509,18 @@ Off-site pass over the Phase-1 capture (`assets/capture/20260610T163337Z/`): dif
 - `#670–#676` = `1, 50, 5, 10, −5, 400, 20` — **candidate tool-setter / probe config block**
   (`#671=50` ≈ our default block height, `#675=400` ≈ a probe feed). `[HYPOTHESIS]`
 
+**Machine-frame `geometry.homeDir` (travel sign) — DERIVATION** (gateway `Ops._map_geometry_to_profile`,
+2026-06-21): Studio's sim needs a **signed** travel per axis (sign = which side of machine-zero / home the
+working envelope sits on). The gateway emits `geometry.homeDir` = ±1 per axis, derived from the **sign of
+the soft-limit machine coordinates** (`#161-168` neg/pos): the home end reads ~0 and the far end ~±span, so
+the envelope-midpoint sign IS the travel direction — unambiguous, no homing-polarity guess (e.g. this
+capture's `#166`=+756 → +X envelope, `#162`=−776 → −Y envelope). `[CONFIRMED logic; soft-limit addressing
+CONFIRMED 2026-06-17]`. **Fallback** when an axis has soft limits disabled (±9999 sentinel → the travel span
+is null, so Studio ignores the sign for that axis anyway): the homing-direction param `#112-114` (0 = home
+toward the neg end → travel +, 1 = home toward the pos end → travel −). That polarity is `[TO TEST at
+machine]`, but it only ever feeds an axis Studio doesn't use, so a wrong guess can't flip a real envelope.
+The raw `homingDir` (0/1) is still emitted alongside for debugging.
+
 **`uservar` probe/setter slots** (meaning fixed by the captured NC; range #100–#549, slot = #var−100):
 `#101/#102` = saved Sensor X/Y · `#110–#113` = 3D-probe ball-R(Z) / ball-R(XY) / max-search / clearance ·
 `#120–#122` = last-probed Z/X/Y machine pos. **All 0 in this capture** (no sensor pos saved / probe

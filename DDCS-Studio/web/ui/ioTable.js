@@ -170,21 +170,65 @@ export function renderMagazineTable(container, atc, onChange) {
     ctl.appendChild(field('Pockets', cnt, 60));
     container.appendChild(ctl);
 
-    if (atc.magType === 'disk') {
+    const isDisk = atc.magType === 'disk';
+    if (isDisk) {
+        // Disk/carousel: ONE fixed pickup; the carousel rotates each pocket to it by index. So no per-pocket XYZ —
+        // just the shared pickup + which tool is in each pocket.
+        atc.pickup = atc.pickup || { x: '', y: '', z: '' };
+        const pkr = document.createElement('div');
+        pkr.style.cssText = 'display:flex; gap:16px; align-items:flex-end; margin-bottom:10px; flex-wrap:wrap;';
+        const pcell = (key) => { const inp = document.createElement('input'); inp.type = 'number'; inp.step = '0.1'; inp.value = atc.pickup[key] ?? ''; inp.addEventListener('change', () => { atc.pickup[key] = inp.value === '' ? '' : Number(inp.value); onChange(); }); return inp; };
+        pkr.appendChild(field('Pickup X', pcell('x'), 70));
+        pkr.appendChild(field('Pickup Y', pcell('y'), 70));
+        pkr.appendChild(field('Pickup Z', pcell('z'), 70));
+        const dia = document.createElement('input'); dia.type = 'number'; dia.step = '1'; dia.min = '0'; dia.value = atc.diskDia ?? '';
+        dia.addEventListener('change', () => { atc.diskDia = dia.value === '' ? '' : Number(dia.value); onChange(); });
+        pkr.appendChild(field('Carousel Ø', dia, 80));
+        const axSel = document.createElement('select');
+        [['+y', '+Y'], ['-y', '-Y'], ['+x', '+X'], ['-x', '-X']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if ((atc.diskAxis || '+y') === v) o.selected = true; axSel.appendChild(o); });
+        axSel.addEventListener('change', () => { atc.diskAxis = axSel.value; onChange(); });
+        pkr.appendChild(field('Disk toward', axSel, 64));
+        container.appendChild(pkr);
         const note = document.createElement('div'); note.className = 'settings-hint';
-        note.textContent = 'Disk: a carousel-rotate output + pocket-index sensor input were added (Output / Input). One fixed pickup; the magazine rotates each pocket to it.';
+        note.textContent = 'Disk: one fixed pickup — the carousel (Ø) rotates each pocket to it by index, so per-pocket XYZ aren’t needed (just the pickup + which tool is in each pocket).';
         container.appendChild(note);
     }
+
     if (!atc.magazine.length) {
         const e = document.createElement('div'); e.className = 'settings-hint'; e.textContent = 'Set the pocket count to build the magazine table.'; container.appendChild(e);
         return;
     }
 
-    const COLS = [['Pocket', 46], ['Tool', 168], ['Description', 150], ['Park X', 66], ['Park Y', 66], ['Park Z', 66]];
+    const COLS = isDisk
+        ? [['Pocket', 46], ['Tool', 168], ['Description', 150]]
+        : [['Pocket', 46], ['Tool', 168], ['Description', 150], ['Park X', 66], ['Park Y', 66], ['Park Z', 66]];
     const head = document.createElement('div');
     head.style.cssText = 'display:flex; gap:8px; font-size:10px; color:#6b6150; font-weight:600; padding:2px;';
     COLS.forEach(([h, w]) => { const s = document.createElement('span'); s.textContent = h; s.style.width = w + 'px'; head.appendChild(s); });
     container.appendChild(head);
+
+    // Linear racks sit on a LINE: keep pocket 1, then step each pocket by a fixed pitch along one axis. The
+    // controller still stores each pocket individually (#1330+ tables, usually taught by jogging / pulled), so
+    // you can fine-tune any row after — this just saves typing the evenly-spaced ones.
+    if (!isDisk && atc.magazine.length > 1) {
+        const lf = document.createElement('div');
+        lf.style.cssText = 'display:flex; gap:8px; align-items:flex-end; margin:6px 0 4px; flex-wrap:wrap;';
+        const axSel = document.createElement('select');
+        [['x', 'X'], ['y', 'Y'], ['z', 'Z']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; axSel.appendChild(o); });
+        const pitch = document.createElement('input'); pitch.type = 'number'; pitch.step = '1'; pitch.value = atc._linePitch ?? 50;
+        pitch.addEventListener('change', () => { atc._linePitch = Number(pitch.value) || 0; });
+        const btn = document.createElement('button'); btn.className = 'toolbar-btn settings-io'; btn.textContent = '↳ Fill line from P1';
+        btn.title = 'Pockets are on a line: keep pocket 1, then step each pocket by the pitch along the axis. Edit any row after, or Pull the taught positions from the controller.';
+        btn.addEventListener('click', () => {
+            const ax = axSel.value, pp = Number(pitch.value) || 0, p0 = atc.magazine[0];
+            atc.magazine.forEach((row, i) => { if (i === 0) return; row.x = p0.x; row.y = p0.y; row.z = p0.z; row[ax] = (Number(p0[ax]) || 0) + i * pp; });
+            onChange(); rerender();
+        });
+        lf.appendChild(field('Line axis', axSel, 56));
+        lf.appendChild(field('Pitch (mm)', pitch, 70));
+        lf.appendChild(btn);
+        container.appendChild(lf);
+    }
 
     atc.magazine.forEach((row, i) => {
         row.pocket = i + 1;
@@ -211,9 +255,28 @@ export function renderMagazineTable(container, atc, onChange) {
             inp.addEventListener('change', () => { row[key] = inp.value === '' ? '' : Number(inp.value); onChange(); });
             return inp;
         };
-        tr.appendChild(cell('x', 58));
-        tr.appendChild(cell('y', 58));
-        tr.appendChild(cell('z', 58));
+        if (!isDisk) { tr.appendChild(cell('x', 58)); tr.appendChild(cell('y', 58)); tr.appendChild(cell('z', 58)); }
+
+        // Reorganise: ▲/▼ swap the TOOL assignment with the neighbouring pocket (the physical pocket position +
+        // its park XYZ stay put — you're moving which tool lives in which pocket, not moving the pocket).
+        const moves = document.createElement('span');
+        moves.style.cssText = 'display:flex; gap:3px; margin-left:6px;';
+        const mk = (txt, ttl, dir) => {
+            const b = document.createElement('button'); b.className = 'toolbar-btn'; b.textContent = txt; b.title = ttl;
+            b.style.cssText = 'padding:1px 7px; align-self:center;';
+            if ((dir < 0 && i === 0) || (dir > 0 && i === atc.magazine.length - 1)) b.disabled = true;
+            b.addEventListener('click', () => {
+                const j = i + dir; if (j < 0 || j >= atc.magazine.length) return;
+                const a = atc.magazine[i], b2 = atc.magazine[j];
+                [a.tool, b2.tool] = [b2.tool, a.tool];
+                [a.name, b2.name] = [b2.name, a.name];
+                onChange(); rerender();
+            });
+            return b;
+        };
+        moves.appendChild(mk('▲', 'Move this tool up a pocket', -1));
+        moves.appendChild(mk('▼', 'Move this tool down a pocket', 1));
+        tr.appendChild(moves);
         container.appendChild(tr);
     });
 }

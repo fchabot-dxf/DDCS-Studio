@@ -5,8 +5,9 @@ test('settings stacks on phone, content full-width', async ({ page }) => {
   page.on('pageerror', (e) => errs.push(e.message));
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
-  await page.click('.app-header .tab[data-app="settings"]');
-  await page.waitForSelector('#settings-app .settings-sidebar', { state: 'visible', timeout: 8000 });
+  // Settings is no longer a header tab — it opens as a modal overlay from the header quick-menu / wizard gear.
+  await page.evaluate(() => window.openSettings());
+  await page.waitForSelector('#settings-overlay.active #settings-app .settings-sidebar', { state: 'visible', timeout: 8000 });
   await page.waitForTimeout(300);
   const r = await page.evaluate(() => {
     const body = document.querySelector('#settings-app .settings-body');

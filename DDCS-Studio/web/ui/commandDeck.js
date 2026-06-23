@@ -524,9 +524,17 @@ export class CommandDeck {
         if (leftTarget) {
             leftTarget.innerHTML = `
                 <div style="display:flex; gap:6px; align-items:center;">
-                    <button class="toolbar-btn" onclick="openWiz && openWiz('comm')" title="Comm / MDI console"><span class="btn-ico">${HEADER_ICONS.comm}</span><span class="btn-tx">Comm</span></button>
-                    <button class="toolbar-btn" onclick="openWiz && openWiz('wcs')" title="Work coordinate systems"><span class="btn-ico">${HEADER_ICONS.wcs}</span><span class="btn-tx">WCS</span></button>
-                    <button class="toolbar-btn" onclick="openWiz && openWiz('atc_warmup')" title="Spindle warm-up sequence"><span class="btn-ico">${HEADER_ICONS.warmup}</span><span class="btn-tx">Warm-up</span></button>
+                    <div class="toolbar-dropdown">
+                        <button class="toolbar-btn wizard-btn" title="Setup — Comm, Warm-up, I/O"><span class="btn-ico">${HEADER_ICONS.comm}</span><span class="btn-tx">Setup</span><span class="btn-caret">▼</span></button>
+                        <div class="toolbar-dropdown-content">
+                            <button onclick="openWiz && openWiz('comm')">💬 Comm / MDI</button>
+                            <button onclick="openWiz && openWiz('atc_warmup')">🔥 Warm-up</button>
+                            <div style="padding:4px 12px; font-size:10px; opacity:.55; text-transform:uppercase; letter-spacing:1px;">I/O</div>
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('outpin')">⚡ Set Output</button>
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('waitinput')">⏱ Wait Input</button>
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('dwell')">⏳ Dwell</button>
+                        </div>
+                    </div>
                 </div>
             `;
         }
@@ -538,6 +546,8 @@ export class CommandDeck {
                     <div class="toolbar-dropdown">
                         <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.probe}</span><span class="btn-tx">Probe</span><span class="btn-caret">▼</span></button>
                         <div class="toolbar-dropdown-content">
+                            <button onclick="openWiz && openWiz('wcs')">⊕ WCS / work offsets</button>
+                            <button onclick="openWiz && openWiz('homing')">⌖ Homing</button>
                             <button onclick="openCornerWiz && openCornerWiz()">📐 Corner</button>
                             <button onclick="openMiddleWiz && openMiddleWiz()">🎯 Middle</button>
                             <button onclick="openWiz && openWiz('circular')">⭕ Bore/Boss</button>
@@ -563,34 +573,27 @@ export class CommandDeck {
                     <div class="toolbar-dropdown">
                         <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.mill}</span><span class="btn-tx">Mill</span><span class="btn-caret">▼</span></button>
                         <div class="toolbar-dropdown-content">
-                            <button onclick="openWiz && openWiz('drill')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" fill="#1e293b" stroke="none"/></svg>Drill / holes</button>
+                            <button onclick="openWiz && openWiz('drill','drill')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" fill="#1e293b" stroke="none"/></svg>Drill</button>
+                            <button onclick="openWiz && openWiz('drill','bore')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" stroke="#94a3b8" stroke-width="2"/><circle cx="12" cy="12" r="2" fill="#1e293b" stroke="none"/></svg>Bore</button>
                             <button onclick="openWiz && openWiz('pocket')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="5" width="18" height="14" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><rect x="7" y="9" width="10" height="6" rx="1" fill="#1e293b" stroke="none"/></svg>Pocket</button>
+                            <button onclick="openWiz && openWiz('contour')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="6" y="8" width="12" height="8" rx="1" fill="#1e293b" stroke="none"/><rect x="3" y="5" width="18" height="14" rx="1.5" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="3 2"/></svg>Contour</button>
                             <button onclick="openWiz && openWiz('slot')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="9" width="18" height="6" rx="3" stroke="#94a3b8" stroke-width="2.5"/><line x1="7" y1="12" x2="17" y2="12" stroke="#1e293b" stroke-width="2" stroke-linecap="round"/></svg>Slot</button>
                             <button onclick="openWiz && openWiz('surfacing')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="4" width="18" height="16" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><path d="M5 8h14M5 12h14M5 16h14" stroke="#1e293b" stroke-width="1.5"/></svg>Surfacing</button>
                             <button onclick="openWiz && openWiz('text')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><path d="M5 6h14M12 6v13" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/></svg>Text / engrave</button>
                         </div>
                     </div>
 
-                    <div class="toolbar-dropdown">
-                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.io}</span><span class="btn-tx">I/O</span><span class="btn-caret">▼</span></button>
-                        <div class="toolbar-dropdown-content">
-                            <button onclick="ddcsInsertIo && ddcsInsertIo('outpin')">⚡ Set Output</button>
-                            <button onclick="ddcsInsertIo && ddcsInsertIo('waitinput')">⏱ Wait Input</button>
-                            <button onclick="ddcsInsertIo && ddcsInsertIo('dwell')">⏳ Dwell</button>
-                        </div>
-                    </div>
-
-                    <!-- Comm and WCS buttons are provided in the left header; avoid duplicates here -->
+                    <!-- I/O actions moved to the left "Setup" dropdown; WCS moved into Probe (above). -->
                 </div>
             `;
             
             // Add click-to-toggle support for mobile/touch
-            centerTarget.querySelectorAll('.toolbar-dropdown > button').forEach(btn => {
+            document.querySelectorAll('.dock-header .toolbar-dropdown > button').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const parent = btn.parentElement;
                     // close all others
-                    centerTarget.querySelectorAll('.toolbar-dropdown').forEach(d => {
+                    document.querySelectorAll('.dock-header .toolbar-dropdown').forEach(d => {
                         if (d !== parent) {
                             d.classList.remove('active');
                             const cc = d.querySelector('.toolbar-dropdown-content');
@@ -634,7 +637,7 @@ export class CommandDeck {
             });
             // close dropdowns on outside click and clear inline positioning
             document.addEventListener('click', () => {
-                centerTarget.querySelectorAll('.toolbar-dropdown').forEach(d => {
+                document.querySelectorAll('.dock-header .toolbar-dropdown').forEach(d => {
                     d.classList.remove('active');
                     const cc = d.querySelector('.toolbar-dropdown-content');
                     if (cc) {
@@ -650,13 +653,12 @@ export class CommandDeck {
 
         const rightTarget = document.querySelector('.dock-header .header-right');
         if (rightTarget) {
+            // Slim quick-toolbar: only the two most-used in-place actions (icon-only). Load / Insert /
+            // Export now live in the header chevron quick-menu (ui/headerPost.js).
             rightTarget.innerHTML = `
                 <div style="display:flex; gap:6px; align-items:center;">
-                    <button class="toolbar-btn" onclick="loadGcodeFile && loadGcodeFile()" title="Load a G-code / .nc file into the editor (replaces the current program)"><span class="btn-ico">${HEADER_ICONS.load}</span><span class="btn-tx">Load</span></button>
-                    <button class="toolbar-btn" onclick="insertGcodeFile && insertGcodeFile()" title="Insert a G-code file at the cursor — keeps your current program"><span class="btn-ico">${HEADER_ICONS.insert}</span><span class="btn-tx">Insert</span></button>
-                    <button class="toolbar-btn" onclick="copyCode && copyCode()" title="Copy editor to clipboard"><span class="btn-ico">${HEADER_ICONS.copy}</span><span class="btn-tx">Copy</span></button>
-                    <button class="toolbar-btn" onclick="clearCode && clearCode()" title="Clear the editor"><span class="btn-ico">${HEADER_ICONS.clear}</span><span class="btn-tx">Clear</span></button>
-                    <button class="toolbar-btn" onclick="downloadFile && downloadFile()" title="Export / download the program"><span class="btn-ico">${HEADER_ICONS.export}</span><span class="btn-tx">Export</span></button>
+                    <button class="toolbar-btn icon-only" onclick="copyCode && copyCode()" title="Copy editor to clipboard" aria-label="Copy"><span class="btn-ico">${HEADER_ICONS.copy}</span></button>
+                    <button class="toolbar-btn icon-only" onclick="clearCode && clearCode()" title="Clear the editor" aria-label="Clear"><span class="btn-ico">${HEADER_ICONS.clear}</span></button>
                 </div>
             `;
         }

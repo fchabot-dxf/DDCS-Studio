@@ -36,6 +36,10 @@ export const arrayBlock = {
     type: 'array', label: 'Array', kind: 'container', category: 'Modify',
     defaults: { pattern: 'grid', x0: 0, y0: 0, cols: 3, rows: 2, dx: 20, dy: 20, count: 4, spacing: 20, angle: 0, dia: 50, startAngle: 0, skip: '' },
     fields: ['pattern'],   // pattern-specific fields resolved by fieldsFor()
+    // Blocks view carries ALL pattern fields (so every pattern is editable + round-trips); a Blockly extension
+    // toggles which are visible per `pattern` (the `dynamic` field). The wizard uses fieldsFor() directly.
+    allFields: ['pattern', 'x0', 'y0', 'cols', 'rows', 'dx', 'dy', 'count', 'spacing', 'angle', 'dia', 'startAngle', 'w', 'h', 'nx', 'ny', 'skip'],
+    dynamic: 'pattern',
     /** Pattern points; mirrors x0/y0 → cx/cy so circle reads the same origin. */
     points: (p) => patternPoints({ ...p, cx: num(p.x0, 0), cy: num(p.y0, 0) }),
     /** Which fields to show depends on the chosen pattern. */
@@ -43,6 +47,7 @@ export const arrayBlock = {
         const base = ['pattern', 'x0', 'y0'];
         if (p.pattern === 'circle') return [...base, 'dia', 'count', 'startAngle', 'skip'];
         if (p.pattern === 'line') return [...base, 'count', 'spacing', 'angle', 'skip'];
+        if (p.pattern === 'rect') return [...base, 'w', 'h', 'nx', 'ny', 'skip'];   // rect-perimeter
         return [...base, 'cols', 'rows', 'dx', 'dy', 'skip'];   // grid
     },
 };

@@ -5,12 +5,18 @@ test('mobile: header controls on-screen, no h-scroll, wizard preview controls fi
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
 
-  // header: the post dropdown is narrowed on mobile so the header controls stay on-screen
+  // header: every visible header control stays on-screen on mobile (the auto-fit collapses labels/version
+  // and the post-processor moved into the chevron quick-menu, so nothing overflows the viewport edge).
   const hdr = await page.evaluate(() => {
-    const p = document.querySelector('.hdr-post').getBoundingClientRect();
-    return { postW: p.width };
+    const header = document.querySelector('.app-header');
+    const vis = (el) => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
+    const overflows = [...header.children].filter(vis)
+      .map((c) => ({ cls: c.className, right: c.getBoundingClientRect().right }))
+      .filter((c) => c.right > window.innerWidth + 1);
+    return { innerW: window.innerWidth, headerRight: header.getBoundingClientRect().right, overflows };
   });
-  expect(hdr.postW, 'post dropdown narrowed on mobile').toBeLessThanOrEqual(130);
+  expect(hdr.headerRight, 'header within the viewport').toBeLessThanOrEqual(hdr.innerW + 1);
+  expect(hdr.overflows, 'no header control overflows the viewport edge').toEqual([]);
 
   // page must never scroll horizontally
   expect(await page.evaluate(() => document.documentElement.scrollWidth), 'no horizontal page overflow').toBeLessThanOrEqual(391);

@@ -1,0 +1,85 @@
+/**
+ * data/rotateProgram.js — rotate a G-code program's XY geometry by an angle about a pivot.
+ *
+ * The "real alignment" companion-app fix (CAM-MENU-RESEARCH; alignment-real-correction memory): the operator
+ * probes a fence, reads the misalignment angle, and Studio rotates the WHOLE program to match the physically
+ * skewed part — the rotation DDCS can't do itself (no G68). Pure + testable; ALWAYS simulate the result before
+ * cutting.
+ *
+ * Absolute (G90) moves rotate about (px,py); arc centre offsets I/J rotate as vectors (R-form arcs keep R, since
+ * a radius is rotation-invariant). Modal position is tracked so a partial move (X-only or Y-only) rotates
+ * correctly — it's rewritten with BOTH X and Y because rotation couples the axes. G91 incremental moves are NOT
+ * rotated (flagged via `hadIncremental`) — Fusion posts are G90; an incremental program needs the operator's eye.
+ */
+const r3 = (n) => { const v = Math.round(n * 1000) / 1000; return Object.is(v, -0) ? 0 : v; };
+const numAfter = (line, letter) => {
+    const m = line.match(new RegExp(letter + '\\s*(-?\\d*\\.?\\d+)', 'i'));
+    return m ? { val: parseFloat(m[1]), token: m[0] } : null;
+};
+
+/**
+ * @param {string} gcode
+ * @param {number} angleDeg  CCW degrees
+ * @param {number} [px=0] @param {number} [py=0]  pivot (part datum) in the program frame
+ * @returns {{ text:string, hadIncremental:boolean, rotated:number }}
+ */
+export function rotateProgram(gcode, angleDeg, px = 0, py = 0) {
+    const th = (Number(angleDeg) || 0) * Math.PI / 180, cos = Math.cos(th), sin = Math.sin(th);
+    const rotPt = (x, y) => [px + (x - px) * cos - (y - py) * sin, py + (x - px) * sin + (y - py) * cos];
+    const rotVec = (i, j) => [i * cos - j * sin, i * sin + j * cos];
+    let curX = 0, curY = 0, abs = true, hadIncremental = false, rotated = 0;
+    const out = String(gcode == null ? '' : gcode).split(/\r?\n/).map((raw) => {
+        if (/\bG91\b/.test(raw)) abs = false;
+        if (/\bG90\b/.test(raw)) abs = true;
+        const X = numAfter(raw, 'X'), Y = numAfter(raw, 'Y');
+        const I = numAfter(raw, 'I'), J = numAfter(raw, 'J');
+        if (!X && !Y && !I && !J) return raw;            // no planar geometry → pass through (Z, M-codes, …)
+        if (!abs) { if (X || Y) hadIncremental = true; return raw; }   // don't rotate incremental moves
+
+        let line = raw;
+        if (X || Y) {
+            const tx = X ? X.val : curX, ty = Y ? Y.val : curY;   // fill the missing axis from the tracked position
+            const [rx, ry] = rotPt(tx, ty);
+            // rewrite both axes (rotation couples them); append the missing one (G-code word order is free).
+            line = X ? line.replace(X.token, 'X' + r3(rx)) : line + ' X' + r3(rx);
+            line = Y ? line.replace(Y.token, 'Y' + r3(ry)) : line + ' Y' + r3(ry);
+            curX = tx; curY = ty;   // track the ORIGINAL (pre-rotation) position for the next partial move
+            rotated += 1;
+        }
+        if (I || J) {                                    // arc centre offset = a vector → rotate without the pivot
+            const [ri, rj] = rotVec(I ? I.val : 0, J ? J.val : 0);
+            if (I) line = line.replace(I.token, 'I' + r3(ri)); else line += ' I' + r3(ri);
+            if (J) line = line.replace(J.token, 'J' + r3(rj)); else line += ' J' + r3(rj);
+        }
+        return line;
+    });
+    return { text: out.join('\n'), hadIncremental, rotated };
+}
+
+/**
+ * Translate a program's geometry by (dx,dy,dz) — shift the whole toolpath on the stock (a path-placement companion
+ * to rotateProgram). Absolute (G90) X/Y/Z moves get the delta added; arc offsets I/J/K are RELATIVE vectors (centre
+ * offsets) so they're unchanged; G91 incremental and G53 machine-coord moves are left alone (a shift would move them
+ * wrongly). Per-axis independent, so partial moves carry the already-shifted modal position. Pure; simulate after.
+ * @param {string} gcode @param {number} [dx=0] @param {number} [dy=0] @param {number} [dz=0]
+ * @returns {{ text:string, hadIncremental:boolean, moved:number }}
+ */
+export function translateProgram(gcode, dx = 0, dy = 0, dz = 0) {
+    dx = Number(dx) || 0; dy = Number(dy) || 0; dz = Number(dz) || 0;
+    let abs = true, hadIncremental = false, moved = 0;
+    const out = String(gcode == null ? '' : gcode).split(/\r?\n/).map((raw) => {
+        if (/\bG91\b/.test(raw)) abs = false;
+        if (/\bG90\b/.test(raw)) abs = true;
+        const X = numAfter(raw, 'X'), Y = numAfter(raw, 'Y'), Z = numAfter(raw, 'Z');
+        if (!X && !Y && !Z) return raw;                  // no linear geometry → pass through
+        if (!abs) { hadIncremental = true; return raw; } // incremental moves: a shift doesn't apply
+        if (/\bG53\b/.test(raw)) return raw;             // machine-coord move: don't shift it elsewhere in the machine
+        let line = raw;
+        if (X) line = line.replace(X.token, 'X' + r3(X.val + dx));
+        if (Y) line = line.replace(Y.token, 'Y' + r3(Y.val + dy));
+        if (Z) line = line.replace(Z.token, 'Z' + r3(Z.val + dz));
+        moved += 1;
+        return line;
+    });
+    return { text: out.join('\n'), hadIncremental, moved };
+}

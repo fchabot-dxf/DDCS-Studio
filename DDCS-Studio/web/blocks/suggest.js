@@ -35,8 +35,8 @@ const SEED = {
     bore: ['move', 'progend'],
     line: ['line', 'move'],
     slot: ['move', 'progend'],
-    wall: ['move', 'progend'],
-    region: ['fillzigzag', 'fillconcentric', 'wall'],
+    contour: ['move', 'progend'],
+    region: ['fillzigzag', 'fillconcentric', 'contour'],
     array: ['drill', 'bore', 'line'],
     dwell: ['mcode', 'move', 'spindle'],           // G04 sits between drawbar M-codes + before retracts
     mcode: ['mcode', 'move', 'dwell'],             // M-codes cluster (M151/M153/M155, M300/M301/M302)

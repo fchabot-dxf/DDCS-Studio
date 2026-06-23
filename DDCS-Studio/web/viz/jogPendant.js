@@ -18,8 +18,14 @@ export function setupJogPendant(viz) {
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; color: #888; margin-bottom: 6px;">
                     <span style="color:#9fb4c8;">Step</span>
-                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="1"> 1.0</label>
-                    <label style="cursor:pointer;"><input type="radio" name="jogStep" value="10" checked> 10</label>
+                    <button class="toolbar-btn jog-step-cycle" data-step="10" title="Click to cycle the jog step: 0.1 → 1 → 10 → 100" style="min-width:46px; padding:2px 8px; font-weight:bold;">10</button>
+                    <span style="color:#5f6b7a; font-size:10px;">mm</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px; color: #888; margin-bottom: 6px;">
+                    <span style="color:#9fb4c8;">Pos</span>
+                    <input class="jog-pos" data-axis="x" type="number" step="0.1" title="Start X (mm) — type for a precise position" style="width:48px;">
+                    <input class="jog-pos" data-axis="y" type="number" step="0.1" title="Start Y (mm)" style="width:48px;">
+                    <input class="jog-pos" data-axis="z" type="number" step="0.1" title="Start Z (mm)" style="width:48px;">
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 32px 32px; gap: 6px;">
                     <button class="toolbar-btn" data-axis="z" data-dir="-1" style="font-weight:bold; padding:0;">Z-</button>
@@ -29,9 +35,11 @@ export function setupJogPendant(viz) {
                     <button class="toolbar-btn" data-axis="y" data-dir="-1" style="font-weight:bold; padding:0;">Y-</button>
                     <button class="toolbar-btn" data-axis="x" data-dir="1" style="font-weight:bold; padding:0;">X+</button>
                 </div>
-                <div style="display: flex; gap: 6px; margin-top: 6px;">
-                    <button class="toolbar-btn" data-axis="xy" data-dir="0" style="flex:1; height:24px; padding:0; background:#2b3340; border-color:#555; color:#e6ecf2;" title="Reset X/Y to 0">0 XY</button>
-                    <button class="toolbar-btn" data-axis="z" data-dir="0" style="flex:1; height:24px; padding:0; background:#2b3340; border-color:#555; color:#e6ecf2;" title="Reset Z to 0">0 Z</button>
+                <div class="jog-a-row" style="display: none; align-items: center; gap: 6px; margin-top: 6px;">
+                    <span style="color:#9fb4c8;">A</span>
+                    <button class="toolbar-btn" data-axis="a" data-dir="-1" title="Rotate the part about the 4th axis (− degrees)" style="font-weight:bold; padding:2px 10px;">A−</button>
+                    <button class="toolbar-btn" data-axis="a" data-dir="1" title="Rotate the part about the 4th axis (+ degrees)" style="font-weight:bold; padding:2px 10px;">A+</button>
+                    <span style="color:#5f6b7a; font-size:10px;">deg</span>
                 </div>
             </div>
         `;
@@ -47,25 +55,55 @@ export function setupJogPendant(viz) {
             btn.addEventListener('click', (e) => {
                 const axis = btn.getAttribute('data-axis');
                 const dir = parseFloat(btn.getAttribute('data-dir'));
-                const stepInput = div.querySelector('input[type="radio"]:checked');
-                const step = stepInput ? parseFloat(stepInput.value) : 1;
-                
+                const stepBtn = div.querySelector('.jog-step-cycle');
+                const step = stepBtn ? parseFloat(stepBtn.dataset.step) : 1;
+
+                // A = manual 4th-axis rotation (degrees), not a start-marker move. Spins the part in the preview.
+                if (axis === 'a') { if (viz.rotaryJogA) viz.rotaryJogA(dir * step); return; }
+
                 const idx = viz.selectedStart || 0;
                 if (viz.starts && viz.starts[idx]) {
                     const s = viz.starts[idx]; // jog the selected start (see the Start selector)
                     if (axis === 'x') s.x += dir * step;
                     if (axis === 'y') s.y += dir * step;
                     if (axis === 'z') s.z += dir * step;
-                    if (axis === 'xy' && dir === 0) { s.x = 0; s.y = 0; }
-                    if (axis === 'z' && dir === 0) { s.z = 0; }
                     
                     viz._positionMarkers();
                     viz._rebuild();
                     viz.render();
                     if (typeof viz.onStartChange === 'function') viz.onStartChange(viz.starts);
+                    if (viz._syncJogPos) viz._syncJogPos();   // refresh the precise X/Y/Z fields after a jog
                 }
             });
         });
+
+        // Step is a single CYCLE-TOGGLE button: 0.1 → 1 → 10 → 100 → (wrap). Brings back the fine (0.1) and
+        // coarse (100) steps without four radios cluttering the row.
+        const STEPS = [0.1, 1, 10, 100];
+        const stepBtn = div.querySelector('.jog-step-cycle');
+        if (stepBtn) stepBtn.addEventListener('click', () => {
+            const i = (STEPS.indexOf(parseFloat(stepBtn.dataset.step)) + 1) % STEPS.length;
+            stepBtn.dataset.step = String(STEPS[i]);
+            stepBtn.textContent = String(STEPS[i]);
+        });
+
+        // Precise start entry — type the selected start's X/Y/Z directly (complements drag + step-jog). syncPos
+        // refreshes the fields from the marker (after a jog, a drag, or a start switch); editing a field moves it.
+        const posInputs = [...div.querySelectorAll('.jog-pos')];
+        const syncPos = () => {
+            const s = (viz.starts && viz.starts[viz.selectedStart || 0]) || { x: 0, y: 0, z: 0 };
+            posInputs.forEach((inp) => { if (document.activeElement !== inp) inp.value = Number((s[inp.dataset.axis] || 0).toFixed(3)); });
+        };
+        viz._syncJogPos = syncPos;   // gcodeViz3d calls this after a drag so the fields track it
+        posInputs.forEach((inp) => inp.addEventListener('change', () => {
+            const idx = viz.selectedStart || 0;
+            if (!viz.starts || !viz.starts[idx]) return;
+            const v = parseFloat(inp.value); if (!Number.isFinite(v)) return;
+            viz.starts[idx][inp.dataset.axis] = v;
+            viz._positionMarkers(); viz._rebuild(); viz.render();
+            if (typeof viz.onStartChange === 'function') viz.onStartChange(viz.starts);
+        }));
+        syncPos();
 
         // Start selector — pick which start marker the jog buttons drive. Multi-pass programs
         // (e.g. the middle wizard, where a reposition creates a 2nd start) get one button per
@@ -82,7 +120,7 @@ export function setupJogPendant(viz) {
                 b.textContent = String(i + 1);
                 b.title = `Jog start ${i + 1}`;
                 if (i === sel) b.classList.add('on');
-                b.addEventListener('click', () => { if (viz.selectStart) viz.selectStart(i); });
+                b.addEventListener('click', () => { if (viz.selectStart) viz.selectStart(i); if (viz._syncJogPos) viz._syncJogPos(); });
                 startBtns.appendChild(b);
             }
         };

@@ -9,11 +9,18 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
+import { makePlace } from '../blocks/programFraming.js';
 import { layoutText, textContours } from './textGeometry.js';
 
 export { layoutText, textContours };   // back-compat for views/textView.js + the 2D schematic
 
 function num(v, d) { return (v === '' || v == null || isNaN(Number(v))) ? d : Number(v); }
+
+/** The laid-out text's bounding box — used by PlaceOnStock (when you attach a label to a stock corner) + the view. */
+export function textBBox(params = {}) {
+    const b = layoutText(params).bbox;
+    return { minX: b.x0, maxX: b.x1, minY: b.y0, maxY: b.y1 };
+}
 
 /** Text params → its engraving block stack (the one source of truth for both displays). */
 export function textStack(params = {}) {
@@ -45,7 +52,7 @@ export function textStack(params = {}) {
     const sd = newBlock('stepdown');
     sd.params = { ...sd.params, to: depth, by: stepdown };
     sd.children = [ft];
-    S.push(sd);
+    S.push(makePlace(params, textBBox(params), sd));   // opt-in placement: stays at x/y unless you attach to a corner
 
     S.push(newBlock('progend'));
     return S;

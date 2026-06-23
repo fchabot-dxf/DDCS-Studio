@@ -8,14 +8,15 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockModel.js';
 import { recordOp } from '../blocks/opRecord.js';
-import { makeStart, makeEnd } from '../blocks/programFraming.js';
+import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { patternPoints } from './ops/index.js';
 import { num } from './ops/util.js';
+import { pointsBBox } from './ops/placement.js';
 
 // Re-export so views (drillView) keep importing the pattern geometry from here.
 export { patternPoints };
 
-/** Drill params → [ Array{ Drill|Bore } ]. The one source of truth for both displays. */
+/** Drill params → [ PlaceOnStock{ Array{ Drill|Bore } } ]. The one source of truth for both displays. */
 export function drillStack(params = {}) {
     const arr = newBlock('array');
     arr.params = {
@@ -30,16 +31,19 @@ export function drillStack(params = {}) {
     const helical = params.method === 'helical';
     const hole = newBlock(helical ? 'bore' : 'drill');
     hole.params = helical
-        ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) }
+        ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), ramp: params.ramp || 'step', feed: num(params.feed, 100), clearance: num(params.clearance, 5) }
         : { x: 0, y: 0, depth: num(params.depth, 5), peck: num(params.peck, 5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) };
     arr.children = [hole];
-    return [makeStart(params), arr, makeEnd(params)];
+    // PLACE the pattern on the stock — a C-block carrying the intent + a bbox/stock SNAPSHOT (placeOnStock.js); the
+    // emit fold (kind:'place') translates the wrapped op so its datum corner lands on the stock-attach corner.
+    const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
+    return [makeStart(params), wcs, makePlace(params, pointsBBox(patternPoints(params)), arr), makeEnd(params)];
 }
 
 export class DrillWizard {
     generate(params) {
         recordOp('drill', params);   // let the Blocks tab open this op as its stack
-        return emitMapped(drillStack(params)).text;
+        return emitMapped(drillStack(params)).text;   // placement is baked into the stack (drillStack)
     }
 
     /** Preview/sim start hint (work frame): origin; the pattern is drawn from there. */

@@ -124,4 +124,27 @@ export class AlignmentWizard {
         recordOp('alignment', params);   // let the Blocks tab open this op as its stack
         return emitMapped(alignmentStack(params)).text;
     }
+
+    /** Preview start (first probe, point A). */
+    inferStart(params, stock) {
+        return this.inferStarts(params, stock)[0];
+    }
+
+    /**
+     * Per-pass preview starts: the alignment macro probes point A, repositions (jog to B along the fence), then
+     * probes point B → 2 passes. Spread the two starts ALONG the fence (the checkAxis) so both markers are placed
+     * at DISTINCT points (else both probes start at the same spot). Probe height = the stock top in the preview.
+     */
+    inferStarts(params, stock) {
+        const n = (v, d) => num(v, d);
+        const sx = n(stock && stock.x, 150), sy = n(stock && stock.y, 100), sz = n(stock && stock.z, 25);
+        const checkAxis = (params && params.checkAxis) === 'Y' ? 'Y' : 'X';   // fence runs along this
+        const z = Math.min(5, sz * 0.5);                                      // just above the top
+        if (checkAxis === 'X') {
+            // Fence along X → A and B differ in X (spread along X), near the +Y edge; probe moves in Y.
+            return [{ x: sx * 0.3, y: sy * 0.85, z }, { x: sx * 0.7, y: sy * 0.85, z }];
+        }
+        // Fence along Y → A and B differ in Y; probe moves in X.
+        return [{ x: sx * 0.85, y: sy * 0.3, z }, { x: sx * 0.85, y: sy * 0.7, z }];
+    }
 }

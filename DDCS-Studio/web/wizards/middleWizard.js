@@ -22,14 +22,17 @@ const sgn = (plus) => (plus ? 'pos' : 'neg');
 /** Middle params → its probe-macro block stack. The one source of truth for both displays. */
 export function middleStack(params = {}) {
     const featureType = params.featureType === 'boss' ? 'boss' : 'pocket';
+    const approach = params.approach === 'manual' ? 'manual' : 'auto';   // hands-free cycle vs operator-jogged repositions
     const axis = params.axis === 'Y' ? 'Y' : 'X';
     const dir1Plus = (params.dir1 || 'pos') === 'pos';
     const twoAxis = !!params.twoAxis || !!params.findBoth;
+    const circular = !!params.circular;   // round bore/boss: report the diameter (opposite-touch span) + re-centre between axes
     const second = axis === 'X' ? 'Y' : 'X';
     const resolvedDir2 = (typeof params.dir2 === 'string') ? params.dir2 : (dir1Plus ? 'neg' : 'pos');
     const dir2Plus = resolvedDir2 === 'pos';
     const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
     const dist = num(params.dist, 20), retract = num(params.retract, 2), safeZ = num(params.safeZ, 10);
+    const clearOver = num(params.clearOver, 15);   // boss AUTO: how high to lift before crossing over the part
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
 
     const S = [];
@@ -43,6 +46,7 @@ export function middleStack(params = {}) {
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
     const PR = (ax, to, feed) => { const b = newBlock('probe'); b.params = { axis: ax, to, feed, port: '#5', level: 0 }; S.push(b); };
     const CK = (ax, g) => { const b = newBlock('probecheck'); b.params = { axis: ax, goto: g }; S.push(b); };   // folds where there's no status var
+    const MSG = (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); };
     const END = () => S.push(newBlock('endprogram'));
 
     const twoPass = (ax, plus, resultVar) => {
@@ -52,9 +56,19 @@ export function middleStack(params = {}) {
         PR(ax, pv, '#4'); CK(ax, 1); A(resultVar, av.result); MV(ax, rv);
     };
     const reposition = () => { A('#57', '#882'); MV('Z', '#17'); A('#1505', '1', 'Press Enter when repositioned'); IF('#1505', '==', '0', 2); MM('Z', '#57'); };
+    // Boss, AUTO: clear over the feature to the far side, hands-free. Uses the max probe distance #1 as the
+    // over-estimate of the feature width (the operator already sets it >= the feature for the probes to reach),
+    // so traversing #1+retract past the first face lands beyond the second; then drop back to probe height.
+    const traverseOver = (ax, firstPlus) => { MV('Z', '#18'); MV(ax, firstPlus ? '[#1+#2]' : '[0-#1-#2]'); MV('Z', '[0-#18]'); };
+    const between = (ax, firstPlus) => {
+        // The two opposite walls. POCKET probes both from the centre (no move). BOSS needs the 2nd face from the
+        // far side: MANUAL pauses for the operator to jog over; AUTO traverses over hands-free.
+        if (featureType !== 'boss') { if (approach === 'manual') reposition(); return; }
+        if (approach === 'manual') reposition(); else traverseOver(ax, firstPlus);
+    };
     const seq = (ax, firstPlus, base) => {
         twoPass(ax, firstPlus, `#${base}`);
-        if (featureType === 'boss') reposition();          // boss: 2nd side from outside needs a move-over
+        between(ax, firstPlus);
         twoPass(ax, !firstPlus, `#${base + 1}`);
         A(`#${base + 2}`, `[#${base}+#${base + 1}]/2`);     // centre = midpoint of the two walls
     };
@@ -65,6 +79,7 @@ export function middleStack(params = {}) {
     A('#54', 0, 'Wall 3 pos'); A('#55', 0, 'Wall 4 pos'); A('#56', 0, 'Center pos 2');
     A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
     A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract'); A('#17', safeZ, 'Safe Z retract');
+    A('#18', clearOver, 'Traverse-over clearance (boss auto: lift this high to clear the part before crossing)');
     if (wcs === 'active') { A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'); A('#72', '[#71-1]', 'Zero-based index'); A('#70', '[805+[#72*5]]', 'Base WCS address'); }
     else A('#70', WCS_BASE[wcs]);
     A('#1505', '1', 'Press Enter to probe - ESC=cancel'); IF('#1505', '==', '0', 2); DM('inc');
@@ -72,6 +87,9 @@ export function middleStack(params = {}) {
     seq(axis, dir1Plus, 51);
     if (twoAxis) {
         reposition();
+        // CIRCULAR + 2-axis: re-centre to the found PRIMARY-axis centre (#53, machine frame) before probing the
+        // perpendicular axis, so the secondary touches cross the true diameter instead of an off-centre chord.
+        if (circular) MM(axis, '#53');
         C(`2axis_${axis === 'X' ? 'XtoY' : 'YtoX'}_${resolvedDir2}`);
         seq(second, dir2Plus, 54);
         MV('Z', '#17');
@@ -81,6 +99,13 @@ export function middleStack(params = {}) {
     } else {
         MV('Z', '#17');
         A(`#[#70+${AX[axis].off}]`, '#53');
+    }
+    if (circular) {
+        // Round feature: the opposite-touch span IS the diameter. #58 = primary-axis Ø; with 2-axis, #59 = the
+        // perpendicular Ø and #60 the mean. ABS so the result is direction-agnostic (dir1 pos/neg ordering).
+        A('#58', `ABS[#51-#52]`, 'Primary-axis diameter');
+        if (twoAxis) { A('#59', `ABS[#54-#55]`, 'Secondary-axis diameter'); A('#60', '[#58+#59]/2', 'Mean diameter'); }
+        MSG(twoAxis ? 'Centre #53/#56 - mean dia #60' : 'Centre #53 - dia #58');
     }
     if (params.syncA && (axis === 'Y' || twoAxis)) { const s = params.slave || '3'; A('#74', `[#70+${s}]`); A('#[#74]', '#883'); }
 

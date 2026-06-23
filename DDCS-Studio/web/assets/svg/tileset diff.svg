@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 880 560" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;">
+    <g id="stock_rect">
+        <rect x="23" y="33" width="64" height="54" style="fill:#838383;stroke:#fff;stroke-width:4px;"/>
+    </g>
+    <g id="stock_round">
+        <circle cx="165" cy="60" r="30" style="fill:#838383;stroke:#fff;stroke-width:4px;"/>
+    </g>
+    <g id="pocket_rect">
+        <path d="M307,42L307,78C307,82.967 302.967,87 298,87L252,87C247.033,87 243,82.967 243,78L243,42C243,37.033 247.033,33 252,33L298,33C302.967,33 307,37.033 307,42Z" style="fill:#838383;stroke:#fff;stroke-width:4px;"/>
+    </g>
+    <g id="bore">
+        <circle cx="385" cy="60" r="28" style="fill:none;stroke:#fff;stroke-width:4px;"/>
+        <path d="M385,46L385,74M371,60L399,60" style="fill:none;fill-rule:nonzero;stroke:#fff;stroke-width:4px;"/>
+    </g>
+    <g id="boss_rect">
+        <path d="M527,31L527,89L463,89L463,31L527,31ZM517,41L473,41L473,79L517,79L517,41Z" style="fill:#838383;stroke:#fff;stroke-width:4px;"/>
+    </g>
+    <g id="boss_round">
+        <path d="M605,30C621.557,30 635,43.443 635,60C635,76.557 621.557,90 605,90C588.443,90 575,76.557 575,60C575,43.443 588.443,30 605,30ZM605,43C595.617,43 588,50.617 588,60C588,69.383 595.617,77 605,77C614.383,77 622,69.383 622,60C622,50.617 614.383,43 605,43Z" style="fill:#838383;stroke:#fff;stroke-width:4px;"/>
+    </g>
+    <g id="slot">
+        <path d="M692,70C686.514,70 682,65.486 682,60C682,54.514 686.514,50 692,50L738,50C743.486,50 748,54.514 748,60C748,65.486 743.486,70 738,70L692,70Z" style="fill:none;fill-rule:nonzero;stroke:#fff;stroke-width:4px;"/>
+    </g>
+    <g id="corner">
+        <path d="M30,177L30,123L84,123" style="fill:none;fill-rule:nonzero;stroke:#fff;stroke-width:5px;"/>
+    </g>
+    <g id="edge">
+        <path d="M138,150L192,150M146,150L142,160M162,150L158,160M178,150L174,160" style="fill:none;fill-rule:nonzero;stroke:#fff;stroke-width:4px;"/>
+    </g>
+    <g id="datum_corner">
+        <path d="M250,177L250,127L304,127" style="fill:none;fill-rule:nonzero;stroke:#fff;stroke-width:4px;"/>
+        <circle cx="250" cy="177" r="4" style="fill:#fff;"/>
+    </g>
+    <g id="bolt_array" transform="matrix(1,0,0,1,224.346672,0)">
+        <g transform="matrix(1,0,0,1,329.504154,90.653065)">
+            <rect x="23" y="33" width="64" height="54" style="fill:none;stroke:#fff;stroke-width:4px;"/>
+        </g>
+        <g>
+            <g transform="matrix(1,0,0,1,3.504154,27.653065)">
+                <circle cx="413" cy="150" r="4" style="fill:#000eff;"/>
+            </g>
+            <g transform="matrix(1,0,0,1,-14.495846,3.653065)">
+                <circle cx="399" cy="174" r="4" style="fill:#000eff;"/>
+            </g>
+            <g transform="matrix(1,0,0,1,-18.495846,3.653065)">
+                <circle cx="371" cy="174" r="4" style="fill:#000eff;"/>
+            </g>
+            <g transform="matrix(1,0,0,1,27.504154,-26.346935)">
+                <circle cx="357" cy="150" r="4" style="fill:#000eff;"/>
+            </g>
+            <g transform="matrix(1,0,0,1,27.504154,0.653065)">
+                <circle cx="357" cy="150" r="4" style="fill:#000eff;"/>
+            </g>
+            <g transform="matrix(1,0,0,1,-18.495846,-2.346935)">
+                <circle cx="371" cy="126" r="4" style="fill:#000eff;"/>
+            </g>
+            <g transform="matrix(1,0,0,1,-18.495846,24.653065)">
+                <circle cx="371" cy="126" r="4" style="fill:#000eff;"/>
+            </g>
+            <g transform="matrix(1,0,0,1,17.504154,-2.346935)">
+                <circle cx="399" cy="126" r="4" style="fill:#000eff;"/>
+            </g>
+            <g transform="matrix(1,0,0,1,17.504154,24.653065)">
+                <circle cx="399" cy="126" r="4" style="fill:#000eff;"/>
+            </g>
+        </g>
+    </g>
+    <g id="bolt_circle">
+        <circle cx="385" cy="150" r="28" style="fill:none;stroke:#fff;stroke-width:3px;"/>
+        <g>
+            <circle cx="413" cy="150" r="4" style="fill:#000eff;"/>
+            <circle cx="399" cy="174" r="4" style="fill:#000eff;"/>
+            <circle cx="371" cy="174" r="4" style="fill:#000eff;"/>
+            <circle cx="357" cy="150" r="4" style="fill:#000eff;"/>
+            <circle cx="371" cy="126" r="4" style="fill:#000eff;"/>
+            <circle cx="399" cy="126" r="4" style="fill:#000eff;"/>
+        </g>
+    </g>
+    <g id="bolt_rect" transform="matrix(1,0,0,1,109.572005,0)">
+        <g transform="matrix(1,0,0,1,329.504154,90.653065)">
+            <rect x="23" y="33" width="64" height="54" style="fill:none;stroke:#fff;stroke-width:4px;"/>
+        </g>
+        <g>
+            <g transform="matrix(1,0,0,1,3.504154,27.653065)">
+                <circle cx="413" cy="150" r="4" style="fill:#000eff;"/>
+            </g>
+            <g transform="matrix(1,0,0,1,-14.495846,3.653065)">
+                <circle cx="399" cy="174" r="4" style="fill:#000eff;"/>
+            </g>
+            <g transform="matrix(1,0,0,1,-18.495846,3.653065)">
+                <circle cx="371" cy="174" r="4" style="fill:#000eff;"/>
+            </g>
+            <g transform="matrix(1,0,0,1,27.504154,-26.346935)">
+                <circle cx="357" cy="150" r="4" style="fill:#000eff;"/>
+            </g>
+            <g transform="matrix(1,0,0,1,-18.495846,-2.346935)">
+                <circle cx="371" cy="126" r="4" style="fill:#000eff;"/>
+            </g>
+            <g transform="matrix(1,0,0,1,17.504154,-2.346935)">
+                <circle cx="399" cy="126" r="4" style="fill:#000eff;"/>
+            </g>
+        </g>
+    </g>
+    <g id="centerline" transform="matrix(1,0,0,1,217.173205,-92.623764)">
+        <path d="M575,150L635,150" style="fill:none;fill-rule:nonzero;stroke:#fff;stroke-width:3px;stroke-dasharray:16,5,3,5;"/>
+    </g>
+    <g id="dim_line">
+        <path d="M690,150L740,150M690,140L690,160M740,140L740,160M700,144L690,150L700,156M730,144L740,150L730,156" style="fill:none;fill-rule:nonzero;stroke:#fff;stroke-width:3px;"/>
+    </g>
+    <g id="crosshair">
+        <path d="M825,118L825,182M793,150L857,150" style="fill:none;fill-rule:nonzero;stroke:#fff;stroke-width:4px;"/>
+        <circle cx="825" cy="150" r="9" style="fill:none;stroke:#fff;stroke-width:4px;"/>
+    </g>
+    <g id="arrow">
+        <path d="M28,240L82,240M70,230L83,240L70,250" style="fill:none;fill-rule:nonzero;stroke:#3cf;stroke-width:4px;"/>
+    </g>
+    <g id="arrow_double">
+        <path d="M140,240L190,240M152,230L140,240L152,250M178,230L190,240L178,250" style="fill:none;fill-rule:nonzero;stroke:#3cf;stroke-width:4px;"/>
+    </g>
+    <g transform="matrix(1,0,0,1,0,-15.98269)">
+        <g id="jogpath">
+            <path d="M248,257L313.907,257" style="fill:none;fill-rule:nonzero;stroke:#3cf;stroke-width:3px;stroke-dasharray:7,5;"/>
+        </g>
+    </g>
+    <g id="touch_spark">
+        <path d="M385,215L385,265M360,240L410,240M367,222L403,258M403,222L367,258" style="fill:none;fill-rule:nonzero;stroke:#ffd23f;stroke-width:3px;"/>
+        <circle cx="385" cy="240" r="5" style="fill:#ffd23f;"/>
+    </g>
+    <g id="plus">
+        <path d="M495,218L495,262M473,240L517,240" style="fill:none;fill-rule:nonzero;stroke:#fff;stroke-width:5px;"/>
+    </g>
+    <g id="minus">
+        <path d="M583,240L627,240" style="fill:none;fill-rule:nonzero;stroke:#fff;stroke-width:5px;"/>
+    </g>
+    <g id="wcs_origin">
+        <path d="M695,262L745,262M736,255L746,262L736,269" style="fill:none;fill-rule:nonzero;stroke:#ff6b6b;stroke-width:4px;"/>
+        <path d="M695,262L695,215M688,224L695,214L702,224" style="fill:none;fill-rule:nonzero;stroke:#4ade80;stroke-width:4px;"/>
+        <circle cx="695" cy="262" r="4" style="fill:#fff;"/>
+    </g>
+    <g id="axis_arrow">
+        <path d="M798,240L852,240M840,230L853,240L840,250M798,232L798,248" style="fill:none;fill-rule:nonzero;stroke:#3cf;stroke-width:4px;"/>
+    </g>
+    <g id="probe_ball">
+        <circle cx="55" cy="330" r="8" style="fill:#ff6b6b;"/>
+    </g>
+    <g id="stylus_side">
+        <rect x="155" y="300" width="20" height="8" style="fill:none;stroke:#cfd6dd;stroke-width:4px;"/>
+        <path d="M165,308L165,348" style="fill:none;fill-rule:nonzero;stroke:#cfd6dd;stroke-width:4px;"/>
+        <circle cx="165" cy="356" r="9" style="fill:#ff6b6b;stroke:#ff6b6b;stroke-width:4px;"/>
+    </g>
+    <g id="endmill_top">
+        <circle cx="275" cy="330" r="28" style="fill:none;stroke:#cfd6dd;stroke-width:4px;"/>
+        <path d="M255,310L295,350M295,310L255,350" style="fill:none;fill-rule:nonzero;stroke:#cfd6dd;stroke-width:4px;"/>
+    </g>
+    <g id="endmill_side">
+        <g transform="matrix(0.5,0,0,1,186,0)">
+            <rect x="372" y="304" width="26" height="38" style="fill:#838383;stroke:#272727;stroke-width:2.53px;"/>
+        </g>
+        <g transform="matrix(1,0,0,1,0,-38)">
+            <path d="M372,342L385,357" style="fill:none;fill-rule:nonzero;stroke:#272727;stroke-width:2px;stroke-linecap:butt;"/>
+        </g>
+        <g transform="matrix(1,0,0,1,0,-26.5)">
+            <path d="M372,342L385,357" style="fill:none;fill-rule:nonzero;stroke:#272727;stroke-width:2px;stroke-linecap:butt;"/>
+        </g>
+        <g transform="matrix(1,0,0,1,0,-15)">
+            <path d="M372,342L385,357" style="fill:none;fill-rule:nonzero;stroke:#272727;stroke-width:2px;stroke-linecap:butt;"/>
+        </g>
+    </g>
+    <g id="tool_setter">
+        <rect x="468" y="342" width="54" height="14" style="fill:#838383;stroke:#cfd6dd;stroke-width:4px;"/>
+        <g transform="matrix(1.428571,0,0,1,-212.142857,0)">
+            <rect x="488" y="322" width="14" height="20" style="fill:#838383;stroke:#cfd6dd;stroke-width:3.24px;"/>
+        </g>
+    </g>
+    <g id="surface">
+        <path d="M580,346L630,346M605,312L605,344M598,334L605,345L612,334" style="fill:none;fill-rule:nonzero;stroke:#fff;stroke-width:4px;"/>
+    </g>
+    <g id="badge_0">
+        <circle cx="55" cy="435" r="20" style="fill:none;stroke:#fff;stroke-width:3px;"/>
+        <g transform="matrix(1,0,0,1,55,444)">
+            <text x="-4.449px" y="0px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:16px;fill:#fff;">0</text>
+        </g>
+    </g>
+    <g id="badge_1">
+        <circle cx="165" cy="435" r="20" style="fill:none;stroke:#fff;stroke-width:3px;"/>
+        <g transform="matrix(1,0,0,1,165,444)">
+            <text x="-4.449px" y="0px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:16px;fill:#fff;">1</text>
+        </g>
+    </g>
+    <g id="badge_2">
+        <circle cx="275" cy="435" r="20" style="fill:none;stroke:#fff;stroke-width:3px;"/>
+        <g transform="matrix(1,0,0,1,275,444)">
+            <text x="-4.449px" y="0px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:16px;fill:#fff;">2</text>
+        </g>
+    </g>
+    <g id="badge_3">
+        <circle cx="385" cy="435" r="20" style="fill:none;stroke:#fff;stroke-width:3px;"/>
+        <g transform="matrix(1,0,0,1,385,444)">
+            <text x="-4.449px" y="0px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:16px;fill:#fff;">3</text>
+        </g>
+    </g>
+    <g id="badge_4">
+        <circle cx="495" cy="435" r="20" style="fill:none;stroke:#fff;stroke-width:3px;"/>
+        <g transform="matrix(1,0,0,1,495,444)">
+            <text x="-4.449px" y="0px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:16px;fill:#fff;">4</text>
+        </g>
+    </g>
+    <g id="badge_5">
+        <circle cx="605" cy="435" r="20" style="fill:none;stroke:#fff;stroke-width:3px;"/>
+        <g transform="matrix(1,0,0,1,605,444)">
+            <text x="-4.449px" y="0px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:16px;fill:#fff;">5</text>
+        </g>
+    </g>
+    <g id="badge_6">
+        <circle cx="715" cy="435" r="20" style="fill:none;stroke:#fff;stroke-width:3px;"/>
+        <g transform="matrix(1,0,0,1,715,444)">
+            <text x="-4.449px" y="0px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:16px;fill:#fff;">6</text>
+        </g>
+    </g>
+    <g id="badge_7">
+        <circle cx="825" cy="435" r="20" style="fill:none;stroke:#fff;stroke-width:3px;"/>
+        <g transform="matrix(1,0,0,1,825,444)">
+            <text x="-4.449px" y="0px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:16px;fill:#fff;">7</text>
+        </g>
+    </g>
+    <g id="badge_8">
+        <circle cx="55" cy="510" r="20" style="fill:none;stroke:#fff;stroke-width:3px;"/>
+        <g transform="matrix(1,0,0,1,55,519)">
+            <text x="-4.449px" y="0px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:16px;fill:#fff;">8</text>
+        </g>
+    </g>
+    <g id="badge_9">
+        <circle cx="165" cy="510" r="20" style="fill:none;stroke:#fff;stroke-width:3px;"/>
+        <g transform="matrix(1,0,0,1,165,519)">
+            <text x="-4.449px" y="0px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:16px;fill:#fff;">9</text>
+        </g>
+    </g>
+</svg>

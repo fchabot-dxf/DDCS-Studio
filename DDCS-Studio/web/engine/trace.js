@@ -25,5 +25,7 @@ export function traceToolpath(text, opts = {}) {
         wcsOffset: opts.wcsOffset || null,   // work origin in MACHINE coords → G53 moves draw in the part frame
         createVarStore: opts.createVarStore || null,
     });
-    return eng.trace(String(text || ''));
+    const result = eng.trace(String(text || ''));
+    eng.dispose();   // transient per-call engine — detach its io_change bridge listener so it doesn't leak
+    return result;
 }

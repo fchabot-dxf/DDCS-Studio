@@ -66,7 +66,9 @@ export class DockManager {
             // Drag the handle up/down to RESIZE the keyboard height. A >4px move counts as a resize
             // (not a toggle); the height is stored on #controller-dock as --dock-h, persisted, and the
             // keys flex to fill it. Restore any saved height on load.
-            try { const sh = parseInt(localStorage.getItem('ddcs_dock_h') || '', 10); if (sh) this.controllerDock.style.setProperty('--dock-h', sh + 'px'); } catch (_) { /* ignore */ }
+            // --dock-h lives on <html> (not the dock) so the editor can read it too — it pads its scroll
+            // by the keyboard height when the keyboard floats over it (see the glass-keyboard CSS).
+            try { const sh = parseInt(localStorage.getItem('ddcs_dock_h') || '', 10); if (sh) document.documentElement.style.setProperty('--dock-h', sh + 'px'); } catch (_) { /* ignore */ }
             let dz = false, dzMoved = false, dzY = 0, dzH = 0;
             const dockBody = () => this.controllerDock.querySelector('.dock-body');
             handle.style.touchAction = 'none';
@@ -83,12 +85,12 @@ export class DockManager {
                 if (!dzMoved) return;
                 if (!this.controllerDock.classList.contains('is-expanded')) this.controllerDock.classList.add('is-expanded');
                 const h = Math.max(160, Math.min(Math.round(window.innerHeight * 0.85), Math.round(dzH + dy)));
-                this.controllerDock.style.setProperty('--dock-h', h + 'px');
+                document.documentElement.style.setProperty('--dock-h', h + 'px');
             });
             const dzEnd = (e) => {
                 if (!dz) return; dz = false;
                 try { handle.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
-                if (dzMoved) { const h = this.controllerDock.style.getPropertyValue('--dock-h'); if (h) { try { localStorage.setItem('ddcs_dock_h', h.replace('px', '')); } catch (_) { /* ignore */ } } }
+                if (dzMoved) { const h = document.documentElement.style.getPropertyValue('--dock-h'); if (h) { try { localStorage.setItem('ddcs_dock_h', h.replace('px', '')); } catch (_) { /* ignore */ } } }
             };
             handle.addEventListener('pointerup', dzEnd);
             handle.addEventListener('pointercancel', dzEnd);
@@ -139,6 +141,9 @@ export class DockManager {
         } catch (err) {
             console.warn('DockManager sanity guard failed', err);
         }
+
+        // Corsair-style key lighting (reactive press flash + ambient matrix rain) — futuristic only.
+        import('./keyFx.js').then((m) => m.initKeyFx()).catch(() => {});
     }
 
     clear() {

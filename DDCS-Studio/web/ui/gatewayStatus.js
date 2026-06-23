@@ -18,6 +18,7 @@ export function initGatewayStatus() {
     const studioTab = document.querySelector('.hdr-tabs .tab[data-app="studio"]');
     const settingsTab = document.querySelector('.hdr-tabs .tab[data-app="settings"]');
     const blocksTab = document.querySelector('.hdr-tabs .tab[data-app="blocks"]');
+    const macrosTab = document.querySelector('.hdr-tabs .tab[data-app="macros"]');
     const client = makeClient();
     let bridged = false;
 
@@ -44,15 +45,20 @@ export function initGatewayStatus() {
     }
 
     async function showApp(which) {
+        window.ddcsTrack?.('feature', 'tab:' + which);
+
+        // Settings is a MODAL, not an app view — open it over whatever's showing and return.
+        if (which === 'settings') { (await import('./settingsPanel.js')).openSettings(); return; }
+
         const studioApp = document.getElementById('studio-app');
         const gatewayApp = document.getElementById('gateway-app');
-        const settingsApp = document.getElementById('settings-app');
         const blocksApp = document.getElementById('blocks-app');
+        const macrosApp = document.getElementById('macros-app');
 
         const isStudio = which === 'studio';
         const isGateway = which === 'gateway';
-        const isSettings = which === 'settings';
         const isBlocks = which === 'blocks';
+        const isMacros = which === 'macros';
 
         // Any tab change stops every preview's run — otherwise a run keeps executing off-screen and its snapshot
         // can clobber the editor on the way back (see REMINDERS / decode-standby). The event reaches every mounted
@@ -68,23 +74,25 @@ export function initGatewayStatus() {
             try { (await import('./gatewayPanel.js')).setGatewayPanelVisible(false); } catch { /* not loaded */ }
         }
 
-        if (isSettings) {
-            const mod = await import('./settingsPanel.js');
-            mod.openSettings();
+        if (isMacros) {
+            const mod = await import('./macrosApp.js');
+            mod.initMacrosApp();
         }
 
-        // (Blocks → STUDIO round-trip is now LIVE: the Blocks tab projects its G-code straight into the editor
-        // on every change — see blocksApp.reproject. No tab-switch copy/reconcile needed here.)
+        // (Blocks → STUDIO editor round-trip is LIVE: the Blocks tab projects its G-code straight into the editor
+        // on every change — see blocksApp.reproject.) The open WIZARD's FORM is pulled back here, on the way in, so
+        // block edits to the PlaceOnStock cornergrid / params show up on the form too (reverse-sync).
+        if (isStudio) { try { window.ddcsStudio?.wizardManager?.pullFromBlocks?.(); } catch (_) { /* not ready */ } }
 
         studioApp?.classList.toggle('hidden', !isStudio);
         gatewayApp?.classList.toggle('hidden', !isGateway);
-        settingsApp?.classList.toggle('hidden', !isSettings);
         blocksApp?.classList.toggle('hidden', !isBlocks);
+        macrosApp?.classList.toggle('hidden', !isMacros);
 
         studioTab?.classList.toggle('active', isStudio);
         tab?.classList.toggle('active', isGateway);
-        settingsTab?.classList.toggle('active', isSettings);
         blocksTab?.classList.toggle('active', isBlocks);
+        macrosTab?.classList.toggle('active', isMacros);
 
         // Build/refresh the Blocks tab only after it's visible (canvas + three.js need layout). All Blocks logic
         // lives in blocksApp.showBlocks — this router just routes (the showApp router itself moves out of this

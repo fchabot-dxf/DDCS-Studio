@@ -16,7 +16,11 @@
  * mouth; everything else → a statement (prev/next). Requires window.Blockly (vendored UMD).
  */
 import { PALETTE, CATEGORIES } from '../../wizards/ops/index.js';
+import { installCornerGridField } from './cornerGridField.js';
 
+// Fields that render as the inline 3×3 corner-grid picker (field_cornergrid), tinted per datum so PlaceOnStock's
+// stock-attach (blue) and path-datum (amber) glyphs read apart — matching the 2D canvas pickers.
+const CORNER_COLOUR = { stockAttach: '#4ab3ff', pathDatum: '#ffcf3a' };
 const SELECTS = {
     corner: ['FL', 'FR', 'BL', 'BR'],
     probeSeq: ['XY', 'YX'],
@@ -34,14 +38,19 @@ const SELECTS = {
     dist: ['abs', 'inc'],
     stop: ['M0', 'M1'],
     cycle: ['drill', 'dwell', 'peck', 'bore'],
-    state: ['on', 'off']
+    state: ['on', 'off'],
+    pattern: ['grid', 'line', 'circle', 'rect'],   // array (drill/bore) hole pattern
+    ramp: ['step', 'helix'],                         // bore stepdown
+    side: ['outside', 'inside', 'on']                // contour/profile cutter side
 };
 const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/\s+/g, '');
 export const FN = (field) => field.toUpperCase();   // Blockly input/field name from an op field
 const REPORTER_CHECK = { boolean: 'Boolean', region: 'Region' };   // reporter return type → Blockly output check
 const outputCheck = (def) => REPORTER_CHECK[def.returns] || 'Number';
-export const isWrap = (def) => ['container', 'path', 'loop', 'cond', 'depth', 'fill'].includes(def.kind);
-export const fieldsOf = (def, params) => (def.fieldsFor ? def.fieldsFor(params || def.defaults) : def.fields) || [];
+export const isWrap = (def) => ['container', 'path', 'loop', 'cond', 'depth', 'fill', 'place', 'rotate'].includes(def.kind);
+// Blocks build/read ALL fields when a def lists them (so a dynamic block like array round-trips every pattern,
+// not just the default); a `dynamic` extension toggles which are visible. The wizard uses fieldsFor() directly.
+export const fieldsOf = (def, params) => (def.allFields || (def.fieldsFor ? def.fieldsFor(params || def.defaults) : def.fields)) || [];
 
 const DESCRIPTIONS = {
     fmode: "Feed Mode: G94 (Units/Min) or G95 (Units/Rev)",
@@ -94,7 +103,9 @@ const DESCRIPTIONS = {
     dir: "Spindle direction (CW / CCW)",
     coolant: "Coolant (Flood / Mist / Off)",
     tool: "Tool Number (T)",
-    value: "Value to set"
+    value: "Value to set",
+    pattern: "Hole pattern: grid, line, circle (bolt) or rect perimeter",
+    ramp: "Bore stepdown: step (plunge + flat circle) or helix (linearized G1 ramp)"
 };
 const getDesc = (f) => DESCRIPTIONS[f.toLowerCase()] || `The ${f} parameter`;
 
@@ -110,6 +121,7 @@ const optionsFor = (def, field) => {
 
 /** Classify a field → how it renders in Blockly. */
 export function fieldKind(def, field) {
+    if (CORNER_COLOUR[field]) return 'cornergrid';   // PlaceOnStock attach / path-datum → inline 3×3 picker
     if (optionsFor(def, field)) return 'dropdown';
     const sock = def.sockets && def.sockets[field];
     if (sock === 'region') return 'region';
@@ -128,7 +140,8 @@ function jsonDef(def) {
         const k = fieldKind(def, f);
         message += ` ${f} %${++n}`;
         const desc = getDesc(f);
-        if (k === 'dropdown') args.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });
+        if (k === 'cornergrid') args.push({ type: 'field_cornergrid', name: FN(f), value: String(def.defaults[f] ?? ''), colour: CORNER_COLOUR[f], tooltip: desc });
+        else if (k === 'dropdown') args.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });
         else if (k === 'checkbox') args.push({ type: 'field_checkbox', name: FN(f), checked: def.defaults[f] !== false, tooltip: desc });
         else if (k === 'text') args.push({ type: 'field_input', name: FN(f), text: String(def.defaults[f] ?? ''), tooltip: desc });
         else if (k === 'region') args.push({ type: 'input_value', name: FN(f), check: 'Region', tooltip: desc });
@@ -140,6 +153,7 @@ function jsonDef(def) {
         type: def.type, message0: message, args0: args, inputsInline: true,
         style: catSlug(def.category) + '_style', tooltip: `${def.label} (${def.category})`,
     };
+    if (def.dynamic) block.extensions = ['ddcs_dynfields'];   // toggle pattern-specific inputs per the `dynamic` field
     if (def.kind === 'reporter') block.output = outputCheck(def);   // value block
     else { block.previousStatement = null; block.nextStatement = null; }   // statement block
     return block;
@@ -234,8 +248,39 @@ export const OP_BLOCKS = [
 /** Define every op as a Blockly block. (Emit happens via stackBridge → emitMapped, not a Blockly generator.) */
 let _Blockly = null;
 export const getBlockly = () => _Blockly;   // stackBridge needs the serialization API to render blocks (v11)
+const DEF_BY_TYPE = {}; PALETTE.forEach((d) => { DEF_BY_TYPE[d.type] = d; });
+
+// Dynamic block extension: show only the fields the current `dynamic` value calls for (e.g. array → only the
+// chosen pattern's fields). Degrades safely — if anything throws, all fields stay visible (still editable).
+function registerDynExtension(Blockly) {
+    try {
+        Blockly.Extensions.register('ddcs_dynfields', function () {
+            const def = DEF_BY_TYPE[this.type];
+            if (!def || !def.dynamic || !def.fieldsFor) return;
+            const all = def.allFields || [];
+            const apply = () => {
+                try {
+                    const params = { ...def.defaults, [def.dynamic]: this.getFieldValue(FN(def.dynamic)) };
+                    const show = new Set(def.fieldsFor(params).map(FN));
+                    all.forEach((f) => { const inp = this.getInput(FN(f)); if (inp) inp.setVisible(show.has(FN(f))); });
+                    if (this.rendered) { if (this.queueRender) this.queueRender(); else if (this.render) this.render(); }
+                } catch (e) { /* degrade to all-fields-visible */ }
+            };
+            this.setOnChange(function () {
+                if (this.isInFlyout || !this.workspace) return;
+                const v = this.getFieldValue(FN(def.dynamic));
+                if (v === this._ddcsDyn) return;
+                this._ddcsDyn = v; apply();
+            });
+            apply();
+        });
+    } catch (e) { /* already registered */ }
+}
+
 export function installBlockly(Blockly) {
     _Blockly = Blockly;
+    installCornerGridField(Blockly);   // register field_cornergrid BEFORE the blocks that reference it
+    registerDynExtension(Blockly);
     Blockly.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), ...OP_BLOCKS]);
 }
 

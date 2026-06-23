@@ -14,11 +14,14 @@ Extra args pass straight through to the gateway, e.g.:
             python fairy_gateway.py --dest \\\\192.168.0.99\\CNCDISK --port COM6
 """
 import datetime
+import json
 import os
+import platform
 import sys
 import threading
 import time
 import urllib.request
+import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOST = "127.0.0.1"
@@ -76,6 +79,60 @@ def _asset(name):
         "studio": os.path.join(HERE, "DDCS-Studio", "web"),
         "shared": os.path.join(HERE, "DDCS-Studio", "web", "shared"),
     }[name]
+
+
+# Anonymous launch beacon — the authoritative "exe was launched" signal (unique installs, OS, version).
+# No PII; best-effort; never blocks or raises. The in-app web UI also reports visit/feature events via
+# ui/analytics.js, but those depend on the page JS — this fires straight from Python. Matches the Worker
+# in analytics/. Set ANALYTICS_URL to your deployed Worker URL; opt out with env DDCS_NO_ANALYTICS=1.
+ANALYTICS_URL = "https://ddcs-analytics.dansemur.workers.dev/e"   # deployed Worker (see analytics/)
+
+
+def _install_id():
+    """Stable anonymous id for this install (random uuid in ~/.ddcs-bridge/install_id) — NOT a person."""
+    p = os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "install_id")
+    try:
+        if os.path.exists(p):
+            return open(p, encoding="utf-8").read().strip()[:64]
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        new = uuid.uuid4().hex
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(new)
+        return new
+    except Exception:
+        return ""
+
+
+def _studio_version():
+    """Read the Studio version from the bundled index.html .ver chip (best-effort)."""
+    try:
+        import re
+        html = open(os.path.join(_asset("studio"), "index.html"), encoding="utf-8").read()
+        m = re.search(r'class="ver">V([0-9][0-9.]*)<', html)
+        return m.group(1) if m else ""
+    except Exception:
+        return ""
+
+
+def _beacon_launch():
+    """POST one anonymous app_launch event. Swallows everything — analytics must never affect the app."""
+    if "REPLACE-ME" in ANALYTICS_URL or os.environ.get("DDCS_NO_ANALYTICS") == "1":
+        return
+    try:
+        # dev=1 for your own runs: a non-frozen run (python fairy_gateway.py) or env DDCS_DEV=1 — so your
+        # testing across any PC is filterable out of the numbers. A released exe is frozen → counts as real.
+        is_dev = (not getattr(sys, "frozen", False)) or os.environ.get("DDCS_DEV") == "1"
+        body = json.dumps({
+            "event": "app_launch", "app": "exe", "id": _install_id(),
+            "version": _studio_version(),
+            "os": f"{platform.system()} {platform.release()}".strip()[:32],
+            "dev": 1 if is_dev else 0,
+        }).encode("utf-8")
+        req = urllib.request.Request(ANALYTICS_URL, data=body,
+                                     headers={"content-type": "text/plain"}, method="POST")
+        urllib.request.urlopen(req, timeout=4).close()
+    except Exception:
+        pass
 
 
 def _run_gateway(user_args):
@@ -250,6 +307,7 @@ def main():
     print(f"[fairy] serving on http://{HOST}:{PORT}")
     user_args = sys.argv[1:]
     threading.Thread(target=_run_gateway, args=(user_args,), daemon=True).start()
+    threading.Thread(target=_beacon_launch, daemon=True).start()   # anonymous launch beacon (best-effort)
     if not _wait_up():
         print("[fairy] gateway did not start — see the log above.", file=sys.stderr)
     url = f"http://{HOST}:{PORT}/"

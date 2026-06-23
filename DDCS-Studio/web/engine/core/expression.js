@@ -124,6 +124,15 @@ export function evalExpr(str, vars, opts = {}) {
             const arg = parseExpr();
             if (peek() === ']') p += 1;
             if (arg === null) return null;
+            // Fanuc/DDCS two-operand arctangent: ATAN[a]/[b] = atan2(a, b) in DEGREES (quadrant-correct).
+            // Only the bracketed `/[…]` form is atan2; `ATAN[a]/2` stays a plain division of the single-arg result.
+            if (t.fn === 'ATAN' && peek() === '/' && toks[p + 1] === '[') {
+                p += 2;                       // consume '/' and '['
+                const arg2 = parseExpr();
+                if (peek() === ']') p += 1;
+                if (arg2 === null) return null;
+                return Math.atan2(arg, arg2) * 180 / Math.PI;
+            }
             return fn(arg);
         }
         if (t === '#') {

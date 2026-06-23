@@ -1,6 +1,7 @@
 /** views/rotaryClockView.js — Rotary clock (A0 to a feature) wizard view. */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { RotaryClockWizard } from '../rotaryClockWizard.js';
+import { restoreBoxStock } from './rotaryCenterView.js';
 
 const wizard = new RotaryClockWizard();
 
@@ -18,6 +19,7 @@ export const rotaryClockView = {
     probeSrcFields: { rcl_feed_fast: 'fastFeed', rcl_retract: 'retract' },
 
     onOpen(ctx) {
+        restoreBoxStock();                 // clocks a FLAT → default to rectangular stock (revert a prior rotary round bar)
         setTimeout(() => { ctx.update(); }, 50);
     },
 
@@ -54,6 +56,7 @@ export const rotaryClockView = {
         el('wiz_rotary_clock_code').innerHTML = UIUtils.formatGCode(gcode);
         const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
         ctx.preview3D(gcode, 'rotaryClockVizContainer', wizard.inferStart(params, stock));
+        ctx.previewRotaryFixture('rotaryClockVizContainer', true);   // op-specific: show the 4th-axis rig
 
         const status = el('rotaryClockVizStatus');
         if (status) status.textContent = `Rotary clock: ${action} | ref ${params.reference} | ${params.wcs}`;

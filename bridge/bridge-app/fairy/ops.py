@@ -97,6 +97,50 @@ class Ops:
         except OSError as e:
             return {"ok": False, "error": str(e)}
 
+    # --- SYSDISK macro files: K-button programs (key-N.nc) + the O100nn library (slib-m.nc) ---------
+    # WRITE to the controller's macro disk. Whitelisted names only (no traversal, no firmware files); the
+    # existing file is ALWAYS backed up to <name>.bak before any change. The controller loads slib-m.nc at
+    # boot, so a merged M-code needs a REBOOT to take effect (the UI says so); key-N.nc is a button program.
+    def _sysfile_path(self, name):
+        base = self._sysdisk_path()
+        if not base or not name or not re.match(r"^(key-[1-7]\.nc|slib-m\.nc)$", name):
+            return None
+        return os.path.join(base, name)
+
+    def read_sysfile(self, name):
+        """Read a whitelisted SYSDISK macro file (text) — for previewing / merging slib-m.nc."""
+        if not self.controller_reachable():
+            return {"ok": False, "error": "controller unreachable"}
+        p = self._sysfile_path(name)
+        if not p:
+            return {"ok": False, "error": f"name not allowed: {name!r}"}
+        try:
+            with open(p, "r", encoding="utf-8", errors="replace") as f:
+                return {"ok": True, "name": name, "content": f.read()}
+        except OSError as e:
+            return {"ok": False, "error": str(e)}
+
+    def write_sysfile(self, name, content, mode="write"):
+        """Write (overwrite) or append a whitelisted SYSDISK macro file. Backs the existing file up to
+        <name>.bak first. mode='append' adds to the end — used to merge an O100nn block into slib-m.nc
+        WITHOUT rewriting the factory content (binary-preserved original + appended block)."""
+        if not self.controller_reachable():
+            return {"ok": False, "error": "controller unreachable"}
+        p = self._sysfile_path(name)
+        if not p:
+            return {"ok": False, "error": f"name not allowed: {name!r}"}
+        try:
+            backed = False
+            if os.path.exists(p):
+                with open(p, "rb") as src, open(p + ".bak", "wb") as dst:
+                    dst.write(src.read())
+                backed = True
+            with open(p, "a" if mode == "append" else "w", encoding="utf-8", newline="") as f:
+                f.write(content)
+            return {"ok": True, "name": name, "backup": (name + ".bak") if backed else ""}
+        except OSError as e:
+            return {"ok": False, "error": str(e)}
+
     # --- identity / descriptor ---------------------------------------------
     def controller_reachable(self):
         if not self.cfg.expert_dest:
@@ -148,6 +192,21 @@ class Ops:
         if self._detect_cache and self._detect_cache[0] == dest:
             return self._detect_cache[1]
         result = self._fingerprint_sysdisk(self._sysdisk_path())
+        if result.get("family") == "unknown":
+            # Firmware `.out` missing/ambiguous → fall back to the `setting` param COUNT, a reliable
+            # discriminator the validator already relies on: a V4.1's setting has ~1500 params, an
+            # Expert/M350's ~1000 (see controllers/v4.1 + _EXPECTED_PARAM_COUNT). Keeps a V4.1 from
+            # defaulting to the Expert baseline (which then false-flags a profile MISMATCH).
+            try:
+                params = self._read_setting_params()
+            except Exception:
+                params = None
+            if params is not None:
+                n = len(params)
+                fam = "v4.1" if n >= 1400 else "expert-m350" if 900 <= n <= 1100 else "unknown"
+                if fam != "unknown":
+                    result = {**result, "family": fam,
+                              "signals": {**result.get("signals", {}), "paramCount": n, "via": "param-count"}}
         self._detect_cache = (dest, result)
         return result
 
@@ -332,6 +391,28 @@ class Ops:
                 return None
             return round(pos - neg, 4)
 
+        def home_sign(i):
+            """Travel SIGN (±1) Studio's sim needs = which side of machine-zero (home) the working envelope
+            sits on. PRIMARY signal = the soft-limit MACHINE coordinates (#161-168): neg/pos are machine
+            coords of the envelope ends, so the side of 0 they fall on IS the travel direction — unambiguous,
+            no polarity guess. Since the machine homes to an extreme, the home end reads ~0 and the far end
+            ~±span, so the envelope midpoint's sign gives the direction. FALLBACK (both ends sentinel/zero):
+            the homing-direction param (#112-114: 0 = home toward the negative end → envelope/travel positive;
+            1 = home toward the positive end → travel negative). Returns +1, -1, or None (undeterminable →
+            Studio keeps the user's current sign). Never returns 0 (the web treats 0 as 'no info')."""
+            neg, pos = at(self._SOFT_NEG[i], -self._SENTINEL), at(self._SOFT_POS[i], self._SENTINEL)
+            neg_ok, pos_ok = abs(neg) < self._SENTINEL, abs(pos) < self._SENTINEL
+            if neg_ok and pos_ok and (neg + pos) != 0:
+                return 1 if (neg + pos) > 0 else -1
+            if pos_ok and pos != 0:
+                return 1 if pos > 0 else -1
+            if neg_ok and neg != 0:
+                return 1 if neg > 0 else -1
+            hd = at(self._HOMING_DIR[i], None)
+            if hd is None:
+                return None
+            return 1 if int(hd) == 0 else -1
+
         active = at(self._ACTIVE_WCS, 1.0)
         active = int(active) if 1 <= active <= 6 else 1
         base = self._WCS_BASE + (active - 1) * self._WCS_STRIDE
@@ -350,6 +431,9 @@ class Ops:
                            "zMin": at(self._SOFT_NEG[2]), "zMax": at(self._SOFT_POS[2])},
             "homingDir": {"x": int(at(self._HOMING_DIR[0])), "y": int(at(self._HOMING_DIR[1])),
                           "z": int(at(self._HOMING_DIR[2]))},
+            # homeDir = the derived ±1 travel sign Studio consumes (geometry.homeDir); homingDir above is the
+            # raw 0/1 param it's derived from, kept for debugging.
+            "homeDir": {"x": home_sign(0), "y": home_sign(1), "z": home_sign(2)},
             "machZero": {"x": at(self._MACH_ZERO[0]), "y": at(self._MACH_ZERO[1]), "z": at(self._MACH_ZERO[2])},
         }
         prof["wcs"] = {
@@ -371,6 +455,11 @@ class Ops:
         sanity-checks the decode via known anchors, so a wrong share / wrong-size dump / ATC-misconfig
         surfaces (at startup and in the UI) instead of silently feeding Studio bad data. Pass `params`
         to reuse an already-read `setting` (profile() does this); otherwise it reads once."""
+        # The M350 baseline (1000 params + probes/limits + M350 anchors) doesn't apply to a V4.1: it has a
+        # different setting schema (~1500 params, different I/O indices) and serves its own builtin baseline,
+        # so validating it against the Expert profile would always false-flag a mismatch. Skip it.
+        if self.detect_controller().get("family") == "v4.1":
+            return {"ok": None, "reason": "V4.1 controller — uses its builtin baseline, not the M350 profile check"}
         if params is None:
             params = self._read_setting_params()
         if params is None:

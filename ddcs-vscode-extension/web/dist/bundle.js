@@ -64,10 +64,21 @@ var init_drill = __esm({
 function helicalBore(pt, p) {
   const clr = num(p.clearance, 5), depth = num(p.depth, 5), feed = num(p.feed, 100);
   const r = (num(p.holeDia, 12) - num(p.toolDia, 6)) / 2, pitch = Math.max(0.05, num(p.pitch, 0.5));
+  const ramp = p.ramp === "helix" ? "helix" : "step";
   const cx = pt.x, cy = pt.y;
   if (r <= 0.01) return [`G0 X${cx} Y${cy}`, `G0 Z${clr}`, `G1 Z${r3(-depth)} F${feed}`, `G0 Z${clr}`];
   const L2 = [`G0 X${r3(cx + r)} Y${cy}   ( bore radius )`, `G0 Z${clr}`];
   const arc = `G3 X${r3(cx + r)} Y${cy} I${r3(-r)} J0`;
+  if (ramp === "helix") {
+    const segPerTurn = 24, turns = Math.max(1, Math.ceil(depth / pitch)), total = turns * segPerTurn;
+    L2.push(`G1 Z0 F${feed}   ( helix top )`);
+    for (let s = 1; s <= total; s++) {
+      const a = s / segPerTurn * 2 * Math.PI;
+      L2.push(`G1 X${r3(cx + r * Math.cos(a))} Y${r3(cy + r * Math.sin(a))} Z${r3(-(depth * s) / total)} F${feed}`);
+    }
+    L2.push(`${arc} F${feed}   ( finish circle )`, `G0 Z${clr}`);
+    return L2;
+  }
   let z = 0;
   while (z < depth - 1e-6) {
     z = Math.min(z + pitch, depth);
@@ -85,8 +96,9 @@ var init_bore = __esm({
       label: "Bore",
       kind: "leaf",
       category: "Ops",
-      defaults: { x: 0, y: 0, holeDia: 12, toolDia: 6, depth: 5, pitch: 0.5, feed: 120, clearance: 5 },
-      fields: ["x", "y", "holeDia", "toolDia", "depth", "pitch", "feed", "clearance"],
+      defaults: { x: 0, y: 0, holeDia: 12, toolDia: 6, depth: 5, pitch: 0.5, ramp: "step", feed: 120, clearance: 5 },
+      fields: ["x", "y", "holeDia", "toolDia", "depth", "pitch", "ramp", "feed", "clearance"],
+      // ramp: step / helix
       emit: (p, dx = 0, dy = 0) => helicalBore({ x: r3(num(p.x, 0) + dx), y: r3(num(p.y, 0) + dy) }, p)
     };
   }
@@ -907,6 +919,10 @@ var init_array = __esm({
       defaults: { pattern: "grid", x0: 0, y0: 0, cols: 3, rows: 2, dx: 20, dy: 20, count: 4, spacing: 20, angle: 0, dia: 50, startAngle: 0, skip: "" },
       fields: ["pattern"],
       // pattern-specific fields resolved by fieldsFor()
+      // Blocks view carries ALL pattern fields (so every pattern is editable + round-trips); a Blockly extension
+      // toggles which are visible per `pattern` (the `dynamic` field). The wizard uses fieldsFor() directly.
+      allFields: ["pattern", "x0", "y0", "cols", "rows", "dx", "dy", "count", "spacing", "angle", "dia", "startAngle", "w", "h", "nx", "ny", "skip"],
+      dynamic: "pattern",
       /** Pattern points; mirrors x0/y0 → cx/cy so circle reads the same origin. */
       points: (p) => patternPoints({ ...p, cx: num(p.x0, 0), cy: num(p.y0, 0) }),
       /** Which fields to show depends on the chosen pattern. */
@@ -914,6 +930,7 @@ var init_array = __esm({
         const base = ["pattern", "x0", "y0"];
         if (p.pattern === "circle") return [...base, "dia", "count", "startAngle", "skip"];
         if (p.pattern === "line") return [...base, "count", "spacing", "angle", "skip"];
+        if (p.pattern === "rect") return [...base, "w", "h", "nx", "ny", "skip"];
         return [...base, "cols", "rows", "dx", "dy", "skip"];
       }
     };
@@ -1394,9 +1411,22 @@ var init_ddcs_expert_m350 = __esm({
       programModel: "inline",
       probeModel: "g31",
       dwellUnits: "ms",
-      vars: { dro: 880, probeStatus: 1920, probeTrig: 1925, wcsBase: 805, wcsStride: 5, activeWcs: 578, toolTable: 1430, ax: AX },
-      caps: { vars: true, flow: "goto", probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, inputRead: true },
-      // the fullest profile (inputRead = generic live-input poll #[1520+N], slib O10300)
+      vars: {
+        dro: 880,
+        probeStatus: 1920,
+        probeTrig: 1925,
+        wcsBase: 805,
+        wcsStride: 5,
+        activeWcs: 578,
+        toolTable: 1430,
+        // ATC tool-changer firmware tables. currentTool/capacity/pockets live in SYSDISK/camsetting (#1000-1499,
+        // slot = var-1000 — boundary-confirmed by the captured sentinels) so the gateway can READ them over SMB;
+        // targetTool #1504 is a runtime var (M6 Txx). Param meanings from default_vars.js (#1300/#1330/#1350/#1370).
+        atc: { currentTool: 1300, capacity: 1301, targetTool: 1504, pocketX: 1330, pocketY: 1350, pocketZ: 1370 },
+        ax: AX
+      },
+      caps: { vars: true, flow: "goto", probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, inputRead: true, atc: true },
+      // the fullest profile (inputRead = generic live-input poll #[1520+N], slib O10300; atc = full pick&place model)
       // G31 Z-10 F100 P3 L0 Q1   (snippets.nc:9 · words.nc:6 "G31 Z#7 F#3 P#5 L0 Q1")
       probeMove: (axis, dist, { feed = 100, port = 3, level = 0 } = {}) => [`G31 ${axis}${dist} F${feed} P${port} L${level} Q1`],
       // IF #1922!=2 GOTO1   (3D PROBE G55.nc:29 · snippets.nc:10). status block #1920+axis; "!=2" = did NOT trigger
@@ -1413,7 +1443,7 @@ var init_ddcs_expert_m350 = __esm({
       // #578 = active WCS index 1=G54… (COPY_WCS.nc:15)
       distMode: (mode) => mode === "inc" ? "G91" : "G90",
       dwell: (sec) => [`G04 P${Math.round(sec * 1e3)}`],
-      // P = ms (slib-g.nc:691 "G04 P100 //100ms")
+      // integer P = ms (slib-g.nc:691 "G04 P100 //100ms"); a DECIMAL P would be seconds — we always emit the unambiguous integer-ms form
       endProgram: () => ["M30"],
       // universal end; no M2/M02 in any capture
       ifGoto: (lhs, op, rhs, label) => [`IF ${lhs}${op}${rhs} GOTO${label}`],
@@ -1466,9 +1496,13 @@ var init_ddcs_expert_m350 = __esm({
           ax = sys - 880;
           if (ax >= 0 && ax <= 3) return { type: "readmachine", params: { axis: AXR[ax], var: m[1] } };
         }
+        if (m = line2.match(/^M0*(\d+)$/)) {
+          const mc = +m[1];
+          if (mc >= 50 && mc <= 91) return { type: "outpin", params: { pin: mc - 50 >> 1, state: (mc - 50) % 2 === 0 ? "on" : "off" } };
+        }
         return null;
       },
-      notes: "In-program Macro-B-INSPIRED dialect (real Fanuc Macro B does NOT run on M350). G53 needs a #var (no literal, no G0). WCS via direct #[805+] indirect write, stride 5 (G10 L20 also works on this firmware but house style is the indirect write). Dwell P=ms. WHILE/DO/END also exist (word ops, bracketed). Verified vs bridge/controllers/expert-m350 \u2014 appcode/snippets.nc, SYSDISK/slib-*.nc, CNCDISK captures."
+      notes: "In-program Macro-B-INSPIRED dialect (real Fanuc Macro B does NOT run on M350). G53 needs a #var (no literal, no G0). WCS via direct #[805+] indirect write, stride 5. \u26A0\uFE0F NEVER emit G10 L20/L2 with axis words: V1 on-machine (2026-06-19) proved G10 L20 P6 X25 writes NO offset and the X word executes as a G90/G01 MOVE (Mach X 5\u219273.286) \u2014 broken AND dangerous. Direct register write is the only safe WCS set. Dwell P=ms. WHILE/DO/END also exist (word ops, bracketed). Verified vs bridge/controllers/expert-m350 \u2014 appcode/snippets.nc, SYSDISK/slib-*.nc, CNCDISK captures."
     };
   }
 });
@@ -1485,9 +1519,10 @@ var init_ddcs_v41 = __esm({
       probeModel: "g31",
       dwellUnits: "ms",
       // dro = machine pos #1500-1503; wcsWork = workpiece pos #1506-1509 (what zero*.nc writes); toolTable #1560/#764.
-      vars: { dro: 1500, wcsWork: 1506, probeStatus: null, probeTrig: 1500, wcsBase: 1512, wcsStride: 6, activeWcs: null, toolTable: 1560, ax: AX2 },
-      caps: { vars: true, flow: "goto", probeStatusCheck: false, hmi: false, toolTable: true, probePort: false },
-      // G31 L#682; success read from DRO #1502
+      vars: { dro: 1500, wcsWork: 1506, probeStatus: null, probeTrig: 1500, wcsBase: 1512, wcsStride: 6, activeWcs: null, toolTable: 1560, atc: null, ax: AX2 },
+      // atc null: the #1300/#1330 ATC firmware tables are unmapped on V4.1 (the dump shows them as generic "system parameter area")
+      caps: { vars: true, flow: "goto", probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false },
+      // G31 L#682; success read from DRO #1502; no confirmed pick&place ATC model
       // G91 G31 Z-1000 L#682 Q1 K0 F#106  (probe-float.nc, live). L#682 = probe-selector config param; no P-port word.
       probeMove: (axis, dist, { feed = 100 } = {}) => [`G31 ${axis}${dist} L#682 Q1 K0 F${feed}`],
       probeStatus: () => [],
@@ -1553,9 +1588,10 @@ var init_ddcs_v3_dm500 = __esm({
       programModel: "inline",
       probeModel: "move-until-input",
       dwellUnits: "s",
-      vars: { dro: 864, probeStatus: null, probeTrig: 864, wcsBase: 804, wcsStride: 4, activeWcs: 455, toolTable: 1430, ax: AX3 },
-      caps: { vars: true, flow: "goto", probeStatusCheck: false, hmi: false, toolTable: true, probePort: false },
-      // M101/G01/M102 halts on the probe input
+      vars: { dro: 864, probeStatus: null, probeTrig: 864, wcsBase: 804, wcsStride: 4, activeWcs: 455, toolTable: 1430, atc: null, ax: AX3 },
+      // atc null: no confirmed tool-changer firmware model on the DM500
+      caps: { vars: true, flow: "goto", probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false },
+      // M101/G01/M102 halts on the probe input; manual tool change only
       // move-until-input: arm (M101) → feed move → disarm (M102). probe.nc:23-25.
       probeMove: (axis, dist, { feed = 100 } = {}) => ["M101", `G91 G01 ${axis}${dist} F${feed}`, "M102"],
       probeStatus: () => [],
@@ -2673,6 +2709,7 @@ function jsonDef(def) {
     style: catSlug(def.category) + "_style",
     tooltip: `${def.label} (${def.category})`
   };
+  if (def.dynamic) block.extensions = ["ddcs_dynfields"];
   if (def.kind === "reporter") block.output = outputCheck(def);
   else {
     block.previousStatement = null;
@@ -2680,8 +2717,42 @@ function jsonDef(def) {
   }
   return block;
 }
+function registerDynExtension(Blockly2) {
+  try {
+    Blockly2.Extensions.register("ddcs_dynfields", function() {
+      const def = DEF_BY_TYPE[this.type];
+      if (!def || !def.dynamic || !def.fieldsFor) return;
+      const all = def.allFields || [];
+      const apply = () => {
+        try {
+          const params = { ...def.defaults, [def.dynamic]: this.getFieldValue(FN(def.dynamic)) };
+          const show = new Set(def.fieldsFor(params).map(FN));
+          all.forEach((f) => {
+            const inp = this.getInput(FN(f));
+            if (inp) inp.setVisible(show.has(FN(f)));
+          });
+          if (this.rendered) {
+            if (this.queueRender) this.queueRender();
+            else if (this.render) this.render();
+          }
+        } catch (e) {
+        }
+      };
+      this.setOnChange(function() {
+        if (this.isInFlyout || !this.workspace) return;
+        const v6 = this.getFieldValue(FN(def.dynamic));
+        if (v6 === this._ddcsDyn) return;
+        this._ddcsDyn = v6;
+        apply();
+      });
+      apply();
+    });
+  } catch (e) {
+  }
+}
 function installBlockly(Blockly2) {
   _Blockly = Blockly2;
+  registerDynExtension(Blockly2);
   Blockly2.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), ...OP_BLOCKS]);
 }
 function buildToolbox() {
@@ -2701,7 +2772,7 @@ function buildToolbox() {
   }));
   return { kind: "categoryToolbox", contents: cats };
 }
-var SELECTS, catSlug, FN, REPORTER_CHECK, outputCheck, isWrap, fieldsOf, DESCRIPTIONS, getDesc, optionsFor, makeOpDef, OP_BLOCKS, _Blockly, getBlockly, shadow;
+var SELECTS, catSlug, FN, REPORTER_CHECK, outputCheck, isWrap, fieldsOf, DESCRIPTIONS, getDesc, optionsFor, makeOpDef, OP_BLOCKS, _Blockly, getBlockly, DEF_BY_TYPE, shadow;
 var init_bridge = __esm({
   "../DDCS-Studio/web/blocks/blockly/bridge.js"() {
     init_ops();
@@ -2722,14 +2793,18 @@ var init_bridge = __esm({
       dist: ["abs", "inc"],
       stop: ["M0", "M1"],
       cycle: ["drill", "dwell", "peck", "bore"],
-      state: ["on", "off"]
+      state: ["on", "off"],
+      pattern: ["grid", "line", "circle", "rect"],
+      // array (drill/bore) hole pattern
+      ramp: ["step", "helix"]
+      // bore stepdown
     };
     catSlug = (c2) => (c2 || "Ops").toLowerCase().replace(/\s+/g, "");
     FN = (field3) => field3.toUpperCase();
     REPORTER_CHECK = { boolean: "Boolean", region: "Region" };
     outputCheck = (def) => REPORTER_CHECK[def.returns] || "Number";
     isWrap = (def) => ["container", "path", "loop", "cond", "depth", "fill"].includes(def.kind);
-    fieldsOf = (def, params) => (def.fieldsFor ? def.fieldsFor(params || def.defaults) : def.fields) || [];
+    fieldsOf = (def, params) => def.allFields || (def.fieldsFor ? def.fieldsFor(params || def.defaults) : def.fields) || [];
     DESCRIPTIONS = {
       fmode: "Feed Mode: G94 (Units/Min) or G95 (Units/Rev)",
       plane: "Arc/Compensation Plane (G17 XY, G18 XZ, G19 YZ)",
@@ -2781,7 +2856,9 @@ var init_bridge = __esm({
       dir: "Spindle direction (CW / CCW)",
       coolant: "Coolant (Flood / Mist / Off)",
       tool: "Tool Number (T)",
-      value: "Value to set"
+      value: "Value to set",
+      pattern: "Hole pattern: grid, line, circle (bolt) or rect perimeter",
+      ramp: "Bore stepdown: step (plunge + flat circle) or helix (linearized G1 ramp)"
     };
     getDesc = (f) => DESCRIPTIONS[f.toLowerCase()] || `The ${f} parameter`;
     optionsFor = (def, field3) => {
@@ -2880,6 +2957,10 @@ var init_bridge = __esm({
     ];
     _Blockly = null;
     getBlockly = () => _Blockly;
+    DEF_BY_TYPE = {};
+    PALETTE.forEach((d) => {
+      DEF_BY_TYPE[d.type] = d;
+    });
     shadow = (v6) => ({ shadow: { type: "math_number", fields: { NUM: Number(v6) || 0 } } });
   }
 });
@@ -4754,10 +4835,11 @@ function edgeStack(params = {}) {
   const axis = params.axis === "Y" ? "Y" : "X", av = AX9[axis];
   const dir = params.dir === "neg" ? "neg" : "pos", plus = dir === "pos";
   const wcs = params.wcs || "active", wcsLabel = wcs === "active" ? "Active WCS" : wcs;
-  const dist = num(params.dist, 15), retract = num(params.retract, 2);
+  const dist = num(params.dist, 15), retract = num(params.retract, 2), radius = num(params.radius, 2);
   const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
   const level = num(params.level, 0);
   const probeVar = plus ? "#8" : "#7", retractVar = plus ? "#9" : "#10", limitVal = plus ? "2" : "1";
+  const compOp = plus ? "+" : "-";
   const S = [];
   const C = (text) => {
     const b2 = newBlock("comment");
@@ -4813,6 +4895,7 @@ function edgeStack(params = {}) {
   A("#3", fFast, "Fast feedrate");
   A("#4", fSlow, "Slow feedrate");
   A("#5", port, "Probe port");
+  A("#6", radius, "Probe stylus radius");
   C("Result storage");
   A("#50", 0, "Edge contact position");
   C("Pre-calculated motion values");
@@ -4841,7 +4924,7 @@ function edgeStack(params = {}) {
   MV(retractVar);
   PR(probeVar, "#4");
   CK(1);
-  A("#50", av.result, "Save edge position");
+  A("#50", `[${av.result}${compOp}#6]`, "Edge = trigger +/- stylus radius");
   MV(retractVar);
   C("Write to WCS");
   A(`#[#70+${av.off}]`, "#50", `Set ${wcsLabel} ${axis} to edge`);
@@ -5053,6 +5136,74 @@ var init_alignmentWizard = __esm({
   }
 });
 
+// ../DDCS-Studio/web/viz/toolProfile.js
+function toolHalfProfile(tool) {
+  const type = tool && tool.type || "endmill";
+  const dia = numOr(tool && tool.dia, 6);
+  const r = dia / 2;
+  const len = numOr(tool && tool.length, dia * 4);
+  const ang = numOr(tool && tool.angle, DEFAULT_ANGLE[type] || 0);
+  switch (type) {
+    case "ballnose": {
+      const pts = [];
+      const segs = 10;
+      for (let i = 0; i <= segs; i++) {
+        const a = Math.PI / 2 * (i / segs);
+        pts.push([r * Math.sin(a), r - r * Math.cos(a)]);
+      }
+      pts.push([r, Math.max(len, r)]);
+      return pts;
+    }
+    case "vbit":
+    case "chamfer":
+    case "engraver":
+    case "spotdrill": {
+      const coneH = r / Math.tan((ang || 90) / 2 * Math.PI / 180);
+      return [[0, 0], [r, coneH], [r, Math.max(len, coneH)]];
+    }
+    case "drill": {
+      const tipH = r / Math.tan((ang || 118) / 2 * Math.PI / 180);
+      return [[0, 0], [r, tipH], [r, Math.max(len, tipH)]];
+    }
+    case "tapered": {
+      const tip = r * 0.3;
+      return [[tip, 0], [r, len * 0.6], [r, len]];
+    }
+    case "face":
+    case "surfacing":
+      return [[r, 0], [r, Math.max(len * 0.35, r * 0.6)]];
+    case "tap":
+    case "reamer":
+    case "endmill":
+    default:
+      return [[r, 0], [r, len]];
+  }
+}
+function toolProfileSvg(tool, { w: w2 = 40, h = 60, color = "var(--accent, #6cc)", stroke = "#888", bg = "transparent" } = {}) {
+  const half = toolHalfProfile(tool);
+  const maxR = Math.max(0.1, ...half.map((p) => p[0]));
+  const maxZ = Math.max(0.1, ...half.map((p) => p[1]));
+  const pad = 3;
+  const sx = (w2 / 2 - pad) / maxR;
+  const sz = (h - 2 * pad) / maxZ;
+  const cx = w2 / 2;
+  const toXY = (p, sign) => [(cx + sign * p[0] * sx).toFixed(1), (h - pad - p[1] * sz).toFixed(1)];
+  const right = half.map((p) => toXY(p, 1));
+  const left = half.slice().reverse().map((p) => toXY(p, -1));
+  const poly = right.concat(left).map((q) => q[0] + "," + q[1]).join(" ");
+  return `<svg viewBox="0 0 ${w2} ${h}" width="${w2}" height="${h}" class="tool-profile" aria-hidden="true">` + (bg !== "transparent" ? `<rect width="${w2}" height="${h}" fill="${bg}"/>` : "") + `<polygon points="${poly}" fill="${color}" stroke="${stroke}" stroke-width="0.6" stroke-linejoin="round"/></svg>`;
+}
+var DEFAULT_ANGLE, numOr;
+var init_toolProfile = __esm({
+  "../DDCS-Studio/web/viz/toolProfile.js"() {
+    DEFAULT_ANGLE = { vbit: 90, chamfer: 90, engraver: 30, spotdrill: 90, drill: 118 };
+    numOr = (v6, d) => {
+      const n = Number(v6);
+      return Number.isFinite(n) && n > 0 ? n : d;
+    };
+  }
+});
+
 // ../DDCS-Studio/web/wizards/atcLengthWizard.js
 function atcLengthStack(params = {}) {
   const blockHeight = num(params.blockHeight, 50), safeZ = num(params.safeZ, 10), maxDist = num(params.maxDist, 100);
@@ -5166,7 +5317,7 @@ function atcLengthStack(params = {}) {
   C("Calculate and store the tool length offset");
   RD("#101");
   A("#102", "[#101 - #6]", "Length = MachineZ - BlockHeight");
-  A("#103", "#1300", "Read current tool number");
+  A("#103", curToolVar(getDialect4()), "Read current tool number");
   IF("#103", "<", "1", 3);
   TO("#103", "#102");
   MV("Z", "#19");
@@ -5184,13 +5335,23 @@ function atcLengthStack(params = {}) {
   END();
   return S;
 }
-var AtcLengthWizard;
+var getDialect4, curToolVar, AtcLengthWizard;
 var init_atcLengthWizard = __esm({
   "../DDCS-Studio/web/wizards/atcLengthWizard.js"() {
     init_blockModel();
     init_opRecord();
     init_util();
     init_probeBlocks();
+    init_dialects();
+    init_controllerProfiles();
+    getDialect4 = () => {
+      try {
+        return resolveActivePost(getActiveProfile().id);
+      } catch (_) {
+        return null;
+      }
+    };
+    curToolVar = (d) => "#" + (d && d.vars && d.vars.atc && d.vars.atc.currentTool || 1300);
     AtcLengthWizard = class {
       generate(params) {
         recordOp("atc_length", params);
@@ -5345,6 +5506,8 @@ function H(S) {
 }
 function manualStack(params) {
   const x = num(params.x, 100), y = num(params.y, 100), z = num(params.z, 0);
+  const d = getDialect5();
+  const dro = d && d.vars && d.vars.dro || 880;
   const S = [];
   const { C, A, SPOFF, COOLOFF, MM, PAUSE, MSG: MSG2, END } = H(S);
   C("ATC | Manual Tool Change");
@@ -5356,8 +5519,8 @@ function manualStack(params) {
   C("Stop spindle and coolant");
   SPOFF();
   COOLOFF();
-  A("#1155", "#880 + 0", "Save Tool Change X - washed for DDCS priming");
-  A("#1156", "#881 + 0", "Save Tool Change Y - washed for DDCS priming");
+  A("#1155", `#${dro} + 0`, "Save Tool Change X - washed for DDCS priming");
+  A("#1156", `#${dro + 1} + 0`, "Save Tool Change Y - washed for DDCS priming");
   C("Park clear of the work - safe Z first, then XY");
   MM("Z", "#3");
   MM("X", "#1");
@@ -5371,23 +5534,36 @@ function manualStack(params) {
   return S;
 }
 function autoStack(params) {
-  const zClear = num(params.zClear, 0), capacity = num(params.capacity, 8), fixedT = num(params.fixedT, 0);
-  const useM300 = params.waitSpindle !== false, useCover = params.dustCover === true, confirm2 = params.confirm === true;
-  const target = fixedT > 0 ? String(fixedT) : "#1504";
+  const d = getDialect5();
   const S = [];
   const { C, A, IF, GO, LB, SPOFF, COOLOFF, MM, MC, CF, MSG: MSG2, END } = H(S);
-  C("ATC | Automatic Tool Change - T.nc style");
-  C("Drawbar M154/M155 + sensor waits M301/M302 - pockets from tables #1330/#1350/#1370");
-  C(fixedT > 0 ? `TEST MODE: fixed target tool T${fixedT}` : "Target tool from #1504 - set by M6 Txx; save as T.nc");
+  const atc = d && d.vars && d.vars.atc;
+  if (!atc) {
+    C("ATC | Automatic Tool Change");
+    C(`Not available on ${d ? d.name : "this controller"} \u2014 no confirmed ATC firmware model.`);
+    C("Use Manual mode, or select the DDCS Expert post.");
+    END();
+    return S;
+  }
+  const zClear = num(params.zClear, 0), fixedT = num(params.fixedT, 0);
+  const useM300 = params.waitSpindle !== false, useCover = params.dustCover === true, confirm2 = params.confirm === true;
+  const mag = (Array.isArray(params.magazine) ? params.magazine : []).filter((p) => p && p.tool !== "" && p.tool != null);
+  const cur = "#" + atc.currentTool;
+  const tgt = fixedT > 0 ? String(fixedT) : "#" + atc.targetTool;
+  C("ATC | Automatic Tool Change \u2014 magazine pick & place");
+  C("Pockets + park XYZ come from Settings \u2192 Tool table magazine");
+  C(fixedT > 0 ? `TEST MODE: fixed target tool T${fixedT}` : `Target tool from ${tgt} \u2014 set by M6 Txx; save as T.nc`);
   C("VERIFY FIRST RUN with no tool in spindle + hand on e-stop");
+  if (!mag.length) {
+    C("!! Magazine is EMPTY \u2014 add pockets in Settings \u2192 Tool table (or Import from controller).");
+    END();
+    return S;
+  }
   C("=== CONFIGURATION ===");
-  A("#100", target, "Target tool");
-  A("#101", "#1300", "Current tool in spindle, 0 = empty");
-  A("#102", zClear, "Z change height - MACHINE coords");
-  A("#103", capacity, "Magazine capacity - keep equal to param #1301");
+  A("#100", tgt, "Target tool");
+  A("#101", cur, "Current tool in spindle, 0 = empty");
+  A("#102", String(zClear), "Z change height - MACHINE coords");
   C("=== VALIDATE ===");
-  IF("#100", "<", "1", 910);
-  IF("#100", ">", "#103", 910);
   IF("#100", "==", "#101", 900);
   if (confirm2) {
     A("#1510", "#100", "Show target tool");
@@ -5399,47 +5575,53 @@ function autoStack(params) {
   if (useM300) MC(300, "Wait: spindle-stopped sensor");
   if (useCover) MC(162, "Dust cover OPEN");
   MM("Z", "#102");
-  C("=== PUT AWAY CURRENT TOOL - skipped if spindle is empty ===");
+  C("=== PUT AWAY CURRENT TOOL \u2014 skipped if spindle empty or tool not in magazine ===");
   IF("#101", "<", "1", 20);
-  A("#105", "[1330+#101-1]", "Old pocket X table address");
-  A("#106", "[1350+#101-1]", "Old pocket Y table address");
-  A("#107", "[1370+#101-1]", "Old pocket Z table address");
-  A("#110", "#[#105]", "Old pocket X");
-  A("#111", "#[#106]", "Old pocket Y");
-  A("#112", "#[#107]", "Old pocket Z");
-  MM("X", "#110");
-  MM("Y", "#111");
-  MM("Z", "#112");
-  MC(154, "Drawbar RELEASE");
-  MC(301, "Wait: drawbar-released sensor");
-  A("#1300", "0", "Spindle now empty");
-  MM("Z", "#102");
+  mag.forEach((p, i) => IF("#101", "==", String(num(p.tool, 0)), 100 + i));
+  GO(20);
+  mag.forEach((p, i) => {
+    LB(100 + i);
+    C(`Return T${num(p.tool, 0)} to pocket ${i + 1}`);
+    A("#110", String(num(p.x, 0)), "Pocket X");
+    A("#111", String(num(p.y, 0)), "Pocket Y");
+    A("#112", String(num(p.z, 0)), "Pocket Z");
+    MM("X", "#110");
+    MM("Y", "#111");
+    MM("Z", "#112");
+    MC(154, "Drawbar RELEASE");
+    MC(301, "Wait: drawbar-released sensor");
+    MM("Z", "#102");
+    A(cur, "0", "Spindle now empty");
+    GO(20);
+  });
   LB(20);
-  C("PICK UP NEW TOOL");
-  A("#105", "[1330+#100-1]", "New pocket X table address");
-  A("#106", "[1350+#100-1]", "New pocket Y table address");
-  A("#107", "[1370+#100-1]", "New pocket Z table address");
-  A("#110", "#[#105]", "New pocket X");
-  A("#111", "#[#106]", "New pocket Y");
-  A("#112", "#[#107]", "New pocket Z");
-  MM("X", "#110");
-  MM("Y", "#111");
-  MC(154, "Collet OPEN before descending");
-  MC(301, "Wait: drawbar-released sensor");
-  MM("Z", "#112");
-  MC(155, "Drawbar LOCK");
-  MC(302, "Wait: tool-locked sensor");
-  MM("Z", "#102");
-  if (useCover) MC(163, "Dust cover CLOSE");
-  A("#1300", "#100", "Current tool = target");
-  MSG2("Tool change complete");
+  C("=== PICK UP TARGET TOOL ===");
+  mag.forEach((p, i) => IF("#100", "==", String(num(p.tool, 0)), 200 + i));
+  A("#1505", "1", "ERROR: target tool has no pocket in the magazine");
   GO(999);
+  mag.forEach((p, i) => {
+    LB(200 + i);
+    C(`Fetch T${num(p.tool, 0)} from pocket ${i + 1}`);
+    A("#110", String(num(p.x, 0)), "Pocket X");
+    A("#111", String(num(p.y, 0)), "Pocket Y");
+    A("#112", String(num(p.z, 0)), "Pocket Z");
+    MM("X", "#110");
+    MM("Y", "#111");
+    MC(154, "Collet OPEN before descending");
+    MC(301, "Wait: drawbar-released sensor");
+    MM("Z", "#112");
+    MC(155, "Drawbar LOCK");
+    MC(302, "Wait: tool-locked sensor");
+    MM("Z", "#102");
+    if (useCover) MC(163, "Dust cover CLOSE");
+    A(cur, "#100", "Current tool = target");
+    MSG2("Tool change complete");
+    GO(999);
+  });
   C("=== HANDLERS ===");
   LB(900);
   MSG2("Tool already in spindle - nothing to do");
   GO(999);
-  LB(910);
-  A("#1505", "1", "ERROR: invalid target tool - check M6 T / capacity");
   LB(999);
   END();
   return S;
@@ -5447,12 +5629,21 @@ function autoStack(params) {
 function atcChangeStack(params = {}) {
   return params.mode === "auto" ? autoStack(params) : manualStack(params);
 }
-var AtcChangeWizard;
+var getDialect5, AtcChangeWizard;
 var init_atcChangeWizard = __esm({
   "../DDCS-Studio/web/wizards/atcChangeWizard.js"() {
     init_blockModel();
     init_opRecord();
     init_util();
+    init_dialects();
+    init_controllerProfiles();
+    getDialect5 = () => {
+      try {
+        return resolveActivePost(getActiveProfile().id);
+      } catch (_) {
+        return null;
+      }
+    };
     AtcChangeWizard = class {
       generate(params) {
         recordOp("atc_change", params);
@@ -5555,39 +5746,47 @@ function drawbarStack(params) {
   return S;
 }
 function pocketsStack(params) {
+  const d = getDialect6();
+  const S = [];
+  const { C, A, LB, SPOFF, COOLOFF, MM, CF, MSG: MSG2, END } = H2(S);
+  const atc = d && d.vars && d.vars.atc;
+  const mag = (Array.isArray(params.magazine) ? params.magazine : []).filter((p) => p && p.tool !== "" && p.tool != null);
   const first = Math.max(1, num(params.first, 1));
-  const count = Math.max(1, num(params.count, 8));
+  const count = Math.max(1, num(params.count, mag.length || 1));
+  const sel = mag.slice(first - 1, first - 1 + count);
   const zClear = num(params.zClear, 0);
   const descend = params.descend === true;
-  const S = [];
-  const { C, A, IF, LB, SPOFF, COOLOFF, MM, CF, MSG: MSG2, END } = H2(S);
   C("ATC | Pocket Dry-Run - commissioning");
-  C(`Visits pockets ${first}..${first + count - 1} from tables #1330/#1350/#1370`);
+  C("Visits each taught magazine pocket (Settings \u2192 Tool table) at clearance Z");
   C("NO tool in spindle, NO drawbar action - visual alignment check at each stop");
+  if (!atc) {
+    C(`Not available on ${d ? d.name : "this controller"} \u2014 select the DDCS Expert post.`);
+    END();
+    return S;
+  }
+  if (!sel.length) {
+    C("!! Magazine is EMPTY \u2014 add pockets in Settings \u2192 Tool table (or Import from controller).");
+    END();
+    return S;
+  }
   C("=== CONFIGURATION ===");
-  A("#100", first, "First pocket");
-  A("#101", first + count - 1, "Last pocket");
-  A("#102", zClear, "Z clearance height - MACHINE coords");
+  A("#102", String(zClear), "Z clearance height - MACHINE coords");
   SPOFF();
   COOLOFF();
   MM("Z", "#102");
-  LB(10);
-  C("NEXT POCKET");
-  A("#105", "[1330+#100-1]", "Pocket X table address");
-  A("#106", "[1350+#100-1]", "Pocket Y table address");
-  A("#110", "#[#105]", "Pocket X");
-  A("#111", "#[#106]", "Pocket Y");
-  MM("X", "#110");
-  MM("Y", "#111");
-  if (descend) {
-    A("#107", "[1370+#100-1]", "Pocket Z table address");
-    A("#112", "#[#107]", "Pocket Z");
-    MM("Z", "#112");
-  }
-  CF("Pocket #100 - verify alignment. Enter = next", 999);
-  if (descend) MM("Z", "#102");
-  A("#100", "[#100+1]", "Next pocket");
-  IF("#100", "<=", "#101", 10);
+  sel.forEach((p, i) => {
+    C(`Pocket ${first + i} \u2014 T${num(p.tool, 0)}`);
+    A("#110", String(num(p.x, 0)), "Pocket X");
+    A("#111", String(num(p.y, 0)), "Pocket Y");
+    MM("X", "#110");
+    MM("Y", "#111");
+    if (descend) {
+      A("#112", String(num(p.z, 0)), "Pocket Z");
+      MM("Z", "#112");
+    }
+    CF(`Pocket ${first + i} \u2014 verify alignment. Enter = next`, 999);
+    if (descend) MM("Z", "#102");
+  });
   C("Complete");
   MSG2("Pocket dry-run complete");
   LB(999);
@@ -5597,12 +5796,21 @@ function pocketsStack(params) {
 function atcTestStack(params = {}) {
   return params.mode === "pockets" ? pocketsStack(params) : drawbarStack(params);
 }
-var AtcTestWizard;
+var getDialect6, AtcTestWizard;
 var init_atcTestWizard = __esm({
   "../DDCS-Studio/web/wizards/atcTestWizard.js"() {
     init_blockModel();
     init_opRecord();
     init_util();
+    init_dialects();
+    init_controllerProfiles();
+    getDialect6 = () => {
+      try {
+        return resolveActivePost(getActiveProfile().id);
+      } catch (_) {
+        return null;
+      }
+    };
     AtcTestWizard = class {
       generate(params) {
         recordOp("atc_test", params);
@@ -5614,6 +5822,9 @@ var init_atcTestWizard = __esm({
 
 // ../DDCS-Studio/web/wizards/atcToolCheckWizard.js
 function atcToolCheckStack(params = {}) {
+  const d = getDialect7();
+  const toolBase = d && d.vars && d.vars.toolTable || 1430;
+  const curTool = "#" + (d && d.vars && d.vars.atc && d.vars.atc.currentTool || 1300);
   const blockHeight = num(params.blockHeight, 50), safeZ = num(params.safeZ, 10), maxDist = num(params.maxDist, 100);
   const retract = num(params.retract, 3), fFast = num(params.f_fast, 300), fSlow = num(params.f_slow, 50);
   const port = num(params.port, 2), level = num(params.level, 0), tol = num(params.tolerance, 0.5);
@@ -5709,9 +5920,9 @@ function atcToolCheckStack(params = {}) {
   C("Measure + compare to the stored tool length");
   RD("#51");
   A("#52", "[#51-#6]", "Measured length = MachineZ - block height");
-  A("#53", "#1300", "Current tool number");
+  A("#53", curTool, "Current tool number");
   IF("#53", "<", "1", 3);
-  A("#54", "[1430+#53-1]", "Tool table address");
+  A("#54", `[${toolBase}+#53-1]`, "Tool table address");
   A("#55", "#[#54]", "Expected stored length");
   A("#56", "[#52-#55]", "Deviation");
   IF("#56", ">", "#20", 4);
@@ -5738,17 +5949,97 @@ function atcToolCheckStack(params = {}) {
   END();
   return S;
 }
-var AtcToolCheckWizard;
+var getDialect7, AtcToolCheckWizard;
 var init_atcToolCheckWizard = __esm({
   "../DDCS-Studio/web/wizards/atcToolCheckWizard.js"() {
     init_blockModel();
     init_opRecord();
     init_util();
     init_probeBlocks();
+    init_dialects();
+    init_controllerProfiles();
+    getDialect7 = () => {
+      try {
+        return resolveActivePost(getActiveProfile().id);
+      } catch (_) {
+        return null;
+      }
+    };
     AtcToolCheckWizard = class {
       generate(params) {
         recordOp("atc_check", params);
         return emitMapped(atcToolCheckStack(params)).text;
+      }
+    };
+  }
+});
+
+// ../DDCS-Studio/web/wizards/atcTableWizard.js
+function atcTableStack(params = {}) {
+  const d = getDialect8();
+  const S = [];
+  const C = (text) => {
+    const b2 = newBlock("comment");
+    b2.params = { text };
+    S.push(b2);
+  };
+  const A = (v6, value, note) => {
+    const b2 = newBlock("assign");
+    b2.params = { var: v6, value: String(value), note: note || "" };
+    S.push(b2);
+  };
+  const END = () => S.push(newBlock("endprogram"));
+  const atc = d && d.vars && d.vars.atc;
+  const toolBase = d && d.vars && d.vars.toolTable || 1430;
+  const tools = (Array.isArray(params.tools) ? params.tools : []).filter((t) => t && t.num != null && t.num !== "" && t.length !== "" && t.length != null && Number.isFinite(Number(t.length)));
+  const mag = (Array.isArray(params.magazine) ? params.magazine : []).filter((p) => p && (p.x !== "" || p.y !== "" || p.z !== ""));
+  const doLengths = params.includeLengths !== false;
+  const doPockets = params.includePockets !== false && !!atc;
+  C("ATC | Write Tool Table to controller");
+  C("RUN THIS ON THE CONTROLLER to apply the tool table + pockets \u2014 variable writes only, no motion.");
+  C("Source: Settings \u2192 Tool table (library lengths + magazine pockets).");
+  if (doLengths) {
+    C(`=== TOOL LENGTHS (table base #${toolBase}) ===`);
+    if (!tools.length) C("(no tool lengths set in the library)");
+    tools.forEach((t) => {
+      const n = parseInt(t.num, 10);
+      A(`#${toolBase + n - 1}`, Number(t.length), `T${n}${t.name ? " " + t.name : ""} length`);
+    });
+  }
+  if (doPockets) {
+    C(`=== POCKET POSITIONS (#${atc.pocketX}/#${atc.pocketY}/#${atc.pocketZ}) \u2014 UNVERIFIED: running this is the test ===`);
+    if (!mag.length) C("(no pockets in the magazine)");
+    mag.forEach((p, i) => {
+      const idx = num(p.pocket, i + 1);
+      A(`#${atc.pocketX + idx - 1}`, num(p.x, 0), `Pocket ${idx} X`);
+      A(`#${atc.pocketY + idx - 1}`, num(p.y, 0), `Pocket ${idx} Y`);
+      A(`#${atc.pocketZ + idx - 1}`, num(p.z, 0), `Pocket ${idx} Z`);
+    });
+  } else if (params.includePockets !== false && !atc) {
+    C("Pockets: not available on this controller (no mapped ATC model)");
+  }
+  END();
+  return S;
+}
+var getDialect8, AtcTableWizard;
+var init_atcTableWizard = __esm({
+  "../DDCS-Studio/web/wizards/atcTableWizard.js"() {
+    init_blockModel();
+    init_opRecord();
+    init_util();
+    init_dialects();
+    init_controllerProfiles();
+    getDialect8 = () => {
+      try {
+        return resolveActivePost(getActiveProfile().id);
+      } catch (_) {
+        return null;
+      }
+    };
+    AtcTableWizard = class {
+      generate(params) {
+        recordOp("atc_table", params);
+        return emitMapped(atcTableStack(params)).text;
       }
     };
   }
@@ -5809,9 +6100,11 @@ function drillStack(params = {}) {
   };
   const helical = params.method === "helical";
   const hole = newBlock(helical ? "bore" : "drill");
-  hole.params = helical ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) } : { x: 0, y: 0, depth: num(params.depth, 5), peck: num(params.peck, 5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) };
+  hole.params = helical ? { x: 0, y: 0, holeDia: num(params.holeDia, 12), toolDia: num(params.toolDia, 6), depth: num(params.depth, 5), pitch: num(params.pitch, 0.5), ramp: params.ramp || "step", feed: num(params.feed, 100), clearance: num(params.clearance, 5) } : { x: 0, y: 0, depth: num(params.depth, 5), peck: num(params.peck, 5), feed: num(params.feed, 100), clearance: num(params.clearance, 5) };
   arr.children = [hole];
-  return [makeStart(params), arr, makeEnd(params)];
+  const wcs = newBlock("wcs");
+  wcs.params = { wcs: params.wcs || "active" };
+  return [makeStart(params), wcs, arr, makeEnd(params)];
 }
 var DrillWizard;
 var init_drillWizard = __esm({
@@ -5892,7 +6185,11 @@ function makeClient(opts = {}) {
     deleteFile: (name) => postJSON("/api/files/delete", { name }),
     submitJob: (name, nc, map) => postJSON("/api/jobs", { name, nc, map }),
     getConfig: () => call("/api/config"),
-    setConfig: (updates) => postJSON("/api/config", updates)
+    setConfig: (updates) => postJSON("/api/config", updates),
+    readSysfile: (name) => call("/api/sysfile?name=" + encodeURIComponent(name)),
+    // SYSDISK macro file (key-N.nc / slib-m.nc)
+    writeSysfile: (name, content, mode = "write") => postJSON("/api/sysfile", { name, content, mode })
+    // backed-up write/append
   };
 }
 function deviceName(d) {
@@ -6358,7 +6655,7 @@ function setClientId(id, v6) {
   } catch (e) {
   }
 }
-var CFG, ICONS, PROVIDER_IDS, DEFAULT_CLIENT_IDS, redirectUri;
+var CFG, ICONS, PROVIDER_IDS, AVAILABLE_PROVIDER_IDS, DEFAULT_CLIENT_IDS, redirectUri;
 var init_providers = __esm({
   "../DDCS-Studio/web/ui/cloud/providers.js"() {
     CFG = {
@@ -6394,6 +6691,7 @@ var init_providers = __esm({
       onedrive: '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="#0364B8" d="M13.6 9.7a4.3 4.3 0 0 0-8.1-1.4A3.8 3.8 0 0 0 6 15.9h12.3a3.2 3.2 0 0 0 .4-6.4 3.7 3.7 0 0 0-5.1-.2z"/></svg>'
     };
     PROVIDER_IDS = Object.keys(CFG);
+    AVAILABLE_PROVIDER_IDS = ["google"];
     DEFAULT_CLIENT_IDS = {
       // PUBLIC OAuth client IDs (safe in the browser — no secret). drive.file SPA client; secret stays out of git.
       google: "895572525139-mapt84pm4lfudmjfq553k6pm4m2o0e77.apps.googleusercontent.com",
@@ -6456,6 +6754,7 @@ __export(googleDrive_exports, {
   del: () => del,
   ensureRoot: () => ensureRoot,
   getAccessToken: () => getAccessToken,
+  getUserInfo: () => getUserInfo,
   list: () => list,
   mkdir: () => mkdir,
   read: () => read,
@@ -6616,6 +6915,14 @@ async function del(id) {
 async function rename(id, name) {
   await api(`${API}/files/${id}?fields=id`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
 }
+async function getUserInfo() {
+  try {
+    const u = (await (await api(`${API}/about?fields=user`)).json()).user || {};
+    return { name: u.displayName || "", email: u.emailAddress || "" };
+  } catch (e) {
+    return { name: "", email: "" };
+  }
+}
 var SCOPE, API, UPLOAD, FOLDER_MIME, TOK, FOLDER_KEY, token, getAccessToken;
 var init_googleDrive = __esm({
   "../DDCS-Studio/web/ui/cloud/googleDrive.js"() {
@@ -6640,14 +6947,24 @@ var init_googleDrive = __esm({
 // ../DDCS-Studio/web/ui/cloudAccount.js
 function getAccount() {
   try {
-    return { connected: !!localStorage.getItem(TOK2), provider: localStorage.getItem(PROV) || "", email: localStorage.getItem(EMAIL) || "" };
+    return { connected: !!localStorage.getItem(TOK2), provider: localStorage.getItem(PROV) || "", email: localStorage.getItem(EMAIL) || "", name: localStorage.getItem(NAME) || "" };
   } catch (e) {
-    return { connected: false, provider: "", email: "" };
+    return { connected: false, provider: "", email: "", name: "" };
   }
 }
 function disconnect() {
   try {
-    [TOK2, PROV, EMAIL, REFRESH].forEach((k) => localStorage.removeItem(k));
+    [TOK2, PROV, EMAIL, REFRESH, NAME].forEach((k) => localStorage.removeItem(k));
+  } catch (e) {
+  }
+  window.dispatchEvent(new CustomEvent("ddcs:cloud-account"));
+}
+async function captureGoogleIdentity() {
+  try {
+    const { getUserInfo: getUserInfo2 } = await Promise.resolve().then(() => (init_googleDrive(), googleDrive_exports));
+    const u = await getUserInfo2();
+    if (u.email) localStorage.setItem(EMAIL, u.email);
+    if (u.name) localStorage.setItem(NAME, u.name);
   } catch (e) {
   }
   window.dispatchEvent(new CustomEvent("ddcs:cloud-account"));
@@ -6684,6 +7001,7 @@ async function connectGoogleFlow() {
     localStorage.setItem(TOK2, tok2);
     localStorage.setItem(PROV, "google");
     window.dispatchEvent(new CustomEvent("ddcs:cloud-account"));
+    captureGoogleIdentity();
   } catch (e) {
     if (String(e && e.message) !== "sign-in cancelled") window.alert("Google sign-in failed: " + (e && e.message));
   }
@@ -6714,6 +7032,7 @@ async function connectGoogleDesktop() {
       } catch (e) {
       }
       window.dispatchEvent(new CustomEvent("ddcs:cloud-account"));
+      captureGoogleIdentity();
       return;
     }
     if (Date.now() < deadline) setTimeout(tick, 1500);
@@ -6782,11 +7101,15 @@ async function openConnectModal(provider) {
 function renderCloudLogin(container) {
   if (!container) return;
   const a = getAccount();
+  if (a.connected && !a.name && !a.email && !captureGoogleIdentity._tried) {
+    captureGoogleIdentity._tried = true;
+    captureGoogleIdentity();
+  }
   const wrap = document.createElement("div");
   wrap.className = "cloud-login";
   const status = document.createElement("div");
   status.className = "cloud-status" + (a.connected ? "" : " muted");
-  status.textContent = a.connected ? `Connected \xB7 ${providerLabel(a.provider)}${a.email ? " \xB7 " + a.email : ""}` : "Not connected \u2014 projects stay local until you connect your own cloud account.";
+  status.textContent = a.connected ? `Connected \xB7 ${providerLabel(a.provider)}${a.name ? " \xB7 " + a.name : ""}${a.email ? " \xB7 " + a.email : ""}` : "Not connected \u2014 sign in to sync your projects to your own Google Drive.";
   wrap.appendChild(status);
   if (a.connected) {
     const dc = document.createElement("button");
@@ -6797,7 +7120,7 @@ function renderCloudLogin(container) {
   } else {
     const row = document.createElement("div");
     row.className = "cloud-providers";
-    for (const id of PROVIDER_IDS) {
+    for (const id of AVAILABLE_PROVIDER_IDS) {
       const b2 = document.createElement("button");
       b2.className = "op-btn cloud-connect";
       b2.innerHTML = providerIcon(id) + "<span>Connect " + providerLabel(id) + "</span>";
@@ -6812,7 +7135,7 @@ function renderCloudLogin(container) {
     window.addEventListener("ddcs:cloud-account", () => renderCloudLogin(container));
   }
 }
-var TOK2, PROV, EMAIL, REFRESH;
+var TOK2, PROV, EMAIL, REFRESH, NAME;
 var init_cloudAccount = __esm({
   "../DDCS-Studio/web/ui/cloudAccount.js"() {
     init_providers();
@@ -6821,6 +7144,7 @@ var init_cloudAccount = __esm({
     PROV = "ddcs_cloud_provider";
     EMAIL = "ddcs_cloud_email";
     REFRESH = "ddcs_cloud_refresh";
+    NAME = "ddcs_cloud_name";
   }
 });
 
@@ -6842,6 +7166,7 @@ __export(settingsPanel_exports, {
   probeSrc: () => probeSrc,
   probeSrcAvailable: () => probeSrcAvailable,
   resolveProbeSources: () => resolveProbeSources,
+  saveSettings: () => saveSettings,
   setProbeSrc: () => setProbeSrc,
   syncIO: () => syncIO
 });
@@ -6939,7 +7264,8 @@ function loadSettings() {
         endProgram: { ...SETTINGS_DEFAULTS.endProgram, ...p.endProgram || {} },
         motors: { ...SETTINGS_DEFAULTS.motors, ...p.motors || {} },
         inputs: Array.isArray(p.inputs) ? p.inputs : [],
-        outputs: Array.isArray(p.outputs) ? p.outputs : []
+        outputs: Array.isArray(p.outputs) ? p.outputs : [],
+        macros: Array.isArray(p.macros) ? p.macros : []
       });
       if (!merged.toolsSeeded && (!Array.isArray(merged.atc.tools) || merged.atc.tools.length === 0)) {
         merged.atc.tools = standardTools();
@@ -7002,15 +7328,27 @@ function resolveProbeSources(fields) {
 }
 function applySettings(incoming) {
   if (!incoming || typeof incoming !== "object") return;
-  if (incoming.stock) _ddcsSettings.stock = { ...SETTINGS_DEFAULTS.stock, ..._ddcsSettings.stock, ...incoming.stock };
-  if (incoming.machine) _ddcsSettings.machine = { ...SETTINGS_DEFAULTS.machine, ..._ddcsSettings.machine, ...incoming.machine };
-  if (incoming.probes) _ddcsSettings.probes = { ...SETTINGS_DEFAULTS.probes, ..._ddcsSettings.probes, ...incoming.probes };
-  if (incoming.limits) _ddcsSettings.limits = { ...SETTINGS_DEFAULTS.limits, ..._ddcsSettings.limits, ...incoming.limits };
+  const D = SETTINGS_DEFAULTS, S = _ddcsSettings;
+  if (incoming.stock) S.stock = { ...D.stock, ...S.stock, ...incoming.stock };
+  if (incoming.machine) S.machine = { ...D.machine, ...S.machine, ...incoming.machine };
+  if (incoming.probes) S.probes = { ...D.probes, ...S.probes, ...incoming.probes, sources: { ...D.probes.sources, ...(S.probes || {}).sources || {}, ...(incoming.probes || {}).sources || {} } };
+  if (incoming.limits) S.limits = { ...D.limits, ...S.limits, ...incoming.limits };
+  if (incoming.atc) S.atc = { ...D.atc, ...S.atc, ...incoming.atc };
+  if (incoming.head) S.head = { ...D.head, ...S.head, ...incoming.head };
+  if (incoming.spindle) S.spindle = { ...D.spindle, ...S.spindle, ...incoming.spindle };
+  if (incoming.endProgram) S.endProgram = { ...D.endProgram, ...S.endProgram, ...incoming.endProgram };
+  if (incoming.motors) S.motors = { ...D.motors, ...S.motors, ...incoming.motors };
+  if (incoming.hardwareTabs) S.hardwareTabs = { ...D.hardwareTabs, ...S.hardwareTabs, ...incoming.hardwareTabs };
+  if (incoming.preview) S.preview = { ...D.preview, ...S.preview, ...incoming.preview };
+  if (incoming.compose) S.compose = { ...D.compose, ...S.compose, ...incoming.compose };
+  if (incoming.view) S.view = { ...D.view, ...S.view, ...incoming.view };
+  if (Array.isArray(incoming.stockTemplates)) S.stockTemplates = incoming.stockTemplates;
   if (Array.isArray(incoming.inputs)) {
-    _ddcsSettings.inputs = incoming.inputs;
-    syncFlatFromIO(_ddcsSettings);
+    S.inputs = incoming.inputs;
+    syncFlatFromIO(S);
   }
-  if (Array.isArray(incoming.outputs)) _ddcsSettings.outputs = incoming.outputs;
+  if (Array.isArray(incoming.outputs)) S.outputs = incoming.outputs;
+  if (Array.isArray(incoming.macros)) S.macros = incoming.macros;
   saveSettings();
   if (_fillSettingsInputs) _fillSettingsInputs();
 }
@@ -7054,7 +7392,8 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_program">Program</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_network">Network</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_gateway">Gateway</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_about">About</button>
                     <div class="sidebar-group-label" data-group-label="hardware" style="display:none;">Hardware</div>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_machine" style="display:none;">Machine</button>
@@ -7100,12 +7439,12 @@ function buildSettingsOverlay() {
                 <!-- GENERAL: PROFILE -->
                 <div id="set_tab_profile">
                     <div class="settings-section">
-                        <div class="settings-section-title">CONTROLLER PROFILE</div>
+                        <div class="settings-section-title">CONTROLLER</div>
                         <div class="settings-row">
                             <select id="set_profile" title="Controller profile \u2014 presets the hardware your machine has" style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
                             <button class="toolbar-btn settings-io" id="set_profile_pull" title="Fetch this machine's profile (tabs + pins) from the bridged controller. Offline controllers like the DDCS 3.1: use Import profile.">\u21A7 Pull from controller</button>
                         </div>
-                        <div class="settings-hint">Presets which hardware your machine has (DDCS Expert, 4.1, \u2026). You still add/remove inputs &amp; outputs in the Hardware tabs.</div>
+                        <div class="settings-hint">Which controller you have (DDCS Expert, 4.1, \u2026) \u2014 sets the G-code dialect/post and presets your hardware tabs. (The <b>Profile</b> below saves your actual settings + variables for it.)</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">POST PROCESSOR</div>
@@ -7119,8 +7458,10 @@ function buildSettingsOverlay() {
                         <div class="settings-row">
                             <button class="toolbar-btn settings-io" id="set_profile_export">\u2B07 Export profile</button>
                             <button class="toolbar-btn settings-io" id="set_profile_import">\u2B06 Import profile</button>
+                            <button class="toolbar-btn settings-io" id="set_profile_cloud_save">\u2601 Save to cloud</button>
+                            <button class="toolbar-btn settings-io" id="set_profile_cloud_load">\u2601 Load from cloud</button>
                         </div>
-                        <div class="settings-hint">One JSON with your machine/stock/limits + user variables. The desktop app saves it to a local file automatically.</div>
+                        <div class="settings-hint">One JSON with your machine/stock/limits + user variables. The desktop app saves it to a local file automatically; <b>Save/Load to cloud</b> keeps named profiles in your own Google Drive (Settings \u2192 Cloud) \u2014 pull at the machine, load on a remote PC for a faithful sim.</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">EDITOR</div>
@@ -7156,21 +7497,25 @@ function buildSettingsOverlay() {
                 </div>
 
                 <!-- GENERAL: NETWORK (cloud account + machine network) -->
-                <div id="set_tab_network" style="display:none">
+                <div id="set_tab_gateway" style="display:none">
                     <div class="settings-section">
-                        <div class="settings-section-title">CLOUD ACCOUNT</div>
-                        <div class="settings-hint">Connect your OWN cloud account (Google Drive / Dropbox / OneDrive) to sync projects \u2014 browser-direct, no server. Projects stay local until you connect.</div>
-                        <div id="set_cloud_mount" style="margin-top:8px"></div>
-                    </div>
-                    <div class="settings-section">
-                        <div class="settings-section-title">MACHINE NETWORK</div>
-                        <div class="settings-hint">Point this gateway at your controller's SMB share \u2014 or scan the LAN to find it. Live view/control needs the gateway (the desktop app); the hosted page can't reach a machine on your network.</div>
+                        <div class="settings-section-title">CONTROLLER</div>
+                        <div class="settings-hint">Point the gateway at your controller's CNCDISK share \u2014 or scan the LAN to find it. Needs the gateway (the desktop app); the hosted page can't reach a machine on your network.</div>
                         <div id="set_machinenet_mount" style="margin-top:8px"></div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">LAN ACCESS</div>
-                        <div class="settings-hint">Open Studio from a phone/laptop on the same wifi \u2014 your exe serves it (the "personal cloud"). Use this URL, not the hosted page.</div>
+                        <div class="settings-hint">Open Studio from a phone/laptop on the same wifi \u2014 your exe serves it. Use this URL, not the hosted page.</div>
                         <div id="set_lan_mount" style="margin-top:8px"></div>
+                    </div>
+                </div>
+
+                <!-- GENERAL: CLOUD (project storage \u2014 separate from the machine) -->
+                <div id="set_tab_cloud" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">CLOUD STORAGE</div>
+                        <div class="settings-hint">Sign in to save &amp; sync your projects to your own Google Drive \u2014 files go straight to your account, we never see them.</div>
+                        <div id="set_cloud_mount" style="margin-top:8px"></div>
                     </div>
                 </div>
 
@@ -7211,6 +7556,8 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
+                <!-- (Macros + CAM Builder promoted to the MACROS main tab \u2014 see ui/macrosApp.js) -->
+
                 <!-- GENERAL: ABOUT -->
                 <div id="set_tab_about" style="display:none">
                     <div class="settings-section">
@@ -7220,7 +7567,7 @@ function buildSettingsOverlay() {
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">CREDITS</div>
-                        <div class="settings-hint">Built by Fr\xE9d\xE9ric \xB7 MIT License</div>
+                        <div class="settings-hint">Built by Fr\xE9d\xE9ric Chabot \xB7 MIT License</div>
                     </div>
                 </div>
 
@@ -7524,20 +7871,8 @@ async function renderLanAccess(mount) {
   const lanIp = c2.lan_ip || "";
   const lanUrl = lanOn && lanIp ? "http://" + lanIp + ":" + port + "/" : "";
   const wrap = document.createElement("div");
-  wrap.innerHTML = '<label class="settings-check"><input type="checkbox" id="lan_toggle"' + (lanOn ? " checked" : "") + '> Allow other devices on my network (LAN)</label><div class="cloud-status" style="margin-top:6px">This PC: <code>http://localhost:' + port + "</code></div>" + (lanUrl ? '<div class="cloud-status" style="margin-top:4px">Other devices: <code>' + lanUrl + `</code></div><img src="/api/lan-qr" alt="Scan to open on your phone" width="148" height="148" style="margin-top:8px;background:#fff;border-radius:6px;padding:6px" onerror="this.style.display='none'">` : '<div class="cloud-status muted" style="margin-top:4px">Turn on LAN access to get a shareable URL + QR code.</div>') + '<div class="lan-msg settings-hint" style="margin-top:6px"></div>';
+  wrap.innerHTML = '<div class="cloud-status">This PC: <code>http://localhost:' + port + "</code></div>" + (lanUrl ? '<div class="cloud-status" style="margin-top:4px">On your wifi: <code>' + lanUrl + `</code></div><div class="settings-hint" style="margin-top:2px">Other devices on the same network can open this \u2014 scan the code or share the link.</div><img src="/api/lan-qr" alt="Scan to open on your phone" width="148" height="148" style="margin-top:8px;background:#fff;border-radius:6px;padding:6px" onerror="this.style.display='none'">` : '<div class="settings-hint" style="margin-top:4px">Served on this PC only \u2014 set <code>host</code> to <code>0.0.0.0</code> in the gateway config to allow other devices.</div>');
   mount.replaceChildren(wrap);
-  const msg = wrap.querySelector(".lan-msg");
-  wrap.querySelector("#lan_toggle").addEventListener("change", async (e) => {
-    msg.textContent = "Saving\u2026";
-    try {
-      await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ host: e.target.checked ? "0.0.0.0" : "127.0.0.1" }) });
-    } catch (err) {
-      msg.textContent = "Save failed.";
-      return;
-    }
-    msg.textContent = "Saved \u2014 restart the app to apply the LAN binding.";
-    setTimeout(() => renderLanAccess(mount), 600);
-  });
 }
 function wireSettingsOverlay(ov) {
   const q = (id) => ov.querySelector("#" + id);
@@ -7688,7 +8023,7 @@ function wireSettingsOverlay(ov) {
   function fillPostOptions() {
     if (!postSel) return;
     const machinePost = getDialect(getActiveProfile().id);
-    postSel.innerHTML = ['<option value="auto">Follow machine profile (' + machinePost.name + ")</option>"].concat(listPosts().map((p) => '<option value="' + p.id + '">' + p.name + (p.verified ? "  \u2713" : "  \u26A0 unverified") + "</option>")).join("");
+    postSel.innerHTML = ['<option value="auto">Follow controller (' + machinePost.name + ")</option>"].concat(listPosts().map((p) => '<option value="' + p.id + '">' + p.name + (p.verified ? "  \u2713" : "  \u26A0 unverified") + "</option>")).join("");
     postSel.value = getActivePostId();
     updatePostHint();
   }
@@ -7697,7 +8032,7 @@ function wireSettingsOverlay(ov) {
     if (!hint) return;
     const id = getActivePostId();
     if (id === "auto") {
-      hint.textContent = "Following the machine profile (" + getDialect(getActiveProfile().id).name + "). Override to generate for another controller.";
+      hint.textContent = "Following the controller (" + getDialect(getActiveProfile().id).name + "). Override to generate for another controller.";
       hint.style.color = "";
     } else if (!isPostVerified(id)) {
       hint.textContent = "\u26A0 Unverified post \u2014 dump-derived, simulator/reference only. Not validated on hardware.";
@@ -7745,39 +8080,7 @@ function wireSettingsOverlay(ov) {
     }).catch(() => {
     });
     const pullBtn = q("set_profile_pull");
-    if (pullBtn) pullBtn.addEventListener("click", async () => {
-      const orig = pullBtn.textContent;
-      pullBtn.disabled = true;
-      pullBtn.textContent = "Pulling\u2026";
-      try {
-        let p;
-        try {
-          p = await makeClient().profile();
-        } catch (e) {
-          alert("Not bridged to a controller \u2014 run the desktop app (or the gateway) to pull a live profile. Offline controllers like the DDCS 3.1: use Import profile with the exported settings.");
-          return;
-        }
-        if (!p || !p.id) {
-          alert("The gateway returned no profile.");
-          return;
-        }
-        if (!confirm('Pull "' + p.name + '" from the controller? This replaces the current hardware tabs and Input/Output list with the controller values.')) return;
-        registerProfile(p);
-        setActiveProfile(p.id);
-        applyControllerProfile(p);
-        fillProfileOptions();
-        const it = ov.querySelector("#io_input_table");
-        if (it) renderIoTable(it, "input", getInputs(), syncIO);
-        const ot = ov.querySelector("#io_output_table");
-        if (ot) renderIoTable(ot, "output", getOutputs(), syncIO);
-        alert('Pulled "' + p.name + '": ' + getInputs().length + " inputs configured.");
-      } catch (e) {
-        alert("Pull failed: " + (e && e.message ? e.message : e));
-      } finally {
-        pullBtn.disabled = false;
-        pullBtn.textContent = orig;
-      }
-    });
+    if (pullBtn) pullBtn.addEventListener("click", () => openImportModal());
   }
   function applyControllerProfile(p) {
     if (!p) return;
@@ -7817,6 +8120,283 @@ function wireSettingsOverlay(ov) {
     applyHardwareTabs();
   }
   applyHardwareTabs();
+  window.ddcsRefreshControllerUI = () => {
+    try {
+      fillProfileOptions();
+      fillPostOptions();
+      applyHardwareTabs();
+      fill();
+    } catch (e) {
+    }
+  };
+  function activeDialect() {
+    const pid = getActivePostId();
+    return getDialect(pid && pid !== "auto" ? pid : getActiveProfile().id);
+  }
+  function upsertToolLength(a, num12, len) {
+    a.tools = a.tools || [];
+    let rec = a.tools.find((t) => parseInt(t && t.num, 10) === num12);
+    if (!rec) {
+      rec = normalizeTool({}, num12);
+      rec.num = num12;
+      a.tools.push(rec);
+    }
+    rec.length = len;
+  }
+  async function applyHardwareProfile(p) {
+    if (!p || !p.id) throw new Error("no profile");
+    registerProfile(p);
+    setActiveProfile(p.id);
+    applyControllerProfile(p);
+    const vdb = window.ddcsStudio && window.ddcsStudio.variableDB;
+    const ap = getActiveProfile();
+    if (ap && ap.varFamily && vdb) vdb.setControllerVars(ap.varFamily);
+    fillProfileOptions();
+    fillPostOptions();
+    const it = ov.querySelector("#io_input_table");
+    if (it) renderIoTable(it, "input", getInputs(), syncIO);
+    const ot = ov.querySelector("#io_output_table");
+    if (ot) renderIoTable(ot, "output", getOutputs(), syncIO);
+  }
+  async function scanController() {
+    let hwProfile = null;
+    try {
+      hwProfile = await makeClient().profile();
+    } catch (e) {
+    }
+    const d = hwProfile && hwProfile.id ? getDialect(hwProfile.id) : activeDialect();
+    const atc = d.vars && d.vars.atc;
+    const tb = d.vars && d.vars.toolTable || 1430;
+    const wcsBase = d.vars && d.vars.wcsBase || 805, wcsStride = d.vars && d.vars.wcsStride || 5, activeWcsVar = d.vars && d.vars.activeWcs || 578;
+    const MAX = 24;
+    const need = /* @__PURE__ */ new Set([activeWcsVar]);
+    for (let k = 0; k < 6 * wcsStride; k++) need.add(wcsBase + k);
+    for (let i = 0; i < MAX; i++) {
+      need.add(tb + i);
+      if (atc) {
+        need.add(atc.pocketX + i);
+        need.add(atc.pocketY + i);
+        need.add(atc.pocketZ + i);
+      }
+    }
+    let values = {}, connected = false;
+    try {
+      const res = await makeClient().readVars([...need].map(String));
+      connected = !!(res && res.connected);
+      values = res && res.values || {};
+    } catch (e) {
+    }
+    const obj = (n) => {
+      const x = values[String(n)];
+      return x && x.available ? x : null;
+    };
+    const cands = [], notes = [];
+    if (hwProfile && hwProfile.id) {
+      connected = true;
+      cands.push({ group: "Hardware & I/O", label: `Profile \u201C${hwProfile.name}\u201D`, value: "tabs + pin map", changed: true, kind: "hardware", data: hwProfile });
+    } else notes.push({ group: "Hardware & I/O", label: "Not available", value: "no gateway profile", kind: "note" });
+    let magReadable = false, magCount = 0;
+    if (atc) for (let i = 0; i < MAX; i++) {
+      const x = obj(atc.pocketX + i), y = obj(atc.pocketY + i), z = obj(atc.pocketZ + i);
+      if (x || y || z) magReadable = true;
+      const xx = x ? x.value : 0, yy = y ? y.value : 0, zz = z ? z.value : 0;
+      if (!xx && !yy && !zz) continue;
+      magCount++;
+      cands.push({ group: "ATC magazine", label: `Pocket ${i + 1} (T${i + 1})`, value: `X${xx} Y${yy} Z${zz}`, changed: [x, y, z].some((o) => o && o.userSet), kind: "magazine", data: { pocket: i + 1, tool: i + 1, name: "", x: xx, y: yy, z: zz } });
+    }
+    if (!atc) notes.push({ group: "ATC magazine", label: "Not available on this controller", value: "no mapped ATC model", kind: "note" });
+    else if (!magReadable) notes.push({ group: "ATC magazine", label: "Not readable", value: "controller returned nothing", kind: "note" });
+    else if (!magCount) notes.push({ group: "ATC magazine", label: "No taught pockets", value: "all at default (0)", kind: "note" });
+    let lenReadable = false, lenCount = 0;
+    for (let i = 0; i < MAX; i++) {
+      const L2 = obj(tb + i);
+      if (L2) lenReadable = true;
+      if (!L2 || L2.value === 0) continue;
+      lenCount++;
+      cands.push({ group: "Tool lengths", label: `T${i + 1} length`, value: String(L2.value), changed: !!L2.userSet, kind: "length", data: { num: i + 1, length: L2.value } });
+    }
+    if (!lenReadable) notes.push({ group: "Tool lengths", label: "Not readable on this controller", value: "\u2014", kind: "note" });
+    else if (!lenCount) notes.push({ group: "Tool lengths", label: "None set", value: "all at default (0)", kind: "note" });
+    const idxO = obj(activeWcsVar);
+    const idx = idxO && idxO.value >= 1 && idxO.value <= 6 ? Math.round(idxO.value) : 1;
+    const base = wcsBase + (idx - 1) * wcsStride;
+    const wx = obj(base), wy = obj(base + 1), wz = obj(base + 2);
+    if (wx || wy || wz) {
+      if (wx && wx.value || wy && wy.value || wz && wz.value)
+        cands.push({ group: "WCS work offset", label: `G${53 + idx} work origin`, value: `X${wx ? wx.value : 0} Y${wy ? wy.value : 0} Z${wz ? wz.value : 0}`, changed: [wx, wy, wz].some((o) => o && o.userSet), kind: "wcs", data: { x: wx ? wx.value : 0, y: wy ? wy.value : 0, z: wz ? wz.value : 0 } });
+      else notes.push({ group: "WCS work offset", label: `G${53 + idx} at default`, value: "origin = 0", kind: "note" });
+    } else notes.push({ group: "WCS work offset", label: "Not readable", value: "\u2014", kind: "note" });
+    const tv = hwProfile && hwProfile.geometry && hwProfile.geometry.travel;
+    const mc = _ddcsSettings.machine || {};
+    if (tv && [tv.x, tv.y, tv.z].some((v6) => v6 != null && v6 > 0)) {
+      const tx = tv.x > 0 ? tv.x : mc.x, ty = tv.y > 0 ? tv.y : mc.y, tz = tv.z > 0 ? tv.z : mc.z;
+      const changed = tv.x > 0 && tv.x !== mc.x || tv.y > 0 && tv.y !== mc.y || tv.z > 0 && tv.z !== mc.z;
+      cands.push({ group: "Machine envelope", label: "Travel X/Y/Z", value: `${tx} \xD7 ${ty} \xD7 ${tz} mm`, changed, kind: "travel", data: { x: tv.x, y: tv.y, z: tv.z } });
+    } else if (hwProfile && hwProfile.id) {
+      notes.push({ group: "Machine envelope", label: "Not set", value: "soft limits off \u2014 keeping current", kind: "note" });
+    }
+    return { connected, candidates: cands.concat(notes), controller: hwProfile && hwProfile.id ? { id: hwProfile.id, name: hwProfile.name } : null };
+  }
+  async function applyCandidates(checked) {
+    const a = _ddcsSettings.atc || (_ddcsSettings.atc = {});
+    const mag = checked.filter((c2) => c2.kind === "magazine").map((c2) => c2.data).sort((x, y) => x.pocket - y.pocket);
+    if (mag.length) {
+      a.magazine = mag;
+      a.tools = a.tools || [];
+      mag.forEach((p) => {
+        const tn = Number(p.tool);
+        if (tn > 0 && !a.tools.some((t) => parseInt(t && t.num, 10) === tn)) a.tools.push(normalizeTool({}, tn));
+      });
+    }
+    checked.filter((c2) => c2.kind === "length").forEach((c2) => upsertToolLength(a, c2.data.num, c2.data.length));
+    const wcs = checked.find((c2) => c2.kind === "wcs");
+    if (wcs) (_ddcsSettings.machine || (_ddcsSettings.machine = {})).workOrigin = wcs.data;
+    const tvc = checked.find((c2) => c2.kind === "travel");
+    if (tvc) {
+      const mm = _ddcsSettings.machine || (_ddcsSettings.machine = {});
+      if (tvc.data.x > 0) mm.x = tvc.data.x;
+      if (tvc.data.y > 0) mm.y = tvc.data.y;
+      if (tvc.data.z > 0) mm.z = tvc.data.z;
+    }
+    for (const c2 of checked.filter((c3) => c3.kind === "hardware")) {
+      try {
+        await applyHardwareProfile(c2.data);
+      } catch (e) {
+      }
+    }
+    saveSettings();
+    fill();
+    const mt = ov.querySelector("#atc_magazine");
+    if (mt) renderMagazineTable(mt, _ddcsSettings.atc, atcOnChange);
+    renderLibSummary();
+  }
+  let _importCands = [];
+  let _importController = null;
+  function buildImportModal() {
+    if (document.getElementById("import-modal")) return;
+    const m = document.createElement("div");
+    m.id = "import-modal";
+    m.innerHTML = `
+            <style>
+                #import-modal { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
+                #import-modal.active { display: flex; }
+                #import-modal .im-panel { background: var(--panel); color: var(--text-main); border: 1px solid var(--border); border-radius: var(--radius, 6px); width: min(620px, 95vw); max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+                #import-modal .im-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; letter-spacing: .5px; }
+                #import-modal .im-head button { background: transparent; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; }
+                #import-modal .im-body { overflow: auto; padding: 4px 14px 10px; min-height: 80px; }
+                #import-modal .im-empty { padding: 24px 8px; text-align: center; color: var(--text-dim); }
+                #import-modal .im-banner { margin: 8px 2px 2px; padding: 8px 10px; border-radius: 4px; font-size: 12px; background: rgba(224,160,32,.16); border: 1px solid rgba(224,160,32,.5); color: var(--text-main); }
+                #import-modal .im-group { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); padding: 12px 4px 4px; font-weight: 700; }
+                #import-modal .im-row { display: grid; grid-template-columns: 22px 1fr auto auto; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid var(--border); cursor: pointer; }
+                #import-modal .im-lbl { font-weight: 600; }
+                #import-modal .im-val { font-family: monospace; font-size: 11.5px; color: var(--text-dim); }
+                #import-modal .im-tag { font-size: 9.5px; text-transform: uppercase; letter-spacing: .5px; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+                #import-modal .im-tag.chg { background: rgba(60,180,90,.22); color: #3cb24f; }
+                #import-modal .im-tag.def { background: rgba(128,128,128,.18); color: var(--text-dim); }
+                #import-modal .im-tag.na { background: transparent; color: var(--text-dim); font-style: italic; }
+                #import-modal .im-note-row { cursor: default; opacity: .85; }
+                #import-modal .im-foot { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+                #import-modal .im-only { font-size: 11.5px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; cursor: pointer; }
+            </style>
+            <div class="im-panel">
+                <div class="im-head"><span>\u21A7 Pull from controller</span><button id="import-close" title="Close">\u2715</button></div>
+                <div class="im-body" id="import-body"></div>
+                <div class="im-foot">
+                    <label class="im-only"><input type="checkbox" id="import-only" checked> Show only changed</label>
+                    <span style="flex:1"></span>
+                    <button class="toolbar-btn settings-io" id="import-cancel">Cancel</button>
+                    <button class="toolbar-btn settings-io" id="import-apply" disabled>Apply</button>
+                </div>
+            </div>`;
+    document.body.appendChild(m);
+    const close = () => m.classList.remove("active");
+    m.querySelector("#import-close").addEventListener("click", close);
+    m.querySelector("#import-cancel").addEventListener("click", close);
+    m.addEventListener("mousedown", (e) => {
+      if (e.target === m) close();
+    });
+  }
+  function renderImportReview() {
+    const m = document.getElementById("import-modal");
+    const body = m.querySelector("#import-body");
+    const applyBtn = m.querySelector("#import-apply");
+    const onlyChanged = m.querySelector("#import-only").checked;
+    const isNote = (c2) => c2.kind === "note";
+    if (!_importCands.length) {
+      body.innerHTML = '<div class="im-empty">Nothing readable on the controller.</div>';
+      applyBtn.disabled = true;
+      return;
+    }
+    const shown = _importCands.filter((c2) => isNote(c2) || !onlyChanged || c2.changed);
+    const hiddenDefaults = _importCands.filter((c2) => !isNote(c2) && !c2.changed).length;
+    const groups = {};
+    shown.forEach((c2) => {
+      (groups[c2.group] = groups[c2.group] || []).push(c2);
+    });
+    let html = "";
+    if (_importController && _importController.id && _importController.id !== getActiveProfile().id) {
+      html += `<div class="im-banner">Connected controller: <b>${_importController.name}</b> \u2014 applying <b>Hardware &amp; I/O</b> switches your machine profile + post from <b>${getActiveProfile().name}</b> to it.</div>`;
+    }
+    Object.keys(groups).forEach((g) => {
+      html += `<div class="im-group">${g}</div>`;
+      groups[g].forEach((c2) => {
+        if (isNote(c2)) {
+          html += `<div class="im-row im-note-row"><span></span><span class="im-lbl">${c2.label}</span><span class="im-val">${c2.value}</span><span class="im-tag na">n/a</span></div>`;
+          return;
+        }
+        const i = _importCands.indexOf(c2);
+        html += `<label class="im-row"><input type="checkbox" data-cand="${i}"${c2.checked ? " checked" : ""}><span class="im-lbl">${c2.label}</span><span class="im-val">${c2.value}</span><span class="im-tag ${c2.changed ? "chg" : "def"}">${c2.changed ? "changed" : "default"}</span></label>`;
+      });
+    });
+    if (onlyChanged && hiddenDefaults) html += `<div class="im-empty">+${hiddenDefaults} value${hiddenDefaults > 1 ? "s" : ""} at factory default \u2014 untick \u201CShow only changed\u201D to add them.</div>`;
+    body.innerHTML = html;
+    body.querySelectorAll("[data-cand]").forEach((cb) => cb.addEventListener("change", () => {
+      _importCands[+cb.dataset.cand].checked = cb.checked;
+      updateApply();
+    }));
+    updateApply();
+  }
+  function updateApply() {
+    const applyBtn = document.querySelector("#import-apply");
+    const n = _importCands.filter((c2) => c2.checked).length;
+    applyBtn.disabled = !n;
+    applyBtn.textContent = n ? `Apply ${n}` : "Apply";
+  }
+  async function openImportModal() {
+    buildImportModal();
+    const m = document.getElementById("import-modal");
+    const body = m.querySelector("#import-body");
+    _importCands = [];
+    body.innerHTML = '<div class="im-empty">Reading the controller\u2026</div>';
+    m.querySelector("#import-apply").disabled = true;
+    m.classList.add("active");
+    let scan2;
+    try {
+      scan2 = await scanController();
+    } catch (e) {
+      scan2 = { connected: false, candidates: [] };
+    }
+    if (!scan2.connected) {
+      body.innerHTML = '<div class="im-empty">Not bridged to a controller \u2014 run the desktop app / gateway, or Import a saved profile instead.</div>';
+      return;
+    }
+    _importController = scan2.controller || null;
+    _importCands = scan2.candidates.map((c2) => ({ ...c2, checked: !!c2.changed }));
+    renderImportReview();
+    m.querySelector("#import-only").onchange = renderImportReview;
+    m.querySelector("#import-apply").onclick = async () => {
+      const checked = _importCands.filter((c2) => c2.checked);
+      const btn = m.querySelector("#import-apply");
+      btn.disabled = true;
+      btn.textContent = "Applying\u2026";
+      try {
+        await applyCandidates(checked);
+        m.classList.remove("active");
+      } catch (e) {
+        body.innerHTML = '<div class="im-empty">Apply failed: ' + (e && e.message ? e.message : e) + "</div>";
+      }
+    };
+  }
   function renderLibSummary() {
     const cont = q("set_atc_libsummary");
     if (!cont) return;
@@ -7869,13 +8449,13 @@ function wireSettingsOverlay(ov) {
     const opt = (cur) => '<option value="">\u2014</option>' + TOOL_TYPES.map((ty) => '<option value="' + ty + '"' + (ty === cur ? " selected" : "") + ">" + ty + "</option>").join("");
     const cell = (i, f, val2, step) => '<td><input type="number" step="' + (step || "any") + '" data-tool="' + i + '" data-field="' + f + '" value="' + (val2 === "" || val2 == null ? "" : val2) + '"></td>';
     if (!tools.length) {
-      body.innerHTML = '<tr><td colspan="10" class="tl-empty">No tools yet \u2014 \u201C\uFF0B Add tool\u201D to start your library.</td></tr>';
+      body.innerHTML = '<tr><td colspan="11" class="tl-empty">No tools yet \u2014 \u201C\uFF0B Add tool\u201D to start your library.</td></tr>';
       return;
     }
     let html = "";
     tools.forEach((raw2, i) => {
       const t = normalizeTool(raw2, i + 1);
-      html += '<tr><td class="tl-numcell"><input type="number" step="1" min="1" max="99" data-tool="' + i + '" data-field="num" value="' + (t.num === "" || t.num == null ? "" : t.num) + '"><span class="tl-var" data-var="' + i + '">' + lenVarLabel(t.num, base) + '</span></td><td><input type="text" data-tool="' + i + '" data-field="name" value="' + String(t.name).replace(/"/g, "&quot;") + '" placeholder="e.g. 6mm flat 2F"></td><td><select data-tool="' + i + '" data-field="type">' + opt(t.type) + "</select></td>" + cell(i, "dia", t.dia) + cell(i, "flutes", t.flutes, "1") + cell(i, "length", t.length, "0.001") + cell(i, "rpm", t.rpm, "1") + cell(i, "feed", t.feed, "1") + cell(i, "plunge", t.plunge, "1") + '<td><button class="tl-del" data-del="' + i + '" title="Remove tool">\u2715</button></td></tr>';
+      html += '<tr><td class="tl-numcell"><input type="number" step="1" min="1" max="99" data-tool="' + i + '" data-field="num" value="' + (t.num === "" || t.num == null ? "" : t.num) + '"><span class="tl-var" data-var="' + i + '">' + lenVarLabel(t.num, base) + '</span></td><td><input type="text" data-tool="' + i + '" data-field="name" value="' + String(t.name).replace(/"/g, "&quot;") + '" placeholder="e.g. 6mm flat 2F"></td><td><select data-tool="' + i + '" data-field="type">' + opt(t.type) + '</select></td><td class="tl-prof" data-prof="' + i + '">' + toolProfileSvg(t, { w: 26, h: 40 }) + "</td>" + cell(i, "dia", t.dia) + cell(i, "flutes", t.flutes, "1") + cell(i, "length", t.length, "0.001") + cell(i, "rpm", t.rpm, "1") + cell(i, "feed", t.feed, "1") + cell(i, "plunge", t.plunge, "1") + '<td><button class="tl-del" data-del="' + i + '" title="Remove tool">\u2715</button></td></tr>';
     });
     body.innerHTML = html;
   }
@@ -7897,6 +8477,8 @@ function wireSettingsOverlay(ov) {
                 #toollib-modal .tl-numcell { white-space: nowrap; }
                 #toollib-modal .tl-numcell input { width: 46px; }
                 #toollib-modal .tl-var { display: inline-block; margin-left: 6px; font-size: 10px; color: var(--text-dim); }
+                #toollib-modal .tl-prof { text-align: center; width: 34px; }
+                #toollib-modal .tl-prof svg { display: block; margin: 0 auto; }
                 #toollib-modal .tl-empty { padding: 16px; text-align: center; color: var(--text-dim); }
                 #toollib-modal input, #toollib-modal select { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 3px; padding: 4px 6px; font: inherit; }
                 #toollib-modal td:nth-child(4) input, #toollib-modal td:nth-child(5) input, #toollib-modal td:nth-child(6) input,
@@ -7911,7 +8493,7 @@ function wireSettingsOverlay(ov) {
                 <div class="tl-body">
                     <table>
                         <thead><tr>
-                            <th>Tool #</th><th>Name</th><th>Type</th><th>\xD8 mm</th><th>Flutes</th><th>Length</th><th>RPM</th><th>Feed</th><th>Plunge</th><th></th>
+                            <th>Tool #</th><th>Name</th><th>Type</th><th>Profile</th><th>\xD8 mm</th><th>Flutes</th><th>Length</th><th>RPM</th><th>Feed</th><th>Plunge</th><th></th>
                         </tr></thead>
                         <tbody id="toollib-rows"></tbody>
                     </table>
@@ -7944,6 +8526,10 @@ function wireSettingsOverlay(ov) {
       if (f === "num") {
         const span = m.querySelector('.tl-var[data-var="' + i + '"]');
         if (span) span.textContent = lenVarLabel(rec.num, parseInt(a.baseVar, 10) || 1430);
+      }
+      if (f === "type" || f === "dia" || f === "length") {
+        const cellEl = m.querySelector('.tl-prof[data-prof="' + i + '"]');
+        if (cellEl) cellEl.innerHTML = toolProfileSvg(rec, { w: 26, h: 40 });
       }
       renderLibSummary();
     });
@@ -8173,6 +8759,84 @@ function wireSettingsOverlay(ov) {
   q("set_profile_import").addEventListener("click", () => {
     if (window.ddcsImportProfile) window.ddcsImportProfile();
   });
+  const cloudSave = q("set_profile_cloud_save");
+  if (cloudSave) cloudSave.addEventListener("click", async () => {
+    if (!window.ddcsSaveProfileToCloud) return;
+    let def = "";
+    try {
+      def = getActiveProfile().name || "";
+    } catch (e) {
+    }
+    const name = window.prompt("Save this profile to your cloud as:", def || "My machine");
+    if (!name) return;
+    const orig = cloudSave.textContent;
+    cloudSave.disabled = true;
+    cloudSave.textContent = "Saving\u2026";
+    try {
+      const n = await window.ddcsSaveProfileToCloud(name);
+      alert("Saved \u201C" + n + "\u201D to your cloud.");
+    } catch (e) {
+      alert("Cloud save failed: " + (e && e.message ? e.message : e));
+    } finally {
+      cloudSave.disabled = false;
+      cloudSave.textContent = orig;
+    }
+  });
+  const cloudLoad = q("set_profile_cloud_load");
+  if (cloudLoad) cloudLoad.addEventListener("click", () => openCloudProfilePicker());
+  async function openCloudProfilePicker() {
+    let items = [];
+    try {
+      items = await window.ddcsListCloudProfiles() || [];
+    } catch (e) {
+      alert("Could not reach your cloud: " + (e && e.message ? e.message : e));
+      return;
+    }
+    if (!items.length) {
+      alert("No cloud profiles yet \u2014 sign in (Settings \u2192 Cloud) and use \u201CSave to cloud\u201D.");
+      return;
+    }
+    let m = document.getElementById("cloudprof-modal");
+    if (!m) {
+      m = document.createElement("div");
+      m.id = "cloudprof-modal";
+      m.innerHTML = '<style>#cloudprof-modal { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.5); }#cloudprof-modal .cp-panel { background:var(--panel); color:var(--text-main); border:1px solid var(--border); border-radius:var(--radius,6px); width:min(460px,94vw); max-height:80vh; display:flex; flex-direction:column; box-shadow:0 12px 40px rgba(0,0,0,.5); }#cloudprof-modal .cp-head { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); font-weight:700; }#cloudprof-modal .cp-head button { background:transparent; border:none; color:var(--text-dim); font-size:18px; cursor:pointer; }#cloudprof-modal .cp-body { overflow:auto; padding:6px 12px 12px; }#cloudprof-modal .cp-row { display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid var(--border); }#cloudprof-modal .cp-name { flex:1; font-weight:600; } #cloudprof-modal .cp-date { font-size:11px; color:var(--text-dim); }</style><div class="cp-panel"><div class="cp-head"><span>\u2601 Load profile from cloud</span><button data-cp="x">\u2715</button></div><div class="cp-body" id="cloudprof-body"></div></div>';
+      document.body.appendChild(m);
+      m.addEventListener("mousedown", (e) => {
+        if (e.target === m || e.target.dataset && e.target.dataset.cp === "x") m.remove();
+      });
+    }
+    const body = m.querySelector("#cloudprof-body");
+    body.innerHTML = items.map((it) => {
+      const d = it.savedAt ? new Date(it.savedAt).toLocaleString() : "";
+      return '<div class="cp-row"><span class="cp-name">' + it.name + '</span><span class="cp-date">' + d + '</span><button class="toolbar-btn settings-io" data-load="' + it.id + '">Load</button><button class="op-btn" data-del="' + it.id + '" title="Delete">\u2715</button></div>';
+    }).join("");
+    body.querySelectorAll("[data-load]").forEach((b2) => b2.addEventListener("click", async () => {
+      if (!confirm("Load this profile? It replaces your current settings + variables.")) return;
+      b2.disabled = true;
+      b2.textContent = "Loading\u2026";
+      try {
+        await window.ddcsLoadCloudProfile(b2.dataset.load);
+        m.remove();
+        fill();
+        applyHardwareTabs();
+        alert("Profile loaded.");
+      } catch (e) {
+        alert("Load failed: " + (e && e.message ? e.message : e));
+        b2.disabled = false;
+        b2.textContent = "Load";
+      }
+    }));
+    body.querySelectorAll("[data-del]").forEach((b2) => b2.addEventListener("click", async () => {
+      if (!confirm("Delete this cloud profile?")) return;
+      try {
+        await window.ddcsDeleteCloudProfile(b2.dataset.del);
+        openCloudProfilePicker();
+      } catch (e) {
+        alert("Delete failed: " + (e && e.message ? e.message : e));
+      }
+    }));
+  }
   const genTnc = q("atc_gen_tnc");
   if (genTnc) genTnc.addEventListener("click", () => {
     const nc = generateToolChangeNc(_ddcsSettings.atc, getOutputs());
@@ -8210,7 +8874,8 @@ function wireSettingsOverlay(ov) {
     "set_tab_variables",
     "set_tab_program",
     "set_tab_feedback",
-    "set_tab_network",
+    "set_tab_gateway",
+    "set_tab_cloud",
     "set_tab_about",
     "set_tab_machine",
     "set_tab_spindle",
@@ -8299,6 +8964,7 @@ var init_settingsPanel = __esm({
     init_dialects();
     init_client();
     init_ioTable();
+    init_toolProfile();
     init_themes();
     init_atcGenerator();
     init_cloudAccount();
@@ -8411,6 +9077,10 @@ var init_settingsPanel = __esm({
       // Dynamic machine I/O — the new source of truth; seeded from probes/limits on first load.
       inputs: [],
       outputs: [],
+      // Custom controller macros (PART OF THE PROFILE): each = { id, name, trigger, body }. trigger.kind =
+      // 'mcode' (O100nn → Mnn, called from a program) | 'kbutton' (key-1..7.nc, a panel button) | 'program'
+      // (a named .nc). Authored in the Macros tab; rides in Export/Import/cloud via buildProfile.
+      macros: [],
       // Axis roles — X/Y/Z linear; A/B optionally rotary. The sim reads this to spin the solid on a
       // rotary-axis move (around the declared Cartesian axis). Two rotary axes are allowed (A and B).
       motors: {
@@ -8495,6 +9165,8 @@ function pocketStack(params = {}) {
   const ox = num(params.originX, 0), oy = num(params.originY, 0);
   const raster = (params.strategy || "spiral") === "raster";
   const depth = num(params.depth, 4), by = num(params.stepdown, 1.5);
+  const wcs = newBlock("wcs");
+  wcs.params = { wcs: params.wcs || "active" };
   let region = newBlock("region"), tooSmall, cx, cy;
   if (shape === "circle") {
     const Rc = num(params.dia, 50) / 2 - r;
@@ -8512,7 +9184,7 @@ function pocketStack(params = {}) {
   if (tooSmall) {
     const hole = newBlock("drill");
     hole.params = { x: cx, y: cy, depth, peck: by, feed: plunge, clearance: clr };
-    return [makeStart(params), hole, makeEnd(params)];
+    return [makeStart(params), wcs, hole, makeEnd(params)];
   }
   const over = newBlock("stepover");
   over.params = { region, stepover: so, strategy: raster ? "parallel" : "concentric", direction: "bothways", z: "z", feed, plunge, clearance: clr };
@@ -8524,7 +9196,7 @@ function pocketStack(params = {}) {
     wall.params = { region, z: "z", feed, plunge, clearance: clr };
     down.children.push(wall);
   }
-  return [makeStart(params), down, makeEnd(params)];
+  return [makeStart(params), wcs, down, makeEnd(params)];
 }
 var PocketWizard;
 var init_pocketWizard = __esm({
@@ -8559,7 +9231,9 @@ function slotStack(params = {}) {
     plunge: num(params.plunge, 150),
     clearance: num(params.clearance, 5)
   };
-  return [makeStart(params), slot, makeEnd(params)];
+  const wcs = newBlock("wcs");
+  wcs.params = { wcs: params.wcs || "active" };
+  return [makeStart(params), wcs, slot, makeEnd(params)];
 }
 var SlotWizard;
 var init_slotWizard = __esm({
@@ -8591,7 +9265,9 @@ function surfacingStack(params = {}) {
   const down = newBlock("stepdown");
   down.params = { to: num(params.depth, 0.5), by: num(params.stepdown, 0.5) };
   down.children = [over];
-  return [makeStart(params), down, makeEnd(params)];
+  const wcs = newBlock("wcs");
+  wcs.params = { wcs: params.wcs || "active" };
+  return [makeStart(params), wcs, down, makeEnd(params)];
 }
 var SurfacingWizard;
 var init_surfacingWizard = __esm({
@@ -10323,8 +10999,12 @@ function tokenizeWords(line2) {
       const letter = ch.toUpperCase();
       i += 1;
       let value = "";
-      while (i < n && !isLetter(line2[i])) {
-        value += line2[i];
+      let depth = 0;
+      while (i < n && !(depth === 0 && isLetter(line2[i]))) {
+        const c2 = line2[i];
+        if (c2 === "[") depth += 1;
+        else if (c2 === "]") depth = Math.max(0, depth - 1);
+        value += c2;
         i += 1;
       }
       words.push({ letter, value: value.trim() });
@@ -10432,6 +11112,13 @@ function evalExpr2(str, vars, opts = {}) {
       const arg = parseExpr();
       if (peek() === "]") p += 1;
       if (arg === null) return null;
+      if (t.fn === "ATAN" && peek() === "/" && toks[p + 1] === "[") {
+        p += 2;
+        const arg2 = parseExpr();
+        if (peek() === "]") p += 1;
+        if (arg2 === null) return null;
+        return Math.atan2(arg, arg2) * 180 / Math.PI;
+      }
       return fn(arg);
     }
     if (t === "#") {
@@ -10693,6 +11380,23 @@ var init_GcodeExecutionEngine = __esm({
           if (gotoMatch) {
             return;
           }
+          const whileMatch = stripped.match(/^WHILE\s+(.+?)\s+DO\s*[123]\s*$/i);
+          if (whileMatch) {
+            if (!validateCondition(whileMatch[1].trim().replace(/^\[|\]$/g, ""))) {
+              reportError(lineIndex, "Invalid WHILE condition syntax");
+            }
+            return;
+          }
+          if (/^END\s*[123]\s*$/i.test(stripped)) {
+            return;
+          }
+          const ifThenMatch = stripped.match(/^IF\s+(.+?)\s+THEN\s+(.+)$/i);
+          if (ifThenMatch) {
+            if (!validateCondition(ifThenMatch[1].trim().replace(/^\[|\]$/g, ""))) {
+              reportError(lineIndex, "Invalid IF condition syntax");
+            }
+            return;
+          }
           if (/^(M30|M02|M2|M99)\b/i.test(stripped)) {
             return;
           }
@@ -10769,6 +11473,37 @@ var init_GcodeExecutionEngine = __esm({
         this.program = program;
         this.labels = labels;
         this.totalLines = totalLines;
+        this._matchLoops();
+      }
+      /**
+       * Pre-match `WHILE <cond> DOn` ↔ `ENDn` (n = 1|2|3, FANUC-style) by structural nesting, tagging each
+       * step so the executor can jump in O(1): the WHILE gets `whileN`/`whileCond`/`loopEnd` (program index of
+       * its END), the END gets `endN`/`loopStart` (index of its WHILE). DDCS macros loop with WHILE/END, which
+       * the IF/GOTO core can't express — this is what lets a generated CAM slot macro run in the simulator.
+       */
+      _matchLoops() {
+        const stacks = { 1: [], 2: [], 3: [] };
+        for (let i = 0; i < this.program.length; i++) {
+          const s = this.program[i];
+          const line2 = s && s.stripped;
+          if (!line2) continue;
+          const wm = line2.match(/^WHILE\b\s*(.+?)\s*\bDO\s*([123])\b\s*$/i);
+          if (wm) {
+            s.whileN = Number(wm[2]);
+            s.whileCond = wm[1].trim().replace(/^\[|\]$/g, "");
+            stacks[s.whileN].push(i);
+            continue;
+          }
+          const em = line2.match(/^END\s*([123])\b\s*$/i);
+          if (em) {
+            s.endN = Number(em[1]);
+            const open = stacks[s.endN].pop();
+            if (open != null) {
+              s.loopStart = open;
+              this.program[open].loopEnd = i;
+            }
+          }
+        }
       }
       run(text) {
         this.stop();
@@ -10965,11 +11700,15 @@ var init_GcodeExecutionEngine = __esm({
           return;
         }
         if (typeof this.onPositionChange === "function") {
-          this.onPositionChange({
-            x: mv.from.x + (mv.to.x - mv.from.x) * t,
-            y: mv.from.y + (mv.to.y - mv.from.y) * t,
-            z: mv.from.z + (mv.to.z - mv.from.z) * t
-          });
+          let p;
+          if (mv.path) {
+            const segs = mv.path.length - 1, f = t * segs, i = Math.min(segs - 1, Math.floor(f)), u = f - i;
+            const a = mv.path[i], b2 = mv.path[i + 1];
+            p = { x: a.x + (b2.x - a.x) * u, y: a.y + (b2.y - a.y) * u, z: a.z + (b2.z - a.z) * u };
+          } else {
+            p = { x: mv.from.x + (mv.to.x - mv.from.x) * t, y: mv.from.y + (mv.to.y - mv.from.y) * t, z: mv.from.z + (mv.to.z - mv.from.z) * t };
+          }
+          this.onPositionChange(p);
         }
         this._nextDelayMs = 16;
       }
@@ -11044,6 +11783,29 @@ var init_GcodeExecutionEngine = __esm({
           return false;
         }
         if (/^\s*[();]/.test(step.raw.trim())) {
+          this.ip += 1;
+          return false;
+        }
+        if (step.whileN != null) {
+          if (step.loopEnd != null && !this._evaluateCondition(step.whileCond)) this.ip = step.loopEnd + 1;
+          else this.ip += 1;
+          return false;
+        }
+        if (step.endN != null) {
+          this.ip = step.loopStart != null ? step.loopStart : this.ip + 1;
+          return false;
+        }
+        const ifThen = line2.match(/^IF\s+(.+?)\s+THEN\s+(.+)$/i);
+        if (ifThen) {
+          if (this._evaluateCondition(ifThen[1].trim().replace(/^\[|\]$/g, ""))) {
+            const stmt = ifThen[2].trim();
+            const g = stmt.match(/^GOTO\s*(\d+)$/i);
+            if (g && this.labels.has(Number.parseInt(g[1], 10))) {
+              this.ip = this.labels.get(Number.parseInt(g[1], 10));
+              return false;
+            }
+            if (/^#/.test(stmt)) this._handleAssignment(stmt);
+          }
           this.ip += 1;
           return false;
         }
@@ -11351,7 +12113,27 @@ var init_GcodeExecutionEngine = __esm({
             this.pos = target;
           }
         } else {
-          this.stats.skipped += 1;
+          const off = { I: wm.I, J: wm.J, K: wm.K, R: wm.R };
+          const anyNull = ["I", "J", "K", "R"].some((k) => wm[k] != null && !Number.isFinite(wm[k]));
+          const pts = anyNull ? null : arcPoints(this.pos, target, off, effMotion, this.plane, this.unitScale);
+          if (!pts || pts.length < 3) {
+            this.stats.skipped += 1;
+          } else {
+            let len = 0;
+            for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y, pts[i].z - pts[i - 1].z);
+            const rate = this.feedVal > 0 ? this.feedVal : 600;
+            const realMs = rate > 0 ? len / rate * 6e4 : 0;
+            const speed = this.simSpeed > 0 ? this.simSpeed : 1;
+            if (realMs / speed > 50) {
+              this._move = { from: { ...pts[0] }, to: { ...pts[pts.length - 1] }, path: pts, durMs: realMs, elapsed: 0, last: null, touchName: null };
+              this._setStatus(`${effMotion === 2 ? "G2 cw" : "G3 ccw"} arc ${len.toFixed(1)} mm at F${rate} \u2014 ${(realMs / 1e3).toFixed(1)} s${speed !== 1 ? ` @ ${speed}\xD7` : ""}`, true);
+              this._nextDelayMs = 16;
+              this.ip += 1;
+              return false;
+            }
+            this.pos = target;
+            if (typeof this.onPositionChange === "function") this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
+          }
         }
         this.ip += 1;
         return false;
@@ -12222,11 +13004,31 @@ function parseLine(line2, opts = {}) {
   }
   return { type: "raw", params: { text: raw2 } };
 }
+function matchWaitInputPoll(lines, i, opts) {
+  const d = opts && opts.dialect;
+  if (!(d && d.caps && d.caps.inputRead)) return null;
+  const m = String(lines[i]).trim().match(/^WHILE\s*\[#\[1520\+(\d+)\]\s*!=\s*([01])\]\s*DO1\b/i);
+  if (!m) return null;
+  let j = i + 1;
+  while (j < lines.length && !lines[j].trim()) j++;
+  if (j >= lines.length || !/^G0*4\s+P[\d.]+/i.test(lines[j].trim())) return null;
+  let k = j + 1;
+  while (k < lines.length && !lines[k].trim()) k++;
+  if (k >= lines.length || !/^END1\b/i.test(lines[k].trim())) return null;
+  return { rec: { type: "waitinput", params: { pin: Number(m[1]), mode: Number(m[2]) === 1 ? "high" : "low" } }, end: k };
+}
 function parseGcodeToStack(text, opts = {}) {
   const out = [];
   let modalFeed = null;
-  for (const line2 of String(text || "").split("\n")) {
-    const rec = parseLine(line2, opts);
+  const lines = String(text || "").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const wi = matchWaitInputPoll(lines, i, opts);
+    if (wi) {
+      out.push(wi.rec);
+      i = wi.end;
+      continue;
+    }
+    const rec = parseLine(lines[i], opts);
     if (!rec) continue;
     if (rec.type === "arc" || rec.type === "move" && (rec.params.mode === "cut" || rec.params.mode === "probe")) {
       if (typeof rec.params.feed === "number") modalFeed = rec.params.feed;
@@ -12458,6 +13260,7 @@ var init_opStacks = __esm({
     init_atcWarmupWizard();
     init_atcChangeWizard();
     init_atcTestWizard();
+    init_atcTableWizard();
     init_circularWizard();
     init_rotaryClockWizard();
     init_rotaryCenterWizard();
@@ -12485,6 +13288,7 @@ var init_opStacks = __esm({
       atc_warmup: atcWarmupStack,
       atc_change: atcChangeStack,
       atc_test: atcTestStack,
+      atc_table: atcTableStack,
       circular: circularStack,
       rotary_clock: rotaryClockStack,
       rotary_center: rotaryCenterStack,
@@ -12534,8 +13338,9 @@ var init_opStacks = __esm({
       surfacing(prog) {
         const down = find(prog, "stepdown"), over = down && down.children && down.children[0], rg = over && over.params && over.params.region;
         if (!down || !over || !rg || !rg.params) return null;
-        const tool = formNum("sf_toolDia", 12);
+        const tool = formNum("sf_toolDia", 12), wb = find(prog, "wcs");
         return {
+          sf_wcs: wb && wb.params && wb.params.wcs || "active",
           sf_originX: rg.params.x,
           sf_originY: rg.params.y,
           sf_w: rg.params.w,
@@ -12552,8 +13357,9 @@ var init_opStacks = __esm({
       slot(prog) {
         const s = find(prog, "slot");
         if (!s || !s.params) return null;
-        const p = s.params;
+        const p = s.params, wb = find(prog, "wcs");
         return {
+          sl_wcs: wb && wb.params && wb.params.wcs || "active",
           sl_ax: p.x0,
           sl_ay: p.y0,
           sl_bx: p.x1,
@@ -12573,8 +13379,9 @@ var init_opStacks = __esm({
         if (!down || !Array.isArray(down.children)) return null;
         const over = down.children.find((c2) => c2.type === "stepover"), rg = over && over.params && over.params.region;
         if (!over || !rg || !rg.params) return null;
-        const tool = formNum("p_toolDia", 6), r = tool / 2;
+        const tool = formNum("p_toolDia", 6), r = tool / 2, wb = find(prog, "wcs");
         const f = {
+          p_wcs: wb && wb.params && wb.params.wcs || "active",
           p_shape: rg.params.shape,
           p_depth: down.params.to,
           p_stepdown: down.params.by,
@@ -12599,8 +13406,8 @@ var init_opStacks = __esm({
       drill(prog) {
         const arr = find(prog, "array");
         if (!arr || !arr.params) return null;
-        const p = arr.params, hole = arr.children && arr.children[0];
-        const f = { d_pattern: p.pattern, d_originX: p.x0, d_originY: p.y0, d_skip: p.skip || "" };
+        const p = arr.params, hole = arr.children && arr.children[0], wb = find(prog, "wcs");
+        const f = { d_pattern: p.pattern, d_originX: p.x0, d_originY: p.y0, d_skip: p.skip || "", d_wcs: wb && wb.params && wb.params.wcs || "active" };
         if (p.pattern === "circle") {
           f.d_dia = p.dia;
           f.d_count = p.count;
@@ -12630,6 +13437,7 @@ var init_opStacks = __esm({
             f.d_holeDia = h.holeDia;
             f.d_toolDia = h.toolDia;
             f.d_pitch = h.pitch;
+            f.d_ramp = h.ramp;
           } else f.d_peck = h.peck;
         }
         return f;
@@ -14228,15 +15036,86 @@ var headerPost_exports = {};
 __export(headerPost_exports, {
   initHeaderPost: () => initHeaderPost
 });
+function runQuickAction(act) {
+  switch (act) {
+    case "open":
+      document.getElementById("projOpenBtn")?.click();
+      break;
+    case "save":
+      document.getElementById("projSaveBtn")?.click();
+      break;
+    case "load":
+      window.loadGcodeFile?.();
+      break;
+    case "insert":
+      window.insertGcodeFile?.();
+      break;
+    case "copy":
+      window.copyCode?.();
+      break;
+    case "clear":
+      window.clearCode?.();
+      break;
+    case "export":
+      window.downloadFile?.();
+      break;
+  }
+}
+function setQuickTheme(name) {
+  try {
+    const tm = window.ddcsStudio && window.ddcsStudio.themeManager;
+    if (tm && tm.setCurrent) tm.setCurrent(name);
+    else {
+      document.body.setAttribute("data-theme", name);
+      localStorage.setItem("ddcs_theme", name);
+    }
+  } catch (_) {
+    document.body.setAttribute("data-theme", name);
+  }
+}
 function initHeaderPost() {
-  const sel = document.getElementById("hdrPost");
-  if (!sel) return;
+  const btn = document.getElementById("hdrPostBtn");
+  const menu = document.getElementById("hdrPostMenu");
+  if (!btn || !menu) return;
   const warnEl = document.getElementById("hdrPostWarn");
-  const fillOptions = () => {
+  const esc3 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const svgIco = (k) => `<svg class="hq-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="${HQ_ICONS[k].c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HQ_ICONS[k].d}</svg>`;
+  const fillMenu = () => {
     const machinePost = getDialect(getActiveProfile().id);
-    sel.innerHTML = [`<option value="auto">Auto \xB7 ${machinePost.name}</option>`].concat(listPosts().map((p) => `<option value="${p.id}">${p.name}${p.verified ? "" : " \u26A0"}</option>`)).join("");
-    sel.value = getActivePostId();
+    const active2 = getActivePostId();
+    const autoLabel = `Auto \xB7 ${machinePost.name}`;
+    const curTheme = document.body.getAttribute("data-theme") || "studio";
+    const actionRow = (a) => `<button type="button" role="menuitem" class="hdr-quick-item" data-act="${a.act}"><span class="hdr-quick-check" aria-hidden="true"></span>` + svgIco(a.act) + `<span class="hdr-quick-lbl">${a.label}</span></button>`;
+    const postRow = (value, label, warn) => `<button type="button" role="menuitemradio" class="hdr-quick-item" data-post="${esc3(value)}" aria-checked="${active2 === value}"><span class="hdr-quick-check" aria-hidden="true">${active2 === value ? "\u2713" : ""}</span><span class="hdr-quick-lbl">${esc3(label)}</span>` + (warn ? '<span class="hdr-quick-warn" title="Not yet verified">\u26A0</span>' : "") + "</button>";
+    const themeRow = (name) => `<button type="button" role="menuitemradio" class="hdr-quick-item" data-theme="${name}" aria-checked="${curTheme === name}"><span class="hdr-quick-check" aria-hidden="true">${curTheme === name ? "\u2713" : ""}</span><span class="hq-swatch" style="background:${HQ_THEME_SWATCH[name] || "#888"}"></span><span class="hdr-quick-lbl">${name[0].toUpperCase() + name.slice(1)}</span></button>`;
+    menu.innerHTML = '<div class="hdr-quick-head">Program</div>' + HQ_ACTIONS.map(actionRow).join("") + '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Post-processor</div>' + postRow("auto", autoLabel, false) + listPosts().map((p) => postRow(p.id, p.name, !p.verified)).join("") + '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Theme</div>' + THEMES.map(themeRow).join("");
+    const activeName = active2 === "auto" ? autoLabel : listPosts().find((p) => p.id === active2)?.name || active2;
+    btn.title = `Quick actions \u2014 open / save / load / export, post-processor (${activeName}), theme. Click to open.`;
+    btn.setAttribute("aria-label", `Quick actions (post-processor: ${activeName})`);
   };
+  const onDocClick = (e) => {
+    if (!menu.contains(e.target) && !btn.contains(e.target)) closeMenu();
+  };
+  const onKey = (e) => {
+    if (e.key === "Escape") {
+      closeMenu();
+      btn.focus();
+    }
+  };
+  function closeMenu() {
+    if (menu.hidden) return;
+    menu.hidden = true;
+    btn.setAttribute("aria-expanded", "false");
+    document.removeEventListener("click", onDocClick, true);
+    document.removeEventListener("keydown", onKey, true);
+  }
+  function openMenu() {
+    fillMenu();
+    menu.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+    document.addEventListener("click", onDocClick, true);
+    document.addEventListener("keydown", onKey, true);
+  }
   const lint = () => {
     if (!warnEl) return;
     const post = resolveActivePost(getActiveProfile().id);
@@ -14293,9 +15172,25 @@ function initHeaderPost() {
       setTimeout(() => copyBtn.style.color = "", 500);
     });
   }
-  fillOptions();
-  sel.addEventListener("change", () => {
-    setActivePostId(sel.value);
+  fillMenu();
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (menu.hidden) openMenu();
+    else closeMenu();
+  });
+  menu.addEventListener("click", (e) => {
+    const it = e.target.closest(".hdr-quick-item");
+    if (!it) return;
+    closeMenu();
+    if (it.dataset.act) {
+      runQuickAction(it.dataset.act);
+      return;
+    }
+    if (it.dataset.theme) {
+      setQuickTheme(it.dataset.theme);
+      return;
+    }
+    setActivePostId(it.dataset.post);
     const post = resolveActivePost(getActiveProfile().id);
     const vdb = window.ddcsStudio && window.ddcsStudio.variableDB;
     if (vdb && post) {
@@ -14313,18 +15208,39 @@ function initHeaderPost() {
     lint();
   });
   window.addEventListener("ddcs:settings-changed", () => {
-    fillOptions();
+    fillMenu();
     lint();
   });
   const ed = document.getElementById("editor");
   if (ed) ed.addEventListener("input", lint);
   lint();
 }
+var HQ_ICONS, HQ_ACTIONS, HQ_THEME_SWATCH;
 var init_headerPost = __esm({
   "../DDCS-Studio/web/ui/headerPost.js"() {
     init_dialects();
     init_controllerProfiles();
     init_validate();
+    init_themes();
+    HQ_ICONS = {
+      open: { c: "#f59e0b", d: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>' },
+      save: { c: "#0ea5e9", d: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>' },
+      load: { c: "#f59e0b", d: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>' },
+      insert: { c: "#14b8a6", d: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>' },
+      copy: { c: "#6366f1", d: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>' },
+      clear: { c: "#ef4444", d: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>' },
+      export: { c: "#0ea5e9", d: '<path d="M16 9h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2"/><line x1="12" y1="14" x2="12" y2="3"/><polyline points="8 7 12 3 16 7"/>' }
+    };
+    HQ_ACTIONS = [
+      { act: "open", label: "Open project" },
+      { act: "save", label: "Save project" },
+      { act: "load", label: "Load file" },
+      { act: "insert", label: "Insert file" },
+      { act: "copy", label: "Copy program" },
+      { act: "clear", label: "Clear editor" },
+      { act: "export", label: "Export / download" }
+    ];
+    HQ_THEME_SWATCH = { studio: "#9aa0a6", normal: "#4a90e2", steampunk: "#b07a2a", futuristic: "#00e5e5", organic: "#6b8e23" };
   }
 });
 
@@ -14972,6 +15888,7 @@ var edgeView = {
     "p_axis",
     "p_dir",
     "p_dist",
+    "p_radius",
     "p_feed_fast",
     "p_feed_slow",
     "p_retract",
@@ -14999,6 +15916,7 @@ var edgeView = {
       dir: el("p_dir")?.value || "pos",
       wcs: el("p_wcs")?.value || "active",
       dist: el("p_dist")?.value || "15",
+      radius: el("p_radius")?.value || "2",
       retract: el("p_retract")?.value || "2",
       syncA: el("p_sync_a")?.checked || false,
       slave: el("p_slave")?.value || "3",
@@ -15111,16 +16029,20 @@ var alignmentView = {
 
 // ../DDCS-Studio/web/wizards/views/atcViews.js
 init_uiUtils();
+init_util();
+init_toolProfile();
 init_atcLengthWizard();
 init_atcWarmupWizard();
 init_atcChangeWizard();
 init_atcTestWizard();
 init_atcToolCheckWizard();
+init_atcTableWizard();
 var lengthWizard = new AtcLengthWizard();
 var warmupWizard = new AtcWarmupWizard();
 var changeWizard = new AtcChangeWizard();
 var testWizard = new AtcTestWizard();
 var toolCheckWizard = new AtcToolCheckWizard();
+var tableWizard = new AtcTableWizard();
 var setStatus = (id, text) => {
   const e = el(id);
   if (e) e.textContent = text;
@@ -15225,6 +16147,7 @@ var atcChangeView = {
     "atc_change_confirm"
   ],
   update(mgr) {
+    const s = window.ddcsGetSettings && window.ddcsGetSettings() || {};
     const mode = el("atc_change_mode")?.value || "manual";
     const manualRow = el("atc_change_manual_params");
     const autoRow = el("atc_change_auto_params");
@@ -15238,11 +16161,12 @@ var atcChangeView = {
       z: el("atc_change_z")?.value || "0",
       // auto
       zClear: el("atc_change_zclear")?.value || "0",
-      capacity: el("atc_change_capacity")?.value || "8",
       fixedT: el("atc_change_fixedt")?.value || "0",
       waitSpindle: el("atc_change_m300")?.checked !== false,
       dustCover: el("atc_change_cover")?.checked === true,
-      confirm: el("atc_change_confirm")?.checked === true
+      confirm: el("atc_change_confirm")?.checked === true,
+      magazine: s.atc && s.atc.magazine || []
+      // pockets + park XYZ come from Settings → Tool table
     };
     const gcode = changeWizard.generate(params);
     el("wiz_atc_change_code").innerHTML = UIUtils.formatGCode(gcode);
@@ -15266,6 +16190,7 @@ var atcTestView = {
     "atc_test_descend"
   ],
   update(mgr) {
+    const s = window.ddcsGetSettings && window.ddcsGetSettings() || {};
     const mode = el("atc_test_mode")?.value || "drawbar";
     const drawbarRow = el("atc_test_drawbar_params");
     const pocketRow = el("atc_test_pocket_params");
@@ -15278,12 +16203,14 @@ var atcTestView = {
       first: el("atc_test_first")?.value || "1",
       count: el("atc_test_count")?.value || "8",
       zClear: el("atc_test_zclear")?.value || "0",
-      descend: el("atc_test_descend")?.checked === true
+      descend: el("atc_test_descend")?.checked === true,
+      magazine: s.atc && s.atc.magazine || []
+      // pocket dry-run visits the Settings → Tool table magazine
     };
     const gcode = testWizard.generate(params);
     el("wiz_atc_test_code").innerHTML = UIUtils.formatGCode(gcode);
     if (mgr) mgr.preview3D(gcode, "atcTestViz");
-    setStatus("atcTestVizStatus", mode === "pockets" ? "Pocket dry-run \xB7 visits the taught pocket positions (controller tables) at clearance Z" : "Drawbar cycle \xB7 no toolpath \u2014 \u25B6 steps the release / lock sequence");
+    setStatus("atcTestVizStatus", mode === "pockets" ? "Pocket dry-run \xB7 visits each magazine pocket (Settings \u2192 Tool table) at clearance Z" : "Drawbar cycle \xB7 no toolpath \u2014 \u25B6 steps the release / lock sequence");
   }
 };
 
@@ -15680,6 +16607,7 @@ var drillView = {
     "d_skip",
     "d_originX",
     "d_originY",
+    "d_wcs",
     "d_cols",
     "d_rows",
     "d_dx",
@@ -15699,6 +16627,7 @@ var drillView = {
     "d_peck",
     "d_toolDia",
     "d_pitch",
+    "d_ramp",
     "d_depth",
     "d_clearance",
     "d_feed",
@@ -15706,6 +16635,18 @@ var drillView = {
   ],
   probeSrcFields: {},
   // not a probe wizard — keep the shared controller-source decorator a no-op
+  // Variant entries (Drill vs Bore): one form, two menu entries. Lock the method + hide its selector so the
+  // op's identity is fixed by which entry opened it — no toggle to silently turn a drill into a bore.
+  variants: [{ id: "drill", label: "Drill" }, { id: "bore", label: "Bore" }],
+  applyVariant(variant) {
+    const m = el("d_method");
+    if (m && variant === "bore") m.value = "helical";
+    else if (m && variant === "drill") m.value = "peck";
+    ["d_method_cell", "d_method_label"].forEach((id) => {
+      const e = el(id);
+      if (e) e.style.display = "none";
+    });
+  },
   // Custom params → form (pattern variants: `count` lives in d_count for circle but d_lcount for line, so a
   // flat map can't express it). The inverse of update()'s reads; used by wizardManager._seedForm on edit.
   setForm(p = {}) {
@@ -15718,6 +16659,7 @@ var drillView = {
     set2("d_skip", p.skip);
     set2("d_originX", p.originX);
     set2("d_originY", p.originY);
+    set2("d_wcs", p.wcs);
     set2("d_depth", p.depth);
     set2("d_clearance", p.clearance);
     set2("d_feed", p.feed);
@@ -15726,6 +16668,7 @@ var drillView = {
     set2("d_peck", p.peck);
     set2("d_toolDia", p.toolDia);
     set2("d_pitch", p.pitch);
+    set2("d_ramp", p.ramp);
     if (p.pattern === "grid") {
       set2("d_cols", p.cols);
       set2("d_rows", p.rows);
@@ -15768,6 +16711,7 @@ var drillView = {
       pattern,
       method,
       skip: v("d_skip") || "",
+      wcs: v("d_wcs") || "active",
       originX,
       originY,
       cx: originX,
@@ -15782,6 +16726,7 @@ var drillView = {
       peck: v("d_peck"),
       toolDia: v("d_toolDia"),
       pitch: v("d_pitch"),
+      ramp: v("d_ramp"),
       spindle: s.spindle,
       head: s.head,
       endProgram: s.endProgram
@@ -15877,6 +16822,7 @@ var pocketView = {
     "p_w",
     "p_h",
     "p_dia",
+    "p_wcs",
     "p_strategy",
     "p_toolDia",
     "p_stepoverPct",
@@ -15911,6 +16857,7 @@ var pocketView = {
       w: v2("p_w"),
       h: v2("p_h"),
       dia: v2("p_dia"),
+      wcs: v2("p_wcs") || "active",
       toolDia: v2("p_toolDia"),
       stepoverPct: v2("p_stepoverPct"),
       depth: v2("p_depth"),
@@ -16019,6 +16966,7 @@ var slotView = {
     "sl_bx",
     "sl_by",
     "sl_width",
+    "sl_wcs",
     "sl_toolDia",
     "sl_stepoverPct",
     "sl_depth",
@@ -16048,6 +16996,7 @@ var slotView = {
       bx: v3("sl_bx"),
       by: v3("sl_by"),
       width: v3("sl_width"),
+      wcs: v3("sl_wcs") || "active",
       toolDia: v3("sl_toolDia"),
       stepoverPct: v3("sl_stepoverPct"),
       depth: v3("sl_depth"),
@@ -16130,6 +17079,7 @@ var surfacingView = {
     "sf_originY",
     "sf_w",
     "sf_h",
+    "sf_wcs",
     "sf_strategy",
     "sf_toolDia",
     "sf_stepoverPct",
@@ -16162,6 +17112,7 @@ var surfacingView = {
       originY: v4("sf_originY"),
       w: v4("sf_w"),
       h: v4("sf_h"),
+      wcs: v4("sf_wcs") || "active",
       strategy: v4("sf_strategy") || "raster",
       toolDia: v4("sf_toolDia"),
       stepoverPct: v4("sf_stepoverPct"),
@@ -16784,7 +17735,7 @@ var WizardManager = class {
       return e && e.style.display !== "none";
     }) || null;
   }
-  open(type) {
+  open(type, variant) {
     playClick();
     this._activeType = type;
     closeTemplatesPopover();
@@ -16818,6 +17769,7 @@ var WizardManager = class {
     const wizElem = el("wiz_" + type);
     if (wizElem) {
       wizElem.style.display = "block";
+      if (view && typeof view.applyVariant === "function") view.applyVariant(variant);
       if (view && typeof view.onShow === "function") view.onShow(this);
       decorateProbeSrc(view);
       this.applyProbeDefaults();
@@ -17652,6 +18604,7 @@ Type: ${v6.t || ""}`));
                             <button onclick="openWiz && openWiz('atc_length')">\u{1F4CF} Tool Length</button>
                             <button onclick="openWiz && openWiz('atc_check')">\u{1F6E1} Tool Check</button>
                             <button onclick="openWiz && openWiz('atc_change')">\u{1F527} Tool Change</button>
+                            <button onclick="openWiz && openWiz('atc_table')">\u{1F4CB} Tool Table</button>
                             <button onclick="openWiz && openWiz('atc_test')">\u{1F9EA} ATC Test</button>
                         </div>
                     </div>
@@ -17659,7 +18612,8 @@ Type: ${v6.t || ""}`));
                     <div class="toolbar-dropdown">
                         <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.mill}</span><span class="btn-tx">Mill</span><span class="btn-caret">\u25BC</span></button>
                         <div class="toolbar-dropdown-content">
-                            <button onclick="openWiz && openWiz('drill')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" fill="#1e293b" stroke="none"/></svg>Drill / holes</button>
+                            <button onclick="openWiz && openWiz('drill','drill')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" fill="#1e293b" stroke="none"/></svg>Drill</button>
+                            <button onclick="openWiz && openWiz('drill','bore')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" stroke="#94a3b8" stroke-width="2"/><circle cx="12" cy="12" r="2" fill="#1e293b" stroke="none"/></svg>Bore</button>
                             <button onclick="openWiz && openWiz('pocket')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="5" width="18" height="14" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><rect x="7" y="9" width="10" height="6" rx="1" fill="#1e293b" stroke="none"/></svg>Pocket</button>
                             <button onclick="openWiz && openWiz('slot')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="9" width="18" height="6" rx="3" stroke="#94a3b8" stroke-width="2.5"/><line x1="7" y1="12" x2="17" y2="12" stroke="#1e293b" stroke-width="2" stroke-linecap="round"/></svg>Slot</button>
                             <button onclick="openWiz && openWiz('surfacing')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="4" width="18" height="16" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><path d="M5 8h14M5 12h14M5 16h14" stroke="#1e293b" stroke-width="1.5"/></svg>Surfacing</button>
@@ -17738,11 +18692,8 @@ Type: ${v6.t || ""}`));
     if (rightTarget) {
       rightTarget.innerHTML = `
                 <div style="display:flex; gap:6px; align-items:center;">
-                    <button class="toolbar-btn" onclick="loadGcodeFile && loadGcodeFile()" title="Load a G-code / .nc file into the editor (replaces the current program)"><span class="btn-ico">${HEADER_ICONS.load}</span><span class="btn-tx">Load</span></button>
-                    <button class="toolbar-btn" onclick="insertGcodeFile && insertGcodeFile()" title="Insert a G-code file at the cursor \u2014 keeps your current program"><span class="btn-ico">${HEADER_ICONS.insert}</span><span class="btn-tx">Insert</span></button>
-                    <button class="toolbar-btn" onclick="copyCode && copyCode()" title="Copy editor to clipboard"><span class="btn-ico">${HEADER_ICONS.copy}</span><span class="btn-tx">Copy</span></button>
-                    <button class="toolbar-btn" onclick="clearCode && clearCode()" title="Clear the editor"><span class="btn-ico">${HEADER_ICONS.clear}</span><span class="btn-tx">Clear</span></button>
-                    <button class="toolbar-btn" onclick="downloadFile && downloadFile()" title="Export / download the program"><span class="btn-ico">${HEADER_ICONS.export}</span><span class="btn-tx">Export</span></button>
+                    <button class="toolbar-btn icon-only" onclick="copyCode && copyCode()" title="Copy editor to clipboard" aria-label="Copy"><span class="btn-ico">${HEADER_ICONS.copy}</span></button>
+                    <button class="toolbar-btn icon-only" onclick="clearCode && clearCode()" title="Clear the editor" aria-label="Clear"><span class="btn-ico">${HEADER_ICONS.clear}</span></button>
                 </div>
             `;
     }

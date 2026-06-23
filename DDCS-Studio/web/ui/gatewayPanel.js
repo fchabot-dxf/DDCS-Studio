@@ -31,12 +31,14 @@ export function initGatewayPanel() {
     if (inited) return;
     inited = true;
     const panel = document.getElementById('gateway-app');
-    tabsEl = el('div', { class: 'tabs' });
+    const head = el('div', { class: 'settings-head' });
+    tabsEl = el('div', { class: 'settings-tabs' });
+    head.append(tabsEl);
     const root = el('div', { class: 'gw-view' });
-    panel.append(tabsEl, root);
+    panel.append(head, root);
 
     ctx = { client: makeClient(), root, status: null, refresh: () => activate(active) };
-    VIEWS.forEach((v) => tabsEl.append(el('div', { class: 'tab', onclick: () => activate(v) }, v.label)));
+    VIEWS.forEach((v) => tabsEl.append(el('button', { class: 'settings-main-tab', onclick: () => activate(v) }, v.label)));
     activate(statusView);
     setInterval(poll, POLL_MS);
 }
@@ -48,7 +50,7 @@ export function setGatewayPanelVisible(on) {
 
 function activate(view) {
     active = view;
-    [...tabsEl.children].forEach((t, i) => t.classList.toggle('on', VIEWS[i] === view));
+    [...tabsEl.children].forEach((t, i) => t.classList.toggle('active', VIEWS[i] === view));
     clear(ctx.root);
     view.mount(ctx);
 }

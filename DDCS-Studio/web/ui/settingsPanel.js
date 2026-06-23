@@ -67,10 +67,12 @@ export const STOCK_TEMPLATES = [
     { name: 'Rotary block 3″', x: 150, y: 76.2, z: 76.2, shape: 'boss' },
     { name: 'Rotary cylinder Ø3″', x: 150, y: 76.2, z: 76.2, shape: 'cylinder' },
 ];
-const SETTINGS_DEFAULTS = {
-    stock:   { x: 100, y: 80, z: 20, shape: 'boss', show: true },
+export const SETTINGS_DEFAULTS = {
+    stock:   { x: 100, y: 80, z: 20, shape: 'boss', show: true, datum: 'nnp', pin: 'origin' },
     stockTemplates: [],   // user-saved presets: { name, x, y, z, shape }
-    machine: { x: 300, y: 300, z: 120, ox: 0, oy: 0, oz: 0, show: true, workOrigin: { x: 0, y: 0, z: 0 } },
+    // Travel x/y/z are SIGNED (sign = home direction). workOrigin = the active WCS offset (machine coords of
+    // part-zero), kept in sync from wcs.table[active-1]. wcs = the G54–G59 table pulled from the controller.
+    machine: { x: 300, y: 300, z: 120, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } },
     view:    { theta: -1.5708, phi: 1.0472 }, // 3D preview start orientation (front: +X right, +Y back)
     probes:  {
         probePin: 3, probeLevel: 0,        // IN03 = YunKia V6 3D probe (confirmed)
@@ -96,7 +98,13 @@ const SETTINGS_DEFAULTS = {
     // users can configure for accurate simulation; a controller profile just presets these.
     hardwareTabs: { probes: true, atc: false, limits: true, spindle: false },
     // 3D/2D toolpath preview (read by viz/createPreviewPanel via window.ddcsGetSettings().preview).
-    preview: { followDamp: 50, showRapids: true, defaultView: '3d', defaultSpeed: 1, followDefault: true, autoLoop: true },
+    // head = the sim spindle/collet body sizes (VISUAL ONLY — they change the render, never the G-code, so they
+    // live here with the view options, not under Machine). parts = which assembly pieces are shown.
+    preview: { followDamp: 50, showRapids: true, defaultView: '3d', defaultSpeed: 1, followDefault: true, autoLoop: true, gridStep: 0,
+        head: { spindleDia: 80, spindleLen: 200, colletDia: 20, colletLen: 30 }, parts: { spindle: true, collet: true, tool: true },
+        // 3D touch probe SIM body sizes (VISUAL ONLY — same contract as head: change the render, never the G-code; the
+        // probing radius comes from the Stylus radius field under 3D PROBE DEFAULTS). ballDia defaults to 2× a typical 1mm stylus radius.
+        probe: { bodyDia: 40, bodyLen: 90, stylusLen: 30, ballDia: 4 } },
     // Composing assists (Blocks suggestions, Studio editor autocomplete, ghost next-block).
     compose: { suggestions: true, autocomplete: true, ghost: true },
     // ATC: tool-length probe defaults (consumed by the Tool Length wizard) + the tool-offset table.
@@ -120,12 +128,40 @@ const SETTINGS_DEFAULTS = {
     // Dynamic machine I/O — the new source of truth; seeded from probes/limits on first load.
     inputs: [],
     outputs: [],
+    // Custom controller macros (PART OF THE PROFILE): each = { id, name, trigger, body }. trigger.kind =
+    // 'mcode' (O100nn → Mnn, called from a program) | 'kbutton' (key-1..7.nc, a panel button) | 'program'
+    // (a named .nc). Authored in the Macros tab; rides in Export/Import/cloud via buildProfile.
+    macros: [],
     // Axis roles — X/Y/Z linear; A/B optionally rotary. The sim reads this to spin the solid on a
     // rotary-axis move (around the declared Cartesian axis). Two rotary axes are allowed (A and B).
     motors: {
         x: { role: 'linear' }, y: { role: 'linear' }, z: { role: 'linear' },
         a: { role: 'unused', around: 'x' },
         b: { role: 'unused', around: 'y' }
+    },
+    // First-run Setup health-check / checklist (ui/setupChecklist.js). dismissed = the "Don't show again" flag
+    // (the modal still re-opens from the quick-menu, ignoring it). saveDest = the user's DELIBERATE save-destination
+    // choice ('' = not yet chosen → stays ⚠ | 'local' | 'cloud' | 'both'); we never auto-default it to local.
+    setup: { dismissed: false, saveDest: '' },
+    // Persisted machine HOMING profile — authored in the Homing Setup modal, consumed by the Homing wizard.
+    // PER-AXIS: enable, order (1..N — lower homes first), method, direction, feeds, back-off, home offset.
+    //   method: 'native'  — controller built-in M98 P501 X<idx> (safest; uses the controller's own config + flag)
+    //           'seek'     — low-level switch-seek + back-off + slow re-seek (M98 P503), composed in the macro
+    //           'setzero'  — set current position AS home (#[880+N]=0, #[1515+N]=1) — NO motion
+    //   slaveFollows: ''|axisIdx — a dual-axis gantry SLAVE; homing this (master) axis syncs the slave coord +
+    //                 marks it homed (#883=#881; #1518=1). Gantry SQUARING is manual — Studio emits no auto-square.
+    //   rotary: 'setzero' | 'switch' ; continuous = mod-360 wrap (A/B/C)
+    // order philosophy: 'sequential' (by the order field — default; Z(1) X(2) Y(3) per fndzero.nc) | 'simultaneous'
+    // Defaults mirror fndzero.nc: Z first (order 1), X (2), Y (3, A slaved). softLimits = re-enable #655 after homing.
+    homing: {
+        philosophy: 'sequential', softLimits: true,
+        axes: {
+            x: { enable: true,  order: 2, method: 'native', dir: '-', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
+            y: { enable: true,  order: 3, method: 'native', dir: '-', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
+            z: { enable: true,  order: 1, method: 'native', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
+            a: { enable: false, order: 4, method: 'setzero', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'setzero', continuous: true },
+            b: { enable: false, order: 5, method: 'setzero', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'setzero', continuous: true }
+        }
     }
 };
 
@@ -171,6 +207,26 @@ function syncFlatFromIO(s) {
     }
 }
 
+// Deep-merge a persisted homing config over the defaults: top-level scalars, then per-axis fields, so a partial
+// save can't drop fields. Idempotent. A legacy 'zfirst' philosophy maps to 'sequential' (the order field now
+// drives the sequence); a legacy per-axis method:'dual' (auto-squaring, removed) falls back to native + its slave.
+function mergeHoming(p) {
+    const D = SETTINGS_DEFAULTS.homing;
+    const philosophy = (p && p.philosophy === 'simultaneous') ? 'simultaneous' : 'sequential';
+    const out = { philosophy, softLimits: p ? p.softLimits !== false : D.softLimits, axes: {} };
+    for (const ax of ['x', 'y', 'z', 'a', 'b']) {
+        const da = D.axes[ax], pa = (p && p.axes && p.axes[ax]) || {};
+        const merged = { ...da, ...pa };
+        delete merged.dual;                                        // drop the removed auto-squaring sub-config
+        if (merged.method === 'dual') {                            // legacy dual → native master; keep its slave sync
+            merged.method = 'native';
+            if (!merged.slaveFollows && pa.dual && pa.dual.slaveIdx != null) merged.slaveFollows = String(pa.dual.slaveIdx);
+        }
+        out.axes[ax] = merged;
+    }
+    return out;
+}
+
 let _ddcsSettings = loadSettings();
 // Migrate any legacy dense / bare-number tool storage to the sparse library shape (one pass, idempotent).
 if (_ddcsSettings.atc) _ddcsSettings.atc.tools = libraryTools(_ddcsSettings.atc);
@@ -197,8 +253,11 @@ function loadSettings() {
                 spindle: { ...SETTINGS_DEFAULTS.spindle, ...(p.spindle || {}) },
                 endProgram: { ...SETTINGS_DEFAULTS.endProgram, ...(p.endProgram || {}) },
                 motors: { ...SETTINGS_DEFAULTS.motors, ...(p.motors || {}) },
+                setup: { ...SETTINGS_DEFAULTS.setup, ...(p.setup || {}) },
+                homing: mergeHoming(p.homing),
                 inputs: Array.isArray(p.inputs) ? p.inputs : [],
                 outputs: Array.isArray(p.outputs) ? p.outputs : [],
+                macros: Array.isArray(p.macros) ? p.macros : [],
             });
             // One-time seed of the starter tool library into an existing install (empty + never seeded before).
             if (!merged.toolsSeeded && (!Array.isArray(merged.atc.tools) || merged.atc.tools.length === 0)) {
@@ -211,7 +270,7 @@ function loadSettings() {
     return migrateIO(JSON.parse(JSON.stringify(SETTINGS_DEFAULTS)));
 }
 
-function saveSettings() {
+export function saveSettings() {
     try { localStorage.setItem(DDCS_SETTINGS_KEY, JSON.stringify(_ddcsSettings)); } catch (e) { /* ignore */ }
     window.dispatchEvent(new CustomEvent('ddcs:settings-changed', { detail: _ddcsSettings }));
 }
@@ -258,17 +317,306 @@ window.ddcsProbeSrcAvailable = probeSrcAvailable;
 window.ddcsSetProbeSrc = setProbeSrc;
 window.ddcsResolveProbeSources = resolveProbeSources;
 
-let _fillSettingsInputs = null;
+// Interactive head schematic for Preview settings (Centroid-conversational style): the dimension inputs sit ON the
+// drawing, clamped to their dimension vectors — the diagram IS the input, not a separate form. Diameters are to-scale
+// against each other; lengths are schematic. Editing a field redraws + repositions. See [[wizard-twopane-layout]].
+const _gv = (id, d) => { const el = document.getElementById(id); const n = Number(el && el.value); return Number.isFinite(n) && n > 0 ? n : d; };
+function renderHeadGui() {
+    const svgBox = document.getElementById('set_pv_head_svg'); if (!svgBox) return;
+    const sD = _gv('set_pv_spindle_dia', 80), sL = _gv('set_pv_spindle_len', 200);
+    const cD = _gv('set_pv_collet_dia', 20), cL = _gv('set_pv_collet_len', 30);
+    const tD = 6, tL = 40;                                                              // sample tool stub (the real cutter comes from the tool table)
+    const W = 248, H = 212, cx = 112, maxD = Math.max(sD, cD, tD), totalL = sL + cL + tL;
+    const scale = Math.min(96 / maxD, 168 / totalL);                                    // ONE uniform scale → the WHOLE head scales together (true proportions) and fits
+    const sw = sD * scale, cw = cD * scale, tw = Math.max(2, tD * scale);
+    const sH = sL * scale, cH = cL * scale, tH = tL * scale;
+    const ySpinT = (H - (sH + cH + tH)) / 2, yColT = ySpinT + sH, yToolT = yColT + cH;  // vertically centred stack
+    const yDia = Math.max(11, ySpinT - 12);
+    const rect = (w, hh, yy, fill, part) => `<rect data-part="${part}" x="${(cx - w / 2).toFixed(1)}" y="${yy.toFixed(1)}" width="${Math.max(2, w).toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="${fill}" stroke="#9fb4c8" stroke-width="0.8"/>`;
+    const tick = (x1, y1, x2, y2) => `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#5f7286" stroke-width="0.7" stroke-dasharray="2 2"/>`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">`;
+    svg += rect(sw, sH, ySpinT, '#6b7682', 'spindle') + rect(cw, cH, yColT, '#9aa6b2', 'collet') + rect(tw, tH, yToolT, '#ffab40', 'tool');
+    svg += tick(cx, ySpinT, cx, yDia);                                 // spindle Ø → top input
+    svg += tick(cx + sw / 2, ySpinT + sH / 2, W - 30, ySpinT + sH / 2); // spindle length → right input
+    svg += tick(cx - cw / 2, yColT + cH / 2, 30, yColT + cH / 2);       // collet Ø → left input
+    svg += tick(cx + cw / 2, yColT + cH / 2, W - 30, yColT + cH / 2);   // collet length → right input
+    svgBox.innerHTML = svg + '</svg>';
+    const place = (id, x, y) => { const el = document.getElementById(id); if (el) { el.style.left = Math.max(0, Math.min(W - 50, x - 25)) + 'px'; el.style.top = (y - 9) + 'px'; } };
+    place('set_pv_spindle_dia', cx, yDia);
+    place('set_pv_spindle_len', W - 26, ySpinT + sH / 2);
+    place('set_pv_collet_dia', 30, yColT + cH / 2);
+    place('set_pv_collet_len', W - 26, yColT + cH / 2);
+}
+// Commit the on-diagram dims to settings (on change/blur) so an open preview re-pulls them live.
+function commitHeadDims() {
+    const s = getSettings(); if (!s.preview) s.preview = {}; const h = s.preview.head || (s.preview.head = {});
+    h.spindleDia = _gv('set_pv_spindle_dia', 80); h.spindleLen = _gv('set_pv_spindle_len', 200);
+    h.colletDia = _gv('set_pv_collet_dia', 20); h.colletLen = _gv('set_pv_collet_len', 30);
+    saveSettings();
+}
 
-// Merge incoming settings (e.g. from an imported profile), persist, and refresh the panel
+// Interactive PROBE schematic — mirrors renderHeadGui: a touch-trigger probe drawn body (top) ▸ stylus (thin) ▸ ruby
+// ball (tip), with the dimension inputs sitting ON the drawing at the tick ends. Visual only (never the G-code).
+function renderProbeGui() {
+    const svgBox = document.getElementById('set_pv_probe_svg'); if (!svgBox) return;
+    const bD = _gv('set_pv_probe_body_dia', 40), bL = _gv('set_pv_probe_body_len', 90);
+    const stL = _gv('set_pv_probe_stylus_len', 30), ballD = _gv('set_pv_probe_ball_dia', 4);
+    const stD = Math.max(2, ballD * 0.6);                                               // stylus shaft (schematic, thinner than the ball)
+    const W = 248, H = 212, cx = 112, maxD = Math.max(bD, stD, ballD), totalL = bL + stL + ballD;
+    const scale = Math.min(96 / maxD, 168 / totalL);                                    // ONE uniform scale → the WHOLE probe scales together and fits
+    const bw = bD * scale, sw = Math.max(2, stD * scale), ballR = (ballD * scale) / 2;
+    const bH = bL * scale, sH = stL * scale, ballH = ballD * scale;
+    const yBodyT = (H - (bH + sH + ballH)) / 2, yStyT = yBodyT + bH, yBallT = yStyT + sH; // vertically centred stack
+    const yDia = Math.max(11, yBodyT - 12);
+    const rect = (w, hh, yy, fill, part) => `<rect data-part="${part}" x="${(cx - w / 2).toFixed(1)}" y="${yy.toFixed(1)}" width="${Math.max(2, w).toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="${fill}" stroke="#9fb4c8" stroke-width="0.8"/>`;
+    const tick = (x1, y1, x2, y2) => `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#5f7286" stroke-width="0.7" stroke-dasharray="2 2"/>`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">`;
+    svg += rect(bw, bH, yBodyT, '#6b7682', 'body') + rect(sw, sH, yStyT, '#9aa6b2', 'stylus');
+    svg += `<circle data-part="ball" cx="${cx.toFixed(1)}" cy="${(yBallT + ballR).toFixed(1)}" r="${Math.max(2, ballR).toFixed(1)}" fill="#e11d48" stroke="#9fb4c8" stroke-width="0.8"/>`;  // ruby ball
+    svg += tick(cx, yBodyT, cx, yDia);                                  // body Ø → top input
+    svg += tick(cx + bw / 2, yBodyT + bH / 2, W - 30, yBodyT + bH / 2);  // body length → right input
+    svg += tick(cx + sw / 2, yStyT + sH / 2, W - 30, yStyT + sH / 2);    // stylus length → right input
+    svg += tick(cx - ballR, yBallT + ballR, 30, yBallT + ballR);         // ball Ø → left input
+    svgBox.innerHTML = svg + '</svg>';
+    const place = (id, x, y) => { const el = document.getElementById(id); if (el) { el.style.left = Math.max(0, Math.min(W - 50, x - 25)) + 'px'; el.style.top = (y - 9) + 'px'; } };
+    place('set_pv_probe_body_dia', cx, yDia);
+    place('set_pv_probe_body_len', W - 26, yBodyT + bH / 2);
+    place('set_pv_probe_stylus_len', W - 26, yStyT + sH / 2);
+    place('set_pv_probe_ball_dia', 30, yBallT + ballR);
+}
+// Commit the on-diagram probe dims to settings (on change/blur). Visual only — stored under preview.probe.
+function commitProbeDims() {
+    const s = getSettings(); if (!s.preview) s.preview = {}; const p = s.preview.probe || (s.preview.probe = {});
+    p.bodyDia = _gv('set_pv_probe_body_dia', 40); p.bodyLen = _gv('set_pv_probe_body_len', 90);
+    p.stylusLen = _gv('set_pv_probe_stylus_len', 30); p.ballDia = _gv('set_pv_probe_ball_dia', 4);
+    saveSettings();
+}
+
+// Signed field getter — travel can be negative (the sign is the home direction).
+const _gvs = (id, d) => { const el = document.getElementById(id); const n = Number(el && el.value); return Number.isFinite(n) && n !== 0 ? n : d; };
+// Interactive MACHINE ENVELOPE: an isometric box drawn from the SIGNED travels, so home (machine 0) sits at the
+// corner the signs dictate and each axis edge points the travel direction. The travel inputs sit on their axis edge.
+function renderMachineGui() {
+    const svgBox = document.getElementById('set_mach_env_svg'); if (!svgBox) return;
+    const X = _gvs('set_mach_x', 300), Y = _gvs('set_mach_y', 300), Z = _gvs('set_mach_z', 120);
+    const W = 260, H = 200, c = Math.cos(Math.PI / 6), s = Math.sin(Math.PI / 6);
+    const P = (x, y, z) => [(x - y) * c, (x + y) * s - z];          // iso: +X right-down, +Y left-down, +Z up
+    const all = []; for (const x of [0, X]) for (const y of [0, Y]) for (const z of [0, Z]) all.push(P(x, y, z));
+    const xs = all.map((p) => p[0]), ys = all.map((p) => p[1]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys), pad = 38;
+    const scale = Math.min((W - 2 * pad) / Math.max(1, maxX - minX), (H - 2 * pad) / Math.max(1, maxY - minY));
+    const ox = (W - (minX + maxX) * scale) / 2, oy = (H - (minY + maxY) * scale) / 2;
+    const S = (x, y, z) => { const p = P(x, y, z); return [ox + p[0] * scale, oy + p[1] * scale]; };
+    const k = (i, j, l) => S(i ? X : 0, j ? Y : 0, l ? Z : 0);
+    const O = k(0, 0, 0), c100 = k(1, 0, 0), c010 = k(0, 1, 0), c001 = k(0, 0, 1),
+          c110 = k(1, 1, 0), c101 = k(1, 0, 1), c011 = k(0, 1, 1), c111 = k(1, 1, 1);
+    const ln = (a, b, col, w) => `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${col}" stroke-width="${w}"/>`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">`;
+    [[c100, c110], [c100, c101], [c010, c110], [c010, c011], [c001, c101], [c001, c011], [c110, c111], [c101, c111], [c011, c111]]
+        .forEach(([a, b]) => { svg += ln(a, b, '#465666', 1); });   // 9 non-origin edges
+    svg += ln(O, c100, '#e0564f', 2.4) + ln(O, c010, '#5fbf6a', 2.4) + ln(O, c001, '#5a8fe0', 2.4);   // travels: X red, Y green, Z blue
+    const away = (p, d) => { const dx = p[0] - O[0], dy = p[1] - O[1], L = Math.hypot(dx, dy) || 1; return [p[0] + dx / L * d, p[1] + dy / L * d]; };
+    const ax = (t, p, col) => { const q = away(p, 9); return `<text x="${q[0].toFixed(0)}" y="${q[1].toFixed(0)}" fill="${col}" font-size="9" font-weight="bold" text-anchor="middle">${t}</text>`; };
+    svg += ax('X', c100, '#e0564f') + ax('Y', c010, '#5fbf6a') + ax('Z', c001, '#5a8fe0');
+    svg += `<circle cx="${O[0].toFixed(1)}" cy="${O[1].toFixed(1)}" r="3.4" fill="#ffd24a" stroke="#111" stroke-width="0.7"/>`;   // home (machine 0)
+    svgBox.innerHTML = svg + '</svg>';
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const place = (id, p) => { const el = document.getElementById(id); if (el) { el.style.left = Math.max(0, Math.min(W - 46, p[0] - 23)) + 'px'; el.style.top = Math.max(0, Math.min(H - 18, p[1] - 9)) + 'px'; } };
+    place('set_mach_x', mid(O, c100)); place('set_mach_y', mid(O, c010)); place('set_mach_z', mid(O, c001));
+}
+function commitMachine() {
+    const s = getSettings(); if (!s.machine) s.machine = {};
+    s.machine.x = _gvs('set_mach_x', s.machine.x || 300);
+    s.machine.y = _gvs('set_mach_y', s.machine.y || 300);
+    s.machine.z = _gvs('set_mach_z', s.machine.z || 120);
+    saveSettings();
+}
+
+// ── HOMING profile (Machine tab section) ──────────────────────────────────────────────────────────────────
+// Per-axis homing config, rendered + edited inline (no separate modal). Travel/home-direction reference the
+// envelope above (machine.x/y/z); this section adds per-axis method/feeds/back-off/offset + sequence order +
+// dual-axis SLAVE SYNC ("Slave follows") + rotary mode. (Auto-squaring is NOT emitted — the operator squares the
+// gantry manually; Studio only syncs the slave coordinate when the master homes.) Commits live via saveSettings().
+const HOMING_AX_IDX = { x: 0, y: 1, z: 2, a: 3, b: 4 }, HOMING_AX_LABEL = { x: 'X', y: 'Y', z: 'Z', a: 'A', b: 'B' };
+const HOMING_METHODS = [
+    { v: 'native', label: 'Native (M98 P501)' }, { v: 'seek', label: 'Switch-seek (M98 P503)' },
+    { v: 'setzero', label: 'Set current as home' },
+];
+function homingConfiguredAxes() {
+    const m = (_ddcsSettings.motors) || {};
+    const out = ['x', 'y', 'z'];
+    if (m.a && m.a.role && m.a.role !== 'unused') out.push('a');
+    if (m.b && m.b.role && m.b.role !== 'unused') out.push('b');
+    return out;
+}
+function homingPostIsExpert() {
+    try {
+        const ap = localStorage.getItem('ddcs_active_post');
+        if (ap && ap !== 'auto') return ap === 'ddcs-expert-m350';
+        return (localStorage.getItem('ddcs_controller_profile') || 'ddcs-expert-m350') === 'ddcs-expert-m350';
+    } catch (_) { return true; }
+}
+function renderHomingGui() {
+    const host = document.getElementById('set_homing_axes'); if (!host) return;
+    const h = _ddcsSettings.homing || (_ddcsSettings.homing = JSON.parse(JSON.stringify(SETTINGS_DEFAULTS.homing)));
+    const cfg = h.axes || {};
+    const expert = homingPostIsExpert();
+    const list = homingConfiguredAxes();
+    const tag = document.getElementById('set_homing_tag');
+    if (tag) tag.textContent = expert ? 'DDCS Expert M350 — full methods available.' : 'Active post is unverified for homing — native home only; advanced methods are disabled.';
+    if (document.getElementById('set_homing_simul')) document.getElementById('set_homing_simul').checked = h.philosophy === 'simultaneous';
+    if (document.getElementById('set_homing_softlimits')) document.getElementById('set_homing_softlimits').checked = h.softLimits !== false;
+
+    const ordered = [...list].sort((p, q) => ((cfg[p] || {}).order || HOMING_AX_IDX[p] + 1) - ((cfg[q] || {}).order || HOMING_AX_IDX[q] + 1));
+    const methodOpts = (sel) => HOMING_METHODS.map((m) => {
+        const dis = !expert && m.v !== 'native';
+        return `<option value="${m.v}"${m.v === sel ? ' selected' : ''}${dis ? ' disabled title="Unverified on this post"' : ''}>${m.label}</option>`;
+    }).join('');
+    const followOpts = (sel) => `<option value="">none</option>` + list.map((a) => `<option value="${HOMING_AX_IDX[a]}"${String(HOMING_AX_IDX[a]) === String(sel) ? ' selected' : ''}>${HOMING_AX_LABEL[a]} (idx ${HOMING_AX_IDX[a]})</option>`).join('');
+
+    host.innerHTML = ordered.map((ax, pos) => {
+        const c = cfg[ax] || {}, rotary = ax === 'a' || ax === 'b';
+        return `<div class="homing-axis-row" data-axis="${ax}" style="border:1px solid var(--border); border-radius:6px; padding:8px 10px; margin-bottom:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-size:11px; font-weight:700;">${pos + 1}</span>
+                <button type="button" class="hm-up" title="Home earlier" style="cursor:pointer;">▲</button>
+                <button type="button" class="hm-down" title="Home later" style="cursor:pointer;">▼</button>
+                <label style="font-weight:600;"><input type="checkbox" class="hm-enable" ${c.enable !== false ? 'checked' : ''}/> ${HOMING_AX_LABEL[ax]}</label>
+                <input type="hidden" class="hm-order" value="${pos + 1}">
+                <label style="font-size:12px;">Method <select class="hm-method">${methodOpts(c.method || 'native')}</select></label>
+                <label style="font-size:12px;">Dir <select class="hm-dir"><option value="+"${(c.dir || '-') === '+' ? ' selected' : ''}>+</option><option value="-"${(c.dir || '-') === '-' ? ' selected' : ''}>−</option></select></label>
+            </div>
+            <div class="hm-motion" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <label>Seek feed <input type="number" class="hm-seekfeed" value="${num(c.seekFeed, 800)}" style="width:60px;"></label>
+                <label>Back-off <input type="number" class="hm-backoff" value="${num(c.backoff, 5)}" step="0.5" style="width:54px;"></label>
+                <label>Slow feed <input type="number" class="hm-slowfeed" value="${num(c.slowFeed, 100)}" style="width:60px;"></label>
+                <label>Home offset <input type="number" class="hm-offset" value="${num(c.offset, 0)}" step="0.5" style="width:54px;"></label>
+            </div>
+            <div class="hm-slave" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <label title="Dual-axis gantry: homing this axis syncs the slave's coordinate and marks it homed. Squaring is done manually by the operator.">Slave axis follows <select class="hm-follow">${followOpts(c.slaveFollows)}</select></label>
+            </div>
+            ${rotary ? `<div class="hm-rotary" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <label>Rotary <select class="hm-rotmode"><option value="setzero"${(c.rotary || 'setzero') === 'setzero' ? ' selected' : ''}>set zero</option><option value="switch"${(c.rotary || 'setzero') === 'switch' ? ' selected' : ''}>switch home</option></select></label>
+                <label><input type="checkbox" class="hm-continuous" ${c.continuous ? 'checked' : ''}/> continuous (mod 360)</label>
+            </div>` : ''}
+        </div>`;
+    }).join('');
+
+    host.querySelectorAll('.homing-axis-row').forEach((row) => {
+        const methodSel = row.querySelector('.hm-method');
+        const sync = () => {
+            // Seek-path motion params (feeds/back-off) only matter for the switch-seek method.
+            row.querySelector('.hm-motion').style.display = methodSel.value === 'seek' ? 'flex' : 'none';
+        };
+        sync();
+        // Any field change commits + re-renders (so visibility tracks the method); reorder swaps order then commits.
+        row.querySelectorAll('input,select').forEach((f) => f.addEventListener('change', () => { commitHoming(); renderHomingGui(); }));
+        row.querySelector('.hm-up').addEventListener('click', () => homingMove(row.getAttribute('data-axis'), -1));
+        row.querySelector('.hm-down').addEventListener('click', () => homingMove(row.getAttribute('data-axis'), +1));
+    });
+}
+function commitHoming() {
+    const host = document.getElementById('set_homing_axes'); if (!host) return;
+    const h = _ddcsSettings.homing || (_ddcsSettings.homing = JSON.parse(JSON.stringify(SETTINGS_DEFAULTS.homing)));
+    const axes = h.axes || (h.axes = {});
+    host.querySelectorAll('.homing-axis-row').forEach((row, idx) => {
+        const ax = row.getAttribute('data-axis'), g = (s) => row.querySelector(s), prev = axes[ax] || {};
+        axes[ax] = {
+            ...prev,
+            enable: g('.hm-enable').checked,
+            order: num(g('.hm-order').value, idx + 1),
+            method: g('.hm-method').value,
+            dir: g('.hm-dir').value,
+            seekFeed: num(g('.hm-seekfeed').value, prev.seekFeed || 800),
+            backoff: num(g('.hm-backoff').value, prev.backoff || 5),
+            slowFeed: num(g('.hm-slowfeed').value, prev.slowFeed || 100),
+            offset: num(g('.hm-offset').value, prev.offset || 0),
+            slaveFollows: g('.hm-follow').value,
+            rotary: g('.hm-rotmode') ? g('.hm-rotmode').value : (prev.rotary || 'setzero'),
+            continuous: g('.hm-continuous') ? g('.hm-continuous').checked : !!prev.continuous,
+        };
+    });
+    const simul = document.getElementById('set_homing_simul'), soft = document.getElementById('set_homing_softlimits');
+    h.philosophy = (simul && simul.checked) ? 'simultaneous' : 'sequential';
+    h.softLimits = soft ? soft.checked : true;
+    saveSettings();
+}
+function homingMove(ax, delta) {
+    commitHoming();
+    const h = _ddcsSettings.homing, cfg = h.axes;
+    const list = homingConfiguredAxes().sort((p, q) => (cfg[p].order || 9) - (cfg[q].order || 9));
+    const i = list.indexOf(ax), j = i + delta;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    const a = cfg[list[i]], b = cfg[list[j]], t = a.order; a.order = b.order; b.order = t;
+    saveSettings();
+    renderHomingGui();
+}
+const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
+
+// The WCS table (G54–G59 offsets, machine coords of each part-zero) + which one is active. workOrigin (used by
+// the sim for G53/program placement) is derived from the active row. Pulled from the controller, editable offline.
+const WCS_NAMES = ['G54', 'G55', 'G56', 'G57', 'G58', 'G59'];
+function syncWorkOrigin(m) {
+    const w = m.wcs, r = w && w.table && w.table[(w.active || 1) - 1];
+    m.workOrigin = r ? { x: num(r.x, 0), y: num(r.y, 0), z: num(r.z, 0) } : { x: 0, y: 0, z: 0 };
+}
+function renderWcsTable(host, machine) {
+    if (!host) return;
+    machine.wcs = machine.wcs || { active: 1, table: null };
+    const w = machine.wcs;
+    if (!Array.isArray(w.table)) w.table = WCS_NAMES.map(() => ({ x: '', y: '', z: '' }));
+    if (!w.active) w.active = 1;
+    const GRID = 'display:grid; grid-template-columns:30px 42px 1fr 1fr 1fr; gap:6px; align-items:center;';
+    host.innerHTML = '';
+    const head = document.createElement('div');
+    head.style.cssText = GRID + ' font-size:10px; color:var(--text-dim); padding:0 2px 3px;';
+    head.innerHTML = '<span>act</span><span>WCS</span><span>X</span><span>Y</span><span>Z</span>';
+    host.appendChild(head);
+    w.table.forEach((row, i) => {
+        const tr = document.createElement('div');
+        tr.style.cssText = GRID + ' padding:2px;';
+        const rb = document.createElement('input'); rb.type = 'radio'; rb.name = 'wcs_active'; rb.checked = w.active === i + 1;
+        rb.title = 'Active WCS — positions the program in the envelope';
+        rb.addEventListener('change', () => { w.active = i + 1; syncWorkOrigin(machine); saveSettings(); });
+        const lab = document.createElement('span'); lab.textContent = WCS_NAMES[i]; lab.style.cssText = 'font-weight:600; font-size:11px;';
+        tr.appendChild(rb); tr.appendChild(lab);
+        ['x', 'y', 'z'].forEach((k) => {
+            const inp = document.createElement('input'); inp.type = 'number'; inp.step = '0.001'; inp.value = row[k] ?? '';
+            inp.style.cssText = 'width:100%; box-sizing:border-box;';
+            inp.addEventListener('change', () => { row[k] = inp.value === '' ? '' : Number(inp.value); if (w.active === i + 1) syncWorkOrigin(machine); saveSettings(); });
+            tr.appendChild(inp);
+        });
+        host.appendChild(tr);
+    });
+}
+
+let _fillSettingsInputs = null;
+let _settingsNavTo = null;   // (group, panelId) → deep-link a tab (set after the overlay is built)
+
+// Merge incoming settings (e.g. from an imported / cloud-loaded profile), persist, and refresh the panel.
+// Restores the FULL persisted config (mirrors the load-merge) so a loaded profile brings back the magazine,
+// tool library, macros, I/O, head, etc. — not just a subset.
 export function applySettings(incoming) {
     if (!incoming || typeof incoming !== 'object') return;
-    if (incoming.stock) _ddcsSettings.stock = { ...SETTINGS_DEFAULTS.stock, ..._ddcsSettings.stock, ...incoming.stock };
-    if (incoming.machine) _ddcsSettings.machine = { ...SETTINGS_DEFAULTS.machine, ..._ddcsSettings.machine, ...incoming.machine };
-    if (incoming.probes) _ddcsSettings.probes = { ...SETTINGS_DEFAULTS.probes, ..._ddcsSettings.probes, ...incoming.probes };
-    if (incoming.limits) _ddcsSettings.limits = { ...SETTINGS_DEFAULTS.limits, ..._ddcsSettings.limits, ...incoming.limits };
-    if (Array.isArray(incoming.inputs)) { _ddcsSettings.inputs = incoming.inputs; syncFlatFromIO(_ddcsSettings); }
-    if (Array.isArray(incoming.outputs)) _ddcsSettings.outputs = incoming.outputs;
+    const D = SETTINGS_DEFAULTS, S = _ddcsSettings;
+    if (incoming.stock) S.stock = { ...D.stock, ...S.stock, ...incoming.stock };
+    if (incoming.machine) S.machine = { ...D.machine, ...S.machine, ...incoming.machine };
+    if (incoming.probes) S.probes = { ...D.probes, ...S.probes, ...incoming.probes, sources: { ...D.probes.sources, ...((S.probes || {}).sources || {}), ...((incoming.probes || {}).sources || {}) } };
+    if (incoming.limits) S.limits = { ...D.limits, ...S.limits, ...incoming.limits };
+    if (incoming.atc) S.atc = { ...D.atc, ...S.atc, ...incoming.atc };
+    if (incoming.head) S.head = { ...D.head, ...S.head, ...incoming.head };
+    if (incoming.spindle) S.spindle = { ...D.spindle, ...S.spindle, ...incoming.spindle };
+    if (incoming.endProgram) S.endProgram = { ...D.endProgram, ...S.endProgram, ...incoming.endProgram };
+    if (incoming.motors) S.motors = { ...D.motors, ...S.motors, ...incoming.motors };
+    if (incoming.homing) S.homing = mergeHoming({ ...S.homing, ...incoming.homing, axes: { ...((S.homing || {}).axes || {}), ...((incoming.homing || {}).axes || {}) } });
+    if (incoming.hardwareTabs) S.hardwareTabs = { ...D.hardwareTabs, ...S.hardwareTabs, ...incoming.hardwareTabs };
+    if (incoming.preview) S.preview = { ...D.preview, ...S.preview, ...incoming.preview };
+    if (incoming.compose) S.compose = { ...D.compose, ...S.compose, ...incoming.compose };
+    if (incoming.view) S.view = { ...D.view, ...S.view, ...incoming.view };
+    if (Array.isArray(incoming.stockTemplates)) S.stockTemplates = incoming.stockTemplates;
+    if (Array.isArray(incoming.inputs)) { S.inputs = incoming.inputs; syncFlatFromIO(S); }
+    if (Array.isArray(incoming.outputs)) S.outputs = incoming.outputs;
+    if (Array.isArray(incoming.macros)) S.macros = incoming.macros;
     saveSettings();
     if (_fillSettingsInputs) _fillSettingsInputs();
 }
@@ -282,9 +630,7 @@ function buildSettingsOverlay() {
         <style>
             #settings-app { display: flex; flex-direction: column; }
             #settings-app .settings-head { padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--panel); flex: 0 0 auto; display: flex; align-items: center; }
-            #settings-app .settings-main-tab, #settings-app .settings-main-tab:hover, #settings-app .settings-main-tab:active { position: relative; padding: 6px 6px; font-size: 12.5px; font-weight: 700; letter-spacing: 1px; font-family: inherit; color: var(--text-dim); background: transparent; border: none; border-radius: 0; box-shadow: none; text-shadow: none; filter: none; transform: none; cursor: pointer; transition: 120ms; }
-            #settings-app .settings-main-tab:hover, #settings-app .settings-main-tab.active { color: var(--text-main); }
-            #settings-app .settings-main-tab.active::after { content: ''; position: absolute; left: 4px; right: 4px; bottom: -8px; height: 3px; background: var(--accent); border-radius: var(--radius, 3px) var(--radius, 3px) 0 0; }
+            /* .settings-main-tab styling is shared/global in styles.css */
             #settings-app .settings-body { display: flex; flex-direction: row; flex: 1; min-height: 0; overflow: hidden; }
             #settings-app .settings-sidebar { width: 160px; flex: 0 0 160px; display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; }
             #settings-app .settings-sidebar .settings-tab { display: block; width: 100%; text-align: left; padding: 7px 12px; font-size: 12.5px; font-weight: 600; border-radius: var(--radius, 4px); border: none; background: transparent; color: var(--text-dim); cursor: pointer; transition: 120ms; }
@@ -294,28 +640,41 @@ function buildSettingsOverlay() {
             #settings-app .settings-sidebar .sidebar-group-label:first-child { padding-top: 2px; }
             #settings-app .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 20px; background: var(--bg); }
             #settings-app .settings-foot { flex: 0 0 auto; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--panel); display: flex; gap: 8px; }
+            #settings-app .settings-head { justify-content: space-between; }
+            #settings-app .settings-close { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; cursor: pointer; color: #fff; font-size: 14px; font-weight: 700; line-height: 1; border-radius: 6px; border: 1px solid #8e1408; background: linear-gradient(180deg, #ff8276 0%, #ef4d33 45%, #d62311 50%, #e6431c 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 2px rgba(0,0,0,.35); text-shadow: 0 1px 1px rgba(0,0,0,.35); padding: 0; min-height: 0; }
+            #settings-app .settings-close:hover { filter: brightness(1.08); background: linear-gradient(180deg, #ff8276 0%, #ef4d33 45%, #d62311 50%, #e6431c 100%); }
+            #settings-app .settings-close:active { transform: translateY(1px); box-shadow: inset 0 1px 2px rgba(0,0,0,.3); }
+            #settings-app .settings-foot { justify-content: flex-end; }
+            #settings-app .settings-done { background: var(--accent); color: #fff; border: none; border-radius: var(--radius, 5px); padding: 7px 24px; font-size: 13px; font-weight: 600; cursor: pointer; transition: filter 120ms; }
+            #settings-app .settings-done:hover { filter: brightness(1.12); }
+            #settings-app .dim-edit { position: absolute; width: 50px; padding: 1px 2px; font-size: 11px; text-align: center; background: var(--panel); color: var(--text-main); border: 1px solid var(--accent); border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.45); }
         </style>
             <div class="settings-head">
                 <div style="display: flex; align-items: center; gap: 16px;">
                     <div class="settings-tabs" style="display: flex; gap: 8px;">
                         <button class="settings-main-tab active" data-group="general">General</button>
+                        <button class="settings-main-tab" data-group="controller">Controller</button>
                         <button class="settings-main-tab" data-group="hardware">Hardware</button>
                     </div>
                 </div>
+                <button class="settings-close" type="button" title="Close (Esc)" aria-label="Close settings" onclick="window.closeSettings && window.closeSettings()">✕</button>
             </div>
             <div class="settings-body">
                 <div class="settings-sidebar">
                     <div class="sidebar-group-label" data-group-label="general">General</div>
-                    <button class="settings-tab active" data-group="general" data-target="set_tab_profile">Profile</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_appearance">Appearance</button>
+                    <button class="settings-tab active" data-group="general" data-target="set_tab_appearance">Appearance</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_preview">Preview</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_compose">Editor</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_variables">Variables</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_program">Program</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_gateway">Gateway</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_faq">FAQ</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_about">About</button>
+                    <div class="sidebar-group-label" data-group-label="controller" style="display:none;">Controller</div>
+                    <button class="settings-tab" data-group="controller" data-target="set_tab_profile">Profile</button>
+                    <button class="settings-tab" data-group="controller" data-target="set_tab_wcs">WCS</button>
+                    <button class="settings-tab" data-group="controller" data-target="set_tab_variables">Variables</button>
+                    <button class="settings-tab" data-group="controller" data-target="set_tab_program">Program</button>
+                    <button class="settings-tab" data-group="controller" data-target="set_tab_gateway">Gateway</button>
                     <div class="sidebar-group-label" data-group-label="hardware" style="display:none;">Hardware</div>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_machine" style="display:none;">Machine</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_spindle" style="display:none;">Head</button>
@@ -335,6 +694,17 @@ function buildSettingsOverlay() {
                             <select id="set_pv_speed"><option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select>
                         </div>
                         <label class="settings-check"><input type="checkbox" id="set_pv_rapids"> Show rapid moves (yellow) in the 3D view</label>
+                        <div class="settings-field" style="margin-top:10px">Grid spacing
+                            <select id="set_pv_gridstep" title="Floor-grid line spacing. The grid is linked to the machine envelope; Auto picks a tidy step for its size.">
+                                <option value="0">Auto</option>
+                                <option value="5">5 mm</option>
+                                <option value="10">10 mm</option>
+                                <option value="20">20 mm</option>
+                                <option value="25">25 mm</option>
+                                <option value="50">50 mm</option>
+                                <option value="100">100 mm</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">FOLLOW CAMERA</div>
@@ -345,6 +715,33 @@ function buildSettingsOverlay() {
                             <input type="range" id="set_pv_followdamp" min="0" max="100" step="5" style="width:100%; max-width:280px;">
                         </div>
                         <div class="settings-hint">Low = snaps to the tool · High = smooth, gentle follow.</div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">SPINDLE / HEAD (SIM VIEW)</div>
+                        <div class="settings-hint">Edit a dimension right on the diagram — the head redraws to match. Visual only (never changes the G-code); the cutter/probe shape comes from the <b>tool table</b>. These are the machine's spindle + collet body (see <b>Hardware → Head</b>) — set them so the sim matches your real machine.</div>
+                        <div id="set_pv_head_gui" style="position:relative; width:248px; height:212px; margin:6px 0;">
+                            <div id="set_pv_head_svg" style="position:absolute; inset:0;"></div>
+                            <input type="number" id="set_pv_spindle_dia" class="dim-edit" min="1" step="1" title="Spindle diameter (mm)">
+                            <input type="number" id="set_pv_spindle_len" class="dim-edit" min="1" step="5" title="Spindle length (mm)">
+                            <input type="number" id="set_pv_collet_dia" class="dim-edit" min="1" step="1" title="Collet diameter (mm)">
+                            <input type="number" id="set_pv_collet_len" class="dim-edit" min="1" step="1" title="Collet length (mm)">
+                        </div>
+                        <div style="margin-top:2px">Show:
+                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_spindle"> Spindle</label>
+                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_collet"> Collet</label>
+                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_tool"> Tool</label>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">3D PROBE (SIM VIEW)</div>
+                        <div class="settings-hint">Edit a dimension right on the diagram — the probe redraws to match. Visual only (never changes the G-code); the probing radius comes from the <b>Stylus radius</b> field above (3D Probe defaults). These are the touch-probe body sizes so the sim matches your real probe.</div>
+                        <div id="set_pv_probe_gui" style="position:relative; width:248px; height:212px; margin:6px 0;">
+                            <div id="set_pv_probe_svg" style="position:absolute; inset:0;"></div>
+                            <input type="number" id="set_pv_probe_body_dia" class="dim-edit" min="1" step="1" title="Probe body diameter (mm)">
+                            <input type="number" id="set_pv_probe_body_len" class="dim-edit" min="1" step="5" title="Probe body length (mm)">
+                            <input type="number" id="set_pv_probe_stylus_len" class="dim-edit" min="1" step="1" title="Stylus length (mm)">
+                            <input type="number" id="set_pv_probe_ball_dia" class="dim-edit" min="0.5" step="0.5" title="Ruby ball diameter (mm)">
+                        </div>
                     </div>
                 </div>
                 <!-- GENERAL: COMPOSING (authoring assists — Blocks suggestions + Studio editor autocomplete) -->
@@ -404,6 +801,31 @@ function buildSettingsOverlay() {
                             <button class="toolbar-btn settings-io" id="set_export">⬇ Export CSV</button>
                             <span class="settings-hint" id="set_var_count"></span>
                         </div>
+                        <input type="text" id="set_var_search" placeholder="Filter variables…  (e.g. 1100, drill, feed)" style="width:100%; margin-top:8px; box-sizing:border-box;">
+                        <div class="settings-hint" style="margin:4px 0 0;">Plain text for speed (thousands of vars). Click ⬇ Export CSV for the full file.</div>
+                        <pre id="set_var_list" style="max-height:46vh; overflow:auto; margin-top:6px; font:12px/1.55 monospace; background:#11141a; border:1px solid var(--border); border-radius:6px; padding:8px 10px; white-space:pre; color:#cdd9e6;"></pre>
+                    </div>
+                </div>
+
+                <!-- GENERAL: FAQ -->
+                <div id="set_tab_faq" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">FREQUENTLY ASKED</div>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What is DDCS Studio?</summary><div class="settings-hint" style="margin-top:6px;">A companion app for DDCS Expert / M350 controllers: wizards that generate G-code, a CAM-pack builder, a full toolpath simulator, and a gateway to send programs to the machine.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Do I need the desktop app?</summary><div class="settings-hint" style="margin-top:6px;">To talk to a real controller, yes — the desktop app is the <b>gateway</b> (it reaches your machine's CNCDISK share on the LAN). The hosted web page can design + simulate offline, but can't reach a machine.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I send a program to the controller?</summary><div class="settings-hint" style="margin-top:6px;">Open the <b>Gateway</b> tab, point it at your controller share (Settings → Gateway), then Send. System macros (T.nc, key-<i>N</i>.nc, slib-m.nc) are written to SYSDISK and backed up first.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Which controllers are supported?</summary><div class="settings-hint" style="margin-top:6px;">DDCS <b>Expert / M350</b> is the primary, fully-mapped target. V4.1 and a few others have partial support — the post/dialect switches with the selected profile.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I add a probe, ATC, or spindle?</summary><div class="settings-hint" style="margin-top:6px;">Settings → <b>Hardware</b> → use <b>+ Add</b> on the relevant tab. Adding an ATC also seeds the essential drawbar + sensor I/O.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I simulate a program before running it?</summary><div class="settings-hint" style="margin-top:6px;">Press <b>▶</b> in the preview bar. The simulator runs the full G-code through the execution engine — resolving #vars, IF/GOTO loops and probes — so parametric/probe macros play correctly, not just straight moves.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What does "Pull from controller" do?</summary><div class="settings-hint" style="margin-top:6px;">Reads your machine's live settings — WCS table, tool lengths, ATC magazine, travel/soft-limits — into a review modal so you can adopt them. Needs the gateway + a connected controller. It never writes the firmware-owned <code>camsetting</code>.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What is a CAM pack?</summary><div class="settings-hint" style="margin-top:6px;">A DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's on-board CAM page. Build, simulate and export one (USB-ready .zip) in the <b>Macros</b> tab → CAM Pack Builder.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Can I use Studio on my phone?</summary><div class="settings-hint" style="margin-top:6px;">Yes — the UI is responsive. Your desktop app serves Studio on your LAN; open the URL shown in Settings → Gateway from a phone/laptop on the same wifi.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I update Studio?</summary><div class="settings-hint" style="margin-top:6px;">The desktop app shows an in-app banner when a new release is published, with a one-click update. The web version updates automatically on load.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Cloud vs Gateway — what's the difference?</summary><div class="settings-hint" style="margin-top:6px;">The <b>Gateway</b> is the local desktop app that talks to <i>your machine</i> over the LAN (send programs, read settings, write macros). <b>Cloud</b> is optional <i>project storage</i> (e.g. Google Drive), separate from the machine — it syncs your profiles and programs across devices. You can use the Gateway with no Cloud, and Cloud with no machine connected.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What is the virtual I/O panel?</summary><div class="settings-hint" style="margin-top:6px;">The <b>I/O</b> button in the preview bar opens a floating panel showing the controller's inputs/outputs. During a simulation it <b>auto-answers sensors</b> so probe / M-code wait loops terminate hands-free; you can also flip inputs manually to test your logic.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Why does a probe in the sim run to the limit?</summary><div class="settings-hint" style="margin-top:6px;">A probe (G31) traces its full travel until it has <b>stock</b> to stop on. Set the Stock (the 📦 button) so the probe contacts the surface — then it stops at the real face instead of the soft-limit.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Why do some ops need me to jog the start position first?</summary><div class="settings-hint" style="margin-top:6px;">Some ops — especially <b>incremental / relative probes</b> — run <i>from the tool's current position</i>, not an absolute coordinate. Set where it begins by jogging the machine there (or dragging the <b>①</b> start handle in the preview) before running; otherwise the op traces from zero and can probe the wrong spot.</div></details>
+                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Found a bug or have an idea?</summary><div class="settings-hint" style="margin-top:6px;">Settings → <b>Feedback</b> → <b>🐛 Report a bug</b>. Tell us what you did and what you expected.</div></details>
                     </div>
                 </div>
 
@@ -477,6 +899,8 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
+                <!-- (Macros + CAM Builder promoted to the MACROS main tab — see ui/macrosApp.js) -->
+
                 <!-- GENERAL: ABOUT -->
                 <div id="set_tab_about" style="display:none">
                     <div class="settings-section">
@@ -494,26 +918,14 @@ function buildSettingsOverlay() {
                 <div id="set_tab_machine" style="display:none">
                     <div class="settings-section">
                         <div class="settings-section-title">MACHINE ENVELOPE (mm)</div>
-                        <div class="settings-grid">
-                            <label>Travel X<input type="number" id="set_mach_x" min="0" step="1"></label>
-                            <label>Travel Y<input type="number" id="set_mach_y" min="0" step="1"></label>
-                            <label>Travel Z<input type="number" id="set_mach_z" min="0" step="1"></label>
-                        </div>
-                        <div class="settings-section-title sub">LIMIT / ORIGIN POSITION (mm from min corner)</div>
-                        <div class="settings-grid">
-                            <label>Origin X<input type="number" id="set_mach_ox" step="1"></label>
-                            <label>Origin Y<input type="number" id="set_mach_oy" step="1"></label>
-                            <label>Origin Z<input type="number" id="set_mach_oz" step="1"></label>
-                        </div>
-                        <div class="settings-section-title sub">WORK ORIGIN — machine coords of part-zero (mm)</div>
-                        <div class="settings-hint">Where your G54 part-zero sits in machine coordinates (after homing + probing). Makes <code>G53</code> machine-frame moves (safe-Z retract, park) draw correctly in the sim. Leave 0 if program-zero = machine-zero. Auto-filled from a controller dump when available.</div>
-                        <div class="settings-grid">
-                            <label>Work origin X<input type="number" id="set_mach_wx" step="0.001"></label>
-                            <label>Work origin Y<input type="number" id="set_mach_wy" step="0.001"></label>
-                            <label>Work origin Z<input type="number" id="set_mach_wz" step="0.001"></label>
+                        <div class="settings-hint">Travel per axis, edited on the envelope. The <b>sign sets the home direction</b>: <code>X 300</code> homes at one end and travels +X; <code>X -300</code> homes at the other and travels −X. The ⬤ marks home (machine 0); the coloured edges are the travels.</div>
+                        <div id="set_mach_env_gui" style="position:relative; width:260px; height:200px; margin:6px 0;">
+                            <div id="set_mach_env_svg" style="position:absolute; inset:0;"></div>
+                            <input type="number" id="set_mach_x" class="dim-edit" step="1" title="X travel (mm) — sign sets the home direction">
+                            <input type="number" id="set_mach_y" class="dim-edit" step="1" title="Y travel (mm) — sign sets the home direction">
+                            <input type="number" id="set_mach_z" class="dim-edit" step="1" title="Z travel (mm) — sign sets the home direction">
                         </div>
                         <label class="settings-check"><input type="checkbox" id="set_mach_show"> Show machine envelope in 3D</label>
-                        <div class="settings-hint">Origin = program zero position within the envelope.</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">AXES</div>
@@ -524,6 +936,26 @@ function buildSettingsOverlay() {
                             <label>B — role<select id="set_axis_b_role"><option value="unused">Unused</option><option value="linear">Linear</option><option value="rotary">Rotary</option></select></label>
                             <label>B — spins around<select id="set_axis_b_around"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></label>
                         </div>
+                    </div>
+                    <div class="settings-section" id="set_homing_section">
+                        <div class="settings-section-title">HOMING</div>
+                        <div class="settings-hint">Per-axis homing profile, used by the <b>Homing wizard</b>. Travel + home direction come from the envelope above. <b>Native</b> runs the controller's built-in home (safest). The numbered list sets the home <b>sequence</b> (▲▼ to reorder; default Z→X→Y). For a dual-axis gantry, set the master's <b>slave axis follows</b> so homing the master syncs the slave (squaring stays manual). The switch-seek method is DDCS Expert M350 only.</div>
+                        <div id="set_homing_tag" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
+                        <label class="settings-check" style="margin-bottom:6px;"><input type="checkbox" id="set_homing_simul"> Simultaneous (emit calls back-to-back, still in this order)</label>
+                        <div id="set_homing_axes"></div>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;">
+                            <button class="toolbar-btn settings-io" id="set_homing_reset" type="button">↺ Safe default (Z → X → Y)</button>
+                            <label class="settings-check"><input type="checkbox" id="set_homing_softlimits"> Re-enable soft limits after homing (#655)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HARDWARE: WCS (work-coordinate offsets) -->
+                <div id="set_tab_wcs" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">WORK COORDINATE SYSTEM (G54–G59)</div>
+                        <div class="settings-hint">Where each part-zero sits in machine coordinates — <b>Controller → Profile → ↧ Pull from controller</b> reads these (no typing). The active WCS positions your program in the envelope and makes <code>G53</code> moves draw correctly.</div>
+                        <div id="set_mach_wcs_table"></div>
                     </div>
                 </div>
 
@@ -553,6 +985,11 @@ function buildSettingsOverlay() {
                                     <label>Spin-up dwell (s)<input type="number" id="set_spin_up" min="0" step="0.1"></label>
                                     <label>Spin-down dwell (s)<input type="number" id="set_spin_down" min="0" step="0.1"></label>
                                 </div>
+                            </div>
+                            <div class="settings-section">
+                                <div class="settings-section-title">SIM APPEARANCE</div>
+                                <div class="settings-hint">The spindle &amp; collet <b>body sizes used in the simulation</b> live in Preview settings (they're visual only — set them so the sim matches your real machine).</div>
+                                <button class="toolbar-btn" id="set_head_simlink">Spindle / collet sizes → Preview ↗</button>
                             </div>
                         </div>
                         <div id="set_head_plasma" style="display:none">
@@ -694,6 +1131,8 @@ function buildSettingsOverlay() {
                             <div class="settings-row" style="margin-top:12px;">
                                 <button class="toolbar-btn settings-io" id="atc_gen_tnc">⚙ Generate T.nc</button>
                                 <button class="toolbar-btn settings-io" id="atc_dl_tnc" style="display:none">⬇ Download T.nc</button>
+                                <span style="flex:1"></span>
+                                <button class="toolbar-btn settings-io" id="set_atc_remove_btn" title="Remove the ATC subsystem and its drawbar + sensor I/O rows">🗑 Remove tool changer</button>
                             </div>
                             <div class="settings-hint">Builds the tool-change macro from the table above. Save it as <b>T.nc</b> on the controller — review &amp; dry-run first (generated template).</div>
                             <textarea id="atc_tnc_out" readonly spellcheck="false" style="display:none; width:100%; height:240px; margin-top:8px; font:12px/1.45 monospace; background:#1a1a1a; color:#d8d8d8; border:1px solid #888; border-radius:4px; padding:8px; box-sizing:border-box;"></textarea>
@@ -702,6 +1141,10 @@ function buildSettingsOverlay() {
                 </div>
 
                         </div><!-- end settings-content -->
+                </div><!-- end settings-body -->
+                <div class="settings-foot">
+                    <button class="settings-done" type="button" onclick="window.closeSettings && window.closeSettings()">Done</button>
+                </div>
             `;
     wireSettingsOverlay(parent);
 }
@@ -807,6 +1250,16 @@ function wireSettingsOverlay(ov) {
         const el = q('set_var_count');
         if (el && db) el.textContent = `${db.getAll().length} variables loaded`;
     }
+    // Variable browser: a single <pre> of "id  description" (filtered), built lazily on tab open — text, not
+    // thousands of DOM rows, so it stays fast with a 3000-var DB. db.search() filters by id/description.
+    function renderVarList(filter) {
+        const db = window.ddcsStudio && window.ddcsStudio.variableDB;
+        const pre = q('set_var_list');
+        if (!pre || !db) return;
+        const term = (filter || '').toLowerCase().trim();
+        const rows = term ? db.search(term) : db.getAll();
+        pre.textContent = rows.length ? rows.map((v) => `${String(v.i).padEnd(14)}${v.d || ''}`).join('\n') : 'No variables match.';
+    }
 
     function fill() {
         const s = _ddcsSettings;
@@ -818,8 +1271,25 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_view')) q('set_pv_view').value = pv.defaultView || '3d';
         if (q('set_pv_speed')) q('set_pv_speed').value = String(pv.defaultSpeed || 1);
         if (q('set_pv_rapids')) q('set_pv_rapids').checked = pv.showRapids !== false;
+        if (q('set_pv_gridstep')) q('set_pv_gridstep').value = String(pv.gridStep || 0);
         if (q('set_pv_follow_default')) q('set_pv_follow_default').checked = pv.followDefault !== false;
         if (q('set_pv_autoloop')) q('set_pv_autoloop').checked = pv.autoLoop !== false;
+        const pvh = pv.head || (pv.head = { ...SETTINGS_DEFAULTS.preview.head });
+        const pvp = pv.parts || (pv.parts = { ...SETTINGS_DEFAULTS.preview.parts });
+        if (q('set_pv_spindle_dia')) q('set_pv_spindle_dia').value = pvh.spindleDia;
+        if (q('set_pv_spindle_len')) q('set_pv_spindle_len').value = pvh.spindleLen;
+        if (q('set_pv_collet_dia')) q('set_pv_collet_dia').value = pvh.colletDia;
+        if (q('set_pv_collet_len')) q('set_pv_collet_len').value = pvh.colletLen;
+        if (q('set_pv_show_spindle')) q('set_pv_show_spindle').checked = pvp.spindle !== false;
+        if (q('set_pv_show_collet')) q('set_pv_show_collet').checked = pvp.collet !== false;
+        if (q('set_pv_show_tool')) q('set_pv_show_tool').checked = pvp.tool !== false;
+        renderHeadGui();
+        const pvpr = pv.probe || (pv.probe = { ...SETTINGS_DEFAULTS.preview.probe });
+        if (q('set_pv_probe_body_dia')) q('set_pv_probe_body_dia').value = pvpr.bodyDia;
+        if (q('set_pv_probe_body_len')) q('set_pv_probe_body_len').value = pvpr.bodyLen;
+        if (q('set_pv_probe_stylus_len')) q('set_pv_probe_stylus_len').value = pvpr.stylusLen;
+        if (q('set_pv_probe_ball_dia')) q('set_pv_probe_ball_dia').value = pvpr.ballDia;
+        renderProbeGui();
         const cp = s.compose || (s.compose = { ...SETTINGS_DEFAULTS.compose });
         if (q('set_cp_suggestions')) q('set_cp_suggestions').checked = cp.suggestions !== false;
         if (q('set_cp_autocomplete')) q('set_cp_autocomplete').checked = cp.autocomplete !== false;
@@ -842,10 +1312,9 @@ function wireSettingsOverlay(ov) {
         q('set_mach_x').value = s.machine.x;
         q('set_mach_y').value = s.machine.y;
         q('set_mach_z').value = s.machine.z;
-        q('set_mach_ox').value = s.machine.ox;
-        q('set_mach_oy').value = s.machine.oy;
-        q('set_mach_oz').value = s.machine.oz;
-        { const w = s.machine.workOrigin || { x: 0, y: 0, z: 0 }; q('set_mach_wx').value = w.x; q('set_mach_wy').value = w.y; q('set_mach_wz').value = w.z; }
+        renderMachineGui();
+        renderHomingGui();
+        renderWcsTable(q('set_mach_wcs_table'), s.machine);
         q('set_mach_show').checked = !!s.machine.show;
         if (q('set_axis_a_role')) {
             const mo = s.motors || {};
@@ -1113,22 +1582,28 @@ function wireSettingsOverlay(ov) {
         }
         if (!lenReadable) notes.push({ group: 'Tool lengths', label: 'Not readable on this controller', value: '—', kind: 'note' });
         else if (!lenCount) notes.push({ group: 'Tool lengths', label: 'None set', value: 'all at default (0)', kind: 'note' });
-        // WCS work offset (active system)
-        const idxO = obj(activeWcsVar); const idx = (idxO && idxO.value >= 1 && idxO.value <= 6) ? Math.round(idxO.value) : 1;
-        const base = wcsBase + (idx - 1) * wcsStride;
-        const wx = obj(base), wy = obj(base + 1), wz = obj(base + 2);
-        if (wx || wy || wz) {
-            if ((wx && wx.value) || (wy && wy.value) || (wz && wz.value))
-                cands.push({ group: 'WCS work offset', label: `G${53 + idx} work origin`, value: `X${wx ? wx.value : 0} Y${wy ? wy.value : 0} Z${wz ? wz.value : 0}`, changed: [wx, wy, wz].some((o) => o && o.userSet), kind: 'wcs', data: { x: wx ? wx.value : 0, y: wy ? wy.value : 0, z: wz ? wz.value : 0 } });
-            else notes.push({ group: 'WCS work offset', label: `G${53 + idx} at default`, value: 'origin = 0', kind: 'note' });
-        } else notes.push({ group: 'WCS work offset', label: 'Not readable', value: '—', kind: 'note' });
+        // WCS table — read all 6 systems (G54–G59) + the active index. Builds the full table for Settings → Machine.
+        const idxO = obj(activeWcsVar); const active = (idxO && idxO.value >= 1 && idxO.value <= 6) ? Math.round(idxO.value) : 1;
+        const table = []; let anyWcs = false;
+        for (let g = 0; g < 6; g++) {
+            const b = wcsBase + g * wcsStride; const gx = obj(b), gy = obj(b + 1), gz = obj(b + 2);
+            if (gx || gy || gz) anyWcs = true;
+            table.push({ x: gx ? gx.value : 0, y: gy ? gy.value : 0, z: gz ? gz.value : 0 });
+        }
+        if (anyWcs) {
+            const ar = table[active - 1] || { x: 0, y: 0, z: 0 };
+            cands.push({ group: 'WCS table (G54–G59)', label: `${WCS_NAMES[active - 1]} active`, value: `X${ar.x} Y${ar.y} Z${ar.z}`, changed: false, kind: 'wcs', data: { table, active } });
+        } else notes.push({ group: 'WCS table (G54–G59)', label: 'Not readable / all zero', value: '—', kind: 'note' });
         // Machine envelope / travel — from the controller's soft-limit params (gateway /api/profile geometry).
         const tv = hwProfile && hwProfile.geometry && hwProfile.geometry.travel;
         const mc = _ddcsSettings.machine || {};
         if (tv && [tv.x, tv.y, tv.z].some((v) => v != null && v > 0)) {
             const tx = (tv.x > 0 ? tv.x : mc.x), ty = (tv.y > 0 ? tv.y : mc.y), tz = (tv.z > 0 ? tv.z : mc.z);
             const changed = (tv.x > 0 && tv.x !== mc.x) || (tv.y > 0 && tv.y !== mc.y) || (tv.z > 0 && tv.z !== mc.z);
-            cands.push({ group: 'Machine envelope', label: 'Travel X/Y/Z', value: `${tx} × ${ty} × ${tz} mm`, changed, kind: 'travel', data: { x: tv.x, y: tv.y, z: tv.z } });
+            // homeDir (±1 per axis) = the homing direction → the travel SIGN. From geometry.homeDir when the gateway
+            // exposes the controller's homing-direction param, else inferred from a signed travel value.
+            const hd = (hwProfile.geometry && hwProfile.geometry.homeDir) || null;
+            cands.push({ group: 'Machine envelope', label: 'Travel X/Y/Z', value: `${tx} × ${ty} × ${tz} mm`, changed, kind: 'travel', data: { x: tv.x, y: tv.y, z: tv.z, homeDir: hd } });
         } else if (hwProfile && hwProfile.id) {
             notes.push({ group: 'Machine envelope', label: 'Not set', value: 'soft limits off — keeping current', kind: 'note' });
         }
@@ -1145,9 +1620,17 @@ function wireSettingsOverlay(ov) {
             mag.forEach((p) => { const tn = Number(p.tool); if (tn > 0 && !a.tools.some((t) => parseInt(t && t.num, 10) === tn)) a.tools.push(normalizeTool({}, tn)); });
         }
         checked.filter((c) => c.kind === 'length').forEach((c) => upsertToolLength(a, c.data.num, c.data.length));
-        const wcs = checked.find((c) => c.kind === 'wcs'); if (wcs) (_ddcsSettings.machine || (_ddcsSettings.machine = {})).workOrigin = wcs.data;
+        const wcs = checked.find((c) => c.kind === 'wcs');
+        if (wcs) { const m = (_ddcsSettings.machine || (_ddcsSettings.machine = {})); m.wcs = { active: wcs.data.active, table: wcs.data.table }; syncWorkOrigin(m); }
         const tvc = checked.find((c) => c.kind === 'travel');
-        if (tvc) { const mm = _ddcsSettings.machine || (_ddcsSettings.machine = {}); if (tvc.data.x > 0) mm.x = tvc.data.x; if (tvc.data.y > 0) mm.y = tvc.data.y; if (tvc.data.z > 0) mm.z = tvc.data.z; }
+        if (tvc) {
+            const mm = _ddcsSettings.machine || (_ddcsSettings.machine = {});
+            const hd = tvc.data.homeDir || {};
+            // Travel SIGN = homing direction: use the pulled homeDir if present, else the pulled value's own sign,
+            // else keep the user's current sign. Magnitude is the controller's soft-limit span.
+            const set = (cur, v, dir) => { const mag = Math.abs(v || 0); if (!mag) return cur; const s = dir || (v < 0 ? -1 : (cur < 0 ? -1 : 1)); return s * mag; };
+            mm.x = set(mm.x, tvc.data.x, hd.x); mm.y = set(mm.y, tvc.data.y, hd.y); mm.z = set(mm.z, tvc.data.z, hd.z);
+        }
         for (const c of checked.filter((c) => c.kind === 'hardware')) { try { await applyHardwareProfile(c.data); } catch (e) { /* ignore */ } }
         saveSettings(); fill();
         const mt = ov.querySelector('#atc_magazine'); if (mt) renderMagazineTable(mt, _ddcsSettings.atc, atcOnChange);
@@ -1434,8 +1917,23 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_view')) pv.defaultView = q('set_pv_view').value;
         if (q('set_pv_speed')) pv.defaultSpeed = num(q('set_pv_speed').value, 1);
         if (q('set_pv_rapids')) pv.showRapids = q('set_pv_rapids').checked;
+        if (q('set_pv_gridstep')) pv.gridStep = num(q('set_pv_gridstep').value, 0);
         if (q('set_pv_follow_default')) pv.followDefault = q('set_pv_follow_default').checked;
         if (q('set_pv_autoloop')) pv.autoLoop = q('set_pv_autoloop').checked;
+        const pvh = pv.head || (pv.head = { ...SETTINGS_DEFAULTS.preview.head });
+        const pvp = pv.parts || (pv.parts = { ...SETTINGS_DEFAULTS.preview.parts });
+        if (q('set_pv_spindle_dia')) pvh.spindleDia = num(q('set_pv_spindle_dia').value, 80);
+        if (q('set_pv_spindle_len')) pvh.spindleLen = num(q('set_pv_spindle_len').value, 200);
+        if (q('set_pv_collet_dia')) pvh.colletDia = num(q('set_pv_collet_dia').value, 20);
+        if (q('set_pv_collet_len')) pvh.colletLen = num(q('set_pv_collet_len').value, 30);
+        if (q('set_pv_show_spindle')) pvp.spindle = q('set_pv_show_spindle').checked;
+        if (q('set_pv_show_collet')) pvp.collet = q('set_pv_show_collet').checked;
+        if (q('set_pv_show_tool')) pvp.tool = q('set_pv_show_tool').checked;
+        const pvpr = pv.probe || (pv.probe = { ...SETTINGS_DEFAULTS.preview.probe });
+        if (q('set_pv_probe_body_dia')) pvpr.bodyDia = num(q('set_pv_probe_body_dia').value, 40);
+        if (q('set_pv_probe_body_len')) pvpr.bodyLen = num(q('set_pv_probe_body_len').value, 90);
+        if (q('set_pv_probe_stylus_len')) pvpr.stylusLen = num(q('set_pv_probe_stylus_len').value, 30);
+        if (q('set_pv_probe_ball_dia')) pvpr.ballDia = num(q('set_pv_probe_ball_dia').value, 4);
         const cp = s.compose || (s.compose = { ...SETTINGS_DEFAULTS.compose });
         if (q('set_cp_suggestions')) cp.suggestions = q('set_cp_suggestions').checked;
         if (q('set_cp_autocomplete')) cp.autocomplete = q('set_cp_autocomplete').checked;
@@ -1457,10 +1955,7 @@ function wireSettingsOverlay(ov) {
         s.machine.x = num(q('set_mach_x').value, s.machine.x);
         s.machine.y = num(q('set_mach_y').value, s.machine.y);
         s.machine.z = num(q('set_mach_z').value, s.machine.z);
-        s.machine.ox = num(q('set_mach_ox').value, s.machine.ox);
-        s.machine.oy = num(q('set_mach_oy').value, s.machine.oy);
-        s.machine.oz = num(q('set_mach_oz').value, s.machine.oz);
-        { const w = s.machine.workOrigin || (s.machine.workOrigin = { x: 0, y: 0, z: 0 }); w.x = num(q('set_mach_wx').value, w.x); w.y = num(q('set_mach_wy').value, w.y); w.z = num(q('set_mach_wz').value, w.z); }
+        // ox/oy/oz removed; workOrigin is derived from the WCS table (renderWcsTable persists it on edit/pull).
         s.machine.show = q('set_mach_show').checked;
 
         s.probes.probePin = num(q('set_probe_pin').value, s.probes.probePin);
@@ -1577,9 +2072,12 @@ function wireSettingsOverlay(ov) {
             if (db) db.loadFromCSV(ev.target.result);
             if (window.refreshDeckVariables) window.refreshDeckVariables();
             updateVarCount();
+            renderVarList(q('set_var_search') ? q('set_var_search').value : '');   // shared DB updated → refresh this view too
         };
         r.readAsText(f);
     });
+    const _varSearch = q('set_var_search');
+    if (_varSearch) _varSearch.addEventListener('input', () => renderVarList(_varSearch.value));
     // CSV export
     q('set_export').addEventListener('click', () => {
         const db = window.ddcsStudio && window.ddcsStudio.variableDB;
@@ -1676,14 +2174,16 @@ function wireSettingsOverlay(ov) {
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
     const sideTabs = [...ov.querySelectorAll('.settings-sidebar .settings-tab')];
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
-        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_program', 'set_tab_feedback', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_about',
-                     'set_tab_machine', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
+        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_faq', 'set_tab_feedback', 'set_tab_about',
+                     'set_tab_machine', 'set_tab_wcs', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
         sideTabs.forEach(b => b.classList.toggle('active', b.dataset.target === id));
+        if (id === 'set_tab_machine') { renderMachineGui(); renderHomingGui(); }   // axis list tracks motors; re-render on open
         if (id === 'set_tab_input') renderIoTable(ov.querySelector('#io_input_table'), 'input', getInputs(), syncIO);
         if (id === 'set_tab_output') renderIoTable(ov.querySelector('#io_output_table'), 'output', getOutputs(), syncIO);
         if (id === 'set_tab_atc') renderMagazineTable(ov.querySelector('#atc_magazine'), _ddcsSettings.atc, atcOnChange);
+        if (id === 'set_tab_variables') renderVarList(q('set_var_search') ? q('set_var_search').value : '');   // build lazily on open
     }
     function showGroup(g) {
         mainTabs.forEach(b => b.classList.toggle('active', b.dataset.group === g));
@@ -1695,6 +2195,27 @@ function wireSettingsOverlay(ov) {
     }
     mainTabs.forEach(t => t.addEventListener('click', () => showGroup(t.dataset.group)));
     sideTabs.forEach(t => t.addEventListener('click', () => showPanel(t.dataset.target)));
+    // Expose group+panel navigation so callers (e.g. the Homing wizard's "⚙ Homing setup" link) can deep-link
+    // to Settings → Hardware → Machine where the homing section now lives.
+    _settingsNavTo = (group, panelId) => { showGroup(group); if (panelId) showPanel(panelId); };
+    // Cross-link: Hardware → Head's "sim appearance" jumps to the Preview tab (General) where the head body dims live.
+    const _headSimLink = q('set_head_simlink');
+    if (_headSimLink) _headSimLink.addEventListener('click', () => { showGroup('general'); showPanel('set_tab_preview'); });
+    // Interactive head GUI: typing redraws/repositions live; on commit (change/blur) persist so an open preview re-pulls.
+    ['set_pv_spindle_dia', 'set_pv_spindle_len', 'set_pv_collet_dia', 'set_pv_collet_len'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderHeadGui); el.addEventListener('change', commitHeadDims); } });
+    // Interactive probe GUI: typing redraws/repositions live; on commit (change/blur) persist (visual only).
+    ['set_pv_probe_body_dia', 'set_pv_probe_body_len', 'set_pv_probe_stylus_len', 'set_pv_probe_ball_dia'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderProbeGui); el.addEventListener('change', commitProbeDims); } });
+    // Machine envelope GUI: typing redraws the iso box (origin follows the signs); on commit persist so the 3D updates.
+    ['set_mach_x', 'set_mach_y', 'set_mach_z'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderMachineGui); el.addEventListener('change', commitMachine); } });
+    // Homing section: the two top-level toggles commit on change; Reset renumbers the order to the safe Z→X→Y.
+    ['set_homing_simul', 'set_homing_softlimits'].forEach(id => { const el = q(id); if (el) el.addEventListener('change', commitHoming); });
+    const _homingReset = q('set_homing_reset');
+    if (_homingReset) _homingReset.addEventListener('click', () => {
+        commitHoming();
+        const cfg = (_ddcsSettings.homing || {}).axes || {}, rank = { z: 1, x: 2, y: 3, a: 4, b: 5 };
+        for (const ax in cfg) cfg[ax].order = rank[ax] || 9;
+        saveSettings(); renderHomingGui();
+    });
     showGroup('general');
 
     // "+ Add hardware" tool: adds a subsystem category tab + its standard I/O (mirrored + badged).
@@ -1702,8 +2223,15 @@ function wireSettingsOverlay(ov) {
         if (kind === 'atc') {
             _ddcsSettings.hardwareTabs = _ddcsSettings.hardwareTabs || {};
             _ddcsSettings.hardwareTabs.atc = true;
-            const outs = getOutputs();
+            // Seed the ESSENTIAL ATC I/O every tool changer needs: the drawbar output + the three sensors the
+            // change sequence waits on (drawbar released M301, clamped M302, spindle stopped M300). Pins are left
+            // blank for the user to assign. (Disk/carousel adds rotate + index on top, via atcOnChange.)
+            const outs = getOutputs(), ins = getInputs();
             if (!outs.some(o => o.type === 'drawbar')) outs.push({ id: 'drawbar_atc', type: 'drawbar', label: 'Drawbar (ATC)', pin: '', onCode: 'M154', offCode: 'M155', group: 'atc' });
+            const addIn = (id, label) => { if (!ins.some(i => i.id === id)) ins.push({ id, type: 'sensor', label, pin: '', level: 0, group: 'atc' }); };
+            addIn('drawbar_released_atc', 'Drawbar released (M301)');
+            addIn('drawbar_clamped_atc', 'Drawbar clamped (M302)');
+            addIn('spindle_stopped_atc', 'Spindle stopped (M300)');
             saveSettings();
             applyHardwareTabs();
             showPanel('set_tab_atc');
@@ -1721,6 +2249,19 @@ function wireSettingsOverlay(ov) {
     if (_spinAddBtn) _spinAddBtn.addEventListener('click', () => addSubsystem('spindle'));
     const _atcAddBtn = q('set_atc_add_btn');
     if (_atcAddBtn) _atcAddBtn.addEventListener('click', () => addSubsystem('atc'));
+    // Remove a subsystem: hide its tab + strip the I/O rows it owns (group-tagged). The tool table/magazine data
+    // is left intact (it lives under atc.*), so re-adding restores everything.
+    function removeSubsystem(kind) {
+        if (!window.confirm('Remove the ' + kind.toUpperCase() + ' subsystem and its I/O rows? (Your magazine + tool table are kept.)')) return;
+        _ddcsSettings.hardwareTabs = _ddcsSettings.hardwareTabs || {};
+        _ddcsSettings.hardwareTabs[kind] = false;
+        const outs = getOutputs(), ins = getInputs();
+        for (let i = outs.length - 1; i >= 0; i--) if (outs[i].group === kind) outs.splice(i, 1);
+        for (let i = ins.length - 1; i >= 0; i--) if (ins[i].group === kind) ins.splice(i, 1);
+        saveSettings(); applyHardwareTabs(); showGroup('general');
+    }
+    const _atcRemoveBtn = q('set_atc_remove_btn');
+    if (_atcRemoveBtn) _atcRemoveBtn.addEventListener('click', () => removeSubsystem('atc'));
 
     // Persist ATC magazine edits; disk auto-adds (and straight removes) the carousel-rotate / index I/O.
     function atcOnChange() {
@@ -1738,21 +2279,42 @@ function wireSettingsOverlay(ov) {
 
 }
 
-export function openSettings() {
+function _settingsEsc(e) { if (e.key === 'Escape') { e.stopPropagation(); closeSettings(); } }
+
+export function openSettings(nav) {
     // Opening setup leaves the Studio preview context — stop any running engine/play (every preview panel +
     // Studio's drawer), any open path, so nothing keeps executing behind the panel.
     window.dispatchEvent(new CustomEvent('ddcs:stop-previews'));
     if (window.ddcsStopPreview) window.ddcsStopPreview();
     buildSettingsOverlay();
-    const app = document.getElementById('settings-app');
-    if (app) app.classList.remove('hidden');
+    const ov = document.getElementById('settings-overlay');
+    if (ov) {
+        ov.classList.add('active');
+        if (!ov.dataset.wired) {                       // scrim click (outside the modal box) closes
+            ov.addEventListener('click', (e) => { if (e.target === ov) closeSettings(); });
+            ov.dataset.wired = '1';
+        }
+    }
+    // Optional deep-link: { group, panel } — e.g. open straight to Hardware → Machine (homing section).
+    if (nav && _settingsNavTo) { try { _settingsNavTo(nav.group, nav.panel); } catch (_) { /* noop */ } }
+    document.addEventListener('keydown', _settingsEsc, true);
+    window.ddcsTrack?.('feature', 'settings');
+}
+
+/** Open Settings at the Machine tab and scroll to the homing section (the wizard's "⚙ Homing setup" link). */
+export function openHomingSetup() {
+    if (window.showApp) { try { window.showApp('settings'); } catch (_) { /* noop */ } }
+    openSettings({ group: 'hardware', panel: 'set_tab_machine' });
+    setTimeout(() => { const s = document.getElementById('set_homing_section'); if (s && s.scrollIntoView) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
 }
 export function closeSettings() {
-    const app = document.getElementById('settings-app');
-    if (app) app.classList.add('hidden');
+    const ov = document.getElementById('settings-overlay');
+    if (ov) ov.classList.remove('active');
+    document.removeEventListener('keydown', _settingsEsc, true);
 }
 
 window.openSettings = openSettings;
 window.closeSettings = closeSettings;
 window.ddcsGetSettings = getSettings;
+window.ddcsSaveSettings = saveSettings;   // let wizards (e.g. the ATC table magazine editor) persist + broadcast edits
 window.ddcsApplySettings = applySettings;

@@ -16,6 +16,7 @@ import { srcVal, srcNote } from './probeBlocks.js';
 
 export function rotaryCenterStack(params = {}) {
     const method = params.method === 'fit' ? 'fit' : 'known';
+    const approach = params.approach === 'guided' ? 'guided' : 'auto';   // known-method flanks: hands-free cycle vs operator-jogged
     const datum = params.datum === 'top' ? 'top' : 'center';
     const level = num(params.level, 0), diameter = num(params.diameter, 76.2), dist = num(params.dist, 30);
     const retract = num(params.retract, 2), safeZ = num(params.safeZ, 15), fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
@@ -46,10 +47,15 @@ export function rotaryCenterStack(params = {}) {
         PR(axis, pv, '#4'); CK(axis, 1); RD(axis, resultVar); MV(axis, rv);
     };
     const reposition = (msg) => {
-        RM('Z', '#57'); MV('Z', '#17');
+        // Lift clear, operator jogs to the flank, then drop back the SAME amount — all INCREMENTAL (no G53).
+        // Keeping the fit start-anchored lets the preview fan the 3 passes out to their own markers; a G53 here
+        // would mark the whole trace absolute and the 3 probe paths would collapse onto the macro's machine coords.
+        // Assumes the operator jogs in Y only (the "move clear to the +/-Y side" prompt), so the symmetric Z drop
+        // returns to the prior height. (Was: RM #57 machine-Z save + G53 restore.)
+        MV('Z', '#17');
         C(`REPOSITION: ${msg}`);
         CF('Press Enter when repositioned - ESC=cancel', 2);
-        MM('Z', '#57'); DM('inc');
+        MV('Z', '[0-#17]'); DM('inc');
     };
 
     C(`Rotary centreline | ${method === 'fit' ? '3-point fit' : 'known dia ' + diameter} | Z0 at ${datum === 'top' ? 'OD top' : 'centreline'} | ${wcsLabel}`);
@@ -67,13 +73,32 @@ export function rotaryCenterStack(params = {}) {
     DM('inc');
 
     if (method === 'known') {
-        C('=== Known diameter: top + two flanks ===');
+        C(`=== Known diameter: top + two flanks (${approach === 'auto' ? 'auto-centring' : 'operator-guided'}) ===`);
+        A('#55', `${diameter}/2`, 'R = known diameter / 2');
+        A('#11', '[#55+#2]', 'Flank approach = R + retract (lateral offset AND top->centreline drop)');
+        // A solid bar can't be probed from its axis — approach each flank from OUTSIDE at the centreline.
+        // Traverses run at a SAFE height clear above the bar (#17 over the top, so the rapid never skims the OD);
+        // drops land beside the bar in free space. #11 = R+retract = lateral offset (clears the OD); #12 = safeZ+R
+        // = the drop from the traverse height down to the centreline. GUIDED = the same motion + a confirm gate
+        // before each touch (operator verifies / fine-jogs); AUTO runs hands-free. Both simulate identically.
+        const gate = (msg) => { if (approach === 'guided') CF(msg, 2); };
+        A('#12', '[#17+#55]', 'Traverse height -> centreline drop = safeZ + R');
         C('Probe top (Z down)'); pp('Z', false, '#50');
-        C('Probe +Y flank'); pp('Y', true, '#52');
-        C('Probe -Y flank'); pp('Y', false, '#53');
+        MV('Z', '[#17-#2]');         // lift from the top (Ztop+retract) to the safe traverse height (Ztop+safeZ)
+        C('+Y flank: cross clear to the +Y side, drop to the centreline, probe inward');
+        MV('Y', '#11');              // over to the +Y side, beyond the OD (well above the top)
+        MV('Z', '[0-#12]');          // drop to the centreline (Ztop - R), beside the bar
+        gate('At the +Y side, centreline height - Enter to probe (jog to adjust), ESC=cancel');
+        pp('Y', false, '#52');       // probe -Y -> the +Y OD surface
+        C('-Y flank: raise clear, cross to the -Y side, drop, probe inward');
+        MV('Z', '#12');              // raise back to the traverse height
+        MV('Y', '[0-#11-#11]');      // cross to the -Y side, beyond the OD (well above the top)
+        MV('Z', '[0-#12]');          // drop to the centreline
+        gate('At the -Y side, centreline height - Enter to probe (jog to adjust), ESC=cancel');
+        pp('Y', true, '#53');        // probe +Y -> the -Y OD surface
+        MV('Z', '#12');              // raise clear of the bar before the final retract
         C('Centre + radius');
         A('#54', '[#52+#53]/2', 'Yc = midpoint of flanks');
-        A('#55', `${diameter}/2`, 'R = known diameter / 2');
         A('#56', '[#50-#55]', 'Zc = top - R');
     } else {
         C('=== 3-point circle fit (no diameter) === ADVANCED: verify on machine');
@@ -117,8 +142,32 @@ export class RotaryCenterWizard {
 
     /** Preview start (stock frame): above the cylinder top, centred, ready to probe down. */
     inferStart(params, stock) {
+        return this.inferStarts(params, stock)[0];
+    }
+
+    /**
+     * Per-pass preview starts (one draggable marker per manual REPOSITION). The KNOWN method is a single hands-free
+     * pass (1 start). The FIT method repositions twice → 3 passes, so spread the 3 starts to DISTINCT points around
+     * the bar (the cylinder lies along X, cross-section in Y-Z; the preview is top-at-0, so the centreline is at
+     * Z = -R) — else all three probes start at the same spot, hit the same point, and the circle solve is degenerate:
+     *   pass 0 = over the bar TOP at the centreline (probe down in Z)
+     *   pass 1 = the +Y flank, at centreline height (probe in Y)
+     *   pass 2 = the -Y flank, at centreline height (probe in Y)
+     */
+    inferStarts(params, stock) {
         const n = (v, d) => num(v, d);
-        const sy = n(stock && stock.y, 76), sz = n(stock && stock.z, 76);
-        return { x: n(stock && stock.x, 150) / 2, y: sy / 2, z: Math.min(5, sz * 0.5) };
+        const sx = n(stock && stock.x, 150), sy = n(stock && stock.y, 76), sz = n(stock && stock.z, 76);
+        const cx = sx / 2, cy = sy / 2;
+        const R = Math.min(sy, sz) / 2;                 // bar radius (cross-section = min of the two cross dims)
+        const retract = n(params && params.retract, 2);
+        const top = { x: cx, y: cy, z: Math.min(5, sz * 0.5) };   // above the top, ready to probe down
+        const method = (params && params.method) === 'fit' ? 'fit' : 'known';
+        if (method !== 'fit') return [top];
+        const flankZ = -R;                              // centreline height in the top-at-0 preview frame
+        return [
+            top,
+            { x: cx, y: cy + R + retract, z: flankZ },  // +Y flank, beside the bar at centreline height
+            { x: cx, y: cy - R - retract, z: flankZ },  // -Y flank
+        ];
     }
 }

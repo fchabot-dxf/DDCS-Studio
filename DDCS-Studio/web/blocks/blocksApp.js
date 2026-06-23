@@ -457,6 +457,35 @@ async function buildWorkspace() {
       });
     }
 
+    // Desktop: drag the horizontal divider to resize the Preview pane vs the Projected G-code pane below it.
+    // Split height lives in --blk-pv-split on .right and persists across sessions.
+    const rowResize = right.querySelector('.blk-row-resize');
+    const pvPane = right.querySelector('.pv');
+    if (rowResize && pvPane) {
+      try { const h = parseInt(localStorage.getItem('ddcs_blk_pv_split'), 10); if (h > 0) right.style.setProperty('--blk-pv-split', h + 'px'); } catch (_) { /* */ }
+      let dragging = false;
+      const onMove = (e) => {
+        if (!dragging) return;
+        const y = e.touches ? e.touches[0].clientY : e.clientY;
+        const pvTop = pvPane.getBoundingClientRect().top;
+        const rr = right.getBoundingClientRect();
+        const h = Math.max(120, Math.min(Math.round(rr.bottom - pvTop - 90), Math.round(y - pvTop)));
+        right.style.setProperty('--blk-pv-split', h + 'px');
+        try { panel.refresh(); } catch (_) { /* re-fit the 3D preview to the new height */ }
+      };
+      const onUp = () => {
+        if (!dragging) return;
+        dragging = false;
+        window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp);
+        try { localStorage.setItem('ddcs_blk_pv_split', parseInt(right.style.getPropertyValue('--blk-pv-split'), 10) || ''); } catch (_) { /* */ }
+        try { panel.refresh(); } catch (_) { /* */ }
+      };
+      rowResize.addEventListener('pointerdown', (e) => {
+        dragging = true; e.preventDefault();
+        window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp);
+      });
+    }
+
     // Palette (Blockly toolbox) as a left drawer. Collapse via the toolbox's OWN setVisible() so the canvas
     // truly reclaims the width (display:none → getWidth()=0); a CSS translate alone would leave a dead strip.
     const tbx = () => { try { return ws.getToolbox(); } catch (_) { return null; } };

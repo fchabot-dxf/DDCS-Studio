@@ -1,6 +1,7 @@
 /** views/edgeView.js — Edge probing wizard view (DOM glue + SVG animator). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { EdgeWizard } from '../edgeWizard.js';
+import { restoreBoxStock } from './rotaryCenterView.js';
 
 const wizard = new EdgeWizard();
 
@@ -31,7 +32,7 @@ export const edgeView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'p_axis', 'p_dir', 'p_dist', 'p_feed_fast', 'p_feed_slow',
+        'p_axis', 'p_dir', 'p_dist', 'p_radius', 'p_feed_fast', 'p_feed_slow',
         'p_retract', 'p_port', 'p_level', 'p_q', 'p_sync_a', 'p_wcs', 'p_slave',
     ],
     // Controller-source chips: which inputs map to which probe-config field (PROBE-CONFIG-SOURCE.md)
@@ -39,6 +40,7 @@ export const edgeView = {
     startAnim: startEdgeAnim,
 
     onOpen(ctx) {
+        restoreBoxStock();   // not a rotary op → revert a forced cylinder back to the box (no-op if already a box)
         setTimeout(() => {
             ctx.update();
             // start animator similar to corner animator
@@ -52,6 +54,7 @@ export const edgeView = {
             dir: el('p_dir')?.value || 'pos',
             wcs: el('p_wcs')?.value || 'active',
             dist: el('p_dist')?.value || '15',
+            radius: el('p_radius')?.value || '2',
             retract: el('p_retract')?.value || '2',
             syncA: el('p_sync_a')?.checked || false,
             slave: el('p_slave')?.value || '3',

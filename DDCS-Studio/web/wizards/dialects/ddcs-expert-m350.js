@@ -31,7 +31,7 @@ export const dialect = {
     setWorkOffset: (wcsExpr, axis, value) => [`#[805+[${wcsExpr}-1]*5+${AX[axis]}]=${value}`],
     readActiveWcs: (varName) => [`${varName}=#578`],   // #578 = active WCS index 1=G54… (COPY_WCS.nc:15)
     distMode: (mode) => (mode === 'inc' ? 'G91' : 'G90'),
-    dwell: (sec) => [`G04 P${Math.round(sec * 1000)}`],   // P = ms (slib-g.nc:691 "G04 P100 //100ms")
+    dwell: (sec) => [`G04 P${Math.round(sec * 1000)}`],   // integer P = ms (slib-g.nc:691 "G04 P100 //100ms"); a DECIMAL P would be seconds — we always emit the unambiguous integer-ms form
     endProgram: () => ['M30'],   // universal end; no M2/M02 in any capture
     ifGoto: (lhs, op, rhs, label) => [`IF ${lhs}${op}${rhs} GOTO${label}`],   // symbolic ops ==/!=/<=; GOTO no space
     goto: (label) => [`GOTO${label}`],

@@ -13,6 +13,8 @@ import { playClick, playClickReverse } from './ui/sound.js';  // audio helper fo
 import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
 import { createPreviewPanel } from './viz/createPreviewPanel.js';   // THE shared preview (identical to Blocks/Studio), fed the wizard's op code
 import { openTemplatesPopover, closeTemplatesPopover } from './ui/wizardTemplates.js';   // per-op save/load templates (local + cloud)
+import { frameWizardSections } from './ui/wizardSections.js';   // group each form's fields into framed categories
+import { needsPrereqPrompt } from './ui/wizardPrereq.js';   // just-in-time "add a probe / ATC" prompt for hardware-gated wizards
 
 // Map the touch-probe wizards' per-op input fields to the global 3D-probe defaults
 // (settings.probes). open() pre-fills these so every wizard starts from the configured
@@ -33,23 +35,25 @@ const PROBE_DEFAULT_FIELDS = {
 // Flat maps cover most wizards; drill has a custom view.setForm (pattern variants), atc_length is Settings-
 // driven (no per-op fields). value vs checkbox is decided by the element type at seed time.
 const PARAM_FIELDS = {
-    surfacing: { originX: 'sf_originX', originY: 'sf_originY', w: 'sf_w', h: 'sf_h', strategy: 'sf_strategy', toolDia: 'sf_toolDia', stepoverPct: 'sf_stepoverPct', depth: 'sf_depth', stepdown: 'sf_stepdown', clearance: 'sf_clearance', feed: 'sf_feed', plunge: 'sf_plunge', rpm: 'sf_rpm' },
-    pocket: { shape: 'p_shape', strategy: 'p_strategy', originX: 'p_originX', originY: 'p_originY', w: 'p_w', h: 'p_h', dia: 'p_dia', toolDia: 'p_toolDia', stepoverPct: 'p_stepoverPct', depth: 'p_depth', stepdown: 'p_stepdown', clearance: 'p_clearance', feed: 'p_feed', plunge: 'p_plunge', rpm: 'p_rpm' },
-    slot: { ax: 'sl_ax', ay: 'sl_ay', bx: 'sl_bx', by: 'sl_by', width: 'sl_width', toolDia: 'sl_toolDia', stepoverPct: 'sl_stepoverPct', depth: 'sl_depth', stepdown: 'sl_stepdown', clearance: 'sl_clearance', feed: 'sl_feed', plunge: 'sl_plunge', rpm: 'sl_rpm' },
-    text: { text: 'tx_text', x: 'tx_x', y: 'tx_y', height: 'tx_height', spacing: 'tx_spacing', align: 'tx_align', strokeWidth: 'tx_strokeWidth', toolDia: 'tx_toolDia', stepoverPct: 'tx_stepoverPct', depth: 'tx_depth', stepdown: 'tx_stepdown', clearance: 'tx_clearance', feed: 'tx_feed', plunge: 'tx_plunge', rpm: 'tx_rpm' },
+    surfacing: { originX: 'sf_originX', originY: 'sf_originY', offZ: 'sf_offZ', pathDatum: 'sf_pathDatum', stockAttach: 'sf_stockAttach', w: 'sf_w', h: 'sf_h', strategy: 'sf_strategy', toolDia: 'sf_toolDia', stepoverPct: 'sf_stepoverPct', depth: 'sf_depth', stepdown: 'sf_stepdown', clearance: 'sf_clearance', feed: 'sf_feed', plunge: 'sf_plunge', rpm: 'sf_rpm' },
+    pocket: { shape: 'p_shape', strategy: 'p_strategy', originX: 'p_originX', originY: 'p_originY', offZ: 'p_offZ', pathDatum: 'p_pathDatum', stockAttach: 'p_stockAttach', w: 'p_w', h: 'p_h', dia: 'p_dia', sides: 'p_sides', toolDia: 'p_toolDia', stepoverPct: 'p_stepoverPct', depth: 'p_depth', stepdown: 'p_stepdown', clearance: 'p_clearance', feed: 'p_feed', plunge: 'p_plunge', rpm: 'p_rpm' },
+    contour: { shape: 'ct_shape', side: 'ct_side', originX: 'ct_originX', originY: 'ct_originY', offZ: 'ct_offZ', pathDatum: 'ct_pathDatum', stockAttach: 'ct_stockAttach', w: 'ct_w', h: 'ct_h', dia: 'ct_dia', sides: 'ct_sides', wcs: 'ct_wcs', toolDia: 'ct_toolDia', depth: 'ct_depth', stepdown: 'ct_stepdown', clearance: 'ct_clearance', feed: 'ct_feed', plunge: 'ct_plunge', rpm: 'ct_rpm' },
+    slot: { ax: 'sl_ax', ay: 'sl_ay', bx: 'sl_bx', by: 'sl_by', width: 'sl_width', originX: 'sl_offX', originY: 'sl_offY', offZ: 'sl_offZ', pathDatum: 'sl_pathDatum', stockAttach: 'sl_stockAttach', toolDia: 'sl_toolDia', stepoverPct: 'sl_stepoverPct', depth: 'sl_depth', stepdown: 'sl_stepdown', clearance: 'sl_clearance', feed: 'sl_feed', plunge: 'sl_plunge', rpm: 'sl_rpm' },
+    text: { text: 'tx_text', x: 'tx_x', y: 'tx_y', originX: 'tx_offX', originY: 'tx_offY', offZ: 'tx_offZ', pathDatum: 'tx_pathDatum', stockAttach: 'tx_stockAttach', height: 'tx_height', spacing: 'tx_spacing', align: 'tx_align', strokeWidth: 'tx_strokeWidth', toolDia: 'tx_toolDia', stepoverPct: 'tx_stepoverPct', depth: 'tx_depth', stepdown: 'tx_stepdown', clearance: 'tx_clearance', feed: 'tx_feed', plunge: 'tx_plunge', rpm: 'tx_rpm' },
     corner: { corner: 'c_corner', probeZ: 'c_probe_z_first', syncA: 'c_sync_a', slave: 'c_slave', probeSeq: 'c_probe_seq', wcs: 'c_wcs', dist: 'c_dist', retract: 'c_retract', f_fast: 'c_feed_fast', f_slow: 'c_feed_slow', qStop: 'c_q', safeZ: 'c_safe_z', travelDist: 'c_travel_dist', scanDepth: 'c_scan_depth', radius: 'c_radius' },
     edge: { axis: 'p_axis', dir: 'p_dir', wcs: 'p_wcs', dist: 'p_dist', retract: 'p_retract', syncA: 'p_sync_a', slave: 'p_slave', f_fast: 'p_feed_fast', f_slow: 'p_feed_slow', qStop: 'p_q' },
-    middle: { featureType: 'm_type', axis: 'm_axis', findBoth: 'm_both', syncA: 'm_sync_a', slave: 'm_slave', wcs: 'm_wcs', dist: 'm_dist', retract: 'm_retract', safeZ: 'm_safe_z', f_fast: 'm_feed_fast', f_slow: 'm_feed_slow', qStop: 'm_q', dir1: 'm_dir', dir2: 'm_dir2' },
+    middle: { featureType: 'm_type', approach: 'm_approach', clearOver: 'm_clear', axis: 'm_axis', findBoth: 'm_both', circular: 'm_circular', syncA: 'm_sync_a', slave: 'm_slave', wcs: 'm_wcs', dist: 'm_dist', retract: 'm_retract', safeZ: 'm_safe_z', f_fast: 'm_feed_fast', f_slow: 'm_feed_slow', qStop: 'm_q', dir1: 'm_dir', dir2: 'm_dir2' },
     wcs: { sys: 'w_sys', axisX: 'w_x', axisY: 'w_y', axisZ: 'w_z', sync: 'w_sync', slave: 'w_slave' },
     alignment: { checkAxis: 'al_check_axis', probeDir: 'al_probe_dir', tolerance: 'al_tolerance', dist: 'al_dist', retract: 'al_retract', safeZ: 'al_safe_z', f_fast: 'al_feed_fast', f_slow: 'al_feed_slow', qStop: 'al_q' },
     circular: { featureType: 'circ_type', wcs: 'circ_wcs', dist: 'circ_dist', retract: 'circ_retract', safeZ: 'circ_safe_z', f_fast: 'circ_feed_fast', f_slow: 'circ_feed_slow', qStop: 'circ_q' },
     rotary_clock: { action: 'rcl_action', reference: 'rcl_reference', span: 'rcl_span', wcs: 'rcl_wcs', dist: 'rcl_dist', retract: 'rcl_retract', safeZ: 'rcl_safe_z', f_fast: 'rcl_feed_fast', f_slow: 'rcl_feed_slow', qStop: 'rcl_q' },
-    rotary_center: { method: 'rc_method', datum: 'rc_datum', diameter: 'rc_diameter', wcs: 'rc_wcs', dist: 'rc_dist', retract: 'rc_retract', safeZ: 'rc_safe_z', f_fast: 'rc_feed_fast', f_slow: 'rc_feed_slow', qStop: 'rc_q' },
+    rotary_center: { method: 'rc_method', approach: 'rc_approach', datum: 'rc_datum', diameter: 'rc_diameter', wcs: 'rc_wcs', dist: 'rc_dist', retract: 'rc_retract', safeZ: 'rc_safe_z', f_fast: 'rc_feed_fast', f_slow: 'rc_feed_slow', qStop: 'rc_q' },
     comm: { type: 'c_type', msg: 'c_msg', val: 'c_val', cycle: 'c_cycle', popupMode: 'c_popup_mode', id: 'c_id', dest: 'c_dest', slot1: 'c_slot1', slot2: 'c_slot2', slot3: 'c_slot3', slot4: 'c_slot4', statusColor: 'c_status_color', statusMode: 'c_status_mode', statusDwell: 'c_status_dwell' },
     atc_check: { tolerance: 'atc_check_tol' },
     atc_warmup: { rpm1: 'atc_warmup_rpm1', time1: 'atc_warmup_time1', rpm2: 'atc_warmup_rpm2', time2: 'atc_warmup_time2' },
-    atc_change: { mode: 'atc_change_mode', x: 'atc_change_x', y: 'atc_change_y', z: 'atc_change_z', zClear: 'atc_change_zclear', capacity: 'atc_change_capacity', fixedT: 'atc_change_fixedt', waitSpindle: 'atc_change_m300', dustCover: 'atc_change_cover', confirm: 'atc_change_confirm' },
+    atc_change: { method: 'atc_change_method', x: 'atc_change_x', y: 'atc_change_y', z: 'atc_change_z', zClear: 'atc_change_zclear', fixedT: 'atc_change_fixedt', orient: 'atc_change_orient', waitSpindle: 'atc_change_m300', dustCover: 'atc_change_cover', confirm: 'atc_change_confirm' },
     atc_test: { mode: 'atc_test_mode', cycles: 'atc_test_cycles', dwellMs: 'atc_test_dwell', first: 'atc_test_first', count: 'atc_test_count', zClear: 'atc_test_zclear', descend: 'atc_test_descend' },
+    atc_table: { lengths: 'atc_table_lengths', pockets: 'atc_table_pockets' },
 };
 
 export class WizardManager {
@@ -161,7 +165,37 @@ export class WizardManager {
         }) || null;
     }
 
-    open(type) {
+    /**
+     * Reverse-sync: pull the (possibly block-edited) active op back into the OPEN wizard's form, so editing the
+     * PlaceOnStock cornergrid / params in the Blocks tab shows up here. Wired to the tab switch back to Studio
+     * (gatewayStatus.showApp). No-op unless a wizard is open AND it matches the op the Blocks tab is showing.
+     */
+    async pullFromBlocks() {
+        const view = this.activeView();
+        if (!view || !this.wizardElement || !this.wizardElement.classList.contains('active')) return;
+        let reconcileActiveOp;
+        try { ({ reconcileActiveOp } = await import('./blocks/opStacks.js')); } catch (_) { return; }
+        const r = reconcileActiveOp();
+        if (!r || r.type !== view.type || !r.fields) return;
+        for (const id in r.fields) {
+            const e = el(id), val = r.fields[id];
+            if (e && e.type === 'checkbox') {   // booleans (e.g. middle's circular / both) sync via .checked, not .value
+                if (val == null || e.checked === !!val) continue;
+                e.checked = !!val;
+                e.dispatchEvent(new Event('change', { bubbles: true }));
+                continue;
+            }
+            if (!e || val == null || String(e.value) === String(val)) continue;
+            e.value = String(val);
+            e.dispatchEvent(new Event('input', { bubbles: true }));   // refresh the form's anchor pickers + re-run the wizard
+        }
+    }
+
+    open(type, variant, bypassPrereq) {
+        // Just-in-time hardware gate: if this wizard needs a probe / ATC that isn't configured, show a small
+        // non-blocking prompt instead of opening. "Open anyway" re-enters with bypassPrereq, so the gate is a
+        // thin pass-through when the hardware is present (or the user already chose to proceed).
+        if (needsPrereqPrompt(type, variant, bypassPrereq)) return;
         // play a feedback sound whenever a wizard is opened
         playClick();
         this._activeType = type;   // for the Templates popover (save/load this op's parameter templates)
@@ -205,6 +239,11 @@ export class WizardManager {
         const wizElem = el('wiz_' + type);
         if (wizElem) {
             wizElem.style.display = 'block';
+            frameWizardSections(wizElem);   // group the form's fields into framed categories (idempotent)
+            this._setupSplitter(wizElem);   // draggable form/preview divider (all two-pane wizards)
+            // Variant entry: a view may declare identity-splitting variants (e.g. drill vs bore) that share one
+            // form. The view locks the variant param + hides its selector so the menu choice fixes the identity.
+            if (view && typeof view.applyVariant === 'function') view.applyVariant(variant);
             if (view && typeof view.onShow === 'function') view.onShow(this);
             decorateProbeSrc(view);   // controller/Studio source chips (before first generate)
             this.applyProbeDefaults();   // seed probe fields from the global 3D-probe defaults
@@ -243,7 +282,13 @@ export class WizardManager {
         const op = prog.find((b) => b && b.type === 'op' && b.id === opId);
         if (!op || !op.opType) return;
         this.open(op.opType);                          // normal open (clears editing + glow, seeds defaults)
-        this._seedForm(op.opType, op.params);          // params → form (the single source of truth)
+        let params = op.params;
+        // Back-compat: old atc_change ops carry mode/magType, not method — derive method so the form shows right.
+        if (op.opType === 'atc_change' && params && !params.method) {
+            const method = params.mode === 'auto' ? (params.magType === 'disk' ? 'disk' : 'generic') : 'manual';
+            params = { ...params, method };
+        }
+        this._seedForm(op.opType, params);             // params → form (the single source of truth)
         this.update();                                 // re-render preview + code from the seeded values
         this.editingOpId = opId;                       // now mark as editing this op
         const box = document.querySelector('.wiz-box'); if (box) box.classList.add('editing');  // accent glow
@@ -315,8 +360,8 @@ export class WizardManager {
         if (committed || code) {
             // Carry the start position the user set in this wizard's 3D preview over to the main preview.
             try {
-                const v = this._activePanel && this._activePanel.viz;
-                const ws = (v && v.starts) ? v.starts[0] : null;
+                const p = this._activePanel;
+                const ws = (p && p.getStartPos) ? p.getStartPos() : ((p && p.viz && p.viz.starts) ? p.viz.starts[0] : null);
                 if (ws) {
                     window.__pendingSpindleStart = { x: ws.x, y: ws.y, z: ws.z };
                     if (window.ddcsSetSpindleStart) window.ddcsSetSpindleStart(ws.x, ws.y, ws.z, 0);
@@ -334,7 +379,7 @@ export class WizardManager {
     // Render the wizard's generated G-code in the active wizard's viz area using THE shared preview panel
     // (identical code + UI to Studio main + Blocks). The SVG schematic is hidden (kept in wizards/views/* +
     // _svgPreview.bak.js for the DDCS CAM-menu thumbnails). The wizard feeds its own op code + inferred start.
-    preview3D(gcode, containerId, start) {
+    preview3D(gcode, containerId, start, startHints) {
         const svgCont = document.getElementById(containerId);
         if (!svgCont || !svgCont.parentElement) return;
         const parent = svgCont.parentElement; // .viz-container
@@ -350,12 +395,16 @@ export class WizardManager {
             host.__panel = createPreviewPanel(host, {
                 getGcode: () => host.__gcode || '',
                 getStart: () => host.__start,
+                // Per-pass start hints (multi-point probe): one start per manual REPOSITION so 3-point/A-B probes
+                // land at DISTINCT points (else the degenerate single-start solve). Optional (most ops are 1-pass).
+                getStartHints: () => host.__startHints,
                 onLine: (i) => this._highlightWizLine(host, i),   // play → highlight the executing line in the CODE PREVIEW (like Studio main)
             });
         }
         svgCont.style.display = 'none';
         host.__gcode = gcode || '';
         host.__start = start || null;
+        host.__startHints = Array.isArray(startHints) ? startHints : null;
         this._activePanel = host.__panel;   // for insert(): read the start the user set/dragged in this preview
         host.__panel.setActive(true);        // mark active + render this op's code
     }
@@ -370,6 +419,62 @@ export class WizardManager {
         const codeEl = body.querySelector('pre[id^="wiz_"][id$="_code"]');
         const ln = codeEl && codeEl.querySelector(`.g-line[data-line-index="${i}"]`);
         if (ln) ln.classList.add('active-line');   // no scrollIntoView — the CODE PREVIEW must not jump while playing; the line just pulses (CSS animation)
+    }
+
+    // Pin a wizard preview to the MACHINE frame so the envelope always draws (ATC tool changes are inherently G53,
+    // even when a given trace — auto-change with no tool, warmup/drawbar with no motion, the table-write macro —
+    // doesn't reach a G53). Opt-in (ATC wizards only) — call AFTER preview3D so the panel exists.
+    previewMachine(containerId, on) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const panel = host && host.__panel;
+        if (panel && panel.setForceMachine) panel.setForceMachine(on !== false);
+    }
+
+    // Draw the ATC magazine (pockets + tool stubs) in the 3D preview on the machine envelope. Opt-in (ATC wizards
+    // only) — call AFTER preview3D so the panel/viz exists. pockets = [{x,y,z,dia,length,pocket,tool,color}].
+    previewMagazine(containerId, pockets) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const viz = host && host.__panel && host.__panel.viz;
+        if (viz && viz.setMagazine) viz.setMagazine(pockets || []);
+    }
+
+    // Show/hide the 4th-axis rig (chuck + tailstock) around a cylinder stock in the 3D preview. Opt-in (rotary
+    // probe wizards only) — call AFTER preview3D so the panel/viz exists.
+    previewRotaryFixture(containerId, on) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const viz = host && host.__panel && host.__panel.viz;
+        if (viz && viz.setRotaryFixture) viz.setRotaryFixture(on);
+    }
+
+    // Draggable splitter between the form (.wiz-controls, left) and the preview (.wiz-visual, right) for every
+    // two-pane wizard. Drag resizes the form width; the 3D viz auto-resizes (its own ResizeObserver). The chosen
+    // width is remembered across wizards. Idempotent per wizard body.
+    _setupSplitter(wizElem) {
+        const pane = wizElem && wizElem.querySelector('.wiz-2pane');
+        if (!pane || pane.__split) return;
+        const controls = pane.querySelector(':scope > .wiz-controls');
+        const visual = pane.querySelector(':scope > .wiz-visual');
+        if (!controls || !visual) return;
+        pane.__split = true;
+        controls.style.order = '1'; visual.style.order = '3';
+        const sp = document.createElement('div');
+        sp.className = 'wiz-splitter';
+        sp.style.cssText = 'order:2; flex:0 0 6px; align-self:stretch; cursor:col-resize; border-radius:4px; background:var(--border,#444); opacity:.45; touch-action:none; transition:opacity .12s;';
+        sp.title = 'Drag to resize the form / preview';
+        pane.appendChild(sp);
+        let drag = false;
+        const setW = (px) => { const r = pane.getBoundingClientRect(); controls.style.flex = '0 0 ' + Math.max(220, Math.min(r.width - 260, px)) + 'px'; };
+        const stored = parseFloat(localStorage.getItem('ddcs_wiz_split_px'));
+        if (Number.isFinite(stored)) requestAnimationFrame(() => setW(stored));
+        sp.addEventListener('pointerdown', (e) => { drag = true; sp.setPointerCapture(e.pointerId); sp.style.opacity = '.95'; e.preventDefault(); });
+        sp.addEventListener('pointermove', (e) => { if (!drag) return; setW(e.clientX - pane.getBoundingClientRect().left); });
+        const end = (e) => { if (!drag) return; drag = false; sp.style.opacity = '.45'; try { sp.releasePointerCapture(e.pointerId); } catch (_) { /* noop */ } localStorage.setItem('ddcs_wiz_split_px', String(controls.getBoundingClientRect().width)); };
+        sp.addEventListener('pointerup', end); sp.addEventListener('pointercancel', end);
+        sp.addEventListener('pointerenter', () => { if (!drag) sp.style.opacity = '.8'; });
+        sp.addEventListener('pointerleave', () => { if (!drag) sp.style.opacity = '.45'; });
     }
 
     // Old private name kept as an alias for any external callers

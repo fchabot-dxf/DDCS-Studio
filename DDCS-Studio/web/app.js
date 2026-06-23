@@ -41,6 +41,9 @@ import './data/profileStore.js';
 // IO Settings & Diagnostics
 import './ui/ioTab.js';
 
+// Anonymous, opt-out usage analytics — fires a `visit` on load; see ui/analytics.js
+import './ui/analytics.js';
+
 class DDCSStudio {
     constructor() {
         this.themeManager = new ThemeManager();

@@ -18,12 +18,14 @@ import { drillBlock, peckDrill } from './drill.js';
 import { boreBlock, helicalBore } from './bore.js';
 import { lineBlock, lineCut } from './line.js';
 import { slotBlock, slotPath } from './slot.js';
-import { wallBlock } from './wall.js';
+import { contourBlock } from './contour.js';
 import { regionBlock } from './region.js';
 import { stepoverBlock, fillStrategy } from './stepover.js';
 import { fillZigzagBlock, fillConcentricBlock } from './fill.js';
 import { fillTextBlock } from './fillText.js';
 import { stepdownBlock } from './stepdown.js';
+import { placeOnStockBlock } from './placeOnStock.js';
+import { rotateBlock } from './rotate.js';
 import { probeBlock } from './probe.js';
 import { arrayBlock, patternPoints } from './array.js';
 import { helixBlock, helixPoints } from './helix.js';
@@ -61,8 +63,8 @@ export const PALETTE = [
     moveBlock, arcBlock, probeBlock, machineMoveBlock, homeBlock,   // Move (+ G53 machine-coord move + G28 home)
     spindleBlock, feedBlock, feedModeBlock, dwellBlock, coolantBlock, toolBlock, wcsBlock, distModeBlock, planeBlock, pathModeBlock,   // Machine modal state (+ G94/95 feed mode, G17-19 plane)
     progStartBlock, progEndBlock, endProgramBlock, mcodeBlock, rawBlock, probeReadBlock, readMachineBlock, toolOffsetBlock, setWorkOffsetBlock, outPinBlock, waitInputBlock,   // Machine (framing, end, raw, probe/DRO capture, tool-table/WCS write, digital I/O M62-66)
-    lineBlock, slotBlock, boreBlock, drillBlock, wallBlock, drillCycleBlock, cancelCycleBlock,  // Ops (feature presets + wall finish + native canned cycles G81-85/G80)
-    arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, stepdownBlock,    // Modify (stamp/sweep + lateral fills [zigzag/concentric/text] + depth pass wrappers)
+    lineBlock, slotBlock, boreBlock, drillBlock, contourBlock, drillCycleBlock, cancelCycleBlock,  // Ops (feature presets + contour/profile [+ pocket-wall finish] + native canned cycles G81-85/G80)
+    arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, stepdownBlock, placeOnStockBlock, rotateBlock,    // Modify (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align)
     countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)

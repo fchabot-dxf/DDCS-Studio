@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 
-// Uniform preview, step 2: the wizard 3D preview gains a shared 2D/3D toggle + Play (same 2D view as the
-// Blocks tab, via viz/toolpath2d.js). The 2D canvas overlays the GcodeViz3D and is shown/hidden by the toggle;
-// the 3D path is unchanged. (DOM is created before the GcodeViz3D init, so this holds even if 3D init no-ops.)
+// Uniform preview, step 2: the wizard preview is the SAME shared createPreviewPanel as the Blocks tab + Studio
+// main (mounted into the wizard's .wiz-viz3d host). Its single 2D/3D toggle (.pp-mtoggle) shows/hides the shared
+// 2D canvas (.pp-2d, display:none in 3D); the 3D path is unchanged. (The old standalone .wiz-m2d/.wiz-m3d +
+// .wiz-viz2d overlay were folded into the panel — see studio-preview-2d.spec.js for the Studio-main twin.)
 test.use({ viewport: { width: 1400, height: 950 } });
 
 test('wizard preview has a 2D/3D toggle that swaps the shared 2D view', async ({ page }) => {
@@ -13,32 +14,33 @@ test('wizard preview has a 2D/3D toggle that swaps the shared 2D view', async ({
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('surfacing'));
   await page.waitForSelector('#wiz_surfacing', { state: 'visible' });
-  await page.evaluate(() => window.ddcsStudio.wizardManager.update());
-  await page.waitForSelector('.wiz-viz3d .wiz-m2d', { timeout: 8000 });
+  await page.evaluate(() => window.ddcsStudio.wizardManager.update());   // mounts the shared preview panel
 
-  const before = await page.evaluate(() => {
-    const cv = document.querySelector('.wiz-viz3d .wiz-viz2d');
-    return {
-      hasToggle: !!document.querySelector('.wiz-viz3d .wiz-m2d') && !!document.querySelector('.wiz-viz3d .wiz-m3d'),
-      hasCanvas: !!cv,
-      canvasDisplay: cv ? getComputedStyle(cv).display : 'missing',
-    };
-  });
-  expect(before.hasToggle, 'wizard preview has a [2D | 3D] toggle').toBe(true);
+  const host = '#wiz_surfacing .wiz-viz3d';                              // the active wizard's panel host
+  await page.waitForSelector(`${host} .pp-2d`, { state: 'attached', timeout: 8000 });
+
+  const cv2dDisplay = () => page.evaluate((h) => {
+    const c = document.querySelector(`${h} .pp-2d`);
+    return c ? getComputedStyle(c).display : 'missing';
+  }, host);
+
+  const before = await page.evaluate((h) => ({
+    hasToggle: !!document.querySelector(`${h} .pp-mtoggle`),
+    hasCanvas: !!document.querySelector(`${h} .pp-2d`),
+  }), host);
+  expect(before.hasToggle, 'wizard preview has the [2D/3D] toggle').toBe(true);
   expect(before.hasCanvas, 'wizard preview has the shared 2D canvas').toBe(true);
-  expect(before.canvasDisplay, 'defaults to 3D (2D canvas hidden)').toBe('none');
+  expect(await cv2dDisplay(), 'defaults to 3D (2D canvas hidden)').toBe('none');
 
   // Switch to 2D → the shared canvas shows.
-  await page.evaluate(() => document.querySelector('.wiz-viz3d .wiz-m2d').click());
+  await page.click(`${host} .pp-mtoggle`);
   await page.waitForTimeout(150);
-  const in2d = await page.evaluate(() => getComputedStyle(document.querySelector('.wiz-viz3d .wiz-viz2d')).display);
-  expect(in2d, '2D view is shown after clicking 2D').not.toBe('none');
+  expect(await cv2dDisplay(), '2D view is shown after toggling to 2D').not.toBe('none');
 
   // Switch back to 3D → the canvas hides again.
-  await page.evaluate(() => document.querySelector('.wiz-viz3d .wiz-m3d').click());
+  await page.click(`${host} .pp-mtoggle`);
   await page.waitForTimeout(150);
-  const back3d = await page.evaluate(() => getComputedStyle(document.querySelector('.wiz-viz3d .wiz-viz2d')).display);
-  expect(back3d, '2D view hidden again after clicking 3D').toBe('none');
+  expect(await cv2dDisplay(), '2D view hidden again after toggling back to 3D').toBe('none');
 
   expect(errs, 'no page errors').toEqual([]);
 });

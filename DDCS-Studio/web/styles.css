@@ -106,6 +106,61 @@ svg [id*="Zfirst_travel"] {
     --warn: #eab308;
 }
 
+/* ============================================================================
+   DESIGN-TOKEN CONTRACT  ·  the "skin" API
+   A SKIN is one [data-theme="…"] bundle that sets these tokens; components read
+   ONLY tokens, never raw colour. The defaults below ALIAS the base palette above,
+   so any token a skin leaves unset is still sane and a skin can stay tiny.
+
+   To add a skin: copy the SKIN TEMPLATE comment near the theme bundles, give it a
+   new data-theme value, add it to THEMES in ui/themes.js, and fill the tokens you
+   want to change. Keyboard material tokens (--kbd-*) live in the GLASS KEYBOARD
+   section; everything else lives here.
+   ============================================================================ */
+:root {
+    /* Surfaces & elevation — what panels / popovers / wells are made of */
+    --surface-1: var(--panel);                                       /* cards, popovers, dock body   */
+    --surface-2: var(--bg);                                          /* inset wells, inputs, tracks  */
+    --surface-3: color-mix(in srgb, var(--panel) 86%, var(--text));  /* raised / hover               */
+    --outline:   var(--border);                                      /* hairline edges / separators  */
+    --scrim:     rgba(0, 0, 0, .55);                                 /* modal / overlay backdrop     */
+    --elev-1: 0 2px 8px rgba(0, 0, 0, .18);
+    --elev-2: 0 8px 22px rgba(0, 0, 0, .34);
+
+    /* Typography */
+    --font-ui:   var(--sans, "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif);
+    --font-code: var(--mono, ui-monospace, "Consolas", "Liberation Mono", monospace);
+
+    /* Shape */
+    --border-w: 1px;
+
+    /* Editor / code "screen" (reserved contract slots — editor rules migrate here incrementally) */
+    --screen:       #000000;
+    --code-text:    #e6e6e6;
+    --code-comment: var(--success, #22c55e);
+    --code-num:     #d9b3ff;
+    --code-word:    #67d3ff;
+    --code-ln:      #ff6b6b;
+}
+
+/*  SKIN TEMPLATE — copy this block, rename the data-theme, add it to THEMES in
+    ui/themes.js, and change the values you want. Only `--bg/--panel/--accent/--text*
+    /--border` are essential; everything else inherits a sane default from the contract.
+
+    [data-theme="my-skin"] {
+        --bg: #101418;  --panel: #161b22;  --accent: #58a6ff;
+        --text: #c9d1d9;  --text-main: #fff;  --text-dim: #8b949e;  --border: #30363d;
+        --radius: 8px;
+
+        --surface-1: #161b22;  --surface-2: #0d1117;  --outline: #30363d;
+        --scrim: rgba(1,4,9,.7);
+
+        --kbd-glass: linear-gradient(180deg, rgba(22,27,34,.4), rgba(13,17,23,.78));
+        --kbd-blur: 5px;  --kbd-handle: linear-gradient(180deg,#21262d,#0d1117);
+        --kbd-grip: rgba(88,166,255,.6);  --kbd-edge: #30363d;
+    }
+*/
+
 /* ============================================
    RESET & BASE
    ============================================ */
@@ -133,7 +188,8 @@ html, body { overflow-x: clip; }
     padding: 0 15px 0 0;
     display: flex;
     align-items: stretch;
-    background: var(--hdr-bg, var(--panel));
+    background: var(--bg);   /* header = the deepest tone in EVERY theme (some themes set --hdr-bg == --panel, which
+                                collided with the panel-toned active tab — steampunk). Consistent: header darker than the tab. */
     border-bottom: 1px solid var(--border);
     user-select: none;
 }
@@ -169,7 +225,7 @@ html, body { overflow-x: clip; }
 
 /* App-switcher tabs (STUDIO / GATEWAY) — visual stubs, no navigation yet.
    The :hover/:active resets shield them from the per-theme global `button` skins. */
-.hdr-tabs { display: flex; align-items: stretch; }
+.hdr-tabs { display: flex; align-items: stretch; margin-left: 16px; align-self: flex-end; height: 44px; }   /* bottom-aligned: a bit of space above the tab tops, feet still meet the bar below */
 /* Custom app icons so STUDIO / GATEWAY can collapse to icon-only when the header is tight */
 .hdr-tabs .tab .app-ico { display: inline-flex; flex: 0 0 auto; }
 .hdr-tabs .tab .app-ico svg { width: 17px; height: 17px; display: block; }
@@ -178,12 +234,20 @@ html, body { overflow-x: clip; }
 
 /* Underline-style app-switcher tabs (the original look): flat, transparent, with a coloured accent
    bar under the active tab. Icons kept so they collapse to icon-only on narrow screens. */
+/* Per-theme tab shape: --tab-radius = TOP-corner rounding; --tab-flare = OUTWARD bottom-corner "feet" radius
+   (the classic browser-tab curve into the bar); --tab-edge = the outline colour that traces both. */
+:root, [data-theme="steampunk"] { --tab-radius: 8px;  --tab-flare: 7px;  --tab-edge: var(--border); }
+[data-theme="studio"]     { --tab-radius: 13px; --tab-flare: 9px;  --tab-edge: var(--border); }
+[data-theme="organic"]    { --tab-radius: 16px; --tab-flare: 11px; --tab-edge: var(--border); }
+[data-theme="futuristic"] { --tab-radius: 0;    --tab-flare: 0;    --tab-edge: rgba(45,226,255,.7); }  /* square */
+[data-theme="normal"]     { --tab-radius: 5px;  --tab-flare: 0;    --tab-edge: var(--border); }          /* flat, no feet */
+
 .app-header .tab,
 .app-header .tab:hover,
 .app-header .tab:active {
     display: flex;
     align-items: center;
-    padding: 0 16px;
+    padding: 6px 16px;
     min-height: 0;
     font-size: 12.5px;
     font-weight: 700;
@@ -191,7 +255,7 @@ html, body { overflow-x: clip; }
     font-family: inherit;
     color: var(--hdr-dim, var(--text-dim));
     border: none;
-    border-radius: 0;
+    border-radius: var(--tab-radius, 8px) var(--tab-radius, 8px) 0 0;
     background: transparent;
     box-shadow: none;
     text-shadow: none;
@@ -200,24 +264,53 @@ html, body { overflow-x: clip; }
     cursor: pointer;
     position: relative;
 }
-.app-header .tab.active,
-.app-header .tab:hover { color: var(--hdr-ink, var(--text-main)); }
-.app-header .tab.active::after {
-    content: '';
-    position: absolute;
-    left: 10px; right: 10px; bottom: 0;
-    height: 3px;
-    background: var(--tab-accent, var(--accent));
-    border-radius: var(--radius, 3px) var(--radius, 3px) 0 0;
+.app-header .tab:hover { color: var(--hdr-ink, var(--text-main)); background: color-mix(in srgb, var(--bg) 45%, transparent); }
+/* Active app tab fills with the colour of the strip DIRECTLY below the header (var(--panel) — now unified across
+   every app: studio wizard bar, macros/gateway/settings sub-tab head). So it reads as merged with the body, and
+   that "body colour below the header" is identical for every tab in a given theme. margin-bottom:-1px punches it
+   through the header's bottom border so there's no separating line. */
+.app-header .tab.active { --tab-fill: var(--panel); color: var(--hdr-ink, var(--text-main)); background: var(--tab-fill); margin-bottom: -1px;
+    box-shadow: inset 0 1px 0 var(--tab-edge), inset 1px 0 0 var(--tab-edge), inset -1px 0 0 var(--tab-edge); }
+/* Organic theme: the connecting tab AND the bar below the header are pink (theme accent), kept matching so the
+   active tab still merges into the bar. */
+[data-theme="organic"] .app-header .tab.active,
+[data-theme="organic"] #studio-app .top-dock-header,
+[data-theme="organic"] #macros-app .settings-head,
+[data-theme="organic"] #gateway-app .settings-head,
+[data-theme="organic"] #blocks-app .blk-topbar { background: #6f9b4d !important; }
+/* Organic's bars are a saturated colour → inactive tab labels need lighter, higher-contrast text. */
+[data-theme="organic"] .settings-tabs .settings-main-tab:not(.active) { color: rgba(255,255,255,0.82); }
+[data-theme="organic"] .app-header .tab:not(.active) { color: rgba(255,255,255,0.7); }
+
+/* --- Active-tab outward "feet": concave quarter-curves at the bottom-outer corners that flare into the bar.
+   Sized by --tab-flare; filled with --tab-fill (the tab colour) with a 1px --tab-edge ring tracing the curve so
+   the outline wraps the foot. Applies to studio/steampunk/organic; futuristic (square) + normal (flat) opt out. --- */
+.app-header .tab.active::before, .app-header .tab.active::after,
+.settings-tabs .settings-main-tab.active::before, .settings-tabs .settings-main-tab.active::after {
+    content: ''; position: absolute; bottom: 0; width: calc(var(--tab-flare, 0) + 1px); height: var(--tab-flare, 0); pointer-events: none;
 }
-.app-header .tab[data-app="studio"]  { --tab-accent: #f59e0b; }
-.app-header .tab[data-app="gateway"] { --tab-accent: #0ea5e9; }
-.app-header .tab[data-app="settings"] { --tab-accent: #94a3b8; }
+.app-header .tab.active::before, .settings-tabs .settings-main-tab.active::before {
+    left: calc(-1 * var(--tab-flare, 0));
+    background: radial-gradient(circle at top left, transparent var(--tab-flare, 0), var(--tab-edge) var(--tab-flare, 0), var(--tab-edge) calc(var(--tab-flare, 0) + 1px), var(--tab-fill) calc(var(--tab-flare, 0) + 1px));
+}
+.app-header .tab.active::after, .settings-tabs .settings-main-tab.active::after {
+    right: calc(-1 * var(--tab-flare, 0));
+    background: radial-gradient(circle at top right, transparent var(--tab-flare, 0), var(--tab-edge) var(--tab-flare, 0), var(--tab-edge) calc(var(--tab-flare, 0) + 1px), var(--tab-fill) calc(var(--tab-flare, 0) + 1px));
+}
+/* futuristic = square, normal = flat → no feet (also kills any 0-size pseudo artifact from old futuristic ::after). */
+[data-theme="futuristic"] .app-header .tab.active::before, [data-theme="futuristic"] .app-header .tab.active::after,
+[data-theme="futuristic"] .settings-tabs .settings-main-tab.active::before, [data-theme="futuristic"] .settings-tabs .settings-main-tab.active::after,
+[data-theme="normal"] .app-header .tab.active::before, [data-theme="normal"] .app-header .tab.active::after,
+[data-theme="normal"] .settings-tabs .settings-main-tab.active::before, [data-theme="normal"] .settings-tabs .settings-main-tab.active::after { content: none; }
+/* Organic header-tab feet flare into the green bar (match the tab fill). */
+[data-theme="organic"] .app-header .tab.active { --tab-fill: #6f9b4d; }
 /* Studio depth: the toolbar's bevel is RAISED (light top edge), so it sits ABOVE the header in the
    colour hierarchy — toolbar lightest (sv-1), header darker (sv-3). Active tab = toolbar colour,
    inactive tab = header colour. */
 body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !important; }
-body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !important; }
+/* Wizard bar (studio top action bar) = the unified below-header strip colour in EVERY theme (was the theme accent
+   — grey/gold/cyan), so the active STUDIO tab connects to it. Flat: no border/shadow. (organic overrides to pink.) */
+.top-dock-header { background: var(--panel) !important; border: none !important; box-shadow: none !important; }
 
 /* GATEWAY tab when no gateway is reachable (hosted / standalone): greyed but clickable —
    clicking offers the desktop exe download (see ui/gatewayStatus.js). */
@@ -241,10 +334,10 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
     z-index: 1000;
     min-width: 220px;
     padding: 12px 14px;
-    background: var(--panel, #1e1e1e);
-    border: 1px solid var(--border, #444);
+    background: var(--surface-1, var(--panel, #1e1e1e));
+    border: var(--border-w, 1px) solid var(--outline, var(--border, #444));
     border-radius: var(--radius, 6px);
-    box-shadow: 0 8px 22px rgba(0,0,0,.45);
+    box-shadow: var(--elev-2, 0 8px 22px rgba(0,0,0,.45));
 }
 
 .gateway-dl-pop {
@@ -252,11 +345,11 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
     z-index: 1000;
     max-width: 270px;
     padding: 12px 14px;
-    background: var(--panel-bg, #1e1e1e);
+    background: var(--surface-1, var(--panel-bg, #1e1e1e));
     color: var(--text-main, #ddd);
-    border: 1px solid var(--border-color, #444);
+    border: var(--border-w, 1px) solid var(--outline, var(--border-color, #444));
     border-radius: var(--radius, 6px);
-    box-shadow: 0 8px 22px rgba(0,0,0,.45);
+    box-shadow: var(--elev-2, 0 8px 22px rgba(0,0,0,.45));
     font-size: 12px;
     line-height: 1.45;
 }
@@ -281,11 +374,13 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
     --panel2: var(--panel);
     --accent2: var(--accent);
     --bar: var(--accent);
-    display: block;
-    padding: 16px 22px 30px;
-    max-width: 1100px;
-    margin: 0 auto;
+    /* Same layout as the Macros app: a full-width flex column (no max-width / centring), a fixed head bar
+       above a scrolling content area — see #macros-app. */
+    display: flex;
+    flex-direction: column;
+    height: 100%;
     width: 100%;
+    box-sizing: border-box;
 }
 .gateway-app.hidden { display: none; }
 
@@ -296,12 +391,11 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .gateway-app .block { margin: 18px 0; }
 .gateway-app .block:first-child { margin-top: 8px; }
 
-.gateway-app .tabs { display: flex; gap: 6px; margin: 4px 0 14px; flex-wrap: wrap; }
-.gateway-app .tabs .tab {
-    padding: 7px 14px; border: 1px solid var(--border); border-radius: var(--radius);
-    background: var(--panel); color: var(--text-dim); cursor: pointer; font-weight: 600; font-size: 13px;
-}
-.gateway-app .tabs .tab.on { background: var(--panel2); color: var(--text-main); border-color: var(--accent2); }
+/* Sub-tab bar unified with Settings + Macros: a .settings-head row of shared .settings-main-tab buttons
+   (underline-active). The .settings-main-tab look itself is defined globally above. */
+.gateway-app .settings-head { padding: 8px 16px; border-bottom: 1px solid var(--border); flex: 0 0 auto; display: flex; align-items: center; background: var(--panel); color: var(--text-main); }
+.gateway-app .settings-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.gateway-app .gw-view { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 20px; background: var(--bg); }
 
 .gateway-app table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .gateway-app th, .gateway-app td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--border); }
@@ -408,31 +502,115 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
     align-self: center;
 }
 
-/* Global post-processor (dialect) selector in the header (ui/headerPost.js) */
-.hdr-post {
-    font-size: 12px;
-    max-width: 200px;
-    padding: 4px 8px;
-    border-radius: var(--radius, 4px);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.25));
-    background: var(--panel, #1d2530);
-    color: var(--text-main, #e6edf3);
-    cursor: pointer;
+/* Global post-processor (dialect) selector — a discreet chevron quick-action in the header (ui/headerPost.js).
+   Icon-only at every width. The `.hdr-controls button.hdr-quick-btn` specificity (0,2,1) beats the per-theme
+   `button` skin so the chevron stays flat, not a beveled pill. */
+.hdr-quick { position: relative; display: inline-flex; align-items: center; }
+.app-header button.hdr-quick-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; min-height: 0; padding: 0;
+    border: 1px solid transparent; border-radius: var(--radius, 6px);
+    background: transparent; color: var(--text-main, #e6edf3);
+    cursor: pointer; opacity: .7; transition: opacity .12s ease, background .12s ease, border-color .12s ease;
+    box-shadow: none; text-shadow: none;
 }
-.hdr-post:hover { border-color: var(--accent, #0ea5e9); }
-.hdr-post-warn { color: #e0a020; font-size: 15px; cursor: help; user-select: none; }
+.app-header button.hdr-quick-btn svg { width: 13px; height: 13px; transition: transform .15s ease; }
+.app-header button.hdr-quick-btn:hover { opacity: 1; background: var(--panel2, rgba(255,255,255,.10)); border-color: var(--border, rgba(255,255,255,.18)); }
+.app-header button.hdr-quick-btn[aria-expanded="true"] { opacity: 1; background: var(--panel2, rgba(255,255,255,.10)); }
+.app-header button.hdr-quick-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+/* Popover menu (reuses .scale-pop chrome) — themed like the keyboard: same translucent "glass" material
+   (--kbd-glass / --kbd-blur / --kbd-edge tokens). Items are buttons → override the per-theme skin via (0,2,0). */
+.hdr-quick-menu {
+    left: 0; right: auto;                 /* the chevron now sits LEFT (by the logo) → menu opens leftward-anchored */
+    min-width: 226px; max-height: min(72vh, 560px); overflow-y: auto;
+    padding: 6px; display: flex; flex-direction: column; gap: 2px;
+    background: var(--kbd-glass, var(--panel, #1e1e1e));
+    -webkit-backdrop-filter: blur(var(--kbd-blur, 8px)) saturate(1.1);
+    backdrop-filter: blur(var(--kbd-blur, 8px)) saturate(1.1);
+    border: 1px solid var(--kbd-edge, var(--border, #444));
+}
+.hdr-quick-menu[hidden] { display: none; }
+.hdr-quick-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; opacity: .55; padding: 4px 8px 2px; }
+.hdr-quick-menu .hdr-quick-item {
+    display: flex; align-items: center; gap: 6px; width: 100%;
+    padding: 6px 8px; min-height: 0; border: 0; border-radius: 5px;
+    background: transparent; color: var(--text-main, #e6edf3);
+    font-size: 12px; font-weight: 500; text-align: left; text-shadow: none; box-shadow: none; cursor: pointer;
+}
+.hdr-quick-menu .hdr-quick-item:hover { background: var(--panel2, rgba(255,255,255,.12)); }
+.hdr-quick-menu .hdr-quick-item[aria-checked="true"] { font-weight: 700; }
+.hdr-quick-check { width: 12px; flex: 0 0 12px; color: var(--accent, #0ea5e9); text-align: center; }
+.hdr-quick-lbl { flex: 1 1 auto; }
+.hdr-quick-warn { color: #e0a020; }
+.hq-ico { flex: 0 0 15px; }
+.hq-swatch { width: 12px; height: 12px; flex: 0 0 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.3); }
+.hdr-quick-sep { height: 1px; margin: 5px 4px; background: var(--kbd-edge, var(--border, #444)); opacity: .6; }
+
+/* Collapsible submenus (Post-processor, Theme): a header row + an indented, togglable list */
+.hdr-quick-sub { font-weight: 700; }
+.hq-cur { font-weight: 400; opacity: .55; }
+.hq-caret { margin-left: auto; flex: 0 0 auto; opacity: .55; transition: transform .12s ease; }
+.hdr-quick-sub.is-open .hq-caret { transform: rotate(90deg); }
+.hdr-quick-subitems { display: flex; flex-direction: column; gap: 2px; margin: 1px 0 2px; }
+.hdr-quick-subitems[hidden] { display: none; }
+.hdr-quick-menu .hdr-quick-subitems .hdr-quick-item { padding-left: 16px; font-weight: 500; }
+/* Theme picker = a horizontal row of small chips, each PREVIEWING its own theme's style (shape/fill/outline/
+   bevel/glow) regardless of the active theme. Scoped + !important so the per-theme button skin can't hijack them. */
+.hdr-quick-subitems[data-subitems="theme"] { flex-direction: row !important; flex-wrap: wrap; gap: 10px; padding: 9px 12px 7px; }
+.hdr-quick-subitems .hq-theme-chip {
+    width: 26px !important; height: 26px !important; min-width: 0 !important; flex: 0 0 auto; padding: 0 !important;
+    cursor: pointer; text-shadow: none !important; transform: none; transition: transform .12s ease !important;
+    border: 1px solid transparent !important; border-radius: 6px !important; background: #888 !important;
+}
+.hdr-quick-subitems .hq-theme-chip:hover { transform: translateY(-1px) scale(1.08); }
+/* per-theme previews — roundness + fill + outline/border + bevel(neumorphic)/glow(futuristic)/flat(normal) */
+.hdr-quick-subitems .hq-theme-chip[data-theme="studio"]     { border-radius: 7px !important; background: linear-gradient(180deg,#e7e3db,#cfcabf 60%,#bdb8ac) !important; border-color: #b0aa9d !important; box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.25) !important; }
+.hdr-quick-subitems .hq-theme-chip[data-theme="steampunk"]  { border-radius: 6px !important; background: linear-gradient(180deg,#c79a2e,#8b6914 65%,#6b500f) !important; border-color: #4a3608 !important; box-shadow: inset 0 1px 0 rgba(255,224,150,.5), 0 1px 2px rgba(0,0,0,.4) !important; }
+.hdr-quick-subitems .hq-theme-chip[data-theme="organic"]    { border-radius: 50% !important; background: radial-gradient(circle at 35% 30%,#86b562,#6f9b4d 70%) !important; border-color: #4c6b34 !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.3) !important; }
+.hdr-quick-subitems .hq-theme-chip[data-theme="futuristic"] { border-radius: 2px !important; background: #0c1422 !important; border-color: rgba(45,226,255,.8) !important; box-shadow: 0 0 7px rgba(45,226,255,.55), inset 0 0 6px rgba(45,226,255,.25) !important; }
+.hdr-quick-subitems .hq-theme-chip[data-theme="normal"]     { border-radius: 4px !important; background: #f4f4f4 !important; border-color: #b9b9b9 !important; box-shadow: none !important; }
+/* active selection ring — sits OUTSIDE the chip so each theme's own look stays intact */
+.hdr-quick-subitems .hq-theme-chip.active { outline: 2px solid var(--text-main, #fff) !important; outline-offset: 2px; }
+
+/* Profile/post capability warning — a prominent amber badge (was an easy-to-miss 15px glyph) that gently
+   pulses to draw the eye; only ever shown when there's a real warning (hidden otherwise). */
+.hdr-post-warn {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 auto; width: 22px; height: 22px; min-width: 22px; margin: 0 2px; box-sizing: border-box;
+    color: #2a1d04; background: #f0b429; border: 1px solid #ffcf4d; border-radius: 50%;
+    font-size: 13px; line-height: 1; font-weight: bold; cursor: help; user-select: none;
+    box-shadow: 0 0 0 0 rgba(240, 180, 41, 0.6); animation: hdrPostWarnPulse 1.8s ease-out infinite;
+}
 .hdr-post-warn[hidden] { display: none; }
+@keyframes hdrPostWarnPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(240, 180, 41, 0.55); }
+    70%  { box-shadow: 0 0 0 8px rgba(240, 180, 41, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(240, 180, 41, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .hdr-post-warn { animation: none; } }
 
 /* Editor op hover-to-edit: highlight the hovered op's lines (in the #editor-highlight overlay) + a float chip. */
 #editor-highlight .g-line.op-hover { background: rgba(14, 165, 233, 0.16); border-radius: 2px; }
-.op-edit-chip {
+/* Scoped under .editor-container (0,2,0) so the ACCENT fill out-ranks the per-theme `button` skin
+   (which otherwise made the chip a subdued dark pill). Accent fill + a soft accent halo = it reads
+   as the live "edit this op" affordance across every theme. */
+.editor-container .op-edit-chip {
     position: absolute; left: 12px; z-index: 12;
-    font: 600 11px/1 inherit; padding: 3px 9px; border-radius: 999px; cursor: pointer;
-    background: var(--accent, #0ea5e9); color: #fff; border: none; box-shadow: 0 2px 8px rgba(0,0,0,.35);
-    white-space: nowrap; opacity: .95;
+    font: 700 11px/1 inherit; padding: 4px 11px; border-radius: 999px; cursor: pointer;
+    background: var(--accent, #0ea5e9); color: #fff;
+    border: 1px solid color-mix(in srgb, var(--accent, #0ea5e9) 55%, #ffffff);
+    box-shadow: 0 2px 10px rgba(0,0,0,.42), 0 0 0 3px color-mix(in srgb, var(--accent, #0ea5e9) 30%, transparent);
+    text-shadow: 0 1px 1px rgba(0,0,0,.35); white-space: nowrap; opacity: 1;
 }
-.op-edit-chip:hover { opacity: 1; filter: brightness(1.08); }
-.op-edit-chip:disabled { background: var(--panel, #334); color: var(--text-dim, #9aa); cursor: default; box-shadow: none; }
+.editor-container .op-edit-chip:hover { filter: brightness(1.1); box-shadow: 0 2px 13px rgba(0,0,0,.48), 0 0 0 4px color-mix(in srgb, var(--accent, #0ea5e9) 42%, transparent); }
+.editor-container .op-edit-chip:disabled { background: var(--panel, #334); color: var(--text-dim, #9aa); cursor: default; box-shadow: none; border-color: transparent; }
+/* Mobile portrait: the 3D preview is a bottom sheet (height --viz3d-size). Push the Transform button UP so it
+   rides just above the open drawer (and follows its resize) instead of hiding under it. (The keyboard case is
+   already handled — keyboard-active pins the editor to a top strip, carrying the button with it.) */
+@media (orientation: portrait) {
+    .editor-container:has(.viz3d-drawer.open) #align-rotate-btn { bottom: calc(var(--viz3d-size, 50%) + 12px) !important; }
+}
 .op-edit-chip[hidden] { display: none; }
 
 /* Studio editor autocomplete — phone-autocorrect-style float at the caret. */
@@ -478,7 +656,9 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .cap-off input, .cap-off select, .cap-off button { pointer-events: none; }
 
 /* Header project buttons (📂 Open drawer / 💾 Save modal) — borderless ghost icon buttons. */
-.macro-bar { display: flex; gap: 6px; align-items: center; }
+/* Open/Save: on desktop/tablet they live in the chevron quick-menu (hidden here); on PHONE the chevron is
+   hidden, so the standalone Open/Save come back to the header (see the max-width:600px rule). */
+.macro-bar { display: none; gap: 6px; align-items: center; }
 .macro-bar .op-btn { border-color: transparent; background: transparent; }
 .macro-bar .op-btn:hover { background: var(--panel2, rgba(255, 255, 255, .08)); }
 
@@ -1298,8 +1478,8 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     width: 280px;
     padding: 12px;
     overflow-y: auto;
-    background: var(--panel);
-    border-right: 1px solid var(--border);
+    background: var(--surface-1, var(--panel));
+    border-right: var(--border-w, 1px) solid var(--outline, var(--border));
     z-index: 2;
 }
 
@@ -1525,6 +1705,16 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     margin-top: 12px;
 }
 
+/* Per-category frames — frameWizardSections() (ui/wizardSections.js) wraps each section-label + its fields in a
+   .wiz-section, so the form reads as grouped, framed categories. Theme-aware via the skin tokens. */
+.wiz-section {
+    border: 1px solid var(--outline, var(--border, #2c3a4a));
+    border-radius: var(--radius, 6px);
+    padding: 8px 11px 11px;
+    margin: 10px 0;
+}
+.wiz-section > .section-label:first-child { margin-top: 0; }
+
 /* Button Grids */
 .grid-2 {
     display: grid;
@@ -1634,7 +1824,7 @@ button.primary:hover {
 .wiz-box {
     /* Responsive, capped-fluid: near-full-width on mobile, comfortable cap on desktop.
        Two-pane wizards widen further (see .wiz-box.two-pane). */
-    width: min(96vw, 560px);
+    width: min(96vw, 680px);
     max-width: 96vw;
     max-height: 95vh;           /* fallback for older browsers */
     max-height: 95dvh;          /* dynamic viewport-aware height */
@@ -1662,8 +1852,8 @@ button.primary:hover {
    Collapses to a single column on mobile.
    ============================================ */
 .wiz-box.two-pane {
-    width: min(97vw, 1180px);
-    height: min(90dvh, 860px);   /* definite height so the right pane (3D) can span it */
+    width: min(98vw, 1500px);
+    height: min(93dvh, 1000px);   /* definite height so the right pane (3D) can span it */
 }
 .two-pane .wiz-body { overflow: hidden; padding-bottom: 0; }
 .wiz-2pane { display: flex; gap: 14px; height: 100%; min-height: 0; align-items: stretch; }
@@ -1697,8 +1887,11 @@ button.primary:hover {
     .wiz-box.two-pane { width: min(96vw, 560px); height: auto; }
     .two-pane .wiz-body { overflow-y: auto; }
     .wiz-2pane { flex-direction: column; height: auto; }
-    .wiz-2pane > .wiz-controls { order: 2; flex: 0 0 auto; overflow: visible; width: 100%; padding: 0; }
-    .wiz-2pane > .wiz-visual { order: 1; flex: 0 0 auto; min-height: 0; }     /* visuals on top, content-sized */
+    /* !important beats the splitter's inline order (controls:1 / visual:3) so the preview stacks on TOP and can
+       stay sticky; the side-by-side drag splitter is meaningless in a single column, so hide it. */
+    .wiz-2pane > .wiz-controls { order: 2 !important; flex: 0 0 auto; overflow: visible; width: 100%; padding: 0; }
+    .wiz-2pane > .wiz-visual { order: 1 !important; flex: 0 0 auto; min-height: 0; }     /* visuals on top, content-sized */
+    .wiz-2pane > .wiz-splitter { display: none; }
     .wiz-2pane > .wiz-visual > .viz-container { flex: 0 0 auto; min-height: 0; }
     .wiz-2pane .wiz-visual .wiz-viz3d { flex: 0 0 auto; height: 240px !important; min-height: 240px; }
     .wiz-2pane .wiz-visual .viz-split { flex-direction: row; }               /* drill: 2D | 3D side-by-side */
@@ -1900,6 +2093,9 @@ button.primary:hover {
 .feature-canvas .fc-axis-y { stroke: #3b7a48; stroke-width: 1.5; }
 .feature-canvas .fc-stock { fill: rgba(80,110,150,0.08); stroke: #46566a; stroke-width: 1.5; }
 .feature-canvas .fc-guide { fill: none; stroke: #2e8b9a; stroke-width: 1; stroke-dasharray: 4 3; }
+.feature-canvas .fc-path-ghost { fill: none; stroke: #43525f; stroke-width: 1.2; }   /* original path (before rotate) */
+.feature-canvas .fc-path { fill: none; stroke: #4ab3ff; stroke-width: 1.8; }          /* rotated result — cut moves */
+.feature-canvas .fc-path-rapid { fill: none; stroke: #4ab3ff; stroke-width: 1; stroke-dasharray: 4 3; opacity: .5; }
 .feature-canvas .fc-hole { fill: rgba(63,182,255,0.18); stroke: #3fb6ff; stroke-width: 1.5; }
 .feature-canvas .fc-hole-skip { fill: none; stroke: #5a6470; stroke-width: 1.2; stroke-dasharray: 3 2; }
 .feature-canvas .fc-hole-label { fill: #9fd8ff; font: 10px var(--mono, monospace); text-anchor: middle; }
@@ -1969,6 +2165,23 @@ button.primary:hover {
 .wiz-box {
     position: relative;
     z-index: 10001;
+}
+
+/* Settings MODAL — a wide/tall flex modal hosted in an .overlay (ui/settingsPanel.js renders its
+   flex head/body/foot inside #settings-app). z above wizards so the ⚙ gear opens it ON TOP of a wizard. */
+.settings-overlay { z-index: 12000; }
+.settings-modal {
+    width: min(1500px, 96vw);
+    height: min(1000px, 94vh);
+    display: flex; flex-direction: column;
+    background: var(--bg, #111);
+    border: 1px solid var(--outline, var(--border, #444));
+    border-radius: var(--radius, 10px);
+    box-shadow: var(--elev-2, 0 12px 40px rgba(0,0,0,.55));
+    overflow: hidden;
+}
+@media (max-width: 600px) {
+    .settings-modal { width: 100vw; height: 100vh; max-width: none; border-radius: 0; border: none; }
 }
 
 /* ============================================
@@ -2383,20 +2596,24 @@ Middle (handle) {
 }
 [data-theme="studio"] .preview-block pre .g-comment { color: var(--phosphor-2); }
 
-/* Settings tabs: keep the panel's own simple chip selection — opt OUT of the
-   hardware-key skin (the global studio button rule otherwise hijacks the active tab) */
-[data-theme="studio"] button.settings-main-tab,
-[data-theme="studio"] button.settings-main-tab:active,
-[data-theme="studio"] .settings-subtabs button.settings-tab,
-[data-theme="studio"] .settings-subtabs button.settings-tab:active {
-    background: rgba(255,255,255,0.14);
-    border: 1px solid rgba(255,255,255,0.45);
-    color: #fff; border-radius: 5px;
-    text-shadow: none; box-shadow: none; transform: none;
+/* Shared top-bar tab (.settings-main-tab) — ONE definition for Settings, Macros AND Gateway.
+   Previously duplicated scoped under #settings-app + #macros-app; now global so all three share it. */
+/* Classic browser-tab strip — Settings/Macros/Gateway sub-tabs. Theme-adaptive (NO per-theme rules): inactive
+   tabs are transparent/muted; the ACTIVE tab fills with the CONTENT colour (var(--bg)) so it reads as merged
+   with the panel below — a browser tab. Scoped to .settings-tabs so it out-specifies the generic
+   [data-theme="x"] button skin (no theme button styling leaks onto the tabs). */
+.settings-tabs .settings-main-tab, .settings-tabs .settings-main-tab:hover, .settings-tabs .settings-main-tab:active {
+    position: relative; padding: 6px 14px; font-size: 12.5px; font-weight: 700; letter-spacing: 1px; font-family: inherit;
+    color: var(--text-dim); background: transparent; border: none; border-radius: var(--tab-radius, 8px) var(--tab-radius, 8px) 0 0;
+    box-shadow: none; text-shadow: none; filter: none; transform: none; cursor: pointer; transition: 120ms;
 }
-[data-theme="studio"] button.settings-main-tab:not(.active),
-[data-theme="studio"] .settings-subtabs button.settings-tab:not(.active) {
-    background: transparent; border-color: transparent; color: rgba(255,255,255,0.7);
+.settings-tabs .settings-main-tab:hover { color: var(--text-main); background: color-mix(in srgb, var(--bg) 45%, transparent); }
+.settings-tabs .settings-main-tab.active { --tab-fill: var(--bg); color: var(--text-main); background: var(--tab-fill);
+    box-shadow: inset 0 1px 0 var(--tab-edge), inset 1px 0 0 var(--tab-edge), inset -1px 0 0 var(--tab-edge); }
+/* Sub-tab bar connects to the body: drop its bottom border (the colored line) + bottom padding so the active
+   tab's var(--bg) fill meets the content with no seam. body-prefixed to beat the per-app .settings-head rules. */
+body #macros-app .settings-head, body #settings-app .settings-head, body .gateway-app .settings-head {
+    border-bottom: none; padding-bottom: 0;
 }
 
 /* --- Virtual numpad (comm wizard) → electric-blue keys --- */
@@ -2457,23 +2674,84 @@ Middle (handle) {
 /* ============================================
    THEME: FUTURISTIC (Neon Cyan)
    ============================================ */
+/* ===== SKIN: "THE OPERATOR" (futuristic) — a neon-HUD machine for the super-coder.
+   Deep-space navy, cyan glass + glow, amber/magenta data accents, code-first screen. ===== */
 [data-theme="futuristic"] {
-    --bg: #0a0e1a;
-    --panel: #111827;
-    --accent: #00ffff;
-    --text: #e0e7ff;
+    --bg: #070b14;
+    --panel: #0e1626;
+    --accent: #2de2ff;
+    --text: #d4e3ff;
     --text-main: #ffffff;
-    --text-dim: #8892b0;
-    --border: #1e293b;
+    --text-dim: #7488a8;
+    --border: #20344f;
     --radius: 8px;
 
+    /* contract: surfaces / material */
+    --surface-1: rgba(14, 22, 38, .92);
+    --surface-2: #070b14;
+    --surface-3: #16243c;
+    --outline: #244468;
+    --scrim: rgba(3, 7, 16, .72);
+    --elev-2: 0 10px 30px rgba(0, 0, 0, .55), 0 0 0 1px rgba(45, 226, 255, .12);
+
+    /* contract: editor "screen" + syntax */
+    --screen: #080f1c;
+    --code-text: #cdd9f5;
+    --code-comment: #46d6a0;
+    --code-num: #ffce6a;
+    --code-word: #36e3ff;
+    --code-ln: #ff5d9e;
+
     /* header */
-    --hdr-bg: #111827;
-    --hdr-ink: #ffffff;
-    --hdr-dim: #8892b0;
-    --accent-studio: #00ffff;
+    --hdr-bg: #0b1322;
+    --hdr-ink: #eafcff;
+    --hdr-dim: #6f86a8;
+    --accent-studio: #2de2ff;
     --accent-gateway: #2bd47a;
 }
+
+/* HUD header: faint vertical grid, cyan hairline + glow, glowing brand & active tab */
+[data-theme="futuristic"] .app-header {
+    background:
+        repeating-linear-gradient(90deg, rgba(45,226,255,.045) 0 1px, transparent 1px 44px),
+        var(--hdr-bg);
+    border-bottom: 1px solid rgba(45,226,255,.32);
+    box-shadow: 0 1px 14px rgba(45,226,255,.12);
+}
+[data-theme="futuristic"] .app-header .brand .logo { filter: drop-shadow(0 0 6px rgba(45,226,255,.55)); }
+[data-theme="futuristic"] .app-header .tab.active::after { box-shadow: 0 0 9px var(--tab-accent, var(--accent)); }
+/* Futuristic: the tab outline uses the SAME cyan as the .wizard-btn border (rgba(45,226,255,.7)) — top + left +
+   right, open bottom so it connects to the body, plus the theme's signature upward glow. */
+[data-theme="futuristic"] .app-header .tab.active,
+[data-theme="futuristic"] .settings-tabs .settings-main-tab.active {
+    box-shadow: inset 0 1px 0 rgba(45,226,255,.7), inset 1px 0 0 rgba(45,226,255,.7), inset -1px 0 0 rgba(45,226,255,.7), 0 -2px 10px rgba(45,226,255,.3);
+}
+[data-theme="futuristic"] .top-dock-header {
+    background:
+        repeating-linear-gradient(90deg, rgba(45,226,255,.04) 0 1px, transparent 1px 44px),
+        var(--panel);
+    border-bottom: 1px solid rgba(45,226,255,.18);
+}
+
+/* Editor = the HUD screen: deep navy, cyan caret/selection, data-coloured syntax */
+[data-theme="futuristic"] .editor-container { background: var(--screen); }
+/* HUD grid screen — a faint cyan graticule so the glass keyboard ALWAYS has something to reveal
+   (transparency reads even over an empty program) and the editor feels like an instrument screen */
+[data-theme="futuristic"] #editor-highlight {
+    background-color: var(--screen) !important; color: var(--code-text);
+    background-image:
+        repeating-linear-gradient(0deg, rgba(45,226,255,.05) 0 1px, transparent 1px 30px),
+        repeating-linear-gradient(90deg, rgba(45,226,255,.05) 0 1px, transparent 1px 30px) !important;
+}
+[data-theme="futuristic"] #editor-gutter { background: var(--screen); color: #3c5a82; }
+[data-theme="futuristic"] #editor { caret-color: var(--accent); }
+[data-theme="futuristic"] #editor::selection,
+[data-theme="futuristic"] #editor-highlight ::selection { background: rgba(45,226,255,.30); color: #fff; }
+[data-theme="futuristic"] #editor-highlight .g-comment,
+[data-theme="futuristic"] .g-comment { color: var(--code-comment) !important; font-weight: 600; }
+[data-theme="futuristic"] #editor-highlight .g-num  { color: var(--code-num); }
+[data-theme="futuristic"] #editor-highlight .g-word { color: var(--code-word); }
+[data-theme="futuristic"] #editor-highlight .g-ln   { color: var(--code-ln); }
 
 [data-theme="futuristic"] .wizard {
     background: rgba(10, 14, 26, 0.9);
@@ -2486,61 +2764,149 @@ Middle (handle) {
 
 [data-theme="futuristic"] .toolbar-btn,
 [data-theme="futuristic"] button {
-    background: linear-gradient(180deg, #1e293b, #0f172a);
-    border: 1px solid #00ffff;
-    color: #00ffff;
+    background: linear-gradient(180deg, rgba(28,42,66,.92), rgba(10,16,28,.95));
+    border: 1px solid rgba(45,226,255,.45);
+    color: #b7f3ff;
+    box-shadow: inset 0 1px 0 rgba(45,226,255,.10);
+    text-shadow: 0 0 6px rgba(45,226,255,.22);
+    transition: box-shadow .12s ease, background .12s ease, color .12s ease, border-color .12s ease;
 }
 
 [data-theme="futuristic"] .toolbar-btn:hover,
 [data-theme="futuristic"] button:hover {
-    background: #00ffff;
-    color: #0a0e1a;
-    box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+    background: linear-gradient(180deg, rgba(45,226,255,.18), rgba(20,40,60,.95));
+    color: #eafdff;
+    border-color: rgba(45,226,255,.9);
+    box-shadow: 0 0 14px rgba(45,226,255,.42), inset 0 0 8px rgba(45,226,255,.12);
 }
+[data-theme="futuristic"] .toolbar-btn:active,
+[data-theme="futuristic"] button:active { transform: translateY(1px); }
+
+/* ===== OPERATOR · heavy detailing — make it feel like a real HUD device, not a recolor ===== */
+
+/* The editor is a CRT console: horizontal scanlines + a soft edge vignette over the whole screen.
+   z-index 5 sits above the code/drawer (z1–4) but below the dock handle (z6); pointer-events:none so
+   typing + 3D-orbit still work. */
+[data-theme="futuristic"] .editor-container::after {
+    content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none;
+    background:
+        repeating-linear-gradient(0deg, rgba(0,0,0,.14) 0 1px, transparent 1px 3px),
+        radial-gradient(135% 95% at 50% 32%, transparent 60%, rgba(0,10,22,.5) 100%);
+}
+
+/* HUD chip labels: uppercase + spaced, like instrument legends */
+[data-theme="futuristic"] .toolbar-btn .btn-tx,
+[data-theme="futuristic"] .op-btn .op-label,
+[data-theme="futuristic"] .app-header .tab .app-tx { text-transform: uppercase; letter-spacing: .08em; }
+
+/* Big wizard buttons get a brighter cyan instrument edge */
+[data-theme="futuristic"] .wizard-btn { border-color: rgba(45,226,255,.7) !important; }
+
+/* Keyboard dock: subtle inner top glow (corner brackets removed — read as clutter) */
+[data-theme="futuristic"] #controller-dock.controller-dock {
+    box-shadow: 0 -10px 34px rgba(0,0,0,.55), inset 0 1px 0 rgba(45,226,255,.22);
+    border-top: 1px solid rgba(45,226,255,.4);
+}
+
+/* 3D preview = a targeting scope: neon frame + inner glow */
+[data-theme="futuristic"] .viz3d-drawer {
+    border-left: 1px solid rgba(45,226,255,.6);
+    box-shadow: -6px 0 24px rgba(0,0,0,.6), inset 0 0 36px rgba(45,226,255,.07);
+}
+
+/* Active tab breathes; respects reduced-motion */
+@keyframes op-pulse { 0%,100% { box-shadow: 0 0 6px var(--tab-accent, var(--accent)); } 50% { box-shadow: 0 0 15px var(--tab-accent, var(--accent)); } }
+[data-theme="futuristic"] .app-header .tab.active::after { animation: op-pulse 2.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { [data-theme="futuristic"] .app-header .tab.active::after { animation: none; } }
 
 /* ============================================
    THEME: ORGANIC (Earth Tones)
    ============================================ */
+/* ===== SKIN: "BIOMORPH" (organic) — a biomorphic command deck. Dark visceral body, bone-ivory
+   keycaps (the exoskeleton), sinew seams, coral/arterial accents. Giger-ish anatomical command. ===== */
 [data-theme="organic"] {
-    --bg: #f4f1e8;
-    --panel: #faf8f3;
-    --accent: #6b8e23;
-    --text: #3d3d2f;
-    --text-main: #2d2d20;
-    --text-dim: #7d7d6f;
-    --border: #d4d1c8;
-    --radius: 12px;
+    --bg: #15110d;            /* visceral dark body */
+    --panel: #241c15;         /* sinew / bone-shadow */
+    --panel2: #2f261c;
+    --accent: #d97a5c;        /* coral / arterial */
+    --text: #e9dcc4;          /* bone */
+    --text-main: #f8eed8;
+    --text-dim: #9d8a6b;      /* aged bone */
+    --border: #5a4836;        /* sinew seam */
+    --radius: 16px;           /* organic curvature */
+    --success: #8aa15a;       /* muscle green */
+    --danger:  #c0473a;       /* arterial */
+    --warn:    #d99a3a;
 
     /* header */
-    --hdr-bg: #faf8f3;
-    --hdr-ink: #2d2d20;
-    --hdr-dim: #7d7d6f;
-    --accent-studio: #6b8e23;
-    --accent-gateway: #8e6b23;
+    --hdr-bg: #1d160f;
+    --hdr-ink: #f3e8d0;
+    --hdr-dim: #9d8a6b;
+    --accent-studio: #d97a5c;
+    --accent-gateway: #8aa15a;
+
+    /* contract */
+    --surface-1: #241c15; --surface-2: #15110d; --outline: #5a4836;
+    --scrim: rgba(12,8,5,.72);
+    --screen: #120d09;        /* the body-cavity editor */
 }
 
-[data-theme="organic"] .wizard {
-    background: rgba(100, 100, 80, 0.75);
-}
+[data-theme="organic"] .wizard { background: rgba(14,9,6,.82); }
+[data-theme="organic"] .wiz-box { border: 1px solid #6e5840; box-shadow: 0 12px 44px rgba(0,0,0,.6), 0 0 0 1px rgba(217,122,92,.20); }
 
-[data-theme="organic"] .wiz-box {
-    border: 2px solid #6b8e23;
-    box-shadow: 0 4px 24px rgba(107, 142, 35, 0.2);
-}
-
+/* Bone keycaps / buttons: ivory cap, sinew rim, soft organic shadow, big curvature */
 [data-theme="organic"] .toolbar-btn,
 [data-theme="organic"] button {
-    background: linear-gradient(180deg, #e8e5dc, #d4d1c8);
-    border: 1px solid #a0a090;
-    color: #3d3d2f;
-    border-radius: 12px;
+    background: linear-gradient(180deg, #e7dbc0, #ccbd99);
+    border: 1px solid #8a7657;
+    color: #2a2117;
+    border-radius: 14px;
+    box-shadow: 0 2px 5px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.5);
+    text-shadow: none;
 }
-
 [data-theme="organic"] .toolbar-btn:hover,
 [data-theme="organic"] button:hover {
-    background: linear-gradient(180deg, #6b8e23, #556b1c);
-    color: white;
+    background: linear-gradient(180deg, #f1c6af, #d98a6f);
+    border-color: #d97a5c; color: #2a1712;
 }
+
+/* Editor = the body cavity; bone text, coral caret, arterial line-numbers */
+[data-theme="organic"] .editor-container { background: var(--screen); }
+[data-theme="organic"] #editor-highlight { background-color: var(--screen) !important; color: #e9dcc4; }
+[data-theme="organic"] #editor-gutter { background: var(--screen); color: #6e5b42; }
+[data-theme="organic"] #editor { caret-color: #d97a5c; }
+[data-theme="organic"] #editor::selection,
+[data-theme="organic"] #editor-highlight ::selection { background: rgba(217,122,92,.32); color: #fff; }
+[data-theme="organic"] #editor-highlight .g-comment, [data-theme="organic"] .g-comment { color: #8aa15a !important; }
+[data-theme="organic"] #editor-highlight .g-num  { color: #e4a06a; }
+[data-theme="organic"] #editor-highlight .g-word { color: #ecdcb4; }
+[data-theme="organic"] #editor-highlight .g-ln   { color: #d97a5c; }
+
+/* Header = bone/sinew bar; the program toolbar = a muscle-tissue band the bone keys sit on */
+[data-theme="organic"] .app-header { border-bottom: 1px solid #5a4836; box-shadow: 0 1px 12px rgba(0,0,0,.45); }
+[data-theme="organic"] .app-header .brand .logo { filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
+[data-theme="organic"] .top-dock-header {
+    background: linear-gradient(180deg, #bf6850, #8d4533);
+    border-top: 1px solid rgba(255,205,180,.16);
+    border-bottom: 1px solid #4a3a2a;
+}
+
+/* Biomorph SHAPES — organic & asymmetric (not boxy): blob panels + pebble keys with varied radii,
+   so the deck reads like a grown exoskeleton rather than a grid of rectangles. */
+[data-theme="organic"] .dock-body .deck-tab-panel { border-radius: 0 30px 36px 32px; }
+[data-theme="organic"] .wiz-box { border-radius: 30px 12px 30px 12px; }
+[data-theme="organic"] #controller-dock .dock-body .toolbar-btn { border-radius: 18px 26px 16px 22px; }
+[data-theme="organic"] #controller-dock .dock-body .toolbar-btn:nth-child(2n) { border-radius: 26px 16px 22px 18px; }
+[data-theme="organic"] #controller-dock .dock-body .toolbar-btn:nth-child(3n) { border-radius: 16px 22px 28px 14px; }
+[data-theme="organic"] #controller-dock .dock-body .var-item { border-radius: 14px 20px 12px 18px; }
+[data-theme="organic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role="back"]  { border-radius: 28px 16px 22px 18px !important; }
+[data-theme="organic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role="space"] { border-radius: 18px 26px 16px 26px !important; }
+[data-theme="organic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role="enter"] { border-radius: 16px 28px 18px 24px !important; }
+/* the deck folder-tabs get a soft organic top */
+[data-theme="organic"] .dock-body .deck-tab { border-radius: 16px 16px 0 0 !important; }
+/* the whole keyboard frame: organic rounded top corners (the dock + its handle lip together) */
+[data-theme="organic"] #controller-dock.controller-dock { border-radius: 44px 32px 0 0; }
+[data-theme="organic"] #controller-dock .header-handle { border-radius: 44px 32px 0 0; }
 
 /* Added classes to replace inline styles in commandDeck.js */
 
@@ -2600,7 +2966,14 @@ Middle (handle) {
     font-size: 11px;
     box-sizing: border-box;
 }
-.wiz-body select { width: 100%; box-sizing: border-box; }
+/* Dropdowns size to their content (a lower minimum), not the full cell — they were too wide. Capped at the cell. */
+.wiz-body select { width: auto; min-width: 0; max-width: 100%; box-sizing: border-box; }
+
+/* Fields flex to fill their grid cell but may shrink BELOW their intrinsic width — grid items default to
+   min-width:auto (≈ the input's ~150px natural width), which makes grid-3/grid-4 overflow a narrow panel and clip.
+   min-width:0 on the cells + inputs lets the 1fr columns shrink to fit, keeping them flexible. (Across all wizards.) */
+.wiz-body .grid-2 > *, .wiz-body .grid-3 > *, .wiz-body .grid-4 > *, .wiz-body .row-2 > * { min-width: 0; }
+.wiz-body input[type="text"], .wiz-body input[type="number"], .wiz-body input:not([type]) { min-width: 0; max-width: 100%; }
 
 /* Labels - Tighter Spacing */
 .label {
@@ -3126,6 +3499,28 @@ svg [id$="_wcs"] { display: none; }
 /* Wizard usage instructions */
 .wiz-usage { font-size: 10px; color: var(--text-dim); padding: 6px 8px; margin: 4px 0 6px; border-left: 2px solid var(--accent); background: rgba(255,255,255,0.03); line-height: 1.5; }
 
+/* Wizard parameter forms (ATC + others) — these were unstyled, so they inherited the modal's large default
+   font and read as a "block of text". Lay fields out in a compact responsive grid; notes are small. */
+.param-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 6px 12px;
+    margin: 4px 0 8px;
+    align-items: end;
+}
+.param-grid > label {
+    display: flex; flex-direction: column; gap: 3px;
+    font-size: 10px; color: var(--text-dim);
+}
+.param-grid > label:has(input[type="checkbox"]) {   /* checkbox rows read inline, not stacked */
+    flex-direction: row; align-items: center; gap: 6px; font-size: 11px;
+}
+.wiz-note {
+    font-size: 10.5px; color: var(--text-dim); line-height: 1.45;
+    margin: 4px 0 8px; padding: 6px 8px;
+    border-left: 2px solid var(--border); background: rgba(127,127,127,0.05); border-radius: 0 4px 4px 0;
+}
+
 /* ============================================
    VIEW TOGGLE FAB  (3D / CODE)  +  3D PREVIEW
    ============================================ */
@@ -3213,11 +3608,13 @@ svg [id$="_wcs"] { display: none; }
    colour-mix can't fall through to transparent — the active tab + its panel are one tinted surface. */
 .dock-body .deck-tab[data-deck-tab="move"]      { --tab-color: #3b82f6; }
 .dock-body .deck-tab[data-deck-tab="gm"]        { --tab-color: #f59e0b; }
-.dock-body .deck-tab[data-deck-tab="macro"]     { --tab-color: #a855f7; }
+.dock-body .deck-tab[data-deck-tab="math"]      { --tab-color: #14b8a6; }
+.dock-body .deck-tab[data-deck-tab="logic"]     { --tab-color: #a855f7; }
 .dock-body .deck-tab[data-deck-tab="variables"] { --tab-color: #10b981; }
 .dock-body .deck-tab[data-deck-tab="move"].active      { background: color-mix(in srgb, var(--panel) 90%, #3b82f6) !important; border-top-color: #3b82f6 !important; }
 .dock-body .deck-tab[data-deck-tab="gm"].active        { background: color-mix(in srgb, var(--panel) 90%, #f59e0b) !important; border-top-color: #f59e0b !important; }
-.dock-body .deck-tab[data-deck-tab="macro"].active     { background: color-mix(in srgb, var(--panel) 90%, #a855f7) !important; border-top-color: #a855f7 !important; }
+.dock-body .deck-tab[data-deck-tab="math"].active      { background: color-mix(in srgb, var(--panel) 90%, #14b8a6) !important; border-top-color: #14b8a6 !important; }
+.dock-body .deck-tab[data-deck-tab="logic"].active     { background: color-mix(in srgb, var(--panel) 90%, #a855f7) !important; border-top-color: #a855f7 !important; }
 .dock-body .deck-tab[data-deck-tab="variables"].active { background: color-mix(in srgb, var(--panel) 90%, #10b981) !important; border-top-color: #10b981 !important; }
 
 /* Studio keyboard tabs use the SAME folder-tab styling as every other theme (active fill = panel
@@ -3237,8 +3634,271 @@ svg [id$="_wcs"] { display: none; }
 }
 #deck-tab-move      { --tab-color: #3b82f6; background: color-mix(in srgb, var(--panel) 90%, #3b82f6); }
 #deck-tab-gm        { --tab-color: #f59e0b; background: color-mix(in srgb, var(--panel) 90%, #f59e0b); }
-#deck-tab-macro     { --tab-color: #a855f7; background: color-mix(in srgb, var(--panel) 90%, #a855f7); }
+#deck-tab-math      { --tab-color: #14b8a6; background: color-mix(in srgb, var(--panel) 90%, #14b8a6); }
+#deck-tab-logic     { --tab-color: #a855f7; background: color-mix(in srgb, var(--panel) 90%, #a855f7); }
 #deck-tab-variables { --tab-color: #10b981; background: color-mix(in srgb, var(--panel) 90%, #10b981); }
+
+/* ============================================================================
+   GLASS KEYBOARD — "frosted command glass"
+   The on-screen keypad (controller dock) is a sheet of translucent glass laid OVER
+   the running program, so you keep reading the code through it. Each theme is its own
+   MATERIAL (gradient vector + pattern/texture + see-through level), declared ONLY via
+   the --kbd-* token contract below. Components read tokens, never raw colour — adding /
+   re-skinning a theme = edit its token block. Disposition (key layout) never changes.
+
+   Desktop/tablet: the dock FLOATS over the editor (code shows behind); the editor pads
+   its scroll so the active line clears the keys. Phones keep the in-flow behaviour.
+   ============================================================================ */
+
+/* ---- Token contract: defaults (neutral light frost). Every theme may override. ---- */
+:root {
+    --kbd-glass: linear-gradient(180deg,
+        color-mix(in srgb, var(--panel) 60%, transparent),
+        color-mix(in srgb, var(--panel) 86%, transparent));      /* non-uniform: clearer at top */
+    --kbd-blur: 7px;
+    --kbd-handle: linear-gradient(180deg,
+        color-mix(in srgb, var(--panel) 82%, transparent),
+        color-mix(in srgb, var(--panel) 95%, transparent));
+    --kbd-grip: color-mix(in srgb, var(--text-dim) 55%, transparent);
+    --kbd-edge: color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+/* FUTURISTIC — "the super coder": cold cyan HUD glass. MOST see-through, low blur (sharp code),
+   scanline pattern, translucent keys so code peeks through everything. */
+[data-theme="futuristic"] {
+    /* glass-screen: clear panel so the code/grid reads through it (a touch more opaque now), faint scanlines */
+    --kbd-glass:
+        linear-gradient(180deg, rgba(10,16,30,.24), rgba(8,12,24,.34)),
+        repeating-linear-gradient(0deg, rgba(45,212,191,.04) 0 1px, transparent 1px 3px);
+    --kbd-blur: 0.5px;
+    --kbd-handle: linear-gradient(180deg, rgba(36,68,104,.45), rgba(8,12,24,.6));
+    --kbd-grip: rgba(150,195,220,.5);          /* soft steel — not garish neon cyan */
+    --kbd-edge: rgba(45,226,255,.40);
+    /* translucent glass keys (sheen added in the keys rule). --kbd-key-glow = the glow colour as r,g,b;
+       per-category key classes (axis-blue / m-red / m-green) override these to keep the ORIGINAL colours. */
+    --kbd-key: rgba(22,34,56,.34);
+    --kbd-key-bd: rgba(0,255,255,.42);
+    --kbd-key-ink: #cffafe;
+    --kbd-key-glow: 45,226,255;
+}
+
+/* STEAMPUNK — smoked brass. LEAST see-through overall (opaque keys), but the translucent
+   panel lets code glow through the gutters between keys (the "few elements" that show through).
+   Warm diagonal brass hatch + grain. */
+[data-theme="steampunk"] {
+    --kbd-glass:
+        linear-gradient(165deg, rgba(61,40,23,.58), rgba(42,24,16,.78)),
+        repeating-linear-gradient(45deg, rgba(190,130,50,.07) 0 7px, transparent 7px 14px),
+        repeating-linear-gradient(-45deg, rgba(20,10,4,.05) 0 7px, transparent 7px 14px);
+    --kbd-blur: 4px;
+    --kbd-handle: linear-gradient(180deg, #6b5329, #3d2817);
+    --kbd-grip: rgba(245,215,168,.7);
+    --kbd-edge: #8b6914;
+}
+
+/* STUDIO — brushed aluminium scrim. Medium translucent panel + fine machined lines; the
+   silver bevel keys stay opaque (kept as-is) so only the gutters reveal the phosphor screen. */
+[data-theme="studio"] {
+    --kbd-glass:
+        linear-gradient(180deg, rgba(207,202,191,.56), rgba(182,177,165,.84)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 1px, transparent 1px 3px);
+    --kbd-blur: 6px;
+    --kbd-handle: repeating-linear-gradient(180deg, rgba(230,226,217,.94) 0 2px, rgba(207,202,191,.94) 2px 4px);
+    --kbd-grip: rgba(16,16,16,.7);
+    --kbd-edge: var(--bv-dark);
+}
+
+/* ORGANIC → BIOMORPH — a ribcage panel: dark sinew body with bone-coloured rib striations; the
+   bone keycaps (organic button skin) sit on it like an exoskeleton, code shows in the cavity gutters. */
+[data-theme="organic"] {
+    --kbd-glass:
+        linear-gradient(180deg, rgba(58,46,33,.50), rgba(24,18,12,.80)),
+        repeating-linear-gradient(90deg, rgba(222,206,170,.06) 0 2px, transparent 2px 11px),
+        repeating-linear-gradient(0deg, rgba(0,0,0,.06) 0 1px, transparent 1px 7px);
+    --kbd-blur: 4px;
+    --kbd-handle: linear-gradient(180deg, #4a3b2a, #211a12);
+    --kbd-grip: rgba(231,219,192,.65);     /* bone grip */
+    --kbd-edge: #6e5840;                    /* sinew seam */
+}
+
+/* NORMAL — clean white frost. LEAST see-through (a light bg needs density to stay legible). */
+[data-theme="normal"] {
+    --kbd-glass: linear-gradient(180deg, rgba(255,255,255,.74), rgba(255,255,255,.93));
+    --kbd-blur: 9px;
+    --kbd-handle: linear-gradient(180deg, rgba(255,255,255,.9), rgba(245,245,245,.97));
+    --kbd-grip: rgba(74,144,226,.6);
+    --kbd-edge: #cfd8e3;
+}
+
+/* ---- Component (reads ONLY tokens) ---- */
+#controller-dock.controller-dock {
+    background: var(--kbd-glass);
+    -webkit-backdrop-filter: blur(var(--kbd-blur)) saturate(1.12);
+    backdrop-filter: blur(var(--kbd-blur)) saturate(1.12);
+    border-top: 1px solid var(--kbd-edge);
+}
+#controller-dock .dock-body { background: transparent; }   /* let the dock glass show through */
+
+/* Bigger, tactile, translucent grab handle with a legible grip + chevron */
+#controller-dock .header-handle {
+    height: 42px !important; min-height: 42px;
+    background: var(--kbd-handle);
+    border-top: 1px solid color-mix(in srgb, var(--kbd-edge) 70%, transparent);
+    border-bottom: 1px solid var(--kbd-edge);
+    position: relative; overflow: visible;
+}
+#controller-dock .header-handle .chevron { font-size: 19px; color: var(--kbd-grip); opacity: .95; }
+/* grip bars to the left of the chevron — reads as draggable */
+#controller-dock .header-handle::before {
+    content: ""; position: absolute; top: 50%; left: calc(50% - 46px); transform: translateY(-50%);
+    width: 26px; height: 2px; border-radius: 2px;
+    background: var(--kbd-grip);
+    box-shadow: 0 -5px 0 var(--kbd-grip), 0 5px 0 var(--kbd-grip);
+    opacity: .5; pointer-events: none;
+}
+#controller-dock .header-handle::after {
+    content: ""; position: absolute; top: 50%; left: calc(50% + 20px); transform: translateY(-50%);
+    width: 26px; height: 2px; border-radius: 2px;
+    background: var(--kbd-grip);
+    box-shadow: 0 -5px 0 var(--kbd-grip), 0 5px 0 var(--kbd-grip);
+    opacity: .5; pointer-events: none;
+}
+
+/* Key labels ADAPT to the keyboard size — a taller deck → bigger keys → bigger type (drag the handle).
+   Driven by --dock-h (on <html>); clamped so it stays legible at the extremes. */
+#controller-dock .dock-body .toolbar-btn { font-size: clamp(11px, calc(var(--dock-h, 300px) / 21), 21px); }
+#controller-dock .dock-body .toolbar-btn .btn-tx { font-size: inherit; }
+#controller-dock .editor-keys-row .toolbar-btn,
+#controller-dock .editor-keys-row button { font-size: clamp(13px, calc(var(--dock-h, 300px) / 15), 27px) !important; }
+#controller-dock .var-item .var-id { font-size: clamp(10px, calc(var(--dock-h, 300px) / 26), 16px); }
+
+/* FUTURISTIC only: keys go translucent (crisp neon outlines keep them legible) */
+[data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn:not([data-ddcs-role]),
+[data-theme="futuristic"] #controller-dock .dock-body button:not([data-ddcs-role]),
+[data-theme="futuristic"] #controller-dock .var-item {
+    /* glass keycap: a top-left sheen over the translucent fill, hairline cyan rim, inner light */
+    background: linear-gradient(135deg, rgba(255,255,255,.13), rgba(255,255,255,0) 42%), var(--kbd-key) !important;
+    border: 1px solid var(--kbd-key-bd) !important;
+    color: var(--kbd-key-ink) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 12px rgba(var(--kbd-key-glow,45,226,255),.06), 0 0 9px rgba(var(--kbd-key-glow,45,226,255),.22) !important;
+    position: relative; overflow: hidden;
+}
+
+/* Keep the ORIGINAL colour-coded keys: each category sets the glass tokens (fill/border/ink/glow) the
+   rule above + the press-flash read — so axis keys stay blue, m-red red, m-green green, all as glowing glass. */
+[data-theme="futuristic"] #controller-dock .dock-body .axis-blue {
+    --kbd-key: rgba(40,82,150,.30); --kbd-key-bd: rgba(96,165,250,.6); --kbd-key-ink: #d6e6ff; --kbd-key-glow: 96,165,250;
+}
+[data-theme="futuristic"] #controller-dock .dock-body .m-red {
+    --kbd-key: rgba(150,48,48,.28); --kbd-key-bd: rgba(248,113,113,.6); --kbd-key-ink: #ffdada; --kbd-key-glow: 248,113,113;
+}
+[data-theme="futuristic"] #controller-dock .dock-body .m-green {
+    --kbd-key: rgba(40,130,72,.26); --kbd-key-bd: rgba(74,222,128,.6); --kbd-key-ink: #d8ffe5; --kbd-key-glow: 74,222,128;
+}
+
+/* ===== OPERATOR CONSOLE — the futuristic keyboard as a living sci-fi command deck ===== */
+[data-theme="futuristic"] #controller-dock .dock-body { position: relative; }
+
+/* a cyan light SWEEPS across the keypad on a loop (compositor-friendly transform) */
+/* Reactive per-key glow (Corsair-style): on press a key flashes bright then fades over ~520ms.
+   Uses `filter` (brightness + drop-shadow) so it isn't blocked by the keys' !important box-shadow.
+   The .kp-flash class is added on pointerdown by ui/keyFlash.js (re-added each press to retrigger). */
+@keyframes kp-flash {
+    0%   { filter: brightness(1.8)  drop-shadow(0 0 14px rgba(var(--kbd-key-glow,45,226,255),1)); }
+    55%  { filter: brightness(1.6)  drop-shadow(0 0 12px rgba(var(--kbd-key-glow,45,226,255),.85)); }   /* hold the glow longer */
+    100% { filter: brightness(1)    drop-shadow(0 0 0 rgba(var(--kbd-key-glow,45,226,255),0)); }
+}
+[data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn.kp-flash {
+    animation: kp-flash 2200ms ease-out;
+}
+[data-theme="futuristic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role].kp-flash {
+    animation: kp-flash 2200ms ease-out;
+}
+
+
+/* HUD readout tag, top-right of the deck */
+[data-theme="futuristic"] #controller-dock .dock-body::before {
+    content: "\25C9 OPERATOR \00b7 SYS NOMINAL"; position: absolute; top: 5px; right: 14px; z-index: 6;
+    font: 700 9px/1 var(--font-code); letter-spacing: .16em; color: rgba(45,226,255,.62);
+    text-shadow: 0 0 7px rgba(45,226,255,.5); pointer-events: none;
+}
+
+/* keys: a HUD corner tick + edge light on hover, full bloom on press */
+[data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn:not([data-ddcs-role]):hover {
+    border-color: rgba(45,226,255,.95) !important;
+    box-shadow: 0 0 12px rgba(45,226,255,.4), inset 0 0 8px rgba(45,226,255,.12) !important;
+    color: #eafdff !important;
+}
+[data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn:not([data-ddcs-role]):active {
+    background: rgba(45,226,255,.22) !important;
+    box-shadow: 0 0 18px rgba(45,226,255,.6), inset 0 0 10px rgba(45,226,255,.25) !important;
+    color: #ffffff !important;
+}
+
+/* BACK / SPACE / ENTER — keep their colour tint but as translucent glass that glows (was solid) */
+[data-theme="futuristic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role="back"] {
+    --kbd-key-glow: 248,113,113;
+    background: rgba(239,68,68,.20) !important; border: 1px solid rgba(248,113,113,.7) !important; color: #ffdada !important;
+    box-shadow: 0 0 15px rgba(239,68,68,.42), inset 0 0 14px rgba(239,68,68,.16) !important; text-shadow: 0 0 9px rgba(239,68,68,.55) !important;
+}
+[data-theme="futuristic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role="space"] {
+    --kbd-key-glow: 203,213,225;
+    background: rgba(148,163,184,.18) !important; border: 1px solid rgba(203,213,225,.65) !important; color: #eaf0f7 !important;
+    box-shadow: 0 0 15px rgba(148,163,184,.36), inset 0 0 14px rgba(148,163,184,.16) !important; text-shadow: 0 0 9px rgba(148,163,184,.5) !important;
+}
+[data-theme="futuristic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role="enter"] {
+    --kbd-key-glow: 96,165,250;
+    background: rgba(59,130,246,.20) !important; border: 1px solid rgba(96,165,250,.72) !important; color: #d9e8ff !important;
+    box-shadow: 0 0 15px rgba(59,130,246,.46), inset 0 0 14px rgba(59,130,246,.18) !important; text-shadow: 0 0 9px rgba(59,130,246,.55) !important;
+}
+[data-theme="futuristic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role]:hover { filter: brightness(1.18); }
+
+@media (prefers-reduced-motion: reduce) {
+    [data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn.kp-flash,
+    [data-theme="futuristic"] #controller-dock .editor-keys-row .toolbar-btn[data-ddcs-role].kp-flash { animation: none; }
+}
+
+/* The tabbed-deck surfaces go glass too — translucent COLOURED panels + tabs so code shows through them
+   (the panel behind the keys was the last opaque layer). Each keeps its accent identity as a colour cast. */
+#deck-tab-move      { background: color-mix(in srgb, #3b82f6 14%, transparent); }
+#deck-tab-gm        { background: color-mix(in srgb, #f59e0b 14%, transparent); }
+#deck-tab-math      { background: color-mix(in srgb, #14b8a6 14%, transparent); }
+#deck-tab-logic     { background: color-mix(in srgb, #a855f7 14%, transparent); }
+#deck-tab-variables { background: color-mix(in srgb, #10b981 14%, transparent); }
+#controller-dock .dock-body .deck-tab { background: color-mix(in srgb, var(--panel) 24%, transparent) !important; }
+#controller-dock .dock-body .deck-tab[data-deck-tab="move"].active      { background: color-mix(in srgb, #3b82f6 26%, transparent) !important; }
+#controller-dock .dock-body .deck-tab[data-deck-tab="gm"].active        { background: color-mix(in srgb, #f59e0b 26%, transparent) !important; }
+#controller-dock .dock-body .deck-tab[data-deck-tab="math"].active      { background: color-mix(in srgb, #14b8a6 26%, transparent) !important; }
+#controller-dock .dock-body .deck-tab[data-deck-tab="logic"].active     { background: color-mix(in srgb, #a855f7 26%, transparent) !important; }
+#controller-dock .dock-body .deck-tab[data-deck-tab="variables"].active { background: color-mix(in srgb, #10b981 26%, transparent) !important; }
+/* labels stay legible over the moving code behind them */
+#controller-dock .group-header, #controller-dock .section-label,
+#controller-dock .deck-tabs .deck-tab { text-shadow: 0 1px 2px rgba(0,0,0,.35); }
+
+/* LANDSCAPE (desktop + landscape tablets): FLOAT the keyboard over the editor so the live code shows
+   behind it. Scoped to landscape so PORTRAIT (phones / portrait tablets) keeps the in-flow keyboard and
+   its own bottom-pull 3D drawer — no collision. --kbd-clear = how much the floating keyboard covers; the
+   editor pads its scroll by it, and the 3D drawer + toggle button stay ABOVE it. */
+@media (min-width: 700px) and (orientation: landscape) {
+    #controller-dock.controller-dock {
+        position: absolute; left: 0; right: 0; bottom: 0;
+        box-shadow: 0 -10px 30px rgba(0,0,0,.28);
+    }
+    /* --kbd-clear = the EXACT keyboard height (handle = 42px), so the 3D drawer / divider meet the
+       keyboard edge with no floating gap. The editor scroll adds its own breathing margin below. */
+    .app-shell { --kbd-clear: 42px; }                                                  /* collapsed: just the handle */
+    .app-shell:has(#controller-dock.is-expanded) { --kbd-clear: calc(var(--dock-h, 320px) + 42px); }
+
+    /* editor scroll clears the keys + a little breathing room (gutter too → line numbers stay aligned) */
+    #editor, #editor-highlight, #editor-gutter { padding-bottom: calc(var(--kbd-clear, 42px) + 14px) !important; }
+
+    /* keep the 3D preview drawer + its toggle button ABOVE the floating keyboard, flush to its top edge.
+       !important: the base .viz3d-drawer{bottom:0} rule is later in the file and would win otherwise. */
+    .viz3d-drawer { bottom: var(--kbd-clear, 42px) !important; height: auto !important; }
+    .editor-container .viz3d-handle { top: calc((100% - var(--kbd-clear, 0px)) / 2) !important; }
+    /* the ⟳ Align editor-overlay control is pinned bottom:8px (inline) → lift it just above the keys */
+    #align-rotate-btn { bottom: calc(var(--kbd-clear, 42px) + 8px) !important; }
+}
 
 /* Variables tab — search row + Filters button */
 .deck-var-searchrow { display: flex; gap: 6px; align-items: center; padding: 2px 0 6px; }
@@ -3601,19 +4261,20 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .app-header.is-compact .hdr-controls { gap: 6px; }
 .app-header.is-mini .hdr-tabs .tab .app-tx { display: none; }
 .app-header.is-mini .hdr-tabs .tab .app-ico { margin-left: 0; }
-.app-header.is-mini .hdr-tabs .tab { padding: 0 12px; letter-spacing: 0; }   /* icon-only, full header height */
+.app-header.is-mini .hdr-tabs .tab { padding: 0 18px; letter-spacing: 0; }   /* icon-only, full header height */
 .app-header.is-mini .ver { display: none; }
 @media (max-width: 520px) {
     .app-header .brand { padding: 0 8px; gap: 6px; }
     .app-header .logo { height: 26px; }
 }
-/* The post-processor dropdown is the header's widest item — shrink it on tablet (is-mini); on PHONE
-   hide it entirely (set it in Settings → Post processor). Project Open/Save (macro-bar) stay in the header. */
-.app-header.is-mini .hdr-post { max-width: 120px; }
+/* The post-processor chevron is icon-only at every width; on PHONE hide it entirely (set it in
+   Settings → Post processor). Project Open/Save (macro-bar) stay in the header. */
 @media (max-width: 600px) {
-    .app-header.is-mini .hdr-tabs .tab { padding: 0 8px; }
+    .app-header.is-mini .hdr-tabs .tab { padding: 0 13px; }
     .hdr-controls { gap: 6px; }
-    #hdrPost, #hdrPostWarn { display: none; }   /* post selector lives in Settings on phone */
+    /* The chevron quick-menu stays visible on phone — it's the single quick-access point everywhere
+       (Open/Save/Load/Insert/Copy/Clear/Export + post + theme). The standalone macro-bar stays hidden
+       (its Open/Save now live in the chevron). */
 }
 
 /* ===== Portrait / mobile: 3D drawer pulls UP from the bottom of the editor ===== */
@@ -3700,7 +4361,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* Blockly host = a column: a top BAR (search + suggestions) above the Blockly workspace, so neither overlaps
    the toolbox/canvas (Blockly resists CSS padding + makes its own stacking context). */
 #blocks-app .blk-ws { position:relative; min-width:0; background:var(--bg); display:flex; flex-direction:column; }
-#blocks-app .blk-topbar { flex:0 0 auto; display:flex; flex-direction:column; gap:6px; padding:6px; background:var(--bg); border-bottom:1px solid var(--line); }
+#blocks-app .blk-topbar { flex:0 0 auto; display:flex; flex-direction:column; gap:6px; padding:6px; background:var(--panel); border-bottom:1px solid var(--line); }
 #blocks-app .blk-bk-host { flex:1 1 auto; position:relative; min-height:0; }
 #blocks-app .blk-search {
     width:100%; box-sizing:border-box; background:var(--panel); color:var(--ink);
@@ -3852,7 +4513,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .right { position:relative; display:flex; flex-direction:column; border-left:1px solid var(--line); min-width:0; background:var(--screen); }
 #blocks-app .pane-h { margin:0; padding:6px 10px; font-size:11px; letter-spacing:.08em; color:var(--screen-dim);
                       text-transform:uppercase; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
-#blocks-app .pv { height:320px; display:flex; flex-direction:column; background:var(--screen); }
+#blocks-app .pv { height:var(--blk-pv-split, 320px); flex:0 0 auto; display:flex; flex-direction:column; background:var(--screen); }
 #blocks-app .pv-body { flex:1; position:relative; }
 #blocks-app .pv-body > canvas, #blocks-app .pv-body > div { position:absolute; inset:0; width:100%; height:100%; }
 #blocks-app .seg { margin-left:auto; display:flex; gap:4px; }   /* 2D/3D + Play reuse .op-btn (.primary = active) */
@@ -3904,6 +4565,9 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* Desktop: drag the left edge of the preview column to resize it (width = --blk-pv-w on #blocks-app). */
 #blocks-app .blk-col-resize { position:absolute; left:-4px; top:0; bottom:0; width:8px; cursor:ew-resize; z-index:6; }
 #blocks-app .blk-col-resize:hover { background:linear-gradient(90deg, transparent, var(--accent), transparent); opacity:.6; }
+/* Horizontal divider between the Preview pane and the Projected G-code pane (desktop) — drag to resize. */
+#blocks-app .blk-row-resize { flex:0 0 auto; height:7px; cursor:ns-resize; position:relative; z-index:6; border-top:1px solid var(--line); }
+#blocks-app .blk-row-resize:hover { background:linear-gradient(180deg, transparent, var(--accent), transparent); opacity:.7; }
 
 /* ============================================================================
    BLOCKS TAB — MOBILE (≤860px): Blockly canvas gets the whole tab; the Preview
@@ -3932,6 +4596,8 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
         cursor:ns-resize; touch-action:none; z-index:3;
     }
     #blocks-app .blk-col-resize { display:none; }   /* desktop-only column resize off in the mobile drawer layout */
+    #blocks-app .blk-row-resize { display:none; }   /* mobile uses the Preview/G-code toggle, not a split */
+    #blocks-app .right .pv { height:auto; }         /* drawer layout controls the preview height itself */
 
     #blocks-app .blk-drawer-head {
         display:flex; align-items:center; gap:8px; position:relative;
