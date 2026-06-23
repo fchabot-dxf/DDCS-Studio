@@ -48,6 +48,10 @@ function probeSet() {
     const pin = (getSettings().probes || {}).probePin;
     return pin !== '' && pin != null && Number(pin) > 0;
 }
+function gatewaySet() {
+    // The header LED reflects live gateway reachability (gatewayStatus.js): .led-ok = a gateway is answering.
+    try { return !!document.getElementById('gateway-led')?.classList.contains('led-ok'); } catch (_) { return false; }
+}
 // Save destination: a DELIBERATE choice. '' = not chosen → ⚠. local = done. cloud/both → also need a connection.
 function saveDestState() {
     const dest = (getSettings().setup || {}).saveDest || '';
@@ -65,21 +69,23 @@ const ITEMS = [
     { key: 'profile', label: 'Controller profile', hint: 'Which controller this machine is.', detect: profileSet, set: () => goSettings('controller', 'set_tab_profile') },
     { key: 'stock',   label: 'Stock', hint: 'The workpiece dimensions / shape.', detect: stockSet, set: () => { try { window.showApp && window.showApp('studio'); } catch (_) {} window.ddcsOpenStock && window.ddcsOpenStock(); } },
     { key: 'tool',    label: 'Tool', hint: 'At least one tool in the tool table.', detect: toolSet, set: () => goSettings('hardware', 'set_tab_atc') },
-    { key: 'probe',   label: 'Probe input', hint: 'Touch-probe pin (optional, needed to simulate probing).', detect: probeSet, set: () => goSettings('hardware', 'set_tab_input'), optional: true },
+    { key: 'probe',   label: 'Probe input', hint: 'Touch-probe pin (needed to simulate probing).', detect: probeSet, set: () => goSettings('hardware', 'set_tab_input'), optional: true },
+    { key: 'gateway', label: 'Gateway', hint: 'Connect to a controller / bridge (live status, send, pull).', detect: gatewaySet, set: () => { try { window.showApp && window.showApp('gateway'); } catch (_) {} }, optional: true },
 ];
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
 let _ov = null;
 
-function close() { if (_ov) { _ov.remove(); _ov = null; } window.removeEventListener('ddcs:cloud-account', render); window.removeEventListener('ddcs:settings-changed', render); }
+function close() { if (_ov) { _ov.remove(); _ov = null; } window.removeEventListener('ddcs:cloud-account', render); window.removeEventListener('ddcs:settings-changed', render); document.removeEventListener('ddcs:gateway-status', render); }
 
 function render() {
     if (!_ov) return;
     const sd = saveDestState();
     // total / ready count — required items + save destination (probe is optional, counted only as a bonus row).
     const required = ITEMS.filter((i) => !i.optional);
-    const reqOk = required.filter((i) => i.detect()).length + (sd.ok ? 1 : 0);
-    const total = required.length + 1;   // +1 for save destination
+    const optionalItems = ITEMS.filter((i) => i.optional);
+    const reqOk = required.filter((i) => i.detect()).length;
+    const total = required.length;   // only required items count toward "ready"; save destination + gateway + probe are optional
 
     const icon = (ok) => ok
         ? '<span style="color:#3ddc84; font-size:15px; width:18px; text-align:center;">✓</span>'
@@ -117,7 +123,9 @@ function render() {
             <button type="button" class="sc-close" title="Close" style="width:24px; height:24px; border:none; background:transparent; color:#cfd6df; font-size:16px; cursor:pointer;">✕</button>
         </div>
         <p style="margin:0 0 8px; font-size:11px; color:#8a93a0;">The minimum for a good simulation. Each ⚠ has a <b>Set</b> link.</p>
-        <div class="sc-list">${ITEMS.map(row).join('')}${destRow}</div>
+        <div class="sc-list">${required.map(row).join('')}</div>
+        <div style="margin:11px 0 1px; font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:#8a93a0;">Optional</div>
+        <div class="sc-list">${optionalItems.map(row).join('')}${destRow}</div>
         <div style="display:flex; gap:8px; margin-top:12px; justify-content:flex-end;">
             <button type="button" class="sc-skip" style="padding:6px 14px; font-size:12px; background:transparent; color:#cfd6df; border:1px solid rgba(255,255,255,.18); border-radius:5px; cursor:pointer;">Don't show again</button>
             <button type="button" class="sc-done" style="padding:6px 18px; font-size:12px; background:var(--accent,#2d7ff9); color:#fff; border:none; border-radius:5px; cursor:pointer;">Done</button>
@@ -152,6 +160,7 @@ export function openSetupChecklist() {
     _ov.addEventListener('click', (e) => { if (e.target === _ov) close(); });
     window.addEventListener('ddcs:cloud-account', render);    // live-update the cloud-gated save-destination row
     window.addEventListener('ddcs:settings-changed', render); // live-update ✓/⚠ if something gets set elsewhere
+    document.addEventListener('ddcs:gateway-status', render); // live-update the Gateway row when a connection lands
     render();
     window.ddcsTrack && window.ddcsTrack('feature', 'setup-checklist');
 }
@@ -164,7 +173,7 @@ export function maybeAutoOpenSetupChecklist() {
     const s = getSettings();
     if (s.setup && s.setup.dismissed) return;
     const required = ITEMS.filter((i) => !i.optional);
-    const allReqOk = required.every((i) => i.detect()) && saveDestState().ok;
+    const allReqOk = required.every((i) => i.detect());   // optional items (save destination, gateway, probe) don't trigger the nag
     if (allReqOk) return;   // nothing to nag about
     openSetupChecklist();
 }
