@@ -1,6 +1,7 @@
 /** views/middleView.js — Middle (pocket/boss centre) wizard view. */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { MiddleWizard } from '../middleWizard.js';
+import { restoreBoxStock } from './rotaryCenterView.js';
 
 const wizard = new MiddleWizard();
 
@@ -19,6 +20,7 @@ export const middleView = {
     probeSrcFields: { m_port: 'port', m_level: 'level', m_feed_fast: 'fastFeed', m_retract: 'retract' },
 
     onOpen(ctx) {
+        restoreBoxStock();   // not a rotary op → revert a forced cylinder back to the box (no-op if already a box)
         setTimeout(() => { ctx.update(); }, 50);
     },
 

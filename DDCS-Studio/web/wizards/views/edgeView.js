@@ -1,6 +1,7 @@
 /** views/edgeView.js — Edge probing wizard view (DOM glue + SVG animator). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { EdgeWizard } from '../edgeWizard.js';
+import { restoreBoxStock } from './rotaryCenterView.js';
 
 const wizard = new EdgeWizard();
 
@@ -39,6 +40,7 @@ export const edgeView = {
     startAnim: startEdgeAnim,
 
     onOpen(ctx) {
+        restoreBoxStock();   // not a rotary op → revert a forced cylinder back to the box (no-op if already a box)
         setTimeout(() => {
             ctx.update();
             // start animator similar to corner animator

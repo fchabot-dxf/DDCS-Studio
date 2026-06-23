@@ -1,6 +1,7 @@
 /** views/cornerView.js — Corner probing wizard view (DOM glue + SVG animator). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { CornerWizard } from '../cornerWizard.js';
+import { restoreBoxStock } from './rotaryCenterView.js';
 
 const wizard = new CornerWizard();
 
@@ -45,6 +46,7 @@ export const cornerView = {
     startAnim: startCornerAnim,
 
     onOpen() {
+        restoreBoxStock();   // not a rotary op → revert a forced cylinder back to the box (no-op if already a box)
         setTimeout(async () => {
             startCornerAnim();
         }, 50);
