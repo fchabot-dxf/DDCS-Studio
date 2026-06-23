@@ -47,10 +47,15 @@ export function rotaryCenterStack(params = {}) {
         PR(axis, pv, '#4'); CK(axis, 1); RD(axis, resultVar); MV(axis, rv);
     };
     const reposition = (msg) => {
-        RM('Z', '#57'); MV('Z', '#17');
+        // Lift clear, operator jogs to the flank, then drop back the SAME amount — all INCREMENTAL (no G53).
+        // Keeping the fit start-anchored lets the preview fan the 3 passes out to their own markers; a G53 here
+        // would mark the whole trace absolute and the 3 probe paths would collapse onto the macro's machine coords.
+        // Assumes the operator jogs in Y only (the "move clear to the +/-Y side" prompt), so the symmetric Z drop
+        // returns to the prior height. (Was: RM #57 machine-Z save + G53 restore.)
+        MV('Z', '#17');
         C(`REPOSITION: ${msg}`);
         CF('Press Enter when repositioned - ESC=cancel', 2);
-        MM('Z', '#57'); DM('inc');
+        MV('Z', '[0-#17]'); DM('inc');
     };
 
     C(`Rotary centreline | ${method === 'fit' ? '3-point fit' : 'known dia ' + diameter} | Z0 at ${datum === 'top' ? 'OD top' : 'centreline'} | ${wcsLabel}`);
