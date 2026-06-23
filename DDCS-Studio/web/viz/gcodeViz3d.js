@@ -132,6 +132,27 @@ export class GcodeViz3D {
         this._axisLineX = mkAxisLine(0xff6b6b);
         this._axisLineY = mkAxisLine(0x5fd35f);
         this._axisLineZ = mkAxisLine(0x6b9bff);   // vertical Z axis at the origin column, spanning the envelope height
+        // Labelled WORK-ORIGIN gizmo at part-zero (the WCS). The thin axis LINES above span the footprint, but the
+        // datum itself is easy to miss — so add a small constant-screen-size crosshair + dot + "WCS" label that rides
+        // the part frame (same datum tracking as the axis lines). Scaled per-frame in _scaleMarkers so it never grows
+        // with zoom. Built in part-local units (base size ~1mm); _scaleMarkers sets the group scale for ~constant px.
+        const og = new THREE.Group();
+        og.renderOrder = 14;
+        const omat = new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.95, depthTest: false });
+        const ogeo = new THREE.BufferGeometry();
+        // a 3D crosshair (±X, ±Y, ±Z) of unit half-length — one mm at scale 1
+        ogeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+            -1, 0, 0, 1, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, -1, 0, 0, 1,
+        ]), 3));
+        const cross = new THREE.LineSegments(ogeo, omat); cross.renderOrder = 14; og.add(cross);
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffe08a, depthTest: false }));
+        dot.renderOrder = 14; og.add(dot);
+        const olabel = this._makeTextSprite('WCS', '#ffe08a');
+        olabel.position.set(1.2, 1.2, 0.2);   // float up-right of the dot (re-scaled with the group)
+        og.add(olabel);
+        this._originGizmo = og;
+        this._originLabel = olabel;
+        this.partFrame.add(og);   // rides the part frame → tracks the datum exactly like the axis lines
         // Direction labels on the grid edges (repositioned to the footprint in setSegments)
         this._gridLabels = {
             xp: this._makeTextSprite('+X', '#ff6b6b'), xn: this._makeTextSprite('-X', '#ff6b6b'),
@@ -268,6 +289,15 @@ export class GcodeViz3D {
             : (2 * this.camera.position.distanceTo(pos) * tanHalf) / H;
         const targetPx = this._gizmoPx || 90, base = 26; // base = the arrow length at scale 1
         for (const m of this.spindleMarkers) m.scale.setScalar(Math.max(1e-4, (targetPx * worldPerPxAt(m.position)) / base));
+        // Work-origin gizmo: constant on-screen size. Group crosshair is ±1mm at scale 1, so scale it so the cross
+        // spans ~36px; the label sprite (a group child) is counter-scaled so the "WCS" text stays a fixed px width
+        // (canvas is 2:1) instead of compounding with the group scale.
+        if (this._originGizmo) {
+            const wpp = worldPerPxAt(this._originGizmo.getWorldPosition(this._ogV3 || (this._ogV3 = new this.THREE.Vector3())));
+            const gs = Math.max(1e-4, 18 * wpp);   // ±18px crosshair half-length
+            this._originGizmo.scale.setScalar(gs);
+            if (this._originLabel) { const w = Math.max(1e-4, 48 * wpp / gs); this._originLabel.scale.set(w, w / 2, 1); }
+        }
         // Direction labels (+X/-X/+Y/-Y): constant on-screen width too (canvas is 2:1), so they don't grow with zoom.
         const L = this._gridLabels;
         if (L) for (const k in L) { const w = Math.max(1e-4, 55 * worldPerPxAt(L[k].position)); L[k].scale.set(w, w / 2, 1); }
@@ -792,6 +822,8 @@ export class GcodeViz3D {
             const zTop = useMch ? Math.max(0, m.z) : Math.max(pFloor + Math.max(sz, 10) * 0.3, b ? b.maxZ : 0);
             const pz = this._axisLineZ.geometry.attributes.position; pz.setXYZ(0, 0, 0, zBot); pz.setXYZ(1, 0, 0, zTop); pz.needsUpdate = true;
         }
+        // Work-origin gizmo sits at the X/Y axis-line crossing (part-zero, at the datum floor Z) so it marks the WCS.
+        if (this._originGizmo) this._originGizmo.position.set(0, 0, pFloor);
 
         this._applyCamera();
     }
