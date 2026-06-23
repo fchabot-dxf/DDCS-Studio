@@ -39,8 +39,9 @@ const HQ_ACTIONS = [
     { act: 'copy',   label: 'Copy program' },
     { act: 'clear',  label: 'Clear editor' },
     { act: 'export', label: 'Export / download' },
-    { act: 'standalone', label: 'Download standalone' },
 ];
+// Rendered as its OWN section (the standalone = the desktop EXE release, not a file op).
+const HQ_STANDALONE = { act: 'standalone', label: 'Download standalone' };
 const HQ_THEME_SWATCH = { studio: '#9aa0a6', normal: '#4a90e2', steampunk: '#b07a2a', futuristic: '#00e5e5', organic: '#6b8e23' };
 
 function runQuickAction(act) {
@@ -127,6 +128,8 @@ export function initHeaderPost() {
 
         menu.innerHTML = '<div class="hdr-quick-head">Program</div>'
             + HQ_ACTIONS.map(actionRow).join('')
+            + '<div class="hdr-quick-sep"></div>'
+            + actionRow(HQ_STANDALONE)
             + '<div class="hdr-quick-sep"></div>' + postSub
             + '<div class="hdr-quick-sep"></div>' + themeSub
             + '<div class="hdr-quick-sep"></div>' + settingsRow;

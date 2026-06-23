@@ -467,9 +467,9 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="controller" data-target="set_tab_variables">Variables</button>
                     <button class="settings-tab" data-group="controller" data-target="set_tab_program">Program</button>
                     <button class="settings-tab" data-group="controller" data-target="set_tab_gateway">Gateway</button>
+                    <button class="settings-tab" data-group="controller" data-target="set_tab_wcs">WCS</button>
                     <div class="sidebar-group-label" data-group-label="hardware" style="display:none;">Hardware</div>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_machine" style="display:none;">Machine</button>
-                    <button class="settings-tab" data-group="hardware" data-target="set_tab_wcs" style="display:none;">WCS</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_spindle" style="display:none;">Head</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_input" style="display:none;">Input</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_output" style="display:none;">Output</button>

@@ -41,18 +41,12 @@ export function initMacrosApp() {
         </style>
         <div class="settings-head">
             <div class="settings-tabs" style="display: flex; gap: 8px;">
-                <button class="settings-main-tab active" data-group="controller">Controller macros</button>
-                <button class="settings-main-tab" data-group="cam">CAM packs</button>
+                <button class="settings-main-tab active" data-target="macros_panel_mcode">M-codes</button>
+                <button class="settings-main-tab" data-target="macros_panel_kbtn">K-buttons</button>
+                <button class="settings-main-tab" data-target="macros_panel_cam">CAM Pack Builder</button>
             </div>
         </div>
         <div class="settings-body">
-            <div class="settings-sidebar">
-                <div class="sidebar-group-label" data-group-label="controller">Controller macros</div>
-                <button class="settings-tab active" data-group="controller" data-target="macros_panel_mcode">M-codes</button>
-                <button class="settings-tab" data-group="controller" data-target="macros_panel_kbtn">K-buttons</button>
-                <div class="sidebar-group-label" data-group-label="cam" style="display:none;">CAM packs</div>
-                <button class="settings-tab" data-group="cam" data-target="macros_panel_cam" style="display:none;">CAM Pack Builder</button>
-            </div>
             <div class="settings-content">
                 <div id="macros_panel_mcode">
                     <div class="settings-section">
@@ -85,25 +79,15 @@ export function initMacrosApp() {
         </div>`;
 
     const q = (id) => root.querySelector('#' + id);
-    // Two-level tabs (mirrors Settings): L1 main (Controller macros | CAM packs) → filters the L2 sidebar.
+    // Flat top-bar tabs: M-codes | K-buttons | CAM Pack Builder → each shows its panel directly (no sidebar).
     const PANEL_IDS = ['macros_panel_mcode', 'macros_panel_kbtn', 'macros_panel_cam'];
     const mMainTabs = [...root.querySelectorAll('.settings-main-tab')];
-    const mSideTabs = [...root.querySelectorAll('.settings-sidebar .settings-tab')];
-    const mSideLabels = [...root.querySelectorAll('.settings-sidebar .sidebar-group-label')];
     const mShowPanel = (id) => {
         PANEL_IDS.forEach((p) => { const el = q(p); if (el) el.style.display = (p === id) ? '' : 'none'; });
-        mSideTabs.forEach((b) => b.classList.toggle('active', b.dataset.target === id));
+        mMainTabs.forEach((b) => b.classList.toggle('active', b.dataset.target === id));
     };
-    const mShowGroup = (g) => {
-        mMainTabs.forEach((b) => b.classList.toggle('active', b.dataset.group === g));
-        mSideTabs.forEach((b) => { b.style.display = (b.dataset.group === g) ? '' : 'none'; });
-        mSideLabels.forEach((l) => { l.style.display = (l.dataset.groupLabel === g) ? '' : 'none'; });
-        const first = mSideTabs.find((b) => b.dataset.group === g && b.style.display !== 'none');
-        if (first) mShowPanel(first.dataset.target);
-    };
-    mMainTabs.forEach((t) => t.addEventListener('click', () => mShowGroup(t.dataset.group)));
-    mSideTabs.forEach((t) => t.addEventListener('click', () => mShowPanel(t.dataset.target)));
-    mShowGroup('controller');
+    mMainTabs.forEach((t) => t.addEventListener('click', () => mShowPanel(t.dataset.target)));
+    mShowPanel('macros_panel_mcode');
 
     // --- Macros: author controller macros (M-code O100nn / K-button key-N); saved in the profile. ---
     const macrosArr = () => (getSettings().macros || (getSettings().macros = []));

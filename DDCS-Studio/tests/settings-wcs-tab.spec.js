@@ -1,14 +1,15 @@
 import { test, expect } from '@playwright/test';
 
-// The WCS table (G54–G59 work offsets) moved out of the Machine tab into its own Hardware tab.
+// The WCS table (G54–G59 work offsets) lives in its own tab under the CONTROLLER group (it's controller-derived
+// — pulled from the controller, never pushed), not inside Machine.
 test.use({ viewport: { width: 1280, height: 900 } });
 
-test('WCS lives in its own Hardware tab, not inside Machine', async ({ page }) => {
+test('WCS lives in its own tab under Controller, not inside Machine', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openSettings);
   await page.evaluate(() => window.openSettings());
 
-  await page.click('.settings-main-tab[data-group="hardware"]');
+  await page.click('.settings-main-tab[data-group="controller"]');
   await expect(page.locator('[data-target="set_tab_wcs"]')).toBeVisible();
 
   await page.click('[data-target="set_tab_wcs"]');
