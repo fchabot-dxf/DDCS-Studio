@@ -351,12 +351,10 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .gateway-app .block { margin: 18px 0; }
 .gateway-app .block:first-child { margin-top: 8px; }
 
-.gateway-app .tabs { display: flex; gap: 6px; margin: 4px 0 14px; flex-wrap: wrap; }
-.gateway-app .tabs .tab {
-    padding: 7px 14px; border: 1px solid var(--border); border-radius: var(--radius);
-    background: var(--panel); color: var(--text-dim); cursor: pointer; font-weight: 600; font-size: 13px;
-}
-.gateway-app .tabs .tab.on { background: var(--panel2); color: var(--text-main); border-color: var(--accent2); }
+/* Sub-tab bar unified with Settings + Macros: a .settings-head row of shared .settings-main-tab buttons
+   (underline-active). The .settings-main-tab look itself is defined globally above. */
+.gateway-app .settings-head { padding: 8px 0; border-bottom: 1px solid var(--border); margin: 0 0 14px; display: flex; align-items: center; }
+.gateway-app .settings-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .gateway-app table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .gateway-app th, .gateway-app td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--border); }
@@ -2533,6 +2531,12 @@ Middle (handle) {
                                          var(--bv-mid-lite) 65%, var(--bv-lite-2)) border-box;
 }
 [data-theme="studio"] .preview-block pre .g-comment { color: var(--phosphor-2); }
+
+/* Shared top-bar tab (.settings-main-tab) — ONE definition for Settings, Macros AND Gateway.
+   Previously duplicated scoped under #settings-app + #macros-app; now global so all three share it. */
+.settings-main-tab, .settings-main-tab:hover, .settings-main-tab:active { position: relative; padding: 6px 6px; font-size: 12.5px; font-weight: 700; letter-spacing: 1px; font-family: inherit; color: var(--text-dim); background: transparent; border: none; border-radius: 0; box-shadow: none; text-shadow: none; filter: none; transform: none; cursor: pointer; transition: 120ms; }
+.settings-main-tab:hover, .settings-main-tab.active { color: var(--text-main); }
+.settings-main-tab.active::after { content: ''; position: absolute; left: 4px; right: 4px; bottom: -8px; height: 3px; background: var(--accent); border-radius: var(--radius, 3px) var(--radius, 3px) 0 0; }
 
 /* Settings tabs: keep the panel's own simple chip selection — opt OUT of the
    hardware-key skin (the global studio button rule otherwise hijacks the active tab) */
