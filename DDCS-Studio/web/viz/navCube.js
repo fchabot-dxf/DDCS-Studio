@@ -81,9 +81,55 @@ function nearestVisibleFace(viz, e) {
         return best;
     }
 
-    // Hit-test a click against the ViewCube; snaps the view if a face is hit (or the nearest one on a near-miss).
-    // Returns true when the click landed inside the cube viewport (so it shouldn't orbit).
+    // The 8 cube CORNERS (±0.5 each axis). Clicking near a corner orients the camera to a 45° ISO view looking
+    // ALONG that body diagonal (theta/phi of the corner's direction). Corners take priority over faces so an iso
+    // view is reachable even from a face/ortho view. `_cubeCornerHit` finds the closest VISIBLE corner near the
+    // cursor; `setIsoCorner` applies its direction.
+const CUBE_CORNERS = (() => {
+        const out = [];
+        for (const sx of [1, -1]) for (const sy of [1, -1]) for (const sz of [1, -1]) out.push([sx * 0.5, sy * 0.5, sz * 0.5]);
+        return out;
+    })();
+
+    // Closest visible cube corner within a screen-pixel radius of the cursor, or -1. Visible = facing the cube cam.
+function cubeCornerHit(viz, e) {
+        if (!viz._cubeScene || !viz._cubeRect) return -1;
+        const THREE = viz.THREE;
+        const r = viz.renderer.domElement.getBoundingClientRect();
+        const { size, m } = viz._cubeRect;
+        const cx = e.clientX - r.left, cy = e.clientY - r.top;
+        const left = r.width - size - m, top = m;
+        if (cx < left || cx > left + size || cy < top || cy > top + size) return -1;   // outside the cube square
+        const cam = viz._cubeCam.position;
+        const tol = Math.max(10, size * 0.22) ** 2;   // generous corner hot-zone (px²)
+        let best = -1, bestD = tol;
+        for (let i = 0; i < CUBE_CORNERS.length; i++) {
+            const c = CUBE_CORNERS[i];
+            if (c[0] * cam.x + c[1] * cam.y + c[2] * cam.z <= 0) continue;   // corner faces away from the cube cam
+            const v = new THREE.Vector3(c[0], c[1], c[2]).project(viz._cubeCam);
+            const sx = left + (v.x * 0.5 + 0.5) * size, sy = top + (-v.y * 0.5 + 0.5) * size;
+            const d = (sx - cx) ** 2 + (sy - cy) ** 2;
+            if (d < bestD) { bestD = d; best = i; }
+        }
+        return best;
+    }
+
+    // Orient the main camera to the 45° iso direction of corner i (sign vector → theta/phi), keeping target+radius.
+export function setIsoCorner(viz, i) {
+        const c = CUBE_CORNERS[i]; if (!c) return;
+        viz.theta = Math.atan2(c[1], c[0]);
+        viz.phi = Math.acos(c[2] / Math.hypot(c[0], c[1], c[2]));   // ≈54.7° from +Z for a true body-diagonal iso
+        viz.camera = viz.ortho; viz._ortho = true;   // match face-view behaviour (parallel projection)
+        viz._applyCamera();
+        viz.render();
+    }
+export function cubeCornerAt(viz, e) { return cubeCornerHit(viz, e); }
+
+    // Hit-test a click against the ViewCube; snaps the view if a corner (iso) or face is hit (or the nearest face on
+    // a near-miss). Returns true when the click landed inside the cube viewport (so it shouldn't orbit).
 export function pickCube(viz, e) {
+        const corner = cubeCornerHit(viz, e);
+        if (corner >= 0) { setIsoCorner(viz, corner); return true; }   // corners win → reachable from any view
         const idx = cubeFaceAt(viz, e);
         if (idx === -2) return false;                                // outside the cube square → orbit
         const face = idx >= 0 ? idx : nearestVisibleFace(viz, e);    // near-miss inside the square → nearest visible face
