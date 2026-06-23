@@ -82,7 +82,7 @@ export function createPreviewPanel(container, opts = {}) {
     t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.setWcs(wcsForViz());   // 2D mirrors the 3D scene
 
     let viz = null;            // GcodeViz3D (lazy — only when 3D is shown and WebGL is available)
-    let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false;
+    let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null;
     let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false, liveTimer = null;
 
     // The 2D canvas only repaints when told to; without this it goes blank if first drawn at a transient/zero
@@ -192,7 +192,17 @@ export function createPreviewPanel(container, opts = {}) {
                 // established — e.g. an incremental probe macro) is start-relative, so the route emanates from the
                 // start marker. An ABSOLUTE program (G90/G53 — mill) sits at its own coords; the start is independent
                 // and moving it must not drag the path. Set BEFORE setSegments so _rebuild uses it.
-                v._anchorToStart = !(parsed.stats && parsed.stats.absolute);
+                const anchor = !(parsed.stats && parsed.stats.absolute);
+                v._anchorToStart = anchor;
+                // ONE flag drives the whole frame: an incremental / operator-relative op (a probe) is LOCAL —
+                // stock top-at-0 AND no machine envelope; an absolute / WCS op (mill, WCS setup) shows the MACHINE
+                // frame — datum-aware stock + the envelope. The op's coordinate nature decides it, not the host.
+                if (anchor !== lastAnchor) {
+                    v.setStock(stockForViz());
+                    v.setMachine(anchor ? null : machineForViz());     // probe → no envelope; mill → per settings
+                    t2.setMachine(anchor ? null : machineForViz());    // 2D mirrors
+                    lastAnchor = anchor;
+                }
                 // Place the origin marker before setSegments so an anchored (probe) route offsets to it.
                 if (st && v.starts) v.starts[0] = { x: +st.x || 0, y: +st.y || 0, z: +st.z || 0 };
                 v.setSegments(parsed, !fitted); fitted = true;
@@ -357,7 +367,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     window.addEventListener('ddcs:stop-previews', stopPlay);
     // Stock (or other settings) changed — e.g. the Stock modal — update the workpiece box + re-trace (probe clamp).
-    window.addEventListener('ddcs:settings-changed', () => { renderStock(); if (viz) viz.setMachine(machineForViz()); t2.setMachine(machineForViz()); applyPreviewSettings(); if (active) setGcode(); });
+    window.addEventListener('ddcs:settings-changed', () => { renderStock(); const m = (viz && viz._anchorToStart) ? null : machineForViz(); if (viz) viz.setMachine(m); t2.setMachine(m); applyPreviewSettings(); if (active) setGcode(); });
 
     function setActive(on) {
         active = !!on;

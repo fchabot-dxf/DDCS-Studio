@@ -945,10 +945,15 @@ export class GcodeViz3D {
             if (!/^[ncp]{3}$/.test(dcode)) dcode = OLD_DATUM[dcode] || 'nnp';
             const dfrac = { n: 0, c: 0.5, p: 1 };
             const D = [dfrac[dcode[0]] * stock.x, dfrac[dcode[1]] * stock.y, dfrac[dcode[2]] * stock.z];   // [Dx,Dy,Dz] from min corner (Dz: 0=bottom, z=top)
-            // Positioned by its DATUM only (part-zero at part-local 0); the PART frame carries it to the stock's WCS
-            // (see _partShift), so op + stock share one offset and never double-count.
-            pg.position.set(stock.x / 2 - D[0], stock.y / 2 - D[1], stock.z / 2 - D[2]);
-            this._stockFloorZ = pg.position.z - stock.z / 2;   // datum-aware stock bottom → where the table/grid sits
+            // XY follows the datum (the stock's WCS-XY pin — for convenience). Z is the subtle one: an
+            // incremental / start-anchored op (a probe) is operator-relative — it references the stock SURFACE, not
+            // the datum (the datum is a mill/WCS-Z concept) — so present the stock TOP-AT-0 regardless of datum, so
+            // render == collision == start marker == path. ABSOLUTE (mill) stays datum-aware: the datum-Z there is a
+            // real feature (a bottom datum offsets the path up by the stock height for a precision height cut).
+            // See docs/probe-preview-frame-issues.md.
+            const dzCol = this._anchorToStart ? stock.z : D[2];   // start-anchored → top-at-0; mill → datum-aware
+            pg.position.set(stock.x / 2 - D[0], stock.y / 2 - D[1], stock.z / 2 - dzCol);
+            this._stockFloorZ = pg.position.z - stock.z / 2;   // stock bottom → where the table/grid sits
             mesh.position.sub(C);
             edges.position.sub(C);
             this.stockMesh = mesh; pg.add(mesh);
