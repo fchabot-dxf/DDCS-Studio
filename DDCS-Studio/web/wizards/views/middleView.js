@@ -11,7 +11,7 @@ export const middleView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'm_type', 'm_approach', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_sync_a', 'm_wcs', 'm_slave',
+        'm_type', 'm_approach', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_circular', 'm_sync_a', 'm_wcs', 'm_slave',
         'm_dist', 'm_retract', 'm_safe_z', 'm_clear',
         'm_feed_fast', 'm_feed_slow', 'm_port', 'm_level', 'm_q',
     ],
@@ -34,6 +34,7 @@ export const middleView = {
             dir1: dir1val,
             dir2: dir2val,
             findBoth: el('m_both')?.checked || false,
+            circular: el('m_circular')?.checked || false,
             syncA: el('m_sync_a')?.checked || false,
             slave: el('m_slave')?.value || '3',
             wcs: el('m_wcs')?.value || 'active',
@@ -58,9 +59,13 @@ export const middleView = {
                 ? 'With <b>Probe Both Axes</b> enabled, it performs the two-edge cycle on the selected axis, then repeats on the perpendicular axis (with reposition pauses where required).'
                 : 'With <b>Probe Both Axes</b> disabled, it performs <b>two opposite-edge probes on the selected axis</b> and computes midpoint/offset from that axis only.';
 
-            middleDesc.innerHTML = params.featureType === 'boss'
+            const circularDetail = params.circular
+                ? ` <b>Circular</b> is on: the opposite-touch span is reported as the <b>diameter</b> (#58, plus the mean #60 in 2-axis)${params.findBoth ? ', and the tool re-centres to the found X centre before the Y probes so they cross the true diameter rather than a chord' : ''}.`
+                : '';
+
+            middleDesc.innerHTML = (params.featureType === 'boss'
                 ? `<b>Boss (outside feature):</b> Start with the probe near one external wall of the boss at probe height. Keep approach clear so the stylus can move away for retract and return safely. ${bossDetail}`
-                : `<b>Pocket (inside feature):</b> Start near the pocket center so there is travel room in both directions on the chosen axis. The macro performs internal wall touches and retract moves to establish center/offset safely. ${pocketDetail}`;
+                : `<b>Pocket (inside feature):</b> Start near the pocket center so there is travel room in both directions on the chosen axis. The macro performs internal wall touches and retract moves to establish center/offset safely. ${pocketDetail}`) + circularDetail;
         }
 
         // Show/hide secondary direction control when Find Both is enabled

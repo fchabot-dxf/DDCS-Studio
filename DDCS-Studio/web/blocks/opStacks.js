@@ -213,6 +213,31 @@ const RECONCILERS = {
         }
         return Object.assign(f, placeFields(prog, 'd_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper, not the array
     },
+    middle(prog) {
+        // Reverse-sync the middle (pocket/boss centre) op from its block stack. Read the identity fields that are
+        // UNAMBIGUOUS in the stack: circular ← the #58=ABS[..] diameter assign (circular-only); 2-axis ← the
+        // 2axis_ comment; the primary axis ← that comment (XtoY/YtoX) or, single-axis, the WCS-write offset
+        // (#[#70+0]=X / +1=Y); dir2 ← the comment; WCS ← active (#71=#578) vs the #70 literal. featureType,
+        // approach and dir1 aren't structurally distinguishable, so they're left to the form's current value.
+        const all = [];
+        (function walk(arr) { for (const b of (arr || [])) { if (!b) continue; all.push(b); if (b.children) walk(b.children); } })(prog);
+        const asn = (v) => all.find((b) => b.type === 'assign' && b.params && b.params.var === v);
+        const wcsWrites = all.filter((b) => b.type === 'assign' && b.params && /^#\[#70\+/.test(b.params.var));
+        if (!asn('#53') || !wcsWrites.length) return null;   // not a middle op
+        const cm = all.find((b) => b.type === 'comment' && b.params && /^2axis_/.test(b.params.text || ''));
+        const twoAxis = !!cm || all.some((b) => b.type === 'assign' && b.params && b.params.var === '#56' && /\[#54\+#55\]/.test(b.params.value || ''));
+        const m = cm && /^2axis_(XtoY|YtoX)_(pos|neg)$/.exec(cm.params.text);
+        const axis = m ? (m[1] === 'XtoY' ? 'X' : 'Y')
+                       : (/\+0\]/.test(wcsWrites[0].params.var) ? 'X' : 'Y');   // single-axis: the offset is the axis
+        const circular = all.some((b) => b.type === 'assign' && b.params && b.params.var === '#58' && /ABS\[#51-#52\]/.test(b.params.value || ''));
+        const wb = asn('#70');                               // active path has #71=#578; fixed path sets #70 to a literal
+        const active = all.some((b) => b.type === 'assign' && b.params && b.params.var === '#71' && b.params.value === '#578');
+        const wcsByBase = { 805: 'G54', 810: 'G55', 815: 'G56', 820: 'G57', 825: 'G58', 830: 'G59' };
+        const wcs = active ? 'active' : (wb && wcsByBase[Math.round(num(wb.params.value, 0))]) || 'active';
+        const f = { m_circular: circular, m_both: twoAxis, m_axis: axis, m_wcs: wcs };
+        if (m) f.m_dir2 = m[2];
+        return f;
+    },
 };
 
 let loadedSig = null, shownOp = null;

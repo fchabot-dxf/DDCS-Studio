@@ -41,7 +41,7 @@ const PARAM_FIELDS = {
     text: { text: 'tx_text', x: 'tx_x', y: 'tx_y', originX: 'tx_offX', originY: 'tx_offY', offZ: 'tx_offZ', pathDatum: 'tx_pathDatum', stockAttach: 'tx_stockAttach', height: 'tx_height', spacing: 'tx_spacing', align: 'tx_align', strokeWidth: 'tx_strokeWidth', toolDia: 'tx_toolDia', stepoverPct: 'tx_stepoverPct', depth: 'tx_depth', stepdown: 'tx_stepdown', clearance: 'tx_clearance', feed: 'tx_feed', plunge: 'tx_plunge', rpm: 'tx_rpm' },
     corner: { corner: 'c_corner', probeZ: 'c_probe_z_first', syncA: 'c_sync_a', slave: 'c_slave', probeSeq: 'c_probe_seq', wcs: 'c_wcs', dist: 'c_dist', retract: 'c_retract', f_fast: 'c_feed_fast', f_slow: 'c_feed_slow', qStop: 'c_q', safeZ: 'c_safe_z', travelDist: 'c_travel_dist', scanDepth: 'c_scan_depth', radius: 'c_radius' },
     edge: { axis: 'p_axis', dir: 'p_dir', wcs: 'p_wcs', dist: 'p_dist', retract: 'p_retract', syncA: 'p_sync_a', slave: 'p_slave', f_fast: 'p_feed_fast', f_slow: 'p_feed_slow', qStop: 'p_q' },
-    middle: { featureType: 'm_type', approach: 'm_approach', clearOver: 'm_clear', axis: 'm_axis', findBoth: 'm_both', syncA: 'm_sync_a', slave: 'm_slave', wcs: 'm_wcs', dist: 'm_dist', retract: 'm_retract', safeZ: 'm_safe_z', f_fast: 'm_feed_fast', f_slow: 'm_feed_slow', qStop: 'm_q', dir1: 'm_dir', dir2: 'm_dir2' },
+    middle: { featureType: 'm_type', approach: 'm_approach', clearOver: 'm_clear', axis: 'm_axis', findBoth: 'm_both', circular: 'm_circular', syncA: 'm_sync_a', slave: 'm_slave', wcs: 'm_wcs', dist: 'm_dist', retract: 'm_retract', safeZ: 'm_safe_z', f_fast: 'm_feed_fast', f_slow: 'm_feed_slow', qStop: 'm_q', dir1: 'm_dir', dir2: 'm_dir2' },
     wcs: { sys: 'w_sys', axisX: 'w_x', axisY: 'w_y', axisZ: 'w_z', sync: 'w_sync', slave: 'w_slave' },
     alignment: { checkAxis: 'al_check_axis', probeDir: 'al_probe_dir', tolerance: 'al_tolerance', dist: 'al_dist', retract: 'al_retract', safeZ: 'al_safe_z', f_fast: 'al_feed_fast', f_slow: 'al_feed_slow', qStop: 'al_q' },
     circular: { featureType: 'circ_type', wcs: 'circ_wcs', dist: 'circ_dist', retract: 'circ_retract', safeZ: 'circ_safe_z', f_fast: 'circ_feed_fast', f_slow: 'circ_feed_slow', qStop: 'circ_q' },
@@ -178,6 +178,12 @@ export class WizardManager {
         if (!r || r.type !== view.type || !r.fields) return;
         for (const id in r.fields) {
             const e = el(id), val = r.fields[id];
+            if (e && e.type === 'checkbox') {   // booleans (e.g. middle's circular / both) sync via .checked, not .value
+                if (val == null || e.checked === !!val) continue;
+                e.checked = !!val;
+                e.dispatchEvent(new Event('change', { bubbles: true }));
+                continue;
+            }
             if (!e || val == null || String(e.value) === String(val)) continue;
             e.value = String(val);
             e.dispatchEvent(new Event('input', { bubbles: true }));   // refresh the form's anchor pickers + re-run the wizard
