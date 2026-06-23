@@ -146,3 +146,63 @@ test('clicking the centre of a face still snaps to its orthographic standard vie
   // TOP view = looking straight down +Z: phi ≈ 0 (the pole), NOT a 45° corner/edge angle.
   expect(r.phi, 'a mid-face click gives the orthographic TOP view (phi≈0), not a corner/edge tilt').toBeLessThan(0.1);
 });
+
+// HOVER feedback (Fusion/CAD-style): hovering a cube corner shows the corner chip, an edge shows the edge bar, a
+// mid-face shows the face tint — and the highlight matches the click priority (corner > edge > face). Drives the
+// same handler path the pointermove listener uses (_cubeFaceAt stashes the event, _highlightCubeFace previews it).
+test('hovering a corner / edge / face highlights exactly what a click would select', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio);
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
+  await page.waitForSelector('#wiz_drill', { state: 'visible' });
+  await page.evaluate(() => window.ddcsStudio.wizardManager.update());
+  await page.waitForFunction(() => {
+    const p = window.ddcsStudio.wizardManager._activePanel;
+    return p && p.viz && p.viz._cubeRect && p.viz.renderer;
+  });
+
+  const r = await page.evaluate(() => {
+    const viz = window.ddcsStudio.wizardManager._activePanel.viz;
+    viz.theta = 0.6; viz.phi = 0.9; viz._applyCamera(); viz.render();   // iso-ish: corners/edges well separated
+    const THREE = viz.THREE;
+    const rect = viz.renderer.domElement.getBoundingClientRect();
+    const { size, m } = viz._cubeRect;
+    const left = rect.width - size - m, top = m;
+    const screen = (vec) => {
+      const v = new THREE.Vector3(vec[0], vec[1], vec[2]).project(viz._cubeCam);
+      return { clientX: rect.left + left + (v.x * 0.5 + 0.5) * size, clientY: rect.top + top + (-v.y * 0.5 + 0.5) * size };
+    };
+    // Mimic the pointermove path: stash the event via _cubeFaceAt, then preview via _highlightCubeFace.
+    const hover = (vec) => { const e = screen(vec); viz._highlightCubeFace(viz._cubeFaceAt(e)); };
+
+    hover([0.5, 0.5, 0.5]);                 // a CORNER
+    const onCorner = { corner: !!(viz._cubeCorner && viz._cubeCorner.visible), edge: !!(viz._cubeEdge && viz._cubeEdge.visible), faceTinted: viz._cubeMats.some((mt) => mt.color.getHex() !== 0xffffff) };
+
+    hover([0, 0.5, 0.5]);                    // an EDGE (runs along X)
+    const onEdge = { corner: viz._cubeCorner.visible, edge: viz._cubeEdge.visible, edgeIdx: viz._cubeEdgeIdx };
+
+    hover([0, 0, 0.5]);                      // a FACE centre (+Z)
+    const onFace = { corner: viz._cubeCorner.visible, edge: viz._cubeEdge.visible, faceTinted: viz._cubeMats.some((mt) => mt.color.getHex() !== 0xffffff) };
+
+    // Leave the cube square entirely → everything clears.
+    viz._cubeFaceAt({ clientX: rect.left + 5, clientY: rect.top + rect.height - 5 });
+    viz._highlightCubeFace(-1);
+    const onLeave = { corner: viz._cubeCorner.visible, edge: viz._cubeEdge.visible, faceTinted: viz._cubeMats.some((mt) => mt.color.getHex() !== 0xffffff) };
+
+    return { onCorner, onEdge, onFace, onLeave };
+  });
+
+  expect(r.onCorner.corner, 'corner hover shows the corner chip').toBeTruthy();
+  expect(r.onCorner.edge, 'corner hover does NOT show the edge bar').toBeFalsy();
+  expect(r.onCorner.faceTinted, 'corner hover does NOT tint a face').toBeFalsy();
+
+  expect(r.onEdge.edge, 'edge hover shows the edge bar').toBeTruthy();
+  expect(r.onEdge.corner, 'edge hover does NOT show the corner chip').toBeFalsy();
+  expect(r.onEdge.edgeIdx, 'edge cue tracks a real edge index').toBeGreaterThanOrEqual(0);
+
+  expect(r.onFace.faceTinted, 'face-centre hover tints the face').toBeTruthy();
+  expect(r.onFace.corner, 'face hover shows no corner chip').toBeFalsy();
+  expect(r.onFace.edge, 'face hover shows no edge bar').toBeFalsy();
+
+  expect(r.onLeave.corner || r.onLeave.edge || r.onLeave.faceTinted, 'leaving the cube clears all hover cues').toBeFalsy();
+});

@@ -34,26 +34,90 @@ export function initCube(viz) {
     // Cube face material index under the cursor; -1 if in the cube region but off a face,
     // -2 if the cursor is outside the cube viewport.
 export function cubeFaceAt(viz, e) {
-        if (!viz._cubeScene || !viz._cubeRect) return -2;
+        if (!viz._cubeScene || !viz._cubeRect) { viz._cubeHoverEvent = null; return -2; }
         const r = viz.renderer.domElement.getBoundingClientRect();
         const { size, m } = viz._cubeRect;
         const cx = e.clientX - r.left, cy = e.clientY - r.top;
         const left = r.width - size - m, top = m; // top-right corner
-        if (cx < left || cx > left + size || cy < top || cy > top + size) return -2;
+        if (cx < left || cx > left + size || cy < top || cy > top + size) { viz._cubeHoverEvent = null; return -2; }
+        viz._cubeHoverEvent = e;   // stashed so highlightCubeFace can also preview the corner/edge under the cursor
         const ndc = new viz.THREE.Vector2(((cx - left) / size) * 2 - 1, -(((cy - top) / size) * 2 - 1));
         viz.raycaster.setFromCamera(ndc, viz._cubeCam);
         const hit = viz.raycaster.intersectObject(viz._cube, false)[0];
         return (hit && hit.face) ? hit.face.materialIndex : -1;
     }
 
-    // Tint the hovered cube face (idx 0-5); idx < 0 clears. Re-renders only on a change.
+    // Accent colour for the hover cues (corner chip + edge bar), matching the face-tint blue.
+const CUBE_HL = 0x66aaff;
+
+    // Lazily build the corner + edge hover cues once and park them in the cube scene (hidden).
+    //   • corner cue = a small bright sphere sitting on the hovered vertex
+    //   • edge cue   = a thin bright bar laid along the hovered edge (between its two vertices)
+    // Both draw OVER the cube (depthTest off, high renderOrder) like the face tint, so they read as a glow.
+function ensureCubeCues(viz) {
+        if (viz._cubeCorner) return;
+        const THREE = viz.THREE;
+        const mat = () => new THREE.MeshBasicMaterial({ color: CUBE_HL, transparent: true, opacity: 0.85, depthTest: false });
+        const corner = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), mat());
+        corner.renderOrder = 999; corner.visible = false;
+        // A unit-length bar along +X (length 1 = the cube edge); reoriented/positioned per hovered edge.
+        const edge = new THREE.Mesh(new THREE.BoxGeometry(1, 0.12, 0.12), mat());
+        edge.renderOrder = 999; edge.visible = false;
+        viz._cubeCorner = corner; viz._cubeEdge = edge;
+        viz._cubeScene.add(corner); viz._cubeScene.add(edge);
+    }
+
+    // Position/orient the edge bar along the cube edge whose midpoint is CUBE_EDGES[i] (the bar's length runs
+    // along the one axis that is zero in that midpoint vector).
+function placeEdgeCue(viz, i) {
+        const mid = CUBE_EDGES[i];
+        const edge = viz._cubeEdge;
+        edge.position.set(mid[0], mid[1], mid[2]);
+        const runAxis = mid[0] === 0 ? 0 : (mid[1] === 0 ? 1 : 2);   // the zero component = the edge's long axis
+        edge.rotation.set(0, 0, 0);
+        if (runAxis === 1) edge.rotation.z = Math.PI / 2;            // bar (+X) → +Y
+        else if (runAxis === 2) edge.rotation.y = Math.PI / 2;       // bar (+X) → +Z
+    }
+
+    // Hover feedback for the ViewCube. Mirrors the click priority (corner > edge > face) so the highlight previews
+    // exactly what a click would select: a corner-hover shows the corner chip, an edge-hover shows the edge bar, a
+    // mid-face hover tints the face. `idx` is the face material index under the cursor (cubeFaceAt) used as the
+    // face-tint candidate; the stashed pointer event (viz._cubeHoverEvent) drives the corner/edge test. A missing
+    // event (e.g. pointerleave / off-cube) clears everything. Re-renders only on a change.
 export function highlightCubeFace(viz, idx) {
         if (!viz._cubeMats) return;
+        ensureCubeCues(viz);
+        const e = viz._cubeHoverEvent;
+        // Corner > edge > face — same order as pickCube. Only meaningful while actually over the cube square.
+        let corner = -1, edge = -1, face = -1;
+        if (e) {
+            corner = cubeCornerHit(viz, e);
+            if (corner < 0) {
+                edge = cubeEdgeHit(viz, e);
+                if (edge < 0) face = idx;   // fall through to the face the raycast hit
+            }
+        }
         let changed = false;
+        // Face tint (cleared whenever a corner/edge wins, or nothing is hovered).
         for (let i = 0; i < viz._cubeMats.length; i++) {
-            const hex = i === idx ? 0x66aaff : 0xffffff;
+            const hex = i === face ? CUBE_HL : 0xffffff;
             if (viz._cubeMats[i].color.getHex() !== hex) { viz._cubeMats[i].color.setHex(hex); changed = true; }
         }
+        // Corner chip.
+        if (corner >= 0) {
+            const c = CUBE_CORNERS[corner];
+            if (!viz._cubeCorner.visible || viz._cubeCornerIdx !== corner) {
+                viz._cubeCorner.position.set(c[0], c[1], c[2]);
+                viz._cubeCorner.visible = true; viz._cubeCornerIdx = corner; changed = true;
+            }
+        } else if (viz._cubeCorner.visible) { viz._cubeCorner.visible = false; viz._cubeCornerIdx = -1; changed = true; }
+        // Edge bar.
+        if (edge >= 0) {
+            if (!viz._cubeEdge.visible || viz._cubeEdgeIdx !== edge) {
+                placeEdgeCue(viz, edge);
+                viz._cubeEdge.visible = true; viz._cubeEdgeIdx = edge; changed = true;
+            }
+        } else if (viz._cubeEdge.visible) { viz._cubeEdge.visible = false; viz._cubeEdgeIdx = -1; changed = true; }
         if (changed) viz.render();
     }
 
