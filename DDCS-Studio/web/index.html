@@ -1914,6 +1914,10 @@
                 initHeaderPost();
             } catch (err) { console.error('header post init failed', err); }
             try {
+                const { maybeAutoOpenSetupChecklist } = await import('./ui/setupChecklist.js');
+                maybeAutoOpenSetupChecklist();    // first-run health check (auto-opens once unless dismissed); also reopenable from the quick-menu
+            } catch (err) { console.error('setup checklist init failed', err); }
+            try {
                 const { initPostGating } = await import('./ui/postGating.js');
                 initPostGating();                 // grey wizard fields the active post can't use (tooltip-only why)
             } catch (err) { console.error('post gating init failed', err); }

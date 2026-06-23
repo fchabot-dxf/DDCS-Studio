@@ -67,7 +67,7 @@ export const STOCK_TEMPLATES = [
     { name: 'Rotary block 3″', x: 150, y: 76.2, z: 76.2, shape: 'boss' },
     { name: 'Rotary cylinder Ø3″', x: 150, y: 76.2, z: 76.2, shape: 'cylinder' },
 ];
-const SETTINGS_DEFAULTS = {
+export const SETTINGS_DEFAULTS = {
     stock:   { x: 100, y: 80, z: 20, shape: 'boss', show: true, datum: 'nnp', pin: 'origin' },
     stockTemplates: [],   // user-saved presets: { name, x, y, z, shape }
     // Travel x/y/z are SIGNED (sign = home direction). workOrigin = the active WCS offset (machine coords of
@@ -139,6 +139,10 @@ const SETTINGS_DEFAULTS = {
         a: { role: 'unused', around: 'x' },
         b: { role: 'unused', around: 'y' }
     },
+    // First-run Setup health-check / checklist (ui/setupChecklist.js). dismissed = the "Don't show again" flag
+    // (the modal still re-opens from the quick-menu, ignoring it). saveDest = the user's DELIBERATE save-destination
+    // choice ('' = not yet chosen → stays ⚠ | 'local' | 'cloud' | 'both'); we never auto-default it to local.
+    setup: { dismissed: false, saveDest: '' },
     // Persisted machine HOMING profile — authored in the Homing Setup modal, consumed by the Homing wizard.
     // PER-AXIS: enable, order (1..N — lower homes first), method, direction, feeds, back-off, home offset.
     //   method: 'native'  — controller built-in M98 P501 X<idx> (safest; uses the controller's own config + flag)
@@ -249,6 +253,7 @@ function loadSettings() {
                 spindle: { ...SETTINGS_DEFAULTS.spindle, ...(p.spindle || {}) },
                 endProgram: { ...SETTINGS_DEFAULTS.endProgram, ...(p.endProgram || {}) },
                 motors: { ...SETTINGS_DEFAULTS.motors, ...(p.motors || {}) },
+                setup: { ...SETTINGS_DEFAULTS.setup, ...(p.setup || {}) },
                 homing: mergeHoming(p.homing),
                 inputs: Array.isArray(p.inputs) ? p.inputs : [],
                 outputs: Array.isArray(p.outputs) ? p.outputs : [],

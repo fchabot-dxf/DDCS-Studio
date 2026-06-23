@@ -29,6 +29,7 @@ const HQ_ICONS = {
     export: { c: '#0ea5e9', d: '<path d="M16 9h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2"/><line x1="12" y1="14" x2="12" y2="3"/><polyline points="8 7 12 3 16 7"/>' },
     standalone: { c: '#22c55e', d: '<rect x="3" y="3" width="18" height="14" rx="2"/><line x1="3" y1="8" x2="21" y2="8"/><polyline points="9 13 12 16 15 13"/><line x1="12" y1="11" x2="12" y2="16"/>' },
     settings: { c: '#94a3b8', d: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>' },
+    checklist: { c: '#3ddc84', d: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>' },
 };
 // data-act → the existing handler it proxies (file ops are window globals; Open/Save click their header buttons).
 const HQ_ACTIONS = [
@@ -59,6 +60,7 @@ function runQuickAction(act) {
             window.open(EXE_DOWNLOAD_URL, '_blank', 'noopener');
             break;
         case 'settings': window.openSettings?.(); break;
+        case 'checklist': window.openSetupChecklist?.(); break;
     }
 }
 
@@ -122,6 +124,10 @@ export function initHeaderPost() {
         const themeSection = '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Theme</div>'
             + `<div class="hdr-quick-subitems" data-subitems="theme">${THEMES.map(themeRow).join('')}</div>`;
 
+        const checklistRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="checklist">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('checklist')
+            + '<span class="hdr-quick-lbl">Setup checklist</span></button>';
         const settingsRow =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="settings">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('settings')
@@ -133,7 +139,7 @@ export function initHeaderPost() {
             + actionRow(HQ_STANDALONE)
             + '<div class="hdr-quick-sep"></div>' + postSub
             + themeSection
-            + '<div class="hdr-quick-sep"></div>' + settingsRow;
+            + '<div class="hdr-quick-sep"></div>' + checklistRow + settingsRow;
 
         btn.title = `Quick actions — open / save / load / export, post-processor (${activeName}), theme. Click to open.`;
         btn.setAttribute('aria-label', `Quick actions (post-processor: ${activeName})`);

@@ -61,7 +61,7 @@ test('quick-menu chevron: icon-only; opens Program actions + Post-processor + Th
   expect(await page.getAttribute('#hdrPostBtn', 'aria-expanded')).toBe('true');
 
   // Program file-actions present (Open/Save moved in, plus load/insert/copy/clear/export/standalone).
-  const programActions = await page.locator('#hdrPostMenu .hdr-quick-item[data-act]:not([data-act="settings"])').count();
+  const programActions = await page.locator('#hdrPostMenu .hdr-quick-item[data-act]:not([data-act="settings"]):not([data-act="checklist"])').count();
   expect(programActions, 'eight program file-actions').toBe(8);
   // Settings opens as a modal from the menu.
   expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="settings"]').count(), 'Settings… row present').toBe(1);

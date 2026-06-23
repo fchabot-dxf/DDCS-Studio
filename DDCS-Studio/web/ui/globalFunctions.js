@@ -10,6 +10,7 @@ import { parseGcode } from '../gcodeParser.js';
 import { FeatureCanvas } from '../viz/featureCanvas.js';
 import { makeRotate, makePlace } from '../blocks/programFraming.js';
 import { openHomingSetup } from './settingsPanel.js';
+import { openStockEditor } from './stockEditor.js';
 
 export function setupGlobalFunctions(app) {
         // Expose key functions to global scope for HTML onclick handlers
@@ -32,6 +33,7 @@ export function setupGlobalFunctions(app) {
         window.openAlignmentWiz = () => { window.ddcsTrack?.('feature', 'wizard:alignment'); return app.wizardManager.openAlignment(); };
         window.closeWiz = () => app.wizardManager.close();
         window.openHomingSetup = () => { window.ddcsTrack?.('feature', 'homing:setup'); return openHomingSetup(); };
+        window.ddcsOpenStock = () => openStockEditor();   // the rich Stock modal (centred, no anchor needed) — used by the Setup checklist
         window.insertWiz = () => { window.ddcsTrack?.('feature', 'insert'); return app.wizardManager.insert(); };
         window.ddcsEditOp = (opId) => app.wizardManager.openForEdit(opId);   // editor hover-chip → edit an existing op
         window.ddcsCanEditOp = (opType) => app.wizardManager.canEdit(opType);   // does this op type support form-edit yet?
