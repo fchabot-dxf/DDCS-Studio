@@ -167,15 +167,10 @@ export function openSetupChecklist() {
 
 // First run / health check: auto-open once when the user hasn't dismissed it AND a required item is still unset.
 export function maybeAutoOpenSetupChecklist() {
-    // Skip the auto-nag under automation (Playwright sets navigator.webdriver) so the first-run overlay doesn't
-    // intercept clicks in the existing UI tests; it's still openable via window.openSetupChecklist() / the menu.
-    try { if (navigator.webdriver) return; } catch (_) {}
-    const s = getSettings();
-    if (s.setup && s.setup.dismissed) return;
-    const required = ITEMS.filter((i) => !i.optional);
-    const allReqOk = required.every((i) => i.detect());   // optional items (save destination, gateway, probe) don't trigger the nag
-    if (allReqOk) return;   // nothing to nag about
-    openSetupChecklist();
+    // Auto-open intentionally DISABLED. An upfront health-check on first run is premature friction; hardware is
+    // prompted JUST-IN-TIME (when a wizard actually needs a probe/ATC). This checklist remains available
+    // on-demand from the header quick-menu ("Setup checklist") as a "where am I" overview.
+    return;
 }
 
 window.openSetupChecklist = openSetupChecklist;
