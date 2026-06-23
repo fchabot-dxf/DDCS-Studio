@@ -30,6 +30,14 @@ const toolsForViz = () => { const a = (window.ddcsGetSettings && window.ddcsGetS
 const wcsForViz = () => { const m = (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null; return (m && m.workOrigin) ? m.workOrigin : null; };   // work origin in MACHINE coords → G53 moves draw in the part frame
 const machineForViz = () => (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null;   // envelope: travel + show + ox/oy/oz (drawn by viz.setMachine, gated on machine.show)
 const previewPrefs = () => (window.ddcsGetSettings && window.ddcsGetSettings().preview) || {};   // Settings → Preview tab
+// Z-fraction of the stock datum (0=bottom, 0.5=centre, 1=top) — the datum's height above the stock bottom, as a
+// fraction of the stock height. Migrates the legacy XY-only codes (all top-Z). Used to place part-zero in the frame.
+const datumZFrac = (d) => {
+    let c = String(d || 'nnp');
+    if (!/^[ncp]{3}$/.test(c)) c = ({ fl: 'nnp', fr: 'pnp', bl: 'npp', br: 'ppp', center: 'ccp' })[c] || 'nnp';
+    const f = ({ n: 0, c: 0.5, p: 1 })[c[2]];
+    return f == null ? 1 : f;
+};
 
 // Custom transport icons (currentColor → inherit the button's text colour), in place of emoji.
 const ICON_PLAY = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" style="vertical-align:middle" aria-hidden="true"><path d="M4.5 3 12.5 8 4.5 13Z"/></svg>';
@@ -179,8 +187,19 @@ export function createPreviewPanel(container, opts = {}) {
         // Inferred operator start (wizard preview): probes test from the real tool position so an incremental
         // probe macro doesn't trace from the origin (on the stock face) and clamp its first probe to zero.
         const st = getStartPos();
-        let parsed; try { parsed = traceToolpath(code, { stock: stockForViz(), start: st, wcsOffset: wcsForViz() }); }
-        catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
+        const stk = stockForViz(), mch = machineForViz(), wo = wcsForViz() || {};
+        let parsed;
+        try {
+            parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: wcsForViz() });
+            // (b) Faithful machine frame: an ABSOLUTE (mill) program's G53 / machine moves must resolve to where the
+            // part actually SITS in the envelope, not at part-zero. Part-zero's machine Z = the table + the datum's
+            // height above the stock bottom. Re-trace once with that as the work-origin Z so e.g. `G53 Z0` (the
+            // end "safe Z" retract) draws at machine home (the top) instead of plunging onto a bottom-datum origin.
+            if (mch && mch.show && stk && stk.x > 0 && parsed.stats && parsed.stats.absolute) {
+                const z = Math.min(0, mch.z || 0) + datumZFrac(stk.datum) * (Number(stk.z) || 0);
+                parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: { x: wo.x || 0, y: wo.y || 0, z } });
+            }
+        } catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
         segs = parsed.segments || [];
         t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
         t2.setStart(st);        // the draggable 2D start handle
