@@ -14,6 +14,7 @@ import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-sour
 import { createPreviewPanel } from './viz/createPreviewPanel.js';   // THE shared preview (identical to Blocks/Studio), fed the wizard's op code
 import { openTemplatesPopover, closeTemplatesPopover } from './ui/wizardTemplates.js';   // per-op save/load templates (local + cloud)
 import { frameWizardSections } from './ui/wizardSections.js';   // group each form's fields into framed categories
+import { needsPrereqPrompt } from './ui/wizardPrereq.js';   // just-in-time "add a probe / ATC" prompt for hardware-gated wizards
 
 // Map the touch-probe wizards' per-op input fields to the global 3D-probe defaults
 // (settings.probes). open() pre-fills these so every wizard starts from the configured
@@ -190,7 +191,11 @@ export class WizardManager {
         }
     }
 
-    open(type, variant) {
+    open(type, variant, bypassPrereq) {
+        // Just-in-time hardware gate: if this wizard needs a probe / ATC that isn't configured, show a small
+        // non-blocking prompt instead of opening. "Open anyway" re-enters with bypassPrereq, so the gate is a
+        // thin pass-through when the hardware is present (or the user already chose to proceed).
+        if (needsPrereqPrompt(type, variant, bypassPrereq)) return;
         // play a feedback sound whenever a wizard is opened
         playClick();
         this._activeType = type;   // for the Templates popover (save/load this op's parameter templates)
