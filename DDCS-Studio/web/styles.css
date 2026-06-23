@@ -188,7 +188,8 @@ html, body { overflow-x: clip; }
     padding: 0 15px 0 0;
     display: flex;
     align-items: stretch;
-    background: var(--hdr-bg, var(--panel));
+    background: var(--bg);   /* header = the deepest tone in EVERY theme (some themes set --hdr-bg == --panel, which
+                                collided with the panel-toned active tab — steampunk). Consistent: header darker than the tab. */
     border-bottom: 1px solid var(--border);
     user-select: none;
 }
@@ -233,6 +234,14 @@ html, body { overflow-x: clip; }
 
 /* Underline-style app-switcher tabs (the original look): flat, transparent, with a coloured accent
    bar under the active tab. Icons kept so they collapse to icon-only on narrow screens. */
+/* Per-theme tab corner roundness — one var drives both header tabs + sub-tabs. Soft on studio/organic, crisp on
+   futuristic, medium on steampunk/normal. */
+:root, [data-theme="steampunk"] { --tab-radius: 8px; }
+[data-theme="studio"]     { --tab-radius: 13px; }
+[data-theme="organic"]    { --tab-radius: 16px; }
+[data-theme="futuristic"] { --tab-radius: 2px; }
+[data-theme="normal"]     { --tab-radius: 5px; }
+
 .app-header .tab,
 .app-header .tab:hover,
 .app-header .tab:active {
@@ -246,7 +255,7 @@ html, body { overflow-x: clip; }
     font-family: inherit;
     color: var(--hdr-dim, var(--text-dim));
     border: none;
-    border-radius: 8px 8px 0 0;
+    border-radius: var(--tab-radius, 8px) var(--tab-radius, 8px) 0 0;
     background: transparent;
     box-shadow: none;
     text-shadow: none;
@@ -256,14 +265,29 @@ html, body { overflow-x: clip; }
     position: relative;
 }
 .app-header .tab:hover { color: var(--hdr-ink, var(--text-main)); background: color-mix(in srgb, var(--bg) 45%, transparent); }
-/* Active app tab fills with the content colour (var(--bg)) → reads as merged with the app below, a browser tab.
-   margin-bottom:-1px punches it through the header's bottom border so it connects to the body (no separating line). */
-.app-header .tab.active { color: var(--hdr-ink, var(--text-main)); background: var(--bg); margin-bottom: -1px; }
+/* Active app tab fills with the colour of the strip DIRECTLY below the header (var(--panel) — now unified across
+   every app: studio wizard bar, macros/gateway/settings sub-tab head). So it reads as merged with the body, and
+   that "body colour below the header" is identical for every tab in a given theme. margin-bottom:-1px punches it
+   through the header's bottom border so there's no separating line. */
+.app-header .tab.active { color: var(--hdr-ink, var(--text-main)); background: var(--panel); margin-bottom: -1px;
+    box-shadow: inset 0 1px 0 var(--border), inset 1px 0 0 var(--border), inset -1px 0 0 var(--border); }
+/* Organic theme: the connecting tab AND the bar below the header are pink (theme accent), kept matching so the
+   active tab still merges into the bar. */
+[data-theme="organic"] .app-header .tab.active,
+[data-theme="organic"] #studio-app .top-dock-header,
+[data-theme="organic"] #macros-app .settings-head,
+[data-theme="organic"] #gateway-app .settings-head,
+[data-theme="organic"] #blocks-app .blk-topbar { background: #6f9b4d !important; }
+/* Organic's bars are a saturated colour → inactive tab labels need lighter, higher-contrast text. */
+[data-theme="organic"] .settings-tabs .settings-main-tab:not(.active) { color: rgba(255,255,255,0.82); }
+[data-theme="organic"] .app-header .tab:not(.active) { color: rgba(255,255,255,0.7); }
 /* Studio depth: the toolbar's bevel is RAISED (light top edge), so it sits ABOVE the header in the
    colour hierarchy — toolbar lightest (sv-1), header darker (sv-3). Active tab = toolbar colour,
    inactive tab = header colour. */
 body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !important; }
-body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !important; }
+/* Wizard bar (studio top action bar) = the unified below-header strip colour in EVERY theme (was the theme accent
+   — grey/gold/cyan), so the active STUDIO tab connects to it. Flat: no border/shadow. (organic overrides to pink.) */
+.top-dock-header { background: var(--panel) !important; border: none !important; box-shadow: none !important; }
 
 /* GATEWAY tab when no gateway is reachable (hosted / standalone): greyed but clickable —
    clicking offers the desktop exe download (see ui/gatewayStatus.js). */
@@ -2534,11 +2558,12 @@ Middle (handle) {
    [data-theme="x"] button skin (no theme button styling leaks onto the tabs). */
 .settings-tabs .settings-main-tab, .settings-tabs .settings-main-tab:hover, .settings-tabs .settings-main-tab:active {
     position: relative; padding: 6px 14px; font-size: 12.5px; font-weight: 700; letter-spacing: 1px; font-family: inherit;
-    color: var(--text-dim); background: transparent; border: none; border-radius: 8px 8px 0 0;
+    color: var(--text-dim); background: transparent; border: none; border-radius: var(--tab-radius, 8px) var(--tab-radius, 8px) 0 0;
     box-shadow: none; text-shadow: none; filter: none; transform: none; cursor: pointer; transition: 120ms;
 }
 .settings-tabs .settings-main-tab:hover { color: var(--text-main); background: color-mix(in srgb, var(--bg) 45%, transparent); }
-.settings-tabs .settings-main-tab.active { color: var(--text-main); background: var(--bg); }
+.settings-tabs .settings-main-tab.active { color: var(--text-main); background: var(--bg);
+    box-shadow: inset 0 1px 0 var(--border), inset 1px 0 0 var(--border), inset -1px 0 0 var(--border); }
 /* Sub-tab bar connects to the body: drop its bottom border (the colored line) + bottom padding so the active
    tab's var(--bg) fill meets the content with no seam. body-prefixed to beat the per-app .settings-head rules. */
 body #macros-app .settings-head, body #settings-app .settings-head, body .gateway-app .settings-head {
@@ -4284,7 +4309,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* Blockly host = a column: a top BAR (search + suggestions) above the Blockly workspace, so neither overlaps
    the toolbox/canvas (Blockly resists CSS padding + makes its own stacking context). */
 #blocks-app .blk-ws { position:relative; min-width:0; background:var(--bg); display:flex; flex-direction:column; }
-#blocks-app .blk-topbar { flex:0 0 auto; display:flex; flex-direction:column; gap:6px; padding:6px; background:var(--bg); border-bottom:1px solid var(--line); }
+#blocks-app .blk-topbar { flex:0 0 auto; display:flex; flex-direction:column; gap:6px; padding:6px; background:var(--panel); border-bottom:1px solid var(--line); }
 #blocks-app .blk-bk-host { flex:1 1 auto; position:relative; min-height:0; }
 #blocks-app .blk-search {
     width:100%; box-sizing:border-box; background:var(--panel); color:var(--ink);
