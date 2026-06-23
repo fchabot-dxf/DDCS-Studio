@@ -67,7 +67,7 @@ test('quick-menu chevron: icon-only; opens Program actions + Post-processor + Th
   expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="settings"]').count(), 'Settings… row present').toBe(1);
   // Exactly one active post and one active theme are checked.
   const postChecked = await page.locator('#hdrPostMenu .hdr-quick-item[data-post][aria-checked="true"]').count();
-  const themeChecked = await page.locator('#hdrPostMenu .hdr-quick-item[data-theme][aria-checked="true"]').count();
+  const themeChecked = await page.locator('#hdrPostMenu .hq-theme-chip[data-theme][aria-checked="true"]').count();
   expect(postChecked, 'one active post checked').toBe(1);
   expect(themeChecked, 'one active theme checked').toBe(1);
 
@@ -75,10 +75,9 @@ test('quick-menu chevron: icon-only; opens Program actions + Post-processor + Th
   await page.keyboard.press('Escape');
   expect(await page.locator('#hdrPostMenu').isHidden()).toBe(true);
 
-  // Reopen, expand the Theme submenu, pick a theme → it applies and the menu closes.
+  // Reopen: theme chips show directly (no submenu). Pick one → it applies and the menu stays open (try-themes UX).
   await page.click('#hdrPostBtn');
-  await page.click('#hdrPostMenu .hdr-quick-sub[data-sub="theme"]');
-  await page.click('#hdrPostMenu .hdr-quick-item[data-theme="futuristic"]');
+  await page.click('#hdrPostMenu .hq-theme-chip[data-theme="futuristic"]');
   expect(await page.getAttribute('body', 'data-theme')).toBe('futuristic');
-  expect(await page.locator('#hdrPostMenu').isHidden()).toBe(true);
+  expect(await page.locator('#hdrPostMenu').isHidden()).toBe(false);
 });
