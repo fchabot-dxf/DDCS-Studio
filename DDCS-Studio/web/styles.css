@@ -238,7 +238,7 @@ html, body { overflow-x: clip; }
 .app-header .tab:active {
     display: flex;
     align-items: center;
-    padding: 0 16px;
+    padding: 6px 16px;
     min-height: 0;
     font-size: 12.5px;
     font-weight: 700;
@@ -246,7 +246,7 @@ html, body { overflow-x: clip; }
     font-family: inherit;
     color: var(--hdr-dim, var(--text-dim));
     border: none;
-    border-radius: 0;
+    border-radius: 8px 8px 0 0;
     background: transparent;
     box-shadow: none;
     text-shadow: none;
@@ -255,19 +255,10 @@ html, body { overflow-x: clip; }
     cursor: pointer;
     position: relative;
 }
-.app-header .tab.active,
-.app-header .tab:hover { color: var(--hdr-ink, var(--text-main)); }
-.app-header .tab.active::after {
-    content: '';
-    position: absolute;
-    left: 10px; right: 10px; bottom: 0;
-    height: 3px;
-    background: var(--tab-accent, var(--accent));
-    border-radius: var(--radius, 3px) var(--radius, 3px) 0 0;
-}
-.app-header .tab[data-app="studio"]  { --tab-accent: #f59e0b; }
-.app-header .tab[data-app="gateway"] { --tab-accent: #0ea5e9; }
-.app-header .tab[data-app="settings"] { --tab-accent: #94a3b8; }
+.app-header .tab:hover { color: var(--hdr-ink, var(--text-main)); background: color-mix(in srgb, var(--bg) 45%, transparent); }
+/* Active app tab fills with the content colour (var(--bg)) → reads as merged with the app below, a browser tab.
+   margin-bottom:-1px punches it through the header's bottom border so it connects to the body (no separating line). */
+.app-header .tab.active { color: var(--hdr-ink, var(--text-main)); background: var(--bg); margin-bottom: -1px; }
 /* Studio depth: the toolbar's bevel is RAISED (light top edge), so it sits ABOVE the header in the
    colour hierarchy — toolbar lightest (sv-1), header darker (sv-3). Active tab = toolbar colour,
    inactive tab = header colour. */
@@ -2537,34 +2528,21 @@ Middle (handle) {
 
 /* Shared top-bar tab (.settings-main-tab) — ONE definition for Settings, Macros AND Gateway.
    Previously duplicated scoped under #settings-app + #macros-app; now global so all three share it. */
-.settings-main-tab, .settings-main-tab:hover, .settings-main-tab:active { position: relative; padding: 6px 6px; font-size: 12.5px; font-weight: 700; letter-spacing: 1px; font-family: inherit; color: var(--text-dim); background: transparent; border: none; border-radius: 0; box-shadow: none; text-shadow: none; filter: none; transform: none; cursor: pointer; transition: 120ms; }
-.settings-main-tab:hover, .settings-main-tab.active { color: var(--text-main); }
-.settings-main-tab.active::after { content: ''; position: absolute; left: 4px; right: 4px; bottom: -8px; height: 3px; background: var(--accent); border-radius: var(--radius, 3px) var(--radius, 3px) 0 0; }
-
-/* Settings tabs: keep the panel's own simple chip selection — opt OUT of the
-   hardware-key skin (the global studio button rule otherwise hijacks the active tab) */
-[data-theme="studio"] button.settings-main-tab,
-[data-theme="studio"] button.settings-main-tab:active,
-[data-theme="studio"] .settings-subtabs button.settings-tab,
-[data-theme="studio"] .settings-subtabs button.settings-tab:active {
-    background: rgba(255,255,255,0.14);
-    border: 1px solid rgba(255,255,255,0.45);
-    color: #1a1205; border-radius: 5px;
-    text-shadow: none; box-shadow: none; transform: none;
+/* Classic browser-tab strip — Settings/Macros/Gateway sub-tabs. Theme-adaptive (NO per-theme rules): inactive
+   tabs are transparent/muted; the ACTIVE tab fills with the CONTENT colour (var(--bg)) so it reads as merged
+   with the panel below — a browser tab. Scoped to .settings-tabs so it out-specifies the generic
+   [data-theme="x"] button skin (no theme button styling leaks onto the tabs). */
+.settings-tabs .settings-main-tab, .settings-tabs .settings-main-tab:hover, .settings-tabs .settings-main-tab:active {
+    position: relative; padding: 6px 14px; font-size: 12.5px; font-weight: 700; letter-spacing: 1px; font-family: inherit;
+    color: var(--text-dim); background: transparent; border: none; border-radius: 8px 8px 0 0;
+    box-shadow: none; text-shadow: none; filter: none; transform: none; cursor: pointer; transition: 120ms;
 }
-[data-theme="studio"] button.settings-main-tab:not(.active),
-[data-theme="studio"] .settings-subtabs button.settings-tab:not(.active) {
-    background: transparent; border-color: transparent; color: rgba(0,0,0,0.55);
-}
-
-/* Every OTHER theme: the top-bar tabs are UNDERLINE-ONLY — strip the theme's generic button border/fill/shadow
-   so only the .active ::after underline shows. Shared by Settings, Macros AND the Gateway. (Un-scoping the base
-   rule dropped its specificity below `[data-theme="x"] button`, which is why the button skin leaked through.) */
-[data-theme="steampunk"] button.settings-main-tab,  [data-theme="steampunk"] button.settings-main-tab:hover,  [data-theme="steampunk"] button.settings-main-tab:active,
-[data-theme="normal"] button.settings-main-tab,     [data-theme="normal"] button.settings-main-tab:hover,     [data-theme="normal"] button.settings-main-tab:active,
-[data-theme="futuristic"] button.settings-main-tab, [data-theme="futuristic"] button.settings-main-tab:hover, [data-theme="futuristic"] button.settings-main-tab:active,
-[data-theme="organic"] button.settings-main-tab,    [data-theme="organic"] button.settings-main-tab:hover,    [data-theme="organic"] button.settings-main-tab:active {
-    background: transparent; border: none; box-shadow: none; text-shadow: none; transform: none; filter: none;
+.settings-tabs .settings-main-tab:hover { color: var(--text-main); background: color-mix(in srgb, var(--bg) 45%, transparent); }
+.settings-tabs .settings-main-tab.active { color: var(--text-main); background: var(--bg); }
+/* Sub-tab bar connects to the body: drop its bottom border (the colored line) + bottom padding so the active
+   tab's var(--bg) fill meets the content with no seam. body-prefixed to beat the per-app .settings-head rules. */
+body #macros-app .settings-head, body #settings-app .settings-head, body .gateway-app .settings-head {
+    border-bottom: none; padding-bottom: 0;
 }
 
 /* --- Virtual numpad (comm wizard) → electric-blue keys --- */
