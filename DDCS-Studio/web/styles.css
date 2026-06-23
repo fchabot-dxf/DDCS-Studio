@@ -517,8 +517,22 @@ body[data-theme="studio"] .top-dock-header { background: var(--sv-1, #e2dfd7) !i
 .hdr-quick-subitems[hidden] { display: none; }
 .hdr-quick-menu .hdr-quick-subitems .hdr-quick-item { padding-left: 16px; font-weight: 500; }
 
-.hdr-post-warn { color: #e0a020; font-size: 15px; cursor: help; user-select: none; }
+/* Profile/post capability warning — a prominent amber badge (was an easy-to-miss 15px glyph) that gently
+   pulses to draw the eye; only ever shown when there's a real warning (hidden otherwise). */
+.hdr-post-warn {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 auto; width: 22px; height: 22px; min-width: 22px; margin: 0 2px; box-sizing: border-box;
+    color: #2a1d04; background: #f0b429; border: 1px solid #ffcf4d; border-radius: 50%;
+    font-size: 13px; line-height: 1; font-weight: bold; cursor: help; user-select: none;
+    box-shadow: 0 0 0 0 rgba(240, 180, 41, 0.6); animation: hdrPostWarnPulse 1.8s ease-out infinite;
+}
 .hdr-post-warn[hidden] { display: none; }
+@keyframes hdrPostWarnPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(240, 180, 41, 0.55); }
+    70%  { box-shadow: 0 0 0 8px rgba(240, 180, 41, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(240, 180, 41, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .hdr-post-warn { animation: none; } }
 
 /* Editor op hover-to-edit: highlight the hovered op's lines (in the #editor-highlight overlay) + a float chip. */
 #editor-highlight .g-line.op-hover { background: rgba(14, 165, 233, 0.16); border-radius: 2px; }
