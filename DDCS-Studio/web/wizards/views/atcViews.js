@@ -121,6 +121,7 @@ export const atcLengthView = {
         const gcode = lengthWizard.generate(params);
         el('wiz_atc_length_code').innerHTML = UIUtils.formatGCode(gcode);
         if (mgr) mgr.preview3D(gcode, 'atcLengthViz');
+        if (mgr) mgr.previewMachine('atcLengthViz', true);   // ATC = machine-frame: always show the envelope
         setStatus('atcLengthVizStatus', 'Z touch on the tool setter · ▶ traces the fast approach, slow touch + retract');
     },
 };
@@ -152,6 +153,7 @@ export const atcCheckView = {
         const gcode = toolCheckWizard.generate(params);
         el('wiz_atc_check_code').innerHTML = UIUtils.formatGCode(gcode);
         if (mgr) mgr.preview3D(gcode, 'atcCheckViz');
+        if (mgr) mgr.previewMachine('atcCheckViz', true);   // ATC = machine-frame: always show the envelope
         setStatus('atcCheckVizStatus', 'Z re-tap on the setter · ▶ traces the probe; aborts if broken / wrong length');
     },
 };
@@ -173,6 +175,7 @@ export const atcWarmupView = {
         const gcode = warmupWizard.generate(params);
         el('wiz_atc_warmup_code').innerHTML = UIUtils.formatGCode(gcode);
         if (mgr) mgr.preview3D(gcode, 'atcWarmupViz');
+        if (mgr) mgr.previewMachine('atcWarmupViz', true);   // ATC = machine-frame: always show the envelope
         setStatus('atcWarmupVizStatus', 'Spindle warm-up · no toolpath — ▶ steps the RPM / dwell stages');
     },
 };
@@ -227,6 +230,7 @@ export const atcChangeView = {
         const gcode = changeWizard.generate(params);
         el('wiz_atc_change_code').innerHTML = UIUtils.formatGCode(gcode);
         if (mgr) mgr.preview3D(gcode, 'atcChangeViz');
+        if (mgr) mgr.previewMachine('atcChangeViz', true);   // ATC = machine-frame: always show the envelope
         if (mgr) mgr.previewMagazine('atcChangeViz', magazinePockets(s.atc || {}));   // pockets + tools in 3D on the envelope
         // Magazine strip: show the pockets + tools; in auto mode highlight the fixed test tool being swapped to.
         const ft = Number(el('atc_change_fixedt')?.value || 0);
@@ -270,6 +274,7 @@ export const atcTestView = {
         const gcode = testWizard.generate(params);
         el('wiz_atc_test_code').innerHTML = UIUtils.formatGCode(gcode);
         if (mgr) mgr.preview3D(gcode, 'atcTestViz');
+        if (mgr) mgr.previewMachine('atcTestViz', true);   // ATC = machine-frame: always show the envelope
         setStatus('atcTestVizStatus', mode === 'pockets'
             ? 'Pocket dry-run · visits each magazine pocket (Settings → Tool table) at clearance Z'
             : 'Drawbar cycle · no toolpath — ▶ steps the release / lock sequence');
@@ -299,6 +304,7 @@ export const atcTableView = {
         // the real preview (pockets + tools).
         const mag = (Array.isArray(a.magazine) ? a.magazine : []).filter((p) => p && (p.x !== '' || p.y !== '' || p.z !== ''));
         if (mgr) mgr.preview3D('G90', 'atcTableViz');
+        if (mgr) mgr.previewMachine('atcTableViz', true);   // ATC = machine-frame: always show the envelope
         if (mgr) mgr.previewMagazine('atcTableViz', magazinePockets(a));   // pockets + tools in 3D on the envelope
         // Tool-profile rack strip: each magazine tool drawn at its real shape (type/Ø) + length — review the rack.
         const rack = el('atcTableTools');

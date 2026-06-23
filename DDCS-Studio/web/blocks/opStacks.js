@@ -238,7 +238,96 @@ const RECONCILERS = {
         if (m) f.m_dir2 = m[2];
         return f;
     },
+    // ── ATC reconcilers ──────────────────────────────────────────────────────────────────────────────────
+    // Read the editable form fields back from each ATC op's (possibly block-edited) stack. The identity fields
+    // are recoverable from named #vars / atom presence; structural-only params (the magazine, which comes from
+    // Settings → Tool table, the probe feeds that live in Settings) are left to the form's current value.
+    atc_warmup(prog) {
+        const all = flat(prog);
+        // rpm1/rpm2 ← the two non-zero Spindle blocks in order; time1/time2 ← the two Dwell blocks in order.
+        const rpms = all.filter((b) => b.type === 'spindle' && b.params && num(b.params.rpm, 0) > 0);
+        const dwells = all.filter((b) => b.type === 'dwell' && b.params);
+        if (rpms.length < 2 || dwells.length < 2) return null;   // not a warmup op
+        return {
+            atc_warmup_rpm1: num(rpms[0].params.rpm, 6000), atc_warmup_time1: num(dwells[0].params.sec, 30),
+            atc_warmup_rpm2: num(rpms[1].params.rpm, 12000), atc_warmup_time2: num(dwells[1].params.sec, 30),
+        };
+    },
+    atc_check(prog) {
+        const all = flat(prog);
+        const tol = all.find((b) => b.type === 'assign' && b.params && b.params.var === '#20');
+        if (!tol) return null;   // not a tool-check op
+        return { atc_check_tol: num(tol.params.value, 0.5) };
+    },
+    atc_change(prog) {
+        const all = flat(prog);
+        const asn = (v) => all.find((b) => b.type === 'assign' && b.params && b.params.var === v);
+        const manual = all.some((b) => b.type === 'comment' && /Manual Tool Change/.test((b.params && b.params.text) || ''));
+        if (manual) {
+            const x = asn('#1'), y = asn('#2'), z = asn('#3');
+            if (!x || !y || !z) return null;
+            return { atc_change_mode: 'manual', atc_change_x: num(x.params.value, 100), atc_change_y: num(y.params.value, 100), atc_change_z: num(z.params.value, 0) };
+        }
+        const tgt = asn('#100'), zc = asn('#102');
+        if (!tgt) return null;   // not an auto-change op (e.g. the "not available" stub)
+        // fixedT: a literal target tool was typed; a #var means "From program (M6 Txx)" → field value 0.
+        const tv = String(tgt.params.value || '').trim();
+        const fixedT = /^#/.test(tv) ? 0 : Math.round(num(tv, 0));
+        const f = {
+            atc_change_mode: 'auto', atc_change_fixedt: fixedT,
+            atc_change_m300: all.some((b) => b.type === 'mcode' && num(b.params.code, 0) === 300),
+            atc_change_cover: all.some((b) => b.type === 'mcode' && num(b.params.code, 0) === 162),
+            atc_change_confirm: all.some((b) => b.type === 'confirm'),
+        };
+        if (zc) f.atc_change_zclear = num(zc.params.value, 0);
+        return f;
+    },
+    atc_test(prog) {
+        const all = flat(prog);
+        const asn = (v) => all.find((b) => b.type === 'assign' && b.params && b.params.var === v);
+        const pockets = all.some((b) => b.type === 'comment' && /Pocket Dry-Run/.test((b.params && b.params.text) || ''));
+        if (pockets) {
+            const zc = asn('#102');
+            // first ← the first "Pocket N — T#" comment index; count ← how many such stops; descend ← a Pocket-Z move present.
+            const stops = all.map((b) => b.type === 'comment' && /^Pocket (\d+) /.exec((b.params && b.params.text) || '')).filter(Boolean);
+            const f = {
+                atc_test_mode: 'pockets',
+                atc_test_descend: all.some((b) => b.type === 'assign' && b.params && b.params.var === '#112'),
+            };
+            if (zc) f.atc_test_zclear = num(zc.params.value, 0);
+            if (stops.length) { f.atc_test_first = num(stops[0][1], 1); f.atc_test_count = stops.length; }
+            return f;
+        }
+        const cyc = asn('#101');
+        if (!cyc) return null;   // not a drawbar test
+        const dw = all.find((b) => b.type === 'dwell' && b.params);
+        const f = { atc_test_mode: 'drawbar', atc_test_cycles: num(cyc.params.value, 10) };
+        if (dw) f.atc_test_dwell = Math.round(num(dw.params.sec, 0.5) * 1000);   // dwell atom is seconds; field is ms
+        return f;
+    },
+    atc_table(prog) {
+        const all = flat(prog);
+        const isTable = all.some((b) => b.type === 'comment' && /Write Tool Table to controller/.test((b.params && b.params.text) || ''));
+        if (!isTable) return null;
+        // The two include-checkboxes ← the presence of each section header comment.
+        return {
+            atc_table_lengths: all.some((b) => b.type === 'comment' && /TOOL LENGTHS/.test((b.params && b.params.text) || '')),
+            atc_table_pockets: all.some((b) => b.type === 'comment' && /POCKET POSITIONS/.test((b.params && b.params.text) || '')),
+        };
+    },
+    // atc_length has NO editable form fields (all params come from Settings → Probes/ATC), so there is nothing to
+    // reverse-sync; it round-trips via params (the builder is the single source). Registered so the audit shows it
+    // is wired; returns an empty field set (a structural no-op in pullFromBlocks).
+    atc_length() { return {}; },
 };
+
+// Flatten a block program (incl. op-container + flow-block children) to a single ordered list — ATC reconcilers
+// read named #vars / atom presence out of it. (The middle reconciler walks inline; this is the shared form.)
+function flat(prog) {
+    const out = [];
+    (function walk(arr) { for (const b of (arr || [])) { if (!b) continue; out.push(b); if (b.children) walk(b.children); } })(prog);
+    return out;
+}
 
 let loadedSig = null, shownOp = null;
 const sig = (op) => (op ? `${op.type}:${JSON.stringify(op.params)}` : null);

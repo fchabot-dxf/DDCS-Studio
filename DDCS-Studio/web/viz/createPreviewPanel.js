@@ -90,6 +90,10 @@ export function createPreviewPanel(container, opts = {}) {
     t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.setWcs(wcsForViz());   // 2D mirrors the 3D scene
 
     let viz = null;            // GcodeViz3D (lazy — only when 3D is shown and WebGL is available)
+    // forceMachine: a host hint that this op is INHERENTLY machine-frame (ATC tool changes move in G53) so the
+    // envelope must always draw, even when the traced path happens not to reach a G53 (auto-change with no tool
+    // loaded, warmup/drawbar with no motion, the parameter-write table). Set by the host via setForceMachine().
+    let forceMachine = false;
     let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null, lastStockKey = '';
     let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false, liveTimer = null;
 
@@ -211,7 +215,9 @@ export function createPreviewPanel(container, opts = {}) {
                 // established — e.g. an incremental probe macro) is start-relative, so the route emanates from the
                 // start marker. An ABSOLUTE program (G90/G53 — mill) sits at its own coords; the start is independent
                 // and moving it must not drag the path. Set BEFORE setSegments so _rebuild uses it.
-                const anchor = !(parsed.stats && parsed.stats.absolute);
+                // forceMachine (ATC) pins the op to the machine frame: never anchor to the start, always show the
+                // envelope — tool changes are G53 even when this particular trace didn't reach one.
+                const anchor = !forceMachine && !(parsed.stats && parsed.stats.absolute);
                 v._anchorToStart = anchor;
                 // ONE flag drives the whole frame: an incremental / operator-relative op (a probe) is LOCAL —
                 // stock top-at-0 AND no machine envelope; an absolute / WCS op (mill, WCS setup) shows the MACHINE
@@ -429,5 +435,15 @@ export function createPreviewPanel(container, opts = {}) {
     // with the toggle stuck on "3D" — because `mode` was set but setMode() never ran.
     { const _mt = q('.pp-mtoggle'); if (_mt) _mt.textContent = mode === '2d' ? '2D' : '3D'; if (cv2d) cv2d.style.display = mode === '2d' ? '' : 'none'; }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, get viz() { return viz; }, get engine() { return engine; }, el: container };
+    // Host hint: pin this preview to the MACHINE frame (ATC ops). Forces the envelope on regardless of the traced
+    // G-code, and re-renders if active so the change shows immediately.
+    function setForceMachine(on) {
+        on = !!on;
+        if (on === forceMachine) return;
+        forceMachine = on;
+        lastAnchor = null;   // force the anchor/envelope block in setGcode to re-evaluate
+        if (active) setGcode();
+    }
+
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, get viz() { return viz; }, get engine() { return engine; }, el: container };
 }

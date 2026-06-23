@@ -406,6 +406,16 @@ export class WizardManager {
         if (ln) ln.classList.add('active-line');   // no scrollIntoView — the CODE PREVIEW must not jump while playing; the line just pulses (CSS animation)
     }
 
+    // Pin a wizard preview to the MACHINE frame so the envelope always draws (ATC tool changes are inherently G53,
+    // even when a given trace — auto-change with no tool, warmup/drawbar with no motion, the table-write macro —
+    // doesn't reach a G53). Opt-in (ATC wizards only) — call AFTER preview3D so the panel exists.
+    previewMachine(containerId, on) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const panel = host && host.__panel;
+        if (panel && panel.setForceMachine) panel.setForceMachine(on !== false);
+    }
+
     // Draw the ATC magazine (pockets + tool stubs) in the 3D preview on the machine envelope. Opt-in (ATC wizards
     // only) — call AFTER preview3D so the panel/viz exists. pockets = [{x,y,z,dia,length,pocket,tool,color}].
     previewMagazine(containerId, pockets) {
