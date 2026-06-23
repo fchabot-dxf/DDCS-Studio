@@ -82,7 +82,7 @@ export function createPreviewPanel(container, opts = {}) {
     t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.setWcs(wcsForViz());   // 2D mirrors the 3D scene
 
     let viz = null;            // GcodeViz3D (lazy — only when 3D is shown and WebGL is available)
-    let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null;
+    let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null, lastStockKey = '';
     let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false, liveTimer = null;
 
     // The 2D canvas only repaints when told to; without this it goes blank if first drawn at a transient/zero
@@ -331,7 +331,15 @@ export function createPreviewPanel(container, opts = {}) {
 
     // ---- stock: a button that opens the rich Stock modal (ui/stockEditor.js). The modal persists to the shared
     //      store + broadcasts ddcs:settings-changed; renderStock() then pushes it into this panel's viz/engine. ----
-    function renderStock() { if (viz) viz.setStock(stockForViz()); if (engine) engine.stock = stockForViz(); t2.setStock(stockForViz()); }
+    function renderStock() {
+        const s = stockForViz();
+        if (viz) viz.setStock(s); if (engine) engine.stock = stockForViz(); t2.setStock(s);
+        // A stock GEOMETRY change (dims / shape / datum) must refresh the view — the grid floor + framing are set
+        // in fit(), which otherwise only runs once. Reset `fitted` so the next render re-fits (grid follows the
+        // new stock bottom). Keyed so unrelated settings changes don't reframe.
+        const key = s ? `${s.x}/${s.y}/${s.z}/${s.shape}/${s.datum}` : '';
+        if (key !== lastStockKey) { lastStockKey = key; fitted = false; }
+    }
     q('.pp-stock').addEventListener('click', (e) => toggleStockEditor(e.currentTarget));
 
     // ---- play / view controls ----
