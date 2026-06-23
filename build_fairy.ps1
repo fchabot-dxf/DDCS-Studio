@@ -16,6 +16,7 @@ Push-Location $root
 try {
     $sep = ";"   # Windows PyInstaller --add-data "SRC;DEST" separator
     python -m PyInstaller --noconfirm --clean --onefile --name $Name `
+        --icon "ddcs.ico" `
         --paths "bridge/bridge-app" `
         --add-data "bridge/bridge-app/web/ui${sep}console" `
         --add-data "DDCS-Studio/web${sep}studio" `
