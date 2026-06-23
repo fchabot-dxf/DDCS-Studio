@@ -7,7 +7,7 @@
  * handshake simulation and probe collision detection.
  */
 
-import { resetVirtualIO, setVirtualOutput, getVirtualInput, injectVirtualInput, triggerProbeCollision, resolveVirtualPin } from './virtualIO.js';
+import { resetVirtualIO, setVirtualOutput, getVirtualInput, injectVirtualInput, triggerProbeCollision, resolveVirtualPin, ioState } from './virtualIO.js';
 import { tokenizeWords } from './core/tokenizer.js';
 import { evalExpr, validateExpression } from './core/expression.js';
 import { evaluateCondition, validateCondition } from './core/condition.js';
@@ -50,7 +50,41 @@ export class GcodeExecutionEngine {
         this.autoAnswer = autoAnswer !== false;
         this.autoAnswerMs = Number.isFinite(autoAnswerMs) ? autoAnswerMs : 800;
         this._autoTimers = new Map();   // pinName -> timeout id
+        // Generic live-input bridge (DDCS Expert I/O-automation dialect). The factory sensor-wait idiom polls
+        // #[1520+N] (N = 0-based pin, so var 1520+N ↔ panel pin N+1). Mirror every virtual input into that var
+        // window so a `WHILE [#[1520+N] != L]` poll actually sees the panel / auto-sensor / truth-table state —
+        // symmetric with how outputs already drive the panel. One listener for the engine's lifetime.
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+            this._onIoChange = (e) => this._mirrorInputVar(e && e.detail && e.detail.pin);
+            window.addEventListener('io_change', this._onIoChange);
+        }
         this.resetState();
+    }
+
+    /**
+     * Mirror a virtual INPUT pin's state into the live-input var window #[1520+N] (N = 0-based, so panel pin
+     * k → var 1519+k). Called on every io_change and when an input wait is first evaluated, so the Expert
+     * `WHILE [#[1520+N] != L]` poll reads the same state the panel / auto-sensor / truth table expose.
+     * `changedName` is the resolved pin name from io_change; null re-syncs every input pin (used at eval time).
+     */
+    _mirrorInputVar(changedName) {
+        if (!this.vars) return;
+        // Re-resolve all 1-based input pins (1..24) and copy the matching virtual-input state into its var.
+        // Cheap, and robust to semantic-name remapping (resolveVirtualPin) — only ever touches the #1520 window.
+        for (let k = 1; k <= 24; k++) {
+            const name = resolveVirtualPin(k, 'IN');
+            if (changedName != null && name !== changedName) continue;
+            this.vars.set(1519 + k, getVirtualInput(name) ? 1 : 0);
+        }
+    }
+
+    /** Detach the io_change listener. Call when discarding a transient engine (e.g. a one-shot trace) so the
+     *  bridge listener doesn't leak across the many engines a live editor spins up. */
+    dispose() {
+        if (this._onIoChange && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+            window.removeEventListener('io_change', this._onIoChange);
+            this._onIoChange = null;
+        }
     }
 
     verifySyntax(text) {
@@ -158,6 +192,7 @@ export class GcodeExecutionEngine {
         resetVirtualIO();
         this._clearAutoTimers();
         this.vars = this.createVarStore();
+        this._mirrorInputVar(null);   // seed the #[1520+N] input window from the (now-cleared) virtual inputs
         this.pos = { x: 0, y: 0, z: 0 };
         this.absolute = true;
         this.unitScale = 1;
@@ -487,6 +522,43 @@ export class GcodeExecutionEngine {
         this._autoTimers.clear();
     }
 
+    /**
+     * Recognise a DDCS Expert live-input poll WHILE condition: `#[1520+N] <op> L` (N = 0-based pin literal,
+     * L the wanted level). Returns { pin, pinName, want } where pin is the 1-based panel pin (N+1), pinName the
+     * resolved virtual-input name, and want the boolean input level that makes the WHILE condition FALSE (i.e.
+     * the level the loop is waiting for, so we can route it through the same wait/auto-answer path as M31).
+     * Returns null if the condition isn't a bare #[1520+N] input poll (those keep the plain WHILE behaviour).
+     */
+    _inputPollWhile(cond) {
+        if (!cond) return null;
+        const m = String(cond).trim().match(/^#\[\s*1520\s*\+\s*(\d+)\s*\]\s*(==|!=|<=|>=|<|>|=)\s*(-?\d+)\s*$/);
+        if (!m) return null;
+        const n = Number(m[1]);                 // 0-based pin index
+        if (!Number.isFinite(n) || n < 0 || n > 23) return null;
+        const pin = n + 1;                       // 1-based panel pin
+        const pinName = resolveVirtualPin(pin, 'IN');
+        // The awaited level is whichever of 0/1 makes the loop EXIT (condition false). For the factory `!= L`
+        // idiom this is simply L; computing it generally also covers `== L`, `< L`, etc.
+        const op = m[2] === '=' ? '==' : m[2];
+        const rhs = Number(m[3]);
+        const cmp = (lhs) => {
+            switch (op) {
+                case '==': return lhs === rhs;
+                case '!=': return lhs !== rhs;
+                case '<=': return lhs <= rhs;
+                case '>=': return lhs >= rhs;
+                case '<': return lhs < rhs;
+                case '>': return lhs > rhs;
+                default: return false;
+            }
+        };
+        // Want the input level for which the WHILE condition is FALSE (loop exits). If both or neither 0/1
+        // satisfy that, this isn't a level-wait we can answer — fall back to plain WHILE.
+        const want0 = !cmp(0), want1 = !cmp(1);
+        if (want0 === want1) return null;
+        return { pin, pinName, want: want1 };
+    }
+
     _executeStep(step) {
         const line = step.stripped;
         this.stats.steps += 1;
@@ -504,6 +576,32 @@ export class GcodeExecutionEngine {
         // WHILE <cond> DOn — pre-matched to its ENDn at load. Enter the body if the condition holds,
         // otherwise jump past the matching END. (Unmatched WHILE: just enter, the cap guards runaways.)
         if (step.whileN != null) {
+            // DDCS Expert I/O-automation: a `WHILE [#[1520+N] != L] DO1 / G04 P10 / END1` is the factory
+            // sensor-wait idiom (slib O10300) — it spins until live input N reaches L. That loop never
+            // resolves on its own (nothing in the body changes the input), so instead of letting it run to
+            // the trace cap, PARK on it like an M31 wait: surface the awaited pin (panel banner + pulse),
+            // auto-answer it (virtual sensor) when "Auto sensors" is on, and let a panel click / truth table
+            // satisfy it. The WHILE-EXIT condition is `input N == L`, so we wait for the input to BECOME L.
+            const poll = this._inputPollWhile(step.whileCond);
+            if (poll && !this._evaluateCondition(step.whileCond)) {
+                // Condition false ⇒ the loop would EXIT now ⇒ the input has reached the wanted level: fall through.
+                this.ip = step.loopEnd != null ? step.loopEnd + 1 : this.ip + 1;
+                this._setWaitPin(null);
+                return false;
+            }
+            if (poll) {
+                // Condition true ⇒ the loop would SPIN: the input is not yet at the wanted level → wait for it.
+                if (this._traceSink) {                        // trace: a virtual sensor satisfies the wait at once
+                    injectVirtualInput(poll.pinName, poll.want);
+                    this.ip = step.loopEnd != null ? step.loopEnd + 1 : this.ip + 1;
+                    return false;
+                }
+                this._setStatus(`WHILE waiting for ${poll.pinName} to be ${poll.want ? 'ON' : 'OFF'}...`, true);
+                this._setWaitPin({ pin: poll.pin, pinName: poll.pinName, target: poll.want });
+                if (this.autoAnswer) this._scheduleAutoAnswer(poll.pinName, poll.want);
+                this._nextDelayMs = 50;   // poll gently instead of spinning at the fast-step rate
+                return false;             // do NOT advance — re-test this same WHILE next tick
+            }
             if (step.loopEnd != null && !this._evaluateCondition(step.whileCond)) this.ip = step.loopEnd + 1;
             else this.ip += 1;
             return false;
@@ -654,6 +752,17 @@ export class GcodeExecutionEngine {
                 if (wm.P != null) {
                     if (waitForInput(m, wm.P, resolveVirtualPin(wm.P, 'IN'), m === 31)) waiting = true;
                 }
+            } else if (m >= 50 && m <= 91) {
+                // DDCS Expert generic digital OUTPUT (I/O-automation dialect): M(50+2k) = output k+1 ON,
+                // M(51+2k) = output k+1 OFF (k 0-based; slib O10050-O10091 write #1552+k). Light the panel
+                // (and fire any truth-table handshake) AND mirror the bit into the firmware var #1551+k so a
+                // later `IF #1551+k…` / `WHILE` branch can read its own output back.
+                const k = (m - 50) >> 1;          // 0-based output index
+                const on = (m - 50) % 2 === 0;
+                const pinName = resolveVirtualPin(k + 1, 'OUT');   // panel output is 1-based (k+1)
+                setVirtualOutput(pinName, on);
+                this.vars.set(1551 + k, on ? 1 : 0);
+                this._setStatus(`M${m} → ${pinName} = ${on ? 'ON' : 'OFF'}`, true);
             } else if (m === 101 || m === 102) {
                 // DM500 move-until-input probe cycle (bridge/controllers/dm500/install/probe.nc): M101 arms
                 // probe-input monitoring, the following G01 feeds until the input triggers (the move stops at
