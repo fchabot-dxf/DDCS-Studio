@@ -656,8 +656,6 @@ export class CommandDeck {
             // Export now live in the header chevron quick-menu (ui/headerPost.js).
             rightTarget.innerHTML = `
                 <div style="display:flex; gap:6px; align-items:center;">
-                    <button id="btn-undo" class="toolbar-btn icon-only" onclick="window.ddcsUndo && window.ddcsUndo()" title="Undo (program history — inserts + block / editor edits)" aria-label="Undo" disabled>↶</button>
-                    <button id="btn-redo" class="toolbar-btn icon-only" onclick="window.ddcsRedo && window.ddcsRedo()" title="Redo (program history)" aria-label="Redo" disabled>↷</button>
                     <button class="toolbar-btn icon-only" onclick="copyCode && copyCode()" title="Copy editor to clipboard" aria-label="Copy"><span class="btn-ico">${HEADER_ICONS.copy}</span></button>
                     <button class="toolbar-btn icon-only" onclick="clearCode && clearCode()" title="Clear the editor" aria-label="Clear"><span class="btn-ico">${HEADER_ICONS.clear}</span></button>
                 </div>
@@ -704,17 +702,19 @@ export class CommandDeck {
     }
 
     // Top app-header: staged so the right-edge icons never overflow the window. Stage 1 drops the
-    // op-button labels (.is-compact); if it still overflows, stage 2 drops STUDIO/GATEWAY labels +
-    // version (.is-mini). Measured each call (load + resize + theme change) — no fixed breakpoints.
+    // op-button labels (.is-compact); stage 2 drops inactive tab labels + version (.is-mini);
+    // stage 3 drops ALL tab labels + undo/redo + shrinks logo (.is-tiny).
+    // Measured each call (load + resize + theme change) — no fixed breakpoints.
     _fitAppHeader() {
         const h = document.querySelector('.app-header');
         if (!h) return;
-        h.classList.remove('is-compact', 'is-mini');
+        h.classList.remove('is-compact', 'is-mini', 'is-tiny');
         // Strict (no tolerance): the app-header has no internal scroll, so ANY overflow is page
         // overflow. Collapse on the first pixel over so the right-edge icons never leave the window.
         if (h.scrollWidth > h.clientWidth) {
             h.classList.add('is-compact');
             if (h.scrollWidth > h.clientWidth) h.classList.add('is-mini');
+            if (h.scrollWidth > h.clientWidth) h.classList.add('is-tiny');
         }
     }
 

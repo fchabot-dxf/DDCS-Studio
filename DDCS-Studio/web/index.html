@@ -120,6 +120,8 @@
 
         </nav>
         <div class="hdr-controls">
+            <button type="button" id="btn-undo" class="toolbar-btn icon-only hdr-undo" onclick="window.ddcsUndo && window.ddcsUndo()" title="Undo (program history)" aria-label="Undo" disabled>↶</button>
+            <button type="button" id="btn-redo" class="toolbar-btn icon-only hdr-undo" onclick="window.ddcsRedo && window.ddcsRedo()" title="Redo (program history)" aria-label="Redo" disabled>↷</button>
             <button class="op-btn hidden" id="transferBtn" title="Send the current program to the machine"><span class="op-icon">📡</span><span class="op-label">TRANSFER</span></button>
         </div>
     </header>

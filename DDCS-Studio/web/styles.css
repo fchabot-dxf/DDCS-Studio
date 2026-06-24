@@ -104,6 +104,7 @@ svg [id*="Zfirst_travel"] {
     --success: #22c55e;
     --danger: #ef4444;
     --warn: #eab308;
+    --block-edited: #ffb454;   /* amber — block-edited line marker (overridden per theme) */
 }
 
 /* ============================================================================
@@ -592,9 +593,15 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 
 /* Editor op hover-to-edit: highlight the hovered op's lines (in the #editor-highlight overlay) + a float chip. */
 #editor-highlight .g-line.op-hover { background: rgba(14, 165, 233, 0.16); border-radius: 2px; }
-/* Block-edited ops: their emitted editor lines get an amber left-accent + tint (applied by editorOpHover). */
-#editor-highlight .g-line.op-block-edited { box-shadow: inset 3px 0 0 #ffb454; background: rgba(255, 180, 84, 0.10); border-radius: 2px; }
-.editor-container .op-edit-chip.block-edited { box-shadow: 0 2px 13px rgba(0,0,0,.48), 0 0 0 3px color-mix(in srgb, #ffb454 55%, transparent); }
+/* Block-edited ops: characters turn --block-edited colour + a gentle breathing animation.
+   The overlay carries the visible text (textarea is transparent). Left accent kept for scanning. */
+@keyframes blockEditedBreathe {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: .55; }
+}
+#editor-highlight .g-line.op-block-edited { color: var(--block-edited); box-shadow: inset 3px 0 0 var(--block-edited); border-radius: 2px; animation: blockEditedBreathe 3s ease-in-out infinite; }
+#editor-highlight .g-line.op-block-edited span { color: inherit; }   /* override per-token syntax colours */
+.editor-container .op-edit-chip.block-edited { box-shadow: 0 2px 13px rgba(0,0,0,.48), 0 0 0 3px color-mix(in srgb, var(--block-edited) 55%, transparent); }
 /* Grey out disabled toolbar buttons (e.g. the header Undo/Redo when there's no history to step through). */
 .toolbar-btn:disabled, .toolbar-btn[disabled] { opacity: .38; cursor: default; filter: grayscale(.4); pointer-events: none; }
 /* Scoped under .editor-container (0,2,0) so the ACCENT fill out-ranks the per-theme `button` skin
@@ -2362,6 +2369,7 @@ Middle (handle) {
     --text-dim: #666666;
     --border: #dddddd;
     --radius: 6px;
+    --block-edited: #e08a00;   /* warm amber on light bg */
 
     /* header */
     --hdr-bg: #ffffff;
@@ -2406,6 +2414,7 @@ Middle (handle) {
     --text-dim:      #4b4843;
     --border:        #6f6a60;
     --radius:        6px;
+    --block-edited:  #ff9d00;   /* CRT amber, matches the phosphor family */
 
     /* header */
     --hdr-bg:        #cfcabf;
@@ -2720,6 +2729,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --text-dim: #8b7355;
     --border: #6b5329;
     --radius: 4px;
+    --block-edited: #e6a832;   /* burnished brass */
 
     /* header */
     --hdr-bg: #3d2817;
@@ -2765,6 +2775,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --text-dim: #7488a8;
     --border: #20344f;
     --radius: 8px;
+    --block-edited: #ff5daa;   /* hot-pink neon */
 
     /* contract: surfaces / material */
     --surface-1: rgba(14, 22, 38, .92);
@@ -2914,6 +2925,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --text-dim: #9d8a6b;      /* aged bone */
     --border: #5a4836;        /* sinew seam */
     --radius: 16px;           /* organic curvature */
+    --block-edited: #e6a24a;  /* sap / resin amber */
     --success: #8aa15a;       /* muscle green */
     --danger:  #c0473a;       /* arterial */
     --warn:    #d99a3a;
@@ -4343,6 +4355,19 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .app-header.is-mini .hdr-tabs .tab .app-ico { margin-left: 0; }
 .app-header.is-mini .hdr-tabs .tab { padding: 0 18px; letter-spacing: 0; }   /* icon-only, full header height */
 .app-header.is-mini .ver { display: none; }
+/* Stage 3 (.is-tiny): very narrow — ALL tab labels hidden (icons only), undo/redo hidden */
+.app-header.is-tiny .hdr-tabs .tab .app-tx { display: none; }
+.app-header.is-tiny .hdr-tabs .tab { padding: 0 10px; }
+.app-header.is-tiny .hdr-undo { display: none; }
+.app-header.is-tiny .brand { padding: 0 4px; gap: 4px; }
+.app-header.is-tiny .logo { height: 24px; }
+/* Header Undo/Redo: slim icon buttons that match the header chrome */
+.hdr-controls .hdr-undo {
+    font-size: 15px; padding: 2px 6px; line-height: 1; border: none; border-radius: 4px;
+    background: transparent; color: var(--hdr-ink, var(--text)); cursor: pointer; opacity: .8;
+}
+.hdr-controls .hdr-undo:hover:not(:disabled) { opacity: 1; background: rgba(128,128,128,.15); }
+.hdr-controls .hdr-undo:disabled { opacity: .28; cursor: default; filter: grayscale(.5); }
 @media (max-width: 520px) {
     .app-header .brand { padding: 0 8px; gap: 6px; }
     .app-header .logo { height: 26px; }
