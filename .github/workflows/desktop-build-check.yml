@@ -18,6 +18,7 @@ on:
       - 'bridge/bridge-app/**'
       - 'fairy_gateway.py'
       - 'build_fairy.ps1'
+      - 'ddcs.ico'
       - 'requirements-build.txt'
       - '.github/workflows/desktop-build-check.yml'
   pull_request:
