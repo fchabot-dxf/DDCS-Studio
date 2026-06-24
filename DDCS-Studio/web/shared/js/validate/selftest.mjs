@@ -20,6 +20,8 @@ const cases = [
   ["#250 = #1630 + 10\nMSETDATA[250,1,0,2,16,300]\nM30\n", "E-CH1630"],
   ["#2070 = 1175(Enter speed)\nM30\n", "W-2070RANGE"],
   ["G53 X0 Y0\nM30\n", "W-G53CONST"],
+  ["G04 P3.0\nM30\n", "W-DWELLDEC"],    // decimal dwell P is ms/near-instant, not seconds
+  ["G04 P3000\nM30\n", null],           // integer ms is correct → clean
   ["MSETDATA[200,1,0,4,16]\nM30\n", "E-MARGS"],
   ["#100 = [#1 + 2\nM30\n", "E-BRACKET"],
 ];

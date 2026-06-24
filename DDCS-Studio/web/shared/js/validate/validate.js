@@ -22,6 +22,7 @@ const AXIS_BARE_CONST = /(?<![#[\d.])\b[XYZABCUVW]\s*[-+]?\d/;
 const INPUT2070 = /#2070\s*=\s*(\d+)/g;
 const MCALL = /\b(MSETDATA|MGETDATA)\s*\[([^\]]*)\]/g;
 const LITERAL_ASSIGN = /^#(\d+)\s*=\s*[-+]?\d+(?:\.\d+)?\s*$/;   // '#n = <constant>'
+const DWELL_DECIMAL = /\bG0*4\s+P(\d*\.\d+)/;   // 'G04 P3.0' — decimal dwell (P is ms; a decimal is NOT seconds)
 const IF_WORD = /\bIF\b/;
 const G10 = /\bG10\b/;
 const G10_LWORD = /\bL(?:20|2)\b/;                 // the L2 / L20 (set-offset) form
@@ -107,6 +108,13 @@ function lintLine(n, raw, findings, primed) {
   const g = G53_BARE.exec(code);
   if (g && AXIS_BARE_CONST.test(g[1])) {
     findings.push({ line: n, sev: "WARN", code: "W-G53CONST", msg: "G53 with a bare constant fails - operand must include a #var (e.g. 'G53 X#x', not 'G53 X0')" });
+  }
+
+  // G04 dwell with a DECIMAL P is NOT seconds on the Expert (on-machine 2026-06-23): P is always milliseconds;
+  // 'G04 P3.0' truncates to ~3 ms (near-instant), not 3 seconds.
+  const md = DWELL_DECIMAL.exec(code);
+  if (md) {
+    findings.push({ line: n, sev: "WARN", code: "W-DWELLDEC", msg: `decimal 'G04 P${md[1]}' is ~ms / near-instant, NOT seconds - P is always milliseconds; for N seconds use integer 'G04 P<N*1000>'` });
   }
 
   // #2070 input dialog writing to PERSISTENT storage fails silently (factory code DOES use
