@@ -250,6 +250,8 @@ export class WizardManager {
             // Ensure fields & preview reflect current defaults immediately
             this.update();
             if (view && typeof view.onOpen === 'function') view.onOpen(this);
+            // Transactional snapshot: capture the form state now, so a Cancel can revert to it.
+            this._formSnapshot = this._captureForm();
         }
     }
 
@@ -277,6 +279,29 @@ export class WizardManager {
         }
     }
 
+    /** Snapshot the current values of all input fields for the active wizard view. */
+    _captureForm() {
+        const view = this.activeView();
+        if (!view || !view.inputIds) return null;
+        const snap = {};
+        for (const id of view.inputIds) {
+            const e = el(id);
+            if (!e) continue;
+            snap[id] = e.type === 'checkbox' ? e.checked : e.value;
+        }
+        return snap;
+    }
+
+    /** Restore all input fields from a previous snapshot. */
+    _restoreForm(snap) {
+        if (!snap) return;
+        for (const [id, val] of Object.entries(snap)) {
+            const e = el(id);
+            if (!e) continue;
+            if (e.type === 'checkbox') e.checked = !!val; else e.value = val;
+        }
+    }
+
     openForEdit(opId) {
         const prog = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
         const op = prog.find((b) => b && b.type === 'op' && b.id === opId);
@@ -292,6 +317,8 @@ export class WizardManager {
         this.update();                                 // re-render preview + code from the seeded values
         this.editingOpId = opId;                       // now mark as editing this op
         const box = document.querySelector('.wiz-box'); if (box) box.classList.add('editing');  // accent glow
+        // Transactional snapshot: capture the form state now, so a Cancel can revert to it.
+        this._formSnapshot = this._captureForm();
     }
 
     // Back-compat entry points (older callers and window.* glue)
@@ -303,11 +330,15 @@ export class WizardManager {
     /**
      * Hide the wizard overlay.  If `reverse` is truthy the click sound will
      * play backwards; callers that are performing an insert should pass
-     * `false` so only the forward animation is heard.
+     * `false` so only the forward animation is heard. If `isCancel` is true, 
+     * the form's edits are discarded by restoring the snapshot taken on open.
      */
-    close(reverse = true) {
+    close(reverse = true, isCancel = true) {
         if (reverse) {
             playClickReverse();
+        }
+        if (isCancel && this._formSnapshot) {
+            this._restoreForm(this._formSnapshot);
         }
         closeTemplatesPopover();
         // Hide overlay and clear active state
@@ -379,8 +410,8 @@ export class WizardManager {
             console.warn('WizardManager: No visible wizard or empty code.');
         }
 
-        // do not fire reverse sound when closing as part of insertion
-        this.close(false);
+        // do not fire reverse sound when closing as part of insertion, and do not revert the form snapshot
+        this.close(false, false);
     }
 
     // Render the wizard's generated G-code in the active wizard's viz area using THE shared preview panel
