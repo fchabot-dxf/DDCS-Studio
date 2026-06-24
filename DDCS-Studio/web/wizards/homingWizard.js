@@ -171,7 +171,7 @@ export function homingSimProxy(params = {}) {
     const axes = Array.isArray(params.axes) ? params.axes.filter((a) => AX_IDX[a] != null) : [];
     const cfg = params.config || {};
     const machine = params.machine || {};
-    const travel = { x: num(machine.x, 300), y: num(machine.y, 300), z: num(machine.z, 120), a: 0, b: 0 };
+    const travel = { x: num(machine.x, 300), y: num(machine.y, 300), z: num(machine.z, -120), a: 0, b: 0 };
 
     const L = [];
     L.push('( SIMULATION PROXY — homing motion model, not the emitted macro )');

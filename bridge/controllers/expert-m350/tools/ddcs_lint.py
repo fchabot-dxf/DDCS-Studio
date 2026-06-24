@@ -62,7 +62,7 @@ def scan_comments(line):
 
 
 # --------------------------------------------------------------------------- checks
-FANUC_OPS = re.compile(r"(?<![A-Za-z0-9_])(EQ|NE|LT|GT|LE|GE)(?![A-Za-z0-9_])")
+FANUC_OPS = re.compile(r"(?<![A-Za-z0-9_])(NE|LT|GT|LE|GE)(?![A-Za-z0-9_])")  # EQ excluded - CONFIRMED working (V10); others untested
 ASSIGN = re.compile(r"#(\d+)\s*=\s*(.+?)\s*$")
 HASH_REF = re.compile(r"#(\d+)")
 GOTO_SPACE = re.compile(r"\bGOTO\s+([0-9\[])")
@@ -89,22 +89,28 @@ def lint_line(n, raw, findings, primed=frozenset()):
         findings.append(Finding(n, "ERROR", "E-BRACKET",
                                 f"unbalanced [ ] ({code.count('[')} '[' vs {code.count(']')} ']')"))
 
-    # GOTO with a space before the label
+    # GOTO with a space before the label - ACCEPTED on the Expert (CONFIRMED V11 2026-06-23) -> warning, not error
     if GOTO_SPACE.search(code):
-        findings.append(Finding(n, "ERROR", "E-GOTOSPACE",
-                                "space after GOTO - must be 'GOTO1' / 'GOTO[expr]', not 'GOTO 1'"))
+        findings.append(Finding(n, "WARN", "W-GOTOSPACE",
+                                "space after GOTO ('GOTO 1') is accepted on the DDCS Expert - emit 'GOTO1' / "
+                                "'GOTO[expr]' for portability"))
 
-    # FANUC comparison words instead of C-style operators
+    # FANUC comparison words (EQ excluded - confirmed working; others untested)
     m = FANUC_OPS.search(code)
     if m and re.search(r"\bIF\b", code):
         findings.append(Finding(n, "WARN", "W-FANUCOP",
-                                f"FANUC operator '{m.group(1)}' is unreliable - use C-style "
-                                "==, !=, <, >, <=, >="))
+                                f"FANUC operator '{m.group(1)}' is untested on the DDCS - prefer C-style "
+                                "==, !=, <, >, <=, >= (EQ is confirmed working)"))
 
-    # G10 (broken on DDCS)
+    # G10 is broken; the L2/L20 + axis-word form is DANGEROUS - the axis word runs as a MOVE (CONFIRMED V1 2026-06-19)
     if re.search(r"\bG10\b", code):
-        findings.append(Finding(n, "WARN", "W-G10",
-                                "G10 is broken on DDCS (causes unwanted motion) - write #805+ offsets directly"))
+        if re.search(r"\bL(?:20|2)\b", code) and re.search(r"[XYZABCUVW]\s*[-+]?[\d.#\[]", code):
+            findings.append(Finding(n, "ERROR", "E-G10MOVE",
+                                    "G10 L2/L20 with an axis word sets NO offset and MOVES the axis "
+                                    "(confirmed dangerous) - write #805+ offsets directly"))
+        else:
+            findings.append(Finding(n, "WARN", "W-G10",
+                                    "G10 is broken on DDCS (causes unwanted motion) - write #805+ offsets directly"))
 
     # G53 with a bare constant operand (must contain a variable)
     g = G53_BARE.search(code)
@@ -193,8 +199,10 @@ def self_test():
         # (text, expected_code_substring or None for clean)
         ("(ok comment)\n#250 = 1\nMSETDATA[250,1,0,2,16,300]\nM30\n", None),
         ("( try X5=4 (input regs) )\nM30\n", "E-NESTPAREN"),
-        ("IF #1!=2 GOTO 5\nM30\n", "E-GOTOSPACE"),
-        ("IF #1 EQ 5 GOTO1\nM30\n", "W-FANUCOP"),
+        ("IF #1!=2 GOTO 5\nM30\n", "W-GOTOSPACE"),   # GOTO-space accepted on Expert -> warning, not error
+        ("IF #1 EQ 5 GOTO1\nM30\n", None),           # EQ confirmed working -> no W-FANUCOP
+        ("IF #1 NE 5 GOTO1\nM30\n", "W-FANUCOP"),     # NE still untested -> warns
+        ("G10 L20 P6 X25\nM30\n", "E-G10MOVE"),       # G10 L20 + axis word = confirmed-dangerous move -> ERROR
         ("#1153 = #880\nM30\n", "W-PRIME"),
         ("#1153 = #880 + 0\nM30\n", None),
         ("#1153 = 1\n#1153 = #880\nM30\n", None),   # primed with constant first -> suppressed

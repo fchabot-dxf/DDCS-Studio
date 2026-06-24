@@ -718,15 +718,59 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 .cloud-status { font-size: 13px; color: var(--text-main); }
 .cloud-status.muted { color: var(--text-dim); }
 
-/* A wizard re-opened to EDIT an existing op (vs create a new one): pronounced accent glow + soft pulse. */
-.wiz-box.editing {
+/* EDIT / RETURN GLOW — ONE shared definition. Used by both a wizard re-opened to EDIT an op (.wiz-box.editing)
+   and Settings opened via a return path (.settings-modal.return-glow → "you came from somewhere; leaving here
+   walks you back", toggled by openSettings/closeSettings). Colour + pace follow the ACTIVE THEME via the
+   --edit-glow-* tokens set per theme below — some deliberately more eccentric than others. */
+.wiz-box.editing,
+.settings-modal.return-glow {
     border-color: var(--accent, #0ea5e9) !important;
-    animation: wizEditGlow 1.5s ease-in-out infinite;
+    animation: editGlow var(--edit-glow-speed, 1.5s) ease-in-out infinite;
 }
-@keyframes wizEditGlow {
-    0%, 100% { box-shadow: 0 0 0 3px var(--accent, #0ea5e9), 0 0 34px 5px rgba(14, 165, 233, .65); }
-    50%      { box-shadow: 0 0 0 4px var(--accent, #0ea5e9), 0 0 52px 12px rgba(14, 165, 233, 1); }
+@keyframes editGlow {
+    0%, 100% { box-shadow: 0 0 0 3px var(--accent, #0ea5e9), 0 0 34px 5px rgba(var(--edit-glow-rgb, 14,165,233), .65); }
+    50%      { box-shadow: 0 0 0 4px var(--accent, #0ea5e9), 0 0 52px 12px rgba(var(--edit-glow-rgb, 14,165,233), 1); }
 }
+/* A glowing level sitting BEHIND another (e.g. the wizard edit-glow while Settings is open over it via the ⚙):
+   desaturate it a touch so the FRONT/current level reads as the most saturated and this one as a "level back". */
+.wiz-box.editing.glow-behind { filter: saturate(.5); }
+
+/* Per-theme glow colour (rgb so the halo can take an alpha) + pace. */
+[data-theme="normal"]     { --edit-glow-rgb: 74,144,226;  --edit-glow-speed: 1.9s; }   /* flat, calm blue */
+[data-theme="studio"]     { --edit-glow-rgb: 22,104,255;  --edit-glow-speed: 1.5s; }   /* clean electric-blue */
+[data-theme="steampunk"]  { --edit-glow-rgb: 201,154,46;  --edit-glow-speed: 2.4s; }   /* warm brass, slow ornate breathe */
+[data-theme="organic"]    { --edit-glow-rgb: 217,122,92;  --edit-glow-speed: 2.8s; }   /* soft coral, gentle */
+[data-theme="futuristic"] { --edit-glow-rgb: 45,226,255;  --edit-glow-speed: .9s; }    /* neon cyan, fast + punchy */
+/* Futuristic is the eccentric one: a brighter, multi-layer neon pulse instead of the calm single halo. */
+[data-theme="futuristic"] .wiz-box.editing,
+[data-theme="futuristic"] .settings-modal.return-glow {
+    animation: editGlowNeon .9s ease-in-out infinite;
+}
+@keyframes editGlowNeon {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(45,226,255,1), 0 0 26px 5px rgba(45,226,255,.7), 0 0 60px 14px rgba(45,226,255,.35); }
+    50%      { box-shadow: 0 0 0 3px rgba(45,226,255,1), 0 0 46px 12px rgba(45,226,255,1), 0 0 90px 26px rgba(45,226,255,.55); }
+}
+/* Studio: a BREATHING colour cycle that SLOWS as it goes — each successive breath is longer than the last, so it
+   decelerates rather than speeding up. Blue is the quick first breath, yellow slower, red the slowest/longest,
+   then it settles back to blue. One colour at a time (no muddy multi-colour box-shadow). */
+[data-theme="studio"] .wiz-box.editing,
+[data-theme="studio"] .settings-modal.return-glow {
+    animation: editGlowStudio 7s ease-in-out infinite;
+}
+@keyframes editGlowStudio {
+    0%   { box-shadow: 0 0 0 2px rgba(22,104,255,1),   0 0 16px 2px rgba(22,104,255,.4); }    /* blue small */
+    12%  { box-shadow: 0 0 0 4px rgba(22,104,255,1),   0 0 56px 13px rgba(22,104,255,.95); }  /* blue inhale (now a full, longer breath) */
+    24%  { box-shadow: 0 0 0 2px rgba(22,104,255,1),   0 0 16px 2px rgba(22,104,255,.4); }    /* blue exhale */
+    38%  { box-shadow: 0 0 0 4px rgba(255,200,60,1),   0 0 52px 12px rgba(255,200,60,.92); }  /* yellow inhale (slower) */
+    52%  { box-shadow: 0 0 0 2px rgba(255,200,60,.55), 0 0 14px 2px rgba(255,200,60,.3); }    /* yellow exhale */
+    70%  { box-shadow: 0 0 0 4px rgba(255,60,55,1),    0 0 52px 12px rgba(255,60,55,.92); }   /* red inhale (slowest) */
+    88%  { box-shadow: 0 0 0 2px rgba(255,60,55,.5),   0 0 14px 2px rgba(255,60,55,.28); }    /* red exhale (long) */
+    100% { box-shadow: 0 0 0 2px rgba(22,104,255,1),   0 0 16px 2px rgba(22,104,255,.4); }    /* settle back to blue */
+}
+
+/* Setup health-check bubble — the momentary first-run nudge (ui/setupChecklist.js). Slides up + fades in. */
+@keyframes setupBubbleIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.setup-bubble:hover { border-left-color: var(--accent, #2d7ff9); filter: brightness(1.06); }
 
 /* Main Layout */
 .app-shell {

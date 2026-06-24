@@ -179,7 +179,7 @@
                 <span id="wizTitle">GENERATOR</span>
                 <span class="wiz-head-actions" style="display:flex; gap:14px; align-items:center;">
                     <span class="wiz-templates" title="Templates — save / load this op's settings" role="button" tabindex="0">📑</span>
-                    <span class="wiz-gear" title="Settings — stock, probe, machine (live updates this preview)" onclick="window.openSettings && window.openSettings()">⚙</span>
+                    <span class="wiz-gear" title="Settings — stock, probe, machine (live updates this preview)" onclick="window.ddcsOpenSettingsReturn ? window.ddcsOpenSettingsReturn('Wizard') : (window.openSettings && window.openSettings())">⚙</span>
                     <span class="wiz-close" onclick="closeWiz()" title="Close">✕</span>
                 </span>
             </div>
@@ -1440,6 +1440,7 @@
                 </div><!-- /.wiz-visual -->
                 <div class="wiz-controls">
                 <div class="settings-hint" style="margin-bottom:8px;">Tool-length probe parameters come from <b>Settings → ATC</b> (block height, feeds, max distance, retract, Q) and the tool-setter pin/level from <b>Settings → Probes</b>. The preview reflects those values — edit them in Settings. ▶ traces the Z touch on the setter.</div>
+                <button type="button" class="wiz-atc-setup" onclick="window.openAtcSetup && window.openAtcSetup()" title="Open ATC settings — magazine, drawbar I/O, tool-length probe params" style="margin-bottom:10px; padding:4px 12px; font-size:12px; background:var(--accent,#2d7ff9); color:#fff; border:none; border-radius:5px; cursor:pointer;">⚙ ATC Settings…</button>
                 <div class="preview-block">
                     <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_atc_length_code"></pre>
@@ -1460,6 +1461,7 @@
                 </div><!-- /.wiz-visual -->
                 <div class="wiz-controls">
                 <div class="settings-hint" style="margin-bottom:8px;">A quick tap on the tool setter that <b>aborts if the tool is broken, missing, or the wrong length</b>. Re-measures and compares to the stored tool-length table (1430+T-1). Setter pin/level from <b>Settings → Probes</b>; block height, feeds, safe Z, max distance from <b>Settings → ATC</b>.</div>
+                <button type="button" class="wiz-atc-setup" onclick="window.openAtcSetup && window.openAtcSetup()" title="Open ATC settings — magazine, drawbar I/O, tool-length probe params" style="margin-bottom:10px; padding:4px 12px; font-size:12px; background:var(--accent,#2d7ff9); color:#fff; border:none; border-radius:5px; cursor:pointer;">⚙ ATC Settings…</button>
                 <span class="section-label">TOLERANCE</span>
                 <div class="grid-2">
                     <div><span class="label">LENGTH TOLERANCE (mm)</span><input id="atc_check_tol" value="0.5" title="Max allowed deviation from the stored tool length. Beyond +/- this aborts (broken or wrong tool)."/></div>
@@ -1511,6 +1513,7 @@
                     <div id="atcTableTools" class="tool-rack" style="display:flex;gap:10px;overflow-x:auto;padding:8px 2px;align-items:flex-end;min-height:54px;"></div>
                 </div><!-- /.wiz-visual -->
                 <div class="wiz-controls">
+                <button type="button" class="wiz-atc-setup" onclick="window.openAtcSetup && window.openAtcSetup()" title="Open ATC settings — magazine, drawbar I/O, tool-length probe params" style="margin-bottom:10px; padding:4px 12px; font-size:12px; background:var(--accent,#2d7ff9); color:#fff; border:none; border-radius:5px; cursor:pointer;">⚙ ATC Settings…</button>
                 <span class="section-label">MAGAZINE</span>
                 <div id="atc_table_magazine"></div>
                 <span class="section-label" style="margin-top:10px;">TOOL TABLE → CONTROLLER</span>
@@ -1539,6 +1542,7 @@
                     <div id="atcChangeTools" class="tool-rack" style="display:flex;gap:10px;overflow-x:auto;padding:8px 2px;align-items:flex-end;min-height:54px;"></div>
                 </div><!-- /.wiz-visual -->
                 <div class="wiz-controls">
+                <button type="button" class="wiz-atc-setup" onclick="window.openAtcSetup && window.openAtcSetup()" title="Open ATC settings — magazine, drawbar I/O, tool-length probe params" style="margin-bottom:10px; padding:4px 12px; font-size:12px; background:var(--accent,#2d7ff9); color:#fff; border:none; border-radius:5px; cursor:pointer;">⚙ ATC Settings…</button>
                 <span class="section-label">TOOL CHANGE</span>
                 <div class="param-grid">
                     <label>Method

@@ -9,8 +9,10 @@ import { validate, summarize } from "./validate.js";
 const cases = [
   ["(ok comment)\n#250 = 1\nMSETDATA[250,1,0,2,16,300]\nM30\n", null],
   ["( try X5=4 (input regs) )\nM30\n", "E-NESTPAREN"],
-  ["IF #1!=2 GOTO 5\nM30\n", "E-GOTOSPACE"],
-  ["IF #1 EQ 5 GOTO1\nM30\n", "W-FANUCOP"],
+  ["IF #1!=2 GOTO 5\nM30\n", "W-GOTOSPACE"],          // GOTO-space accepted on Expert → warning, not error
+  ["IF #1 EQ 5 GOTO1\nM30\n", null],                  // EQ confirmed working on machine → no W-FANUCOP
+  ["IF #1 NE 5 GOTO1\nM30\n", "W-FANUCOP"],            // NE still untested → warns
+  ["G10 L20 P6 X25\nM30\n", "E-G10MOVE"],             // G10 L20 + axis word = confirmed-dangerous move → ERROR
   ["#1153 = #880\nM30\n", "W-PRIME"],
   ["#1153 = #880 + 0\nM30\n", null],
   ["#1153 = 1\n#1153 = #880\nM30\n", null],            // primed with a constant first -> suppressed
@@ -34,7 +36,7 @@ for (const [text, want] of cases) {
 // a couple of structural checks on the result shape
 const r = validate("MSETDATA[200,1,0,4,16]\nM30\n");
 if (!(r.errors === 1 && r.ok === false)) { failures++; console.log("  [FAIL] result shape: errors/ok"); }
-console.log(`  [ok] summary line: "${summarize(validate("IF #1 EQ 5 GOTO1\nM30\n"))}"`);
+console.log(`  [ok] summary line: "${summarize(validate("IF #1 NE 5 GOTO1\nM30\n"))}"`);
 
 console.log(`\nvalidator self-test: ${failures === 0 ? "PASS" : "FAIL (" + failures + ")"}`);
 process.exit(failures === 0 ? 0 : 1);

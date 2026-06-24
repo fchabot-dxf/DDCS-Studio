@@ -13,7 +13,7 @@
 // Severities: 'ERROR' = will fail to parse OR freeze/wedge the controller · 'WARN' = documented quirk / foot-gun.
 // Result: { ok, errors, warnings, findings: [{ line, sev, code, msg }] }  (line is 1-based; ok = no ERRORs)
 
-const FANUC_OPS = /(?<![A-Za-z0-9_])(EQ|NE|LT|GT|LE|GE)(?![A-Za-z0-9_])/;
+const FANUC_OPS = /(?<![A-Za-z0-9_])(NE|LT|GT|LE|GE)(?![A-Za-z0-9_])/;   // EQ excluded — CONFIRMED working on machine (V10); these others untested
 const ASSIGN = /^#(\d+)\s*=\s*(.+?)\s*$/;
 const HASH_REF = /#(\d+)/g;
 const GOTO_SPACE = /\bGOTO\s+[0-9[]/;
@@ -24,6 +24,8 @@ const MCALL = /\b(MSETDATA|MGETDATA)\s*\[([^\]]*)\]/g;
 const LITERAL_ASSIGN = /^#(\d+)\s*=\s*[-+]?\d+(?:\.\d+)?\s*$/;   // '#n = <constant>'
 const IF_WORD = /\bIF\b/;
 const G10 = /\bG10\b/;
+const G10_LWORD = /\bL(?:20|2)\b/;                 // the L2 / L20 (set-offset) form
+const G10_AXIS = /[XYZABCUVW]\s*[-+]?[\d.#[]/;      // an axis word with a value → the dangerous "runs as a move" case
 const STRAY_WORD = /[A-Za-z]{2,}/g;
 const VALID_MACRO_WORDS = new Set([
   "IF", "THEN", "GOTO", "WHILE", "DO", "END",
@@ -71,9 +73,10 @@ function lintLine(n, raw, findings, primed) {
     findings.push({ line: n, sev: "ERROR", code: "E-BRACKET", msg: `unbalanced [ ] (${opens} '[' vs ${closes} ']')` });
   }
 
-  // GOTO with a space before the label
+  // GOTO with a space before the label — ACCEPTED on the DDCS Expert (CONFIRMED on machine 2026-06-23,
+  // V11_gotospace.nc), so it's a portability/style warning, not a parse error. House style stays no-space.
   if (GOTO_SPACE.test(code)) {
-    findings.push({ line: n, sev: "ERROR", code: "E-GOTOSPACE", msg: "space after GOTO - must be 'GOTO1' / 'GOTO[expr]', not 'GOTO 1'" });
+    findings.push({ line: n, sev: "WARN", code: "W-GOTOSPACE", msg: "space after GOTO ('GOTO 1') is accepted on the DDCS Expert - emit 'GOTO1' / 'GOTO[expr]' for portability" });
   }
 
   // stray words (invalid alphabetical sequences)
@@ -86,12 +89,18 @@ function lintLine(n, raw, findings, primed) {
   // FANUC comparison words instead of C-style operators
   const fo = FANUC_OPS.exec(code);
   if (fo && IF_WORD.test(code)) {
-    findings.push({ line: n, sev: "WARN", code: "W-FANUCOP", msg: `FANUC operator '${fo[1]}' is unreliable - use C-style ==, !=, <, >, <=, >=` });
+    findings.push({ line: n, sev: "WARN", code: "W-FANUCOP", msg: `FANUC operator '${fo[1]}' is untested on the DDCS - prefer C-style ==, !=, <, >, <=, >= (EQ is confirmed working)` });
   }
 
-  // G10 (broken on DDCS - but factory key-5/key-6 macros use it, so WARN not ERROR)
+  // G10 is broken on DDCS (writes no offset). The L2/L20 + axis-word form is DANGEROUS — the axis word executes
+  // as a MOVE (CONFIRMED on machine 2026-06-19, V1_G10_WCS.nc: 'G10 L20 P6 X25' drove Mach X 5→73). Escalate THAT
+  // form to ERROR; plain G10 stays a warning (factory key-5/key-6 macros use it).
   if (G10.test(code)) {
-    findings.push({ line: n, sev: "WARN", code: "W-G10", msg: "G10 is broken on DDCS (causes unwanted motion) - write #805+ offsets directly" });
+    if (G10_LWORD.test(code) && G10_AXIS.test(code)) {
+      findings.push({ line: n, sev: "ERROR", code: "E-G10MOVE", msg: "G10 L2/L20 with an axis word sets NO offset and MOVES the axis (confirmed dangerous) - write #805+ offsets directly" });
+    } else {
+      findings.push({ line: n, sev: "WARN", code: "W-G10", msg: "G10 is broken on DDCS (causes unwanted motion) - write #805+ offsets directly" });
+    }
   }
 
   // G53 with a bare constant operand (must contain a variable)

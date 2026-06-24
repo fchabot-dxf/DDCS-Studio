@@ -15,6 +15,7 @@
  */
 import { getSettings, saveSettings, SETTINGS_DEFAULTS, libraryTools } from './settingsPanel.js';
 import { getAccount } from './cloudAccount.js';
+import { pushReturn } from './navReturn.js';   // register "return to this checklist" before deep-linking away
 
 const PROFILE_KEY = 'ddcs_controller_profile';   // mirrors controllerProfiles.js — set ONLY when the user picks a profile
 
@@ -61,16 +62,29 @@ function saveDestState() {
 }
 
 // ── Deep-links (reuse the existing patterns) ──────────────────────────────────
-const goSettings = (group, panel) => { try { window.showApp && window.showApp('settings'); } catch (_) {} window.openSettings && window.openSettings({ group, panel }); };
+// Register "return to this checklist" then deep-link into Settings — closing Settings walks back here (see
+// ui/navReturn.js). Call openSettings directly (Settings is a modal over the current view); going via
+// showApp('settings') would fire a second, nav-less openSettings a microtask later and clobber the token.
+const goSettings = (group, panel) => {
+    const returnToken = pushReturn('Setup checklist', openSetupChecklist);
+    window.openSettings && window.openSettings({ group, panel, returnToken });
+};
 
 const ITEMS = [
     { key: 'machine', label: 'Machine envelope', hint: 'Travel limits (X / Y / Z) for the sim.', detect: machineEnvelopeSet, set: () => goSettings('hardware', 'set_tab_machine') },
     { key: 'wcs',     label: 'WCS / work origin', hint: 'Where part-zero sits in the machine.', detect: wcsSet, set: () => goSettings('controller', 'set_tab_wcs') },
     { key: 'profile', label: 'Controller profile', hint: 'Which controller this machine is.', detect: profileSet, set: () => goSettings('controller', 'set_tab_profile') },
-    { key: 'stock',   label: 'Stock', hint: 'The workpiece dimensions / shape.', detect: stockSet, set: () => { try { window.showApp && window.showApp('studio'); } catch (_) {} window.ddcsOpenStock && window.ddcsOpenStock(); } },
+    { key: 'stock',   label: 'Stock', hint: 'The workpiece dimensions / shape.', detect: stockSet, set: async () => {
+        // Stock is a visual setting — the popover is meant to float over the live 3D. From the checklist the preview
+        // drawer may be closed, so open it (in the editor region) first, then float the Stock popover over it. Await
+        // showApp so Studio is mounted before we open the drawer.
+        try { await (window.showApp && window.showApp('studio')); } catch (_) { /* noop */ }
+        try { window.setGcodeView && window.setGcodeView('3d'); } catch (_) { /* noop */ }
+        window.ddcsOpenStock && window.ddcsOpenStock({ returnToken: pushReturn('Setup checklist', openSetupChecklist) });   // the ✕ returns to the checklist
+    } },
     { key: 'tool',    label: 'Tool', hint: 'At least one tool in the tool table.', detect: toolSet, set: () => goSettings('hardware', 'set_tab_atc') },
     { key: 'probe',   label: 'Probe input', hint: 'Touch-probe pin (needed to simulate probing).', detect: probeSet, set: () => goSettings('hardware', 'set_tab_input'), optional: true },
-    { key: 'gateway', label: 'Gateway', hint: 'Connect to a controller / bridge (live status, send, pull).', detect: gatewaySet, set: () => { try { window.showApp && window.showApp('gateway'); } catch (_) {} }, optional: true },
+    { key: 'gateway', label: 'Gateway', hint: 'Connect to a controller / bridge (live status, send, pull).', detect: gatewaySet, set: () => goSettings('controller', 'set_tab_gateway'), optional: true },
 ];
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
@@ -139,7 +153,7 @@ function render() {
     };
     box.querySelectorAll('.sc-set').forEach((b) => b.onclick = () => {
         const key = b.dataset.set;
-        if (key === 'connectcloud') { close(); window.openSettings && (window.showApp && window.showApp('settings'), window.openSettings({ group: 'general', panel: 'set_tab_cloud' })); return; }
+        if (key === 'connectcloud') { close(); window.openSettings && window.openSettings({ group: 'general', panel: 'set_tab_cloud', returnToken: pushReturn('Setup checklist', openSetupChecklist) }); return; }
         const it = ITEMS.find((i) => i.key === key);
         close();
         if (it) it.set();
@@ -165,12 +179,44 @@ export function openSetupChecklist() {
     window.ddcsTrack && window.ddcsTrack('feature', 'setup-checklist');
 }
 
-// First run / health check: auto-open once when the user hasn't dismissed it AND a required item is still unset.
-export function maybeAutoOpenSetupChecklist() {
-    // Auto-open intentionally DISABLED. An upfront health-check on first run is premature friction; hardware is
-    // prompted JUST-IN-TIME (when a wizard actually needs a probe/ATC). This checklist remains available
-    // on-demand from the header quick-menu ("Setup checklist") as a "where am I" overview.
-    return;
+// ── First-run nudge: a MOMENTARY BUBBLE (not an upfront modal) ─────────────────────────────────────────────────
+// An upfront health-check modal is premature friction. Instead, a small 10-second dismissible bubble that OPENS the
+// full health check when clicked — a gentle, ignorable entry point. Hardware is still prompted just-in-time
+// (wizardPrereq); this is just the "where am I" nudge.
+let _bubble = null;
+function dismissBubble() { if (_bubble) { clearTimeout(_bubble.timer); _bubble.el.remove(); _bubble = null; } }
+
+export function showSetupBubble() {
+    dismissBubble();
+    const required = ITEMS.filter((i) => !i.optional);
+    const reqOk = required.filter((i) => i.detect()).length;
+    if (reqOk >= required.length) return;   // nothing to nudge about — everything required is set
+    const b = document.createElement('div');
+    b.className = 'setup-bubble';
+    b.style.cssText = 'position:fixed; right:16px; bottom:16px; z-index:9000; display:flex; align-items:center; gap:10px;'
+        + ' max-width:300px; padding:10px 12px; background:var(--panel,#161b22); color:var(--text-main,#e6ecf2);'
+        + ' border:1px solid var(--border,#2a313b); border-left:3px solid var(--accent,#2d7ff9); border-radius:8px;'
+        + ' box-shadow:0 8px 28px rgba(0,0,0,.45); font-size:12.5px; cursor:pointer; animation:setupBubbleIn .7s cubic-bezier(.22,1,.36,1);';
+    b.innerHTML = `<span style="font-size:16px; color:#ffb454; line-height:1;">⚠</span>
+        <span style="display:flex; flex-direction:column; gap:1px;">
+            <b style="font-size:12.5px;">Setup health check</b>
+            <span style="font-size:11px; color:#8a93a0;">${reqOk}/${required.length} ready — click to review</span>
+        </span>
+        <button class="sb-x" title="Dismiss" style="margin-left:6px; width:20px; height:20px; border:none; background:transparent; color:#8a93a0; font-size:13px; cursor:pointer; line-height:1;">✕</button>`;
+    document.body.appendChild(b);
+    _bubble = { el: b, timer: setTimeout(dismissBubble, 10000) };   // momentary: gone after 10s
+    b.querySelector('.sb-x').addEventListener('click', (e) => { e.stopPropagation(); dismissBubble(); });
+    b.addEventListener('click', () => { dismissBubble(); openSetupChecklist(); });   // click → full health check
+    window.ddcsTrack && window.ddcsTrack('feature', 'setup-bubble');
 }
+
+// Called on load (index.html). Shows the bubble unless the user dismissed the checklist (Don't show again) — and
+// never under automation, so it doesn't intercept the UI tests.
+export function maybeAutoOpenSetupChecklist() {
+    try { if (navigator.webdriver) return; } catch (_) { /* noop */ }
+    try { if ((getSettings().setup || {}).dismissed) return; } catch (_) { /* noop */ }
+    setTimeout(showSetupBubble, 1500);   // let the app settle (detectors/LED) before the nudge
+}
+window.ddcsShowSetupBubble = showSetupBubble;
 
 window.openSetupChecklist = openSetupChecklist;

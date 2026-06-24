@@ -29,7 +29,12 @@ export const dialect = {
     machineMove: (axis, ref) => [`G53 ${axis}${ref}`],
     // #[805+[idx-1]*5+ax]=value   (SAVE_WCS_XY_AUTO.nc:21-26). base 805, stride 5; X=base,Y=+1,Z=+2,A=+3
     setWorkOffset: (wcsExpr, axis, value) => [`#[805+[${wcsExpr}-1]*5+${AX[axis]}]=${value}`],
-    readActiveWcs: (varName) => [`${varName}=#578`],   // #578 = active WCS index 1=G54… (COPY_WCS.nc:15)
+    // #578 = active WCS index 1=G54… (COPY_WCS.nc:15). ⚠️ STALE after an in-program G-word WCS switch: a
+    // G54..G59 changes the modal frame but does NOT update #578 (CONFIRMED on machine 2026-06-19, DIAG_g53setup.nc).
+    // So #578 reflects the panel/variable selector, not a mid-program G-word. Only read it when no in-program
+    // G54..G59 has run since (our emitted stacks set WCS via this index, so they're consistent); don't trust it to
+    // recover a frame the operator's own code switched with a bare G-word.
+    readActiveWcs: (varName) => [`${varName}=#578`],
     distMode: (mode) => (mode === 'inc' ? 'G91' : 'G90'),
     dwell: (sec) => [`G04 P${Math.round(sec * 1000)}`],   // integer P = ms (slib-g.nc:691 "G04 P100 //100ms"); a DECIMAL P would be seconds — we always emit the unambiguous integer-ms form
     endProgram: () => ['M30'],   // universal end; no M2/M02 in any capture

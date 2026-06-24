@@ -4,7 +4,35 @@ Working backlog as of 2026-06-23. Shipped this session: **v10.27** (theme-consis
 grouping, theme chips, BLOCKS preview/G-code divider, editable 3D-probe dimensions diagram, Align→Transform) and
 **v10.28** (Homing wizard + Settings→Hardware→Machine homing config). Suite green (228).
 
+Also this session (uncut, on `main`): **central back-navigation** (`ui/navReturn.js`) — the Setup checklist now
+round-trips: a "Set" deep-links into Settings / the Stock popover and **every** exit (Done/✕/Esc/scrim/click-outside)
+walks back to the checklist. Stock "Set" also opens the 3D preview drawer in the editor region first. Gateway "Set"
+now goes to the Settings → Controller → **Gateway tab** (where you point at the controller), not the live Console.
+
 ---
+
+## Strategy — modal exits + state save-states (THE linked system)
+
+Return paths, OK/Cancel, and save-states are one design seen from three sides — but **OK/Cancel is NOT universal.**
+Modals come in two kinds, and each declares which it is:
+
+- **Commit-only ("always OK")** — applies LIVE, every exit commits + returns. No Cancel, no snapshot (there's no
+  prior state to roll back to). → **Stock** (drag a dim, the 3D updates; closing keeps it), and the live-preview
+  popovers. A "Cancel" here would be fake. *This is already how Stock behaves — done.*
+- **Transactional (OK/Cancel)** — snapshot on open; Cancel reverts to it, OK keeps it; both pop the return path.
+  Only for modals where changes should NOT land until confirmed. None exist yet; add when a case actually needs it.
+
+The three sides:
+- **Return path** = where a modal sends you on exit (done: `navReturn`, token-matched, depth-1, leak-safe; all
+  current exits walk it back — consistent across Settings + Stock).
+- **OK / Cancel** = *how* you leave — but only transactional modals have a real Cancel. Commit-only modals = always OK.
+- **Save-state** = the on-open snapshot that makes a transactional Cancel mean something. A per-modal snapshot IS a
+  save-state, so **building the first transactional Cancel = building the first save-state.**
+
+Deferred (not minimal): when a transactional modal is actually needed, snapshot its slice on open + restore on Cancel,
+then generalise that same snapshot into document-level autosave (serializeProject ring in IndexedDB + recovery-on-load
+— see the deferred save-states note below). `navReturn.activeReturn()` exposes the live return label if we ever want a
+"‹ back to X" chip (skipped for now — big modals cover what's behind anyway, which is fine).
 
 ## In flight (on branches — review → merge)
 
@@ -14,6 +42,36 @@ grouping, theme chips, BLOCKS preview/G-code divider, editable 3D-probe dimensio
   but warns the wizard won't work well without it. → Review emitted UX + the detection, then merge.
 
 ## To build
+
+- **Head tab → just "normal forms for a spindle" (no Add gate).** Decided: a spindle/router is the *default*
+  (every machine has one), so don't gate it behind "Add head" or a read-only sample — show the editable spindle
+  form directly. (The read-only-sample + Add/Remove pattern is for genuinely optional subsystems like ATC, which
+  already has it; Input/Output are always-present pin tables, not add/remove.)
+  - **What the Head fields actually do to G-code today** (traced): only THREE are wired — **Default RPM** (seeds
+    the `S` word when an op gives none), **Direction** (`M3`/`M4` on spindle-on), **Spin-up dwell** (dwell after
+    spindle-on). They reach codegen because every cutting wizard view passes `spindle: s.spindle` into program
+    framing (`makeStart` → progstart; `cuttingBlocks`).
+  - **Dead fields** (stored, ZERO consumers outside the form): **Max RPM** (nothing clamps `S`), **Spin-down
+    dwell** (no dwell before `M5`), **Head type** spindle/plasma/laser (no generator branches on it; plasma/laser
+    are pure UI stubs). None of the Head settings drive any *simulation* — they only shape emitted text.
+  - **Spindle attachments → link Head ↔ Input/Output.** The spindle's real-world peripherals are the natural
+    content for this tab, and each is an I/O attachment (so Head should deep-link to the Input/Output pin rows it
+    owns, like the probe/ATC tabs do):
+    - **Coolant — M7/M8/M9.** Flood (M8) / mist (M7) on, M9 off → a coolant output pin + the M-codes in programs.
+    - **Spindle water cooling.** A pump output, plus (ideally) a **flow-sensor input as an interlock** — refuse to
+      spin / fault if no coolant flow. This is a genuine spindle attachment spanning Head + Input/Output.
+    - **Spindle enable / at-speed / fault** — enable output, at-speed + fault inputs (the VFD handshake; ties into
+      the VFD sim track below).
+    Open: how much lives on the Head form vs. just linking out to Input/Output.
+
+- **Separate sim tracks (each its own project — NOT Head-tab fields).** The things that would give the dead
+  fields meaning are whole other simulations, none built:
+  - **VFD / spindle sim** — real RPM ramp, spin-up/down timing actually simulated, direction, maybe load/torque.
+    This is what would make Max RPM + Spin-down mean something.
+  - **Plasma / laser heads** — own configs (pierce height/delay, THC, arc-OK; power %, PWM/M-code). What `head.type`
+    is reserved for.
+  - **Ballscrews + steps (motion fidelity)** — steps/mm, screw pitch, microstepping → positional resolution,
+    backlash. A motion-accuracy layer independent of the spindle one.
 
 - **SVG copy of the app icon** — vector recreation of `ddcs.ico` (dark rounded badge, gold "DDCS / CNC MACRO
   STUDIO" wordmark + glyph) for scalable in-app use. *Blocked on viewing the icon:* ICO is binary; view the
@@ -44,5 +102,10 @@ grouping, theme chips, BLOCKS preview/G-code divider, editable 3D-probe dimensio
 The shape we converged on, for reference:
 - **Defaults work out of the box** — 3-axis, spindle, a controller are sensible defaults; nothing to announce.
 - **Just-in-time** — push the user to add a part exactly when a wizard needs it (the `feat/wizard-prereq` work).
-- **On-demand** — the Setup checklist stays in the header quick-menu for a "where am I" overview. Its first-run
-  **auto-open is disabled** (committed). No startup notification (it would only restate defaults).
+- **On-demand** — the Setup checklist stays in the header quick-menu for a "where am I" overview.
+- **First-run nudge = a momentary BUBBLE, not a modal** (revised 2026-06-23). On load (when a required item is unset
+  and the user hasn't dismissed), a small 10-second dismissible bubble appears bottom-right ("Setup health check —
+  N/M ready"); clicking it opens the full checklist. No blocking modal auto-open. `showSetupBubble` in
+  ui/setupChecklist.js; skipped under automation. *Still open:* the checklist's ⚠ uses a defaults-heuristic, so a
+  user legitimately running the exact default values sees a false ⚠ — a real "user touched this" flag is the proper
+  fix (see Follow-ups).

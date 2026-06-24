@@ -17,6 +17,7 @@ import { toolProfileSvg } from '../viz/toolProfile.js';
 import { THEMES } from './themes.js';
 import { generateToolChangeNc } from '../data/atcGenerator.js';
 import { renderCloudLogin } from './cloudAccount.js';
+import { popReturn, dropReturn, pushReturn } from './navReturn.js';   // central back-navigation: return to wherever we were deep-linked from
 
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 
@@ -72,7 +73,7 @@ export const SETTINGS_DEFAULTS = {
     stockTemplates: [],   // user-saved presets: { name, x, y, z, shape }
     // Travel x/y/z are SIGNED (sign = home direction). workOrigin = the active WCS offset (machine coords of
     // part-zero), kept in sync from wcs.table[active-1]. wcs = the G54–G59 table pulled from the controller.
-    machine: { x: 300, y: 300, z: 120, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } },
+    machine: { x: 300, y: 300, z: -120, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } },   // Z is negative: homes at the TOP (machine 0) and travels down into the work — the router/mill norm
     view:    { theta: -1.5708, phi: 1.0472 }, // 3D preview start orientation (front: +X right, +Y back)
     probes:  {
         probePin: 3, probeLevel: 0,        // IN03 = YunKia V6 3D probe (confirmed)
@@ -428,7 +429,7 @@ function commitMachine() {
     const s = getSettings(); if (!s.machine) s.machine = {};
     s.machine.x = _gvs('set_mach_x', s.machine.x || 300);
     s.machine.y = _gvs('set_mach_y', s.machine.y || 300);
-    s.machine.z = _gvs('set_mach_z', s.machine.z || 120);
+    s.machine.z = _gvs('set_mach_z', s.machine.z || -120);   // negative default — Z homes at top, travels down
     saveSettings();
 }
 
@@ -592,6 +593,7 @@ function renderWcsTable(host, machine) {
 
 let _fillSettingsInputs = null;
 let _settingsNavTo = null;   // (group, panelId) → deep-link a tab (set after the overlay is built)
+let _returnTok = null;   // live nav-return token for this Settings session (see ui/navReturn.js); null = no return
 
 // Merge incoming settings (e.g. from an imported / cloud-loaded profile), persist, and refresh the panel.
 // Restores the FULL persisted config (mirrors the load-merge) so a loaded profile brings back the magazine,
@@ -2282,6 +2284,11 @@ function wireSettingsOverlay(ov) {
 function _settingsEsc(e) { if (e.key === 'Escape') { e.stopPropagation(); closeSettings(); } }
 
 export function openSettings(nav) {
+    // A screen that deep-linked here passes nav.returnToken (see ui/navReturn.js) so closing Settings returns
+    // there. A normal open (tab click, no token) has none. Replacing a prior session's token without consuming
+    // it would orphan the return path, so drop it first.
+    if (_returnTok != null) dropReturn(_returnTok);
+    _returnTok = nav?.returnToken ?? null;
     // Opening setup leaves the Studio preview context — stop any running engine/play (every preview panel +
     // Studio's drawer), any open path, so nothing keeps executing behind the panel.
     window.dispatchEvent(new CustomEvent('ddcs:stop-previews'));
@@ -2295,8 +2302,17 @@ export function openSettings(nav) {
             ov.dataset.wired = '1';
         }
     }
-    // Optional deep-link: { group, panel } — e.g. open straight to Hardware → Machine (homing section).
-    if (nav && _settingsNavTo) { try { _settingsNavTo(nav.group, nav.panel); } catch (_) { /* noop */ } }
+    // Optional deep-link: { group, panel } — e.g. open straight to Hardware → Machine (homing section). Only when a
+    // group is actually given: a nav with just { returnToken } (the in-wizard ⚙) must NOT navigate, or showGroup
+    // (undefined) would blank the sidebar — leave the panel on its current/last group instead.
+    if (nav && nav.group && _settingsNavTo) { try { _settingsNavTo(nav.group, nav.panel); } catch (_) { /* noop */ } }
+    // Glow the panel when we arrived via a return path (e.g. the Setup checklist) — the ambient "leaving here walks
+    // you back" cue, matching the edit-form glow. Off for a normal open.
+    const app = document.getElementById('settings-app');
+    if (app) app.classList.toggle('return-glow', _returnTok != null);
+    // Nested glow levels: if a wizard edit-glow is open BEHIND this returning Settings, desaturate it a touch so
+    // the front (current) level reads as the most saturated and the one behind as a "level back".
+    if (_returnTok != null) { const wb = document.querySelector('.wiz-box.editing'); if (wb) wb.classList.add('glow-behind'); }
     document.addEventListener('keydown', _settingsEsc, true);
     window.ddcsTrack?.('feature', 'settings');
 }
@@ -2307,14 +2323,29 @@ export function openHomingSetup() {
     openSettings({ group: 'hardware', panel: 'set_tab_machine' });
     setTimeout(() => { const s = document.getElementById('set_homing_section'); if (s && s.scrollIntoView) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
 }
+/** Open Settings at the ATC tab — the in-wizard "⚙ ATC Settings…" link (magazine, drawbar I/O, length-probe params).
+ *  Registers a return so Settings shows the return-glow and closing it drops back to the wizard mounted behind it. */
+export function openAtcSetup() {
+    openSettings({ group: 'hardware', panel: 'set_tab_atc', returnToken: pushReturn('Wizard', () => {}) });
+}
 export function closeSettings() {
     const ov = document.getElementById('settings-overlay');
     if (ov) ov.classList.remove('active');
+    const app = document.getElementById('settings-app');
+    if (app) app.classList.remove('return-glow');
+    document.querySelectorAll('.wiz-box.glow-behind').forEach((w) => w.classList.remove('glow-behind'));   // restore the level behind
     document.removeEventListener('keydown', _settingsEsc, true);
+    // Explicit close → walk the return path back to wherever we were deep-linked from (no-op if none).
+    if (_returnTok != null) { const t = _returnTok; _returnTok = null; popReturn(t); }
 }
 
 window.openSettings = openSettings;
 window.closeSettings = closeSettings;
+window.openAtcSetup = openAtcSetup;
+// Open Settings from a context we should return to (e.g. the in-wizard ⚙) — registers a return so Settings shows
+// the return-glow. The reopen fn is a no-op because that context (the wizard) stays mounted behind Settings, so
+// closing Settings just reveals it again.
+window.ddcsOpenSettingsReturn = (label) => openSettings({ returnToken: pushReturn(label || 'Back', () => {}) });
 window.ddcsGetSettings = getSettings;
 window.ddcsSaveSettings = saveSettings;   // let wizards (e.g. the ATC table magazine editor) persist + broadcast edits
 window.ddcsApplySettings = applySettings;

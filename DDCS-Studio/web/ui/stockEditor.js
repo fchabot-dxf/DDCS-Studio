@@ -10,11 +10,13 @@
 import { getSettings, applySettings, STOCK_TEMPLATES } from './settingsPanel.js';
 import { makeDraggable } from './uiUtils.js';
 import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
+import { popReturn, dropReturn, activeReturn } from './navReturn.js';   // central back-navigation: the ✕ returns to wherever we came from
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 
 let _pop = null;
 let _anchor = null;
+let _returnTok = null;   // live nav-return token (see ui/navReturn.js): the ✕ walks it back, outside-click drops it
 
 const esc = (v) => String(v).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
 function tplLabel(t) {
@@ -31,9 +33,13 @@ export function toggleStockEditor(anchor) {
     openStockEditor(anchor);
 }
 
-export function openStockEditor(anchor) {
+export function openStockEditor(anchor, opts) {
     closeStockEditor();
     _anchor = anchor || null;
+    _returnTok = (opts && opts.returnToken != null) ? opts.returnToken : null;   // closeStockEditor() above already dropped any prior token
+    // This popover floats over the 3D (small, doesn't cover everything), so when we arrived via a return path show
+    // where from — a "‹ <origin>" link in the header. (The big Settings modal covers what's behind, so it gets none.)
+    const backLabel = _returnTok != null ? ((activeReturn() || {}).label || '') : '';
     const s = getSettings().stock || {};
     const pop = document.createElement('div');
     pop.className = 'stock-editor-pop';
@@ -55,6 +61,7 @@ export function openStockEditor(anchor) {
             .se-zsel .se-zdot { width:7px; height:7px; border-radius:50%; background:#5a6675; border:1px solid #7a8699; }
             .se-zsel button.on .se-zdot { background:#1a1a1a; border-color:#1a1a1a; }
         </style>
+        ${backLabel ? `<button id="se_back" type="button" title="Back to ${esc(backLabel)}" style="display:inline-flex; align-items:center; gap:5px; margin-bottom:9px; padding:2px 9px 2px 6px; font-size:11px; background:transparent; border:1px solid #3a414d; color:#9fb4cc; border-radius:4px; cursor:pointer;">‹ ${esc(backLabel)}</button>` : ''}
         <div class="stock-editor-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <span style="font-weight:bold; letter-spacing:1px; color:#9fb4cc;">STOCK</span>
             <button id="se_close" class="toolbar-btn" style="padding:1px 8px;" title="Close">✕</button>
@@ -244,19 +251,32 @@ export function openStockEditor(anchor) {
         rebuildTplDropdown();
     });
 
-    q('se_close').addEventListener('click', closeStockEditor);
+    q('se_close').addEventListener('click', closeAndReturn);
+    const backBtn = q('se_back'); if (backBtn) backBtn.addEventListener('click', closeAndReturn);   // "‹ origin" → walk back
     // keep pointer events on the popover from reaching the 3D orbit handler
     pop.addEventListener('pointerdown', (e) => e.stopPropagation());
     setTimeout(() => document.addEventListener('pointerdown', _onDoc, true), 0);
+}
+
+// Consistent exit: EVERY way out of the popover (✕ or click-outside) walks the return path back — same rule as
+// Settings, so leaving a modal behaves the same regardless of which one you're in. No-op return when opened from
+// the jog bar (no token), where it's just a plain close.
+function closeAndReturn() {
+    const tok = _returnTok; _returnTok = null;   // claim it before close so closeStockEditor's drop won't discard it
+    closeStockEditor();
+    popReturn(tok);
 }
 
 function _onDoc(e) {
     if (!_pop) return;
     if (_pop.contains(e.target)) return;
     if (_anchor && (e.target === _anchor || _anchor.contains(e.target))) return; // let the button toggle
-    closeStockEditor();
+    closeAndReturn();
 }
 
 export function closeStockEditor() {
     if (_pop) { _pop.remove(); _pop = null; _anchor = null; document.removeEventListener('pointerdown', _onDoc, true); }
+    // Navigate-away (outside-click, or a fresh open replacing this one): discard any pending return. The ✕ handler
+    // claims the token before calling this, so an explicit close still returns.
+    if (_returnTok != null) { dropReturn(_returnTok); _returnTok = null; }
 }
