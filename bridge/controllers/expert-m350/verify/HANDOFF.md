@@ -50,14 +50,15 @@ This file is the quick "where are we / how to resume" sheet.
 | **V10** operators | `V10_operators.nc` | FANUC **`EQ` works** (contradicts skill). Symbolic `==`/`!=` also fine. |
 | **V11** GOTO-space | `V11_gotospace.nc` | **`GOTO 1` (space) accepted** (contradicts `E-GOTOSPACE`). |
 | **IF neg-decimal** | `IF_neg_test.nc` | Compares vs negative decimals work → `ifGoto` may emit negative operands. |
+| **V8** dual-Y gantry | `V8_read_gantry.nc` | `#806 Yoff == #808 Aoff` (−665.944) → A tracks Y in the WCS table; sim can ignore A/B. |
+| **V6** tool-length (write) | `V6_set/V6_restore.nc` | macro `#900` = param `#400` = H01 offset (panel showed 12.5). H01–H16 = `#900-#915` = `#400-#415` (+500). Register-writable; no `G43` needed for the write. |
 
 ## Left to do — ALL need a deliberate MOTION setup (Z clearance, low rapid override, hand on feed-hold)
 
 | Test | Question | How to approach |
 |---|---|---|
 | **V3b** | `G28` — configured or inert? Does it move, and to where? | Park safe, expendable line, watch where it goes. |
-| **V6** | Tool-length offset write + is `G43 H` honored, or direct register math only? | Write `#900=12.5`, check H-table; try `G43 H1`. |
-| **V8** | Dual-Y gantry: does A (`#808`) track Y (`#806`) on a new Y zero? | Set a Y work-zero, read both registers. |
+| **V6 (G43 half)** | Is `G43 H1` actually HONORED (applies offset on a Z move), or direct register math only? | Set `#900`, `G43 H1`, make a small Z move, see if it shifts by the offset. |
 | **V7** | Formal homed-DRO read (only seen incidentally = Mach 5/−5/−5). | Home all, read `#880/#881/#882`. |
 
 ## Deferred / not pursued
