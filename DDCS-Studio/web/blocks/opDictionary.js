@@ -123,7 +123,10 @@ export const DICT = {
         strokeWidth: N(), toolDia: N(), stepoverPct: N(), depth: N('Z'), stepdown: N(), feed: N('F'), plunge: N(),
         clearance: N(), ...PLACE,
     },
-    // circular: delegates to middleStack (circularWizard.js → middleStack(toMiddleParams(params))) — no own params; see `middle`.
+    circular: {   // own form params (circularWizard); circularStack maps them onto middleStack at emit
+        featureType: Enum(), wcs: Enum(), dist: N(null, 'maxDist'), retract: N(), safeZ: N(),
+        f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), qStop: N(),
+    },
 };
 
 // ── marker codec (op record <-> ( @DDCS:v {…} ) comment), mapping internal keys <-> canon names ──
