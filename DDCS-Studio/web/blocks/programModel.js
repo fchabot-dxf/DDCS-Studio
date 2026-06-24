@@ -11,6 +11,7 @@
  */
 import { emitMapped } from './blockModel.js';
 import { reconcileGcodeToStack } from './gcodeToStack.js';
+import { markerLine } from './opDictionary.js';
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
@@ -48,6 +49,21 @@ export function linesForOp(opId) {
     const out = [];
     (proj.map || []).forEach((anc, i) => { if (anc && anc.includes(opId)) out.push(i); });
     return out;
+}
+
+/** Serialize the program to .nc text WITH self-describing op markers (for export / persistence). The live
+ *  editor projection (proj.text) stays CLEAN — markers are a file-format concern, read back on import. A
+ *  ( @DDCS:1 {…} ) marker carrying the op record is inserted before each op's first projected line. */
+export function serializeWithMarkers() {
+    const out = [];
+    let lastOpId = null;
+    (proj.lines || []).forEach((line, i) => {
+        const op = opAtLine(i);
+        if (op && op.id !== lastOpId) { out.push(markerLine(op.opType, op.params || {})); lastOpId = op.id; }
+        else if (!op) lastOpId = null;
+        out.push(line);
+    });
+    return out.join('\n');
 }
 /** True when the editor text still matches the live projection (so the line→op map is valid for hover). */
 export function editorMatchesProjection() {
@@ -96,6 +112,7 @@ export function initProgramModel() {
     window.ddcsOpAtLine = (i) => (editorMatchesProjection() ? opAtLine(i) : null);
     window.ddcsLinesForOp = linesForOp;
     window.ddcsGetProjection = getProjection;   // { text, lines, map } — map[i] = block ancestry of line i (for the block-edit glow)
+    window.ddcsSerializeWithMarkers = serializeWithMarkers;   // .nc text + self-describing op markers (export only; editor stays clean)
 
     const e = editor(); if (!e || !e.editor || e.editor.__pmWired) return;
     e.editor.__pmWired = true;
