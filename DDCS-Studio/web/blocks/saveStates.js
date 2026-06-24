@@ -62,6 +62,12 @@ export function initSaveStates() {
     if (_wired) return; _wired = true;
     onProgramChange(({ origin }) => { if (origin !== 'refresh') snapshot(LABELS[origin] || origin); });
     snapshot('open');   // baseline so the first edit has somewhere to undo back to
+    // Wire the editor's Undo/Redo buttons — enable/disable tracks the history (onChange fires on every snapshot + undo/redo).
+    const ub = document.getElementById('btn-undo'), rb = document.getElementById('btn-redo');
+    if (ub || rb) {
+        const sync = () => { if (ub) ub.disabled = !canUndo(); if (rb) rb.disabled = !canRedo(); };
+        onChange(sync); sync();
+    }
 }
 
 // Undo/Redo for the toolbar buttons (saveStates owns the history; snapshots arrive via the onChange subscription).
