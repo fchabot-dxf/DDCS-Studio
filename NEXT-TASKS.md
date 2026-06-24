@@ -73,7 +73,15 @@ then generalise that same snapshot into document-level autosave (serializeProjec
   Merge/Replace notice at the single shared insert/regenerate chokepoint (`WizardManager`/apply path) that every
   wizard already routes through. Covers ALL forms uniformly (homing, probing, pocket, ATC, …), never duplicated
   per-wizard. Binary version first (block-version vs form-version); field-level merge later. Foundational — build
-  before/with C.
+  before/with C. **Three-way**: Merge / Replace / **Cancel** (back to the form, nothing inserted — lets the user
+  bail and go edit the block directly instead).
+
+- **Transactional snapshot = a real Cancel (the deferred save-state, now MOTIVATED).** Today no wizard is
+  transactional: there's no snapshot-on-open, so a form **Cancel** doesn't reliably discard edits (the program only
+  changes on Insert, but `op.values` can remember field edits — no clean revert). The Merge/Replace **Cancel** and
+  the form **Cancel** want the SAME mechanism: snapshot the op/form state on open → restore it on any Cancel (form
+  or notice). Build it once → both Cancels become real. Verify the exact current quirk first. This is the "first
+  transactional Cancel = first save-state" from the strategy section, no longer deferred.
 
 - **Dedicated Squaring wizard (gated on Y2) — built on the G31 seek.** Two complementary paths:
   - **Switch-based auto-square (primary):** decouple the dual-Y motors (`#988–#992` sync-toggle), G31-seek each to
