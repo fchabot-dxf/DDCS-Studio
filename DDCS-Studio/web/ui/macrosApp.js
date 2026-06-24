@@ -35,24 +35,40 @@ export function initMacrosApp() {
             #macros-app .settings-sidebar .settings-tab.active { background: var(--bg); color: var(--text-main); border-left: 3px solid var(--accent); padding-left: 9px; }
             #macros-app .settings-sidebar .sidebar-group-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); padding: 8px 12px 4px; opacity: .6; }
             #macros-app .settings-sidebar .sidebar-group-label:first-child { padding-top: 2px; }
-            #macros-app .settings-sidebar .tree-level-1 { padding-left: 24px; }
-            #macros-app .settings-sidebar .tree-level-1.active { padding-left: 21px; }
-            #macros-app .settings-sidebar .tree-level-2 { padding-left: 36px; }
-            #macros-app .settings-sidebar .tree-level-2.active { padding-left: 33px; }
+            #macros-app .settings-sidebar .tree-level-1 { padding-left: 20px; }
+            #macros-app .settings-sidebar .tree-level-1.active { padding-left: 17px; }
+            #macros-app .settings-sidebar .tree-level-2 { padding-left: 32px; }
+            #macros-app .settings-sidebar .tree-level-2.active { padding-left: 29px; }
             #macros-app .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 20px; background: var(--bg); }
         </style>
         <div class="settings-body">
             <div class="settings-sidebar">
-                <div class="sidebar-group-label" style="font-size: 11px;">SYSDISK/</div>
-                
-                <div class="sidebar-group-label" id="mac_grp_slib" style="padding-left: 24px; text-transform: none; font-size: 11px; margin-top: 2px;">slib-m.nc</div>
-                <button class="settings-tab tree-level-2 active" data-target="macros_panel_mcode">Custom M-codes</button>
-                
-                <button class="settings-tab tree-level-1" data-target="macros_panel_syshooks" id="mac_btn_syshooks" style="margin-top: 6px;">System Hooks</button>
-                <button class="settings-tab tree-level-1" data-target="macros_panel_kbtn" id="mac_btn_kbtn">K-buttons (key-N.nc)</button>
-                
-                <div class="sidebar-group-label" id="mac_grp_cam" style="padding-left: 24px; font-size: 11px; margin-top: 6px;">CAM/</div>
-                <button class="settings-tab tree-level-2" data-target="macros_panel_cam" id="mac_btn_cam">CAM Pack Builder</button>
+                <details open style="margin-top: 4px; padding-left: 10px;">
+                    <summary class="sidebar-group-label" style="font-size: 11px; cursor: pointer; outline: none; padding-left: 4px; margin-left: -4px;">SYSDISK/</summary>
+                    
+                    <button class="settings-tab tree-level-1 active" data-target="macros_panel_mcode" style="margin-top: 4px; line-height: 1.3;">
+                        <div id="mac_lbl_slib" style="text-transform: none; font-size: 12px;">slib-m.nc</div>
+                        <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">Custom M-codes</div>
+                    </button>
+                    
+                    <button class="settings-tab tree-level-1" data-target="macros_panel_syshooks" id="mac_btn_syshooks" style="margin-top: 2px; line-height: 1.3;">
+                        <div style="text-transform: none; font-size: 12px;">System Hooks</div>
+                        <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">sysstart, error, T...</div>
+                    </button>
+                    
+                    <button class="settings-tab tree-level-1" data-target="macros_panel_kbtn" id="mac_btn_kbtn" style="margin-top: 2px; line-height: 1.3;">
+                        <div style="text-transform: none; font-size: 12px;">key-N.nc</div>
+                        <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">K-buttons</div>
+                    </button>
+                    
+                    <details open id="mac_grp_cam_details" style="margin-top: 2px;">
+                        <summary class="sidebar-group-label" id="mac_grp_cam" style="padding-left: 12px; font-size: 11px; cursor: pointer; outline: none; margin-left: 4px;">CAM/</summary>
+                        <button class="settings-tab tree-level-2" data-target="macros_panel_cam" id="mac_btn_cam" style="line-height: 1.3;">
+                            <div style="text-transform: none; font-size: 12px;">macro_camN.nc</div>
+                            <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">CAM Pack Builder</div>
+                        </button>
+                    </details>
+                </details>
             </div>
             <div class="settings-content">
                 <div id="macros_panel_mcode">
@@ -101,10 +117,9 @@ export function initMacrosApp() {
     const isV41 = dialectId === 'ddcs-v4.1';
     
     // Apply dynamic visibilities
-    if (q('mac_grp_slib')) q('mac_grp_slib').textContent = (isExpert || isV41) ? 'SYSDISK/slib-m.nc' : 'SYSDISK/slib.nc';
+    if (q('mac_grp_slib')) q('mac_grp_slib').textContent = (isExpert || isV41) ? 'slib-m.nc' : 'slib.nc';
     if (!isExpert) {
-        if (q('mac_grp_cam')) q('mac_grp_cam').style.display = 'none';
-        if (q('mac_btn_cam')) q('mac_btn_cam').style.display = 'none';
+        if (q('mac_grp_cam_details')) q('mac_grp_cam_details').style.display = 'none';
     }
 
     const PANEL_IDS = ['macros_panel_mcode', 'macros_panel_syshooks', 'macros_panel_kbtn', 'macros_panel_cam'];
