@@ -1829,6 +1829,8 @@
                 // primary surface; the Blocks tab is just a view). Must run after app.js created the editor.
                 const { initProgramModel } = await import('./blocks/programModel.js');
                 initProgramModel();
+                const { initSaveStates } = await import('./blocks/saveStates.js');
+                initSaveStates();             // program-level undo/redo history (snapshots on insert + block / editor edits)
             } catch (err) { console.error('program model init failed', err); }
             try {
                 const { initBridgeTransfer } = await import('./ui/bridgeTransfer.js');
