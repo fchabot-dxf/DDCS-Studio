@@ -500,6 +500,19 @@ register** — no `G43` needed for the write; restored to 0 via `V6_restore.nc`.
   ignored so depths must come from direct register math (house style)? The *write* works; whether `G43`
   *applies* it on a move is the deferred motion half of V6.
 
+## DWELL RESULT — `G04` integer P = MILLISECONDS `[CONFIRMED on machine 2026-06-23, fw 2025-06-19-00]`
+Ran `verify/DWELL_units.nc` (motion-free, timed two dwells). **`G04 P3000` produced a ~3-4 s pause** (user
+hand-counted 4-5 s incl. popup latency) — a real few-second dwell, **NOT** a 3000-second hang. ⇒ **integer
+`G04 P<n>` = `<n>` MILLISECONDS, CONFIRMED.** Resolves the `communicationWizard.js:223` "units unconfirmed"
+flag and validates the dialect's `dwell: sec => G04 P${sec*1000}` (integer ms) AND the `waitInput` 10 ms poll
+(`G04 P10`). No 1000x bug. **Decimal `G04 P3.0` = INSTANT `[CONFIRMED on machine 2026-06-23]`** (user: "p3 is instant").
+⇒ **decimal P is NOT seconds — "decimal = seconds" is a MYTH on this firmware.** The Expert treats `P3.0` as
+~3 ms (drops/ignores the `.0`), so it returns instantly. **`G04 P` is ALWAYS milliseconds**; the decimal point
+does not switch units. **Footgun:** `G04 P1.0` (expecting 1 s) gives ~1 ms (instant), NOT 1 s — corrects the
+slib-g.nc `P1.0`=1 s reading and the dialect's old "a decimal P would be seconds" comment.
+⇒ **dialect:** keep emitting integer-ms (correct); **linter:** WARN on a decimal `G04 P<x.y>` — it is ~`x` ms
+(near-instant), never `x` seconds. To dwell N seconds, emit `G04 P<N*1000>` (integer ms).
+
 ### CORE_TRUTH (skill) vs factory-firmware reality — discrepancies the linter exposed
 - **G10:** skill says "G10 is broken." **V1 (above) CONFIRMS broken + dangerous on this fw** (`G10 L20 P6 X25`
   emitted motion, wrote no offset). Factory `key-5.nc`/`key-6.nc`/`3D PROBE G55.nc` *use* `G10 L20 P2` — so

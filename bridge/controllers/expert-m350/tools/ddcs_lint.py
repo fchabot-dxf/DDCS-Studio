@@ -72,6 +72,7 @@ INPUT2070 = re.compile(r"#2070\s*=\s*(\d+)")
 MCALL = re.compile(r"\b(MSETDATA|MGETDATA)\s*\[([^\]]*)\]")
 MSG_FMT = re.compile(r"#(1503|1505)\s*=\s*-?\d+\s*\(")
 LITERAL_ASSIGN = re.compile(r"#(\d+)\s*=\s*[-+]?\d+(?:\.\d+)?\s*$")  # '#n = <constant>'
+DWELL_DECIMAL = re.compile(r"\bG0*4\s+P(\d*\.\d+)")                  # 'G04 P3.0' - decimal dwell (NOT seconds)
 
 
 def _is_persistent(n):
@@ -118,6 +119,14 @@ def lint_line(n, raw, findings, primed=frozenset()):
         findings.append(Finding(n, "WARN", "W-G53CONST",
                                 "G53 with a bare constant fails - operand must include a #var "
                                 "(e.g. 'G53 X#x', not 'G53 X0')"))
+
+    # G04 dwell with a DECIMAL P is NOT seconds on the Expert (on-machine 2026-06-23):
+    # P is always milliseconds; 'G04 P3.0' truncates to ~3 ms (near-instant), not 3 seconds.
+    md = DWELL_DECIMAL.search(code)
+    if md:
+        findings.append(Finding(n, "WARN", "W-DWELLDEC",
+                                f"decimal 'G04 P{md.group(1)}' is ~ms / near-instant, NOT seconds - "
+                                "P is always milliseconds; for N seconds use integer 'G04 P<N*1000>'"))
 
     # #2070 input dialog writing to PERSISTENT storage fails silently (factory code DOES use
     # non-persistent targets like #800, so only flag the documented-unsafe persistent ranges).
@@ -210,6 +219,8 @@ def self_test():
         ("#250 = #1630 + 10\nMSETDATA[250,1,0,2,16,300]\nM30\n", "E-CH1630"),
         ("#2070 = 1175(Enter speed)\nM30\n", "W-2070RANGE"),
         ("G53 X0 Y0\nM30\n", "W-G53CONST"),
+        ("G04 P3.0\nM30\n", "W-DWELLDEC"),
+        ("G04 P3000\nM30\n", None),
         ("MSETDATA[200,1,0,4,16]\nM30\n", "E-MARGS"),
         ("#100 = [#1 + 2\nM30\n", "E-BRACKET"),
     ]

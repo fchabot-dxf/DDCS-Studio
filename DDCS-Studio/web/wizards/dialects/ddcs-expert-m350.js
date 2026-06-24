@@ -36,7 +36,7 @@ export const dialect = {
     // recover a frame the operator's own code switched with a bare G-word.
     readActiveWcs: (varName) => [`${varName}=#578`],
     distMode: (mode) => (mode === 'inc' ? 'G91' : 'G90'),
-    dwell: (sec) => [`G04 P${Math.round(sec * 1000)}`],   // integer P = ms (slib-g.nc:691 "G04 P100 //100ms"); a DECIMAL P would be seconds — we always emit the unambiguous integer-ms form
+    dwell: (sec) => [`G04 P${Math.round(sec * 1000)}`],   // P is ALWAYS ms — integer-ms emit (on-machine 2026-06-23: G04 P3000 ≈ 3 s; G04 P3.0 = INSTANT, so a decimal P is NOT seconds, it truncates to ~ms. "decimal = seconds" is a myth here; G04 P1.0 ≈ 1 ms, not 1 s)
     endProgram: () => ['M30'],   // universal end; no M2/M02 in any capture
     ifGoto: (lhs, op, rhs, label) => [`IF ${lhs}${op}${rhs} GOTO${label}`],   // symbolic ops ==/!=/<=; GOTO no space
     goto: (label) => [`GOTO${label}`],

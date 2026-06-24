@@ -220,7 +220,7 @@ export class CommunicationWizard {
             modeLabel:      type === 'status' ? 'STATUS MODE' : 'POPUP MODE',
             valLabel:       type === 'beep'  ? 'DURATION' : type === 'dwell' ? 'DURATION' : 'VALUE',
             valHint:        type === 'beep'  ? '#2042 total beep duration in ms (e.g. 1000 = 1 sec)' :
-                            type === 'dwell' ? 'e.g. P1.0 or P3000 — units unconfirmed (seconds or ms)' : ''
+                            type === 'dwell' ? 'P is in MS (P3000 = 3 s). A decimal like P1.0 is ~1 ms / instant, NOT 1 s — for N sec use P{N*1000}' : ''
         };
     }
 
