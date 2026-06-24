@@ -120,7 +120,7 @@ export const SETTINGS_DEFAULTS = {
     head: { type: 'spindle' },
     // Spindle / VFD — Studio-side authoring defaults. The DDCS controller owns the live spindle
     // params (PWM/analog, max RPM #582); these seed generated M3/M4 + S words, spin-up/down dwell,
-    // and the warm-up wizard target. Added via the Head tab's "Add head".
+    // and the warm-up wizard target. Always shown on the Head tab (a spindle/router is the default head).
     spindle: { maxRpm: 24000, defaultRpm: 18000, dir: 'cw', spinUp: 3, spinDown: 3 },
     // End-of-program routine — the safe footer appended to generated programs. DDCS note: G53
     // machine-coord moves are verified; G28 is NOT configured, so retract/park use G53. Global
@@ -968,12 +968,7 @@ function buildSettingsOverlay() {
 
                 <!-- HARDWARE: SPINDLE -->
                 <div id="set_tab_spindle" style="display:none">
-                    <div class="settings-section" id="set_spin_add" style="display:none">
-                        <div class="settings-section-title">HEAD</div>
-                        <div class="settings-hint">Add the machine's toolhead — spindle / router today (plasma &amp; laser coming). Sets speed/direction and inserts M3/M4 + S into programs.</div>
-                        <button class="toolbar-btn settings-io" id="set_spin_add_btn">➕ Add head</button>
-                    </div>
-                    <div id="set_spin_config" style="display:none">
+                    <div id="set_spin_config">
                         <div class="settings-section">
                             <div class="settings-section-title">HEAD</div>
                             <div class="settings-grid">
@@ -992,6 +987,13 @@ function buildSettingsOverlay() {
                                     <label>Spin-up dwell (s)<input type="number" id="set_spin_up" min="0" step="0.1"></label>
                                     <label>Spin-down dwell (s)<input type="number" id="set_spin_down" min="0" step="0.1"></label>
                                 </div>
+                                <div class="settings-hint">Only <b>Default RPM</b>, <b>Direction</b> and <b>Spin-up dwell</b> affect emitted G-code today; Max RPM, Spin-down dwell and Plasma/Laser are stored for future use (VFD / plasma sim tracks).</div>
+                            </div>
+                            <div class="settings-section">
+                                <div class="settings-section-title">SPINDLE ATTACHMENTS</div>
+                                <div class="settings-hint">The spindle's real-world peripherals live as I/O pins — coolant (M7/M8/M9), water-cooling pump + flow sensor, and spindle enable / at-speed / fault.</div>
+                                <button class="toolbar-btn" id="set_head_inputlink">Sensor inputs → Input ↗</button>
+                                <button class="toolbar-btn" id="set_head_outputlink">Coolant / pump outputs → Output ↗</button>
                             </div>
                             <div class="settings-section">
                                 <div class="settings-section-title">SIM APPEARANCE</div>
@@ -1394,11 +1396,10 @@ function wireSettingsOverlay(ov) {
 
     // --- Subsystem gating: the Spindle + Tool-table tabs are always present; this toggles each tab's
     //     in-tab "Add" button vs its config section based on whether the subsystem has been added. ---
+    //     Head/spindle is the default (every machine has one) — always shown, no Add gate. ---
     function applyHardwareTabs() {
         const ht = _ddcsSettings.hardwareTabs || {};
         const show = (id, on) => { const e = ov.querySelector('#' + id); if (e) e.style.display = on ? '' : 'none'; };
-        show('set_spin_config', ht.spindle === true);
-        show('set_spin_add', ht.spindle !== true);
         show('set_atc_magazine_wrap', ht.atc === true);
         show('set_atc_add', ht.atc !== true);
     }
@@ -2216,6 +2217,11 @@ function wireSettingsOverlay(ov) {
     // Cross-link: Hardware → Head's "sim appearance" jumps to the Preview tab (General) where the head body dims live.
     const _headSimLink = q('set_head_simlink');
     if (_headSimLink) _headSimLink.addEventListener('click', () => { showGroup('general'); showPanel('set_tab_preview'); });
+    // Spindle attachments are I/O pins — deep-link out to the Input / Output pin tables (no codegen/interlock logic here).
+    const _headInputLink = q('set_head_inputlink');
+    if (_headInputLink) _headInputLink.addEventListener('click', () => { showGroup('hardware'); showPanel('set_tab_input'); });
+    const _headOutputLink = q('set_head_outputlink');
+    if (_headOutputLink) _headOutputLink.addEventListener('click', () => { showGroup('hardware'); showPanel('set_tab_output'); });
     // Interactive head GUI: typing redraws/repositions live; on commit (change/blur) persist so an open preview re-pulls.
     ['set_pv_spindle_dia', 'set_pv_spindle_len', 'set_pv_collet_dia', 'set_pv_collet_len'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderHeadGui); el.addEventListener('change', commitHeadDims); } });
     // Interactive probe GUI: typing redraws/repositions live; on commit (change/blur) persist (visual only).
@@ -2251,17 +2257,8 @@ function wireSettingsOverlay(ov) {
             applyHardwareTabs();
             showPanel('set_tab_atc');
         }
-        if (kind === 'spindle') {
-            _ddcsSettings.hardwareTabs = _ddcsSettings.hardwareTabs || {};
-            _ddcsSettings.hardwareTabs.spindle = true;
-            saveSettings();
-            applyHardwareTabs();
-            showPanel('set_tab_spindle');
-        }
     }
-    // "+ Add" lives inside each subsystem's own (always-present) tab now.
-    const _spinAddBtn = q('set_spin_add_btn');
-    if (_spinAddBtn) _spinAddBtn.addEventListener('click', () => addSubsystem('spindle'));
+    // "+ Add" lives inside each subsystem's own (always-present) tab now. (Head has no Add — it's the default.)
     const _atcAddBtn = q('set_atc_add_btn');
     if (_atcAddBtn) _atcAddBtn.addEventListener('click', () => addSubsystem('atc'));
     // Remove a subsystem: hide its tab + strip the I/O rows it owns (group-tagged). The tool table/magazine data
