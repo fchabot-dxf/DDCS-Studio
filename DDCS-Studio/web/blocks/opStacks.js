@@ -9,6 +9,7 @@
 import { getLastOp, recordOp } from './opRecord.js';
 import { num, r3 } from '../wizards/ops/util.js';
 import { parseGcodeToStack } from './gcodeToStack.js';                       // decode a non-builder op's G-code → blocks
+import { isMarker, parseMarker } from './opDictionary.js';                   // read self-describing op markers
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } };
@@ -37,7 +38,7 @@ import { rotaryCenterStack } from '../wizards/rotaryCenterWizard.js';
 import { textStack } from '../wizards/textWizard.js';
 import { homingStack } from '../wizards/homingWizard.js';
 
-const BUILDERS = {
+export const BUILDERS = {
     surfacing: surfacingStack, pocket: pocketStack, contour: contourStack, slot: slotStack, drill: drillStack,
     wcs: wcsStack, edge: edgeStack, comm: commStack, middle: middleStack, corner: cornerStack, alignment: alignmentStack,
     atc_length: atcLengthStack, atc_check: atcToolCheckStack, atc_warmup: atcWarmupStack, atc_change: atcChangeStack, atc_test: atcTestStack, atc_table: atcTableStack,
@@ -794,4 +795,40 @@ export function editedLinesForOp(opId) {
     const out = [];
     map.forEach((anc, i) => { if (anc && anc.some((id) => injected.has(id))) out.push(i); });
     return out;
+}
+
+// ── import: read self-describing markers → RECONSTRUCT ops (declare, never infer) ───────────────────────────
+/** Reconstruct an op container from a declared marker record. Forward-only: BUILDERS rebuilds the body from
+ *  the declared params (we trust the declaration; verify-vs-motion + overrides are the B4 override-diff). */
+export function opFromMarker(opType, params) {
+    if (!BUILDERS[opType]) return null;
+    let kids = BUILDERS[opType](params || {});
+    if (kids.length === 1 && kids[0] && kids[0].type === 'op') kids = kids[0].children || [];   // unwrap a self-wrapping builder (homing)
+    kids = kids.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
+    return makeOp(opType, params, kids);
+}
+
+/** Import a .nc → program stack, using DDCS op markers where present. A marker DECLARES an op → it's
+ *  reconstructed from BUILDERS and its file body (up to the next marker) is consumed; marker-free spans are
+ *  leaf-parsed (the sanctioned declaration path). A marker-free .nc → pure leaf parse, exactly as today. */
+export function importMarkedNc(text, opts) {
+    const lines = String(text).split('\n');
+    const o = opts || dialectOpts();
+    const stack = [];
+    let i = 0;
+    while (i < lines.length) {
+        if (isMarker(lines[i])) {
+            const rec = parseMarker(lines[i]);
+            const op = rec && opFromMarker(rec.opType, rec.params);
+            if (op) stack.push(op);
+            i++;
+            while (i < lines.length && !isMarker(lines[i])) i++;                 // consume the declared op's body
+        } else {
+            const seg = [];
+            while (i < lines.length && !isMarker(lines[i])) { seg.push(lines[i]); i++; }
+            let leaf; try { leaf = parseGcodeToStack(seg.join('\n'), o); } catch (_) { leaf = null; }
+            if (Array.isArray(leaf)) stack.push(...leaf);
+        }
+    }
+    return stack;
 }
