@@ -113,6 +113,12 @@ then generalise that same snapshot into document-level autosave (serializeProjec
 
 ## Follow-ups / deferred
 
+- **Investigate (later): other native subs that are G31/raw-decomposable.** Homing's `M98 P501/P503` are
+  implemented as `G31` P/L seeks in `slib-g.nc` — so they can be re-emitted transparently (granular + simulatable +
+  interleavable). Audit Studio's other native-sub usage (probing `M98 P502`, ATC, etc.) against `slib-g.nc` /
+  `slib-m.nc` for subs that decompose the same way → candidates for the same Native-vs-decomposed wizard-method
+  treatment as the homing G31 method.
+
 - **Machine facts come from the controller eng — and don't change the macro** (decided 2026-06-24). Motor polarity,
   signed travel/soft-limits, and home direction are all controller **Pr values**, readable via pull-from-controller.
   They do NOT alter the emitted macro: G-code is logical-frame (the controller maps ± to motors) and native homing

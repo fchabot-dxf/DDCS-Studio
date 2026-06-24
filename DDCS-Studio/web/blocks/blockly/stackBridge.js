@@ -80,6 +80,7 @@ function toRecord(b) {
         return {
             id: b.id, type: 'op', opType: meta.opType, label: b.getFieldValue('LABEL') || meta.label,
             requires: meta.requires || [], params: params, children: first ? chain(first) : [],
+            collapsed: b.isCollapsed() || undefined,
         };
     }
     const def = BLOCKS[b.type];
@@ -102,6 +103,7 @@ function toRecord(b) {
         const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
         r.children = first ? chain(first) : [];
     }
+    if (b.isCollapsed && b.isCollapsed()) r.collapsed = true;
     return r;
 }
 
@@ -189,6 +191,7 @@ function recToJson(rec) {
         }
 
         if (rec.children && rec.children.length) node.inputs = { DO: { block: chainToJson(rec.children) } };
+        if (rec.collapsed) node.collapsed = true;
         return node;
     }
     const def = BLOCKS[rec.type], node = { type: rec.type };
@@ -213,6 +216,7 @@ function recToJson(rec) {
     if (isWrap(def) && rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
     if (Object.keys(fields).length) node.fields = fields;
     if (Object.keys(inputs).length) node.inputs = inputs;
+    if (rec.collapsed) node.collapsed = true;
     return node;
 }
 

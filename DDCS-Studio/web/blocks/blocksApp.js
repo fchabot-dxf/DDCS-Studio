@@ -140,7 +140,7 @@ async function buildWorkspace() {
   // once here; the rest of the chrome re-skins live via setTheme below).
   const gridColour = (() => { try { return getComputedStyle(document.body).getPropertyValue('--border').trim() || '#1b2733'; } catch (_) { return '#1b2733'; } })();
   const ws = B.inject(host, {
-    toolbox: buildToolbox(), theme: ddcsTheme(B), renderer: 'geras',
+    toolbox: buildToolbox(), theme: ddcsTheme(B), renderer: 'geras', collapse: true,
     grid: { spacing: 26, length: 2, colour: gridColour, snap: true },
     zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { smoothScroll: true },
   });
