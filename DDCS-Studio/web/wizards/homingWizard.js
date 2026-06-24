@@ -151,7 +151,10 @@ export function homingStack(params = {}) {
 
     C('HOMING COMPLETE');
     END();
-    return S;
+    // Wrap the atoms in a collapsible op container so the Blocks view folds the whole homing sequence to one line
+    // ("⬡ Home Z X Y") and expands to the steps (where the user can interleave MSG/comm). The op-container emit
+    // walks its children, so the emitted G-code is unchanged. Collapsed by default — clean at a glance.
+    return [{ type: 'op', opType: 'homing', label: `Home ${axes.map((a) => AX_LABEL[a]).join(' ')}`, children: S, collapsed: true }];
 }
 
 /**
