@@ -177,13 +177,16 @@ export function createPreviewPanel(container, opts = {}) {
     // looked up in the tool table (settings.atc.tools → type/Ø/length); else infer from the path (probe → touch
     // probe); else a default endmill.
     function simTool(code, parsed) {
-        const ht = get('getTool'); if (ht) return ht;
+        // Attach the configured SIM probe body dims (Settings → Preview → 3D PROBE) to ANY probe tool, so the
+        // rendered touch probe matches what the user set on the diagram. Non-probe tools pass through untouched.
+        const withProbe = (t) => (t && t.type === 'probe') ? { ...t, probeDims: (previewPrefs().probe || {}) } : t;
+        const ht = get('getTool'); if (ht) return withProbe(ht);
         const m = /\bT(\d+)\b/.exec(code || '');
         if (m) {
             const t = toolsForViz().find((x) => parseInt(x && x.num, 10) === parseInt(m[1], 10));
-            if (t) return { type: t.type || 'endmill', dia: Number(t.dia) || 6, length: Number(t.length) || undefined };
+            if (t) return withProbe({ type: t.type || 'endmill', dia: Number(t.dia) || 6, length: Number(t.length) || undefined });
         }
-        if ((parsed && parsed.stats && parsed.stats.probe) > 0) return { type: 'probe', dia: 6 };
+        if ((parsed && parsed.stats && parsed.stats.probe) > 0) return withProbe({ type: 'probe', dia: 6 });
         return { type: 'endmill', dia: 6 };
     }
     function setGcode(text) {

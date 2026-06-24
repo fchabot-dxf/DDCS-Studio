@@ -47,11 +47,15 @@ export function toolHalfProfile(tool) {
         case 'face': case 'surfacing':              // wide, short body (face/fly cutter)
             return [[r, 0], [r, Math.max(len * 0.35, r * 0.6)]];
         case 'probe': {                             // 3D touch probe: ruby ball ▸ thin stylus ▸ wide body ▸ shank (dia = shank Ø)
-            const rball = Math.max(1, r * 0.5);     // ruby ball
-            const rsty = Math.max(0.5, r * 0.22);   // stylus shaft
-            const styL = Math.max(len, r * 7);      // stylus length (20–50 mm range)
-            const rbody = 15;                       // electronics body disc (~Ø30)
-            const bodyL = Math.max(r * 6, 28);
+            // Use the configured SIM dims (Settings → Preview → 3D PROBE, passed as tool.probeDims) when present;
+            // else fall back to the original ratio-based geometry so the tool-library / ATC-rack icons are unchanged.
+            const pd = (tool && tool.probeDims) || null;
+            const use = !!(pd && (pd.bodyDia || pd.ballDia || pd.stylusLen || pd.bodyLen));
+            const rball = use && pd.ballDia   > 0 ? pd.ballDia / 2 : Math.max(1, r * 0.5);   // ruby ball
+            const rsty  = use ? Math.max(0.5, Math.min(rball * 0.55, (pd.bodyDia ? pd.bodyDia / 2 : 15) * 0.18)) : Math.max(0.5, r * 0.22);   // stylus shaft (derived; not a configured dim)
+            const styL  = use && pd.stylusLen > 0 ? pd.stylusLen   : Math.max(len, r * 7);   // stylus length (20–50 mm range)
+            const rbody = use && pd.bodyDia   > 0 ? pd.bodyDia / 2 : 15;                     // electronics body disc (~Ø30)
+            const bodyL = use && pd.bodyLen   > 0 ? pd.bodyLen     : Math.max(r * 6, 28);
             const shankL = Math.max(r * 3, 16);
             const pts = []; const segs = 16;
             for (let i = 0; i <= segs; i++) { const a = Math.PI * (i / segs); pts.push([rball * Math.sin(a), rball - rball * Math.cos(a)]); }  // full ruby sphere (0..π → bottom round to top)
