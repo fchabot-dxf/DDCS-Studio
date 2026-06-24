@@ -750,8 +750,11 @@ const _structKeyGlow = (b) => {
     return k;
 };
 function _allBlockIds(b, into) { if (!b) return; if (b.id) into.add(b.id); (b.children || []).forEach((c) => _allBlockIds(c, into)); }
-// Ids of `actual` blocks (+ their whole subtree) with no structural match in `base` — the injections. LCS-aligned
-// by the same key the merge uses; matched containers recurse so an atom injected inside a kept container is caught.
+// Two matched blocks' OWN params differ (children/id excluded) → a value edited in Blocks (an override).
+const _paramsDiffer = (a, b) => JSON.stringify((a && a.params) || {}) !== JSON.stringify((b && b.params) || {});
+// Ids of `actual` blocks that OVERRIDE the clean form rebuild: injected atoms (no structural match in `base`) PLUS
+// matched atoms whose own params were value-edited. LCS-aligned by the merge's key; matched containers recurse, so an
+// atom injected/edited inside a kept container is caught. The override-diff — both sides forward emits, no inference.
 function collectInjectedIds(base, actual, into = new Set()) {
     const bK = base.map(_structKeyGlow), aK = actual.map(_structKeyGlow);
     const L = Array.from({ length: base.length + 1 }, () => new Array(actual.length + 1).fill(0));
@@ -761,6 +764,7 @@ function collectInjectedIds(base, actual, into = new Set()) {
     let i = base.length, j = actual.length;
     while (i > 0 || j > 0) {
         if (i > 0 && j > 0 && bK[i - 1] === aK[j - 1]) {
+            if (_paramsDiffer(base[i - 1], actual[j - 1])) into.add(actual[j - 1].id);   // matched but value-edited → override
             collectInjectedIds(base[i - 1].children || [], actual[j - 1].children || [], into);   // matched → recurse
             i--; j--;
         } else if (j > 0 && (i === 0 || L[i][j - 1] >= L[i - 1][j])) {
