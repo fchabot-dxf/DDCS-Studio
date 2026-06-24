@@ -37,14 +37,16 @@ export function initMacrosApp() {
             #macros-app .settings-sidebar .sidebar-group-label:first-child { padding-top: 2px; }
             #macros-app .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 20px; background: var(--bg); }
         </style>
-        <div class="settings-head">
-            <div class="settings-tabs" style="display: flex; gap: 8px;">
-                <button class="settings-main-tab active" data-target="macros_panel_mcode">M-codes</button>
-                <button class="settings-main-tab" data-target="macros_panel_kbtn">K-buttons</button>
-                <button class="settings-main-tab" data-target="macros_panel_cam">CAM Pack Builder</button>
-            </div>
-        </div>
         <div class="settings-body">
+            <div class="settings-sidebar">
+                <div class="sidebar-group-label" id="mac_grp_slib">SYSDISK/slib-m.nc</div>
+                <button class="settings-tab active" data-target="macros_panel_mcode">Custom M-codes</button>
+                <div class="sidebar-group-label">SYSDISK/</div>
+                <button class="settings-tab" data-target="macros_panel_syshooks" id="mac_btn_syshooks">System Hooks</button>
+                <button class="settings-tab" data-target="macros_panel_kbtn" id="mac_btn_kbtn">K-buttons</button>
+                <div class="sidebar-group-label" id="mac_grp_cam">SYSDISK/CAM/</div>
+                <button class="settings-tab" data-target="macros_panel_cam" id="mac_btn_cam">CAM Pack Builder</button>
+            </div>
             <div class="settings-content">
                 <div id="macros_panel_mcode">
                     <div class="settings-section">
@@ -54,6 +56,15 @@ export function initMacrosApp() {
                         <div class="settings-row" style="margin-top:8px;">
                             <button class="toolbar-btn settings-io" id="mcodes_add_editor">＋ Add from editor</button>
                             <button class="toolbar-btn settings-io" id="mcodes_add_blank">＋ Add blank</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="macros_panel_syshooks" style="display:none;">
+                    <div class="settings-section">
+                        <div class="settings-section-title">SYSTEM HOOKS</div>
+                        <div class="settings-hint">Macros the controller runs <b>automatically</b> in response to events (boot, alarms, T-codes). Configure them here to customize how the machine physically behaves.</div>
+                        <div id="syshooks_list">
+                            <div class="settings-hint" style="margin-top: 20px; font-style: italic;">(UI builder components coming soon)</div>
                         </div>
                     </div>
                 </div>
@@ -74,12 +85,23 @@ export function initMacrosApp() {
                     </div>
                 </div>
             </div>
-        </div>`;
+        </div>\`;
 
     const q = (id) => root.querySelector('#' + id);
-    // Flat top-bar tabs: M-codes | K-buttons | CAM Pack Builder → each shows its panel directly (no sidebar).
-    const PANEL_IDS = ['macros_panel_mcode', 'macros_panel_kbtn', 'macros_panel_cam'];
-    const mMainTabs = [...root.querySelectorAll('.settings-main-tab')];
+    // Dialect capabilities
+    const dialectId = (getSettings().machine || {}).post || 'ddcs-expert-m350';
+    const isExpert = dialectId === 'ddcs-expert-m350';
+    const isV41 = dialectId === 'ddcs-v4.1';
+    
+    // Apply dynamic visibilities
+    if (q('mac_grp_slib')) q('mac_grp_slib').textContent = (isExpert || isV41) ? 'SYSDISK/slib-m.nc' : 'SYSDISK/slib.nc';
+    if (!isExpert) {
+        if (q('mac_grp_cam')) q('mac_grp_cam').style.display = 'none';
+        if (q('mac_btn_cam')) q('mac_btn_cam').style.display = 'none';
+    }
+
+    const PANEL_IDS = ['macros_panel_mcode', 'macros_panel_syshooks', 'macros_panel_kbtn', 'macros_panel_cam'];
+    const mMainTabs = [...root.querySelectorAll('.settings-tab')];
     const mShowPanel = (id) => {
         PANEL_IDS.forEach((p) => { const el = q(p); if (el) el.style.display = (p === id) ? '' : 'none'; });
         mMainTabs.forEach((b) => b.classList.toggle('active', b.dataset.target === id));
