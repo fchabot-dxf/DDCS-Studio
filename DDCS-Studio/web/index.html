@@ -380,7 +380,7 @@
                 <div class="grid-2">
                     <div>
                         <span class="label">CIRCULAR (round bore/boss)</span>
-                        <input type="checkbox" id="m_circular" title="Round feature: report the DIAMETER (opposite-touch span → #58, mean #60 in 2-axis) and, in 2-axis, re-centre to the found X centre before the Y probes so they cross the true diameter, not a chord. Absorbs the standalone Circular wizard."/>
+                        <input type="checkbox" id="m_circular" title="Round feature: report the DIAMETER (opposite-touch span → #58, mean #60 in 2-axis) and, in 2-axis, re-centre to the found X centre before the Y probes so they cross the true diameter, not a chord. Reports out-of-round #61 in 2-axis. This is the round bore/boss centre+diameter finder (replaces the retired standalone Circular wizard)."/>
                     </div>
                 </div>
 
@@ -460,77 +460,8 @@
               </div><!-- /.wiz-2pane -->
             </div>
 
-            <!-- Circular (bore/boss) Wizard -->
-            <div id="wiz_circular" class="wiz-body" style="display:none">
-              <div class="wiz-2pane">
-                <div class="wiz-visual">
-                <span class="section-label">VISUALIZATION</span>
-                <div class="viz-container">
-                    <div id="circularVizStatus" class="viz-status"></div>
-                    <div id="circularVizContainer" class="viz-canvas"></div>
-                </div>
-
-                </div><!-- /.wiz-visual -->
-                <div class="wiz-controls">
-                <div id="circ_desc" class="wiz-usage"></div>
-
-                <span class="section-label">FEATURE CONTEXT</span>
-                <div class="grid-2">
-                    <div>
-                        <span class="label">FEATURE TYPE</span>
-                        <select id="circ_type" title="Bore: probe outward across an inside hole. Boss: probe each outside face (reposition pauses between faces).">
-                            <option value="bore">bore (inside)</option>
-                            <option value="boss">boss (outside)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <span class="label">WCS TARGET</span>
-                        <select id="circ_wcs" title="Target WCS for the found centre. Active: reads #578. Fixed: G54..G59 directly.">
-                            <option value="active">Active WCS</option>
-                            <option value="G54">G54</option>
-                            <option value="G55">G55</option>
-                            <option value="G56">G56</option>
-                            <option value="G57">G57</option>
-                            <option value="G58">G58</option>
-                            <option value="G59">G59</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div>
-                    <span class="section-label">GEOMETRY</span>
-                    <div class="grid-3">
-                        <div><span class="label">MAX PROBE</span><input id="circ_dist" value="100" title="Max probe travel per touch (mm). #1; used as #7=[0-#1]/#8=#1 in G31."/></div>
-                        <div><span class="label">RETRACT</span><input id="circ_retract" value="2" title="Retract between fast and slow passes (mm). #2."/></div>
-                        <div><span class="label">SAFE Z</span><input id="circ_safe_z" value="10" title="Z retract height between moves (mm). #17; used as G0 Z#17."/></div>
-                    </div>
-                </div>
-
-                <div>
-                    <span class="section-label">FEED RATES</span>
-                    <div class="grid-2">
-                        <div><span class="label">FAST FEED</span><input id="circ_feed_fast" value="200" title="Fast probe feedrate (mm/min). #3."/></div>
-                        <div><span class="label">SLOW FEED</span><input id="circ_feed_slow" value="50" title="Slow probe feedrate (mm/min). #4."/></div>
-                    </div>
-                </div>
-
-                <div>
-                    <span class="section-label">ADVANCED</span>
-                    <div class="grid-2">
-                        <div><span class="label">STOP (Q)</span>
-                            <select id="circ_q" title="G31 stop mode. Q1=immediate, Q0=decelerate."><option value="1">Immediate (Q1)</option><option value="0">Decel (Q0)</option></select>
-                        </div>
-                        <div><span class="label" style="opacity:.7;">PROBE PORT/LEVEL</span><div class="wiz-usage" style="margin:0;">from Settings → probe input</div></div>
-                    </div>
-                </div>
-
-                <div class="preview-block">
-                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
-                    <pre id="wiz_circular_code"></pre>
-                </div>
-                </div><!-- /.wiz-controls -->
-              </div><!-- /.wiz-2pane -->
-            </div>
+            <!-- Circular (bore/boss) wizard RETIRED 2026-06-23 — superseded by the Middle wizard
+                 (FEATURE TYPE boss/pocket + CIRCULAR + PROBE BOTH AXES = centre, diameter, out-of-round). -->
 
             <!-- Rotary Centreline (4th-axis setup) Wizard -->
             <div id="wiz_rotary_center" class="wiz-body" style="display:none">
