@@ -85,6 +85,16 @@ then generalise that same snapshot into document-level autosave (serializeProjec
 
 ## Follow-ups / deferred
 
+- **Machine facts come from the controller eng — and don't change the macro** (decided 2026-06-24). Motor polarity,
+  signed travel/soft-limits, and home direction are all controller **Pr values**, readable via pull-from-controller.
+  They do NOT alter the emitted macro: G-code is logical-frame (the controller maps ± to motors) and native homing
+  `M98 P501 X<N>` delegates direction/speed/port to the controller. So they're a **sim + profile** concern, not
+  codegen — signed travel → real machine-frame render; home direction → correct homing *animation* + the non-native
+  switch-seek variant. **Pull them, don't author them for the macro.** Layered model: (0) motor polarity [install
+  Pr] → (1) signed travel [envelope] → (2) home direction [derived/read] → (3) homing routine + soft-limit enable
+  [Controller → Homing]. The Homing-tab per-axis Dir field is a sim/switch-seek hint only — native ignores it.
+  *(Done this session: the homing config moved from Hardware → Machine to a **Controller → Homing** tab.)*
+
 - **Homing — Blockly reverse-sync.** `homingStack` round-trips structurally (renders as generic comment/assign/raw
   atoms) but has no dedicated semantic "home" block + reconciler. Add a first-class Homing block.
 - **Probe sim dims → 3D render.** The editable 3D-probe dimensions persist + draw the 2D diagram, but aren't wired
