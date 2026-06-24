@@ -52,7 +52,10 @@ then generalise that same snapshot into document-level autosave (serializeProjec
     **direction**, port, level), (b) is transparent + engine-**simulatable** (real G31 moves, not the proxy), and
     (c) is the one place the home **direction** genuinely matters — so direction returns as a **G31-method-only
     field**, not a global one (consistent with dropping the global Dir). The existing 'seek' method (currently
-    `M98 P503`) is the natural home — reframe it to emit raw G31.
+    `M98 P503`) is the natural home — reframe it to emit raw G31. Emit it **atom-decomposed** so the Blocks view
+    exposes each step: because it's an editable sequence (not an opaque `M98` call), users can interleave
+    `(MSG, …)` toasts / comm / M-codes between steps — but they do that **in the Blocks view or editor
+    themselves**; NO dedicated insert-UI (the real `fndzero.nc` already uses `(MSG, …)`).
 
 - **Dedicated Squaring wizard (gated on Y2) — built on the G31 seek.** Two complementary paths:
   - **Switch-based auto-square (primary):** decouple the dual-Y motors (`#988–#992` sync-toggle), G31-seek each to
