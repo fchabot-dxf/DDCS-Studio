@@ -55,7 +55,16 @@ export function middleStack(params = {}) {
         PR(ax, pv, '#3'); CK(ax, 1); MV(ax, rv);
         PR(ax, pv, '#4'); CK(ax, 1); A(resultVar, av.result); MV(ax, rv);
     };
-    const reposition = () => { A('#57', '#882'); MV('Z', '#17'); A('#1505', '1', 'Press Enter when repositioned'); IF('#1505', '==', '0', 2); MM('Z', '#57'); };
+    const reposition = (msg) => {
+        // Lift clear, the operator jogs to the next wall, then drop back the SAME amount — all INCREMENTAL (no G53),
+        // so the preview stays start-anchored and fans each pass out to its own marker. The "REPOSITION:" comment is
+        // what the parser counts as a new pass (gcodeParser.js). (Was: #57 machine-Z save + G53 restore — that marked
+        // the trace absolute and collapsed every pass onto the same marker, so only marker 1 ever appeared.)
+        MV('Z', '#17');
+        C(`REPOSITION: ${msg || 'jog the probe to the next wall'}`);
+        A('#1505', '1', 'Press Enter when repositioned'); IF('#1505', '==', '0', 2);
+        MV('Z', '[0-#17]'); DM('inc');
+    };
     // Boss, AUTO: clear over the feature to the far side, hands-free. Uses the max probe distance #1 as the
     // over-estimate of the feature width (the operator already sets it >= the feature for the probes to reach),
     // so traversing #1+retract past the first face lands beyond the second; then drop back to probe height.
@@ -65,7 +74,7 @@ export function middleStack(params = {}) {
         // BOSS needs the 2nd face from the far side: MANUAL pauses for the operator to jog over; AUTO traverses
         // over hands-free.
         if (featureType !== 'boss') return;
-        if (approach === 'manual') reposition(); else traverseOver(ax, firstPlus);
+        if (approach === 'manual') reposition('jog clear, around to the opposite wall'); else traverseOver(ax, firstPlus);
     };
     const seq = (ax, firstPlus, base) => {
         twoPass(ax, firstPlus, `#${base}`);
@@ -87,7 +96,9 @@ export function middleStack(params = {}) {
 
     seq(axis, dir1Plus, 51);
     if (twoAxis) {
-        reposition();
+        // Between axes: only a BOSS needs the probe physically moved to the perpendicular walls (a pocket stays at
+        // the centre — no reposition, matching the manual-pocket fix). Boss pauses for the operator either way.
+        if (featureType === 'boss') reposition('jog clear, around to the perpendicular walls');
         // CIRCULAR + 2-axis: re-centre to the found PRIMARY-axis centre (#53, machine frame) before probing the
         // perpendicular axis, so the secondary touches cross the true diameter instead of an off-centre chord.
         if (circular) MM(axis, '#53');
@@ -124,16 +135,39 @@ export class MiddleWizard {
         return emitMapped(middleStack(params)).text;
     }
 
-    /** Preview/sim start hint (stock frame): pocket → centre inside the cavity; boss → just outside the first wall. */
-    inferStart(params, stock) {
+    /**
+     * Per-pass preview starts — ONE per parser pass (each REPOSITION: in the macro starts a new pass, so the
+     * counts here MUST mirror the reposition() calls in middleStack, else extra markers fall back to the origin).
+     *   pocket            → 1 pass: probe both walls from the centre (no reposition).
+     *   boss single-axis  → manual: 2 (wall1, wall2); auto: 1 (traverses over hands-free).
+     *   boss two-axis     → manual: 4 (X w1/w2, Y w1/w2); auto: 2 (one per axis, with the between-axes reposition).
+     */
+    inferStarts(params, stock) {
         const n = (v, d) => num(v, d);
         const sx = n(stock && stock.x, 100), sy = n(stock && stock.y, 80), sz = n(stock && stock.z, 20);
         const cx = sx / 2, cy = sy / 2, probeZ = -Math.min(5, sz * 0.5);
-        if ((params.featureType || 'pocket') !== 'boss') return { x: cx, y: cy, z: probeZ };
+        const centre = { x: cx, y: cy, z: probeZ };
+        const boss = (params.featureType || 'pocket') === 'boss';
+        const twoAxis = !!params.twoAxis || !!params.findBoth;
+        const manual = params.approach === 'manual';
+        const axis = (params.axis || 'X') === 'Y' ? 'Y' : 'X';
+        const second = axis === 'X' ? 'Y' : 'X';
+        const dir1Plus = (params.dir1 || 'pos') === 'pos';
+        const dir2Plus = (typeof params.dir2 === 'string' ? params.dir2 : (dir1Plus ? 'neg' : 'pos')) === 'pos';
         const outset = Math.max(6, Math.min(n(params.dist, 20) * 0.6, 15));
-        const pos = (params.dir1 || 'pos') === 'pos';
-        return ((params.axis || 'X') === 'X')
-            ? { x: pos ? -outset : sx + outset, y: cy, z: probeZ }
-            : { x: cx, y: pos ? -outset : sy + outset, z: probeZ };
+        const outside = (ax, plus) => ax === 'X'
+            ? { x: plus ? -outset : sx + outset, y: cy, z: probeZ }
+            : { x: cx, y: plus ? -outset : sy + outset, z: probeZ };
+
+        if (!boss) return [centre];                                  // pocket: always one pass, from the centre
+        const prim = [outside(axis, dir1Plus), outside(axis, !dir1Plus)];
+        if (!twoAxis) return manual ? prim : [prim[0]];
+        const sec = [outside(second, dir2Plus), outside(second, !dir2Plus)];
+        return manual ? [...prim, ...sec] : [prim[0], sec[0]];
+    }
+
+    /** Preview/sim start hint = the first pass's start. */
+    inferStart(params, stock) {
+        return this.inferStarts(params, stock)[0];
     }
 }
