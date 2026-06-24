@@ -43,6 +43,20 @@ then generalise that same snapshot into document-level autosave (serializeProjec
 
 ## To build
 
+- **Save-states / Undo-Redo module (ACTIVE BUILD).** A program-level history with block-edit awareness:
+  - **Snapshot granularity** — on **Insert** (coarse, per op commit/replace) **+ on each block edit** (granular;
+    block edits commit immediately). **NOT on form edits** (verified in `wizardManager.js`: field listeners →
+    `update()` → live preview only; the program/op commits only in `insert()`; `close()`/Esc/click-out just hides.
+    So form edit + Cancel already discards — op.params is the untouched snapshot. No per-keystroke snapshots.)
+  - **Undo / Redo buttons** navigate the history (snapshot = the program block stack via
+    `ddcsGetBlockProgram`/`ddcsLoadBlockStack`; an `applying` guard + the existing `muteChanges` avoid self-loops).
+  - **"Blocks edited" chip** beside the edit-op chip in the editor, + **glow** the block-edited blocks; driven by a
+    `blockEdited` flag (op's blocks diverge from its form params).
+  - **Merge / Replace / Cancel** notice at `insert()` when the op was block-edited: Merge (keep block stack) /
+    Replace (rebuild from form via `replaceOp`/`commitActiveOp`) / Cancel (back to form, nothing inserted).
+  - Module file `blocks/saveStates.js`; hooks at `WizardManager.insert` + the `blocksApp` reproject; later:
+    `serializeProject` ring in IndexedDB + recovery-on-load.
+
 - **Homing wizard: propose Native vs G31 (granular) seek.** Two methods the wizard offers:
   - **Native (`M98 P501`):** minimal — axis + order; the controller does seek/back-off/direction/speed from its own
     Pr. Safest, opaque.
@@ -138,6 +152,15 @@ then generalise that same snapshot into document-level autosave (serializeProjec
   render), so I can't target the defect blind.
 
 ## Follow-ups / deferred
+
+- **G31 granular seek — BUILT (e82c363), VERIFY ON HARDWARE before relying on it.** Faithful re-derivation of
+  `O501` (slib-g.nc) as transparent raw G31, opt-in method; native `M98 P501` stays default; code + emitted macro
+  flagged UNVERIFIED. Inferred (NOT dump-confirmed) semantics to verify: `#[1920+N]` (read as >2 = hard-limit-struck
+  guard), `#[1900+N]` (per-axis input-register base for the debounce pick), `#[1910+N]` (expected debounce level,
+  distinct from the G31 `L` `#[1047+N*3]`), the 7-read / `<4`-majority debounce (assumes boolean input reads), and
+  the `K`/`Q` G31 params (mirrored from O501, undocumented in the dump). Two deliberate divergences: the trailing
+  `G53` return-to-reference (O501 ~251-298, needs `#622-626`/`#735`) is omitted; datum is zeroed (`#[880+N]=0`)
+  rather than `#[735+N]`.
 
 - **Investigate (later): other native subs that are G31/raw-decomposable.** Homing's `M98 P501/P503` are
   implemented as `G31` P/L seeks in `slib-g.nc` — so they can be re-emitted transparently (granular + simulatable +
