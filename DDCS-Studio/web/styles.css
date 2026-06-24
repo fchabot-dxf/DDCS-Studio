@@ -4355,10 +4355,9 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .app-header.is-mini .hdr-tabs .tab .app-ico { margin-left: 0; }
 .app-header.is-mini .hdr-tabs .tab { padding: 0 18px; letter-spacing: 0; }   /* icon-only, full header height */
 .app-header.is-mini .ver { display: none; }
-/* Stage 3 (.is-tiny): very narrow — ALL tab labels hidden (icons only), undo/redo hidden */
+/* Stage 3 (.is-tiny): very narrow — ALL tab labels hidden (icons only) */
 .app-header.is-tiny .hdr-tabs .tab .app-tx { display: none; }
 .app-header.is-tiny .hdr-tabs .tab { padding: 0 10px; }
-.app-header.is-tiny .hdr-undo { display: none; }
 .app-header.is-tiny .brand { padding: 0 4px; gap: 4px; }
 .app-header.is-tiny .logo { height: 24px; }
 /* Header Undo/Redo: slim icon buttons that match the header chrome */

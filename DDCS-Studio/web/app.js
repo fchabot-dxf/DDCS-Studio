@@ -44,6 +44,9 @@ import './ui/ioTab.js';
 // Anonymous, opt-out usage analytics — fires a `visit` on load; see ui/analytics.js
 import './ui/analytics.js';
 
+import { initProgramModel } from './blocks/programModel.js';
+import { initSaveStates } from './blocks/saveStates.js';
+
 class DDCSStudio {
     constructor() {
         this.themeManager = new ThemeManager();
@@ -63,6 +66,11 @@ class DDCSStudio {
 
     init() {
         console.debug('DDCSStudio.init() start');
+        
+        // Initialize the global program model and history (undo/redo)
+        initProgramModel();
+        initSaveStates();
+
         // Setup global window functions for backwards compatibility
         this.setupGlobalFunctions();
         console.debug('DDCSStudio.init() - setupGlobalFunctions complete');

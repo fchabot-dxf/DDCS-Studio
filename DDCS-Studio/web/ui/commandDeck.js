@@ -703,7 +703,7 @@ export class CommandDeck {
 
     // Top app-header: staged so the right-edge icons never overflow the window. Stage 1 drops the
     // op-button labels (.is-compact); stage 2 drops inactive tab labels + version (.is-mini);
-    // stage 3 drops ALL tab labels + undo/redo + shrinks logo (.is-tiny).
+    // stage 3 drops ALL tab labels + shrinks logo (.is-tiny).
     // Measured each call (load + resize + theme change) — no fixed breakpoints.
     _fitAppHeader() {
         const h = document.querySelector('.app-header');
