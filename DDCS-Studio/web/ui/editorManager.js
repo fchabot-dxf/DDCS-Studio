@@ -181,6 +181,11 @@ export class EditorManager {
             title = 'Program';
         }
 
+        // Body: emit self-describing op markers ( @DDCS:1 {…} ) when the editor matches the model (a clean,
+        // model-tracked program). If it's been hand-edited beyond the model, export the raw text as-is.
+        const _proj = window.ddcsGetProjection && window.ddcsGetProjection();
+        if (window.ddcsSerializeWithMarkers && _proj && code === _proj.text) code = window.ddcsSerializeWithMarkers();
+
         // Ensure first line of the exported code contains the title as a comment
         const titleLine = `(${title})`;
         const lines = code.split(/\r?\n/);

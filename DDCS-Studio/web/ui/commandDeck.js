@@ -46,9 +46,20 @@ window.loadGcodeFile = function loadGcodeFile() {
             const f = input.files && input.files[0];
             if (!f) return;
             const r = new FileReader();
-            r.onload = (e) => {
+            r.onload = async (e) => {
                 const ed = document.getElementById('editor');
-                if (ed) { ed.value = e.target.result || ''; ed.dispatchEvent(new Event('input', { bubbles: true })); }
+                if (!ed) return;
+                const text = e.target.result || '';
+                // Self-describing .nc: reconstruct the high-level ops from their ( @DDCS:… ) markers (the editor
+                // then shows the clean projection). Marker-free files load as raw text, exactly as before.
+                if (/\(\s*@DDCS:\d+\s/.test(text) && window.ddcsLoadBlockStack) {
+                    try {
+                        const { importMarkedNc } = await import('../blocks/opStacks.js');
+                        const stack = importMarkedNc(text);
+                        if (stack && stack.length) { window.ddcsLoadBlockStack(stack); return; }
+                    } catch (_) { /* fall through to raw load */ }
+                }
+                ed.value = text; ed.dispatchEvent(new Event('input', { bubbles: true }));
             };
             r.readAsText(f);
             input.value = ''; // let the same file be picked again
