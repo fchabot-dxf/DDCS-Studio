@@ -51,9 +51,24 @@ export function initMacrosApp() {
                         <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">Custom M-codes</div>
                     </button>
                     
-                    <button class="settings-tab tree-level-1" data-target="macros_panel_syshooks" id="mac_btn_syshooks" style="margin-top: 2px; line-height: 1.3;">
-                        <div style="text-transform: none; font-size: 12px;">System Hooks</div>
-                        <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">sysstart, error, T...</div>
+                    <button class="settings-tab tree-level-1" data-target="macros_panel_sysstart" id="mac_btn_sysstart" style="margin-top: 2px; line-height: 1.3;">
+                        <div id="mac_lbl_sysstart" style="text-transform: none; font-size: 12px;">sysstart.nc</div>
+                        <div id="mac_sub_sysstart" style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">Boot initialization</div>
+                    </button>
+                    
+                    <button class="settings-tab tree-level-1" data-target="macros_panel_tnc" id="mac_btn_tnc" style="margin-top: 2px; line-height: 1.3;">
+                        <div style="text-transform: none; font-size: 12px;">T.nc</div>
+                        <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">Tool change hook</div>
+                    </button>
+                    
+                    <button class="settings-tab tree-level-1" data-target="macros_panel_error" id="mac_btn_error" style="margin-top: 2px; line-height: 1.3;">
+                        <div style="text-transform: none; font-size: 12px;">error.nc</div>
+                        <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">Alarm / fault hook</div>
+                    </button>
+                    
+                    <button class="settings-tab tree-level-1" data-target="macros_panel_probe" id="mac_btn_probe" style="margin-top: 2px; line-height: 1.3;">
+                        <div style="text-transform: none; font-size: 12px;">probe.nc</div>
+                        <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">Native probing</div>
                     </button>
                     
                     <button class="settings-tab tree-level-1" data-target="macros_panel_kbtn" id="mac_btn_kbtn" style="margin-top: 2px; line-height: 1.3;">
@@ -82,13 +97,29 @@ export function initMacrosApp() {
                         </div>
                     </div>
                 </div>
-                <div id="macros_panel_syshooks" style="display:none;">
+                <div id="macros_panel_sysstart" style="display:none;">
                     <div class="settings-section">
-                        <div class="settings-section-title">SYSTEM HOOKS</div>
-                        <div class="settings-hint">Macros the controller runs <b>automatically</b> in response to events (boot, alarms, T-codes). Configure them here to customize how the machine physically behaves.</div>
-                        <div id="syshooks_list">
-                            <div class="settings-hint" style="margin-top: 20px; font-style: italic;">(UI builder components coming soon)</div>
-                        </div>
+                        <div class="settings-section-title" id="mac_title_sysstart">SYSSTART.NC (BOOT HOOK)</div>
+                        <div class="settings-hint" id="mac_desc_sysstart">Executes automatically when the controller boots up. Used to set default machine states, trigger auto-homing, or restore WCS.</div>
+                        <div id="sysstart_list"><div class="settings-hint" style="margin-top: 20px; font-style: italic;">(Homing UI coming soon)</div></div>
+                    </div>
+                </div>
+                <div id="macros_panel_tnc" style="display:none;">
+                    <div class="settings-section">
+                        <div class="settings-section-title">T.NC (TOOL CHANGE)</div>
+                        <div class="settings-hint">Executes when an M6 tool change is called.</div>
+                    </div>
+                </div>
+                <div id="macros_panel_error" style="display:none;">
+                    <div class="settings-section">
+                        <div class="settings-section-title">ERROR.NC (ALARM HOOK)</div>
+                        <div class="settings-hint">Executes when the controller throws a hard alarm.</div>
+                    </div>
+                </div>
+                <div id="macros_panel_probe" style="display:none;">
+                    <div class="settings-section">
+                        <div class="settings-section-title">PROBE.NC</div>
+                        <div class="settings-hint">Executes when you trigger probing from the controller UI.</div>
                     </div>
                 </div>
                 <div id="macros_panel_kbtn" style="display:none;">
@@ -117,12 +148,21 @@ export function initMacrosApp() {
     const isV41 = dialectId === 'ddcs-v4.1';
     
     // Apply dynamic visibilities
-    if (q('mac_grp_slib')) q('mac_grp_slib').textContent = (isExpert || isV41) ? 'slib-m.nc' : 'slib.nc';
-    if (!isExpert) {
+    if (q('mac_lbl_slib')) q('mac_lbl_slib').textContent = (isExpert || isV41) ? 'slib-m.nc' : 'slib.nc';
+    
+    if (isV41) {
+        if (q('mac_lbl_sysstart')) q('mac_lbl_sysstart').textContent = 'advstart.nc';
+        if (q('mac_sub_sysstart')) q('mac_sub_sysstart').textContent = 'Advanced start hook';
+        if (q('mac_title_sysstart')) q('mac_title_sysstart').textContent = 'ADVSTART.NC (V4.1 START HOOK)';
+        if (q('mac_btn_error')) q('mac_btn_error').style.display = 'none';
+        if (q('mac_grp_cam_details')) q('mac_grp_cam_details').style.display = 'none';
+    } else if (!isExpert) {
+        if (q('mac_btn_sysstart')) q('mac_btn_sysstart').style.display = 'none';
+        if (q('mac_btn_error')) q('mac_btn_error').style.display = 'none';
         if (q('mac_grp_cam_details')) q('mac_grp_cam_details').style.display = 'none';
     }
 
-    const PANEL_IDS = ['macros_panel_mcode', 'macros_panel_syshooks', 'macros_panel_kbtn', 'macros_panel_cam'];
+    const PANEL_IDS = ['macros_panel_mcode', 'macros_panel_sysstart', 'macros_panel_tnc', 'macros_panel_error', 'macros_panel_probe', 'macros_panel_kbtn', 'macros_panel_cam'];
     const mMainTabs = [...root.querySelectorAll('.settings-tab')];
     const mShowPanel = (id) => {
         PANEL_IDS.forEach((p) => { const el = q(p); if (el) el.style.display = (p === id) ? '' : 'none'; });
