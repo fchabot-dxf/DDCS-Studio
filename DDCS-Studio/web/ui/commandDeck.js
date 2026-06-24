@@ -549,8 +549,7 @@ export class CommandDeck {
                             <button onclick="openWiz && openWiz('wcs')">⊕ WCS / work offsets</button>
                             <button onclick="openWiz && openWiz('homing')">⌖ Homing</button>
                             <button onclick="openCornerWiz && openCornerWiz()">📐 Corner</button>
-                            <button onclick="openMiddleWiz && openMiddleWiz()">🎯 Middle</button>
-                            <button onclick="openWiz && openWiz('circular')">⭕ Bore/Boss</button>
+                            <button onclick="openMiddleWiz && openMiddleWiz()">🎯 Middle / Bore / Boss</button>
                             <button onclick="openEdgeWiz && openEdgeWiz()">📏 Edge</button>
                             <button onclick="openAlignmentWiz && openAlignmentWiz()">🧭 Align</button>
                             <div style="padding:4px 12px; font-size:10px; opacity:.55; text-transform:uppercase; letter-spacing:1px;">Rotary</div>

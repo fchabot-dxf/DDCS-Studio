@@ -19,7 +19,7 @@ import { commView } from './commView.js';
 import { wcsView } from './wcsView.js';
 import { cornerView } from './cornerView.js';
 import { middleView } from './middleView.js';
-import { circularView } from './circularView.js';
+// Circular wizard retired 2026-06-23 — superseded by Middle (circular + probe-both-axes).
 import { rotaryCenterView } from './rotaryCenterView.js';
 import { rotaryClockView } from './rotaryClockView.js';
 import { edgeView } from './edgeView.js';
@@ -39,7 +39,6 @@ export const WIZARD_VIEWS = [
     homingView,
     cornerView,
     middleView,
-    circularView,
     rotaryCenterView,
     rotaryClockView,
     edgeView,
