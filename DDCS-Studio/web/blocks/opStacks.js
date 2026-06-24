@@ -514,23 +514,11 @@ export function isOpBlockEdited(opId) {
     const bare = _builderAtoms(op.opType, op.params);
     if (sig(op.children) === sig(bare)) return false; // Not edited at all
     
-    // 2. It was edited, but is it "form-safe"? 
-    // Ask the reconciler if it can perfectly recreate these edits.
-    if (RECONCILERS[op.opType]) {
-        try {
-            const fields = RECONCILERS[op.opType](op.children);
-            if (fields) {
-                const rebuilt = _builderAtoms(op.opType, fields);   // NOTE: `fields` are reconciler field-ids; BUILDERS wants params — adapter gap (slice B, see NEXT-TASKS)
-                if (sig(op.children) === sig(rebuilt)) {
-                    // The form perfectly captured and rebuilt the edits!
-                    // This means they are 100% form-safe and won't be lost on Replace.
-                    return false;
-                }
-            }
-        } catch(e) {}
-    }
-    
-    return true; // It has unsupported edits that would be clobbered
+    // 2. It diverges structurally from the form rebuild → block-edited. We do NOT try to prove it "form-safe"
+    // by reverse-syncing the blocks back to params: that's the banned inference (docs/MULTI-OP-STACKING.md),
+    // and the field-id↔param adapter never worked anyway (it always fell through to `return true`). The
+    // override-diff glow + the Merge/Replace notice handle this forward-only.
+    return true;
 }
 
 /** Remove a top-level op from the program (right-click → Delete). */
