@@ -52,10 +52,28 @@ then generalise that same snapshot into document-level autosave (serializeProjec
     **direction**, port, level), (b) is transparent + engine-**simulatable** (real G31 moves, not the proxy), and
     (c) is the one place the home **direction** genuinely matters — so direction returns as a **G31-method-only
     field**, not a global one (consistent with dropping the global Dir). The existing 'seek' method (currently
-    `M98 P503`) is the natural home — reframe it to emit raw G31. Emit it **atom-decomposed** so the Blocks view
+    `M98 P503`) is the natural home — reframe it to emit raw G31. **DECISION: build the FULL faithful version (C)** —
+    re-derive the controller's real seek from `slib-g.nc`: direction (`#612` → `±` distance), fast `G31 … K0 Q0`,
+    **not-found → reverse + re-seek** (`IF #[1920+N]<=2`), a **7-read debounce** loop on the input (`#[1520+…]` vs
+    threshold `#[1910+N]`), back-off-until-release (`G31 … L[1-level] Q1`), **halve-speed multi-pass**. The point is
+    to allow *unconventional* uses. Mark it **UNVERIFIED — verify on hardware**; **native `M98 P501` stays the
+    default + robust path**. Granular params (port/level/speed/dir/debounce/passes) live on the **block atoms**, NOT
+    the wizard form (form stays a lean method-picker); a few may later surface in probing wizards, but most are
+    block-level. Emit it **atom-decomposed** so the Blocks view
     exposes each step: because it's an editable sequence (not an opaque `M98` call), users can interleave
     `(MSG, …)` toasts / comm / M-codes between steps — but they do that **in the Blocks view or editor
     themselves**; NO dedicated insert-UI (the real `fndzero.nc` already uses `(MSG, …)`).
+
+- **Insert-time "Merge or Replace" notice (general wizard↔blocks safety net).** When a wizard would insert/regenerate
+  an op that's been hand-edited in blocks (a `blockEdited` flag, set by the Blocks change listener on the first edit
+  the form can't represent), prompt: **Merge** (keep the block-edited stack — preserves block-only params + interleaved
+  `(MSG,…)`/comm) vs **Replace** (regenerate fresh from the form, discarding block edits). User-in-control fix for the
+  regenerate-clobber; makes block-editing safe for every wizard (and is what lets homing's interleaved comms survive).
+  **APP-WIDE + CENTRALISED**: implement ONCE — one `blockEdited` flag set by the shared Blocks change listener, one
+  Merge/Replace notice at the single shared insert/regenerate chokepoint (`WizardManager`/apply path) that every
+  wizard already routes through. Covers ALL forms uniformly (homing, probing, pocket, ATC, …), never duplicated
+  per-wizard. Binary version first (block-version vs form-version); field-level merge later. Foundational — build
+  before/with C.
 
 - **Dedicated Squaring wizard (gated on Y2) — built on the G31 seek.** Two complementary paths:
   - **Switch-based auto-square (primary):** decouple the dual-Y motors (`#988–#992` sync-toggle), G31-seek each to
