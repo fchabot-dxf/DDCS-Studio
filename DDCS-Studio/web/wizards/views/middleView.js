@@ -52,6 +52,12 @@ export const middleView = {
             sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
+        // Manual jog is useless for a POCKET — both walls are reached from the centre, so there is nothing to
+        // reposition. Force auto and hide the Probe-Mode control unless the feature is a boss.
+        if (params.featureType !== 'boss') params.approach = 'auto';
+        const approachBlock = el('m_approach_block');
+        if (approachBlock) approachBlock.classList.toggle('hidden', params.featureType !== 'boss');
+
         const middleDesc = el('middle_desc');
         if (middleDesc) {
             const pocketDetail = params.findBoth

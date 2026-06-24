@@ -61,9 +61,10 @@ export function middleStack(params = {}) {
     // so traversing #1+retract past the first face lands beyond the second; then drop back to probe height.
     const traverseOver = (ax, firstPlus) => { MV('Z', '#18'); MV(ax, firstPlus ? '[#1+#2]' : '[0-#1-#2]'); MV('Z', '[0-#18]'); };
     const between = (ax, firstPlus) => {
-        // The two opposite walls. POCKET probes both from the centre (no move). BOSS needs the 2nd face from the
-        // far side: MANUAL pauses for the operator to jog over; AUTO traverses over hands-free.
-        if (featureType !== 'boss') { if (approach === 'manual') reposition(); return; }
+        // The two opposite walls. POCKET probes both from the centre (no move - manual is N/A, never reposition).
+        // BOSS needs the 2nd face from the far side: MANUAL pauses for the operator to jog over; AUTO traverses
+        // over hands-free.
+        if (featureType !== 'boss') return;
         if (approach === 'manual') reposition(); else traverseOver(ax, firstPlus);
     };
     const seq = (ax, firstPlus, base) => {
@@ -104,8 +105,11 @@ export function middleStack(params = {}) {
         // Round feature: the opposite-touch span IS the diameter. #58 = primary-axis Ø; with 2-axis, #59 = the
         // perpendicular Ø and #60 the mean. ABS so the result is direction-agnostic (dir1 pos/neg ordering).
         A('#58', `ABS[#51-#52]`, 'Primary-axis diameter');
-        if (twoAxis) { A('#59', `ABS[#54-#55]`, 'Secondary-axis diameter'); A('#60', '[#58+#59]/2', 'Mean diameter'); }
-        MSG(twoAxis ? 'Centre #53/#56 - mean dia #60' : 'Centre #53 - dia #58');
+        if (twoAxis) {
+            A('#59', `ABS[#54-#55]`, 'Secondary-axis diameter'); A('#60', '[#58+#59]/2', 'Mean diameter');
+            A('#61', '[#58-#59]', 'Out-of-round (primary dia - secondary dia)');   // roundness metric (same as the Circular wizard)
+        }
+        MSG(twoAxis ? 'Centre #53/#56 - mean dia #60 - round #61' : 'Centre #53 - dia #58');
     }
     if (params.syncA && (axis === 'Y' || twoAxis)) { const s = params.slave || '3'; A('#74', `[#70+${s}]`); A('#[#74]', '#883'); }
 
