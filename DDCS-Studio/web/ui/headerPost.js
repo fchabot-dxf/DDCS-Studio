@@ -124,7 +124,9 @@ export function initHeaderPost() {
         const themeSection = '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Theme</div>'
             + `<div class="hdr-quick-subitems" data-subitems="theme">${THEMES.map(themeRow).join('')}</div>`;
 
-        const checklistRow =
+        // The Setup checklist entry is hidden when the master health switch is off (Settings / the checklist toggle).
+        const healthOn = (window.ddcsHealthSignalsOn ? window.ddcsHealthSignalsOn() : true);
+        const checklistRow = !healthOn ? '' :
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="checklist">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('checklist')
             + '<span class="hdr-quick-lbl">Setup checklist</span></button>';

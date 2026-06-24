@@ -772,6 +772,37 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 @keyframes setupBubbleIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .setup-bubble:hover { border-left-color: var(--accent, #2d7ff9); filter: brightness(1.06); }
 
+/* Setup-health signals reused outside the checklist (ui/setupChecklist.decorateSettingsHealth + the preview Stock
+   button). A ⚠ on each Settings sidebar tab whose item is unset (::after so DOM text is untouched), and a gentle
+   theme-coloured pulse on the Stock button while stock is still default (reuses the --edit-glow-rgb theme token). */
+@keyframes tabNeedsGlow {
+    0%, 100% { text-shadow: 0 0 4px rgba(var(--edit-glow-rgb, 45,127,249), .55); }
+    50%      { text-shadow: 0 0 10px rgba(var(--edit-glow-rgb, 45,127,249), .95); }
+}
+.settings-tab.needs-setup { animation: tabNeedsGlow 1.9s ease-in-out infinite; }
+
+/* Reusable sliding toggle switch (.ddcs-switch wraps an <input type=checkbox> + a .ddcs-slider span). */
+.ddcs-switch { position: relative; display: inline-block; width: 38px; height: 21px; flex: 0 0 auto; }
+.ddcs-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.ddcs-switch .ddcs-slider { position: absolute; inset: 0; cursor: pointer; border-radius: 21px; background: rgba(125,135,150,.35); border: 1px solid var(--border, #2a313b); transition: background .18s, border-color .18s; }
+.ddcs-switch .ddcs-slider::before { content: ""; position: absolute; left: 2px; top: 2px; width: 15px; height: 15px; border-radius: 50%; background: #f2f5f9; box-shadow: 0 1px 3px rgba(0,0,0,.45); transition: transform .18s; }
+.ddcs-switch input:checked + .ddcs-slider { background: var(--accent, #2d7ff9); border-color: var(--accent, #2d7ff9); }
+.ddcs-switch input:checked + .ddcs-slider::before { transform: translateX(17px); }
+.ddcs-switch input:focus-visible + .ddcs-slider { box-shadow: 0 0 0 2px rgba(var(--edit-glow-rgb, 45,127,249), .6); }
+
+/* Field-level setup glow — the actual control on a Settings tab pulses while its item is unset (decorateSettingsHealth). */
+@keyframes fieldNeedsGlow {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(var(--edit-glow-rgb, 45,127,249), .8),  0 0 6px 1px rgba(var(--edit-glow-rgb, 45,127,249), .4); }
+    50%      { box-shadow: 0 0 0 2px rgba(var(--edit-glow-rgb, 45,127,249), 1),   0 0 12px 3px rgba(var(--edit-glow-rgb, 45,127,249), .65); }
+}
+.set-needs-glow { animation: fieldNeedsGlow 1.9s ease-in-out infinite; border-radius: 4px; }
+
+@keyframes ppStockNeeds {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(var(--edit-glow-rgb, 45,127,249), .9),  0 0 7px 1px rgba(var(--edit-glow-rgb, 45,127,249), .45); }
+    50%      { box-shadow: 0 0 0 2px rgba(var(--edit-glow-rgb, 45,127,249), 1),   0 0 13px 3px rgba(var(--edit-glow-rgb, 45,127,249), .7); }
+}
+.pp-stock.needs-setup { animation: ppStockNeeds 1.9s ease-in-out infinite; border-radius: 4px; }
+
 /* Main Layout */
 .app-shell {
     display: flex;

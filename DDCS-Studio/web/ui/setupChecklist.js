@@ -140,17 +140,14 @@ function render() {
         <div class="sc-list">${required.map(row).join('')}</div>
         <div style="margin:11px 0 1px; font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:#8a93a0;">Optional</div>
         <div class="sc-list">${optionalItems.map(row).join('')}${destRow}</div>
-        <div style="display:flex; gap:8px; margin-top:12px; justify-content:flex-end;">
-            <button type="button" class="sc-skip" style="padding:6px 14px; font-size:12px; background:transparent; color:#cfd6df; border:1px solid rgba(255,255,255,.18); border-radius:5px; cursor:pointer;">Don't show again</button>
-            <button type="button" class="sc-done" style="padding:6px 18px; font-size:12px; background:var(--accent,#2d7ff9); color:#fff; border:none; border-radius:5px; cursor:pointer;">Done</button>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:13px;">
+            <label title="Master switch — also in Settings → Appearance" style="display:flex; align-items:center; gap:8px; font-size:11px; color:#8a93a0; cursor:pointer;"><span class="ddcs-switch"><input type="checkbox" class="sc-health" ${healthSignalsOn() ? 'checked' : ''}><span class="ddcs-slider"></span></span> Show setup health signals</label>
+            <button type="button" class="sc-done" style="margin-left:auto; padding:6px 18px; font-size:12px; background:var(--accent,#2d7ff9); color:#fff; border:none; border-radius:5px; cursor:pointer;">Done</button>
         </div>`;
 
     box.querySelector('.sc-close').onclick = close;
     box.querySelector('.sc-done').onclick = close;
-    box.querySelector('.sc-skip').onclick = () => {
-        const s = getSettings(); s.setup = s.setup || {}; s.setup.dismissed = true; saveSettings();
-        close();
-    };
+    box.querySelector('.sc-health').onchange = (e) => { setHealthSignals(e.target.checked); if (!e.target.checked) close(); };   // master switch (also in Settings); off → close the panel too
     box.querySelectorAll('.sc-set').forEach((b) => b.onclick = () => {
         const key = b.dataset.set;
         if (key === 'connectcloud') { close(); window.openSettings && window.openSettings({ group: 'general', panel: 'set_tab_cloud', returnToken: pushReturn('Setup checklist', openSetupChecklist) }); return; }
@@ -188,6 +185,7 @@ function dismissBubble() { if (_bubble) { clearTimeout(_bubble.timer); _bubble.e
 
 export function showSetupBubble() {
     dismissBubble();
+    if (!healthSignalsOn()) return;   // master switch off → no nudge
     const required = ITEMS.filter((i) => !i.optional);
     const reqOk = required.filter((i) => i.detect()).length;
     if (reqOk >= required.length) return;   // nothing to nudge about — everything required is set
@@ -214,9 +212,46 @@ export function showSetupBubble() {
 // never under automation, so it doesn't intercept the UI tests.
 export function maybeAutoOpenSetupChecklist() {
     try { if (navigator.webdriver) return; } catch (_) { /* noop */ }
-    try { if ((getSettings().setup || {}).dismissed) return; } catch (_) { /* noop */ }
-    setTimeout(showSetupBubble, 1500);   // let the app settle (detectors/LED) before the nudge
+    setTimeout(showSetupBubble, 1500);   // let the app settle (detectors/LED) before the nudge; showSetupBubble gates on the master switch
 }
 window.ddcsShowSetupBubble = showSetupBubble;
+
+// ── Health signals reused OUTSIDE the modal: each unset item glows its Settings sidebar TAB label AND the actual
+// FIELD on that tab (lead-through to the real control); the preview's Stock button glows for Stock (no tab). One
+// master switch (setup.health, default on) gates ALL of it — the bubble, every glow, the quick-menu entry. ──
+const SETTINGS_TAB = { machine: 'set_tab_machine', wcs: 'set_tab_wcs', profile: 'set_tab_profile', tool: 'set_tab_atc', probe: 'set_tab_input', gateway: 'set_tab_gateway' };
+const FIELD_TARGET = {   // the actual control(s) the glow points at once you're on the tab
+    machine: '#set_mach_x, #set_mach_y, #set_mach_z',
+    wcs: '#set_mach_wcs_table', profile: '#set_profile', tool: '#set_atc_library',
+    probe: '#set_probe_pin', gateway: '#set_machinenet_mount',
+};
+
+function healthSignalsOn() { try { return (getSettings().setup || {}).health !== false; } catch (_) { return true; } }
+window.ddcsHealthSignalsOn = healthSignalsOn;
+
+export function decorateSettingsHealth() {
+    const on = healthSignalsOn();
+    for (const it of ITEMS) {
+        const unset = on && !it.detect();   // off → unset is false everywhere → all glows cleared
+        const tab = SETTINGS_TAB[it.key];
+        if (tab) { const b = document.querySelector('.settings-tab[data-target="' + tab + '"]'); if (b) b.classList.toggle('needs-setup', unset); }
+        const fsel = FIELD_TARGET[it.key];
+        if (fsel) document.querySelectorAll(fsel).forEach((el) => el.classList.toggle('set-needs-glow', unset));
+    }
+}
+window.ddcsDecorateSettingsHealth = decorateSettingsHealth;
+window.ddcsStockNeedsSetup = () => healthSignalsOn() && !stockSet();   // the preview Stock button glows when true
+
+// Master switch — flip from Settings OR the checklist; re-applies every surface + refreshes the quick-menu/previews.
+export function setHealthSignals(on) {
+    const s = getSettings(); s.setup = s.setup || {}; s.setup.health = !!on; saveSettings();
+    if (!on) dismissBubble();
+    decorateSettingsHealth();
+    try { window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); } catch (_) { /* refresh stock glow + previews */ }
+}
+window.ddcsSetHealthSignals = setHealthSignals;
+
+window.addEventListener('ddcs:settings-changed', decorateSettingsHealth);   // keep the marks fresh
+document.addEventListener('ddcs:gateway-status', decorateSettingsHealth);   // the Gateway mark tracks the LED
 
 window.openSetupChecklist = openSetupChecklist;

@@ -873,6 +873,11 @@ function buildSettingsOverlay() {
                         </div>
                         <div class="settings-hint">Switches the whole UI skin. Saved on this device.</div>
                     </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">SETUP HEALTH</div>
+                        <label class="settings-check"><span class="ddcs-switch"><input type="checkbox" id="set_health_signals"><span class="ddcs-slider"></span></span> Show setup health signals — the first-run nudge, the unset-tab + field glows, and the Stock-button glow</label>
+                        <div class="settings-hint">When off: no setup nudges anywhere, and the Setup checklist is hidden from the header menu. Re-enable here.</div>
+                    </div>
                 </div>
 
                 <!-- GENERAL: PROGRAM (end-of-program routine) -->
@@ -1276,6 +1281,7 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_gridstep')) q('set_pv_gridstep').value = String(pv.gridStep || 0);
         if (q('set_pv_follow_default')) q('set_pv_follow_default').checked = pv.followDefault !== false;
         if (q('set_pv_autoloop')) q('set_pv_autoloop').checked = pv.autoLoop !== false;
+        if (q('set_health_signals')) q('set_health_signals').checked = (s.setup || {}).health !== false;   // master health switch (per-open state)
         const pvh = pv.head || (pv.head = { ...SETTINGS_DEFAULTS.preview.head });
         const pvp = pv.parts || (pv.parts = { ...SETTINGS_DEFAULTS.preview.parts });
         if (q('set_pv_spindle_dia')) q('set_pv_spindle_dia').value = pvh.spindleDia;
@@ -2044,6 +2050,13 @@ function wireSettingsOverlay(ov) {
             else { document.body.setAttribute('data-theme', _theme.value); try { localStorage.setItem('ddcs_theme', _theme.value); } catch (e) { /* ignore */ } }
         });
     }
+    // Appearance: master "setup health signals" switch (mirrors the one in the checklist; gates bubble + all glows
+    // + the quick-menu entry). setHealthSignals lives in setupChecklist — call it via the window hook (no import cycle).
+    const _health = q('set_health_signals');
+    if (_health) {
+        _health.checked = (_ddcsSettings.setup || {}).health !== false;
+        _health.addEventListener('change', () => { try { window.ddcsSetHealthSignals && window.ddcsSetHealthSignals(_health.checked); } catch (_) { /* noop */ } });
+    }
     const _aboutVer = q('set_about_ver');
     if (_aboutVer) { const v = document.querySelector('.ver'); _aboutVer.textContent = v ? v.textContent.trim() : 'V10.20'; }
 
@@ -2313,6 +2326,7 @@ export function openSettings(nav) {
     // Nested glow levels: if a wizard edit-glow is open BEHIND this returning Settings, desaturate it a touch so
     // the front (current) level reads as the most saturated and the one behind as a "level back".
     if (_returnTok != null) { const wb = document.querySelector('.wiz-box.editing'); if (wb) wb.classList.add('glow-behind'); }
+    try { window.ddcsDecorateSettingsHealth && window.ddcsDecorateSettingsHealth(); } catch (_) { /* noop */ }   // ⚠ on unset tabs
     document.addEventListener('keydown', _settingsEsc, true);
     window.ddcsTrack?.('feature', 'settings');
 }

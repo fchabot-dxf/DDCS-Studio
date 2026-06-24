@@ -379,6 +379,10 @@ export function createPreviewPanel(container, opts = {}) {
         if (key !== lastStockKey) { lastStockKey = key; fitted = false; }
     }
     q('.pp-stock').addEventListener('click', (e) => toggleStockEditor(e.currentTarget));
+    // Stock has no Settings tab, so its "needs setup" signal lives HERE: glow the Stock button while stock is still
+    // the shipped default (mirrors the checklist's stockSet detector via window.ddcsStockNeedsSetup).
+    const updateStockGlow = () => { const b = q('.pp-stock'); if (b) b.classList.toggle('needs-setup', !!(window.ddcsStockNeedsSetup && window.ddcsStockNeedsSetup())); };
+    updateStockGlow();
 
     // ---- play / view controls ----
     q('.pp-mtoggle').addEventListener('click', () => setMode(mode === '2d' ? '3d' : '2d'));
@@ -413,7 +417,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     window.addEventListener('ddcs:stop-previews', stopPlay);
     // Stock (or other settings) changed — e.g. the Stock modal — update the workpiece box + re-trace (probe clamp).
-    window.addEventListener('ddcs:settings-changed', () => { renderStock(); const m = (viz && viz._anchorToStart) ? null : machineForViz(); if (viz) viz.setMachine(m); t2.setMachine(m); applyPreviewSettings(); if (active) setGcode(); });
+    window.addEventListener('ddcs:settings-changed', () => { renderStock(); updateStockGlow(); const m = (viz && viz._anchorToStart) ? null : machineForViz(); if (viz) viz.setMachine(m); t2.setMachine(m); applyPreviewSettings(); if (active) setGcode(); });
 
     function setActive(on) {
         active = !!on;
