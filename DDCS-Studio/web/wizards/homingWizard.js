@@ -39,7 +39,7 @@ const AX_LABEL = { x: 'X', y: 'Y', z: 'Z', a: 'A', b: 'B' };
  * Homing params → its block SNIPPET. params:
  *   axes: ['z','x','y']  — the axes to home THIS run, already in execution order (the view resolves order/philosophy)
  *   config: the per-axis homing config (settings.homing.axes) — method/dir/feeds/backoff/slaveFollows/rotary/offset
- *   softLimits: re-enable #655 at the end (default true)
+ *   softLimits: re-enable #655 at the end iff the machine uses soft limits (sourced from machine.softLimits)
  * A frameless snippet — inserted mid-program like the other setup macros.
  */
 export function homingStack(params = {}) {

@@ -156,9 +156,10 @@ export const SETTINGS_DEFAULTS = {
     //                 marks it homed (#883=#881; #1518=1). Gantry SQUARING is manual — Studio emits no auto-square.
     //   rotary: 'setzero' | 'switch' ; continuous = mod-360 wrap (A/B/C)
     // order philosophy: 'sequential' (by the order field — default; Z(1) X(2) Y(3) per fndzero.nc) | 'simultaneous'
-    // Defaults mirror fndzero.nc: Z first (order 1), X (2), Y (3, A slaved). softLimits = re-enable #655 after homing.
+    // Defaults mirror fndzero.nc: Z first (order 1), X (2), Y (3, A slaved). Soft-limit enable lives on
+    // machine.softLimits (Machine tab); the homing macro re-enables #655 at the end iff that's on.
     homing: {
-        philosophy: 'sequential', softLimits: true,
+        philosophy: 'sequential',
         axes: {
             x: { enable: true,  order: 2, method: 'native', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
             y: { enable: true,  order: 3, method: 'native', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
@@ -217,7 +218,7 @@ function syncFlatFromIO(s) {
 function mergeHoming(p) {
     const D = SETTINGS_DEFAULTS.homing;
     const philosophy = (p && p.philosophy === 'simultaneous') ? 'simultaneous' : 'sequential';
-    const out = { philosophy, softLimits: p ? p.softLimits !== false : D.softLimits, axes: {} };
+    const out = { philosophy, axes: {} };
     for (const ax of ['x', 'y', 'z', 'a', 'b']) {
         const da = D.axes[ax], pa = (p && p.axes && p.axes[ax]) || {};
         const merged = { ...da, ...pa };
@@ -476,7 +477,6 @@ function renderHomingGui() {
     const tag = document.getElementById('set_homing_tag');
     if (tag) tag.textContent = expert ? 'DDCS Expert M350 — full methods available.' : 'Active post is unverified for homing — native home only; advanced methods are disabled.';
     if (document.getElementById('set_homing_simul')) document.getElementById('set_homing_simul').checked = h.philosophy === 'simultaneous';
-    if (document.getElementById('set_homing_softlimits')) document.getElementById('set_homing_softlimits').checked = h.softLimits !== false;
 
     const ordered = [...list].sort((p, q) => ((cfg[p] || {}).order || HOMING_AX_IDX[p] + 1) - ((cfg[q] || {}).order || HOMING_AX_IDX[q] + 1));
     const methodOpts = (sel) => HOMING_METHODS.map((m) => {
@@ -545,9 +545,8 @@ function commitHoming() {
             continuous: g('.hm-continuous') ? g('.hm-continuous').checked : !!prev.continuous,
         };
     });
-    const simul = document.getElementById('set_homing_simul'), soft = document.getElementById('set_homing_softlimits');
+    const simul = document.getElementById('set_homing_simul');
     h.philosophy = (simul && simul.checked) ? 'simultaneous' : 'sequential';
-    h.softLimits = soft ? soft.checked : true;
     saveSettings();
 }
 function homingMove(ax, delta) {
@@ -964,7 +963,6 @@ function buildSettingsOverlay() {
                         <div id="set_homing_axes"></div>
                         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;">
                             <button class="toolbar-btn settings-io" id="set_homing_reset" type="button">↺ Safe default (Z → X → Y)</button>
-                            <label class="settings-check"><input type="checkbox" id="set_homing_softlimits"> Re-enable soft limits after homing (#655)</label>
                         </div>
                     </div>
                 </div>
@@ -2245,7 +2243,7 @@ function wireSettingsOverlay(ov) {
     ['set_mach_x', 'set_mach_y', 'set_mach_z'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderMachineGui); el.addEventListener('change', commitMachine); } });
     { const el = q('set_mach_softlimit'); if (el) el.addEventListener('change', () => { commitMachine(); renderMachineGui(); }); }   // soft-limit toggle redraws the box closed/open
     // Homing section: the two top-level toggles commit on change; Reset renumbers the order to the safe Z→X→Y.
-    ['set_homing_simul', 'set_homing_softlimits'].forEach(id => { const el = q(id); if (el) el.addEventListener('change', commitHoming); });
+    { const el = q('set_homing_simul'); if (el) el.addEventListener('change', commitHoming); }
     const _homingReset = q('set_homing_reset');
     if (_homingReset) _homingReset.addEventListener('click', () => {
         commitHoming();

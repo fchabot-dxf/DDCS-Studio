@@ -43,6 +43,31 @@ then generalise that same snapshot into document-level autosave (serializeProjec
 
 ## To build
 
+- **Homing wizard: propose Native vs G31 (granular) seek.** Two methods the wizard offers:
+  - **Native (`M98 P501`):** minimal — axis + order; the controller does seek/back-off/direction/speed from its own
+    Pr. Safest, opaque.
+  - **G31 raw seek (granular):** emit the seek explicitly — `G91 G31 X.. F#[607+N] P#[1045+N*3] L#[1047+N*3]` +
+    back-off (inverted `L[1-..]`) + slow re-seek + set `#[880+N]`/`#[1515+N]` — which is *exactly* how `slib-g.nc`
+    implements the system subs (verified). This (a) exposes the granular settings (seek speed, back-off, re-seek,
+    **direction**, port, level), (b) is transparent + engine-**simulatable** (real G31 moves, not the proxy), and
+    (c) is the one place the home **direction** genuinely matters — so direction returns as a **G31-method-only
+    field**, not a global one (consistent with dropping the global Dir). The existing 'seek' method (currently
+    `M98 P503`) is the natural home — reframe it to emit raw G31.
+
+- **Dedicated Squaring wizard (gated on Y2) — built on the G31 seek.** Two complementary paths:
+  - **Switch-based auto-square (primary):** decouple the dual-Y motors (`#988–#992` sync-toggle), G31-seek each to
+    its OWN home switch independently (reusing the G31 granular seek above), then re-couple — the two switches
+    define square. This is the real "auto-squaring" that was deferred ("squaring done manually"); the per-motor
+    G31 seek is exactly the primitive it needs (native `M98 P501` can't seek the motors independently). So build
+    the G31 method first — squaring composes on top of it.
+  - **Probe-based verify/correct (optional):** probe a square reference at ≥2 X → measure the residual skew (ΔY
+    across X) → report/apply a Y2 home-offset correction. Gantry square is MECHANICAL (no G68); correction = one
+    motor's home offset (distinct from workpiece-rotation alignment, [[alignment-real-correction]]).
+  Lives in the probe/setup group, unlocked when a Y2 is configured. OPEN: (a) where "Y2" lives — a dual-Y config on
+  the Machine tab that's the unlock AND drives the homing slave-sync (`slaveFollows`); (b) does Studio WRITE the
+  correction via the gateway (a deliberate setup write — allowed, unlike the read-only machine-facts rule) or just
+  report it.
+
 - **Head tab → just "normal forms for a spindle" (no Add gate).** Decided: a spindle/router is the *default*
   (every machine has one), so don't gate it behind "Add head" or a read-only sample — show the editable spindle
   form directly. (The read-only-sample + Add/Remove pattern is for genuinely optional subsystems like ATC, which
