@@ -91,9 +91,11 @@ export function initProgramModel() {
     window.ddcsGetBlockProgram = getStack;                     // the program stack
     window.ddcsLoadBlockStack = (s) => setStack(s, 'load');    // STUDIO op / wizard → program (blocksApp reframes)
     window.ddcsRefreshBlocks = () => setStack(stack, 'refresh');   // recompute projection (e.g. post-processor change)
+    window.ddcsEmitMapped = (s, opts) => emitMapped(s, opts || dialectOpts());
     // Editor hover-to-edit: which op owns a line, an op's line range, and whether the map is currently valid.
     window.ddcsOpAtLine = (i) => (editorMatchesProjection() ? opAtLine(i) : null);
     window.ddcsLinesForOp = linesForOp;
+    window.ddcsGetProjection = getProjection;   // { text, lines, map } — map[i] = block ancestry of line i (for the block-edit glow)
 
     const e = editor(); if (!e || !e.editor || e.editor.__pmWired) return;
     e.editor.__pmWired = true;

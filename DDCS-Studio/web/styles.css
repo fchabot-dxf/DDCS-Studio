@@ -593,15 +593,23 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 
 /* Editor op hover-to-edit: highlight the hovered op's lines (in the #editor-highlight overlay) + a float chip. */
 #editor-highlight .g-line.op-hover { background: rgba(14, 165, 233, 0.16); border-radius: 2px; }
-/* Block-edited ops: characters turn --block-edited colour + a gentle breathing animation.
-   The overlay carries the visible text (textarea is transparent). Left accent kept for scanning. */
+/* Block-edited lines: the CHARACTERS glow (a text-shadow halo on the glyphs), not a full-width row wash — so the
+   glow hugs the edited code itself (e.g. `#100=20`) and never the empty rest of the line. Gentle breathing pulse. */
 @keyframes blockEditedBreathe {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: .55; }
+    0%, 100% { text-shadow: 0 0 2px rgba(var(--edit-glow-rgb, 14,165,233), .55); }
+    50%      { text-shadow: 0 0 22px rgba(var(--edit-glow-rgb, 14,165,233), 1), 0 0 9px rgba(var(--edit-glow-rgb, 14,165,233), 1); }
 }
-#editor-highlight .g-line.op-block-edited { color: var(--block-edited); box-shadow: inset 3px 0 0 var(--block-edited); border-radius: 2px; animation: blockEditedBreathe 3s ease-in-out infinite; }
-#editor-highlight .g-line.op-block-edited span { color: inherit; }   /* override per-token syntax colours */
-.editor-container .op-edit-chip.block-edited { box-shadow: 0 2px 13px rgba(0,0,0,.48), 0 0 0 3px color-mix(in srgb, var(--block-edited) 55%, transparent); }
+/* The CHARACTER glow REUSES the app's window/return glow — theme colour --edit-glow-rgb + pace --edit-glow-speed
+   (same family as .settings-modal.return-glow / the wizard edit-glow). The STATIC highlight behind the words uses
+   the theme --accent; width: fit-content keeps it hugging the text (e.g. `#100=20`), never the whole row. */
+#editor-highlight .g-line.op-block-edited {
+    width: fit-content;
+    max-width: 100%;
+    border-radius: 3px;
+    background-color: color-mix(in srgb, var(--accent, #0ea5e9) 38%, transparent);
+    animation: blockEditedBreathe var(--edit-glow-speed, 1.5s) ease-in-out infinite;
+}
+
 /* Grey out disabled toolbar buttons (e.g. the header Undo/Redo when there's no history to step through). */
 .toolbar-btn:disabled, .toolbar-btn[disabled] { opacity: .38; cursor: default; filter: grayscale(.4); pointer-events: none; }
 /* Scoped under .editor-container (0,2,0) so the ACCENT fill out-ranks the per-theme `button` skin

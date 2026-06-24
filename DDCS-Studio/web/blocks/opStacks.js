@@ -504,10 +504,32 @@ export function isOpBlockEdited(opId) {
     const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
     const op = cur.find((b) => b && b.type === 'op' && b.id === opId);
     if (!op || !op.opType || !BUILDERS[op.opType]) return false;
+    
     const noId = (b) => { const o = {}; for (const k in b) { if (k === 'id') continue; o[k] = (k === 'children' && Array.isArray(b[k])) ? b[k].map(noId) : b[k]; } return o; };
     const sig = (a) => JSON.stringify((a || []).map(noId));
-    const bare = BUILDERS[op.opType](op.params).filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
-    return sig(op.children) !== sig(bare);
+    
+    // 1. Check if it matches the last known form params (_builderAtoms unwraps a self-wrapping builder — homing —
+    //    so an unedited homing op isn't falsely flagged as block-edited)
+    const bare = _builderAtoms(op.opType, op.params);
+    if (sig(op.children) === sig(bare)) return false; // Not edited at all
+    
+    // 2. It was edited, but is it "form-safe"? 
+    // Ask the reconciler if it can perfectly recreate these edits.
+    if (RECONCILERS[op.opType]) {
+        try {
+            const fields = RECONCILERS[op.opType](op.children);
+            if (fields) {
+                const rebuilt = _builderAtoms(op.opType, fields);   // NOTE: `fields` are reconciler field-ids; BUILDERS wants params — adapter gap (slice B, see NEXT-TASKS)
+                if (sig(op.children) === sig(rebuilt)) {
+                    // The form perfectly captured and rebuilt the edits!
+                    // This means they are 100% form-safe and won't be lost on Replace.
+                    return false;
+                }
+            }
+        } catch(e) {}
+    }
+    
+    return true; // It has unsupported edits that would be clobbered
 }
 
 /** Remove a top-level op from the program (right-click → Delete). */
@@ -557,4 +579,219 @@ export function reconcileActiveOp() {
     if (!prog || !prog.length) return null;
     const fields = RECONCILERS[shownOp](prog);
     return fields ? { type: shownOp, fields } : null;
+}
+
+/**
+ * Perform a True AST Merge for block-edited ops.
+ * It takes the old form-generated blocks (base), the user's hand-edited blocks (edited),
+ * and the newly generated form blocks (target). It finds the custom injections in `edited`
+ * and splices them perfectly into `target`.
+ */
+function mergeArrays(base, edited, target) {
+    const getStructKey = (b) => {
+        let k = b.type;
+        if (b.type === 'assign') k += ':' + (b.params?.var || '');
+        if (b.type === 'op') k += ':' + (b.opType || '');
+        return k;
+    };
+    
+    const mergeParams = (bParams, eParams, tParams) => {
+        if (!bParams) bParams = {};
+        if (!eParams) eParams = {};
+        if (!tParams) tParams = {};
+        
+        const merged = { ...tParams };
+        for (const k in eParams) {
+            if (JSON.stringify(eParams[k]) !== JSON.stringify(bParams[k])) {
+                if (JSON.stringify(tParams[k]) === JSON.stringify(bParams[k])) {
+                    // Form didn't change it, so user's Blocks edit wins
+                    merged[k] = eParams[k];
+                }
+            }
+        }
+        return merged;
+    };
+
+    const bKeys = base.map(getStructKey);
+    const eKeys = edited.map(getStructKey);
+    
+    // 1. Structure match base and edited
+    const L1 = Array.from({length: base.length + 1}, () => new Array(edited.length + 1).fill(0));
+    for (let i = 1; i <= base.length; i++) {
+        for (let j = 1; j <= edited.length; j++) {
+            if (bKeys[i-1] === eKeys[j-1]) L1[i][j] = L1[i-1][j-1] + 1;
+            else L1[i][j] = Math.max(L1[i-1][j], L1[i][j-1]);
+        }
+    }
+    
+    let i = base.length, j = edited.length;
+    const alignedBE = [];
+    while (i > 0 || j > 0) {
+        if (i > 0 && j > 0 && bKeys[i-1] === eKeys[j-1]) {
+            alignedBE.unshift({ bIdx: i-1, eIdx: j-1 });
+            i--; j--;
+        } else if (j > 0 && (i === 0 || L1[i][j-1] >= L1[i-1][j])) {
+            alignedBE.unshift({ bIdx: null, eIdx: j-1 });
+            j--;
+        } else if (i > 0 && (j === 0 || L1[i][j-1] < L1[i-1][j])) {
+            alignedBE.unshift({ bIdx: i-1, eIdx: null });
+            i--;
+        }
+    }
+    
+    // 2. Structure match base and target
+    const tKeys = target.map(getStructKey);
+    const L2 = Array.from({length: base.length + 1}, () => new Array(target.length + 1).fill(0));
+    for (let x = 1; x <= base.length; x++) {
+        for (let y = 1; y <= target.length; y++) {
+            if (bKeys[x-1] === tKeys[y-1]) {
+                L2[x][y] = L2[x-1][y-1] + 1;
+            } else {
+                L2[x][y] = Math.max(L2[x-1][y], L2[x][y-1]);
+            }
+        }
+    }
+    let x = base.length, y = target.length;
+    const bToT = [];
+    const mappedT = new Set();
+    while (x > 0 || y > 0) {
+        if (x > 0 && y > 0 && bKeys[x-1] === tKeys[y-1]) {
+            bToT[x-1] = y-1;
+            mappedT.add(y-1);
+            x--; y--;
+        } else if (y > 0 && (x === 0 || L2[x][y-1] >= L2[x-1][y])) {
+            y--;
+        } else if (x > 0 && (y === 0 || L2[x][y-1] < L2[x-1][y])) {
+            x--;
+        }
+    }
+    
+    // 3. Reconstruct target
+    const result = [];
+    let nextTargetIdx = 0;
+    
+    for (const a of alignedBE) {
+        if (a.bIdx !== null && a.eIdx !== null) {
+            const tIdx = bToT[a.bIdx];
+            if (tIdx !== undefined) {
+                while (nextTargetIdx < tIdx) {
+                    if (!mappedT.has(nextTargetIdx)) result.push({ ...target[nextTargetIdx] });
+                    nextTargetIdx++;
+                }
+                const tBlock = { ...target[tIdx] };
+                if (tBlock.params || base[a.bIdx].params || edited[a.eIdx].params) {
+                    tBlock.params = mergeParams(base[a.bIdx].params, edited[a.eIdx].params, target[tIdx].params);
+                }
+                if (edited[a.eIdx].children || target[tIdx].children) {
+                    tBlock.children = mergeArrays(base[a.bIdx].children || [], edited[a.eIdx].children || [], target[tIdx].children || []);
+                }
+                if (edited[a.eIdx].id) tBlock.id = edited[a.eIdx].id;
+                result.push(tBlock);
+                nextTargetIdx = tIdx + 1;
+            }
+        } else if (a.bIdx !== null && a.eIdx === null) {
+            const tIdx = bToT[a.bIdx];
+            if (tIdx !== undefined) {
+                mappedT.add(tIdx);
+                nextTargetIdx = tIdx + 1;
+            }
+        } else if (a.bIdx === null && a.eIdx !== null) {
+            result.push(edited[a.eIdx]);
+        }
+    }
+    while (nextTargetIdx < target.length) {
+        if (!mappedT.has(nextTargetIdx)) result.push({ ...target[nextTargetIdx] });
+        nextTargetIdx++;
+    }
+    
+    return result;
+}
+
+export function mergeOpBlocks(opId, newParams) {
+    const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+    const idx = cur.findIndex((b) => b && b.type === 'op' && b.id === opId);
+    if (idx < 0) return false;
+    const op = cur[idx];
+    if (!op || !op.opType || !BUILDERS[op.opType]) return false;
+
+    // The user's manually edited blocks
+    const editedBlocks = op.children;
+
+    // The "base" pristine blocks from the old params + the "target" fresh blocks from the new params.
+    // _builderAtoms unwraps a self-wrapping builder (homing) so base/target align with op.children (else the merge
+    // mis-aligns every homing atom as an injection).
+    const oldPristine = _builderAtoms(op.opType, op.params);
+    const targetBlocks = _builderAtoms(op.opType, newParams);
+    
+    // Perform the 3-way merge
+    const mergedBlocks = mergeArrays(oldPristine, editedBlocks, targetBlocks);
+    
+    // Apply the merged AST back to the program model
+    const opC = makeOp(op.opType, newParams, mergedBlocks);
+    opC.id = opId;
+    const next = [...cur.slice(0, idx), opC, ...cur.slice(idx + 1)];
+    recordOp(op.opType, newParams);
+    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
+    return true;
+}
+
+// ── form-UNrepresentable edits → editor glow ──────────────────────────────────────────────────────────────
+// editedLinesForOp(opId) → the projected editor line indices that come from atoms INJECTED in blocks: present in
+// the op's live children but NOT producible by the form (BUILDERS(op.params)). Those are exactly the edits a form
+// regenerate (Replace) would erase unseen, so the editor glows only them — never the whole op, never a
+// form-settable change. Built on the projection map's per-line block ancestry (blockModel: `own = [...anc, id]`),
+// so each injected atom's own id tags its own lines. SLICE A only (injections); a matched atom whose UNSURFACED
+// param VALUE was edited is NOT flagged yet — that needs the reverse-synced baseline (see NEXT-TASKS).
+const _structKeyGlow = (b) => {
+    let k = b.type;
+    if (b.type === 'assign') k += ':' + (b.params?.var || '');
+    if (b.type === 'op') k += ':' + (b.opType || '');
+    return k;
+};
+function _allBlockIds(b, into) { if (!b) return; if (b.id) into.add(b.id); (b.children || []).forEach((c) => _allBlockIds(c, into)); }
+// Ids of `actual` blocks (+ their whole subtree) with no structural match in `base` — the injections. LCS-aligned
+// by the same key the merge uses; matched containers recurse so an atom injected inside a kept container is caught.
+function collectInjectedIds(base, actual, into = new Set()) {
+    const bK = base.map(_structKeyGlow), aK = actual.map(_structKeyGlow);
+    const L = Array.from({ length: base.length + 1 }, () => new Array(actual.length + 1).fill(0));
+    for (let i = 1; i <= base.length; i++)
+        for (let j = 1; j <= actual.length; j++)
+            L[i][j] = bK[i - 1] === aK[j - 1] ? L[i - 1][j - 1] + 1 : Math.max(L[i - 1][j], L[i][j - 1]);
+    let i = base.length, j = actual.length;
+    while (i > 0 || j > 0) {
+        if (i > 0 && j > 0 && bK[i - 1] === aK[j - 1]) {
+            collectInjectedIds(base[i - 1].children || [], actual[j - 1].children || [], into);   // matched → recurse
+            i--; j--;
+        } else if (j > 0 && (i === 0 || L[i][j - 1] >= L[i - 1][j])) {
+            _allBlockIds(actual[j - 1], into);    // actual-only → injected (with its subtree)
+            j--;
+        } else { i--; }                           // base-only → a deletion (nothing in the editor to glow)
+    }
+    return into;
+}
+// Builder atoms at the SAME granularity as op.children — unwrap a builder that returns its own op container
+// (only homing does today) and drop program framing, so base ↔ children align.
+function _builderAtoms(opType, params) {
+    let s = BUILDERS[opType](params || {}) || [];
+    if (s.length === 1 && s[0] && s[0].type === 'op') s = s[0].children || [];
+    return s.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
+}
+function _findOpById(prog, id) {
+    for (const b of (prog || [])) {
+        if (!b) continue;
+        if (b.type === 'op' && b.id === id) return b;
+        if (b.children) { const f = _findOpById(b.children, id); if (f) return f; }
+    }
+    return null;
+}
+export function editedLinesForOp(opId) {
+    if (typeof window === 'undefined' || !window.ddcsGetBlockProgram || !window.ddcsGetProjection) return [];
+    const op = _findOpById(window.ddcsGetBlockProgram() || [], opId);
+    if (!op || !op.opType || !BUILDERS[op.opType] || !Array.isArray(op.children)) return [];
+    const injected = collectInjectedIds(_builderAtoms(op.opType, op.params), op.children);
+    if (!injected.size) return [];
+    const map = (window.ddcsGetProjection() || {}).map || [];
+    const out = [];
+    map.forEach((anc, i) => { if (anc && anc.some((id) => injected.has(id))) out.push(i); });
+    return out;
 }

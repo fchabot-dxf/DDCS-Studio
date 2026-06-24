@@ -7,7 +7,9 @@ test.use({ viewport: { width: 1280, height: 900 } });
 
 test('typing raw G-code in the editor decodes into the proper atom blocks', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => document.getElementById('editor') && window.ddcsGetBlockProgram);
+  // Wait for the editor's input→reconcile listener to be wired (programModel sets __pmWired once editorManager
+  // exists), else we'd type before the listener attaches and the 'input' event is missed (a startup race).
+  await page.waitForFunction(() => { const e = document.getElementById('editor'); return e && e.__pmWired && window.ddcsGetBlockProgram; });
 
   await page.evaluate(() => {
     const ed = document.getElementById('editor');
@@ -30,7 +32,9 @@ test('typing raw G-code in the editor decodes into the proper atom blocks', asyn
 
 test('control flow (#var / label / IF-GOTO / GOTO / stop) decodes through the editor', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => document.getElementById('editor') && window.ddcsGetBlockProgram);
+  // Wait for the editor's input→reconcile listener to be wired (programModel sets __pmWired once editorManager
+  // exists), else we'd type before the listener attaches and the 'input' event is missed (a startup race).
+  await page.waitForFunction(() => { const e = document.getElementById('editor'); return e && e.__pmWired && window.ddcsGetBlockProgram; });
   await page.evaluate(() => {
     const ed = document.getElementById('editor');
     ed.value = '#100=5\nN1\nG0 X#100\nIF #100>0 GOTO1\nGOTO2\nN2\nM1\nM0\nM30';

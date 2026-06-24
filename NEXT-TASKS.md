@@ -51,18 +51,53 @@ then generalise that same snapshot into document-level autosave (serializeProjec
     - **Conflict Resolution:** For files being pulled, implement a "Merge, Replace, or Cancel" safety notice if the imported data conflicts with macros already authored in Studio.
     - *Note: Retain the local per-file "Push" buttons in each panel for rapid, single-file testing.*
 
-- **Save-states / Undo-Redo module (ACTIVE BUILD).** A program-level history with block-edit awareness:
-  - **Snapshot granularity** — on **Insert** (coarse, per op commit/replace) **+ on each block edit** (granular;
+- **[x] Save-states / Undo-Redo module (COMPLETED).** A program-level history with block-edit awareness:
+  - **[x] Snapshot granularity** — on **Insert** (coarse, per op commit/replace) **+ on each block edit** (granular;
     block edits commit immediately). **NOT on form edits** (verified in `wizardManager.js`: field listeners →
     `update()` → live preview only; the program/op commits only in `insert()`; `close()`/Esc/click-out just hides.
     So form edit + Cancel already discards — op.params is the untouched snapshot. No per-keystroke snapshots.)
-  - **Undo / Redo buttons** navigate the history (snapshot = the program block stack via
+  - **[x] Undo / Redo buttons** navigate the history (snapshot = the program block stack via
     `ddcsGetBlockProgram`/`ddcsLoadBlockStack`; an `applying` guard + the existing `muteChanges` avoid self-loops).
-  - **"Blocks edited" chip** beside the edit-op chip in the editor, + **glow** the block-edited blocks; driven by a
-    `blockEdited` flag (op's blocks diverge from its form params).
-  - **Merge / Replace / Cancel** notice at `insert()` when the op was block-edited: Merge (keep block stack) /
+  - **[x] "Blocks edited" indication**: 
+    - **Removed**: The `✦` symbol from the editor chip and the full-column vertical line.
+    - **⚠ OPEN PROBLEM — "glow the exact edit" (the real ask).** Line-level targeting only solves HALF the cases:
+      1. **Custom whole-line atom** (an M8, a Probe sub) → a new line; line-glow isolates it perfectly. ✓
+      2. **Editing the VALUE of an UNSURFACED param from a block** → changes a single *token* inside a line that's
+         otherwise form-generated. Line-glow would light the WHOLE line (imprecise); the ask is to glow the changed
+         **word**. This case is NOT solved by any line-list approach.
+    - **It's feasible, not "impossible".** `UIUtils.formatGCode` ([ui/uiUtils.js:106](DDCS-Studio/web/ui/uiUtils.js#L106))
+      already wraps tokens in spans (M-codes, axis letters, comments, G31), so per-word highlighting is a CSS class on a
+      token span. The hard part is knowing *which* token an edit produced — not the rendering.
+    - **To build (the right design): a per-op DIFF, not line lists.** Glow exactly the changed **character ranges**
+      in `#editor-highlight`, where the diff is **actual emit vs the form's BEST reconstruction** of the edited op:
+      1. Reverse-sync the edited block stack back into params (`RECONCILERS[opType]`), then rebuild (`BUILDERS[opType]`)
+         and emit → this baseline = "everything the form CAN express, applied."
+      2. Diff that baseline against the actual block-edited emit.
+      3. The residue (chars present in actual but not in the form's reconstruction) is **by definition exactly what the
+         form cannot edit** → glow only that. **Critical adjustment: do NOT glow form-representable diffs.** A surfaced
+         param changed in a block (e.g. Depth) gets absorbed into the baseline → baseline == actual → no glow. A custom
+         atom (M8) or an UNSURFACED param value survives the diff → glows (whole line for the atom, single token/word
+         for the value).
+      - One mechanism, no block-vs-token branching, no line classification. The granularity (word vs line) is just how
+        big the residual diff happens to be.
+      - **Caveat — precision rides on reverse-sync coverage.** Missing/partial reconcilers (e.g. pocket's derived
+        `stepover` is intentionally not reversed) leave those surfaced params unabsorbed → they over-glow. Fails SAFE
+        (never hides a real divergence), but is the thing to watch; completeness of `RECONCILERS` = precision of the glow.
+      - Implementation note: `RECONCILERS` return form-field ids → values; `BUILDERS` take a params object — needs the
+        small field-id↔param-key adapter the wizards already use when reading the form.
+      - This SUPERSEDES the `unsupportedLinesForOp` / `editedLinesForOp` idea — note `editorOpHover.js` currently
+        *references* `window.ddcsEditedLinesForOp` but it's unimplemented in `opStacks.js`, so the glow silently falls
+        back to the whole op (the "all 26 lines glow" behaviour).
+      - **WHY (north star): never regenerate code in a way that silently erases block-only functions.** The glow, the
+        chip, and the **Merge/Replace/Cancel** notice are the SAME diff at three surfaces: glow = WHERE the
+        form-unrepresentable edits are; chip/`isOpBlockEdited` = WHETHER any exist; notice = the GATE that stops Replace
+        from clobbering them. Glow ⟺ chip ⟺ notice must all mean exactly one thing: "the form would erase this."
+      - **Consistency fix to land with it:** `isOpBlockEdited` currently diffs against the ORIGINAL `op.params`, so it
+        also flags *surfaced* edits (false alarm — fires the notice when nothing is actually at risk). Re-base it on the
+        SAME reverse-synced reconstruction as the glow, so all three agree: highlight/warn ⟺ Replace would lose something.
+  - **[x] Merge / Replace / Cancel** notice at `insert()` when the op was block-edited: Merge (keep block stack) /
     Replace (rebuild from form via `replaceOp`/`commitActiveOp`) / Cancel (back to form, nothing inserted).
-  - Module file `blocks/saveStates.js`; hooks at `WizardManager.insert` + the `blocksApp` reproject; later:
+  - **[x] Module file `blocks/saveStates.js`**; hooks at `WizardManager.insert` + the `blocksApp` reproject; later:
     `serializeProject` ring in IndexedDB + recovery-on-load.
 
 - **Homing wizard: propose Native vs G31 (granular) seek.** Two methods the wizard offers:

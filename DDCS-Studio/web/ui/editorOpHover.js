@@ -30,7 +30,7 @@ export function initEditorOpHover() {
     const hide = () => { clearHi(); chip.hidden = true; hoverOpId = null; };
 
     // Persistent "edited in Blocks" glow: any op whose blocks diverge from its form params (isOpBlockEdited) gets
-    // its emitted editor lines marked. The detector lives in the lazy opStacks module — import it once so it's
+    // its SPECIFIC emitted editor lines marked. The detector lives in the lazy opStacks module — import it once so it's
     // available on the editor side; re-glow whenever the highlight overlay rebuilds (childList only, so our own
     // class toggles don't re-trigger it).
     const glowEdited = () => {
@@ -38,14 +38,20 @@ export function initEditorOpHover() {
         overlay.querySelectorAll('.g-line.op-block-edited').forEach((s) => s.classList.remove('op-block-edited'));
         for (const op of (window.ddcsGetBlockProgram() || [])) {
             if (!op || op.type !== 'op' || !window.ddcsOpBlockEdited(op.id)) continue;
-            ((window.ddcsLinesForOp && window.ddcsLinesForOp(op.id)) || []).forEach((j) => {
+            // Only highlight the exact lines that were hand-edited in Blocks
+            const linesToGlow = window.ddcsEditedLinesForOp ? window.ddcsEditedLinesForOp(op.id) : (window.ddcsLinesForOp && window.ddcsLinesForOp(op.id) || []);
+            linesToGlow.forEach((j) => {
                 const s = overlay.querySelector(`.g-line[data-line-index="${j}"]`); if (s) s.classList.add('op-block-edited');
             });
         }
     };
     window.ddcsRefreshBlockGlow = glowEdited;
     new MutationObserver(glowEdited).observe(overlay, { childList: true, subtree: true });
-    import('../blocks/opStacks.js').then((m) => { window.ddcsOpBlockEdited = m.isOpBlockEdited; glowEdited(); }).catch(() => { /* detector optional */ });
+    import('../blocks/opStacks.js').then((m) => { 
+        window.ddcsOpBlockEdited = m.isOpBlockEdited; 
+        window.ddcsEditedLinesForOp = m.editedLinesForOp;
+        glowEdited(); 
+    }).catch(() => { /* detector optional */ });
 
     editor.addEventListener('mousemove', (e) => {
         if (typeof window.ddcsOpAtLine !== 'function') return;
@@ -58,11 +64,9 @@ export function initEditorOpHover() {
         lines.forEach((j) => { const s = overlay.querySelector(`.g-line[data-line-index="${j}"]`); if (s) s.classList.add('op-hover'); });
         const first = lines.length ? lines[0] : 0;
         const editable = !window.ddcsCanEditOp || window.ddcsCanEditOp(op.opType);
-        const edited = typeof window.ddcsOpBlockEdited === 'function' && window.ddcsOpBlockEdited(op.id);
-        chip.textContent = (editable ? '✎ ' : '🔒 ') + (op.label || op.opType) + (edited ? '  ✦' : '');
-        chip.classList.toggle('block-edited', !!edited);
+        chip.textContent = (editable ? '✎ ' : '🔒 ') + (op.label || op.opType);
         chip.disabled = !editable;
-        chip.title = (editable ? `Edit this ${op.label || op.opType}` : `${op.label || op.opType}: form-edit not wired yet`) + (edited ? ' — edited in Blocks' : '');
+        chip.title = editable ? `Edit this ${op.label || op.opType}` : `${op.label || op.opType}: form-edit not wired yet`;
         chip.style.top = Math.max(2, Math.round(first * lineHeight() + padTop() - editor.scrollTop)) + 'px';
         // Chip floats on the LEFT of the editor (left: 12px in CSS) — clear of the right-side 3D preview
         // drawer / view-cube gizmo, so it's always reachable (the "out of reach" report).
