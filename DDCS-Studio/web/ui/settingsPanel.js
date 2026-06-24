@@ -73,7 +73,7 @@ export const SETTINGS_DEFAULTS = {
     stockTemplates: [],   // user-saved presets: { name, x, y, z, shape }
     // Travel x/y/z are SIGNED (sign = home direction). workOrigin = the active WCS offset (machine coords of
     // part-zero), kept in sync from wcs.table[active-1]. wcs = the G54–G59 table pulled from the controller.
-    machine: { x: 300, y: 300, z: -120, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } },   // Z is negative: homes at the TOP (machine 0) and travels down into the work — the router/mill norm
+    machine: { x: 300, y: 300, z: -120, show: true, softLimits: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } },   // Z is negative: homes at the TOP (machine 0) and travels down into the work — the router/mill norm
     view:    { theta: -1.5708, phi: 1.0472 }, // 3D preview start orientation (front: +X right, +Y back)
     probes:  {
         probePin: 3, probeLevel: 0,        // IN03 = YunKia V6 3D probe (confirmed)
@@ -145,7 +145,10 @@ export const SETTINGS_DEFAULTS = {
     // choice ('' = not yet chosen → stays ⚠ | 'local' | 'cloud' | 'both'); we never auto-default it to local.
     setup: { dismissed: false, saveDest: '' },
     // Persisted machine HOMING profile — authored in the Homing Setup modal, consumed by the Homing wizard.
-    // PER-AXIS: enable, order (1..N — lower homes first), method, direction, feeds, back-off, home offset.
+    // PER-AXIS: enable, order (1..N — lower homes first), method, feeds, back-off, home offset.
+    // Home DIRECTION is NOT stored here / not in the settings form — it's derived from the SIGNED machine travel for
+    // the sim animation; a Homing block can override it per-axis (kept on the axis via ...prev). The real seek
+    // direction is the controller's #612 (read at runtime by the M98 P503 switch-seek path) — Studio never authors it.
     //   method: 'native'  — controller built-in M98 P501 X<idx> (safest; uses the controller's own config + flag)
     //           'seek'     — low-level switch-seek + back-off + slow re-seek (M98 P503), composed in the macro
     //           'setzero'  — set current position AS home (#[880+N]=0, #[1515+N]=1) — NO motion
@@ -157,11 +160,11 @@ export const SETTINGS_DEFAULTS = {
     homing: {
         philosophy: 'sequential', softLimits: true,
         axes: {
-            x: { enable: true,  order: 2, method: 'native', dir: '-', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
-            y: { enable: true,  order: 3, method: 'native', dir: '-', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
-            z: { enable: true,  order: 1, method: 'native', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
-            a: { enable: false, order: 4, method: 'setzero', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'setzero', continuous: true },
-            b: { enable: false, order: 5, method: 'setzero', dir: '+', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'setzero', continuous: true }
+            x: { enable: true,  order: 2, method: 'native', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
+            y: { enable: true,  order: 3, method: 'native', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
+            z: { enable: true,  order: 1, method: 'native', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
+            a: { enable: false, order: 4, method: 'setzero', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'setzero', continuous: true },
+            b: { enable: false, order: 5, method: 'setzero', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'setzero', continuous: true }
         }
     }
 };
@@ -411,14 +414,20 @@ function renderMachineGui() {
     const k = (i, j, l) => S(i ? X : 0, j ? Y : 0, l ? Z : 0);
     const O = k(0, 0, 0), c100 = k(1, 0, 0), c010 = k(0, 1, 0), c001 = k(0, 0, 1),
           c110 = k(1, 1, 0), c101 = k(1, 0, 1), c011 = k(0, 1, 1), c111 = k(1, 1, 1);
-    const ln = (a, b, col, w) => `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${col}" stroke-width="${w}"/>`;
+    const ln = (a, b, col, w, extra = '') => `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${col}" stroke-width="${w}"${extra}/>`;
     let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">`;
+    const soft = (() => { const cb = document.getElementById('set_mach_softlimit'); return cb ? cb.checked : (getSettings().machine || {}).softLimits !== false; })();
+    const closeEdge = soft ? '' : ' stroke-dasharray="3 3" opacity="0.4"';   // soft ON → solid closed box; OFF → dashed (open; not an enforced bound)
     [[c100, c110], [c100, c101], [c010, c110], [c010, c011], [c001, c101], [c001, c011], [c110, c111], [c101, c111], [c011, c111]]
-        .forEach(([a, b]) => { svg += ln(a, b, '#465666', 1); });   // 9 non-origin edges
+        .forEach(([a, b]) => { svg += ln(a, b, '#465666', 1, closeEdge); });   // 9 non-origin (closing) edges
     svg += ln(O, c100, '#e0564f', 2.4) + ln(O, c010, '#5fbf6a', 2.4) + ln(O, c001, '#5a8fe0', 2.4);   // travels: X red, Y green, Z blue
     const away = (p, d) => { const dx = p[0] - O[0], dy = p[1] - O[1], L = Math.hypot(dx, dy) || 1; return [p[0] + dx / L * d, p[1] + dy / L * d]; };
     const ax = (t, p, col) => { const q = away(p, 9); return `<text x="${q[0].toFixed(0)}" y="${q[1].toFixed(0)}" fill="${col}" font-size="9" font-weight="bold" text-anchor="middle">${t}</text>`; };
     svg += ax('X', c100, '#e0564f') + ax('Y', c010, '#5fbf6a') + ax('Z', c001, '#5a8fe0');
+    if (!soft) {   // open envelope: travels run unbounded in their direction → a soft ∞ past each far corner
+        const inf = (p, col) => { const q = away(p, 21); return `<text x="${q[0].toFixed(0)}" y="${(q[1] + 3).toFixed(0)}" fill="${col}" font-size="11" font-weight="bold" text-anchor="middle" opacity="0.85">∞</text>`; };
+        svg += inf(c100, '#e0564f') + inf(c010, '#5fbf6a') + inf(c001, '#5a8fe0');
+    }
     svg += `<circle cx="${O[0].toFixed(1)}" cy="${O[1].toFixed(1)}" r="3.4" fill="#ffd24a" stroke="#111" stroke-width="0.7"/>`;   // home (machine 0)
     svgBox.innerHTML = svg + '</svg>';
     const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
@@ -430,6 +439,7 @@ function commitMachine() {
     s.machine.x = _gvs('set_mach_x', s.machine.x || 300);
     s.machine.y = _gvs('set_mach_y', s.machine.y || 300);
     s.machine.z = _gvs('set_mach_z', s.machine.z || -120);   // negative default — Z homes at top, travels down
+    const sl = document.getElementById('set_mach_softlimit'); if (sl) s.machine.softLimits = sl.checked;
     saveSettings();
 }
 
@@ -485,7 +495,6 @@ function renderHomingGui() {
                 <label style="font-weight:600;"><input type="checkbox" class="hm-enable" ${c.enable !== false ? 'checked' : ''}/> ${HOMING_AX_LABEL[ax]}</label>
                 <input type="hidden" class="hm-order" value="${pos + 1}">
                 <label style="font-size:12px;">Method <select class="hm-method">${methodOpts(c.method || 'native')}</select></label>
-                <label style="font-size:12px;">Dir <select class="hm-dir"><option value="+"${(c.dir || '-') === '+' ? ' selected' : ''}>+</option><option value="-"${(c.dir || '-') === '-' ? ' selected' : ''}>−</option></select></label>
             </div>
             <div class="hm-motion" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
                 <label>Seek feed <input type="number" class="hm-seekfeed" value="${num(c.seekFeed, 800)}" style="width:60px;"></label>
@@ -527,7 +536,6 @@ function commitHoming() {
             enable: g('.hm-enable').checked,
             order: num(g('.hm-order').value, idx + 1),
             method: g('.hm-method').value,
-            dir: g('.hm-dir').value,
             seekFeed: num(g('.hm-seekfeed').value, prev.seekFeed || 800),
             backoff: num(g('.hm-backoff').value, prev.backoff || 5),
             slowFeed: num(g('.hm-slowfeed').value, prev.slowFeed || 100),
@@ -934,6 +942,7 @@ function buildSettingsOverlay() {
                             <input type="number" id="set_mach_z" class="dim-edit" step="1" title="Z travel (mm) — sign sets the home direction">
                         </div>
                         <label class="settings-check"><input type="checkbox" id="set_mach_show"> Show machine envelope in 3D</label>
+                        <label class="settings-check" title="Soft limits (#655). On = the controller bounds travel to this envelope, so the box closes. Off = no software bound — the box opens, unbounded in the travel direction (still pinned at home). Studio never writes #655 to the controller; this mirrors the machine's own setting (pull it)."><input type="checkbox" id="set_mach_softlimit"> Enable soft limits (#655) — closes the envelope</label>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">AXES</div>
@@ -1329,6 +1338,7 @@ function wireSettingsOverlay(ov) {
         renderHomingGui();
         renderWcsTable(q('set_mach_wcs_table'), s.machine);
         q('set_mach_show').checked = !!s.machine.show;
+        if (q('set_mach_softlimit')) q('set_mach_softlimit').checked = !!s.machine.softLimits;
         if (q('set_axis_a_role')) {
             const mo = s.motors || {};
             q('set_axis_a_role').value = (mo.a && mo.a.role) || 'unused';
@@ -1969,6 +1979,7 @@ function wireSettingsOverlay(ov) {
         s.machine.z = num(q('set_mach_z').value, s.machine.z);
         // ox/oy/oz removed; workOrigin is derived from the WCS table (renderWcsTable persists it on edit/pull).
         s.machine.show = q('set_mach_show').checked;
+        if (q('set_mach_softlimit')) s.machine.softLimits = q('set_mach_softlimit').checked;
 
         s.probes.probePin = num(q('set_probe_pin').value, s.probes.probePin);
         s.probes.probeLevel = num(q('set_probe_level').value, s.probes.probeLevel);
@@ -2232,6 +2243,7 @@ function wireSettingsOverlay(ov) {
     ['set_pv_probe_body_dia', 'set_pv_probe_body_len', 'set_pv_probe_stylus_len', 'set_pv_probe_ball_dia'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderProbeGui); el.addEventListener('change', commitProbeDims); } });
     // Machine envelope GUI: typing redraws the iso box (origin follows the signs); on commit persist so the 3D updates.
     ['set_mach_x', 'set_mach_y', 'set_mach_z'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderMachineGui); el.addEventListener('change', commitMachine); } });
+    { const el = q('set_mach_softlimit'); if (el) el.addEventListener('change', () => { commitMachine(); renderMachineGui(); }); }   // soft-limit toggle redraws the box closed/open
     // Homing section: the two top-level toggles commit on change; Reset renumbers the order to the safe Z→X→Y.
     ['set_homing_simul', 'set_homing_softlimits'].forEach(id => { const el = q(id); if (el) el.addEventListener('change', commitHoming); });
     const _homingReset = q('set_homing_reset');

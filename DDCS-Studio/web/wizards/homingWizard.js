@@ -179,8 +179,9 @@ export function homingSimProxy(params = {}) {
     const homeEnd = (ax) => {
         const c = cfg[ax] || {};
         const t = travel[ax] || 0;
-        // signed home end: + dir → +|travel|, − dir → −|travel|. offset shifts the landing point.
-        const end = ((c.dir || '-') === '+' ? Math.abs(t) : -Math.abs(t));
+        // Home end follows the SIGNED travel (its sign = home direction). An explicit c.dir — set by a Homing block,
+        // never the settings form — overrides; otherwise derive from the travel sign. offset shifts the landing point.
+        const end = c.dir === '+' ? Math.abs(t) : c.dir === '-' ? -Math.abs(t) : t;
         return Math.round((end + num(c.offset, 0)) * 1000) / 1000;
     };
     axes.forEach((ax) => {
