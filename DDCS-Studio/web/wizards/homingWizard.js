@@ -11,7 +11,9 @@
  * GROUND TRUTH (DDCS Expert M350, verified vs fndzero.nc / fndY.nc):
  *   native per-axis home   M98 P501 X<N>     (N = axis index 0=X 1=Y 2=Z 3=A 4=B) — uses the controller's config
  *                                            AND sets the homed flag itself (we do NOT write #[1515+N] for it)
- *   low-level switch-seek   M98 P503 X<N>     — raw seek with no firmware flag write (we set #[1515+N] after)
+ *   G31 granular seek       transparent raw G31  — UNVERIFIED faithful re-derivation of O501 (slib-g.nc); no
+ *                                                  firmware flag write, so we set #[1515+N] ourselves. Advanced
+ *                                                  path only; native M98 P501 is the robust default.
  *   per-axis params         port #[1045+N*3] · level #[1047+N*3] · seek speed #[607+N] · seek dir #[612+N]
  *   machine coord #[880+N] · homed flag #[1515+N] (A=#1518) · soft-limit enable #655 (0=off/1=on)
  *   set-current-as-home     #[880+N]=0 then #[1515+N]=1   (NO motion)
@@ -79,7 +81,7 @@ export function homingStack(params = {}) {
         // Homed-flag / machine-coord at their RESOLVED literal address (e.g. Z=#1517, #882). The native path does
         // NOT write the homed flag — M98 P501 sets it itself (fndzero.nc never writes it for switch-homed axes), and
         // a manual write would falsely mark the axis homed if the home failed/alarmed. The flag is written ONLY where
-        // the controller doesn't: slave-sync, set-current-as-home, and the P503 seek path.
+        // the controller doesn't: slave-sync, set-current-as-home, and the G31 granular-seek path.
         const flagVar = `#${1515 + N}`, coordVar = `#${880 + N}`;
 
         // A dual-axis SLAVE that follows this master (e.g. A slaved to Y): after the master homes, copy its machine
@@ -112,28 +114,90 @@ export function homingStack(params = {}) {
         }
 
         if (method === 'seek') {
-            // Low-level switch-seek + back-off + slow re-seek, composed from M98 P503. Uses the per-axis param
-            // registers verbatim (port/level/speed/dir), then zeroes the coord and re-seeks slowly for repeatability.
-            const backoff = num(c.backoff, 5);
-            C(`Home ${L} — switch-seek + back-off + slow re-seek`);
-            A('#100', N, 'axis index');
-            A('#101', `#[1045+#100*3]`, 'input port');
-            A('#102', `#[1047+#100*3]`, 'active level');
-            A('#103', `#[607+#100]`, 'seek speed');
-            A('#104', `#[612+#100]`, 'seek direction');
-            A('#105', backoff, 'back-off distance');
-            RAW(`M98P503X#100     ( seek ${L} switch )`);
-            A(`#[880+#100]`, '0', `${L} machine coord = 0`);
-            // back-off direction = opposite the seek direction (#612: 0=neg seek → back +, 1=pos seek → back -)
-            A('#106', `[1*[1-#104]]-#104`, 'back-off direction');
-            RAW(`G91 G01 ${L}[#106*#105] F#103     ( back off )`);
-            RAW(`M98P503X#100     ( slow re-seek ${L} )`);
-            A(`#[880+#100]`, '0', `${L} machine coord = 0 (precise)`);
-            RAW(`G91 G01 ${L}[#106*#105] F#103     ( back off clear )`);
-            // P503 is a raw switch-seek with no firmware homed-flag write, so we set it here (primed via #107).
-            A('#107', `#[1515+#100]`, 'prime homed flag');
-            A('#107', '1', `${L} homed flag`);
-            A(`#[1515+#100]`, '#107');
+            // ── G31 GRANULAR SEEK — a FAITHFUL re-derivation of the controller's O501 single-axis home seek
+            //    (slib-g.nc lines ~157-304), emitted as TRANSPARENT raw G31 instead of the M98 P503 sub the native
+            //    path uses. This is for advanced / unconventional uses (custom debounce, interleaved MSG/comm in the
+            //    Blocks view, non-standard switch wiring). It is UNVERIFIED on hardware — `native` (M98 P501) is the
+            //    robust, controller-flagged path. The tunables (dir / feeds / back-off / debounce passes) ride on
+            //    these emitted atoms only; the wizard form stays a lean method-picker (no settings fields added).
+            //
+            //    SEQUENCE (mirrors O501): fast G31 toward the switch (signed by dir) → NOT-FOUND guard (#1920+N>2
+            //    means a hard limit was struck instead of the home switch → reverse + re-seek) → 7-read debounce on
+            //    the input register vs the expected level → back-off until release (inverted-level G31, Q1) → halve
+            //    feed → multi-pass loop → set machine coord + homed flag. The trailing G53 "return to reference
+            //    point" (O501 lines 251-298, machine-specific #622-626 + rotary remap) is NOT mirrored — it depends
+            //    on per-machine reference offsets we don't carry, and the home itself is complete without it.
+            //
+            //    DIRECTION (granular per-axis): c.dir '+'/'-' wins; else the SIGNED machine-travel sign; else fall
+            //    back to the controller's own #612 register (20000*#612-10000 → ±10000). Signs the seek distance.
+            const backoff = num(c.backoff, 5);                       // back-off / release-clear distance (mm)
+            const seekDist = 10000;                                  // O501: ±10000 signed seek distance
+            const tSign = Math.sign(num((params.machine || {})[ax], 0)); // signed-travel sign (0 if unknown)
+            const dir = c.dir === '+' ? 1 : c.dir === '-' ? -1 : (tSign || 0); // 0 ⇒ defer to controller #612
+            const passes = Math.max(1, Math.round(num(c.seekPasses, 2)));     // O501 multi-pass (#606); default 2
+
+            C(`Home ${L} — G31 GRANULAR SEEK (transparent re-derivation of O501)`);
+            C(`G31 seek — transparent/UNVERIFIED: verify on hardware; native M98 P501 is the robust path`);
+            A('#100', N, 'axis index N');
+            // Seek distance, signed by the granular direction. dir==0 → use the controller's own #612 register
+            // exactly as O501 does (20000*#[612+N]-10000), so config-driven machines still work.
+            if (dir === 0) A('#102', `20000*#[612+#100]-10000`, 'seek dist (signed by controller #612)');
+            else A('#102', `${dir * seekDist}`, `seek dist (signed by dir ${dir > 0 ? '+' : '-'})`);
+            A('#103', `#[607+#100]`, 'fast seek feed');
+            A('#104', `#[1910+#100]`, 'expected switch level (debounce target)');
+
+            // ── Pass loop. #21 = pass counter (O501 #21); feed halves each pass (#22). ──
+            A('#21', '0', 'pass counter');
+            A('#22', `#103`, 'this-pass feed (halves each pass)');
+            C('N41  ( ---- seek pass ---- )');
+
+            // Fast G31 toward the switch. P=port #[1045+N*3], L=active level #[1047+N*3], K0, Q0 (per O501 line 190).
+            C(`Fast G31 ${L} toward home switch`);
+            RAW(`G91 G31 ${L}[#102] F#22 P#[1045+#100*3] L#[1047+#100*3] K0 Q0     ( seek switch )`);
+
+            // NOT-FOUND guard: #[1920+N] > 2 means a HARD LIMIT was struck, not the home switch (O501 line 192:
+            // IF #[1920+N]<=2 GOTO found). If so, reverse the seek and try once from the other side, exactly like
+            // O501 lines 193-197. (#1920+N semantics UNVERIFIED — see report.)
+            RAW(`IF #[1920+#100]<=2 GOTO42     ( home switch hit -> debounce )`);
+            C('Limit struck instead of home switch — reverse and re-seek');
+            A('#102', `-#102`, 'reverse seek');
+            RAW(`G91 G31 ${L}[#102] F#103 P#[1045+#100*3] L#[1047+#100*3] K0 Q0     ( re-seek from far side )`);
+
+            // ── Debounce: O501 lines 199-214 sum 7 reads of the input register #[1520+#[1900+N]-1] into #24;
+            //    <4 → 0, else → 1 (majority vote). Then compare to the expected level #[1910+N]. ──
+            C('N42  ( debounce — 7-read majority vote on the home input )');
+            A('#24', '0', 'debounce accumulator');
+            for (let r = 0; r < 7; r++) A('#24', `#24+#[1520+#[1900+#100]-1]`, r === 0 ? 'read home input x7' : '');
+            RAW('IF #24<4 GOTO43     ( majority LOW )');
+            A('#24', '1', 'majority HIGH');
+            RAW('GOTO44');
+            C('N43'); A('#24', '0', 'settled LOW');
+            C('N44');
+            RAW('IF #24==#104 GOTO45     ( settled in switch zone -> back off )');
+            // Overshot the switch zone (O501 line 217): reverse-seek back into it, Q1.
+            C('Overshot switch zone — reverse-seek back into it');
+            RAW(`G91 G31 ${L}[-#102] F#22 P#[1045+#100*3] L#[1047+#100*3] K0 Q1     ( back into zone )`);
+
+            // ── Back-off until release: reverse-seek with the INVERTED active level L[1-#[1047+N*3]] and Q1
+            //    (O501 line 220 — seek the switch's RELEASE edge for a repeatable datum). ──
+            C('N45  ( back off until switch releases — inverted level, Q1 )');
+            RAW(`G91 G31 ${L}[-#102] F#22 P#[1045+#100*3] L[1-#[1047+#100*3]] K0 Q1     ( seek release edge )`);
+
+            // Halve feed for the next, finer pass (O501 lines 222-223).
+            A('#22', `#22/2`, 'halve feed for next pass');
+            A('#21', `#21+1`, 'pass++');
+            RAW(`IF #21<${passes} GOTO41     ( more passes )`);
+
+            // ── Datum: set machine coord + homed flag. O501 sets #[880+N]=#[735+N] (reference offset); we don't
+            //    carry #735, so we zero the coord here (#[880+N]=0) — the same datum the setzero/native paths use.
+            //    The seek path writes the homed flag itself (O501 line 245) since no firmware sub did it. ──
+            C(`${L} homed — set machine coord + homed flag`);
+            A(`#[880+#100]`, '0', `${L} machine coord = 0 at datum`);
+            A(`#[1515+#100]`, '1', `${L} homed flag`);
+
+            // Final clearance back-off so the homed state isn't sitting on the switch (granular back-off distance),
+            // away from the switch i.e. opposite the seek direction. dir 0 (deferred to #612) → back off positive.
+            RAW(`G91 G01 ${L}${(-dir || 1) * backoff} F#22     ( clearance back-off )`);
             RAW('G90');
             syncSlave();
             return;
