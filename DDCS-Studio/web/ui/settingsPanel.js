@@ -674,6 +674,7 @@ function buildSettingsOverlay() {
                     <div class="sidebar-group-label" data-group-label="controller" style="display:none;">Controller</div>
                     <button class="settings-tab" data-group="controller" data-target="set_tab_profile">Profile</button>
                     <button class="settings-tab" data-group="controller" data-target="set_tab_wcs">WCS</button>
+                    <button class="settings-tab" data-group="controller" data-target="set_tab_homing">Homing</button>
                     <button class="settings-tab" data-group="controller" data-target="set_tab_variables">Variables</button>
                     <button class="settings-tab" data-group="controller" data-target="set_tab_program">Program</button>
                     <button class="settings-tab" data-group="controller" data-target="set_tab_gateway">Gateway</button>
@@ -944,9 +945,11 @@ function buildSettingsOverlay() {
                             <label>B — spins around<select id="set_axis_b_around"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></label>
                         </div>
                     </div>
+                </div>
+                <div id="set_tab_homing" style="display:none">
                     <div class="settings-section" id="set_homing_section">
                         <div class="settings-section-title">HOMING</div>
-                        <div class="settings-hint">Per-axis homing profile, used by the <b>Homing wizard</b>. Travel + home direction come from the envelope above. <b>Native</b> runs the controller's built-in home (safest). The numbered list sets the home <b>sequence</b> (▲▼ to reorder; default Z→X→Y). For a dual-axis gantry, set the master's <b>slave axis follows</b> so homing the master syncs the slave (squaring stays manual). The switch-seek method is DDCS Expert M350 only.</div>
+                        <div class="settings-hint">Per-axis homing profile, used by the <b>Homing wizard</b>. The travel / soft-limit range comes from the machine envelope (Hardware → Machine); homing finds the datum that range is measured from. <b>Native</b> runs the controller's built-in home (safest). The numbered list sets the home <b>sequence</b> (▲▼ to reorder; default Z→X→Y). For a dual-axis gantry, set the master's <b>slave axis follows</b> so homing the master syncs the slave (squaring stays manual). The switch-seek method is DDCS Expert M350 only.</div>
                         <div id="set_homing_tag" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
                         <label class="settings-check" style="margin-bottom:6px;"><input type="checkbox" id="set_homing_simul"> Simultaneous (emit calls back-to-back, still in this order)</label>
                         <div id="set_homing_axes"></div>
@@ -2190,12 +2193,13 @@ function wireSettingsOverlay(ov) {
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
     const sideTabs = [...ov.querySelectorAll('.settings-sidebar .settings-tab')];
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
-        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_faq', 'set_tab_feedback', 'set_tab_about',
+        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_homing', 'set_tab_program', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_faq', 'set_tab_feedback', 'set_tab_about',
                      'set_tab_machine', 'set_tab_wcs', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
         sideTabs.forEach(b => b.classList.toggle('active', b.dataset.target === id));
-        if (id === 'set_tab_machine') { renderMachineGui(); renderHomingGui(); }   // axis list tracks motors; re-render on open
+        if (id === 'set_tab_machine') renderMachineGui();   // axis list tracks motors; re-render on open
+        if (id === 'set_tab_homing') renderHomingGui();     // homing now lives in the Controller group
         if (id === 'set_tab_input') renderIoTable(ov.querySelector('#io_input_table'), 'input', getInputs(), syncIO);
         if (id === 'set_tab_output') renderIoTable(ov.querySelector('#io_output_table'), 'output', getOutputs(), syncIO);
         if (id === 'set_tab_atc') renderMagazineTable(ov.querySelector('#atc_magazine'), _ddcsSettings.atc, atcOnChange);
@@ -2328,10 +2332,10 @@ export function openSettings(nav) {
     window.ddcsTrack?.('feature', 'settings');
 }
 
-/** Open Settings at the Machine tab and scroll to the homing section (the wizard's "⚙ Homing setup" link). */
+/** Open Settings at the Controller → Homing tab (the wizard's "⚙ Homing setup" link). */
 export function openHomingSetup() {
     if (window.showApp) { try { window.showApp('settings'); } catch (_) { /* noop */ } }
-    openSettings({ group: 'hardware', panel: 'set_tab_machine' });
+    openSettings({ group: 'controller', panel: 'set_tab_homing' });
     setTimeout(() => { const s = document.getElementById('set_homing_section'); if (s && s.scrollIntoView) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
 }
 /** Open Settings at the ATC tab — the in-wizard "⚙ ATC Settings…" link (magazine, drawbar I/O, length-probe params).
