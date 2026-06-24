@@ -62,6 +62,68 @@ export const DICT = {
         waitSpindle: Bool(), dustCover: Bool(), confirm: Bool(), magazine: Struct(),
     },
     homing: { axes: Struct(), config: Struct(), machine: Struct(), softLimits: Bool() },
+    pocket: {
+        shape: Enum(), originX: N('X'), originY: N('Y'), dia: N(), sides: N(), w: N(), h: N(),
+        toolDia: N(), stepoverPct: N(), wallOffset: N(), strategy: Enum(), depth: N('Z'), stepdown: N(),
+        feed: N('F'), plunge: N(), clearance: N(), wcs: Enum(), ...PLACE,
+    },
+    contour: {
+        shape: Enum(), originX: N('X'), originY: N('Y'), dia: N(), sides: N(), w: N(), h: N(),
+        side: Enum(), toolDia: N(), depth: N('Z'), stepdown: N(), feed: N('F'), plunge: N(), clearance: N(),
+        wcs: Enum(), ...PLACE,
+    },
+    wcs: {
+        sys: Enum('wcs'), axisX: Bool(), axisY: Bool(), axisZ: Bool(), sync: Bool(), slave: Enum(),
+    },
+    comm: {
+        type: Enum(), slot1: Str(), slot2: Str(), slot3: Str(), slot4: Str(), msg: Str(), popupMode: Enum(),
+        statusColor: N(), statusMode: Enum(), statusDwell: N(), id: Str('destVar'), dest: Str('copyTo'),
+        val: N(null, 'value'), cycle: N(),
+    },
+    middle: {
+        featureType: Enum(), approach: Enum(), axis: Enum(), dir1: Enum(), dir2: Enum(), twoAxis: Bool(),
+        findBoth: Bool(), circular: Bool(), wcs: Enum(), dist: N(null, 'maxDist'), retract: N(), safeZ: N(),
+        clearOver: N(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), syncA: Bool(), slave: Enum(),
+    },
+    corner: {
+        corner: Enum(), probeSeq: Enum(), probeZ: Bool(), probeZFirst: Bool(), wcs: Enum(), dist: N(null, 'maxDist'),
+        retract: N(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), level: N(null, 'triggerLevel'),
+        safeZ: N(), travelDist: N(), scanDepth: N(), radius: N(), sources: Struct(), syncA: Bool(), slave: Enum(),
+    },
+    alignment: {
+        checkAxis: Enum(), probeDir: Enum(), safeZ: N(), dist: N(null, 'maxDist'), retract: N(),
+        f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), level: N(null, 'triggerLevel'),
+        tolerance: N(), sources: Struct(),
+    },
+    atc_length: {
+        blockHeight: N(), safeZ: N(), maxDist: N(), retract: N(), f_fast: N('F', 'feedFast'),
+        f_slow: N('F', 'feedSlow'), port: N(), level: N(null, 'triggerLevel'), sources: Struct(),
+    },
+    atc_check: {
+        blockHeight: N(), safeZ: N(), maxDist: N(), retract: N(), f_fast: N('F', 'feedFast'),
+        f_slow: N('F', 'feedSlow'), port: N(), level: N(null, 'triggerLevel'), tolerance: N(), sources: Struct(),
+    },
+    atc_warmup: { rpm1: N('S'), time1: N(), rpm2: N('S'), time2: N() },
+    atc_test: {
+        mode: Enum(), cycles: N(), dwellMs: N(), magazine: Struct(), first: N(), count: N(), zClear: N('Z'), descend: Bool(),
+    },
+    atc_table: { tools: Struct(), magazine: Struct(), includeLengths: Bool(), includePockets: Bool() },
+    rotary_clock: {
+        action: Enum(), reference: Enum(), wcs: Enum(), level: N(null, 'triggerLevel'), span: N(),
+        dist: N(null, 'maxDist'), retract: N(), safeZ: N(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'),
+        port: N(), sources: Struct(),
+    },
+    rotary_center: {
+        method: Enum(), approach: Enum(), datum: Enum(), wcs: Enum(), level: N(null, 'triggerLevel'), diameter: N(),
+        dist: N(null, 'maxDist'), retract: N(), safeZ: N(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'),
+        port: N(), sources: Struct(),
+    },
+    text: {
+        text: Str(), rpm: N('S'), dir: Enum(), height: N(), spacing: N(), align: Enum(), x: N('X'), y: N('Y'),
+        strokeWidth: N(), toolDia: N(), stepoverPct: N(), depth: N('Z'), stepdown: N(), feed: N('F'), plunge: N(),
+        clearance: N(), ...PLACE,
+    },
+    // circular: delegates to middleStack (circularWizard.js → middleStack(toMiddleParams(params))) — no own params; see `middle`.
 };
 
 // ── marker codec (op record <-> ( @DDCS:v {…} ) comment), mapping internal keys <-> canon names ──
