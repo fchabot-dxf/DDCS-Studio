@@ -482,6 +482,24 @@ does not imply every axis end is bounded. **Phase-2 envelope rule: treat ±9999 
 (`setting #155→macro #655`, `#161/#163/#168 → #661/#663/#668`). Real (non-sentinel) travel values, if any,
 live on the *other* ends (e.g. profile-diff candidates `#162`/`#166`) — not read here. `[CONFIRMED]`
 
+## V8 RESULT — dual-Y gantry: A column mirrors Y in the WCS table `[CONFIRMED on machine 2026-06-23, fw 2025-06-19-00]`
+Ran `verify/V8_read_gantry.nc` (read-only). G54 **`#806 Yoff = −665.944`** and **`#808 Aoff = −665.944`** — equal.
+⇒ the **A axis tracks Y through the WCS table** (base+3 mirrors base+1), consistent with `sysstart`'s `#883=#881`
+gantry sync. **Sim can ignore A/B and treat the machine as X/Y/Z.** (−665.944 also matches the back-computed
+G54 Y offset from earlier screenshots — cross-checks the `805+(wcs−1)*5` addressing.) `[CONFIRMED]`
+
+## V6 RESULT (write half) — tool-length offsets are register-writable `[CONFIRMED on machine 2026-06-23, fw 2025-06-19-00]`
+Ran `verify/V6_set.nc` (`#900 = 12.5`) and read it on the panel: **Param `#400` "H01 tool length offset" showed
+12.5**. ⇒ **macro `#900` = param `#400` = H01 tool-length offset** (the `+500` rule, same family confirmed in V5).
+Schema cross-check: `cfg_utf8` `#400 -s1"H01 tool length offset" -s3"G43\G44 Hxx."`; **H01–H16 = params
+`#400-#415` = macro `#900-#915`.** ⇒ **the tool-length sim layer can read AND write H-offsets directly by
+register** — no `G43` needed for the write; restored to 0 via `V6_restore.nc`. `[CONFIRMED]`
+- ⚠️ **Don't confuse with the ATC tool table** (`#1430+`, camsetting / `toolTable:1430`) — that's the
+  pocket/magazine length table; `#900-#915` is the **G43/G44 H-code** offset table. Different address space.
+- `[TO TEST — needs motion]` **Is `G43 H1` actually HONORED** (applies the offset to subsequent Z), or is it
+  ignored so depths must come from direct register math (house style)? The *write* works; whether `G43`
+  *applies* it on a move is the deferred motion half of V6.
+
 ### CORE_TRUTH (skill) vs factory-firmware reality — discrepancies the linter exposed
 - **G10:** skill says "G10 is broken." **V1 (above) CONFIRMS broken + dangerous on this fw** (`G10 L20 P6 X25`
   emitted motion, wrote no offset). Factory `key-5.nc`/`key-6.nc`/`3D PROBE G55.nc` *use* `G10 L20 P2` — so
