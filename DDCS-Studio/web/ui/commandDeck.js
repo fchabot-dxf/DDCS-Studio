@@ -656,6 +656,8 @@ export class CommandDeck {
             // Export now live in the header chevron quick-menu (ui/headerPost.js).
             rightTarget.innerHTML = `
                 <div style="display:flex; gap:6px; align-items:center;">
+                    <button id="btn-undo" class="toolbar-btn icon-only" onclick="window.ddcsUndo && window.ddcsUndo()" title="Undo (program history — inserts + block / editor edits)" aria-label="Undo" disabled>↶</button>
+                    <button id="btn-redo" class="toolbar-btn icon-only" onclick="window.ddcsRedo && window.ddcsRedo()" title="Redo (program history)" aria-label="Redo" disabled>↷</button>
                     <button class="toolbar-btn icon-only" onclick="copyCode && copyCode()" title="Copy editor to clipboard" aria-label="Copy"><span class="btn-ico">${HEADER_ICONS.copy}</span></button>
                     <button class="toolbar-btn icon-only" onclick="clearCode && clearCode()" title="Clear the editor" aria-label="Clear"><span class="btn-ico">${HEADER_ICONS.clear}</span></button>
                 </div>
