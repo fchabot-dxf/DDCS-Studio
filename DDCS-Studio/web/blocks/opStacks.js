@@ -498,6 +498,18 @@ export function replaceOp(opId, params) {
     return true;
 }
 
+/** True if a top-level op's blocks were hand-edited away from what its form params would rebuild — so a
+ *  form-driven Insert/replace would clobber them. Compares the live children to a fresh build, ids stripped. */
+export function isOpBlockEdited(opId) {
+    const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+    const op = cur.find((b) => b && b.type === 'op' && b.id === opId);
+    if (!op || !op.opType || !BUILDERS[op.opType]) return false;
+    const noId = (b) => { const o = {}; for (const k in b) { if (k === 'id') continue; o[k] = (k === 'children' && Array.isArray(b[k])) ? b[k].map(noId) : b[k]; } return o; };
+    const sig = (a) => JSON.stringify((a || []).map(noId));
+    const bare = BUILDERS[op.opType](op.params).filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
+    return sig(op.children) !== sig(bare);
+}
+
 /** Remove a top-level op from the program (right-click → Delete). */
 export function deleteOp(opId) {
     const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];

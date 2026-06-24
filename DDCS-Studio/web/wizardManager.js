@@ -350,7 +350,14 @@ export class WizardManager {
                 // EDIT: rebuild THIS op from the new params (single source of truth) and replace it in place.
                 const { getLastOp } = await import('./blocks/opRecord.js');
                 const op = getLastOp();
-                committed = op ? ops.replaceOp(this.editingOpId, op.params) : false;
+                // Safety net: if this op was hand-edited in Blocks, a form rebuild would clobber those edits — ask.
+                if (ops.isOpBlockEdited && ops.isOpBlockEdited(this.editingOpId)) {
+                    const { showBlockEditNotice } = await import('./ui/blockEditNotice.js');
+                    const choice = await showBlockEditNotice(op?.label || op?.type || this._activeType || 'op');
+                    if (choice === 'cancel') return;                         // back to the form, nothing inserted
+                    if (choice === 'merge') { this.close(false); playClick(); return; }   // keep the block-edited op as-is
+                }
+                committed = op ? ops.replaceOp(this.editingOpId, op.params) : false;   // 'replace' / no edit → rebuild from form
             } else {
                 committed = ops.commitActiveOp() || (!!code && ops.commitDecodedCode(code));   // builder op → high-level; else decode the generated code → blocks
             }
