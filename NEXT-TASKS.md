@@ -43,6 +43,14 @@ then generalise that same snapshot into document-level autosave (serializeProjec
 
 ## To build
 
+- **System Hooks UI (Macros App)**: The Macros App was just reorganized into a dialect-dynamic, physical `SYSDISK/` tree layout, granulating the abstract "System Hooks" into actual target files (`sysstart.nc`, `T.nc`, `error.nc`, `probe.nc`).  *(Done this session)*
+  - **`sysstart.nc` (Boot Hook)**: Relocate the Homing wizard UI from the Global Settings panel into the Macros `sysstart.nc` builder. Add an "Additional Boot G-code" raw text editor beneath the checkboxes so users can append `G54` restores or I/O pins after homing.
+  - **Remaining Hook Builders**: Design and build dedicated UI configurators for **`T.nc` (Tool Change)**, **`error.nc` (Alarm Hook)**, and **`probe.nc` (Native Probing)**.
+  - **Global Sync & Deploy (Gateway)**: Add a global "Load from Controller" and "Deploy to Controller" mechanism to the Macros app, leveraging the existing Gateway SMB connection. 
+    - **Selective Syncing:** When triggered, present a checklist of available files (e.g., `[x] slib-m.nc`, `[ ] sysstart.nc`, `[x] key-N.nc`). This allows the user to surgically choose which files to pull (parse into the UI) or push (overwrite on the controller) without clobbering files they intentionally want to isolate.
+    - **Conflict Resolution:** For files being pulled, implement a "Merge, Replace, or Cancel" safety notice if the imported data conflicts with macros already authored in Studio.
+    - *Note: Retain the local per-file "Push" buttons in each panel for rapid, single-file testing.*
+
 - **Save-states / Undo-Redo module (ACTIVE BUILD).** A program-level history with block-edit awareness:
   - **Snapshot granularity** — on **Insert** (coarse, per op commit/replace) **+ on each block edit** (granular;
     block edits commit immediately). **NOT on form edits** (verified in `wizardManager.js`: field listeners →

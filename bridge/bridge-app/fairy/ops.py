@@ -103,7 +103,7 @@ class Ops:
     # boot, so a merged M-code needs a REBOOT to take effect (the UI says so); key-N.nc is a button program.
     def _sysfile_path(self, name):
         base = self._sysdisk_path()
-        if not base or not name or not re.match(r"^(key-[1-7]\.nc|slib-m\.nc)$", name):
+        if not base or not name or not re.match(r"^(key-[1-7]\.nc|slib-m\.nc|T\.nc|error\.nc|probe\.nc|mulprobe\.nc)$", name):
             return None
         return os.path.join(base, name)
 
@@ -138,6 +138,25 @@ class Ops:
             with open(p, "a" if mode == "append" else "w", encoding="utf-8", newline="") as f:
                 f.write(content)
             return {"ok": True, "name": name, "backup": (name + ".bak") if backed else ""}
+        except OSError as e:
+            return {"ok": False, "error": str(e)}
+
+    def delete_sysfile(self, name):
+        """Delete a whitelisted SYSDISK macro file (standalone hooks/buttons)."""
+        if name == "slib-m.nc":
+            return {"ok": False, "error": "slib-m.nc cannot be deleted, only overwritten"}
+        if not self.controller_reachable():
+            return {"ok": False, "error": "controller unreachable"}
+        p = self._sysfile_path(name)
+        if not p:
+            return {"ok": False, "error": f"name not allowed: {name!r}"}
+        try:
+            if os.path.exists(p):
+                os.remove(p)
+            # Remove backup if exists too
+            if os.path.exists(p + ".bak"):
+                os.remove(p + ".bak")
+            return {"ok": True, "name": name}
         except OSError as e:
             return {"ok": False, "error": str(e)}
 

@@ -184,6 +184,9 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path == "/api/sysfile":
             b = self._read_body()
             return self._send_json(self.ops.write_sysfile(b.get("name", ""), b.get("content", ""), b.get("mode", "write")))
+        if self.path == "/api/sysfiles/delete":
+            b = self._read_body()
+            return self._send_json(self.ops.delete_sysfile(b.get("name", "")))
         return self._send_json({"error": "not found"}, 404)
 
     # -- static console -------------------------------------------------------

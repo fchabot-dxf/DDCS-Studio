@@ -57,6 +57,7 @@ export function makeClient(opts = {}) {
     setConfig: (updates) => postJSON("/api/config", updates),
     readSysfile: (name) => call("/api/sysfile?name=" + encodeURIComponent(name)),                  // SYSDISK macro file (key-N.nc / slib-m.nc)
     writeSysfile: (name, content, mode = "write") => postJSON("/api/sysfile", { name, content, mode }),   // backed-up write/append
+    deleteSysfile: (name) => postJSON("/api/sysfiles/delete", { name }),
   };
 }
 

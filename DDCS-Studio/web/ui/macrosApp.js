@@ -5,6 +5,8 @@
  * distributable kept in localStorage. Mounted lazily into #macros-app by showApp('macros').
  */
 import { getSettings, saveSettings } from './settingsPanel.js';
+import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { FACTORY_MACROS } from '../data/factoryMacros.js';
 import { makeClient } from '../shared/js/client.js';
 import * as camPack from '../data/camPack.js';
 import { bmpDataUrl } from '../data/bmp.js';
@@ -16,20 +18,33 @@ import { autoIconBmp } from '../data/autoIcon.js';
 import { auditMacroVars } from '../data/varMap.js';
 import { makeZip, downloadBytes } from '../data/zip.js';
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';
+import { homingStack } from '../wizards/homingWizard.js';
+import { emitMapped } from '../blocks/blockModel.js';
 
 let _wired = false;
 
+// --- Homing & Sysstart Constants ---
+const HOMING_AX_IDX = { x: 0, y: 1, z: 2, a: 3, b: 4 };
+const HOMING_AX_LABEL = { x: 'X', y: 'Y', z: 'Z', a: 'A', b: 'B' };
+const HOMING_METHODS = [
+    { v: 'native', label: 'Native (M98 P501)' },
+    { v: 'setzero', label: 'Set zero (no motion)' },
+    { v: 'seek', label: 'Switch seek (G31)' }
+];
+const FOUNDATIONAL_M_CODES = [3, 4, 5, 6, 8, 9, 30, 50];
+
 export function initMacrosApp() {
+    const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
     const root = document.getElementById('macros-app');
     if (!root || _wired) return; _wired = true;
 
     root.innerHTML = `
         <style>
-            #macros-app { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
+            #macros-app { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; position: relative; }
             #macros-app .settings-head { padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--panel); flex: 0 0 auto; display: flex; align-items: center; }
             /* .settings-main-tab styling is shared/global in styles.css */
             #macros-app .settings-body { display: flex; flex-direction: row; flex: 1; min-height: 0; overflow: hidden; }
-            #macros-app .settings-sidebar { width: 160px; flex: 0 0 160px; display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; }
+            #macros-app .settings-sidebar { width: 180px; flex: 0 0 180px; display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; }
             #macros-app .settings-sidebar .settings-tab { display: block; width: 100%; text-align: left; padding: 7px 12px; font-size: 12.5px; font-weight: 600; border-radius: var(--radius, 4px); border: none; background: transparent; color: var(--text-dim); cursor: pointer; transition: 120ms; }
             #macros-app .settings-sidebar .settings-tab:hover { background: var(--bg); color: var(--text-main); }
             #macros-app .settings-sidebar .settings-tab.active { background: var(--bg); color: var(--text-main); border-left: 3px solid var(--accent); padding-left: 9px; }
@@ -84,6 +99,11 @@ export function initMacrosApp() {
                         </button>
                     </details>
                 </details>
+                <div style="flex: 1;"></div>
+                <div style="padding: 12px 4px 4px; border-top: 1px solid var(--border); margin-top: 16px;">
+                    <button id="mac_btn_global_pull" class="toolbar-btn settings-io" style="width:100%; margin-bottom:8px; display:flex; justify-content:center; align-items:center; background: var(--bg); color: var(--text-main); border: 1px solid var(--border);">⬇ Load from controller</button>
+                    <button id="mac_btn_global_push" class="toolbar-btn settings-io" style="width:100%; display:flex; justify-content:center; align-items:center;">⬆ Deploy to controller</button>
+                </div>
             </div>
             <div class="settings-content">
                 <div id="macros_panel_mcode">
@@ -101,19 +121,60 @@ export function initMacrosApp() {
                     <div class="settings-section">
                         <div class="settings-section-title" id="mac_title_sysstart">SYSSTART.NC (BOOT HOOK)</div>
                         <div class="settings-hint" id="mac_desc_sysstart">Executes automatically when the controller boots up. Used to set default machine states, trigger auto-homing, or restore WCS.</div>
-                        <div id="sysstart_list"><div class="settings-hint" style="margin-top: 20px; font-style: italic;">(Homing UI coming soon)</div></div>
+                        <div id="sysstart_list">
+                            <div class="settings-hint" style="margin-top: 12px; font-weight: 600;">1. AUTO-HOME SEQUENCE</div>
+                            <div class="settings-hint">The numbered list sets the home <b>sequence</b> (▲▼ to reorder). <b>Native</b> runs the controller's built-in home (safest). For a dual-axis gantry, set the master's <b>slave axis follows</b> so homing the master syncs the slave.</div>
+                            <div id="set_homing_tag" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
+                            <label class="settings-check" style="margin-bottom:6px;"><input type="checkbox" id="set_homing_simul"> Simultaneous (emit calls back-to-back, still in this order)</label>
+                            <div id="set_homing_axes"></div>
+                            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;">
+                                <button class="toolbar-btn settings-io" id="set_homing_reset" type="button">↺ Safe default (Z → X → Y)</button>
+                            </div>
+                            
+                            <div class="settings-hint" style="margin-top: 20px; font-weight: 600;">2. ADDITIONAL BOOT G-CODE</div>
+                            <div class="settings-hint">Runs immediately after homing finishes. Use this for <code>G54</code> restores, variable setup, or pin toggles.</div>
+                            <textarea id="sysstart_custom_gcode" spellcheck="false" placeholder="(e.g. G54&#10;#100 = 1)" style="width:100%; height:80px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box; background: var(--bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 8px;"></textarea>
+                            
+                            <div class="settings-row" style="margin-top:12px;">
+                                <button class="toolbar-btn settings-io" id="sysstart_gen">⬇ Generate sysstart.nc</button>
+                                <button class="toolbar-btn settings-io" id="sysstart_push">⬆ Push to controller</button>
+                            </div>
+                            <textarea id="sysstart_out" readonly spellcheck="false" style="display:none; width:100%; height:160px; margin-top:8px; font:12px/1.45 monospace; background:#1a1a1a; color:#d8d8d8; border:1px solid #888; border-radius:4px; padding:8px; box-sizing:border-box;"></textarea>
+                        </div>
                     </div>
                 </div>
                 <div id="macros_panel_tnc" style="display:none;">
                     <div class="settings-section">
-                        <div class="settings-section-title">T.NC (TOOL CHANGE)</div>
-                        <div class="settings-hint">Executes when an M6 tool change is called.</div>
+                        <div class="settings-section-title">T.NC (TOOL CHANGE HOOK)</div>
+                        <div class="settings-hint">Executes when an M6 tool change is called. <b>Use with caution!</b> A bad tool change macro can cause a crash.</div>
+                        <div style="margin-top:12px; position:relative;">
+                            <textarea id="mac_tnc_body" class="mcode-body" spellcheck="false" disabled style="width:100%; height:200px; font:13px/1.45 monospace; background:#1a1a1a; color:#d8d8d8; border:1px solid #888; border-radius:4px; padding:10px; box-sizing:border-box;" placeholder="Enter T.nc G-code here..."></textarea>
+                            <div style="display:flex; justify-content:space-between; margin-top:8px;">
+                                <div id="mac_tnc_status" style="font-size:12px; font-weight:600; color:var(--text-dim); display:flex; align-items:center; gap:6px;">
+                                    <span style="color:#d4982c;">🔒 System hook</span> — locked to prevent accidental edits
+                                </div>
+                                <div style="display:flex; gap:8px;">
+                                    <button class="toolbar-btn settings-io" id="mac_tnc_unlock" style="color:#d4982c;">🔓 Unlock to Edit</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div id="macros_panel_error" style="display:none;">
                     <div class="settings-section">
                         <div class="settings-section-title">ERROR.NC (ALARM HOOK)</div>
-                        <div class="settings-hint">Executes when the controller throws a hard alarm.</div>
+                        <div class="settings-hint">Executes when the controller throws a hard alarm. Use this to safely stop external peripherals (like disabling a plasma torch or dropping a vacuum table) before the machine halts.</div>
+                        <div style="margin-top:12px; position:relative;">
+                            <textarea id="mac_error_body" class="mcode-body" spellcheck="false" disabled style="width:100%; height:120px; font:13px/1.45 monospace; background:#1a1a1a; color:#d8d8d8; border:1px solid #888; border-radius:4px; padding:10px; box-sizing:border-box;" placeholder="Enter error.nc G-code here..."></textarea>
+                            <div style="display:flex; justify-content:space-between; margin-top:8px;">
+                                <div id="mac_error_status" style="font-size:12px; font-weight:600; color:var(--text-dim); display:flex; align-items:center; gap:6px;">
+                                    <span style="color:#d4982c;">🔒 System hook</span> — locked to prevent accidental edits
+                                </div>
+                                <div style="display:flex; gap:8px;">
+                                    <button class="toolbar-btn settings-io" id="mac_error_unlock" style="color:#d4982c;">🔓 Unlock to Edit</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div id="macros_panel_probe" style="display:none;">
@@ -139,7 +200,30 @@ export function initMacrosApp() {
                     </div>
                 </div>
             </div>
-        </div>`;
+        </div>
+        <div id="macros_sync_modal" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:100; align-items:center; justify-content:center;">
+            <div style="background:var(--panel); border:1px solid var(--border); border-radius:8px; width:450px; padding:20px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+                <div style="font-weight:700; margin-bottom:12px; font-size:16px;" id="macros_sync_title">Sync Macros</div>
+                <div id="macros_sync_body" style="font-size:12.5px; color:var(--text-dim); margin-bottom:16px; line-height: 1.4;">
+                    Checking connection to controller...
+                </div>
+                <div id="macros_sync_list" style="margin-bottom:16px; max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:4px; padding:8px; display:none; flex-direction:column; gap:4px;">
+                </div>
+                <div id="macros_sync_conflict_ui" style="display:none; margin-bottom:16px; padding:12px; border:1px solid #c2410c; background:rgba(194,65,12,0.1); border-radius:4px;">
+                    <div style="font-weight:600; color:#fdba74; margin-bottom:8px;">⚠️ Conflict Detected</div>
+                    <div style="font-size:12px; color:var(--text-dim); margin-bottom:12px;">Some files from the controller contain M-codes or K-buttons that you have also edited locally. How would you like to handle this?</div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;"><input type="radio" name="sync_conflict_strategy" value="merge" checked> <b>Merge:</b> Keep local edits, append only new items from controller.</label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;"><input type="radio" name="sync_conflict_strategy" value="replace"> <b>Replace:</b> Wipe local edits, strictly mirror the controller.</label>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button id="macros_sync_cancel" class="toolbar-btn" style="background:transparent; border:1px solid var(--border); color:var(--text-main);">Cancel</button>
+                    <button id="macros_sync_confirm" class="toolbar-btn settings-io" style="display:none;">Confirm</button>
+                </div>
+            </div>
+        </div>
+    `;
 
     const q = (id) => root.querySelector('#' + id);
     // Dialect capabilities
@@ -168,6 +252,7 @@ export function initMacrosApp() {
         PANEL_IDS.forEach((p) => { const el = q(p); if (el) el.style.display = (p === id) ? '' : 'none'; });
         mMainTabs.forEach((b) => b.classList.toggle('active', b.dataset.target === id));
     };
+    window.showMacrosPanel = mShowPanel;
     mMainTabs.forEach((t) => t.addEventListener('click', () => mShowPanel(t.dataset.target)));
     mShowPanel('macros_panel_mcode');
 
@@ -210,15 +295,28 @@ export function initMacrosApp() {
         const host = q('mcodes_list'); if (!host) return;
         const rows = macrosArr().map((m, i) => ({ m, i })).filter((x) => (x.m.trigger || {}).kind === 'mcode');
         if (!rows.length) { host.innerHTML = '<div class="settings-hint">No custom M-codes yet — “＋ Add from editor” or “＋ Add blank”.</div>'; return; }
-        host.innerHTML = rows.map(({ m, i }) => `<div class="macro-card" data-i="${i}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
-            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                <label style="font-size:11px; color:var(--text-dim);">M<input type="number" class="mc-f" data-f="num" value="${(m.trigger || {}).code != null ? m.trigger.code : 15}" min="0" max="99" style="width:52px; margin-left:2px;"></label>
-                <input class="mc-f" data-f="name" value="${String(m.name || '').replace(/"/g, '&quot;')}" placeholder="Name" style="flex:1; min-width:120px;">
-                <span class="mc-o" style="font-size:10px; color:var(--text-dim);">→ O${10000 + (parseInt((m.trigger || {}).code, 10) || 0)}</span>
-            </div>
-            <textarea class="mc-f" data-f="body" spellcheck="false" placeholder="macro body (G-code)" style="width:100%; height:110px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;">${String(m.body || '').replace(/</g, '&lt;')}</textarea>
-            <div class="settings-row" style="margin-top:6px;"><button class="toolbar-btn settings-io" data-act="gen">⬇ Generate</button><button class="toolbar-btn settings-io" data-act="push">⬆ Push to controller</button><span style="flex:1"></span><button class="op-btn" data-act="del" title="Delete">✕</button></div>
-        </div>`).join('');
+        host.innerHTML = rows.map(({ m, i }) => {
+            const code = (m.trigger || {}).code != null ? parseInt(m.trigger.code, 10) : 15;
+            const isSys = FOUNDATIONAL_M_CODES.includes(code);
+            const locked = isSys && !m.unlocked;
+            const dis = locked ? 'disabled' : '';
+            return `<div class="macro-card" data-i="${i}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <label style="font-size:11px; color:var(--text-dim);">M<input type="number" class="mc-f" data-f="num" value="${code}" min="0" max="99" style="width:52px; margin-left:2px;" ${dis}></label>
+                    <input class="mc-f" data-f="name" value="${String(m.name || '').replace(/"/g, '&quot;')}" placeholder="Name" style="flex:1; min-width:120px;" ${dis}>
+                    <span class="mc-o" style="font-size:10px; color:var(--text-dim);">→ O${10000 + code}</span>
+                </div>
+                <textarea class="mc-f" data-f="body" spellcheck="false" placeholder="macro body (G-code)" style="width:100%; height:110px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box;" ${dis}>${String(m.body || '').replace(/</g, '&lt;')}</textarea>
+                <div class="settings-row" style="margin-top:6px;">
+                    <button class="toolbar-btn settings-io" data-act="gen">⬇ Generate</button>
+                    <button class="toolbar-btn settings-io" data-act="push">⬆ Push to controller</button>
+                    ${isSys ? `<button class="toolbar-btn settings-io" data-act="restore">↺ Revert to Factory</button>` : ''}
+                    ${locked ? `<button class="toolbar-btn settings-io" data-act="unlock" style="color:#d4982c;">🔓 Unlock to Edit</button>` : ''}
+                    <span style="flex:1"></span>
+                    ${!isSys ? `<button class="op-btn" data-act="del" title="Delete">✕</button>` : ''}
+                </div>
+            </div>`;
+        }).join('');
     }
     function renderKbuttons() {
         const host = q('kbuttons_list'); if (!host) return;
@@ -249,7 +347,38 @@ export function initMacrosApp() {
         });
         mch.addEventListener('click', (e) => {
             const c = e.target.closest('.macro-card'); if (!c) return; const i = +c.dataset.i; const a = e.target.dataset.act;
-            if (a === 'del') { macrosArr().splice(i, 1); saveSettings(); renderMcodes(); }
+            const m = macrosArr()[i];
+            if (a === 'del') { 
+                const code = (m.trigger || {}).code != null ? parseInt(m.trigger.code, 10) : null;
+                if (FOUNDATIONAL_M_CODES.includes(code)) {
+                    if (!confirm(`M${code} is a foundational system M-code. Deleting it may break basic controller functionality (like spindle or coolant).\n\nAre you absolutely sure you want to delete it?`)) return;
+                }
+                macrosArr().splice(i, 1); 
+                saveSettings(); 
+                renderMcodes(); 
+            }
+            else if (a === 'unlock') {
+                m.unlocked = true;
+                saveSettings();
+                renderMcodes();
+            }
+            else if (a === 'restore') {
+                const code = (m.trigger || {}).code != null ? parseInt(m.trigger.code, 10) : null;
+                if (!confirm(`This will overwrite your current M${code} macro with the factory default for your active controller.\n\nAre you sure you want to revert to the original code?`)) return;
+                
+                const profileId = (getActiveProfile() || {}).id || 'ddcs-expert-m350';
+                const factory = FACTORY_MACROS[profileId] || [];
+                const pristine = factory.find(fm => (fm.trigger || {}).kind === 'mcode' && fm.trigger.code === code);
+                
+                if (pristine) {
+                    m.body = pristine.body;
+                    m.unlocked = false; // re-lock after restoring
+                    saveSettings();
+                    renderMcodes();
+                } else {
+                    alert('Could not find the factory default code for this macro.');
+                }
+            }
             else if (a === 'gen') insertToEditor(macroFileText(macrosArr()[i]));
             else if (a === 'push') pushMcode(macrosArr()[i]);
         });
@@ -269,8 +398,530 @@ export function initMacrosApp() {
     if (_mcAddEd) _mcAddEd.addEventListener('click', () => { macrosArr().push({ name: 'New M-code', trigger: { kind: 'mcode', code: 15 }, body: editorText().trim() }); saveSettings(); renderMcodes(); });
     const _mcAddBlank = q('mcodes_add_blank');
     if (_mcAddBlank) _mcAddBlank.addEventListener('click', () => { macrosArr().push({ name: 'New M-code', trigger: { kind: 'mcode', code: 15 }, body: '' }); saveSettings(); renderMcodes(); });
-    renderMcodes(); renderKbuttons();
+    
+    function renderSystemHooks() {
+        const hooks = getSettings().systemHooks || {};
+        const T = hooks.T || '';
+        const T_unl = !!hooks.T_unlocked;
+        const err = hooks.error || '';
+        const err_unl = !!hooks.error_unlocked;
+        
+        const tb = q('mac_tnc_body');
+        if (tb) {
+            tb.value = T;
+            tb.disabled = !T_unl;
+            tb.style.borderColor = T_unl ? 'var(--accent)' : '#888';
+            q('mac_tnc_unlock').style.display = T_unl ? 'none' : '';
+            q('mac_tnc_status').innerHTML = T_unl ? '<span style="color:var(--accent);">🔓 Unlocked</span> — edits will be deployed' : '<span style="color:#d4982c;">🔒 System hook</span> — locked to prevent accidental edits';
+        }
+        
+        const eb = q('mac_error_body');
+        if (eb) {
+            eb.value = err;
+            eb.disabled = !err_unl;
+            eb.style.borderColor = err_unl ? 'var(--accent)' : '#888';
+            q('mac_error_unlock').style.display = err_unl ? 'none' : '';
+            q('mac_error_status').innerHTML = err_unl ? '<span style="color:var(--accent);">🔓 Unlocked</span> — edits will be deployed' : '<span style="color:#d4982c;">🔒 System hook</span> — locked to prevent accidental edits';
+        }
+    }
 
+    if (q('mac_tnc_body')) q('mac_tnc_body').addEventListener('input', (e) => {
+        getSettings().systemHooks = getSettings().systemHooks || {};
+        getSettings().systemHooks.T = e.target.value;
+        saveSettings();
+    });
+    if (q('mac_error_body')) q('mac_error_body').addEventListener('input', (e) => {
+        getSettings().systemHooks = getSettings().systemHooks || {};
+        getSettings().systemHooks.error = e.target.value;
+        saveSettings();
+    });
+    
+    if (q('mac_tnc_unlock')) q('mac_tnc_unlock').addEventListener('click', () => {
+        if (!confirm('T.nc executes on every tool change. Errors here can cause crashes.\n\nAre you sure you want to unlock it?')) return;
+        getSettings().systemHooks = getSettings().systemHooks || {};
+        getSettings().systemHooks.T_unlocked = true;
+        saveSettings();
+        renderSystemHooks();
+    });
+    if (q('mac_error_unlock')) q('mac_error_unlock').addEventListener('click', () => {
+        getSettings().systemHooks = getSettings().systemHooks || {};
+        getSettings().systemHooks.error_unlocked = true;
+        saveSettings();
+        renderSystemHooks();
+    });
+
+    // Render the initial states
+    renderMcodes();
+    renderKbuttons();
+    renderHomingGui();
+    renderSystemHooks();
+
+    if (q('sysstart_custom_gcode')) {
+        q('sysstart_custom_gcode').value = getSettings().sysstartCustomGcode || '';
+        q('sysstart_custom_gcode').addEventListener('change', (e) => {
+            getSettings().sysstartCustomGcode = e.target.value;
+            saveSettings();
+        });
+    }
+
+    // --- Global Sync Logic ---
+    const SYNC_FILES = ['slib-m.nc', 'sysstart.nc', 'advstart.nc', 'T.nc', 'error.nc', 'probe.nc', 'key-1.nc', 'key-2.nc', 'key-3.nc', 'key-4.nc', 'key-5.nc', 'key-6.nc', 'key-7.nc'];
+    
+    let currentSyncFiles = {};
+    let syncMode = 'pull';
+
+    const parseMcodeLibrary = (text) => {
+        const found = [];
+        const regex = /O100(\d{2})[ \t]*(?:\(\s*([^)\n]*?)\s*\))?\r?\n([\s\S]*?)(?=O100\d{2}|$)/g;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            let body = match[3].trim();
+            body = body.replace(/M99\s*$/, '').trim(); // strip trailing M99
+            let name = match[2] ? match[2].replace(/— M\d+/, '').trim() : '';
+            found.push({
+                name: name || 'Extracted M' + parseInt(match[1], 10),
+                trigger: { kind: 'mcode', code: parseInt(match[1], 10) },
+                body: body
+            });
+        }
+        return found;
+    };
+
+    const performPull = async (strategy) => {
+        const checked = [...q('macros_sync_list').querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value);
+        if (!checked.length) return;
+        
+        let mcodeUpdates = [];
+        let kbtnUpdates = [];
+        
+        for (const file of checked) {
+            const content = currentSyncFiles[file];
+            if (!content) continue;
+            
+            if (file === 'slib-m.nc') {
+                mcodeUpdates = parseMcodeLibrary(content);
+            } else if (file.startsWith('key-')) {
+                const num = parseInt(file.replace(/\D/g, ''), 10);
+                let body = content.trim();
+                body = body.replace(/M30\s*$/, '').trim(); // strip trailing M30
+                // Try to extract name from first comment line
+                let name = `K${num}`;
+                const lines = body.split('\n');
+                if (lines[0].startsWith('(') && lines[0].endsWith(')')) {
+                    const cmt = lines.shift().replace(/^\(|\)$/g, '').trim();
+                    if (cmt.includes('—')) name = cmt.split('—').pop().trim();
+                    body = lines.join('\n').trim();
+                }
+                kbtnUpdates.push({
+                    name: name,
+                    trigger: { kind: 'kbutton', key: num },
+                    body: body
+                });
+            } else if (file === 'sysstart.nc' || file === 'advstart.nc') {
+                // Since sysstart generated is heavily structured, we can't easily parse it back to the homing form UI.
+                // We'll just append it to the custom G-code area if they want to pull it.
+                if (strategy === 'replace') {
+                    getSettings().sysstartCustomGcode = content;
+                } else if (strategy === 'merge') {
+                    getSettings().sysstartCustomGcode = (getSettings().sysstartCustomGcode || '') + '\n\n' + content;
+                }
+            }
+        }
+        
+        const existing = macrosArr();
+        
+        if (strategy === 'replace') {
+            if (checked.includes('slib-m.nc')) {
+                // Remove all local mcodes
+                for (let i = existing.length - 1; i >= 0; i--) {
+                    if ((existing[i].trigger || {}).kind === 'mcode') existing.splice(i, 1);
+                }
+            }
+            const pulledKeys = kbtnUpdates.map(u => (u.trigger || {}).key);
+            for (let i = existing.length - 1; i >= 0; i--) {
+                const t = existing[i].trigger || {};
+                if (t.kind === 'kbutton' && pulledKeys.includes(t.key)) existing.splice(i, 1);
+            }
+        }
+        
+        // Merge in new
+        const allUpdates = [...mcodeUpdates, ...kbtnUpdates];
+        for (const u of allUpdates) {
+            const tk = u.trigger.kind;
+            const tv = tk === 'mcode' ? u.trigger.code : u.trigger.key;
+            
+            const matchIdx = existing.findIndex(m => (m.trigger || {}).kind === tk && ((m.trigger || {}).code === tv || (m.trigger || {}).key === tv));
+            if (matchIdx >= 0) {
+                if (strategy === 'replace') existing[matchIdx] = u;
+                // If strategy === 'merge', we KEEP local and ignore pulled
+            } else {
+                existing.push(u);
+            }
+        }
+        
+        getSettings().macrosSynced = true;
+        saveSettings();
+        renderMcodes();
+        renderKbuttons();
+        if (q('sysstart_custom_gcode')) q('sysstart_custom_gcode').value = getSettings().sysstartCustomGcode || '';
+        q('macros_sync_modal').style.display = 'none';
+    };
+
+    if (q('mac_btn_global_pull')) {
+        q('mac_btn_global_pull').addEventListener('click', async () => {
+            q('macros_sync_modal').style.display = 'flex';
+            q('macros_sync_title').textContent = 'Load from Controller';
+            q('macros_sync_body').textContent = 'Checking connection and finding files...';
+            q('macros_sync_list').style.display = 'none';
+            q('macros_sync_conflict_ui').style.display = 'none';
+            q('macros_sync_confirm').style.display = 'none';
+            
+            syncMode = 'pull';
+            currentSyncFiles = {};
+            let hasConflicts = false;
+            let html = '';
+            
+            for (const file of SYNC_FILES) {
+                // Only pull advstart or sysstart depending on dialect
+                if (isV41 && file === 'sysstart.nc') continue;
+                if (!isV41 && file === 'advstart.nc') continue;
+                
+                try {
+                    const res = await makeClient().readSysfile(file);
+                    if (res && res.ok && res.content && res.content.trim()) {
+                        currentSyncFiles[file] = res.content;
+                        
+                        // Check for conflicts
+                        if (file === 'slib-m.nc') {
+                            const parsed = parseMcodeLibrary(res.content);
+                            const existingCodes = macrosArr().filter(m => (m.trigger || {}).kind === 'mcode').map(m => (m.trigger || {}).code);
+                            if (parsed.some(p => existingCodes.includes(p.trigger.code))) hasConflicts = true;
+                        } else if (file.startsWith('key-')) {
+                            const num = parseInt(file.replace(/\D/g, ''), 10);
+                            const existingKeys = macrosArr().filter(m => (m.trigger || {}).kind === 'kbutton').map(m => (m.trigger || {}).key);
+                            if (existingKeys.includes(num)) hasConflicts = true;
+                        }
+
+                        html += `<label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; padding:2px 4px; border-radius:4px;"><input type="checkbox" value="${file}" checked> ${file}</label>`;
+                    }
+                } catch(e) {}
+            }
+            
+            if (!Object.keys(currentSyncFiles).length) {
+                q('macros_sync_body').textContent = 'Could not find any macro files on the controller. Make sure it is connected.';
+                return;
+            }
+            
+            q('macros_sync_body').textContent = `Found ${Object.keys(currentSyncFiles).length} files. Select the ones you want to pull into Studio:`;
+            q('macros_sync_list').innerHTML = html;
+            q('macros_sync_list').style.display = 'flex';
+            if (hasConflicts) q('macros_sync_conflict_ui').style.display = 'block';
+            
+            q('macros_sync_confirm').style.display = 'block';
+            q('macros_sync_confirm').textContent = 'Pull Files';
+        });
+    }
+
+    if (q('mac_btn_global_push')) {
+        q('mac_btn_global_push').addEventListener('click', () => {
+            if (!getSettings().macrosSynced) {
+                // Show Deploy Safeguard Warning
+                q('macros_sync_modal').style.display = 'flex';
+                q('macros_sync_title').textContent = '⚠️ Incompatible Firmware Warning';
+                q('macros_sync_body').innerHTML = `
+                    <div style="background: rgba(224,160,32,0.1); border: 1px solid rgba(224,160,32,0.4); padding: 12px; border-radius: 4px; margin-bottom: 12px; color: var(--text-main);">
+                        You are about to push Studio's default factory macros to your controller.
+                        <br><br>
+                        If your controller is running older or customized firmware, these defaults may be incompatible and could overwrite your working configuration.
+                    </div>
+                    <b>We highly recommend you click "Load from controller" first</b> to sync your machine's exact macros into Studio.
+                `;
+                q('macros_sync_list').style.display = 'none';
+                q('macros_sync_conflict_ui').style.display = 'none';
+                q('macros_sync_confirm').style.display = 'block';
+                q('macros_sync_confirm').textContent = 'Deploy Anyway';
+                syncMode = 'push_warning';
+                return;
+            }
+            openDeployModal();
+        });
+    }
+
+    async function openDeployModal() {
+            q('macros_sync_modal').style.display = 'flex';
+            q('macros_sync_title').textContent = 'Deploy to Controller';
+            q('macros_sync_body').textContent = 'Gathering local macros...';
+            q('macros_sync_list').style.display = 'none';
+            q('macros_sync_conflict_ui').style.display = 'none';
+            q('macros_sync_confirm').style.display = 'none';
+            
+            syncMode = 'push';
+            currentSyncFiles = {};
+            let html = '';
+            const existing = macrosArr();
+            
+            // slib-m.nc
+            const mcodes = existing.filter(m => (m.trigger || {}).kind === 'mcode');
+            if (mcodes.length) {
+                let text = '';
+                for (const m of mcodes) text += macroFileText(m) + '\n';
+                currentSyncFiles['slib-m.nc'] = text;
+                html += `<label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; padding:2px 4px; border-radius:4px;"><input type="checkbox" value="slib-m.nc" checked> slib-m.nc (${mcodes.length} M-codes)</label>`;
+            }
+            
+            // key-N.nc
+            const kbtns = existing.filter(m => (m.trigger || {}).kind === 'kbutton');
+            for (const m of kbtns) {
+                const k = (m.trigger || {}).key;
+                const file = `key-${k}.nc`;
+                currentSyncFiles[file] = macroFileText(m);
+                html += `<label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; padding:2px 4px; border-radius:4px;"><input type="checkbox" value="${file}" checked> ${file}</label>`;
+            }
+            
+            // sysstart.nc
+            const h = getSettings().homing || {};
+            let syscode = emitMapped(homingStack(h)).text || '';
+            const custom = String(getSettings().sysstartCustomGcode || '').trim();
+            if (custom) syscode += '\n( --- Additional Boot G-code --- )\n' + custom + '\n';
+            syscode += '\nM30\n';
+            if (syscode.trim() !== 'M30') {
+                const file = (homingPostIsExpert() || isV41) ? 'advstart.nc' : 'sysstart.nc';
+                currentSyncFiles[file] = syscode;
+                html += `<label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; padding:2px 4px; border-radius:4px;"><input type="checkbox" value="${file}" checked> ${file}</label>`;
+            }
+            
+            if (!Object.keys(currentSyncFiles).length) {
+                q('macros_sync_body').textContent = 'No local macros or hooks are configured to deploy.';
+                return;
+            }
+            
+            const DELETABLE = ['key-1.nc', 'key-2.nc', 'key-3.nc', 'key-4.nc', 'key-5.nc', 'key-6.nc', 'key-7.nc', 'T.nc', 'error.nc', 'probe.nc', 'mulprobe.nc'];
+            const toCheck = DELETABLE.filter(f => !currentSyncFiles[f]);
+            
+            if (toCheck.length > 0) {
+                try {
+                    const resps = await Promise.all(toCheck.map(f => makeClient().readSysfile(f)));
+                    const orphaned = resps.filter(r => r && r.ok).map(r => r.name);
+                    if (orphaned.length) {
+                        html += '<div style="margin:12px 0 6px 0; font-weight:600; font-size:12px; color:var(--accent);">Orphaned on Controller (safe to delete)</div>';
+                        for (const file of orphaned) {
+                            html += `<label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; padding:2px 4px; border-radius:4px; color:#e06c75;"><input type="checkbox" value="DEL:${file}"> 🗑 Delete ${file}</label>`;
+                        }
+                    }
+                } catch(e) {}
+            }
+            
+            q('macros_sync_body').textContent = `Select the files you want to push to the controller (existing files on the controller will be backed up):`;
+            q('macros_sync_list').innerHTML = html;
+            q('macros_sync_list').style.display = 'flex';
+            
+            q('macros_sync_confirm').style.display = 'block';
+            q('macros_sync_confirm').textContent = 'Deploy Files';
+        }
+
+    if (q('macros_sync_cancel')) q('macros_sync_cancel').addEventListener('click', () => q('macros_sync_modal').style.display = 'none');
+    
+    if (q('macros_sync_confirm')) {
+        q('macros_sync_confirm').addEventListener('click', async () => {
+            if (syncMode === 'pull') {
+                const stratNode = q('macros_sync_conflict_ui').querySelector('input[name="sync_conflict_strategy"]:checked');
+                performPull(stratNode ? stratNode.value : 'merge');
+            } else if (syncMode === 'push') {
+                const checked = [...q('macros_sync_list').querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value);
+                if (!checked.length) return;
+                
+                const toPush = checked.filter(v => !v.startsWith('DEL:'));
+                const toDel = checked.filter(v => v.startsWith('DEL:')).map(v => v.slice(4));
+                
+                let successCount = 0;
+                let failCount = 0;
+                
+                for (const file of toPush) {
+                    const content = currentSyncFiles[file];
+                    if (!content) continue;
+                    try {
+                        const res = await makeClient().writeSysfile(file, content, 'write');
+                        if (res && res.ok) successCount++;
+                        else failCount++;
+                    } catch (e) {
+                        failCount++;
+                    }
+                }
+                
+                for (const file of toDel) {
+                    try {
+                        const res = await makeClient().deleteSysfile(file);
+                        if (res && res.ok) successCount++;
+                        else failCount++;
+                    } catch (e) {
+                        failCount++;
+                    }
+                }
+                
+                q('macros_sync_modal').style.display = 'none';
+                q('macros_sync_modal').style.display = 'none';
+                if (failCount === 0) alert(`Successfully deployed ${successCount} file(s) to the controller.\n\nNote: For slib-m.nc changes, you must reboot the controller to load the new M-codes.`);
+                else alert(`Deployed ${successCount} file(s), but ${failCount} failed. Ensure the controller is connected.`);
+            } else if (syncMode === 'push_warning') {
+                // User chose to bypass the warning
+                getSettings().macrosSynced = true; // Mark as synced so we don't warn again
+                saveSettings();
+                openDeployModal();
+            }
+        });
+    }
+
+    if (q('sysstart_gen')) {
+        q('sysstart_gen').addEventListener('click', () => {
+            const out = q('sysstart_out');
+            if (!out) return;
+            const h = getSettings().homing || {};
+            let code = emitMapped(homingStack(h)).text || '';
+            const custom = String(q('sysstart_custom_gcode').value || '').trim();
+            if (custom) code += '\n( --- Additional Boot G-code --- )\n' + custom + '\n';
+            code += '\nM30\n';
+            out.value = code;
+            out.style.display = 'block';
+        });
+    }
+
+    if (q('sysstart_push')) {
+        q('sysstart_push').addEventListener('click', async () => {
+            const h = getSettings().homing || {};
+            let code = emitMapped(homingStack(h)).text || '';
+            const custom = String(q('sysstart_custom_gcode').value || '').trim();
+            if (custom) code += '\n( --- Additional Boot G-code --- )\n' + custom + '\n';
+            code += '\nM30\n';
+
+            const filename = (homingPostIsExpert() || isV41) ? 'advstart.nc' : 'sysstart.nc';
+            if (!confirm(`Write ${filename} to the controller?\n\nThe existing ${filename} will be backed up.`)) return;
+            try {
+                const res = await makeClient().writeSysfile(filename, code, 'write');
+                if (res && res.ok) alert(`Wrote ${filename}${res.backup ? ' — backup ' + res.backup : ''}.`);
+                else alert('Push failed: ' + ((res && res.error) || 'needs the gateway/desktop app + a connected controller'));
+            } catch (err) { alert('Push failed: ' + (err && err.message ? err.message : err)); }
+        });
+    }
+
+    if (q('set_homing_simul')) q('set_homing_simul').addEventListener('change', commitHoming);
+    if (q('set_homing_reset')) q('set_homing_reset').addEventListener('click', () => {
+        commitHoming();
+        const cfg = (getSettings().homing || {}).axes || {}, rank = { z: 1, x: 2, y: 3, a: 4, b: 5 };
+        for (const ax in cfg) cfg[ax].order = rank[ax] || 9;
+        saveSettings(); renderHomingGui();
+    });
+
+// --- Homing & Sysstart Logic ---
+
+
+function homingConfiguredAxes() {
+    const s = getSettings();
+    const m = (s.motors) || {};
+    const out = ['x', 'y', 'z'];
+    if (m.a && m.a.role && m.a.role !== 'unused') out.push('a');
+    if (m.b && m.b.role && m.b.role !== 'unused') out.push('b');
+    return out;
+}
+
+function homingPostIsExpert() {
+    try {
+        const ap = localStorage.getItem('ddcs_active_post');
+        if (ap && ap !== 'auto') return ap === 'ddcs-expert-m350';
+        return (localStorage.getItem('ddcs_controller_profile') || 'ddcs-expert-m350') === 'ddcs-expert-m350';
+    } catch (_) { return true; }
+}
+
+function renderHomingGui() {
+    const host = document.getElementById('set_homing_axes'); if (!host) return;
+    const h = getSettings().homing || (getSettings().homing = { philosophy: 'sequential', axes: {} });
+    const cfg = h.axes || {};
+    const expert = homingPostIsExpert();
+    const list = homingConfiguredAxes();
+    const tag = document.getElementById('set_homing_tag');
+    if (tag) tag.textContent = expert ? 'DDCS Expert M350 — full methods available.' : 'Active post is unverified for homing — native home only; advanced methods are disabled.';
+    if (document.getElementById('set_homing_simul')) document.getElementById('set_homing_simul').checked = h.philosophy === 'simultaneous';
+
+    const ordered = [...list].sort((p, q) => ((cfg[p] || {}).order || HOMING_AX_IDX[p] + 1) - ((cfg[q] || {}).order || HOMING_AX_IDX[q] + 1));
+    const methodOpts = (sel) => HOMING_METHODS.map((m) => {
+        const dis = !expert && m.v !== 'native';
+        return `<option value="${m.v}"${m.v === sel ? ' selected' : ''}${dis ? ' disabled title="Unverified on this post"' : ''}>${m.label}</option>`;
+    }).join('');
+    const followOpts = (sel) => `<option value="">none</option>` + list.map((a) => `<option value="${HOMING_AX_IDX[a]}"${String(HOMING_AX_IDX[a]) === String(sel) ? ' selected' : ''}>${HOMING_AX_LABEL[a]} (idx ${HOMING_AX_IDX[a]})</option>`).join('');
+
+    host.innerHTML = ordered.map((ax, pos) => {
+        const c = cfg[ax] || {}, rotary = ax === 'a' || ax === 'b';
+        return `<div class="homing-axis-row" data-axis="${ax}" style="border:1px solid var(--border); border-radius:6px; padding:8px 10px; margin-bottom:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-size:11px; font-weight:700;">${pos + 1}</span>
+                <button type="button" class="hm-up" title="Home earlier" style="cursor:pointer; background:none; border:none; color:var(--text-main);">▲</button>
+                <button type="button" class="hm-down" title="Home later" style="cursor:pointer; background:none; border:none; color:var(--text-main);">▼</button>
+                <label style="font-weight:600;"><input type="checkbox" class="hm-enable" ${c.enable !== false ? 'checked' : ''}/> ${HOMING_AX_LABEL[ax]}</label>
+                <input type="hidden" class="hm-order" value="${pos + 1}">
+                <label style="font-size:12px;">Method <select class="hm-method">${methodOpts(c.method || 'native')}</select></label>
+            </div>
+            <div class="hm-motion" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <label>Seek feed <input type="number" class="hm-seekfeed" value="${num(c.seekFeed, 800)}" style="width:60px;"></label>
+                <label>Back-off <input type="number" class="hm-backoff" value="${num(c.backoff, 5)}" step="0.5" style="width:54px;"></label>
+                <label>Slow feed <input type="number" class="hm-slowfeed" value="${num(c.slowFeed, 100)}" style="width:60px;"></label>
+                <label>Home offset <input type="number" class="hm-offset" value="${num(c.offset, 0)}" step="0.5" style="width:54px;"></label>
+            </div>
+            <div class="hm-slave" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <label title="Dual-axis gantry: homing this axis syncs the slave's coordinate and marks it homed. Squaring is done manually by the operator.">Slave axis follows <select class="hm-follow">${followOpts(c.slaveFollows)}</select></label>
+            </div>
+            ${rotary ? `<div class="hm-rotary" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <label>Rotary <select class="hm-rotmode"><option value="setzero"${(c.rotary || 'setzero') === 'setzero' ? ' selected' : ''}>set zero</option><option value="switch"${(c.rotary || 'setzero') === 'setzero' ? '' : ' selected'}>switch home</option></select></label>
+                <label><input type="checkbox" class="hm-continuous" ${c.continuous ? 'checked' : ''}/> continuous (mod 360)</label>
+            </div>` : ''}
+        </div>`;
+    }).join('');
+
+    host.querySelectorAll('.homing-axis-row').forEach((row) => {
+        const methodSel = row.querySelector('.hm-method');
+        const sync = () => {
+            row.querySelector('.hm-motion').style.display = methodSel.value === 'seek' ? 'flex' : 'none';
+        };
+        sync();
+        row.querySelectorAll('input,select').forEach((f) => f.addEventListener('change', () => { commitHoming(); renderHomingGui(); }));
+        row.querySelector('.hm-up').addEventListener('click', () => homingMove(row.getAttribute('data-axis'), -1));
+        row.querySelector('.hm-down').addEventListener('click', () => homingMove(row.getAttribute('data-axis'), +1));
+    });
+}
+
+function commitHoming() {
+    const host = document.getElementById('set_homing_axes'); if (!host) return;
+    const h = getSettings().homing || (getSettings().homing = { philosophy: 'sequential', axes: {} });
+    const axes = h.axes || (h.axes = {});
+    host.querySelectorAll('.homing-axis-row').forEach((row, idx) => {
+        const ax = row.getAttribute('data-axis'), g = (s) => row.querySelector(s), prev = axes[ax] || {};
+        axes[ax] = {
+            ...prev,
+            enable: g('.hm-enable').checked,
+            order: num(g('.hm-order').value, idx + 1),
+            method: g('.hm-method').value,
+            seekFeed: num(g('.hm-seekfeed').value, prev.seekFeed || 800),
+            backoff: num(g('.hm-backoff').value, prev.backoff || 5),
+            slowFeed: num(g('.hm-slowfeed').value, prev.slowFeed || 100),
+            offset: num(g('.hm-offset').value, prev.offset || 0),
+            slaveFollows: g('.hm-follow').value,
+            rotary: g('.hm-rotmode') ? g('.hm-rotmode').value : (prev.rotary || 'setzero'),
+            continuous: g('.hm-continuous') ? g('.hm-continuous').checked : !!prev.continuous,
+        };
+    });
+    const simul = document.getElementById('set_homing_simul');
+    h.philosophy = (simul && simul.checked) ? 'simultaneous' : 'sequential';
+    saveSettings();
+}
+
+function homingMove(ax, delta) {
+    commitHoming();
+    const h = getSettings().homing, cfg = h.axes;
+    const list = homingConfiguredAxes().sort((p, q) => (cfg[p].order || 9) - (cfg[q].order || 9));
+    const i = list.indexOf(ax), j = i + delta;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    const a = cfg[list[i]], b = cfg[list[j]], t = a.order; a.order = b.order; b.order = t;
+    saveSettings();
+    renderHomingGui();
+}
     // --- CAM Pack Builder (Phase 1): author CAM-menu slots (form + macro), auto-allocate #11xx, export. ---
     const CAMPACK_KEY = 'ddcs_campack';
     const loadCamPack = () => { try { const p = JSON.parse(localStorage.getItem(CAMPACK_KEY)); if (p && Array.isArray(p.slots)) return p; } catch (e) { /* */ } return { meta: { name: 'My CAM pack', baseSlot: 22 }, slots: [] }; };
