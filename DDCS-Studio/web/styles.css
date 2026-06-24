@@ -4339,7 +4339,7 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .app-header.is-compact .op-btn .op-label { display: none; }
 .app-header.is-compact .op-btn { gap: 0; }
 .app-header.is-compact .hdr-controls { gap: 6px; }
-.app-header.is-mini .hdr-tabs .tab .app-tx { display: none; }
+.app-header.is-mini .hdr-tabs .tab:not(.active) .app-tx { display: none; }   /* intermediate: inactive tabs collapse to icons, the ACTIVE tab keeps its label (UX standard) */
 .app-header.is-mini .hdr-tabs .tab .app-ico { margin-left: 0; }
 .app-header.is-mini .hdr-tabs .tab { padding: 0 18px; letter-spacing: 0; }   /* icon-only, full header height */
 .app-header.is-mini .ver { display: none; }
