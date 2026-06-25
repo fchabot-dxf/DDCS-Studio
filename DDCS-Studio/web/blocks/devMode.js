@@ -131,6 +131,11 @@ export function mountDevMode(ws, B, hostEl) {
             <option value="form2d">Form + 2D layout</option>
             <option value="form">Form only</option>
         </select></label>
+        <div class="blk-dev-sim">Preview rig <span class="blk-dev-sim-why" title="DECLARE what the preview shows for this op — never guessed from the G-code. Rotary reveals the 4th-axis rig + the A± jog row; Machine pins to the envelope; Magazine draws the ATC pockets.">ⓘ</span>
+            <label><input type="checkbox" class="blk-dev-sim-rotary"> 4th-axis rotary (jog)</label>
+            <label><input type="checkbox" class="blk-dev-sim-machine"> Machine frame</label>
+            <label><input type="checkbox" class="blk-dev-sim-magazine"> ATC magazine</label>
+        </div>
         <button type="button" class="blk-dev-save">Save as custom wizard</button>`;
     _nameInput = _panel.querySelector('.blk-dev-opname');
     _panel.querySelector('.blk-dev-save').addEventListener('click', () => saveAsCustomOp());
@@ -216,6 +221,20 @@ export async function editWizardDef(opType) {
     setDevMode(true);
     if (_nameInput) _nameInput.value = def.label || '';
     const psel = _panel && _panel.querySelector('.blk-dev-paneltype'); if (psel) psel.value = def.panel || 'form3d';
+    setSimChecks(def.sim || {});   // restore the declared preview intent so it round-trips on re-author
+}
+
+// The DECLARED preview intent off the dev-panel checkboxes → { showRotaryRig, forceMachine, showMagazine }, or null
+// when none are ticked (the default local-frame preview). NEVER inferred from the stack — it's an explicit choice,
+// the same kind of declaration as the panel type (see opSimContext / [[custom-op-sim-intent-infer-vs-declare]]).
+function readSimIntent() {
+    const ck = (cls) => !!(_panel && _panel.querySelector(cls) && _panel.querySelector(cls).checked);
+    const sim = { showRotaryRig: ck('.blk-dev-sim-rotary'), forceMachine: ck('.blk-dev-sim-machine'), showMagazine: ck('.blk-dev-sim-magazine') };
+    return (sim.showRotaryRig || sim.forceMachine || sim.showMagazine) ? sim : null;
+}
+function setSimChecks(sim) {
+    const set = (cls, v) => { const el = _panel && _panel.querySelector(cls); if (el) el.checked = !!v; };
+    set('.blk-dev-sim-rotary', sim.showRotaryRig); set('.blk-dev-sim-machine', sim.forceMachine); set('.blk-dev-sim-magazine', sim.showMagazine);
 }
 
 // Register the current op's STACK as a custom WIZARD — a bar button (+ its form). Reads the ticked exposures (if any)
@@ -245,20 +264,22 @@ function saveAsCustomOp() {
     let panel = (psel && psel.value) || 'form3d';
     const panelBlk = flattenBlocks(a.opRec.children).find((b) => b && b.type === 'panel');   // a GUI panel block, if present, wins
     if (panelBlk && panelBlk.params && panelBlk.params.panel) panel = panelBlk.params.panel;
+    const sim = readSimIntent();   // DECLARED preview intent (rotary rig / machine / magazine) — never inferred from the stack
     const editing = _editingWizard;   // re-authoring an existing wizard → update in place (keep its opType)
     try {
         if (editing) {
-            updateUserOp(userOpFromStack(editing, name, a.opRec.children, bindings, panel));
+            updateUserOp(userOpFromStack(editing, name, a.opRec.children, bindings, panel, sim));
         } else {
             const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'wizard';
             const existing = new Set(listUserOps().map((d) => d.opType));
             let type = slug, n = 2; while (existing.has(USER_OP_PREFIX + type)) type = slug + '_' + (n++);
-            createWizard(userOpFromStack(type, name, a.opRec.children, bindings, panel));
+            createWizard(userOpFromStack(type, name, a.opRec.children, bindings, panel, sim));
         }
     } catch (e) { console.warn('save wizard failed', e); alert('Save failed: ' + ((e && e.message) || e)); return; }
 
     if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
     if (_on) setDevMode(false);   // also clears _editingWizard
     if (_nameInput) _nameInput.value = '';
+    setSimChecks({});   // reset the preview-intent checkboxes for the next wizard
     alert(editing ? `Updated “${name}”.` : `Saved “${name}” — it's now a button in the bar (Custom)${bindings.length ? ` with ${bindings.length} knob${bindings.length === 1 ? '' : 's'}` : ''}.`);
 }

@@ -4551,6 +4551,9 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     padding:6px 8px; font:inherit; color:var(--text-main,#e6edf3);
     background:var(--bg,#0b0f14); border:1px solid var(--line, rgba(255,255,255,.18)); border-radius:6px;
 }
+#blocks-app .blk-dev-sim { display:flex; flex-direction:column; gap:4px; font:600 11px/1 inherit; color:var(--text-dim,#9fb0c0); }
+#blocks-app .blk-dev-sim label { display:flex; align-items:center; gap:6px; font-weight:400; cursor:pointer; }
+#blocks-app .blk-dev-sim-why { cursor:help; opacity:.7; }
 #blocks-app .blk-dev-save {
     padding:7px 10px; font:700 12px/1 inherit; cursor:pointer; color:#fff;
     background:var(--accent,#3b82f6); border:none; border-radius:6px;

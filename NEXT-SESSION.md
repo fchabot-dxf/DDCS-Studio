@@ -103,9 +103,12 @@ Earlier-but-related (prior session, on `main`): the data-driven wizard bar (`com
    doesn't carry intent for an open-world op on an unknown machine (atom-reading is only safe for built-ins WE
    authored — that's why the static `ROTARY_RIG`/`FORCE_MACHINE`/`WITH_MAGAZINE` sets gate built-in types only). See
    [[custom-op-sim-intent-infer-vs-declare]]. Test: `tests/custom-op-sim-intent.spec.js`.
-   **NEXT (the open piece):** an AUTHORING surface to SET `def.sim` — a dev-mode control and/or a GUI declaration
-   block, parallel to the panel block (`devMode` panel dropdown + `panel.js`). Until then a custom op has no rig
-   unless `def.sim` is set programmatically (the plumbing is ready; the UI isn't).
+   **AUTHORING (✅ DONE):** the Blocks dev-mode save panel has a "Preview rig" group — rotary / machine / magazine
+   checkboxes (`devMode.readSimIntent`/`setSimChecks`) → `def.sim`, parallel to the Panel dropdown. Round-trips on
+   re-author (`editWizardDef` restores the checkboxes from `def.sim`); resets after save. Test:
+   `tests/dev-mode-sim-intent.spec.js`. **Still open (optional):** a blocks-native GUI declaration block (like
+   `panel.js`) so intent is also visible IN the stack; and `wizardToFile` drops `panel`+`sim` on `.wizard` export
+   (pre-existing gap — both are lost on share/import).
 
 CONCEPT-ONLY (do NOT build the behavior): the **terrain-probe** is a proof-of-concept illustration (see
 `CRAZY-IDEAS.md` — surface digitizing / probe-array → terrain). Its real CNC gaps (probe base must be block-ported;
