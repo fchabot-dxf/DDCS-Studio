@@ -67,9 +67,12 @@ Earlier-but-related (prior session, on `main`): the data-driven wizard bar (`com
 
 ## ▶ Queued — wizard-maker follow-ups (the natural next steps)
 
-1. **xy/rect param-block grouping** — group param blocks into a canvas picker (a `group` field on `param` + roles by
-   order; `extractParamBlocks` emits group/role bindings). NOTE: the canvas pickers are ALREADY authorable via the
-   inline-expose path (it groups xy/rect by order) — this is a blocks-native convenience, not a missing capability.
+1. **xy/rect param-block grouping** — ✅ DONE. `param.widget` now offers `xy-pad`/`rect`; `extractParamBlocks` pools
+   those pills and groups them BY ORDER (xy-pad pairs → roles x,y; rect fours → x,y,w,h), exactly like the dev-mode
+   inline-expose path — so two/four param blocks collapse into ONE canvas picker in the form. No new field (order is
+   the convention; an odd leftover degrades to a plain number knob). Test: `tests/gui-param-grouping.spec.js`
+   (unit + form + Class-B render guard). (As noted, this was a blocks-native convenience — canvas pickers were
+   already authorable via inline-expose.)
 2. **Typed widgets from param blocks** — ✅ DONE for the *sound* subset (dropdown presets + numeric toggle). A param
    block always lives in a NUMERIC socket, so every widget commits a NUMBER (valid by construction, no emitter
    changes): `dropdown` = a numeric preset chosen from a new `options` field ("Rough=500, Finish=1500"); `toggle` =

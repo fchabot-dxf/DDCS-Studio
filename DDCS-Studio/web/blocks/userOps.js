@@ -54,8 +54,12 @@ export function parseParamOptions(str) {
 // v(A) (keepPills=false): replace the pill with its number (a clean number-only template). Names deduped vs `seen`.
 // Widget round-trip: every param widget commits a NUMBER (the socket stays numeric) — slider/toggle keep their
 // widget key; dropdown also carries its parsed numeric presets as widgetConfig.options. type stays 'number'.
+// Canvas pickers (xy-pad / rect) are MULTI-param: param pills with that widget are pooled and grouped BY ORDER —
+// xy-pad in pairs (roles x,y), rect in fours (x,y,w,h) — exactly like the dev-mode inline-expose path. An odd
+// leftover degrades to a plain number knob. Grouped bindings are appended after the single ones (form-order parity
+// with buildBindings).
 export function extractParamBlocks(template, seen = new Set(), keepPills = true) {
-    const flat = flattenBlocks(template), bindings = [];
+    const flat = flattenBlocks(template), bindings = [], pools = { 'xy-pad': [], rect: [] };
     flat.forEach((blk, i) => {
         if (!blk || !blk.params) return;
         for (const key in blk.params) {
@@ -66,16 +70,27 @@ export function extractParamBlocks(template, seen = new Set(), keepPills = true)
             if (seen.has(name)) { let k = 2; while (seen.has(name + '_' + k)) k++; name += '_' + k; }
             seen.add(name);
             const dn = Number(pp.value), dflt = Number.isFinite(dn) ? dn : 0;
-            let extra = {};
-            if (pp.widget === 'slider' || pp.widget === 'toggle') extra = { widget: pp.widget };
+            const base = { param: name, blockIndex: i, key, type: 'number', default: dflt, label: pp.name || name };
+            if (pp.widget === 'xy-pad' || pp.widget === 'rect') pools[pp.widget].push(base);   // grouped by order below
+            else if (pp.widget === 'slider' || pp.widget === 'toggle') bindings.push({ ...base, widget: pp.widget });
             else if (pp.widget === 'dropdown') {
                 const options = parseParamOptions(pp.options);
-                extra = { widget: 'dropdown', ...(options.length ? { widgetConfig: { options } } : {}) };
-            }
-            bindings.push({ param: name, blockIndex: i, key, type: 'number', default: dflt, label: pp.name || name, ...extra });
+                bindings.push({ ...base, widget: 'dropdown', ...(options.length ? { widgetConfig: { options } } : {}) });
+            } else bindings.push(base);
             if (!keepPills) blk.params[key] = dflt;   // (A) replace; (B/default) leave the pill in the template
         }
     });
+    let gi = 0;
+    const group = (pool, size, roles, widget) => {
+        let i = 0;
+        for (; i + size <= pool.length; i += size) {
+            const gid = 'pg' + (++gi);
+            for (let r = 0; r < size; r++) bindings.push({ ...pool[i + r], group: gid, role: roles[r], ...(r === 0 ? { widget } : {}) });
+        }
+        for (; i < pool.length; i++) bindings.push(pool[i]);   // leftover (incomplete group) → a plain number knob
+    };
+    group(pools['xy-pad'], 2, ['x', 'y'], 'xy-pad');
+    group(pools.rect, 4, ['x', 'y', 'w', 'h'], 'rect');
     return bindings;
 }
 
