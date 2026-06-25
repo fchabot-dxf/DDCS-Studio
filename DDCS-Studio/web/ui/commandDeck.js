@@ -4,6 +4,7 @@ import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { outPinBlock, waitInputBlock } from '../wizards/ops/cnc.js';
 import { dwellBlock } from '../wizards/ops/dwell.js';
+import { getLibrary } from '../blocks/wizardLibrary.js';
 
 // Header toolbar icons — inline line-art SVG (not emoji) so they render identically on every OS,
 // inherit the theme via currentColor, stay crisp at any size, and give each button an icon to
@@ -29,7 +30,77 @@ const HEADER_ICONS = {
     export: _svg('<path d="M16 9h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2"/><line x1="12" y1="14" x2="12" y2="3"/><polyline points="8 7 12 3 16 7"/>', '#0ea5e9'),
     // I/O = two opposite arrows (output out · input in)
     io:     _svg('<line x1="3" y1="8" x2="14" y2="8" stroke="#22c55e"/><polyline points="11 5 14 8 11 11" stroke="#22c55e"/><line x1="21" y1="16" x2="10" y2="16" stroke="#38bdf8"/><polyline points="13 13 10 16 13 19" stroke="#38bdf8"/>', '#22c55e'),
+    // Custom (user wizards) = a four-point sparkle, matching the ✦ used as the user-op item marker
+    custom: _svg('<path d="M12 2.5c.6 4.3 2.7 6.4 7 7-4.3.6-6.4 2.7-7 7-.6-4.3-2.7-6.4-7-7 4.3-.6 6.4-2.7 7-7z" fill="#fbbf24" stroke="#f59e0b"/>', '#f59e0b'),
 };
+
+// ── Data-driven wizard bar (stage 4) ─────────────────────────────────────────────────────────────────────────
+// The bar's GROUPS + ENTRIES come from blocks/wizardLibrary.getLibrary() — user-customisable (rename / hide /
+// reorder / regroup) and including user ops. commandDeck owns only the PRESENTATION the library can't carry:
+// the per-group header icon, the inline-SVG item icons, the "Rotary" sub-label, the special I/O quick-actions
+// section, and the 3D-animated openers a few probe wizards use instead of the generic openWiz(type).
+
+// Per-group header icon (the library carries the label; the icon lives here).
+const WIZ_GROUP_ICON = { setup: HEADER_ICONS.comm, probe: HEADER_ICONS.probe, atc: HEADER_ICONS.atc, mill: HEADER_ICONS.mill, custom: HEADER_ICONS.custom };
+
+// Inline-SVG item icons. Library entries that use an SVG carry icon:'' — this map is their source, and it WINS
+// over any emoji (e.g. `text` is given '✎' in the library but the bar has always drawn the pen SVG).
+const WIZ_ITEM_SVG = {
+    rotary_center: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;"><rect x="4" y="8" width="13" height="8" rx="2" stroke="#64748b"/><ellipse cx="17" cy="12" rx="2" ry="4" stroke="#64748b"/><line x1="1.5" y1="12" x2="22.5" y2="12" stroke="#e11d48" stroke-dasharray="3 2"/></svg>`,
+    drill:     `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" fill="#1e293b" stroke="none"/></svg>`,
+    bore:      `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" stroke="#94a3b8" stroke-width="2"/><circle cx="12" cy="12" r="2" fill="#1e293b" stroke="none"/></svg>`,
+    pocket:    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="5" width="18" height="14" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><rect x="7" y="9" width="10" height="6" rx="1" fill="#1e293b" stroke="none"/></svg>`,
+    contour:   `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="6" y="8" width="12" height="8" rx="1" fill="#1e293b" stroke="none"/><rect x="3" y="5" width="18" height="14" rx="1.5" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="3 2"/></svg>`,
+    slot:      `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="9" width="18" height="6" rx="3" stroke="#94a3b8" stroke-width="2.5"/><line x1="7" y1="12" x2="17" y2="12" stroke="#1e293b" stroke-width="2" stroke-linecap="round"/></svg>`,
+    surfacing: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="4" width="18" height="16" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><path d="M5 8h14M5 12h14M5 16h14" stroke="#1e293b" stroke-width="1.5"/></svg>`,
+    text:      `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><path d="M5 6h14M12 6v13" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/></svg>`,
+};
+
+// Sub-labels injected before specific items (faithful to the old static bar's "Rotary" divider).
+const WIZ_SUBLABEL = { rotary_center: 'Rotary' };
+
+// Wizards with a dedicated 3D-animated opener instead of the generic openWiz(type).
+const WIZ_SPECIAL_OPENER = { corner: 'openCornerWiz', middle: 'openMiddleWiz', edge: 'openEdgeWiz', alignment: 'openAlignmentWiz' };
+
+// The I/O quick-actions — a bar-special section appended to the Setup dropdown (not library entries).
+const WIZ_IO_SECTION = `
+                            <div style="padding:4px 12px; font-size:10px; opacity:.55; text-transform:uppercase; letter-spacing:1px;">I/O</div>
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('outpin')">⚡ Set Output</button>
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('waitinput')">⏱ Wait Input</button>
+                            <button onclick="ddcsInsertIo && ddcsInsertIo('dwell')">⏳ Dwell</button>`;
+
+const _escHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// An untrusted value placed inside onclick="fn('…')": JS-escape (\, ') then HTML-attr-escape (&, ", <, >) — but NOT '.
+const _escArg = (s) => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+function wizItemIcon(e) {
+    const svg = WIZ_ITEM_SVG[e.id];
+    if (svg) return svg;                            // inline SVG wins (commandDeck owns the line-art icons)
+    return e.icon ? `${e.icon} ` : '';              // emoji (or the ✦ user-op marker) + a space
+}
+function wizItemOnclick(e) {
+    if (e.kind === 'user') return `ddcsInsertUserOp && ddcsInsertUserOp('${_escArg(e.type)}')`;
+    const special = WIZ_SPECIAL_OPENER[e.id];
+    if (special) return `${special} && ${special}()`;
+    if (e.variant) return `openWiz && openWiz('${_escArg(e.type)}','${_escArg(e.variant)}')`;
+    return `openWiz && openWiz('${_escArg(e.type)}')`;
+}
+function wizItemHtml(e) {
+    const sub = WIZ_SUBLABEL[e.id]
+        ? `<div style="padding:4px 12px; font-size:10px; opacity:.55; text-transform:uppercase; letter-spacing:1px;">${WIZ_SUBLABEL[e.id]}</div>`
+        : '';
+    return `${sub}<button onclick="${wizItemOnclick(e)}">${wizItemIcon(e)}${_escHtml(e.label)}</button>`;
+}
+function wizGroupHtml(group) {
+    const icon = WIZ_GROUP_ICON[group.id] || HEADER_ICONS.custom;
+    const btnAttrs = group.id === 'setup' ? ' title="Setup — Comm, Warm-up, I/O"' : ' style="min-width: 100px;"';
+    const items = group.items.map(wizItemHtml).join('');
+    const extra = group.id === 'setup' ? WIZ_IO_SECTION : '';
+    return `<div class="toolbar-dropdown">
+                        <button class="toolbar-btn wizard-btn"${btnAttrs}><span class="btn-ico">${icon}</span><span class="btn-tx">${_escHtml(group.label)}</span><span class="btn-caret">▼</span></button>
+                        <div class="toolbar-dropdown-content">${items}${extra}</div>
+                    </div>`;
+}
 
 // Load a G-code / .nc file from disk into the editor, then trigger a re-parse + preview — for
 // simulating an existing program instead of pasting it. Wired to the 📂 Load header button;
@@ -531,135 +602,7 @@ export class CommandDeck {
 
     // Helper: Render header left/center/right
     renderHeader() {
-        const leftTarget = document.querySelector('.dock-header .header-left');
-        if (leftTarget) {
-            leftTarget.innerHTML = `
-                <div style="display:flex; gap:6px; align-items:center;">
-                    <div class="toolbar-dropdown">
-                        <button class="toolbar-btn wizard-btn" title="Setup — Comm, Warm-up, I/O"><span class="btn-ico">${HEADER_ICONS.comm}</span><span class="btn-tx">Setup</span><span class="btn-caret">▼</span></button>
-                        <div class="toolbar-dropdown-content">
-                            <button onclick="openWiz && openWiz('comm')">💬 Comm / MDI</button>
-                            <button onclick="openWiz && openWiz('atc_warmup')">🔥 Warm-up</button>
-                            <div style="padding:4px 12px; font-size:10px; opacity:.55; text-transform:uppercase; letter-spacing:1px;">I/O</div>
-                            <button onclick="ddcsInsertIo && ddcsInsertIo('outpin')">⚡ Set Output</button>
-                            <button onclick="ddcsInsertIo && ddcsInsertIo('waitinput')">⏱ Wait Input</button>
-                            <button onclick="ddcsInsertIo && ddcsInsertIo('dwell')">⏳ Dwell</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        const centerTarget = document.querySelector('.dock-header .header-center');
-        if (centerTarget) {
-            centerTarget.innerHTML = `
-                <div style="display:flex; gap:6px; width:auto; align-items:center;">
-                    <div class="toolbar-dropdown">
-                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.probe}</span><span class="btn-tx">Probe</span><span class="btn-caret">▼</span></button>
-                        <div class="toolbar-dropdown-content">
-                            <button onclick="openWiz && openWiz('wcs')">⊕ WCS / work offsets</button>
-                            <button onclick="openWiz && openWiz('homing')">⌖ Homing</button>
-                            <button onclick="openCornerWiz && openCornerWiz()">📐 Corner</button>
-                            <button onclick="openMiddleWiz && openMiddleWiz()">🎯 Middle / Bore / Boss</button>
-                            <button onclick="openEdgeWiz && openEdgeWiz()">📏 Edge</button>
-                            <button onclick="openAlignmentWiz && openAlignmentWiz()">🧭 Align</button>
-                            <div style="padding:4px 12px; font-size:10px; opacity:.55; text-transform:uppercase; letter-spacing:1px;">Rotary</div>
-                            <button onclick="openWiz && openWiz('rotary_center')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;"><rect x="4" y="8" width="13" height="8" rx="2" stroke="#64748b"/><ellipse cx="17" cy="12" rx="2" ry="4" stroke="#64748b"/><line x1="1.5" y1="12" x2="22.5" y2="12" stroke="#e11d48" stroke-dasharray="3 2"/></svg>Centreline</button>
-                            <button onclick="openWiz && openWiz('rotary_clock')">🕒 Clock A0</button>
-                        </div>
-                    </div>
-                    
-                    <div class="toolbar-dropdown">
-                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.atc}</span><span class="btn-tx">ATC</span><span class="btn-caret">▼</span></button>
-                        <div class="toolbar-dropdown-content">
-                            <button onclick="openWiz && openWiz('atc_length')">📏 Tool Length</button>
-                            <button onclick="openWiz && openWiz('atc_check')">🛡 Tool Check</button>
-                            <button onclick="openWiz && openWiz('atc_change')">🔧 Tool Change</button>
-                            <button onclick="openWiz && openWiz('atc_table')">📋 Tool Table</button>
-                            <button onclick="openWiz && openWiz('atc_test')">🧪 ATC Test</button>
-                        </div>
-                    </div>
-
-                    <div class="toolbar-dropdown">
-                        <button class="toolbar-btn wizard-btn" style="min-width: 100px;"><span class="btn-ico">${HEADER_ICONS.mill}</span><span class="btn-tx">Mill</span><span class="btn-caret">▼</span></button>
-                        <div class="toolbar-dropdown-content">
-                            <button onclick="openWiz && openWiz('drill','drill')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" fill="#1e293b" stroke="none"/></svg>Drill</button>
-                            <button onclick="openWiz && openWiz('drill','bore')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" stroke="#94a3b8" stroke-width="2"/><circle cx="12" cy="12" r="2" fill="#1e293b" stroke="none"/></svg>Bore</button>
-                            <button onclick="openWiz && openWiz('pocket')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="5" width="18" height="14" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><rect x="7" y="9" width="10" height="6" rx="1" fill="#1e293b" stroke="none"/></svg>Pocket</button>
-                            <button onclick="openWiz && openWiz('contour')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="6" y="8" width="12" height="8" rx="1" fill="#1e293b" stroke="none"/><rect x="3" y="5" width="18" height="14" rx="1.5" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="3 2"/></svg>Contour</button>
-                            <button onclick="openWiz && openWiz('slot')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="9" width="18" height="6" rx="3" stroke="#94a3b8" stroke-width="2.5"/><line x1="7" y1="12" x2="17" y2="12" stroke="#1e293b" stroke-width="2" stroke-linecap="round"/></svg>Slot</button>
-                            <button onclick="openWiz && openWiz('surfacing')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="4" width="18" height="16" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><path d="M5 8h14M5 12h14M5 16h14" stroke="#1e293b" stroke-width="1.5"/></svg>Surfacing</button>
-                            <button onclick="openWiz && openWiz('text')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><path d="M5 6h14M12 6v13" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/></svg>Text / engrave</button>
-                        </div>
-                    </div>
-
-                    <!-- I/O actions moved to the left "Setup" dropdown; WCS moved into Probe (above). -->
-                </div>
-            `;
-            
-            // Add click-to-toggle support for mobile/touch
-            document.querySelectorAll('.dock-header .toolbar-dropdown > button').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const parent = btn.parentElement;
-                    // close all others
-                    document.querySelectorAll('.dock-header .toolbar-dropdown').forEach(d => {
-                        if (d !== parent) {
-                            d.classList.remove('active');
-                            const cc = d.querySelector('.toolbar-dropdown-content');
-                            if (cc) {
-                                cc.style.position = '';
-                                cc.style.left = '';
-                                cc.style.top = '';
-                                cc.style.minWidth = '';
-                                cc.style.paddingTop = '';
-                            }
-                        }
-                    });
-
-                    const content = parent.querySelector('.toolbar-dropdown-content');
-                    const willOpen = !parent.classList.contains('active');
-                    parent.classList.toggle('active');
-
-                    // Position dropdown using fixed positioning so it won't be clipped
-                    if (content && willOpen) {
-                        try {
-                            const rect = btn.getBoundingClientRect();
-                            const pad = 6; // tray border + padding ring around the trigger
-                            content.style.position = 'fixed';
-                            content.style.left = `${Math.max(6, Math.round(rect.left - pad))}px`;
-                            content.style.top = `${Math.round(rect.top - pad)}px`;
-                            content.style.minWidth = `${Math.max(btn.offsetWidth + pad * 2, 0)}px`;
-                            // Tray wraps the trigger, but items start below it (trigger stays visible on top)
-                            content.style.paddingTop = `${btn.offsetHeight + pad + 4}px`;
-                        } catch (err) {
-                            // fallback: leave it absolute
-                            content.style.position = '';
-                        }
-                    } else if (content) {
-                        content.style.position = '';
-                        content.style.left = '';
-                        content.style.top = '';
-                        content.style.minWidth = '';
-                        content.style.paddingTop = '';
-                    }
-                });
-            });
-            // close dropdowns on outside click and clear inline positioning
-            document.addEventListener('click', () => {
-                document.querySelectorAll('.dock-header .toolbar-dropdown').forEach(d => {
-                    d.classList.remove('active');
-                    const cc = d.querySelector('.toolbar-dropdown-content');
-                    if (cc) {
-                        cc.style.position = '';
-                        cc.style.left = '';
-                        cc.style.top = '';
-                        cc.style.minWidth = '';
-                        cc.style.paddingTop = '';
-                    }
-                });
-            });
-        }
+        this._renderWizardBar();
 
         const rightTarget = document.querySelector('.dock-header .header-right');
         if (rightTarget) {
@@ -673,15 +616,14 @@ export class CommandDeck {
             `;
         }
 
-        document.querySelectorAll('.dock-header .header-left button, .dock-header .header-center button, .dock-header .header-right button')
+        // Wizard buttons (left/center) get their pointerdown guard inside _renderWizardBar; bind the right
+        // action buttons here.
+        document.querySelectorAll('.dock-header .header-right button')
             .forEach(btn => btn.addEventListener('pointerdown', (e) => { e.preventDefault(); }, { passive: false }));
-        document.addEventListener('click', (ev) => {
-            const t = ev.target;
-            if (t && t.dataset && t.dataset.__ddcs_handled) {
-                try { ev.stopImmediatePropagation(); ev.preventDefault(); } catch (e) { /* noop */ }
-                try { delete t.dataset.__ddcs_handled; } catch (e) { /* noop */ }
-            }
-        }, true);
+        this._initHeaderDocListeners();
+
+        // Live re-render hook for the Settings "wizard library manager" (stage 5) — re-reads getLibrary().
+        window.ddcsRefreshWizardBar = () => { this._renderWizardBar(); requestAnimationFrame(() => { this._fitHeader(); this._fitAppHeader(); }); };
 
         // One-line toolbar: collapse labels→icons the instant the labelled bar wouldn't fit, so it
         // never wraps (wrapping clipped the 2nd row) and the page never scrolls. Re-measure on
@@ -697,6 +639,118 @@ export class CommandDeck {
                 if (document.body) mo.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
             }
         }
+    }
+
+    // Render the wizard bar from the wizard library (blocks/wizardLibrary.getLibrary()): the Setup group
+    // goes left, every other group (Probe / ATC / Mill / Custom / …) goes center. Re-callable for live
+    // refresh after the Settings library manager edits the catalog (window.ddcsRefreshWizardBar).
+    _renderWizardBar() {
+        let groups = [];
+        try { groups = getLibrary().groups || []; } catch (err) { console.warn('wizard library unavailable', err); }
+        const setup = groups.find(g => g.id === 'setup') || { id: 'setup', label: 'Setup', items: [] };
+        const center = groups.filter(g => g.id !== 'setup');
+
+        const leftTarget = document.querySelector('.dock-header .header-left');
+        if (leftTarget) {
+            leftTarget.innerHTML = `
+                <div style="display:flex; gap:6px; align-items:center;">
+                    ${wizGroupHtml(setup)}
+                </div>
+            `;
+        }
+        const centerTarget = document.querySelector('.dock-header .header-center');
+        if (centerTarget) {
+            centerTarget.innerHTML = `
+                <div style="display:flex; gap:6px; width:auto; align-items:center;">
+                    ${center.map(wizGroupHtml).join('')}
+                </div>
+            `;
+        }
+        this._bindWizardDropdowns();
+    }
+
+    // (Re)bind the per-trigger mobile/touch toggle + the focus-steal guard on the wizard buttons. These are
+    // element-level listeners — they die with the old DOM on each re-render, so they never accumulate.
+    _bindWizardDropdowns() {
+        // Click-to-toggle support for mobile/touch (fixed-positioned so the tray isn't clipped).
+        document.querySelectorAll('.dock-header .toolbar-dropdown > button').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const parent = btn.parentElement;
+                // close all others
+                document.querySelectorAll('.dock-header .toolbar-dropdown').forEach(d => {
+                    if (d !== parent) {
+                        d.classList.remove('active');
+                        const cc = d.querySelector('.toolbar-dropdown-content');
+                        if (cc) {
+                            cc.style.position = '';
+                            cc.style.left = '';
+                            cc.style.top = '';
+                            cc.style.minWidth = '';
+                            cc.style.paddingTop = '';
+                        }
+                    }
+                });
+
+                const content = parent.querySelector('.toolbar-dropdown-content');
+                const willOpen = !parent.classList.contains('active');
+                parent.classList.toggle('active');
+
+                // Position dropdown using fixed positioning so it won't be clipped
+                if (content && willOpen) {
+                    try {
+                        const rect = btn.getBoundingClientRect();
+                        const pad = 6; // tray border + padding ring around the trigger
+                        content.style.position = 'fixed';
+                        content.style.left = `${Math.max(6, Math.round(rect.left - pad))}px`;
+                        content.style.top = `${Math.round(rect.top - pad)}px`;
+                        content.style.minWidth = `${Math.max(btn.offsetWidth + pad * 2, 0)}px`;
+                        // Tray wraps the trigger, but items start below it (trigger stays visible on top)
+                        content.style.paddingTop = `${btn.offsetHeight + pad + 4}px`;
+                    } catch (err) {
+                        // fallback: leave it absolute
+                        content.style.position = '';
+                    }
+                } else if (content) {
+                    content.style.position = '';
+                    content.style.left = '';
+                    content.style.top = '';
+                    content.style.minWidth = '';
+                    content.style.paddingTop = '';
+                }
+            });
+        });
+        // Suppress focus-steal (keeps the keyboard from popping) on the wizard trigger + item buttons.
+        document.querySelectorAll('.dock-header .header-left button, .dock-header .header-center button')
+            .forEach(btn => btn.addEventListener('pointerdown', (e) => { e.preventDefault(); }, { passive: false }));
+    }
+
+    // One-time document-level listeners: close any open dropdown on an outside click, and honour the
+    // __ddcs_handled pointerdown guard. Guarded so live re-renders (ddcsRefreshWizardBar) don't stack copies.
+    _initHeaderDocListeners() {
+        if (this._headerDocListeners) return;
+        this._headerDocListeners = true;
+        // close dropdowns on outside click and clear inline positioning
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.dock-header .toolbar-dropdown').forEach(d => {
+                d.classList.remove('active');
+                const cc = d.querySelector('.toolbar-dropdown-content');
+                if (cc) {
+                    cc.style.position = '';
+                    cc.style.left = '';
+                    cc.style.top = '';
+                    cc.style.minWidth = '';
+                    cc.style.paddingTop = '';
+                }
+            });
+        });
+        document.addEventListener('click', (ev) => {
+            const t = ev.target;
+            if (t && t.dataset && t.dataset.__ddcs_handled) {
+                try { ev.stopImmediatePropagation(); ev.preventDefault(); } catch (e) { /* noop */ }
+                try { delete t.dataset.__ddcs_handled; } catch (e) { /* noop */ }
+            }
+        }, true);
     }
 
     // Priority+ fit for the wizard toolbar: keep the most labels possible. Stage 1 (.is-compact)

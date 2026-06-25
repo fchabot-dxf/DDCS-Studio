@@ -1,0 +1,100 @@
+import { test, expect } from '@playwright/test';
+
+/**
+ * STAGE 4 — the data-driven wizard bar. commandDeck.renderHeader no longer hard-codes the dropdowns; it renders
+ * from blocks/wizardLibrary.getLibrary(). This locks the behaviour-preserving contract at the DOM level: the
+ * Setup group (+ the bar-special I/O quick-actions) on the left; Probe/ATC/Mill on the center; the "Rotary"
+ * sub-label; the dedicated 3D-animated openers (openCornerWiz &c.); inline-SVG icons winning over emoji; and a
+ * user op surfacing a live "Custom" dropdown through window.ddcsRefreshWizardBar.
+ */
+test('wizard bar renders from the library (groups, I/O, openers, icons, live custom group)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsRefreshWizardBar && window.ddcsGetBlockProgram);
+
+  // Read the live bar DOM: each dropdown's group label, its content buttons (+ onclick/svg), and any dividers.
+  const readBar = () => page.evaluate(() => {
+    const read = (sel) => Array.from(document.querySelectorAll(sel)).map((dd) => ({
+      label: (dd.querySelector('.btn-tx')?.textContent || '').trim(),
+      items: Array.from(dd.querySelectorAll('.toolbar-dropdown-content > button')).map((b) => ({
+        text: b.textContent.trim(),
+        onclick: b.getAttribute('onclick') || '',
+        hasSvg: !!b.querySelector('svg'),
+      })),
+      dividers: Array.from(dd.querySelectorAll('.toolbar-dropdown-content > div')).map((d) => d.textContent.trim()),
+    }));
+    return { left: read('.dock-header .header-left .toolbar-dropdown'), center: read('.dock-header .header-center .toolbar-dropdown') };
+  });
+
+  // baseline catalog (no user ops / overrides yet)
+  await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
+  const bar = await readBar();
+
+  // ── left: the Setup dropdown, with the I/O quick-actions appended as a special section ──
+  expect(bar.left).toHaveLength(1);
+  expect(bar.left[0].label).toBe('Setup');
+  const leftOnclicks = bar.left[0].items.map((i) => i.onclick);
+  expect(leftOnclicks).toEqual([
+    "openWiz && openWiz('comm')",
+    "openWiz && openWiz('atc_warmup')",
+    "ddcsInsertIo && ddcsInsertIo('outpin')",
+    "ddcsInsertIo && ddcsInsertIo('waitinput')",
+    "ddcsInsertIo && ddcsInsertIo('dwell')",
+  ]);
+  expect(bar.left[0].dividers).toEqual(['I/O']);
+
+  // ── center: Probe / ATC / Mill, in order ──
+  expect(bar.center.map((g) => g.label)).toEqual(['Probe', 'ATC', 'Mill']);
+  const probe = bar.center[0], atc = bar.center[1], mill = bar.center[2];
+
+  // Probe: WCS uses the generic openWiz; Corner/Middle/Edge/Align use their dedicated 3D-animated openers;
+  // the "Rotary" sub-label divider survives.
+  const probeBy = Object.fromEntries(probe.items.map((i) => [i.text.replace(/\s+/g, ' '), i.onclick]));
+  expect(probe.items[0].onclick).toBe("openWiz && openWiz('wcs')");
+  expect(probe.items.find((i) => /Corner/.test(i.text)).onclick).toContain('openCornerWiz');
+  expect(probe.items.find((i) => /Middle/.test(i.text)).onclick).toContain('openMiddleWiz');
+  expect(probe.items.find((i) => /Edge/.test(i.text)).onclick).toContain('openEdgeWiz');
+  expect(probe.items.find((i) => /Align/.test(i.text)).onclick).toContain('openAlignmentWiz');
+  expect(probe.dividers).toEqual(['Rotary']);
+
+  // ATC: all five tools via openWiz
+  expect(atc.items.map((i) => i.onclick)).toEqual([
+    "openWiz && openWiz('atc_length')", "openWiz && openWiz('atc_check')", "openWiz && openWiz('atc_change')",
+    "openWiz && openWiz('atc_table')", "openWiz && openWiz('atc_test')",
+  ]);
+
+  // Mill: drill carries its variant; inline-SVG icons render (drill); `text` is given an emoji in the library
+  // but the bar's SVG map WINS, so it must render an svg (icon precedence).
+  expect(mill.items[0].onclick).toBe("openWiz && openWiz('drill','drill')");
+  expect(mill.items[1].onclick).toBe("openWiz && openWiz('drill','bore')");
+  expect(mill.items.find((i) => i.onclick === "openWiz && openWiz('drill','drill')").hasSvg).toBe(true);
+  expect(mill.items.find((i) => i.onclick === "openWiz && openWiz('text')").hasSvg).toBe(true);
+
+  // ── live custom group: register a user op + refresh → a "Custom" dropdown appears on the center ──
+  await page.evaluate(async () => {
+    const L = await import('/blocks/wizardLibrary.js');
+    const U = await import('/blocks/userOps.js');
+    L.createWizard(U.userOpFromStack('bar_test', 'Bar Test',
+      [{ type: 'move', params: { x: 0, y: 0, z: -5 } }],
+      [{ param: 'depth', blockIndex: 0, key: 'z', type: 'number', default: -5 }]));
+    window.ddcsRefreshWizardBar();
+  });
+  const bar2 = await readBar();
+  const custom = bar2.center.find((g) => g.label === 'Custom');
+  expect(custom).toBeTruthy();
+  expect(custom.items).toHaveLength(1);
+  expect(custom.items[0].text).toContain('Bar Test');
+  expect(custom.items[0].onclick).toBe("ddcsInsertUserOp && ddcsInsertUserOp('user_bar_test')");
+
+  // ── a hidden built-in drops out of the bar (override + refresh) ──
+  await page.evaluate(async () => {
+    const L = await import('/blocks/wizardLibrary.js');
+    L.setEntryOverride('pocket', { visible: false });
+    window.ddcsRefreshWizardBar();
+  });
+  const bar3 = await readBar();
+  const mill3 = bar3.center.find((g) => g.label === 'Mill');
+  expect(mill3.items.some((i) => i.onclick === "openWiz && openWiz('pocket')")).toBe(false);
+
+  // cleanup: restore the shipped bar so we don't leak state into other specs
+  await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
+});
