@@ -30,11 +30,12 @@ export function flattenBlocks(blocks, out = []) {
     return out;
 }
 
-// Walk a template; for each `param` reporter record plugged into a value socket, produce a form binding AND
-// replace the record with its default number — v(A): a clean template (param blocks are an authoring INPUT, not
-// round-tripped; instantiate stays blockIndex/key). Mutates `template`. (v(B): keep the record + instantiate by
-// name — see the gui-blocks-roundtrip-target note.) Param names are deduped against `seen`.
-export function extractParamBlocks(template, seen = new Set()) {
+// Walk a template; for each `param` reporter record plugged into a value socket, produce a form binding.
+// v(B) (keepPills=true, the default for save): KEEP the pill in the template so it ROUND-TRIPS — re-opening the
+// wizard shows the param blocks. instantiate still resolves the pill to a number (it overwrites the socket by
+// blockIndex/key), so the committed op + valid-by-construction are untouched (pills never reach a committed op).
+// v(A) (keepPills=false): replace the pill with its number (a clean number-only template). Names deduped vs `seen`.
+export function extractParamBlocks(template, seen = new Set(), keepPills = true) {
     const flat = flattenBlocks(template), bindings = [], STANDALONE = new Set(['slider']);
     flat.forEach((blk, i) => {
         if (!blk || !blk.params) return;
@@ -48,7 +49,7 @@ export function extractParamBlocks(template, seen = new Set()) {
             const dn = Number(pp.value), dflt = Number.isFinite(dn) ? dn : 0;
             const widget = STANDALONE.has(pp.widget) ? { widget: pp.widget } : {};
             bindings.push({ param: name, blockIndex: i, key, type: 'number', default: dflt, label: pp.name || name, ...widget });
-            blk.params[key] = dflt;   // replace the pill with its number → clean template
+            if (!keepPills) blk.params[key] = dflt;   // (A) replace; (B/default) leave the pill in the template
         }
     });
     return bindings;
