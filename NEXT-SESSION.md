@@ -196,3 +196,9 @@ routed through all six build sites. Guard: `tests/op-params-complete.spec.js` (a
   differing line (inject a glow span at a char range in `formatGCode`'s overlay — the fiddly part).
 - **L1/L2** — per-controller address columns in the dict (the cross-controller translator); best-effort read of
   foreign post markers (e.g. Fusion op headers) as declarations.
+- **Blocks tab rotary stock auto-shape** — when the active op is `rotary_clock` or `rotary_center`, the preview
+  panel should auto-set `stock.shape = 'cylinder'` before rendering (the 3D renderer + stock editor already fully
+  support cylinder; the gap is just the auto-detect). Currently the user has to manually open the stock editor and
+  pick "Cylinder — rotary stock." Fix: in `previewActiveOp` (or wherever the Blocks tab initialises the preview
+  for an op), check `op.type` and coerce the stock shape. One-liner, but needs a "don't clobber the user's
+  intentional stock choice" guard (e.g. only auto-switch if `stock.shape === 'boss'` / the default).
