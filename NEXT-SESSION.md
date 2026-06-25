@@ -106,14 +106,21 @@ partial, messy decouple of 14-tested reverse-sync code for modest gain. **Left a
 
 ---
 
+## ✅ Params-completeness — DONE (commit `6b997ab`)
+A freshly-inserted op now satisfies `BUILDERS(op.params) == op.children` (block ids aside), so it doesn't
+false-glow or falsely read as block-edited. **The handoff's "probe op.params doesn't capture sources" was a
+MISDIAGNOSIS** — `sources` round-trips fine; probe ops were already clean. The real culprits (found by actually
+running the app, not guessing): (1) the `region` block nested in `stepover.params` gets a fresh counter-based id
+each build → fixed with a shared `stripBlockIds()` in the id-sensitive compares (`isOpBlockEdited`, the glow's
+`_paramsDiffer`); pocket glowed 189 lines → 0. (2) `homing` self-wraps its atoms in an op container but
+commit/replace/duplicate wrapped it AGAIN → fixed with `_framed()` (build + unwrap a self-wrapping builder),
+routed through all six build sites. Guard: `tests/op-params-complete.spec.js` (all 21 ops clean).
+
 ## Other queued work (after the binding rebuild)
 - **USER wizard-maker** — let a user parametrize a block stack → a *compliant* custom op; the validator validates
-  it by construction. (Separate product feature; builds on the unified binding + validator.)
+  it by construction. (Separate product feature; builds on the unified binding + validator + the params-
+  completeness guard above — a user op is valid only if `BUILDERS(params)` reproduces its blocks.)
 - **Word-level glow** — the override-diff glow is block/line-level today; word-level needs a char-diff within the
   differing line (inject a glow span at a char range in `formatGCode`'s overlay — the fiddly part).
-- **Probe `op.params` completeness** — a *freshly-inserted* probe op glows (false positive) because
-  `BUILDERS(op.params) ≠ op.children` (op.params doesn't fully capture the probe config / `sources`). The rebuild
-  (making op.params the complete source) fixes it; add a "**`BUILDERS(op.params)` reproduces `op.children`**"
-  (params-completeness) check to the validator to catch it.
 - **L1/L2** — per-controller address columns in the dict (the cross-controller translator); best-effort read of
   foreign post markers (e.g. Fusion op headers) as declarations.
