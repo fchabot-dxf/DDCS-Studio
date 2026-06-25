@@ -15,6 +15,7 @@
  */
 import { BUILDERS, registerOpLabel } from './opBuilders.js';
 import { SCHEMA } from './opSchema.js';
+import { setUserSimIntent } from '../viz/opSimContext.js';
 
 const STORE_KEY = 'ddcs_user_ops';
 export const USER_OP_PREFIX = 'user_';
@@ -125,6 +126,21 @@ function instantiate(def, params) {
     return clone;
 }
 
+// A custom op shows the 4th-axis rotary rig in previews if any atom drives a rotary axis (A/B/C) — a move with an
+// a/b/c word, or a probe / DRO-read / work-offset on an A/B/C axis (the atoms the built-in rotary ops emit, see
+// rotaryClockWizard MV('A',…) → {mode,a}). Only rotary is inferred; forceMachine/showMagazine stay declared.
+const ROT_AXES = new Set(['A', 'B', 'C']);
+function deriveSimIntent(template) {
+    const rotary = flattenBlocks(template).some((b) => {
+        if (!b || !b.params) return false;
+        if (b.type === 'move') return ['a', 'b', 'c'].some((k) => b.params[k] != null && b.params[k] !== '');
+        if (b.type === 'probe' || b.type === 'proberead' || b.type === 'readmachine' || b.type === 'setworkoffset')
+            return ROT_AXES.has(String(b.params.axis || '').toUpperCase());
+        return false;
+    });
+    return { showRotaryRig: rotary };
+}
+
 /** Validate a def BEFORE registering — returns a list of problems ([] = compliant). */
 export function validateUserOp(def) {
     const errs = [];
@@ -152,6 +168,7 @@ export function registerUserOp(def) {
     for (const b of def.bindings) schema[b.param] = { type: b.type, addr: null, field: `uop_${def.opType}_${b.param}` };
     SCHEMA[def.opType] = schema;
     registerOpLabel(def.opType, def.label || def.opType);
+    setUserSimIntent(def.opType, deriveSimIntent(def.template));   // declare the preview intent (rotary rig from atoms)
     return def;
 }
 
@@ -197,6 +214,7 @@ export function deleteUserOp(opType) {
     writeStore(readStore().filter((d) => d.opType !== opType));
     delete BUILDERS[opType];
     delete SCHEMA[opType];
+    setUserSimIntent(opType, null);   // clear the declared preview intent
 }
 
 /** Re-register every persisted user op — call ONCE at app start. Returns the count registered. */

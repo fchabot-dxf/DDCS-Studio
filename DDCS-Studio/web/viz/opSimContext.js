@@ -25,14 +25,30 @@ const FORCE_MACHINE = new Set(['atc_length', 'atc_check', 'atc_warmup', 'atc_cha
 // Carries an ATC magazine (pockets + tool stubs on the envelope): the ops that actually move tools to/from pockets.
 const WITH_MAGAZINE = new Set(['atc_change', 'atc_table']);
 
+// Custom ops (user_*) DECLARE their intent at register time: userOps.registerUserOp derives it from the op's atoms
+// (an A/B/C-axis move/probe/DRO-read → the rotary rig) and registers it here. Only the rotary signal is derived —
+// G31→machine and tool-change→magazine are deliberately NOT inferred (they'd contradict the built-in intents
+// above: the edge/corner probe wizards aren't forceMachine, and a bare tool-change carries no magazine model). A
+// custom op that needs forceMachine/showMagazine should declare it explicitly. Built-ins use the static sets.
+const USER_INTENT = new Map();
+
+/** Register a custom op's declared preview intent (or clear it with intent=null). Called by userOps on
+ *  register/delete so a user_* op gets the same preview treatment as a built-in. */
+export function setUserSimIntent(opType, intent) {
+    if (intent) USER_INTENT.set(opType, intent); else USER_INTENT.delete(opType);
+}
+
 /**
  * The declared preview intent for an op type:
  *   - showRotaryRig: show the 4th-axis chuck + tailstock rig.
  *   - forceMachine:  pin to the machine frame (always draw the envelope), regardless of whether the trace hits G53.
  *   - showMagazine:  this op carries an ATC magazine to render (the pocket DATA comes from the profile separately).
- * Unknown / cutting ops get all-false (the default local-frame, no-rig, no-magazine preview).
+ * A registered custom op uses its declared intent; built-ins use the static sets; everything else is all-false
+ * (the default local-frame, no-rig, no-magazine preview).
  */
 export function opSimContext(opType) {
+    const u = USER_INTENT.get(opType);
+    if (u) return { showRotaryRig: !!u.showRotaryRig, forceMachine: !!u.forceMachine, showMagazine: !!u.showMagazine };
     return {
         showRotaryRig: ROTARY_RIG.has(opType),
         forceMachine: FORCE_MACHINE.has(opType),

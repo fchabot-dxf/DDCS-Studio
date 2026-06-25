@@ -94,8 +94,17 @@ Earlier-but-related (prior session, on `main`): the data-driven wizard bar (`com
    chevron menu (the floating button is universal). Wiring in `headerPost.js`; styles in `styles.css`. Test:
    `tests/editor-chrome.spec.js` (desktop wiring + menu delta; phone hide). NOTE the test must wait for the chevron
    menu to populate (initHeaderPost wires the Copy listener AFTER window.copyCode exists).
-5. **Custom-op preview intent** — extend `viz/opSimContext.js` to `user_*` ops (rotary/probe/magazine), derived from
-   atoms (A-move→rotary, G31→machine, tool-change→magazine) or declared.
+5. **Custom-op preview intent** — ✅ DONE for the *sound* subset (rotary rig only). A `user_*` op now DECLARES its
+   preview intent at register time: `userOps.registerUserOp` derives the 4th-axis rotary rig from the op's atoms
+   (an A/B/C-axis move/probe/DRO-read — the atoms the built-in rotary wizards emit) and registers it via
+   `opSimContext.setUserSimIntent`, so a custom rotary op gets the same rig as a built-in (the Blocks program
+   preview's `programSimContext` union picks it up). "Showing the rotary = the 4th axis is plugged in" — and it's
+   wired to jogging: `setRotaryFixture(on)` → `gcodeViz3d._showRotaryJog(on)` reveals the manual A± jog row, so a
+   custom rotary op becomes joggable in the preview (the controller/profile 4th-axis setting stays independent).
+   Cleared on delete; re-derived by `loadUserOps`. **DEFERRED**: `G31→forceMachine` and `tool-change→showMagazine` were NOT
+   inferred — they contradict the built-in intents (edge/corner probes aren't forceMachine; a bare tool-change has
+   no magazine model). A custom op needing those should DECLARE them (the registry accepts a full intent object).
+   Test: `tests/custom-op-sim-intent.spec.js`.
 
 CONCEPT-ONLY (do NOT build the behavior): the **terrain-probe** is a proof-of-concept illustration (see
 `CRAZY-IDEAS.md` — surface digitizing / probe-array → terrain). Its real CNC gaps (probe base must be block-ported;
