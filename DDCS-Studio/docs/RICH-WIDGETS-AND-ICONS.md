@@ -130,12 +130,40 @@ Each piece: shared core + Blockly field adapter + form widget + **a Class-B rend
 (`block.getHeightWidth().height > 0`, per the Blockly v13 trap) + a form round-trip test. Controls commit the same
 param values (pick → enum/number, handle → number) so numeric sockets stay numeric → valid by construction.
 
-## Track D — The composer (authoring surface, on top of Track C)
+## Track D — The authoring editor ("make your own datum") — UX SCOPE (review before code)
 
-The "custom-GUI maker": **compose a graphic** (the `iconEditor` layer engine) → **mark interaction** (hit-regions for
-`pick`, handles for `handle`) → **bind to a param**. Output = a control spec (Track C) that's *functional* in form +
-block AND *exportable as a graphic* (reuse `iconEditor`'s stage→raster). No logic-buttons — the spec's binding + the
-op stack are the logic. The CAM Pack Builder is a key consumer (slot authoring wants both custom controls + icons).
+The "custom-GUI maker": a user creates a region-pick control = `{ backdrop, regions:[{shape, geometry, value, label}] }`
+and binds it to a param → a `regionpick` block (spec in `b.data`) → renders in form **and** block (both shipped).
+Below is the UX, written for review BEFORE implementation (per the handoff — "scope first, the region-drawing
+surface + iconEditor reuse is the hard part").
+
+**Flow:**
+1. **Entry** — in Blocks **dev mode**, a "＋ Region pick" action (the authoring home, beside "expose value"). On save
+   it inserts a `regionpick` reporter into the chosen value socket + records the binding.
+2. **Backdrop** — composed via the **existing `iconEditor`** (its LAYERS), rendered to **SVG** via `stageSvg` →
+   `spec.backdrop` (vector, crisp, re-editable by reopening iconEditor with the layers). Coordinate space = the
+   iconEditor canvas (360×180) → `spec.viewBox = '0 0 360 180'`. Backdrop is optional (skip → blank).
+3. **Regions** — draw **rect / polygon / freeform** on the backdrop; each gets a **NUMBER** (v1 numeric) + a **label**;
+   select / move / delete / reorder. Freeform = a freehand drag simplified to a polygon.
+4. **Bind** — name the param + choose which numeric value (socket) it drives (same gesture as dev-mode "expose value").
+5. **Output** — a `regionpick` block (spec on `b.data`) → `extractParamBlocks` → the `widget:'region-pick'` binding.
+   Re-edit: reopen the editor from the spec (spec → layers + regions).
+
+**THE KEY FORK — the region-drawing surface (decide at review):**
+- **(A) EXTEND `iconEditor`** with a "region" layer type (shape + value + label) + polygon/freeform tools; on
+  save-as-region-pick, split GRAPHIC layers (→ backdrop SVG) from REGION layers (→ `spec.regions`). ONE editor does
+  backdrop + regions — **max reuse** of its stage/drag/select/layers machinery. *Cost:* couples region semantics into
+  the CAM icon editor (some bloat / shared-tool risk).
+- **(B) DEDICATED region editor** — a focused surface that takes the backdrop (iconEditor layers/SVG) and only
+  draws/assigns regions. **Clean separation** (iconEditor stays the CAM tool). *Cost:* duplicates some drag/draw code.
+- *Lean:* (A) for reuse (the handoff frames it as "iconEditor reuse"), but the coupling is the thing to weigh — hence
+  review before code.
+
+**Smaller decisions:** backdrop as vector SVG (recommended) vs raster data-uri; freeform → simplified polygon vs
+polygon-only (click points) for v1; values numeric in v1 (enum once field-targeting lands); the CAM Pack Builder is a
+second consumer (slot authoring wants custom controls + icons on the same editor).
+
+**→ STOP after this scope (per the handoff): the plan gets eyes before implementation.**
 
 ---
 

@@ -111,11 +111,19 @@ Earlier-but-related (prior session, on `main`): the data-driven wizard bar (`com
      non-field-scalar channel), the picked NUMBER reduces into real G-code, and `extractParamBlocks` turns a pill into
      a `widget:'region-pick'` binding. Test: `tests/region-pick-block.spec.js` (Class-B + round-trip). Region-pick is
      now a genuine dual-adapter (form + block) pick surface — the real 2nd case beside the datum.
-   - **DIRECTION — next: the AUTHORING editor** ("make your own datum": compose the backdrop in `iconEditor` + mark
-     rect/poly/freeform regions + assign numbers/labels + bind to a param). The headline — the agent flagged it as a
-     big "blind" build, so scope the UX first (esp. the region-drawing surface + iconEditor reuse). AND: with datum +
-     region-pick now two concrete dual-adapter pick widgets, the deferred generic `pick` renderer can be extracted
-     (rule of three met) — but only if a 3rd case or real friction justifies it; otherwise keep them concrete.
+   - **DIRECTION — (1) ship V10.35, then (2) SCOPE the authoring editor before any code.**
+     (1) **Ship V10.35 first.** A large user-facing batch is sitting unreleased — icon picker + region-pick runtime +
+     region-pick block parity. Cut the release to bank it before opening the next big build. Release hygiene; a clean
+     stopping line.
+     (2) **Scope the authoring editor → ✅ SCOPE WRITTEN (awaiting review).** UX in `docs/RICH-WIDGETS-AND-ICONS.md`
+     → "Track D — The authoring editor". Flow: dev-mode "＋ Region pick" → backdrop via `iconEditor` (layers →
+     `stageSvg` SVG, 360×180) → draw rect/poly/freeform regions + numbers/labels → bind → a `regionpick` block.
+     **THE FORK to decide at review: (A) EXTEND iconEditor with a "region" layer type (max reuse, some coupling) vs
+     (B) a DEDICATED region editor over the iconEditor backdrop (clean separation, some duplicated draw code).** Agent
+     leans (A); the coupling is the thing to weigh. NO code yet — stopped here for eyes, per this direction.
+     - NOTE on the generic renderer: datum + region-pick are now two concrete dual-adapter pick widgets, so the
+       deferred generic `pick` renderer COULD be extracted (rule of three nearly met) — but do NOT, unless a 3rd case
+       or real friction forces it. Keep them concrete; the authoring editor is the priority, not the abstraction.
 
    - **Rule of thumb:** when a second concrete pick widget appears (e.g. the fixture-backdrop canvas), put the two
      side by side and extract the shared spec then. Two real examples disagreeing is what tells you what's genuinely
