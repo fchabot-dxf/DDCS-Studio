@@ -196,6 +196,11 @@ routed through all six build sites. Guard: `tests/op-params-complete.spec.js` (a
   differing line (inject a glow span at a char range in `formatGCode`'s overlay — the fiddly part).
 - **L1/L2** — per-controller address columns in the dict (the cross-controller translator); best-effort read of
   foreign post markers (e.g. Fusion op headers) as declarations.
+- **Sim intent layer** (`opSimContext.js`) — same declare-not-infer discipline applied to rendering. Today
+  `gcodeViz3d.js` interrogates op type + stock shape + profile directly (accumulated special cases: rotary rig,
+  probe stop, ATC magazine, machine envelope). Fix: a declared `(op, stock, profile) → simContext` translation —
+  `{ showRotaryRig, stockGeometry, showFixture, … }` — so the renderer consumes plain data and is testable. Same
+  leaf-import pattern as `opBuilders.js`. Do AFTER the module restructure settles.
 - **Blocks tab rotary preview context** — when the active op is `rotary_clock` or `rotary_center`, the Blocks tab
   preview should show the 4th-axis fixture (chuck + tailstock rig). The **op type decides** whether the rig
   appears, not the stock shape — rectangular stock on a rotary axis is a valid setup (`rotary_clock` probes off a
