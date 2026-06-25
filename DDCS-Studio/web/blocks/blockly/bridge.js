@@ -105,7 +105,9 @@ const DESCRIPTIONS = {
     tool: "Tool Number (T)",
     value: "Value to set",
     pattern: "Hole pattern: grid, line, circle (bolt) or rect perimeter",
-    ramp: "Bore stepdown: step (plunge + flat circle) or helix (linearized G1 ramp)"
+    ramp: "Bore stepdown: step (plunge + flat circle) or helix (linearized G1 ramp)",
+    widget: "How this knob renders in the form: number / slider / dropdown (presets) / toggle (on=1, off=0)",
+    options: "Dropdown presets — a comma/newline list of Label=value (numeric), e.g. Rough=500, Finish=1500"
 };
 const getDesc = (f) => DESCRIPTIONS[f.toLowerCase()] || `The ${f} parameter`;
 
@@ -116,7 +118,7 @@ const optionsFor = (def, field) => {
         if (def.type === 'waitinput') return ['imm', 'rise', 'fall', 'high', 'low'];
         if (def.type === 'move') return ['cut', 'rapid', 'probe'];
     }
-    if (field === 'widget' && def.type === 'param') return ['number', 'slider'];   // numeric-socket widgets (more come with grouping / B)
+    if (field === 'widget' && def.type === 'param') return ['number', 'slider', 'dropdown', 'toggle'];   // numeric-socket widgets (all commit a number)
     if (field === 'panel' && def.type === 'panel') return ['form3d', 'form2d', 'form'];   // the GUI panel-type declaration
     return SELECTS[field] || null;
 };

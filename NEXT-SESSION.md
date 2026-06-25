@@ -70,8 +70,17 @@ Earlier-but-related (prior session, on `main`): the data-driven wizard bar (`com
 1. **xy/rect param-block grouping** — group param blocks into a canvas picker (a `group` field on `param` + roles by
    order; `extractParamBlocks` emits group/role bindings). NOTE: the canvas pickers are ALREADY authorable via the
    inline-expose path (it groups xy/rect by order) — this is a blocks-native convenience, not a missing capability.
-2. **Typed widgets from param blocks** (dropdown/toggle/corner-grid) — needs the `param` value to be non-numeric
-   (enum/bool/string), i.e. a small value-type extension to the param block (today its value is a numeric socket).
+2. **Typed widgets from param blocks** — ✅ DONE for the *sound* subset (dropdown presets + numeric toggle). A param
+   block always lives in a NUMERIC socket, so every widget commits a NUMBER (valid by construction, no emitter
+   changes): `dropdown` = a numeric preset chosen from a new `options` field ("Rough=500, Finish=1500"); `toggle` =
+   1/0. `param.widget` dropdown now offers number/slider/dropdown/toggle; `userOps.parseParamOptions` +
+   `extractParamBlocks` derive the binding (+ widgetConfig.options); `formWidgets` dropdown/toggle commit a number
+   for numeric bindings (still bool/enum for those binding types). Test: `tests/gui-param-typed-widgets.spec.js`
+   (Class-B render guard included). **DEFERRED**: `text` / `corner-grid` knobs — they commit a string/code, which
+   can't live in a numeric socket; they'd need a *field-targeting* param (a param that occupies an inline dropdown/
+   text field, not a value socket) — a separate, larger mechanism. (Both widgets already work form-side, just not
+   authorable as a param block.) Not yet wired into the dev-mode *inline-expose* path (only param blocks carry the
+   `options` presets); a toggle there would be trivial, a dropdown needs an options input.
 3. **SVG / icons** (raised, deferred): a curated icon library + picker for wizards & dropdowns (the `iconOverride`
    passthrough already exists in `getLibrary`); custom SVG **import** (sanitised) + an **in-modal GUI editor** (compose
    from components — fields/handles/buttons, NOT a vector editor); SVG **backdrop** for a canvas picker (your fixture

@@ -8,11 +8,16 @@
  * don't round-trip). v(B) [target, see memory]: keep the param record in the template so it round-trips.
  *
  * `value` is a numeric socket (the default), so it can itself hold a #var/expression like any value.
+ *
+ * Typed widgets: a param block always lives in a NUMERIC socket, so every widget commits a NUMBER (valid by
+ * construction, no emitter changes) — number/slider = a plain number; `dropdown` = a numeric preset chosen from
+ * the `options` list ("Rough=500, Finish=1500"); `toggle` = 0/1. Non-numeric widgets (text / corner-grid) target
+ * inline fields, not sockets, so they aren't reachable from a param block (form-only — see ui/formWidgets.js).
  */
 export const paramBlock = {
     type: 'param', label: 'param', kind: 'reporter', category: 'Variables',
-    defaults: { name: 'value', widget: 'number', value: 0 },
-    fields: ['name', 'widget', 'value'],
+    defaults: { name: 'value', widget: 'number', value: 0, options: '' },
+    fields: ['name', 'widget', 'value', 'options'],   // `options` (presets) only matters for the dropdown widget
     reduce: (p, scope, rc) => {
         const v = p.value;
         if (v && typeof v === 'object' && rc) return rc(v);   // a reporter plugged into the default socket

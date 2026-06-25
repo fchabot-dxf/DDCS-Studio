@@ -77,7 +77,9 @@ function dropdownWidget(host, b) {
         sel.appendChild(op);
     }
     host.append(labelSpan(b), sel);
-    return { read: () => ({ [b.param]: sel.value }) };
+    // numeric bindings (a param-block dropdown of presets) commit a number; enum/string keep the raw option value.
+    const numeric = b.type === 'number' || b.type === 'int';
+    return { read: () => ({ [b.param]: numeric ? numOr(sel.value, b.default ?? 0) : sel.value }) };
 }
 
 function toggleWidget(host, b) {
@@ -88,7 +90,9 @@ function toggleWidget(host, b) {
     const cb = lab.querySelector('input');
     cb.checked = !!b.default;
     host.append(labelSpan(b), lab);
-    return { read: () => ({ [b.param]: cb.checked }) };
+    // a bool binding commits true/false; a numeric param-block toggle commits 1/0 (it lands in a numeric socket).
+    const numeric = b.type === 'number' || b.type === 'int';
+    return { read: () => ({ [b.param]: numeric ? (cb.checked ? 1 : 0) : cb.checked }) };
 }
 
 function textWidget(host, b) {

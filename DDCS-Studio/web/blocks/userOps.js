@@ -30,13 +30,32 @@ export function flattenBlocks(blocks, out = []) {
     return out;
 }
 
+// Parse a param block's `options` string ("Rough=500, Finish=1500", or newline-separated) → [[label, value], …].
+// Values must be NUMERIC (a param knob lands in a numeric socket → valid by construction); non-numeric presets are
+// dropped. A bare "500" yields ['500', 500]. Exported so the form widget + tests share one parser.
+export function parseParamOptions(str) {
+    const out = [];
+    for (const tok of String(str || '').split(/[,\n]/)) {
+        const t = tok.trim();
+        if (!t) continue;
+        const eq = t.indexOf('=');
+        const label = (eq >= 0 ? t.slice(0, eq) : t).trim();
+        const val = Number((eq >= 0 ? t.slice(eq + 1) : t).trim());
+        if (!Number.isFinite(val)) continue;
+        out.push([label || String(val), val]);
+    }
+    return out;
+}
+
 // Walk a template; for each `param` reporter record plugged into a value socket, produce a form binding.
 // v(B) (keepPills=true, the default for save): KEEP the pill in the template so it ROUND-TRIPS — re-opening the
 // wizard shows the param blocks. instantiate still resolves the pill to a number (it overwrites the socket by
 // blockIndex/key), so the committed op + valid-by-construction are untouched (pills never reach a committed op).
 // v(A) (keepPills=false): replace the pill with its number (a clean number-only template). Names deduped vs `seen`.
+// Widget round-trip: every param widget commits a NUMBER (the socket stays numeric) — slider/toggle keep their
+// widget key; dropdown also carries its parsed numeric presets as widgetConfig.options. type stays 'number'.
 export function extractParamBlocks(template, seen = new Set(), keepPills = true) {
-    const flat = flattenBlocks(template), bindings = [], STANDALONE = new Set(['slider']);
+    const flat = flattenBlocks(template), bindings = [];
     flat.forEach((blk, i) => {
         if (!blk || !blk.params) return;
         for (const key in blk.params) {
@@ -47,8 +66,13 @@ export function extractParamBlocks(template, seen = new Set(), keepPills = true)
             if (seen.has(name)) { let k = 2; while (seen.has(name + '_' + k)) k++; name += '_' + k; }
             seen.add(name);
             const dn = Number(pp.value), dflt = Number.isFinite(dn) ? dn : 0;
-            const widget = STANDALONE.has(pp.widget) ? { widget: pp.widget } : {};
-            bindings.push({ param: name, blockIndex: i, key, type: 'number', default: dflt, label: pp.name || name, ...widget });
+            let extra = {};
+            if (pp.widget === 'slider' || pp.widget === 'toggle') extra = { widget: pp.widget };
+            else if (pp.widget === 'dropdown') {
+                const options = parseParamOptions(pp.options);
+                extra = { widget: 'dropdown', ...(options.length ? { widgetConfig: { options } } : {}) };
+            }
+            bindings.push({ param: name, blockIndex: i, key, type: 'number', default: dflt, label: pp.name || name, ...extra });
             if (!keepPills) blk.params[key] = dflt;   // (A) replace; (B/default) leave the pill in the template
         }
     });
