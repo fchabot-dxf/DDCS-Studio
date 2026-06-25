@@ -38,13 +38,19 @@ export function openUserOpForm(def) {
         <div style="opacity:.6; font-size:12px; margin-bottom:10px;">Custom op · set parameters</div>`;
     box.appendChild(head);
 
-    // one WIDGET per binding (the form half of the widget library)
+    // one WIDGET per UNIT (the form half of the widget library): a plain binding is its own unit; bindings sharing
+    // a `group` (a multi-param canvas picker, e.g. xy → x,y) render as ONE widget. Order follows first appearance.
     const readers = [];
     if (def.bindings.length) {
+        const units = [], byGroup = {};
         for (const b of def.bindings) {
+            if (b.group) { if (!byGroup[b.group]) { byGroup[b.group] = []; units.push(byGroup[b.group]); } byGroup[b.group].push(b); }
+            else units.push([b]);
+        }
+        for (const unit of units) {
             const row = document.createElement('div');
-            try { readers.push(renderFormWidget(row, b).read); }
-            catch (e) { console.warn('widget render failed for', b.param, e); }
+            try { readers.push(renderFormWidget(row, unit).read); }
+            catch (e) { console.warn('widget render failed for', unit[0] && unit[0].param, e); }
             box.appendChild(row);
         }
     } else {

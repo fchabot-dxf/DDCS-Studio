@@ -83,6 +83,78 @@ test('form widgets: corner-grid datum picker renders + reads its [X][Y] code', a
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 });
 
+test('form widgets: xy-pad canvas picker — group of bindings → one canvas, drag drives both params', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
+
+  await page.evaluate(async () => {
+    localStorage.removeItem('ddcs_user_ops');
+    const U = await import('/blocks/userOps.js');
+    U.createUserOp(U.userOpFromStack('xy_test', 'XY Test',
+      [{ type: 'move', params: { x: 0, y: 0, z: -5 } }],
+      [
+        { param: 'cx', blockIndex: 0, key: 'x', type: 'number', group: 'pos', role: 'x', widget: 'xy-pad', widgetConfig: { bounds: { w: 200, h: 150, ox: 0, oy: 0 } }, default: 50 },
+        { param: 'cy', blockIndex: 0, key: 'y', type: 'number', group: 'pos', role: 'y', default: 30 },
+      ]));
+    window.ddcsInsertUserOp('user_xy_test');
+  });
+
+  const form = page.locator('.uop-form');
+  await expect(form).toBeVisible();
+  // both params live in ONE canvas — no per-param number rows
+  await expect(form.locator('input[type="number"]')).toHaveCount(0);
+  await expect(form.locator('svg')).toHaveCount(1);
+  await expect(form.locator('.fc-handle-move')).toHaveCount(1);
+
+  // drag the position handle → onDrag drives cx,cy
+  const box = await form.locator('.fc-handle-move').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 45, box.y - 25, { steps: 6 });
+  await page.mouse.up();
+
+  await form.locator('.uop-insert').click();
+  await expect(form).toHaveCount(0);
+
+  const op = await page.evaluate(() => (window.ddcsGetBlockProgram() || []).find((b) => b && b.type === 'op' && b.opType === 'user_xy_test'));
+  expect(op).toBeTruthy();
+  expect(typeof op.params.cx).toBe('number');
+  expect(typeof op.params.cy).toBe('number');
+  expect(op.params.cx !== 50 || op.params.cy !== 30, 'dragging the handle moved at least one axis off its default').toBe(true);
+
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+});
+
+test('form widgets: rect canvas picker reads x/y/w/h at defaults', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
+
+  await page.evaluate(async () => {
+    localStorage.removeItem('ddcs_user_ops');
+    const U = await import('/blocks/userOps.js');
+    U.createUserOp(U.userOpFromStack('rect_test', 'Rect Test',
+      [{ type: 'move', params: { x: 0, y: 0, w: 0, h: 0 } }],
+      [
+        { param: 'rx', blockIndex: 0, key: 'x', type: 'number', group: 'r', role: 'x', widget: 'rect', widgetConfig: { bounds: { w: 200, h: 150, ox: 0, oy: 0 } }, default: 20 },
+        { param: 'ry', blockIndex: 0, key: 'y', type: 'number', group: 'r', role: 'y', default: 15 },
+        { param: 'rw', blockIndex: 0, key: 'w', type: 'number', group: 'r', role: 'w', default: 80 },
+        { param: 'rh', blockIndex: 0, key: 'h', type: 'number', group: 'r', role: 'h', default: 60 },
+      ]));
+    window.ddcsInsertUserOp('user_rect_test');
+  });
+
+  const form = page.locator('.uop-form');
+  await expect(form.locator('svg')).toHaveCount(1);                 // all four params in ONE canvas
+  await expect(form.locator('.fc-handle')).toHaveCount(2);          // origin + size handles
+  await form.locator('.uop-insert').click();
+  await expect(form).toHaveCount(0);                                // commit goes through an async import — wait for close
+
+  const op = await page.evaluate(() => (window.ddcsGetBlockProgram() || []).find((b) => b && b.type === 'op' && b.opType === 'user_rect_test'));
+  expect(op.params).toMatchObject({ rx: 20, ry: 15, rw: 80, rh: 60 });
+
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+});
+
 test('form widgets: registry defaults a widget per binding.type', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {

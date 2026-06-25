@@ -11,11 +11,14 @@
  * adapter when it needs one). Number params stay the easy default; richer widgets are opt-in.
  */
 import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
+import { FeatureCanvas } from '../viz/featureCanvas.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const ROW_CSS = 'display:flex; align-items:center; justify-content:space-between; gap:14px; margin:9px 0;';
 const CTRL_CSS = 'padding:5px 8px; background:var(--bg,#0b0f14); color:inherit; border:1px solid var(--border,#2a3340); border-radius:6px;';
 const numOr = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
+const r3 = (n) => Math.round(n * 1000) / 1000;
+const clamp = (v, a, z) => Math.max(a, Math.min(z, v));
 
 function labelSpan(b) {
     const span = document.createElement('span');
@@ -122,6 +125,65 @@ function cornerGridWidget(host, b) {
     return { read: () => ({ [b.param]: cur }) };
 }
 
+// ── canvas pickers (multi-param) ─────────────────────────────────────────────────────────────────────────────
+// FORM-ONLY widgets built on FeatureCanvas (the same engine the built-in wizards' 2D layout uses): a draggable
+// handle drives several params at once. A canvas inside a Blockly block is deliberately NOT attempted — the block
+// renders those params as plain fields (the seam for a future mini-canvas block field stays open, unused). Each
+// takes the binding GROUP (bindings sharing `group`, each tagged with a `role`: x/y/w/h) and reads every param.
+function resolveBounds(cfg) {
+    if (cfg.bounds && cfg.bounds.w > 0 && cfg.bounds.h > 0) return cfg.bounds;          // explicit {w,h,ox,oy}
+    const s = (typeof window !== 'undefined' && window.ddcsGetSettings && (window.ddcsGetSettings().stock)) || null;
+    if (s && s.x > 0 && s.y > 0) return { w: s.x, h: s.y, ox: 0, oy: 0 };               // the real stock, when there is one
+    return { w: cfg.w || 200, h: cfg.h || 150, ox: 0, oy: 0 };                          // a neutral default canvas
+}
+function canvasHost(host, b) {
+    host.style.cssText = 'display:flex; flex-direction:column; gap:6px; margin:10px 0;';
+    host.appendChild(labelSpan(b));
+    const c = document.createElement('div');
+    c.style.cssText = `width:100%; height:${(b.widgetConfig && b.widgetConfig.height) || 175}px; border:1px solid var(--border,#2a3340); border-radius:8px; overflow:hidden;`;
+    host.appendChild(c);
+    return c;
+}
+const rolesOf = (group, primary) => { const m = {}; for (const g of (group && group.length ? group : [primary])) m[g.role || 'x'] = g; return m; };
+
+function xyPadWidget(host, primary, group) {
+    const role = rolesOf(group, primary), bx = role.x, by = role.y;
+    const bd = resolveBounds(primary.widgetConfig || {});
+    let x = numOr(bx && bx.default, bd.ox + bd.w / 2), y = numOr(by && by.default, bd.oy + bd.h / 2);
+    const c = canvasHost(host, primary), layout = new FeatureCanvas();
+    const draw = () => layout.render(c, {
+        stock: { w: bd.w, h: bd.h, ox: bd.ox, oy: bd.oy },
+        items: [{ kind: 'hole', x, y, n: 1, r: Math.max(1, bd.w * 0.012) }],
+        handles: [{ id: 'pt', x, y, kind: 'move', label: 'pos' }],
+        onDrag: (id, w) => { x = clamp(w.x, bd.ox, bd.ox + bd.w); y = clamp(w.y, bd.oy, bd.oy + bd.h); draw(); },
+    });
+    requestAnimationFrame(draw);                                                        // wait for the host to have a size
+    return { read: () => ({ [bx.param]: r3(x), [by.param]: r3(y) }) };
+}
+
+function rectPadWidget(host, primary, group) {
+    const role = rolesOf(group, primary), bx = role.x, by = role.y, bw = role.w, bh = role.h;
+    const bd = resolveBounds(primary.widgetConfig || {});
+    let x = numOr(bx && bx.default, bd.ox + bd.w * 0.25), y = numOr(by && by.default, bd.oy + bd.h * 0.25);
+    let w = numOr(bw && bw.default, bd.w * 0.5), h = numOr(bh && bh.default, bd.h * 0.5);
+    const c = canvasHost(host, primary), layout = new FeatureCanvas();
+    const draw = () => layout.render(c, {
+        stock: { w: bd.w, h: bd.h, ox: bd.ox, oy: bd.oy },
+        items: [{ kind: 'rect', x, y, w, h }],
+        handles: [
+            { id: 'origin', x, y, kind: 'move', label: 'xy' },
+            { id: 'size', x: x + w, y: y + h, kind: 'size', label: 'W', value: w },
+        ],
+        onDrag: (id, p) => {
+            if (id === 'origin') { x = clamp(p.x, bd.ox, bd.ox + bd.w); y = clamp(p.y, bd.oy, bd.oy + bd.h); }
+            else { w = Math.max(1, p.x - x); h = Math.max(1, p.y - y); }
+            draw();
+        },
+    });
+    requestAnimationFrame(draw);
+    return { read: () => ({ [bx.param]: r3(x), [by.param]: r3(y), [bw.param]: r3(w), [bh.param]: r3(h) }) };
+}
+
 export const FORM_WIDGETS = {
     number: numberWidget,
     slider: sliderWidget,
@@ -129,7 +191,12 @@ export const FORM_WIDGETS = {
     toggle: toggleWidget,
     text: textWidget,
     'corner-grid': cornerGridWidget,
+    'xy-pad': xyPadWidget,
+    rect: rectPadWidget,
 };
+
+// widgets that bind a GROUP of params (the form renders ONE widget for the whole group, not one per binding).
+export const MULTI_WIDGETS = new Set(['xy-pad', 'rect']);
 
 const DEFAULT_BY_TYPE = { number: 'number', int: 'number', enum: 'dropdown', bool: 'toggle', string: 'text' };
 
@@ -139,7 +206,9 @@ export function resolveFormWidget(b) {
     return FORM_WIDGETS[DEFAULT_BY_TYPE[(b && b.type) || 'number'] || 'number'];
 }
 
-/** Render a binding's widget into host; returns { read() → { param: value } }. */
-export function renderFormWidget(host, b) {
-    return resolveFormWidget(b)(host, b);
+/** Render a UNIT (a single binding, or a group of bindings sharing a multi-param widget) into host.
+ *  Returns { read() → { param: value, … } }. The widget gets (host, primaryBinding, group). */
+export function renderFormWidget(host, unit) {
+    const group = Array.isArray(unit) ? unit : [unit];
+    return resolveFormWidget(group[0])(host, group[0], group);
 }
