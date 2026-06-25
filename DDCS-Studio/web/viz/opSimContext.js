@@ -25,11 +25,12 @@ const FORCE_MACHINE = new Set(['atc_length', 'atc_check', 'atc_warmup', 'atc_cha
 // Carries an ATC magazine (pockets + tool stubs on the envelope): the ops that actually move tools to/from pockets.
 const WITH_MAGAZINE = new Set(['atc_change', 'atc_table']);
 
-// Custom ops (user_*) DECLARE their intent at register time: userOps.registerUserOp derives it from the op's atoms
-// (an A/B/C-axis move/probe/DRO-read → the rotary rig) and registers it here. Only the rotary signal is derived —
-// G31→machine and tool-change→magazine are deliberately NOT inferred (they'd contradict the built-in intents
-// above: the edge/corner probe wizards aren't forceMachine, and a bare tool-change carries no magazine model). A
-// custom op that needs forceMachine/showMagazine should declare it explicitly. Built-ins use the static sets.
+// Custom ops (user_*) DECLARE their full preview intent — NOTHING is inferred from their motion. userOps registers
+// whatever `def.sim` declares (the same way the panel block declares panel type). The axis letter doesn't carry
+// intent for an open-world op authored by an unknown user on an unknown machine (A could be a rotary, a non-rotary
+// attachment, anything) — a built-in's A-move is safe to read as rotary only because WE authored it. So unlike the
+// static sets above (which gate BUILT-IN types we authored), custom ops never guess from atoms. Built-ins use the
+// static sets; custom ops use their declared intent; everything else is all-false.
 const USER_INTENT = new Map();
 
 /** Register a custom op's declared preview intent (or clear it with intent=null). Called by userOps on

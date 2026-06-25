@@ -1,14 +1,15 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Custom-op preview intent (#5, rotary-only sound subset). A user_* op now DECLARES its preview intent at register
- * time: userOps derives the 4th-axis rotary rig from the op's atoms (an A/B/C-axis move/probe/DRO-read) and
- * registers it in opSimContext, so a custom rotary op gets the same rig as a built-in rotary wizard. Only rotary
- * is inferred (G31→machine / tool-change→magazine would contradict the built-ins — those stay declared). Locks:
- * the derivation, the registry round-trip, the program union, and that delete clears it.
+ * Custom-op preview intent (#5) — DECLARED, never inferred. A user_* op is open-world (an unknown user may wire the
+ * A axis to anything on an unknown machine), so its preview intent (rotary rig / forceMachine / magazine) is taken
+ * ONLY from what `def.sim` declares — never read from the stack's motion. (A built-in's A-move is safe to read as
+ * rotary because WE authored it; that's why the static sets in opSimContext gate built-ins, not custom ops.)
+ * Showing the rotary rig is what reveals the A± jog row, so a false positive = a spurious jog control. Locks: no
+ * inference from an A-move, the declared intent round-trips through the registry, program union, delete clears.
  */
 
-test('custom-op rotary intent: A-axis atoms → rotary rig; program union; delete clears', async ({ page }) => {
+test('custom-op sim intent is DECLARED, never inferred from motion', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
 
@@ -17,44 +18,31 @@ test('custom-op rotary intent: A-axis atoms → rotary rig; program union; delet
     const U = await import('/blocks/userOps.js');
     const sim = await import('/viz/opSimContext.js');
 
-    // a custom op with an A-axis MOVE (the rotaryClock idiom: { mode:'rapid', a:… })
-    U.createUserOp(U.userOpFromStack('rotmove_test', 'Rot Move', [
-      { type: 'comment', params: { text: 'index' } },
-      { type: 'move', params: { mode: 'rapid', a: 90 } },
-    ], []));
-    // a custom op that PROBES the A axis
-    U.createUserOp(U.userOpFromStack('rotprobe_test', 'Rot Probe',
-      [{ type: 'probe', params: { axis: 'A', to: -10, feed: 100, port: 3, level: 0 } }], []));
-    // a plain XY/Z cutting op — no rotary axis
-    U.createUserOp(U.userOpFromStack('flat_test', 'Flat',
-      [{ type: 'move', params: { mode: 'cut', x: 10, y: 5, z: -2, feed: 200 } }], []));
+    // an A-axis MOVE alone must NOT infer a rotary rig — motion text doesn't carry intent for a custom op
+    U.createUserOp(U.userOpFromStack('amove_test', 'A Move',
+      [{ type: 'move', params: { mode: 'rapid', a: 90 } }], []));
+    const amove = sim.opSimContext('user_amove_test');
 
-    const rotMove = sim.opSimContext('user_rotmove_test');
-    const rotProbe = sim.opSimContext('user_rotprobe_test');
-    const flat = sim.opSimContext('user_flat_test');
-    const progFlatOnly = sim.programSimContext(['user_flat_test']);
-    const progWithRot = sim.programSimContext(['user_flat_test', 'user_rotmove_test']);
+    // intent is DECLARED via def.sim (6th positional arg) — the panel-block-style declaration, not the motion
+    U.createUserOp(U.userOpFromStack('declared_test', 'Declared',
+      [{ type: 'move', params: { mode: 'rapid', x: 5 } }], [], 'form3d', { showRotaryRig: true }));
+    const declared = sim.opSimContext('user_declared_test');
+    const prog = sim.programSimContext(['user_amove_test', 'user_declared_test']);
 
-    U.deleteUserOp('user_rotmove_test');
-    const afterDelete = sim.opSimContext('user_rotmove_test');
+    U.deleteUserOp('user_declared_test');
+    const afterDel = sim.opSimContext('user_declared_test');
 
     localStorage.removeItem('ddcs_user_ops');
-    return { rotMove, rotProbe, flat, progFlatOnly, progWithRot, afterDelete };
+    return { amove, declared, prog, afterDel };
   });
 
-  // an A-axis move/probe → the rotary rig; the dubious mappings stay false (rotary-only)
-  expect(r.rotMove).toEqual({ showRotaryRig: true, forceMachine: false, showMagazine: false });
-  expect(r.rotProbe.showRotaryRig).toBe(true);
-  // a plain cut op → no rig
-  expect(r.flat.showRotaryRig).toBe(false);
-  // program union: rig appears iff ANY op is rotary
-  expect(r.progFlatOnly.showRotaryRig).toBe(false);
-  expect(r.progWithRot.showRotaryRig).toBe(true);
-  // delete clears the declared intent → falls back to the all-false default
-  expect(r.afterDelete.showRotaryRig).toBe(false);
+  expect(r.amove.showRotaryRig, 'an A-move alone is NOT inferred as rotary (open-world op)').toBe(false);
+  expect(r.declared, 'declared intent is honoured').toEqual({ showRotaryRig: true, forceMachine: false, showMagazine: false });
+  expect(r.prog.showRotaryRig, 'program union picks up the DECLARED rotary op, not the A-move one').toBe(true);
+  expect(r.afterDel.showRotaryRig, 'delete clears the declared intent').toBe(false);
 });
 
-test('custom-op rotary intent survives a persistence reload (loadUserOps re-declares it)', async ({ page }) => {
+test('declared custom-op sim intent persists + re-registers via loadUserOps', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
 
@@ -62,17 +50,17 @@ test('custom-op rotary intent survives a persistence reload (loadUserOps re-decl
     localStorage.removeItem('ddcs_user_ops');
     const U = await import('/blocks/userOps.js');
     const sim = await import('/viz/opSimContext.js');
-    U.createUserOp(U.userOpFromStack('persist_rot', 'Persist Rot',
-      [{ type: 'move', params: { mode: 'rapid', a: 45 } }], []));
-    // simulate a fresh session: clear the live registry, then re-register from storage
-    sim.setUserSimIntent('user_persist_rot', null);
-    const beforeReload = sim.opSimContext('user_persist_rot').showRotaryRig;
+    U.createUserOp(U.userOpFromStack('persist_decl', 'Persist',
+      [{ type: 'move', params: { mode: 'rapid', x: 5 } }], [], 'form3d', { showRotaryRig: true }));
+    // simulate a fresh session: clear the live registry, then re-register from storage (reads def.sim)
+    sim.setUserSimIntent('user_persist_decl', null);
+    const beforeReload = sim.opSimContext('user_persist_decl').showRotaryRig;
     U.loadUserOps();
-    const afterReload = sim.opSimContext('user_persist_rot').showRotaryRig;
+    const afterReload = sim.opSimContext('user_persist_decl').showRotaryRig;
     localStorage.removeItem('ddcs_user_ops');
     return { beforeReload, afterReload };
   });
 
   expect(r.beforeReload, 'cleared registry → no intent').toBe(false);
-  expect(r.afterReload, 'loadUserOps re-derives + re-declares the intent').toBe(true);
+  expect(r.afterReload, 'loadUserOps re-registers the DECLARED intent from storage').toBe(true);
 });

@@ -126,20 +126,11 @@ function instantiate(def, params) {
     return clone;
 }
 
-// A custom op shows the 4th-axis rotary rig in previews if any atom drives a rotary axis (A/B/C) — a move with an
-// a/b/c word, or a probe / DRO-read / work-offset on an A/B/C axis (the atoms the built-in rotary ops emit, see
-// rotaryClockWizard MV('A',…) → {mode,a}). Only rotary is inferred; forceMachine/showMagazine stay declared.
-const ROT_AXES = new Set(['A', 'B', 'C']);
-function deriveSimIntent(template) {
-    const rotary = flattenBlocks(template).some((b) => {
-        if (!b || !b.params) return false;
-        if (b.type === 'move') return ['a', 'b', 'c'].some((k) => b.params[k] != null && b.params[k] !== '');
-        if (b.type === 'probe' || b.type === 'proberead' || b.type === 'readmachine' || b.type === 'setworkoffset')
-            return ROT_AXES.has(String(b.params.axis || '').toUpperCase());
-        return false;
-    });
-    return { showRotaryRig: rotary };
-}
+// NO INFERENCE for custom ops: a user_* op's preview intent (rotary rig / forceMachine / magazine) is whatever the
+// def DECLARES in `def.sim` — never read from its motion. The axis letter doesn't carry intent for an open-world
+// op authored by an unknown user on an unknown machine (A could be a rotary, a non-rotary attachment, anything).
+// A built-in's A-move is safe to read as rotary only because WE authored it; a custom op isn't. So intent is
+// declared the same way the panel block declares panel type — see [[custom-op-sim-intent-infer-vs-declare]].
 
 /** Validate a def BEFORE registering — returns a list of problems ([] = compliant). */
 export function validateUserOp(def) {
@@ -168,7 +159,7 @@ export function registerUserOp(def) {
     for (const b of def.bindings) schema[b.param] = { type: b.type, addr: null, field: `uop_${def.opType}_${b.param}` };
     SCHEMA[def.opType] = schema;
     registerOpLabel(def.opType, def.label || def.opType);
-    setUserSimIntent(def.opType, deriveSimIntent(def.template));   // declare the preview intent (rotary rig from atoms)
+    setUserSimIntent(def.opType, def.sim || null);   // DECLARED preview intent only (never inferred from motion)
     return def;
 }
 
@@ -225,8 +216,12 @@ export function loadUserOps() {
 }
 
 /** Author a def FROM a forked block stack + binding specs (the dev-panel output). Strips ids → a stable template.
- *  `panel` is the wizard's panel-layout id (form / form3d / form2d) — view-only metadata, persisted with the def. */
-export function userOpFromStack(opType, label, stack, bindings, panel) {
+ *  `panel` is the wizard's panel-layout id (form / form3d / form2d) — view-only metadata, persisted with the def.
+ *  `sim` is the DECLARED preview intent ({ showRotaryRig?, forceMachine?, showMagazine? }) — never inferred from
+ *  the stack's motion; omitted = the default local-frame preview. Both are view-only metadata. */
+export function userOpFromStack(opType, label, stack, bindings, panel, sim) {
     const t = opType.startsWith(USER_OP_PREFIX) ? opType : USER_OP_PREFIX + opType;
-    return { opType: t, label: label || t, template: stripIds(stack), bindings: bindings || [], panel: panel || 'form3d' };
+    const def = { opType: t, label: label || t, template: stripIds(stack), bindings: bindings || [], panel: panel || 'form3d' };
+    if (sim && typeof sim === 'object') def.sim = sim;   // declared preview intent (rotary rig / machine / magazine)
+    return def;
 }
