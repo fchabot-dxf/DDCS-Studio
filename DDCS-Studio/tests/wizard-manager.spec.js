@@ -1,10 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * STAGE 5 — the Settings "Wizard library manager" tab. Drives the real overlay: open Settings → General → Wizards,
- * then exercise every control (hide, rename, regroup, reorder, fork, reset) and assert each edit flows LIVE to the
- * wizard bar. A second test is the adversarial gate for FORK: every built-in must fork to a valid, non-empty,
- * params-complete user op via _builderAtoms({}) — no builder may crash or empty on default params.
+ * The Settings "Wizard library manager" — a section tree that designs the bar. Drives the real overlay:
+ * open Settings → General → Wizards, then exercise every control (hide, rename, regroup, reorder, reset) and
+ * assert each edit flows LIVE to the wizard bar. A custom op (authored in Dev mode) shows in its Custom dropdown.
  */
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -39,9 +38,8 @@ test('Wizard library manager: every control flows live to the bar', async ({ pag
   await expect(page.locator('#set_tab_wizards')).toBeVisible();
 
   const mgr = page.locator('#wizard_library_manager');
-  // catalog rendered incl. hidden-capable entries; a built-in row carries the badge + Fork
+  // catalog rendered incl. hidden-capable entries; a built-in row carries the badge (no per-row action — arrange only)
   await expect(mgr.locator('[data-entry="pocket"]')).toContainText('BUILT-IN');
-  await expect(mgr.locator('[data-entry="pocket"] button', { hasText: 'Fork' })).toBeVisible();
 
   // 1. HIDE pocket → drops out of the bar (the real checkbox is visually hidden by .ddcs-switch; click the slider)
   await expect(mgr.locator('[data-entry="pocket"] input[type="checkbox"]')).toBeChecked();
@@ -50,13 +48,19 @@ test('Wizard library manager: every control flows live to the bar', async ({ pag
   expect(mill.items.some((i) => i.onclick.includes("openWiz('pocket')"))).toBe(false);
   expect((await libState(page)).mill).not.toContain('pocket');
 
-  // 2. FORK edge → a CUSTOM op in the manager + the bar's Custom group
-  await mgr.locator('[data-entry="edge"] button', { hasText: 'Fork' }).click();
-  await expect(mgr.locator('[data-entry="user_edge_copy"]')).toContainText('CUSTOM');
+  // 2. a CUSTOM op (authored in Dev mode → saved) shows in its Custom dropdown — in the manager + the bar
+  await page.evaluate(async () => {
+    const L = await import('/blocks/wizardLibrary.js');
+    const U = await import('/blocks/userOps.js');
+    L.createWizard(U.userOpFromStack('my_op', 'My Op', [{ type: 'move', params: { x: 0, y: 0, z: -5 } }], [{ param: 'depth', blockIndex: 0, key: 'z', type: 'number', default: -5 }]));
+    window.ddcsRefreshWizardBar();
+  });
+  await page.click('[data-target="set_tab_wizards"]');   // re-render the manager to pick up the new op
+  await expect(mgr.locator('[data-entry="user_my_op"]')).toContainText('CUSTOM');
   let groups = await readBar(page);
   const custom = groups.find((g) => g.label === 'Custom');
   expect(custom, 'Custom group appears in the bar').toBeTruthy();
-  expect(custom.items.some((i) => i.onclick.includes("ddcsInsertUserOp('user_edge_copy')"))).toBe(true);
+  expect(custom.items.some((i) => i.onclick.includes("ddcsInsertUserOp('user_my_op')"))).toBe(true);
 
   // 3. RENAME wcs → the bar label updates
   const wcsName = mgr.locator('[data-entry="wcs"] input[type="text"]');
@@ -83,39 +87,56 @@ test('Wizard library manager: every control flows live to the bar', async ({ pag
   expect(st.mill).toContain('pocket');
   expect(st.mill).toContain('text');
   expect(st.wcsLabel).toBe('WCS / work offsets');
-  await expect(mgr.locator('[data-entry="user_edge_copy"]')).toBeVisible();   // user op survives reset
+  await expect(mgr.locator('[data-entry="user_my_op"]')).toBeVisible();   // user op survives reset
 
   // cleanup
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
 });
 
-test('fork: every built-in produces a valid, non-empty, params-complete user op', async ({ page }) => {
+test('Wizard library manager: the section tree — create dropdown, move a wizard in, delete', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => window.openSettings && window.ddcsRefreshWizardBar);
+  await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
+  await page.evaluate(() => window.openSettings());
+  await page.click('.settings-main-tab[data-group="general"]');
+  await page.click('[data-target="set_tab_wizards"]');
+  const mgr = page.locator('#wizard_library_manager');
 
-  const results = await page.evaluate(async () => {
-    const OB = await import('/blocks/opBuilders.js');
-    const U = await import('/blocks/userOps.js');
+  // the three section blocks render
+  await expect(mgr).toContainText('LEFT SECTION');
+  await expect(mgr).toContainText('CENTRE SECTION');
+  await expect(mgr).toContainText('RIGHT SECTION');
+
+  // create a dropdown in the RIGHT section via the UI
+  const ndRow = mgr.locator('.settings-row').first();
+  await ndRow.locator('input').fill('My Probes');
+  await ndRow.locator('select').selectOption('right');
+  await ndRow.locator('button', { hasText: 'Add dropdown' }).click();
+  await expect(mgr.locator('[data-group="my_probes"]')).toBeVisible();
+
+  // move 'edge' into it via its dropdown selector → lands in the new dropdown + the bar's RIGHT section
+  await mgr.locator('[data-entry="edge"] select').selectOption('my_probes');
+  const moved = await page.evaluate(async () => {
     const WL = await import('/blocks/wizardLibrary.js');
-    localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout');
-    const out = [];
-    for (const g of WL.getLibrary({ includeHidden: true }).groups) {
-      for (const e of g.items.filter((x) => x.kind === 'builtin')) {
-        try {
-          const params = e.variant ? { variant: e.variant } : {};
-          const stack = OB._builderAtoms(e.type, params);
-          const def = U.userOpFromStack(e.id + '_fk', e.label, stack, []);   // mirrors forkBuiltin (zero bindings)
-          out.push({ id: e.id, type: e.type, len: (stack || []).length, errs: U.validateUserOp(def) });
-        } catch (err) { out.push({ id: e.id, type: e.type, error: String((err && err.message) || err) }); }
-      }
-    }
-    return out;
+    const g = WL.getLibrary().groups.find((x) => x.id === 'my_probes');
+    const inBarRight = Array.from(document.querySelectorAll('.dock-header .header-right .toolbar-dropdown'))
+      .some((dd) => (dd.querySelector('.btn-tx')?.textContent || '').trim() === 'My Probes');
+    return { section: g && g.section, hasEdge: !!(g && g.items.find((i) => i.id === 'edge')), inBarRight };
   });
+  expect(moved.section).toBe('right');
+  expect(moved.hasEdge).toBe(true);
+  expect(moved.inBarRight, 'the new dropdown renders in the bar right section').toBe(true);
 
-  expect(results.length).toBeGreaterThan(15);
-  for (const r of results) {
-    expect(r.error, `fork ${r.id} threw: ${r.error}`).toBeFalsy();
-    expect(r.len, `fork ${r.id} produced an empty stack`).toBeGreaterThan(0);
-    expect(r.errs, `fork ${r.id} is invalid: ${JSON.stringify(r.errs)}`).toEqual([]);
-  }
+  // delete the dropdown via its 🗑 button → edge reverts to its default dropdown (Probe)
+  await mgr.locator('[data-group="my_probes"] button', { hasText: 'Delete' }).click();
+  const afterDelete = await page.evaluate(async () => {
+    const WL = await import('/blocks/wizardLibrary.js');
+    const lib = WL.getLibrary();
+    return { gone: !lib.groups.some((g) => g.id === 'my_probes'), edgeInProbe: (lib.groups.find((g) => g.id === 'probe') || {}).items.some((i) => i.id === 'edge') };
+  });
+  expect(afterDelete.gone).toBe(true);
+  expect(afterDelete.edgeInProbe, 'its wizard reverts to its default dropdown').toBe(true);
+
+  await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
 });

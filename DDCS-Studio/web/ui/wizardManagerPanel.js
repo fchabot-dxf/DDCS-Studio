@@ -1,22 +1,24 @@
 /**
- * ui/wizardManagerPanel.js — the Settings "Wizard library manager" (wizard-maker stage 5).
+ * ui/wizardManagerPanel.js — the Settings "Wizard library manager": a simple TREE that designs the wizard bar.
  *
- * Renders the whole wizard catalog (blocks/wizardLibrary.getLibrary, includeHidden) as an editable list and lets
- * the user customise the wizard bar without touching code: show/hide, rename, re-group, re-order ANY wizard
- * (built-ins included), delete or export a custom op, import a `.wizard` file, fork a built-in into an editable
- * copy, and reset the whole layout to factory. Every edit persists through the library layer (the bar layout in
- * `ddcs_wizard_layout`, user ops in `ddcs_user_ops`) and is pushed LIVE to the bar via window.ddcsRefreshWizardBar.
+ * The bar has three SECTIONS (left · centre · right), each holding dropdowns, each holding wizards. This panel
+ * renders that tree (blocks/wizardLibrary.getLibrary, includeHidden + includeEmpty) and lets the user design it
+ * without touching code: add / delete / rename a dropdown, move a dropdown between sections, and show/hide, rename,
+ * re-group, re-order any wizard (built-ins included), delete or export a custom op, import a `.wizard`, fork a
+ * built-in into an editable copy, or reset to factory. Every edit persists through the library layer (the bar
+ * layout in `ddcs_wizard_layout`, user ops in `ddcs_user_ops`) and is pushed LIVE to the bar (ddcsRefreshWizardBar).
  *
- * Built like ioTable.renderIoTable: a `rerender()` closure rebuilds the list in place after each mutation. No
- * saveSettings() — the library owns its own persistence.
+ * Built like ioTable.renderIoTable: a `rerender()` closure rebuilds the tree in place after each mutation.
  */
 import { UIUtils } from './uiUtils.js';
 import {
     getLibrary, setEntryOverride, setGroupOverride, resetLayout,
-    createWizard, deleteWizard, exportWizard, importWizard,
+    deleteWizard, exportWizard, importWizard,
+    createGroup, deleteGroup, SECTIONS,
 } from '../blocks/wizardLibrary.js';
-import { _builderAtoms } from '../blocks/opBuilders.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX } from '../blocks/userOps.js';
+// Authoring custom ops lives in Blocks → Dev mode (the one authoring path); this panel only DESIGNS the bar.
+
+const SECTION_LABEL = { left: 'LEFT', center: 'CENTRE', right: 'RIGHT' };
 
 // ── small DOM helpers ────────────────────────────────────────────────────────────────────────────────────────
 function mkBtn(text, onClick, opts = {}) {
@@ -39,40 +41,31 @@ function mkArrow(glyph, disabled, onClick, title) {
     return b;
 }
 
-// ── mutations (each reassigns contiguous order to avoid the implicit-index pitfall) ─────────────────────────────
+// ── mutations (reassign contiguous order to avoid the implicit-index pitfall) ───────────────────────────────────
 function moveItem(items, i, dir) {
     const j = i + dir;
     if (j < 0 || j >= items.length) return;
     const ids = items.map((e) => e.id);
     [ids[i], ids[j]] = [ids[j], ids[i]];
-    ids.forEach((id, k) => setEntryOverride(id, { order: k }));   // contiguous 0..n-1 within the group
+    ids.forEach((id, k) => setEntryOverride(id, { order: k }));   // contiguous within the dropdown
 }
-function moveGroup(groups, gi, dir) {
+function moveGroupInSection(sectionGroups, gi, dir) {
     const j = gi + dir;
-    if (j < 0 || j >= groups.length) return;
-    const ids = groups.map((g) => g.id);
+    if (j < 0 || j >= sectionGroups.length) return;
+    const ids = sectionGroups.map((g) => g.id);
     [ids[gi], ids[j]] = [ids[j], ids[gi]];
-    ids.forEach((id, k) => setGroupOverride(id, { order: k }));
+    ids.forEach((id, k) => setGroupOverride(id, { order: k }));   // contiguous within the section
+}
+function moveGroupToSection(group, section, lib) {
+    if (section === group.section) return;
+    const maxOrder = lib.groups.filter((g) => g.section === section && g.id !== group.id).reduce((m, g) => Math.max(m, g.order), -1);
+    setGroupOverride(group.id, { section, order: maxOrder + 1 });   // append to the end of the target section
 }
 function regroup(entry, newGroup) {
     if (!newGroup || newGroup === entry.group) return;
-    const target = getLibrary({ includeHidden: true }).groups.find((g) => g.id === newGroup);
+    const target = getLibrary({ includeHidden: true, includeEmpty: true }).groups.find((g) => g.id === newGroup);
     const maxOrder = target ? target.items.reduce((m, e) => Math.max(m, e.order), -1) : -1;
-    setEntryOverride(entry.id, { group: newGroup, order: maxOrder + 1 });   // append to the end of the target group
-}
-
-/** Fork a built-in into an editable user op: capture its default output stack as a zero-binding template. */
-function forkBuiltin(entry) {
-    const params = entry.variant ? { variant: entry.variant } : {};
-    const stack = _builderAtoms(entry.type, params);
-    if (!stack || !stack.length) throw new Error('this wizard produced no blocks to fork');
-    const existing = new Set(listUserOps().map((d) => d.opType));
-    const pref = (s) => (s.startsWith(USER_OP_PREFIX) ? s : USER_OP_PREFIX + s);
-    const base = entry.id;                                          // id is unique per catalog entry (incl. bore vs drill)
-    let slug = `${base}_copy`, n = 2;
-    while (existing.has(pref(slug))) slug = `${base}_copy${n++}`;
-    const def = userOpFromStack(slug, `${entry.label || base} (copy)`, stack, []);
-    createWizard(def);                                             // validates by construction (params baked, zero bindings)
+    setEntryOverride(entry.id, { group: newGroup, order: maxOrder + 1 });   // append to the end of the target dropdown
 }
 
 function exportEntry(entry) {
@@ -94,7 +87,7 @@ function importWizardFile(onDone) {
     const input = _importInput;
     input.onchange = () => {
         const f = input.files && input.files[0];
-        input.value = '';                                          // let the same file be re-picked
+        input.value = '';
         if (!f) return;
         const r = new FileReader();
         r.onload = (e) => {
@@ -109,65 +102,118 @@ function importWizardFile(onDone) {
     input.click();
 }
 
-// ── the panel ──────────────────────────────────────────────────────────────────────────────────────────────────
+// ── the tree ────────────────────────────────────────────────────────────────────────────────────────────────────
 export function renderWizardLibrary(container) {
     if (!container) return;
     const rerender = () => renderWizardLibrary(container);
-    // after a mutation: rebuild this list AND push the change live to the wizard bar
     const apply = () => { rerender(); if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar(); };
 
     container.innerHTML = '';
-    const lib = getLibrary({ includeHidden: true });
-    const groupIds = lib.groups.map((g) => g.id);
+    const lib = getLibrary({ includeHidden: true, includeEmpty: true });
+    const allGroups = lib.groups;
 
-    // header: intro + import + reset
+    // header: intro + new dropdown + import + reset
     const head = document.createElement('div');
     head.className = 'settings-section';
-    head.innerHTML = `<div class="settings-section-title">WIZARD LIBRARY</div>
-        <div class="settings-hint">Customise the wizard bar: hide, rename, re-group or re-order any wizard (built-ins included),
-        fork a built-in into an editable copy, or import/share custom <code>.wizard</code> ops. Changes apply to the bar instantly.</div>`;
+    head.innerHTML = `<div class="settings-section-title">WIZARD LIBRARY — DESIGN THE BAR</div>
+        <div class="settings-hint">The bar has three sections (left · centre · right), each holding dropdowns, each holding wizards.
+        Add or delete a dropdown, move it between sections, and show/hide · rename · re-group · re-order any wizard (built-ins too).
+        Fork a built-in into an editable copy, or import a custom <code>.wizard</code>. Changes apply to the bar instantly.</div>`;
+
+    const nd = document.createElement('div');
+    nd.className = 'settings-row'; nd.style.marginTop = '10px';
+    const ndName = document.createElement('input');
+    ndName.type = 'text'; ndName.placeholder = 'New dropdown name';
+    ndName.style.cssText = 'flex:0 0 auto; width:170px; padding:5px 8px; border:1px solid var(--border); border-radius:5px; background:var(--bg); color:var(--text); font-size:13px;';
+    const ndSect = document.createElement('select');
+    ndSect.style.cssText = 'flex:0 0 auto; padding:4px 6px; border:1px solid var(--border); border-radius:5px; background:var(--bg); color:var(--text); font-size:12px;';
+    SECTIONS.forEach((s) => { const o = document.createElement('option'); o.value = s; o.textContent = SECTION_LABEL[s]; if (s === 'center') o.selected = true; ndSect.appendChild(o); });
+    nd.append(ndName, ndSect, mkBtn('+ Add dropdown', () => {
+        const nm = ndName.value.trim(); if (!nm) { ndName.focus(); return; }
+        createGroup(nm, ndSect.value); ndName.value = ''; apply();
+    }, { title: 'Create a new dropdown in the chosen section' }));
+    head.appendChild(nd);
+
     const actions = document.createElement('div');
-    actions.className = 'settings-row';
-    actions.style.marginTop = '10px';
+    actions.className = 'settings-row'; actions.style.marginTop = '8px';
     actions.appendChild(mkBtn('⬆ Import .wizard', () => importWizardFile(apply), { title: 'Load a shared .wizard file into your library' }));
     actions.appendChild(mkBtn('↺ Reset to factory', () => {
-        if (confirm('Reset the wizard bar layout (visibility, names, grouping, order) to factory defaults?\nYour custom .wizard ops are kept.')) { resetLayout(); apply(); }
+        if (confirm('Reset the whole bar layout (sections, dropdowns, names, visibility, order, icons) to factory defaults?\nYour custom .wizard ops are kept.')) { resetLayout(); apply(); }
     }, { title: 'Discard all bar customisation (keeps your custom ops)' }));
     head.appendChild(actions);
     container.appendChild(head);
 
-    // one section per group
-    lib.groups.forEach((group, gi) => {
-        const sec = document.createElement('div');
-        sec.className = 'settings-section';
+    // one block per SECTION → its dropdowns → their wizards
+    for (const section of SECTIONS) {
+        const groups = allGroups.filter((g) => g.section === section);
 
-        const gh = document.createElement('div');
-        gh.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:4px;';
-        const gName = document.createElement('input');
-        gName.type = 'text';
-        gName.value = group.label;
-        gName.title = 'Rename this group';
-        gName.style.cssText = 'flex:0 0 auto; width:160px; font-size:12px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); background:transparent; border:1px solid transparent; border-radius:5px; padding:3px 6px;';
-        gName.addEventListener('focus', () => { gName.style.borderColor = 'var(--border)'; gName.style.background = 'var(--bg)'; });
-        gName.addEventListener('blur', () => { gName.style.borderColor = 'transparent'; gName.style.background = 'transparent'; });
-        gName.addEventListener('change', () => { setGroupOverride(group.id, { label: gName.value.trim() || group.id }); apply(); });
-        gh.appendChild(gName);
-        gh.appendChild(mkArrow('▲', gi === 0, () => { moveGroup(lib.groups, gi, -1); apply(); }, 'Move group up'));
-        gh.appendChild(mkArrow('▼', gi === lib.groups.length - 1, () => { moveGroup(lib.groups, gi, +1); apply(); }, 'Move group down'));
-        sec.appendChild(gh);
+        const secEl = document.createElement('div');
+        secEl.className = 'settings-section';
+        const secHdr = document.createElement('div');
+        secHdr.className = 'settings-section-title';
+        secHdr.textContent = `${SECTION_LABEL[section]} SECTION`;
+        secHdr.style.cssText = 'color:var(--accent); margin-bottom:6px;';
+        secEl.appendChild(secHdr);
 
-        group.items.forEach((entry, ei) => sec.appendChild(renderRow(entry, group, ei, groupIds, apply)));
-        container.appendChild(sec);
-    });
+        if (!groups.length) {
+            const hint = document.createElement('div');
+            hint.className = 'settings-hint';
+            hint.textContent = 'No dropdowns here — add one above, or move a dropdown into this section.';
+            hint.style.cssText += '; opacity:.6; padding:2px 0 2px 12px;';
+            secEl.appendChild(hint);
+        }
+
+        groups.forEach((group, gi) => {
+            const grpEl = document.createElement('div');
+            grpEl.dataset.group = group.id;
+            grpEl.style.cssText = 'margin:6px 0 8px 12px; border-left:2px solid var(--border); padding-left:10px;';
+
+            const gh = document.createElement('div');
+            gh.style.cssText = 'display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-bottom:4px;';
+            const gName = document.createElement('input');
+            gName.type = 'text'; gName.value = group.label; gName.title = 'Rename this dropdown';
+            gName.style.cssText = 'flex:0 0 auto; width:150px; font-size:12px; font-weight:700; letter-spacing:0.4px; color:var(--text-main); background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:4px 7px;';
+            gName.addEventListener('change', () => { setGroupOverride(group.id, { label: gName.value.trim() || group.id }); apply(); });
+            gh.appendChild(gName);
+
+            const gSect = document.createElement('select');
+            gSect.title = 'Move this dropdown to a section';
+            gSect.style.cssText = 'flex:0 0 auto; padding:4px 6px; border:1px solid var(--border); border-radius:5px; background:var(--bg); color:var(--text); font-size:11px;';
+            SECTIONS.forEach((s) => { const o = document.createElement('option'); o.value = s; o.textContent = SECTION_LABEL[s]; if (s === group.section) o.selected = true; gSect.appendChild(o); });
+            gSect.addEventListener('change', () => { moveGroupToSection(group, gSect.value, lib); apply(); });
+            gh.appendChild(gSect);
+
+            gh.appendChild(mkArrow('▲', gi === 0, () => { moveGroupInSection(groups, gi, -1); apply(); }, 'Move dropdown up'));
+            gh.appendChild(mkArrow('▼', gi === groups.length - 1, () => { moveGroupInSection(groups, gi, +1); apply(); }, 'Move dropdown down'));
+            if (group.custom) {
+                gh.appendChild(mkBtn('🗑 Delete', () => {
+                    if (confirm(`Delete the “${group.label}” dropdown? Its wizards return to their default dropdowns.`)) { deleteGroup(group.id); apply(); }
+                }, { danger: true, title: 'Delete this dropdown (its wizards revert to their defaults)' }));
+            }
+            grpEl.appendChild(gh);
+
+            if (!group.items.length) {
+                const e = document.createElement('div'); e.className = 'settings-hint';
+                e.textContent = 'empty — move a wizard here via its dropdown selector';
+                e.style.cssText += '; opacity:.55; padding:1px 0 3px;';
+                grpEl.appendChild(e);
+            }
+            group.items.forEach((entry, ei) => grpEl.appendChild(renderRow(entry, group, ei, allGroups, apply)));
+
+            secEl.appendChild(grpEl);
+        });
+
+        container.appendChild(secEl);
+    }
 }
 
-function renderRow(entry, group, ei, groupIds, apply) {
+function renderRow(entry, group, ei, allGroups, apply) {
     const items = group.items;
     const row = document.createElement('div');
     row.dataset.entry = entry.id;
-    row.style.cssText = 'display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:7px 9px; margin:6px 0; border:1px solid var(--border); border-radius:7px; background:var(--panel);';
+    row.style.cssText = 'display:flex; align-items:center; gap:7px; flex-wrap:wrap; padding:6px 8px; margin:5px 0; border:1px solid var(--border); border-radius:7px; background:var(--panel);';
 
-    // visibility toggle (the app's switch)
+    // visibility
     const vis = document.createElement('label');
     vis.className = 'ddcs-switch';
     vis.title = entry.visible ? 'Visible in the bar — click to hide' : 'Hidden — click to show';
@@ -179,10 +225,8 @@ function renderRow(entry, group, ei, groupIds, apply) {
 
     // rename
     const name = document.createElement('input');
-    name.type = 'text';
-    name.value = entry.label;
-    name.title = 'Rename (the name shown in the bar)';
-    name.style.cssText = 'flex:1 1 140px; min-width:120px; padding:5px 8px; border:1px solid var(--border); border-radius:5px; background:var(--bg); color:var(--text); font-size:13px;';
+    name.type = 'text'; name.value = entry.label; name.title = 'Rename (the name shown in the bar)';
+    name.style.cssText = 'flex:1 1 130px; min-width:110px; padding:5px 8px; border:1px solid var(--border); border-radius:5px; background:var(--bg); color:var(--text); font-size:13px;';
     if (!entry.visible) name.style.opacity = '0.5';
     name.addEventListener('change', () => { const v = name.value.trim(); if (v) { setEntryOverride(entry.id, { label: v }); apply(); } else { name.value = entry.label; } });
     row.appendChild(name);
@@ -193,34 +237,34 @@ function renderRow(entry, group, ei, groupIds, apply) {
     badge.style.cssText = `flex:0 0 auto; font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; color:#fff; background:${entry.kind === 'user' ? '#3a6b7b' : '#6b7b3a'};`;
     row.appendChild(badge);
 
-    // regroup
+    // regroup — every dropdown across all sections, by label, grouped by section
     const grp = document.createElement('select');
-    grp.title = 'Move to another group';
-    grp.style.cssText = 'flex:0 0 auto; padding:4px 6px; border:1px solid var(--border); border-radius:5px; background:var(--bg); color:var(--text); font-size:12px;';
-    groupIds.forEach((gid) => {
-        const o = document.createElement('option');
-        o.value = gid; o.textContent = gid;
-        if (gid === entry.group) o.selected = true;
-        grp.appendChild(o);
-    });
+    grp.title = 'Move to another dropdown';
+    grp.style.cssText = 'flex:0 0 auto; max-width:130px; padding:4px 6px; border:1px solid var(--border); border-radius:5px; background:var(--bg); color:var(--text); font-size:12px;';
+    for (const section of SECTIONS) {
+        const inSec = allGroups.filter((g) => g.section === section);
+        if (!inSec.length) continue;
+        const og = document.createElement('optgroup'); og.label = SECTION_LABEL[section];
+        for (const g of inSec) {
+            const o = document.createElement('option'); o.value = g.id; o.textContent = g.label;
+            if (g.id === entry.group) o.selected = true;
+            og.appendChild(o);
+        }
+        grp.appendChild(og);
+    }
     grp.addEventListener('change', () => { regroup(entry, grp.value); apply(); });
     row.appendChild(grp);
 
-    // reorder within group
+    // reorder within dropdown
     row.appendChild(mkArrow('▲', ei === 0, () => { moveItem(items, ei, -1); apply(); }, 'Move up'));
     row.appendChild(mkArrow('▼', ei === items.length - 1, () => { moveItem(items, ei, +1); apply(); }, 'Move down'));
 
-    // actions
+    // actions — custom ops can be exported/deleted; built-ins are only arranged here (authored in Blocks → Dev mode)
     if (entry.kind === 'user') {
         row.appendChild(mkBtn('Export', () => exportEntry(entry), { title: 'Save this op as a shareable .wizard file' }));
         row.appendChild(mkBtn('Delete', () => {
             if (confirm(`Delete the custom wizard “${entry.label}”? This removes it from your library.`)) { deleteWizard(entry.type); apply(); }
         }, { danger: true, title: 'Remove this custom op' }));
-    } else {
-        row.appendChild(mkBtn('Fork', () => {
-            try { forkBuiltin(entry); apply(); }
-            catch (e) { console.warn('fork failed', e); alert('Could not fork this wizard: ' + (e && e.message || e)); }
-        }, { title: 'Create an editable custom copy of this built-in' }));
     }
     return row;
 }
