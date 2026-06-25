@@ -16,6 +16,7 @@ import {
     deleteWizard, exportWizard, importWizard,
     createGroup, deleteGroup, SECTIONS,
 } from '../blocks/wizardLibrary.js';
+import { ICON_REGISTRY, entryIconHtml } from './wizIcons.js';
 // Authoring custom ops lives in Blocks → Dev mode (the one authoring path); this panel only DESIGNS the bar.
 
 const SECTION_LABEL = { left: 'LEFT', center: 'CENTRE', right: 'RIGHT' };
@@ -52,15 +53,18 @@ function openIconPicker(anchor, current, onPick) {
     const pop = document.createElement('div');
     pop.className = 'wizicon-pop';
     pop.style.cssText = 'position:fixed; z-index:1300; background:var(--panel); color:var(--text-main); border:1px solid var(--border); border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.5); padding:8px; display:grid; grid-template-columns:repeat(8,30px); gap:4px;';
-    const cell = (label, val, title, span) => {
+    const cell = (label, val, title, span, isHtml) => {
         const b = document.createElement('button');
-        b.type = 'button'; b.textContent = label; b.title = title || '';
-        b.style.cssText = `font-size:17px; line-height:1; height:30px; ${span ? `grid-column:span ${span}; font-size:12px;` : 'width:30px;'} border:1px solid ${String(val) === String(current) ? 'var(--accent)' : 'transparent'}; border-radius:6px; background:transparent; color:inherit; cursor:pointer;`;
+        b.type = 'button'; b.title = title || '';
+        if (isHtml) b.innerHTML = label; else b.textContent = label;
+        b.style.cssText = `font-size:17px; line-height:1; height:30px; display:flex; align-items:center; justify-content:center; ${span ? `grid-column:span ${span}; font-size:12px;` : 'width:30px;'} border:1px solid ${String(val) === String(current) ? 'var(--accent)' : 'transparent'}; border-radius:6px; background:transparent; color:inherit; cursor:pointer;`;
         b.addEventListener('click', () => { pop.remove(); onPick(val); });
         return b;
     };
     pop.appendChild(cell('⌀ Default', null, 'Clear the icon (back to the default ✦)', 8));
     ICON_CHOICES.forEach((e) => pop.appendChild(cell(e, e, e)));
+    // built-in line-art glyphs — `ic:<id>`, rendered as SVG; pick one to give any wizard a crisp vector icon
+    Object.keys(ICON_REGISTRY).forEach((id) => pop.appendChild(cell(ICON_REGISTRY[id], 'ic:' + id, id + ' (line-art)', null, true)));
     document.body.appendChild(pop);
     const r = anchor.getBoundingClientRect();
     pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 8)) + 'px';
@@ -287,14 +291,16 @@ function renderRow(entry, group, ei, allGroups, apply) {
     row.appendChild(mkArrow('▲', ei === 0, () => { moveItem(items, ei, -1); apply(); }, 'Move up'));
     row.appendChild(mkArrow('▼', ei === items.length - 1, () => { moveItem(items, ei, +1); apply(); }, 'Move down'));
 
-    // actions — custom ops can be re-iconed / re-authored / exported / deleted; built-ins are only arranged here (authored in Blocks → Dev mode)
+    // icon — EVERY wizard (built-in + custom) can be re-iconed (an emoji or an ic:<id> line-art); the override wins on the bar.
+    const iconBtn = mkBtn('', () => {
+        openIconPicker(iconBtn, entry.iconOverride || '', (val) => { setEntryOverride(entry.id, { icon: val }); apply(); });
+    }, { title: 'Choose this wizard’s bar icon' });
+    iconBtn.innerHTML = entryIconHtml(entry) || '✦';
+    iconBtn.classList.add('wizicon-btn');
+    iconBtn.style.cssText += ' font-size:15px; min-width:32px; padding:4px 6px;';
+    row.appendChild(iconBtn);
+    // re-author / export / delete are custom-op only (built-ins are authored in Blocks → Dev mode)
     if (entry.kind === 'user') {
-        const iconBtn = mkBtn(entry.iconOverride || entry.icon || '✦', () => {
-            openIconPicker(iconBtn, entry.iconOverride || '', (val) => { setEntryOverride(entry.id, { icon: val }); apply(); });
-        }, { title: 'Choose this wizard’s bar icon' });
-        iconBtn.classList.add('wizicon-btn');
-        iconBtn.style.cssText += ' font-size:15px; min-width:32px; padding:4px 6px;';
-        row.appendChild(iconBtn);
         row.appendChild(mkBtn('✎ Edit', () => { if (window.ddcsEditWizardDef) { window.ddcsEditWizardDef(entry.type); if (window.closeSettings) window.closeSettings(); } },
             { title: 'Re-author this wizard — opens its blocks (knobs + all) in Dev mode to tweak and re-save' }));
         row.appendChild(mkBtn('Export', () => exportEntry(entry), { title: 'Save this op as a shareable .wizard file' }));

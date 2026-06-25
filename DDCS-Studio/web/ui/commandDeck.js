@@ -5,6 +5,7 @@ import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { outPinBlock, waitInputBlock } from '../wizards/ops/cnc.js';
 import { dwellBlock } from '../wizards/ops/dwell.js';
 import { getLibrary } from '../blocks/wizardLibrary.js';
+import { entryIconHtml } from './wizIcons.js';
 
 // Header toolbar icons — inline line-art SVG (not emoji) so they render identically on every OS,
 // inherit the theme via currentColor, stay crisp at any size, and give each button an icon to
@@ -43,18 +44,8 @@ const HEADER_ICONS = {
 // Per-group header icon (the library carries the label; the icon lives here).
 const WIZ_GROUP_ICON = { setup: HEADER_ICONS.comm, probe: HEADER_ICONS.probe, atc: HEADER_ICONS.atc, mill: HEADER_ICONS.mill, custom: HEADER_ICONS.custom };
 
-// Inline-SVG item icons. Library entries that use an SVG carry icon:'' — this map is their source, and it WINS
-// over any emoji (e.g. `text` is given '✎' in the library but the bar has always drawn the pen SVG).
-const WIZ_ITEM_SVG = {
-    rotary_center: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;"><rect x="4" y="8" width="13" height="8" rx="2" stroke="#64748b"/><ellipse cx="17" cy="12" rx="2" ry="4" stroke="#64748b"/><line x1="1.5" y1="12" x2="22.5" y2="12" stroke="#e11d48" stroke-dasharray="3 2"/></svg>`,
-    drill:     `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" fill="#1e293b" stroke="none"/></svg>`,
-    bore:      `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="#94a3b8" stroke-width="2.5"/><ellipse cx="12" cy="12" rx="6.5" ry="3.6" stroke="#94a3b8" stroke-width="2"/><circle cx="12" cy="12" r="2" fill="#1e293b" stroke="none"/></svg>`,
-    pocket:    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="5" width="18" height="14" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><rect x="7" y="9" width="10" height="6" rx="1" fill="#1e293b" stroke="none"/></svg>`,
-    contour:   `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="6" y="8" width="12" height="8" rx="1" fill="#1e293b" stroke="none"/><rect x="3" y="5" width="18" height="14" rx="1.5" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="3 2"/></svg>`,
-    slot:      `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="9" width="18" height="6" rx="3" stroke="#94a3b8" stroke-width="2.5"/><line x1="7" y1="12" x2="17" y2="12" stroke="#1e293b" stroke-width="2" stroke-linecap="round"/></svg>`,
-    surfacing: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><rect x="3" y="4" width="18" height="16" rx="1.5" stroke="#94a3b8" stroke-width="2.5"/><path d="M5 8h14M5 12h14M5 16h14" stroke="#1e293b" stroke-width="1.5"/></svg>`,
-    text:      `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:3px;"><path d="M5 6h14M12 6v13" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/></svg>`,
-};
+// Item icons + the ic:<id> registry live in ./wizIcons.js (shared with the Settings icon picker). An explicit
+// user iconOverride (emoji or ic:<id>) wins over the built-in default — see entryIconHtml.
 
 // Sub-labels injected before specific items (faithful to the old static bar's "Rotary" divider).
 const WIZ_SUBLABEL = { rotary_center: 'Rotary' };
@@ -74,9 +65,7 @@ const _escHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
 const _escArg = (s) => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 function wizItemIcon(e) {
-    const svg = WIZ_ITEM_SVG[e.id];
-    if (svg) return svg;                            // inline SVG wins (commandDeck owns the line-art icons)
-    return e.icon ? `${e.icon} ` : '';              // emoji (or the ✦ user-op marker) + a space
+    return entryIconHtml(e);   // iconOverride (emoji or ic:<id>) wins → built-in line-art (by id) → emoji default
 }
 function wizItemOnclick(e) {
     if (e.kind === 'user') return `ddcsInsertUserOp && ddcsInsertUserOp('${_escArg(e.type)}')`;
