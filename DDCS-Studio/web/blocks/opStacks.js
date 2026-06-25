@@ -93,6 +93,16 @@ function makeOp(opType, params, children) {
     };
 }
 
+// Build an op's stack, UNWRAPPING a builder that returns its OWN op container (only homing today) → the bare
+// blocks. Every consumer (wizard commit, marker import, glow/edit rebuild) must agree on the shape: without this,
+// makeOp would wrap homing's container AGAIN (op.children = [{op:homing}]) while the glow/edit checks rebuild the
+// unwrapped atoms — so a fresh homing op would false-glow + falsely read as block-edited.
+function _framed(opType, params) {
+    let f = BUILDERS[opType](params || {}) || [];
+    if (f.length === 1 && f[0] && f[0].type === 'op') f = f[0].children || [];
+    return f;
+}
+
 // ── reverse sync: edited block stack → STUDIO form fields ──────────────────────────────────────────────
 // Read the (possibly edited) block objects and return { formFieldId: value }. The inverse of each builder,
 // co-located with it. Numeric/geometry params reconcile cleanly here; derived (stepover) and inset (pocket)
@@ -376,7 +386,7 @@ export function buildActiveOpStack() {
     shownOp = op.type;                      // remember what the Blocks tab is showing (for reverse sync)
     if (s === loadedSig) return null;       // already loaded → don't clobber block-side edits
     loadedSig = s;
-    const framed = BUILDERS[op.type](op.params);
+    const framed = _framed(op.type, op.params);   // unwrap a self-wrapping builder (homing) so the op isn't double-wrapped
     const start = framed.find((b) => b && b.type === 'progstart');
     const end = framed.find((b) => b && b.type === 'progend');
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
@@ -470,7 +480,7 @@ function appendIntoProgram(bare, framed) {
 export function commitActiveOp() {
     const op = getLastOp();
     if (!op || !BUILDERS[op.type]) return false;
-    const framed = BUILDERS[op.type](op.params);                       // [progstart, …op…, progend]
+    const framed = _framed(op.type, op.params);                        // [progstart, …op…, progend] (homing unwrapped)
     const start = framed.find((b) => b && b.type === 'progstart');
     const end = framed.find((b) => b && b.type === 'progend');
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
@@ -489,7 +499,7 @@ export function replaceOp(opId, params) {
     if (idx < 0) return false;
     const opType = cur[idx].opType;
     if (!BUILDERS[opType]) return false;
-    const framed = BUILDERS[opType](params);
+    const framed = _framed(opType, params);
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
     const opC = makeOp(opType, params, bare);
     opC.id = opId;                                                     // keep the same id so views/selection stay stable
@@ -499,15 +509,29 @@ export function replaceOp(opId, params) {
     return true;
 }
 
+// Deep-strip BLOCK ids before a structural compare: drop `id` from any block-shaped object (one with a string
+// `type`) anywhere in the tree — top-level atoms, their children, AND a block nested inside params (e.g.
+// stepover.params.region). Block ids are counter-based and regenerated on every BUILDERS() call, so without this
+// a fresh op looks hand-edited (false glow + false isOpBlockEdited on surfacing/pocket/contour). A value `id`
+// (e.g. comm's destVar — a string on the params object, which has no `type`) is left intact.
+function stripBlockIds(v) {
+    if (Array.isArray(v)) return v.map(stripBlockIds);
+    if (v && typeof v === 'object') {
+        const o = {};
+        for (const k in v) { if (k === 'id' && typeof v.type === 'string') continue; o[k] = stripBlockIds(v[k]); }
+        return o;
+    }
+    return v;
+}
+
 /** True if a top-level op's blocks were hand-edited away from what its form params would rebuild — so a
- *  form-driven Insert/replace would clobber them. Compares the live children to a fresh build, ids stripped. */
+ *  form-driven Insert/replace would clobber them. Compares the live children to a fresh build, block ids stripped. */
 export function isOpBlockEdited(opId) {
     const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
     const op = cur.find((b) => b && b.type === 'op' && b.id === opId);
     if (!op || !op.opType || !BUILDERS[op.opType]) return false;
-    
-    const noId = (b) => { const o = {}; for (const k in b) { if (k === 'id') continue; o[k] = (k === 'children' && Array.isArray(b[k])) ? b[k].map(noId) : b[k]; } return o; };
-    const sig = (a) => JSON.stringify((a || []).map(noId));
+
+    const sig = (a) => JSON.stringify((a || []).map(stripBlockIds));
     
     // 1. Check if it matches the last known form params (_builderAtoms unwraps a self-wrapping builder — homing —
     //    so an unedited homing op isn't falsely flagged as block-edited)
@@ -538,7 +562,7 @@ export function duplicateOp(opId) {
     if (idx < 0) return false;
     const src = cur[idx];
     if (!BUILDERS[src.opType]) return false;
-    const framed = BUILDERS[src.opType](src.params);
+    const framed = _framed(src.opType, src.params);
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
     const copy = makeOp(src.opType, src.params, bare);                 // fresh id
     const next = [...cur.slice(0, idx + 1), copy, ...cur.slice(idx + 1)];
@@ -739,7 +763,7 @@ const _structKeyGlow = (b) => {
 };
 function _allBlockIds(b, into) { if (!b) return; if (b.id) into.add(b.id); (b.children || []).forEach((c) => _allBlockIds(c, into)); }
 // Two matched blocks' OWN params differ (children/id excluded) → a value edited in Blocks (an override).
-const _paramsDiffer = (a, b) => JSON.stringify((a && a.params) || {}) !== JSON.stringify((b && b.params) || {});
+const _paramsDiffer = (a, b) => JSON.stringify(stripBlockIds((a && a.params) || {})) !== JSON.stringify(stripBlockIds((b && b.params) || {}));
 // Ids of `actual` blocks that OVERRIDE the clean form rebuild: injected atoms (no structural match in `base`) PLUS
 // matched atoms whose own params were value-edited. LCS-aligned by the merge's key; matched containers recurse, so an
 // atom injected/edited inside a kept container is caught. The override-diff — both sides forward emits, no inference.
@@ -765,9 +789,7 @@ function collectInjectedIds(base, actual, into = new Set()) {
 // Builder atoms at the SAME granularity as op.children — unwrap a builder that returns its own op container
 // (only homing does today) and drop program framing, so base ↔ children align.
 function _builderAtoms(opType, params) {
-    let s = BUILDERS[opType](params || {}) || [];
-    if (s.length === 1 && s[0] && s[0].type === 'op') s = s[0].children || [];
-    return s.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
+    return _framed(opType, params).filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
 }
 function _findOpById(prog, id) {
     for (const b of (prog || [])) {
@@ -794,10 +816,7 @@ export function editedLinesForOp(opId) {
  *  the declared params (we trust the declaration; verify-vs-motion + overrides are the B4 override-diff). */
 export function opFromMarker(opType, params) {
     if (!BUILDERS[opType]) return null;
-    let kids = BUILDERS[opType](params || {});
-    if (kids.length === 1 && kids[0] && kids[0].type === 'op') kids = kids[0].children || [];   // unwrap a self-wrapping builder (homing)
-    kids = kids.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
-    return makeOp(opType, params, kids);
+    return makeOp(opType, params, _builderAtoms(opType, params));   // _builderAtoms unwraps a self-wrapping builder (homing)
 }
 
 /** Import a .nc → program stack, using DDCS op markers where present. A marker DECLARES an op → it's
