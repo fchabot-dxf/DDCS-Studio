@@ -42,6 +42,68 @@ function isAtom(blk) {
     return blk && !blk.isShadow() && blk.type !== 'op' && !blk.type.endsWith('_op') && blk.type !== 'progstart' && blk.type !== 'progend';
 }
 
+// the widget a numeric exposure renders as in the form (the form-widget registry keys; numeric-compatible only).
+// number/slider are single-param; xy-pad/rect are MULTI-param — exposures that pick them group by order (see
+// buildBindings): xy-pad in pairs (x,y), rect in fours (x,y,w,h). Leftovers fall back to a plain number.
+const WIDGET_CHOICES = [['#', 'number'], ['slider', 'slider'], ['xy', 'xy-pad'], ['rect', 'rect']];
+
+// Read the ticked exposures off the LIVE workspace → { opRec, exposures, varErr }. opRec is the active op (live
+// params); exposures are { param, blockIndex, key, default, widget } in pre-order; varErr names the first exposed
+// field that has a #var/expression plugged in (not a plain number) so the caller can refuse.
+function collectAuthoring(ws) {
+    const stack = workspaceToStack(ws);
+    const opRec = stack.find((b) => b && b.type === 'op');
+    if (!opRec || !(opRec.children || []).length) return null;
+    const flat = flattenBlocks(opRec.children);
+    const opBlk = ws.getAllBlocks().find((b) => b.type === 'op' || b.type.endsWith('_op'));
+    const doIn = opBlk && opBlk.getInput('DO');
+    const first = doIn && doIn.connection && doIn.connection.targetBlock();
+    const atomBlocks = first ? preorderAtoms(first) : [];                                  // aligns index-for-index with flat
+    const exposures = [], used = new Set();
+    let varErr = null;
+    atomBlocks.forEach((blk, i) => {
+        const rec = flat[i];
+        if (!rec || !rec.params) return;
+        for (const f of numericFields(blk)) {
+            if (blk.getFieldValue('EXPOSE_' + FN(f)) !== 'TRUE') continue;
+            if (typeof rec.params[f] !== 'number') { if (!varErr) varErr = f; continue; }   // a #var/expression got plugged in
+            let pname = (blk.getFieldValue('PNAME_' + FN(f)) || f).trim().replace(/[^A-Za-z0-9_]/g, '_').replace(/^_+|_+$/g, '') || f;
+            if (used.has(pname)) { let k = 2; while (used.has(pname + '_' + k)) k++; pname += '_' + k; }
+            used.add(pname);
+            exposures.push({ param: pname, blockIndex: i, key: f, default: rec.params[f], widget: blk.getFieldValue('WIDGET_' + FN(f)) || 'number' });
+        }
+    });
+    return { opRec, exposures, varErr };
+}
+
+// Turn exposures into bindings. Single-param widgets (number/slider) → one binding each. Multi-param canvas
+// pickers (xy-pad/rect) → group by ORDER of appearance: xy-pad in pairs (roles x,y), rect in fours (x,y,w,h);
+// the group's first binding carries the widget. An incomplete trailing group degrades to plain numbers.
+function buildBindings(exposures) {
+    const out = [], pools = { 'xy-pad': [], rect: [] };
+    const plain = (e) => ({ param: e.param, blockIndex: e.blockIndex, key: e.key, type: 'number', default: e.default, label: e.param });
+    for (const e of exposures) {
+        if (e.widget === 'xy-pad' || e.widget === 'rect') pools[e.widget].push(e);
+        else out.push(e.widget && e.widget !== 'number' ? { ...plain(e), widget: e.widget } : plain(e));
+    }
+    let gi = 0;
+    const group = (pool, size, roles, widget) => {
+        let i = 0;
+        for (; i + size <= pool.length; i += size) {
+            const gid = 'g' + (++gi);
+            for (let r = 0; r < size; r++) {
+                const bnd = { ...plain(pool[i + r]), group: gid, role: roles[r] };
+                if (r === 0) bnd.widget = widget;
+                out.push(bnd);
+            }
+        }
+        for (; i < pool.length; i++) out.push(plain(pool[i]));                              // leftover → plain number
+    };
+    group(pools['xy-pad'], 2, ['x', 'y'], 'xy-pad');
+    group(pools.rect, 4, ['x', 'y', 'w', 'h'], 'rect');
+    return out;
+}
+
 let _on = false, _ws = null, _B = null, _toggle = null, _panel = null, _nameInput = null;
 
 export function isDevMode() { return _on; }
@@ -96,7 +158,8 @@ function augment() {
                     .appendField('▸ expose')
                     .appendField(new B.FieldCheckbox('FALSE'), 'EXPOSE_' + FN(f))
                     .appendField(f + ' as')
-                    .appendField(new B.FieldTextInput(f), 'PNAME_' + FN(f));
+                    .appendField(new B.FieldTextInput(f), 'PNAME_' + FN(f))
+                    .appendField(new B.FieldDropdown(WIDGET_CHOICES), 'WIDGET_' + FN(f));   // how it renders in the form
             }
             if (blk.queueRender) blk.queueRender();
         }
@@ -123,39 +186,16 @@ function clearAugment() {
 
 // read the ticked exposures off the live blocks → bindings → userOpFromStack → createWizard (into library + bar).
 function saveAsCustomOp() {
-    const ws = _ws;
     const name = (_nameInput.value || '').trim();
     if (!name) { alert('Name the custom op first.'); _nameInput.focus(); return; }
 
     // Read the LIVE workspace, not the model: Blockly v13 batches change events (FIRE_QUEUE / setTimeout 0), so a value
-    // edited right before Save hasn't reprojected into the model yet. workspaceToStack ignores the dev-only fields (not
-    // in fieldsOf) → a clean stack, and its pre-order matches preorderAtoms below.
-    const stack = workspaceToStack(ws);
-    const opRec = stack.find((b) => b && b.type === 'op');                                // the active op (live params)
-    if (!opRec || !(opRec.children || []).length) { alert('No op to author here — insert an op first, then open Dev mode.'); return; }
-    const flat = flattenBlocks(opRec.children);
-
-    const opBlk = ws.getAllBlocks().find((b) => b.type === 'op' || b.type.endsWith('_op'));
-    const doIn = opBlk && opBlk.getInput('DO');
-    const first = doIn && doIn.connection && doIn.connection.targetBlock();
-    const atomBlocks = first ? preorderAtoms(first) : [];                                  // aligns index-for-index with flat
-
-    const bindings = [], used = new Set();
-    atomBlocks.forEach((blk, i) => {
-        const rec = flat[i];
-        if (!rec || !rec.params) return;
-        for (const f of numericFields(blk)) {
-            if (blk.getFieldValue('EXPOSE_' + FN(f)) !== 'TRUE') continue;
-            if (typeof rec.params[f] !== 'number') {                                       // a #var/expression got plugged in
-                alert(`The exposed value “${f}” has a variable or expression plugged in — a parameter must be a plain number. Restore a number on that block, then save again.`);
-                return;
-            }
-            let pname = (blk.getFieldValue('PNAME_' + FN(f)) || f).trim().replace(/[^A-Za-z0-9_]/g, '_').replace(/^_+|_+$/g, '') || f;
-            if (used.has(pname)) { let k = 2; while (used.has(pname + '_' + k)) k++; pname += '_' + k; }
-            used.add(pname);
-            bindings.push({ param: pname, blockIndex: i, key: f, type: 'number', default: rec.params[f], label: pname });
-        }
-    });
+    // edited right before Save hasn't reprojected into the model yet (collectAuthoring uses workspaceToStack, which
+    // ignores the dev-only EXPOSE_/PNAME_/WIDGET_ fields and whose pre-order matches preorderAtoms).
+    const a = collectAuthoring(_ws);
+    if (!a) { alert('No op to author here — insert an op first, then open Dev mode.'); return; }
+    if (a.varErr) { alert(`The exposed value “${a.varErr}” has a variable or expression plugged in — a parameter must be a plain number. Restore a number on that block, then save again.`); return; }
+    const bindings = buildBindings(a.exposures);
     if (!bindings.length && !confirm('No values are exposed — save as a fixed op with no parameters?')) return;
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'op';
@@ -163,7 +203,7 @@ function saveAsCustomOp() {
     let type = slug, n = 2; while (existing.has(USER_OP_PREFIX + type)) type = slug + '_' + (n++);
 
     try {
-        createWizard(userOpFromStack(type, name, opRec.children, bindings));
+        createWizard(userOpFromStack(type, name, a.opRec.children, bindings));
     } catch (e) { console.warn('save custom op failed', e); alert('Save failed: ' + ((e && e.message) || e)); return; }
 
     if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
