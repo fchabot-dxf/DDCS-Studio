@@ -9,6 +9,9 @@
 
 import { el, makeDraggable } from './ui/uiUtils.js';
 import { WIZARD_VIEWS, viewByType } from './wizards/views/index.js';
+import { userOpView, setUserOpDef } from './wizards/views/userOpView.js';   // ONE generic view for every user_* op (reuses #wiz_user)
+import { listUserOps } from './blocks/userOps.js';
+const isUserOp = (t) => typeof t === 'string' && t.startsWith('user_');
 import { playClick, playClickReverse } from './ui/sound.js';  // audio helper for click sounds
 import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
 import { createPreviewPanel } from './viz/createPreviewPanel.js';   // THE shared preview (identical to Blocks/Studio), fed the wizard's op code
@@ -136,8 +139,10 @@ export class WizardManager {
         }
     }
 
-    /** The view whose panel is currently visible (or null). */
+    /** The view whose panel is currently visible (or null). The shared #wiz_user panel maps to the generic view. */
     activeView() {
+        const u = el('wiz_user');
+        if (u && u.style.display !== 'none') return userOpView;
         return this.views.find((v) => {
             const e = el(v.panelId);
             return e && e.style.display !== 'none';
@@ -186,7 +191,8 @@ export class WizardManager {
         window.dispatchEvent(new CustomEvent('ddcs:stop-previews'));
         if (window.ddcsStopPreview) window.ddcsStopPreview();
 
-        const view = viewByType.get(type) || null;
+        const view = viewByType.get(type) || (isUserOp(type) ? userOpView : null);
+        if (view === userOpView) setUserOpDef(listUserOps().find((d) => d.opType === type) || null);   // tell the generic view which custom op
         const box = document.querySelector('.wiz-box');
         // Re-centre on open: clear any drag offset left from a previous session.
         if (box) Object.assign(box.style, { position: '', left: '', top: '', right: '', bottom: '', transform: '', margin: '' });
@@ -208,14 +214,15 @@ export class WizardManager {
         this.wizardElement.style.display = 'flex';
         this.wizardElement.classList.add('active');
 
-        // Hide all wizard panels
+        // Hide all wizard panels (incl. the shared custom-op panel)
         this.views.forEach((v) => {
             const elem = el(v.panelId);
             if (elem) elem.style.display = 'none';
         });
+        { const u = el('wiz_user'); if (u) u.style.display = 'none'; }
 
-        // Show requested wizard
-        const wizElem = el('wiz_' + type);
+        // Show requested wizard (every user_* op shares the one #wiz_user panel)
+        const wizElem = el(view === userOpView ? 'wiz_user' : 'wiz_' + type);
         if (wizElem) {
             wizElem.style.display = 'block';
             frameWizardSections(wizElem);   // group the form's fields into framed categories (idempotent)
@@ -241,6 +248,7 @@ export class WizardManager {
      */
     /** Does this op type support seeding its form from params (so it can be edited in place)? */
     canEdit(opType) {
+        if (isUserOp(opType)) return true;                 // every custom op edits in the generic #wiz_user view
         const view = viewByType.get(opType);
         return !!(opType && (Object.keys(paramFields(opType)).length || (view && typeof view.setForm === 'function')));
     }
@@ -248,7 +256,7 @@ export class WizardManager {
     /** params → form: a custom view.setForm() when it has one (e.g. drill's pattern variants), else the dict's
      *  field binding (value/checkbox decided by element type). params are the single source of truth — no snapshot. */
     _seedForm(opType, params) {
-        const view = viewByType.get(opType);
+        const view = viewByType.get(opType) || (isUserOp(opType) ? userOpView : null);
         if (view && typeof view.setForm === 'function') { view.setForm(params || {}); return; }
         const map = paramFields(opType); if (!params || !Object.keys(map).length) return;
         for (const key in map) {

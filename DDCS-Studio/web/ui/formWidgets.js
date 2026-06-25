@@ -155,7 +155,7 @@ function xyPadWidget(host, primary, group) {
         stock: { w: bd.w, h: bd.h, ox: bd.ox, oy: bd.oy },
         items: [{ kind: 'hole', x, y, n: 1, r: Math.max(1, bd.w * 0.012) }],
         handles: [{ id: 'pt', x, y, kind: 'move', label: 'pos' }],
-        onDrag: (id, w) => { x = clamp(w.x, bd.ox, bd.ox + bd.w); y = clamp(w.y, bd.oy, bd.oy + bd.h); draw(); },
+        onDrag: (id, w) => { x = clamp(w.x, bd.ox, bd.ox + bd.w); y = clamp(w.y, bd.oy, bd.oy + bd.h); draw(); host.dispatchEvent(new Event('input', { bubbles: true })); },
     });
     requestAnimationFrame(draw);                                                        // wait for the host to have a size
     return { read: () => ({ [bx.param]: r3(x), [by.param]: r3(y) }) };
@@ -178,6 +178,7 @@ function rectPadWidget(host, primary, group) {
             if (id === 'origin') { x = clamp(p.x, bd.ox, bd.ox + bd.w); y = clamp(p.y, bd.oy, bd.oy + bd.h); }
             else { w = Math.max(1, p.x - x); h = Math.max(1, p.y - y); }
             draw();
+            host.dispatchEvent(new Event('input', { bubbles: true }));
         },
     });
     requestAnimationFrame(draw);
@@ -211,4 +212,21 @@ export function resolveFormWidget(b) {
 export function renderFormWidget(host, unit) {
     const group = Array.isArray(unit) ? unit : [unit];
     return resolveFormWidget(group[0])(host, group[0], group);
+}
+
+/** Render a whole op's BINDINGS into host as one row per unit (single binding, or a group sharing a multi-param
+ *  widget). Returns the readers [() → {param: value}]. Shared by the modal (userOpForm) and the panel view. */
+export function renderOpForm(host, bindings) {
+    const readers = [], units = [], byGroup = {};
+    for (const b of (bindings || [])) {
+        if (b.group) { if (!byGroup[b.group]) { byGroup[b.group] = []; units.push(byGroup[b.group]); } byGroup[b.group].push(b); }
+        else units.push([b]);
+    }
+    for (const unit of units) {
+        const row = document.createElement('div');
+        try { readers.push(renderFormWidget(row, unit).read); }
+        catch (e) { console.warn('widget render failed for', unit[0] && unit[0].param, e); }
+        host.appendChild(row);
+    }
+    return readers;
 }

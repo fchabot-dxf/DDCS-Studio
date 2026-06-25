@@ -859,6 +859,30 @@
               </div><!-- /.wiz-2pane -->
             </div>
 
+            <!-- Custom op (user-authored): ONE generic panel reused for every user_* op; its form is built from the
+                 op's bindings (ui/formWidgets) and the code/preview from its builder. See wizards/views/userOpView.js -->
+            <div id="wiz_user" class="wiz-body" style="display:none">
+              <div class="wiz-2pane">
+                <div class="wiz-visual">
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="userVizStatus" class="viz-status"></div>
+                        <div id="userVizContainer" class="viz-canvas"></div>
+                    </div>
+                </div>
+                </div><!-- /.wiz-visual -->
+                <div class="wiz-controls">
+                <div class="wiz-usage" id="wiz_user_usage">Custom op.</div>
+                <div id="wiz_user_form"></div>
+                <div class="preview-block">
+                    <span class="label">CODE PREVIEW</span>
+                    <pre id="wiz_user_code"></pre>
+                </div>
+                </div><!-- /.wiz-controls -->
+              </div><!-- /.wiz-2pane -->
+            </div>
+
             <!-- Pocket clearing Wizard (Mill group) -->
             <div id="wiz_pocket" class="wiz-body" style="display:none">
               <div class="wiz-2pane">
