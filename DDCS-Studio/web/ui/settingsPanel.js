@@ -13,6 +13,7 @@ import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile, registerProfil
 import { listPosts, getActivePostId, setActivePostId, isPostVerified, getDialect } from '../wizards/dialects/index.js';
 import { makeClient } from '../shared/js/client.js';
 import { renderIoTable, renderMagazineTable } from './ioTable.js';
+import { renderWizardLibrary } from './wizardManagerPanel.js';
 import { toolProfileSvg } from '../viz/toolProfile.js';
 import { THEMES } from './themes.js';
 import { generateToolChangeNc } from '../data/atcGenerator.js';
@@ -572,6 +573,7 @@ function buildSettingsOverlay() {
                     <button class="settings-tab active" data-group="general" data-target="set_tab_appearance">Appearance</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_preview">Preview</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_compose">Editor</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_wizards">Wizards</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_faq">FAQ</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
@@ -590,6 +592,10 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_atc" style="display:none;">Tool table</button>
                 </div>
                 <div class="settings-content">
+                <!-- GENERAL: WIZARDS (the wizard-bar library manager — rendered by wizardManagerPanel.js) -->
+                <div id="set_tab_wizards" style="display:none;">
+                    <div id="wizard_library_manager"></div>
+                </div>
                 <!-- GENERAL: PREVIEW (3D/2D toolpath view + simulation) -->
                 <div id="set_tab_preview" style="display:none;">
                     <div class="settings-section">
@@ -2095,7 +2101,7 @@ function wireSettingsOverlay(ov) {
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
     const sideTabs = [...ov.querySelectorAll('.settings-sidebar .settings-tab')];
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
-        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_faq', 'set_tab_feedback', 'set_tab_about',
+        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_wizards', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_faq', 'set_tab_feedback', 'set_tab_about',
                      'set_tab_machine', 'set_tab_wcs', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
@@ -2105,6 +2111,7 @@ function wireSettingsOverlay(ov) {
         if (id === 'set_tab_output') renderIoTable(ov.querySelector('#io_output_table'), 'output', getOutputs(), syncIO);
         if (id === 'set_tab_atc') renderMagazineTable(ov.querySelector('#atc_magazine'), _ddcsSettings.atc, atcOnChange);
         if (id === 'set_tab_variables') renderVarList(q('set_var_search') ? q('set_var_search').value : '');   // build lazily on open
+        if (id === 'set_tab_wizards') renderWizardLibrary(ov.querySelector('#wizard_library_manager'));   // the wizard-bar library manager
     }
     function showGroup(g) {
         mainTabs.forEach(b => b.classList.toggle('active', b.dataset.group === g));
