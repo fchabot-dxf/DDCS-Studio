@@ -11,6 +11,7 @@
  * adapter when it needs one). Number params stay the easy default; richer widgets are opt-in.
  */
 import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
+import { buildRegions, paintRegions, regionValueFromEvent } from './regionPickSvg.js';
 import { FeatureCanvas } from '../viz/featureCanvas.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -129,6 +130,31 @@ function cornerGridWidget(host, b) {
     return { read: () => ({ [b.param]: cur }) };
 }
 
+// the REGION-PICK control — a "make your own datum": click a region (rect/poly/freeform) on an optional backdrop;
+// the picked region's NUMBER is committed (binds to a numeric socket → valid by construction). Shares its core
+// (regionPickSvg.js) with the Blockly field, exactly like the datum. spec lives in widgetConfig {viewBox, backdrop,
+// regions:[{shape,…,value,label}]}.
+function regionPickWidget(host, b) {
+    const cfg = b.widgetConfig || {};
+    host.style.cssText = 'display:flex; flex-direction:column; gap:6px; margin:10px 0;';
+    host.appendChild(labelSpan(b));
+    const first = (cfg.regions && cfg.regions[0] && cfg.regions[0].value);
+    let cur = (b.default != null) ? b.default : (first != null ? first : 0);
+    const svg = document.createElementNS(SVGNS, 'svg');
+    svg.setAttribute('width', '100%');
+    svg.style.cssText = 'width:100%; max-width:320px; border:1px solid var(--border,#2a3340); border-radius:8px; background:var(--bg,#0b0f14);';
+    const regions = buildRegions(svg, cfg);
+    const repaint = () => paintRegions(regions, cur);
+    svg.addEventListener('click', (e) => {
+        const v = regionValueFromEvent(regions, e);
+        if (v == null) return;
+        cur = v; repaint(); host.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    repaint();
+    host.append(svg);
+    return { read: () => ({ [b.param]: numOr(cur, b.default ?? 0) }) };
+}
+
 // ── canvas pickers (multi-param) ─────────────────────────────────────────────────────────────────────────────
 // FORM-ONLY widgets built on FeatureCanvas (the same engine the built-in wizards' 2D layout uses): a draggable
 // handle drives several params at once. A canvas inside a Blockly block is deliberately NOT attempted — the block
@@ -196,6 +222,7 @@ export const FORM_WIDGETS = {
     toggle: toggleWidget,
     text: textWidget,
     'corner-grid': cornerGridWidget,
+    'region-pick': regionPickWidget,
     'xy-pad': xyPadWidget,
     rect: rectPadWidget,
 };

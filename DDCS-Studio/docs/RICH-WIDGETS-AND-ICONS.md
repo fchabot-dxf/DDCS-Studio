@@ -103,8 +103,16 @@ and ONE generic Blockly field (`field_control`) + ONE generic form widget interp
 
 **Phasing (concrete-first; the generic renderer is DEFERRED — see BUILD ORDER above):**
 - **Cn — concrete `pick` widgets, one at a time.** Build each by reusing `cornerGridSvg`'s existing pattern directly
-  (shared core module + Blockly field adapter + form widget), NOT a framework. First strong candidate for #2: a
-  fixture-backdrop region picker (the "make your own datum"/SVG-backdrop idea). The datum is #1 (already shipped).
+  (shared core module + Blockly field adapter + form widget), NOT a framework. The datum is #1 (already shipped).
+  **#2 = the region-pick control ("make your own datum") — IN PROGRESS:**
+  - ✅ **runtime form widget (v1, numeric)** — `ui/regionPickSvg.js` (shared core: `buildRegions`/`paintRegions`/
+    `regionValueFromEvent`) + `regionPickWidget` in `formWidgets.js` (`widget:'region-pick'`). A spec `{viewBox,
+    backdrop?, regions:[{shape:'rect'|'poly',…,value:<number>,label}]}` renders clickable rect/poly/freeform regions
+    over an optional backdrop; a click commits the region's NUMBER (numeric socket → valid by construction). Test:
+    `tests/region-pick-widget.spec.js`.
+  - ▶ **next:** the Blockly **field adapter** (`field_regionpick`, same shared core → form/block parity, like
+    `cornerGridField`) + the **authoring** flow (compose the backdrop in `iconEditor` + mark regions + assign numbers
+    + bind). Then enum/string region-pick once field-targeting lands.
 - **C★ — extract the generic `pick` renderer + spec** ONLY once ≥2 concrete pick widgets exist and can be diffed.
   Re-express datum + the new one(s) as built-in `pick` specs to prove form/block parity. *Deferred until forced.*
 - **handle widgets** (slider / xy-pad / rect / steppers) — same concrete-first discipline; slider/xy/rect already
