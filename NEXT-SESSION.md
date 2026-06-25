@@ -1,6 +1,69 @@
 # NEXT SESSION — Binding Rebuild (handoff)
 
 ---
+## 📝 MESSAGE FROM THE ADVISORY SESSION — module restructure proposal
+
+**Finish your current work first (glow), commit it clean, then read this.**
+
+### The problem: `opStacks.js` is a misnamed mediator
+The name "opStacks" only describes one of five unrelated responsibilities living in that file. It sits between
+all 21 wizard files and `programModel.js`, orchestrating between them — that's a controller role, not a "stacks"
+role. This is the root of the "forked away from programModel" drift.
+
+The five responsibilities and where they should live:
+
+| what lives in `opStacks.js` today | what it actually is | right home |
+|---|---|---|
+| `BUILDERS` registry + `makeOp` | how to construct a block stack from op params (needs all 21 wizard imports) | **`opBuilders.js`** |
+| `buildActiveOpStack` → `previewActiveOp` → `commitActiveOp` → `reconcileActiveOp` | the wizard session — the op being authored before commit | **`opSession.js`** |
+| `replaceOp`, `deleteOp`, `duplicateOp`, `mergeOpBlocks` | program mutations — edits to the committed stack | `opSession.js` (needs BUILDERS; see coupling note below) |
+| `isOpBlockEdited`, `editedLinesForOp`, `collectInjectedIds` | glow / diff utilities | **`opGlow.js`** |
+| `opFromMarker`, `importMarkedNc` | marker import — the other half of `serializeWithMarkers` | **`programModel.js`** |
+
+### The clearest symptom — codec asymmetry
+- Export: `serializeWithMarkers()` lives in `programModel.js` ✓
+- Import: `opFromMarker()`, `importMarkedNc()` live in `opStacks.js` ✗
+
+Both halves of a codec belong in the same file. Moving the import side into `programModel.js` (next to
+`serializeWithMarkers`) is the single most impactful fix — it makes the round-trip self-contained in the right
+place.
+
+### Second issue — `blockModel.js` is misnamed
+It's stateless (no state, no subscriptions). It takes blocks and emits G-code (`emitMapped`, `emitProgram`, `newBlock`).
+The name "model" implies it owns state, like `programModel.js` does. More honest: **`blockEmitter.js`**.
+
+### Coupling note — why program mutations can't simply move to `programModel.js`
+`replaceOp`, `deleteOp`, `duplicateOp` need BUILDERS to rebuild after a replacement. Moving them to
+`programModel.js` would require importing `opBuilders.js` there — a new dependency. Simpler: keep mutations in
+`opSession.js` which already owns BUILDERS, and have `opSession.js` call `programModel.setStack()` to commit.
+That's the current pattern anyway; the rename makes the role explicit.
+
+### Proposed end state
+```
+blocks/
+  opBuilders.js   ← BUILDERS registry (21 wizard imports, makeOp)          [was part of opStacks.js]
+  opSession.js    ← active wizard session (build→preview→commit) + mutations [was part of opStacks.js]
+  opGlow.js       ← glow/diff (isOpBlockEdited, editedLinesForOp,            [was part of opStacks.js]
+                    collectInjectedIds)
+  opSchema.js     ← schema registry + codec (already renamed) ✓
+  programModel.js ← program state + opFromMarker + importMarkedNc            [absorbs codec import side]
+  blockEmitter.js ← stateless block→G-code emitter                          [was blockModel.js]
+  gcodeToStack.js ← G-code → block stack parser (fine as-is) ✓
+  programFraming.js, macroFile.js, lint.js, suggest.js, bigram.js, saveStates.js — all fine as-is
+```
+
+### How to do it safely
+Each rename is purely mechanical — no logic changes, just moving exports between files.
+Run the full suite + protocol validator after each step. One commit per rename.
+Do NOT do them all in one commit — the diff becomes unreadable.
+
+Order:
+1. `blockModel.js` → `blockEmitter.js` (simplest, touches fewest files — just update the import in `programModel.js` and anywhere else it's imported)
+2. Move `opFromMarker` + `importMarkedNc` → `programModel.js` (codec symmetry; update the import in `opStacks.js` + anywhere else)
+3. Extract `opGlow.js` from `opStacks.js` (pull the three glow exports out, update importers)
+4. Split remaining `opStacks.js` → `opBuilders.js` + `opSession.js` (the big one — do last when the file is smallest)
+
+---
 ## ✅ DONE — `DICT` → `SCHEMA`, `opDictionary.js` → `opSchema.js` (advisory rename, commit below)
 The export is now `SCHEMA` and the file `web/blocks/opSchema.js` (a schema registry — it declares every op's
 param structure/types/canon/field bindings; not a plain lookup). Purely mechanical; suite + validator green.
