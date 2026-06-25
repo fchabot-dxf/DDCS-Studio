@@ -7,10 +7,11 @@ import { test, expect } from '@playwright/test';
  *
  * For every op in BUILDERS it asserts:
  *   1. it has a DICT entry (its vocabulary is declared in opDictionary), and
- *   2. its declared params survive the marker round-trip  params → ( @DDCS:1 {…} ) → params  (canon bijective), and
- *   3. its canon names are unique (no two params collide on the same marker key — which would lose data).
- * (Form-field binding + reconstruct-from-real-params are checked by the existing per-op specs; this guard will
- *  extend to the binding as it folds into the dictionary.)
+ *   2. it has a form-field binding (PARAM_FIELDS) unless exempt, and every binding key is a DICT param
+ *      (FIELDS ⊆ DICT — so the binding folds into the dictionary with no orphan keys), and
+ *   3. its declared params survive the marker round-trip  params → ( @DDCS:1 {…} ) → params  (canon bijective), and
+ *   4. its canon names are unique (no two params collide on the same marker key — which would lose data).
+ * (reconstruct-from-real-params is checked by the existing per-op specs.)
  */
 test('protocol: every op has a dict entry, round-trips, and is canon-clean', async ({ page }) => {
   await page.goto('http://localhost:3211');
@@ -27,6 +28,12 @@ test('protocol: every op has a dict entry, round-trips, and is canon-clean', asy
       const spec = D.DICT[opType];
       if (!spec) { r.errors.push('no DICT entry'); out.push(r); continue; }
       if (!FIELDS[opType] && !EXEMPT_BINDING.has(opType)) r.errors.push('no form-field binding (PARAM_FIELDS)');
+
+      // FIELDS ⊆ DICT: every form-field binding key must be a declared DICT param. A stale FIELDS key seeds
+      // nothing (op.params[key] is undefined) and never round-trips through the marker — this guards the
+      // binding rebuild: the field map can fold into the dictionary with no orphan keys.
+      const fmap = FIELDS[opType];
+      if (fmap) for (const k in fmap) { if (!spec[k]) r.errors.push(`FIELDS key "${k}" not in DICT`); }
 
       // canon uniqueness (a collision would silently drop a param on round-trip)
       const seen = {};

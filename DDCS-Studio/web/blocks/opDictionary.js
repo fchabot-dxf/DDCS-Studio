@@ -44,33 +44,35 @@ export const DICT = {
         ramp: Enum(), feed: N('F'), clearance: N(), wcs: Enum(), ...PLACE,
     },
     surfacing: {
-        toolDia: N(), stepoverPct: N(), clearance: N(), feed: N('F'), plunge: N(), originX: N('X'),
+        toolDia: N(), stepoverPct: N(), clearance: N(), feed: N('F'), plunge: N(), rpm: N('S'), originX: N('X'),
         originY: N('Y'), w: N(), h: N(), depth: N('Z'), stepdown: N(), strategy: Enum(), wcs: Enum(), ...PLACE,
     },
     slot: {
         ax: N('X'), ay: N('Y'), bx: N('X'), by: N('Y'), width: N(), toolDia: N(), stepoverPct: N(),
-        depth: N('Z'), stepdown: N(), feed: N('F'), plunge: N(), clearance: N(), wcs: Enum(), pattern: Enum(),
+        depth: N('Z'), stepdown: N(), feed: N('F'), plunge: N(), rpm: N('S'), clearance: N(), originX: N('X'),
+        originY: N('Y'), wcs: Enum(), pattern: Enum(),
         cols: N(), rows: N(), dx: N(), dy: N(), count: N(), spacing: N(), angle: N(), dia: N(null, 'patternDia'),
         startAngle: N(), w: N(), h: N(), nx: N(), ny: N(), skip: Str(), ...PLACE,
     },
     edge: {
         axis: Enum(), dir: Enum(), wcs: Enum(), dist: N(null, 'maxDist'), retract: N(), radius: N(),
         f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), level: N(null, 'triggerLevel'),
+        syncA: Bool(), slave: Enum(), qStop: N(),
     },
     atc_change: {
-        method: Enum(), x: N('X'), y: N('Y'), z: N('Z'), zClear: N('Z'), fixedT: N('T'),
+        method: Enum(), x: N('X'), y: N('Y'), z: N('Z'), zClear: N('Z'), fixedT: N('T'), orient: Bool(),
         waitSpindle: Bool(), dustCover: Bool(), confirm: Bool(), magazine: Struct(),
     },
     homing: { axes: Struct(), config: Struct(), machine: Struct(), softLimits: Bool() },
     pocket: {
         shape: Enum(), originX: N('X'), originY: N('Y'), dia: N(), sides: N(), w: N(), h: N(),
         toolDia: N(), stepoverPct: N(), wallOffset: N(), strategy: Enum(), depth: N('Z'), stepdown: N(),
-        feed: N('F'), plunge: N(), clearance: N(), wcs: Enum(), ...PLACE,
+        feed: N('F'), plunge: N(), rpm: N('S'), clearance: N(), wcs: Enum(), ...PLACE,
     },
     contour: {
         shape: Enum(), originX: N('X'), originY: N('Y'), dia: N(), sides: N(), w: N(), h: N(),
-        side: Enum(), toolDia: N(), depth: N('Z'), stepdown: N(), feed: N('F'), plunge: N(), clearance: N(),
-        wcs: Enum(), ...PLACE,
+        side: Enum(), toolDia: N(), depth: N('Z'), stepdown: N(), feed: N('F'), plunge: N(), rpm: N('S'),
+        clearance: N(), wcs: Enum(), ...PLACE,
     },
     wcs: {
         sys: Enum('wcs'), axisX: Bool(), axisY: Bool(), axisZ: Bool(), sync: Bool(), slave: Enum(),
@@ -83,17 +85,17 @@ export const DICT = {
     middle: {
         featureType: Enum(), approach: Enum(), axis: Enum(), dir1: Enum(), dir2: Enum(), twoAxis: Bool(),
         findBoth: Bool(), circular: Bool(), wcs: Enum(), dist: N(null, 'maxDist'), retract: N(), safeZ: N(),
-        clearOver: N(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), syncA: Bool(), slave: Enum(),
+        clearOver: N(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), syncA: Bool(), slave: Enum(), qStop: N(),
     },
     corner: {
         corner: Enum(), probeSeq: Enum(), probeZ: Bool(), probeZFirst: Bool(), wcs: Enum(), dist: N(null, 'maxDist'),
         retract: N(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), level: N(null, 'triggerLevel'),
-        safeZ: N(), travelDist: N(), scanDepth: N(), radius: N(), sources: Struct(), syncA: Bool(), slave: Enum(),
+        safeZ: N(), travelDist: N(), scanDepth: N(), radius: N(), sources: Struct(), syncA: Bool(), slave: Enum(), qStop: N(),
     },
     alignment: {
         checkAxis: Enum(), probeDir: Enum(), safeZ: N(), dist: N(null, 'maxDist'), retract: N(),
         f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), level: N(null, 'triggerLevel'),
-        tolerance: N(), sources: Struct(),
+        tolerance: N(), sources: Struct(), qStop: N(),
     },
     atc_length: {
         blockHeight: N(), safeZ: N(), maxDist: N(), retract: N(), f_fast: N('F', 'feedFast'),
@@ -111,17 +113,17 @@ export const DICT = {
     rotary_clock: {
         action: Enum(), reference: Enum(), wcs: Enum(), level: N(null, 'triggerLevel'), span: N(),
         dist: N(null, 'maxDist'), retract: N(), safeZ: N(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'),
-        port: N(), sources: Struct(),
+        port: N(), sources: Struct(), qStop: N(),
     },
     rotary_center: {
         method: Enum(), approach: Enum(), datum: Enum(), wcs: Enum(), level: N(null, 'triggerLevel'), diameter: N(),
         dist: N(null, 'maxDist'), retract: N(), safeZ: N(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'),
-        port: N(), sources: Struct(),
+        port: N(), sources: Struct(), qStop: N(),
     },
     text: {
         text: Str(), rpm: N('S'), dir: Enum(), height: N(), spacing: N(), align: Enum(), x: N('X'), y: N('Y'),
         strokeWidth: N(), toolDia: N(), stepoverPct: N(), depth: N('Z'), stepdown: N(), feed: N('F'), plunge: N(),
-        clearance: N(), ...PLACE,
+        clearance: N(), originX: N('X'), originY: N('Y'), ...PLACE,
     },
     circular: {   // own form params (circularWizard); circularStack maps them onto middleStack at emit
         featureType: Enum(), wcs: Enum(), dist: N(null, 'maxDist'), retract: N(), safeZ: N(),
@@ -155,7 +157,7 @@ export const FIELDS = {
     atc_warmup: { rpm1: 'atc_warmup_rpm1', time1: 'atc_warmup_time1', rpm2: 'atc_warmup_rpm2', time2: 'atc_warmup_time2' },
     atc_change: { method: 'atc_change_method', x: 'atc_change_x', y: 'atc_change_y', z: 'atc_change_z', zClear: 'atc_change_zclear', fixedT: 'atc_change_fixedt', orient: 'atc_change_orient', waitSpindle: 'atc_change_m300', dustCover: 'atc_change_cover', confirm: 'atc_change_confirm' },
     atc_test: { mode: 'atc_test_mode', cycles: 'atc_test_cycles', dwellMs: 'atc_test_dwell', first: 'atc_test_first', count: 'atc_test_count', zClear: 'atc_test_zclear', descend: 'atc_test_descend' },
-    atc_table: { lengths: 'atc_table_lengths', pockets: 'atc_table_pockets' },
+    atc_table: { includeLengths: 'atc_table_lengths', includePockets: 'atc_table_pockets' },
 };
 
 // ── marker codec (op record <-> ( @DDCS:v {…} ) comment), mapping internal keys <-> canon names ──
