@@ -11,7 +11,7 @@
  * adapter when it needs one). Number params stay the easy default; richer widgets are opt-in.
  */
 import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
-import { buildRegions, paintRegions, regionValueFromEvent } from './regionPickSvg.js';
+import { buildRegions, paintRegions, regionValueFromEvent, regionLabel } from './regionPickSvg.js';
 import { FeatureCanvas } from '../viz/featureCanvas.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -144,14 +144,17 @@ function regionPickWidget(host, b) {
     svg.setAttribute('width', '100%');
     svg.style.cssText = 'width:100%; max-width:320px; border:1px solid var(--border,#2a3340); border-radius:8px; background:var(--bg,#0b0f14);';
     const regions = buildRegions(svg, cfg);
-    const repaint = () => paintRegions(regions, cur);
+    const echo = document.createElement('div');   // echo the picked region's LABEL — what was committed, not just the lit shape
+    echo.style.cssText = 'font-size:11px; opacity:.8; min-height:14px;';
+    const updateEcho = () => { const l = regionLabel(cfg, cur); echo.textContent = l ? `▸ ${l}` : ''; };
+    const repaint = () => { paintRegions(regions, cur); updateEcho(); };
     svg.addEventListener('click', (e) => {
-        const v = regionValueFromEvent(regions, e);
+        const v = regionValueFromEvent(regions, e);   // topmost-wins (SVG paint order); single-select → one `cur`
         if (v == null) return;
         cur = v; repaint(); host.dispatchEvent(new Event('input', { bubbles: true }));
     });
     repaint();
-    host.append(svg);
+    host.append(svg, echo);
     return { read: () => ({ [b.param]: numOr(cur, b.default ?? 0) }) };
 }
 

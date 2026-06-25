@@ -51,10 +51,14 @@ export function buildRegions(svgEl, spec = {}) {
     return out;
 }
 
-/** Paint each region: the one whose value === `selected` gets the accent; the rest are faint. */
+/** Paint each region: the one whose value === `selected` gets the accent, the rest dim (default look = accent fill +
+ *  dim the rest, which survives irregular poly/freeform where a thin outline would be lost). The `rp-region`/`rp-on`
+ *  classes are a CSS hook so a theme can restyle the selection from the SAME design tokens as the datum picker (so
+ *  theming restyles both pickers as one family — the shared-core argument applied to the visual layer). */
 export function paintRegions(regions, selected) {
     for (const r of regions) {
         const on = String(r.value) === String(selected);
+        r.el.classList.add('rp-region'); r.el.classList.toggle('rp-on', on);
         r.el.setAttribute('fill', on ? RP.SEL : RP.IDLE_FILL);
         r.el.setAttribute('fill-opacity', on ? '0.40' : '1');
         r.el.setAttribute('stroke', on ? RP.SEL : RP.IDLE_STROKE);
@@ -62,10 +66,18 @@ export function paintRegions(regions, selected) {
     }
 }
 
-/** The region value under a click event (or null) — by the hit-shape's data-ri. */
+/** The region value under a click event (or null). TOPMOST-WINS by construction: SVG paints in document order, so
+ *  the last-drawn (highest z) overlapping region is on top and IS `e.target` — matching what the user sees, not a
+ *  surprising smallest-area rule. Single-select/radio is the caller's job (it tracks one `cur`). */
 export function regionValueFromEvent(regions, e) {
     const el = e.target && e.target.closest ? e.target.closest('[data-ri]') : null;
     if (!el) return null;
     const r = regions[+el.getAttribute('data-ri')];
     return r ? r.value : null;
+}
+
+/** The label of the region with this value (for echoing WHAT was committed, not just the lit shape). */
+export function regionLabel(spec, value) {
+    const r = ((spec && spec.regions) || []).find((rr) => String(rr.value) === String(value));
+    return r ? (r.label || '') : '';
 }

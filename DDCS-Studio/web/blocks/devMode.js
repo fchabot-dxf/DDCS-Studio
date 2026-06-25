@@ -20,6 +20,10 @@ import { fieldKind, fieldsOf, FN } from './blockly/bridge.js';
 import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack } from './userOps.js';
 import { createWizard } from './wizardLibrary.js';
 import { workspaceToStack } from './blockly/stackBridge.js';
+import { openRegionEditor } from '../ui/regionEditor.js';   // the "make your own datum" authoring editor
+
+// A pencil glyph for the dev-mode "✎ regions" affordance on a regionpick block (a FieldImage with an onClick).
+const PENCIL_URI = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cfe6ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>');
 
 // op-children flatten reuses userOps.flattenBlocks so binding.blockIndex shares ONE definition with the registry.
 // pre-order walk of the op-container's atom blocks (DO chain + nested DO) — aligns 1:1 with flattenBlocks(op.children).
@@ -155,6 +159,7 @@ function augment() {
     B.Events.disable();
     try {
         for (const blk of ws.getAllBlocks()) {
+            if (blk.type === 'regionpick') { augmentRegionPick(blk); if (blk.queueRender) blk.queueRender(); continue; }   // ✎ regions affordance
             if (!isAtom(blk)) continue;
             for (const f of numericFields(blk)) {
                 const inputName = 'DECL_' + FN(f);
@@ -181,6 +186,7 @@ function clearAugment() {
     B.Events.disable();
     try {
         for (const blk of ws.getAllBlocks()) {
+            if (blk.type === 'regionpick') { if (blk.getInput('RGNED')) { try { blk.removeInput('RGNED'); } catch (_) { /* */ } } if (blk.queueRender) blk.queueRender(); continue; }
             if (!isAtom(blk)) continue;
             for (const f of numericFields(blk)) {
                 const inputName = 'DECL_' + FN(f);
@@ -190,6 +196,29 @@ function clearAugment() {
         }
     } finally { B.Events.enable(); }
     try { if (B.renderManagement) B.renderManagement.triggerQueuedRenders(); } catch (_) { /* */ }
+}
+
+// The dev-mode "✎ regions" affordance: a pencil FieldImage on a regionpick block that opens the region editor and
+// writes the authored spec back to the SAME block.data channel the runtime + round-trip already use (one spec, no
+// divergence). Gated to dev mode (authoring is a power-user gesture; *using* the picker stays a normal-mode click).
+function augmentRegionPick(blk) {
+    if (blk.getInput('RGNED')) return;   // idempotent
+    blk.appendDummyInput('RGNED').appendField(new _B.FieldImage(PENCIL_URI, 16, 16, '✎ regions', () => openRegionAuthor(blk)));
+}
+export function openRegionAuthor(blk) {   // exported so the pencil onClick AND tests can trigger it the same way
+    let spec = null;
+    try { const d = blk.data ? JSON.parse(blk.data) : {}; if (d.spec) spec = typeof d.spec === 'string' ? JSON.parse(d.spec) : d.spec; } catch (_) { /* fresh */ }
+    openRegionEditor(spec ? { spec } : null, (newSpec) => {
+        let d = {}; try { d = blk.data ? JSON.parse(blk.data) : {}; } catch (_) { /* */ }
+        d.spec = JSON.stringify(newSpec);
+        blk.data = JSON.stringify(d);                            // spec rides block.data (runtime + round-trip read it)
+        const f = blk.getField('VALUE');
+        if (f) {
+            const cur = f.getValue();
+            if (newSpec.regions && newSpec.regions.length && !newSpec.regions.some((r) => String(r.value) === cur)) f.setValue(String(newSpec.regions[0].value));
+            if (f.forceRerender) f.forceRerender();              // redraw the inline picker from the new spec
+        }
+    });
 }
 
 // RE-AUTHOR a saved wizard: load its template (with its param pills) back into the Blocks tab + dev mode, so the

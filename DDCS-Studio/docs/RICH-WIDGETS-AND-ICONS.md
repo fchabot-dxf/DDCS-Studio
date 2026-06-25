@@ -182,7 +182,19 @@ second consumer (slot authoring wants custom controls + icons on the same core).
   polygon** on save (via `boxPoint`) so authoring matches the runtime. Load round-trips rect + poly. Test:
   `tests/region-editor.spec.js`. (Poly/freeform point-editing is the v1.x follow-up; the runtime + bake already
   handle polygons.)
-- ▶ **(3) wire** dev-mode "＋ Region pick" → `regionpick` block (the editor's spec → a regionpick pill in the op).
+- ✅ **(3) wire** the editor into authoring — a dev-mode **✎ regions** affordance on the `regionpick` block
+  (`devMode.augmentRegionPick` → `openRegionAuthor`) opens `openRegionEditor` and writes the spec back to the SAME
+  `block.data` channel the runtime + round-trip use (one spec, no divergence). Gated to dev mode. Test:
+  `tests/region-author-block.spec.js`.
+
+**Selection model (shipped with the picker):** topmost-wins hit-test (SVG paint order → `e.target`), single-select
+(one number committed), the form widget **echoes the picked region's label** (`regionLabel`), and the selection
+visual uses the SAME accent + a `rp-region`/`rp-on` CSS class hook as the datum picker (theming restyles both).
+
+**"Make your own datum" is COMPLETE end-to-end:** shared core (`shapeStage`) → region editor (`regionEditor`) → ✎
+authoring on the `regionpick` block → runtime in form (`regionPickWidget`) + block (`field_regionpick`) → reduces to
+real G-code → round-trips + rides `.wizard`. Follow-ups: poly/freeform point-editing in the editor; enum/string
+region values (needs field-targeting from #2).
 Each step tested; the refactor (1) landed first and independently.
 
 ---
