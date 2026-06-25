@@ -39,7 +39,8 @@ const HQ_ACTIONS = [
     { act: 'wizard', label: 'Save as custom wizard' },   // register the current op's stack as a bar button (+ its form)
     { act: 'load',   label: 'Load file' },
     { act: 'insert', label: 'Insert file' },
-    { act: 'copy',   label: 'Copy program' },
+    // Copy moved to a floating button in the editor (ui: #editor-copy-btn). Clear stays here as the phone access
+    // point (the header Clear shortcut is desktop-only); on desktop it's a fallback to the header trash button.
     { act: 'clear',  label: 'Clear editor' },
     { act: 'export', label: 'Export / download' },
 ];
@@ -54,7 +55,6 @@ function runQuickAction(act) {
         case 'wizard': window.ddcsSaveAsWizard ? window.ddcsSaveAsWizard() : alert('Open an op in the Blocks tab first, then save it as a wizard.'); break;
         case 'load':   window.loadGcodeFile?.(); break;
         case 'insert': window.insertGcodeFile?.(); break;
-        case 'copy':   window.copyCode?.(); break;
         case 'clear':  window.clearCode?.(); break;
         case 'export': window.downloadFile?.(); break;
         case 'standalone':
@@ -225,6 +225,16 @@ export function initHeaderPost() {
             
             copyBtn.style.color = '#00ff00';
             setTimeout(() => copyBtn.style.color = '', 500);
+        });
+    }
+
+    // Floating Copy-program button in the editor (moved out of the quick-menu) → copy the whole program + flash.
+    const progCopyBtn = document.getElementById('editor-copy-btn');
+    if (progCopyBtn) {
+        progCopyBtn.addEventListener('click', () => {
+            window.copyCode?.();
+            progCopyBtn.classList.add('copied');
+            setTimeout(() => progCopyBtn.classList.remove('copied'), 600);
         });
     }
 

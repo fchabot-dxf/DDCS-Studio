@@ -4383,6 +4383,20 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 }
 .hdr-controls .hdr-undo:hover:not(:disabled) { opacity: 1; background: rgba(128,128,128,.15); }
 .hdr-controls .hdr-undo:disabled { opacity: .28; cursor: default; filter: grayscale(.5); }
+/* Clear-program shortcut beside undo/redo (destructive → a red-tinted trash glyph). Hidden on phone (≤600px),
+   where header space is tight and the chevron quick-menu keeps Clear as the access point. */
+.hdr-controls .hdr-clear { color: #ef4444; display: inline-flex; align-items: center; }
+.hdr-controls .hdr-clear:hover { opacity: 1; background: rgba(239,68,68,.14); }
+@media (max-width: 600px) { .hdr-controls .hdr-clear { display: none; } }
+
+/* Floating Copy-program button, top-right of the editor (mirrors the bottom-left ⟳ Transform overlay). Clear of
+   the vertically-centred 3D pull-tab; gets covered by the 3D drawer when it's open (copy is for the code view). */
+.editor-copy-float {
+    position: absolute; right: 8px; top: 8px; z-index: 3; opacity: .75;
+    padding: 4px 6px; line-height: 0; display: inline-flex; align-items: center;
+}
+.editor-copy-float:hover { opacity: 1; }
+.editor-copy-float.copied { color: #22c55e; opacity: 1; }
 @media (max-width: 520px) {
     .app-header .brand { padding: 0 8px; gap: 6px; }
     .app-header .logo { height: 26px; }

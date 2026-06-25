@@ -88,7 +88,12 @@ Earlier-but-related (prior session, on `main`): the data-driven wizard bar (`com
    passthrough already exists in `getLibrary`); custom SVG **import** (sanitised) + an **in-modal GUI editor** (compose
    from components — fields/handles/buttons, NOT a vector editor); SVG **backdrop** for a canvas picker (your fixture
    as the canvas; needs sanitisation + a coord map). The picker registry is built to absorb these.
-4. **Editor chrome** (small): Clear → app header (near undo/redo), Copy → a floating button in the editor.
+4. **Editor chrome** — ✅ DONE. **Clear** → a red trash button in the header beside undo/redo (`#btn-clear`,
+   desktop only — hidden ≤600px, where the chevron menu keeps it as the phone access point). **Copy** → a floating
+   button top-right of the editor (`#editor-copy-btn`, all widths, with a green flash on click), removed from the
+   chevron menu (the floating button is universal). Wiring in `headerPost.js`; styles in `styles.css`. Test:
+   `tests/editor-chrome.spec.js` (desktop wiring + menu delta; phone hide). NOTE the test must wait for the chevron
+   menu to populate (initHeaderPost wires the Copy listener AFTER window.copyCode exists).
 5. **Custom-op preview intent** — extend `viz/opSimContext.js` to `user_*` ops (rotary/probe/magazine), derived from
    atoms (A-move→rotary, G31→machine, tool-change→magazine) or declared.
 
