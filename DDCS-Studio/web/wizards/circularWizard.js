@@ -3,7 +3,7 @@
  *
  * Superseded by the Middle wizard (circular + probe-both-axes), which finds the centre AND reports the
  * diameter + out-of-round (#58/#59/#60/#61) for a round bore/boss. This thin shim stays ONLY so the
- * Blocks/Blockly layer (opStacks `circular`, the `circular_op` block) keeps resolving and any previously
+ * Blocks/Blockly layer (opBuilders `circular`, the `circular_op` block) keeps resolving and any previously
  * saved circular ops still render — it now DELEGATES to middleStack, so there is no duplicated probe
  * sequence. New work uses the Middle wizard.
  */

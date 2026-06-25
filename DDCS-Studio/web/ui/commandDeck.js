@@ -54,7 +54,7 @@ window.loadGcodeFile = function loadGcodeFile() {
                 // then shows the clean projection). Marker-free files load as raw text, exactly as before.
                 if (/\(\s*@DDCS:\d+\s/.test(text) && window.ddcsLoadBlockStack) {
                     try {
-                        const { importMarkedNc } = await import('../blocks/opStacks.js');
+                        const { importMarkedNc } = await import('../blocks/programModel.js');
                         const stack = importMarkedNc(text);
                         if (stack && stack.length) { window.ddcsLoadBlockStack(stack); return; }
                     } catch (_) { /* fall through to raw load */ }

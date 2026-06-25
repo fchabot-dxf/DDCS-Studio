@@ -12,7 +12,7 @@ test('editedRangesForOp: word-level range for a value edit, whole-line for an in
   await page.waitForFunction(() => window.openWiz && window.insertWiz && window.ddcsGetBlockProgram && window.ddcsLoadBlockStack && window.ddcsGetProjection);
 
   const r = await page.evaluate(async () => {
-    const ops = await import('/blocks/opStacks.js');
+    const ops = await import('/blocks/opGlow.js');
     const clone = (x) => JSON.parse(JSON.stringify(x));
     const findLeaf = (blocks, pred) => {
       for (const b of (blocks || [])) {

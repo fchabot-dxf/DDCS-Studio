@@ -79,7 +79,7 @@ test('contour op round-trips: BUILDERS.contour → reconcile reads the TRUE boun
   await page.waitForFunction(() => window.ddcsStudio);
 
   const r = await page.evaluate(async () => {
-    const ops = await import('/blocks/opStacks.js');
+    const ops = await import('/blocks/opSession.js');
     const cw = await import('/wizards/contourWizard.js');
     const rec = await import('/blocks/opRecord.js');
 

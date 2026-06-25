@@ -17,7 +17,7 @@ test('protocol: every op has a dict entry, round-trips, and is canon-clean', asy
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
   const report = await page.evaluate(async () => {
-    const ops = await import('/blocks/opStacks.js');
+    const ops = await import('/blocks/opBuilders.js');
     const D = await import('/blocks/opSchema.js');
     const EXEMPT_BINDING = new Set(['drill', 'atc_length', 'homing']);   // drill: custom view.setForm; atc_length: settings-driven; homing: no form-field map
     const out = [];

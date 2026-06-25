@@ -53,7 +53,7 @@ function applyOpGating(ws) {
 }
 
 let api = null;            // module singleton, set once the workspace is built: { refresh, load }
-let _ops = null;           // captured opStacks module reference for interceptors
+let _ops = null;           // captured opSession module reference for interceptors
 let initPromise = null;    // in-flight build. The header tabs are double-wired (inline onclick in index.html +
 // addEventListener in gatewayStatus.js), so ONE Blocks click fires showApp('blocks') twice → two initBlocks().
 // `api` isn't set until the end of the build, so a plain `if (api)` guard can't stop the second call. We cache
@@ -86,7 +86,7 @@ export function initBlocks() {
 export async function showBlocks() {
   await initBlocks();
   try {
-    const ops = await import('./opStacks.js');
+    const ops = await import('./opSession.js');
     if (_ops === null) _ops = ops;
     
     if (getStack().length) {

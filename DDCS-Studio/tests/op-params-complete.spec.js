@@ -16,7 +16,8 @@ test('fresh-inserted ops are params-complete (no false glow / block-edited)', as
     && window.ddcsLoadBlockStack && typeof window.ddcsEditedLinesForOp === 'function');
 
   const r = await page.evaluate(async () => {
-    const ops = await import('/blocks/opStacks.js');
+    const ops = await import('/blocks/opBuilders.js');
+    const glowMod = await import('/blocks/opGlow.js');
     const committed = [], dirty = [];
     for (const type of Object.keys(ops.BUILDERS)) {
       try {
@@ -30,7 +31,7 @@ test('fresh-inserted ops are params-complete (no false glow / block-edited)', as
         if (!op) continue;   // no openWiz opener (retired circular / special ATC openers) — out of scope here
         committed.push(type);
         const glow = (window.ddcsEditedLinesForOp(op.id) || []).length;
-        const edited = ops.isOpBlockEdited ? ops.isOpBlockEdited(op.id) : false;
+        const edited = glowMod.isOpBlockEdited ? glowMod.isOpBlockEdited(op.id) : false;
         if (glow || edited) dirty.push({ type, glow, edited });
       } catch (_) { /* opener threw — not a params-completeness failure */ }
     }

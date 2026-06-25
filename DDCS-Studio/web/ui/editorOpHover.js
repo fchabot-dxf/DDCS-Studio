@@ -52,7 +52,7 @@ export function initEditorOpHover() {
 
     // Persistent "edited in Blocks" glow: any op whose blocks diverge from its form params (isOpBlockEdited) gets
     // its SPECIFIC emitted editor lines marked — WORD-LEVEL where a value token was edited (editedRangesForOp),
-    // whole-line for an injected atom. The detector lives in the lazy opStacks module. Wrapping word spans mutates
+    // whole-line for an injected atom. The detector lives in the lazy opGlow module. Wrapping word spans mutates
     // the overlay, so disconnect the observer around the mutation phase (else it re-fires on our own edits → loop).
     let obs = null;
     const glowEdited = () => {
@@ -79,7 +79,7 @@ export function initEditorOpHover() {
     window.ddcsRefreshBlockGlow = glowEdited;
     obs = new MutationObserver(glowEdited);
     obs.observe(overlay, { childList: true, subtree: true });
-    import('../blocks/opStacks.js').then((m) => {
+    import('../blocks/opGlow.js').then((m) => {
         window.ddcsOpBlockEdited = m.isOpBlockEdited;
         window.ddcsEditedLinesForOp = m.editedLinesForOp;
         window.ddcsEditedRangesForOp = m.editedRangesForOp;

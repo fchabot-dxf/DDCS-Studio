@@ -9,7 +9,7 @@ const MAG = [{ pocket: 1, tool: 1, x: 10, y: 0, z: -5 }, { pocket: 2, tool: 2, x
 
 async function roundTrip(page, type, params) {
   return page.evaluate(async ({ type, params }) => {
-    const ops = await import('/blocks/opStacks.js');
+    const ops = await import('/blocks/opSession.js');
     const rec = await import('/blocks/opRecord.js');
     rec.recordOp(type, params);
     const built = ops.buildActiveOpStack();        // sets shownOp = type, returns [progstart, op, progend]
@@ -108,7 +108,7 @@ test('atc_length is registered for reverse-sync (no editable form fields)', asyn
 
 test('every ATC op has a BUILDERS stack AND a reconciler', async ({ page }) => {
   const missing = await page.evaluate(async () => {
-    const ops = await import('/blocks/opStacks.js');
+    const ops = await import('/blocks/opSession.js');
     const rec = await import('/blocks/opRecord.js');
     const types = ['atc_length', 'atc_check', 'atc_warmup', 'atc_change', 'atc_test', 'atc_table'];
     const bad = [];

@@ -43,7 +43,7 @@ test('circular middle op round-trips: BUILDERS.middle → reconcile recovers the
   await page.waitForFunction(() => window.ddcsStudio);
 
   const back = await page.evaluate(async () => {
-    const ops = await import('/blocks/opStacks.js');
+    const ops = await import('/blocks/opSession.js');
     const rec = await import('/blocks/opRecord.js');
     const params = { featureType: 'pocket', circular: true, approach: 'auto', axis: 'X', dir1: 'pos', findBoth: true, dir2: 'neg', wcs: 'G55' };
     // Drive the reconciler the way the app does: record the op, build its op-stack (via BUILDERS.middle = the

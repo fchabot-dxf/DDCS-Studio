@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // Accumulating two snippet/probe ops into one program must NOT produce a mid-program M30 (which would halt the
 // program after the first op) or duplicate jump labels (which make GOTOs resolve to the wrong target). Guards
-// the renumber-labels + single-terminator normalisation in opStacks.appendIntoProgram.
+// the renumber-labels + single-terminator normalisation in opSession.appendIntoProgram.
 test.use({ viewport: { width: 1400, height: 1000 } });
 
 async function insertOp(page, name) {

@@ -153,7 +153,7 @@ export class WizardManager {
         const view = this.activeView();
         if (!view || !this.wizardElement || !this.wizardElement.classList.contains('active')) return;
         let reconcileActiveOp;
-        try { ({ reconcileActiveOp } = await import('./blocks/opStacks.js')); } catch (_) { return; }
+        try { ({ reconcileActiveOp } = await import('./blocks/opSession.js')); } catch (_) { return; }
         const r = reconcileActiveOp();
         if (!r || r.type !== view.type || !r.fields) return;
         for (const id in r.fields) {
@@ -355,12 +355,13 @@ export class WizardManager {
         // no block builder yet (probe/ATC families) fall back to a plain text insert.
         let committed = false;
         try {
-            const ops = await import('./blocks/opStacks.js');
+            const ops = await import('./blocks/opSession.js');
+            const { isOpBlockEdited } = await import('./blocks/opGlow.js');
             if (this.editingOpId) {
                 // EDIT: rebuild THIS op from the new params (single source of truth) and replace it in place.
                 const { getLastOp } = await import('./blocks/opRecord.js');
                 const op = getLastOp();
-                if (ops.isOpBlockEdited && ops.isOpBlockEdited(this.editingOpId)) {
+                if (isOpBlockEdited && isOpBlockEdited(this.editingOpId)) {
                     const { showBlockEditNotice } = await import('./ui/blockEditNotice.js');
                     const choice = await showBlockEditNotice(op?.label || op?.type || this._activeType || 'op');
                     if (choice === 'cancel') return;                         // back to the form, nothing inserted

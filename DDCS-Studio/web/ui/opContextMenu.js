@@ -1,7 +1,7 @@
 /**
  * ui/opContextMenu.js — the shared right-click op menu (✎ Edit / ⧉ Duplicate / 🗑 Delete), reused by every
  * surface that can identify an op: the editor (line→op), the Blocks code panel (span ancestry→op), and the
- * Blockly op blocks. Acts via the window hooks (ddcsEditOp + opStacks duplicate/delete) — params stay the truth.
+ * Blockly op blocks. Acts via the window hooks (ddcsEditOp + opSession duplicate/delete) — params stay the truth.
  */
 let menu = null;
 function ensure() {
@@ -30,8 +30,8 @@ export function showOpMenu(op, x, y) {
         m.appendChild(b);
     };
     item(`✎ Edit ${op.label || op.opType || 'op'}`, () => window.ddcsEditOp && window.ddcsEditOp(op.id), !editable);
-    item('⧉ Duplicate', async () => { try { (await import('../blocks/opStacks.js')).duplicateOp(op.id); } catch (_) { /* */ } });
-    item('🗑 Delete', async () => { try { (await import('../blocks/opStacks.js')).deleteOp(op.id); } catch (_) { /* */ } });
+    item('⧉ Duplicate', async () => { try { (await import('../blocks/opSession.js')).duplicateOp(op.id); } catch (_) { /* */ } });
+    item('🗑 Delete', async () => { try { (await import('../blocks/opSession.js')).deleteOp(op.id); } catch (_) { /* */ } });
     // Clamp into the viewport.
     m.hidden = false;
     const r = m.getBoundingClientRect();

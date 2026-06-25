@@ -12,7 +12,7 @@ test('pocket: polygon insets the circumradius by the tool radius; ellipse insets
   const r = await page.evaluate(async () => {
     const findType = (bs, t) => { for (const b of (bs || [])) { if (!b) continue; if (b.type === t) return b; const f = b.children && findType(b.children, t); if (f) return f; } return null; };
     const pw = await import('/wizards/pocketWizard.js');
-    const ops = await import('/blocks/opStacks.js');
+    const ops = await import('/blocks/opSession.js');
     const rec = await import('/blocks/opRecord.js');
 
     const regionOf = (params) => {
@@ -71,7 +71,7 @@ test('contour: polygon + ellipse offset (outside grows, inside shrinks) and roun
   const r = await page.evaluate(async () => {
     const { regionDesc } = await import('/wizards/ops/region.js');
     const { contourRegion } = await import('/wizards/ops/contour.js');
-    const ops = await import('/blocks/opStacks.js');
+    const ops = await import('/blocks/opSession.js');
     const rec = await import('/blocks/opRecord.js');
 
     // Contour offsets the TRUE boundary by the side (outside = +r, inside = −r). tool Ø6 → r=3.
