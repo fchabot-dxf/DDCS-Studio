@@ -29,28 +29,61 @@ export function initEditorOpHover() {
     const clearHi = () => overlay.querySelectorAll('.g-line.op-hover').forEach((s) => s.classList.remove('op-hover'));
     const hide = () => { clearHi(); chip.hidden = true; hoverOpId = null; };
 
+    // Wrap chars [start, end) of a .g-line in a <span class="word-edited"> (glow just the edited token). Walks the
+    // line's text nodes — they concatenate to the rendered line text, so offsets map straight through the colour
+    // spans formatGCode inserts. surroundContents covers the common case (token in one text node); the extract
+    // fallback handles a range that crosses a colour-span boundary (e.g. an axis value next to its yellow letter).
+    const wrapRange = (lineEl, start, end) => {
+        const walker = document.createTreeWalker(lineEl, NodeFilter.SHOW_TEXT);
+        let pos = 0, sNode = null, sOff = 0, eNode = null, eOff = 0, n;
+        while ((n = walker.nextNode())) {
+            const len = n.nodeValue.length;
+            if (sNode === null && pos + len > start) { sNode = n; sOff = start - pos; }
+            if (pos + len >= end) { eNode = n; eOff = end - pos; break; }
+            pos += len;
+        }
+        if (!sNode || !eNode) return;
+        const range = document.createRange();
+        range.setStart(sNode, sOff); range.setEnd(eNode, eOff);
+        const span = document.createElement('span'); span.className = 'word-edited';
+        try { range.surroundContents(span); }
+        catch (_) { span.appendChild(range.extractContents()); range.insertNode(span); }
+    };
+
     // Persistent "edited in Blocks" glow: any op whose blocks diverge from its form params (isOpBlockEdited) gets
-    // its SPECIFIC emitted editor lines marked. The detector lives in the lazy opStacks module — import it once so it's
-    // available on the editor side; re-glow whenever the highlight overlay rebuilds (childList only, so our own
-    // class toggles don't re-trigger it).
+    // its SPECIFIC emitted editor lines marked — WORD-LEVEL where a value token was edited (editedRangesForOp),
+    // whole-line for an injected atom. The detector lives in the lazy opStacks module. Wrapping word spans mutates
+    // the overlay, so disconnect the observer around the mutation phase (else it re-fires on our own edits → loop).
+    let obs = null;
     const glowEdited = () => {
         if (typeof window.ddcsOpBlockEdited !== 'function' || typeof window.ddcsGetBlockProgram !== 'function') return;
-        overlay.querySelectorAll('.g-line.op-block-edited').forEach((s) => s.classList.remove('op-block-edited'));
-        for (const op of (window.ddcsGetBlockProgram() || [])) {
-            if (!op || op.type !== 'op' || !window.ddcsOpBlockEdited(op.id)) continue;
-            // Only highlight the exact lines that were hand-edited in Blocks
-            const linesToGlow = window.ddcsEditedLinesForOp ? window.ddcsEditedLinesForOp(op.id) : (window.ddcsLinesForOp && window.ddcsLinesForOp(op.id) || []);
-            linesToGlow.forEach((j) => {
-                const s = overlay.querySelector(`.g-line[data-line-index="${j}"]`); if (s) s.classList.add('op-block-edited');
-            });
+        if (obs) obs.disconnect();
+        try {
+            overlay.querySelectorAll('.g-line.op-block-edited').forEach((s) => s.classList.remove('op-block-edited'));
+            overlay.querySelectorAll('span.word-edited').forEach((s) => s.replaceWith(...s.childNodes));   // unwrap stale
+            overlay.normalize();                                                                          // merge split text nodes → clean offsets
+            for (const op of (window.ddcsGetBlockProgram() || [])) {
+                if (!op || op.type !== 'op' || !window.ddcsOpBlockEdited(op.id)) continue;
+                const entries = window.ddcsEditedRangesForOp ? window.ddcsEditedRangesForOp(op.id)
+                    : ((window.ddcsEditedLinesForOp ? window.ddcsEditedLinesForOp(op.id) : (window.ddcsLinesForOp && window.ddcsLinesForOp(op.id)) || []).map((line) => ({ line, range: null })));
+                for (const { line, range } of entries) {
+                    const s = overlay.querySelector(`.g-line[data-line-index="${line}"]`); if (!s) continue;
+                    if (!range) s.classList.add('op-block-edited');       // injected / container edit → whole-line
+                    else wrapRange(s, range[0], range[1]);                // value-edited token → just the word
+                }
+            }
+        } finally {
+            if (obs) obs.observe(overlay, { childList: true, subtree: true });
         }
     };
     window.ddcsRefreshBlockGlow = glowEdited;
-    new MutationObserver(glowEdited).observe(overlay, { childList: true, subtree: true });
-    import('../blocks/opStacks.js').then((m) => { 
-        window.ddcsOpBlockEdited = m.isOpBlockEdited; 
+    obs = new MutationObserver(glowEdited);
+    obs.observe(overlay, { childList: true, subtree: true });
+    import('../blocks/opStacks.js').then((m) => {
+        window.ddcsOpBlockEdited = m.isOpBlockEdited;
         window.ddcsEditedLinesForOp = m.editedLinesForOp;
-        glowEdited(); 
+        window.ddcsEditedRangesForOp = m.editedRangesForOp;
+        glowEdited();
     }).catch(() => { /* detector optional */ });
 
     editor.addEventListener('mousemove', (e) => {

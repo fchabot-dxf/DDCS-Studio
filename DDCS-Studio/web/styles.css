@@ -609,6 +609,14 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
     background-color: color-mix(in srgb, var(--accent, #0ea5e9) 38%, transparent);
     animation: blockEditedBreathe var(--edit-glow-speed, 1.5s) ease-in-out infinite;
 }
+/* WORD-LEVEL glow: when a Blocks edit changed just a VALUE token in an otherwise form-generated line, only that
+   token is wrapped (editorOpHover.wrapRange) — same accent fill + character breathe as the whole-line glow, but
+   hugging the inline span (e.g. only the `987654` in `#1=987654`), never the rest of the line. */
+#editor-highlight .g-line .word-edited {
+    border-radius: 3px;
+    background-color: color-mix(in srgb, var(--accent, #0ea5e9) 38%, transparent);
+    animation: blockEditedBreathe var(--edit-glow-speed, 1.5s) ease-in-out infinite;
+}
 
 /* Grey out disabled toolbar buttons (e.g. the header Undo/Redo when there's no history to step through). */
 .toolbar-btn:disabled, .toolbar-btn[disabled] { opacity: .38; cursor: default; filter: grayscale(.4); pointer-events: none; }

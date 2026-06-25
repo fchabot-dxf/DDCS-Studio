@@ -10,6 +10,7 @@ import { getLastOp, recordOp } from './opRecord.js';
 import { num, r3 } from '../wizards/ops/util.js';
 import { parseGcodeToStack } from './gcodeToStack.js';                       // decode a non-builder op's G-code → blocks
 import { isMarker, parseMarker } from './opSchema.js';                       // read self-describing op markers
+import { emitMapped } from './blockModel.js';                               // emit a stack → { lines, map } (for word-level glow diff)
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } };
@@ -764,10 +765,13 @@ const _structKeyGlow = (b) => {
 function _allBlockIds(b, into) { if (!b) return; if (b.id) into.add(b.id); (b.children || []).forEach((c) => _allBlockIds(c, into)); }
 // Two matched blocks' OWN params differ (children/id excluded) → a value edited in Blocks (an override).
 const _paramsDiffer = (a, b) => JSON.stringify(stripBlockIds((a && a.params) || {})) !== JSON.stringify(stripBlockIds((b && b.params) || {}));
-// Ids of `actual` blocks that OVERRIDE the clean form rebuild: injected atoms (no structural match in `base`) PLUS
-// matched atoms whose own params were value-edited. LCS-aligned by the merge's key; matched containers recurse, so an
-// atom injected/edited inside a kept container is caught. The override-diff — both sides forward emits, no inference.
-function collectInjectedIds(base, actual, into = new Set()) {
+// Walk the override-diff (base = clean form rebuild, actual = the live block stack). LCS-align by the merge's
+// structural key, then classify each `actual` block:
+//   - actual-only (no match in base) → INJECTED: the whole subtree is form-unrepresentable → acc.injected.
+//   - matched but its OWN params were value-edited → an OVERRIDE: record BOTH sides (for the word-level diff);
+//     recurse so an edit inside a kept container is caught.
+// Both sides are forward emits (BUILDERS) — no inference.
+function collectEdits(base, actual, acc = { injected: new Set(), overrides: [] }) {
     const bK = base.map(_structKeyGlow), aK = actual.map(_structKeyGlow);
     const L = Array.from({ length: base.length + 1 }, () => new Array(actual.length + 1).fill(0));
     for (let i = 1; i <= base.length; i++)
@@ -776,15 +780,21 @@ function collectInjectedIds(base, actual, into = new Set()) {
     let i = base.length, j = actual.length;
     while (i > 0 || j > 0) {
         if (i > 0 && j > 0 && bK[i - 1] === aK[j - 1]) {
-            if (_paramsDiffer(base[i - 1], actual[j - 1])) into.add(actual[j - 1].id);   // matched but value-edited → override
-            collectInjectedIds(base[i - 1].children || [], actual[j - 1].children || [], into);   // matched → recurse
+            if (_paramsDiffer(base[i - 1], actual[j - 1])) acc.overrides.push({ id: actual[j - 1].id, base: base[i - 1], actual: actual[j - 1] });
+            collectEdits(base[i - 1].children || [], actual[j - 1].children || [], acc);   // matched → recurse
             i--; j--;
         } else if (j > 0 && (i === 0 || L[i][j - 1] >= L[i - 1][j])) {
-            _allBlockIds(actual[j - 1], into);    // actual-only → injected (with its subtree)
+            _allBlockIds(actual[j - 1], acc.injected);   // actual-only → injected (with its subtree)
             j--;
-        } else { i--; }                           // base-only → a deletion (nothing in the editor to glow)
+        } else { i--; }                                  // base-only → a deletion (nothing in the editor to glow)
     }
-    return into;
+    return acc;
+}
+// The injected ids PLUS the override ids — the set editedLinesForOp glows whole-line (line-level, back-compat).
+function collectInjectedIds(base, actual) {
+    const { injected, overrides } = collectEdits(base, actual);
+    overrides.forEach((o) => injected.add(o.id));
+    return injected;
 }
 // Builder atoms at the SAME granularity as op.children — unwrap a builder that returns its own op container
 // (only homing does today) and drop program framing, so base ↔ children align.
@@ -809,6 +819,55 @@ export function editedLinesForOp(opId) {
     const out = [];
     map.forEach((anc, i) => { if (anc && anc.some((id) => injected.has(id))) out.push(i); });
     return out;
+}
+
+// Smallest changed [start, end) slice between two strings — trim the common prefix + suffix. start >= end ⇒ identical.
+function diffRange(b, a) {
+    const max = Math.min(a.length, b.length);
+    let p = 0; while (p < max && a[p] === b[p]) p++;
+    let s = 0; while (s < max - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
+    return [p, a.length - s];
+}
+// Line indices in an emit owned by block `id` — the own id is the LAST element of each line's ancestry (blockModel: own=[...anc,id]).
+function _emitLinesOf(emit, id) {
+    const out = [];
+    (emit.map || []).forEach((anc, i) => { if (anc && anc[anc.length - 1] === id) out.push(i); });
+    return out;
+}
+/**
+ * Like editedLinesForOp but WORD-LEVEL: the editor overlay data as [{ line, range }]. `range` = a [start, end)
+ * char span within the line — glow just the value token a Blocks edit changed in an otherwise form-generated line
+ * — or `null` = whole-line (an INJECTED atom is a wholly new line; a multi-line / container override can't localize
+ * to one token). Forward-only: diffs the clean form rebuild's emit against the live stack's emit (no inference).
+ */
+export function editedRangesForOp(opId) {
+    if (typeof window === 'undefined' || !window.ddcsGetBlockProgram || !window.ddcsGetProjection) return [];
+    const op = _findOpById(window.ddcsGetBlockProgram() || [], opId);
+    if (!op || !op.opType || !BUILDERS[op.opType] || !Array.isArray(op.children)) return [];
+    const baseAtoms = _builderAtoms(op.opType, op.params);
+    const { injected, overrides } = collectEdits(baseAtoms, op.children);
+    if (!injected.size && !overrides.length) return [];
+    const liveMap = (window.ddcsGetProjection() || {}).map || [];
+    const seen = new Set(), out = [];
+    const pushLine = (i, range) => { if (!seen.has(i)) { seen.add(i); out.push({ line: i, range }); } };
+    // injected atoms → whole-line on every editor line they own (the subtree)
+    liveMap.forEach((anc, i) => { if (anc && anc.some((id) => injected.has(id))) pushLine(i, null); });
+    // overrides → word-level when the atom is a single-line leaf; else whole-line
+    if (overrides.length) {
+        const o = dialectOpts();
+        const actualEmit = emitMapped(op.children, o), baseEmit = emitMapped(baseAtoms, o);
+        for (const ov of overrides) {
+            const liveLines = []; liveMap.forEach((anc, i) => { if (anc && anc[anc.length - 1] === ov.actual.id) liveLines.push(i); });
+            const aLines = _emitLinesOf(actualEmit, ov.actual.id), bLines = _emitLinesOf(baseEmit, ov.base.id);
+            if (liveLines.length === 1 && aLines.length === 1 && bLines.length === 1) {
+                const r = diffRange(baseEmit.lines[bLines[0]], actualEmit.lines[aLines[0]]);
+                pushLine(liveLines[0], r[1] > r[0] ? r : null);   // empty diff (e.g. only an id changed) → whole-line
+            } else {                                              // container / multi-line override → whole-line under it
+                liveMap.forEach((anc, i) => { if (anc && anc.some((id) => id === ov.actual.id)) pushLine(i, null); });
+            }
+        }
+    }
+    return out.sort((x, y) => x.line - y.line);
 }
 
 // ── import: read self-describing markers → RECONSTRUCT ops (declare, never infer) ───────────────────────────
