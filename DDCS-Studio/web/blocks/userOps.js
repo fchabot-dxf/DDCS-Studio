@@ -30,6 +30,30 @@ export function flattenBlocks(blocks, out = []) {
     return out;
 }
 
+// Walk a template; for each `param` reporter record plugged into a value socket, produce a form binding AND
+// replace the record with its default number — v(A): a clean template (param blocks are an authoring INPUT, not
+// round-tripped; instantiate stays blockIndex/key). Mutates `template`. (v(B): keep the record + instantiate by
+// name — see the gui-blocks-roundtrip-target note.) Param names are deduped against `seen`.
+export function extractParamBlocks(template, seen = new Set()) {
+    const flat = flattenBlocks(template), bindings = [], STANDALONE = new Set(['slider']);
+    flat.forEach((blk, i) => {
+        if (!blk || !blk.params) return;
+        for (const key in blk.params) {
+            const v = blk.params[key];
+            if (!v || typeof v !== 'object' || v.type !== 'param') continue;
+            const pp = v.params || {};
+            let name = String(pp.name || key).trim().replace(/[^A-Za-z0-9_]/g, '_').replace(/^_+|_+$/g, '') || key;
+            if (seen.has(name)) { let k = 2; while (seen.has(name + '_' + k)) k++; name += '_' + k; }
+            seen.add(name);
+            const dn = Number(pp.value), dflt = Number.isFinite(dn) ? dn : 0;
+            const widget = STANDALONE.has(pp.widget) ? { widget: pp.widget } : {};
+            bindings.push({ param: name, blockIndex: i, key, type: 'number', default: dflt, label: pp.name || name, ...widget });
+            blk.params[key] = dflt;   // replace the pill with its number → clean template
+        }
+    });
+    return bindings;
+}
+
 // Drop counter-based block ids so a stored template is stable (ids are reassigned on emit). (Same rule as opGlow.)
 function stripIds(v) {
     if (Array.isArray(v)) return v.map(stripIds);

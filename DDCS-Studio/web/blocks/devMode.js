@@ -17,7 +17,7 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks } from './userOps.js';
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks } from './userOps.js';
 import { createWizard } from './wizardLibrary.js';
 import { workspaceToStack } from './blockly/stackBridge.js';
 
@@ -210,7 +210,10 @@ function saveAsCustomOp() {
     if (!name) name = (window.prompt('Name this wizard (it becomes a button in the bar):', '') || '').trim();
     if (!name) return;   // cancelled
 
-    const bindings = buildBindings(a.exposures);
+    const inlineBindings = buildBindings(a.exposures);
+    // GUI param blocks plugged into value sockets ALSO declare knobs — extract them (mutates the template: pills → numbers).
+    const paramBindings = extractParamBlocks(a.opRec.children, new Set(inlineBindings.map((b) => b.param)));
+    const bindings = [...inlineBindings, ...paramBindings];
     if (!bindings.length && !confirm('No knobs exposed — save as a fixed wizard (a bar button with no parameters)?')) return;
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'wizard';

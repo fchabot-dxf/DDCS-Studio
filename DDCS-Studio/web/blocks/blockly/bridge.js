@@ -116,6 +116,7 @@ const optionsFor = (def, field) => {
         if (def.type === 'waitinput') return ['imm', 'rise', 'fall', 'high', 'low'];
         if (def.type === 'move') return ['cut', 'rapid', 'probe'];
     }
+    if (field === 'widget' && def.type === 'param') return ['number', 'slider'];   // numeric-socket widgets (more come with grouping / B)
     return SELECTS[field] || null;
 };
 

@@ -44,6 +44,7 @@ import { wcsBlock } from './wcs.js';
 import { distModeBlock } from './distmode.js';
 import { commentBlock } from './comment.js';
 import { variableBlock } from './variable.js';
+import { paramBlock } from './param.js';
 import { mathBlock } from './math.js';
 import { machineMoveBlock, endProgramBlock, mcodeBlock, rawBlock } from './macro.js';
 import { progStartBlock, progEndBlock } from './program.js';
@@ -67,7 +68,7 @@ export const PALETTE = [
     arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, stepdownBlock, placeOnStockBlock, rotateBlock,    // Modify (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align)
     countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
-    setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
+    setBlock, assignBlock, variableBlock, paramBlock,          // Variables (compile-time Set + runtime Set # + reporter + GUI param knob)
     commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
     cornerConfigBlock,                                         // Universal Corner Macro config (emits #30 and #31)
 ];
