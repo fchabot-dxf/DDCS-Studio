@@ -48,19 +48,52 @@ export function parseParamOptions(str) {
     return out;
 }
 
+// Canvas widgets (xy-pad / rect) fold the ROLE into the widget value so the role is DECLARED, never inferred from
+// pool position — reordering / deleting+re-adding a knob can't silently remap x↔y (audit #6-B). 'xy-x'/'xy-y' →
+// xy-pad x/y; 'rect-x/-y/-w/-h' → rect. decodeCanvasWidget → { widget, role } (role null = not a canvas widget).
+const CANVAS_DECODE = { 'xy-x': ['xy-pad', 'x'], 'xy-y': ['xy-pad', 'y'], 'rect-x': ['rect', 'x'], 'rect-y': ['rect', 'y'], 'rect-w': ['rect', 'w'], 'rect-h': ['rect', 'h'] };
+/** The role-encoded canvas widget choices ([label, value]) — shared by the param-block dropdown (bridge) and the
+ *  dev-mode inline-expose dropdown so all three (author / decode / form) agree on the encoding. */
+export const CANVAS_ROLE_WIDGETS = [['XY pad · X', 'xy-x'], ['XY pad · Y', 'xy-y'], ['Rect · X', 'rect-x'], ['Rect · Y', 'rect-y'], ['Rect · W', 'rect-w'], ['Rect · H', 'rect-h']];
+/** Decode a (possibly role-encoded) widget value → { widget, role }. role is null for plain widgets. */
+export function decodeCanvasWidget(w) { const d = CANVAS_DECODE[w]; return d ? { widget: d[0], role: d[1] } : { widget: w, role: null }; }
+
+// The roles a complete canvas needs (an incomplete one degrades to plain number knobs).
+const CANVAS_ROLES = { 'xy-pad': ['x', 'y'], rect: ['x', 'y', 'w', 'h'] };
+const cleanBinding = (b) => ({ param: b.param, blockIndex: b.blockIndex, key: b.key, type: b.type, default: b.default, label: b.label });
+
+/** Assemble canvas bindings (each carrying `_widget` + a DECLARED `role`) into form groups: consecutive same-widget
+ *  bindings share a group; a NEW group starts when a role would repeat (so two xy-pads → two canvases). The role is
+ *  declared (folded into the widget), NEVER from pool position. The first member carries the form `widget`
+ *  (resolveFormWidget reads group[0].widget); an INCOMPLETE group (e.g. an xy-pad missing Y) degrades each member to
+ *  a plain number knob. Shared by both authoring paths. */
+export function groupCanvasBindings(canvas, prefix = 'pg') {
+    const groups = []; let cur = null, seen = null;
+    for (const b of canvas) {
+        if (!cur || cur.widget !== b._widget || seen.has(b.role)) { cur = { widget: b._widget, items: [] }; groups.push(cur); seen = new Set(); }
+        cur.items.push(b); seen.add(b.role);
+    }
+    const out = []; let gi = 0;
+    for (const g of groups) {
+        const have = new Set(g.items.map((b) => b.role));
+        const complete = (CANVAS_ROLES[g.widget] || []).every((r) => have.has(r));
+        if (!complete) { g.items.forEach((b) => out.push(cleanBinding(b))); continue; }   // incomplete → plain number knobs
+        const gid = prefix + (++gi);
+        g.items.forEach((b, i) => out.push({ ...cleanBinding(b), group: gid, role: b.role, ...(i === 0 ? { widget: g.widget } : {}) }));
+    }
+    return out;
+}
+
 // Walk a template; for each `param` reporter record plugged into a value socket, produce a form binding.
 // v(B) (keepPills=true, the default for save): KEEP the pill in the template so it ROUND-TRIPS — re-opening the
 // wizard shows the param blocks. instantiate still resolves the pill to a number (it overwrites the socket by
 // blockIndex/key), so the committed op + valid-by-construction are untouched (pills never reach a committed op).
 // v(A) (keepPills=false): replace the pill with its number (a clean number-only template). Names deduped vs `seen`.
 // Widget round-trip: every param widget commits a NUMBER (the socket stays numeric) — slider/toggle keep their
-// widget key; dropdown also carries its parsed numeric presets as widgetConfig.options. type stays 'number'.
-// Canvas pickers (xy-pad / rect) are MULTI-param: param pills with that widget are pooled and grouped BY ORDER —
-// xy-pad in pairs (roles x,y), rect in fours (x,y,w,h) — exactly like the dev-mode inline-expose path. An odd
-// leftover degrades to a plain number knob. Grouped bindings are appended after the single ones (form-order parity
-// with buildBindings).
+// widget key; dropdown also carries its parsed numeric presets as widgetConfig.options; canvas widgets carry a
+// DECLARED role (folded into the widget value) and group via groupCanvasBindings.
 export function extractParamBlocks(template, seen = new Set(), keepPills = true) {
-    const flat = flattenBlocks(template), bindings = [], pools = { 'xy-pad': [], rect: [] };
+    const flat = flattenBlocks(template), bindings = [], canvas = [];
     flat.forEach((blk, i) => {
         if (!blk || !blk.params) return;
         for (const key in blk.params) {
@@ -71,8 +104,14 @@ export function extractParamBlocks(template, seen = new Set(), keepPills = true)
             if (seen.has(name)) { let k = 2; while (seen.has(name + '_' + k)) k++; name += '_' + k; }
             seen.add(name);
             const dn = Number(pp.value), dflt = Number.isFinite(dn) ? dn : 0;
+            // type stays 'number' for EVERY param widget — a param pill lives in a numeric socket, so its committed
+            // value is always a number (dropdown = a numeric preset, toggle = 1/0). The WIDGET (not the type) drives
+            // form rendering — resolveFormWidget prefers binding.widget — so this is NOT a downgrade. Do NOT "fix" a
+            // toggle to type:'bool': a bool in a numeric socket resolves to 0, so a toggled-ON knob would emit OFF
+            // (audit #6-A — a false alarm; this comment exists so it isn't re-flagged).
             const base = { param: name, blockIndex: i, key, type: 'number', default: dflt, label: pp.name || name };
-            if (pp.widget === 'xy-pad' || pp.widget === 'rect') pools[pp.widget].push(base);   // grouped by order below
+            const dec = decodeCanvasWidget(pp.widget);
+            if (dec.role) canvas.push({ ...base, _widget: dec.widget, role: dec.role });   // DECLARED role (folded into the widget)
             else if (pp.widget === 'slider' || pp.widget === 'toggle') bindings.push({ ...base, widget: pp.widget });
             else if (pp.widget === 'dropdown') {
                 const options = parseParamOptions(pp.options);
@@ -81,17 +120,7 @@ export function extractParamBlocks(template, seen = new Set(), keepPills = true)
             if (!keepPills) blk.params[key] = dflt;   // (A) replace; (B/default) leave the pill in the template
         }
     });
-    let gi = 0;
-    const group = (pool, size, roles, widget) => {
-        let i = 0;
-        for (; i + size <= pool.length; i += size) {
-            const gid = 'pg' + (++gi);
-            for (let r = 0; r < size; r++) bindings.push({ ...pool[i + r], group: gid, role: roles[r], ...(r === 0 ? { widget } : {}) });
-        }
-        for (; i < pool.length; i++) bindings.push(pool[i]);   // leftover (incomplete group) → a plain number knob
-    };
-    group(pools['xy-pad'], 2, ['x', 'y'], 'xy-pad');
-    group(pools.rect, 4, ['x', 'y', 'w', 'h'], 'rect');
+    bindings.push(...groupCanvasBindings(canvas, 'pg'));   // declared roles → groups (new group when a role repeats)
     return bindings;
 }
 
@@ -142,7 +171,8 @@ export function validateUserOp(def) {
         if (!b || !b.param) { errs.push('a binding has no param name'); continue; }
         if (seen.has(b.param)) errs.push(`duplicate param "${b.param}"`);
         seen.add(b.param);
-        if (b.type && !BINDING_TYPES.has(b.type)) errs.push(`param "${b.param}": unsupported type "${b.type}" (use ${[...BINDING_TYPES].join(' / ')})`);
+        if (!b.type) errs.push(`param "${b.param}": missing type — declare one of ${[...BINDING_TYPES].join(' / ')} (type is declared, never assumed — audit #6)`);
+        else if (!BINDING_TYPES.has(b.type)) errs.push(`param "${b.param}": unsupported type "${b.type}" (use ${[...BINDING_TYPES].join(' / ')})`);
         const blk = flat[b.blockIndex];
         if (!blk || !blk.params || !(b.key in blk.params)) errs.push(`param "${b.param}": binding (block ${b.blockIndex}.${b.key}) does not resolve in the template`);
     }

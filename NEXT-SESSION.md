@@ -110,6 +110,24 @@ Earlier-but-related (prior session, on `main`): the data-driven wizard bar (`com
    `panel.js`) so intent is also visible IN the stack; and `wizardToFile` drops `panel`+`sim` on `.wizard` export
    (pre-existing gap — both are lost on share/import).
 
+6. **Binding type + role declaration audit (declare, never infer)** — ✅ RESOLVED (2026-06-25).
+
+   **A — binding `type` hardcoded to `'number'`** → **REJECTED (false alarm), documented.** Not a downgrade:
+   `resolveFormWidget` prefers `binding.widget` (always set for slider/toggle/dropdown), proven by
+   `form-widgets.spec.js` (`widget:'slider'` wins over `type:'number'`) + the typed-widget round-trip. `type:'number'`
+   is CORRECT — a param pill lives in a numeric socket, so its committed value is always a number (toggle = 1/0,
+   dropdown = a numeric preset). The proposed fix (`toggle`→`type:'bool'`) would REINTRODUCE the numeric-socket bug
+   (a bool resolves to 0 → a toggled-ON knob emits OFF). A clarifying comment now lives at both binding-creation
+   sites so it isn't re-flagged. (Harmless hardening kept: `validateUserOp` now REQUIRES `binding.type`.)
+
+   **B — canvas role inferred from pool order** → **FIXED.** The role is now DECLARED: canvas widgets fold the role
+   into the widget value (`xy-x`/`xy-y`/`rect-x/-y/-w/-h`, shared `userOps.CANVAS_ROLE_WIDGETS`); `decodeCanvasWidget`
+   + `groupCanvasBindings` form canvases (same-widget consecutive; a repeated role starts a new canvas; an incomplete
+   canvas degrades to plain number knobs). Roles no longer depend on pool position — both the param-block path
+   (`extractParamBlocks`) and the inline-expose path (`devMode.buildBindings` + the `WIDGET_CHOICES` dropdown) use the
+   shared helpers. Regression test `gui-param-grouping.spec.js` includes an ORDER-INDEPENDENCE case (declare Y before
+   X → roles don't flip). See [[custom-op-sim-intent-infer-vs-declare]] (same declare-never-infer principle).
+
 CONCEPT-ONLY (do NOT build the behavior): the **terrain-probe** is a proof-of-concept illustration (see
 `CRAZY-IDEAS.md` — surface digitizing / probe-array → terrain). Its real CNC gaps (probe base must be block-ported;
 a grid probe needs an indexed probe-array for per-point Z) are out of scope unless explicitly requested.

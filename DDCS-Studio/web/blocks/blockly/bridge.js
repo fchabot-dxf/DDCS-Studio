@@ -118,7 +118,10 @@ const optionsFor = (def, field) => {
         if (def.type === 'waitinput') return ['imm', 'rise', 'fall', 'high', 'low'];
         if (def.type === 'move') return ['cut', 'rapid', 'probe'];
     }
-    if (field === 'widget' && def.type === 'param') return ['number', 'slider', 'dropdown', 'toggle', 'xy-pad', 'rect'];   // numeric-socket widgets (all commit a number); xy-pad/rect group by order
+    // numeric-socket widgets (all commit a number). Canvas pickers fold the ROLE into the value (decoded by
+    // userOps.decodeCanvasWidget) so the role is DECLARED, not inferred from pool order (audit #6-B).
+    if (field === 'widget' && def.type === 'param') return ['number', 'slider', 'dropdown', 'toggle',
+        ['XY pad · X', 'xy-x'], ['XY pad · Y', 'xy-y'], ['Rect · X', 'rect-x'], ['Rect · Y', 'rect-y'], ['Rect · W', 'rect-w'], ['Rect · H', 'rect-h']];
     if (field === 'panel' && def.type === 'panel') return ['form3d', 'form2d', 'form'];   // the GUI panel-type declaration
     return SELECTS[field] || null;
 };

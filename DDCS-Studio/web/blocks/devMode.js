@@ -17,7 +17,7 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams } from './userOps.js';
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS } from './userOps.js';
 import { createWizard } from './wizardLibrary.js';
 import { workspaceToStack } from './blockly/stackBridge.js';
 
@@ -43,9 +43,10 @@ function isAtom(blk) {
 }
 
 // the widget a numeric exposure renders as in the form (the form-widget registry keys; numeric-compatible only).
-// number/slider are single-param; xy-pad/rect are MULTI-param — exposures that pick them group by order (see
-// buildBindings): xy-pad in pairs (x,y), rect in fours (x,y,w,h). Leftovers fall back to a plain number.
-const WIDGET_CHOICES = [['#', 'number'], ['slider', 'slider'], ['xy', 'xy-pad'], ['rect', 'rect']];
+// number/slider are single-param; the canvas pickers are MULTI-param and fold their ROLE into the choice
+// (XY pad · X / · Y, Rect · X/Y/W/H) — so the role is DECLARED here, not inferred from pool order (audit #6-B).
+// buildBindings groups them via groupCanvasBindings (a repeated role starts a new canvas).
+const WIDGET_CHOICES = [['#', 'number'], ['slider', 'slider'], ...CANVAS_ROLE_WIDGETS];
 
 // Read the ticked exposures off the LIVE workspace → { opRec, exposures, varErr }. opRec is the active op (live
 // params); exposures are { param, blockIndex, key, default, widget } in pre-order; varErr names the first exposed
@@ -76,31 +77,19 @@ function collectAuthoring(ws) {
     return { opRec, exposures, varErr };
 }
 
-// Turn exposures into bindings. Single-param widgets (number/slider) → one binding each. Multi-param canvas
-// pickers (xy-pad/rect) → group by ORDER of appearance: xy-pad in pairs (roles x,y), rect in fours (x,y,w,h);
-// the group's first binding carries the widget. An incomplete trailing group degrades to plain numbers.
+// Turn exposures into bindings. Single-param widgets (number/slider) → one binding each. The canvas pickers fold
+// their ROLE into the chosen widget value (xy-x / rect-w / …), so each binding's role is DECLARED, not derived from
+// pool position — groupCanvasBindings then forms canvases (a repeated role starts a new one). type stays 'number'
+// for every binding: an exposure is a plain-number socket, so the value is always numeric (see extractParamBlocks).
 function buildBindings(exposures) {
-    const out = [], pools = { 'xy-pad': [], rect: [] };
+    const out = [], canvas = [];
     const plain = (e) => ({ param: e.param, blockIndex: e.blockIndex, key: e.key, type: 'number', default: e.default, label: e.param });
     for (const e of exposures) {
-        if (e.widget === 'xy-pad' || e.widget === 'rect') pools[e.widget].push(e);
+        const dec = decodeCanvasWidget(e.widget);
+        if (dec.role) canvas.push({ ...plain(e), _widget: dec.widget, role: dec.role });   // DECLARED role (folded into the widget)
         else out.push(e.widget && e.widget !== 'number' ? { ...plain(e), widget: e.widget } : plain(e));
     }
-    let gi = 0;
-    const group = (pool, size, roles, widget) => {
-        let i = 0;
-        for (; i + size <= pool.length; i += size) {
-            const gid = 'g' + (++gi);
-            for (let r = 0; r < size; r++) {
-                const bnd = { ...plain(pool[i + r]), group: gid, role: roles[r] };
-                if (r === 0) bnd.widget = widget;
-                out.push(bnd);
-            }
-        }
-        for (; i < pool.length; i++) out.push(plain(pool[i]));                              // leftover → plain number
-    };
-    group(pools['xy-pad'], 2, ['x', 'y'], 'xy-pad');
-    group(pools.rect, 4, ['x', 'y', 'w', 'h'], 'rect');
+    out.push(...groupCanvasBindings(canvas, 'g'));
     return out;
 }
 
