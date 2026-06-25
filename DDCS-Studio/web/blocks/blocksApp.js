@@ -14,6 +14,7 @@ import { suggestNext, recordProgram } from './suggest.js';   // next-block sugge
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
+import { mountDevMode } from './devMode.js';   // Dev (authoring) mode: expose atom values as params → Save as custom op
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
 import { programSimContext } from '../viz/opSimContext.js';          // declared op-type → preview render-intent (rotary rig, …)
 import { getCaps, resolveActivePost } from '../wizards/dialects/index.js';
@@ -159,6 +160,10 @@ async function buildWorkspace() {
   const fit = () => { try { B.svgResize(ws); } catch (_) { /* pre-render */ } };
   new ResizeObserver(fit).observe(host);
 
+  // Dev (authoring) mode — a floating toggle that grows each atom's numeric values into inline "expose as param"
+  // rows, then "Save as custom op". Re-augments after a model-driven rebuild (renderFromModel) while dev mode is on.
+  const _dev = mountDevMode(ws, B, host);
+
   // ---- Palette search: a filter input above the toolbox. Typing shows the matching blocks (across ALL
   //      categories) in the flyout; clearing restores the normal category flyout. ----
   const search = document.createElement('input');
@@ -302,6 +307,7 @@ async function buildWorkspace() {
   function renderFromModel(p) {
     muteChanges = true;
     try { stackToWorkspace(getStack(), ws); applyOpGating(ws); } finally { muteChanges = false; }   // gate gated ops (muted: no echo)
+    if (_dev) _dev.onModelRender();   // re-apply dev-mode "expose" rows after a clean rebuild (no-op when dev off)
     requestAnimationFrame(place); setTimeout(place, 120); setTimeout(place, 400);
     renderViews(p);
   }
