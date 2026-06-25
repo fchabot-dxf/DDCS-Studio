@@ -17,15 +17,12 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX } from './userOps.js';
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks } from './userOps.js';
 import { createWizard } from './wizardLibrary.js';
+import { workspaceToStack } from './blockly/stackBridge.js';
 
-// pre-order flatten of an op's children records — must match userOps.flattenBlocks (binding.blockIndex indexes this).
-function flatten(blocks, out = []) {
-    for (const b of (blocks || [])) { if (!b) continue; out.push(b); if (b.children) flatten(b.children, out); }
-    return out;
-}
-// pre-order walk of the op-container's atom blocks (DO chain + nested DO) — aligns 1:1 with flatten(op.children).
+// op-children flatten reuses userOps.flattenBlocks so binding.blockIndex shares ONE definition with the registry.
+// pre-order walk of the op-container's atom blocks (DO chain + nested DO) — aligns 1:1 with flattenBlocks(op.children).
 function preorderAtoms(first, out = []) {
     for (let b = first; b; b = b.getNextBlock()) {
         out.push(b);
@@ -130,10 +127,13 @@ function saveAsCustomOp() {
     const name = (_nameInput.value || '').trim();
     if (!name) { alert('Name the custom op first.'); _nameInput.focus(); return; }
 
-    const stack = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
-    const opRec = stack.find((b) => b && b.type === 'op');                                // the active op (model = clean params)
+    // Read the LIVE workspace, not the model: Blockly v13 batches change events (FIRE_QUEUE / setTimeout 0), so a value
+    // edited right before Save hasn't reprojected into the model yet. workspaceToStack ignores the dev-only fields (not
+    // in fieldsOf) → a clean stack, and its pre-order matches preorderAtoms below.
+    const stack = workspaceToStack(ws);
+    const opRec = stack.find((b) => b && b.type === 'op');                                // the active op (live params)
     if (!opRec || !(opRec.children || []).length) { alert('No op to author here — insert an op first, then open Dev mode.'); return; }
-    const flat = flatten(opRec.children);
+    const flat = flattenBlocks(opRec.children);
 
     const opBlk = ws.getAllBlocks().find((b) => b.type === 'op' || b.type.endsWith('_op'));
     const doIn = opBlk && opBlk.getInput('DO');
@@ -146,11 +146,14 @@ function saveAsCustomOp() {
         if (!rec || !rec.params) return;
         for (const f of numericFields(blk)) {
             if (blk.getFieldValue('EXPOSE_' + FN(f)) !== 'TRUE') continue;
+            if (typeof rec.params[f] !== 'number') {                                       // a #var/expression got plugged in
+                alert(`The exposed value “${f}” has a variable or expression plugged in — a parameter must be a plain number. Restore a number on that block, then save again.`);
+                return;
+            }
             let pname = (blk.getFieldValue('PNAME_' + FN(f)) || f).trim().replace(/[^A-Za-z0-9_]/g, '_').replace(/^_+|_+$/g, '') || f;
-            while (used.has(pname)) pname += '_2';
+            if (used.has(pname)) { let k = 2; while (used.has(pname + '_' + k)) k++; pname += '_' + k; }
             used.add(pname);
-            const d = Number(rec.params[f]);
-            bindings.push({ param: pname, blockIndex: i, key: f, type: 'number', default: Number.isFinite(d) ? d : 0, label: pname });
+            bindings.push({ param: pname, blockIndex: i, key: f, type: 'number', default: rec.params[f], label: pname });
         }
     });
     if (!bindings.length && !confirm('No values are exposed — save as a fixed op with no parameters?')) return;

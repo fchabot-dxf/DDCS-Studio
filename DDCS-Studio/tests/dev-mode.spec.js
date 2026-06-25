@@ -47,9 +47,18 @@ test('dev mode: expose a value → Save as custom op → it registers in the lib
   });
   expect(picked, 'found an augmented numeric value to expose').toBeTruthy();
 
-  // name the op + Save
-  await page.fill('.blk-dev-opname', 'My Test Op');
-  await page.click('.blk-dev-save');
+  // Regression guard for the stale-model bug: edit the exposed value to a sentinel, then name + Save ALL in one
+  // synchronous task (Blockly v13 batches change events, so the model hasn't reprojected yet) — the saved default
+  // must equal the LIVE value, which only holds if saveAsCustomOp reads the workspace, not the model.
+  const SENTINEL = 777.5;
+  await page.evaluate(({ key, sentinel }) => {
+    const ws = window.__blkws, VK = key.toUpperCase();
+    let target = null;
+    for (const b of ws.getAllBlocks()) { if (b.getField && b.getField('EXPOSE_' + VK) && b.getFieldValue('EXPOSE_' + VK) === 'TRUE') { target = b; break; } }
+    target.getInput(VK).connection.targetBlock().setFieldValue(String(sentinel), 'NUM');   // model now stale
+    document.querySelector('.blk-dev-opname').value = 'My Test Op';
+    document.querySelector('.blk-dev-save').click();                                         // same task → must read live workspace
+  }, { key: picked.key, sentinel: SENTINEL });
   await page.waitForTimeout(150);
 
   // assert: a valid user op exists with the binding, and it surfaces in the library Custom group + the bar
@@ -79,7 +88,7 @@ test('dev mode: expose a value → Save as custom op → it registers in the lib
   expect(r.bindings[0].param).toBe('myparam');
   expect(r.bindings[0].key).toBe(picked.key);
   expect(r.bindings[0].type).toBe('number');
-  expect(Number(r.bindings[0].default)).toBe(Number(picked.value));   // binding default = the atom's live value
+  expect(r.bindings[0].default, 'binding default = the LIVE-edited value, not the stale model').toBe(SENTINEL);
   expect(r.inCustomGroup, 'appears in the library Custom group').toBe(true);
   expect(r.inBar, 'appears in the wizard bar Custom dropdown').toBe(true);
 

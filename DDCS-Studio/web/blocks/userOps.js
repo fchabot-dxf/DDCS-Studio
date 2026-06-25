@@ -20,7 +20,8 @@ const STORE_KEY = 'ddcs_user_ops';
 export const USER_OP_PREFIX = 'user_';
 
 // Deterministic pre-order walk of a block stack (block, then its children) → a flat array of block REFS.
-function flattenBlocks(blocks, out = []) {
+// Exported so devMode shares ONE definition (binding.blockIndex must mean the same block in both modules).
+export function flattenBlocks(blocks, out = []) {
     for (const b of (blocks || [])) { if (!b) continue; out.push(b); if (b.children) flattenBlocks(b.children, out); }
     return out;
 }
@@ -99,9 +100,11 @@ export function listUserOps() { return readStore(); }
 
 /** Validate → register → persist a new user op. Throws if invalid or the opType already exists. */
 export function createUserOp(def) {
-    registerUserOp(def);                                         // validates (throws on bad def)
+    const errs = validateUserOp(def);
+    if (errs.length) throw new Error('invalid user op: ' + errs.join('; '));
     const defs = readStore();
     if (defs.some((d) => d.opType === def.opType)) throw new Error(`user op "${def.opType}" already exists`);
+    registerUserOp(def);                                         // only now mutate the live BUILDERS/SCHEMA/labels
     defs.push(def);
     writeStore(defs);
     return def;
