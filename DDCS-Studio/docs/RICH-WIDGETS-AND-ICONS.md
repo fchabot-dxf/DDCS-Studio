@@ -199,6 +199,23 @@ Each step tested; the refactor (1) landed first and independently.
 
 ---
 
+## Parametric-canvas atom — investigation + first list-valued instance
+
+`viz/featureCanvas.js` is the **parametric-canvas core** (draggable handles + click-to-type dimension HUD, driving op
+*parameters*, never freeform geometry — used form-side by drill(array)/pocket/contour/slot/text/surfacing views). Its
+**pure form** is `(params → picture) + (interaction → Δparams)` — a surface-agnostic 2-way binding between a value-set
+and a manipulable drawing. Every control we've built is a special case of it (datum/region-pick = 1 value; xy-pad/rect
+= a few; FeatureCanvas = a whole param set). Extracting that pure form → the deferred generic standard (`C★`); the
+forcing function is wanting the canvas *in the blocks*, where the form-only `setFields` tangle blocks reuse.
+
+**✅ First LIST-valued instance — the coordinate-list positioner** (`coordListWidget`, `widget:'coord-list'`): a GROUP
+of XY points (draggable markers on FeatureCanvas) + a shared Z, with add/delete. State = `{ points:[{x,y}], z }`;
+commits the whole list (new binding `type:'list'`). Proves the atom can author an *arbitrary coordinate positioner*
+(not a fixed grid/line/circle pattern) — each marker drives a list-entry param, so it stays parametric (the list IS
+the model, no CAM-trap). Additive (no production-view refactor). Test: `tests/coord-list-widget.spec.js`.
+**Follow-ups:** per-point Z; the block adapter (`field` mounting FeatureCanvas → the positioner in the Blocks view);
+then migrate the existing views onto the extracted pure `(params↔picture)` atom.
+
 ## Cross-cutting
 
 - **Class-B render trap** (Blockly v13): every new field needs a render-guard test, not just an emit/model assertion.

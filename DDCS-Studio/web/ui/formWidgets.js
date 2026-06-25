@@ -194,6 +194,60 @@ function xyPadWidget(host, primary, group) {
     return { read: () => ({ [bx.param]: r3(x), [by.param]: r3(y) }) };
 }
 
+// COORDINATE-LIST positioner — a GROUP of XY points (each a draggable marker on the shared FeatureCanvas) + a
+// shared Z, with add/delete. The first LIST-valued instance of the parametric-canvas atom ("(state → picture) +
+// (interaction → Δstate)"), state = { points:[{x,y}], z }. Commits the whole list (binding type:'list'). Pure
+// spec (points → FeatureCanvas items/handles) is inline here for now; a block adapter would reuse it. Drag a marker
+// → that point; ＋Point/✕ → add/remove; one Z field → the shared depth. (Per-point Z is a later option.)
+function coordListWidget(host, b) {
+    const cfg = b.widgetConfig || {}, bd = resolveBounds(cfg);
+    const d = (b.default && typeof b.default === 'object') ? b.default : {};
+    let points = Array.isArray(d.points) ? d.points.map((p) => ({ x: numOr(p.x, 0), y: numOr(p.y, 0) })) : [];
+    let z = numOr(d.z, 0);
+    host.style.cssText = 'display:flex; flex-direction:column; gap:6px; margin:10px 0;';
+    host.appendChild(labelSpan(b));
+
+    const cv = document.createElement('div'); cv.className = 'cl-canvas';
+    cv.style.cssText = `width:100%; height:${cfg.height || 175}px; border:1px solid var(--border,#2a3340); border-radius:8px; overflow:hidden;`;
+    host.appendChild(cv);
+    const layout = new FeatureCanvas();
+    const draw = () => layout.render(cv, {
+        stock: { w: bd.w, h: bd.h, ox: bd.ox, oy: bd.oy },
+        items: points.map((p, i) => ({ kind: 'hole', x: p.x, y: p.y, n: i + 1, r: Math.max(1.5, bd.w * 0.012) })),
+        handles: points.map((p, i) => ({ id: 'p' + i, x: p.x, y: p.y, kind: 'move' })),
+        onDrag: (id, w) => { const i = +id.slice(1); if (points[i]) { points[i] = { x: clamp(w.x, bd.ox, bd.ox + bd.w), y: clamp(w.y, bd.oy, bd.oy + bd.h) }; renderList(); draw(); host.dispatchEvent(new Event('input', { bubbles: true })); } },
+    });
+    requestAnimationFrame(draw);
+
+    const row = document.createElement('div'); row.style.cssText = 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;';
+    const addBtn = document.createElement('button'); addBtn.type = 'button'; addBtn.className = 'cl-add'; addBtn.textContent = '＋ Point';
+    addBtn.style.cssText = CTRL_CSS + ' cursor:pointer;';
+    addBtn.addEventListener('click', () => { points.push({ x: r3(bd.ox + bd.w / 2), y: r3(bd.oy + bd.h / 2) }); renderList(); draw(); host.dispatchEvent(new Event('input', { bubbles: true })); });
+    const zWrap = document.createElement('label'); zWrap.style.cssText = 'display:flex; align-items:center; gap:4px; font-size:11px;';
+    const zInp = document.createElement('input'); zInp.type = 'number'; zInp.step = 'any'; zInp.className = 'cl-z'; zInp.value = z; zInp.style.cssText = CTRL_CSS + ' width:80px;';
+    zInp.addEventListener('input', () => { z = numOr(zInp.value, 0); host.dispatchEvent(new Event('input', { bubbles: true })); });
+    zWrap.append(document.createTextNode('Z (shared)'), zInp);
+    row.append(addBtn, zWrap);
+    host.appendChild(row);
+
+    const list = document.createElement('div'); list.className = 'cl-list'; list.style.cssText = 'font-size:11px; max-height:90px; overflow:auto;';
+    function renderList() {
+        list.innerHTML = '';
+        points.forEach((p, i) => {
+            const r = document.createElement('div'); r.style.cssText = 'display:flex; gap:6px; align-items:center; padding:2px 0;';
+            r.append(document.createTextNode(`${i + 1}: ${r3(p.x)}, ${r3(p.y)}`));
+            const del = document.createElement('button'); del.type = 'button'; del.className = 'cl-del'; del.textContent = '✕';
+            del.style.cssText = 'cursor:pointer; background:transparent; border:none; color:inherit; opacity:.6;';
+            del.addEventListener('click', () => { points.splice(i, 1); renderList(); draw(); host.dispatchEvent(new Event('input', { bubbles: true })); });
+            r.appendChild(del); list.appendChild(r);
+        });
+    }
+    renderList();
+    host.appendChild(list);
+
+    return { read: () => ({ [b.param]: { points: points.map((p) => ({ x: r3(p.x), y: r3(p.y) })), z: r3(z) } }) };
+}
+
 function rectPadWidget(host, primary, group) {
     const role = rolesOf(group, primary), bx = role.x, by = role.y, bw = role.w, bh = role.h;
     const bd = resolveBounds(primary.widgetConfig || {});
@@ -226,6 +280,7 @@ export const FORM_WIDGETS = {
     text: textWidget,
     'corner-grid': cornerGridWidget,
     'region-pick': regionPickWidget,
+    'coord-list': coordListWidget,
     'xy-pad': xyPadWidget,
     rect: rectPadWidget,
 };

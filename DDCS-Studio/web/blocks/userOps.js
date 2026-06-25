@@ -22,7 +22,7 @@ export const USER_OP_PREFIX = 'user_';
 
 // Param value-types a binding may carry. `type` is the VALUE kind (drives marker codec + defaults); the form
 // `widget` (separate, ui/formWidgets.js) is just how it's rendered. number stays the easy default.
-export const BINDING_TYPES = new Set(['number', 'int', 'enum', 'bool', 'string']);
+export const BINDING_TYPES = new Set(['number', 'int', 'enum', 'bool', 'string', 'list']);   // 'list' = a structured/array value (e.g. a coordinate-list positioner) — not a scalar socket
 
 // Deterministic pre-order walk of a block stack (block, then its children) → a flat array of block REFS.
 // Exported so devMode shares ONE definition (binding.blockIndex must mean the same block in both modules).
