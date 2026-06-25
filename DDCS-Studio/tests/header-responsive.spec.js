@@ -60,9 +60,10 @@ test('quick-menu chevron: icon-only; opens Program actions + Post-processor + Th
   expect(await page.locator('#hdrPostMenu').isHidden()).toBe(false);
   expect(await page.getAttribute('#hdrPostBtn', 'aria-expanded')).toBe('true');
 
-  // Program actions present (Open/Save/Save-as-custom-wizard, plus load/insert/copy/clear/export/standalone).
+  // Program actions present (Open/Save/Save-as-custom-wizard, plus load/insert/clear/export/standalone).
+  // Copy moved to a floating #editor-copy-btn (editor-chrome work, 30492fc), so it's no longer a quick-menu action.
   const programActions = await page.locator('#hdrPostMenu .hdr-quick-item[data-act]:not([data-act="settings"]):not([data-act="checklist"])').count();
-  expect(programActions, 'nine program actions (incl. Save as custom wizard)').toBe(9);
+  expect(programActions, 'eight program actions (incl. Save as custom wizard)').toBe(8);
   expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="wizard"]').count(), 'Save as custom wizard row present').toBe(1);
   // Settings opens as a modal from the menu.
   expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="settings"]').count(), 'Settings… row present').toBe(1);
