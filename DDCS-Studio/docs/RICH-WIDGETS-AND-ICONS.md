@@ -171,9 +171,15 @@ must not be trapped inside `iconEditor`. So → extract the core.
 polygon-only (click points) for v1; values numeric in v1 (enum once field-targeting lands); the CAM Pack Builder is a
 second consumer (slot authoring wants custom controls + icons on the same core).
 
-**Build order (once greenlit):** (1) extract the shared drawing core from `iconEditor` (no behaviour change — pure
-refactor, keep its tests green); (2) the region editor = core + the thin region-semantics layer; (3) wire it into the
-dev-mode "＋ Region pick" → `regionpick` block. Each step tested; the refactor (1) lands first and independently.
+**Build order (once greenlit):**
+- ✅ **(1) extract the shared drawing core** — `ui/shapeStage.js` (`stageSvg` + `rotateVec`/`boxPoint` +
+  `startGesture`/`applyGesture` + `HANDLE_XY`), lifted verbatim from `iconEditor` (W/H parameterized). `iconEditor`
+  now consumes it; behaviour unchanged. Test: `tests/shape-stage.spec.js` (core unit + an iconEditor smoke test it
+  never had). The `poly` shape is already in the core, ready for region freeform.
+- ▶ **(2) the region editor** = the core + a thin region-semantics layer (value/label/hit-test) over a backdrop
+  (composed via `iconEditor`).
+- ▶ **(3) wire** dev-mode "＋ Region pick" → `regionpick` block.
+Each step tested; the refactor (1) landed first and independently.
 
 ---
 
