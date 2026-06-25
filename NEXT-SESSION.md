@@ -16,11 +16,14 @@ loops/control (`count`/`iff`/`array`/`flow`), and raw-emit atoms (`macro.js`) al
 — express ONE built-in *as data* + assert output-equivalence → port the rest → self-host. See ROADMAP "Key reframe."
 
 ## ▶ Immediate next task
-**ROADMAP → NEAR #1 — Finish Track A icons** (re-icon built-ins + curated line-art SVG). `[S]`, no deps, substrate
-shipped: `wizItemIcon` precedence (`iconOverride` before `WIZ_ITEM_SVG`) + an `ic:<id>` registry + drop the
-`kind==='user'` gate so built-in rows get an icon button. Files: `web/ui/commandDeck.js`,
-`web/ui/wizardManagerPanel.js`, `web/blocks/wizardLibrary.js`.
-*(The handoff-stated alternative next-up is NEAR #2, the in-block ✎ editor for coordlist — `[M]`.)*
+**ROADMAP → NEAR #3 — App-wide Merge/Replace/Cancel safety net** `[M]` — generalise the shipped edit-path notice to
+the NEW-op insert chokepoint (`wizardManager.js` else-branch via `commitActiveOp`; expose the committed op's id
+pre-insert). North star: never regenerate code in a way that silently erases block-only functions. (Then NEAR #4 —
+the field-targeting / non-numeric param unlock, the highest-leverage item.)
+
+**Shipped this session:**
+- NEAR #1 — re-icon any wizard (built-ins incl.) + line-art icon picker (`ef0ee43`); shared `web/ui/wizIcons.js` registry.
+- NEAR #2 — in-block ✎ editor for the coordlist positioner (`105c837`); `buildCoordEditor`/`openCoordEditor` shared by the form widget + the block ✎ affordance.
 
 ## Environment — fresh-checkout gotchas (cost real time this session)
 - Git root has a **doubled `DDCS-Studio/` dir**; the npm project + app code is under `DDCS-Studio/DDCS-Studio/`. Use absolute paths — a stray relative `cd DDCS-Studio` lands you one level too deep.

@@ -43,14 +43,20 @@ output-equivalence → port the rest one-by-one → self-host (forkable built-in
 
 ## Wizard-maker — NEAR (do next)
 
-### 1. [S] Finish Track A icons — re-icon built-ins + curated line-art SVG
+### 1. ✅ SHIPPED (`ef0ee43`) — Track A icons: re-icon any wizard + line-art picker
+Done. A shared `ic:<id>` registry (`web/ui/wizIcons.js`) backs both the bar and the picker; an `iconOverride`
+(emoji or `ic:<id>`) wins over a built-in's default line-art; the icon button is ungated (built-ins re-iconable).
+*Follow-up = MID "curated line-art SVG icon library" (a larger/new glyph set + folding in the header icons).*
 The emoji icon picker shipped; this completes it. Smallest standalone win; substrate already in place.
 - `commandDeck.js` `wizItemIcon`: check `iconOverride` **before** the unconditional `WIZ_ITEM_SVG[e.id]` return, so an override can win for the 8 SVG-iconed built-ins.
 - Extract `HEADER_ICONS`+`WIZ_ITEM_SVG` into a shared `ic:<id>` registry; add `ic:`/SVG rows to `ICON_CHOICES` + render SVG in `openIconPicker` cells and the bar.
 - Drop the `kind==='user'` gate (`wizardManagerPanel.js:291`) so built-in rows get an icon button. Keep `ic:` SVG trusted/curated (injected as raw HTML; labels are `_escHtml`'d).
 - Files: `web/ui/commandDeck.js`, `web/ui/wizardManagerPanel.js`, `web/blocks/wizardLibrary.js`.
 
-### 2. [M] In-block ✎ editor for the coordinate-list positioner
+### 2. ✅ SHIPPED (`105c837`) — In-block ✎ editor for the coordinate-list positioner
+Done. The editor core is `formWidgets.buildCoordEditor` (shared by the form widget + a new `openCoordEditor` modal);
+dev-mode grows a ✎ pencil on `coordlist` blocks → `devMode.openCoordAuthor` reads/writes the `PTS` field + redraws.
+*Still open (coupled): `extractParamBlocks` ignores coordlist pills, so coordlist can't yet become a saved wizard knob (needs NEAR #4's non-numeric param mechanism).*
 The handoff's explicit next-up after V10.36; completes coordlist as a dual-surface authoring widget (matches region-pick).
 - Mirror region-pick: `devMode.augment()/clearAugment()` branch for `coordlist` → pencil `FieldImage` → `openCoordAuthor(blk)`; read/write the **`pts` field** value (`{points,z}` JSON — *not* `block.data`, the one divergence) → `forceRerender()`.
 - The rich editor only exists as an inline closure in `formWidgets.js` (`coordListWidget`) — **extract a standalone `openCoordEditor(initial,onSave)`** (region-pick already has a packaged editor; this doesn't). Add a coord-author spec.
