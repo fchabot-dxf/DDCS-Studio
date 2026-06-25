@@ -18,11 +18,15 @@ test('protocol: every op has a dict entry, round-trips, and is canon-clean', asy
   const report = await page.evaluate(async () => {
     const ops = await import('/blocks/opStacks.js');
     const D = await import('/blocks/opDictionary.js');
+    const wm = await import('/wizardManager.js');
+    const FIELDS = wm.PARAM_FIELDS || {};
+    const EXEMPT_BINDING = new Set(['drill', 'atc_length', 'homing']);   // drill: custom view.setForm; atc_length: settings-driven; homing: no form-field map
     const out = [];
     for (const opType of Object.keys(ops.BUILDERS)) {
       const r = { opType, errors: [] };
       const spec = D.DICT[opType];
       if (!spec) { r.errors.push('no DICT entry'); out.push(r); continue; }
+      if (!FIELDS[opType] && !EXEMPT_BINDING.has(opType)) r.errors.push('no form-field binding (PARAM_FIELDS)');
 
       // canon uniqueness (a collision would silently drop a param on round-trip)
       const seen = {};
