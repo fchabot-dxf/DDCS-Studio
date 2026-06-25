@@ -32,10 +32,17 @@ framework up front.
 
 ---
 
-## Track A — Wizbar icon PICKER (new, small, standalone)
+## Track A — Wizbar icon PICKER (✅ SHIPPED v1 — emoji)
 
 Goal: assign a custom wizard's **bar-button icon** from a curated set. A **picker, not an editor** (drawing a custom
 icon is Track B). Distinct from everything else.
+
+**✅ v1 shipped:** a curated emoji set + an icon button per custom-wizard row in Settings → Wizards
+(`ui/wizardManagerPanel.js`: `ICON_CHOICES` + `openIconPicker`) → writes `iconOverride` via
+`setEntryOverride(id, {icon})`; a custom op renders it through the existing emoji path (no commandDeck change).
+"⌀ Default" clears it (back to ✦). Test: `tests/wizbar-icon-picker.spec.js`. **Follow-ups (optional):** curated
+line-art SVG icons (needs `wizItemIcon` to let `iconOverride` win over `WIZ_ITEM_SVG` + an `ic:<id>` registry);
+re-iconing built-ins (same change).
 
 - **Seams:** `getLibrary`'s `iconOverride` + `setEntryOverride(opType, { icon })` (`blocks/wizardLibrary.js`); the bar
   renders icons from `ui/commandDeck.js` (`HEADER_ICONS` / `WIZ_ITEM_SVG` / `WIZ_GROUP_ICON`, curated line-art SVGs).

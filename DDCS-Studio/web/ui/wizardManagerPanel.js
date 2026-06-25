@@ -41,6 +41,34 @@ function mkArrow(glyph, disabled, onClick, title) {
     return b;
 }
 
+// ── wizbar icon PICKER (Track A — docs/RICH-WIDGETS-AND-ICONS.md) ───────────────────────────────────────────────
+// A curated emoji set; the pick writes `iconOverride` (setEntryOverride id,{icon}); a custom op renders it via the
+// existing emoji path in commandDeck (wizItemIcon → e.icon). "⌀ Default" clears the override (back to ✦). A picker,
+// not an editor — drawing a custom icon graphic is the separate iconEditor (CAM builder).
+const ICON_CHOICES = ['🔧', '🔩', '🪛', '🪚', '⚙', '🧲', '📐', '📏', '🎯', '⊕', '⌖', '🧭', '🕒', '🛡', '📋', '🧪', '💬', '🔥', '✎', '✦', '⭐', '🚩', '⚡', '🧰', '🔨', '🗜', '📦', '🕳', '🔲', '🪙', '🧮', '📌'];
+
+function openIconPicker(anchor, current, onPick) {
+    document.querySelector('.wizicon-pop')?.remove();
+    const pop = document.createElement('div');
+    pop.className = 'wizicon-pop';
+    pop.style.cssText = 'position:fixed; z-index:1300; background:var(--panel); color:var(--text-main); border:1px solid var(--border); border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.5); padding:8px; display:grid; grid-template-columns:repeat(8,30px); gap:4px;';
+    const cell = (label, val, title, span) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.textContent = label; b.title = title || '';
+        b.style.cssText = `font-size:17px; line-height:1; height:30px; ${span ? `grid-column:span ${span}; font-size:12px;` : 'width:30px;'} border:1px solid ${String(val) === String(current) ? 'var(--accent)' : 'transparent'}; border-radius:6px; background:transparent; color:inherit; cursor:pointer;`;
+        b.addEventListener('click', () => { pop.remove(); onPick(val); });
+        return b;
+    };
+    pop.appendChild(cell('⌀ Default', null, 'Clear the icon (back to the default ✦)', 8));
+    ICON_CHOICES.forEach((e) => pop.appendChild(cell(e, e, e)));
+    document.body.appendChild(pop);
+    const r = anchor.getBoundingClientRect();
+    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 8)) + 'px';
+    pop.style.top = Math.min(r.bottom + 4, window.innerHeight - pop.offsetHeight - 8) + 'px';
+    const close = (ev) => { if (!pop.contains(ev.target) && ev.target !== anchor) { pop.remove(); document.removeEventListener('mousedown', close, true); } };
+    setTimeout(() => document.addEventListener('mousedown', close, true), 0);
+}
+
 // ── mutations (reassign contiguous order to avoid the implicit-index pitfall) ───────────────────────────────────
 function moveItem(items, i, dir) {
     const j = i + dir;
@@ -259,8 +287,14 @@ function renderRow(entry, group, ei, allGroups, apply) {
     row.appendChild(mkArrow('▲', ei === 0, () => { moveItem(items, ei, -1); apply(); }, 'Move up'));
     row.appendChild(mkArrow('▼', ei === items.length - 1, () => { moveItem(items, ei, +1); apply(); }, 'Move down'));
 
-    // actions — custom ops can be re-authored / exported / deleted; built-ins are only arranged here (authored in Blocks → Dev mode)
+    // actions — custom ops can be re-iconed / re-authored / exported / deleted; built-ins are only arranged here (authored in Blocks → Dev mode)
     if (entry.kind === 'user') {
+        const iconBtn = mkBtn(entry.iconOverride || entry.icon || '✦', () => {
+            openIconPicker(iconBtn, entry.iconOverride || '', (val) => { setEntryOverride(entry.id, { icon: val }); apply(); });
+        }, { title: 'Choose this wizard’s bar icon' });
+        iconBtn.classList.add('wizicon-btn');
+        iconBtn.style.cssText += ' font-size:15px; min-width:32px; padding:4px 6px;';
+        row.appendChild(iconBtn);
         row.appendChild(mkBtn('✎ Edit', () => { if (window.ddcsEditWizardDef) { window.ddcsEditWizardDef(entry.type); if (window.closeSettings) window.closeSettings(); } },
             { title: 'Re-author this wizard — opens its blocks (knobs + all) in Dev mode to tweak and re-save' }));
         row.appendChild(mkBtn('Export', () => exportEntry(entry), { title: 'Save this op as a shareable .wizard file' }));

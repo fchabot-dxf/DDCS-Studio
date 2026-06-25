@@ -95,9 +95,11 @@ Earlier-but-related (prior session, on `main`): the data-driven wizard bar (`com
      "standard" is something we **extract from 2–3 concrete widgets**, not something we design before a second case
      forces it. Mark C1 in the doc as *"deferred until ≥2 concrete pick widgets exist; generalize from working code,
      don't frame the abstraction first."*
-   - **START with Track A — the wizbar icon picker.** Smallest standalone win, independently useful, reuses the
-     existing `iconEditor`, commits us to none of the generic-control machinery. Ship it while the bigger model
-     settles.
+   - **Track A — the wizbar icon picker → ✅ SHIPPED (v1, emoji).** A curated emoji set + an icon button per
+     custom-wizard row in Settings → Wizards (`wizardManagerPanel.js`: `ICON_CHOICES`/`openIconPicker`) → writes
+     `iconOverride`; the custom op renders it via the existing emoji path (no commandDeck change). "⌀ Default" clears
+     it. Test: `tests/wizbar-icon-picker.spec.js`. (Follow-up: curated line-art SVG icons + re-iconing built-ins —
+     needs `wizItemIcon` to let `iconOverride` win over `WIZ_ITEM_SVG` + an `ic:<id>` registry.)
    - **Rule of thumb:** when a second concrete pick widget appears (e.g. the fixture-backdrop canvas), put the two
      side by side and extract the shared spec then. Two real examples disagreeing is what tells you what's genuinely
      generic vs. what only looked generic on paper. Until then, build concrete widgets one at a time and reuse
