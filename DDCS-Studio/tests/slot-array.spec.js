@@ -10,7 +10,7 @@ test('slot array repeats the slot across the pattern; single = one slot', async 
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
     const sw = await import('/wizards/slotWizard.js');
-    const bm = await import('/blocks/blockModel.js');
+    const bm = await import('/blocks/blockEmitter.js');
     const base = { ax: 0, ay: 0, bx: 40, by: 0, width: 6, toolDia: 6, depth: 4, stepdown: 2 };
     const emit = (extra) => bm.emitProgram(sw.slotStack({ ...base, ...extra }));
     const stamps = (g) => (g.match(/ @ -?\d/g) || []).length;   // one "( <op> N @ x,y )" marker per stamped copy

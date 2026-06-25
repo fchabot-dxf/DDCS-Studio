@@ -65,7 +65,7 @@ for (const [dialectId, stack] of Object.entries(STACKS)) {
   test(`${dialectId}: dialect-specific ops decode to proper blocks (no raw) and round-trip`, async ({ page }) => {
     await page.goto('http://localhost:3211');
     const r = await page.evaluate(async ({ dialectId, stack }) => {
-      const { emitMapped } = await import('/blocks/blockModel.js');
+      const { emitMapped } = await import('/blocks/blockEmitter.js');
       const { parseGcodeToStack } = await import('/blocks/gcodeToStack.js');
       const { getDialect } = await import('/wizards/dialects/index.js');
       const dialect = getDialect(dialectId);

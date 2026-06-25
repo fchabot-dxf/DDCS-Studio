@@ -9,7 +9,7 @@
  */
 import { installBlockly, buildToolbox } from './blockly/bridge.js';
 import { PALETTE, BLOCKS } from '../wizards/ops/index.js';   // for the palette search filter + suggestion inserts
-import { newBlock } from './blockModel.js';
+import { newBlock } from './blockEmitter.js';
 import { suggestNext, recordProgram } from './suggest.js';   // next-block suggestions
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';

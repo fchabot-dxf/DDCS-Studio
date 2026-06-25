@@ -8,7 +8,7 @@ test.use({ viewport: { width: 1000, height: 800 } });
 test('leaf stack round-trips: emit → parse → emit is byte-identical', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
-    const { emitMapped } = await import('/blocks/blockModel.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { parseGcodeToStack } = await import('/blocks/gcodeToStack.js');
     const stack = [
       { type: 'distmode', params: { dist: 'abs' } },
@@ -66,7 +66,7 @@ test('#var / [expr] coordinates survive as literals; unknown lines → raw', asy
 test('standard atoms (plane / feed-mode / home / call / return) decode instead of falling to raw, and round-trip', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
-    const { emitMapped } = await import('/blocks/blockModel.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { parseGcodeToStack } = await import('/blocks/gcodeToStack.js');
     const stack = [
       { type: 'plane', params: { plane: 'G18' } },
@@ -91,7 +91,7 @@ test('reconcileGcodeToStack: leaf/empty programs re-parse; high-level programs r
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
     const { reconcileGcodeToStack, isAllLeaf } = await import('/blocks/gcodeToStack.js');
-    const { newBlock } = await import('/blocks/blockModel.js');
+    const { newBlock } = await import('/blocks/blockEmitter.js');
     const leafStack = [{ type: 'move', params: { mode: 'cut', x: 1, y: 2, z: -1, feed: 100 } }];
     // a high-level program: Step Down ▸ Fill ▸ Region
     const sd = newBlock('stepdown'); const f = newBlock('fillzigzag'); const rg = newBlock('region');
@@ -116,7 +116,7 @@ test('reconcileGcodeToStack: leaf/empty programs re-parse; high-level programs r
 test('M350 dialect: a probe-style program decodes to proper blocks (no raw) and round-trips', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
-    const { emitMapped } = await import('/blocks/blockModel.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { parseGcodeToStack } = await import('/blocks/gcodeToStack.js');
     const { getDialect } = await import('/wizards/dialects/index.js');
     const dialect = getDialect('ddcs-expert-m350');

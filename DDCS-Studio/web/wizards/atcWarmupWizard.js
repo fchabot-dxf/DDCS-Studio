@@ -6,7 +6,7 @@
  * (ms on Expert/V4.1, seconds on DM500) and the Confirm gate (folds where there's no scripted HMI) come from
  * the active dialect. Form and Blocks view are two editors of this one stack.
  */
-import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 

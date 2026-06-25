@@ -7,7 +7,7 @@
  * saved circular ops still render — it now DELEGATES to middleStack, so there is no duplicated probe
  * sequence. New work uses the Middle wizard.
  */
-import { emitMapped } from '../blocks/blockModel.js';
+import { emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { middleStack, MiddleWizard } from './middleWizard.js';
 

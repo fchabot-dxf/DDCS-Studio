@@ -10,7 +10,7 @@ test('rotate atom: emit fold rotates the wrapped op about the pivot', async ({ p
   await page.waitForFunction(() => window.ddcsStudio);
 
   const r = await page.evaluate(async () => {
-    const bm = await import('/blocks/blockModel.js');
+    const bm = await import('/blocks/blockEmitter.js');
     const pf = await import('/blocks/programFraming.js');
     const mv = bm.newBlock('move');
     mv.params = { ...mv.params, mode: 'cut', x: 20, y: 0, feed: 200 };

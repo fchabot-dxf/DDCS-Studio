@@ -36,7 +36,7 @@ test('a bottom-datum program emits the cut offset up by the stock height', async
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
-    const bm = await import('/blocks/blockModel.js');
+    const bm = await import('/blocks/blockEmitter.js');
     const pf = await import('/blocks/programFraming.js');
     const mk = (datum) => {
       const mv = bm.newBlock('move');

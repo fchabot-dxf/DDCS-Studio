@@ -19,7 +19,7 @@ import { auditMacroVars } from '../data/varMap.js';
 import { makeZip, downloadBytes } from '../data/zip.js';
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';
 import { homingStack } from '../wizards/homingWizard.js';
-import { emitMapped } from '../blocks/blockModel.js';
+import { emitMapped } from '../blocks/blockEmitter.js';
 
 let _wired = false;
 

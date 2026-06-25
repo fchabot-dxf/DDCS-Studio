@@ -7,7 +7,7 @@
  * finish; spiral → concentric rings (which reach the wall). A pocket smaller than the tool falls back to a
  * single centre plunge (peck). Form and Blocks view are two editors of this one stack.
  */
-import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';

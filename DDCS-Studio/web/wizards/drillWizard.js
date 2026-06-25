@@ -6,7 +6,7 @@
  * `skip` omitting holes by 1-based number. The wizard form and the Blocks view are two editors of this one
  * stack; the kernels (patternPoints / peckDrill / helicalBore) live in ops/ and are shared.
  */
-import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { patternPoints } from './ops/index.js';

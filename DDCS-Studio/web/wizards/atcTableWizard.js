@@ -9,7 +9,7 @@
  * a post with a mapped ATC model (caps.atc). Tool lengths + WCS writes are confirmed program-writable; pocket
  * (#1330) writes are UNVERIFIED — running this macro is itself the bench test (assignment is harmless either way).
  */
-import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { resolveActivePost } from './dialects/index.js';

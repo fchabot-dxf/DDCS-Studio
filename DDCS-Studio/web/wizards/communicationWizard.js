@@ -2,7 +2,7 @@
  * DDCS Studio - Communication Wizard
  * Generates G-code for controller communication and UI interactions
  */
-import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { resolveActivePost, getCaps } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';

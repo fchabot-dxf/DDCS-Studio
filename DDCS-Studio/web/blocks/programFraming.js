@@ -5,7 +5,7 @@
  * Lives here (not in ops/program.js) because it needs newBlock from blockModel, which would cycle through
  * ops/index back into ops/program.
  */
-import { newBlock } from './blockModel.js';
+import { newBlock } from './blockEmitter.js';
 import { num } from '../wizards/ops/util.js';
 
 /** Program Start from wizard params: spindle (rpm/dir/spin-up) + clearance. */

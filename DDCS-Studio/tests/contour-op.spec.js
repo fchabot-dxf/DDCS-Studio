@@ -9,7 +9,7 @@ test('contour side offsets the traced boundary by the tool radius', async ({ pag
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
-    const bm = await import('/blocks/blockModel.js');
+    const bm = await import('/blocks/blockEmitter.js');
     const w = (side) => {
       const b = bm.newBlock('contour');
       b.params = { region: { type: 'region', params: { shape: 'rect', x: 0, y: 0, w: 50, h: 30 } }, side, tool: 6, z: -2, feed: 400, plunge: 200, clearance: 5 };

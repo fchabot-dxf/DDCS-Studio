@@ -19,7 +19,7 @@ test('Blockly bridge: stack ⇄ workspace round-trips and emits via emitMapped',
 
   const r = await page.evaluate(async () => {
     const { stackToWorkspace, workspaceToStack } = await import('/blocks/blockly/stackBridge.js');
-    const { emitMapped } = await import('/blocks/blockModel.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { getDialect } = await import('/wizards/dialects/index.js');
     const { surfacingStack } = await import('/wizards/surfacingWizard.js');
     const ws = window.__bk.ws, d = getDialect('ddcs-expert-m350');

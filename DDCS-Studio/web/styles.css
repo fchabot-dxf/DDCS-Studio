@@ -4461,7 +4461,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
    BLOCKS TAB (#blocks-app) — Codeblocks-for-G-code. Ported from blocks/blocks.html.
    ALL rules scoped under #blocks-app so the dark prototype look can't bleed into the
    app (and the app's global classes can't bleed in — only .hint collided, renamed .bk-hint).
-   Engine: wizards/ops/* + blocks/blockModel.js; logic in blocks/blocksApp.js.
+   Engine: wizards/ops/* + blocks/blockEmitter.js; logic in blocks/blocksApp.js.
    ============================================================================ */
 #blocks-app {
     /* Follow the active app theme: CHROME (palette/canvas/cards) = theme tokens;

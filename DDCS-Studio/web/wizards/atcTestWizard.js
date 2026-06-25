@@ -9,7 +9,7 @@
  * POCKETS mode — visit every magazine pocket at clearance height (tables #1330/#1350/#1370) for a visual check.
  * Both run in the Studio simulator (Run + Auto sensors) before the first powered test.
  */
-import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { resolveActivePost } from './dialects/index.js';

@@ -47,7 +47,7 @@ test('zigzag + concentric fill kernels (angle, direction, order, finish)', async
 test('Fill blocks emit through Step Down > Fill > Region', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const out = await page.evaluate(async () => {
-    const { newBlock, emitMapped } = await import('/blocks/blockModel.js');
+    const { newBlock, emitMapped } = await import('/blocks/blockEmitter.js');
     const make = (fillType) => {
       const sd = newBlock('stepdown'); sd.params.to = 4; sd.params.by = 2;
       const f = newBlock(fillType); f.params.stepover = 5;

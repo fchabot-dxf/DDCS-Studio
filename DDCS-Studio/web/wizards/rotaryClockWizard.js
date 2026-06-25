@@ -8,7 +8,7 @@
  * Method (horizontal 4th axis, spin around X): probe down at point A, step +Y by the span, probe down at B.
  * tilt phi = ATAN[(Zb-Za)/span]. Datum A so the level orientation reads A0 (set / report / rotate).
  */
-import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';

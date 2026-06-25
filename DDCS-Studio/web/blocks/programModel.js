@@ -9,7 +9,7 @@
  *
  * Views subscribe via onChange; setStack carries an `origin` so a view ignores its own echo (no feedback loop).
  */
-import { emitMapped } from './blockModel.js';
+import { emitMapped } from './blockEmitter.js';
 import { reconcileGcodeToStack } from './gcodeToStack.js';
 import { markerLine } from './opSchema.js';
 import { resolveActivePost } from '../wizards/dialects/index.js';

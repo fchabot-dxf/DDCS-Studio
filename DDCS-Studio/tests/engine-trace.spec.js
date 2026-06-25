@@ -99,7 +99,7 @@ test('trace counts manual-REPOSITION passes (rotary 3-point fit → 3 passes, di
   const r = await page.evaluate(async () => {
     const { GcodeExecutionEngine } = await import('/engine/index.js');
     const { rotaryCenterStack } = await import('/wizards/rotaryCenterWizard.js');
-    const { emitMapped } = await import('/blocks/blockModel.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const code = emitMapped(rotaryCenterStack({ method: 'fit' })).text;
     const eng = new GcodeExecutionEngine({ autoAnswer: true });
     const t = eng.trace(code);
@@ -131,7 +131,7 @@ test('trace counts the alignment reposition (point A + B → 2 passes)', async (
   const r = await page.evaluate(async () => {
     const { GcodeExecutionEngine } = await import('/engine/index.js');
     const { alignmentStack } = await import('/wizards/alignmentWizard.js');
-    const { emitMapped } = await import('/blocks/blockModel.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const code = emitMapped(alignmentStack({ checkAxis: 'X' })).text;
     const eng = new GcodeExecutionEngine({ autoAnswer: true });
     const t = eng.trace(code);

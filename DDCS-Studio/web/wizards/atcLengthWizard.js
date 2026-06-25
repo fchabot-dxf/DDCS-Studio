@@ -7,7 +7,7 @@
  * Goto / Label / End Program). Native across posts: the probe form, the Z trigger read, the tool-table base
  * (#1430 Expert/DM500, #1560 V4.1), the status-check folding and the confirm gate all come from the dialect.
  */
-import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';

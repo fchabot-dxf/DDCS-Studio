@@ -7,7 +7,7 @@
  * G0/G1 engraving — dialect-agnostic, so it emits identically on every post; the Step Down / framing route
  * through the active dialect like every other cutting wizard.
  */
-import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { makePlace } from '../blocks/programFraming.js';
 import { layoutText, textContours } from './textGeometry.js';

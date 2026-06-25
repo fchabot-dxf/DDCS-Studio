@@ -6,7 +6,7 @@
  * Set# (assign) atoms, emitted bare (no program header/footer — it's a macro snippet, not a cutting program).
  * The form and the Blocks view are two editors of this one stack. No motion: pure #805+ register writes.
  */
-import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';

@@ -67,7 +67,7 @@ test('atc_change round-trips every change method', async ({ page }) => {
 test('atc_change methods emit valid, firmware-accurate g-code', async ({ page }) => {
   const emit = (params) => page.evaluate(async (params) => {
     const w = await import('/wizards/atcChangeWizard.js');
-    const bm = await import('/blocks/blockModel.js');
+    const bm = await import('/blocks/blockEmitter.js');
     return bm.emitMapped(w.atcChangeStack(params)).text;
   }, params);
 

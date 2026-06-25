@@ -1,5 +1,8 @@
 /**
- * blocks/blockModel.js — the Blocks-tab program model + recursive emit.
+ * blocks/blockEmitter.js — the STATELESS block→G-code emitter (recursive fold over a block stack).
+ *
+ * No state, no subscriptions — it takes blocks and returns G-code. (Program STATE lives in programModel.js;
+ * this used to be misnamed "blockModel", which collided with that role.)
  *
  * A program is an ordered list of block records; each block is a primitive from the ops registry.
  * emit() folds the tree:

@@ -7,7 +7,7 @@ test('edge wizard compensates the stylus radius (WCS lands on the edge, not the 
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
     const { edgeStack } = await import('/wizards/edgeWizard.js');
-    const { emitMapped } = await import('/blocks/blockModel.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const pos = emitMapped(edgeStack({ axis: 'X', dir: 'pos', wcs: 'G54', radius: 2 })).text;
     const neg = emitMapped(edgeStack({ axis: 'X', dir: 'neg', wcs: 'G54', radius: 2 })).text;
     const compLine = (t) => t.split('\n').find((l) => /#50\s*=/.test(l) && /#1925/.test(l)) || '';

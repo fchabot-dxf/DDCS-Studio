@@ -6,7 +6,7 @@
  * form, Z trigger read, the tool-table base, status-check folding and the confirm gate all come from the dialect.
  * Re-measures with the same convention as the Tool Length wizard (length = MachineZ − block height).
  */
-import { newBlock, emitMapped } from '../blocks/blockModel.js';
+import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';

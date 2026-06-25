@@ -10,7 +10,7 @@ import { getLastOp, recordOp } from './opRecord.js';
 import { num, r3 } from '../wizards/ops/util.js';
 import { parseGcodeToStack } from './gcodeToStack.js';                       // decode a non-builder op's G-code → blocks
 import { isMarker, parseMarker } from './opSchema.js';                       // read self-describing op markers
-import { emitMapped } from './blockModel.js';                               // emit a stack → { lines, map } (for word-level glow diff)
+import { emitMapped } from './blockEmitter.js';                               // emit a stack → { lines, map } (for word-level glow diff)
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } };
@@ -61,7 +61,7 @@ const find = (prog, type) => {
 // ── op CONTAINERS ───────────────────────────────────────────────────────────────────────────────────────
 // Each accumulated op is wrapped in a { type:'op', opType, label, requires, params, children } container so a
 // loaded program keeps the op RECORD and emit can gate it per post (capable → children; incapable → marker;
-// blocks/blockModel.js). `requires` is derived from the atoms the op uses: #var atoms → 'vars', flow atoms →
+// blocks/blockEmitter.js). `requires` is derived from the atoms the op uses: #var atoms → 'vars', flow atoms →
 // 'flow' (both absent on grbl). params ride along for op-form editing. See REMINDERS "Op-containers".
 const OP_LABELS = {
     surfacing: 'Surfacing', pocket: 'Pocket', contour: 'Contour', slot: 'Slot', drill: 'Drill', text: 'Text',
