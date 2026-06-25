@@ -58,10 +58,21 @@ Run the full suite + protocol validator after each step. One commit per rename.
 Do NOT do them all in one commit — the diff becomes unreadable.
 
 Order:
-1. `blockModel.js` → `blockEmitter.js` (simplest, touches fewest files — just update the import in `programModel.js` and anywhere else it's imported)
+1. ✅ **DONE (commit `47a330d`)** `blockModel.js` → `blockEmitter.js` — git mv + ~40 importers + header; suite green.
 2. Move `opFromMarker` + `importMarkedNc` → `programModel.js` (codec symmetry; update the import in `opStacks.js` + anywhere else)
 3. Extract `opGlow.js` from `opStacks.js` (pull the three glow exports out, update importers)
 4. Split remaining `opStacks.js` → `opBuilders.js` + `opSession.js` (the big one — do last when the file is smallest)
+
+> **⚠ Ordering note from the impl session (steps 2–4 remain).** `opFromMarker` (step 2), the glow's `_builderAtoms`
+> (step 3), and the session mutations (step 4) **all** depend on `BUILDERS` / `_framed` / `makeOp`. So consider
+> extracting **`opBuilders.js` FIRST** (the leaf: the 21 `*Stack` imports + `BUILDERS` + `makeOp` + `_framed` +
+> `OP_LABELS`/`opRequires`/`scanAtoms`/`VAR_ATOMS`/`FLOW_ATOMS` + `_opSeq`), then have `opGlow`, the moved codec, and
+> `opSession` import from it one-way. Same end state, but avoids steps 2–3 transitionally importing the *whole*
+> `opStacks` (which pulls all wizards) and any cycle risk. Cycle check done: wizards don't import `opStacks`
+> (header: "nothing imports this back"), so `opBuilders → wizards` and `opStacks → opBuilders` is acyclic.
+> Watch the helpers that straddle the split: `find` + `RECONCILERS` + `regionParamsFromDesc`/`regionDesc`/`offsetRegion`
+> stay with `opSession`; `stripBlockIds`/`collectEdits`/`diffRange`/`_emitLinesOf`/`_findOpById` go to `opGlow`;
+> `mergeOpBlocks` is a mutation → `opSession`. The split is ~900 lines — do it with fresh context, one commit each.
 
 ---
 ## ✅ DONE — `DICT` → `SCHEMA`, `opDictionary.js` → `opSchema.js` (advisory rename, commit below)
