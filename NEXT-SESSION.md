@@ -248,17 +248,23 @@ DOM level (`tests/word-glow.spec.js`: word range + injection whole-line + the re
      problem as the L1/L2 address columns queued for `opSchema`. Same fix covers both.
   Cloud path (admin.js dual-mode, Worker replacement) remains deferred per [[gateway-cloud-architecture]].
 
-- **Sim intent layer** (`opSimContext.js`) — same declare-not-infer discipline applied to rendering. Today
-  `gcodeViz3d.js` interrogates op type + stock shape + profile directly (accumulated special cases: rotary rig,
-  probe stop, ATC magazine, machine envelope). Fix: a declared `(op, stock, profile) → simContext` translation —
-  `{ showRotaryRig, stockGeometry, showFixture, … }` — so the renderer consumes plain data and is testable. Same
-  leaf-import pattern as `opBuilders.js`. Do AFTER the module restructure settles.
-- **Blocks tab rotary preview context** — when the active op is `rotary_clock` or `rotary_center`, the Blocks tab
-  preview should show the 4th-axis fixture (chuck + tailstock rig). The **op type decides** whether the rig
-  appears, not the stock shape — rectangular stock on a rotary axis is a valid setup (`rotary_clock` probes off a
-  flat). Currently the rig in `gcodeViz3d.js` is gated on `stock.shape === 'cylinder'`, which misses the
-  rectangular case. Fix: in `previewActiveOp`, pass an `isRotary` flag (derived from op type) to the preview panel
-  alongside the stock; the viz uses it to show the rig regardless of stock shape.
+- **Sim intent layer** (`web/viz/opSimContext.js`) — ✅ **v1 DONE** (commits `14f5792` + `6bfcf04`). The declared
+  op-type → preview-render-intent leaf: `opSimContext(opType) → { showRotaryRig, forceMachine, showMagazine }` +
+  `programSimContext(opTypes)` (the UNION for a multi-op program). Pure + tested (`tests/op-sim-context.spec.js`).
+  CORRECTION to the original framing: `gcodeViz3d` does NOT interrogate op TYPE directly — it's already decoupled via
+  external setters (`setRotaryFixture`/`setMagazine`/`setProbes`/`setForceMachine`); the op-type decisions were
+  scattered in the per-wizard VIEWS, so a generic consumer silently missed them. v1 centralizes those flags + wires
+  the one generic consumer that needed them (the Blocks tab — see below). **Remaining (v2, optional):** widen to
+  `(opType, stock, profile)` returning declared geometry/envelope/magazine-pocket data so `gcodeViz3d`'s `stock.shape`
+  / `getRotaryAxes` / machine reads consume plain data too; also the Blocks preview could gain the ATC envelope +
+  magazine (needs the pocket data that today lives in `atcViews.magazinePockets`). The per-op wizard views stay
+  explicit on purpose (each knows its own type — routing through the table would be pure indirection).
+- **Blocks tab rotary preview context** — ✅ **DONE** (commit `6bfcf04`). The Blocks tab is a GENERIC preview, so it
+  missed the 4th-axis rig. `blocksApp.renderViews` now applies `programSimContext(stack op types).showRotaryRig` via a
+  new panel `setRotaryFixture` passthrough — the **op type decides**, not `stock.shape` (rectangular stock on a rotary
+  axis is valid). (The original note's premise — "the rig is gated on `stock.shape === 'cylinder'`" — was wrong: the rig
+  was already op-flag-gated; the real gap was that the Blocks preview never CALLED `setRotaryFixture`.) Verified on the
+  live 3D preview (`tests/blocks-rotary-rig.spec.js`: rotary op shows `viz._showRotaryFixture`, a mill program hides it).
 
 - **Suggest bar: search mode + bigger panel** — the suggest bar (`web/ui/suggestBar.js`) is currently a
   context-aware chip row (predicts next token from the current line). Add a **search mode** alongside it:
@@ -279,6 +285,63 @@ DOM level (`tests/word-glow.spec.js`: word range + injection whole-line + the re
 
   Make the panel larger in both modes (currently one row; expand to show more chips on wide screens and
   allow 2 rows on narrow). The panel height should be a CSS variable so it's easy to tune.
+
+- **Profile identity + pulled-data glow in settings** — two related UX gaps that make the personalized
+  machine space feel abstract:
+
+  0. **Move "Pull from controller" to Settings → Controller tab** — the pull is a setup action (import your
+     machine config into Studio), not a live communication action. It belongs in the Controller tab in
+     Settings, not in the Gateway tab. The gateway bridge still does the actual data fetch, but the
+     user-facing button lives in the Controller tab, but the pull populates EVERY settings tab — Machine
+     (envelope from soft limits), I/O (limit switch pins, probe pins), Spindle, etc. One pull, all tabs
+     reflect real machine data. Gateway keeps its live ops (send, track, console).
+
+  1. **Named profile + correct save model** — after a pull+apply, prompt to save as a named profile file
+     (e.g. "my_router.ddcs"). The active profile name is shown visibly in the UI (header or settings label).
+
+     **Save model — no auto-save to localStorage:**
+     - localStorage stores only WHICH profile was last loaded (filename), not the settings values.
+     - The profile FILE is the source of truth. On load: read settings from file.
+     - Changes are in-memory until the user explicitly saves to the file.
+     - A dirty indicator ("my_router •") shows when in-memory state has drifted from the saved file.
+     - Auto-saving changes to localStorage is dangerous with multiple profiles — silently corrupts state.
+
+  2. **Pulled-data glow in settings** — settings fields populated from a controller pull should be visually
+     distinct from fields still at their default value. A subtle glow, highlight, or "from controller" badge
+     on the field (same visual language as the op-block glow) makes it immediately clear which settings are
+     real machine data vs unconfigured defaults. Store the provenance alongside the value (e.g.
+     `{ value: 300, source: 'pull' }` or a parallel `settings._sources` map) and apply the style in the
+     settings panel renderer.
+
+- **Machine envelope from controller soft limits** — after a gateway pull, automatically read the DDCS soft
+  limit Pr values from the dump and drive the machine envelope visualization. Pr numbers are the same across
+  Expert M350 and V4.1 (shared DDCS parameter space):
+  - **Pr155** = soft limits master switch (0=disabled, 1=enabled)
+  - **Pr161/162/163** = negative X/Y/Z software limit (mm)
+  - **Pr166/167/168** = positive X/Y/Z software limit (mm)
+
+  Behavior:
+  - **Pr155=1** (soft limits on) → set `machine.x/y/z` from the Pr161-168 range; envelope box redraws to
+    match. The user looks at the envelope and sees their soft limits reflected — no lookup, no manual entry.
+  - **Pr155=0** (soft limits off) → check `settings.inputs.some(i => i.type === 'limit')`:
+    - Limit switches with a pin configured (`inputs.some(i => i.type === 'limit' && i.pin !== '' && i.pin != null)`)
+      → machine zero is a hard boundary; grid anchored at machine zero, open toward the work area (no far box).
+    - No limit switches with a pin → fully open grid in all directions; machine zero shown as an origin
+      marker only, not an edge. (Default limit entries with no pin = not physically wired.)
+
+  Also populate limit switch input pins from the pull — the controller knows which physical input is wired
+  to each axis limit switch:
+  - **Pr515/518/521** = negative X/Y/Z hard limit input pin (0 = not wired, 1–24 = input number)
+  - **Pr530/533/536** = positive X/Y/Z hard limit input pin (same range)
+
+  After pull: for each axis, if the Pr value > 0, set the corresponding `inputs[]` limit entry's `pin` to
+  that value. This is what determines whether the visualization treats machine zero as a hard boundary
+  (pin set = physically wired) or shows an open grid (pin = 0 = no switch).
+
+  Where to wire: the gateway pull already decodes the `setting`/`eng` dump via the bridge. The decoded Pr
+  values need to flow into `settingsPanel.js` — Pr155/161-168 into `machine.x/y/z`, and Pr515/518/521 +
+  Pr530/533/536 into the `inputs[]` limit pin fields. The pull modal or a post-pull callback is the right
+  place. No new UI surface needed — the existing envelope box and inputs list are the confirmation.
 
 - **New Machine ops: Loop + Subroutine Call** — two new ops for the Machine wizard dropdown (alongside Comm/MDI,
   Warm-up, Set Output, Wait Input, Dwell). Both clear the "worth a wizard" bar: they generate non-trivial code and
