@@ -239,6 +239,31 @@ DOM level (`tests/word-glow.spec.js`: word range + injection whole-line + the re
   This is the **fork-the-5%-delta** flow: start from a built-in, specialize the parts you control, name
   it, share it. Not building from atoms up — building on top of what already works.
 
+  **Wizard file format:** each custom op saves as its own `.wizard` file — one op, one file. Portable,
+  shareable, not bound to a profile. The wizard bar loads all `.wizard` files in the user's library.
+
+  **Wizard library manager in Settings:** a GUI where users can manage all wizard files — built-ins and
+  custom. Built-in wizards ship as `.wizard` files (the app's default library, same format as user ops).
+  > **Hybrid reality (honest note):** built-ins are CODE (custom forms, 3D sims, pattern logic), so a built-in's
+  > library entry is METADATA-ONLY + references its coded view — only USER ops are fully declarative `.wizard` files.
+  > Built status (2026-06-25): library layer is `web/blocks/wizardLibrary.js` (catalog + per-entry/group overrides
+  > + the `.wizard` codec) on top of `userOps.js`. **Forking a built-in = capture its output stack + expose params**
+  > (a simplified declarative copy via the generic form), NOT a clone of its bespoke UI/sim.
+  - List of all wizards: built-ins (read-only badge, forkable) + user wizards (fully editable)
+  - Per entry: show/hide toggle (hidden wizards don't appear in the wizard bar), rename, edit (opens in
+    Blocks tab dev mode), delete (user wizards), fork (built-ins), export/share
+  - "Reset to factory" = reload the shipped built-in `.wizard` files
+
+  **Dev mode UX (confirmed):**
+  - Remove the current overlay buttons from the Blocks tab canvas (crosshair, +, -, trash). Zoom/pan via
+    scroll/pinch; delete via keyboard or right-click.
+  - Replace with a single small **floating dev-mode toggle** in the corner of the Blocks tab.
+  - **Normal mode** (default): blocks show their current state, clean. Users learn block editing without
+    authoring complexity — progressive disclosure.
+  - **Dev mode**: each block expands inline to reveal its param declaration fields (type, range, default,
+    units, label). No separate panel — the blocks themselves grow to show the authoring layer. The floating
+    toggle is the only mode switch.
+
   ### Technical design (scoped 2026-06-25 — feasibility VERIFIED, ready to build)
   A user op = a saved block-stack **TEMPLATE** + a list of param **BINDINGS**, registered at RUNTIME. The template is
   the forked stack with every value at its default; a binding points at one value and exposes it as a param:
