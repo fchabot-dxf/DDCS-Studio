@@ -94,6 +94,7 @@ export function createPreviewPanel(container, opts = {}) {
     // envelope must always draw, even when the traced path happens not to reach a G53 (auto-change with no tool
     // loaded, warmup/drawbar with no motion, the parameter-write table). Set by the host via setForceMachine().
     let forceMachine = false;
+    let rotaryFixture = false;   // host hint: show the 4th-axis rig (rotary probe ops). Applied to the lazy viz on create + on toggle.
     let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null, lastStockKey = '';
     let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false, liveTimer = null;
 
@@ -136,6 +137,7 @@ export function createPreviewPanel(container, opts = {}) {
         catch (e) { console.warn('preview 3D unavailable — using 2D', e); viz = null; setMode('2d'); }
         // Dragging the 3D start marker is a user override (like the 2D handle) — record it so getStartPos() reads it.
         if (viz) viz.onStartChange = (starts) => { const s = starts && starts[0]; if (s) { curStart = { x: +s.x || 0, y: +s.y || 0, z: +s.z || 0 }; setGcode(); } };
+        if (viz && rotaryFixture && viz.setRotaryFixture) viz.setRotaryFixture(true);   // persist the rig hint across lazy viz creation
         return viz;
     }
 
@@ -465,5 +467,14 @@ export function createPreviewPanel(container, opts = {}) {
         if (active) setGcode();
     }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, get viz() { return viz; }, get engine() { return engine; }, el: container };
+    // Host hint: show/hide the 4th-axis rotary rig (rotary probe ops). Symmetric with setForceMachine — stores the
+    // flag so it survives lazy viz creation (ensureViz re-applies it) and applies straight away if the viz exists.
+    function setRotaryFixture(on) {
+        on = !!on;
+        if (on === rotaryFixture) return;
+        rotaryFixture = on;
+        if (viz && viz.setRotaryFixture) viz.setRotaryFixture(on);   // rebuilds the stock so the rig appears/disappears
+    }
+
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, get viz() { return viz; }, get engine() { return engine; }, el: container };
 }

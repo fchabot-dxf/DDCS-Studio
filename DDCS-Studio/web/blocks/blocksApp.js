@@ -15,6 +15,7 @@ import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
+import { programSimContext } from '../viz/opSimContext.js';          // declared op-type → preview render-intent (rotary rig, …)
 import { getCaps, resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { getLastOp } from './opRecord.js';
@@ -124,7 +125,8 @@ async function buildWorkspace() {
   wsHost.append(topbar, host);
   const out = document.getElementById('blk-gcode');
   // THE shared preview panel — identical to Studio main + the wizards (same code + UI); fed the projected program.
-  const panel = createPreviewPanel(document.getElementById('blk-preview-panel'), {
+  const blkPanelHost = document.getElementById('blk-preview-panel');
+  const panel = createPreviewPanel(blkPanelHost, {
     getGcode: () => getProjection().text,
     getStart: () => {
       const op = getLastOp();
@@ -135,6 +137,7 @@ async function buildWorkspace() {
       return null;
     }
   });
+  if (blkPanelHost) blkPanelHost.__panel = panel;   // expose for inspection/tests (mirrors wizardManager's host.__panel)
 
   // Grid lines follow the theme's border tone (best-effort: the grid colour is an inject option, so it's set
   // once here; the rest of the chrome re-skins live via setTheme below).
@@ -281,6 +284,10 @@ async function buildWorkspace() {
   function renderViews(p) {
     renderCode(p.lines, p.map);
     panel.setGcode(p.text);
+    // Sim intent: the Blocks tab renders the WHOLE program, so apply the UNION render-intent — e.g. the 4th-axis
+    // rotary rig appears when ANY op is rotary (the per-op wizard previews derive the same flag from opSimContext).
+    const sim = programSimContext(getStack().filter((b) => b && b.type === 'op').map((b) => b.opType));
+    panel.setRotaryFixture(sim.showRotaryRig);
     applySelection();
   }
 

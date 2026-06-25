@@ -39,3 +39,19 @@ export function opSimContext(opType) {
         showMagazine: WITH_MAGAZINE.has(opType),
     };
 }
+
+/**
+ * The UNION intent for a whole PROGRAM (a stack of ops) — for a generic preview (the Blocks tab) that renders
+ * multiple ops at once: show the rig if ANY op is rotary, force the envelope if ANY op needs it, etc. A single-op
+ * wizard preview just uses opSimContext(op.type) directly. Empty / no ops → the all-false default.
+ */
+export function programSimContext(opTypes) {
+    return (opTypes || []).reduce((acc, t) => {
+        const c = opSimContext(t);
+        return {
+            showRotaryRig: acc.showRotaryRig || c.showRotaryRig,
+            forceMachine: acc.forceMachine || c.forceMachine,
+            showMagazine: acc.showMagazine || c.showMagazine,
+        };
+    }, { showRotaryRig: false, forceMachine: false, showMagazine: false });
+}

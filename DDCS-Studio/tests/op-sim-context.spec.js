@@ -9,11 +9,20 @@ test('opSimContext: declared op-type → preview intent', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
   const r = await page.evaluate(async () => {
-    const { opSimContext } = await import('/viz/opSimContext.js');
+    const { opSimContext, programSimContext } = await import('/viz/opSimContext.js');
     const { BUILDERS } = await import('/blocks/opBuilders.js');
     const ctxFor = {};
     for (const opType of Object.keys(BUILDERS)) ctxFor[opType] = opSimContext(opType);
-    return { ctxFor, sample: {
+    return {
+      ctxFor,
+      program: {
+        empty: programSimContext([]),
+        millOnly: programSimContext(['pocket', 'surfacing']),
+        millPlusAtc: programSimContext(['pocket', 'atc_change']),
+        millPlusRotary: programSimContext(['surfacing', 'rotary_clock']),
+        rotaryAndAtc: programSimContext(['rotary_center', 'atc_table']),
+      },
+      sample: {
       rotary_clock: opSimContext('rotary_clock'),
       rotary_center: opSimContext('rotary_center'),
       atc_change: opSimContext('atc_change'),
@@ -45,6 +54,14 @@ test('opSimContext: declared op-type → preview intent', async ({ page }) => {
   for (const op of ['pocket', 'surfacing', 'edge', 'unknown']) {
     expect(s[op]).toEqual({ showRotaryRig: false, forceMachine: false, showMagazine: false });
   }
+
+  // programSimContext: the UNION across a multi-op program (the Blocks-tab preview renders the whole stack).
+  const pg = r.program;
+  expect(pg.empty).toEqual({ showRotaryRig: false, forceMachine: false, showMagazine: false });
+  expect(pg.millOnly).toEqual({ showRotaryRig: false, forceMachine: false, showMagazine: false });
+  expect(pg.millPlusAtc).toEqual({ showRotaryRig: false, forceMachine: true, showMagazine: true });
+  expect(pg.millPlusRotary).toEqual({ showRotaryRig: true, forceMachine: false, showMagazine: false });
+  expect(pg.rotaryAndAtc).toEqual({ showRotaryRig: true, forceMachine: true, showMagazine: true });   // a program CAN need both
 
   // Invariants across EVERY built-in op (no throw, 3 booleans, and the structural rules hold).
   for (const [opType, c] of Object.entries(r.ctxFor)) {
