@@ -4,7 +4,7 @@ A Tinkercad-Codeblocks-style tab for DDCS Studio: stack visual op-blocks → liv
 Build-first, learn-G-code-by-revealing. This is the **feature/implementation** doc; the *why* and the
 broader architecture live in [MULTI-OP-STACKING.md](MULTI-OP-STACKING.md).
 
-Status: **live STUDIO tab, on Blockly** (vendored UMD 12.5.1, `web/vendor/blockly/`). The bespoke
+Status: **live STUDIO tab, on Blockly** (vendored UMD **13.0.0**, `web/vendor/blockly/`). The bespoke
 drag/snap canvas this doc described earlier was **replaced by Blockly** — the build-vs-adopt gate (below)
 was crossed. The block stack is the **program data**; the Studio editor is the **primary surface** and a
 **live projection** of it; editing the editor reconciles back into blocks (leaf-level). Verified by the

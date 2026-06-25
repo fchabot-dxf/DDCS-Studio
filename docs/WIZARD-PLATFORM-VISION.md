@@ -2,7 +2,12 @@
 
 > The destination the roadmap ladders up to. Use it to judge a feature: **does this move toward
 > wizards-as-data and total user control, without breaching the safety floor?** This is the *why*, not a
-> task list. (Tasks: [`NEXT-TASKS.md`](../NEXT-TASKS.md). Binding-rebuild handoff: [`NEXT-SESSION.md`](../NEXT-SESSION.md).)
+> task list. (Handoff / current state: [`NEXT-SESSION.md`](../NEXT-SESSION.md).)
+
+> **Status (2026-06):** the wizard-maker is **built end-to-end** — users fork an op, expose values as widget knobs
+> (incl. GUI **param**/**panel** blocks), it reuses the built-in wizard **panel** (edit from Studio hover), and
+> **Save as custom wizard** registers it as a bar button; saved wizards **re-author** + round-trip. The north star
+> below is substantially realized — see [`NEXT-SESSION.md`](../NEXT-SESSION.md) for what's done and what's queued.
 
 ## North star: total wizard control by the user
 Every wizard becomes **data, interpreted** — not hand-coded JS. The moment a user can edit *any* wizard, the
