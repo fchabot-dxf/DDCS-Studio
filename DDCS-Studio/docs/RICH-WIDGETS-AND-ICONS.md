@@ -149,21 +149,31 @@ surface + iconEditor reuse is the hard part").
 5. **Output** — a `regionpick` block (spec on `b.data`) → `extractParamBlocks` → the `widget:'region-pick'` binding.
    Re-edit: reopen the editor from the spec (spec → layers + regions).
 
-**THE KEY FORK — the region-drawing surface (decide at review):**
-- **(A) EXTEND `iconEditor`** with a "region" layer type (shape + value + label) + polygon/freeform tools; on
-  save-as-region-pick, split GRAPHIC layers (→ backdrop SVG) from REGION layers (→ `spec.regions`). ONE editor does
-  backdrop + regions — **max reuse** of its stage/drag/select/layers machinery. *Cost:* couples region semantics into
-  the CAM icon editor (some bloat / shared-tool risk).
-- **(B) DEDICATED region editor** — a focused surface that takes the backdrop (iconEditor layers/SVG) and only
-  draws/assigns regions. **Clean separation** (iconEditor stays the CAM tool). *Cost:* duplicates some drag/draw code.
-- *Lean:* (A) for reuse (the handoff frames it as "iconEditor reuse"), but the coupling is the thing to weigh — hence
-  review before code.
+**THE REGION-DRAWING SURFACE — RESOLVED: extract a shared DRAWING CORE (the A-vs-B fork was a false choice).**
+"Reuse" = sharing CODE, not the same asset. (A) extending `iconEditor` overloads it (icon composition + region
+semantics → one master's change breaks the other); (B) a separate editor duplicates the draw code. Neither is right.
+Instead:
+- Pull the **drawing primitives** (rect / polygon / freeform tools + stage / drag / select) into a small **CORE
+  module** that BOTH `iconEditor` and the region editor consume.
+- **Backdrop** reuses `iconEditor` (same operation, same core). **Region semantics** (value + label + hit-test —
+  which icons don't have) live in their own **thin layer**. Draw code is **shared, not duplicated, not overloaded.**
+- The region stays its **own PRIMITIVE**, NOT an `iconEditor` layer type.
+
+**Why this is the load-bearing decision (not just tidiness) — the region is a cross-domain primitive.** A region =
+a spatial zone on a backdrop mapping to a value, picked by clicking. Generalize backdrop → the part/stock drawing and
+region → a feature (hole/pocket/edge) and you get a different CAM builder: **click features on the part instead of
+typing coordinates** ([[prefer-gui-over-fields]] / [[2d-layout-canvas]]; see `CRAZY-IDEAS.md` → "Region primitive →
+spatial CAM"). Gated on the same non-numeric/field-targeting boundary as #2 (a CAM region commits a FEATURE/op, not a
+number — do NOT build the CAM angle now). The point for THIS build: if regions might later drive spatial CAM, they
+must not be trapped inside `iconEditor`. So → extract the core.
 
 **Smaller decisions:** backdrop as vector SVG (recommended) vs raster data-uri; freeform → simplified polygon vs
 polygon-only (click points) for v1; values numeric in v1 (enum once field-targeting lands); the CAM Pack Builder is a
-second consumer (slot authoring wants custom controls + icons on the same editor).
+second consumer (slot authoring wants custom controls + icons on the same core).
 
-**→ STOP after this scope (per the handoff): the plan gets eyes before implementation.**
+**Build order (once greenlit):** (1) extract the shared drawing core from `iconEditor` (no behaviour change — pure
+refactor, keep its tests green); (2) the region editor = core + the thin region-semantics layer; (3) wire it into the
+dev-mode "＋ Region pick" → `regionpick` block. Each step tested; the refactor (1) lands first and independently.
 
 ---
 
