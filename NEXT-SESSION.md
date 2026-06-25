@@ -1,17 +1,18 @@
 # NEXT SESSION — Binding Rebuild (handoff)
 
-> **You're picking up a large, well-scoped refactor that has a *live safety net*.** Read this top to bottom,
-> run the suite to confirm the baseline, then proceed **one small step at a time**. The previous session built
-> an entire self-describing-G-code format/parser system; your job is to unify the wizard form-field binding
-> into it.
+> ## ✅ THE BINDING REBUILD IS DONE (steps 1–4 shipped to `main`)
+> The wizard form-field binding is now **unified into the dictionary**. `PARAM_FIELDS` is gone; the field id
+> lives ON each DICT param (`DICT[op][param].field`), and consumers read it via `paramFields(opType)`. The
+> protocol validator structurally prevents drift (`BIND_ORPHANS` empty). Verified the live edit path end-to-end.
+> **What's left = optional cleanup + the queued features below.** See "DONE" + "What's next".
 >
-> ## 🔴 GOLDEN RULE
+> ## 🔴 GOLDEN RULE (still applies)
 > **Run BOTH after EVERY change, before committing:**
 > ```
-> cd DDCS-Studio && npx playwright test --reporter=line            # full suite
+> cd DDCS-Studio && npx playwright test --reporter=line            # full suite  (baseline: 229 pass, 1 known-fail)
 > npx playwright test tests/protocol-validator.spec.js              # the protocol guard
 > ```
-> **The existing tests ARE the contract.** The one real error last session came from deleting a subsystem
+> **The existing tests ARE the contract.** The one real error two sessions ago came from deleting a subsystem
 > *without running the suite* — it broke 14 tests (reverted). Do not repeat it. Dev server runs on `localhost:3211`.
 
 ---
@@ -31,6 +32,9 @@ saved `.nc` round-trips back into high-level ops. **Declare, never infer.**
 | `6a0a105` | **B5 (partial)** — removed `isOpBlockEdited`'s broken form-safe reconciler check (field-id↔param adapter gap; it was a dead no-op) |
 | `a6a4040` | **protocol VALIDATOR** `tests/protocol-validator.spec.js` — caught `circular`'s missing dict entry on first run |
 | `a7ad0c5` | **rebuild step 1** — `PARAM_FIELDS` exported; validator now guards "every op has a form-field binding (or is exempt)" |
+| `bd45abf` | **rebuild step 2 (move)** — `PARAM_FIELDS` co-located into `opDictionary.js` as `FIELDS`; wizardManager re-exports it (pure data move) |
+| `8dcb8b0` | **rebuild step 2 (reconcile)** — validator asserts `FIELDS ⊆ DICT`; reconciled every drift (rpm on cutting ops; originX/originY on slot+text; qStop on the 6 probe ops; syncA/slave on edge; orient on atc_change; atc_table lengths/pockets → includeLengths/includePockets). Truth = view params-reader + `<name>Stack` reads (13-agent map + spot-checks) |
+| `58b85d3` | **rebuild steps 3–4** — field folded ONTO each dict param (`DICT[op][param].field`); `paramFields(op)` replaces `PARAM_FIELDS`; `_seedForm`/`canEdit` read the dict; `BIND_ORPHANS` guard replaces the now-structural `FIELDS⊆DICT` check; live edit path verified end-to-end |
 
 Clean baseline = **~229 passed, 1 failed** (the 1 is always one of the two known-bad below).
 
@@ -52,58 +56,46 @@ The BANNED "inference" = recovering high-level intent **from opaque motion lines
 
 ---
 
-## THE TASK — unify the form-field binding into the dictionary
-The param↔form binding lives in **two places that can drift**:
-- `PARAM_FIELDS` (`wizardManager.js`, now exported) — **forward**: param → form-field id, per op.
-- `RECONCILERS` (`opStacks.js`) — **reverse**: field ← block.
+## DONE — the form-field binding is unified into the dictionary
+The param→form binding used to live in **two places that could drift** (`PARAM_FIELDS` forward + `RECONCILERS`
+reverse). The forward binding is now **one declared source of truth on the dict**:
+- The field id is a property of each dict param: **`DICT[op][param].field`** (folded in from a compact authoring
+  column `FIELD_BIND` at module load, in `opDictionary.js`).
+- `paramFields(opType)` (in `opDictionary.js`) returns the `{ param → field id }` map, derived from the dict —
+  the **replacement for `PARAM_FIELDS`**. `wizardManager._seedForm()` + `canEdit()` read it.
+- A binding whose param isn't catalogued can't attach → it lands in **`BIND_ORPHANS`**, which the protocol
+  validator asserts is empty. So the field map **cannot drift** from the dictionary — it lives ON it.
+- The reconciliation (step 2) used the truth = **what each view's params-reader emits + each `<name>Stack`
+  reads** (verified with a 13-agent map + manual spot-checks). Notable resolutions: `qStop` is emitted by every
+  probe view but no builder consumes it yet (`twoPassProbe` hard-codes `Q=1`) — declared in the dict anyway
+  because `op.params` carries it (source of truth); `slot`/`text` placement keys are `originX`/`originY` (the
+  PlaceOnStock child-block layer is `offX`/`offY`, a different layer); `atc_table` was a stale-FIELDS rename.
 
-**Goal: one declared source of truth = the dictionary.**
+### Step 5 (reverse-sync `RECONCILERS`) — ASSESSED + DEFERRED (optional, unfavorable)
+`RECONCILERS` (`opStacks.js`) map **block-atom params → form-field ids** (e.g. `sf_depth ← stepdown.to`), and emit
+a **mix** of (a) op-param-bound fields and (b) pattern/derived fields with *no* flat binding (`sl_dia`, `sl_count`,
+`d_cols`, un-derived `stepover%`). Migrating them to "produce `op.params` → map via the dict" only covers (a);
+(b) stays hardcoded — and `drill`'s reconciler can't use `paramFields` at all (drill is binding-exempt). So it's a
+partial, messy decouple of 14-tested reverse-sync code for modest gain. **Left as-is on purpose. Don't delete it.**
+(The reconcilers reading the structured block model = DECLARATION, not the banned inference — see the trap above.)
 
-### Steps — each one: *change → run suite + validator → commit*
-1. **Co-locate** `PARAM_FIELDS` into `opDictionary.js` (move the const, `export const FIELDS = …`; in
-   `wizardManager.js` replace it with `import { FIELDS as PARAM_FIELDS } from './blocks/opDictionary.js'` so the
-   two usages at lines ~266/274 stay unchanged). Pure data move, **no behavior change** — suite must stay green.
-2. **Extend the validator** to assert `FIELDS[op]` keys ⊆ `DICT[op]` keys. This surfaces the **real mismatches
-   to reconcile** — for each, open the op's `<name>Stack` builder + its `wizards/views/<name>View.js` to decide
-   the true name:
-   - `atc_table`: FIELDS `lengths`/`pockets` vs DICT `includeLengths`/`includePockets` (check `atcTableStack`).
-   - `surfacing`: FIELDS has `rpm` (`sf_rpm`) but DICT has none — does `surfacingStack` read `params.rpm`?
-     (probably a vestigial form field → drop it, or add to the dict).
-   - `atc_change`: FIELDS has `orient` (`atc_change_orient`) but DICT has none (check `atcChangeStack`).
-   - `corner`: FIELDS `probeZ`→`c_probe_z_first` vs DICT `probeZ` + `probeZFirst` — align.
-
-   **⚠️ Systematic, not just these four.** The probe ops (`edge`, `corner`, `alignment`, `middle`, `circular`,
-   `rotary_clock`, `rotary_center`) differ *wholesale*: the FORM (`PARAM_FIELDS`) carries `qStop`/`syncA`/`slave`,
-   while the DICT (built from the emitters) carries `port`/`level`/`sources`/`radius`. Those are **different
-   params** (Q-stop enable vs probe input port / trigger level), not renames. For each, open the `<name>Stack`
-   builder and check **what it actually reads from `op.params`** — *that* is the truth; align both the form
-   binding and the dict to it. The validator extension (FIELDS ⊆ DICT) lists the **full** set — don't assume
-   it's only the examples above. (This is also why a fresh probe op false-glows: see "Probe op.params
-   completeness" below — same root cause, op.params isn't yet the complete source.)
-3. **Merge the field id into the dict per param** — extend the `N/Enum/Str/Bool/Struct` helpers to take a
-   `field` arg (e.g. `N(addr, canon, field)`), or add a `field` property. Then **switch
-   `wizardManager._seedForm()`** to read the dict's field binding instead of `PARAM_FIELDS`.
-4. **Delete `PARAM_FIELDS`** (now in the dict). Validator + suite green.
-5. *(lower priority)* the reverse-sync `RECONCILERS`: **KEEP it working** (14 tests). Optionally migrate it to
-   read declared block params via the dict's binding instead of the hand-written per-op maps — but **do not break
-   the tests**, and remember the underiving (e.g. `stepover%` from the absolute step) is still *declaration*
-   (reading a declared block value + math), not the banned inference.
-
-### Exemptions (ops with no `PARAM_FIELDS` binding — keep the validator exempting these)
+### Exemptions (ops with no `.field` binding — the validator still exempts these)
 `drill` (custom `view.setForm` for pattern variants), `atc_length` (Settings-driven, no per-op fields),
 `homing` (no form-field map).
 
 ---
 
 ## Key files
-- `web/blocks/opDictionary.js` — `DICT` (type + `addr` + `canon`), codec, `validate`. **The destination.**
-- `web/blocks/opStacks.js` — `BUILDERS` (exported), `RECONCILERS` (**keep**), `makeOp`, `opFromMarker`,
-  `importMarkedNc`, `collectInjectedIds` (override-diff), `editedLinesForOp` (glow).
+- `web/blocks/opDictionary.js` — `DICT` (type + `addr` + `canon` + now `.field`), `FIELD_BIND` (the authoring
+  column folded onto `DICT`), `BIND_ORPHANS`, `paramFields(op)`, codec, `validate`. **The single source of truth.**
+- `web/blocks/opStacks.js` — `BUILDERS` (exported), `RECONCILERS` (**keep** — block→form reverse sync), `makeOp`,
+  `opFromMarker`, `importMarkedNc`, `collectInjectedIds` (override-diff), `editedLinesForOp` (glow).
 - `web/blocks/programModel.js` — stack-as-truth, the line→op map (`proj.map` = per-line block ancestry, built in
   `blockModel.js`'s `emit`: `own = [...anc, block.id]`), `serializeWithMarkers`.
-- `web/wizardManager.js` — `PARAM_FIELDS` (exported), `_seedForm`, `openForEdit` (seeds from `op.params` — the
-  correct forward path), `pullFromBlocks` (reverse-sync, **keep**).
-- `tests/protocol-validator.spec.js` — the guard. **Extend it as you migrate.**
+- `web/wizardManager.js` — imports `paramFields`; `_seedForm` + `canEdit` read the dict binding; `openForEdit`
+  (seeds from `op.params` — the correct forward path), `pullFromBlocks` (reverse-sync via RECONCILERS, **keep**).
+- `tests/protocol-validator.spec.js` — the guard: DICT entry + binding (`.field`) + `BIND_ORPHANS` empty + canon
+  unique + marker round-trip. **Extend it as you add ops/features.**
 - `docs/MULTI-OP-STACKING.md` + `docs/BLOCKS-TAB.md` — the architecture (declare vs infer).
 
 ---
