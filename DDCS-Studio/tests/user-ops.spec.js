@@ -120,9 +120,9 @@ test('userOps: the generic param form inserts a user op into the program (depth 
     window.ddcsInsertUserOp('user_form_test');
   });
 
-  // The data-driven form shows only the declared param; set it and insert.
-  await page.waitForSelector('#uop_field_depth', { state: 'visible' });
-  await page.fill('#uop_field_depth', '-8');
+  // The data-driven form shows only the declared param (rendered by the form-widget registry); set it and insert.
+  await page.waitForSelector('.uop-form input[type="number"]', { state: 'visible' });
+  await page.fill('.uop-form input[type="number"]', '-8');
   await page.click('.uop-insert');
   await page.waitForSelector('.uop-form-overlay', { state: 'detached' });
 
