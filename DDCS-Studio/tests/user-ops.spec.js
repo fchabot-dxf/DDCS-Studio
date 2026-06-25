@@ -104,3 +104,36 @@ test('userOps: create / list / load (re-register) / delete persistence round-tri
   expect(r.dupThrew, 'duplicate opType rejected').toBe(true);
   expect(r.afterDelete).toEqual({ count: 0, registered: false });
 });
+
+test('userOps: the generic param form inserts a user op into the program (depth substituted)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsInsertUserOp && window.ddcsLoadBlockStack);
+
+  // Create a 1-param user op + clear the program, then open its insert form.
+  await page.evaluate(async () => {
+    const U = await import('/blocks/userOps.js');
+    localStorage.removeItem('ddcs_user_ops');
+    U.createUserOp(U.userOpFromStack('form_test', 'Form Test',
+      [{ type: 'move', params: { x: 0, y: 0, z: -5, mode: 'feed' } }],
+      [{ param: 'depth', blockIndex: 0, key: 'z', type: 'number', default: -5, units: 'mm', label: 'Depth' }]));
+    window.ddcsLoadBlockStack([]);
+    window.ddcsInsertUserOp('user_form_test');
+  });
+
+  // The data-driven form shows only the declared param; set it and insert.
+  await page.waitForSelector('#uop_field_depth', { state: 'visible' });
+  await page.fill('#uop_field_depth', '-8');
+  await page.click('.uop-insert');
+  await page.waitForSelector('.uop-form-overlay', { state: 'detached' });
+
+  const r = await page.evaluate(() => {
+    const stack = window.ddcsGetBlockProgram() || [];
+    const op = stack.find((b) => b && b.type === 'op' && b.opType === 'user_form_test');
+    const move = op && (op.children || []).find((c) => c && c.type === 'move');
+    localStorage.removeItem('ddcs_user_ops');
+    return { hasOp: !!op, label: op && op.label, z: move && move.params && move.params.z };
+  });
+  expect(r.hasOp, 'user op inserted into the program').toBe(true);
+  expect(r.label, 'friendly label on the op container').toBe('Form Test');
+  expect(r.z, 'depth param substituted at insert time').toBe(-8);
+});
