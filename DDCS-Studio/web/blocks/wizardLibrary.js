@@ -21,12 +21,15 @@ import { listUserOps, createUserOp, deleteUserOp } from './userOps.js';
 // ── the shipped (default) catalog — the current wizard bar as data ───────────────────────────────────────────
 // (Faithful to commandDeck.renderHeader's groups/entries. Icons: emoji where the bar used emoji; the SVG-iconed
 // ones carry an empty icon for now — the bar-render stage reattaches the SVGs. I/O quick-actions stay bar-special.)
+// The bar has three SECTIONS; each dropdown (group) lives in one. Default placement mirrors the shipped bar
+// (Setup→left, the rest→center); the user can move any dropdown to any section in the manager.
+export const SECTIONS = ['left', 'center', 'right'];
 const GROUPS = [
-    { id: 'setup', label: 'Setup' },
-    { id: 'probe', label: 'Probe' },
-    { id: 'atc', label: 'ATC' },
-    { id: 'mill', label: 'Mill' },
-    { id: 'custom', label: 'Custom' },   // user ops land here by default (re-groupable)
+    { id: 'setup', label: 'Setup', section: 'left' },
+    { id: 'probe', label: 'Probe', section: 'center' },
+    { id: 'atc', label: 'ATC', section: 'center' },
+    { id: 'mill', label: 'Mill', section: 'center' },
+    { id: 'custom', label: 'Custom', section: 'center' },   // user ops land here by default (re-groupable)
 ];
 const BUILTINS = [
     { id: 'comm', type: 'comm', label: 'Comm / MDI', icon: '💬', group: 'setup' },
@@ -78,6 +81,28 @@ export function setGroupOverride(id, patch) {
 /** Reset ALL bar customization back to the shipped catalog (does NOT delete user ops). */
 export function resetLayout() { writeLayout({}); }
 
+// ── user-created dropdowns (groups) ──────────────────────────────────────────────────────────────────────────
+/** Create a new (empty) dropdown in a section → returns its id. It appears in the bar once a wizard is moved in. */
+export function createGroup(label, section = 'center') {
+    const l = readLayout();
+    l.customGroups = l.customGroups || [];
+    const base = String(label || 'group').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'group';
+    const taken = new Set([...GROUPS.map((g) => g.id), ...l.customGroups.map((c) => c.id)]);
+    let id = base, n = 2; while (taken.has(id)) id = `${base}_${n++}`;
+    l.customGroups.push({ id, label: label || id, section: SECTIONS.includes(section) ? section : 'center' });
+    writeLayout(l);
+    return id;
+}
+/** Delete a user-created dropdown (shipped ones can't be deleted). Its wizards revert to their default dropdown. */
+export function deleteGroup(id) {
+    if (GROUPS.some((g) => g.id === id)) return;
+    const l = readLayout();
+    if (l.entries) for (const eid in l.entries) { if (l.entries[eid] && l.entries[eid].group === id) delete l.entries[eid].group; }
+    l.customGroups = (l.customGroups || []).filter((c) => c.id !== id);
+    if (l.groups) delete l.groups[id];
+    writeLayout(l);
+}
+
 // ── the merged library (what the bar + Settings render from) ─────────────────────────────────────────────────
 function userEntries() {
     return listUserOps().map((d) => ({ id: d.opType, type: d.opType, label: d.label || d.opType, icon: '✦', group: 'custom', kind: 'user', def: d }));
@@ -89,25 +114,34 @@ export function listEntries() {
     const base = [...BUILTINS.map((b) => ({ ...b, kind: 'builtin' })), ...userEntries()];
     return base.map((e, i) => {
         const o = eov[e.id] || {};
-        return { ...e, label: o.label ?? e.label, group: o.group ?? e.group, visible: o.visible !== false, order: (o.order != null) ? o.order : i };
+        return {
+            ...e, label: o.label ?? e.label, group: o.group ?? e.group, visible: o.visible !== false,
+            order: (o.order != null) ? o.order : i, icon: o.icon ?? e.icon, iconOverride: (o.icon != null) ? o.icon : null,
+        };
     });
 }
 
-/** The library AS the bar shows it: ordered visible groups, each with its ordered visible items. */
-export function getLibrary({ includeHidden = false } = {}) {
-    const l = readLayout(), gov = l.groups || {};
+/** The library AS the bar + manager render from: groups (each with its section + ordered items), order-resolved.
+ *  includeHidden → keep hidden entries (manager). includeEmpty → keep user-created dropdowns that have no items yet. */
+export function getLibrary({ includeHidden = false, includeEmpty = false } = {}) {
+    const l = readLayout(), gov = l.groups || {}, custom = l.customGroups || [];
+    const customById = new Map(custom.map((c) => [c.id, c]));
     const entries = listEntries().filter((e) => includeHidden || e.visible);
     const byGroup = new Map();
     for (const e of entries) { if (!byGroup.has(e.group)) byGroup.set(e.group, []); byGroup.get(e.group).push(e); }
-    // group order: the shipped GROUPS first (in order), then any user-introduced group, each with its override.
-    const knownIds = GROUPS.map((g) => g.id);
-    const groupIds = [...knownIds, ...[...byGroup.keys()].filter((g) => !knownIds.includes(g))];
-    const groups = groupIds
-        .filter((id) => byGroup.has(id))
+    // dropdown order: the shipped GROUPS first, then user-created dropdowns, then any legacy entry-introduced group.
+    const knownIds = GROUPS.map((g) => g.id), customIds = custom.map((c) => c.id);
+    const orderedIds = [...new Set([...knownIds, ...customIds, ...[...byGroup.keys()].filter((g) => !knownIds.includes(g) && !customIds.includes(g))])];
+    const groups = orderedIds
+        .filter((id) => byGroup.has(id) || (includeEmpty && customById.has(id)))           // populated, or empty user dropdowns when asked
         .map((id, i) => {
-            const def = GROUPS.find((g) => g.id === id), o = gov[id] || {};
-            const items = byGroup.get(id).sort((a, b) => a.order - b.order);
-            return { id, label: o.label ?? (def ? def.label : id), order: (o.order != null) ? o.order : i, items };
+            const def = GROUPS.find((g) => g.id === id) || customById.get(id), o = gov[id] || {};
+            const items = (byGroup.get(id) || []).slice().sort((a, b) => a.order - b.order);
+            return {
+                id, label: o.label ?? (def ? def.label : id), section: o.section ?? (def && def.section) ?? 'center',
+                order: (o.order != null) ? o.order : i, items, custom: customById.has(id),
+                icon: o.icon ?? null,
+            };
         })
         .sort((a, b) => a.order - b.order);
     return { groups };

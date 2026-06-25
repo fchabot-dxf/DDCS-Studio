@@ -78,3 +78,59 @@ test('wizardLibrary: catalog + user ops + overrides + .wizard codec', async ({ p
   expect(r.mill3).toEqual(['drill', 'bore', 'pocket', 'contour', 'slot', 'surfacing', 'text']);
   expect(r.customStill).toBe(1);
 });
+
+test('wizardLibrary: sections + create / delete custom dropdowns', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+
+  const r = await page.evaluate(async () => {
+    const L = await import('/blocks/wizardLibrary.js');
+    localStorage.removeItem('ddcs_user_ops');
+    localStorage.removeItem('ddcs_wizard_layout');
+    const sectionOf = (lib, id) => (lib.groups.find((g) => g.id === id) || {}).section;
+    const ids = (lib, id) => ((lib.groups.find((g) => g.id === id) || {}).items || []).map((i) => i.id);
+
+    // default sections: setup→left, the rest→center
+    const lib0 = L.getLibrary();
+    const sections0 = { setup: sectionOf(lib0, 'setup'), probe: sectionOf(lib0, 'probe'), mill: sectionOf(lib0, 'mill') };
+
+    // create a dropdown in the RIGHT section; empty = hidden from the bar, shown in the manager
+    const gid = L.createGroup('My Probes', 'right');
+    const emptyInBar = L.getLibrary().groups.some((g) => g.id === gid);
+    const emptyInMgr = L.getLibrary({ includeHidden: true, includeEmpty: true }).groups.some((g) => g.id === gid);
+
+    // move a wizard into it
+    L.setEntryOverride('edge', { group: gid });
+    const g1 = L.getLibrary().groups.find((g) => g.id === gid);
+    const probeLostEdge = !ids(L.getLibrary(), 'probe').includes('edge');
+
+    // delete it → its wizard reverts to the default dropdown (probe)
+    L.deleteGroup(gid);
+    const lib2 = L.getLibrary();
+    const gone = !lib2.groups.some((g) => g.id === gid);
+    const edgeBackInProbe = ids(lib2, 'probe').includes('edge');
+
+    // shipped dropdowns can't be deleted
+    L.deleteGroup('probe');
+    const probeSurvives = L.getLibrary().groups.some((g) => g.id === 'probe');
+
+    // reset clears custom dropdowns too
+    const gid2 = L.createGroup('Temp', 'left');
+    const afterReset = (L.resetLayout(), L.getLibrary({ includeHidden: true, includeEmpty: true }).groups.some((g) => g.id === gid2));
+
+    localStorage.removeItem('ddcs_wizard_layout');
+    return { sections0, emptyInBar, emptyInMgr, g1section: g1 && g1.section, g1custom: g1 && g1.custom, g1items: g1 && g1.items.map((i) => i.id), probeLostEdge, gone, edgeBackInProbe, probeSurvives, afterReset };
+  });
+
+  expect(r.sections0).toEqual({ setup: 'left', probe: 'center', mill: 'center' });
+  expect(r.emptyInBar, 'empty new dropdown hidden from the bar').toBe(false);
+  expect(r.emptyInMgr, 'empty new dropdown shows in the manager').toBe(true);
+  expect(r.g1section).toBe('right');
+  expect(r.g1custom).toBe(true);
+  expect(r.g1items).toEqual(['edge']);
+  expect(r.probeLostEdge).toBe(true);
+  expect(r.gone, 'deleted dropdown is gone').toBe(true);
+  expect(r.edgeBackInProbe, 'its wizard reverted to its default dropdown').toBe(true);
+  expect(r.probeSurvives, 'shipped dropdowns are undeletable').toBe(true);
+  expect(r.afterReset, 'reset clears custom dropdowns').toBe(false);
+});

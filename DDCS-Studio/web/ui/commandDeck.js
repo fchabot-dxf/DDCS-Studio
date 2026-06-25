@@ -602,24 +602,7 @@ export class CommandDeck {
 
     // Helper: Render header left/center/right
     renderHeader() {
-        this._renderWizardBar();
-
-        const rightTarget = document.querySelector('.dock-header .header-right');
-        if (rightTarget) {
-            // Slim quick-toolbar: only the two most-used in-place actions (icon-only). Load / Insert /
-            // Export now live in the header chevron quick-menu (ui/headerPost.js).
-            rightTarget.innerHTML = `
-                <div style="display:flex; gap:6px; align-items:center;">
-                    <button class="toolbar-btn icon-only" onclick="copyCode && copyCode()" title="Copy editor to clipboard" aria-label="Copy"><span class="btn-ico">${HEADER_ICONS.copy}</span></button>
-                    <button class="toolbar-btn icon-only" onclick="clearCode && clearCode()" title="Clear the editor" aria-label="Clear"><span class="btn-ico">${HEADER_ICONS.clear}</span></button>
-                </div>
-            `;
-        }
-
-        // Wizard buttons (left/center) get their pointerdown guard inside _renderWizardBar; bind the right
-        // action buttons here.
-        document.querySelectorAll('.dock-header .header-right button')
-            .forEach(btn => btn.addEventListener('pointerdown', (e) => { e.preventDefault(); }, { passive: false }));
+        this._renderWizardBar();   // owns all three header sections now (Copy/Clear moved off the bar)
         this._initHeaderDocListeners();
 
         // Live re-render hook for the Settings "wizard library manager" (stage 5) — re-reads getLibrary().
@@ -641,31 +624,21 @@ export class CommandDeck {
         }
     }
 
-    // Render the wizard bar from the wizard library (blocks/wizardLibrary.getLibrary()): the Setup group
-    // goes left, every other group (Probe / ATC / Mill / Custom / …) goes center. Re-callable for live
-    // refresh after the Settings library manager edits the catalog (window.ddcsRefreshWizardBar).
+    // Render the wizard bar from the wizard library (blocks/wizardLibrary.getLibrary()): each dropdown lands in
+    // its SECTION (left / center / right) — user-designable in the Settings manager. The fixed Copy/Clear editor
+    // actions are pinned to the far end of the right section. Re-callable for live refresh (ddcsRefreshWizardBar).
     _renderWizardBar() {
         let groups = [];
         try { groups = getLibrary().groups || []; } catch (err) { console.warn('wizard library unavailable', err); }
-        const setup = groups.find(g => g.id === 'setup') || { id: 'setup', label: 'Setup', items: [] };
-        const center = groups.filter(g => g.id !== 'setup');
+        const sect = { left: [], center: [], right: [] };
+        for (const g of groups) (sect[g.section] || sect.center).push(g);
 
         const leftTarget = document.querySelector('.dock-header .header-left');
-        if (leftTarget) {
-            leftTarget.innerHTML = `
-                <div style="display:flex; gap:6px; align-items:center;">
-                    ${wizGroupHtml(setup)}
-                </div>
-            `;
-        }
+        if (leftTarget) leftTarget.innerHTML = `<div style="display:flex; gap:6px; align-items:center;">${sect.left.map(wizGroupHtml).join('')}</div>`;
         const centerTarget = document.querySelector('.dock-header .header-center');
-        if (centerTarget) {
-            centerTarget.innerHTML = `
-                <div style="display:flex; gap:6px; width:auto; align-items:center;">
-                    ${center.map(wizGroupHtml).join('')}
-                </div>
-            `;
-        }
+        if (centerTarget) centerTarget.innerHTML = `<div style="display:flex; gap:6px; width:auto; align-items:center;">${sect.center.map(wizGroupHtml).join('')}</div>`;
+        const rightTarget = document.querySelector('.dock-header .header-right');   // pure user dropdowns now (Copy/Clear moved to the header chevron menu)
+        if (rightTarget) rightTarget.innerHTML = `<div style="display:flex; gap:6px; align-items:center;">${sect.right.map(wizGroupHtml).join('')}</div>`;
         this._bindWizardDropdowns();
     }
 
@@ -720,8 +693,8 @@ export class CommandDeck {
                 }
             });
         });
-        // Suppress focus-steal (keeps the keyboard from popping) on the wizard trigger + item buttons.
-        document.querySelectorAll('.dock-header .header-left button, .dock-header .header-center button')
+        // Suppress focus-steal (keeps the keyboard from popping) on the wizard trigger + item buttons (all 3 sections).
+        document.querySelectorAll('.dock-header .header-left button, .dock-header .header-center button, .dock-header .header-right button')
             .forEach(btn => btn.addEventListener('pointerdown', (e) => { e.preventDefault(); }, { passive: false }));
     }
 
