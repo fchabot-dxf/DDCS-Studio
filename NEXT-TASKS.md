@@ -60,11 +60,13 @@ then generalise that same snapshot into document-level autosave (serializeProjec
     `ddcsGetBlockProgram`/`ddcsLoadBlockStack`; an `applying` guard + the existing `muteChanges` avoid self-loops).
   - **[x] "Blocks edited" indication**: 
     - **Removed**: The `✦` symbol from the editor chip and the full-column vertical line.
-    - **⚠ OPEN PROBLEM — "glow the exact edit" (the real ask).** Line-level targeting only solves HALF the cases:
-      1. **Custom whole-line atom** (an M8, a Probe sub) → a new line; line-glow isolates it perfectly. ✓
-      2. **Editing the VALUE of an UNSURFACED param from a block** → changes a single *token* inside a line that's
-         otherwise form-generated. Line-glow would light the WHOLE line (imprecise); the ask is to glow the changed
-         **word**. This case is NOT solved by any line-list approach.
+    - **[x] "glow the exact edit" — DONE** (commits `078fba6` + `6d25832`). Both cases now precise:
+      1. **Custom whole-line atom** (an M8, a Probe sub) → injected → whole-line glow (`.op-block-edited`). ✓
+      2. **Editing the VALUE of a param from a block** → `opStacks.editedRangesForOp` char-diffs the leaf atom's
+         clean-rebuild line vs its live line → glows just the changed **token** (`.word-edited` span via
+         `editorOpHover.wrapRange`). ✓ Forward-only (BUILDERS(op.params) baseline, no inference — supersedes the
+         RECONCILERS-baseline design sketched below). Tests: `tests/word-glow.spec.js`.
+    - *(original design notes below — kept for context; the implemented approach diffs forward emits, not reverse-synced params.)*
     - **It's feasible, not "impossible".** `UIUtils.formatGCode` ([ui/uiUtils.js:106](DDCS-Studio/web/ui/uiUtils.js#L106))
       already wraps tokens in spans (M-codes, axis letters, comments, G31), so per-word highlighting is a CSS class on a
       token span. The hard part is knowing *which* token an edit produced — not the rendering.
