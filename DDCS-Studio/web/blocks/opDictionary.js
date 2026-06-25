@@ -131,14 +131,14 @@ export const DICT = {
     },
 };
 
-// ── the form-field binding (op param key → its form field id, per op) ───────────────────────────────────
+// ── the form-field binding (op param → its form field id), FOLDED into each DICT param as `.field` below ──
 // EDIT seeding: the inverse of each view's update() reads. wizardManager._seedForm() restores these into the
 // form when re-opening a wizard to edit an op (op.params = single truth; value vs checkbox decided by element
-// type at seed time). Flat maps cover most wizards; drill has a custom view.setForm (pattern variants),
-// atc_length is Settings-driven (no per-op fields), homing has no form-field map. Co-located with DICT so the
-// vocabulary + its UI binding live in one place; the protocol validator guards that every FIELDS key is a DICT
-// key (web/wizardManager.js re-exports this as PARAM_FIELDS; tests/protocol-validator.spec.js).
-export const FIELDS = {
+// type at seed time). drill has a custom view.setForm (pattern variants), atc_length is Settings-driven, homing
+// has no form-field map — so they're absent here. This column folds ONTO the DICT param entries (one source of
+// truth: DICT[op][param].field); consumers read it via paramFields(). A binding whose param isn't in DICT is an
+// orphan (BIND_ORPHANS) — structurally-caught drift, asserted empty by protocol-validator.spec.js.
+const FIELD_BIND = {
     surfacing: { originX: 'sf_originX', originY: 'sf_originY', offZ: 'sf_offZ', pathDatum: 'sf_pathDatum', stockAttach: 'sf_stockAttach', w: 'sf_w', h: 'sf_h', strategy: 'sf_strategy', toolDia: 'sf_toolDia', stepoverPct: 'sf_stepoverPct', depth: 'sf_depth', stepdown: 'sf_stepdown', clearance: 'sf_clearance', feed: 'sf_feed', plunge: 'sf_plunge', rpm: 'sf_rpm' },
     pocket: { shape: 'p_shape', strategy: 'p_strategy', originX: 'p_originX', originY: 'p_originY', offZ: 'p_offZ', pathDatum: 'p_pathDatum', stockAttach: 'p_stockAttach', w: 'p_w', h: 'p_h', dia: 'p_dia', sides: 'p_sides', toolDia: 'p_toolDia', stepoverPct: 'p_stepoverPct', depth: 'p_depth', stepdown: 'p_stepdown', clearance: 'p_clearance', feed: 'p_feed', plunge: 'p_plunge', rpm: 'p_rpm' },
     contour: { shape: 'ct_shape', side: 'ct_side', originX: 'ct_originX', originY: 'ct_originY', offZ: 'ct_offZ', pathDatum: 'ct_pathDatum', stockAttach: 'ct_stockAttach', w: 'ct_w', h: 'ct_h', dia: 'ct_dia', sides: 'ct_sides', wcs: 'ct_wcs', toolDia: 'ct_toolDia', depth: 'ct_depth', stepdown: 'ct_stepdown', clearance: 'ct_clearance', feed: 'ct_feed', plunge: 'ct_plunge', rpm: 'ct_rpm' },
@@ -159,6 +159,21 @@ export const FIELDS = {
     atc_test: { mode: 'atc_test_mode', cycles: 'atc_test_cycles', dwellMs: 'atc_test_dwell', first: 'atc_test_first', count: 'atc_test_count', zClear: 'atc_test_zclear', descend: 'atc_test_descend' },
     atc_table: { includeLengths: 'atc_table_lengths', includePockets: 'atc_table_pockets' },
 };
+
+// Fold the field-id column ONTO each DICT param (one source of truth: DICT[op][param].field). A binding whose
+// param isn't catalogued has nowhere to land → recorded in BIND_ORPHANS (the protocol validator asserts []).
+export const BIND_ORPHANS = [];
+for (const op in FIELD_BIND) for (const k in FIELD_BIND[op]) {
+    if (DICT[op] && DICT[op][k]) DICT[op][k].field = FIELD_BIND[op][k];
+    else BIND_ORPHANS.push(`${op}.${k}`);
+}
+
+/** The { param → form-field id } binding for an op, derived from DICT — the replacement for PARAM_FIELDS. */
+export function paramFields(opType) {
+    const spec = DICT[opType] || {}, out = {};
+    for (const k in spec) if (spec[k].field) out[k] = spec[k].field;
+    return out;
+}
 
 // ── marker codec (op record <-> ( @DDCS:v {…} ) comment), mapping internal keys <-> canon names ──
 const escParens = (s) => s.replace(/\(/g, '\\u0028').replace(/\)/g, '\\u0029');   // keep payload paren-free

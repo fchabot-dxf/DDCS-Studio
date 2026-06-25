@@ -30,12 +30,10 @@ const PROBE_DEFAULT_FIELDS = {
     al_q: 'qStop', c_q: 'qStop', circ_q: 'qStop', m_q: 'qStop', p_q: 'qStop', rc_q: 'qStop', rcl_q: 'qStop',
 };
 
-// EDIT seeding: op param key → its form field id, per op type (the inverse of each view's update() reads).
-// _seedForm() restores these into the form when re-opening a wizard to edit an op (params = single truth).
-// The map now LIVES in blocks/opDictionary.js (co-located with DICT, the vocabulary it binds). Re-exported here
-// as PARAM_FIELDS so the two usages below (and the protocol validator's wm.PARAM_FIELDS) stay unchanged.
-import { FIELDS as PARAM_FIELDS } from './blocks/opDictionary.js';
-export { PARAM_FIELDS };
+// EDIT seeding: the form-field binding now lives ON each DICT param (blocks/opDictionary.js, DICT[op][param].field).
+// paramFields(opType) returns the { param → field id } map for an op (the old PARAM_FIELDS, derived from the dict);
+// _seedForm() uses it to restore params into the form when re-opening a wizard to edit an op (params = single truth).
+import { paramFields } from './blocks/opDictionary.js';
 
 export class WizardManager {
     constructor(editorManager) {
@@ -244,15 +242,15 @@ export class WizardManager {
     /** Does this op type support seeding its form from params (so it can be edited in place)? */
     canEdit(opType) {
         const view = viewByType.get(opType);
-        return !!(opType && (PARAM_FIELDS[opType] || (view && typeof view.setForm === 'function')));
+        return !!(opType && (Object.keys(paramFields(opType)).length || (view && typeof view.setForm === 'function')));
     }
 
-    /** params → form: a custom view.setForm() when it has one (e.g. drill's pattern variants), else the central
-     *  PARAM_FIELDS map (value/checkbox decided by element type). params are the single source of truth — no snapshot. */
+    /** params → form: a custom view.setForm() when it has one (e.g. drill's pattern variants), else the dict's
+     *  field binding (value/checkbox decided by element type). params are the single source of truth — no snapshot. */
     _seedForm(opType, params) {
         const view = viewByType.get(opType);
         if (view && typeof view.setForm === 'function') { view.setForm(params || {}); return; }
-        const map = PARAM_FIELDS[opType]; if (!map || !params) return;
+        const map = paramFields(opType); if (!params || !Object.keys(map).length) return;
         for (const key in map) {
             const e = el(map[key]); if (!e) continue;
             const val = params[key]; if (val == null) continue;

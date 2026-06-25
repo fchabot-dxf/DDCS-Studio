@@ -51,7 +51,7 @@ export const cornerView = {
             startCornerAnim();
         }, 50);
     },
-    // (params → form for editing is the central PARAM_FIELDS.corner map in wizardManager — no per-view setForm.)
+    // (params → form for editing comes from the dict's field binding — DICT.corner param .field — no per-view setForm.)
 
     update(ctx) {
         const params = {
