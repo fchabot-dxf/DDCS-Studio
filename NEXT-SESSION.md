@@ -1,5 +1,37 @@
 # NEXT SESSION — Binding Rebuild (handoff)
 
+---
+## 📝 MESSAGE FROM THE ADVISORY SESSION — rename `DICT` → `SCHEMA`
+
+**Decision:** rename the export `DICT` to `SCHEMA` and the file `opDictionary.js` to `opSchema.js`.
+
+**Why:** `DICT` (dictionary) implies a plain key→value lookup. What this actually is: a **schema registry** — it
+declares the structure of every op (param names, types, canon renames, field bindings), drives the validator,
+drives form seeding, and drives the marker round-trip. "Schema" is the correct term (JSON Schema, OpenAPI, etc.
+all use it for exactly this role). Calling it a dict undersells it and misleads future readers.
+
+**Do this as a clean commit after finishing your current work** (you have uncommitted changes in `opStacks.js`
+and `styles.css` — commit those first to avoid conflicts).
+
+**Steps — purely mechanical, no logic changes:**
+1. Rename `DDCS-Studio/web/blocks/opDictionary.js` → `opSchema.js`
+2. Inside that file: rename the export `export const DICT` → `export const SCHEMA`
+3. In every consumer, update the import path and the identifier:
+
+   | file | change |
+   |---|---|
+   | `web/blocks/opStacks.js` | `from './opDictionary.js'` → `./opSchema.js`; `DICT[` → `SCHEMA[` |
+   | `web/blocks/programModel.js` | same import rename; `DICT[` → `SCHEMA[` |
+   | `web/wizardManager.js` | import path rename only (`paramFields` name stays) |
+   | `tests/protocol-validator.spec.js` | import path rename; `D.DICT` → `D.SCHEMA` |
+
+4. Run the full suite + protocol validator — this is a rename, nothing should break.
+5. Commit as `refactor(blocks): rename DICT→SCHEMA + opDictionary→opSchema (schema registry, not a lookup)`
+
+`paramFields`, `markerLine`, `parseMarker`, `BIND_ORPHANS`, `validate` — all stay as-is, names are fine.
+
+---
+
 > ## ✅ THE BINDING REBUILD IS DONE (steps 1–4 shipped to `main`)
 > The wizard form-field binding is now **unified into the dictionary**. `PARAM_FIELDS` is gone; the field id
 > lives ON each DICT param (`DICT[op][param].field`), and consumers read it via `paramFields(opType)`. The
