@@ -21,6 +21,7 @@ import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractPar
 import { createWizard } from './wizardLibrary.js';
 import { workspaceToStack } from './blockly/stackBridge.js';
 import { openRegionEditor } from '../ui/regionEditor.js';   // the "make your own datum" authoring editor
+import { openCoordEditor } from '../ui/formWidgets.js';     // the coordinate-list ✎ editor (shares buildCoordEditor with the form)
 
 // A pencil glyph for the dev-mode "✎ regions" affordance on a regionpick block (a FieldImage with an onClick).
 const PENCIL_URI = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cfe6ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>');
@@ -160,6 +161,7 @@ function augment() {
     try {
         for (const blk of ws.getAllBlocks()) {
             if (blk.type === 'regionpick') { augmentRegionPick(blk); if (blk.queueRender) blk.queueRender(); continue; }   // ✎ regions affordance
+            if (blk.type === 'coordlist') { augmentCoordList(blk); if (blk.queueRender) blk.queueRender(); continue; }     // ✎ positions affordance
             if (!isAtom(blk)) continue;
             for (const f of numericFields(blk)) {
                 const inputName = 'DECL_' + FN(f);
@@ -187,6 +189,7 @@ function clearAugment() {
     try {
         for (const blk of ws.getAllBlocks()) {
             if (blk.type === 'regionpick') { if (blk.getInput('RGNED')) { try { blk.removeInput('RGNED'); } catch (_) { /* */ } } if (blk.queueRender) blk.queueRender(); continue; }
+            if (blk.type === 'coordlist') { if (blk.getInput('CLED')) { try { blk.removeInput('CLED'); } catch (_) { /* */ } } if (blk.queueRender) blk.queueRender(); continue; }
             if (!isAtom(blk)) continue;
             for (const f of numericFields(blk)) {
                 const inputName = 'DECL_' + FN(f);
@@ -218,6 +221,24 @@ export function openRegionAuthor(blk) {   // exported so the pencil onClick AND 
             if (newSpec.regions && newSpec.regions.length && !newSpec.regions.some((r) => String(r.value) === cur)) f.setValue(String(newSpec.regions[0].value));
             if (f.forceRerender) f.forceRerender();              // redraw the inline picker from the new spec
         }
+    });
+}
+
+// The dev-mode "✎ positions" affordance: a pencil on a coordlist block that opens the coordinate-list editor and
+// writes the edited list back to the SAME `pts` field VALUE the runtime + round-trip read — the one divergence from
+// region-pick (whose spec rides block.data). Gated to dev mode; USING the positioner stays a normal-mode gesture.
+function augmentCoordList(blk) {
+    if (blk.getInput('CLED')) return;   // idempotent
+    blk.appendDummyInput('CLED').appendField(new _B.FieldImage(PENCIL_URI, 16, 16, '✎ positions', () => openCoordAuthor(blk)));
+}
+export function openCoordAuthor(blk) {   // exported so the pencil onClick AND tests trigger it the same way
+    const f = blk.getField('PTS');
+    let state = { points: [], z: 0 };
+    try { const v = f && f.getValue(); if (v) { const o = JSON.parse(v); if (o && Array.isArray(o.points)) state = { points: o.points, z: o.z }; } } catch (_) { /* fresh */ }
+    openCoordEditor(state, (next) => {
+        if (!f) return;
+        f.setValue(JSON.stringify({ points: (next.points || []).map((p) => ({ x: p.x, y: p.y })), z: next.z }));
+        if (f.forceRerender) f.forceRerender();              // redraw the inline positions preview from the new list
     });
 }
 

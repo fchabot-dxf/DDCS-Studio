@@ -196,16 +196,18 @@ function xyPadWidget(host, primary, group) {
 
 // COORDINATE-LIST positioner — a GROUP of XY points (each a draggable marker on the shared FeatureCanvas) + a
 // shared Z, with add/delete. The first LIST-valued instance of the parametric-canvas atom ("(state → picture) +
-// (interaction → Δstate)"), state = { points:[{x,y}], z }. Commits the whole list (binding type:'list'). Pure
-// spec (points → FeatureCanvas items/handles) is inline here for now; a block adapter would reuse it. Drag a marker
-// → that point; ＋Point/✕ → add/remove; one Z field → the shared depth. (Per-point Z is a later option.)
-function coordListWidget(host, b) {
-    const cfg = b.widgetConfig || {}, bd = resolveBounds(cfg);
-    const d = (b.default && typeof b.default === 'object') ? b.default : {};
+// (interaction → Δstate)"), state = { points:[{x,y}], z }. The editing CORE is buildCoordEditor — shared by the
+// FORM widget (coordListWidget, live, embedded in the row) AND the in-block ✎ editor (openCoordEditor, a modal,
+// opened from blocks/devMode). One editing core, no divergence. (Per-point Z is a later option.)
+
+/** Build the coordinate-list editor (FeatureCanvas points + ＋Point/✕ + shared Z) into `host`. Calls onChange()
+ *  after every edit. initial = { points:[{x,y}], z }; cfg = widgetConfig (height/bounds). Returns { read }. */
+export function buildCoordEditor(host, initial, onChange, cfg = {}) {
+    const bd = resolveBounds(cfg);
+    const d = (initial && typeof initial === 'object') ? initial : {};
     let points = Array.isArray(d.points) ? d.points.map((p) => ({ x: numOr(p.x, 0), y: numOr(p.y, 0) })) : [];
     let z = numOr(d.z, 0);
-    host.style.cssText = 'display:flex; flex-direction:column; gap:6px; margin:10px 0;';
-    host.appendChild(labelSpan(b));
+    const fire = () => { if (onChange) onChange(); };
 
     const cv = document.createElement('div'); cv.className = 'cl-canvas';
     cv.style.cssText = `width:100%; height:${cfg.height || 175}px; border:1px solid var(--border,#2a3340); border-radius:8px; overflow:hidden;`;
@@ -215,17 +217,17 @@ function coordListWidget(host, b) {
         stock: { w: bd.w, h: bd.h, ox: bd.ox, oy: bd.oy },
         items: points.map((p, i) => ({ kind: 'hole', x: p.x, y: p.y, n: i + 1, r: Math.max(1.5, bd.w * 0.012) })),
         handles: points.map((p, i) => ({ id: 'p' + i, x: p.x, y: p.y, kind: 'move' })),
-        onDrag: (id, w) => { const i = +id.slice(1); if (points[i]) { points[i] = { x: clamp(w.x, bd.ox, bd.ox + bd.w), y: clamp(w.y, bd.oy, bd.oy + bd.h) }; renderList(); draw(); host.dispatchEvent(new Event('input', { bubbles: true })); } },
+        onDrag: (id, w) => { const i = +id.slice(1); if (points[i]) { points[i] = { x: clamp(w.x, bd.ox, bd.ox + bd.w), y: clamp(w.y, bd.oy, bd.oy + bd.h) }; renderList(); draw(); fire(); } },
     });
     requestAnimationFrame(draw);
 
     const row = document.createElement('div'); row.style.cssText = 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;';
     const addBtn = document.createElement('button'); addBtn.type = 'button'; addBtn.className = 'cl-add'; addBtn.textContent = '＋ Point';
     addBtn.style.cssText = CTRL_CSS + ' cursor:pointer;';
-    addBtn.addEventListener('click', () => { points.push({ x: r3(bd.ox + bd.w / 2), y: r3(bd.oy + bd.h / 2) }); renderList(); draw(); host.dispatchEvent(new Event('input', { bubbles: true })); });
+    addBtn.addEventListener('click', () => { points.push({ x: r3(bd.ox + bd.w / 2), y: r3(bd.oy + bd.h / 2) }); renderList(); draw(); fire(); });
     const zWrap = document.createElement('label'); zWrap.style.cssText = 'display:flex; align-items:center; gap:4px; font-size:11px;';
     const zInp = document.createElement('input'); zInp.type = 'number'; zInp.step = 'any'; zInp.className = 'cl-z'; zInp.value = z; zInp.style.cssText = CTRL_CSS + ' width:80px;';
-    zInp.addEventListener('input', () => { z = numOr(zInp.value, 0); host.dispatchEvent(new Event('input', { bubbles: true })); });
+    zInp.addEventListener('input', () => { z = numOr(zInp.value, 0); fire(); });
     zWrap.append(document.createTextNode('Z (shared)'), zInp);
     row.append(addBtn, zWrap);
     host.appendChild(row);
@@ -238,14 +240,55 @@ function coordListWidget(host, b) {
             r.append(document.createTextNode(`${i + 1}: ${r3(p.x)}, ${r3(p.y)}`));
             const del = document.createElement('button'); del.type = 'button'; del.className = 'cl-del'; del.textContent = '✕';
             del.style.cssText = 'cursor:pointer; background:transparent; border:none; color:inherit; opacity:.6;';
-            del.addEventListener('click', () => { points.splice(i, 1); renderList(); draw(); host.dispatchEvent(new Event('input', { bubbles: true })); });
+            del.addEventListener('click', () => { points.splice(i, 1); renderList(); draw(); fire(); });
             r.appendChild(del); list.appendChild(r);
         });
     }
     renderList();
     host.appendChild(list);
 
-    return { read: () => ({ [b.param]: { points: points.map((p) => ({ x: r3(p.x), y: r3(p.y) })), z: r3(z) } }) };
+    return { read: () => ({ points: points.map((p) => ({ x: r3(p.x), y: r3(p.y) })), z: r3(z) }) };
+}
+
+function coordListWidget(host, b) {
+    host.style.cssText = 'display:flex; flex-direction:column; gap:6px; margin:10px 0;';
+    host.appendChild(labelSpan(b));
+    const core = buildCoordEditor(host, b.default, () => host.dispatchEvent(new Event('input', { bubbles: true })), b.widgetConfig || {});
+    return { read: () => ({ [b.param]: core.read() }) };
+}
+
+/** The in-block ✎ editor: the coordinate-list editor in a modal. initial = { points, z }; onSave(next) on Done.
+ *  Shares buildCoordEditor with the form widget — one editing core, no divergence (blocks/devMode opens this). */
+export function openCoordEditor(initial, onSave) {
+    document.getElementById('cl-modal')?.remove();
+    const m = document.createElement('div'); m.id = 'cl-modal';
+    m.innerHTML = `<style>
+        #cl-modal{position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);}
+        #cl-modal .cl-panel{background:var(--panel);color:var(--text-main);border:1px solid var(--border);border-radius:8px;width:min(560px,96vw);max-height:94vh;display:flex;flex-direction:column;box-shadow:0 14px 48px rgba(0,0,0,.5);}
+        #cl-modal .cl-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;}
+        #cl-modal .cl-head button{background:transparent;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;}
+        #cl-modal .cl-mbody{display:flex;flex-direction:column;gap:8px;padding:12px 14px;overflow:auto;}
+        #cl-modal .cl-foot{padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+        #cl-modal .cl-foot button{padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--accent,#0ea5e9);color:#fff;cursor:pointer;}
+    </style>`;
+    const panel = document.createElement('div'); panel.className = 'cl-panel';
+    const head = document.createElement('div'); head.className = 'cl-head';
+    const title = document.createElement('span'); title.textContent = 'Edit positions';
+    const x = document.createElement('button'); x.type = 'button'; x.textContent = '✕';
+    head.append(title, x);
+    const body = document.createElement('div'); body.className = 'cl-mbody';
+    const foot = document.createElement('div'); foot.className = 'cl-foot';
+    const done = document.createElement('button'); done.type = 'button'; done.textContent = 'Done'; done.setAttribute('data-cl', 'done');
+    foot.appendChild(done);
+    panel.append(head, body, foot); m.appendChild(panel); document.body.appendChild(m);
+
+    const core = buildCoordEditor(body, initial, null, {});
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    const close = () => { m.remove(); document.removeEventListener('keydown', onKey, true); };
+    document.addEventListener('keydown', onKey, true);
+    x.addEventListener('click', close);
+    m.addEventListener('mousedown', (e) => { if (e.target === m) close(); });   // scrim-close
+    done.addEventListener('click', () => { try { if (onSave) onSave(core.read()); } finally { close(); } });
 }
 
 function rectPadWidget(host, primary, group) {
