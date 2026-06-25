@@ -56,6 +56,38 @@ to the other — each stage ships value:
 4/5 tells you exactly which constructs you need (and which you don't). Mini-languages love to balloon into
 "we accidentally reinvented JavaScript"; porting real wizards is the brake.
 
+## What users actually control — the composition tier
+**Atoms = the controller's instruction set (fixed). Ops = compositions (user-authorable).** `G31` is an atom —
+one controller primitive (move until triggered, store result in `#2002`). A "probe edge" op is a *composition*
+of atoms: approach move + G31 + register read + conditional retry + WCS write. The built-in probes only feel
+primitive because we ship them as wizards; structurally they're stacks, same as anything a user would author.
+
+Total user control operates at the **composition tier**, bounded by the instruction vocabulary below it. A user
+making "a new kind of probe" is making a new op — a new pattern on top of `G31`, which already exists, is
+already understood, is already simulated. They're not inventing a new atom. They're extending the *library*.
+
+**Emit vs understand is the floor, not the atom count.** Two kinds of atom:
+- *Semantic atoms* (`move`, `arc`, `G31`, `PlaceOnStock`) — the system understands them: simulates, transforms,
+  reasons about geometry. These are code; understanding can't be authored as data.
+- *Raw-emit atoms* — a parameterized G/M-code template ("emit `M62 P{port}`"). The system merely emits them.
+  These are fully user-authorable as data — the escape hatch to the metal, parameterized and named. Raw atoms
+  degrade gracefully in sim: standard motion (`G0/1/2/3`) appears for free; a custom `M62` or vendor register
+  write runs on the machine but goes **dark in sim** (the interpreter shrugs, not errors). Name the tier visibly
+  — the maker labels a raw atom "raw / unsimulated / you own the meaning."
+
+**Named op = first-class vocabulary, not a macro.** When a user authors a new op, the name does real work: it's
+the user registry key (dict lookup), the block stack identity (other compositions reference it by name), the
+marker format key (`( @DDCS:1 {"op":"probe_3point_bore", …} )` round-trips to that named op, not an anonymous
+blob), and the wizard bar label. A macro is anonymous text substitution. A named op carries declared semantics,
+round-trips, composes, validates, and ships. Share the op definition alongside the `.nc` and it's fully
+portable.
+
+**The op definition IS the dict entry.** Authoring a new op means declaring params, types, field bindings, and
+the atom stack — exactly what a dict entry is. The dictionary becomes federated: built-ins live in the shipped
+`opDictionary.js` (factory defaults, forkable); user ops carry their own spec in a user registry. The validator
+runs identically on both (`DICT[opType] || userRegistry[opType]`). A user op that passes is protocol-clean by
+construction — same guarantees as a built-in.
+
 ## The honest boundaries (the part that prevents over-promising)
 - **Complete over the *interface*, not over physics.** Reaches any unknown thing that fits the controller's
   *actual* envelope — its digital/analog lines, timing, what its macros can switch. A fieldbus / hard-real-time
