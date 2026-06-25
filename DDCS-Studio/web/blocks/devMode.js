@@ -242,7 +242,9 @@ function saveAsCustomOp() {
     if (!bindings.length && !confirm('No knobs exposed — save as a fixed wizard (a bar button with no parameters)?')) return;
 
     const psel = _panel && _panel.querySelector('.blk-dev-paneltype');
-    const panel = (psel && psel.value) || 'form3d';
+    let panel = (psel && psel.value) || 'form3d';
+    const panelBlk = flattenBlocks(a.opRec.children).find((b) => b && b.type === 'panel');   // a GUI panel block, if present, wins
+    if (panelBlk && panelBlk.params && panelBlk.params.panel) panel = panelBlk.params.panel;
     const editing = _editingWizard;   // re-authoring an existing wizard → update in place (keep its opType)
     try {
         if (editing) {

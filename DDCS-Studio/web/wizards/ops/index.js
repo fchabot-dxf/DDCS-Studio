@@ -43,6 +43,7 @@ import { toolBlock } from './tool.js';
 import { wcsBlock } from './wcs.js';
 import { distModeBlock } from './distmode.js';
 import { commentBlock } from './comment.js';
+import { panelBlock } from './panel.js';
 import { variableBlock } from './variable.js';
 import { paramBlock } from './param.js';
 import { mathBlock } from './math.js';
@@ -69,7 +70,7 @@ export const PALETTE = [
     countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock, paramBlock,          // Variables (compile-time Set + runtime Set # + reporter + GUI param knob)
-    commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
+    commentBlock, messageBlock, panelBlock,                     // Mark Up (comment + on-screen operator message + GUI panel-type declaration)
     cornerConfigBlock,                                         // Universal Corner Macro config (emits #30 and #31)
 ];
 

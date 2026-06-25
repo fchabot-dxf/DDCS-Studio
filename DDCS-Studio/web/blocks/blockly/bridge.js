@@ -117,6 +117,7 @@ const optionsFor = (def, field) => {
         if (def.type === 'move') return ['cut', 'rapid', 'probe'];
     }
     if (field === 'widget' && def.type === 'param') return ['number', 'slider'];   // numeric-socket widgets (more come with grouping / B)
+    if (field === 'panel' && def.type === 'panel') return ['form3d', 'form2d', 'form'];   // the GUI panel-type declaration
     return SELECTS[field] || null;
 };
 
