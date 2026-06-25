@@ -123,11 +123,15 @@ export function mountDevMode(ws, B, hostEl) {
     _panel.className = 'blk-dev-panel';
     _panel.hidden = true;
     _panel.innerHTML = `
-        <div class="blk-dev-hint">Tick the values to expose as knobs, name each, then save this op as a reusable custom wizard.</div>
-        <label class="blk-dev-name">Op name <input type="text" class="blk-dev-opname" placeholder="my corner probe" /></label>
-        <button type="button" class="blk-dev-save">Save as custom op</button>`;
+        <div class="blk-dev-hint">Tick the values to expose as knobs and pick a widget for each, then Save as custom wizard. (You can also save anytime from the ⌄ menu — dev mode is only for adding knobs.)</div>
+        <label class="blk-dev-name">Wizard name <input type="text" class="blk-dev-opname" placeholder="my corner probe" /></label>
+        <button type="button" class="blk-dev-save">Save as custom wizard</button>`;
     _nameInput = _panel.querySelector('.blk-dev-opname');
     _panel.querySelector('.blk-dev-save').addEventListener('click', () => saveAsCustomOp());
+
+    // Saving a wizard = registering the current op's stack as a bar button (+ its form). NOT gated behind dev mode —
+    // the ⌄ quick menu calls this too (with no exposures it saves a parameterless wizard; add knobs later in dev mode).
+    if (typeof window !== 'undefined') window.ddcsSaveAsWizard = () => saveAsCustomOp();
 
     hostEl.append(_toggle, _panel);
     return { onModelRender: () => { if (_on) augment(); } };
@@ -184,30 +188,36 @@ function clearAugment() {
     try { if (B.renderManagement) B.renderManagement.triggerQueuedRenders(); } catch (_) { /* */ }
 }
 
-// read the ticked exposures off the live blocks → bindings → userOpFromStack → createWizard (into library + bar).
+// Register the current op's STACK as a custom WIZARD — a bar button (+ its form). Reads the ticked exposures (if any)
+// → bindings → userOpFromStack → createWizard (into the library + bar). Works with OR without dev mode: no exposures
+// just means a parameterless wizard (add knobs later in dev mode). Called by the dev panel + the ⌄ quick menu.
 function saveAsCustomOp() {
-    const name = (_nameInput.value || '').trim();
-    if (!name) { alert('Name the custom op first.'); _nameInput.focus(); return; }
-
+    if (!_ws) { alert('Open an op in the Blocks tab first, then save it as a wizard.'); return; }
     // Read the LIVE workspace, not the model: Blockly v13 batches change events (FIRE_QUEUE / setTimeout 0), so a value
-    // edited right before Save hasn't reprojected into the model yet (collectAuthoring uses workspaceToStack, which
-    // ignores the dev-only EXPOSE_/PNAME_/WIDGET_ fields and whose pre-order matches preorderAtoms).
+    // edited right before Save hasn't reprojected yet (collectAuthoring uses workspaceToStack, which ignores the
+    // dev-only EXPOSE_/PNAME_/WIDGET_ fields and whose pre-order matches preorderAtoms).
     const a = collectAuthoring(_ws);
-    if (!a) { alert('No op to author here — insert an op first, then open Dev mode.'); return; }
-    if (a.varErr) { alert(`The exposed value “${a.varErr}” has a variable or expression plugged in — a parameter must be a plain number. Restore a number on that block, then save again.`); return; }
-    const bindings = buildBindings(a.exposures);
-    if (!bindings.length && !confirm('No values are exposed — save as a fixed op with no parameters?')) return;
+    if (!a) { alert('No op to save — insert an op in Blocks first.'); return; }
+    if (a.varErr) { alert(`The exposed value “${a.varErr}” has a variable or expression plugged in — a knob must be a plain number. Restore a number on that block, then save again.`); return; }
 
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'op';
+    // Name: the dev panel field if it has one, else ASK — so the ⌄ menu can save with no dev panel open.
+    let name = (_nameInput && _nameInput.value || '').trim();
+    if (!name) name = (window.prompt('Name this wizard (it becomes a button in the bar):', '') || '').trim();
+    if (!name) return;   // cancelled
+
+    const bindings = buildBindings(a.exposures);
+    if (!bindings.length && !confirm('No knobs exposed — save as a fixed wizard (a bar button with no parameters)?')) return;
+
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'wizard';
     const existing = new Set(listUserOps().map((d) => d.opType));
     let type = slug, n = 2; while (existing.has(USER_OP_PREFIX + type)) type = slug + '_' + (n++);
 
     try {
         createWizard(userOpFromStack(type, name, a.opRec.children, bindings));
-    } catch (e) { console.warn('save custom op failed', e); alert('Save failed: ' + ((e && e.message) || e)); return; }
+    } catch (e) { console.warn('save wizard failed', e); alert('Save failed: ' + ((e && e.message) || e)); return; }
 
     if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
-    setDevMode(false);
-    _nameInput.value = '';
-    alert(`Saved “${name}” with ${bindings.length} parameter${bindings.length === 1 ? '' : 's'}. It's in your wizard library and the bar (Custom).`);
+    if (_on) setDevMode(false);
+    if (_nameInput) _nameInput.value = '';
+    alert(`Saved “${name}” — it's now a button in the bar (Custom)${bindings.length ? ` with ${bindings.length} knob${bindings.length === 1 ? '' : 's'}` : ''}.`);
 }
