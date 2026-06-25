@@ -48,6 +48,7 @@ import { simBlock } from './sim.js';
 import { variableBlock } from './variable.js';
 import { paramBlock } from './param.js';
 import { regionPickBlock } from './regionpick.js';
+import { coordListBlock } from './coordlist.js';
 import { mathBlock } from './math.js';
 import { machineMoveBlock, endProgramBlock, mcodeBlock, rawBlock } from './macro.js';
 import { progStartBlock, progEndBlock } from './program.js';
@@ -71,7 +72,7 @@ export const PALETTE = [
     arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, stepdownBlock, placeOnStockBlock, rotateBlock,    // Modify (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align)
     countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
-    setBlock, assignBlock, variableBlock, paramBlock, regionPickBlock,   // Variables (compile-time Set + runtime Set # + reporter + GUI param knob + region-pick knob)
+    setBlock, assignBlock, variableBlock, paramBlock, regionPickBlock, coordListBlock,   // Variables (compile-time Set + runtime Set # + reporter + GUI param knob + region-pick knob + coordinate-list positions)
     commentBlock, messageBlock, panelBlock, simBlock,          // Mark Up (comment + on-screen operator message + GUI panel-type + preview-rig declarations)
     cornerConfigBlock,                                         // Universal Corner Macro config (emits #30 and #31)
 ];

@@ -18,6 +18,7 @@
 import { PALETTE, CATEGORIES } from '../../wizards/ops/index.js';
 import { installCornerGridField } from './cornerGridField.js';
 import { installRegionPickField } from './regionPickField.js';
+import { installCoordListField } from './coordListField.js';
 
 // Fields that render as the inline 3×3 corner-grid picker (field_cornergrid), tinted per datum so PlaceOnStock's
 // stock-attach (blue) and path-datum (amber) glyphs read apart — matching the 2D canvas pickers.
@@ -133,6 +134,7 @@ const optionsFor = (def, field) => {
 /** Classify a field → how it renders in Blockly. */
 export function fieldKind(def, field) {
     if (def.type === 'regionpick' && field === 'value') return 'regionpick';   // the region-pick control's value → inline picker
+    if (def.type === 'coordlist' && field === 'pts') return 'coordlist';        // the coordinate-list → inline positions preview
     if (CORNER_COLOUR[field]) return 'cornergrid';   // PlaceOnStock attach / path-datum → inline 3×3 picker
     if (optionsFor(def, field)) return 'dropdown';
     const sock = def.sockets && def.sockets[field];
@@ -154,6 +156,7 @@ function jsonDef(def) {
         const desc = getDesc(f);
         if (k === 'cornergrid') args.push({ type: 'field_cornergrid', name: FN(f), value: String(def.defaults[f] ?? ''), colour: CORNER_COLOUR[f], tooltip: desc });
         else if (k === 'regionpick') args.push({ type: 'field_regionpick', name: FN(f), value: String(def.defaults[f] ?? 0), tooltip: desc });
+        else if (k === 'coordlist') args.push({ type: 'field_coordlist', name: FN(f), value: String(def.defaults[f] ?? '{"points":[],"z":0}'), tooltip: desc });
         else if (k === 'dropdown') args.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });
         else if (k === 'checkbox') args.push({ type: 'field_checkbox', name: FN(f), checked: def.defaults[f] !== false, tooltip: desc });
         else if (k === 'text') args.push({ type: 'field_input', name: FN(f), text: String(def.defaults[f] ?? ''), tooltip: desc });
@@ -294,6 +297,7 @@ export function installBlockly(Blockly) {
     _Blockly = Blockly;
     installCornerGridField(Blockly);   // register field_cornergrid BEFORE the blocks that reference it
     installRegionPickField(Blockly);   // register field_regionpick (the region-pick control's block adapter)
+    installCoordListField(Blockly);    // register field_coordlist (the coordinate-list positions preview)
     registerDynExtension(Blockly);
     Blockly.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), ...OP_BLOCKS]);
 }

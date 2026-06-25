@@ -213,8 +213,13 @@ of XY points (draggable markers on FeatureCanvas) + a shared Z, with add/delete.
 commits the whole list (new binding `type:'list'`). Proves the atom can author an *arbitrary coordinate positioner*
 (not a fixed grid/line/circle pattern) — each marker drives a list-entry param, so it stays parametric (the list IS
 the model, no CAM-trap). Additive (no production-view refactor). Test: `tests/coord-list-widget.spec.js`.
-**Follow-ups:** per-point Z; the block adapter (`field` mounting FeatureCanvas → the positioner in the Blocks view);
-then migrate the existing views onto the extracted pure `(params↔picture)` atom.
+**✅ Block adapter (dual-adapter established):** a `coordlist` markup block + `field_coordlist` render a compact
+**positions preview** inline in the Blocks view (`ui/coordListSvg.js` markers; the list is the `pts` field's VALUE — a
+JSON string of `{points,z}` → round-trips). The form keeps the rich editor (FeatureCanvas); the block shows the
+preview — the same split as region-pick, because **FeatureCanvas can't live in a Blockly field** (HTML/RAF/pan-zoom +
+in-field drag fights Blockly's gesture). Both adapters share the coordinate-list STATE. Test: `tests/coord-list-block.spec.js`.
+**Follow-ups:** inline editing in the block via a ✎ affordance → the form/FeatureCanvas editor (like region-pick's
+✎); per-point Z; then migrate the existing drill/pocket/contour views onto the extracted pure `(params↔picture)` atom.
 
 ## Cross-cutting
 
