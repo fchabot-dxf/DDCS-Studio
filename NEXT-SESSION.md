@@ -207,6 +207,20 @@ routed through all six build sites. Guard: `tests/op-params-complete.spec.js` (a
   differing line (inject a glow span at a char range in `formatGCode`'s overlay — the fiddly part).
 - **L1/L2** — per-controller address columns in the dict (the cross-controller translator); best-effort read of
   foreign post markers (e.g. Fusion op headers) as declarations.
+- **`macrosApp.js` restructure + naming** — 1338 lines, four unrelated workflows (Homing/Sysstart,
+  M-codes O100nn, K-buttons key-N.nc, CAM Pack Builder). Same medicine as `opStacks.js`: modularize first,
+  then add validation, then tests. Ritual distance by section:
+  - *CAM Pack Builder* — closest (sequence exists: slots → icons → pack → deploy); just untested
+  - *Homing/Sysstart* — short distance (structured fields → .nc); no output validation
+  - *M-codes / K-buttons* — furthest (raw text, no schema, no sim, no round-trip — "a prayer not a ritual")
+  The systemic gap: none of the Macros tab output participates in the `@DDCS` schema system. A lint pass
+  over declared intent (I/O touched, registers written, motion range) would catch obvious errors without full
+  sim — same direction as the sim intent layer.
+  **Naming:** two things called "macro" — `.mjson` saved op-stacks (Studio-side) vs Macros tab O-code scripts
+  (controller-side). Fix: `macroFile.js` → `programFile.js` (Studio saved programs aren't controller macros);
+  `camPack.js` → `slotPack.js` (DDCS on-controller slot system, not industry CAM). `macrosApp.js` can stay —
+  it genuinely authors controller-side macros. Do AFTER the `opStacks` restructure settles.
+
 - **Sim intent layer** (`opSimContext.js`) — same declare-not-infer discipline applied to rendering. Today
   `gcodeViz3d.js` interrogates op type + stock shape + profile directly (accumulated special cases: rotary rig,
   probe stop, ATC magazine, machine envelope). Fix: a declared `(op, stock, profile) → simContext` translation —
