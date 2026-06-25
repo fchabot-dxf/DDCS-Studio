@@ -10,7 +10,9 @@
  * The registry is EXTENSIBLE (like the ops/BUILDERS registry): add a widget = add one entry here (+ its block
  * adapter when it needs one). Number params stay the easy default; richer widgets are opt-in.
  */
+import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
 
+const SVGNS = 'http://www.w3.org/2000/svg';
 const ROW_CSS = 'display:flex; align-items:center; justify-content:space-between; gap:14px; margin:9px 0;';
 const CTRL_CSS = 'padding:5px 8px; background:var(--bg,#0b0f14); color:inherit; border:1px solid var(--border,#2a3340); border-radius:6px;';
 const numOr = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
@@ -95,12 +97,38 @@ function textWidget(host, b) {
     return { read: () => ({ [b.param]: inp.value }) };
 }
 
+// the 3×3 datum picker — the SAME core (cornerGridSvg.js) the Blockly field_cornergrid + wizard pathAnchorField use.
+// Value is a 2-char [X][Y] code (n/c/p = min/centre/max); '' = follow (only reachable when widgetConfig.allowFollow).
+const CORNER_NAMES = { nn: 'front-left', cn: 'front', pn: 'front-right', nc: 'left', cc: 'centre', pc: 'right', np: 'back-left', cp: 'back', pp: 'back-right' };
+function cornerGridWidget(host, b) {
+    const cfg = b.widgetConfig || {};
+    const colour = cfg.colour || '#4ab3ff';
+    host.style.cssText = ROW_CSS;
+    let cur = (b.default != null) ? String(b.default) : '';
+    const svg = document.createElementNS(SVGNS, 'svg');
+    svg.setAttribute('width', CG.SPAN); svg.setAttribute('height', CG.SPAN); svg.setAttribute('viewBox', `0 0 ${CG.SPAN} ${CG.SPAN}`);
+    svg.style.cursor = 'pointer';
+    const { cells, cross } = buildCornerCells(svg);
+    for (const code in cells) { const t = document.createElementNS(SVGNS, 'title'); t.textContent = CORNER_NAMES[code]; cells[code].appendChild(t); }
+    const repaint = () => paintCornerGrid(cells, cross, colour, cur);
+    svg.addEventListener('click', (e) => {                          // crosshair lines are pointer-transparent → e.target is the cell rect
+        const code = e.target && e.target.getAttribute && e.target.getAttribute('data-code');
+        if (!code) return;
+        cur = (cur === code && cfg.allowFollow) ? '' : code;        // re-click → follow, only if the binding allows it
+        repaint();
+    });
+    repaint();
+    host.append(labelSpan(b), svg);
+    return { read: () => ({ [b.param]: cur }) };
+}
+
 export const FORM_WIDGETS = {
     number: numberWidget,
     slider: sliderWidget,
     dropdown: dropdownWidget,
     toggle: toggleWidget,
     text: textWidget,
+    'corner-grid': cornerGridWidget,
 };
 
 const DEFAULT_BY_TYPE = { number: 'number', int: 'number', enum: 'dropdown', bool: 'toggle', string: 'text' };

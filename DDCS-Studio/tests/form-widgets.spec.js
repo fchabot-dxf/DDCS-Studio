@@ -55,6 +55,34 @@ test('form widgets: typed bindings render the right control + Insert reads each 
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 });
 
+test('form widgets: corner-grid datum picker renders + reads its [X][Y] code', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
+
+  await page.evaluate(async () => {
+    localStorage.removeItem('ddcs_user_ops');
+    const U = await import('/blocks/userOps.js');
+    U.createUserOp(U.userOpFromStack('datum_test', 'Datum Test',
+      [{ type: 'move', params: { x: 0, y: 0, z: -5, anchor: '' } }],
+      [{ param: 'anchor', blockIndex: 0, key: 'anchor', type: 'string', widget: 'corner-grid', default: '' }]));
+    window.ddcsInsertUserOp('user_datum_test');
+  });
+
+  const form = page.locator('.uop-form');
+  await expect(form).toBeVisible();
+  await expect(form.locator('svg rect[data-code]')).toHaveCount(9);   // the 3×3 picker (same core as the block field)
+
+  await form.locator('rect[data-code="pp"]').click();                  // pick back-right
+  await form.locator('.uop-insert').click();
+  await expect(form).toHaveCount(0);
+
+  const op = await page.evaluate(() => (window.ddcsGetBlockProgram() || []).find((b) => b && b.type === 'op' && b.opType === 'user_datum_test'));
+  expect(op).toBeTruthy();
+  expect(op.params.anchor).toBe('pp');
+
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+});
+
 test('form widgets: registry defaults a widget per binding.type', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
