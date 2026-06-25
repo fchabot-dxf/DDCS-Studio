@@ -312,13 +312,35 @@ DOM level (`tests/word-glow.spec.js`: word range + injection whole-line + the re
   `op` container block (no bespoke Blockly block); dict-based `_seedForm` (no per-op view) — which is exactly why the
   generic form (build #2) exists.
 
-  **Build order (one commit per stage, suite green each):**
-  1. `web/blocks/userOps.js` core (instantiate/register/validate/persist/load + `userOpFromStack`) + `registerOpLabel`
-     in `opBuilders.js` + a **programmatic compliance test** (make a 2-binding user op → assert it builds, marker
-     round-trips, validates, and `_builderAtoms(type,defaults)` deep-equals the template → no false glow; mirrors
-     `protocol-validator` + `op-params-complete`). **No UI — pure foundation.**
-  2. The generic param form + insert path + `loadUserOps()` at startup + the wizard-bar "Custom" group.
-  3. The dev panel (authoring + edit). **v1 param type = number** (depths/feeds/speeds/coords); enums/geometry later.
+  ### BUILD STATUS (2026-06-25) — the data foundation is DONE, tested + pushed; UI stages remain
+  ✅ **Stage 1 — `web/blocks/userOps.js`** (commit `030ce59`). The runtime registry: a user op = template + numeric
+     bindings; `registerUserOp` installs `BUILDERS[type]`/`SCHEMA[type]`/label; `instantiate`/`defaultParams`/
+     `validateUserOp`/`createUserOp`/`listUserOps`/`deleteUserOp`/`loadUserOps`/`userOpFromStack`; + `registerOpLabel`
+     in `opBuilders.js`. **Valid by construction** — proven compliant (`tests/user-ops.spec.js`: builds, marker
+     round-trips, validates, `_builderAtoms(defaults)==template` → no false glow, persistence round-trip).
+  ✅ **Stage 2a — generic param form + insert** (commit `cfc1657`). `app.js` calls `loadUserOps()` at startup +
+     exposes `window.ddcsInsertUserOp`. `web/ui/userOpForm.js` = the data-driven form (one number input per binding,
+     label/units/range/default) → `recordOp` + `commitActiveOp()` accumulates into the program. Tested end-to-end.
+  ✅ **Library layer — `web/blocks/wizardLibrary.js`** (commit `ff966a2`). The `.wizard` FILE format
+     (`wizardToFile`/`wizardFromFile`/`exportWizard`/`importWizard`) + the CATALOG (`getLibrary()` →
+     `{ groups:[{id,label,items}] }`) merging built-ins (`BUILTINS`/`GROUPS` = the current bar as data) + user ops,
+     with a customization layer (`setEntryOverride`/`setGroupOverride`/`resetLayout` in `ddcs_wizard_layout`) so a user
+     can rename / hide / regroup / reorder ANY wizard incl. built-ins, and rename groups. Tested (`tests/wizard-library.spec.js`).
+     **Hybrid:** built-in entries are metadata-only (reference their coded view); only user ops are declarative.
+
+  ### REMAINING (all UI — wants visual verification; build one per commit, suite green each):
+  4. **Data-driven wizard bar** — render `commandDeck.renderHeader` from `getLibrary()` instead of static HTML.
+     Behavior-preserving: keep the exact `.toolbar-dropdown` DOM (CSS + mobile toggle unchanged), drive
+     items/labels/order/visibility from the library, keep an ICON map for the inline SVGs (in commandDeck), the I/O
+     quick-actions as a special Setup section, the "Rotary" sub-label, the setup→left / probe·atc·mill·custom→center
+     split. Expose `window.ddcsRefreshWizardBar` so Settings edits re-render it live.
+  5. **Settings "Wizard library manager" GUI** — a new Settings tab: list all wizards (built-in: read-only badge +
+     forkable; user: editable), per-entry show/hide · rename · regroup · reorder · delete(user) · fork(built-in) ·
+     export/import `.wizard`; "Reset to factory" = `resetLayout()`. Renders from `getLibrary({includeHidden:true})`.
+  6. **Inline dev-mode authoring** (supersedes the separate "dev panel") — a single floating toggle on the Blocks
+     tab; **normal mode** clean, **dev mode** expands each block inline to reveal its param-declaration fields
+     (type/range/default/units/label) → a binding → "Save as custom op" (`createWizard`). Also remove the canvas
+     overlay buttons (crosshair/+/−/trash) in favour of scroll/pinch + keyboard. **v1 param type = number.**
 - **L1/L2** — per-controller address columns in the dict (the cross-controller translator); best-effort read of
   foreign post markers (e.g. Fusion op headers) as declarations.
 - **`macrosApp.js` restructure + naming** — 1338 lines, four unrelated workflows (Homing/Sysstart,
@@ -362,6 +384,13 @@ DOM level (`tests/word-glow.spec.js`: word range + injection whole-line + the re
   axis is valid). (The original note's premise — "the rig is gated on `stock.shape === 'cylinder'`" — was wrong: the rig
   was already op-flag-gated; the real gap was that the Blocks preview never CALLED `setRotaryFixture`.) Verified on the
   live 3D preview (`tests/blocks-rotary-rig.spec.js`: rotary op shows `viz._showRotaryFixture`, a mill program hides it).
+
+- **Drag and drop G-code files** — add `dragover` + `drop` listeners on two targets:
+  - **Editor area** → calls the existing `loadGcodeFile` (same as the file picker button; already accepts
+    `.nc,.tap,.gcode,.gco,.g,.ngc,.cnc,.txt`)
+  - **Blocks tab** → calls `importMarkedNc` to reconstruct the op stack from `@DDCS` markers if present,
+    or loads as raw G-code if not
+  The gateway send view already has a working drop handler (`send.js` lines 56-58) — use the same pattern.
 
 - **Suggest bar: search mode + bigger panel** — the suggest bar (`web/ui/suggestBar.js`) is currently a
   context-aware chip row (predicts next token from the current line). Add a **search mode** alongside it:
