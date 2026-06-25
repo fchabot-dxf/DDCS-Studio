@@ -176,9 +176,13 @@ second consumer (slot authoring wants custom controls + icons on the same core).
   `startGesture`/`applyGesture` + `HANDLE_XY`), lifted verbatim from `iconEditor` (W/H parameterized). `iconEditor`
   now consumes it; behaviour unchanged. Test: `tests/shape-stage.spec.js` (core unit + an iconEditor smoke test it
   never had). The `poly` shape is already in the core, ready for region freeform.
-- ▶ **(2) the region editor** = the core + a thin region-semantics layer (value/label/hit-test) over a backdrop
-  (composed via `iconEditor`).
-- ▶ **(3) wire** dev-mode "＋ Region pick" → `regionpick` block.
+- ✅ **(2) the region editor** — `ui/regionEditor.js` (`openRegionEditor(initial, onSave)`): draw regions on the
+  shared `shapeStage` (move/resize/rotate handles reused), each with a **value + label**, over an optional backdrop
+  composed by **reusing `iconEditor`**; saves a region-pick spec. v1 = rect regions; a rotated rect **bakes to a
+  polygon** on save (via `boxPoint`) so authoring matches the runtime. Load round-trips rect + poly. Test:
+  `tests/region-editor.spec.js`. (Poly/freeform point-editing is the v1.x follow-up; the runtime + bake already
+  handle polygons.)
+- ▶ **(3) wire** dev-mode "＋ Region pick" → `regionpick` block (the editor's spec → a regionpick pill in the op).
 Each step tested; the refactor (1) landed first and independently.
 
 ---

@@ -22,8 +22,10 @@ export function boxPoint(nx, ny, b) {
 /** Normalized handle points (corner/edge) for the resize hit-map. */
 export const HANDLE_XY = { nw: [0, 0], n: [0.5, 0], ne: [1, 0], e: [1, 0.5], se: [1, 1], s: [0.5, 1], sw: [0, 1], w: [0, 0.5] };
 
-/** Render the stage SVG markup from the layer list (the selected layer gets a Figma-style handle frame). */
-export function stageSvg(layers, sel, W, H) {
+/** Render the stage SVG markup from the layer list (the selected layer gets a Figma-style handle frame). `bg` is the
+ *  stage background fill (default black for the icon composer; the region editor passes 'transparent' to overlay a
+ *  backdrop). */
+export function stageSvg(layers, sel, W, H, bg = '#000') {
     const body = layers.map((L, i) => {
         const t = `translate(${L.x} ${L.y}) rotate(${L.rot || 0} ${L.w / 2} ${L.h / 2})`;
         let el = '';
@@ -46,7 +48,7 @@ export function stageSvg(layers, sel, W, H) {
         }
         return `<g data-li="${i}" transform="${t}" style="cursor:move;">${el}${deco}</g>`;
     }).join('');
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#000"/>${body}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="${bg}"/>${body}</svg>`;
 }
 
 /** pointerdown → the gesture for the picked handle ('rot' / a corner-edge key) or, with no handle, a body MOVE
