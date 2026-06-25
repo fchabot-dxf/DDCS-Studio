@@ -110,9 +110,16 @@ and ONE generic Blockly field (`field_control`) + ONE generic form widget interp
     backdrop?, regions:[{shape:'rect'|'poly',…,value:<number>,label}]}` renders clickable rect/poly/freeform regions
     over an optional backdrop; a click commits the region's NUMBER (numeric socket → valid by construction). Test:
     `tests/region-pick-widget.spec.js`.
-  - ▶ **next:** the Blockly **field adapter** (`field_regionpick`, same shared core → form/block parity, like
-    `cornerGridField`) + the **authoring** flow (compose the backdrop in `iconEditor` + mark regions + assign numbers
-    + bind). Then enum/string region-pick once field-targeting lands.
+  - ✅ **block field adapter (`field_regionpick`)** — `blocks/blockly/regionPickField.js` (same shared core →
+    form/block parity, like `cornerGridField`) + the `regionpick` reporter block (`wizards/ops/regionpick.js`); the
+    `value` renders as the inline picker (`bridge.fieldKind`/`jsonDef`), and the SPEC rides the block's `data` as a
+    JSON-string param (stackBridge round-trips non-field scalars). The picked NUMBER reduces into real G-code;
+    `extractParamBlocks` turns a regionpick pill into a `widget:'region-pick'` binding (widgetConfig = parsed spec).
+    Test: `tests/region-pick-block.spec.js` (Class-B render guard + round-trip). **Region-pick is now a genuine
+    dual-adapter pick surface (form + block) — the real 2nd case beside the datum.**
+  - ▶ **next:** the **authoring** flow ("make your own datum": compose the backdrop in `iconEditor` + mark regions +
+    assign numbers + bind). Then enum/string region-pick once field-targeting lands; and (with datum + region-pick as
+    two concrete dual-adapter pick widgets) the deferred generic `pick` renderer can finally be extracted.
 - **C★ — extract the generic `pick` renderer + spec** ONLY once ≥2 concrete pick widgets exist and can be diffed.
   Re-express datum + the new one(s) as built-in `pick` specs to prove form/block parity. *Deferred until forced.*
 - **handle widgets** (slider / xy-pad / rect / steppers) — same concrete-first discipline; slider/xy/rect already

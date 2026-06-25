@@ -100,6 +100,23 @@ Earlier-but-related (prior session, on `main`): the data-driven wizard bar (`com
      `iconOverride`; the custom op renders it via the existing emoji path (no commandDeck change). "⌀ Default" clears
      it. Test: `tests/wizbar-icon-picker.spec.js`. (Follow-up: curated line-art SVG icons + re-iconing built-ins —
      needs `wizItemIcon` to let `iconOverride` win over `WIZ_ITEM_SVG` + an `ic:<id>` registry.)
+   - **Region-pick runtime → ✅ SHIPPED (`ca469cd`, `web/ui/regionPickSvg.js`).** A custom op's param renders as
+     clickable rect/poly/freeform regions over an optional backdrop; a click commits the picked region's NUMBER —
+     sharing its core with the (future) block field, exactly like the datum. This is the SECOND concrete pick
+     surface after `cornerGridSvg` — the "2 concrete widgets" bar is now met in the FORM, but only the form.
+
+   - **Block-field parity → ✅ DONE.** `field_regionpick` (`blocks/blockly/regionPickField.js`) + the `regionpick`
+     reporter block (`wizards/ops/regionpick.js`) — the `value` renders as the inline picker (`bridge.fieldKind`/
+     `jsonDef`), the SPEC rides the block's `data` as a JSON-string param (the spec→block plumbing, via stackBridge's
+     non-field-scalar channel), the picked NUMBER reduces into real G-code, and `extractParamBlocks` turns a pill into
+     a `widget:'region-pick'` binding. Test: `tests/region-pick-block.spec.js` (Class-B + round-trip). Region-pick is
+     now a genuine dual-adapter (form + block) pick surface — the real 2nd case beside the datum.
+   - **DIRECTION — next: the AUTHORING editor** ("make your own datum": compose the backdrop in `iconEditor` + mark
+     rect/poly/freeform regions + assign numbers/labels + bind to a param). The headline — the agent flagged it as a
+     big "blind" build, so scope the UX first (esp. the region-drawing surface + iconEditor reuse). AND: with datum +
+     region-pick now two concrete dual-adapter pick widgets, the deferred generic `pick` renderer can be extracted
+     (rule of three met) — but only if a 3rd case or real friction justifies it; otherwise keep them concrete.
+
    - **Rule of thumb:** when a second concrete pick widget appears (e.g. the fixture-backdrop canvas), put the two
      side by side and extract the shared spec then. Two real examples disagreeing is what tells you what's genuinely
      generic vs. what only looked generic on paper. Until then, build concrete widgets one at a time and reuse

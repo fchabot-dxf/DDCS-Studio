@@ -98,12 +98,21 @@ export function extractParamBlocks(template, seen = new Set(), keepPills = true)
         if (!blk || !blk.params) return;
         for (const key in blk.params) {
             const v = blk.params[key];
-            if (!v || typeof v !== 'object' || v.type !== 'param') continue;
+            if (!v || typeof v !== 'object' || (v.type !== 'param' && v.type !== 'regionpick')) continue;
             const pp = v.params || {};
             let name = String(pp.name || key).trim().replace(/[^A-Za-z0-9_]/g, '_').replace(/^_+|_+$/g, '') || key;
             if (seen.has(name)) { let k = 2; while (seen.has(name + '_' + k)) k++; name += '_' + k; }
             seen.add(name);
             const dn = Number(pp.value), dflt = Number.isFinite(dn) ? dn : 0;
+            // A region-pick pill → a 'region-pick' binding (widgetConfig = the parsed spec). Commits a NUMBER (the
+            // picked region's value) into a numeric socket, like the other param widgets → valid by construction.
+            if (v.type === 'regionpick') {
+                let widgetConfig = null;
+                try { widgetConfig = pp.spec ? (typeof pp.spec === 'string' ? JSON.parse(pp.spec) : pp.spec) : null; } catch (_) { /* malformed spec */ }
+                bindings.push({ param: name, blockIndex: i, key, type: 'number', default: dflt, label: pp.name || name, widget: 'region-pick', ...(widgetConfig ? { widgetConfig } : {}) });
+                if (!keepPills) blk.params[key] = dflt;
+                continue;
+            }
             // type stays 'number' for EVERY param widget — a param pill lives in a numeric socket, so its committed
             // value is always a number (dropdown = a numeric preset, toggle = 1/0). The WIDGET (not the type) drives
             // form rendering — resolveFormWidget prefers binding.widget — so this is NOT a downgrade. Do NOT "fix" a
