@@ -128,8 +128,9 @@ export function loadUserOps() {
     return n;
 }
 
-/** Author a def FROM a forked block stack + binding specs (the dev-panel output). Strips ids → a stable template. */
-export function userOpFromStack(opType, label, stack, bindings) {
+/** Author a def FROM a forked block stack + binding specs (the dev-panel output). Strips ids → a stable template.
+ *  `panel` is the wizard's panel-layout id (form / form3d / form2d) — view-only metadata, persisted with the def. */
+export function userOpFromStack(opType, label, stack, bindings, panel) {
     const t = opType.startsWith(USER_OP_PREFIX) ? opType : USER_OP_PREFIX + opType;
-    return { opType: t, label: label || t, template: stripIds(stack), bindings: bindings || [] };
+    return { opType: t, label: label || t, template: stripIds(stack), bindings: bindings || [], panel: panel || 'form3d' };
 }

@@ -13,14 +13,24 @@ import { renderOpForm } from '../../ui/formWidgets.js';
 import { recordOp } from '../../blocks/opRecord.js';
 import { BUILDERS } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
+import { panelType, renderLayout2D } from '../ops/panelTypes.js';
 
-let _def = null;          // the active custom-op def (template + bindings)
+let _def = null;          // the active custom-op def (template + bindings + panel)
 let _seed = null;         // params to seed the widgets with (edit), or null (defaults)
 let _readers = [];        // [() → { param: value }] one per rendered widget unit
 let _mgr = null;
 
-/** The manager sets the def before opening (resolved from the type). */
-export function setUserOpDef(def) { _def = def || null; _seed = null; }
+/** The manager sets the def before opening (resolved from the type). Also picks the panel layout. */
+export function setUserOpDef(def) {
+    _def = def || null; _seed = null;
+    userOpView.twoPane = panelType(_def && _def.panel).viz;   // form-only → single pane (open() reads view.twoPane)
+}
+
+// Show/hide the preview pane for the op's panel type (called when the panel is shown).
+function applyPanel() {
+    const vis = document.querySelector('#wiz_user .wiz-visual');
+    if (vis) vis.style.display = panelType(_def && _def.panel).viz ? '' : 'none';
+}
 
 function render() {
     const host = el('wiz_user_form');
@@ -51,7 +61,7 @@ export const userOpView = {
     inputIds: [],               // dynamic — the form wires its own delegated listener in render()
     probeSrcFields: {},         // keep the shared probe-source decorator a no-op
 
-    onShow(mgr) { _mgr = mgr; render(); },
+    onShow(mgr) { _mgr = mgr; applyPanel(); render(); },
 
     update(mgr) {
         _mgr = mgr;
@@ -64,7 +74,10 @@ export const userOpView = {
         catch (e) { gcode = '( error generating: ' + ((e && e.message) || e) + ' )'; }
         const codeEl = el('wiz_user_code');
         if (codeEl) codeEl.innerHTML = UIUtils.formatGCode(gcode);
-        mgr.preview3D(gcode, 'userVizContainer');
+        // preview per panel type: 3D toolpath, a 2D stock layout, or nothing (form-only)
+        const pt = panelType(_def.panel), viz3d = document.querySelector('#wiz_user .wiz-viz3d');
+        if (pt.mode === '3d') { if (viz3d) viz3d.style.display = ''; mgr.preview3D(gcode, 'userVizContainer'); }
+        else if (pt.mode === '2d') { if (viz3d) viz3d.style.display = 'none'; const c = el('userVizContainer'); if (c) c.style.display = ''; renderLayout2D(c, _def, params); }
         const status = el('userVizStatus');
         if (status) status.textContent = (_def.label || 'custom') + ' · ' + (gcode.split('\n').length) + ' lines';
     },

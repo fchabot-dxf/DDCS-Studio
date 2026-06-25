@@ -125,6 +125,11 @@ export function mountDevMode(ws, B, hostEl) {
     _panel.innerHTML = `
         <div class="blk-dev-hint">Tick the values to expose as knobs and pick a widget for each, then Save as custom wizard. (You can also save anytime from the ⌄ menu — dev mode is only for adding knobs.)</div>
         <label class="blk-dev-name">Wizard name <input type="text" class="blk-dev-opname" placeholder="my corner probe" /></label>
+        <label class="blk-dev-name">Panel <select class="blk-dev-paneltype">
+            <option value="form3d">Form + 3D preview</option>
+            <option value="form2d">Form + 2D layout</option>
+            <option value="form">Form only</option>
+        </select></label>
         <button type="button" class="blk-dev-save">Save as custom wizard</button>`;
     _nameInput = _panel.querySelector('.blk-dev-opname');
     _panel.querySelector('.blk-dev-save').addEventListener('click', () => saveAsCustomOp());
@@ -212,8 +217,10 @@ function saveAsCustomOp() {
     const existing = new Set(listUserOps().map((d) => d.opType));
     let type = slug, n = 2; while (existing.has(USER_OP_PREFIX + type)) type = slug + '_' + (n++);
 
+    const psel = _panel && _panel.querySelector('.blk-dev-paneltype');
+    const panel = (psel && psel.value) || 'form3d';
     try {
-        createWizard(userOpFromStack(type, name, a.opRec.children, bindings));
+        createWizard(userOpFromStack(type, name, a.opRec.children, bindings, panel));
     } catch (e) { console.warn('save wizard failed', e); alert('Save failed: ' + ((e && e.message) || e)); return; }
 
     if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
