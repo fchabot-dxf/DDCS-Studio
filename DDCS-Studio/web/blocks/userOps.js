@@ -1,0 +1,128 @@
+/**
+ * blocks/userOps.js — runtime registry for USER-DEFINED ops (the wizard-maker, "fork-the-5%-delta").
+ *
+ * A user op = a saved block-stack TEMPLATE + numeric param BINDINGS. `registerUserOp(def)` installs it live:
+ *   - BUILDERS[def.opType] = (params) => instantiate the template, substituting each binding's value at its path,
+ *   - SCHEMA[def.opType]   = { param → { type, field } } so the form, validator + marker codec recognise it,
+ *   - a friendly label (via opBuilders.registerOpLabel).
+ * The op is then a first-class COMPLIANT op everywhere — build / commit / replace / marker round-trip / glow /
+ * merge all gate on BUILDERS[opType] / SCHEMA[opType] and Just Work.
+ *
+ * "Valid by construction": the template IS `BUILDERS(defaults)`, so `BUILDERS(op.params) == op.children` holds —
+ * a fresh user op never false-glows and satisfies the params-completeness guard automatically.
+ *
+ * Persisted in localStorage (`ddcs_user_ops`); `loadUserOps()` re-registers all at app start. v1 = number params.
+ */
+import { BUILDERS, registerOpLabel } from './opBuilders.js';
+import { SCHEMA } from './opSchema.js';
+
+const STORE_KEY = 'ddcs_user_ops';
+export const USER_OP_PREFIX = 'user_';
+
+// Deterministic pre-order walk of a block stack (block, then its children) → a flat array of block REFS.
+function flattenBlocks(blocks, out = []) {
+    for (const b of (blocks || [])) { if (!b) continue; out.push(b); if (b.children) flattenBlocks(b.children, out); }
+    return out;
+}
+
+// Drop counter-based block ids so a stored template is stable (ids are reassigned on emit). (Same rule as opGlow.)
+function stripIds(v) {
+    if (Array.isArray(v)) return v.map(stripIds);
+    if (v && typeof v === 'object') {
+        const o = {};
+        for (const k in v) { if (k === 'id' && typeof v.type === 'string') continue; o[k] = stripIds(v[k]); }
+        return o;
+    }
+    return v;
+}
+
+/** The op's default params — each binding at its declared default (the op's params on first insert). */
+export function defaultParams(def) {
+    const p = {};
+    for (const b of (def.bindings || [])) p[b.param] = b.default;
+    return p;
+}
+
+// The builder: clone the template, substitute each binding's value at its (blockIndex, key); unbound values stay baked.
+function instantiate(def, params) {
+    const clone = JSON.parse(JSON.stringify(def.template || []));
+    const flat = flattenBlocks(clone);
+    for (const b of (def.bindings || [])) {
+        const blk = flat[b.blockIndex];
+        if (blk && blk.params && (b.key in blk.params)) {
+            blk.params[b.key] = (params && b.param in params) ? params[b.param] : b.default;
+        }
+    }
+    return clone;
+}
+
+/** Validate a def BEFORE registering — returns a list of problems ([] = compliant). */
+export function validateUserOp(def) {
+    const errs = [];
+    if (!def || typeof def.opType !== 'string' || !def.opType.startsWith(USER_OP_PREFIX)) errs.push('opType must be a string starting with "user_"');
+    if (!Array.isArray(def.template) || !def.template.length) errs.push('template must be a non-empty block array');
+    const flat = flattenBlocks(def.template || []), seen = new Set();
+    for (const b of (def.bindings || [])) {
+        if (!b || !b.param) { errs.push('a binding has no param name'); continue; }
+        if (seen.has(b.param)) errs.push(`duplicate param "${b.param}"`);
+        seen.add(b.param);
+        if (b.type !== 'number') errs.push(`param "${b.param}": only number params are supported in v1`);
+        const blk = flat[b.blockIndex];
+        if (!blk || !blk.params || !(b.key in blk.params)) errs.push(`param "${b.param}": binding (block ${b.blockIndex}.${b.key}) does not resolve in the template`);
+    }
+    return errs;
+}
+
+/** Install a user-op def into the LIVE BUILDERS + SCHEMA + label registries (runtime only — no persistence). */
+export function registerUserOp(def) {
+    const errs = validateUserOp(def);
+    if (errs.length) throw new Error('invalid user op: ' + errs.join('; '));
+    BUILDERS[def.opType] = (params) => instantiate(def, params || defaultParams(def));
+    const schema = {};
+    // canon omitted: the param name is already a clean marker key (canonOf falls back to the key). field drives the form.
+    for (const b of def.bindings) schema[b.param] = { type: b.type, addr: null, field: `uop_${def.opType}_${b.param}` };
+    SCHEMA[def.opType] = schema;
+    registerOpLabel(def.opType, def.label || def.opType);
+    return def;
+}
+
+// ── persistence (localStorage) ───────────────────────────────────────────────────────────────────────────
+function readStore() {
+    try { const v = JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (_) { return []; }
+}
+function writeStore(defs) {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(defs)); } catch (_) { /* quota / unavailable */ }
+}
+
+/** Every saved user-op def. */
+export function listUserOps() { return readStore(); }
+
+/** Validate → register → persist a new user op. Throws if invalid or the opType already exists. */
+export function createUserOp(def) {
+    registerUserOp(def);                                         // validates (throws on bad def)
+    const defs = readStore();
+    if (defs.some((d) => d.opType === def.opType)) throw new Error(`user op "${def.opType}" already exists`);
+    defs.push(def);
+    writeStore(defs);
+    return def;
+}
+
+/** Remove a user op from the registry + persistence (and the live BUILDERS/SCHEMA entries). */
+export function deleteUserOp(opType) {
+    writeStore(readStore().filter((d) => d.opType !== opType));
+    delete BUILDERS[opType];
+    delete SCHEMA[opType];
+}
+
+/** Re-register every persisted user op — call ONCE at app start. Returns the count registered. */
+export function loadUserOps() {
+    let n = 0;
+    for (const def of readStore()) { try { registerUserOp(def); n++; } catch (_) { /* skip a corrupt def */ } }
+    return n;
+}
+
+/** Author a def FROM a forked block stack + binding specs (the dev-panel output). Strips ids → a stable template. */
+export function userOpFromStack(opType, label, stack, bindings) {
+    const t = opType.startsWith(USER_OP_PREFIX) ? opType : USER_OP_PREFIX + opType;
+    return { opType: t, label: label || t, template: stripIds(stack), bindings: bindings || [] };
+}

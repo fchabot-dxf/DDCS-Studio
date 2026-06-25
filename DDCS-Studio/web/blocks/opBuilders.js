@@ -76,6 +76,10 @@ export function makeOp(opType, params, children) {
     };
 }
 
+/** Register a friendly label for a RUNTIME op (a user-defined op) so makeOp shows it instead of the raw opType.
+ *  OP_LABELS is otherwise the static built-in table; the wizard-maker (blocks/userOps.js) calls this on register. */
+export function registerOpLabel(opType, label) { if (opType && label) OP_LABELS[opType] = label; }
+
 // Build an op's stack, UNWRAPPING a builder that returns its OWN op container (only homing today) → the bare
 // blocks. Every consumer (wizard commit, marker import, glow/edit rebuild) must agree on the shape: without this,
 // makeOp would wrap homing's container AGAIN (op.children = [{op:homing}]) while the glow/edit checks rebuild the
