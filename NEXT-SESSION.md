@@ -118,12 +118,70 @@ Earlier-but-related (prior session, on `main`): the data-driven wizard bar (`com
      (2) **Scope the authoring editor → ✅ SCOPE WRITTEN (awaiting review).** UX in `docs/RICH-WIDGETS-AND-ICONS.md`
      → "Track D — The authoring editor". Flow: dev-mode "＋ Region pick" → backdrop via `iconEditor` (layers →
      `stageSvg` SVG, 360×180) → draw rect/poly/freeform regions + numbers/labels → bind → a `regionpick` block.
-     **THE FORK to decide at review: (A) EXTEND iconEditor with a "region" layer type (max reuse, some coupling) vs
-     (B) a DEDICATED region editor over the iconEditor backdrop (clean separation, some duplicated draw code).** Agent
-     leans (A); the coupling is the thing to weigh. NO code yet — stopped here for eyes, per this direction.
+     **THE FORK — A-vs-B is a FALSE CHOICE; take the third path: EXTRACT A SHARED DRAWING CORE.** "Reuse" means
+     sharing CODE, not the same asset. (A) extend iconEditor = max sharing but iconEditor serves two masters (icon
+     composition + region semantics) → a change for one can break the other. (B) dedicated editor = clean but
+     duplicates the draw code. Neither is right. Instead: pull the drawing primitives (rect/poly/freeform tools +
+     stage/drag/select) into a small CORE module that BOTH `iconEditor` and the region editor consume. Then the
+     backdrop reuses iconEditor (same operation), region SEMANTICS (value + label + hit-test, which icons don't have)
+     live in their own thin layer, and the draw code is shared — NOT duplicated, NOT overloaded onto iconEditor.
+     - **WHY this matters beyond tidiness — the region is a cross-domain PRIMITIVE.** A region = a spatial zone on a
+       backdrop that maps to a value, picked by clicking. Generalize "backdrop" → the part/stock drawing and "region"
+       → a feature (hole/pocket/edge) and you have a different CAM builder: **click features on the part instead of
+       typing coordinates** — exactly the [[prefer-gui-over-fields]] / [[2d-layout-canvas]] direction. (Gated: a CAM
+       region must commit a FEATURE/op, not a number — the same non-numeric/field-targeting boundary deferred in #2;
+       do NOT build the CAM angle now.) The point for THIS decision: if regions might later drive spatial CAM, they
+       must NOT be trapped as an iconEditor layer type. That settles the fork → extract the core. See `CRAZY-IDEAS.md`.
+     - **SELECTION MODEL (build it this way) — split logic from visual:**
+       - **Logic = intrinsic, built-in (not a style choice):** hit-test resolves a click to a region with **topmost
+         wins** (last-drawn / highest z-order — matches what the user sees on top, vs smallest-area which surprises).
+         **Single-select / radio semantics** — a region commits ONE number into a numeric socket, so exactly one
+         region is "the answer"; picking another unchooses the first. Echo the selected region's **label** (not just
+         the lit shape) next to the canvas/in the field so the user sees WHAT they committed, not just where.
+       - **Visual = tokenized, customizable, NOT hardcoded:** the selection mark (fill colour, fill opacity, dim level
+         for unselected, outline) rides the **skin/design-token contract** (same as [[glass-keyboard-and-quick-menu]];
+         customization-first per [[priorities-friendliness-over-perf]]). Default look = **accent fill + dim the rest**
+         (survives irregular poly/freeform where an outline gets lost). Pull from the **SAME selection tokens as
+         `cornerGridSvg`** so theming restyles BOTH pickers at once and they stay a family — the same shared-core
+         argument, applied to the visual layer.
+     - **STEP 3 ENTRY POINT — DECIDED: (A) affordance on the `regionpick` block. Build it SIMPLY.**
+       The block already exists, already carries its spec on `block.data`, already renders inline + round-trips. So:
+       a dev-mode "✎ regions" affordance on the block → opens the region editor → writes the spec back to the SAME
+       `block.data` channel the runtime + round-trip already use (authoring and runtime share ONE spec, no divergence).
+       Reuses the dev-mode augment pattern; blocks stay the one authoring surface (the param-block model, extended to
+       a config too rich to inline). Rejected: (B) dev-panel "author then insert" (inverts the drag gesture, needs a
+       "which socket?" step) and (C) expose-dropdown widget (threads a rich spec through `buildBindings`, built for
+       simple bindings — more plumbing). Gate the affordance to dev-mode (authoring is a power-user gesture; *using*
+       the picker stays a normal-mode click).
+       - **DO NOT over-build for iteration.** (We talked through making the resolve LOGIC heavily reprogrammable —
+         resolver registry, multi-strategy swap scaffolding, experimental harness — then concluded: NO. There's no
+         second logic to compare yet; don't build the machinery that compares them.) Take ONLY the parts that are free
+         good-hygiene, NOT insurance: (1) the editor is a clean `openRegionEditor(spec, onSave)` function (spec-in,
+         spec-out — because a tangled editor is bad code, not for swappability); (2) the resolve logic lives in its own
+         small spot; (3) **lean on the existing freeze-at-commit** — `instantiate` already resolves the pill to a number
+         and the committed op holds that frozen value (pills never reach a committed op), so changing pick logic later
+         can NEVER retroactively alter a saved program; (4) tests pin the spec round-trip + "always commits a valid
+         number" (the permanent invariant), behavior tests stay disposable. Clean boundaries ARE the reprogrammability
+         — if real iteration pressure shows up, promoting the pure resolve fn to a registry is a cheap CONTAINED change
+         you pay for THEN, not now on a maybe. Same ship-concrete / defer-abstraction / keep-the-door-open call as C1.
      - NOTE on the generic renderer: datum + region-pick are now two concrete dual-adapter pick widgets, so the
        deferred generic `pick` renderer COULD be extracted (rule of three nearly met) — but do NOT, unless a 3rd case
        or real friction forces it. Keep them concrete; the authoring editor is the priority, not the abstraction.
+
+   - **COORD POSITIONER shipped (`52b511a`) → DIRECTION: ship V10.36 → in-block ✎ editor → DEFER the view-migration.**
+     The coordinate positioner is now a dual-adapter (`field_coordlist` + `coordListSvg` markers; rich FeatureCanvas
+     editor in the form, compact positions preview in the block; one coord-list STATE round-tripping as the field
+     value). A large batch is unreleased since V10.35 (region editor + authoring + selection model + positioner).
+     - **(1) Ship V10.36 first** — bank the batch; a big release is too much to keep riding unreleased, and it gives a
+       clean baseline to diff the next change against. Release hygiene, same as every milestone.
+     - **(2) Then the in-block ✎ editor** — add the affordance on the `coordlist` block (dev mode) → opens the form/
+       FeatureCanvas editor → writes the list back, so the positioner is editable from the Blocks view too. This is the
+       EXACT pattern just set for region-pick (affordance → editor → write-back to the field). Cheap, consistent,
+       completes coordlist as a true dual-surface AUTHORING widget. Do it the same simple way (no iteration machinery).
+     - **(3) DEFER the view-migration** (lift a real production view — drill/array/pocket — onto the extracted pure
+       `(params↔picture)` atom). It's the big behavior-preserving refactor; do NOT stack it on a just-shipped pile. Own
+       focused effort, against a released baseline, ONE view first, verified against the **real rendered symptom** not
+       just a green test ([[verify-real-symptom-not-just-test]]). Not now.
 
    - **Rule of thumb:** when a second concrete pick widget appears (e.g. the fixture-backdrop canvas), put the two
      side by side and extract the shared spec then. Two real examples disagreeing is what tells you what's genuinely
