@@ -1,40 +1,17 @@
 # NEXT SESSION — Binding Rebuild (handoff)
 
 ---
-## 📝 MESSAGE FROM THE ADVISORY SESSION — rename `DICT` → `SCHEMA`
-
-**Decision:** rename the export `DICT` to `SCHEMA` and the file `opDictionary.js` to `opSchema.js`.
-
-**Why:** `DICT` (dictionary) implies a plain key→value lookup. What this actually is: a **schema registry** — it
-declares the structure of every op (param names, types, canon renames, field bindings), drives the validator,
-drives form seeding, and drives the marker round-trip. "Schema" is the correct term (JSON Schema, OpenAPI, etc.
-all use it for exactly this role). Calling it a dict undersells it and misleads future readers.
-
-**Do this as a clean commit after finishing your current work** (you have uncommitted changes in `opStacks.js`
-and `styles.css` — commit those first to avoid conflicts).
-
-**Steps — purely mechanical, no logic changes:**
-1. Rename `DDCS-Studio/web/blocks/opDictionary.js` → `opSchema.js`
-2. Inside that file: rename the export `export const DICT` → `export const SCHEMA`
-3. In every consumer, update the import path and the identifier:
-
-   | file | change |
-   |---|---|
-   | `web/blocks/opStacks.js` | `from './opDictionary.js'` → `./opSchema.js`; `DICT[` → `SCHEMA[` |
-   | `web/blocks/programModel.js` | same import rename; `DICT[` → `SCHEMA[` |
-   | `web/wizardManager.js` | import path rename only (`paramFields` name stays) |
-   | `tests/protocol-validator.spec.js` | import path rename; `D.DICT` → `D.SCHEMA` |
-
-4. Run the full suite + protocol validator — this is a rename, nothing should break.
-5. Commit as `refactor(blocks): rename DICT→SCHEMA + opDictionary→opSchema (schema registry, not a lookup)`
-
-`paramFields`, `markerLine`, `parseMarker`, `BIND_ORPHANS`, `validate` — all stay as-is, names are fine.
+## ✅ DONE — `DICT` → `SCHEMA`, `opDictionary.js` → `opSchema.js` (advisory rename, commit below)
+The export is now `SCHEMA` and the file `web/blocks/opSchema.js` (a schema registry — it declares every op's
+param structure/types/canon/field bindings; not a plain lookup). Purely mechanical; suite + validator green.
+`paramFields`, `markerLine`, `parseMarker`, `BIND_ORPHANS`, `validate` kept their names. **References below that
+still say `DICT`/`opDictionary.js` in the historical commit table are accurate for those commits.**
 
 ---
 
 > ## ✅ THE BINDING REBUILD IS DONE (steps 1–4 shipped to `main`)
 > The wizard form-field binding is now **unified into the dictionary**. `PARAM_FIELDS` is gone; the field id
-> lives ON each DICT param (`DICT[op][param].field`), and consumers read it via `paramFields(opType)`. The
+> lives ON each SCHEMA param (`SCHEMA[op][param].field`), and consumers read it via `paramFields(opType)`. The
 > protocol validator structurally prevents drift (`BIND_ORPHANS` empty). Verified the live edit path end-to-end.
 > **What's left = optional cleanup + the queued features below.** See "DONE" + "What's next".
 >
@@ -91,9 +68,9 @@ The BANNED "inference" = recovering high-level intent **from opaque motion lines
 ## DONE — the form-field binding is unified into the dictionary
 The param→form binding used to live in **two places that could drift** (`PARAM_FIELDS` forward + `RECONCILERS`
 reverse). The forward binding is now **one declared source of truth on the dict**:
-- The field id is a property of each dict param: **`DICT[op][param].field`** (folded in from a compact authoring
-  column `FIELD_BIND` at module load, in `opDictionary.js`).
-- `paramFields(opType)` (in `opDictionary.js`) returns the `{ param → field id }` map, derived from the dict —
+- The field id is a property of each schema param: **`SCHEMA[op][param].field`** (folded in from a compact authoring
+  column `FIELD_BIND` at module load, in `opSchema.js`).
+- `paramFields(opType)` (in `opSchema.js`) returns the `{ param → field id }` map, derived from the schema —
   the **replacement for `PARAM_FIELDS`**. `wizardManager._seedForm()` + `canEdit()` read it.
 - A binding whose param isn't catalogued can't attach → it lands in **`BIND_ORPHANS`**, which the protocol
   validator asserts is empty. So the field map **cannot drift** from the dictionary — it lives ON it.
@@ -118,15 +95,15 @@ partial, messy decouple of 14-tested reverse-sync code for modest gain. **Left a
 ---
 
 ## Key files
-- `web/blocks/opDictionary.js` — `DICT` (type + `addr` + `canon` + now `.field`), `FIELD_BIND` (the authoring
-  column folded onto `DICT`), `BIND_ORPHANS`, `paramFields(op)`, codec, `validate`. **The single source of truth.**
+- `web/blocks/opSchema.js` — `SCHEMA` (per op: param type + `addr` + `canon` + now `.field`), `FIELD_BIND` (the
+  authoring column folded onto `SCHEMA`), `BIND_ORPHANS`, `paramFields(op)`, codec, `validate`. **The single source of truth.**
 - `web/blocks/opStacks.js` — `BUILDERS` (exported), `RECONCILERS` (**keep** — block→form reverse sync), `makeOp`,
   `opFromMarker`, `importMarkedNc`, `collectInjectedIds` (override-diff), `editedLinesForOp` (glow).
 - `web/blocks/programModel.js` — stack-as-truth, the line→op map (`proj.map` = per-line block ancestry, built in
   `blockModel.js`'s `emit`: `own = [...anc, block.id]`), `serializeWithMarkers`.
 - `web/wizardManager.js` — imports `paramFields`; `_seedForm` + `canEdit` read the dict binding; `openForEdit`
   (seeds from `op.params` — the correct forward path), `pullFromBlocks` (reverse-sync via RECONCILERS, **keep**).
-- `tests/protocol-validator.spec.js` — the guard: DICT entry + binding (`.field`) + `BIND_ORPHANS` empty + canon
+- `tests/protocol-validator.spec.js` — the guard: SCHEMA entry + binding (`.field`) + `BIND_ORPHANS` empty + canon
   unique + marker round-trip. **Extend it as you add ops/features.**
 - `docs/MULTI-OP-STACKING.md` + `docs/BLOCKS-TAB.md` — the architecture (declare vs infer).
 

@@ -30,10 +30,10 @@ const PROBE_DEFAULT_FIELDS = {
     al_q: 'qStop', c_q: 'qStop', circ_q: 'qStop', m_q: 'qStop', p_q: 'qStop', rc_q: 'qStop', rcl_q: 'qStop',
 };
 
-// EDIT seeding: the form-field binding now lives ON each DICT param (blocks/opDictionary.js, DICT[op][param].field).
-// paramFields(opType) returns the { param → field id } map for an op (the old PARAM_FIELDS, derived from the dict);
+// EDIT seeding: the form-field binding now lives ON each SCHEMA param (blocks/opSchema.js, SCHEMA[op][param].field).
+// paramFields(opType) returns the { param → field id } map for an op (the old PARAM_FIELDS, derived from the schema);
 // _seedForm() uses it to restore params into the form when re-opening a wizard to edit an op (params = single truth).
-import { paramFields } from './blocks/opDictionary.js';
+import { paramFields } from './blocks/opSchema.js';
 
 export class WizardManager {
     constructor(editorManager) {

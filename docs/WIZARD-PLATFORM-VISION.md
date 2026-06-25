@@ -82,10 +82,10 @@ blob), and the wizard bar label. A macro is anonymous text substitution. A named
 round-trips, composes, validates, and ships. Share the op definition alongside the `.nc` and it's fully
 portable.
 
-**The op definition IS the dict entry.** Authoring a new op means declaring params, types, field bindings, and
-the atom stack — exactly what a dict entry is. The dictionary becomes federated: built-ins live in the shipped
-`opDictionary.js` (factory defaults, forkable); user ops carry their own spec in a user registry. The validator
-runs identically on both (`DICT[opType] || userRegistry[opType]`). A user op that passes is protocol-clean by
+**The op definition IS the schema entry.** Authoring a new op means declaring params, types, field bindings, and
+the atom stack — exactly what a schema entry is. The schema registry becomes federated: built-ins live in the
+shipped `opSchema.js` (factory defaults, forkable); user ops carry their own spec in a user registry. The validator
+runs identically on both (`SCHEMA[opType] || userRegistry[opType]`). A user op that passes is protocol-clean by
 construction — same guarantees as a built-in.
 
 ## The honest boundaries (the part that prevents over-promising)

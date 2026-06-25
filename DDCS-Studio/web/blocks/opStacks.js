@@ -9,7 +9,7 @@
 import { getLastOp, recordOp } from './opRecord.js';
 import { num, r3 } from '../wizards/ops/util.js';
 import { parseGcodeToStack } from './gcodeToStack.js';                       // decode a non-builder op's G-code → blocks
-import { isMarker, parseMarker } from './opDictionary.js';                   // read self-describing op markers
+import { isMarker, parseMarker } from './opSchema.js';                       // read self-describing op markers
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } };

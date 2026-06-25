@@ -11,7 +11,7 @@
  */
 import { emitMapped } from './blockModel.js';
 import { reconcileGcodeToStack } from './gcodeToStack.js';
-import { markerLine } from './opDictionary.js';
+import { markerLine } from './opSchema.js';
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 

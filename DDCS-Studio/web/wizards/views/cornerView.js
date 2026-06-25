@@ -51,7 +51,7 @@ export const cornerView = {
             startCornerAnim();
         }, 50);
     },
-    // (params → form for editing comes from the dict's field binding — DICT.corner param .field — no per-view setForm.)
+    // (params → form for editing comes from the schema's field binding — SCHEMA.corner param .field — no per-view setForm.)
 
     update(ctx) {
         const params = {

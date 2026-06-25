@@ -1,5 +1,9 @@
 /**
- * blocks/opDictionary.js — the DECLARED op dictionary + the self-describing marker codec.
+ * blocks/opSchema.js — the DECLARED op SCHEMA registry + the self-describing marker codec.
+ *
+ * SCHEMA (not a plain lookup): it declares the STRUCTURE of every op — param names, types, G-code address,
+ * canon (marker) rename, and the form-field binding (`.field`). It drives the validator, form seeding
+ * (paramFields), and the marker round-trip. One declared source of truth.
  *
  * THE CONTRACT (a format, not a language):
  *   A posted op carries a marker comment that DECLARES its record, e.g.
@@ -15,7 +19,7 @@
  * VOCABULARY LIVES HERE. Each param's `canon` is the CLEAN name the MARKER uses when the internal
  * op.params key is a conflict/ambiguity. Renaming a marker key = change ONE `canon` below; the
  * wizard / op.params key never moves, and emit+parse both read this one table (no drift). That is
- * the whole reason for the dictionary: editing the vocabulary is a one-line change, not a refactor.
+ * the whole reason for the schema registry: editing the vocabulary is a one-line change, not a refactor.
  *
  * Pure module — no DOM/window deps.
  */
@@ -23,7 +27,7 @@
 export const MARKER_VERSION = 1;
 const SENTINEL = '@DDCS';
 
-// ── the dictionary (schema: type + G-code address + canonical marker name) ──────────────────
+// ── the schema registry (per op: param type + G-code address + canonical marker name) ──────────────────
 // type: number|enum|string|bool|structured.  addr: standard G-code address (F/S/T/coords) or null.
 // canon: clean marker name (omit when the internal key is already clean).
 const N = (addr = null, canon = null) => ({ type: 'number', addr, ...(canon && { canon }) });
@@ -36,7 +40,7 @@ const PLACE = { stockAttach: Enum(), pathDatum: Enum(), offX: N(), offY: N(), of
 
 // Representative coverage (every param SHAPE). Remaining ops are mechanical transcriptions of the
 // G1 catalogue — add as data; renames are one-line `canon` edits.
-export const DICT = {
+export const SCHEMA = {
     drill: {
         pattern: Enum(), x0: N('X'), y0: N('Y'), cols: N(), rows: N(), dx: N(), dy: N(), count: N(),
         spacing: N(), angle: N(), dia: N(null, 'patternDia'), startAngle: N(), w: N(), h: N(), nx: N(), ny: N(),
@@ -131,12 +135,12 @@ export const DICT = {
     },
 };
 
-// ── the form-field binding (op param → its form field id), FOLDED into each DICT param as `.field` below ──
+// ── the form-field binding (op param → its form field id), FOLDED into each SCHEMA param as `.field` below ──
 // EDIT seeding: the inverse of each view's update() reads. wizardManager._seedForm() restores these into the
 // form when re-opening a wizard to edit an op (op.params = single truth; value vs checkbox decided by element
 // type at seed time). drill has a custom view.setForm (pattern variants), atc_length is Settings-driven, homing
-// has no form-field map — so they're absent here. This column folds ONTO the DICT param entries (one source of
-// truth: DICT[op][param].field); consumers read it via paramFields(). A binding whose param isn't in DICT is an
+// has no form-field map — so they're absent here. This column folds ONTO the SCHEMA param entries (one source of
+// truth: SCHEMA[op][param].field); consumers read it via paramFields(). A binding whose param isn't in SCHEMA is an
 // orphan (BIND_ORPHANS) — structurally-caught drift, asserted empty by protocol-validator.spec.js.
 const FIELD_BIND = {
     surfacing: { originX: 'sf_originX', originY: 'sf_originY', offZ: 'sf_offZ', pathDatum: 'sf_pathDatum', stockAttach: 'sf_stockAttach', w: 'sf_w', h: 'sf_h', strategy: 'sf_strategy', toolDia: 'sf_toolDia', stepoverPct: 'sf_stepoverPct', depth: 'sf_depth', stepdown: 'sf_stepdown', clearance: 'sf_clearance', feed: 'sf_feed', plunge: 'sf_plunge', rpm: 'sf_rpm' },
@@ -160,26 +164,26 @@ const FIELD_BIND = {
     atc_table: { includeLengths: 'atc_table_lengths', includePockets: 'atc_table_pockets' },
 };
 
-// Fold the field-id column ONTO each DICT param (one source of truth: DICT[op][param].field). A binding whose
+// Fold the field-id column ONTO each SCHEMA param (one source of truth: SCHEMA[op][param].field). A binding whose
 // param isn't catalogued has nowhere to land → recorded in BIND_ORPHANS (the protocol validator asserts []).
 export const BIND_ORPHANS = [];
 for (const op in FIELD_BIND) for (const k in FIELD_BIND[op]) {
-    if (DICT[op] && DICT[op][k]) DICT[op][k].field = FIELD_BIND[op][k];
+    if (SCHEMA[op] && SCHEMA[op][k]) SCHEMA[op][k].field = FIELD_BIND[op][k];
     else BIND_ORPHANS.push(`${op}.${k}`);
 }
 
-/** The { param → form-field id } binding for an op, derived from DICT — the replacement for PARAM_FIELDS. */
+/** The { param → form-field id } binding for an op, derived from SCHEMA — the replacement for PARAM_FIELDS. */
 export function paramFields(opType) {
-    const spec = DICT[opType] || {}, out = {};
+    const spec = SCHEMA[opType] || {}, out = {};
     for (const k in spec) if (spec[k].field) out[k] = spec[k].field;
     return out;
 }
 
 // ── marker codec (op record <-> ( @DDCS:v {…} ) comment), mapping internal keys <-> canon names ──
 const escParens = (s) => s.replace(/\(/g, '\\u0028').replace(/\)/g, '\\u0029');   // keep payload paren-free
-const canonOf = (opType, key) => (DICT[opType] && DICT[opType][key] && DICT[opType][key].canon) || key;
+const canonOf = (opType, key) => (SCHEMA[opType] && SCHEMA[opType][key] && SCHEMA[opType][key].canon) || key;
 function revCanon(opType) {                          // marker (canon) key -> internal param key
-    const spec = DICT[opType] || {}, m = {};
+    const spec = SCHEMA[opType] || {}, m = {};
     for (const key in spec) m[spec[key].canon || key] = key;
     return m;
 }
@@ -206,9 +210,9 @@ export function parseMarker(line) {
     return { opType, params, v: Number(m[1]) };
 }
 
-/** Validate an op record against the dictionary → warning strings ([] = clean, or op not catalogued). */
+/** Validate an op record against the schema → warning strings ([] = clean, or op not catalogued). */
 export function validate(opType, params) {
-    const spec = DICT[opType];
+    const spec = SCHEMA[opType];
     if (!spec) return [];
     const w = [];
     for (const k in (params || {})) {
