@@ -84,10 +84,29 @@ Earlier-but-related (prior session, on `main`): the data-driven wizard bar (`com
    text field, not a value socket) — a separate, larger mechanism. (Both widgets already work form-side, just not
    authorable as a param block.) Not yet wired into the dev-mode *inline-expose* path (only param blocks carry the
    `options` presets); a toggle there would be trivial, a dropdown needs an options input.
-3. **SVG / icons** (raised, deferred): a curated icon library + picker for wizards & dropdowns (the `iconOverride`
-   passthrough already exists in `getLibrary`); custom SVG **import** (sanitised) + an **in-modal GUI editor** (compose
-   from components — fields/handles/buttons, NOT a vector editor); SVG **backdrop** for a canvas picker (your fixture
-   as the canvas; needs sanitisation + a coord map). The picker registry is built to absorb these.
+3. **SVG / icons → rich-widget control standard** — scoped in `docs/RICH-WIDGETS-AND-ICONS.md` (the unified model:
+   one declarative control = spec + one generic renderer; standard widgets = built-in specs, custom graphics = user
+   specs; two spec kinds — `pick` and `handle`; dual adapters = block field + form widget; datum is the existing
+   proof). **DIRECTION (build order):**
+
+   - **Finalize the scoping doc** as the north star; link it from here. The vision is good — keep it written.
+   - **DEFER C1 (the generic `pick` renderer).** Do NOT build the generic renderer as a framework up front. The
+     unification ALREADY exists in one case — `cornerGridSvg` is one shared core across four surfaces today. The
+     "standard" is something we **extract from 2–3 concrete widgets**, not something we design before a second case
+     forces it. Mark C1 in the doc as *"deferred until ≥2 concrete pick widgets exist; generalize from working code,
+     don't frame the abstraction first."*
+   - **START with Track A — the wizbar icon picker.** Smallest standalone win, independently useful, reuses the
+     existing `iconEditor`, commits us to none of the generic-control machinery. Ship it while the bigger model
+     settles.
+   - **Rule of thumb:** when a second concrete pick widget appears (e.g. the fixture-backdrop canvas), put the two
+     side by side and extract the shared spec then. Two real examples disagreeing is what tells you what's genuinely
+     generic vs. what only looked generic on paper. Until then, build concrete widgets one at a time and reuse
+     `cornerGridSvg`'s existing pattern directly.
+
+   (Pre-existing raw scope, still valid: curated icon library + picker — `iconOverride` passthrough already in
+   `getLibrary`; custom SVG **import** (sanitised) + an **in-modal GUI editor** (compose from components, NOT a vector
+   editor); SVG **backdrop** for a canvas picker — fixture as canvas; needs sanitisation + a coord map. The picker
+   registry is built to absorb these.)
 4. **Editor chrome** — ✅ DONE. **Clear** → a red trash button in the header beside undo/redo (`#btn-clear`,
    desktop only — hidden ≤600px, where the chevron menu keeps it as the phone access point). **Copy** → a floating
    button top-right of the editor (`#editor-copy-btn`, all widths, with a green flash on click), removed from the
