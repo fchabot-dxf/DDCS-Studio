@@ -19,6 +19,10 @@ import { SCHEMA } from './opSchema.js';
 const STORE_KEY = 'ddcs_user_ops';
 export const USER_OP_PREFIX = 'user_';
 
+// Param value-types a binding may carry. `type` is the VALUE kind (drives marker codec + defaults); the form
+// `widget` (separate, ui/formWidgets.js) is just how it's rendered. number stays the easy default.
+export const BINDING_TYPES = new Set(['number', 'int', 'enum', 'bool', 'string']);
+
 // Deterministic pre-order walk of a block stack (block, then its children) → a flat array of block REFS.
 // Exported so devMode shares ONE definition (binding.blockIndex must mean the same block in both modules).
 export function flattenBlocks(blocks, out = []) {
@@ -67,7 +71,7 @@ export function validateUserOp(def) {
         if (!b || !b.param) { errs.push('a binding has no param name'); continue; }
         if (seen.has(b.param)) errs.push(`duplicate param "${b.param}"`);
         seen.add(b.param);
-        if (b.type !== 'number') errs.push(`param "${b.param}": only number params are supported in v1`);
+        if (b.type && !BINDING_TYPES.has(b.type)) errs.push(`param "${b.param}": unsupported type "${b.type}" (use ${[...BINDING_TYPES].join(' / ')})`);
         const blk = flat[b.blockIndex];
         if (!blk || !blk.params || !(b.key in blk.params)) errs.push(`param "${b.param}": binding (block ${b.blockIndex}.${b.key}) does not resolve in the template`);
     }
