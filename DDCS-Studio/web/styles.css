@@ -3776,7 +3776,7 @@ svg [id$="_wcs"] { display: none; }
 [data-theme="futuristic"] {
     /* glass-screen: clear panel so the code/grid reads through it (a touch more opaque now), faint scanlines */
     --kbd-glass:
-        linear-gradient(180deg, rgba(10,16,30,.24), rgba(8,12,24,.34)),
+        linear-gradient(180deg, rgba(10,16,30,.78), rgba(8,12,24,.88)),
         repeating-linear-gradient(0deg, rgba(45,212,191,.04) 0 1px, transparent 1px 3px);
     --kbd-blur: 0.5px;
     --kbd-handle: linear-gradient(180deg, rgba(36,68,104,.45), rgba(8,12,24,.6));
