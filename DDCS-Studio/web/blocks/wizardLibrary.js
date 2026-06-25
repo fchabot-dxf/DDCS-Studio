@@ -157,14 +157,18 @@ export function deleteWizard(opType) { deleteUserOp(opType); const l = readLayou
 export const WIZARD_FILE_KIND = 'ddcs.wizard';
 export const WIZARD_FILE_VERSION = 1;
 
-/** Serialize a user-op def → `.wizard` file text (portable, shareable). */
+/** Serialize a user-op def → `.wizard` file text (portable, shareable). Carries the view-only metadata `panel`
+ *  (layout) + `sim` (DECLARED preview intent: rotary rig / machine / magazine) so a shared wizard keeps its panel
+ *  and rig on import — otherwise the recipient loses them. Both are optional (omitted when absent → clean files,
+ *  backward-compatible with v1 files that predate them). */
 export function wizardToFile(def) {
-    return JSON.stringify({
-        kind: WIZARD_FILE_KIND, v: WIZARD_FILE_VERSION,
-        op: { opType: def.opType, label: def.label, template: def.template, bindings: def.bindings },
-    }, null, 2);
+    const op = { opType: def.opType, label: def.label, template: def.template, bindings: def.bindings };
+    if (def.panel) op.panel = def.panel;
+    if (def.sim) op.sim = def.sim;
+    return JSON.stringify({ kind: WIZARD_FILE_KIND, v: WIZARD_FILE_VERSION, op }, null, 2);
 }
-/** Parse `.wizard` file text → a user-op def (or null if it isn't a valid wizard file). */
+/** Parse `.wizard` file text → a user-op def (or null if it isn't a valid wizard file). Returns o.op verbatim, so
+ *  any panel/sim the file carries rides through to createWizard (registerUserOp re-declares the preview intent). */
 export function wizardFromFile(text) {
     let o; try { o = JSON.parse(text); } catch (_) { return null; }
     if (!o || o.kind !== WIZARD_FILE_KIND || !o.op || typeof o.op.opType !== 'string') return null;

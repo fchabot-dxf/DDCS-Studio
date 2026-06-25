@@ -79,6 +79,43 @@ test('wizardLibrary: catalog + user ops + overrides + .wizard codec', async ({ p
   expect(r.customStill).toBe(1);
 });
 
+test('wizardLibrary: .wizard export/import carries panel + declared sim intent', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+
+  const r = await page.evaluate(async () => {
+    const L = await import('/blocks/wizardLibrary.js');
+    const U = await import('/blocks/userOps.js');
+    const sim = await import('/viz/opSimContext.js');
+    localStorage.removeItem('ddcs_user_ops');
+    localStorage.removeItem('ddcs_wizard_layout');
+
+    // a wizard with a 2D panel + a DECLARED rotary rig (the a:45 move is irrelevant — intent is declared, not inferred)
+    L.createWizard(U.userOpFromStack('share_test', 'Share Test',
+      [{ type: 'move', params: { mode: 'rapid', a: 45 } }], [], 'form2d', { showRotaryRig: true }));
+    const file = L.exportWizard('user_share_test');
+    const parsed = JSON.parse(file).op;
+
+    // simulate a clean machine: drop the wizard + its live intent, then import the shared file
+    L.deleteWizard('user_share_test');
+    const afterDelete = sim.opSimContext('user_share_test').showRotaryRig;
+    L.importWizard(file);
+    const reDef = U.listUserOps().find((d) => d.opType === 'user_share_test');
+    const ctx = sim.opSimContext('user_share_test');
+
+    localStorage.removeItem('ddcs_user_ops');
+    localStorage.removeItem('ddcs_wizard_layout');
+    return { filePanel: parsed.panel, fileSim: parsed.sim, afterDelete, panel: reDef && reDef.panel, simDef: reDef && reDef.sim, ctxRig: ctx.showRotaryRig };
+  });
+
+  expect(r.filePanel, '.wizard file carries the panel type').toBe('form2d');
+  expect(r.fileSim, '.wizard file carries the declared sim intent').toMatchObject({ showRotaryRig: true });
+  expect(r.afterDelete, 'deleting cleared the live intent').toBe(false);
+  expect(r.panel, 'imported wizard keeps its panel').toBe('form2d');
+  expect(r.simDef, 'imported wizard keeps its sim intent').toMatchObject({ showRotaryRig: true });
+  expect(r.ctxRig, 'imported wizard re-declares the rotary rig').toBe(true);
+});
+
 test('wizardLibrary: sections + create / delete custom dropdowns', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);

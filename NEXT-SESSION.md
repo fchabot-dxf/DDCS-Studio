@@ -106,9 +106,10 @@ Earlier-but-related (prior session, on `main`): the data-driven wizard bar (`com
    **AUTHORING (✅ DONE):** the Blocks dev-mode save panel has a "Preview rig" group — rotary / machine / magazine
    checkboxes (`devMode.readSimIntent`/`setSimChecks`) → `def.sim`, parallel to the Panel dropdown. Round-trips on
    re-author (`editWizardDef` restores the checkboxes from `def.sim`); resets after save. Test:
-   `tests/dev-mode-sim-intent.spec.js`. **Still open (optional):** a blocks-native GUI declaration block (like
-   `panel.js`) so intent is also visible IN the stack; and `wizardToFile` drops `panel`+`sim` on `.wizard` export
-   (pre-existing gap — both are lost on share/import).
+   `tests/dev-mode-sim-intent.spec.js`. **`.wizard` portability (✅ DONE):** `wizardToFile` now carries `panel`+`sim`
+   (optional, omitted when absent) and `wizardFromFile` returns them, so a shared custom wizard keeps its panel + rig
+   on import (test in `wizard-library.spec.js`). **Still open (optional):** a blocks-native GUI declaration block
+   (like `panel.js`) so the preview intent is also visible IN the stack, not only in the dev-panel checkboxes.
 
 6. **Binding type + role declaration audit (declare, never infer)** — ✅ RESOLVED (2026-06-25).
 
