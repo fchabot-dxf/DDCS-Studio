@@ -7,7 +7,7 @@
  * consumed by the region-pick form widget + the field_regionpick block field (both shipped).
  *
  * v1: RECT regions (a rotated rect bakes to a polygon on save, so authoring matches the runtime); poly/freeform
- * point-editing is a follow-up (the runtime + bake already handle polygons). See docs/RICH-WIDGETS-AND-ICONS.md.
+ * point-editing is a follow-up (the runtime + bake already handle polygons). See docs/archive/RICH-WIDGETS-AND-ICONS.md.
  */
 import { stageSvg, startGesture, applyGesture, boxPoint } from './shapeStage.js';
 import { openIconEditor } from './iconEditor.js';

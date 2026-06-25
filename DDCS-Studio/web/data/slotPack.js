@@ -2,7 +2,7 @@
  * data/slotPack.js — CAM Pack Builder core: the DDCS on-controller slot-pack mechanism (pure logic, no DOM).
  * (Was `camPack.js` — these are DDCS controller "CAM" slots, not an industry-CAM toolpath system.) Phase 1.
  *
- * A DDCS Expert "CAM" slot is a parameterized macro launcher (see docs/CAM-MENU-RESEARCH.md):
+ * A DDCS Expert "CAM" slot is a parameterized macro launcher (see docs/archive/CAM-MENU-RESEARCH.md):
  *   - macro_cam<slot>.nc reads form values at RUNTIME from the #2600+ mirrors (never bakes literals),
  *   - the form is defined by `eng` language-file lines (#11xx … -m<slot+20> …),
  *   - the form value persists in `camsetting` (firmware-owned — NEVER written by us).

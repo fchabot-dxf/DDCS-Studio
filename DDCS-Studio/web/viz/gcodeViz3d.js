@@ -988,7 +988,7 @@ export class GcodeViz3D {
             // the datum (the datum is a mill/WCS-Z concept) — so present the stock TOP-AT-0 regardless of datum, so
             // render == collision == start marker == path. ABSOLUTE (mill) stays datum-aware: the datum-Z there is a
             // real feature (a bottom datum offsets the path up by the stock height for a precision height cut).
-            // See docs/probe-preview-frame-issues.md.
+            // See docs/archive/probe-preview-frame-issues.md.
             const dzCol = this._anchorToStart ? stock.z : D[2];   // start-anchored → top-at-0; mill → datum-aware
             pg.position.set(stock.x / 2 - D[0], stock.y / 2 - D[1], stock.z / 2 - dzCol);
             this._stockFloorZ = pg.position.z - stock.z / 2;   // stock bottom → where the table/grid sits

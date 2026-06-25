@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Track A — the wizbar icon PICKER (docs/RICH-WIDGETS-AND-ICONS.md). A custom wizard's bar icon is chosen from a
+ * Track A — the wizbar icon PICKER (docs/archive/RICH-WIDGETS-AND-ICONS.md). A custom wizard's bar icon is chosen from a
  * curated emoji set in Settings → Wizards; the pick writes `iconOverride` (`setEntryOverride id,{icon}`) and a custom
  * op renders it via the existing emoji path (no commandDeck change). "⌀ Default" clears it (back to ✦). Locks: the
  * picker opens, a pick sets the override (+ updates the row + getLibrary), and Default clears it.

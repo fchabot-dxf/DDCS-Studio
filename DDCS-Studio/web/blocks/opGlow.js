@@ -7,7 +7,7 @@
  *   - editedLinesForOp → line-level glow: editor line indices owned by INJECTED atoms (back-compat).
  *   - editedRangesForOp → word-level glow: [{ line, range }] — the exact changed token, or whole-line.
  * All FORWARD-ONLY: they diff the clean BUILDERS(op.params) rebuild against the live block stack — never infer
- * intent from emitted motion (docs/MULTI-OP-STACKING.md). Imports the BUILDERS leaf + the emitter; nothing imports back.
+ * intent from emitted motion (docs/archive/MULTI-OP-STACKING.md). Imports the BUILDERS leaf + the emitter; nothing imports back.
  */
 import { BUILDERS, _builderAtoms } from './opBuilders.js';
 import { emitMapped } from './blockEmitter.js';                               // emit a stack → { lines, map } (for word-level glow diff)
@@ -115,7 +115,7 @@ export function isOpBlockEdited(opId) {
     if (sig(op.children) === sig(bare)) return false; // Not edited at all
 
     // 2. It diverges structurally from the form rebuild → block-edited. We do NOT try to prove it "form-safe"
-    // by reverse-syncing the blocks back to params: that's the banned inference (docs/MULTI-OP-STACKING.md),
+    // by reverse-syncing the blocks back to params: that's the banned inference (docs/archive/MULTI-OP-STACKING.md),
     // and the field-id↔param adapter never worked anyway (it always fell through to `return true`). The
     // override-diff glow + the Merge/Replace notice handle this forward-only.
     return true;

@@ -41,7 +41,7 @@ function mkArrow(glyph, disabled, onClick, title) {
     return b;
 }
 
-// ── wizbar icon PICKER (Track A — docs/RICH-WIDGETS-AND-ICONS.md) ───────────────────────────────────────────────
+// ── wizbar icon PICKER (Track A — docs/archive/RICH-WIDGETS-AND-ICONS.md) ───────────────────────────────────────────────
 // A curated emoji set; the pick writes `iconOverride` (setEntryOverride id,{icon}); a custom op renders it via the
 // existing emoji path in commandDeck (wizItemIcon → e.icon). "⌀ Default" clears the override (back to ✦). A picker,
 // not an editor — drawing a custom icon graphic is the separate iconEditor (CAM builder).

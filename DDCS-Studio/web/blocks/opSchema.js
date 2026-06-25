@@ -8,7 +8,7 @@
  * THE CONTRACT (a format, not a language):
  *   A posted op carries a marker comment that DECLARES its record, e.g.
  *       ( @DDCS:1 {"op":"drill","patternDia":50,"holeDia":6,"depth":10,"feed":300} )
- *   Re-import READS that declaration — it never guesses intent from motion. (docs/MULTI-OP-STACKING.md:
+ *   Re-import READS that declaration — it never guesses intent from motion. (docs/archive/MULTI-OP-STACKING.md:
  *   "op params are the source of truth; G-code is a one-way projection; never invert it.")
  *
  *   - SENTINEL  @DDCS:<v>  — v = format version (bump when the contract changes).

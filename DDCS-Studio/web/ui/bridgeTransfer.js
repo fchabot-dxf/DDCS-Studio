@@ -1,6 +1,6 @@
 /**
  * ui/bridgeTransfer.js — the header TRANSFER button: send the current editor program to the gateway
- * (docs/addstudiotransfer.md, updated for the one-app architecture: Studio is same-origin with the
+ * (docs/archive/addstudiotransfer.md, updated for the one-app architecture: Studio is same-origin with the
  * gateway, so there is no URL/token config — the shared client seam resolves the base, and the button
  * greys out when no gateway answers, mirroring the GATEWAY tab).
  *

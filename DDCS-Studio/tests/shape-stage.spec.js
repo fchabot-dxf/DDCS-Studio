@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /**
  * The shared 2D drawing CORE (ui/shapeStage.js), extracted from iconEditor so the icon composer AND the region
- * editor consume ONE drawing implementation (docs/RICH-WIDGETS-AND-ICONS.md "Track D"). Pure: stageSvg renders the
+ * editor consume ONE drawing implementation (docs/archive/RICH-WIDGETS-AND-ICONS.md "Track D"). Pure: stageSvg renders the
  * layers + handles; startGesture/applyGesture are the move/resize/rotate math; rotateVec/boxPoint are geometry.
  * Plus a smoke test that iconEditor still opens + edits after the refactor (it had no test before).
  */

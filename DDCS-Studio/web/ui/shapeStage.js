@@ -2,7 +2,7 @@
  * ui/shapeStage.js — the shared 2D DRAWING CORE: a layer model rendered to SVG with Figma-style move/resize/rotate
  * handles, plus the pure gesture math. Extracted from ui/iconEditor.js so BOTH the icon composer AND the region
  * editor (region picks) consume ONE drawing implementation — "reuse" = shared CODE, not a shared tool, and the
- * region stays its own primitive (see docs/RICH-WIDGETS-AND-ICONS.md "Track D"). Pure: no DOM/event wiring, no modal.
+ * region stays its own primitive (see docs/archive/RICH-WIDGETS-AND-ICONS.md "Track D"). Pure: no DOM/event wiring, no modal.
  *
  * A layer = { type, x, y, w, h, rot, ... } in stage coords. The icon composer adds tile/text/rect/line/circle/arrow;
  * the region editor will add region semantics (value/label/hit-test) on top of the SAME shapes — without touching

@@ -8,7 +8,7 @@
  *
  * v1 values are NUMERIC (regions → numbers) so the control binds to a numeric socket → valid by construction (an
  * enum/string region-pick is the same UI once the deferred field-targeting param lands). Pure rendering — no state,
- * no binding; the adapters own selection + read-back. See docs/RICH-WIDGETS-AND-ICONS.md.
+ * no binding; the adapters own selection + read-back. See docs/archive/RICH-WIDGETS-AND-ICONS.md.
  */
 const SVGNS = 'http://www.w3.org/2000/svg';
 

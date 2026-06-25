@@ -9,7 +9,7 @@
  * pattern, with the per-hole cut inlined — no shared sub to install, no monolithic dispatcher. DDCS has no
  * named M-codes (M-codes are numeric: M15 → O10015), so a "sub" would be a numeric O-program the operator must
  * install separately — fragile and easy to forget; inlining keeps every slot runnable on its own.
- * See the cam-menu-architecture memory + docs/CAM-MENU-RESEARCH.md.
+ * See the cam-menu-architecture memory + docs/archive/CAM-MENU-RESEARCH.md.
  */
 import { nextParam, mirrorVar } from './slotPack.js';
 import { spindleOn, spindleOff } from './camMacroKit.js';
