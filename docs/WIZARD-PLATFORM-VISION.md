@@ -107,6 +107,24 @@ construction — same guarantees as a built-in.
   teaching the dictionary each controller's I/O verbs, bounded by what it can physically switch. Digital on/off
   is easy everywhere; analog is where machines diverge.
 
+## Competitive landscape — the space nobody owns
+| Ecosystem | Extensibility | Authoring UX | Validator / safety | Round-trip |
+|---|---|---|---|---|
+| **Centroid CNC12** | None — fixed op set | Polished, closed | n/a | n/a |
+| **Mach3/4** | VB / Lua scripts | Code editor | None — run on trust | None |
+| **LinuxCNC / HAL** | Full (HAL + Python) | Config files, no composer | None at wizard level | None |
+| **grbl ecosystem** (Lightburn, CNCjs, UGS) | None at wizard level | Fixed, per-app | n/a | n/a |
+| **DDCS Studio (target)** | Data-driven, user-authored | Visual maker | Protocol validator — safe by construction | `@DDCS` marker round-trip |
+
+**Mach3/4** is the only prior art with community distribution (VB wizard packs exist) — but the output is
+unvalidated code you run on trust; no format, no round-trip, no visual composer. **Lightburn** proves the
+companion-software model works for laser: GUI composer + dumb firmware. But it's closed and fixed.
+
+The gap nobody has filled: **accessible authoring + validated output + data format that round-trips + community
+library**. If the maker ships, Studio is in that gap across every dialect it speaks (DDCS, grbl, Mach3/4) — the
+architecture is modality- and controller-agnostic by design (see [`PORTING-GRBL-MACH3.md`](../PORTING-GRBL-MACH3.md)).
+The plasma/laser community writing a suite for their controller is the Mach3 wizard ecosystem, made safe.
+
 ## Foundation already laid
 The dictionary (declared vocabulary), the validator (the guard that makes total control *offerable*), the
 binding-unify (form generated from the dict — shipped), atoms-as-data + the `@DDCS` marker format
