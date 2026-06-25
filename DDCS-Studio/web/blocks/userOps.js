@@ -139,6 +139,20 @@ export function createUserOp(def) {
     return def;
 }
 
+/** Replace an existing user op's def IN PLACE (re-register + persist), keeping its opType identity. The re-author
+ *  flow uses this so editing a saved wizard updates it instead of spawning a duplicate. Falls back to create. */
+export function updateUserOp(def) {
+    const errs = validateUserOp(def);
+    if (errs.length) throw new Error('invalid user op: ' + errs.join('; '));
+    const defs = readStore();
+    const i = defs.findIndex((d) => d.opType === def.opType);
+    if (i < 0) return createUserOp(def);
+    registerUserOp(def);            // overwrite the live BUILDERS/SCHEMA/label
+    defs[i] = def;
+    writeStore(defs);
+    return def;
+}
+
 /** Remove a user op from the registry + persistence (and the live BUILDERS/SCHEMA entries). */
 export function deleteUserOp(opType) {
     writeStore(readStore().filter((d) => d.opType !== opType));

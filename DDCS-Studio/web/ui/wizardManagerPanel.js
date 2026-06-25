@@ -259,8 +259,10 @@ function renderRow(entry, group, ei, allGroups, apply) {
     row.appendChild(mkArrow('▲', ei === 0, () => { moveItem(items, ei, -1); apply(); }, 'Move up'));
     row.appendChild(mkArrow('▼', ei === items.length - 1, () => { moveItem(items, ei, +1); apply(); }, 'Move down'));
 
-    // actions — custom ops can be exported/deleted; built-ins are only arranged here (authored in Blocks → Dev mode)
+    // actions — custom ops can be re-authored / exported / deleted; built-ins are only arranged here (authored in Blocks → Dev mode)
     if (entry.kind === 'user') {
+        row.appendChild(mkBtn('✎ Edit', () => { if (window.ddcsEditWizardDef) { window.ddcsEditWizardDef(entry.type); if (window.closeSettings) window.closeSettings(); } },
+            { title: 'Re-author this wizard — opens its blocks (knobs + all) in Dev mode to tweak and re-save' }));
         row.appendChild(mkBtn('Export', () => exportEntry(entry), { title: 'Save this op as a shareable .wizard file' }));
         row.appendChild(mkBtn('Delete', () => {
             if (confirm(`Delete the custom wizard “${entry.label}”? This removes it from your library.`)) { deleteWizard(entry.type); apply(); }

@@ -74,6 +74,9 @@ class DDCSStudio {
         initSaveStates();
         loadUserOps();                              // register every persisted user-defined op (wizard-maker)
         window.ddcsInsertUserOp = insertUserOp;     // open the generic param form for a user op (menu / dev panel)
+        // Re-author a saved wizard (load its template into Blocks). Exposed early — the Settings manager triggers it
+        // from Studio, before the Blocks app (which would otherwise set it) has mounted.
+        import('./blocks/devMode.js').then((m) => { window.ddcsEditWizardDef = (opType) => m.editWizardDef(opType); }).catch(() => {});
 
         // Setup global window functions for backwards compatibility
         this.setupGlobalFunctions();
