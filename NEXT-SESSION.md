@@ -233,10 +233,12 @@ DOM level (`tests/word-glow.spec.js`: word range + injection whole-line + the re
   The systemic gap: none of the Macros tab output participates in the `@DDCS` schema system. A lint pass
   over declared intent (I/O touched, registers written, motion range) would catch obvious errors without full
   sim — same direction as the sim intent layer.
-  **Naming:** two things called "macro" — `.mjson` saved op-stacks (Studio-side) vs Macros tab O-code scripts
-  (controller-side). Fix: `macroFile.js` → `programFile.js` (Studio saved programs aren't controller macros);
-  `camPack.js` → `slotPack.js` (DDCS on-controller slot system, not industry CAM). `macrosApp.js` can stay —
-  it genuinely authors controller-side macros. (The `opStacks` restructure it was gated on is now DONE — see the top of this file.)
+  **Naming:** ✅ **DONE** — two things called "macro" — `.mjson` saved op-stacks (Studio-side) vs Macros tab O-code
+  scripts (controller-side). `macroFile.js` → `programFile.js` (commit `e5c93a7`); `camPack.js` → `slotPack.js`
+  (commit `b5bdde4`, incl. the macrosApp `camPack`→`slotPack` namespace alias). `macrosApp.js` kept (it genuinely
+  authors controller-side macros). Kept for data-compat: the `ddcs.macro` .mjson kind id, `CAMPACK_KEY`, the
+  "CAM Pack Builder" UI label. **Still TODO: the `macrosApp.js` MODULE restructure itself** (1338 lines, 4 workflows
+  above) — same medicine as `opStacks.js`, just untouched.
 
 - **Gateway — implementation gaps (architecture already correct)** — already file-per-view (10 files, ~93
   lines avg). No restructuring needed. Two gaps:
@@ -257,6 +259,26 @@ DOM level (`tests/word-glow.spec.js`: word range + injection whole-line + the re
   flat). Currently the rig in `gcodeViz3d.js` is gated on `stock.shape === 'cylinder'`, which misses the
   rectangular case. Fix: in `previewActiveOp`, pass an `isRotary` flag (derived from op type) to the preview panel
   alongside the stock; the viz uses it to show the rig regardless of stock shape.
+
+- **Suggest bar: search mode + bigger panel** — the suggest bar (`web/ui/suggestBar.js`) is currently a
+  context-aware chip row (predicts next token from the current line). Add a **search mode** alongside it:
+  a small search input (🔍 icon or tap the bar) that lets the user type a name or code and get matching
+  G-code commands to insert. This replaces the on-screen keyboard for the "I want to insert M3" use case
+  on touch — search "spindle" → tap M3 spindle CW → inserted.
+
+  What to build:
+  1. A search input that appears when the user taps/clicks a 🔍 button next to the chip row.
+  2. The search corpus: all chips from `suggestFor()` across all contexts (collect the full flat list), PLUS
+     a curated list of named commands (e.g. `{ label: 'M3 spindle CW', insert: 'M3 S' }`, same pattern as
+     the chip `T()` entries). The named list can start small and grow.
+  3. Filter by label OR by code prefix as the user types. Results render as chips in a bigger panel
+     (not just one row — 2–3 rows or a scrollable list) below/above the bar.
+  4. Tap to insert (same `window.insert` path as the existing chips).
+  5. Clear/close on Escape or when the editor regains focus.
+  6. The existing context-aware chip row stays as-is; search is an additional mode toggled by the 🔍 button.
+
+  Make the panel larger in both modes (currently one row; expand to show more chips on wide screens and
+  allow 2 rows on narrow). The panel height should be a CSS variable so it's easy to tune.
 
 - **New Machine ops: Loop + Subroutine Call** — two new ops for the Machine wizard dropdown (alongside Comm/MDI,
   Warm-up, Set Output, Wait Input, Dwell). Both clear the "worth a wizard" bar: they generate non-trivial code and
