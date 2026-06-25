@@ -17,7 +17,7 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS } from './userOps.js';
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack } from './userOps.js';
 import { createWizard } from './wizardLibrary.js';
 import { workspaceToStack } from './blockly/stackBridge.js';
 
@@ -253,7 +253,9 @@ function saveAsCustomOp() {
     let panel = (psel && psel.value) || 'form3d';
     const panelBlk = flattenBlocks(a.opRec.children).find((b) => b && b.type === 'panel');   // a GUI panel block, if present, wins
     if (panelBlk && panelBlk.params && panelBlk.params.panel) panel = panelBlk.params.panel;
-    const sim = readSimIntent();   // DECLARED preview intent (rotary rig / machine / magazine) — never inferred from the stack
+    // DECLARED preview intent — a `sim` GUI block in the stack wins (like the panel block); else the dev-panel checkboxes.
+    const blkSim = simIntentFromStack(a.opRec.children);
+    const sim = blkSim !== undefined ? blkSim : readSimIntent();
     const editing = _editingWizard;   // re-authoring an existing wizard → update in place (keep its opType)
     try {
         if (editing) {

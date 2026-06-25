@@ -108,8 +108,11 @@ Earlier-but-related (prior session, on `main`): the data-driven wizard bar (`com
    re-author (`editWizardDef` restores the checkboxes from `def.sim`); resets after save. Test:
    `tests/dev-mode-sim-intent.spec.js`. **`.wizard` portability (✅ DONE):** `wizardToFile` now carries `panel`+`sim`
    (optional, omitted when absent) and `wizardFromFile` returns them, so a shared custom wizard keeps its panel + rig
-   on import (test in `wizard-library.spec.js`). **Still open (optional):** a blocks-native GUI declaration block
-   (like `panel.js`) so the preview intent is also visible IN the stack, not only in the dev-panel checkboxes.
+   on import (test in `wizard-library.spec.js`). **Blocks-native declaration (✅ DONE):** the `sim` ("preview rig")
+   block (`web/wizards/ops/sim.js`, Mark Up) declares the intent IN the stack via 3 checkboxes (rotary/machine/
+   magazine); emits nothing; `userOps.simIntentFromStack` reads it and it WINS over the dev-panel checkboxes (same
+   precedence as the panel block). Test: `tests/gui-sim-block.spec.js`. So the wizard-maker GUI-authoring layer is
+   complete: `param` (knobs) + `panel` (layout) + `sim` (preview rig), each declarable as a block AND in dev mode.
 
 6. **Binding type + role declaration audit (declare, never infer)** — ✅ RESOLVED (2026-06-25).
 

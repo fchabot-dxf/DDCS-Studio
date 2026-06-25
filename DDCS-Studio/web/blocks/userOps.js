@@ -124,6 +124,16 @@ export function extractParamBlocks(template, seen = new Set(), keepPills = true)
     return bindings;
 }
 
+/** Read a DECLARED preview intent from a `sim` block in a stack (the blocks-native twin of the dev-panel "Preview
+ *  rig" checkboxes). The block WINS over the dev-panel when present (same precedence as the panel block). Returns:
+ *  the intent object, `null` (a sim block declaring nothing), or `undefined` (no sim block → use the checkboxes). */
+export function simIntentFromStack(children) {
+    const blk = flattenBlocks(children).find((b) => b && b.type === 'sim');
+    if (!blk || !blk.params) return undefined;
+    const s = blk.params, sim = { showRotaryRig: !!s.rotary, forceMachine: !!s.machine, showMagazine: !!s.magazine };
+    return (sim.showRotaryRig || sim.forceMachine || sim.showMagazine) ? sim : null;
+}
+
 // Drop counter-based block ids so a stored template is stable (ids are reassigned on emit). (Same rule as opGlow.)
 function stripIds(v) {
     if (Array.isArray(v)) return v.map(stripIds);

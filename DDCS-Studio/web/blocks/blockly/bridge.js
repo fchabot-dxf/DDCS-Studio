@@ -107,7 +107,10 @@ const DESCRIPTIONS = {
     pattern: "Hole pattern: grid, line, circle (bolt) or rect perimeter",
     ramp: "Bore stepdown: step (plunge + flat circle) or helix (linearized G1 ramp)",
     widget: "How this knob renders in the form: number / slider / dropdown (presets) / toggle (on=1, off=0)",
-    options: "Dropdown presets — a comma/newline list of Label=value (numeric), e.g. Rough=500, Finish=1500"
+    options: "Dropdown presets — a comma/newline list of Label=value (numeric), e.g. Rough=500, Finish=1500",
+    rotary: "Preview shows the 4th-axis rotary rig (+ the A± jog row)",
+    machine: "Preview pins to the machine frame (draws the envelope)",
+    magazine: "Preview shows the ATC magazine (pockets + tool stubs)"
 };
 const getDesc = (f) => DESCRIPTIONS[f.toLowerCase()] || `The ${f} parameter`;
 
