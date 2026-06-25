@@ -62,7 +62,7 @@ then generalise that same snapshot into document-level autosave (serializeProjec
     - **Removed**: The `✦` symbol from the editor chip and the full-column vertical line.
     - **[x] "glow the exact edit" — DONE** (commits `078fba6` + `6d25832`). Both cases now precise:
       1. **Custom whole-line atom** (an M8, a Probe sub) → injected → whole-line glow (`.op-block-edited`). ✓
-      2. **Editing the VALUE of a param from a block** → `opStacks.editedRangesForOp` char-diffs the leaf atom's
+      2. **Editing the VALUE of a param from a block** → `opGlow.editedRangesForOp` char-diffs the leaf atom's
          clean-rebuild line vs its live line → glows just the changed **token** (`.word-edited` span via
          `editorOpHover.wrapRange`). ✓ Forward-only (BUILDERS(op.params) baseline, no inference — supersedes the
          RECONCILERS-baseline design sketched below). Tests: `tests/word-glow.spec.js`.

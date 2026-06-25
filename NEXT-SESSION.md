@@ -59,20 +59,25 @@ Do NOT do them all in one commit — the diff becomes unreadable.
 
 Order:
 1. ✅ **DONE (commit `47a330d`)** `blockModel.js` → `blockEmitter.js` — git mv + ~40 importers + header; suite green.
-2. Move `opFromMarker` + `importMarkedNc` → `programModel.js` (codec symmetry; update the import in `opStacks.js` + anywhere else)
-3. Extract `opGlow.js` from `opStacks.js` (pull the three glow exports out, update importers)
-4. Split remaining `opStacks.js` → `opBuilders.js` + `opSession.js` (the big one — do last when the file is smallest)
+2. ✅ **DONE (commit `7373da5`)** moved `opFromMarker` + `importMarkedNc` → `programModel.js` (codec symmetry, next to `serializeWithMarkers`).
+3. ✅ **DONE (commit `b976615`)** extracted `opGlow.js` (the three glow exports + `stripBlockIds` + the LCS override-diff helpers).
+4. ✅ **DONE (commits `7a383e6` + `89218bf` + `f0bed03`)** — extracted `opBuilders.js` leaf FIRST (per the ordering note),
+   then split the remainder into `opSession.js`, then dissolved the `opStacks.js` barrel (importers re-pointed, file deleted).
 
-> **⚠ Ordering note from the impl session (steps 2–4 remain).** `opFromMarker` (step 2), the glow's `_builderAtoms`
-> (step 3), and the session mutations (step 4) **all** depend on `BUILDERS` / `_framed` / `makeOp`. So consider
-> extracting **`opBuilders.js` FIRST** (the leaf: the 21 `*Stack` imports + `BUILDERS` + `makeOp` + `_framed` +
-> `OP_LABELS`/`opRequires`/`scanAtoms`/`VAR_ATOMS`/`FLOW_ATOMS` + `_opSeq`), then have `opGlow`, the moved codec, and
-> `opSession` import from it one-way. Same end state, but avoids steps 2–3 transitionally importing the *whole*
-> `opStacks` (which pulls all wizards) and any cycle risk. Cycle check done: wizards don't import `opStacks`
-> (header: "nothing imports this back"), so `opBuilders → wizards` and `opStacks → opBuilders` is acyclic.
-> Watch the helpers that straddle the split: `find` + `RECONCILERS` + `regionParamsFromDesc`/`regionDesc`/`offsetRegion`
-> stay with `opSession`; `stripBlockIds`/`collectEdits`/`diffRange`/`_emitLinesOf`/`_findOpById` go to `opGlow`;
-> `mergeOpBlocks` is a mutation → `opSession`. The split is ~900 lines — do it with fresh context, one commit each.
+> ## ✅ THE RESTRUCTURE IS DONE — `opStacks.js` is gone (5 commits `7a383e6`→`f0bed03`, suite green at each)
+> Followed the **opBuilders-first** ordering. Final module set:
+> ```
+> opBuilders.js   ← BUILDERS leaf (the wizard stack-builder registry + op-container construction)
+> opSession.js    ← wizard session (build/preview/commit) + mutations + RECONCILERS + find + accumulation
+> opGlow.js       ← form-vs-blocks diff (isOpBlockEdited / editedLinesForOp / editedRangesForOp + override-diff)
+> programModel.js ← program state + the FULL marker codec (serializeWithMarkers + opFromMarker + importMarkedNc)
+> ```
+> Two corrections to the advisory's straddler plan, **verified against the real code** (the impl-session note above was
+> slightly off): **`find`** is used only by `placeFields` + `RECONCILERS` → stayed with `opSession` (not a leaf util);
+> **`stripBlockIds`** is used only by `isOpBlockEdited` + `_paramsDiffer` → went to `opGlow` (NOT a straddler — `mergeArrays`
+> does not use it). No cycle (`programModel → opBuilders` is call-time only). Adversarially reviewed: reachability + cycle +
+> untested-path agents all clean. ⚠ Downstream: `ddcs-vscode-extension/web/dist/bundle.js` (generated) still names
+> opStacks — it picks up the new files on the next `npm run build:web` in the extension.
 
 ---
 ## ✅ DONE — `DICT` → `SCHEMA`, `opDictionary.js` → `opSchema.js` (advisory rename, commit below)
@@ -128,7 +133,7 @@ Clean baseline = **~229 passed, 1 failed** (the 1 is always one of the two known
 The BANNED "inference" = recovering high-level intent **from opaque motion lines**. That is the *only* banned thing.
 
 ### ⚠️ The trap that bit me last session — read this twice
-- **`RECONCILERS` (in `opStacks.js`) read DECLARED params off the STRUCTURED BLOCK MODEL** (`offX` stored on the
+- **`RECONCILERS` (in `opSession.js`) read DECLARED params off the STRUCTURED BLOCK MODEL** (`offX` stored on the
   PlaceOnStock block; ATC tolerance on the atom). **That is DECLARATION, not inference.** They are a **tested,
   legitimate** reverse-sync feature (≈14 tests: `place-on-stock-block`, `slot-array`, `atc-roundtrip`, …).
   **DO NOT DELETE THEM.** I conflated "reads block params" with "infers from motion," deleted them, broke 14
@@ -155,7 +160,7 @@ reverse). The forward binding is now **one declared source of truth on the dict*
   PlaceOnStock child-block layer is `offX`/`offY`, a different layer); `atc_table` was a stale-FIELDS rename.
 
 ### Step 5 (reverse-sync `RECONCILERS`) — ASSESSED + DEFERRED (optional, unfavorable)
-`RECONCILERS` (`opStacks.js`) map **block-atom params → form-field ids** (e.g. `sf_depth ← stepdown.to`), and emit
+`RECONCILERS` (`opSession.js`) map **block-atom params → form-field ids** (e.g. `sf_depth ← stepdown.to`), and emit
 a **mix** of (a) op-param-bound fields and (b) pattern/derived fields with *no* flat binding (`sl_dia`, `sl_count`,
 `d_cols`, un-derived `stepover%`). Migrating them to "produce `op.params` → map via the dict" only covers (a);
 (b) stays hardcoded — and `drill`'s reconciler can't use `paramFields` at all (drill is binding-exempt). So it's a
@@ -171,10 +176,14 @@ partial, messy decouple of 14-tested reverse-sync code for modest gain. **Left a
 ## Key files
 - `web/blocks/opSchema.js` — `SCHEMA` (per op: param type + `addr` + `canon` + now `.field`), `FIELD_BIND` (the
   authoring column folded onto `SCHEMA`), `BIND_ORPHANS`, `paramFields(op)`, codec, `validate`. **The single source of truth.**
-- `web/blocks/opStacks.js` — `BUILDERS` (exported), `RECONCILERS` (**keep** — block→form reverse sync), `makeOp`,
-  `opFromMarker`, `importMarkedNc`, `collectInjectedIds` (override-diff), `editedLinesForOp` (glow).
+- `web/blocks/opBuilders.js` — `BUILDERS` (exported, the wizard stack-builder registry), `makeOp`, `_framed`, `_builderAtoms`. The LEAF.
+- `web/blocks/opSession.js` — the wizard session (`buildActiveOpStack`/`previewActiveOp`/`commitActiveOp`), mutations
+  (`replaceOp`/`deleteOp`/`duplicateOp`/`commitDecodedCode`/`mergeOpBlocks`), `RECONCILERS` (**keep** — block→form reverse
+  sync), `find`, the accumulation/label-hygiene helpers.
+- `web/blocks/opGlow.js` — the form-vs-blocks diff: `isOpBlockEdited`, `editedLinesForOp`, `editedRangesForOp` +
+  `collectInjectedIds`/`collectEdits` (override-diff) + `stripBlockIds`.
 - `web/blocks/programModel.js` — stack-as-truth, the line→op map (`proj.map` = per-line block ancestry, built in
-  `blockModel.js`'s `emit`: `own = [...anc, block.id]`), `serializeWithMarkers`.
+  `blockEmitter.js`'s `emit`: `own = [...anc, block.id]`), the marker codec (`serializeWithMarkers` + `opFromMarker` + `importMarkedNc`).
 - `web/wizardManager.js` — imports `paramFields`; `_seedForm` + `canEdit` read the dict binding; `openForEdit`
   (seeds from `op.params` — the correct forward path), `pullFromBlocks` (reverse-sync via RECONCILERS, **keep**).
 - `tests/protocol-validator.spec.js` — the guard: SCHEMA entry + binding (`.field`) + `BIND_ORPHANS` empty + canon
@@ -227,7 +236,7 @@ DOM level (`tests/word-glow.spec.js`: word range + injection whole-line + the re
   **Naming:** two things called "macro" — `.mjson` saved op-stacks (Studio-side) vs Macros tab O-code scripts
   (controller-side). Fix: `macroFile.js` → `programFile.js` (Studio saved programs aren't controller macros);
   `camPack.js` → `slotPack.js` (DDCS on-controller slot system, not industry CAM). `macrosApp.js` can stay —
-  it genuinely authors controller-side macros. Do AFTER the `opStacks` restructure settles.
+  it genuinely authors controller-side macros. (The `opStacks` restructure it was gated on is now DONE — see the top of this file.)
 
 - **Gateway — implementation gaps (architecture already correct)** — already file-per-view (10 files, ~93
   lines avg). No restructuring needed. Two gaps:
@@ -248,3 +257,14 @@ DOM level (`tests/word-glow.spec.js`: word range + injection whole-line + the re
   flat). Currently the rig in `gcodeViz3d.js` is gated on `stock.shape === 'cylinder'`, which misses the
   rectangular case. Fix: in `previewActiveOp`, pass an `isRotary` flag (derived from op type) to the preview panel
   alongside the stock; the viz uses it to show the rig regardless of stock shape.
+
+- **New Machine ops: Loop + Subroutine Call** — two new ops for the Machine wizard dropdown (alongside Comm/MDI,
+  Warm-up, Set Output, Wait Input, Dwell). Both clear the "worth a wizard" bar: they generate non-trivial code and
+  have non-obvious syntax on the Expert dialect.
+  1. **Loop** — generates a `WHILE #N LT [count] DO1 … END1` block with a counter variable. Params: iteration
+     count, counter variable number. The body is a nested op slot. Wizard form: count field + variable picker.
+     Schema entry + BUILDERS entry + protocol validator pass required.
+  2. **Subroutine Call** — generates `M98 P[file]` with parameter passing via registers. Params: sub filename/number,
+     argument values mapped to registers. Wizard form: file picker + parameter table. Same protocol requirements.
+  Both are Expert-ONLY (caps-gated, same pattern as I/O ops). Add SCHEMA entries, BUILDERS entries, and extend the
+  validator EXEMPT_BINDING or add field bindings as appropriate.

@@ -77,7 +77,7 @@ read-machine, set-WCS `#[805+]`, IF/GOTO/label, message/ask-number), **V4.1** (`
 
 ### Roadmap (next)
 - **Per-op form editor** — hover a high-level op's lines → frame + edit button → its wizard opens *pre-filled
-  from the block* → Apply writes back (the clean editor for the inferred ops; reuses `opStacks.RECONCILERS`).
+  from the block* → Apply writes back (the clean editor for the inferred ops; reuses `opSession.RECONCILERS`).
 - **Uniform preview** — Blocks 2D/3D+Play as the shared component for Studio's main 3D preview + the wizards.
 - **Heavy fills** (Fill Zigzag/Concentric: `direction=climb/conventional`, shared stepover, tool-Ø higher
   context) → rework surfacing/pocket to seed them. **Forward-port** probe/ATC/comms wizards.

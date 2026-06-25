@@ -63,7 +63,7 @@ across DDCS/LinuxCNC). Remaining:
   footer, park=true path) → split into two lines.
 - **MED** — snippet-op ACCUMULATION: concatenating two probe/ATC snippets gives duplicate `N1`/`N2` labels + a
   mid-program `M30` (strands the 2nd op; a GOTO can hit the wrong `N`). Renumber labels / strip interior `M30` on
-  accumulate (`opStacks.appendIntoProgram`). See [[decode-is-standby]].
+  accumulate (`opSession.appendIntoProgram`). See [[decode-is-standby]].
 - **LOW** — alignment `MSG('Drift=%.3f…')` printf specifiers aren't substituted by hmiToast → shows literal
   `%.3f`. Embed `#vars` like the other wizards.
 - **verify-on-hardware** — DDCS `atan[a]/[b]` acceptance (required on LinuxCNC per interp_read.cc; DDCS Fanuc-style
@@ -237,7 +237,7 @@ Editor-only (user: "don't edit form from block"). Hover an op in the editor → 
 context menu Edit/Duplicate/Delete (shared `ui/opContextMenu.js`). A central `PARAM_FIELDS` map in
 `wizardManager.js` seeds the form from `op.params` (single source of truth — "a snapshot is inference") for ALL
 ops (drill has a custom `setForm` for pattern variants; `atc_length` is Settings-driven → not editable). Insert
-rebuilds in place (`opStacks.replaceOp`, keeps id); `duplicateOp`/`deleteOp` back the menu. Pulsing accent glow
+rebuilds in place (`opSession.replaceOp`, keeps id); `duplicateOp`/`deleteOp` back the menu. Pulsing accent glow
 while editing an existing op. (The "view.setForm rollout" TODO further down is now COMPLETE.)
 
 ## #5 native V4.1/DM500 datum path — DEFERRED (2026-06-15)
@@ -267,7 +267,7 @@ uncommented #var lines (38 gated comments), op kept. Blocks view: `applyOpGating
 gated lines (no greying — per-line gate is partial). The op-container itself is kept for record/group/edit.
 
 DONE (commits b874cb3, 2a6d4c1):
-1. ✅ Accumulation: `opStacks.commitActiveOp` + `buildActiveOpStack` wrap each op in an op-container; `requires`
+1. ✅ Accumulation: `opSession.commitActiveOp` + `buildActiveOpStack` wrap each op in an op-container; `requires`
    derived (assign/probe/proberead/readmachine/setworkoffset/tooloffset/machinemove → 'vars'; ifgoto/goto/label
    → 'flow'; cutting → []). `params` stored. `find()` recurses into containers so reconcilers still work.
 2. ✅ Blockly round-trip: `bridge.js` defines an `op` GROUP block (LABEL field + DO mouth); `stackBridge.js`
@@ -281,7 +281,7 @@ DONE (commit e940ec9) — op-form editing FROM THE EDITOR, params = single truth
 inference"):
 4. ✅ Framework: hover an op in the editor → highlight its lines + a floating "✎ Edit" chip (ui/editorOpHover.js,
    via programModel opAtLine/linesForOp); click → wizardManager.openForEdit(opId) → seed the form from the op's
-   `params` (view.setForm) → on insert opStacks.replaceOp rebuilds the op in place (same id). Verified in Node.
+   `params` (view.setForm) → on insert opSession.replaceOp rebuilds the op in place (same id). Verified in Node.
 5. ✅ Glow: `.wiz-box.editing` accent glow when editing an existing op (vs new).
 
 TODO (op-form editing rollout):
