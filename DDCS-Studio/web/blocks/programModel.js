@@ -10,8 +10,9 @@
  * Views subscribe via onChange; setStack carries an `origin` so a view ignores its own echo (no feedback loop).
  */
 import { emitMapped } from './blockEmitter.js';
-import { reconcileGcodeToStack } from './gcodeToStack.js';
-import { markerLine } from './opSchema.js';
+import { reconcileGcodeToStack, parseGcodeToStack } from './gcodeToStack.js';
+import { markerLine, isMarker, parseMarker } from './opSchema.js';
+import { BUILDERS, makeOp, _builderAtoms } from './opBuilders.js';   // codec: rebuild ops from markers (declare, never infer)
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
@@ -64,6 +65,40 @@ export function serializeWithMarkers() {
         out.push(line);
     });
     return out.join('\n');
+}
+
+// ── import: read self-describing markers → RECONSTRUCT ops (declare, never infer) ───────────────────────────
+// The inverse of serializeWithMarkers above — both halves of the ( @DDCS:1 {…} ) codec live here (was opStacks.js).
+/** Reconstruct an op container from a declared marker record. Forward-only: BUILDERS rebuilds the body from
+ *  the declared params (we trust the declaration; verify-vs-motion + overrides are the B4 override-diff). */
+export function opFromMarker(opType, params) {
+    if (!BUILDERS[opType]) return null;
+    return makeOp(opType, params, _builderAtoms(opType, params));   // _builderAtoms unwraps a self-wrapping builder (homing)
+}
+
+/** Import a .nc → program stack, using DDCS op markers where present. A marker DECLARES an op → it's
+ *  reconstructed from BUILDERS and its file body (up to the next marker) is consumed; marker-free spans are
+ *  leaf-parsed (the sanctioned declaration path). A marker-free .nc → pure leaf parse, exactly as today. */
+export function importMarkedNc(text, opts) {
+    const lines = String(text).split('\n');
+    const o = opts || dialectOpts();
+    const stack = [];
+    let i = 0;
+    while (i < lines.length) {
+        if (isMarker(lines[i])) {
+            const rec = parseMarker(lines[i]);
+            const op = rec && opFromMarker(rec.opType, rec.params);
+            if (op) stack.push(op);
+            i++;
+            while (i < lines.length && !isMarker(lines[i])) i++;                 // consume the declared op's body
+        } else {
+            const seg = [];
+            while (i < lines.length && !isMarker(lines[i])) { seg.push(lines[i]); i++; }
+            let leaf; try { leaf = parseGcodeToStack(seg.join('\n'), o); } catch (_) { leaf = null; }
+            if (Array.isArray(leaf)) stack.push(...leaf);
+        }
+    }
+    return stack;
 }
 /** True when the editor text still matches the live projection (so the line→op map is valid for hover). */
 export function editorMatchesProjection() {

@@ -8,8 +8,7 @@
  */
 import { getLastOp, recordOp } from './opRecord.js';
 import { num, r3 } from '../wizards/ops/util.js';
-import { parseGcodeToStack } from './gcodeToStack.js';                       // decode a non-builder op's G-code → blocks
-import { isMarker, parseMarker } from './opSchema.js';                       // read self-describing op markers
+import { parseGcodeToStack } from './gcodeToStack.js';                       // decode a non-builder op's G-code → blocks (commitDecodedCode)
 import { emitMapped } from './blockEmitter.js';                               // emit a stack → { lines, map } (for word-level glow diff)
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
@@ -791,35 +790,7 @@ export function editedRangesForOp(opId) {
     return out.sort((x, y) => x.line - y.line);
 }
 
-// ── import: read self-describing markers → RECONSTRUCT ops (declare, never infer) ───────────────────────────
-/** Reconstruct an op container from a declared marker record. Forward-only: BUILDERS rebuilds the body from
- *  the declared params (we trust the declaration; verify-vs-motion + overrides are the B4 override-diff). */
-export function opFromMarker(opType, params) {
-    if (!BUILDERS[opType]) return null;
-    return makeOp(opType, params, _builderAtoms(opType, params));   // _builderAtoms unwraps a self-wrapping builder (homing)
-}
-
-/** Import a .nc → program stack, using DDCS op markers where present. A marker DECLARES an op → it's
- *  reconstructed from BUILDERS and its file body (up to the next marker) is consumed; marker-free spans are
- *  leaf-parsed (the sanctioned declaration path). A marker-free .nc → pure leaf parse, exactly as today. */
-export function importMarkedNc(text, opts) {
-    const lines = String(text).split('\n');
-    const o = opts || dialectOpts();
-    const stack = [];
-    let i = 0;
-    while (i < lines.length) {
-        if (isMarker(lines[i])) {
-            const rec = parseMarker(lines[i]);
-            const op = rec && opFromMarker(rec.opType, rec.params);
-            if (op) stack.push(op);
-            i++;
-            while (i < lines.length && !isMarker(lines[i])) i++;                 // consume the declared op's body
-        } else {
-            const seg = [];
-            while (i < lines.length && !isMarker(lines[i])) { seg.push(lines[i]); i++; }
-            let leaf; try { leaf = parseGcodeToStack(seg.join('\n'), o); } catch (_) { leaf = null; }
-            if (Array.isArray(leaf)) stack.push(...leaf);
-        }
-    }
-    return stack;
-}
+// ── import: read self-describing markers → RECONSTRUCT ops ─────────────────────────────────────────────────
+// The marker codec moved to programModel.js (next to serializeWithMarkers — both halves co-located). Re-exported
+// here so importers reading it off opStacks keep working through the split.
+export { opFromMarker, importMarkedNc } from './programModel.js';
