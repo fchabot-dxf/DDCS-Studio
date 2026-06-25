@@ -10,7 +10,7 @@ test('engine traces a generated bore bolt-circle macro with seeded form vars', a
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
     const { slotFromOp } = await import('/data/opToSlot.js');
-    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { slotMacro, mirrorVar } = await import('/data/slotPack.js');
     const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
     const s = slotFromOp('bore', 'circle');
     const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
@@ -34,7 +34,7 @@ test('corner probe slot: each corner probes the correct X/Y walls and every bran
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
     const { cornerSlot } = await import('/data/probeToSlot.js');
-    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { slotMacro, mirrorVar } = await import('/data/slotPack.js');
     const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
     const s = cornerSlot();
     const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
@@ -74,7 +74,7 @@ test('edge probe slot: axis/direction select the wall and the WCS axis written',
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
     const { edgeSlot } = await import('/data/probeToSlot.js');
-    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { slotMacro, mirrorVar } = await import('/data/slotPack.js');
     const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
     const s = edgeSlot();
     const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
@@ -105,7 +105,7 @@ test('inside-centre slot: probes ±X then ±Y with a G53 re-centre between (bore
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
     const { insideCentreSlot } = await import('/data/probeToSlot.js');
-    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { slotMacro, mirrorVar } = await import('/data/slotPack.js');
     const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
     const s = insideCentreSlot();
     const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
@@ -128,7 +128,7 @@ test('boss-centre slot: probes 4 faces from outside, 3 reposition prompts, write
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
     const { bossCentreSlot } = await import('/data/probeToSlot.js');
-    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { slotMacro, mirrorVar } = await import('/data/slotPack.js');
     const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
     const s = bossCentreSlot();
     const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
@@ -151,7 +151,7 @@ test('alignment slot: fence axis selects the probe axis; measures (no WCS write)
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
     const { alignmentSlot } = await import('/data/probeToSlot.js');
-    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { slotMacro, mirrorVar } = await import('/data/slotPack.js');
     const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
     const s = alignmentSlot();
     const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
@@ -174,7 +174,7 @@ test('pocket slot: raster-clears the rect to depth in layers; guards a too-small
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
     const { pocketSlot } = await import('/data/millToSlot.js');
-    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { slotMacro, mirrorVar } = await import('/data/slotPack.js');
     const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
     const s = pocketSlot();
     const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
@@ -203,7 +203,7 @@ test('circle-pocket slot: concentric rings clear the disc to depth (Ø − tool)
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
     const { circlePocketSlot } = await import('/data/millToSlot.js');
-    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { slotMacro, mirrorVar } = await import('/data/slotPack.js');
     const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
     const s = circlePocketSlot();
     const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
@@ -228,7 +228,7 @@ test('surfacing slot: rasters the full area with no inset and no wall pass', asy
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
     const { surfacingSlot } = await import('/data/millToSlot.js');
-    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { slotMacro, mirrorVar } = await import('/data/slotPack.js');
     const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
     const s = surfacingSlot();
     const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
@@ -248,7 +248,7 @@ test('mill variants: raster direction rotates the rows (same coverage); circle a
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
     const { pocketSlot, circlePocketSlot } = await import('/data/millToSlot.js');
-    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { slotMacro, mirrorVar } = await import('/data/slotPack.js');
     const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
     const trace = (s) => {
       const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
@@ -280,7 +280,7 @@ test('cutting slots manage the spindle with the proven Expert forms (M3 S[#var],
   const r = await page.evaluate(async () => {
     const { slotFromOp } = await import('/data/opToSlot.js');
     const { pocketSlot, surfacingSlot } = await import('/data/millToSlot.js');
-    const { slotMacro } = await import('/data/camPack.js');
+    const { slotMacro } = await import('/data/slotPack.js');
     const macros = {
       drill: slotMacro({ slot: 22, ...slotFromOp('drill', 'circle') }),
       slot: slotMacro({ slot: 22, ...slotFromOp('slot') }),
@@ -305,7 +305,7 @@ test('probe-Z slot: two-pass Z touch down, writes WCS Z so the touch reads as Su
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
     const { probeZSlot } = await import('/data/probeToSlot.js');
-    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { slotMacro, mirrorVar } = await import('/data/slotPack.js');
     const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
     const s = probeZSlot();
     const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });
@@ -351,7 +351,7 @@ test('rotateProgram rotates XY + arc I/J about a pivot; tracks partial moves; fl
 test('mergeEng appends pack params, preserves the eng, and flags collisions', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
-    const { mergeEng } = await import('/data/camPack.js');
+    const { mergeEng } = await import('/data/slotPack.js');
     const existing = '#100 -s1"Existing setting" -m1\n#1116 -s1"Community param" -m33\n';
     const additions = '#1100 -p0 =0 -t1 -s1"My field" -s2"mm" -m42 -min=0 -max=10\n#1116 -p0 =0 -t1 -s1"Clash" -m42\n';
     const m = mergeEng(existing, additions);
@@ -389,7 +389,7 @@ test('preview panel mounts on a seeded slot macro without throwing', async ({ pa
   await page.goto('http://localhost:3211');
   const ok = await page.evaluate(async () => {
     const { slotFromOp } = await import('/data/opToSlot.js');
-    const { slotMacro, mirrorVar } = await import('/data/camPack.js');
+    const { slotMacro, mirrorVar } = await import('/data/slotPack.js');
     const { createPreviewPanel } = await import('/viz/createPreviewPanel.js');
     const s = slotFromOp('drill', 'grid');
     const macro = slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body });

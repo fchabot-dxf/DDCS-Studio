@@ -14,7 +14,7 @@
  * Scratch use: fields via their assigned vars; calc in #70/#71/#73 (WCS), #90–#99 (signs/targets), #101/#102
  * (radius-comp temps) — clear of drill/bore's #30–#54 so a probe can share a slot if ever appended.
  */
-import { nextParam } from './camPack.js';
+import { nextParam } from './slotPack.js';
 import { PROBE, wcsBase, writeAxis, twoPassProbe, probeSave } from './camMacroKit.js';
 
 // Probe port + trigger level are MACHINE-CONSTANT config, so the macros read them from the controller's
@@ -56,7 +56,7 @@ export const readLine = (f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units
 
 /**
  * Build the "Probe outside corner" CAM slot. One branching macro: #corner→signs, #wcs→base address,
- * #probeZ→optional Z surface, #seq→wall order. Returns { name, fields, body } (plugs into camPack).
+ * #probeZ→optional Z surface, #seq→wall order. Returns { name, fields, body } (plugs into slotPack).
  */
 export function cornerSlot(used = new Set(), varOffset = 0) {
     const { fields, v } = allocFields(CORNER_FIELDS, used, varOffset);

@@ -11,7 +11,7 @@
  * install separately — fragile and easy to forget; inlining keeps every slot runnable on its own.
  * See the cam-menu-architecture memory + docs/CAM-MENU-RESEARCH.md.
  */
-import { nextParam, mirrorVar } from './camPack.js';
+import { nextParam, mirrorVar } from './slotPack.js';
 import { spindleOn, spindleOff } from './camMacroKit.js';
 
 // Field specs: label / units / default / min / max / type (1=decimal, 0=integer). `def` may depend on method.
@@ -118,7 +118,7 @@ function loopBody(pattern, v, method) {
 /**
  * Build a slot starting point. method 'drill'|'bore', pattern 'circle'|'grid'|'line'|'rect'.
  * `used` = Set of #11xx already taken in the pack (for collision-free allocation).
- * Returns { name, fields:[{idx,label,units,def,min,max,type,var}], body }  — plugs straight into camPack.
+ * Returns { name, fields:[{idx,label,units,def,min,max,type,var}], body }  — plugs straight into slotPack.
  */
 export function slotFromOp(method, pattern, used = new Set(), varOffset = 0) {
     const std = STANDALONE[method];

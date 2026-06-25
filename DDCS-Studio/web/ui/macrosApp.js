@@ -8,7 +8,7 @@ import { getSettings, saveSettings } from './settingsPanel.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { FACTORY_MACROS } from '../data/factoryMacros.js';
 import { makeClient } from '../shared/js/client.js';
-import * as camPack from '../data/camPack.js';
+import * as slotPack from '../data/slotPack.js';
 import { bmpDataUrl } from '../data/bmp.js';
 import { openIconEditor } from './iconEditor.js';
 import { slotFromOp } from '../data/opToSlot.js';
@@ -1009,7 +1009,7 @@ function homingMove(ax, delta) {
         const taken = new Set(otherUsed);
         let body = String(slot.body || '');
         (slot.fields || []).forEach((f) => {
-            const ni = camPack.nextParam(taken); if (ni == null || ni === f.idx) { if (ni != null) taken.add(ni); return; }
+            const ni = slotPack.nextParam(taken); if (ni == null || ni === f.idx) { if (ni != null) taken.add(ni); return; }
             taken.add(ni);
             const re = new RegExp('^([ \\t]*' + f.var.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=#)' + (f.idx + 1500) + '\\b', 'm');
             body = body.replace(re, '$1' + (ni + 1500));
@@ -1044,9 +1044,9 @@ function homingMove(ax, delta) {
     function renderCamBuilder() {
         const host = q('cam_slots'); if (!host) return;
         const nameEl = q('cam_pack_name'); if (nameEl && document.activeElement !== nameEl) nameEl.value = (_camPack.meta && _camPack.meta.name) || '';
-        const v = camPack.validatePack(_camPack);
+        const v = slotPack.validatePack(_camPack);
         const vEl = q('cam_validate');
-        if (vEl) vEl.innerHTML = [...v.errors.map((e) => '⛔ ' + e), ...v.warnings.map((w) => '⚠ ' + w)].join('<br>') || ('✓ No collisions · ' + camPack.usedParams(_camPack).size + '/400 form params used.');
+        if (vEl) vEl.innerHTML = [...v.errors.map((e) => '⛔ ' + e), ...v.warnings.map((w) => '⚠ ' + w)].join('<br>') || ('✓ No collisions · ' + slotPack.usedParams(_camPack).size + '/400 form params used.');
         if (!_camPack.slots.length) { host.innerHTML = '<div class="settings-hint">No slots yet — “＋ Add slot”. Slots default to cam' + ((_camPack.meta && _camPack.meta.baseSlot) || 22) + '+ (cam0–21 are factory / community).</div>'; return; }
         host.innerHTML = _camPack.slots.map((slot, si) => {
             const fields = slot.fields || [];
@@ -1057,7 +1057,7 @@ function homingMove(ax, delta) {
                 <td><input class="cf" data-f="min" type="number" value="${f.min != null ? f.min : 0}" style="width:62px;"></td>
                 <td><input class="cf" data-f="max" type="number" value="${f.max != null ? f.max : 0}" style="width:62px;"></td>
                 <td><input class="cf" data-f="var" value="${camEsc(f.var || '#' + (fi + 1))}" style="width:42px;"></td>
-                <td style="color:var(--text-dim); font-size:10px; white-space:nowrap;">#${f.idx} → #${camPack.mirrorVar(f.idx)}</td>
+                <td style="color:var(--text-dim); font-size:10px; white-space:nowrap;">#${f.idx} → #${slotPack.mirrorVar(f.idx)}</td>
                 <td><button class="op-btn" data-act="delf" title="Remove field">✕</button></td>
             </tr>`).join('');
             return `<div class="cam-slot" data-si="${si}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:10px;">
@@ -1065,7 +1065,7 @@ function homingMove(ax, delta) {
                     <label style="font-size:11px; color:var(--text-dim);">cam<input type="number" class="cs" data-f="slot" value="${slot.slot}" min="0" max="9999" style="width:60px; margin-left:2px;"></label>
                     <input class="cs" data-f="name" value="${camEsc(slot.name)}" placeholder="Slot name" style="flex:1; min-width:120px;">
                     <label style="font-size:10px; color:var(--text-dim);" title="Work coordinate system this slot's macro runs in. Active = whatever G54–G59 the operator has selected; or bake a specific one.">WCS<select class="cs" data-f="wcs" style="margin-left:3px;">${['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59'].map((o) => `<option value="${o}"${(slot.wcs || 'active') === o ? ' selected' : ''}>${o === 'active' ? 'Active' : o}</option>`).join('')}</select></label>
-                    <span style="font-size:10px; color:var(--text-dim);">-m${camPack.slotGroup(slot.slot)}</span>
+                    <span style="font-size:10px; color:var(--text-dim);">-m${slotPack.slotGroup(slot.slot)}</span>
                     <button class="op-btn" data-act="dupslot" title="Duplicate this slot to a new cam number">⧉</button>
                     <button class="op-btn" data-act="dels" title="Remove slot">✕</button>
                 </div>
@@ -1123,9 +1123,9 @@ function homingMove(ax, delta) {
     // the same engine + 2D/3D view the editor preview uses, in a throwaway modal.
     function simulateSlot(slot) {
         if (window.ddcsStopPreview) window.ddcsStopPreview();   // only one engine runs at a time
-        const macro = camPack.slotMacro(slot);
+        const macro = slotPack.slotMacro(slot);
         const seed = new Map();
-        (slot.fields || []).forEach((f) => { const v = Number(f.def); seed.set(camPack.mirrorVar(f.idx), Number.isFinite(v) ? v : 0); });
+        (slot.fields || []).forEach((f) => { const v = Number(f.def); seed.set(slotPack.mirrorVar(f.idx), Number.isFinite(v) ? v : 0); });
         // Probe macros (G31) trace their full travel unless the engine has stock to clamp to — the panel's
         // Stock button (📦) sets it, so a probe then stops at the real surface instead of running to the limit.
         const isProbe = /\bG31\b/.test(macro);
@@ -1172,7 +1172,7 @@ function homingMove(ax, delta) {
         });
         camHost.addEventListener('click', (e) => {
             const card = e.target.closest('.cam-slot'); if (!card) return; const si = +card.dataset.si; const slot = _camPack.slots[si]; if (!slot) return; const a = e.target.dataset.act;
-            if (a === 'addf') { slot.fields = slot.fields || []; const idx = camPack.nextParam(camPack.usedParams(_camPack)); if (idx == null) { alert('The #1100–1499 form-param pool is full.'); return; } slot.fields.push({ idx, label: '', units: '', def: 0, min: 0, max: 0, type: 1, var: '#' + (slot.fields.length + 1) }); saveCamPack(); renderCamBuilder(); }
+            if (a === 'addf') { slot.fields = slot.fields || []; const idx = slotPack.nextParam(slotPack.usedParams(_camPack)); if (idx == null) { alert('The #1100–1499 form-param pool is full.'); return; } slot.fields.push({ idx, label: '', units: '', def: 0, min: 0, max: 0, type: 1, var: '#' + (slot.fields.length + 1) }); saveCamPack(); renderCamBuilder(); }
             else if (a === 'delf') { slot.fields.splice(+e.target.closest('tr').dataset.fi, 1); saveCamPack(); renderCamBuilder(); }
             else if (a === 'dels') { _camPack.slots.splice(si, 1); saveCamPack(); renderCamBuilder(); }
             else if (a === 'edit') { openIconEditor(slot.icon || null, (bmp, model) => { slot.icon = { name: (slot.name || 'cam' + slot.slot) + '.bmp', data: bmp, w: 360, h: 180, layers: model.layers }; saveCamPack(); renderCamBuilder(); }); }
@@ -1185,7 +1185,7 @@ function homingMove(ax, delta) {
                 const empty = !(slot.fields && slot.fields.length) && !String(slot.body || '').trim();
                 if (!slot.ops && !empty) {
                     // Legacy / hand-built slot (no op manifest) — keep the raw-text append so manual work is never lost.
-                    const gen = generateOp(method, variant, camPack.usedParams(_camPack), (slot.fields || []).length);
+                    const gen = generateOp(method, variant, slotPack.usedParams(_camPack), (slot.fields || []).length);
                     slot.fields = (slot.fields || []).concat(gen.fields);
                     slot.body = String(slot.body || '').replace(/\s+$/, '') + '\n\n' + gen.body;
                     slot.name = (slot.name || 'Slot') + ' + ' + gen.name.replace(/^(Drill|Bore) — /, '');
@@ -1232,13 +1232,13 @@ function homingMove(ax, delta) {
                 // "(Label [units] =default [min~max])" is the source for label/units/default/range, so editing it
                 // in the macro and refreshing actually takes effect. Only `type` (int vs decimal) is preserved
                 // from the existing field — it isn't encoded in the comment and has no column in the table to re-enter.
-                const scanned = camPack.fieldsFromMacro(slot.body);
+                const scanned = slotPack.fieldsFromMacro(slot.body);
                 const byIdx = new Map((slot.fields || []).map((f) => [f.idx, f]));
                 slot.fields = scanned.map((s, i) => { const e = byIdx.get(s.idx); return e ? { ...s, type: e.type, var: s.var || e.var } : { ...s, var: s.var || ('#' + (i + 1)) }; });
                 saveCamPack(); renderCamBuilder();
             }
             else if (a === 'sim') { simulateSlot(slot); }
-            else if (a === 'exp') { insertToEditor('( ===== eng form lines — MERGE into the controller eng language file ===== )\n' + camPack.slotEng(slot) + '\n\n' + camPack.slotMacro(slot)); }
+            else if (a === 'exp') { insertToEditor('( ===== eng form lines — MERGE into the controller eng language file ===== )\n' + slotPack.slotEng(slot) + '\n\n' + slotPack.slotMacro(slot)); }
         });
         camHost.addEventListener('change', (e) => {
             const t = e.target;
@@ -1283,13 +1283,13 @@ function homingMove(ax, delta) {
     const _camExport = q('cam_export_pack');
     if (_camExport) _camExport.addEventListener('click', () => {
         if (!_camPack.slots.length) { alert('No slots to export — add a slot first.'); return; }
-        const v = camPack.validatePack(_camPack);
+        const v = slotPack.validatePack(_camPack);
         if (!v.ok && !confirm('This pack has problems:\n\n' + v.errors.join('\n') + '\n\nExport anyway?')) return;
         const files = [], eng = [];
         _camPack.slots.forEach((slot) => {
-            files.push({ name: `CAM/macro_cam${slot.slot}.nc`, data: camPack.slotMacro(slot) });
+            files.push({ name: `CAM/macro_cam${slot.slot}.nc`, data: slotPack.slotMacro(slot) });
             if (slot.icon && slot.icon.data) files.push({ name: `CAM/cam${slot.slot}.bmp`, data: packBytes(slot.icon.data) });
-            eng.push(`( ===== cam${slot.slot} — ${slot.name || ''} ===== )`, camPack.slotEng(slot), '');
+            eng.push(`( ===== cam${slot.slot} — ${slot.name || ''} ===== )`, slotPack.slotEng(slot), '');
         });
         files.push({ name: 'eng-additions.txt', data: '( MERGE these lines into the controller eng/chs language file — do NOT replace it. )\n\n' + eng.join('\n') });
         const name = (_camPack.meta && _camPack.meta.name) || 'CAM pack';
@@ -1301,7 +1301,7 @@ function homingMove(ax, delta) {
     const _camMerge = q('cam_merge_eng');
     if (_camMerge) _camMerge.addEventListener('click', () => {
         if (!_camPack.slots.length) { alert('No slots to merge — add a slot first.'); return; }
-        const additions = _camPack.slots.map((s) => camPack.slotEng(s)).join('\n') + '\n';
+        const additions = _camPack.slots.map((s) => slotPack.slotEng(s)).join('\n') + '\n';
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center;';
         overlay.innerHTML = `<div style="width:min(900px,92vw); height:min(680px,88vh); background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px; display:flex; flex-direction:column; overflow:hidden;">
@@ -1319,7 +1319,7 @@ function homingMove(ax, delta) {
         overlay.querySelector('[data-mgo]').addEventListener('click', () => {
             const eng = overlay.querySelector('[data-eng]').value;
             if (!eng.trim()) { alert('Paste the controller eng first.'); return; }
-            const m = camPack.mergeEng(eng, additions);
+            const m = slotPack.mergeEng(eng, additions);
             const msgs = [];
             if (m.paramCollisions.length) msgs.push('⚠ #param collisions (already defined in the eng): ' + m.paramCollisions.map((n) => '#' + n).join(', ') + ' — reallocate these fields in the builder before installing.');
             if (m.groupCollisions.length) msgs.push('⚠ -m group collisions: ' + m.groupCollisions.map((g) => 'm' + g).join(', ') + ' — change the slot number(s).');

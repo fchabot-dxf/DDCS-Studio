@@ -16,7 +16,7 @@
  *   #2600– #2999  MIRROR     CAM form RUNTIME mirrors (populated from the form before the macro runs).
  *
  * Tracked pools (allocate from these, avoiding what's used): USERVAR #100-549 (persistent state) and FORM
- * #1100-1499 (form params, via camPack). SCRATCH is untracked by design.
+ * #1100-1499 (form params, via slotPack). SCRATCH is untracked by design.
  *
  * ⚠ EXPERT/M350 ONLY. The CAM menu is an Expert firmware feature; the DDCS V4.1 differs (uservar #100–#499,
  *   1500-param setting schema, and likely no CAM page at all) — never apply this map to a V4.1. If we ever
