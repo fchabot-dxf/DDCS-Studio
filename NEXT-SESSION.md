@@ -222,6 +222,78 @@ DOM level (`tests/word-glow.spec.js`: word range + injection whole-line + the re
 - **USER wizard-maker** — let a user parametrize a block stack → a *compliant* custom op; the validator validates
   it by construction. (Separate product feature; builds on the unified binding + validator + the params-
   completeness guard above — a user op is valid only if `BUILDERS(params)` reproduces its blocks.)
+
+  **Authoring flow (confirmed):**
+  1. User inserts an existing op (e.g. probe edge) via the wizard bar — it lands as a block stack in the
+     Blocks tab.
+  2. User switches to the Blocks tab and enables the **dev panel** — a specialized authoring panel that
+     shows the full atom structure with editable param declarations (type, range, default, units, label).
+  3. User marks specific atom values as params (e.g. approach distance, probe speed, corner side) and
+     names them. The dev panel is also usable for editing any existing op or macro — not authoring-only.
+  4. User names the custom op (e.g. "my_corner_probe") and hits **"Save as custom op"** → the op is added
+     to the user registry.
+  5. The custom op appears in the wizard bar as a first-class entry. Clicking it opens a form showing only
+     the declared params — same UX as a built-in wizard.
+  6. Right-click → Edit opens it back in Blocks + dev panel for modification.
+
+  This is the **fork-the-5%-delta** flow: start from a built-in, specialize the parts you control, name
+  it, share it. Not building from atoms up — building on top of what already works.
+
+  ### Technical design (scoped 2026-06-25 — feasibility VERIFIED, ready to build)
+  A user op = a saved block-stack **TEMPLATE** + a list of param **BINDINGS**, registered at RUNTIME. The template is
+  the forked stack with every value at its default; a binding points at one value and exposes it as a param:
+  ```
+  def = {
+    opType:  'user_<slug>',           // unique, namespaced (e.g. user_my_corner_probe)
+    label:   'My Corner Probe',
+    template: [ …block records, ids stripped, all values at default… ],
+    bindings: [ { param:'approach', blockIndex:N, key:'dist',                 // WHERE in the template
+                  type:'number', default:5, min:0, max:50, units:'mm', label:'Approach distance' }, … ],
+  }
+  ```
+  `blockIndex` indexes a deterministic pre-order walk of the template's children; `key` is the numeric param on that
+  block. The binding carries exactly the **dev-panel declarations** (type / range / default / units / label).
+
+  **register(def)** installs it live (one new module `web/blocks/userOps.js`):
+  - `BUILDERS[def.opType] = (params) => instantiate(def, params)` — clone the template, substitute each binding's
+    value at its (blockIndex,key); unbound values stay baked. `instantiate` + `flattenBlocks` (children-only for v1).
+  - `SCHEMA[def.opType] = { param: { type, addr:null, canon:param, field:'uop_<type>_<param>' } … }`.
+  - `registerOpLabel(def.opType, def.label)` — a tiny new export in `opBuilders.js` writing the mutable `OP_LABELS`.
+
+  **Compliant for FREE (verified — `BUILDERS`/`SCHEMA` are plain mutable objects, runtime-extensible):** the template
+  IS `BUILDERS(defaults)`, so `BUILDERS(op.params) == op.children` → **no false glow, passes params-completeness**.
+  Markers round-trip (canon = param name, unique). Validator type-checks. Glow / merge / `replaceOp` / `opFromMarker`
+  all gate on `BUILDERS[opType]`/`SCHEMA[opType]` and just work. Consumers confirmed: `opBuilders._framed`,
+  `opSession.{hasActiveOpStack,build,commit,replace,duplicate,merge}`, `opGlow.{isOpBlockEdited,editedLines/Ranges}`,
+  `programModel.opFromMarker`, `opSchema.{paramFields,canonOf,revCanon,validate,markerLine,parseMarker}`,
+  `wizardManager.{canEdit,_seedForm}`.
+
+  **The two real builds (everything else is free):**
+  1. **The dev panel** (authoring flow steps 2–3, 6) — a Blocks-tab panel that renders the active op's atom tree and
+     lets the user click a numeric value → declare it (type/range/default/units/label) → a binding. Also a general
+     op/macro inspector/editor (per the flow). Captures each value's (blockIndex,key).
+  2. **The generic param form** (flow step 5) — user ops have NO hand-written wizard `view`, so clicking the custom op
+     opens a **data-driven form generated from the bindings** (one input per param, ids `uop_<type>_<param>`, honoring
+     range/units/label) → `BUILDERS(values)` → insert. This same generic form is `_seedForm`'s target on edit.
+
+  **Persistence:** localStorage registry `ddcs_user_ops` (JSON array of defs; mirrors slotPack / `CAMPACK_KEY`).
+  `loadUserOps()` re-registers all at app start. Stretch: fold into the profile (`settings.userOps`) so it survives
+  profile export/import.
+
+  **Surfacing (flow step 5 — "first-class in the wizard bar"):** the wizard bar is **static HTML**
+  (`commandDeck.renderHeader` ~553-597), so a "Custom" group must be injected/data-driven there (the one bit of extra
+  wiring). The Blocks **toolbox** is already registry-driven (`PALETTE`, `web/wizards/ops/index.js`) → a "Custom"
+  category appears for free, a good secondary surface. Soft degradations (all fine): user ops render as the generic
+  `op` container block (no bespoke Blockly block); dict-based `_seedForm` (no per-op view) — which is exactly why the
+  generic form (build #2) exists.
+
+  **Build order (one commit per stage, suite green each):**
+  1. `web/blocks/userOps.js` core (instantiate/register/validate/persist/load + `userOpFromStack`) + `registerOpLabel`
+     in `opBuilders.js` + a **programmatic compliance test** (make a 2-binding user op → assert it builds, marker
+     round-trips, validates, and `_builderAtoms(type,defaults)` deep-equals the template → no false glow; mirrors
+     `protocol-validator` + `op-params-complete`). **No UI — pure foundation.**
+  2. The generic param form + insert path + `loadUserOps()` at startup + the wizard-bar "Custom" group.
+  3. The dev panel (authoring + edit). **v1 param type = number** (depths/feeds/speeds/coords); enums/geometry later.
 - **L1/L2** — per-controller address columns in the dict (the cross-controller translator); best-effort read of
   foreign post markers (e.g. Fusion op headers) as declarations.
 - **`macrosApp.js` restructure + naming** — 1338 lines, four unrelated workflows (Homing/Sysstart,
@@ -285,6 +357,12 @@ DOM level (`tests/word-glow.spec.js`: word range + injection whole-line + the re
 
   Make the panel larger in both modes (currently one row; expand to show more chips on wide screens and
   allow 2 rows on narrow). The panel height should be a CSS variable so it's easy to tune.
+
+- **File extensions: `.profile` + `.project`** — rename the saved file formats to descriptive extensions:
+  - `.profile` — machine configuration (replaces the current anonymous JSON profile saves)
+  - `.project` — saved op stack / program (replaces `.mjson`)
+  Keep backward-compat: on open, accept `.mjson` and re-save as `.project`. The `ddcs.macro` kind id in
+  the JSON payload can stay for data-compat. `programFile.js` needs updating for the new extension.
 
 - **Profile identity + pulled-data glow in settings** — two related UX gaps that make the personalized
   machine space feel abstract:
