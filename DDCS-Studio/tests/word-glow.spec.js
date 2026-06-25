@@ -64,3 +64,39 @@ test('editedRangesForOp: word-level range for a value edit, whole-line for an in
   // INJECTION → at least one WHOLE-LINE (null range) entry
   expect(r.injectRanges.some((x) => x.range === null)).toBe(true);
 });
+
+// The RENDERER actually wraps the changed token in a .word-edited span in the editor overlay (the real symptom).
+test('editorOpHover wraps the changed token in a .word-edited span', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.openWiz && window.insertWiz && window.ddcsGetBlockProgram && window.ddcsLoadBlockStack && window.ddcsRefreshBlockGlow);
+
+  const r = await page.evaluate(async () => {
+    const clone = (x) => JSON.parse(JSON.stringify(x));
+    const findLeaf = (blocks, pred) => {
+      for (const b of (blocks || [])) {
+        if (!b) continue;
+        if ((!b.children || !b.children.length) && pred(b)) return b;
+        if (b.children) { const f = findLeaf(b.children, pred); if (f) return f; }
+      }
+      return null;
+    };
+    window.ddcsLoadBlockStack([]);
+    window.openWiz('edge', undefined, true);
+    window.updateWiz();
+    await window.insertWiz();
+    window.closeWiz && window.closeWiz();
+    const prog = window.ddcsGetBlockProgram() || [];
+    const op = [...prog].reverse().find((b) => b && b.type === 'op' && b.opType === 'edge');
+    const ov = clone(op.children);
+    const asn = findLeaf(ov, (b) => b.type === 'assign' && b.params && /^-?\d+(\.\d+)?$/.test(String(b.params.value)));
+    asn.params.value = '987654';
+    window.ddcsLoadBlockStack(prog.map((b) => (b && b.id === op.id) ? { ...b, children: ov } : b));
+    await new Promise((res) => setTimeout(res, 150));   // editor reproject + MutationObserver
+    window.ddcsRefreshBlockGlow && window.ddcsRefreshBlockGlow();
+    const spans = Array.from(document.querySelectorAll('#editor-highlight .g-line .word-edited'));
+    return { gLines: document.querySelectorAll('#editor-highlight .g-line').length, spanTexts: spans.map((s) => s.textContent) };
+  });
+
+  expect(r.gLines).toBeGreaterThan(0);          // editor overlay is populated
+  expect(r.spanTexts).toContain('987654');      // only the changed token is wrapped
+});
