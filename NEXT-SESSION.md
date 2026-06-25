@@ -199,12 +199,20 @@ each build → fixed with a shared `stripBlockIds()` in the id-sensitive compare
 commit/replace/duplicate wrapped it AGAIN → fixed with `_framed()` (build + unwrap a self-wrapping builder),
 routed through all six build sites. Guard: `tests/op-params-complete.spec.js` (all 21 ops clean).
 
+## ✅ Word-level glow — DONE (commits `078fba6` + renderer test `6d25832`)
+The "glow the exact edit" ask. The override-diff glow was line-level; editing ONE value in a Blocks atom lit the
+whole line. Now `opStacks.editedRangesForOp(opId)` diffs the clean form rebuild's emit vs the live stack's emit
+(forward-only, via `emitMapped`) and returns `[{ line, range }]`: a value-edited LEAF → `range = [start,end)` of
+just the changed token; an injected / container / multi-line edit → `range = null` (whole-line). `editorOpHover`
+renders it: `wrapRange` wraps the token in a `.word-edited` span (disconnects its MutationObserver during the wrap
+to avoid a re-entrancy loop); whole-line keeps the `.op-block-edited` class. `collectInjectedIds` refactored to
+share the LCS walk (`collectEdits`, which also returns the override base/actual pairs). Verified end-to-end at the
+DOM level (`tests/word-glow.spec.js`: word range + injection whole-line + the rendered `.word-edited` span).
+
 ## Other queued work (after the binding rebuild)
 - **USER wizard-maker** — let a user parametrize a block stack → a *compliant* custom op; the validator validates
   it by construction. (Separate product feature; builds on the unified binding + validator + the params-
   completeness guard above — a user op is valid only if `BUILDERS(params)` reproduces its blocks.)
-- **Word-level glow** — the override-diff glow is block/line-level today; word-level needs a char-diff within the
-  differing line (inject a glow span at a char range in `formatGCode`'s overlay — the fiddly part).
 - **L1/L2** — per-controller address columns in the dict (the cross-controller translator); best-effort read of
   foreign post markers (e.g. Fusion op headers) as declarations.
 - **`macrosApp.js` restructure + naming** — 1338 lines, four unrelated workflows (Homing/Sysstart,
@@ -220,6 +228,14 @@ routed through all six build sites. Guard: `tests/op-params-complete.spec.js` (a
   (controller-side). Fix: `macroFile.js` → `programFile.js` (Studio saved programs aren't controller macros);
   `camPack.js` → `slotPack.js` (DDCS on-controller slot system, not industry CAM). `macrosApp.js` can stay —
   it genuinely authors controller-side macros. Do AFTER the `opStacks` restructure settles.
+
+- **Gateway — implementation gaps (architecture already correct)** — already file-per-view (10 files, ~93
+  lines avg). No restructuring needed. Two gaps:
+  1. `merge.js` is a **stub** — multi-tool merge (combine single-tool programs, insert T+M6 + safe retract
+     between each, one program frame) declared but not wired. Natural completion of the Send→Track loop.
+  2. `watch.js` variable map half-done — #100–499 confirmed, #500+ pending per-controller mapping; same
+     problem as the L1/L2 address columns queued for `opSchema`. Same fix covers both.
+  Cloud path (admin.js dual-mode, Worker replacement) remains deferred per [[gateway-cloud-architecture]].
 
 - **Sim intent layer** (`opSimContext.js`) — same declare-not-infer discipline applied to rendering. Today
   `gcodeViz3d.js` interrogates op type + stock shape + profile directly (accumulated special cases: rotary rig,
