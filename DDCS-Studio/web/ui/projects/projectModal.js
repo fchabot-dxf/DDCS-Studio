@@ -6,7 +6,7 @@
  *     → openSaveModal()
  * Two header buttons drive these. Local volume = IndexedDB (projectStore.js); Cloud is a future volume.
  */
-import { serializeProject, loadProject, downloadMacro, openMacroText } from '../../blocks/macroFile.js';
+import { serializeProject, loadProject, downloadMacro, openMacroText } from '../../blocks/programFile.js';
 import * as store from './projectStore.js';
 import { getAccount, connect } from '../cloudAccount.js';
 import { PROVIDER_IDS, providerLabel, providerIcon } from '../cloud/providers.js';

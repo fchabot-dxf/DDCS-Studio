@@ -1,9 +1,10 @@
 /**
- * blocks/macroFile.js — the .mjson macro file format (durable macro save/load).
+ * blocks/programFile.js — the .mjson saved-program file format (durable save/load of a Studio program).
  *
- * A macro is the high-level op-STACK (ops + params), NOT the emitted G-code — params are the single source of
- * truth, so a saved macro re-posts to any dialect and round-trips blocks↔editor. The file is JSON inside, with a
- * .mjson extension. `.nc` is exported separately, on demand, for the controller (terminal/lossy — not re-imported).
+ * A saved program is the high-level op-STACK (ops + params), NOT the emitted G-code — params are the single
+ * source of truth, so it re-posts to any dialect and round-trips blocks↔editor. JSON inside, `.mjson` extension
+ * (the on-disk kind id stays `ddcs.macro` for back-compat). `.nc` is exported separately, on demand, for the
+ * controller (terminal/lossy — not re-imported). (Was `macroFile.js` — a saved Studio program is not a controller macro.)
  */
 import { getActivePostId } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
