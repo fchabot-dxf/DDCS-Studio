@@ -5,7 +5,7 @@
  * click the picked cell again to clear back to follow. The `colour` config tints the picked cell, so the two datums
  * (stock attach vs path datum) read apart at a glance — the same idea as the 2D canvas pickers.
  *
- * Blockly 12.5.1 (vendor/blockly/API-NOTES.md). Custom-field lifecycle: initView() builds the SVG into fieldGroup_,
+ * Blockly 13.0.0 (vendor/blockly/API-NOTES.md). Custom-field lifecycle: initView() builds the SVG into fieldGroup_,
  * render_() repaints + sets size_, getSize() drives block layout. We bind our own pointer events on the cells (no
  * popup editor — it's inline), and stopPropagation so a click picks instead of dragging the block. Verified to
  * render + round-trip by tests/place-on-stock-block.spec.js.

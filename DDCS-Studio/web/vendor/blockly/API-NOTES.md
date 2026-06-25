@@ -1,9 +1,22 @@
 # Blockly — vendored version notes
 
-**Version: 12.5.1** (see `VERSION`). Bundle: `blockly.min.js` (UMD → global `Blockly`).
+**Version: 13.0.0** (see `VERSION`). Bundle: `blockly.min.js` (UMD → global `Blockly`).
 Typings index: `blockly.d.ts` (= upstream `core/blockly.d.ts`, the namespace index — grep it to confirm a
 symbol *exists* in our version). Per-symbol **signatures** aren't in that file; fetch the module on demand:
-`https://unpkg.com/blockly@12.5.1/core/<module>.d.ts` (e.g. `serialization/workspaces.d.ts`).
+`https://unpkg.com/blockly@13.0.0/core/<module>.d.ts` (e.g. `serialization/workspaces.d.ts`).
+
+## Upgraded 12.5.1 → 13.0.0 (2026-06-25)
+v13 is an **accessibility** release (keyboard-nav + screenreader/ARIA on by default); no runtime perf change we
+needed. We kept the **explicit `renderer:'geras'`** — v13's new default is `thrasos` (slightly more performant, and
+already available on either version by setting `renderer:'thrasos'`; switching would reshoot the block PNGs).
+The upgrade was a **drop-in**: swap `blockly.min.js` + `blockly.d.ts` + `VERSION`, **no code changes** — the full
+Playwright suite stayed green (the Class-B render guard, the custom `field_cornergrid` guards, single-inject +
+scale-safety all pass on v13). v13 watch-items that did NOT bite us but to keep in mind: `box-sizing:border-box`
+default, SVG icon assets + media now default to `blockly.com/media`, removed deprecated APIs, new default keyboard
+shortcuts. **Inline authoring is feasible on v13** (stage-6 spike): appending standard fields to a block —
+`block.appendDummyInput().appendField(new Blockly.FieldCheckbox/FieldTextInput)` — grows the block and renders the
+row inline (proven: a block 30px→60px). Wrap the append in `Blockly.Events.disable()/enable()` so the workspace
+change listener doesn't reproject the dev-only fields away.
 
 ## The v11/v12 rendering trap (what bit us — keep this in mind)
 
@@ -65,7 +78,7 @@ Guards: `tests/blocks-single-inject.spec.js` (fires the double-click race → as
 op in view, no page errors) + `tests/blocks-scale-safety.spec.js` (Blocks tab forces body zoom 1, no counter-zoom,
 op rect IN the host). Invisible to plain headless render tests, which call `showApp('blocks')` once.
 
-## Blockly APIs DDCS depends on (all confirmed present in 12.5.1)
+## Blockly APIs DDCS depends on (all confirmed present in 13.0.0)
 
 | API | Where we use it |
 | --- | --- |
@@ -84,7 +97,7 @@ op rect IN the host). Invisible to plain headless render tests, which call `show
 ## Custom fields (first one: `field_cornergrid`)
 
 `blocks/blockly/cornerGridField.js` is the project's first CUSTOM field — an inline 3×3 grid drawn on the block
-(PlaceOnStock's attach / path-datum pickers). The v12.5.1 recipe that works:
+(PlaceOnStock's attach / path-datum pickers). The recipe (works on 12.5.1 **and 13.0.0** — its guards pass on v13):
 - `class X extends Blockly.Field`; `static fromJson(opts)` → `new X(opts.value, undefined, opts)`; set
   `this.SERIALIZABLE = true` and `this.size_ = new Blockly.utils.Size(w,h)` in the ctor.
 - `initView()` builds the SVG into `this.fieldGroup_` (do NOT call `super.initView()` — it adds an unwanted text
@@ -100,5 +113,5 @@ op rect IN the host). Invisible to plain headless render tests, which call `show
 
 There is **no Blockly-specific MCP/skill**. The workflow that prevents version surprises:
 1. `grep <symbol> blockly.d.ts` — does it exist in 12.5.1 at all?
-2. For the signature: WebFetch `https://unpkg.com/blockly@12.5.1/core/<module>.d.ts`.
+2. For the signature: WebFetch `https://unpkg.com/blockly@13.0.0/core/<module>.d.ts`.
 3. For breaking-change context: the Blockly GitHub **release notes** (v11 = rendering + serialization changes).
