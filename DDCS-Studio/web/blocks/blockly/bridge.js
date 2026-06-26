@@ -146,6 +146,17 @@ export function fieldKind(def, field) {
     return 'text';
 }
 
+/** The dropdown options for a field (if it's a dropdown), used by devMode for enum bindings. */
+export const fieldOptions = (def, field) => optionsFor(def, field);
+
+/** The inline fields (non-numeric sockets) eligible for dev-mode exposure. */
+export function inlineFields(def) {
+    return fieldsOf(def).filter((f) => {
+        const k = fieldKind(def, f);
+        return k === 'dropdown' || k === 'text' || k === 'cornergrid' || k === 'checkbox' || k === 'coordlist';
+    });
+}
+
 /** One Blockly JSON block def from an op def. */
 function jsonDef(def) {
     const args = [];

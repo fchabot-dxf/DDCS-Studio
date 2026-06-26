@@ -16,7 +16,7 @@
  * never pollute the op's params or the emitted G-code.
  */
 import { BLOCKS } from '../wizards/ops/index.js';
-import { fieldKind, fieldsOf, FN } from './blockly/bridge.js';
+import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
 import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack } from './userOps.js';
 import { createWizard } from './wizardLibrary.js';
 import { workspaceToStack } from './blockly/stackBridge.js';
@@ -42,6 +42,11 @@ function numericFields(block) {
     const def = BLOCKS[block.type];
     if (!def) return [];
     return fieldsOf(def).filter((f) => fieldKind(def, f) === 'value');
+}
+function getInlineFields(block) {
+    const def = BLOCKS[block.type];
+    if (!def) return [];
+    return inlineFields(def);
 }
 function isAtom(blk) {
     return blk && !blk.isShadow() && blk.type !== 'op' && !blk.type.endsWith('_op') && blk.type !== 'progstart' && blk.type !== 'progend';
@@ -70,14 +75,30 @@ function collectAuthoring(ws) {
     atomBlocks.forEach((blk, i) => {
         const rec = flat[i];
         if (!rec || !rec.params) return;
-        for (const f of numericFields(blk)) {
-            if (blk.getFieldValue('EXPOSE_' + FN(f)) !== 'TRUE') continue;
-            if (typeof rec.params[f] !== 'number') { if (!varErr) varErr = f; continue; }   // a #var/expression got plugged in
+        const processField = (f, isNumeric) => {
+            if (blk.getFieldValue('EXPOSE_' + FN(f)) !== 'TRUE') return;
+            if (isNumeric && typeof rec.params[f] !== 'number') { if (!varErr) varErr = f; return; }   // a #var/expression got plugged in
             let pname = (blk.getFieldValue('PNAME_' + FN(f)) || f).trim().replace(/[^A-Za-z0-9_]/g, '_').replace(/^_+|_+$/g, '') || f;
             if (used.has(pname)) { let k = 2; while (used.has(pname + '_' + k)) k++; pname += '_' + k; }
             used.add(pname);
-            exposures.push({ param: pname, blockIndex: i, key: f, default: rec.params[f], widget: blk.getFieldValue('WIDGET_' + FN(f)) || 'number' });
-        }
+            if (isNumeric) {
+                exposures.push({ param: pname, blockIndex: i, key: f, default: rec.params[f], widget: blk.getFieldValue('WIDGET_' + FN(f)) || 'number' });
+            } else {
+                const def = BLOCKS[blk.type], k = fieldKind(def, f);
+                let type = 'string', widget = null, widgetConfig = null;
+                if (k === 'dropdown') { type = 'enum'; widget = 'dropdown'; const opts = fieldOptions(def, f); if (opts) widgetConfig = { options: opts }; }
+                else if (k === 'checkbox') { type = 'bool'; widget = 'toggle'; }
+                else if (k === 'cornergrid') { type = 'string'; widget = 'corner-grid'; }
+                else if (k === 'coordlist') { type = 'list'; widget = 'coord-list'; }
+                else if (k === 'text') { type = 'string'; widget = 'text'; }
+                const bind = { param: pname, blockIndex: i, key: f, default: rec.params[f], type };
+                if (widget) bind.widget = widget;
+                if (widgetConfig) bind.widgetConfig = widgetConfig;
+                exposures.push(bind);
+            }
+        };
+        for (const f of numericFields(blk)) processField(f, true);
+        for (const f of getInlineFields(blk)) processField(f, false);
     });
     return { opRec, exposures, varErr };
 }
@@ -88,7 +109,11 @@ function collectAuthoring(ws) {
 // for every binding: an exposure is a plain-number socket, so the value is always numeric (see extractParamBlocks).
 function buildBindings(exposures) {
     const out = [], canvas = [];
-    const plain = (e) => ({ param: e.param, blockIndex: e.blockIndex, key: e.key, type: 'number', default: e.default, label: e.param });
+    const plain = (e) => ({
+        param: e.param, blockIndex: e.blockIndex, key: e.key,
+        type: e.type || 'number', default: e.default, label: e.param,
+        ...(e.widgetConfig ? { widgetConfig: e.widgetConfig } : {})
+    });
     for (const e of exposures) {
         const dec = decodeCanvasWidget(e.widget);
         if (dec.role) canvas.push({ ...plain(e), _widget: dec.widget, role: dec.role });   // DECLARED role (folded into the widget)
@@ -176,6 +201,15 @@ function augment() {
                     .appendField(new B.FieldTextInput(f), 'PNAME_' + FN(f))
                     .appendField(new B.FieldDropdown(WIDGET_CHOICES), 'WIDGET_' + FN(f));   // how it renders in the form
             }
+            for (const f of getInlineFields(blk)) {
+                const inputName = 'DECL_' + FN(f);
+                if (blk.getInput(inputName)) continue;
+                blk.appendDummyInput(inputName)
+                    .appendField('▸ expose')
+                    .appendField(new B.FieldCheckbox('FALSE'), 'EXPOSE_' + FN(f))
+                    .appendField(f + ' as')
+                    .appendField(new B.FieldTextInput(f), 'PNAME_' + FN(f));
+            }
             if (blk.queueRender) blk.queueRender();
         }
     } finally { B.Events.enable(); }
@@ -192,6 +226,10 @@ function clearAugment() {
             if (blk.type === 'coordlist') { if (blk.getInput('CLED')) { try { blk.removeInput('CLED'); } catch (_) { /* */ } } if (blk.queueRender) blk.queueRender(); continue; }
             if (!isAtom(blk)) continue;
             for (const f of numericFields(blk)) {
+                const inputName = 'DECL_' + FN(f);
+                if (blk.getInput(inputName)) { try { blk.removeInput(inputName); } catch (_) { /* */ } }
+            }
+            for (const f of getInlineFields(blk)) {
                 const inputName = 'DECL_' + FN(f);
                 if (blk.getInput(inputName)) { try { blk.removeInput(inputName); } catch (_) { /* */ } }
             }
