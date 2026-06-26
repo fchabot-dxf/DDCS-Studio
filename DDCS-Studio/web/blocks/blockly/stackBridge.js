@@ -194,7 +194,10 @@ function recToJson(rec) {
         if (rec.collapsed) node.collapsed = true;
         return node;
     }
-    const def = BLOCKS[rec.type], node = { type: rec.type };
+    // Preserve the model id (op blocks already do, above) so the loaded workspace block keeps the SAME id the emit
+    // map + projected-code panel use — otherwise leaf atoms get fresh Blockly ids on load and the panel's per-line
+    // ancestry doesn't match the workspace until a reproject realigns it (breaks click-selection + hover highlight).
+    const def = BLOCKS[rec.type], node = { type: rec.type, id: rec.id };
     if (!def) return node;
     const fields = {}, inputs = {};
     for (const f of fieldsOf(def)) {
