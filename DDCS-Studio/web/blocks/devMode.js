@@ -1,19 +1,20 @@
 /**
- * blocks/devMode.js — the Blocks-tab DEV (authoring) mode: the keystone of the wizard-maker.
+ * blocks/devMode.js — the Blocks-tab AUTHORING surface: the keystone of the wizard-maker.
  *
- * Form / Block / Editor all EDIT an op. Dev mode is the only rung that DEFINES one: a floating toggle turns the
- * block view into an authoring surface where each atom's numeric values grow an inline "▸ expose … as …" row
- * (standard Blockly fields, so the block itself draws it). Tick the values you want as knobs, name them, name the
- * op, and "Save as custom op" registers a reusable custom wizard (template + bindings) into the library + bar —
- * the fork-the-5%-delta flow that stages 1–5 built the machinery for.
+ * Form / Block / Editor all EDIT an op; the Blocks tab is also the only rung that DEFINES one. Authoring is ALWAYS
+ * ON (no normal/dev toggle — the Blocks tab IS the author/learner surface; operators stay in the wizards): each
+ * atom's numeric values grow an inline "expose as knob" affordance (a dim marker + a checkbox + a name + a widget
+ * pick — standard Blockly fields, so the block itself draws it), quiet by default and lit when exposed. Tick the
+ * values you want as knobs, name them, name the op, and "Save wizard…" registers a reusable custom wizard (template
+ * + bindings) into the library + bar — the fork-the-5%-delta flow.
  *
  * Exposure rule (from the density taxonomy): the candidates are NUMERIC value fields (fieldKind 'value' = a
- * math_number socket) — which is exactly the `tuning` role (feed/depth/count/offset/…). Normal mode is untouched.
+ * math_number socket) — exactly the `tuning` role (feed/depth/count/offset/…) — plus the inline non-numeric fields.
  *
  * Blockly v13 notes (see vendor/blockly/API-NOTES.md): augment inside Events.disable()/enable() so the workspace
  * change listener doesn't reproject the dev-only fields away; flush with renderManagement.triggerQueuedRenders().
- * The dev fields (EXPOSE_ / PNAME_ prefixes) aren't in fieldsOf(def), so stackBridge.toRecord ignores them — they
- * never pollute the op's params or the emitted G-code.
+ * The dev fields (EXPOSE_ / PNAME_ / WIDGET_ / XMARK_ prefixes) aren't in fieldsOf(def), so stackBridge.toRecord
+ * ignores them — they never pollute the op's params or the emitted G-code.
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
@@ -123,54 +124,55 @@ function buildBindings(exposures) {
     return out;
 }
 
-let _on = false, _ws = null, _B = null, _toggle = null, _savebtn = null;
+let _ws = null, _B = null, _savebtn = null;
 let _editingWizard = null;   // opType being re-authored (the re-author flow), or null = a new wizard
 
-export function isDevMode() { return _on; }
-
-/** Mount the floating dev toggle + a "Save wizard…" button into the canvas host. The wizard metadata (name / panel /
- *  preview-rig) is collected in a Save DIALOG at save time (openSaveDialog), not a persistent panel — so nothing
- *  lingers over the canvas. Returns { onModelRender } for blocksApp. */
+/** Mount the ALWAYS-ON authoring surface: a "Save wizard…" button + the per-atom "expose as param" affordances grow
+ *  on every render. There is no normal/dev toggle — the Blocks tab IS the author/learner surface (operators stay in
+ *  the wizards); the affordances are quiet by default and styling, not a mode, keeps the code glanceable. The wizard
+ *  metadata (name / panel / preview-rig) is collected in a Save DIALOG at save time. Returns { onModelRender }. */
 export function mountDevMode(ws, B, hostEl) {
     _ws = ws; _B = B;
 
-    _toggle = document.createElement('button');
-    _toggle.type = 'button';
-    _toggle.className = 'blk-dev-toggle';
-    _toggle.title = 'Author mode — expose values as parameters, then save this op as a reusable custom wizard';
-    _toggle.textContent = '🛠 Dev';
-    _toggle.addEventListener('click', () => setDevMode(!_on));
-
-    // A visible save affordance while authoring (the ⌄ quick menu also calls window.ddcsSaveAsWizard). Shown only in
-    // dev mode; opens the Save dialog where the name / panel / preview-rig are entered at save time.
+    // The one persistent authoring action: name + save the current op as a reusable custom wizard. The ⌄ quick menu
+    // calls the same window.ddcsSaveAsWizard (with no exposures it saves a parameterless wizard).
     _savebtn = document.createElement('button');
     _savebtn.type = 'button';
     _savebtn.className = 'blk-dev-savebtn';
-    _savebtn.hidden = true;
     _savebtn.textContent = '💾 Save wizard…';
     _savebtn.title = 'Name this op and save it as a reusable custom wizard';
     _savebtn.addEventListener('click', () => saveAsCustomOp());
 
-    // Saving a wizard = registering the current op's stack as a bar button (+ its form). NOT gated behind dev mode —
-    // the ⌄ quick menu calls this too (with no exposures it saves a parameterless wizard; add knobs later in dev mode).
     if (typeof window !== 'undefined') {
         window.ddcsSaveAsWizard = () => saveAsCustomOp();
         window.ddcsEditWizardDef = (opType) => editWizardDef(opType);   // re-author a saved wizard (load its template)
     }
 
-    hostEl.append(_toggle, _savebtn);
-    return { onModelRender: () => { if (_on) augment(); } };
+    // Light up a field's marker the moment its EXPOSE checkbox is ticked (the only dynamic emphasis — the dim base
+    // is a construction-time class, reliable across the async render queue; the lit class rides the live <text>).
+    ws.addChangeListener((e) => {
+        if (!e || e.type !== B.Events.BLOCK_CHANGE || e.element !== 'field') return;
+        if (typeof e.name !== 'string' || e.name.indexOf('EXPOSE_') !== 0) return;
+        const blk = ws.getBlockById(e.blockId);
+        if (blk) refreshExposeMark(blk, e.name.slice(7));   // 'EXPOSE_'.length
+    });
+
+    hostEl.append(_savebtn);
+    augment();                                   // a program may already be loaded at mount
+    return { onModelRender: () => augment() };   // authoring is always on — re-grow the affordances on every rebuild
 }
 
-export function setDevMode(on) {
-    _on = !!on;
-    if (!_on) _editingWizard = null;   // leaving dev mode cancels a re-author
-    if (_toggle) _toggle.classList.toggle('active', _on);
-    if (_savebtn) _savebtn.hidden = !_on;
-    if (_on) augment(); else clearAugment();
+// Sync a field's expose MARKER to its EXPOSE state: lit (accent, bold) when exposed, dim otherwise. Toggles the lit
+// class on the marker's live <text> (rendered by the time a user ticks the box); the dim base class is set at
+// construction so it survives the async render queue (the Blockly v13 Class-B render trap).
+function refreshExposeMark(blk, vk) {
+    const mark = blk.getField && blk.getField('XMARK_' + vk);
+    const g = mark && mark.getSvgRoot && mark.getSvgRoot();
+    const textEl = g && (g.tagName.toLowerCase() === 'text' ? g : g.querySelector('text'));
+    if (textEl) textEl.classList.toggle('blk-expose-lit', blk.getFieldValue('EXPOSE_' + vk) === 'TRUE');
 }
 
-// grow each atom with an inline "▸ expose <field> as <name>" row per numeric value (Events.disable → no reproject).
+// grow each atom with an inline "knob [☐] <name> [#]" expose row per numeric/inline field (Events.disable → no reproject).
 function augment() {
     const B = _B, ws = _ws;
     if (!ws) return;
@@ -187,9 +189,8 @@ function augment() {
                 const tgt = valIn && valIn.connection && valIn.connection.targetBlock();
                 if (!tgt || !tgt.isShadow()) continue;                                    // only plain-number sockets are exposable
                 blk.appendDummyInput(inputName)
-                    .appendField('▸ expose')
+                    .appendField(new B.FieldLabel('knob', 'blk-expose-mark'), 'XMARK_' + FN(f))   // dim marker; lights up when exposed
                     .appendField(new B.FieldCheckbox('FALSE'), 'EXPOSE_' + FN(f))
-                    .appendField(f + ' as')
                     .appendField(new B.FieldTextInput(f), 'PNAME_' + FN(f))
                     .appendField(new B.FieldDropdown(WIDGET_CHOICES), 'WIDGET_' + FN(f));   // how it renders in the form
             }
@@ -197,9 +198,8 @@ function augment() {
                 const inputName = 'DECL_' + FN(f);
                 if (blk.getInput(inputName)) continue;
                 blk.appendDummyInput(inputName)
-                    .appendField('▸ expose')
+                    .appendField(new B.FieldLabel('knob', 'blk-expose-mark'), 'XMARK_' + FN(f))   // dim marker; lights up when exposed
                     .appendField(new B.FieldCheckbox('FALSE'), 'EXPOSE_' + FN(f))
-                    .appendField(f + ' as')
                     .appendField(new B.FieldTextInput(f), 'PNAME_' + FN(f));
             }
             if (blk.queueRender) blk.queueRender();
@@ -208,32 +208,9 @@ function augment() {
     try { if (B.renderManagement) B.renderManagement.triggerQueuedRenders(); } catch (_) { /* */ }
 }
 
-function clearAugment() {
-    const B = _B, ws = _ws;
-    if (!ws) return;
-    B.Events.disable();
-    try {
-        for (const blk of ws.getAllBlocks()) {
-            if (blk.type === 'regionpick') { if (blk.getInput('RGNED')) { try { blk.removeInput('RGNED'); } catch (_) { /* */ } } if (blk.queueRender) blk.queueRender(); continue; }
-            if (blk.type === 'coordlist') { if (blk.getInput('CLED')) { try { blk.removeInput('CLED'); } catch (_) { /* */ } } if (blk.queueRender) blk.queueRender(); continue; }
-            if (!isAtom(blk)) continue;
-            for (const f of numericFields(blk)) {
-                const inputName = 'DECL_' + FN(f);
-                if (blk.getInput(inputName)) { try { blk.removeInput(inputName); } catch (_) { /* */ } }
-            }
-            for (const f of getInlineFields(blk)) {
-                const inputName = 'DECL_' + FN(f);
-                if (blk.getInput(inputName)) { try { blk.removeInput(inputName); } catch (_) { /* */ } }
-            }
-            if (blk.queueRender) blk.queueRender();
-        }
-    } finally { B.Events.enable(); }
-    try { if (B.renderManagement) B.renderManagement.triggerQueuedRenders(); } catch (_) { /* */ }
-}
-
-// The dev-mode "✎ regions" affordance: a pencil FieldImage on a regionpick block that opens the region editor and
+// The "✎ regions" affordance: a pencil FieldImage on a regionpick block that opens the region editor and
 // writes the authored spec back to the SAME block.data channel the runtime + round-trip already use (one spec, no
-// divergence). Gated to dev mode (authoring is a power-user gesture; *using* the picker stays a normal-mode click).
+// divergence). Authoring lives on the Blocks tab; *using* the picker is a click in the wizard form / runtime.
 function augmentRegionPick(blk) {
     if (blk.getInput('RGNED')) return;   // idempotent
     blk.appendDummyInput('RGNED').appendField(new _B.FieldImage(PENCIL_URI, 16, 16, '✎ regions', () => openRegionAuthor(blk)));
@@ -254,9 +231,9 @@ export function openRegionAuthor(blk) {   // exported so the pencil onClick AND 
     });
 }
 
-// The dev-mode "✎ positions" affordance: a pencil on a coordlist block that opens the coordinate-list editor and
-// writes the edited list back to the SAME `pts` field VALUE the runtime + round-trip read — the one divergence from
-// region-pick (whose spec rides block.data). Gated to dev mode; USING the positioner stays a normal-mode gesture.
+// The "✎ positions" affordance: a pencil on a coordlist block that opens the coordinate-list editor and writes the
+// edited list back to the SAME `pts` field VALUE the runtime + round-trip read — the one divergence from region-pick
+// (whose spec rides block.data). Authoring lives on the Blocks tab; USING the positioner is a wizard-form gesture.
 function augmentCoordList(blk) {
     if (blk.getInput('CLED')) return;   // idempotent
     blk.appendDummyInput('CLED').appendField(new _B.FieldImage(PENCIL_URI, 16, 16, '✎ positions', () => openCoordAuthor(blk)));
@@ -284,10 +261,9 @@ export async function editWizardDef(opType) {
     } catch (e) { console.warn('edit wizard: build failed', e); return; }
     if (window.showApp) window.showApp('blocks');
     for (let i = 0; i < 80 && !(window.ddcsLoadBlockStack && window.__blkws); i++) await new Promise((r) => setTimeout(r, 50));   // wait for the Blocks app
-    _editingWizard = opType;
+    _editingWizard = opType;   // saving UPDATES this wizard in place; the Save dialog prefills from its def
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack([opC]);
-    await new Promise((r) => setTimeout(r, 150));   // let it project + render
-    setDevMode(true);   // the Save dialog prefills name / panel / preview-rig from this wizard's def when you save
+    await new Promise((r) => setTimeout(r, 150));   // let it project + render (authoring affordances grow automatically)
 }
 
 // The Save DIALOG — the metadata collection surface (name / panel / DECLARED preview-rig), shown at save time and
@@ -313,7 +289,7 @@ function openSaveDialog(init, onConfirm) {
         .blk-dev-savedlg .blk-dev-save:hover{filter:brightness(1.1);}</style>
         <div class="bds">
             <h3>Save as custom wizard</h3>
-            <div class="blk-dev-hint">${init.knobs ? `${init.knobs} knob${init.knobs === 1 ? '' : 's'} exposed.` : 'No knobs exposed — saves a fixed (parameterless) wizard. Add knobs in dev mode anytime.'}</div>
+            <div class="blk-dev-hint">${init.knobs ? `${init.knobs} knob${init.knobs === 1 ? '' : 's'} exposed.` : 'No knobs exposed — saves a fixed (parameterless) wizard. Tick a value’s “knob” on the blocks to add one.'}</div>
             <label class="blk-dev-name">Wizard name <input type="text" class="blk-dev-opname" placeholder="my corner probe" /></label>
             <label class="blk-dev-name">Panel <select class="blk-dev-paneltype">
                 <option value="form3d">Form + 3D preview</option>
@@ -355,8 +331,8 @@ function openSaveDialog(init, onConfirm) {
 }
 
 // Register the current op's STACK as a custom WIZARD — a bar button (+ its form). Reads the ticked exposures (if any)
-// → bindings → userOpFromStack → createWizard (into the library + bar). Works with OR without dev mode: no exposures
-// just means a parameterless wizard (add knobs later in dev mode). Called by the 💾 Save button + the ⌄ quick menu.
+// → bindings → userOpFromStack → createWizard (into the library + bar). No exposures just means a parameterless
+// wizard (tick a value's knob to add one). Called by the 💾 Save button + the ⌄ quick menu.
 function saveAsCustomOp() {
     if (!_ws) { alert('Open an op in the Blocks tab first, then save it as a wizard.'); return; }
     // Read the LIVE workspace SYNCHRONOUSLY here — BEFORE the Save dialog awaits user input — so the bindings/defaults
@@ -405,7 +381,7 @@ function saveAsCustomOp() {
         } catch (e) { console.warn('save wizard failed', e); alert('Save failed: ' + ((e && e.message) || e)); return; }
 
         if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
-        if (_on) setDevMode(false);   // also clears _editingWizard
+        _editingWizard = null;   // a fresh op next time (this save committed or updated the wizard)
         alert(editing ? `Updated “${meta.name}”.` : `Saved “${meta.name}” — it's now a button in the bar (Custom)${bindings.length ? ` with ${bindings.length} knob${bindings.length === 1 ? '' : 's'}` : ''}.`);
     });
 }

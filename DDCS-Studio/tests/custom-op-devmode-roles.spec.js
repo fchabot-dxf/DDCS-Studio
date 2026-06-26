@@ -23,10 +23,10 @@ test('dev-mode expose point-x/point-y → a complete point group → a draggable
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0);
   await page.waitForTimeout(400);
-  await page.click('.blk-dev-toggle');
+  // authoring is always on — the inline "expose" rows are already present (no toggle)
   await page.waitForTimeout(200);
 
-  // tick the first two augmented numeric fields as point-x / point-y (the inline "▸ expose … as …" rows)
+  // tick the first two augmented numeric fields as point-x / point-y (the inline "knob" expose rows)
   const picked = await page.evaluate(async () => {
     const ws = window.__blkws;
     const { BLOCKS } = await import('/wizards/ops/index.js');

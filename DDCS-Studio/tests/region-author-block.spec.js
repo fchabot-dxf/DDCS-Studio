@@ -21,11 +21,10 @@ test('dev mode: ✎ regions opens the editor and writes the spec back to the reg
   ]));
   await page.waitForTimeout(400);
 
-  // enable dev mode → the regionpick block grows the ✎ affordance
-  await page.click('.blk-dev-toggle');
+  // authoring is always on → the regionpick block already grew its ✎ affordance (no toggle)
   await page.waitForTimeout(300);
   const hasAffordance = await page.evaluate(() => { const b = window.__blkws.getAllBlocks().find((x) => x.type === 'regionpick'); return !!(b && b.getInput('RGNED')); });
-  expect(hasAffordance, 'regionpick block grew the ✎ regions input in dev mode').toBe(true);
+  expect(hasAffordance, 'regionpick block grew the ✎ regions input').toBe(true);
 
   // the pencil also renders as a FieldImage on the block (the visible affordance)
   expect(await page.locator('#blocks-app image').count(), 'pencil affordance rendered on the block').toBeGreaterThan(0);

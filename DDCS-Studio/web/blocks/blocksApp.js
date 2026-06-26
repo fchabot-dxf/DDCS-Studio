@@ -172,8 +172,8 @@ async function buildWorkspace() {
   const fit = () => { try { B.svgResize(ws); } catch (_) { /* pre-render */ } };
   new ResizeObserver(fit).observe(host);
 
-  // Dev (authoring) mode — a floating toggle that grows each atom's numeric values into inline "expose as param"
-  // rows, then "Save as custom op". Re-augments after a model-driven rebuild (renderFromModel) while dev mode is on.
+  // Authoring is always on (no normal/dev toggle): mountDevMode grows each atom's "expose as knob" affordances + the
+  // persistent "Save wizard…" button, and re-augments after every model-driven rebuild (renderFromModel) via onModelRender.
   const _dev = mountDevMode(ws, B, host);
 
   // ---- Palette search: a filter input above the toolbox. Typing shows the matching blocks (across ALL
@@ -320,7 +320,7 @@ async function buildWorkspace() {
   function renderFromModel(p) {
     muteChanges = true;
     try { stackToWorkspace(getStack(), ws); applyOpGating(ws); } finally { muteChanges = false; }   // gate gated ops (muted: no echo)
-    if (_dev) _dev.onModelRender();   // re-apply dev-mode "expose" rows after a clean rebuild (no-op when dev off)
+    if (_dev) _dev.onModelRender();   // re-grow the always-on "expose as knob" affordances after a clean rebuild
     requestAnimationFrame(place); setTimeout(place, 120); setTimeout(place, 400);
     renderViews(p);
   }

@@ -21,11 +21,10 @@ test('dev mode: ✎ positions opens the coordinate editor and writes the list ba
   ]));
   await page.waitForTimeout(400);
 
-  // enable dev mode → the coordlist block grows the ✎ positions affordance (the CLED input + a pencil image)
-  await page.click('.blk-dev-toggle');
+  // authoring is always on → the coordlist block already grew its ✎ positions affordance (the CLED input + a pencil image)
   await page.waitForTimeout(300);
   const hasAffordance = await page.evaluate(() => { const b = window.__blkws.getAllBlocks().find((x) => x.type === 'coordlist'); return !!(b && b.getInput('CLED')); });
-  expect(hasAffordance, 'coordlist block grew the ✎ positions input in dev mode').toBe(true);
+  expect(hasAffordance, 'coordlist block grew the ✎ positions input').toBe(true);
   expect(await page.locator('#blocks-app image').count(), 'pencil affordance rendered on the block').toBeGreaterThan(0);
 
   // trigger authoring the same way the pencil's onClick does (Blockly field clicks aren't reliably hit-testable in

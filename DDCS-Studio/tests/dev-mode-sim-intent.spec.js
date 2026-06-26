@@ -21,8 +21,7 @@ test('dev mode: tick "4th-axis rotary" → def.sim declared → opSimContext sho
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0);
   await page.waitForTimeout(400);
-  await page.click('.blk-dev-toggle');
-  await expect(page.locator('.blk-dev-savebtn')).toBeVisible();
+  await expect(page.locator('.blk-dev-savebtn')).toBeVisible();   // authoring is always on (no toggle)
 
   // open the Save dialog → DECLARE rotary + name + save (no knobs → a fixed parameterless wizard)
   await page.evaluate(() => window.ddcsSaveAsWizard());

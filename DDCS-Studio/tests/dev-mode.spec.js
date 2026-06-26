@@ -21,8 +21,7 @@ test('dev mode: expose a value → Save as custom op → it registers in the lib
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0);
   await page.waitForTimeout(400);
 
-  // flip Dev mode — the floating toggle + "Save wizard…" button appear, atoms get "expose" rows
-  await page.click('.blk-dev-toggle');
+  // authoring is always on — the "Save wizard…" button is present and atoms already grew their "expose" rows
   await expect(page.locator('.blk-dev-savebtn')).toBeVisible();
   await page.waitForTimeout(150);
 
