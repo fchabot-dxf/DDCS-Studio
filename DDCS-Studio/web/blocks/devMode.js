@@ -349,6 +349,7 @@ function openSaveDialog(init, onConfirm) {
         .blk-dev-savedlg .blk-dev-save:hover{filter:brightness(1.1);}</style>
         <div class="bds">
             <h3>Save as custom wizard</h3>
+            <div class="blk-dev-editnote blk-dev-hint" hidden></div>
             <div class="blk-dev-hint">${init.knobs ? `${init.knobs} knob${init.knobs === 1 ? '' : 's'} exposed.` : 'No knobs exposed — saves a fixed (parameterless) wizard. Tick a value’s “knob” on the blocks to add one.'}</div>
             <label class="blk-dev-name">Wizard name <input type="text" class="blk-dev-opname" placeholder="my corner probe" /></label>
             <label class="blk-dev-name">Panel <select class="blk-dev-paneltype">
@@ -363,6 +364,7 @@ function openSaveDialog(init, onConfirm) {
             </div>
             <div class="bds-foot">
                 <button type="button" class="blk-dev-cancel">Cancel</button>
+                <button type="button" class="blk-dev-update" hidden>Update</button>
                 <button type="button" class="blk-dev-save">Save</button>
             </div>
         </div>`;
@@ -380,14 +382,24 @@ function openSaveDialog(init, onConfirm) {
     document.addEventListener('keydown', onKey, true);
     q('.blk-dev-cancel').addEventListener('click', close);
     m.addEventListener('click', (e) => { if (e.target === m) close(); });
-    q('.blk-dev-save').addEventListener('click', () => {
+
+    // Non-destructive save: when re-authoring, "Update <name>" overwrites the original (explicit, outline) while the
+    // accent "Save as new" makes a separate copy (the safe default — the original is untouched unless you click Update).
+    if (init.editing) {
+        const note = q('.blk-dev-editnote'); if (note) { note.textContent = `Editing “${init.editing.label}” — “Update” overwrites it; “Save as new” keeps it and saves a copy.`; note.hidden = false; }
+        const upd = q('.blk-dev-update'); if (upd) { upd.textContent = `Update “${init.editing.label}”`; upd.hidden = false; }
+        q('.blk-dev-save').textContent = 'Save as new';
+    }
+    const commit = (mode) => {
         const name = (q('.blk-dev-opname').value || '').trim();
         if (!name) { try { q('.blk-dev-opname').focus(); } catch (_) { /* */ } return; }   // name is required
         const r = q('.blk-dev-sim-rotary').checked, mc = q('.blk-dev-sim-machine').checked, mg = q('.blk-dev-sim-magazine').checked;
         const sim = (r || mc || mg) ? { showRotaryRig: r, forceMachine: mc, showMagazine: mg } : null;
         close();
-        onConfirm({ name, panel: q('.blk-dev-paneltype').value || 'form3d', sim });
-    });
+        onConfirm({ name, panel: q('.blk-dev-paneltype').value || 'form3d', sim, mode });
+    };
+    q('.blk-dev-save').addEventListener('click', () => commit('new'));        // a fresh op, OR "Save as new" (a copy)
+    const updBtn = q('.blk-dev-update'); if (updBtn) updBtn.addEventListener('click', () => commit('update'));   // explicit overwrite
 }
 
 // Register the current op's STACK as a custom WIZARD — a bar button (+ its form). Reads the ticked exposures (if any)
@@ -425,13 +437,16 @@ function saveAsCustomOp() {
         panel: blkPanel || (editingDef && editingDef.panel) || (hasNumberRole ? 'form2d' : 'form3d'),
         sim: blkSim !== undefined ? blkSim : ((editingDef && editingDef.sim) || null),
         knobs: bindings.length,
+        editing: editingDef ? { opType: _editingWizard, label: editingDef.label || _editingWizard } : null,
     }, (meta) => {
         const panel = blkPanel || meta.panel;
         const sim = blkSim !== undefined ? blkSim : meta.sim;
-        const editing = _editingWizard;   // re-authoring an existing wizard → update in place (keep its opType)
+        // Non-destructive: only an EXPLICIT "Update" (mode 'update') overwrites the re-authored wizard. Anything else —
+        // a fresh op, or "Save as new" while editing — creates a SEPARATE wizard, leaving the original untouched.
+        const update = meta.mode === 'update' && _editingWizard;
         try {
-            if (editing) {
-                updateUserOp(userOpFromStack(editing, meta.name, a.opRec.children, bindings, panel, sim));
+            if (update) {
+                updateUserOp(userOpFromStack(_editingWizard, meta.name, a.opRec.children, bindings, panel, sim));
             } else {
                 const slug = meta.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'wizard';
                 const existing = new Set(listUserOps().map((d) => d.opType));
@@ -442,6 +457,6 @@ function saveAsCustomOp() {
 
         if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
         _editingWizard = null; _editingLabel = null; refreshEditingChrome();   // exit the editing context (glow + chip clear)
-        alert(editing ? `Updated “${meta.name}”.` : `Saved “${meta.name}” — it's now a button in the bar (Custom)${bindings.length ? ` with ${bindings.length} knob${bindings.length === 1 ? '' : 's'}` : ''}.`);
+        alert(update ? `Updated “${meta.name}”.` : `Saved “${meta.name}” as a new wizard — it's a button in the bar (Custom)${bindings.length ? ` with ${bindings.length} knob${bindings.length === 1 ? '' : 's'}` : ''}.`);
     });
 }

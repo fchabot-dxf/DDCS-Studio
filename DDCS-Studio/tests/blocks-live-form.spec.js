@@ -125,6 +125,61 @@ test('editing-context chrome: re-authoring shows the glow class + named chip; sa
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 });
 
+async function reauthor(page, opType, label) {
+  await page.evaluate(async ({ opType, label }) => {
+    const U = await import('/blocks/userOps.js');
+    localStorage.removeItem('ddcs_user_ops');
+    const template = [{ type: 'move', params: { x: 0, y: 0, z: { type: 'param', params: { name: 'depth', value: -5 } } } }];
+    U.createUserOp(U.userOpFromStack(opType, label, template, U.extractParamBlocks(template)));
+    window.ddcsRefreshWizardBar();
+  }, { opType, label });
+  await page.evaluate((t) => window.ddcsEditWizardDef(t), 'user_' + opType);
+  await page.waitForSelector('#blk-formpane:not([hidden])', { timeout: 8000 });
+}
+const listOps = (page) => page.evaluate(async () => (await import('/blocks/userOps.js')).listUserOps().map((o) => ({ opType: o.opType, label: o.label })));
+
+test('non-destructive save: re-author + "Save as new" creates a copy, leaving the original intact', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
+  await reauthor(page, 'orig', 'Original');
+
+  await page.evaluate(() => window.ddcsSaveAsWizard());
+  // the dialog offers BOTH actions when editing: an explicit "Update", and the accent "Save as new"
+  await expect(page.locator('.blk-dev-savedlg .blk-dev-update')).toBeVisible();
+  await expect(page.locator('.blk-dev-savedlg .blk-dev-save')).toHaveText('Save as new');
+
+  await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Original Copy');
+  await page.click('.blk-dev-savedlg .blk-dev-save');   // "Save as new" → a separate wizard
+  await page.waitForTimeout(250);
+
+  const ops = await listOps(page);
+  expect(ops.some((o) => o.opType === 'user_orig' && o.label === 'Original'), 'original untouched').toBe(true);
+  expect(ops.some((o) => o.label === 'Original Copy' && o.opType !== 'user_orig'), 'a new copy was created').toBe(true);
+  expect(ops.length, 'two wizards now (original + copy)').toBe(2);
+
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+});
+
+test('non-destructive save: "Update" overwrites the re-authored wizard in place (no duplicate)', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
+  await reauthor(page, 'orig', 'Original');
+
+  await page.evaluate(() => window.ddcsSaveAsWizard());
+  await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Original v2');
+  await page.click('.blk-dev-savedlg .blk-dev-update');   // explicit overwrite
+  await page.waitForTimeout(250);
+
+  const ops = await listOps(page);
+  expect(ops.length, 'still one wizard — updated in place').toBe(1);
+  expect(ops[0].opType, 'same identity').toBe('user_orig');
+  expect(ops[0].label, 'new label').toBe('Original v2');
+
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+});
+
 test('the live form pane is hidden when NOT editing a custom op (normal Blocks use)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack);

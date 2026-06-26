@@ -31,9 +31,9 @@ test('gui blocks (B): re-author a saved wizard — template round-trips, update 
   await page.evaluate(() => window.ddcsSaveAsWizard());
   expect(await page.evaluate(() => document.querySelector('.blk-dev-savedlg .blk-dev-opname').value)).toBe('Reauth');
 
-  // rename + save → UPDATE in place (same opType, not a duplicate), pill still in the template
+  // rename + UPDATE in place (the explicit overwrite button; same opType, not a duplicate), pill still in the template
   await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Reauth v2');
-  await page.click('.blk-dev-savedlg .blk-dev-save');
+  await page.click('.blk-dev-savedlg .blk-dev-update');
   await page.waitForTimeout(200);
 
   const r = await page.evaluate(async () => {
