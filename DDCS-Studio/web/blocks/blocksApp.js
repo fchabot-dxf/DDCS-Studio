@@ -16,6 +16,7 @@ import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { mountDevMode } from './devMode.js';   // Dev (authoring) mode: expose atom values as params → Save as custom op
 import { isOpBlockEdited, valueTokenRanges, valueRangesForSubtree } from './opGlow.js';   // op-edit guard + word-level value-token spans (hover/select highlight)
+import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
 import { programSimContext } from '../viz/opSimContext.js';          // declared op-type → preview render-intent (rotary rig, …)
 import { getCaps, resolveActivePost } from '../wizards/dialects/index.js';
@@ -437,8 +438,29 @@ async function buildWorkspace() {
   });
   host.addEventListener('mouseleave', () => setHover(null, null));
 
+  // DECLARE the edit, don't infer it: when a REAL user change fires (not a UI event, not our own muted model→workspace
+  // rebuild), record which op's atom it touched. The round-trip's representation drift (empty move sockets → 0, #var →
+  // record) happens during MUTED reloads, so it never fires here → it can never be mistaken for an edit.
+  function recordBlockEdit(e) {
+    if (!e.blockId) return;
+    const blk = ws.getBlockById(e.blockId);
+    if (!blk || typeof blk.getParent !== 'function') return;
+    const t = resolveHoverTarget(blk);                          // changed block → its owning model atom (+ value param)
+    const atom = ws.getBlockById(t.warmId);
+    let opBlk = atom; while (opBlk && !(opBlk.type === 'op' || opBlk.type.endsWith('_op'))) opBlk = opBlk.getParent();
+    if (!opBlk || opBlk === atom) return;                       // not inside an op, OR the op HEADER itself (form path handles that)
+    let detail = {};
+    if (e.element === 'field') {
+      let paramKey = t.value ? t.value.paramKey : null;
+      if (!paramKey && e.name) { const rec = findModelById(getStack(), t.warmId); if (rec && rec.params) paramKey = Object.keys(rec.params).find((k) => k.toUpperCase() === e.name); }
+      detail = { paramKey, from: e.oldValue, to: e.newValue };
+    }
+    recordEdit(opBlk.id, t.warmId, detail);
+  }
+
   // ---- workspace events: structural change → re-emit; selection → highlight code ----
   ws.addChangeListener((e) => {
+    if (!e.isUiEvent && !muteChanges) { try { recordBlockEdit(e); } catch (_) { /* a recording miss must never break reproject/selection */ } }
     if (e.type === B.Events.SELECTED) { setSelected(e.newElementId || null, { scrollCode: true }); }
     else if (e.element === 'field' && _ops) {
       try {

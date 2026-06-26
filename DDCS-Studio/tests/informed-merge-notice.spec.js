@@ -41,6 +41,7 @@ test('opEditSummary returns the block-only residue an injection adds (real diff,
     const op = prog.find((b) => b && b.id === opId);
     op.children = [...(op.children || []), { type: 'raw', id: 'raw_dwell_marker', params: { text: 'G4 P500 (DWELL_MARKER)' } }];   // atoms carry ids in the real model
     window.ddcsLoadBlockStack(prog);
+    (await import('/blocks/opEdits.js')).recordEdit(opId, 'raw_dwell_marker', {});   // declare the injection (a live drag fires this; the model-poke can't)
     return glow.opEditSummary(opId);
   }, { opId });
 

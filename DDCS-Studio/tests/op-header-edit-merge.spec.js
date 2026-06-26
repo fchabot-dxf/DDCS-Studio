@@ -47,8 +47,9 @@ test('Blocks-tab header-dropdown edit on a hand-edited typed op MERGES (preserve
     const glow = await import('/blocks/opGlow.js');
     const prog = (window.ddcsGetBlockProgram() || []).map((b) => ({ ...b }));
     const op = prog.find((b) => b && b.id === opId);
-    op.children = [...(op.children || []), { type: 'raw', params: { text: MARKER } }];
+    op.children = [...(op.children || []), { type: 'raw', id: 'raw_marker_42', params: { text: MARKER } }];
     window.ddcsLoadBlockStack(prog);
+    (await import('/blocks/opEdits.js')).recordEdit(opId, 'raw_marker_42', {});   // declare the injection (a live drag fires this; the model-poke can't)
     return glow.isOpBlockEdited(opId);
   }, { opId, MARKER });
   expect(preEdited, 'injecting a body atom makes the op read as block-edited (precondition)').toBe(true);

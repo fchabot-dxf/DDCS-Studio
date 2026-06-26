@@ -32,18 +32,24 @@ test('editedRangesForOp: word-level range for a value edit, whole-line for an in
     const op = [...prog].reverse().find((b) => b && b.type === 'op' && b.opType === 'edge');
     if (!op) return { error: 'no edge op' };
 
-    // (1) OVERRIDE — edit a numeric assign value to a longer, distinctive value
+    const oe = await import('/blocks/opEdits.js');
+
+    // (1) OVERRIDE — edit a numeric assign value to a longer, distinctive value (DECLARE it as a live edit would)
     const ov = clone(op.children);
     const asn = findLeaf(ov, (b) => b.type === 'assign' && b.params && /^-?\d+(\.\d+)?$/.test(String(b.params.value)));
     if (!asn) return { error: 'no numeric assign leaf' };
+    const fromVal = asn.params.value;
     asn.params.value = '987654';
     window.ddcsLoadBlockStack(prog.map((b) => (b && b.id === op.id) ? { ...b, children: ov } : b));
+    oe.recordEdit(op.id, asn.id, { paramKey: 'value', from: fromVal, to: '987654' });
     const overrideRanges = ops.editedRangesForOp(op.id);
 
     // (2) INJECTION — add a brand-new comment atom (no base match)
+    oe.clearOpEdits(op.id);   // independent sub-case
     const inj = clone(op.children);
     inj.push({ type: 'comment', id: 'wgInj1', params: { text: 'hand-added' } });
     window.ddcsLoadBlockStack(prog.map((b) => (b && b.id === op.id) ? { ...b, children: inj } : b));
+    oe.recordEdit(op.id, 'wgInj1', {});
     const injectRanges = ops.editedRangesForOp(op.id);
 
     return { overrideRanges, injectRanges };
@@ -89,8 +95,10 @@ test('editorOpHover wraps the changed token in a .word-edited span', async ({ pa
     const op = [...prog].reverse().find((b) => b && b.type === 'op' && b.opType === 'edge');
     const ov = clone(op.children);
     const asn = findLeaf(ov, (b) => b.type === 'assign' && b.params && /^-?\d+(\.\d+)?$/.test(String(b.params.value)));
+    const fromVal = asn.params.value;
     asn.params.value = '987654';
     window.ddcsLoadBlockStack(prog.map((b) => (b && b.id === op.id) ? { ...b, children: ov } : b));
+    (await import('/blocks/opEdits.js')).recordEdit(op.id, asn.id, { paramKey: 'value', from: fromVal, to: '987654' });   // declare the edit (a live field change fires this)
     await new Promise((res) => setTimeout(res, 150));   // editor reproject + MutationObserver
     window.ddcsRefreshBlockGlow && window.ddcsRefreshBlockGlow();
     const spans = Array.from(document.querySelectorAll('#editor-highlight .g-line .word-edited'));

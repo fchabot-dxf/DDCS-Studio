@@ -8,6 +8,7 @@
  */
 import { getActivePostId } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { serializeOpEdits, restoreOpEdits } from './opEdits.js';   // declared block-edits ride with the program so they survive reload
 
 const MACRO_KIND = 'ddcs.macro';
 const MACRO_VERSION = 1;
@@ -25,6 +26,7 @@ export function serializeProject(name) {
         profile: profileId,               // machine profile at save time (informational)
         stock: settings.stock || null,
         stack,
+        edits: serializeOpEdits(),        // which atoms the user hand-edited in Blocks (keyed by atom id, which `stack` preserves)
     };
 }
 
@@ -34,6 +36,7 @@ export function loadProject(obj) {
         throw new Error('not a .mjson macro');
     }
     if (typeof window !== 'undefined' && window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(obj.stack);
+    restoreOpEdits(obj.edits);   // re-attach the declared edits (atom ids match the loaded stack); clears for a clean program
     return obj;
 }
 
