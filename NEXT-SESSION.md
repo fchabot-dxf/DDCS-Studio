@@ -16,8 +16,22 @@ loops/control (`count`/`iff`/`array`/`flow`), and raw-emit atoms (`macro.js`) al
 — express ONE built-in *as data* + assert output-equivalence → port the rest → self-host. See ROADMAP "Key reframe."
 
 ## ▶ Immediate next task (the held list, in priority order)
-**1. Middle false-glow bug** `[M]` — **FULLY DIAGNOSED + SCOPED (2026-06-26, session 2, repro'd empirically; no fix
-landed — user chose "reproduce + diagnose, then decide", then "definitely inclined toward declare edit").**
+**1. Middle false-glow bug — ✅ SHIPPED (`2789c37`, declare-edit B).** The glow/chip/merge-guard now read the user's
+DECLARED edits (`opEdits.js`, recorded on the Blockly change event) instead of inferring editedness by re-derivation,
+so the round-trip's representation drift can never read as a false edit. Recorder + `blocksApp` listener hook + 4
+`opGlow` surfaces rewritten + `.mjson` persistence (a saved block-edit fires no reload event, so it must ride with the
+program); word-level glow localizes by the old→new emit diff (no sentinel collision); ~134 lines of inference removed.
+**SUPERSEDES MID #1** — the reconciler "surfaced edits are silently reconstructable → not edited" optimisation is gone
+(it WAS the inference); a surfaced block-edit now correctly trips the chip (a form Replace would lose it without the
+reconciler). Deleted `op-edited-reconcile.spec`; consumer specs now declare their model-injected edits. Full suite
+green. **Residuals (follow-ups, NOT blockers):** (a) a pure DELETION isn't flagged (its atom id is gone — documented
+in `opEdits.js`; revisit if a delete-then-Replace clobber surfaces); (b) the BENIGN emit drift itself (`G0 X#9` →
+`Y0 Z0`, a no-op in incremental but latent for abs-mode single-axis moves) is unfixed — the `omitEmpty` faithful-move
+fix (empty axis sockets stay unset, distinguished from a deliberate 0 via empty vs shadow) is the clean fix if wanted;
+(c) the `m_both↔twoAxis` reconciler key-mismatch (reverse-sync, not the glow) still drops a real `twoAxis` form edit.
+*(Original diagnosis kept below for reference.)*
+
+**0. (superseded scoping — kept for reference)** — **FULLY DIAGNOSED + SCOPED (2026-06-26, session 2, repro'd empirically).**
 - **Root = blocks round-trip is NOT representation-faithful** (the `m_both↔twoAxis` hypothesis was a RED HERRING — the
   glow hits EVERY middle config incl. single-axis, and `twoAxis` survives). `stackToWorkspace→workspaceToStack`
   NORMALIZES atom params in ≥2 ways that the clean `BUILDERS` rebuild doesn't, so the diff-based glow fires:
