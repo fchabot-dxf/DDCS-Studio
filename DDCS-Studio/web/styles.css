@@ -4536,6 +4536,21 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     border:1px solid var(--accent,#3b82f6); box-shadow:0 4px 12px rgba(0,0,0,.4);
 }
 #blocks-app .blk-dev-savebtn:hover { filter:brightness(1.1); }
+/* Editing a saved custom wizard — a breathing accent edge-glow around the canvas + a named chip (both keyed on
+   #blocks-app.editing-wizard / _editingWizard). The glow says "you're in an authoring session", the chip names it. */
+#blocks-app.editing-wizard .blk-bk-host::after {
+    content:''; position:absolute; inset:0; pointer-events:none; z-index:6; animation:blkEditGlow 3s ease-in-out infinite;
+}
+@keyframes blkEditGlow {
+    0%,100% { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent,#3b82f6) 26%, transparent), inset 0 0 16px color-mix(in srgb, var(--accent,#3b82f6) 9%, transparent); }
+    50%     { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent,#3b82f6) 64%, transparent), inset 0 0 28px color-mix(in srgb, var(--accent,#3b82f6) 22%, transparent); }
+}
+#blocks-app .blk-edit-chip {
+    position:absolute; top:10px; right:148px; z-index:16; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+    font:700 11px/1 inherit; padding:6px 10px; border-radius:7px; color:#fff;
+    background:color-mix(in srgb, var(--accent,#3b82f6) 88%, #000); border:1px solid var(--accent,#3b82f6); box-shadow:0 4px 12px rgba(0,0,0,.4);
+}
+#blocks-app .blk-edit-chip[hidden] { display:none; }
 /* the expose marker is a Blockly FieldLabel (SVG <text>) — subordinate (dim, small) by default so the code stays the
    thing your eye lands on; accent + bold when its field is exposed (devMode.refreshExposeMark toggles .blk-expose-lit). */
 .blk-expose-mark { fill:var(--text-dim,#9fb0c0) !important; font-size:9px; opacity:.6; }

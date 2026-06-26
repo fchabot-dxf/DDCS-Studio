@@ -86,6 +86,45 @@ test('form→block writeback: editing the live form writes the value back to the
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 });
 
+test('editing-context chrome: re-authoring shows the glow class + named chip; saving clears it', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
+
+  await page.evaluate(async () => {
+    const U = await import('/blocks/userOps.js');
+    localStorage.removeItem('ddcs_user_ops');
+    const template = [{ type: 'move', params: { x: 0, y: 0, z: { type: 'param', params: { name: 'depth', value: -5 } } } }];
+    U.createUserOp(U.userOpFromStack('chrome', 'Chrome Op', template, U.extractParamBlocks(template)));
+    window.ddcsRefreshWizardBar();
+  });
+  await page.evaluate(() => window.ddcsEditWizardDef('user_chrome'));
+  await page.waitForSelector('#blk-formpane:not([hidden])', { timeout: 8000 });
+
+  const editing = await page.evaluate(() => ({
+    hasClass: document.getElementById('blocks-app').classList.contains('editing-wizard'),
+    chipShown: !document.querySelector('.blk-edit-chip').hidden,
+    chipText: document.querySelector('.blk-edit-chip').textContent,
+  }));
+  expect(editing.hasClass, 'the breathing edge-glow context is on').toBe(true);
+  expect(editing.chipShown, 'the editing chip is shown').toBe(true);
+  expect(editing.chipText, 'the chip names the wizard').toContain('Chrome Op');
+
+  // save → exits the editing context (glow + chip clear)
+  await page.evaluate(() => window.ddcsSaveAsWizard());
+  await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Chrome Op');
+  await page.click('.blk-dev-savedlg .blk-dev-save');
+  await page.waitForTimeout(250);
+  const after = await page.evaluate(() => ({
+    hasClass: document.getElementById('blocks-app').classList.contains('editing-wizard'),
+    chipShown: !document.querySelector('.blk-edit-chip').hidden,
+  }));
+  expect(after.hasClass, 'glow clears after save').toBe(false);
+  expect(after.chipShown, 'chip clears after save').toBe(false);
+
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+});
+
 test('the live form pane is hidden when NOT editing a custom op (normal Blocks use)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack);

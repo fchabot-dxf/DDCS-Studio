@@ -124,8 +124,8 @@ function buildBindings(exposures) {
     return out;
 }
 
-let _ws = null, _B = null, _savebtn = null;
-let _editingWizard = null;   // opType being re-authored (the re-author flow), or null = a new wizard
+let _ws = null, _B = null, _savebtn = null, _editChip = null;
+let _editingWizard = null, _editingLabel = null;   // opType + friendly label being re-authored, or null = a fresh op
 
 /** Derive a LIVE wizard def from the workspace WITHOUT saving — the same bindings saveAsCustomOp computes (inline
  *  exposures + GUI param pills), so the Blocks tab can render the op's form as a live VIEW of its blocks (the form is
@@ -185,6 +185,12 @@ export function mountDevMode(ws, B, hostEl) {
     _savebtn.title = 'Name this op and save it as a reusable custom wizard';
     _savebtn.addEventListener('click', () => saveAsCustomOp());
 
+    // "✎ Editing: <name>" chip — shown only while re-authoring a saved wizard (keyed on _editingWizard), so the
+    // Blocks tab reads as "your wizard" not a blank canvas. Pairs with the breathing edge-glow (.editing-wizard).
+    _editChip = document.createElement('div');
+    _editChip.className = 'blk-edit-chip';
+    _editChip.hidden = true;
+
     if (typeof window !== 'undefined') {
         window.ddcsSaveAsWizard = () => saveAsCustomOp();
         window.ddcsEditWizardDef = (opType) => editWizardDef(opType);   // re-author a saved wizard (load its template)
@@ -199,9 +205,20 @@ export function mountDevMode(ws, B, hostEl) {
         if (blk) refreshExposeMark(blk, e.name.slice(7));   // 'EXPOSE_'.length
     });
 
-    hostEl.append(_savebtn);
-    augment();                                   // a program may already be loaded at mount
-    return { onModelRender: () => augment() };   // authoring is always on — re-grow the affordances on every rebuild
+    hostEl.append(_savebtn, _editChip);
+    augment(); refreshEditingChrome();           // a program may already be loaded at mount
+    return { onModelRender: () => { augment(); refreshEditingChrome(); } };   // re-apply on every rebuild
+}
+
+// Reflect the "editing a saved wizard" context: a breathing accent edge-glow (.editing-wizard on #blocks-app) + the
+// "✎ Editing: <name>" chip. Both clear when _editingWizard is null (a fresh op / after Save). Keyed on one flag.
+function refreshEditingChrome() {
+    const app = (typeof document !== 'undefined') && document.getElementById('blocks-app');
+    if (app) app.classList.toggle('editing-wizard', !!_editingWizard);
+    if (_editChip) {
+        _editChip.textContent = _editingWizard ? ('✎ Editing: ' + (_editingLabel || _editingWizard)) : '';
+        _editChip.hidden = !_editingWizard;
+    }
 }
 
 // Sync a field's expose MARKER to its EXPOSE state: lit (accent, bold) when exposed, dim otherwise. Toggles the lit
@@ -303,7 +320,8 @@ export async function editWizardDef(opType) {
     } catch (e) { console.warn('edit wizard: build failed', e); return; }
     if (window.showApp) window.showApp('blocks');
     for (let i = 0; i < 80 && !(window.ddcsLoadBlockStack && window.__blkws); i++) await new Promise((r) => setTimeout(r, 50));   // wait for the Blocks app
-    _editingWizard = opType;   // saving UPDATES this wizard in place; the Save dialog prefills from its def
+    _editingWizard = opType; _editingLabel = def.label || opType;   // saving UPDATES this wizard; the dialog prefills from its def
+    refreshEditingChrome();   // glow + "✎ Editing: <name>" chip (the editing-context UI)
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack([opC]);
     await new Promise((r) => setTimeout(r, 150));   // let it project + render (authoring affordances grow automatically)
 }
@@ -423,7 +441,7 @@ function saveAsCustomOp() {
         } catch (e) { console.warn('save wizard failed', e); alert('Save failed: ' + ((e && e.message) || e)); return; }
 
         if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
-        _editingWizard = null;   // a fresh op next time (this save committed or updated the wizard)
+        _editingWizard = null; _editingLabel = null; refreshEditingChrome();   // exit the editing context (glow + chip clear)
         alert(editing ? `Updated “${meta.name}”.` : `Saved “${meta.name}” — it's now a button in the bar (Custom)${bindings.length ? ` with ${bindings.length} knob${bindings.length === 1 ? '' : 's'}` : ''}.`);
     });
 }
