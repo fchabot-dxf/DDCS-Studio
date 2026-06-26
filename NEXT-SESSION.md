@@ -15,19 +15,38 @@ The "wizards-as-data engine" the vision treated as future is mostly **already bu
 loops/control (`count`/`iff`/`array`/`flow`), and raw-emit atoms (`macro.js`) all ship. What remains is **Stages 4–6**
 — express ONE built-in *as data* + assert output-equivalence → port the rest → self-host. See ROADMAP "Key reframe."
 
-## ▶ Immediate next task
-**Hover a block → highlight its output in the projected-code panel** `[S–M]` — the learner feature. Today only
-SELECTION highlights + scrolls the projected code (`blocksApp` `B.Events.SELECTED` → `applySelection({scrollCode})`).
-Add **HOVER**: moving the mouse over a block lights up its emitted G-code lines in the projected panel — a **lighter
-highlight, no scroll** (distinct from the selection treatment). Hover-to-see-the-mapping is how you learn
-block→G-code — directly serves the author/learner surface. **Reuse the emitter's line map**: `emitMapped` already
-produces per-line block ancestry (`own = [...anc, id]`, backing word-level glow) — map block→its emitted lines from
-that, don't build a second. `blocks/blocksApp.js` (a hover listener + an `applyHover` paint alongside
-`applySelection`), the projected-code panel. (User request, 2026-06-26.)
+## ▶ Immediate next task (the held list, in priority order)
+**1. Middle false-glow bug** `[S]` — the MID #1 follow-up (detailed notes under "✅ Shipped" → MID #1 below). Two
+symptoms on a **middle probe** op: (a) probe lines glow as edited though never touched, (b) a block edit didn't
+survive round-trip. **Confirmed candidate:** the `middle` reconciler emits `m_both`, stripped to **`both`**, but
+`middleStack` reads **`params.twoAxis`** (`middleWizard.js:28`) — key mismatch → a `twoAxis` block-edit is dropped on
+round-trip (symptom b). Symptom (a) — *which* recovered field drives the probe-line glow — was **NOT pinned**;
+**reproduce it before fixing** (the user's standing rule). The user's **approach correction** is logged below: prefer
+**recording the edit as a one-time declared delta** (Blockly change event → transactional snapshot, `777490a`) over
+**inferring** it by re-running the whole reconciler + re-deriving the whole stack + diffing — the latter smears glow
+and drops edits through a partial/inferential reconciler. Surface that fork (surgical key-fix vs declare-edit
+refactor) once symptom (a) is pinned.
 
-*(Also queued: MID #3 — Region editor v1.x poly/freeform point editing `[M]` — poly/freeform create mode +
-per-vertex handles in `shapeStage.stageSvg` + freehand trace/simplify; the prior pick, still open.
-`ui/regionEditor.js`, `ui/shapeStage.js`.)*
+**2. MID #3 — Region editor v1.x poly/freeform point editing** `[M]` — poly/freeform create mode + per-vertex handles
+in `shapeStage.stageSvg` + freehand trace/simplify. `ui/regionEditor.js`, `ui/shapeStage.js`.
+
+## ✅ Shipped 2026-06-26 (session 2)
+- **Hover/select → projected-code highlight** (`dc581b3` + `e309963`) — the learner feature, both granularities (user
+  asked for "both"): **block hover** → its emitted lines glow lighter than selection (`.warm`, no scroll, innermost
+  block via Blockly's `data-id`); **value-field hover** → the exact emitted token boxed (`.thot`) via
+  `opGlow.valueTokenRanges` (perturb the socket to a sentinel, diff the re-emit — declared, no regex); **select a leaf**
+  → all its value tokens boxed (`valueRangesForSubtree`, leaf-scoped — a container shows lines only, kept cheap +
+  uncluttered). All from the ONE emit map (no second map). Overlays re-applied after each render (`renderCode` rebuilds
+  the spans). Tests `blocks-hover.spec` (incl. innermost-resolution + mouseleave + value-token + select-to-token, all
+  stress-stable) + `value-token-ranges.spec` (exact span via a non-circular splice-reconstruct + `[]`-guards). Built
+  understand→implement→review across two ultracode workflows; the review's "critical `diffRange` inversion" was a
+  false positive (verified — `s < max-p` precludes inversion). *DEFERRED:* value-token highlight for **container**
+  selections (perf + clutter — currently leaf-scoped).
+- **🐞 Pre-existing root-cause fix surfaced by the above** (`dc581b3`) — `recToJson` preserved `id: rec.id` for **op**
+  blocks but **not leaf atoms**, so a stack→workspace load gave leaves fresh random Blockly ids → the panel's per-line
+  ancestry (model ids) didn't match the workspace (random ids) until an async reproject realigned them. That broke
+  **click-selection AND hover** on first open (a brief, self-healing transient). One-line fix (carry the leaf id);
+  fixes selection too.
 
 ## ✅ Shipped 2026-06-26
 - **🔴→✅ Blocks tab regression — was DEAD on a non-empty program** (`039244d`, live showstopper on `pages.dev`).
