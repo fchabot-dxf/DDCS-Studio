@@ -24,11 +24,14 @@ function ensureDropdown(portId, levelId) {
     let sel = document.getElementById(selId);
     if (!sel) {
         const div = document.createElement('div');
+        div.style.gridColumn = 'span 2';   // take the room freed by hiding INPUT PORT + LEVEL, so the wide dropdown
+                                           // doesn't overflow its single column and overlap STOP (Q)
         div.innerHTML = '<span class="label">PROBE INPUT</span>';
         sel = document.createElement('select');
         sel.id = selId;
         sel.title = 'Which configured probe input to use — pin + level come from Settings → Hardware → Input.';
-        sel.style.minWidth = '150px';
+        sel.style.minWidth = '0';
+        sel.style.width = '100%';
         div.appendChild(sel);
         if (portDiv && portDiv.parentNode) portDiv.parentNode.insertBefore(div, portDiv);
     }

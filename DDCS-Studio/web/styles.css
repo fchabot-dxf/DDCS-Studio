@@ -1810,12 +1810,11 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 
 /* Per-category frames — frameWizardSections() (ui/wizardSections.js) wraps each section-label + its fields in a
    .wiz-section, so the form reads as grouped, framed categories. Theme-aware via the skin tokens. */
-.wiz-section {
-    border: 1px solid var(--outline, var(--border, #2c3a4a));
-    border-radius: var(--radius, 6px);
-    padding: 8px 11px 11px;
-    margin: 10px 0;
-}
+/* No frames on the form at all — categories read via the section-label header (+ its underline) and spacing only.
+   frameWizardSections() still wraps each section in a .wiz-section, but we don't border them, which also kills the
+   doubled/tripled borders some wizards got from nesting a sub-section frame inside the outer one. */
+.wiz-section { padding: 0; margin-top: 14px; }
+.wiz-section:first-child { margin-top: 0; }
 .wiz-section > .section-label:first-child { margin-top: 0; }
 
 /* Button Grids */
