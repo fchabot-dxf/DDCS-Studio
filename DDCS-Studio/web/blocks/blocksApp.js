@@ -443,6 +443,10 @@ async function buildWorkspace() {
   // record) happens during MUTED reloads, so it never fires here → it can never be mistaken for an edit.
   function recordBlockEdit(e) {
     if (!e.blockId) return;
+    // The always-on authoring affordances (EXPOSE_/PNAME_/WIDGET_/XMARK_ dev fields) aren't part of the op model —
+    // toRecord ignores them, so ticking/naming a knob must not register as an op block-edit (else it would light a
+    // spurious edit-chip + force merge-not-replace). Mirror that exclusion here.
+    if (e.element === 'field' && typeof e.name === 'string' && /^(EXPOSE_|PNAME_|WIDGET_|XMARK_)/.test(e.name)) return;
     const blk = ws.getBlockById(e.blockId);
     if (!blk || typeof blk.getParent !== 'function') return;
     const t = resolveHoverTarget(blk);                          // changed block → its owning model atom (+ value param)
