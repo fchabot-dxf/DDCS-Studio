@@ -16,24 +16,39 @@ loops/control (`count`/`iff`/`array`/`flow`), and raw-emit atoms (`macro.js`) al
 — express ONE built-in *as data* + assert output-equivalence → port the rest → self-host. See ROADMAP "Key reframe."
 
 ## ▶ Immediate next task (the held list, in priority order)
-**1. Middle false-glow bug** `[S→M]` — **ROOT CAUSE PINNED (2026-06-26, session 2, repro'd empirically).** The handoff's
-`m_both↔twoAxis` hypothesis was a **red herring for symptom (a)** — the false glow hits **every** middle config,
-including **single-axis** (which has no `twoAxis`), and `twoAxis` actually **survives** the round-trip. The real cause:
-the **blocks round-trip is not faithful** — `middleStack` builds rapid moves with ONE axis set (`MV(ax,v)` →
-`{mode:'rapid', x:'#9'}`), but `stackToWorkspace`→`workspaceToStack` fills the move block's **empty Y/Z value sockets
-with `0`** (`recToJson`: empty `value` socket → `math_number` shadow `0`; `toRecord` reads `0` back). So `G0 X#9`
-becomes **`G0 X#9 Y0 Z0`** on a no-edit round-trip → the emitted G-code CHANGES (6 lines drift on single-axis) → the op
-looks edited → false glow. **This is a round-trip-FAITHFULNESS bug (and a possible silent G-code change), not a glow
-bug — the glow is a symptom.** Open Q before fixing: is the added `Y0 Z0` behaviourally harmful (G90 absolute = real
-path change) or benign (G91 incremental = relative-zero no-op)? — determines severity. **Two complementary fixes:**
-(A) **make the round-trip faithful** — empty move-axis sockets should stay UNSET, not become `0` (the real bug; also
-kills the false glow at its source; check other atoms with optional sockets); (B) **declare-edit refactor** (user
-DEFINITELY inclined, 2026-06-26) — glow = recorded one-time deltas (Blockly change → snapshot, `777490a`), not
-re-derivation, so a drifting round-trip can't false-glow. (A) fixes the cause + any corruption; (B) is the robust glow
-model regardless. Do (A) for correctness; (B) is the bigger architectural piece — understand `777490a` + the three
-glow surfaces (`isOpBlockEdited`/`editedLinesForOp`/`editedRangesForOp`) before refactoring. The `m_both↔twoAxis`
-mismatch (`opSession.js:184` vs `middleWizard.js:28`) is a SEPARATE latent issue (would drop a real `twoAxis` BLOCK
-edit) worth fixing too, but is NOT symptom (a).
+**1. Middle false-glow bug** `[M]` — **FULLY DIAGNOSED + SCOPED (2026-06-26, session 2, repro'd empirically; no fix
+landed — user chose "reproduce + diagnose, then decide", then "definitely inclined toward declare edit").**
+- **Root = blocks round-trip is NOT representation-faithful** (the `m_both↔twoAxis` hypothesis was a RED HERRING — the
+  glow hits EVERY middle config incl. single-axis, and `twoAxis` survives). `stackToWorkspace→workspaceToStack`
+  NORMALIZES atom params in ≥2 ways that the clean `BUILDERS` rebuild doesn't, so the diff-based glow fires:
+  - **(i) absent move axes → `0`** — `middleStack` builds `MV(ax,v)` = `{mode:'rapid', x:'#9'}` (sparse); `recToJson`
+    fills the move block's empty Y/Z `value` sockets with `math_number` shadow `0`, `toRecord` reads `0` back → `G0 X#9`
+    becomes **`G0 X#9 Y0 Z0`**. This one CHANGES THE EMIT (6 lines on single-axis). **Harm: BENIGN for middle** — the
+    moves are after `DM('inc')` (`middleWizard.js:95`), so `Y0 Z0` = incremental no-op. Would be harmful only for a
+    single-axis move in G90 **absolute** mode (latent risk for other ops).
+  - **(ii) `#var` string → `variable` record** — a param like `to:'#8'` round-trips to `{type:'variable',params:…}`
+    (intended #var-survival, `recToJson:206` / `toRecord:94`). Emit-EQUIVALENT but the param representation differs →
+    also feeds the glow. Affects ANY op with `#var` atom params, not just middle.
+  - ⇒ Making the round-trip byte-identical to the rebuild is **whack-a-mole** (0-axes, #var-records, likely more).
+- **Fix fork (both real, both have costs):**
+  - **(A) faithful round-trip** — only PARTIAL for the glow (fixes (i) not (ii)); and (i)'s clean fix has a tradeoff:
+    a `math_number` shadow can't express "axis absent" (empty socket inline-edits as `0`, and `0` is a valid abs move).
+    The clean form = move def opts into **`omitEmpty`**: `recToJson` leaves an absent optional `value` field's socket
+    EMPTY (no shadow); `toRecord` OMITS an empty optional socket (no default) — this DISTINGUISHES absent (empty
+    socket) from a deliberate `0` (shadow 0). Cost: unset axes show empty (draggable) sockets, not inline `0`. **This
+    is a worthwhile EMIT-faithfulness fix on its own (stops `Y0 Z0`), but it does NOT fix the glow alone (ii remains).**
+  - **(B) declare-edit refactor (user's call) — the right glow fix.** Glow = what the user ACTUALLY edited, not a
+    representation diff, so ANY round-trip normalization is invisible. **No existing infra** — `777490a` is DOCS-ONLY;
+    `saveStates.js` is full-program undo snapshots, NOT a per-op delta recorder. **Key design insight (the cheap path):
+    diff the op's live children against a baseline that has been THROUGH THE SAME ROUND-TRIP** (e.g. capture the op's
+    children right after insert + first reproject, persist it on the op) — the drift is then identical on both sides and
+    CANCELS, leaving only real edits. (Alt: an `edited` flag set on a Blockly change within the op's subtree handles the
+    WHETHER for the chip/merge-guard; the three glow surfaces' WHERE still needs the delta.) Rewire
+    `isOpBlockEdited`/`editedLinesForOp`/`editedRangesForOp` (`opGlow.js`) onto it; `replayReconcile` then becomes
+    secondary. ⚠️ This refactors the EDIT PIPELINE — the area that just had a live regression (`039244d`); do it as a
+    focused effort, test-first (the repro: a no-edit round-trip must NOT glow; a real edit MUST), not half-landed.
+- **Separate latent bug (not symptom a):** the `m_both`→`both` strip vs `middleStack`'s `params.twoAxis` (`opSession.js:184`
+  / `middleWizard.js:28`) would drop a genuine `twoAxis` BLOCK edit on round-trip. Worth a one-line align regardless.
 
 **2. MID #3 — Region editor v1.x poly/freeform point editing** `[M]` — poly/freeform create mode + per-vertex handles
 in `shapeStage.stageSvg` + freehand trace/simplify. `ui/regionEditor.js`, `ui/shapeStage.js`.
