@@ -63,10 +63,17 @@ The handoff's explicit next-up after V10.36; completes coordlist as a dual-surfa
 - ⚠️ Coupled gap: `extractParamBlocks` (`userOps.js`) only converts `param`/`regionpick` pills — **coordlist can't become a saved wizard knob yet** (the `list` binding type exists but no authoring path emits it).
 - Files: `web/blocks/devMode.js`, `web/wizards/ops/coordlist.js`, `web/ui/formWidgets.js`, `web/blocks/blockly/coordListField.js`.
 
-### 3. [M] App-wide Merge/Replace/Cancel safety net — generalise to the new-op insert path
-The narrow edit-path notice ships; the centralised version (north star: *never regenerate code in a way that silently erases block-only functions*) does not.
-- Add a block-edited check at the **new-op** insert chokepoint (`wizardManager.js` else-branch via `commitActiveOp`) — needs the committed op's id exposed pre-insert (small refactor). Optionally one `blockEdited` flag wired to the Blocks change listener. No new UI (`blockEditNotice.js` covers the three-way).
-- Files: `web/wizardManager.js`, `web/ui/blockEditNotice.js`, `web/blocks/opGlow.js`, `web/blocks/opSession.js`.
+### 3. ✅ RESOLVED-BY-ANALYSIS (false premise) — App-wide Merge/Replace/Cancel safety net
+**The new-op insert path is append-only, so it cannot clobber block edits — no generalisation needed.** Traced
+2026-06-25: `wizardManager.insert()` regenerates in place ONLY on the EDIT path (`replaceOp`, already guarded by
+`isOpBlockEdited` + `showBlockEditNotice`); the new-op path (`commitActiveOp`/`commitDecodedCode`) routes through
+`appendIntoProgram` ([opSession.js:387](DDCS-Studio/web/blocks/opSession.js#L387)), which only ever slots the new
+op before Program End / appends — it never removes or replaces an existing op (and `commitActiveOp` mints a fresh
+op id). Since `insert()` is the single chokepoint every wizard routes through, the guard is already centralised for
+the only in-place-regenerate vector. The roadmap's optional "one `blockEdited` flag" was a perf/consistency
+refactor, not added protection. Same flavour as the binding-type audit #6-A false alarm.
+*(The real consistency follow-up is the MID item — re-base `isOpBlockEdited` on a reverse-synced reconstruction —
+itself gated on the field-id↔param adapter the code comments say "never worked".)*
 
 ### 4. [L] Field-targeting / non-numeric param mechanism — **the load-bearing unlock**
 Everything assumes a numeric value socket (valid-by-construction). This gates text/corner-grid knobs, enum/string region values, and (with a part drawing) spatial CAM feature-selection.

@@ -16,10 +16,14 @@ loops/control (`count`/`iff`/`array`/`flow`), and raw-emit atoms (`macro.js`) al
 — express ONE built-in *as data* + assert output-equivalence → port the rest → self-host. See ROADMAP "Key reframe."
 
 ## ▶ Immediate next task
-**ROADMAP → NEAR #3 — App-wide Merge/Replace/Cancel safety net** `[M]` — generalise the shipped edit-path notice to
-the NEW-op insert chokepoint (`wizardManager.js` else-branch via `commitActiveOp`; expose the committed op's id
-pre-insert). North star: never regenerate code in a way that silently erases block-only functions. (Then NEAR #4 —
-the field-targeting / non-numeric param unlock, the highest-leverage item.)
+**ROADMAP → NEAR #4 — Field-targeting / non-numeric param mechanism** `[L]` — the load-bearing unlock. Everything
+assumes a numeric value socket (valid-by-construction); this gates text/corner-grid knobs, enum/string region
+values, spatial CAM, AND completes coordlist-as-a-saved-knob (the coupled gap from #2). Scope a plan before coding;
+form-side widgets already exist, so an enum-via-existing-dropdown first slice could land as `[M]`.
+
+*(NEAR #3 — the app-wide Merge/Replace/Cancel generalisation — was **resolved-by-analysis**: the new-op insert path
+is append-only (`appendIntoProgram` never replaces), so it can't clobber block edits; the edit-path notice already
+centralises the guard at the single `insert()` chokepoint. See ROADMAP #3.)*
 
 **Shipped this session:**
 - NEAR #1 — re-icon any wizard (built-ins incl.) + line-art icon picker (`ef0ee43`); shared `web/ui/wizIcons.js` registry.
