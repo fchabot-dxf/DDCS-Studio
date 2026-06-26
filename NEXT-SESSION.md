@@ -15,10 +15,32 @@ The "wizards-as-data engine" the vision treated as future is mostly **already bu
 loops/control (`count`/`iff`/`array`/`flow`), and raw-emit atoms (`macro.js`) all ship. What remains is **Stages 4–6**
 — express ONE built-in *as data* + assert output-equivalence → port the rest → self-host. See ROADMAP "Key reframe."
 
-## ▶ Immediate next task
-**MID #3 — Region editor v1.x poly/freeform point editing** `[M]` — poly/freeform create mode + per-vertex handles in
-`shapeStage.stageSvg` + freehand trace/simplify (`ui/regionEditor.js`, `ui/shapeStage.js`). *(Confirm scope/approach
-first — this session's false-glow + hover work is shipped, archived below.)*
+## ▶ Immediate next task — finish the spatial-GUI feature (the PRODUCER half)
+**"2D point (numbers)" authoring path** `[M]` — complete custom-op preview drag-to-edit. **Context (the big
+spatial-GUI thread, session 2):** decided + recorded in [[spatial-gui-form-vs-canvas]] + ROADMAP "GUI over fields" —
+spatial input belongs on the **interactive preview canvas** (drag a feature → params, value as plain numbers on the
+block), NOT a mini-canvas in a form row; discrete picks (datum/zone) stay as small form/block-field dual-render. Key
+realisation: a wizard's **output = template + params**; the GUI is a **swappable layer of input blocks** over those
+params — so the same output can be built with different GUI blocks (one source of truth). MID #3 (region poly tool)
+**parked** as low-leverage (authoring modal, not the operator loop). drill ALREADY does full canvas write-back
+(`drillView.buildDrillSpec` — handles + `onDrag`, the proven template); the gap is custom ops.
+- ✅ **CONSUMER seam SHIPPED (`8b268c6`, tested, suite green, drill untouched):** `layoutSpecFromOp`
+  (`wizards/ops/panelTypes.js`) now derives draggable point/rect handles from the grouped `x/y(/w/h)` param-block roles
+  it already read to DRAW, + an `onDrag` that writes the bound number FIELDS (`formWidgets` number/slider now tag
+  `data-param`; fires `'input'` → `userOpView.update()` redraws). Guarded to WRITABLE fields only (no dead handle over
+  a canvas-widget param). Test: `custom-op-canvas-handles.spec`.
+- 🛑 **INERT until the PRODUCER lands** (verify-real-symptom catch): the authoring couples "role" with the
+  `xy-pad`/`rect` FORM-canvas widget — `CANVAS_DECODE` (`blocks/userOps.js:54`) has `'xy-x'→['xy-pad','x']`, **no
+  `number+role`** — so a role-tagged param renders as the form mini-canvas (which the writability guard skips); the
+  handle NEVER fires for a real authored op. **Build:** (1) add decode entries `point-x→[number,x]` /
+  `point-y→[number,y]` (+rect) to `CANVAS_DECODE`/`CANVAS_ROLE_WIDGETS`; (2) **the fiddly bit** — render a number-role
+  GROUP as PAIRED `data-param` number fields, NOT a multi-param canvas widget (`groupCanvasBindings` /
+  `renderOpForm`'s grouping currently assumes a role-group IS a canvas widget). Then an author tags x/y as "2D point
+  (numbers)" + Form+2D panel → the big preview is drag-to-edit. **VERIFY END-TO-END** (a real authored custom op's
+  preview drags + writes the form), not just the unit seam. (Stages 2–3 = preset patterns + parametric-handle presets
+  extracted from drill — ROADMAP STRATEGIC #8.)
+
+*(Parked: MID #3 region poly tool — low-leverage, see ROADMAP. The false-glow + hover work is archived below.)*
 
 ## 🗄️ Session-2 diagnosis archive (false-glow → declare-edit; SHIPPED `2789c37`, kept for reference)
 **Middle false-glow bug — ✅ SHIPPED (`2789c37`, declare-edit B).** The glow/chip/merge-guard now read the user's
