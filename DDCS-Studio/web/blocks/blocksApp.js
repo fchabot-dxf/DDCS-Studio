@@ -14,7 +14,8 @@ import { suggestNext, recordProgram } from './suggest.js';   // next-block sugge
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
-import { mountDevMode } from './devMode.js';   // Dev (authoring) mode: expose atom values as params → Save as custom op
+import { mountDevMode, deriveAuthoredDef, editingWizardType } from './devMode.js';   // authoring: expose atom values as params + derive the live def
+import { renderOpForm } from '../ui/formWidgets.js';   // render the wizard's form from bindings (the live block→form view)
 import { isOpBlockEdited, valueTokenRanges, valueRangesForSubtree } from './opGlow.js';   // op-edit guard + word-level value-token spans (hover/select highlight)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
@@ -307,6 +308,23 @@ async function buildWorkspace() {
     panel.setRotaryFixture(sim.showRotaryRig);
     applySelection();
     repaintOverlays();   // re-apply transient hover (.warm) + value-token (.thot) overlays onto the rebuilt spans
+    renderLiveForm();    // the wizard's form as a LIVE view of the blocks (only while editing a custom op)
+  }
+
+  // Live FORM view — when re-authoring a custom op, render its form as a pure VIEW of the blocks (no save needed).
+  // Derive the bindings (deriveAuthoredDef) + render (renderOpForm) on every view render, so editing a block's value
+  // or a knob's widget is reflected in the form immediately ("see the form change"). Hidden when not editing a wizard.
+  function renderLiveForm() {
+    const pane = document.getElementById('blk-formpane'), formHost = document.getElementById('blk-form');
+    if (!pane || !formHost) return;
+    if (!editingWizardType()) { pane.hidden = true; formHost.innerHTML = ''; return; }
+    let def = null;
+    try { def = deriveAuthoredDef(ws); } catch (_) { /* a mid-edit derive can throw; keep the last good form */ return; }
+    if (!def) { pane.hidden = true; return; }
+    pane.hidden = false;
+    formHost.innerHTML = '';
+    if (def.bindings && def.bindings.length) renderOpForm(formHost, def.bindings);
+    else formHost.innerHTML = '<div class="blk-form-empty">No knobs yet — tick a value’s “knob” on the blocks to expose one.</div>';
   }
 
   // User edited the WORKSPACE → push to the shared model (which re-projects the editor) → refresh the pane.

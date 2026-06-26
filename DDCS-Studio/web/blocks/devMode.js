@@ -127,6 +127,21 @@ function buildBindings(exposures) {
 let _ws = null, _B = null, _savebtn = null;
 let _editingWizard = null;   // opType being re-authored (the re-author flow), or null = a new wizard
 
+/** Derive a LIVE wizard def from the workspace WITHOUT saving — the same bindings saveAsCustomOp computes (inline
+ *  exposures + GUI param pills), so the Blocks tab can render the op's form as a live VIEW of its blocks (the form is
+ *  a pure function of the blocks; save is just persistence). Returns { bindings, children, varErr } or null (no op).
+ *  Read-only: collectAuthoring works off a fresh workspaceToStack projection, so the live blocks aren't touched. */
+export function deriveAuthoredDef(ws) {
+    const a = collectAuthoring(ws || _ws);
+    if (!a) return null;
+    const inlineBindings = buildBindings(a.exposures);
+    const paramBindings = extractParamBlocks(a.opRec.children, new Set(inlineBindings.map((b) => b.param)));
+    return { bindings: [...inlineBindings, ...paramBindings], children: a.opRec.children, varErr: a.varErr };
+}
+
+/** The opType being re-authored (the "editing a saved wizard" context), or null = building/authoring fresh. */
+export function editingWizardType() { return _editingWizard; }
+
 /** Mount the ALWAYS-ON authoring surface: a "Save wizard…" button + the per-atom "expose as param" affordances grow
  *  on every render. There is no normal/dev toggle — the Blocks tab IS the author/learner surface (operators stay in
  *  the wizards); the affordances are quiet by default and styling, not a mode, keeps the code glanceable. The wizard

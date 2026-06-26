@@ -4669,6 +4669,12 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .leg i { display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:middle; margin-right:3px; }
 #blocks-app .gcode { flex:1; overflow:auto; background:var(--screen); }
 #blocks-app .gcode pre { margin:0; padding:10px; font:12px/1.45 ui-monospace,Consolas,monospace; color:var(--screen-ink); white-space:pre; }
+/* Live FORM pane — the wizard's form as a live view of the blocks while editing a custom op (hidden otherwise). */
+#blocks-app .blk-formpane { flex:0 0 auto; max-height:50%; overflow:auto; background:var(--screen); border-bottom:1px solid var(--line); }
+#blocks-app .blk-formpane[hidden] { display:none; }
+#blocks-app .blk-form-body { padding:8px 12px 12px; color:var(--screen-ink); }
+#blocks-app .blk-form-live { margin-left:6px; padding:1px 6px; border-radius:8px; font:700 9px/1.6 inherit; letter-spacing:.04em; color:#fff; background:var(--accent,#3b82f6); }
+#blocks-app .blk-form-empty { font-size:11px; color:var(--screen-dim); padding:6px 2px; }
 /* code view: one span per line, carrying its owning-block ancestry → linked selection */
 #blocks-app .gl { display:block; border-radius:3px; }
 #blocks-app .gl:empty::after { content:'\200B'; }                 /* keep blank separator lines tall */
@@ -4801,7 +4807,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     /* left-edge vertical handle opens the palette; slides to the toolbox edge when open (acts as close) */
     #blocks-app .blk-tools-handle {
         display:block; position:fixed; left:0; top:50%; transform:translateY(-50%);
-        z-index:79; padding:16px 7px; cursor:pointer; writing-mode:vertical-rl; text-orientation:mixed;
+        z-index:81; padding:16px 7px; cursor:pointer; writing-mode:vertical-rl; text-orientation:mixed;   /* above the preview drawer (z 80) so the centred close ✕ stays tappable when both drawers overlap */
         font:700 11px/1 inherit; letter-spacing:.08em; color:var(--screen-ink); background:var(--screen);
         border:1px solid var(--line); border-left:none; border-radius:0 10px 10px 0; box-shadow:4px 0 14px #0007;
     }

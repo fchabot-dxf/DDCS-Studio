@@ -57,14 +57,16 @@ test('mobile: palette collapses (canvas reclaims width), preview + palette drawe
   expect(opened.toolsOpen).toBeTruthy();
   expect(opened.toolboxWidth, 'palette visible → width > 0').toBeGreaterThan(0);
 
-  // close handle should sit near the TOP (the user's bug: it was vertically centred → floating mid-canvas)
+  // close handle is vertically CENTRED on the palette's right edge — matches the closed "Blocks" tab (user request;
+  // supersedes the earlier "park at top" choice). It sits ON the palette edge, so it isn't loose mid-canvas.
   await page.screenshot({ path: 'tests/_blocks-mobile-open.png' });
   const handleBox = await page.evaluate(() => {
     const r = document.getElementById('blkToolsHandle').getBoundingClientRect();
-    return { left: r.left, top: r.top, vw: window.innerWidth };
+    return { left: r.left, top: r.top, vw: window.innerWidth, vh: window.innerHeight };
   });
-  expect(handleBox.top, 'handle parks near the top, not vertically centred').toBeLessThan(80);
-  expect(handleBox.left, 'handle not pushed off the right edge').toBeLessThan(handleBox.vw * 0.7);
+  expect(handleBox.top, 'handle is vertically centred, not parked at the top').toBeGreaterThan(handleBox.vh * 0.3);
+  expect(handleBox.top, 'handle is vertically centred, not at the bottom').toBeLessThan(handleBox.vh * 0.7);
+  expect(handleBox.left, 'handle sits on the palette edge, not pushed off the right').toBeLessThan(handleBox.vw * 0.7);
 
   // with BOTH palette + preview open, the preview must COVER the palette at their overlap (bottom-left)
   await page.click('#blkDrawerHandle');
