@@ -36,7 +36,12 @@ const find = (prog, type) => {
 // co-located with it. Numeric/geometry params reconcile cleanly here; derived (stepover) and inset (pocket)
 // params are intentionally left out for now. Only ops listed here reverse-sync.
 // Read a STUDIO form field as a number (for un-deriving block values like stepover ← stepover% × toolØ).
+// During replayReconcile (wizard CLOSED — the chip/Blocks surfaces have no form open) the form-only values must
+// come from the op's STORED params, not the live DOM (which would read defaults and over-report). `_replayParams`
+// holds those stored params; the field id strips its op prefix (sf_toolDia → toolDia) to look them up.
+let _replayParams = null;
 const formNum = (id, d) => {
+    if (_replayParams) { const v = _replayParams[id.replace(/^[a-z]+_/, '')]; return v == null ? d : num(v, d); }
     if (typeof document === 'undefined') return d;
     const e = document.getElementById(id);
     return e ? num(e.value, d) : d;
@@ -484,6 +489,38 @@ export function reconcileActiveOp() {
     if (!prog || !prog.length) return null;
     const fields = RECONCILERS[shownOp](prog);
     return fields ? { type: shownOp, fields } : null;
+}
+
+/**
+ * Replay the DECLARED Replace path for ONE op, wizard-CLOSED — the single rebuild the three diff surfaces
+ * (glow / chip / Merge-Replace notice, via opGlow) share. Reconciles the op's (possibly block-edited) stack back to
+ * params — the reconciler reads the edited blocks, and its form-only values (toolØ, wallOffset) come from the op's
+ * STORED params, not the DOM — then rebuilds with BUILDERS. The reconciled fields override their params; everything
+ * untouched (toolØ, rpm, head, …) stays from stored state. Returns the rebuilt bare atoms = what a form Replace
+ * would regenerate, or null if the op has no reconciler / its shape doesn't match (caller falls back, fail-safe).
+ * So "edited" can mean exactly "Replace would lose something" — a surfaced edit reconciles + reproduces; an
+ * injection / unrepresentable residue does not. Declaration via the reconcilers, never motion-inference.
+ */
+// Memo by the op OBJECT (its identity is the stack signature: ddcsLoadBlockStack replaces the program with fresh
+// objects on every edit, so a changed stack ⇒ a new key ⇒ a miss; an unchanged op ⇒ a hit). Dedupes the three
+// surface calls (isOpBlockEdited + editedLines + editedRanges) for the same op in one render pass. Caches null too.
+const _replayCache = new WeakMap();
+export function replayReconcile(opId) {
+    const prog = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+    const op = prog.find((b) => b && b.type === 'op' && b.id === opId);
+    if (!op || !op.opType || !RECONCILERS[op.opType] || !BUILDERS[op.opType]) return null;
+    if (_replayCache.has(op)) return _replayCache.get(op);
+    let fields;
+    _replayParams = op.params || {};                                  // stored-state sourcing (wizard closed)
+    try { fields = RECONCILERS[op.opType]([op]); } finally { _replayParams = null; }   // scope find() to THIS op's subtree
+    let rebuilt = null;
+    if (fields) {
+        const overrides = {};
+        for (const k in fields) { if (fields[k] !== undefined) overrides[k.replace(/^[a-z]+_/, '')] = fields[k]; }   // sf_depth → depth
+        rebuilt = _builderAtoms(op.opType, { ...op.params, ...overrides });
+    }
+    _replayCache.set(op, rebuilt);
+    return rebuilt;
 }
 
 /**

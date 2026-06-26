@@ -10,6 +10,7 @@
  * intent from emitted motion (docs/archive/MULTI-OP-STACKING.md). Imports the BUILDERS leaf + the emitter; nothing imports back.
  */
 import { BUILDERS, _builderAtoms } from './opBuilders.js';
+import { replayReconcile } from './opSession.js';                            // the declared Replace rebuild — the shared baseline for "would Replace lose something?" (acyclic: opSession doesn't import opGlow)
 import { emitMapped } from './blockEmitter.js';                               // emit a stack → { lines, map } (for word-level glow diff)
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
@@ -109,23 +110,28 @@ export function isOpBlockEdited(opId) {
 
     const sig = (a) => JSON.stringify((a || []).map(stripBlockIds));
 
-    // 1. Check if it matches the last known form params (_builderAtoms unwraps a self-wrapping builder — homing —
-    //    so an unedited homing op isn't falsely flagged as block-edited)
-    const bare = _builderAtoms(op.opType, op.params);
-    if (sig(op.children) === sig(bare)) return false; // Not edited at all
+    // 1. Matches the clean rebuild from its stored params (_builderAtoms unwraps a self-wrapping builder — homing —
+    //    so an unedited homing op isn't falsely flagged) → not edited at all.
+    if (sig(op.children) === sig(_builderAtoms(op.opType, op.params))) return false;
 
-    // 2. It diverges structurally from the form rebuild → block-edited. We do NOT try to prove it "form-safe"
-    // by reverse-syncing the blocks back to params: that's the banned inference (docs/archive/MULTI-OP-STACKING.md),
-    // and the field-id↔param adapter never worked anyway (it always fell through to `return true`). The
-    // override-diff glow + the Merge/Replace notice handle this forward-only.
-    return true;
+    // 2. It differs from the stored-params rebuild — but a SURFACED edit (a value the form CAN represent) is still
+    //    form-reconstructable, so a Replace would NOT lose it. Replay the DECLARED Replace path
+    //    (opSession.replayReconcile): reconcile the live blocks back to params (untouched values sourced from STORED
+    //    state, not the DOM — runs wizard-closed) and rebuild. If that reproduces the live stack, a form Replace
+    //    loses nothing → not edited; an injection / unrepresentable residue won't reproduce → edited. Declaration
+    //    via the reconcilers, never motion-inference. Fail-safe: no reconciler (replay null) → the forward-only
+    //    answer (differs ⇒ edited) — precision rides on reconciler coverage.
+    const rebuilt = replayReconcile(opId);
+    return rebuilt ? sig(op.children) !== sig(rebuilt) : true;
 }
 
 export function editedLinesForOp(opId) {
     if (typeof window === 'undefined' || !window.ddcsGetBlockProgram || !window.ddcsGetProjection) return [];
     const op = _findOpById(window.ddcsGetBlockProgram() || [], opId);
     if (!op || !op.opType || !BUILDERS[op.opType] || !Array.isArray(op.children)) return [];
-    const injected = collectInjectedIds(_builderAtoms(op.opType, op.params), op.children);
+    // Same baseline as isOpBlockEdited: the declared Replace rebuild (so a SURFACED edit, which Replace regenerates,
+    // doesn't glow) — falling back to the stored-params rebuild where there's no reconciler.
+    const injected = collectInjectedIds(replayReconcile(opId) || _builderAtoms(op.opType, op.params), op.children);
     if (!injected.size) return [];
     const map = (window.ddcsGetProjection() || {}).map || [];
     const out = [];
@@ -137,13 +143,15 @@ export function editedLinesForOp(opId) {
  * Like editedLinesForOp but WORD-LEVEL: the editor overlay data as [{ line, range }]. `range` = a [start, end)
  * char span within the line — glow just the value token a Blocks edit changed in an otherwise form-generated line
  * — or `null` = whole-line (an INJECTED atom is a wholly new line; a multi-line / container override can't localize
- * to one token). Forward-only: diffs the clean form rebuild's emit against the live stack's emit (no inference).
+ * to one token). Diffs the declared Replace rebuild's emit against the live stack's emit (no motion-inference).
  */
 export function editedRangesForOp(opId) {
     if (typeof window === 'undefined' || !window.ddcsGetBlockProgram || !window.ddcsGetProjection) return [];
     const op = _findOpById(window.ddcsGetBlockProgram() || [], opId);
     if (!op || !op.opType || !BUILDERS[op.opType] || !Array.isArray(op.children)) return [];
-    const baseAtoms = _builderAtoms(op.opType, op.params);
+    // Same baseline as isOpBlockEdited: the declared Replace rebuild (so a SURFACED edit doesn't glow), falling back
+    // to the stored-params rebuild where there's no reconciler — one diff, three surfaces.
+    const baseAtoms = replayReconcile(opId) || _builderAtoms(op.opType, op.params);
     const { injected, overrides } = collectEdits(baseAtoms, op.children);
     if (!injected.size && !overrides.length) return [];
     const liveMap = (window.ddcsGetProjection() || {}).map || [];
