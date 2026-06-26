@@ -50,6 +50,25 @@ landed — user chose "reproduce + diagnose, then decide", then "definitely incl
 - **Separate latent bug (not symptom a):** the `m_both`→`both` strip vs `middleStack`'s `params.twoAxis` (`opSession.js:184`
   / `middleWizard.js:28`) would drop a genuine `twoAxis` BLOCK edit on round-trip. Worth a one-line align regardless.
 
+▸ **B build status (session 2 — STARTED, parked at a real design catch; user chose B emphatically):**
+  - **Built (parked WIP, uncommitted):** `web/blocks/opEdits.js` — the per-op declared-edit recorder (`recordEdit`/`opEditMap`,
+    keyed `opId → Map<atomId, {paramKey,from,to}>`); `tests/op-declared-edits.spec.js` — the two-direction regression
+    (no-edit middle round-trip ⇒ NOT edited; a real `setFieldValue` ⇒ edited + glows). **Designed but NOT wired:** the
+    `blocksApp` listener hook (record on `!e.isUiEvent && !muteChanges`, reuse `resolveHoverTarget` to map the changed
+    block → its model atom + paramKey; the drift fires during MUTED reloads so it's never recorded) + the 4 `opGlow`
+    surface rewrites (`isOpBlockEdited`/`editedLinesForOp`/`editedRangesForOp`/`opEditSummary` read `opEditMap`, counting
+    only edits whose atom STILL EXISTS in `op.children` — so a Replace's fresh atom-ids auto-clear stale records; the
+    leaf-id fix `dc581b3` keeps ids stable across the round-trip so a real edit survives it).
+  - 🛑 **THE CATCH (must resolve before cutover):** pure declare-edit (live change events) **can't see a block-edit in a
+    LOADED program** — `.mjson` saves the FULL stack incl. edits (`programFile.js:17`) and `ddcsLoadBlockStack` restores
+    it with NO event firing. So a Replace after reload would clobber loaded block-edits, AND the 3 consumer specs that
+    inject via the model (`op-edited-reconcile`, `op-header-edit-merge`, `informed-merge-notice` — all do
+    `op.children=[…,{type:'raw'}]; ddcsLoadBlockStack`) would read un-edited. Inference-on-load doesn't save us either
+    (it false-glows on the same drift). ⇒ **B MUST persist the declared-edit record**: serialize `opEdits` into
+    `serializeProject` + restore in `loadProject` (atom-ids match — the stack is saved/loaded WITH ids). Then update the
+    3 consumer specs to ALSO declare their injection (or drive it via a live gesture). Net B scope = recorder + listener
+    hook + 4 surfaces + **file-format persistence** + consumer-test updates — a focused effort, not a one-sitting tail.
+
 **2. MID #3 — Region editor v1.x poly/freeform point editing** `[M]` — poly/freeform create mode + per-vertex handles
 in `shapeStage.stageSvg` + freehand trace/simplify. `ui/regionEditor.js`, `ui/shapeStage.js`.
 
