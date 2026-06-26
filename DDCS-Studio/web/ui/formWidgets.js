@@ -44,6 +44,7 @@ function numberWidget(host, b) {
     if (max != null) inp.max = max;
     inp.value = b.default ?? 0;
     inp.style.cssText = CTRL_CSS + ' width:120px;';
+    inp.dataset.param = b.param;   // so a 2D-preview handle can write this field back (drag-to-edit derives from roles)
     host.append(labelSpan(b), inp);
     return { read: () => ({ [b.param]: numOr(inp.value, b.default ?? 0) }) };
 }
@@ -57,6 +58,7 @@ function sliderWidget(host, b) {
     rng.type = 'range';
     rng.min = cfg.min ?? b.min ?? 0; rng.max = cfg.max ?? b.max ?? 100; rng.step = cfg.step || 1;
     rng.value = b.default ?? rng.min;
+    rng.dataset.param = b.param;   // 2D-preview handle can write this field back (drag-to-edit derives from roles)
     const out = document.createElement('span');
     out.style.cssText = 'min-width:42px; text-align:right; opacity:.85;';
     out.textContent = rng.value;
