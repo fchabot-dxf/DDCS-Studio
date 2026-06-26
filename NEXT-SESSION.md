@@ -15,8 +15,13 @@ The "wizards-as-data engine" the vision treated as future is mostly **already bu
 loops/control (`count`/`iff`/`array`/`flow`), and raw-emit atoms (`macro.js`) all ship. What remains is **Stages 4–6**
 — express ONE built-in *as data* + assert output-equivalence → port the rest → self-host. See ROADMAP "Key reframe."
 
-## ▶ Immediate next task (the held list, in priority order)
-**1. Middle false-glow bug — ✅ SHIPPED (`2789c37`, declare-edit B).** The glow/chip/merge-guard now read the user's
+## ▶ Immediate next task
+**MID #3 — Region editor v1.x poly/freeform point editing** `[M]` — poly/freeform create mode + per-vertex handles in
+`shapeStage.stageSvg` + freehand trace/simplify (`ui/regionEditor.js`, `ui/shapeStage.js`). *(Confirm scope/approach
+first — this session's false-glow + hover work is shipped, archived below.)*
+
+## 🗄️ Session-2 diagnosis archive (false-glow → declare-edit; SHIPPED `2789c37`, kept for reference)
+**Middle false-glow bug — ✅ SHIPPED (`2789c37`, declare-edit B).** The glow/chip/merge-guard now read the user's
 DECLARED edits (`opEdits.js`, recorded on the Blockly change event) instead of inferring editedness by re-derivation,
 so the round-trip's representation drift can never read as a false edit. Recorder + `blocksApp` listener hook + 4
 `opGlow` surfaces rewritten + `.mjson` persistence (a saved block-edit fires no reload event, so it must ride with the
@@ -83,10 +88,13 @@ fix (empty axis sockets stay unset, distinguished from a deliberate 0 via empty 
     3 consumer specs to ALSO declare their injection (or drive it via a live gesture). Net B scope = recorder + listener
     hook + 4 surfaces + **file-format persistence** + consumer-test updates — a focused effort, not a one-sitting tail.
 
-**2. MID #3 — Region editor v1.x poly/freeform point editing** `[M]` — poly/freeform create mode + per-vertex handles
-in `shapeStage.stageSvg` + freehand trace/simplify. `ui/regionEditor.js`, `ui/shapeStage.js`.
-
 ## ✅ Shipped 2026-06-26 (session 2)
+- **Middle false-glow → declare-edit** (`2789c37`) — chip/glow/merge-guard read the user's DECLARED block edits
+  (`opEdits.js`, recorded on the Blockly change event), not a re-derivation diff — so a blocks round-trip's
+  representation drift can never read as a false edit. Recorder + listener hook + 4 `opGlow` surfaces + `.mjson`
+  persistence; word-level glow by old→new emit diff; ~134 lines of inference removed. SUPERSEDES MID #1. Residuals:
+  deletions unflagged (v1 gap); benign `Y0 Z0` emit drift unfixed (`omitEmpty` fix if wanted); `m_both↔twoAxis`
+  reverse-sync mismatch open. *(Full diagnosis in the Session-2 archive above.)*
 - **Hover/select → projected-code highlight** (`dc581b3` + `e309963`) — the learner feature, both granularities (user
   asked for "both"): **block hover** → its emitted lines glow lighter than selection (`.warm`, no scroll, innermost
   block via Blockly's `data-id`); **value-field hover** → the exact emitted token boxed (`.thot`) via
