@@ -95,7 +95,10 @@ export async function showBlocks() {
     if (getStack().length) {
       // The program already has content (e.g. accumulated wizard inserts) — render the WHOLE program; don't
       // replace it with just the last previewed op (that was the "only one of two inserts shows" bug).
-      renderFromModel();
+      // Route through api.refresh() (= renderFromModel(getProjection()) + panel.setActive): renderFromModel is a
+      // buildWorkspace closure-local — not visible here at module scope — AND needs the projection arg this path
+      // lacked. `await initBlocks()` above guarantees `api` is set on the non-empty branch.
+      if (api) api.refresh();
     } else {
       // The model is empty (fresh tab click), seed it with whatever active op the UI is focused on.
       ops.previewActiveOp();
