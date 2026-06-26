@@ -356,11 +356,21 @@ export function renderOpForm(host, bindings) {
         if (b.group) { if (!byGroup[b.group]) { byGroup[b.group] = []; units.push(byGroup[b.group]); } byGroup[b.group].push(b); }
         else units.push([b]);
     }
-    for (const unit of units) {
+    const addRow = (spec, label) => {
         const row = document.createElement('div');
-        try { readers.push(renderFormWidget(row, unit).read); }
-        catch (e) { console.warn('widget render failed for', unit[0] && unit[0].param, e); }
+        try { readers.push(renderFormWidget(row, spec).read); }
+        catch (e) { console.warn('widget render failed for', label, e); }
         host.appendChild(row);
+    };
+    for (const unit of units) {
+        // A canvas multi-widget (xy-pad / rect) renders the whole group as ONE widget that owns its value. A
+        // number-role group (2D point / rect declared as plain numbers) instead renders each member as its OWN
+        // number field — each carries data-param so the Form+2D preview's role-derived handle can drag-write it,
+        // while the value stays a plain number on the form. The shared group/role still drives the preview handle
+        // (layoutSpecFromOp); only the FORM rendering differs.
+        if (unit.length > 1 && !MULTI_WIDGETS.has(unit[0] && unit[0].widget)) {
+            for (const b of unit) addRow(b, b && b.param);
+        } else addRow(unit, unit[0] && unit[0].param);
     }
     return readers;
 }

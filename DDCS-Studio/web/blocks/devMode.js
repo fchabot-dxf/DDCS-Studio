@@ -379,9 +379,14 @@ function saveAsCustomOp() {
     const blkSim = simIntentFromStack(a.opRec.children);   // undefined = no sim block in the stack
     const editingDef = _editingWizard ? listUserOps().find((d) => d.opType === _editingWizard) : null;
 
+    // A 2D-point / 2D-rect knob is ONLY drag-to-edit on the Form+2D preview — so default a freshly-authored op that
+    // has one to form2d, else the feature is silently hidden behind the form3d default. Still a DECLARATION: a `panel`
+    // block, a re-authored wizard's own panel, and the dialog dropdown all override (group[0] carries the widget).
+    const hasNumberRole = bindings.some((b) => b.widget === 'point' || b.widget === 'nrect');
+
     openSaveDialog({
         name: editingDef ? (editingDef.label || '') : '',
-        panel: blkPanel || (editingDef && editingDef.panel) || 'form3d',
+        panel: blkPanel || (editingDef && editingDef.panel) || (hasNumberRole ? 'form2d' : 'form3d'),
         sim: blkSim !== undefined ? blkSim : ((editingDef && editingDef.sim) || null),
         knobs: bindings.length,
     }, (meta) => {

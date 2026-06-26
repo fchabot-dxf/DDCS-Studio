@@ -19,6 +19,7 @@ import { PALETTE, CATEGORIES } from '../../wizards/ops/index.js';
 import { installCornerGridField } from './cornerGridField.js';
 import { installRegionPickField } from './regionPickField.js';
 import { installCoordListField } from './coordListField.js';
+import { CANVAS_ROLE_WIDGETS } from '../userOps.js';   // the ONE role-encoded widget list (shared with dev-mode; consumed lazily below → cycle-safe)
 
 // Fields that render as the inline 3×3 corner-grid picker (field_cornergrid), tinted per datum so PlaceOnStock's
 // stock-attach (blue) and path-datum (amber) glyphs read apart — matching the 2D canvas pickers.
@@ -123,10 +124,12 @@ const optionsFor = (def, field) => {
         if (def.type === 'waitinput') return ['imm', 'rise', 'fall', 'high', 'low'];
         if (def.type === 'move') return ['cut', 'rapid', 'probe'];
     }
-    // numeric-socket widgets (all commit a number). Canvas pickers fold the ROLE into the value (decoded by
-    // userOps.decodeCanvasWidget) so the role is DECLARED, not inferred from pool order (audit #6-B).
-    if (field === 'widget' && def.type === 'param') return ['number', 'slider', 'dropdown', 'toggle',
-        ['XY pad · X', 'xy-x'], ['XY pad · Y', 'xy-y'], ['Rect · X', 'rect-x'], ['Rect · Y', 'rect-y'], ['Rect · W', 'rect-w'], ['Rect · H', 'rect-h']];
+    // numeric-socket widgets (all commit a number). The role-encoded widgets fold a ROLE into the value (decoded by
+    // userOps.decodeCanvasWidget) so the role is DECLARED, not inferred from pool order (audit #6-B): "XY pad / Rect"
+    // = a form mini-canvas; "2D point / 2D rect" = plain number fields the Form+2D preview makes drag-to-edit. ONE
+    // source of truth: spread the canonical CANVAS_ROLE_WIDGETS (also feeds the dev-mode dropdown) so the two author
+    // surfaces can't drift. (The import closes a benign cycle — this list is read lazily here, never at module-eval.)
+    if (field === 'widget' && def.type === 'param') return ['number', 'slider', 'dropdown', 'toggle', ...CANVAS_ROLE_WIDGETS];
     if (field === 'panel' && def.type === 'panel') return ['form3d', 'form2d', 'form'];   // the GUI panel-type declaration
     return SELECTS[field] || null;
 };
