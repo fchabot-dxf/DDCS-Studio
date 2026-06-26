@@ -16,6 +16,7 @@ import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { mountDevMode, deriveAuthoredDef, editingWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back
 import { renderOpForm } from '../ui/formWidgets.js';   // render the wizard's form from bindings (the live block→form view)
+import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
 import { isOpBlockEdited, valueTokenRanges, valueRangesForSubtree } from './opGlow.js';   // op-edit guard + word-level value-token spans (hover/select highlight)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
@@ -157,7 +158,7 @@ async function buildWorkspace() {
   // once here; the rest of the chrome re-skins live via setTheme below).
   const gridColour = (() => { try { return getComputedStyle(document.body).getPropertyValue('--border').trim() || '#1b2733'; } catch (_) { return '#1b2733'; } })();
   const ws = B.inject(host, {
-    toolbox: buildToolbox(), theme: ddcsTheme(B), renderer: 'geras', collapse: true,
+    toolbox: buildToolbox(learnerToolboxCategories()), theme: ddcsTheme(B), renderer: 'geras', collapse: true,
     grid: { spacing: 26, length: 2, colour: gridColour, snap: true },
     zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { smoothScroll: true },
   });

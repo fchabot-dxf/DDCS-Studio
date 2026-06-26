@@ -234,6 +234,24 @@ function chainToJson(records) {
     return head;
 }
 
+// Merge each atom's DEFAULTS under its params (recursively), so a curated stack that omits a value field gets the
+// atom's sensible default — exactly like buildToolbox's per-block flyout shadows (def.defaults), NOT recToJson's
+// bare Number(v)||0 = 0 (which would turn an absent feed into F0). Op records carry their own params, untouched.
+function recWithDefaults(rec) {
+    if (!rec || rec.type === 'op') return rec;
+    const def = BLOCKS[rec.type];
+    const out = { ...rec, params: def ? { ...def.defaults, ...(rec.params || {}) } : (rec.params || {}) };
+    if (rec.children) out.children = rec.children.map(recWithDefaults);
+    return out;
+}
+
+/** A curated stack → a single draggable FLYOUT block (head + next-chain, shadows on its value sockets) so a whole
+ *  pattern drags in as one unit. Used by the learner-library toolbox groups (Snippets / Complete Programs). */
+export function stackToFlyoutBlock(stack) {
+    const head = chainToJson((stack || []).map(recWithDefaults));
+    return head ? { kind: 'block', ...head } : null;
+}
+
 /** Render a program stack into the workspace as one connected column (replaces its contents). */
 export function stackToWorkspace(stack, ws) {
     const B = getBlockly();

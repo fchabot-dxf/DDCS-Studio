@@ -8,7 +8,8 @@ test('new atoms emit correct G-code and land in the right categories', async ({ 
     const { buildToolbox } = await import('/blocks/blockly/bridge.js');
     const e = (t, p) => (BLOCKS[t] ? BLOCKS[t].emit(p || {}, 0, 0, {}) : ['MISSING'])[0];
     const tb = buildToolbox();
-    const catOf = (type) => { for (const c of tb.contents) if (c.contents.some((b) => b.type === type)) return c.name; return null; };
+    const ops = (tb.contents.find((c) => /Atoms/.test(c.name)) || { contents: [] }).contents;   // ops categories now nest under ⚛ Atoms
+    const catOf = (type) => { for (const c of ops) if (c.contents.some((b) => b.type === type)) return c.name; return null; };
     return {
       stop: e('stop', { stop: 'M1' }), plane: e('plane', { plane: 'G18' }), fmode: e('feedmode', { fmode: 'G95' }),
       home: e('home', { axes: 'XYZ' }), call: e('call', { prog: 9083 }), ret: e('return', {}),

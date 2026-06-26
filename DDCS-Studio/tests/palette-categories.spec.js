@@ -8,8 +8,9 @@ test('toolbox uses the granular categories (no overloaded Machine)', async ({ pa
   const r = await page.evaluate(async () => {
     const { buildToolbox } = await import('/blocks/blockly/bridge.js');
     const tb = buildToolbox();
-    const names = tb.contents.map((c) => c.name);
-    const catOf = (type) => { for (const c of tb.contents) if (c.contents.some((b) => b.type === type)) return c.name; return null; };
+    const ops = (tb.contents.find((c) => /Atoms/.test(c.name)) || { contents: [] }).contents;   // ops categories now nest under ⚛ Atoms
+    const names = ops.map((c) => c.name);
+    const catOf = (type) => { for (const c of ops) if (c.contents.some((b) => b.type === type)) return c.name; return null; };
     return {
       names,
       spindle: catOf('spindle'), wcs: catOf('wcs'), mcode: catOf('mcode'),

@@ -1,0 +1,52 @@
+import { test, expect } from '@playwright/test';
+
+/**
+ * Learner library (ROADMAP MID #14) — the Blocks toolbox is a TREE: ⚛ Atoms · 📚 Snippets · 📦 Complete Programs,
+ * where Snippets and Programs each hold themed CATEGORIES of curated compositions. The guarantee is
+ * valid-by-construction: every curated composition emits clean G-code, and each is ONE draggable flyout block
+ * (a whole stack, via stackBridge.stackToFlyoutBlock).
+ */
+test('learner library: tree (Atoms · Snippets · Programs) with sub-categories; every composition emits valid G-code', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => !!window.ddcsStudio);
+
+  const r = await page.evaluate(async () => {
+    const { allLearnerEntries, learnerToolboxCategories } = await import('/data/learnerLibrary.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { buildToolbox } = await import('/blocks/blockly/bridge.js');
+
+    // valid-by-construction: each curated composition emits non-empty G-code without throwing
+    const emits = allLearnerEntries().map((e) => {
+      try { const t = (emitMapped(e.stack).text || '').trim(); return { id: e.id, lines: t.split('\n').filter(Boolean).length, err: null }; }
+      catch (ex) { return { id: e.id, lines: 0, err: String((ex && ex.message) || ex) }; }
+    });
+
+    const tb = buildToolbox(learnerToolboxCategories());
+    const top = tb.contents.map((c) => c.name);
+    const get = (re) => tb.contents.find((c) => re.test(c.name));
+    const atoms = get(/Atoms/), snip = get(/Snippets/), prog = get(/Complete Programs/);
+    const isCat = (x) => x && x.kind === 'category';
+    const isBlockStack = (x) => x && x.kind === 'block' && x.type && x.next;   // a connected composition
+    return {
+      emits, top, entryCount: allLearnerEntries().length,
+      atomsHasSubCats: !!(atoms && atoms.contents.length && atoms.contents.every(isCat)),
+      snipSubCatNames: snip ? snip.contents.map((c) => c.name) : [],
+      snipSubCatsAreCats: !!(snip && snip.contents.length && snip.contents.every(isCat)),
+      snipFirstLeafIsStack: !!(snip && snip.contents[0] && isBlockStack(snip.contents[0].contents[0])),
+      progSubCatNames: prog ? prog.contents.map((c) => c.name) : [],
+    };
+  });
+
+  for (const e of r.emits) expect(e.lines, `${e.id} emits valid G-code (${e.err || ''})`).toBeGreaterThan(0);
+  expect(r.entryCount, 'has curated compositions').toBeGreaterThan(0);
+  // three top-level tree nodes, in order
+  expect(r.top.filter((n) => /Atoms|Snippets|Complete Programs/.test(n))).toEqual(
+    expect.arrayContaining(['⚛ Atoms', '📚 Snippets', '📦 Complete Programs']));
+  // Atoms holds the ops categories; Snippets/Programs hold themed sub-categories
+  expect(r.atomsHasSubCats, 'Atoms is a parent of the ops categories').toBe(true);
+  expect(r.snipSubCatsAreCats, 'Snippets holds sub-categories').toBe(true);
+  expect(r.snipSubCatNames, 'Snippets sub-categories present').toEqual(expect.arrayContaining(['Spindle & Coolant', 'Motion']));
+  expect(r.progSubCatNames, 'Programs sub-categories present').toEqual(expect.arrayContaining(['Milling']));
+  // a leaf of a Snippets sub-category is ONE draggable connected composition (head + next)
+  expect(r.snipFirstLeafIsStack, 'a composition is one draggable connected stack').toBe(true);
+});

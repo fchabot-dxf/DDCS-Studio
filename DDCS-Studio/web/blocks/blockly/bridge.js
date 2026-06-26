@@ -319,8 +319,10 @@ export function installBlockly(Blockly) {
 /** A value input's shadow (an editable default number) for the toolbox. */
 const shadow = (v) => ({ shadow: { type: 'math_number', fields: { NUM: Number(v) || 0 } } });
 
-/** The colour-coded toolbox: one category per ops CATEGORY, blocks derived from the registry. */
-export function buildToolbox() {
+/** The colour-coded toolbox: one category per ops CATEGORY, blocks derived from the registry. `extraCategories`
+ *  (caller-supplied, e.g. the learner-library Snippets / Complete Programs groups) are appended after the ops cats —
+ *  injected by the caller so this low-level module needn't import the higher-level stack→flyout converter (cycle). */
+export function buildToolbox(extraCategories = []) {
     const byCat = {};
     PALETTE.forEach((def) => {
         const inputs = {};
@@ -330,5 +332,8 @@ export function buildToolbox() {
     const cats = CATEGORIES.filter((c) => byCat[c]).map((c) => ({
         kind: 'category', name: c, categorystyle: catSlug(c) + '_cat', contents: byCat[c],
     }));
-    return { kind: 'categoryToolbox', contents: cats };
+    // Tree sidebar: the per-category atom blocks live under a collapsible "⚛ Atoms" parent; the caller's groups
+    // (the learner library — Snippets / Complete Programs) are siblings. So the rail reads Atoms · Snippets · Programs.
+    const atoms = { kind: 'category', name: '⚛ Atoms', expanded: 'true', contents: cats };
+    return { kind: 'categoryToolbox', contents: [atoms, ...(extraCategories || [])] };
 }
