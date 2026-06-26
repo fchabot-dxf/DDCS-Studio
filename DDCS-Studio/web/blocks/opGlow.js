@@ -176,3 +176,28 @@ export function editedRangesForOp(opId) {
     }
     return out.sort((x, y) => x.line - y.line);
 }
+
+/**
+ * A human-readable summary of an op's BLOCK-only edits — the residue a form Replace would DISCARD (and "Keep both"
+ * preserves) — for the informed Merge/Replace modal. The SAME MID #1 diff as the chip/glow: collectEdits against the
+ * declared Replace rebuild (replayReconcile), then render via the emitter (no second engine). Returns
+ *   { injected: [gcodeLine…], overrides: [{ from, to }…] }   (each side as emitted G-code)
+ * or null when there's no block-only residue (a clean op, or every edit is form-surfaced).
+ */
+export function opEditSummary(opId) {
+    if (typeof window === 'undefined' || !window.ddcsGetBlockProgram) return null;
+    const op = _findOpById(window.ddcsGetBlockProgram() || [], opId);
+    if (!op || !op.opType || !BUILDERS[op.opType] || !Array.isArray(op.children)) return null;
+    const base = replayReconcile(opId) || _builderAtoms(op.opType, op.params);   // the declared Replace baseline
+    const { injected, overrides } = collectEdits(base, op.children);
+    if (!injected.size && !overrides.length) return null;
+    const o = dialectOpts();
+    const actualEmit = emitMapped(op.children, o), baseEmit = emitMapped(base, o);
+    const injectedLines = [];
+    (actualEmit.map || []).forEach((anc, i) => { if (anc && anc.some((id) => injected.has(id))) injectedLines.push(actualEmit.lines[i]); });
+    const ovr = overrides.map((ov) => ({
+        from: _emitLinesOf(baseEmit, ov.base.id).map((i) => baseEmit.lines[i]).join('  '),
+        to: _emitLinesOf(actualEmit, ov.actual.id).map((i) => actualEmit.lines[i]).join('  '),
+    })).filter((x) => x.from || x.to);
+    return { injected: injectedLines, overrides: ovr };
+}

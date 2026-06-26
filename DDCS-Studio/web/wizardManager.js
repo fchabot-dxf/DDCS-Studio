@@ -364,14 +364,15 @@ export class WizardManager {
         let committed = false;
         try {
             const ops = await import('./blocks/opSession.js');
-            const { isOpBlockEdited } = await import('./blocks/opGlow.js');
+            const { isOpBlockEdited, opEditSummary } = await import('./blocks/opGlow.js');
             if (this.editingOpId) {
                 // EDIT: rebuild THIS op from the new params (single source of truth) and replace it in place.
                 const { getLastOp } = await import('./blocks/opRecord.js');
                 const op = getLastOp();
                 if (isOpBlockEdited && isOpBlockEdited(this.editingOpId)) {
                     const { showBlockEditNotice } = await import('./ui/blockEditNotice.js');
-                    const choice = await showBlockEditNotice(op?.label || op?.type || this._activeType || 'op');
+                    // informed: show WHAT a Replace would discard (the block-only residue) — same MID #1 diff.
+                    const choice = await showBlockEditNotice(op?.label || op?.type || this._activeType || 'op', opEditSummary(this.editingOpId));
                     if (choice === 'cancel') return;                         // back to the form, nothing inserted
                     if (choice === 'merge') {
                         // True AST Merge: weave custom atoms into the newly generated form code
