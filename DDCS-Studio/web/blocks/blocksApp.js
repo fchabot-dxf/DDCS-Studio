@@ -15,6 +15,7 @@ import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { mountDevMode } from './devMode.js';   // Dev (authoring) mode: expose atom values as params → Save as custom op
+import { isOpBlockEdited } from './opGlow.js';   // whether an op's live blocks diverge from its form params (guards the clobber path)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
 import { programSimContext } from '../viz/opSimContext.js';          // declared op-type → preview render-intent (rotary rig, …)
 import { getCaps, resolveActivePost } from '../wizards/dialects/index.js';
@@ -370,7 +371,13 @@ async function buildWorkspace() {
           }
           
           if (blk.type !== 'op') {
-              _ops.replaceOp(blk.id, params);
+              // Guard: if the op has hand-edited children (injected atoms / overridden values),
+              // merge (preserves those edits) instead of replaceOp (rebuilds wholesale, clobbers).
+              if (isOpBlockEdited(blk.id) && _ops.mergeOpBlocks) {
+                _ops.mergeOpBlocks(blk.id, params);
+              } else {
+                _ops.replaceOp(blk.id, params);
+              }
               return;
           }
         }
