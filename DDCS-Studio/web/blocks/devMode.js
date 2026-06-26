@@ -142,6 +142,33 @@ export function deriveAuthoredDef(ws) {
 /** The opType being re-authored (the "editing a saved wizard" context), or null = building/authoring fresh. */
 export function editingWizardType() { return _editingWizard; }
 
+/** Write a form VALUE back to the block it's bound to — the live round-trip's form→block direction. Maps the
+ *  binding's (blockIndex, key) to the live Blockly socket and sets the number SURGICALLY (a math_number shadow, or a
+ *  GUI param pill's value) — only that value changes, no stack regenerate. Fires normally so the reproject updates
+ *  the G-code + preview. Returns true if written. (preorderAtoms aligns index-for-index with the flattened children,
+ *  the same alignment deriveAuthoredDef's blockIndex uses.) */
+export function writeAuthoredValue(ws, param, value) {
+    ws = ws || _ws;
+    if (!ws || !Number.isFinite(value)) return false;
+    const def = deriveAuthoredDef(ws);
+    const b = def && def.bindings.find((x) => x.param === param);
+    if (!b || b.blockIndex == null || b.key == null) return false;
+    const opBlk = ws.getAllBlocks().find((x) => x.type === 'op' || (x.type && x.type.endsWith('_op')));
+    const doIn = opBlk && opBlk.getInput('DO');
+    const first = doIn && doIn.connection && doIn.connection.targetBlock();
+    const blk = (first ? preorderAtoms(first) : [])[b.blockIndex];
+    const sock = blk && blk.getInput(FN(b.key));
+    const tgt = sock && sock.connection && sock.connection.targetBlock();
+    if (!tgt) return false;
+    if (tgt.type === 'math_number') { tgt.setFieldValue(String(value), 'NUM'); return true; }   // a direct value socket
+    if (tgt.type === 'param') {                                                                  // a GUI param pill → set its value
+        const vin = tgt.getInput(FN('value'));
+        const vt = vin && vin.connection && vin.connection.targetBlock();
+        if (vt && vt.type === 'math_number') { vt.setFieldValue(String(value), 'NUM'); return true; }
+    }
+    return false;
+}
+
 /** Mount the ALWAYS-ON authoring surface: a "Save wizard…" button + the per-atom "expose as param" affordances grow
  *  on every render. There is no normal/dev toggle — the Blocks tab IS the author/learner surface (operators stay in
  *  the wizards); the affordances are quiet by default and styling, not a mode, keeps the code glanceable. The wizard

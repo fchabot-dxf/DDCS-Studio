@@ -49,6 +49,43 @@ test('editing a custom op shows its form derived from the blocks; editing a bloc
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 });
 
+test('form→block writeback: editing the live form writes the value back to the block + G-code (no echo clobber)', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
+
+  await page.evaluate(async () => {
+    const U = await import('/blocks/userOps.js');
+    localStorage.removeItem('ddcs_user_ops');
+    const template = [{ type: 'move', params: { x: 0, y: 0, z: { type: 'param', params: { name: 'depth', value: -5 } } } }];
+    const bindings = U.extractParamBlocks(template);
+    U.createUserOp(U.userOpFromStack('wbtest', 'WB Test', template, bindings));
+    window.ddcsRefreshWizardBar();
+  });
+  await page.evaluate(() => window.ddcsEditWizardDef('user_wbtest'));
+  await page.waitForSelector('#blk-formpane:not([hidden]) #blk-form [data-param="depth"]', { timeout: 8000 });
+
+  // sanity: the projected G-code starts at Z-5
+  await expect.poll(() => page.evaluate(() => document.getElementById('blk-gcode').textContent)).toContain('Z-5');
+
+  // EDIT THE FORM: depth -5 → -8 → it writes back to the block, so the projected G-code reflects Z-8
+  await page.locator('#blk-form [data-param="depth"]').fill('-8');
+  await expect.poll(() => page.evaluate(() => document.getElementById('blk-gcode').textContent)).toContain('Z-8');
+
+  // the form field still shows -8 (the smart sync didn't clobber the field that was edited)
+  expect(await page.locator('#blk-form [data-param="depth"]').inputValue()).toBe('-8');
+
+  // the bound param pill in the model carries -8
+  const pillVal = await page.evaluate(() => {
+    const op = (window.ddcsGetBlockProgram() || []).find((b) => b.type === 'op');
+    const z = op && op.children.find((c) => c.type === 'move')?.params?.z;
+    return (z && typeof z === 'object' && z.params) ? z.params.value : z;
+  });
+  expect(Number(pillVal), 'the bound pill value is updated by the form edit').toBe(-8);
+
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+});
+
 test('the live form pane is hidden when NOT editing a custom op (normal Blocks use)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack);

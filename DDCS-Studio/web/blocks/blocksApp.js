@@ -14,7 +14,7 @@ import { suggestNext, recordProgram } from './suggest.js';   // next-block sugge
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
-import { mountDevMode, deriveAuthoredDef, editingWizardType } from './devMode.js';   // authoring: expose atom values as params + derive the live def
+import { mountDevMode, deriveAuthoredDef, editingWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back
 import { renderOpForm } from '../ui/formWidgets.js';   // render the wizard's form from bindings (the live block→form view)
 import { isOpBlockEdited, valueTokenRanges, valueRangesForSubtree } from './opGlow.js';   // op-edit guard + word-level value-token spans (hover/select highlight)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
@@ -311,21 +311,51 @@ async function buildWorkspace() {
     renderLiveForm();    // the wizard's form as a LIVE view of the blocks (only while editing a custom op)
   }
 
-  // Live FORM view — when re-authoring a custom op, render its form as a pure VIEW of the blocks (no save needed).
-  // Derive the bindings (deriveAuthoredDef) + render (renderOpForm) on every view render, so editing a block's value
-  // or a knob's widget is reflected in the form immediately ("see the form change"). Hidden when not editing a wizard.
+  // Live FORM view — the wizard's form as a TWO-WAY view of the blocks (only while editing a custom op).
+  //  · block→form: derive the bindings (deriveAuthoredDef) on every render. Same structure → sync values into the
+  //    NON-focused fields (you "see the form change" without clobbering the field you're typing in); structure
+  //    changed (a knob added / removed / re-widgeted) → full rebuild.
+  //  · form→block: a delegated input listener (wired below) writes a field's value back to its bound block
+  //    (writeAuthoredValue), surgically — which reprojects, updating the G-code + preview too. The smart sync here
+  //    absorbs that echo (the edited field is focused, so it's skipped), so there's no loop and no focus loss.
+  const formSig = (bs) => (bs || []).map((b) => `${b.param}:${b.widget || b.type || 'number'}:${b.group || ''}:${b.role || ''}`).join('|');
   function renderLiveForm() {
     const pane = document.getElementById('blk-formpane'), formHost = document.getElementById('blk-form');
     if (!pane || !formHost) return;
-    if (!editingWizardType()) { pane.hidden = true; formHost.innerHTML = ''; return; }
+    if (!editingWizardType()) { pane.hidden = true; formHost.innerHTML = ''; formHost.__sig = null; return; }
     let def = null;
     try { def = deriveAuthoredDef(ws); } catch (_) { /* a mid-edit derive can throw; keep the last good form */ return; }
     if (!def) { pane.hidden = true; return; }
     pane.hidden = false;
+    const sig = formSig(def.bindings);
+    if (formHost.__sig === sig && formHost.querySelector('[data-param]')) {        // structure unchanged → value-sync only
+      for (const b of def.bindings) {
+        const f = formHost.querySelector(`[data-param="${window.CSS ? CSS.escape(b.param) : b.param}"]`);
+        if (f && f !== document.activeElement && String(f.value) !== String(b.default)) {
+          f.value = b.default;
+          const echo = f.type === 'range' && f.parentElement && f.parentElement.querySelector('span');   // keep a slider's readout in step
+          if (echo) echo.textContent = f.value;
+        }
+      }
+      return;
+    }
+    formHost.__sig = sig;                                                          // structure changed → rebuild
     formHost.innerHTML = '';
     if (def.bindings && def.bindings.length) renderOpForm(formHost, def.bindings);
     else formHost.innerHTML = '<div class="blk-form-empty">No knobs yet — tick a value’s “knob” on the blocks to expose one.</div>';
   }
+  // form→block writeback (wired once): an edited form field writes its value back to the bound block, surgically.
+  (() => {
+    const formHost = document.getElementById('blk-form');
+    if (!formHost || formHost.dataset.wbWired) return;
+    formHost.dataset.wbWired = '1';
+    formHost.addEventListener('input', (e) => {
+      const f = e.target && e.target.closest && e.target.closest('[data-param]');
+      if (!f) return;
+      const n = Number(f.value);
+      if (Number.isFinite(n)) { try { writeAuthoredValue(ws, f.dataset.param, n); } catch (_) { /* transient mid-edit miss is fine */ } }
+    });
+  })();
 
   // User edited the WORKSPACE → push to the shared model (which re-projects the editor) → refresh the pane.
   function reproject() {
