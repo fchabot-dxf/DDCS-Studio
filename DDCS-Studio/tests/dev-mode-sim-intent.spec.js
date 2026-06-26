@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Authoring surface for DECLARED preview intent (def.sim). In Blocks dev mode the save panel has a "Preview rig"
- * group (rotary / machine / magazine checkboxes); ticking one DECLARES it into def.sim — the rotary-rig declaration
- * the no-inference rule requires (a custom op never guesses from motion). Locks: the checkbox → def.sim →
- * opSimContext, and that re-authoring restores the checkbox (round-trips via the def, like the panel dropdown).
+ * Authoring surface for DECLARED preview intent (def.sim). The Blocks Save dialog has a "Preview rig" group
+ * (rotary / machine / magazine checkboxes); ticking one DECLARES it into def.sim — the rotary-rig declaration the
+ * no-inference rule requires (a custom op never guesses from motion). Locks: the checkbox → def.sim → opSimContext,
+ * and that re-authoring prefills the checkbox in the Save dialog (round-trips via the def, like the panel dropdown).
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
@@ -22,14 +22,13 @@ test('dev mode: tick "4th-axis rotary" → def.sim declared → opSimContext sho
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0);
   await page.waitForTimeout(400);
   await page.click('.blk-dev-toggle');
-  await expect(page.locator('.blk-dev-panel')).toBeVisible();
+  await expect(page.locator('.blk-dev-savebtn')).toBeVisible();
 
-  // DECLARE rotary + name + save (one task — no knobs, so the "fixed wizard" confirm is auto-accepted)
-  await page.evaluate(() => {
-    document.querySelector('.blk-dev-sim-rotary').checked = true;
-    document.querySelector('.blk-dev-opname').value = 'Rotary Custom';
-    document.querySelector('.blk-dev-save').click();
-  });
+  // open the Save dialog → DECLARE rotary + name + save (no knobs → a fixed parameterless wizard)
+  await page.evaluate(() => window.ddcsSaveAsWizard());
+  await page.check('.blk-dev-savedlg .blk-dev-sim-rotary');
+  await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Rotary Custom');
+  await page.click('.blk-dev-savedlg .blk-dev-save');
   await page.waitForTimeout(200);
 
   const r = await page.evaluate(async () => {
@@ -41,9 +40,11 @@ test('dev mode: tick "4th-axis rotary" → def.sim declared → opSimContext sho
   expect(r.sim, 'def.sim declared from the checkbox').toMatchObject({ showRotaryRig: true });
   expect(r.ctx.showRotaryRig, 'opSimContext reflects the declared rig').toBe(true);
 
-  // re-author → the checkbox is restored from def.sim (round-trips via the def, like the panel dropdown)
+  // re-author → opening the Save dialog prefills the checkbox from def.sim (round-trips via the def)
   await page.evaluate(() => window.ddcsEditWizardDef('user_rotary_custom'));
-  await expect(page.locator('.blk-dev-sim-rotary')).toBeChecked();
+  await page.waitForTimeout(300);   // let the template load + dev mode engage
+  await page.evaluate(() => window.ddcsSaveAsWizard());
+  await expect(page.locator('.blk-dev-savedlg .blk-dev-sim-rotary')).toBeChecked();
 
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
 });

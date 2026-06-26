@@ -25,13 +25,15 @@ test('gui blocks (B): re-author a saved wizard — template round-trips, update 
   // RE-AUTHOR it → loads the template into Blocks + dev mode (waits for the Blocks app internally)
   await page.evaluate(() => window.ddcsEditWizardDef('user_reauth'));
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().some((b) => b.type === 'param'), { timeout: 8000 });
-  await expect(page.locator('.blk-dev-panel')).toBeVisible();   // dev mode is on, ready to tweak
+  await expect(page.locator('.blk-dev-savebtn')).toBeVisible();   // dev mode is on, ready to tweak
 
-  // the param pill round-tripped into the workspace, and the name field is seeded
-  expect(await page.evaluate(() => document.querySelector('.blk-dev-opname').value)).toBe('Reauth');
+  // the param pill round-tripped into the workspace; opening the Save dialog seeds the name from the wizard's def
+  await page.evaluate(() => window.ddcsSaveAsWizard());
+  expect(await page.evaluate(() => document.querySelector('.blk-dev-savedlg .blk-dev-opname').value)).toBe('Reauth');
 
   // rename + save → UPDATE in place (same opType, not a duplicate), pill still in the template
-  await page.evaluate(() => { document.querySelector('.blk-dev-opname').value = 'Reauth v2'; window.ddcsSaveAsWizard(); });
+  await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Reauth v2');
+  await page.click('.blk-dev-savedlg .blk-dev-save');
   await page.waitForTimeout(200);
 
   const r = await page.evaluate(async () => {

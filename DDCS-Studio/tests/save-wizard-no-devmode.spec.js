@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 test.use({ viewport: { width: 1400, height: 1000 } });
 
 test('save as custom wizard works without dev mode', async ({ page }) => {
-  page.on('dialog', (d) => (d.type() === 'prompt' ? d.accept('Quick Wizard') : d.accept()));
+  page.on('dialog', (d) => d.accept());   // only the success alert now (name comes from the Save dialog, not a prompt)
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsRefreshWizardBar);
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
@@ -20,8 +20,11 @@ test('save as custom wizard works without dev mode', async ({ page }) => {
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0 && window.ddcsSaveAsWizard);
 
-  // the ⌄ quick-menu action → save the current op's stack as a wizard (no dev mode, name via prompt)
+  // the ⌄ quick-menu action → opens the Save dialog (no dev mode needed); name it + save
   await page.evaluate(() => window.ddcsSaveAsWizard());
+  await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Quick Wizard');
+  await page.click('.blk-dev-savedlg .blk-dev-save');
+  await page.waitForTimeout(150);
 
   const r = await page.evaluate(async () => {
     const U = await import('/blocks/userOps.js');

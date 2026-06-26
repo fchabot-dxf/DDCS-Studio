@@ -123,41 +123,33 @@ function buildBindings(exposures) {
     return out;
 }
 
-let _on = false, _ws = null, _B = null, _toggle = null, _panel = null, _nameInput = null;
+let _on = false, _ws = null, _B = null, _toggle = null, _savebtn = null;
 let _editingWizard = null;   // opType being re-authored (the re-author flow), or null = a new wizard
 
 export function isDevMode() { return _on; }
 
-/** Mount the floating dev toggle + save panel into the canvas host. Returns { onModelRender } for blocksApp. */
+/** Mount the floating dev toggle + a "Save wizard…" button into the canvas host. The wizard metadata (name / panel /
+ *  preview-rig) is collected in a Save DIALOG at save time (openSaveDialog), not a persistent panel — so nothing
+ *  lingers over the canvas. Returns { onModelRender } for blocksApp. */
 export function mountDevMode(ws, B, hostEl) {
     _ws = ws; _B = B;
 
     _toggle = document.createElement('button');
     _toggle.type = 'button';
     _toggle.className = 'blk-dev-toggle';
-    _toggle.title = 'Author mode — expose values as parameters and save this op as a reusable custom wizard';
+    _toggle.title = 'Author mode — expose values as parameters, then save this op as a reusable custom wizard';
     _toggle.textContent = '🛠 Dev';
     _toggle.addEventListener('click', () => setDevMode(!_on));
 
-    _panel = document.createElement('div');
-    _panel.className = 'blk-dev-panel';
-    _panel.hidden = true;
-    _panel.innerHTML = `
-        <div class="blk-dev-hint">Tick the values to expose as knobs and pick a widget for each, then Save as custom wizard. (You can also save anytime from the ⌄ menu — dev mode is only for adding knobs.)</div>
-        <label class="blk-dev-name">Wizard name <input type="text" class="blk-dev-opname" placeholder="my corner probe" /></label>
-        <label class="blk-dev-name">Panel <select class="blk-dev-paneltype">
-            <option value="form3d">Form + 3D preview</option>
-            <option value="form2d">Form + 2D layout</option>
-            <option value="form">Form only</option>
-        </select></label>
-        <div class="blk-dev-sim">Preview rig <span class="blk-dev-sim-why" title="DECLARE what the preview shows for this op — never guessed from the G-code. Rotary reveals the 4th-axis rig + the A± jog row; Machine pins to the envelope; Magazine draws the ATC pockets.">ⓘ</span>
-            <label><input type="checkbox" class="blk-dev-sim-rotary"> 4th-axis rotary (jog)</label>
-            <label><input type="checkbox" class="blk-dev-sim-machine"> Machine frame</label>
-            <label><input type="checkbox" class="blk-dev-sim-magazine"> ATC magazine</label>
-        </div>
-        <button type="button" class="blk-dev-save">Save as custom wizard</button>`;
-    _nameInput = _panel.querySelector('.blk-dev-opname');
-    _panel.querySelector('.blk-dev-save').addEventListener('click', () => saveAsCustomOp());
+    // A visible save affordance while authoring (the ⌄ quick menu also calls window.ddcsSaveAsWizard). Shown only in
+    // dev mode; opens the Save dialog where the name / panel / preview-rig are entered at save time.
+    _savebtn = document.createElement('button');
+    _savebtn.type = 'button';
+    _savebtn.className = 'blk-dev-savebtn';
+    _savebtn.hidden = true;
+    _savebtn.textContent = '💾 Save wizard…';
+    _savebtn.title = 'Name this op and save it as a reusable custom wizard';
+    _savebtn.addEventListener('click', () => saveAsCustomOp());
 
     // Saving a wizard = registering the current op's stack as a bar button (+ its form). NOT gated behind dev mode —
     // the ⌄ quick menu calls this too (with no exposures it saves a parameterless wizard; add knobs later in dev mode).
@@ -166,7 +158,7 @@ export function mountDevMode(ws, B, hostEl) {
         window.ddcsEditWizardDef = (opType) => editWizardDef(opType);   // re-author a saved wizard (load its template)
     }
 
-    hostEl.append(_toggle, _panel);
+    hostEl.append(_toggle, _savebtn);
     return { onModelRender: () => { if (_on) augment(); } };
 }
 
@@ -174,7 +166,7 @@ export function setDevMode(on) {
     _on = !!on;
     if (!_on) _editingWizard = null;   // leaving dev mode cancels a re-author
     if (_toggle) _toggle.classList.toggle('active', _on);
-    if (_panel) _panel.hidden = !_on;
+    if (_savebtn) _savebtn.hidden = !_on;
     if (_on) augment(); else clearAugment();
 }
 
@@ -295,70 +287,120 @@ export async function editWizardDef(opType) {
     _editingWizard = opType;
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack([opC]);
     await new Promise((r) => setTimeout(r, 150));   // let it project + render
-    setDevMode(true);
-    if (_nameInput) _nameInput.value = def.label || '';
-    const psel = _panel && _panel.querySelector('.blk-dev-paneltype'); if (psel) psel.value = def.panel || 'form3d';
-    setSimChecks(def.sim || {});   // restore the declared preview intent so it round-trips on re-author
+    setDevMode(true);   // the Save dialog prefills name / panel / preview-rig from this wizard's def when you save
 }
 
-// The DECLARED preview intent off the dev-panel checkboxes → { showRotaryRig, forceMachine, showMagazine }, or null
-// when none are ticked (the default local-frame preview). NEVER inferred from the stack — it's an explicit choice,
-// the same kind of declaration as the panel type (see opSimContext / [[custom-op-sim-intent-infer-vs-declare]]).
-function readSimIntent() {
-    const ck = (cls) => !!(_panel && _panel.querySelector(cls) && _panel.querySelector(cls).checked);
-    const sim = { showRotaryRig: ck('.blk-dev-sim-rotary'), forceMachine: ck('.blk-dev-sim-machine'), showMagazine: ck('.blk-dev-sim-magazine') };
-    return (sim.showRotaryRig || sim.forceMachine || sim.showMagazine) ? sim : null;
-}
-function setSimChecks(sim) {
-    const set = (cls, v) => { const el = _panel && _panel.querySelector(cls); if (el) el.checked = !!v; };
-    set('.blk-dev-sim-rotary', sim.showRotaryRig); set('.blk-dev-sim-machine', sim.forceMachine); set('.blk-dev-sim-magazine', sim.showMagazine);
+// The Save DIALOG — the metadata collection surface (name / panel / DECLARED preview-rig), shown at save time and
+// dismissed after, instead of a persistent panel that lingers over the canvas. Prefilled from `init`; on Save it
+// calls onConfirm({ name, panel, sim }). The preview rig is an explicit DECLARATION (never inferred from motion —
+// see opSimContext / [[custom-op-sim-intent-infer-vs-declare]]). Self-contained (inline styles), like blockEditNotice.
+function openSaveDialog(init, onConfirm) {
+    const m = document.createElement('div');
+    m.className = 'blk-dev-savedlg';
+    m.innerHTML = `<style>
+        .blk-dev-savedlg{position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);}
+        .blk-dev-savedlg .bds{background:var(--panel,#1d2530);color:var(--text-main,#e6edf3);border:1px solid var(--line,rgba(255,255,255,.18));border-radius:9px;width:min(380px,94vw);box-shadow:0 14px 48px rgba(0,0,0,.55);padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
+        .blk-dev-savedlg h3{margin:0;font:700 14px/1 inherit;}
+        .blk-dev-savedlg .blk-dev-hint{font:400 11px/1.4 inherit;color:var(--text-dim,#9fb0c0);}
+        .blk-dev-savedlg label.blk-dev-name{display:flex;flex-direction:column;gap:3px;font:600 11px/1 inherit;color:var(--text-dim,#9fb0c0);}
+        .blk-dev-savedlg input[type=text],.blk-dev-savedlg select{padding:6px 8px;font:inherit;color:var(--text-main,#e6edf3);background:var(--bg,#0b0f14);border:1px solid var(--line,rgba(255,255,255,.18));border-radius:6px;}
+        .blk-dev-savedlg .blk-dev-sim{display:flex;flex-direction:column;gap:4px;font:600 11px/1 inherit;color:var(--text-dim,#9fb0c0);}
+        .blk-dev-savedlg .blk-dev-sim label{display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer;color:var(--text-main,#e6edf3);}
+        .blk-dev-savedlg .blk-dev-sim-why{cursor:help;opacity:.7;}
+        .blk-dev-savedlg .bds-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:2px;}
+        .blk-dev-savedlg button{padding:7px 13px;font:700 12px/1 inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line,rgba(255,255,255,.18));background:transparent;color:var(--text-main,#e6edf3);}
+        .blk-dev-savedlg .blk-dev-save{border:none;color:#fff;background:var(--accent,#3b82f6);}
+        .blk-dev-savedlg .blk-dev-save:hover{filter:brightness(1.1);}</style>
+        <div class="bds">
+            <h3>Save as custom wizard</h3>
+            <div class="blk-dev-hint">${init.knobs ? `${init.knobs} knob${init.knobs === 1 ? '' : 's'} exposed.` : 'No knobs exposed — saves a fixed (parameterless) wizard. Add knobs in dev mode anytime.'}</div>
+            <label class="blk-dev-name">Wizard name <input type="text" class="blk-dev-opname" placeholder="my corner probe" /></label>
+            <label class="blk-dev-name">Panel <select class="blk-dev-paneltype">
+                <option value="form3d">Form + 3D preview</option>
+                <option value="form2d">Form + 2D layout</option>
+                <option value="form">Form only</option>
+            </select></label>
+            <div class="blk-dev-sim">Preview rig <span class="blk-dev-sim-why" title="DECLARE what the preview shows for this op — never guessed from the G-code. Rotary reveals the 4th-axis rig + the A± jog row; Machine pins to the envelope; Magazine draws the ATC pockets.">ⓘ</span>
+                <label><input type="checkbox" class="blk-dev-sim-rotary"> 4th-axis rotary (jog)</label>
+                <label><input type="checkbox" class="blk-dev-sim-machine"> Machine frame</label>
+                <label><input type="checkbox" class="blk-dev-sim-magazine"> ATC magazine</label>
+            </div>
+            <div class="bds-foot">
+                <button type="button" class="blk-dev-cancel">Cancel</button>
+                <button type="button" class="blk-dev-save">Save</button>
+            </div>
+        </div>`;
+    document.body.appendChild(m);
+    const q = (s) => m.querySelector(s);
+    q('.blk-dev-opname').value = init.name || '';
+    q('.blk-dev-paneltype').value = init.panel || 'form3d';
+    q('.blk-dev-sim-rotary').checked = !!(init.sim && init.sim.showRotaryRig);
+    q('.blk-dev-sim-machine').checked = !!(init.sim && init.sim.forceMachine);
+    q('.blk-dev-sim-magazine').checked = !!(init.sim && init.sim.showMagazine);
+    setTimeout(() => { try { q('.blk-dev-opname').focus(); } catch (_) { /* */ } }, 0);
+
+    const close = () => { m.remove(); document.removeEventListener('keydown', onKey, true); };
+    const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); close(); } };
+    document.addEventListener('keydown', onKey, true);
+    q('.blk-dev-cancel').addEventListener('click', close);
+    m.addEventListener('click', (e) => { if (e.target === m) close(); });
+    q('.blk-dev-save').addEventListener('click', () => {
+        const name = (q('.blk-dev-opname').value || '').trim();
+        if (!name) { try { q('.blk-dev-opname').focus(); } catch (_) { /* */ } return; }   // name is required
+        const r = q('.blk-dev-sim-rotary').checked, mc = q('.blk-dev-sim-machine').checked, mg = q('.blk-dev-sim-magazine').checked;
+        const sim = (r || mc || mg) ? { showRotaryRig: r, forceMachine: mc, showMagazine: mg } : null;
+        close();
+        onConfirm({ name, panel: q('.blk-dev-paneltype').value || 'form3d', sim });
+    });
 }
 
 // Register the current op's STACK as a custom WIZARD — a bar button (+ its form). Reads the ticked exposures (if any)
 // → bindings → userOpFromStack → createWizard (into the library + bar). Works with OR without dev mode: no exposures
-// just means a parameterless wizard (add knobs later in dev mode). Called by the dev panel + the ⌄ quick menu.
+// just means a parameterless wizard (add knobs later in dev mode). Called by the 💾 Save button + the ⌄ quick menu.
 function saveAsCustomOp() {
     if (!_ws) { alert('Open an op in the Blocks tab first, then save it as a wizard.'); return; }
-    // Read the LIVE workspace, not the model: Blockly v13 batches change events (FIRE_QUEUE / setTimeout 0), so a value
-    // edited right before Save hasn't reprojected yet (collectAuthoring uses workspaceToStack, which ignores the
-    // dev-only EXPOSE_/PNAME_/WIDGET_ fields and whose pre-order matches preorderAtoms).
+    // Read the LIVE workspace SYNCHRONOUSLY here — BEFORE the Save dialog awaits user input — so the bindings/defaults
+    // freeze at save-initiation. Blockly v13 batches change events (FIRE_QUEUE / setTimeout 0), so a value edited just
+    // before Save hasn't reprojected yet; capturing now (collectAuthoring uses workspaceToStack, ignoring the dev-only
+    // EXPOSE_/PNAME_/WIDGET_ fields) keeps the saved default = the LIVE value, not a stale-model revert during the dialog.
     const a = collectAuthoring(_ws);
     if (!a) { alert('No op to save — insert an op in Blocks first.'); return; }
     if (a.varErr) { alert(`The exposed value “${a.varErr}” has a variable or expression plugged in — a knob must be a plain number. Restore a number on that block, then save again.`); return; }
-
-    // Name: the dev panel field if it has one, else ASK — so the ⌄ menu can save with no dev panel open.
-    let name = (_nameInput && _nameInput.value || '').trim();
-    if (!name) name = (window.prompt('Name this wizard (it becomes a button in the bar):', '') || '').trim();
-    if (!name) return;   // cancelled
 
     const inlineBindings = buildBindings(a.exposures);
     // GUI param blocks plugged into value sockets ALSO declare knobs — extract them (mutates the template: pills → numbers).
     const paramBindings = extractParamBlocks(a.opRec.children, new Set(inlineBindings.map((b) => b.param)));
     const bindings = [...inlineBindings, ...paramBindings];
-    if (!bindings.length && !confirm('No knobs exposed — save as a fixed wizard (a bar button with no parameters)?')) return;
 
-    const psel = _panel && _panel.querySelector('.blk-dev-paneltype');
-    let panel = (psel && psel.value) || 'form3d';
-    const panelBlk = flattenBlocks(a.opRec.children).find((b) => b && b.type === 'panel');   // a GUI panel block, if present, wins
-    if (panelBlk && panelBlk.params && panelBlk.params.panel) panel = panelBlk.params.panel;
-    // DECLARED preview intent — a `sim` GUI block in the stack wins (like the panel block); else the dev-panel checkboxes.
-    const blkSim = simIntentFromStack(a.opRec.children);
-    const sim = blkSim !== undefined ? blkSim : readSimIntent();
-    const editing = _editingWizard;   // re-authoring an existing wizard → update in place (keep its opType)
-    try {
-        if (editing) {
-            updateUserOp(userOpFromStack(editing, name, a.opRec.children, bindings, panel, sim));
-        } else {
-            const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'wizard';
-            const existing = new Set(listUserOps().map((d) => d.opType));
-            let type = slug, n = 2; while (existing.has(USER_OP_PREFIX + type)) type = slug + '_' + (n++);
-            createWizard(userOpFromStack(type, name, a.opRec.children, bindings, panel, sim));
-        }
-    } catch (e) { console.warn('save wizard failed', e); alert('Save failed: ' + ((e && e.message) || e)); return; }
+    // A GUI `panel`/`sim` block in the stack WINS over the dialog choice (a declaration baked into the template) —
+    // capture both now so the dialog can prefill with the truth and the commit can honour the override.
+    const panelBlk = flattenBlocks(a.opRec.children).find((b) => b && b.type === 'panel');
+    const blkPanel = (panelBlk && panelBlk.params && panelBlk.params.panel) || null;
+    const blkSim = simIntentFromStack(a.opRec.children);   // undefined = no sim block in the stack
+    const editingDef = _editingWizard ? listUserOps().find((d) => d.opType === _editingWizard) : null;
 
-    if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
-    if (_on) setDevMode(false);   // also clears _editingWizard
-    if (_nameInput) _nameInput.value = '';
-    setSimChecks({});   // reset the preview-intent checkboxes for the next wizard
-    alert(editing ? `Updated “${name}”.` : `Saved “${name}” — it's now a button in the bar (Custom)${bindings.length ? ` with ${bindings.length} knob${bindings.length === 1 ? '' : 's'}` : ''}.`);
+    openSaveDialog({
+        name: editingDef ? (editingDef.label || '') : '',
+        panel: blkPanel || (editingDef && editingDef.panel) || 'form3d',
+        sim: blkSim !== undefined ? blkSim : ((editingDef && editingDef.sim) || null),
+        knobs: bindings.length,
+    }, (meta) => {
+        const panel = blkPanel || meta.panel;
+        const sim = blkSim !== undefined ? blkSim : meta.sim;
+        const editing = _editingWizard;   // re-authoring an existing wizard → update in place (keep its opType)
+        try {
+            if (editing) {
+                updateUserOp(userOpFromStack(editing, meta.name, a.opRec.children, bindings, panel, sim));
+            } else {
+                const slug = meta.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'wizard';
+                const existing = new Set(listUserOps().map((d) => d.opType));
+                let type = slug, n = 2; while (existing.has(USER_OP_PREFIX + type)) type = slug + '_' + (n++);
+                createWizard(userOpFromStack(type, meta.name, a.opRec.children, bindings, panel, sim));
+            }
+        } catch (e) { console.warn('save wizard failed', e); alert('Save failed: ' + ((e && e.message) || e)); return; }
+
+        if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
+        if (_on) setDevMode(false);   // also clears _editingWizard
+        alert(editing ? `Updated “${meta.name}”.` : `Saved “${meta.name}” — it's now a button in the bar (Custom)${bindings.length ? ` with ${bindings.length} knob${bindings.length === 1 ? '' : 's'}` : ''}.`);
+    });
 }

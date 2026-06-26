@@ -21,9 +21,9 @@ test('dev mode: expose a value → Save as custom op → it registers in the lib
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0);
   await page.waitForTimeout(400);
 
-  // flip Dev mode — the floating toggle + panel appear, atoms get "expose" rows
+  // flip Dev mode — the floating toggle + "Save wizard…" button appear, atoms get "expose" rows
   await page.click('.blk-dev-toggle');
-  await expect(page.locator('.blk-dev-panel')).toBeVisible();
+  await expect(page.locator('.blk-dev-savebtn')).toBeVisible();
   await page.waitForTimeout(150);
 
   // tick the first augmented numeric value's EXPOSE + name it 'myparam'
@@ -47,18 +47,21 @@ test('dev mode: expose a value → Save as custom op → it registers in the lib
   });
   expect(picked, 'found an augmented numeric value to expose').toBeTruthy();
 
-  // Regression guard for the stale-model bug: edit the exposed value to a sentinel, then name + Save ALL in one
-  // synchronous task (Blockly v13 batches change events, so the model hasn't reprojected yet) — the saved default
-  // must equal the LIVE value, which only holds if saveAsCustomOp reads the workspace, not the model.
+  // Regression guard for the stale-model bug: edit the exposed value to a sentinel, then INITIATE save in the same
+  // synchronous task (Blockly v13 batches change events, so the model hasn't reprojected yet). saveAsCustomOp reads
+  // + freezes the bindings from the LIVE workspace synchronously here — the dialog only collects the name afterward —
+  // so the saved default equals the live value, which only holds if it reads the workspace, not the (stale) model.
   const SENTINEL = 777.5;
   await page.evaluate(({ key, sentinel }) => {
     const ws = window.__blkws, VK = key.toUpperCase();
     let target = null;
     for (const b of ws.getAllBlocks()) { if (b.getField && b.getField('EXPOSE_' + VK) && b.getFieldValue('EXPOSE_' + VK) === 'TRUE') { target = b; break; } }
     target.getInput(VK).connection.targetBlock().setFieldValue(String(sentinel), 'NUM');   // model now stale
-    document.querySelector('.blk-dev-opname').value = 'My Test Op';
-    document.querySelector('.blk-dev-save').click();                                         // same task → must read live workspace
+    window.ddcsSaveAsWizard();                                                              // same task → freezes the live workspace, opens the Save dialog
   }, { key: picked.key, sentinel: SENTINEL });
+  // the Save dialog collects the name; the bindings were already frozen above
+  await page.fill('.blk-dev-savedlg .blk-dev-opname', 'My Test Op');
+  await page.click('.blk-dev-savedlg .blk-dev-save');
   await page.waitForTimeout(150);
 
   // assert: a valid user op exists with the binding, and it surfaces in the library Custom group + the bar
