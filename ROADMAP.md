@@ -63,19 +63,17 @@ The handoff's explicit next-up after V10.36; completes coordlist as a dual-surfa
 - ⚠️ Coupled gap: `extractParamBlocks` (`userOps.js`) only converts `param`/`regionpick` pills — **coordlist can't become a saved wizard knob yet** (the `list` binding type exists but no authoring path emits it).
 - Files: `web/blocks/devMode.js`, `web/wizards/ops/coordlist.js`, `web/ui/formWidgets.js`, `web/blocks/blockly/coordListField.js`.
 
-### 3. ✅ RESOLVED-BY-ANALYSIS (false premise) — App-wide Merge/Replace/Cancel safety net
-**The new-op insert path is append-only, so it cannot clobber block edits — no generalisation needed.** Traced
-2026-06-25: `wizardManager.insert()` regenerates in place ONLY on the EDIT path (`replaceOp`, already guarded by
-`isOpBlockEdited` + `showBlockEditNotice`); the new-op path (`commitActiveOp`/`commitDecodedCode`) routes through
-`appendIntoProgram` ([opSession.js:387](DDCS-Studio/web/blocks/opSession.js#L387)), which only ever slots the new
-op before Program End / appends — it never removes or replaces an existing op (and `commitActiveOp` mints a fresh
-op id). Since `insert()` is the single chokepoint every wizard routes through, the guard is already centralised for
-the only in-place-regenerate vector. The roadmap's optional "one `blockEdited` flag" was a perf/consistency
-refactor, not added protection. Same flavour as the binding-type audit #6-A false alarm.
-*(The real consistency follow-up is the MID item — re-base `isOpBlockEdited` on a reverse-synced reconstruction —
-itself gated on the field-id↔param adapter the code comments say "never worked".)*
+### 3. ✅ FIXED — App-wide Merge/Replace/Cancel safety net
+**The original "resolved-by-analysis" missed one path — now fixed.** The new-op insert path IS append-only
+(confirmed), but `blocksApp.js` had an unguarded `replaceOp` call when changing header dropdowns
+(CORNER/AXIS/FEATURETYPE) on typed op blocks in the Blocks tab — silently clobbering hand-edited children.
+**Fix:** the Blocks-tab field-change listener now checks `isOpBlockEdited` and routes through `mergeOpBlocks`
+(3-way merge, preserves injections) instead of the raw `replaceOp` (wholesale rebuild). The wizard edit path
+was already guarded (`wizardManager.insert()` → `isOpBlockEdited` → `showBlockEditNotice`). Both `replaceOp`
+callers are now safe.
+- Files changed: `web/blocks/blocksApp.js` (import `isOpBlockEdited`, guard the field-change `replaceOp` call).
 
-### 4. [L] Field-targeting / non-numeric param mechanism — **the load-bearing unlock**
+### 4. ✅ SHIPPED — Field-targeting / non-numeric param mechanism — **the load-bearing unlock**
 Everything assumes a numeric value socket (valid-by-construction). This gates text/corner-grid knobs, enum/string region values, and (with a part drawing) spatial CAM feature-selection.
 - Introduce a param kind that occupies an inline dropdown/text/corner-grid **field** (not a numeric socket); a Blockly field adapter that commits string/enum/code; `extractParamBlocks` emits `enum`/`string` bindings (drop hardcoded `type:'number'`); extend dev-mode `WIDGET_CHOICES`; emitter/marker round-trip for non-numeric commits.
 - Form-side widgets (`textWidget`, `cornerGridWidget`, dropdown enum branch) already exist — could be **M** if scoped to enum-via-existing-dropdown first.
