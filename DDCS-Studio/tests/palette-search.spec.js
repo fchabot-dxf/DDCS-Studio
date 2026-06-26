@@ -14,10 +14,11 @@ test('palette search filters blocks into the flyout', async ({ page }) => {
     try { return window.__blkWs.getToolbox().getFlyout().getWorkspace().getTopBlocks(false).length; } catch (_) { return -1; }
   });
 
-  // a specific term → just that block
-  await page.fill('#blocks-app .blk-search', 'spindle');
+  // a specific term → just that block (search matches label + type + category, so use a term that's unique to one
+  // block and not a substring of any category name — e.g. 'spindle' now also matches the "Spindle & Feed" category)
+  await page.fill('#blocks-app .blk-search', 'coolant');
   await page.waitForTimeout(200);
-  expect(await flyoutCount(), 'spindle → 1 match').toBe(1);
+  expect(await flyoutCount(), 'coolant → 1 match').toBe(1);
 
   // a broader term → several
   await page.fill('#blocks-app .blk-search', 'probe');

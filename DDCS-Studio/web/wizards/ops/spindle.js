@@ -7,7 +7,7 @@
 import { num, val } from './util.js';
 
 export const spindleBlock = {
-    type: 'spindle', label: 'Spindle', kind: 'leaf', category: 'Machine',
+    type: 'spindle', label: 'Spindle', kind: 'leaf', category: 'Spindle & Feed',
     defaults: { rpm: 12000, dir: 'cw' },
     fields: ['rpm', 'dir'],          // dir = cw (M3) / ccw (M4); rpm 0 → M5 (off)
     emit: (p) => {

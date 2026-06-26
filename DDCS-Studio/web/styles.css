@@ -4482,9 +4482,9 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
        the preview + G-code panes = a black "screen", mirroring the app's editor. */
     --ink: var(--text); --muted: var(--text-dim); --line: var(--border);
     /* fixed category signature colours (semantic, not themed — like the rapid/feed/probe move colours) */
-    --cat-shapes:#3b82f6; --cat-move:#14b8a6; --cat-machine:#64748b; --cat-ops:#22c55e;
-    --cat-modify:#a855f7; --cat-control:#f59e0b; --cat-math:#84cc16; --cat-variables:#06b6d4; --cat-markup:#94a3b8;
-    --cat-cutting:#f97316; --cat-coordinates:#0ea5e9; --cat-program:#64748b; --cat-probing:#e11d48; --cat-signals:#8b5cf6;
+    --cat-shapes:#3b82f6; --cat-move:#14b8a6; --cat-toolpaths:#22c55e; --cat-transforms:#a855f7;
+    --cat-spindlefeed:#f97316; --cat-coordinates:#0ea5e9; --cat-program:#64748b; --cat-probing:#e11d48; --cat-signals:#8b5cf6;
+    --cat-control:#f59e0b; --cat-math:#84cc16; --cat-variables:#06b6d4; --cat-wizardui:#d946ef; --cat-markup:#94a3b8;
     --field: var(--bg);
     --screen:#000; --screen-ink:#cdd9e5; --screen-dim:#8b9bb0;   /* fixed: the screen is black in every theme */
     display:grid; grid-template-columns:1fr var(--blk-pv-w, 380px); grid-template-rows:minmax(0,1fr);
@@ -4527,7 +4527,8 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 }
 #blocks-app .blk-sug-float[hidden] { display:none; }
 
-/* Dev (authoring) mode — floating toggle + save panel over the canvas (wizard-maker stage 6). */
+/* Dev (authoring) mode — floating toggle + a "Save wizard…" button over the canvas; wizard metadata is collected in
+   a Save dialog (.blk-dev-savedlg, self-styled) at save time, not a lingering panel (wizard-maker stage 6). */
 #blocks-app .blk-dev-toggle {
     position:absolute; top:10px; right:12px; z-index:16; cursor:pointer;
     font:700 11px/1 inherit; padding:6px 10px; border-radius:7px;
@@ -4539,26 +4540,14 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     color:#fff; background:var(--accent,#3b82f6); border-color:var(--accent,#3b82f6);
     box-shadow:0 0 0 2px color-mix(in srgb, var(--accent,#3b82f6) 35%, transparent), 0 4px 12px rgba(0,0,0,.45);
 }
-#blocks-app .blk-dev-panel {
-    position:absolute; top:44px; right:12px; z-index:16; width:230px; display:flex; flex-direction:column; gap:8px;
-    background:var(--panel,#1d2530); border:1px solid var(--line, rgba(255,255,255,.18));
-    border-radius:8px; padding:10px 11px; box-shadow:0 8px 22px rgba(0,0,0,.5);
+#blocks-app .blk-dev-savebtn {
+    position:absolute; top:10px; right:64px; z-index:16; cursor:pointer;
+    font:700 11px/1 inherit; padding:6px 10px; border-radius:7px;
+    color:#fff; background:var(--accent,#3b82f6);
+    border:1px solid var(--accent,#3b82f6); box-shadow:0 4px 12px rgba(0,0,0,.4);
 }
-#blocks-app .blk-dev-panel[hidden] { display:none; }
-#blocks-app .blk-dev-hint { font:400 11px/1.4 inherit; color:var(--text-dim,#9fb0c0); }
-#blocks-app .blk-dev-name { display:flex; flex-direction:column; gap:3px; font:600 11px/1 inherit; color:var(--text-dim,#9fb0c0); }
-#blocks-app .blk-dev-opname {
-    padding:6px 8px; font:inherit; color:var(--text-main,#e6edf3);
-    background:var(--bg,#0b0f14); border:1px solid var(--line, rgba(255,255,255,.18)); border-radius:6px;
-}
-#blocks-app .blk-dev-sim { display:flex; flex-direction:column; gap:4px; font:600 11px/1 inherit; color:var(--text-dim,#9fb0c0); }
-#blocks-app .blk-dev-sim label { display:flex; align-items:center; gap:6px; font-weight:400; cursor:pointer; }
-#blocks-app .blk-dev-sim-why { cursor:help; opacity:.7; }
-#blocks-app .blk-dev-save {
-    padding:7px 10px; font:700 12px/1 inherit; cursor:pointer; color:#fff;
-    background:var(--accent,#3b82f6); border:none; border-radius:6px;
-}
-#blocks-app .blk-dev-save:hover { filter:brightness(1.1); }
+#blocks-app .blk-dev-savebtn:hover { filter:brightness(1.1); }
+#blocks-app .blk-dev-savebtn[hidden] { display:none; }
 #blocks-app .blk-sug-opt {
     position:relative; flex:0 0 auto; display:inline-flex; align-items:center; gap:5px; overflow:visible;
     font:600 11px/1 inherit; padding:6px 9px; cursor:pointer; white-space:nowrap;
@@ -4624,18 +4613,18 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* --cat = a block's category colour, shared by the canvas card (head/bump/arm/foot) AND the palette entry/chip */
 #blocks-app .cat-shapes { --cat:var(--cat-shapes); }
 #blocks-app .cat-move { --cat:var(--cat-move); }
-#blocks-app .cat-machine { --cat:var(--cat-machine); }
-#blocks-app .cat-ops { --cat:var(--cat-ops); }
-#blocks-app .cat-modify { --cat:var(--cat-modify); }
-#blocks-app .cat-control { --cat:var(--cat-control); }
-#blocks-app .cat-math { --cat:var(--cat-math); }
-#blocks-app .cat-variables { --cat:var(--cat-variables); }
-#blocks-app .cat-markup { --cat:var(--cat-markup); }
-#blocks-app .cat-cutting { --cat:var(--cat-cutting); }
+#blocks-app .cat-toolpaths { --cat:var(--cat-toolpaths); }
+#blocks-app .cat-transforms { --cat:var(--cat-transforms); }
+#blocks-app .cat-spindlefeed { --cat:var(--cat-spindlefeed); }
 #blocks-app .cat-coordinates { --cat:var(--cat-coordinates); }
 #blocks-app .cat-program { --cat:var(--cat-program); }
 #blocks-app .cat-probing { --cat:var(--cat-probing); }
+#blocks-app .cat-control { --cat:var(--cat-control); }
+#blocks-app .cat-math { --cat:var(--cat-math); }
+#blocks-app .cat-variables { --cat:var(--cat-variables); }
 #blocks-app .cat-signals { --cat:var(--cat-signals); }
+#blocks-app .cat-wizardui { --cat:var(--cat-wizardui); }
+#blocks-app .cat-markup { --cat:var(--cat-markup); }
 /* a STATEMENT silhouette: notch cut into the top edge + a matching bump hanging below — they dovetail when stacked.
    overflow:visible so the bump (::after) shows below; corners moved to head/last-child since overflow no longer clips. */
 #blocks-app .blk { position:relative; width:300px; margin:0 0 8px; border-radius:8px; overflow:visible;

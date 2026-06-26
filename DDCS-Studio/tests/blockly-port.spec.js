@@ -15,7 +15,7 @@ test('Blockly bridge: stack ⇄ workspace round-trips and emits via emitMapped',
     els.map((e) => e.textContent.trim()).filter(Boolean));
   expect(cats.join('|')).toMatch(/Move/);
   expect(cats.join('|')).toMatch(/Coordinates/);
-  expect(cats.join('|')).toMatch(/Ops/);
+  expect(cats.join('|')).toMatch(/Toolpaths/);
 
   const r = await page.evaluate(async () => {
     const { stackToWorkspace, workspaceToStack } = await import('/blocks/blockly/stackBridge.js');

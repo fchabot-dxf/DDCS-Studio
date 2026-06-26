@@ -190,7 +190,7 @@ async function buildWorkspace() {
   //      seed); click to append. Updates as the program changes. ----
   const STMT = new Set(PALETTE.filter((d) => d.kind !== 'reporter').map((d) => d.type));   // insertable (no reporters)
   const labelOf = (t) => (BLOCKS[t] && BLOCKS[t].label) || t;
-  const catSlugOf = (t) => ((BLOCKS[t] && BLOCKS[t].category) || 'ops').toLowerCase().replace(/\s+/g, '');
+  const catSlugOf = (t) => ((BLOCKS[t] && BLOCKS[t].category) || 'ops').toLowerCase().replace(/[^a-z0-9]+/g, '');
   const strip = document.createElement('div');
   strip.className = 'blk-suggest';
   topbar.appendChild(strip);

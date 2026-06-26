@@ -11,7 +11,7 @@ import { num } from './util.js';
 import { headerBlock, footerBlock } from '../cuttingBlocks.js';
 
 export const progStartBlock = {
-    type: 'progstart', label: 'Program Start', kind: 'leaf', category: 'Machine',
+    type: 'progstart', label: 'Program Start', kind: 'leaf', category: 'Program',
     defaults: { rpm: 12000, dir: 'cw', spinUp: 0, clearance: 5 },
     fields: ['rpm', 'dir', 'spinUp', 'clearance'],
     emit: (p, dx, dy, dialect) => [
@@ -23,7 +23,7 @@ export const progStartBlock = {
 const truthy = (v) => v !== false && v !== 'false' && v !== 0 && v !== '0';
 
 export const progEndBlock = {
-    type: 'progend', label: 'Program End', kind: 'leaf', category: 'Machine',
+    type: 'progend', label: 'Program End', kind: 'leaf', category: 'Program',
     defaults: { spindleOff: true, coolantOff: true, retract: true, retractZ: 0, park: false, parkX: 0, parkY: 0, end: 'M30' },
     fields: ['spindleOff', 'coolantOff', 'retract', 'retractZ', 'park', 'parkX', 'parkY', 'end'],
     emit: (p, dx, dy, dialect) => footerBlock({

@@ -25,7 +25,7 @@ export function lineCut(p) {
 }
 
 export const lineBlock = {
-    type: 'line', label: 'Line', kind: 'leaf', category: 'Ops',
+    type: 'line', label: 'Line', kind: 'leaf', category: 'Toolpaths',
     defaults: { x0: 0, y0: 0, x1: 50, y1: 0, depth: 3, stepdown: 1, feed: 200, clearance: 5 },
     fields: ['x0', 'y0', 'x1', 'y1', 'depth', 'stepdown', 'feed', 'clearance'],
     emit: (p, dx = 0, dy = 0) => lineCut({

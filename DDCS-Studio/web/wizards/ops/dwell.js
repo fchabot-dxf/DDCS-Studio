@@ -3,7 +3,7 @@
 import { num } from './util.js';
 
 export const dwellBlock = {
-    type: 'dwell', label: 'Dwell', kind: 'leaf', category: 'Machine',
+    type: 'dwell', label: 'Dwell', kind: 'leaf', category: 'Spindle & Feed',
     defaults: { sec: 1 },
     fields: ['sec'],
     emit: (p, dx, dy, dialect) => dialect.dwell(num(p.sec, 0)),

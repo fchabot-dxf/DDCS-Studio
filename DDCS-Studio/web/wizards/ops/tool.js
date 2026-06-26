@@ -2,7 +2,7 @@
 import { num } from './util.js';
 
 export const toolBlock = {
-    type: 'tool', label: 'Tool', kind: 'leaf', category: 'Machine',
+    type: 'tool', label: 'Tool', kind: 'leaf', category: 'Spindle & Feed',
     defaults: { n: 1 },
     fields: ['n'],
     emit: (p) => [`T${Math.max(0, Math.round(num(p.n, 1)))} M6   ( tool change )`],

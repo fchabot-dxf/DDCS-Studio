@@ -5,7 +5,7 @@
  * WCS / Spindle / Feed are their own blocks instead of per-Move fields). Keeps Move minimal and reusable.
  */
 export const distModeBlock = {
-    type: 'distmode', label: 'Distance', kind: 'leaf', category: 'Machine',
+    type: 'distmode', label: 'Distance', kind: 'leaf', category: 'Coordinates',
     defaults: { dist: 'abs' },
     fields: ['dist'],          // select: abs (G90) / inc (G91)
     emit: (p) => [`${p.dist === 'inc' ? 'G91' : 'G90'}   ( ${p.dist === 'inc' ? 'incremental' : 'absolute'} )`],

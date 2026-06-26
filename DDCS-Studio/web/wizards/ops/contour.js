@@ -40,7 +40,7 @@ function circleTrace(rg, z, clr, feed, plunge) {
 }
 
 export const contourBlock = {
-    type: 'contour', label: 'Contour', kind: 'leaf', category: 'Ops',
+    type: 'contour', label: 'Contour', kind: 'leaf', category: 'Toolpaths',
     defaults: { region: null, side: 'on', tool: 6, z: 'z', feed: 400, plunge: 200, clearance: 5 },
     fields: ['region', 'side', 'tool', 'z', 'feed', 'plunge', 'clearance'],   // side: on (finish) / outside / inside (profile); tool = Ø for the offset
     sockets: { region: 'region' },

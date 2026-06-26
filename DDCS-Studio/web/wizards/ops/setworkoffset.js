@@ -8,7 +8,7 @@
 import { num } from './util.js';
 
 export const setWorkOffsetBlock = {
-    type: 'setworkoffset', label: 'Set WCS Offset', kind: 'leaf', category: 'Machine',
+    type: 'setworkoffset', label: 'Set WCS Offset', kind: 'leaf', category: 'Coordinates',
     defaults: { wcs: '#578', axis: 'X', value: '#50' }, fields: ['wcs', 'axis', 'value'],
     emit: (p, dx, dy, dialect) => dialect.setWorkOffset(p.wcs || '#578', p.axis || 'X',
         (p.value === '' || p.value == null) ? 0 : (typeof p.value === 'number' ? num(p.value, 0) : p.value)),

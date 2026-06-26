@@ -40,7 +40,7 @@ export function helicalBore(pt, p) {
 }
 
 export const boreBlock = {
-    type: 'bore', label: 'Bore', kind: 'leaf', category: 'Ops',
+    type: 'bore', label: 'Bore', kind: 'leaf', category: 'Toolpaths',
     defaults: { x: 0, y: 0, holeDia: 12, toolDia: 6, depth: 5, pitch: 0.5, ramp: 'step', feed: 120, clearance: 5, zOff: 0 },
     fields: ['x', 'y', 'holeDia', 'toolDia', 'depth', 'pitch', 'ramp', 'feed', 'clearance'],   // ramp: step / helix
     emit: (p, dx = 0, dy = 0) => helicalBore({ x: r3(num(p.x, 0) + dx), y: r3(num(p.y, 0) + dy) }, p),

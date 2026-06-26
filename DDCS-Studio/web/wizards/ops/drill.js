@@ -27,7 +27,7 @@ export function peckDrill(pt, p) {
 
 /** Self-describing block (the Blocks-tab palette + emit engine read this). */
 export const drillBlock = {
-    type: 'drill', label: 'Drill', kind: 'leaf', category: 'Ops',
+    type: 'drill', label: 'Drill', kind: 'leaf', category: 'Toolpaths',
     defaults: { x: 0, y: 0, depth: 5, peck: 5, feed: 100, clearance: 5, zOff: 0 },
     fields: ['x', 'y', 'depth', 'peck', 'feed', 'clearance'],
     emit: (p, dx = 0, dy = 0) => peckDrill({ x: r3(num(p.x, 0) + dx), y: r3(num(p.y, 0) + dy) }, p),

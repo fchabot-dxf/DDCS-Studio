@@ -9,7 +9,7 @@
  * `widget:'region-pick'` binding (widgetConfig = the parsed spec), so the form + block render the same control.
  */
 export const regionPickBlock = {
-    type: 'regionpick', label: 'region pick', kind: 'reporter', category: 'Variables',
+    type: 'regionpick', label: 'region pick', kind: 'reporter', category: 'Wizard UI',
     defaults: { name: 'choice', value: 0, spec: '' },   // spec = JSON string (non-field → rides b.data); value = picked number
     fields: ['name', 'value'],
     reduce: (p) => { const n = Number(p.value); return Number.isFinite(n) ? n : 0; },

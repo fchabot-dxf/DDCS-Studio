@@ -45,7 +45,7 @@ const SELECTS = {
     ramp: ['step', 'helix'],                         // bore stepdown
     side: ['outside', 'inside', 'on']                // contour/profile cutter side
 };
-const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/\s+/g, '');
+const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/[^a-z0-9]+/g, '');   // slug = alphanumerics only (so "Spindle & Feed" → spindlefeed, "Wizard UI" → wizardui)
 export const FN = (field) => field.toUpperCase();   // Blockly input/field name from an op field
 const REPORTER_CHECK = { boolean: 'Boolean', region: 'Region' };   // reporter return type → Blockly output check
 const outputCheck = (def) => REPORTER_CHECK[def.returns] || 'Number';

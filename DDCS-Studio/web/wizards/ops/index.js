@@ -62,37 +62,29 @@ import { pathModeBlock, drillCycleBlock, cancelCycleBlock, outPinBlock, waitInpu
 import { stopBlock, planeBlock, feedModeBlock, homeBlock, callBlock, returnBlock } from './more.js';
 import { evalExpr } from './expr.js';
 
-/** Palette: granular atoms (Move, Machine) + feature presets (Ops) + modifiers + control/variables/markup. */
+/** Palette: granular atoms + feature presets + modifiers + control/data/signals/authoring. Grouped by the block's
+ *  own `category` (the single source of truth — the toolbox buckets by it; array order is just within-group order). */
 export const PALETTE = [
     regionBlock,                                               // Shapes (boundary → fills/walls via a region socket)
-    moveBlock, arcBlock, probeBlock, machineMoveBlock, homeBlock,   // Move (+ G53 machine-coord move + G28 home)
-    spindleBlock, feedBlock, feedModeBlock, dwellBlock, coolantBlock, toolBlock, wcsBlock, distModeBlock, planeBlock, pathModeBlock,   // Machine modal state (+ G94/95 feed mode, G17-19 plane)
-    progStartBlock, progEndBlock, endProgramBlock, mcodeBlock, rawBlock, probeReadBlock, readMachineBlock, toolOffsetBlock, setWorkOffsetBlock, outPinBlock, waitInputBlock,   // Machine (framing, end, raw, probe/DRO capture, tool-table/WCS write, digital I/O M62-66)
-    lineBlock, slotBlock, boreBlock, drillBlock, contourBlock, drillCycleBlock, cancelCycleBlock,  // Ops (feature presets + contour/profile [+ pocket-wall finish] + native canned cycles G81-85/G80)
-    arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, stepdownBlock, placeOnStockBlock, rotateBlock,    // Modify (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align)
-    countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input)
+    moveBlock, arcBlock, probeBlock, machineMoveBlock, homeBlock, pathModeBlock,   // Move (+ G53 machine-coord move + G28 home + G64/G61 path mode)
+    lineBlock, slotBlock, boreBlock, drillBlock, contourBlock, drillCycleBlock, cancelCycleBlock,  // Toolpaths (feature presets + contour/profile [+ pocket-wall finish] + native canned cycles G81-85/G80)
+    arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, stepdownBlock, placeOnStockBlock, rotateBlock,    // Transforms (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align)
+    spindleBlock, feedBlock, feedModeBlock, dwellBlock, coolantBlock, toolBlock,   // Spindle & Feed (spindle/feed/coolant/tool/dwell + G94/95 feed mode)
+    wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, toolOffsetBlock,   // Coordinates (WCS + dist-mode + G17-19 plane + work-offset/tool-table write)
+    progStartBlock, progEndBlock, endProgramBlock,             // Program (framing + end)
+    probeReadBlock, readMachineBlock,                          // Probing (probe/DRO capture)
+    countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock, cornerConfigBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input + corner-macro config)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
-    setBlock, assignBlock, variableBlock, paramBlock, regionPickBlock, coordListBlock,   // Variables (compile-time Set + runtime Set # + reporter + GUI param knob + region-pick knob + coordinate-list positions)
-    commentBlock, messageBlock, panelBlock, simBlock,          // Mark Up (comment + on-screen operator message + GUI panel-type + preview-rig declarations)
-    cornerConfigBlock,                                         // Universal Corner Macro config (emits #30 and #31)
+    setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
+    mcodeBlock, rawBlock, outPinBlock, waitInputBlock,         // Signals (raw M-code/G-code escape + digital I/O M62-66)
+    paramBlock, regionPickBlock, coordListBlock, panelBlock, simBlock,   // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig declarations)
+    commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
 ];
 
-// Re-categorise the former overloaded 'Machine' bucket (~20 blocks) into granular, semantic groups. Palette
-// grouping only (the block's emit/behaviour is unchanged); mutating the shared def's category is read solely by
-// the toolbox builder. pathMode (G64/G61) moves to Move (it's a motion mode).
-const RECAT = {
-    spindle: 'Cutting', feed: 'Cutting', dwell: 'Cutting', coolant: 'Cutting', tool: 'Cutting',
-    wcs: 'Coordinates', distmode: 'Coordinates', setworkoffset: 'Coordinates', tooloffset: 'Coordinates',
-    progstart: 'Program', progend: 'Program', endprogram: 'Program',
-    proberead: 'Probing', readmachine: 'Probing',
-    mcode: 'Signals', raw: 'Signals', outpin: 'Signals', waitinput: 'Signals',
-    pathmode: 'Move',
-};
-PALETTE.forEach((d) => { if (RECAT[d.type]) d.category = RECAT[d.type]; });
-
-/** Canonical palette-grouping order (the toolbox category order). Categories with no blocks don't render.
- *  Geometry/toolpath → machine setup/state → probing → logic → low-level signals → annotation. */
-export const CATEGORIES = ['Shapes', 'Move', 'Ops', 'Modify', 'Cutting', 'Coordinates', 'Program', 'Probing', 'Control', 'Math', 'Variables', 'Signals', 'Mark Up'];
+/** Canonical palette-grouping order (the toolbox category order). Categories with no blocks don't render. Each
+ *  block declares its own `category` (the single source of truth — no remap); this list is just the display order.
+ *  Geometry → toolpaths → patterns → machine state/setup → probing → logic/data → low-level signals → authoring. */
+export const CATEGORIES = ['Shapes', 'Move', 'Toolpaths', 'Transforms', 'Spindle & Feed', 'Coordinates', 'Program', 'Probing', 'Control', 'Math', 'Variables', 'Signals', 'Wizard UI', 'Mark Up'];
 
 /** type → definition, for emit dispatch and field lookup. (Reporters — Variable/Math — are in PALETTE too;
  *  dragging one drops it into a value socket rather than onto the canvas.) */

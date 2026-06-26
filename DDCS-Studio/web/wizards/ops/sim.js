@@ -6,7 +6,7 @@
  * letter doesn't carry intent for an open-world op — see opSimContext / [[custom-op-sim-intent-infer-vs-declare]]).
  */
 export const simBlock = {
-    type: 'sim', label: 'preview rig', category: 'Mark Up',
+    type: 'sim', label: 'preview rig', category: 'Wizard UI',
     defaults: { rotary: false, machine: false, magazine: false },
     fields: ['rotary', 'machine', 'magazine'],
     emit: () => [],   // metadata only — produces no G-code

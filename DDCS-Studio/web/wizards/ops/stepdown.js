@@ -7,7 +7,7 @@
  * fold (it owns the scope); this def just declares the fields. `to` = total depth, `by` = stepdown per pass.
  */
 export const stepdownBlock = {
-    type: 'stepdown', label: 'Step Down', kind: 'depth', category: 'Modify',
+    type: 'stepdown', label: 'Step Down', kind: 'depth', category: 'Transforms',
     defaults: { to: 5, by: 1 },
     fields: ['to', 'by'],
 };

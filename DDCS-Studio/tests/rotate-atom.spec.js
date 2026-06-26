@@ -37,7 +37,7 @@ test('rotate atom is registered as a Modify wrap block', async ({ page }) => {
     return { kind: def && def.kind, cat: def && def.category, inPalette: ops.PALETTE.includes(def), isWrap: br.isWrap(def) };
   });
   expect(r.kind).toBe('rotate');
-  expect(r.cat).toBe('Modify');
+  expect(r.cat).toBe('Transforms');
   expect(r.inPalette).toBe(true);
   expect(r.isWrap, 'rotate renders as a C-block with a DO statement input').toBe(true);
 });

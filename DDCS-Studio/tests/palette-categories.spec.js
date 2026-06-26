@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 // Blocks palette: the overloaded 'Machine' bucket is split into granular semantic categories
-// (Cutting / Coordinates / Program / Probing / Signals), and pathMode moves to Move.
+// (Spindle & Feed / Coordinates / Program / Probing / Signals), and pathMode moves to Move.
 test('toolbox uses the granular categories (no overloaded Machine)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
@@ -17,8 +17,8 @@ test('toolbox uses the granular categories (no overloaded Machine)', async ({ pa
     };
   });
   expect(r.names, 'no overloaded Machine category').not.toContain('Machine');
-  expect(r.names, 'granular groups present').toEqual(expect.arrayContaining(['Cutting', 'Coordinates', 'Program', 'Probing', 'Signals']));
-  expect(r.spindle, 'spindle → Cutting').toBe('Cutting');
+  expect(r.names, 'granular groups present').toEqual(expect.arrayContaining(['Spindle & Feed', 'Coordinates', 'Program', 'Probing', 'Signals']));
+  expect(r.spindle, 'spindle → Spindle & Feed').toBe('Spindle & Feed');
   expect(r.wcs, 'wcs → Coordinates').toBe('Coordinates');
   expect(r.progstart, 'progStart → Program').toBe('Program');
   expect(r.proberead, 'probeRead → Probing').toBe('Probing');

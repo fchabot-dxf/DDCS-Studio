@@ -4,7 +4,7 @@
  * `param` block: together they're the visible "form" section of a custom wizard (the GUI-blocks authoring layer).
  */
 export const panelBlock = {
-    type: 'panel', label: 'panel', category: 'Mark Up',
+    type: 'panel', label: 'panel', category: 'Wizard UI',
     defaults: { panel: 'form3d' },
     fields: ['panel'],
     emit: () => [],   // metadata only — produces no G-code

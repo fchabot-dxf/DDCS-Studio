@@ -19,7 +19,7 @@ export const planeBlock = {
 };
 
 export const feedModeBlock = {
-    type: 'feedmode', label: 'Feed Mode', kind: 'leaf', category: 'Cutting',
+    type: 'feedmode', label: 'Feed Mode', kind: 'leaf', category: 'Spindle & Feed',
     defaults: { fmode: 'G94' }, fields: ['fmode'],
     emit: (p) => [{ G94: 'G94   ( feed per min )', G95: 'G95   ( feed per rev )' }[p.fmode] || 'G94   ( feed per min )'],
 };

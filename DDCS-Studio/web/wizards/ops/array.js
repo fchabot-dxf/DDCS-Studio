@@ -33,7 +33,7 @@ export function patternPoints(p) {
 }
 
 export const arrayBlock = {
-    type: 'array', label: 'Array', kind: 'container', category: 'Modify',
+    type: 'array', label: 'Array', kind: 'container', category: 'Transforms',
     defaults: { pattern: 'grid', x0: 0, y0: 0, cols: 3, rows: 2, dx: 20, dy: 20, count: 4, spacing: 20, angle: 0, dia: 50, startAngle: 0, skip: '' },
     fields: ['pattern'],   // pattern-specific fields resolved by fieldsFor()
     // Blocks view carries ALL pattern fields (so every pattern is editable + round-trips); a Blockly extension

@@ -25,5 +25,5 @@ test('new atoms emit correct G-code and land in the right categories', async ({ 
   expect(r.planeCat).toBe('Coordinates');
   expect(r.homeCat).toBe('Move');
   expect(r.callCat).toBe('Control');
-  expect(r.fmodeCat).toBe('Cutting');
+  expect(r.fmodeCat).toBe('Spindle & Feed');
 });

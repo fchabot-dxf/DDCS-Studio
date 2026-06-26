@@ -15,7 +15,7 @@
  * inline fields, not sockets, so they aren't reachable from a param block (form-only — see ui/formWidgets.js).
  */
 export const paramBlock = {
-    type: 'param', label: 'param', kind: 'reporter', category: 'Variables',
+    type: 'param', label: 'param', kind: 'reporter', category: 'Wizard UI',
     defaults: { name: 'value', widget: 'number', value: 0, options: '' },
     fields: ['name', 'widget', 'value', 'options'],   // `options` (presets) only matters for the dropdown widget
     reduce: (p, scope, rc) => {

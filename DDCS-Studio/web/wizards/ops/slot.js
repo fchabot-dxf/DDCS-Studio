@@ -52,7 +52,7 @@ export function slotPath(p) {
 }
 
 export const slotBlock = {
-    type: 'slot', label: 'Slot', kind: 'leaf', category: 'Ops',
+    type: 'slot', label: 'Slot', kind: 'leaf', category: 'Toolpaths',
     defaults: { x0: 0, y0: 0, x1: 60, y1: 0, width: 6, tool: 6, stepoverPct: 40, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5 },
     fields: ['x0', 'y0', 'x1', 'y1', 'width', 'tool', 'stepoverPct', 'depth', 'stepdown', 'feed', 'plunge', 'clearance'],
     emit: (p, dx = 0, dy = 0) => slotPath({

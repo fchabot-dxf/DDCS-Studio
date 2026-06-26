@@ -13,7 +13,7 @@ const noFlow = (dialect) => !!(dialect.caps && dialect.caps.flow === 'none');   
 const isDDCS = (dialect) => !!(dialect.id && String(dialect.id).startsWith('ddcs'));   // DDCS Expert / V4.1 / DM500
 
 export const pathModeBlock = {
-    type: 'pathmode', label: 'Path Mode', kind: 'leaf', category: 'Machine',
+    type: 'pathmode', label: 'Path Mode', kind: 'leaf', category: 'Move',
     defaults: { mode: 'blend', tol: 0.01 }, fields: ['mode', 'tol'],
     gate: (d) => noFlow(d) ? 'no G64 P / exact-stop' : null,   // greyed on classic grbl (Blocks canvas)
     // G64 P<tol> = blend within tolerance (fast); G61 = exact stop (precise). RS274 standard; DDCS/Centroid
@@ -28,7 +28,7 @@ export const pathModeBlock = {
 };
 
 export const drillCycleBlock = {
-    type: 'drillcycle', label: 'Drill Cycle', kind: 'leaf', category: 'Ops',
+    type: 'drillcycle', label: 'Drill Cycle', kind: 'leaf', category: 'Toolpaths',
     defaults: { cycle: 'peck', x: '', y: '', z: -5, r: 2, q: 1, dwell: 0, feed: 200 },
     fields: ['cycle', 'x', 'y', 'z', 'r', 'q', 'dwell', 'feed'],
     gate: (d) => noFlow(d) ? 'no canned cycles — use the Drill wizard' : null,
@@ -47,14 +47,14 @@ export const drillCycleBlock = {
 };
 
 export const cancelCycleBlock = {
-    type: 'cancelcycle', label: 'Cancel Cycle', kind: 'leaf', category: 'Ops',
+    type: 'cancelcycle', label: 'Cancel Cycle', kind: 'leaf', category: 'Toolpaths',
     defaults: {}, fields: [],
     gate: (d) => noFlow(d) ? 'no canned cycles' : null,
     emit: (p, dx, dy, dialect) => noFlow(dialect) ? [] : ['G80'],   // cancel any modal canned cycle
 };
 
 export const outPinBlock = {
-    type: 'outpin', label: 'Output Pin', kind: 'leaf', category: 'Machine',
+    type: 'outpin', label: 'Output Pin', kind: 'leaf', category: 'Signals',
     defaults: { pin: 0, state: 'on', sync: true }, fields: ['pin', 'state', 'sync'],
     gate: (d) => (isOword(d) || isDDCS(d)) ? null : 'no generic output — use an M-Code atom',
     // Digital output, per post:
@@ -75,7 +75,7 @@ export const outPinBlock = {
 };
 
 export const waitInputBlock = {
-    type: 'waitinput', label: 'Wait Input', kind: 'leaf', category: 'Machine',
+    type: 'waitinput', label: 'Wait Input', kind: 'leaf', category: 'Signals',
     defaults: { pin: 0, mode: 'rise', timeout: 0, var: '#5399' }, fields: ['pin', 'mode', 'timeout', 'var'],
     gate: (d) => (isOword(d) || (isDDCS(d) && d.caps && d.caps.inputRead)) ? null : 'wait-on-input: M66 (RS274) or DDCS Expert only — V4.1/DM500 use a sensor M-Code',
     // RS274/grblHAL wait-on-input: M66 P<n> L<mode> Q<timeout> → result in #5399 (L: 0 immediate, 1 rise, 2 fall,

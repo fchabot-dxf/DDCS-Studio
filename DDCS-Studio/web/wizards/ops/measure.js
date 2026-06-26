@@ -7,7 +7,7 @@
 import { num } from './util.js';
 
 export const probeReadBlock = {
-    type: 'proberead', label: 'Probe Read', kind: 'leaf', category: 'Machine',
+    type: 'proberead', label: 'Probe Read', kind: 'leaf', category: 'Probing',
     defaults: { axis: 'Z', var: '#50' }, fields: ['axis', 'var'],
     emit: (p, dx, dy, dialect) => dialect.probeRead(p.axis || 'Z', p.var || '#50'),
 };
@@ -19,13 +19,13 @@ export const probeCheckBlock = {
 };
 
 export const readMachineBlock = {
-    type: 'readmachine', label: 'Read Machine', kind: 'leaf', category: 'Machine',
+    type: 'readmachine', label: 'Read Machine', kind: 'leaf', category: 'Probing',
     defaults: { axis: 'Z', var: '#57' }, fields: ['axis', 'var'],
     emit: (p, dx, dy, dialect) => dialect.readMachine(p.axis || 'Z', p.var || '#57'),
 };
 
 export const toolOffsetBlock = {
-    type: 'tooloffset', label: 'Tool Offset', kind: 'leaf', category: 'Machine',
+    type: 'tooloffset', label: 'Tool Offset', kind: 'leaf', category: 'Coordinates',
     defaults: { tool: '#1300', value: '#102' }, fields: ['tool', 'value'],
     // Write a tool-length offset into the controller's tool table. PROFILE-AWARE: the table base comes from
     // dialect.vars.toolTable (Expert/DM500 #1430, V4.1 #1560), addressed by tool number → #[base + T - 1] = value.
