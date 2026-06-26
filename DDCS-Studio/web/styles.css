@@ -4801,12 +4801,15 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
        reclaims the strip), NOT a CSS translate — a translate would leave a dead strip because Blockly still
        reserves the toolbox width in its metrics. CSS here only animates the slide-in. (Blockly 12.5.1 toolbox
        class is .blocklyToolbox, z-index 70 — the preview drawer sits above it at z 80.) */
-    #blocks-app.tools-open .blk-ws .blocklyToolbox { box-shadow:6px 0 18px #0008; animation:blkTbxIn .22s ease; }
+    #blocks-app.tools-open .blk-ws .blocklyToolbox { box-shadow:6px 0 18px #0008; animation:blkTbxIn .28s cubic-bezier(.22,1,.36,1); }
     @keyframes blkTbxIn { from { transform:translateX(-100%); } to { transform:translateX(0); } }
 
-    /* left-edge vertical handle opens the palette; slides to the toolbox edge when open (acts as close) */
+    /* left-edge vertical handle opens the palette; slides to the toolbox edge when open (acts as close). It
+       TRANSITIONS its transform with the SAME timing as the toolbox slide, so the ✕ stays attached to the palette's
+       right edge throughout the animation instead of jumping to the open position. */
     #blocks-app .blk-tools-handle {
         display:block; position:fixed; left:0; top:50%; transform:translateY(-50%);
+        transition:transform .28s cubic-bezier(.22,1,.36,1);
         z-index:81; padding:16px 7px; cursor:pointer; writing-mode:vertical-rl; text-orientation:mixed;   /* above the preview drawer (z 80) so the centred close ✕ stays tappable when both drawers overlap */
         font:700 11px/1 inherit; letter-spacing:.08em; color:var(--screen-ink); background:var(--screen);
         border:1px solid var(--line); border-left:none; border-radius:0 10px 10px 0; box-shadow:4px 0 14px #0007;
