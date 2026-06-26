@@ -16,16 +16,24 @@ loops/control (`count`/`iff`/`array`/`flow`), and raw-emit atoms (`macro.js`) al
 — express ONE built-in *as data* + assert output-equivalence → port the rest → self-host. See ROADMAP "Key reframe."
 
 ## ▶ Immediate next task (the held list, in priority order)
-**1. Middle false-glow bug** `[S]` — the MID #1 follow-up (detailed notes under "✅ Shipped" → MID #1 below). Two
-symptoms on a **middle probe** op: (a) probe lines glow as edited though never touched, (b) a block edit didn't
-survive round-trip. **Confirmed candidate:** the `middle` reconciler emits `m_both`, stripped to **`both`**, but
-`middleStack` reads **`params.twoAxis`** (`middleWizard.js:28`) — key mismatch → a `twoAxis` block-edit is dropped on
-round-trip (symptom b). Symptom (a) — *which* recovered field drives the probe-line glow — was **NOT pinned**;
-**reproduce it before fixing** (the user's standing rule). The user's **approach correction** is logged below: prefer
-**recording the edit as a one-time declared delta** (Blockly change event → transactional snapshot, `777490a`) over
-**inferring** it by re-running the whole reconciler + re-deriving the whole stack + diffing — the latter smears glow
-and drops edits through a partial/inferential reconciler. Surface that fork (surgical key-fix vs declare-edit
-refactor) once symptom (a) is pinned.
+**1. Middle false-glow bug** `[S→M]` — **ROOT CAUSE PINNED (2026-06-26, session 2, repro'd empirically).** The handoff's
+`m_both↔twoAxis` hypothesis was a **red herring for symptom (a)** — the false glow hits **every** middle config,
+including **single-axis** (which has no `twoAxis`), and `twoAxis` actually **survives** the round-trip. The real cause:
+the **blocks round-trip is not faithful** — `middleStack` builds rapid moves with ONE axis set (`MV(ax,v)` →
+`{mode:'rapid', x:'#9'}`), but `stackToWorkspace`→`workspaceToStack` fills the move block's **empty Y/Z value sockets
+with `0`** (`recToJson`: empty `value` socket → `math_number` shadow `0`; `toRecord` reads `0` back). So `G0 X#9`
+becomes **`G0 X#9 Y0 Z0`** on a no-edit round-trip → the emitted G-code CHANGES (6 lines drift on single-axis) → the op
+looks edited → false glow. **This is a round-trip-FAITHFULNESS bug (and a possible silent G-code change), not a glow
+bug — the glow is a symptom.** Open Q before fixing: is the added `Y0 Z0` behaviourally harmful (G90 absolute = real
+path change) or benign (G91 incremental = relative-zero no-op)? — determines severity. **Two complementary fixes:**
+(A) **make the round-trip faithful** — empty move-axis sockets should stay UNSET, not become `0` (the real bug; also
+kills the false glow at its source; check other atoms with optional sockets); (B) **declare-edit refactor** (user
+DEFINITELY inclined, 2026-06-26) — glow = recorded one-time deltas (Blockly change → snapshot, `777490a`), not
+re-derivation, so a drifting round-trip can't false-glow. (A) fixes the cause + any corruption; (B) is the robust glow
+model regardless. Do (A) for correctness; (B) is the bigger architectural piece — understand `777490a` + the three
+glow surfaces (`isOpBlockEdited`/`editedLinesForOp`/`editedRangesForOp`) before refactoring. The `m_both↔twoAxis`
+mismatch (`opSession.js:184` vs `middleWizard.js:28`) is a SEPARATE latent issue (would drop a real `twoAxis` BLOCK
+edit) worth fixing too, but is NOT symptom (a).
 
 **2. MID #3 — Region editor v1.x poly/freeform point editing** `[M]` — poly/freeform create mode + per-vertex handles
 in `shapeStage.stageSvg` + freehand trace/simplify. `ui/regionEditor.js`, `ui/shapeStage.js`.
