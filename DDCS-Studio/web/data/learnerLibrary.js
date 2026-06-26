@@ -33,6 +33,12 @@ export const SNIPPETS = [
               stack: [cmt('Flood coolant on'), { type: 'coolant', params: { flow: 'flood' } }] },
             { id: 'stop-all', label: 'Stop spindle + coolant', desc: 'Spindle off (M5) and coolant off (M9) — a safe resting state.',
               stack: [cmt('Stop — spindle off, coolant off (safe state)'), { type: 'spindle', params: { rpm: 0, dir: 'cw' } }, { type: 'coolant', params: { flow: 'off' } }] },
+            { id: 'spindle-ccw', label: 'Spindle CCW', desc: 'Start the spindle counter-clockwise (M4).',
+              stack: [cmt('Spindle CCW (M4)'), { type: 'spindle', params: { rpm: 8000, dir: 'ccw' } }] },
+            { id: 'mist-on', label: 'Mist coolant on', desc: 'Turn on mist coolant (M7).',
+              stack: [cmt('Mist coolant on'), { type: 'coolant', params: { flow: 'mist' } }] },
+            { id: 'coolant-off', label: 'Coolant off', desc: 'Turn off coolant (M9).',
+              stack: [cmt('Coolant off'), { type: 'coolant', params: { flow: 'off' } }] },
         ],
     },
     {
@@ -40,6 +46,10 @@ export const SNIPPETS = [
         entries: [
             { id: 'park-lift', label: 'Park & lift', desc: 'Stop, then rapid back to the origin and raise Z clear of the work.',
               stack: [cmt('Park & lift — stop, return to origin, raise Z clear'), { type: 'spindle', params: { rpm: 0, dir: 'cw' } }, { type: 'coolant', params: { flow: 'off' } }, { type: 'move', params: { mode: 'rapid', x: 0, y: 0, z: 50, feed: 200 } }] },
+            { id: 'rapid-origin', label: 'Rapid to origin', desc: 'Rapid to X0 Y0, just above the work.',
+              stack: [cmt('Rapid to origin, just above the work'), { type: 'move', params: { mode: 'rapid', x: 0, y: 0, z: 5, feed: 200 } }] },
+            { id: 'dwell-2s', label: 'Dwell 2 s', desc: 'Pause for 2 seconds (e.g. let the spindle settle).',
+              stack: [cmt('Dwell — pause 2 seconds'), { type: 'dwell', params: { sec: 2 } }] },
         ],
     },
 ];
@@ -59,6 +69,29 @@ export const PROGRAMS = [
                   { type: 'move', params: { mode: 'cut', x: 50, y: 50, z: -1, feed: 600 } },     // ↑
                   { type: 'move', params: { mode: 'cut', x: 0, y: 50, z: -1, feed: 600 } },      // ←
                   { type: 'move', params: { mode: 'cut', x: 0, y: 0, z: -1, feed: 600 } },       // ↓ back to start
+                  { type: 'progend', params: { spindleOff: true, coolantOff: true, retract: true, retractZ: 10, park: false, parkX: 0, parkY: 0, end: 'M30' } },
+              ] },
+            { id: 'face-pass', label: 'Single facing pass', desc: 'Spin up, plunge to a shallow Z, then cut one straight pass across 100 mm.',
+              stack: [
+                  { type: 'progstart', params: { rpm: 12000, dir: 'cw', spinUp: 0, clearance: 5 } },
+                  cmt('A single facing pass across 100 mm at Z-0.5'),
+                  { type: 'move', params: { mode: 'rapid', x: 0, y: 0, z: 5, feed: 200 } },       // above the start
+                  { type: 'move', params: { mode: 'cut', x: 0, y: 0, z: -0.5, feed: 200 } },       // plunge to depth
+                  { type: 'move', params: { mode: 'cut', x: 100, y: 0, z: -0.5, feed: 800 } },     // face across
+                  { type: 'progend', params: { spindleOff: true, coolantOff: true, retract: true, retractZ: 10, park: false, parkX: 0, parkY: 0, end: 'M30' } },
+              ] },
+        ],
+    },
+    {
+        category: 'Drilling',
+        entries: [
+            { id: 'drill-hole', label: 'Drill one hole', desc: 'Spin up, rapid over the hole, plunge to depth, then retract clear.',
+              stack: [
+                  { type: 'progstart', params: { rpm: 6000, dir: 'cw', spinUp: 0, clearance: 5 } },
+                  cmt('Drill one hole at (25,25) to depth -5'),
+                  { type: 'move', params: { mode: 'rapid', x: 25, y: 25, z: 5, feed: 200 } },      // over the hole
+                  { type: 'move', params: { mode: 'cut', x: 25, y: 25, z: -5, feed: 120 } },        // plunge to depth
+                  { type: 'move', params: { mode: 'rapid', x: 25, y: 25, z: 10, feed: 200 } },      // retract clear
                   { type: 'progend', params: { spindleOff: true, coolantOff: true, retract: true, retractZ: 10, park: false, parkX: 0, parkY: 0, end: 'M30' } },
               ] },
         ],
