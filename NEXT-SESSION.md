@@ -30,6 +30,17 @@ per-vertex handles in `shapeStage.stageSvg` + freehand trace/simplify; the prior
 `ui/regionEditor.js`, `ui/shapeStage.js`.)*
 
 ## ✅ Shipped 2026-06-26
+- **🔴→✅ Blocks tab regression — was DEAD on a non-empty program** (`039244d`, live showstopper on `pages.dev`).
+  `showBlocks()` (module scope) called `renderFromModel()`, a `buildWorkspace()` closure-local → `ReferenceError` on
+  `getStack().length > 0`, swallowed by the try/catch, so the Blocks tab opened blank with any accumulated program.
+  A 3-agent audit (ultracode) confirmed it's the **ONLY** such leak (no churn siblings) and caught a bug-amplifier:
+  even in-scope, `renderFromModel()` was called with **no projection arg** → `renderViews(undefined)` →
+  `undefined.lines`. Fix: route line 98 through **`api.refresh()`** (= `renderFromModel(getProjection())` +
+  `panel.setActive`) — reachable at module scope AND supplies the projection. Test-first
+  `tests/blocks-open-seeded.spec.js` (seed an insert → open Blocks → no swallowed error + program renders) — the
+  exact gap the 284-green suite had (nothing exercised `showBlocks()` on a non-empty program;
+  [[verify-core-flow-before-features]]). Suite 287 green. *(Minor still-open: the `Pixelated Arial` web-font fails
+  OTS `cmap` decode — corrupt font asset, cosmetic.)*
 - **Informed Merge/Replace modal (FORM path)** (`6f7e8fc`). The form's block-edit notice now SHOWS what a Replace
   would discard instead of a blind 3-way choice — `opGlow.opEditSummary(opId)` reuses the **same MID #1 diff**
   (`collectEdits(replayReconcile baseline, op.children)` + `emitMapped`) to render the block-only residue (injected
@@ -47,6 +58,28 @@ per-vertex handles in `shapeStage.stageSvg` + freehand trace/simplify; the prior
   incl. a non-default-toolØ case that *forces* stored-state sourcing. Approach A held; the cycle worry
   (`opGlow→opSession→opBuilders→opGlow`) was a false alarm (`opBuilders` only *mentions* opGlow in a comment).
   `editorOpHover.js` needed no change — it consumes the re-based glow. Suite 284 green (macros-tabs known-stale).
+  - 🐞 **OPEN BUG + APPROACH CORRECTION (user-reported 2026-06-26, MID #1 follow-up).** On a **middle probe** op the
+    user saw: (a) **probe lines glow as edited though never touched**, and (b) **a block edit didn't survive
+    round-trip**. Investigation (partial, stopped at user request — NOT fully proven):
+    • `replayReconcile` rebuilds from `_builderAtoms(opType, { ...op.params, ...overrides })` where `overrides` =
+      the reconciler's recovered fields with the prefix stripped (`m_axis`→`axis`). So a false glow on an UNTOUCHED
+      op can only be a **recovered field that DISAGREES with the stored param** (a mis-fire), NOT a "lost field" —
+      un-recovered fields correctly come from `op.params`. (Corrects my earlier "partial-rebuild smear" guess.)
+    • **Confirmed candidate:** the `middle` reconciler emits `m_both`, stripped to **`both`**, but `middleStack`
+      reads **`params.twoAxis`** (`middleWizard.js:28`) — so the override key doesn't match the builder param: the
+      recovered value is silently dropped (→ a `twoAxis` block-edit is LOST on round-trip = symptom b) and is a
+      no-op for the rebuild. `m_circular`→`circular` DOES match (`middleWizard.js:29`). Which recovered field
+      actually drives the probe-line glow (symptom a) was NOT pinned before stopping — verify before fixing.
+    • **APPROACH CORRECTION (user's key point):** a manual edit is a **one-time, specific** event, but MID #1
+      *detects* edits by re-running the WHOLE reconciler + rebuilding the WHOLE stack + diffing — through a reconciler
+      that's partial AND partly inferential. So one mis-recovered/un-recoverable field **smears glow across lines the
+      user never touched** and **drops edits** the reconciler can't represent. The cleaner model: **RECORD the edit
+      as a one-time declaration when it happens** (Blockly fires the change event; transactional-snapshot machinery
+      exists, `777490a`) → glow = exactly the recorded deltas (no smear), round-trip carries them (no drop). I.e.
+      *declare* the edit instead of *inferring* it by full-stack re-derivation. Tradeoff: re-derivation is stateless
+      but needs a faithful reconciler (the failing assumption); edit-recording is precise but must catch every
+      mutation path. Reconcilers ARE (disciplined, closed-world) inference — editable blocks force it — and that's
+      exactly where this bites.
 - **Dev-mode panel → Save dialog** (`eb70de2`). The lingering authoring panel is gone; Dev mode shows just the
   per-field "expose" affordances + a "Save wizard…" button, and name/panel-type/preview-rig are collected in a
   dismissable Save dialog at save time (stale-model guard preserved: bindings frozen from the live workspace before
