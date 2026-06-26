@@ -15,7 +15,7 @@ import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { mountDevMode } from './devMode.js';   // Dev (authoring) mode: expose atom values as params → Save as custom op
-import { isOpBlockEdited } from './opGlow.js';   // whether an op's live blocks diverge from its form params (guards the clobber path)
+import { isOpBlockEdited, valueTokenRanges, valueRangesForSubtree } from './opGlow.js';   // op-edit guard + word-level value-token spans (hover/select highlight)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
 import { programSimContext } from '../viz/opSimContext.js';          // declared op-type → preview render-intent (rotary rig, …)
 import { getCaps, resolveActivePost } from '../wizards/dialects/index.js';
@@ -30,6 +30,13 @@ const WIZARDS = {
     corner: new CornerWizard(), edge: new EdgeWizard(),
     middle: new MiddleWizard(), circular: new CircularWizard()
 };
+
+// Find a model record by block id in the shared stack (records: { id, params, children }) — used to map a hovered
+// Blockly leaf back to its param keys for value-token highlighting.
+function findModelById(stack, id) {
+    for (const b of (stack || [])) { if (!b) continue; if (b.id === id) return b; const f = findModelById(b.children, id); if (f) return f; }
+    return null;
+}
 
 // Heads-up on op-container blocks the active post can't fully run: gating is PER LINE (emit comments out the
 // non-runnable lines — see the G-code panel), so we DON'T grey the whole op (that would overstate a partial
@@ -298,6 +305,7 @@ async function buildWorkspace() {
     const sim = programSimContext(getStack().filter((b) => b && b.type === 'op').map((b) => b.opType));
     panel.setRotaryFixture(sim.showRotaryRig);
     applySelection();
+    repaintOverlays();   // re-apply transient hover (.warm) + value-token (.thot) overlays onto the rebuilt spans
   }
 
   // User edited the WORKSPACE → push to the shared model (which re-projects the editor) → refresh the pane.
@@ -341,15 +349,97 @@ async function buildWorkspace() {
     out.classList.toggle('has-sel', !!selectedId);
     if (selectedId && firstHot && opts.scrollCode) firstHot.scrollIntoView({ block: 'nearest' });
   }
+  // HOVER (learner aid): mouse over a block → light its emitted lines in the code panel — a LIGHTER glow than
+  // selection, and NO scroll. Reuses the SAME per-line block ancestry (dataset.src) as applySelection, so block→code
+  // mapping comes from the one emit map, not a second one. Independent class (.warm) so it composes with selection.
+  let hoveredId = null;
+  function applyHover(id) {
+    if (id === hoveredId) return;
+    hoveredId = id;
+    out.querySelectorAll('.gl').forEach((sp) => {
+      const src = sp.dataset.src ? sp.dataset.src.split(',') : null;
+      sp.classList.toggle('warm', !!(id && src && src.includes(id)));
+    });
+  }
+
+  // WORD-LEVEL value highlight (.thot): box the exact emitted token(s) a value occupies — driven by hovering a value
+  // field (the precise value under the cursor) OR selecting a leaf atom (all its values). Spans come from the emit via
+  // opGlow.valueTokenRanges / valueRangesForSubtree (perturb+diff provenance, no regex). Wrapping replaces a line
+  // span's text with [text][<span.thot>token</span>][text]; clearing resets textContent (collapses the wraps).
+  let valueHover = null;          // { ownerId, paramKey } of the value under the cursor, or null
+  let selTokens = [];             // cached value-token spans for the current LEAF selection (recomputed on change)
+  const tokenLines = new Set();   // line indices currently carrying .thot wraps (for cleanup)
+  function wrapLine(sp, ranges) {
+    const text = sp.textContent;
+    ranges.sort((a, b) => a[0] - b[0]);
+    const frag = document.createDocumentFragment();
+    let pos = 0;
+    for (const [s, e] of ranges) {
+      if (s < pos || s >= e || e > text.length) continue;        // skip overlaps / out-of-bounds
+      if (s > pos) frag.appendChild(document.createTextNode(text.slice(pos, s)));
+      const tok = document.createElement('span'); tok.className = 'thot'; tok.textContent = text.slice(s, e);
+      frag.appendChild(tok); pos = e;
+    }
+    if (pos < text.length) frag.appendChild(document.createTextNode(text.slice(pos)));
+    sp.replaceChildren(frag);
+  }
+  function paintTokens(ranges) {
+    const gls = out.querySelectorAll('.gl');
+    tokenLines.forEach((i) => { const sp = gls[i]; if (sp) sp.textContent = sp.textContent; });   // restore plain text
+    tokenLines.clear();
+    const byLine = new Map();
+    for (const { line, range } of ranges) { if (!byLine.has(line)) byLine.set(line, []); byLine.get(line).push(range); }
+    byLine.forEach((rs, line) => { const sp = gls[line]; if (sp) { wrapLine(sp, rs); tokenLines.add(line); } });
+  }
+  // hovered value wins (the precise token under the cursor); else the selected leaf's tokens; else nothing.
+  function refreshTokens() { paintTokens(valueHover ? valueTokenRanges(valueHover.ownerId, valueHover.paramKey) : selTokens); }
+  function recomputeSelTokens() {
+    const rec = selectedId ? findModelById(getStack(), selectedId) : null;
+    selTokens = (rec && (!rec.children || !rec.children.length)) ? valueRangesForSubtree(selectedId) : [];   // leaf only (cheap + uncluttered)
+  }
+  function setSelected(id, opts) { selectedId = id; recomputeSelTokens(); applySelection(opts); refreshTokens(); }
+  // re-apply the transient hover + value-token overlays onto the freshly-rebuilt .gl spans (renderCode replaces them
+  // on every projection render, dropping .warm/.thot; the reset-then-apply defeats applyHover's same-id early-return).
+  function repaintOverlays() { const h = hoveredId; hoveredId = null; applyHover(h); recomputeSelTokens(); refreshTokens(); }
+
   out.addEventListener('click', (e) => {
     const sp = e.target.closest('.gl');
-    if (sp && sp.dataset.owner) { selectedId = sp.dataset.owner; try { ws.getBlockById(selectedId)?.select(); } catch (_) { /* gone */ } applySelection({ scrollCode: false }); }
-    else { selectedId = null; applySelection(); }
+    if (sp && sp.dataset.owner) { try { ws.getBlockById(sp.dataset.owner)?.select(); } catch (_) { /* gone */ } setSelected(sp.dataset.owner, { scrollCode: false }); }
+    else setSelected(null);
   });
+  // Resolve the innermost hovered block to (a) the statement/leaf whose LINES to warm, and (b) the value socket under
+  // the cursor (if any) whose TOKEN to box. A value/reporter block has an outputConnection; walk up past it to the
+  // owning leaf, then map the socket input → the model param key (FN = uppercase, so match case-insensitively).
+  function resolveHoverTarget(blk) {
+    let v = blk, top = null;
+    while (v && v.outputConnection) { top = v; v = v.getParent(); }
+    const leaf = v;
+    if (!leaf) return { warmId: blk.id, value: null };
+    if (!top) return { warmId: leaf.id, value: null };          // blk is itself a statement/leaf/container, not a value
+    let inputName = null;
+    for (const inp of (leaf.inputList || [])) { if (inp.connection && inp.connection.targetBlock() === top) { inputName = inp.name; break; } }
+    const rec = findModelById(getStack(), leaf.id);
+    const paramKey = (inputName && rec && rec.params) ? Object.keys(rec.params).find((k) => k.toUpperCase() === inputName) : null;
+    return { warmId: leaf.id, value: paramKey ? { ownerId: leaf.id, paramKey } : null };
+  }
+  function setHover(warmId, value) {
+    const changed = JSON.stringify(value || null) !== JSON.stringify(valueHover);
+    applyHover(warmId);                                          // early-returns if the warmed block is unchanged
+    if (changed) { valueHover = value; refreshTokens(); }
+  }
+  // Block→code hover: Blockly tags every block's SVG root with data-id, so closest('[data-id]') from the event target
+  // is the innermost hovered block; the grid/empty canvas has none → clear. mouseleave clears on exit.
+  host.addEventListener('mouseover', (e) => {
+    const g = e.target && e.target.closest && e.target.closest('[data-id]');
+    const blk = g && ws.getBlockById(g.getAttribute('data-id'));
+    if (blk) { const t = resolveHoverTarget(blk); setHover(t.warmId, t.value); }
+    else setHover(null, null);
+  });
+  host.addEventListener('mouseleave', () => setHover(null, null));
 
   // ---- workspace events: structural change → re-emit; selection → highlight code ----
   ws.addChangeListener((e) => {
-    if (e.type === B.Events.SELECTED) { selectedId = e.newElementId || null; applySelection({ scrollCode: true }); }
+    if (e.type === B.Events.SELECTED) { setSelected(e.newElementId || null, { scrollCode: true }); }
     else if (e.element === 'field' && _ops) {
       try {
         const blk = ws.getBlockById(e.blockId);

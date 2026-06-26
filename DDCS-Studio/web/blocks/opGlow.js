@@ -201,3 +201,76 @@ export function opEditSummary(opId) {
     })).filter((x) => x.from || x.to);
     return { injected: injectedLines, overrides: ovr };
 }
+
+// recursive find-by-id over the block tree (atoms live in children; value pills live in params, not searched here).
+function _findById(blocks, id) {
+    for (const b of (blocks || [])) {
+        if (!b) continue;
+        if (b.id === id) return b;
+        const f = _findById(b.children, id);
+        if (f) return f;
+    }
+    return null;
+}
+
+// Localize ONE socket value's emitted token span(s) against a PRECOMPUTED base emit (so a caller batching many
+// values doesn't recompute the base each time). Perturb just that value to a sentinel, re-emit, diff each line.
+function _localizeValue(prog, baseEmit, o, ownerBlockId, paramKey) {
+    const clone = JSON.parse(JSON.stringify(prog));
+    const owner = _findById(clone, ownerBlockId);
+    if (!owner || !owner.params || !(paramKey in owner.params)) return [];
+    owner.params[paramKey] = 987654.321;                 // sentinel → a distinct token; only this value's span differs
+    const pEmit = emitMapped(clone, o);
+    // A value SOCKET never changes the line count. If it did, the param gates STRUCTURE (a cond / loop count), not a
+    // token — the index-aligned diff below can't localize that, so bail. (Known residual: if the real value's emitted
+    // digits coincide with the sentinel's tail, diffRange over-trims to an empty span → that line is skipped — a
+    // missed highlight, never a wrong one. Acceptable graceful-degrade for a learner aid.)
+    if (pEmit.lines.length !== baseEmit.lines.length) return [];
+    const out = [];
+    for (let i = 0; i < baseEmit.lines.length; i++) {
+        if (baseEmit.lines[i] === pEmit.lines[i]) continue;
+        const r = diffRange(pEmit.lines[i], baseEmit.lines[i]);   // span in the ORIGINAL (current) line
+        if (r[1] > r[0]) out.push({ line: i, range: r });
+    }
+    return out;
+}
+
+/**
+ * The EXACT emitted-token span(s) ONE socket value occupies — for hover-highlighting that value in the projected
+ * code at WORD level. Declared by the emit (perturb + diff), never regex-guessed.
+ *   ownerBlockId = the statement/leaf block holding the socket; paramKey = which value socket.
+ * → [{ line, range:[start,end) }] over the CURRENT program's emit (one entry per line the value lands on), or [].
+ */
+export function valueTokenRanges(ownerBlockId, paramKey) {
+    if (typeof window === 'undefined' || !window.ddcsGetBlockProgram) return [];
+    const prog = window.ddcsGetBlockProgram() || [];
+    const o = dialectOpts();
+    return _localizeValue(prog, emitMapped(prog, o), o, ownerBlockId, paramKey);
+}
+
+/**
+ * EVERY value-token span the emit places for a block SUBTREE — for "select a block → box its value tokens." Walks
+ * the block (by id) and its descendants; for each finite-numeric param, localizes its token(s). One base emit, one
+ * perturbation per value. Op-level params (which don't drive the emit — children carry the baked values) localize to
+ * nothing, so selecting an op container yields []; selecting a leaf atom yields its own values. Deduped by line+span.
+ */
+export function valueRangesForSubtree(rootBlockId) {
+    if (typeof window === 'undefined' || !window.ddcsGetBlockProgram) return [];
+    const prog = window.ddcsGetBlockProgram() || [];
+    const root = _findById(prog, rootBlockId);
+    if (!root) return [];
+    const o = dialectOpts(), baseEmit = emitMapped(prog, o);
+    const seen = new Set(), out = [];
+    (function walk(b) {
+        if (!b) return;
+        if (b.params) for (const k in b.params) {
+            if (typeof b.params[k] !== 'number' || !isFinite(b.params[k])) continue;
+            for (const { line, range } of _localizeValue(prog, baseEmit, o, b.id, k)) {
+                const sig = line + ':' + range[0] + ':' + range[1];
+                if (!seen.has(sig)) { seen.add(sig); out.push({ line, range }); }
+            }
+        }
+        (b.children || []).forEach(walk);
+    })(root);
+    return out.sort((a, b) => a.line - b.line || a.range[0] - b.range[0]);
+}
