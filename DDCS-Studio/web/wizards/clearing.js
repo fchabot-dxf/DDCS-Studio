@@ -51,6 +51,11 @@ export function scanlineFill(contours, yStep) {
     let ymin = Infinity, ymax = -Infinity;
     for (const c of contours) for (const p of c) { if (p.y < ymin) ymin = p.y; if (p.y > ymax) ymax = p.y; }
     if (!isFinite(ymin) || ymax - ymin < 1e-6 || !(yStep > 0)) return [];
+    // Runaway guard: a pathological height/stepover (e.g. the value-glow perturbs a fill's height/strokeWidth to its
+    // ~1e6 sentinel to localize that token) would scan tens of millions of rows SYNCHRONOUSLY and freeze the tab. A real
+    // fill is far under the cap, so emit stays byte-identical; an absurd one yields no rows (an empty toolpath — the
+    // caller signals it, e.g. fillText's '( nothing to engrave )'). Mirrors blockEmitter's Math.min(steps,100000) guard.
+    if ((ymax - ymin) / yStep > 100000) return [];
     const rows = [];
     for (let y = ymin + yStep * 0.5; y < ymax; y += yStep) {
         const xs = [];   // { x, w:+1 upward crossing / -1 downward }

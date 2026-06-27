@@ -6,7 +6,7 @@
  * (ops/fillText.js) can share it without a module cycle. Counters (O/A/B/8 holes) fall out for free (a thin
  * ribbon never covers the glyph centre) and overlapping pieces fill solid under the non-zero-winding scanline.
  */
-import { glyph, FONT_CAP_HEIGHT } from './strokeFont.js';
+import { getFont, FONT_CAP_HEIGHT } from './strokeFont.js';
 
 export { FONT_CAP_HEIGHT };
 
@@ -14,9 +14,11 @@ function num(v, d) { return (v === '' || v == null || isNaN(Number(v))) ? d : Nu
 
 /** Lay the string out → placed centreline polylines (work coords) + the text bounding box. */
 export function layoutText(params) {
+    const font = getFont(params.font);            // FONT SEAM: select by name (default = built-in single-stroke)
+    const glyph = font.glyph;
     const text = (params.text == null ? 'TEXT' : String(params.text));
     const H = Math.max(1, num(params.height, 12));
-    const scale = H / FONT_CAP_HEIGHT;
+    const scale = H / font.capHeight;
     const tracking = num(params.spacing, 1.2);   // extra mm between glyphs
     const align = params.align || 'left';
     const ox = num(params.x, 0), oy = num(params.y, 0);

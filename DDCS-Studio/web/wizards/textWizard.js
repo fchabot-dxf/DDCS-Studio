@@ -28,13 +28,14 @@ export function textStack(params = {}) {
     const stepdown = num(params.stepdown, depth) || depth;   // engraving is usually one pass
     const tool = Math.max(0.1, num(params.toolDia, 1.5));
     const clr = num(params.clearance, 4);
-    const safeText = String(params.text == null ? '' : params.text).replace(/[()\n]/g, ' ');
 
     const S = [];
     const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
 
-    C(`Text "${safeText}" - DDCS Studio`);
-    C(`engrave fill | tool Ø${tool} | stroke ${num(params.strokeWidth, 2.5)} | depth ${depth}`);
+    // STATIC comment text (no param interpolation): the text/tool/stroke/depth all live in the executable Fill Text /
+    // Step Down atoms (the single source of truth), so a forked/data-def label can't drift → byte-identical, dumb data-def.
+    C('Text engraving - DDCS Studio');
+    C('engrave fill');
 
     const ps = newBlock('progstart');
     ps.params = { ...ps.params, rpm: num(params.rpm, ps.params.rpm), dir: params.dir || ps.params.dir, clearance: clr };
@@ -43,7 +44,7 @@ export function textStack(params = {}) {
     const ft = newBlock('filltext');
     ft.params = {
         ...ft.params,
-        text: params.text == null ? 'TEXT' : String(params.text),
+        text: params.text == null ? 'TEXT' : String(params.text), font: params.font || 'single-stroke',
         height: num(params.height, 12), spacing: num(params.spacing, 1.2), align: params.align || 'left',
         x: num(params.x, 0), y: num(params.y, 0), strokeWidth: num(params.strokeWidth, 2.5),
         toolDia: tool, stepoverPct: num(params.stepoverPct, 50),

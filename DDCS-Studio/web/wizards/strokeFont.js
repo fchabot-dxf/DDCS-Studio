@@ -72,3 +72,22 @@ export function glyph(ch) {
 
 export const FONT_CAP_HEIGHT = 7;
 export const STROKE_FONT = G;
+
+/**
+ * FONT SEAM — the registry the Text generator lays out from. A FONT is data:
+ *   { glyph(ch) → { w:number, s: Array<polyline of [x,y]> }, capHeight:number, label:string }
+ * To add a font (long-tail, no core change): registerFont('my-font', { glyph, capHeight, label }). The new font is then
+ * selectable by name (the `font` param threads param → filltext.font → layoutText) and bindable in the data-def. A font's
+ * glyphs are CENTRELINES on a 0..capHeight grid; Text scales + inflates them into ribbons + pocket-fills (so counters
+ * appear naturally), exactly like the built-in — any single-stroke/centreline font drops in with no engine work.
+ */
+export const FONTS = {
+    'single-stroke': { glyph, capHeight: FONT_CAP_HEIGHT, label: 'Single-stroke (engraving)' },
+};
+export const DEFAULT_FONT = 'single-stroke';
+
+/** Resolve a font by name → its def (falls back to the built-in single-stroke font for unknown/empty names). */
+export function getFont(name) { return FONTS[name] || FONTS[DEFAULT_FONT]; }
+
+/** Register a font into the seam. `font` = { glyph, capHeight, label }. Returns the name. Idempotent-by-overwrite. */
+export function registerFont(name, font) { FONTS[name] = font; return name; }
