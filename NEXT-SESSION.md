@@ -1,8 +1,14 @@
 # NEXT SESSION — handoff
 
 ## ⭐ Current state (2026-06-27) — READ THIS FIRST
-Everything below is on `main` (pushed; full suite **320 green**, the lone flake is the known `middle-animator` anim test).
-Two threads ran this session:
+**LATEST — the CANVAS-WIDGET consolidation advanced through Stage 2 (COMPLETE) into Stage 3 (started).** 9 commits,
+**local / NOT pushed** (no `.ver` bump → pushing triggers no release), full suite **329 green** (lone flake = known
+`middle-animator`). Stage 2: all 6 draggable views (text/drill/surfacing/pocket/slot/contour) now DECLARE their handles
+via the registry, adding the `rect` / `radial` / `projLength` gestures, each gated byte-identical (unit math + real
+drags). Stage 3 (first increment `46c4195`): the custom-op Form+2D preview renders its handles FROM the registry + a new
+end-to-end declarable `ncircle` (2D circle) gesture. Detail + the next decision → the "▶ Immediate next task" section.
+
+The two threads below ran EARLIER the same day on `main` (pushed; suite was 320 green at that point):
 
 **A · Wizards-as-data Stage 5 — three more ports + a restructure pass (DONE).**
 - The two-session surfacing **"Blockly bridge recursion" was ROOT-CAUSED + fixed** — it was NEVER the bridge: the value-GLOW
@@ -30,7 +36,8 @@ Two threads ran this session:
   behind `buildCanvasWidgets(decls, setFields) → {handles,onDrag,onEdit}`. **Text is the first consumer** (textView): pos +
   height REUSE point/length (hand-rolled onDrag deleted), width=scaleX, slant=shear — the four corners of the text box.
   FeatureCanvas's move/size/corner/stock-snap plumbing reused as-is; only the two missing gestures were added. Proven by
-  `tests/canvas-widgets.spec.js`. **This is the "Stage 1 first, then decide" checkpoint** — see the next-task section.
+  `tests/canvas-widgets.spec.js`. *(Stage 1 was the "then decide" checkpoint; this session CONTINUED it through Stage 2 —
+  all 6 views — and into Stage 3. See the LATEST banner above + the "▶ Immediate next task" section.)*
 
 ---
 
