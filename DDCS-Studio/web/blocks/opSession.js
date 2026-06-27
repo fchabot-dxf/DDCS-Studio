@@ -467,18 +467,24 @@ export function duplicateOp(opId) {
     return true;
 }
 
+const _isLooseTop = (b) => b && b.type !== 'op' && b.type !== 'progstart' && b.type !== 'progend';
+
 /**
- * #headline — wrap the program's LOOSE top-level atoms (a hand-built stack with no op wrapper) into ONE editable
+ * #headline — wrap a CONTIGUOUS run of LOOSE top-level atoms (a hand-built run with no op wrapper) into ONE editable
  * `group` op, so the editor's line→op map finds it (`findOpInStack` matches `type==='op'`) → the hover ✎ chip appears
- * and clicking it edits the stack as a form. The group is a generic op-like container: editable IN PLACE, NOT a
+ * and clicking it edits the run as a form. The group is a generic op-like container: editable IN PLACE, NOT a
  * registered/reusable wizard. Atoms already inside an op (a real drill, etc.) are left alone; program framing is
  * preserved. The group's children ARE the loose atoms, so emit walks them = byte-identical G-code (no builder needed).
+ *
+ * `ids` (the in-context "Group" gesture's contiguous run, from looseRunIds) restricts the wrap to exactly that run —
+ * each loose run groups independently. Omitted (the legacy/auto path) → wraps EVERY loose top-level atom program-wide.
  * Returns the new op's id, or null if there were no loose atoms to wrap.
  */
-export function groupLooseAtoms(label) {
+export function groupLooseAtoms(label, ids) {
     const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
-    const isLoose = (b) => b && b.type !== 'op' && b.type !== 'progstart' && b.type !== 'progend';
-    const loose = cur.filter(isLoose);
+    const idSet = Array.isArray(ids) && ids.length ? new Set(ids) : null;
+    const inRun = (b) => _isLooseTop(b) && (!idSet || idSet.has(b.id));
+    const loose = cur.filter(inRun);
     if (!loose.length) return null;
     const looseIds = new Set(loose.map((b) => b.id));
     const op = makeOp('group', {}, loose);                             // children = the loose atoms (emit = same G-code)

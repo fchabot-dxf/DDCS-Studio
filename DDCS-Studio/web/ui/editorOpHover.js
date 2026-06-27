@@ -7,7 +7,7 @@
  * params are the single source of truth; ddcsEditOp seeds the wizard from them and replaceOp rebuilds the op.
  * The editor text is transparent over the #editor-highlight overlay, so the .op-hover class shows behind it.
  */
-import { showOpMenu, hideOpMenu } from './opContextMenu.js';
+import { showOpMenu, showGroupMenu, hideOpMenu } from './opContextMenu.js';
 
 export function initEditorOpHover() {
     const editor = document.getElementById('editor');
@@ -111,14 +111,24 @@ export function initEditorOpHover() {
     chip.addEventListener('click', () => { const id = chip.dataset.opId; hide(); if (id && window.ddcsEditOp) window.ddcsEditOp(id); });
     editor.addEventListener('scroll', () => { if (!chip.hidden) hide(); });   // avoid drift; re-hover to show again
 
-    // Right-click an op → shared context menu (✎ Edit / ⧉ Duplicate / 🗑 Delete).
+    // Right-click an op → shared context menu (✎ Edit / ⧉ Duplicate / 🗑 Delete). Over a LOOSE hand-built run
+    // (no op wrapper → ddcsOpAtLine null) → the in-context "Group" menu instead: wrap that contiguous run in one
+    // `group` op so it becomes editable (the headline feature; each loose run groups independently).
     editor.addEventListener('contextmenu', (e) => {
         if (typeof window.ddcsOpAtLine !== 'function') return;
-        const op = window.ddcsOpAtLine(lineAtY(e.clientY));
-        if (!op) return;                                   // not over an op → leave the native menu
+        const line = lineAtY(e.clientY);
+        const op = window.ddcsOpAtLine(line);
+        if (op) {
+            e.preventDefault();
+            hide();                                        // drop the hover chip while the menu is up
+            showOpMenu(op, e.clientX, e.clientY);
+            return;
+        }
+        const run = (typeof window.ddcsLooseRunAtLine === 'function') ? window.ddcsLooseRunAtLine(line) : null;
+        if (!run || !run.length) return;                   // not over an op or a loose run → leave the native menu
         e.preventDefault();
-        hide();                                            // drop the hover chip while the menu is up
-        showOpMenu(op, e.clientX, e.clientY);
+        hide();
+        showGroupMenu(run, e.clientX, e.clientY);
     });
     editor.addEventListener('scroll', hideOpMenu);
 }

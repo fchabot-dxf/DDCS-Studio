@@ -52,6 +52,25 @@ export function linesForOp(opId) {
     return out;
 }
 
+// ── loose-run resolution (the in-context "Group" gesture) ───────────────────────────────────────────────────
+// A hand-built atom has no op wrapper, so opAtLine returns null. For the right-click "Group" gesture we instead
+// resolve the CONTIGUOUS run of loose top-level atoms the clicked line belongs to (bounded by a real op / framing),
+// each run grouping independently. proj.map[i] = ancestry [outer…inner]; map[i][0] = the top-level block id.
+const _isLooseTop = (b) => b && b.type !== 'op' && b.type !== 'progstart' && b.type !== 'progend';
+/** The loose run (array of top-level block ids) owning projected line `i`, or null when the line is over a real op,
+ *  program framing, or nothing. Only valid while the editor matches the live projection (the caller gates that). */
+export function looseRunAtLine(i) {
+    const anc = proj.map && proj.map[i];
+    const topId = anc && anc.length ? anc[0] : null;
+    if (!topId) return null;
+    const idx = stack.findIndex((b) => b && b.id === topId);
+    if (idx < 0 || !_isLooseTop(stack[idx])) return null;            // over a real op / framing → not a loose run
+    let s = idx, e = idx;
+    while (s > 0 && _isLooseTop(stack[s - 1])) s--;
+    while (e < stack.length - 1 && _isLooseTop(stack[e + 1])) e++;
+    return stack.slice(s, e + 1).map((b) => b.id);
+}
+
 /** Serialize the program to .nc text WITH self-describing op markers (for export / persistence). The live
  *  editor projection (proj.text) stays CLEAN — markers are a file-format concern, read back on import. A
  *  ( @DDCS:1 {…} ) marker carrying the op record is inserted before each op's first projected line. */
@@ -145,6 +164,7 @@ export function initProgramModel() {
     window.ddcsEmitMapped = (s, opts) => emitMapped(s, opts || dialectOpts());
     // Editor hover-to-edit: which op owns a line, an op's line range, and whether the map is currently valid.
     window.ddcsOpAtLine = (i) => (editorMatchesProjection() ? opAtLine(i) : null);
+    window.ddcsLooseRunAtLine = (i) => (editorMatchesProjection() ? looseRunAtLine(i) : null);   // the in-context "Group" gesture
     window.ddcsLinesForOp = linesForOp;
     window.ddcsGetProjection = getProjection;   // { text, lines, map } — map[i] = block ancestry of line i (for the block-edit glow)
     window.ddcsSerializeWithMarkers = serializeWithMarkers;   // .nc text + self-describing op markers (export only; editor stays clean)
