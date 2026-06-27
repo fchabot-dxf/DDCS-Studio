@@ -75,31 +75,33 @@ cleanly-portable placement op; `atc_warmup` the only clean leaf.** The `liveFoot
 `extent` + a per-op flag so shared atoms like `stepover` don't regress pocket) is DESIGNED and proven on drill, but
 landing it for surfacing was a NO-OP (footprint can't vary) so it was reverted — land it only after binding works.
 
-## ⚠️ BLOCKER FOUND (2026-06-27) — the Blockly BRIDGE recurses on a flat-geometry `fill` block (prerequisite to fix)
-Restructuring `surfacing` to flat geometry was attempted TWO ways and **both proved BYTE-IDENTICAL at the EMIT level**
-(captured a baseline, diffed — identical): (1) geometry flat on the SHARED `stepover` (built its rect region from flat
-`shape/x/y/w/h` via a `fillRegion` helper when no Region reporter is plugged); (2) a DEDICATED `surfacefill` atom (flat
-geometry, NO region socket, reuses the `fillStrategy`/`fillSegments` kernels). **So the reframe is validated — flattening
-surfacing's emit works.** BUT BOTH hit the SAME wall: **`Maximum call stack size exceeded` in `emit` during the Blockly
-BRIDGE round-trip** (insert surfacing → open Blocks tab → reproject). The FINAL model is CLEAN (a cycle-walk found no
-cycle: `progstart, op{wcs, placeonstock{stepdown{surfacefill}}}, progend` with flat primitive params) — so it's a
-**TRANSIENT cyclic stack the bridge builds mid-reproject** for a flat-geometry `fill` block, then emits → recursion.
-The original StepOver(**Region reporter**) round-trips fine (the geometry is a child reporter block, not value sockets),
-so the trigger is **flat value-socket geometry on a `fill`-kind block**. NOT the atom design (shared vs dedicated). All
-reverted to green. The op container also carries `spindle`/`head`/`endProgram` SETTINGS objects with `type:` fields that
-look like reporter pills (`head:{type:'spindle'}`) — a suspected accomplice (resolveValue may treat them as reporters),
-worth checking, though the original surfacing carries them too. ⇒ **FIX THE BRIDGE round-trip of flat-geometry fill
-blocks FIRST** (instrument `stackBridge` stackToWorkspace/workspaceToStack + the blocksApp reproject change-listener);
-it's a PREREQUISITE that unblocks ALL fill-op restructures (surfacing/contour/slot/pocket). The emit-level data-def port
-(`surfacingData.js` + a byte-identical sweep incl. live-footprint placement) works and can land once the bridge is fixed.
+## ✅ RESOLVED (2026-06-27) — the "bridge recursion" was never the bridge; it was the value-GLOW. + restructure-pass done
+The surfacing blocker is SOLVED and shipped. The `Maximum call stack` was **not** a Blockly-bridge cycle — it was the
+select/hover **value-glow** (`opGlow.valueRangesForSubtree`/`_localizeValue`) perturbing surfacing's now-FLAT `h` param
+to the sentinel `987654.321` to localize its token → ~137k scanline rows → `out.push(...bigArray)` overflow. The old
+StepOver(Region) **pill** hid `w/h` as object params the glow skips; flattening SURFACED them. (The earlier "transient
+cyclic stack" hypothesis was wrong — proven by reproducing the throw in a plain emit clone, no bridge involved.)
+Shipped:
+- `8404429` — surfacing → flat `surfacefill` atom (byte-identical, git-diffed vs the Region version) + `opGlow._localizeValue`
+  bails on a throwing perturbation (general fix). studio-to-blocks/blocks-hover updated. Full suite green.
+- `7248bce` — **restructure PASS** (drill/bore/array/atc_warmup + an exhaustive glow-safety sweep, each adversarially
+  verified). drill/array/atc_warmup already MET the standard; the sweep found ONE real defect: **helical `bore`** is a
+  childless leaf whose `depth` MULTIPLIES the toolpath, and at the sentinel it builds ~47M lines **synchronously** →
+  the tab HANGS *before* the push-spread can throw → `try/catch` can't catch it. Fixed with a **kernel cap** in bore.js
+  (real bores untouched → byte-identical; absurd → tiny capped placeholder → glow line-count bail). `tests/bore-glow-cap.spec.js`.
+  Rejected (not real gaps): `line.depth` (throws fast → already caught), `concentricRect` NaN-hang (finite sentinel never
+  triggers it; polygon/ellipse already fall through to scanline). atc_warmup frozen annotation text = declared COSMETIC
+  frontier (no engine change). ⇒ the new design rule for every future fill-op restructure: [[glow-safety-childless-multiplier]].
 
-## ▶ Immediate next task — RESTRUCTURE awkward wizards to fit the dumb format (per the 2026-06-27 reframe)
-**Do NOT build binding-format extensions.** Flatten each blocked wizard so every param maps to ONE flat `(blockIndex,key)`
-socket, keeping the data-def format dumb (directive 1 / [[restructure-source-not-abstraction]]). **GATED on the bridge
-fix above for the fill-ops (surfacing/contour/slot).**
-1. **FIX the Blockly bridge** flat-geometry-fill recursion (above) — then **RESTRUCTURE `surfacing`** (proven byte-identical
-   at emit): a dedicated `surfacefill` atom (flat `shape/x/y/w/h` + the form-computed `stepover` + `strategy` socket value +
-   live-footprint placement). Then `dataOps/surfacingData.js` + `surfacing-as-data.spec` (byte-identical + binding-wiring).
+## ▶ Immediate next task — finish surfacing-as-DATA, then contour/slot/text the same way
+Surfacing's wizard is now FLAT + glow-safe; the remaining piece is the actual Stage-5 **data-def port**.
+1. **`dataOps/surfacingData.js` + `tests/surfacing-as-data.spec.js`** (byte-identical sweep + structural binding-wiring,
+   per `drillData.js`). Bindings: geometry/cut on the `surfacefill` leaf (block 4: x/y/w/h/stepover/strategy/feed/plunge),
+   depth/stepdown on `stepdown` (block 3: to/by), `wcs` (block 1), placement scalars on `placeonstock` (block 2). FAN-OUT
+   to watch: `clearance` feeds progstart + surfacefill (hold unbound, like drill #3); `originX` feeds surfacefill.x AND
+   placeonstock.offX — the reframe's "region at 0,0 + placement owns origin" makes this 1-socket (verify byte-identical via
+   placeShiftFromParams = offX − bbox.minX). The surfacingStack `so = tool·%` math: the FORM precomputes, store a flat
+   `stepover`; `strategy` raster→parallel mapping → accept `parallel`/`concentric` directly (byte-identical, both → same).
 2. **Then `contour`, `slot`, `text`** the same way — one at a time, each gated by the equivalence test. Keep the
    byte-identical gate where legacy output is fine; relax to "equivalent toolpath" only DELIBERATELY, per-wizard.
 3. **Genuine BRANCHING** (the probe/ATC/comm/homing family, conditional-structure-dominated) is the only place that may
