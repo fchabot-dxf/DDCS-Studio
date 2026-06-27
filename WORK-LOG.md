@@ -277,3 +277,24 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
   committed `8de09a6` (LOCAL, not pushed — the push is the user's call; no `.ver` bump → no release). backup branch
   updated to HEAD. NEXT per NEXT-SESSION: AUTO layer (a single loose run auto-applying the same group op, deferred) +
   the canvas-role knob writeback gap if a real authoring need surfaces it. Holding for advisor review of inc 2.
+
+## 2026-06-27 — AUTO task received → AT THE GATE (design proposal, NOT building)
+
+- advisor PASSED increment 2 (`789161a`) → group feature COMPLETE (inc 1+2+3). New active task `bc2a8db`: **AUTO** —
+  a SINGLE unambiguous loose run (a pure hand-built stack, no real ops) auto-gets the editable group/button with NO
+  right-click gesture. The advisor GATED it: propose auto-WRAP vs auto-SHOW + recommend, STOP for sign-off, then build.
+- the two poles the advisor named:
+  - **A · auto-WRAP on projection** — detect "whole program is one loose run" → `groupLooseAtoms()` automatically. Least
+    code (reuses inc 1-2-3 wholesale). COST: silent model mutation on render (every pure stack becomes a `group` in
+    Blocks without the user acting → reverses #12's no-mutation win); mutation-on-render can fight the reproject loop.
+  - **B · auto-SHOW chip, no wrap** — the ✎ chip appears on the BARE run; form-derive + writeback work off the bare
+    top-level atoms (no group op). COST: this is the synthetic-op-at-the-chip-layer path the advisor already REJECTED
+    for the gesture — opAtLine/openForEdit/writeback all key on a `type==='op'` id a bare run lacks → most rework.
+- **WORKER RECOMMENDATION → a SYNTHESIS (auto-SHOW chip on the bare run, auto-WRAP on CLICK):** the ✎ chip appears on a
+  pure stack with no gesture (B's no-mutation-on-render), and CLICKING it calls `groupLooseAtoms()` then `openForEdit`
+  on the new group (A's reuse — by edit-time it's a real group, so inc-2's derive + writeback apply unchanged, B's
+  rework AVOIDED). Mutation is a single explicit act on the edit click, not on every render. New code is small:
+  editorOpHover shows an edit chip when `opAtLine` is null AND the program is one unambiguous loose run (no `type==='op'`),
+  with a click handler that wraps-then-edits. Dominates both poles (B's purity on render + A's reuse on click).
+- state: tests 338/341 green · branch main · inc 2 `8de09a6`/`fcea911` committed (local). **GATE: holding for the advisor's
+  pick on the AUTO design before building. Watcher armed on NEXT-SESSION.md (Monitor b3obi8v5b).** Not building yet.
