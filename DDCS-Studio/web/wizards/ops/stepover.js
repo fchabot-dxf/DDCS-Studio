@@ -8,7 +8,11 @@
  */
 import { num, r3 } from './util.js';
 import { scanlineFill, fillLevelMoves, concentricRect, concentricCircle } from '../clearing.js';
-import { coerceRegion } from './region.js';
+import { coerceRegion, regionDesc } from './region.js';
+
+/** The region to clear: a plugged Region reporter (StepOver) OR, when none is plugged, built from the block's OWN flat
+ *  shape/x/y/w/h params (SurfaceFill). Byte-identical for StepOver. */
+export const fillRegion = (p) => (p.region ? coerceRegion(p.region) : regionDesc(p));
 
 /** One-direction passes (climb/conventional): every pass cut the same way, lift + rapid back between rows. */
 function onewayMoves(rows, ctx, reverse) {
@@ -28,7 +32,7 @@ function onewayMoves(rows, ctx, reverse) {
 
 /** Full clearing toolpath for the region at depth z (auto-cut: StepOver with an empty body). */
 export function fillStrategy(p, z) {
-    const rg = coerceRegion(p.region), step = Math.max(0.1, num(p.stepover, 4));
+    const rg = fillRegion(p), step = Math.max(0.1, num(p.stepover, 4));
     const ctx = { z, clr: num(p.clearance, 5), feed: num(p.feed, 600), plunge: num(p.plunge, 200) };
     // Concentric rings have analytic kernels only for circle + rect; polygon/ellipse fall through to the scanline
     // fill (contour-based, so it clears any shape). (concentricRect on NaN bounds from a centred shape never
@@ -43,7 +47,7 @@ export function fillStrategy(p, z) {
 
 /** Each pass as a segment {x0,y0,x1,y1} (parallel strategy) — exposed to a StepOver body that customises passes. */
 export function fillSegments(p) {
-    const rg = coerceRegion(p.region), step = Math.max(0.1, num(p.stepover, 4));
+    const rg = fillRegion(p), step = Math.max(0.1, num(p.stepover, 4));
     const rows = scanlineFill(rg.contour, step), oneWay = p.direction === 'oneway' || p.direction === 'otherway';
     const rev = p.direction === 'otherway';
     const segs = [];

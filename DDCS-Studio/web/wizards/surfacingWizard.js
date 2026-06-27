@@ -26,15 +26,12 @@ export function surfacingStack(params = {}) {
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
     const raster = (params.strategy || 'raster') === 'raster';
 
-    const region = newBlock('region');
-    region.params = { shape: 'rect', x: ox, y: oy, w: num(params.w, 100), h: num(params.h, 80) };
-
-    const over = newBlock('stepover');
-    over.params = { region, stepover: so, strategy: raster ? 'parallel' : 'concentric', direction: 'bothways', z: 'z', feed, plunge, clearance: clr };
+    const fill = newBlock('surfacefill');
+    fill.params = { shape: 'rect', x: ox, y: oy, w: num(params.w, 100), h: num(params.h, 80), stepover: so, strategy: raster ? 'parallel' : 'concentric', direction: 'bothways', z: 'z', feed, plunge, clearance: clr };
 
     const down = newBlock('stepdown');
     down.params = { to: num(params.depth, 0.5), by: num(params.stepdown, 0.5) };
-    down.children = [over];
+    down.children = [fill];
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
     return [makeStart(params), wcs, makePlace(params, surfacingBBox(params), down), makeEnd(params)];   // Start … WCS … placed op … End
 }

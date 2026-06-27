@@ -21,6 +21,7 @@ import { slotBlock, slotPath } from './slot.js';
 import { contourBlock } from './contour.js';
 import { regionBlock } from './region.js';
 import { stepoverBlock, fillStrategy } from './stepover.js';
+import { surfaceFillBlock } from './surfaceFill.js';
 import { fillZigzagBlock, fillConcentricBlock } from './fill.js';
 import { fillTextBlock } from './fillText.js';
 import { stepdownBlock } from './stepdown.js';
@@ -68,7 +69,7 @@ export const PALETTE = [
     regionBlock,                                               // Shapes (boundary → fills/walls via a region socket)
     moveBlock, arcBlock, probeBlock, machineMoveBlock, homeBlock, pathModeBlock,   // Move (+ G53 machine-coord move + G28 home + G64/G61 path mode)
     lineBlock, slotBlock, boreBlock, drillBlock, contourBlock, drillCycleBlock, cancelCycleBlock,  // Toolpaths (feature presets + contour/profile [+ pocket-wall finish] + native canned cycles G81-85/G80)
-    arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, stepdownBlock, placeOnStockBlock, rotateBlock,    // Transforms (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align)
+    arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, surfaceFillBlock, stepdownBlock, placeOnStockBlock, rotateBlock,    // Transforms (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align)
     spindleBlock, feedBlock, feedModeBlock, dwellBlock, coolantBlock, toolBlock,   // Spindle & Feed (spindle/feed/coolant/tool/dwell + G94/95 feed mode)
     wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, toolOffsetBlock,   // Coordinates (WCS + dist-mode + G17-19 plane + work-offset/tool-table write)
     progStartBlock, progEndBlock, endProgramBlock,             // Program (framing + end)

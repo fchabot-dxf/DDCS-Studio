@@ -139,7 +139,10 @@ function _localizeValue(prog, baseEmit, o, ownerBlockId, paramKey) {
     const owner = _findById(clone, ownerBlockId);
     if (!owner || !owner.params || !(paramKey in owner.params)) return [];
     owner.params[paramKey] = 987654.321;                 // sentinel → a distinct token; only this value's span differs
-    const pEmit = emitMapped(clone, o);
+    // A geometry param (a fill's height) multiplies the toolpath: at the huge sentinel the row count explodes and emit
+    // can overflow (push(...bigArray)). Such a param gates STRUCTURE, not a token — bail, exactly like the line-count
+    // guard below. (It would fail that guard anyway; catching the throw just gets there without crashing the caller.)
+    let pEmit; try { pEmit = emitMapped(clone, o); } catch { return []; }
     // A value SOCKET never changes the line count. If it did, the param gates STRUCTURE (a cond / loop count), not a
     // token — the index-aligned diff below can't localize that, so bail. (Known residual: if the real value's emitted
     // digits coincide with the sentinel's tail, diffRange over-trims to an empty span → that line is skipped — a

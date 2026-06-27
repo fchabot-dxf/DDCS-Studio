@@ -104,12 +104,12 @@ test('selecting a leaf atom boxes its value tokens; selecting a container does n
   await seedAndOpen(page);
   const ids = await page.evaluate(() => {
     const ws = window.__blkws;
-    const leaf = ws.getAllBlocks(false).find((b) => b.type === 'stepover');
+    const leaf = ws.getAllBlocks(false).find((b) => b.type === 'surfacefill');
     // a TRUE statement container = a MODEL block with statement children (getChildren counts shadow values, so use the model)
     const cont = (function find(bs) { for (const b of (bs || [])) { if (b && b.children && b.children.length) return b.id; const f = find(b && b.children); if (f) return f; } return null; })(window.ddcsGetBlockProgram());
     return { leaf: leaf ? leaf.id : null, cont };
   });
-  expect(ids.leaf, 'found the stepover leaf').toBeTruthy();
+  expect(ids.leaf, 'found the surfacefill leaf').toBeTruthy();
 
   await page.evaluate((id) => window.__blkws.getBlockById(id).select(), ids.leaf);
   await page.waitForTimeout(120);

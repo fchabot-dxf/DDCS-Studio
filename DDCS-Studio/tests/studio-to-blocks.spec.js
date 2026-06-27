@@ -26,7 +26,7 @@ test('Blocks tab opens the active cutting op (surfacing) as Blockly blocks with 
     code: document.getElementById('blk-gcode').textContent,
   }));
   expect(r.types, 'workspace has the surfacing op stack').toContain('stepdown');
-  expect(r.types).toEqual(expect.arrayContaining(['progstart', 'stepover', 'region', 'progend']));
+  expect(r.types).toEqual(expect.arrayContaining(['progstart', 'surfacefill', 'progend']));   // surfacing = flat SurfaceFill (no Region socket)
   expect(r.code, 'emitted G-code reflects the edited width').toContain('X123');
 });
 
