@@ -137,16 +137,32 @@ Shipped:
   annotation-text atom that renders from a BOUND param (like Spindle renders `M3 S<rpm>`), built when an op FORCES it, NOT
   speculatively. Never silently drop a number an operator confirms against.
 
-## ▶ Immediate next task — CANVAS-WIDGET consolidation, Stage 2 (the active initiative)
-Stage 1 (the reusable registry `web/viz/canvasWidgets.js` + text migrated onto it) is SHIPPED `6b08676`; this is the
-"Stage 1 first, then decide" checkpoint. Agreed SCOPE: every milling op's **handcoded** 2D-canvas GUI → the ONE
-declarative, reusable, end-user-authorable widget registry (the canvas analogue of `formWidgets.js`).
-1. **STAGE 2 — migrate the handcoded `*View.js` onto the registry. FIRST op = drill or surfacing, NOT another text-like
-   one** (advisor-confirmed): text proved `shear`; the real milling load is `scaleX · rotate · corner`, so stress the
-   registry against the rich shapes EARLY — you'll likely ADD a **`rotate`** gesture (and maybe a `corner`/anchor type —
-   but FeatureCanvas already owns corner-pick + stock-snap, so REUSE those, don't reinvent). Each migration: replace the
-   view's hand-rolled `handles[]` + `onDrag`/`onEdit` with `buildCanvasWidgets([...])`; **byte-identical drag behaviour**
-   (verify by actually dragging). Then sweep slot/array/pocket/bore/middle/circular/… Files: `web/wizards/views/*View.js`.
+## ▶ Immediate next task — CANVAS-WIDGET consolidation, Stage 2 (IN PROGRESS — 3 views migrated, slot next)
+Stage 1 (the reusable registry `web/viz/canvasWidgets.js` + text migrated onto it) is SHIPPED `6b08676`. **Stage 2 is
+now under way** — agreed SCOPE: every milling op's **handcoded** 2D-canvas GUI → the ONE declarative, reusable,
+end-user-authorable widget registry (the canvas analogue of `formWidgets.js`).
+
+**✅ Shipped this session (2026-06-27):**
+- **`0fafda2` — drill + surfacing** onto the registry (the "rich shapes first" stress test, advisor-confirmed). Added
+  the **two milling gestures** the doc predicted as "rotate + corner": **`rect`** (2D corner from an anchor → two fields
+  via a per-axis DIVISOR: `1`=literal W/H · `cols-1`=grid pitch · `0.5`=half-extent radius · `0`=skip that axis) and
+  **`radial`** (polar handle → radius + angle field; the "rotate" fused with radius; `rScale` maps drag-distance→Ø/pitch;
+  omit `fieldA` for radius-only, omit `rScale` for pure rotate). `onEdit` gained an optional `editMin` clamp. Drill's
+  4 patterns (grid/circle/rect/line) + surfacing all reduce to `point` + `rect`/`radial`.
+- **`a6d8f91` — pocket** onto the SAME two gestures, NO new code — chosen 2nd deliberately because the whole sweep rests
+  on "rect+radial cover pocket, no rework," and that was held only by **inspection**. Migrating pocket *discharges the
+  claim by construction* (rect/ellipse=`rect` incl. the `0.5` half-extent divisor; circle/polygon=radius-only `radial`).
+- **Rigor (per review):** each gated by exact-formula **unit math** (`canvas-widgets.spec` — the old formulas as
+  constants) **AND real pointer drags** through the migrated path (`drill-canvas` / `pocket-canvas` — fields actually
+  move: drill `d_dia 50→74.145`, pocket `circle p_dia 50→70.955`, `ellipse p_w 101.68→117.166`). Byte-identical, not
+  waved through. Full suite **324 green**.
+
+1. **STAGE 2 — continue the sweep. NEXT op = `slot`** (the one that FORCES the **3rd gesture**): slot width is a
+   **perpendicular projection** onto the slot normal (`proj = (w−mid)·n̂`), and A↔B are two `point` handles — so it adds
+   a `projLength`-style gesture, the real test of "the registry absorbs new gesture TYPES cleanly." Then the rest:
+   **array / bore / middle / circular / contour** (contour rides this sweep too — see Independent tracks). Each
+   migration: replace the view's hand-rolled `handles[]` + `onDrag`/`onEdit` with `buildCanvasWidgets([...])`;
+   **byte-identical** (unit math + a real drag). Files: `web/wizards/views/*View.js`, `web/viz/canvasWidgets.js`.
 2. **STAGE 3 — make the handles DECLARABLE-AS-DATA in the wizard maker** (the end-user reach, the whole point): a binding
    maps a param to a canvas GESTURE exactly as it maps to a `formWidgets` form widget today, and the custom-op preview
    renders its handles FROM the bindings (the canvas analogue of the form-render-from-bindings that already exists). REUSE
