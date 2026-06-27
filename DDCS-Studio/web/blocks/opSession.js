@@ -468,6 +468,32 @@ export function duplicateOp(opId) {
 }
 
 /**
+ * #headline — wrap the program's LOOSE top-level atoms (a hand-built stack with no op wrapper) into ONE editable
+ * `group` op, so the editor's line→op map finds it (`findOpInStack` matches `type==='op'`) → the hover ✎ chip appears
+ * and clicking it edits the stack as a form. The group is a generic op-like container: editable IN PLACE, NOT a
+ * registered/reusable wizard. Atoms already inside an op (a real drill, etc.) are left alone; program framing is
+ * preserved. The group's children ARE the loose atoms, so emit walks them = byte-identical G-code (no builder needed).
+ * Returns the new op's id, or null if there were no loose atoms to wrap.
+ */
+export function groupLooseAtoms(label) {
+    const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+    const isLoose = (b) => b && b.type !== 'op' && b.type !== 'progstart' && b.type !== 'progend';
+    const loose = cur.filter(isLoose);
+    if (!loose.length) return null;
+    const looseIds = new Set(loose.map((b) => b.id));
+    const op = makeOp('group', {}, loose);                             // children = the loose atoms (emit = same G-code)
+    op.label = label || 'Hand-built';
+    const next = [];
+    let placed = false;
+    for (const b of cur) {
+        if (looseIds.has(b.id)) { if (!placed) { next.push(op); placed = true; } continue; }   // first loose slot → the group
+        next.push(b);
+    }
+    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
+    return op.id;
+}
+
+/**
  * For ops with no block builder yet (corner / alignment / ATC / comms): DECODE their generated G-code into blocks
  * (the active dialect's recognizers turn probe / IF-GOTO / WCS into proper blocks; the rest become leaf/raw) and
  * accumulate them as a frameless snippet — so they coexist in the program and show in Blocks instead of being
