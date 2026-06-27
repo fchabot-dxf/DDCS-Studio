@@ -131,6 +131,36 @@ test('canvasWidgets registry: pocket gesture params (ellipse half-extent rect + 
   expect(r.circClamp, 'Ø clamps to 1').toBe(1);
 });
 
+test('canvasWidgets registry: projLength gesture (slot width) matches the perpendicular-projection formula', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const r = await page.evaluate(async () => {
+    const { buildCanvasWidgets } = await import('/viz/canvasWidgets.js');
+    const out = {};
+    const mk = (decls) => { const cap = {}; const w = buildCanvasWidgets(decls, (m) => Object.assign(cap, m)); return { ...w, cap }; };
+
+    // Horizontal slot A(0,0)→B(60,0): centreline normal n̂=(0,1), midpoint (30,0), tool Ø 6, half-width 5.
+    const horiz = () => mk([{ type: 'projLength', id: 'width', field: 'sl_width', cx: 30, cy: 0, nx: 0, ny: 1, off: 5, scale: 2, min: 6, label: 'width' }]);
+    const h0 = horiz();
+    out.place = (() => { const h = h0.handles[0]; return { x: h.x, y: h.y, value: h.value }; })();   // midpoint + n̂·hw = (30,5)
+    h0.onDrag('width', { x: 35, y: 9 }); out.wide = h0.cap.sl_width;                     // proj=9 → 2·9=18
+    const h1 = horiz(); h1.onDrag('width', { x: 30, y: 2 }); out.clamp = h1.cap.sl_width; // proj=2 → 2·2=4 → clamp to tool Ø 6
+    const h2 = horiz(); h2.onDrag('width', { x: 30, y: -7 }); out.symmetric = h2.cap.sl_width; // proj=-7 → |·|·2 = 14
+
+    // Tilted slot A(0,0)→B(0,40): n̂=(-1,0) — proves the projection follows the slot AXIS, not a fixed screen direction.
+    const tilt = mk([{ type: 'projLength', id: 'width', field: 'sl_width', cx: 0, cy: 20, nx: -1, ny: 0, off: 4, scale: 2, min: 6, label: 'width' }]);
+    out.tiltPlace = (() => { const h = tilt.handles[0]; return { x: h.x, y: h.y }; })();  // (0,20) + (-1,0)·4 = (-4,20)
+    tilt.onDrag('width', { x: -9, y: 25 }); out.tiltWide = tilt.cap.sl_width;             // proj=(-9)(-1)=9 → 18
+    return out;
+  });
+  expect(r.place, 'width handle rides the centreline normal at the half-width, drag-only (no value)').toEqual({ x: 30, y: 5, value: undefined });
+  expect(r.wide, 'width = 2 · perpendicular distance').toBe(18);
+  expect(r.clamp, 'width clamps to the tool Ø').toBe(6);
+  expect(r.symmetric, 'either side of the centreline → the same positive width').toBe(14);
+  expect(r.tiltPlace, 'handle follows the tilted slot normal').toEqual({ x: -4, y: 20 });
+  expect(r.tiltWide, 'projection is taken along the slot axis').toBe(18);
+});
+
 test('drill wizard renders its handles from the registry (point + radial)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);

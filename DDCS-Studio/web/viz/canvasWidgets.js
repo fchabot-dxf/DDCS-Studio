@@ -71,6 +71,13 @@ export const CANVAS_GESTURES = {
             return m;
         },
     },
+    // PERPENDICULAR projection onto an axis `(nx,ny)` about an anchor → one symmetric field (e.g. a slot width measured
+    // off its centreline). The handle rides the axis at `off` (the current half-extent); a drag projects the cursor onto
+    // the axis (signed distance), takes |·|·`scale` (2 = a half-distance → full width), and clamps to `min` (the tool Ø).
+    projLength: {
+        place: (d) => ({ x: d.cx + d.nx * d.off, y: d.cy + d.ny * d.off, kind: 'size', label: d.label, value: d.value }),
+        drag: (d, w) => ({ [d.field]: clampMin(d.scale * Math.abs((w.x - d.cx) * d.nx + (w.y - d.cy) * d.ny), d.min) }),
+    },
 };
 
 /** Declarations → { handles, onDrag, onEdit } for a FeatureCanvas spec. `setFields(map)` writes the op's form fields

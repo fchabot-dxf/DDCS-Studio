@@ -2,6 +2,7 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { SlotWizard, slotArrayBBox, slotPatterned, slotPatternPoints } from '../slotWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
+import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams } from '../ops/placement.js';
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
@@ -43,11 +44,14 @@ function buildSlotSpec(params, stock) {
         items.push({ kind: 'line', x1: ax + nx * hw + o.x, y1: ay + ny * hw + o.y, x2: bx + nx * hw + o.x, y2: by + ny * hw + o.y }); // +edge
         items.push({ kind: 'line', x1: ax - nx * hw + o.x, y1: ay - ny * hw + o.y, x2: bx - nx * hw + o.x, y2: by - ny * hw + o.y }); // -edge
     });
-    const handles = [   // handles sit on the base slot (the [0,0] copy); editing it repeats across the pattern
-        { id: 'a', x: ax, y: ay, kind: 'move', label: 'A' },
-        { id: 'b', x: bx, y: by, kind: 'move', label: 'B' },
-        { id: 'width', x: mx + nx * hw, y: my + ny * hw, kind: 'size', label: 'width' },
-    ];
+    // DECLARE the handles via reusable gestures (not hand-rolled): A/B = two `point`s; width = a `projLength` (the
+    // perpendicular distance from the centreline → full width). Handles sit on the base slot (the [0,0] copy);
+    // editing it repeats across the pattern. Each still drives a wizard PARAMETER via setFields() — never raw geometry.
+    const { handles, onDrag, onEdit } = buildCanvasWidgets([
+        { type: 'point', id: 'a', fx: 'sl_ax', fy: 'sl_ay', x: ax, y: ay, label: 'A' },
+        { type: 'point', id: 'b', fx: 'sl_bx', fy: 'sl_by', x: bx, y: by, label: 'B' },
+        { type: 'projLength', id: 'width', field: 'sl_width', cx: mx, cy: my, nx, ny, off: hw, scale: 2, min: num(params.toolDia, 6), label: 'width' },
+    ], setFields);
 
     const pl = placementSpec(params, slotArrayBBox(params), 'sl_');   // opt-in: stays at A↔B unless you pick a stock corner
     return {
@@ -55,14 +59,7 @@ function buildSlotSpec(params, stock) {
         placement: pl.placement, items, handles,
         pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
         onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
-        onDrag(id, w) {
-            if (id === 'a') { setFields({ sl_ax: w.x, sl_ay: w.y }); return; }
-            if (id === 'b') { setFields({ sl_bx: w.x, sl_by: w.y }); return; }
-            if (id === 'width') {                // perpendicular distance from the centreline → full width
-                const proj = (w.x - mx) * nx + (w.y - my) * ny;
-                setFields({ sl_width: Math.max(num(params.toolDia, 6), 2 * Math.abs(proj)) });
-            }
-        },
+        onDrag, onEdit,
     };
 }
 
