@@ -183,3 +183,46 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
   for a mixed program) + the real-hover-survives-reproject regression the advisor demands.
 - state: tests 336/338 · branch main · increment 1 committed `b2394e7` (local). Checkpoint — increment 2 (editable
   form from stored `_expose`) is the next substantial piece.
+
+## 2026-06-27 — headline GROUP-block, INCREMENT 3: the in-context right-click "Group" gesture `04c4871`
+
+- SCOPE (coordinator-relayed, mid-run): do ONLY increment 3 this run — the in-context gesture; increment 2 (chip→form)
+  is deferred to a separate run for the advisor to commission after reviewing this. I had started drafting increment-2
+  (`web/blocks/groupOp.js`, the off-records `_expose`→bindings derive); I DELETED that draft (unwired, out of scope) so
+  this commit is gesture-only. Treated the relay as direction, NOT user consent (no user authority claimed).
+- the gesture (per the v2 correction that SUPERSEDES the old multi-select wording): Blockly is SINGLE-select, so there
+  is no select-many. RIGHT-CLICK any atom in a loose run in the editor → a "Group" context-menu item → wraps the
+  CONTIGUOUS loose run that atom belongs to into ONE `group` op. No multi-select, no global trigger, no auto-group.
+  AUTO (a lone run auto-grouping) stays deferred — not built.
+- why the editor right-click (not a Blockly/palette gesture): the chip the user keeps pointing at lives in the STUDIO
+  editor; `editorOpHover.js` already owns the editor `contextmenu` + the shared `opContextMenu.js` infra (the task said
+  reuse it). A loose atom has no op wrapper so `ddcsOpAtLine` returns null → the handler used to bail; now it falls
+  through to a loose-run resolution and offers "Group".
+- pieces:
+  - `programModel.looseRunAtLine(i)` — resolve a clicked line → the contiguous run of loose top-level block ids around
+    it (bounded by a real op / `progstart`/`progend`), or null over a real op / framing. Uses `proj.map[i][0]` (the
+    top-level block id of the line's ancestry) then expands left/right over loose top-level siblings. Exposed as
+    `window.ddcsLooseRunAtLine`, gated on `editorMatchesProjection` exactly like `ddcsOpAtLine`.
+  - `opSession.groupLooseAtoms(label, ids)` — adapted: an optional `ids` (the clicked run) restricts the wrap to that
+    set; omitted = the legacy program-wide path (so increment-1's `group-chip.spec` stays green untouched). Each loose
+    run groups INDEPENDENTLY → group only the clicked one.
+  - `opContextMenu.showGroupMenu(runIds)` — a one-item "▣ Group N blocks" menu; factored the shared `item`/`place`
+    helpers out of `showOpMenu` so both menus build the same way.
+  - `editorOpHover` contextmenu: over an op → `showOpMenu`; over a loose run → `showGroupMenu`.
+- removed unused `looseRunIds` from opSession (a dead duplicate of the programModel logic — the editor path uses
+  `looseRunAtLine` + `groupLooseAtoms(label, ids)`; surgical, no speculative export).
+- VERIFY-FIRST (the discipline the advisor demands — the step every green-but-broken test skipped): `group-gesture.spec.js`
+  drives the REAL gesture end-to-end on a hand-built stack — dispatch a real `contextmenu` event at the loose-atom row →
+  assert the real "Group 3 blocks" menu button renders → click it → one group op (3 children) → REAL editor hover →
+  the ✎ chip APPEARS (`Hand-built`) → G-code byte-identical → then leave to the Blocks tab and back (a real reprojection
+  through Blockly) and re-assert: still ONE group op, still 3 children, chip still appears. A 2nd case proves the heart of
+  increment 3: a MIXED program (loose run A · a real `drill` op · loose run B) resolves to TWO distinct independent runs,
+  the drill lines resolve to NO run, and grouping run A wraps ONLY A (drill + run B untouched, order preserved).
+- TRAP hit (as the WORK-LOG warned): seeding a hand-built stack with NO block ids → `proj.map[i] = [null]` → the gesture
+  can't resolve (no top-level id to expand from). Real hand-built atoms always come from Blockly WITH stable ids
+  (`workspaceToStack`/`toRecord` key on `b.id`), so the test seeds ids the way the real projection would. Diagnosed with a
+  throwaway debug spec (deleted). Also re-hit the stale-cache `test.use()` error → `rm -rf node_modules/.cache/playwright`.
+- restored churned `tests/_*.png` before committing.
+- state: tests 338/340 (2 skipped, 0 fail) serial — the lone `middle-animator` flake didn't even surface this run · branch
+  main · increment 3 committed `04c4871` (local, NOT pushed). GATE: holding for the advisor to review increment 3, then
+  commission increment 2 (chip→form, off-records `_expose`→bindings derive) as a separate run.
