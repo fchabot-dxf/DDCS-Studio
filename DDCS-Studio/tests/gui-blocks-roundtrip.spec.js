@@ -18,8 +18,8 @@ test('gui blocks (B): param pills persist in the saved template; instantiate res
     U.createUserOp(U.userOpFromStack('rt_test', 'RT Test', template, bindings));
 
     const def = U.listUserOps().find((d) => d.opType === 'user_rt_test');   // re-read the persisted def
-    const { BUILDERS } = await import('/blocks/opBuilders.js');
-    const built = BUILDERS['user_rt_test']({ depth: -12 });   // instantiate at a non-default value
+    const { builderOf } = await import('/blocks/opBuilders.js');
+    const built = builderOf('user_rt_test')({ depth: -12 });   // instantiate at a non-default value (federated user layer)
 
     const out = {
       tmplZ: def.template[0].params.z,                        // should still be the pill

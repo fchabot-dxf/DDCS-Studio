@@ -40,6 +40,23 @@ export const BUILDERS = {
 };
 // (No bare flag — framing is now Program Start/End BLOCKS in the stack; a snippet just omits them.)
 
+// ── the FEDERATED user layer (MID #6) ───────────────────────────────────────────────────────────────────────
+// BUILDERS above is the PRISTINE built-in layer. USER-authored ops register their builder into USER_BUILDERS, a
+// SEPARATE object, so the built-ins stay forkable/resettable (Stage-6 reset-to-factory = clear the user layer) and
+// a distribution-install can be validated against an isolated layer. Resolve BOTH layers through builderOf();
+// every membership gate (opSession build/commit/replace/duplicate/merge, programModel marker-import, userOpView)
+// and _framed below read it. Precedence is BUILT-IN-FIRST — user opTypes are `user_`-prefixed so the key spaces are
+// disjoint. Pairs with opSchema.js specOf / the USER_SCHEMA layer (the two layers must stay in lockstep per op).
+const USER_BUILDERS = Object.create(null);
+
+/** Resolve an op's stack-builder across the federated layers (built-in pristine layer, then the user layer). */
+export function builderOf(opType) { return BUILDERS[opType] || USER_BUILDERS[opType] || null; }
+
+/** Install a USER op's builder into the user layer (the wizard-maker calls this — see blocks/userOps.js). */
+export function registerUserBuilder(opType, fn) { USER_BUILDERS[opType] = fn; }
+/** Remove a USER op's builder from the user layer. */
+export function unregisterUserBuilder(opType) { delete USER_BUILDERS[opType]; }
+
 // ── op CONTAINERS ───────────────────────────────────────────────────────────────────────────────────────
 // Each accumulated op is wrapped in a { type:'op', opType, label, requires, params, children } container so a
 // loaded program keeps the op RECORD and emit can gate it per post (capable → children; incapable → marker;
@@ -52,6 +69,10 @@ const OP_LABELS = {
     atc_length: 'Tool Length', atc_check: 'Tool Check', atc_warmup: 'Spindle Warmup', atc_change: 'Tool Change', atc_test: 'ATC Test',
     homing: 'Homing',
 };
+// USER-op labels live in their OWN layer (MID #6) so the built-in OP_LABELS table stays PRISTINE — removeOpLabel can
+// never drop a built-in label, and the other three user tables (USER_BUILDERS/USER_SCHEMA/USER_INTENT) are likewise
+// isolated. makeOp resolves built-in-first, then the user layer. (Same federation shape as builderOf/specOf.)
+const USER_LABELS = Object.create(null);
 const VAR_ATOMS = new Set(['assign', 'probe', 'proberead', 'readmachine', 'setworkoffset', 'tooloffset', 'machinemove']);
 const FLOW_ATOMS = new Set(['ifgoto', 'goto', 'label']);
 function scanAtoms(blocks, set) {
@@ -71,21 +92,25 @@ function opRequires(children) {
 let _opSeq = 0;
 export function makeOp(opType, params, children) {
     return {
-        id: `op${++_opSeq}`, type: 'op', opType, label: OP_LABELS[opType] || opType,
+        id: `op${++_opSeq}`, type: 'op', opType, label: OP_LABELS[opType] || USER_LABELS[opType] || opType,
         requires: opRequires(children), params: params ? JSON.parse(JSON.stringify(params)) : {}, children,
     };
 }
 
 /** Register a friendly label for a RUNTIME op (a user-defined op) so makeOp shows it instead of the raw opType.
- *  OP_LABELS is otherwise the static built-in table; the wizard-maker (blocks/userOps.js) calls this on register. */
-export function registerOpLabel(opType, label) { if (opType && label) OP_LABELS[opType] = label; }
+ *  Writes the USER label layer only; the built-in OP_LABELS literal is untouched. The wizard-maker calls this on register. */
+export function registerOpLabel(opType, label) { if (opType && label) USER_LABELS[opType] = label; }
+
+/** Remove a runtime op label (paired with registerOpLabel; deleteUserOp calls it so a deleted user op leaves no stale
+ *  label). Touches the USER layer only — a built-in label can never be dropped, even if called with a built-in opType. */
+export function removeOpLabel(opType) { if (opType) delete USER_LABELS[opType]; }
 
 // Build an op's stack, UNWRAPPING a builder that returns its OWN op container (only homing today) → the bare
 // blocks. Every consumer (wizard commit, marker import, glow/edit rebuild) must agree on the shape: without this,
 // makeOp would wrap homing's container AGAIN (op.children = [{op:homing}]) while the glow/edit checks rebuild the
 // unwrapped atoms — so a fresh homing op would false-glow + falsely read as block-edited.
 export function _framed(opType, params) {
-    let f = BUILDERS[opType](params || {}) || [];
+    let f = builderOf(opType)(params || {}) || [];
     if (f.length === 1 && f[0] && f[0].type === 'op') f = f[0].children || [];
     return f;
 }

@@ -16,7 +16,7 @@ import { parseGcodeToStack } from './gcodeToStack.js';                       // 
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } };
-import { BUILDERS, makeOp, _framed, _builderAtoms } from './opBuilders.js';   // the BUILDERS leaf
+import { builderOf, makeOp, _framed, _builderAtoms } from './opBuilders.js';   // the BUILDERS leaf (federated resolver)
 import { regionParamsFromDesc } from '../wizards/pocketWizard.js';
 import { regionDesc } from '../wizards/ops/region.js';
 import { offsetRegion } from '../wizards/ops/contour.js';
@@ -299,7 +299,7 @@ const sig = (op) => (op ? `${op.type}:${JSON.stringify(op.params)}` : null);
 /** Does the active op have a block stack we can show? */
 export function hasActiveOpStack() {
     const op = getLastOp();
-    return !!(op && BUILDERS[op.type]);
+    return !!(op && builderOf(op.type));
 }
 
 /**
@@ -310,12 +310,12 @@ export function hasActiveOpStack() {
 /** The active op's type if it has NO block builder yet (so the UI can say why it isn't shown), else null. */
 export function unportedActiveOp() {
     const op = getLastOp();
-    return (op && !BUILDERS[op.type]) ? op.type : null;
+    return (op && !builderOf(op.type)) ? op.type : null;
 }
 
 export function buildActiveOpStack() {
     const op = getLastOp(), s = sig(op);
-    if (!op || !BUILDERS[op.type]) { shownOp = null; return null; }
+    if (!op || !builderOf(op.type)) { shownOp = null; return null; }
     shownOp = op.type;                      // remember what the Blocks tab is showing (for reverse sync)
     if (s === loadedSig) return null;       // already loaded → don't clobber block-side edits
     loadedSig = s;
@@ -412,7 +412,7 @@ function appendIntoProgram(bare, framed) {
 
 export function commitActiveOp() {
     const op = getLastOp();
-    if (!op || !BUILDERS[op.type]) return false;
+    if (!op || !builderOf(op.type)) return false;
     const framed = _framed(op.type, op.params);                        // [progstart, …op…, progend] (homing unwrapped)
     const start = framed.find((b) => b && b.type === 'progstart');
     const end = framed.find((b) => b && b.type === 'progend');
@@ -431,7 +431,7 @@ export function replaceOp(opId, params) {
     const idx = cur.findIndex((b) => b && b.type === 'op' && b.id === opId);
     if (idx < 0) return false;
     const opType = cur[idx].opType;
-    if (!BUILDERS[opType]) return false;
+    if (!builderOf(opType)) return false;
     const framed = _framed(opType, params);
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
     const opC = makeOp(opType, params, bare);
@@ -458,7 +458,7 @@ export function duplicateOp(opId) {
     const idx = cur.findIndex((b) => b && b.type === 'op' && b.id === opId);
     if (idx < 0) return false;
     const src = cur[idx];
-    if (!BUILDERS[src.opType]) return false;
+    if (!builderOf(src.opType)) return false;
     const framed = _framed(src.opType, src.params);
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
     const copy = makeOp(src.opType, src.params, bare);                 // fresh id
@@ -508,7 +508,7 @@ const _replayCache = new WeakMap();
 export function replayReconcile(opId) {
     const prog = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
     const op = prog.find((b) => b && b.type === 'op' && b.id === opId);
-    if (!op || !op.opType || !RECONCILERS[op.opType] || !BUILDERS[op.opType]) return null;
+    if (!op || !op.opType || !RECONCILERS[op.opType] || !builderOf(op.opType)) return null;
     if (_replayCache.has(op)) return _replayCache.get(op);
     let fields;
     _replayParams = op.params || {};                                  // stored-state sourcing (wizard closed)
@@ -654,7 +654,7 @@ export function mergeOpBlocks(opId, newParams) {
     const idx = cur.findIndex((b) => b && b.type === 'op' && b.id === opId);
     if (idx < 0) return false;
     const op = cur[idx];
-    if (!op || !op.opType || !BUILDERS[op.opType]) return false;
+    if (!op || !op.opType || !builderOf(op.opType)) return false;
 
     // The user's manually edited blocks
     const editedBlocks = op.children;

@@ -29,19 +29,39 @@ The old planning docs (`NEXT-TASKS`, the vision, `CRAZY-IDEAS`, `FUSION-INTEGRAT
 
 ## ⚑ Reframe worth carrying
 The "wizards-as-data engine" the vision treated as future is mostly **already built**: expressions (`expr.js`),
-loops/control (`count`/`iff`/`array`/`flow`), and raw-emit atoms (`macro.js`) all ship. What remains is **Stages 4–6**
-— express ONE built-in *as data* + assert output-equivalence → port the rest → self-host. See ROADMAP "Key reframe."
+loops/control (`count`/`iff`/`array`/`flow`), and raw-emit atoms (`macro.js`) all ship. **Stage 4 (express ONE built-in
+as data + the equivalence harness) is now done** (drill). What remains is **Stages 5–6** — port the rest (gated on the 3
+frontier format extensions the drill port surfaced) → self-host. See ROADMAP "Key reframe" + STRATEGIC #2/#3.
 
-## ▶ Immediate next task — merge `feat/learner-library`, then the wizards-as-data endgame
-1. **Merge + (optional) release** `feat/learner-library` → `main` (clean fast-forward; redeploys pages.dev). Bump the
-   `.ver` chip in `web/index.html` + push **only** if a new desktop exe/release is wanted (`desktop-release.yml`).
-2. **Then the endgame spine** — ROADMAP "Key reframe": what remains of wizards-as-data is **Stages 4–6**. The live
-   round-trip just made CUSTOM ops first-class editable; the convergence is to make BUILT-INS data too (they'd inherit
-   the same round-trip). Recommended order:
-   - **MID #6 — federated schema registry `[S]`** — a pristine/forkable layer (user specs stop mutating the shared
-     factory object); substrate for self-host + distribution-install validation.
-   - **STRATEGIC #2 — wizards-as-data Stage 4 `[L]`** — express ONE built-in (drill) as a pure data definition + an
-     output-equivalence harness (`emitMapped(interpreter) === drillStack(params)` across a param sweep).
+## ✅ Shipped this session (2026-06-26, UNCOMMITTED in the working tree — `feat/learner-library` already merged to `main`)
+- **MID #6 — Federated schema registry `[S]`** — built-in `BUILDERS`/`SCHEMA` are now PRISTINE; user ops register into
+  separate `USER_BUILDERS`/`USER_SCHEMA`/`USER_LABELS` layers, resolved by `builderOf(op)`/`specOf(op)` (built-in-first;
+  `user_`-prefixed → disjoint). All ~13 `BUILDERS[op]` read-sites + the 4 opSchema helpers route through the resolvers;
+  `USER_LABELS` split fixes the `OP_LABELS`-delete leak (a user-op delete can never drop a built-in label). Adversarially
+  reviewed — audited complete, no missed consumer. `blocks/opSchema.js`, `blocks/opBuilders.js`, `blocks/userOps.js` +
+  `federated-registry.spec.js`.
+- **STRATEGIC #2 — Wizards-as-data Stage 4 `[L]`** — **drill expressed as a `{template, bindings}` data def**
+  (`blocks/dataOps/drillData.js`) consumed by `registerUserOp`/`instantiate` via the federated user layer, + the reusable
+  **equivalence harness** (`blocks/dataOps/equivalence.js`). `drill-as-data.spec.js` proves it BOTH ways: emit-equivalence
+  (byte-identical to `drillStack` across a grid-at-origin/cut/skip/wcs sweep) AND structural binding-wiring (all 21
+  bindings route to the same socket `drillStack` uses). Drill is **~90% data-expressible**; the **3 frontier blockers**
+  are failing-on-purpose tripwires: **(2, primary) live bbox** (`placeOnStock`'s frozen snapshot ≠ a moved pattern bbox),
+  **(1) method swap** (helical→bore child-type), **(3) clearance fan-out** (1 param → 2 sockets).
+- Full suite **310 green** (added `federated-registry.spec` + `drill-as-data.spec`; gui-blocks-roundtrip updated to the
+  resolver API). NOT yet committed — awaiting the go-ahead (no `.ver` bump → no desktop release).
+
+## ▶ Immediate next task — Stage 5 (port more built-ins), gated on the 3 frontier extensions
+1. **(optional) Commit + release** this session's work. Bump the `.ver` chip in `web/index.html` + push only if a desktop
+   exe/release is wanted (`desktop-release.yml`); the web app redeploys to pages.dev on push regardless.
+2. **STRATEGIC #5/#3 → Stage 5** — port the next built-in to data, reusing `dataOps/equivalence.js` (emit-equivalence +
+   binding-wiring). **The drill port sharpened the frontier into 3 concrete format extensions Stage 5 must grow** (now in
+   ROADMAP STRATEGIC #3): **(a) computed/derived bindings OR a live-bbox `placeOnStock`** — the *primary* blocker; the
+   baked bbox snapshot is incompatible with parametric data-defs and affects EVERY placed op; **(b) conditional
+   block-TYPE** (drill↔bore, probe IF-GOTO families); **(c) one-param-→-many-sockets** fan-out. A **leaf op with no
+   placement + static shape** (e.g. a WCS-set or a single fixed-method op) is the cleanest NEXT port to prove the harness
+   on a 2nd op before tackling a placement extension.
+3. **Then STRATEGIC #4 — Stage 6 self-host** (gated on Stage 5 + the now-shipped federated registry): built-ins become
+   forkable; a `resetToFactory` re-registers shipped defs by clearing the `USER_*` layers.
 
 *Loose ends (optional):* round-trip **step 5** — a referential-integrity guard when a removed knobbed block is
 referenced elsewhere (the corner `#1→#7/#8` case); edge-casey, deferred. More learner-library **curation** (the real
@@ -253,3 +273,6 @@ this session.
 - **Valid by construction** — `BUILDERS(op.params) == op.children`; GUI param pills resolve to numbers in `instantiate` so committed ops stay clean.
 - **GUI over fields** — default to a visual/canvas picker, not a text field.
 - **Verify the real symptom at runtime** — a green emit ≠ a working app; reproduce the user's exact symptom in the right viewport.
+- **One stack, many presentations (transparency axis)** — atom → **op** (opaque: header+knobs, for *doing*) → **snippet** (transparent: bare atoms, for *learning*) → **program** (framed, complete) → **wizard** (parameterized + form). Same IR, different fold × parameterization — windows on one truth, not different kinds of thing. A new presentation (learner library) is a *view*, not new machinery.
+- **Decompose where STORED, never where COMPUTED** — an op header wraps real *stored* child blocks → divides losslessly; **toolpath atoms** (`bore/contour/drill/line/slot`) + an **`array`'s repetition** *compute* their output → exploding bakes the formula into dead moves (irreversible, severs recalc); a **probe** is stored-but-*safety-critical* (read-safe, edit-guarded). Fold-floor = wherever authored structure ends. ⇒ snippets/programs are *authored*, never auto-exploded.
+- **Declare edits, don't infer them** — record the edit on the Blockly change event (`opEdits.js` → `.mjson`), never re-derive (`reconcile→BUILDERS→diff`) and diff against live (re-derivation IS inference → false-positives on round-trip drift). Companion: the live form↔block round-trip writes **surgically** to the bound socket, **never regenerates** — the form is a *pure view* of the blocks (blocks = the one truth). "Like the Matrix."

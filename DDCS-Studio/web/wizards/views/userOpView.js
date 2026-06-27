@@ -11,7 +11,7 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { renderOpForm } from '../../ui/formWidgets.js';
 import { recordOp } from '../../blocks/opRecord.js';
-import { BUILDERS } from '../../blocks/opBuilders.js';
+import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
 import { panelType, renderLayout2D } from '../ops/panelTypes.js';
 
@@ -65,12 +65,12 @@ export const userOpView = {
 
     update(mgr) {
         _mgr = mgr;
-        if (!_def || !BUILDERS[_def.opType]) return;
+        if (!_def || !builderOf(_def.opType)) return;
         const params = {};
         for (const read of _readers) { try { Object.assign(params, read()); } catch (_) { /* skip a broken widget */ } }
         recordOp(_def.opType, params);                       // make it the active op → shared insert() commits/replaces it
         let gcode = '';
-        try { gcode = emitMapped(BUILDERS[_def.opType](params)).text; }
+        try { gcode = emitMapped(builderOf(_def.opType)(params)).text; }
         catch (e) { gcode = '( error generating: ' + ((e && e.message) || e) + ' )'; }
         const codeEl = el('wiz_user_code');
         if (codeEl) codeEl.innerHTML = UIUtils.formatGCode(gcode);

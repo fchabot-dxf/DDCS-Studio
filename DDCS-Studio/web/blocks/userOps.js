@@ -1,20 +1,22 @@
 /**
  * blocks/userOps.js — runtime registry for USER-DEFINED ops (the wizard-maker, "fork-the-5%-delta").
  *
- * A user op = a saved block-stack TEMPLATE + numeric param BINDINGS. `registerUserOp(def)` installs it live:
- *   - BUILDERS[def.opType] = (params) => instantiate the template, substituting each binding's value at its path,
- *   - SCHEMA[def.opType]   = { param → { type, field } } so the form, validator + marker codec recognise it,
- *   - a friendly label (via opBuilders.registerOpLabel).
+ * A user op = a saved block-stack TEMPLATE + numeric param BINDINGS. `registerUserOp(def)` installs it live into
+ * the FEDERATED user layer (MID #6) — the built-in BUILDERS/SCHEMA stay pristine/forkable:
+ *   - registerUserBuilder(opType, params => instantiate(template, …)) — the user builder layer (builderOf resolves it),
+ *   - registerUserSpec(opType, { param → { type, field } }) — the user spec layer (specOf resolves it) so the form,
+ *     validator + marker codec recognise it,
+ *   - a friendly label (via opBuilders.registerOpLabel; deleteUserOp clears it via removeOpLabel).
  * The op is then a first-class COMPLIANT op everywhere — build / commit / replace / marker round-trip / glow /
- * merge all gate on BUILDERS[opType] / SCHEMA[opType] and Just Work.
+ * merge all gate on builderOf(opType) / specOf(opType) and Just Work.
  *
  * "Valid by construction": the template IS `BUILDERS(defaults)`, so `BUILDERS(op.params) == op.children` holds —
  * a fresh user op never false-glows and satisfies the params-completeness guard automatically.
  *
  * Persisted in localStorage (`ddcs_user_ops`); `loadUserOps()` re-registers all at app start. v1 = number params.
  */
-import { BUILDERS, registerOpLabel } from './opBuilders.js';
-import { SCHEMA } from './opSchema.js';
+import { registerUserBuilder, unregisterUserBuilder, registerOpLabel, removeOpLabel } from './opBuilders.js';
+import { registerUserSpec, unregisterUserSpec } from './opSchema.js';
 import { setUserSimIntent } from '../viz/opSimContext.js';
 
 const STORE_KEY = 'ddcs_user_ops';
@@ -203,15 +205,15 @@ export function validateUserOp(def) {
     return errs;
 }
 
-/** Install a user-op def into the LIVE BUILDERS + SCHEMA + label registries (runtime only — no persistence). */
+/** Install a user-op def into the LIVE user-layer builder + spec + label registries (runtime only — no persistence). */
 export function registerUserOp(def) {
     const errs = validateUserOp(def);
     if (errs.length) throw new Error('invalid user op: ' + errs.join('; '));
-    BUILDERS[def.opType] = (params) => instantiate(def, params || defaultParams(def));
+    registerUserBuilder(def.opType, (params) => instantiate(def, params || defaultParams(def)));
     const schema = {};
     // canon omitted: the param name is already a clean marker key (canonOf falls back to the key). field drives the form.
     for (const b of def.bindings) schema[b.param] = { type: b.type, addr: null, field: `uop_${def.opType}_${b.param}` };
-    SCHEMA[def.opType] = schema;
+    registerUserSpec(def.opType, schema);
     registerOpLabel(def.opType, def.label || def.opType);
     setUserSimIntent(def.opType, def.sim || null);   // DECLARED preview intent only (never inferred from motion)
     return def;
@@ -234,7 +236,7 @@ export function createUserOp(def) {
     if (errs.length) throw new Error('invalid user op: ' + errs.join('; '));
     const defs = readStore();
     if (defs.some((d) => d.opType === def.opType)) throw new Error(`user op "${def.opType}" already exists`);
-    registerUserOp(def);                                         // only now mutate the live BUILDERS/SCHEMA/labels
+    registerUserOp(def);                                         // only now install into the live user-layer builder/spec/label
     defs.push(def);
     writeStore(defs);
     return def;
@@ -248,17 +250,18 @@ export function updateUserOp(def) {
     const defs = readStore();
     const i = defs.findIndex((d) => d.opType === def.opType);
     if (i < 0) return createUserOp(def);
-    registerUserOp(def);            // overwrite the live BUILDERS/SCHEMA/label
+    registerUserOp(def);            // overwrite the live user-layer builder/spec/label
     defs[i] = def;
     writeStore(defs);
     return def;
 }
 
-/** Remove a user op from the registry + persistence (and the live BUILDERS/SCHEMA entries). */
+/** Remove a user op from the registry + persistence (and the live user-layer builder/spec/label entries). */
 export function deleteUserOp(opType) {
     writeStore(readStore().filter((d) => d.opType !== opType));
-    delete BUILDERS[opType];
-    delete SCHEMA[opType];
+    unregisterUserBuilder(opType);
+    unregisterUserSpec(opType);
+    removeOpLabel(opType);            // register touches 4 tables — delete must clear all 4 (was leaking OP_LABELS)
     setUserSimIntent(opType, null);   // clear the declared preview intent
 }
 

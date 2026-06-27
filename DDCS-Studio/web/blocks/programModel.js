@@ -12,7 +12,7 @@
 import { emitMapped } from './blockEmitter.js';
 import { reconcileGcodeToStack, parseGcodeToStack } from './gcodeToStack.js';
 import { markerLine, isMarker, parseMarker } from './opSchema.js';
-import { BUILDERS, makeOp, _builderAtoms } from './opBuilders.js';   // codec: rebuild ops from markers (declare, never infer)
+import { builderOf, makeOp, _builderAtoms } from './opBuilders.js';   // codec: rebuild ops from markers (declare, never infer)
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
@@ -72,7 +72,7 @@ export function serializeWithMarkers() {
 /** Reconstruct an op container from a declared marker record. Forward-only: BUILDERS rebuilds the body from
  *  the declared params (we trust the declaration; verify-vs-motion + overrides are the B4 override-diff). */
 export function opFromMarker(opType, params) {
-    if (!BUILDERS[opType]) return null;
+    if (!builderOf(opType)) return null;
     return makeOp(opType, params, _builderAtoms(opType, params));   // _builderAtoms unwraps a self-wrapping builder (homing)
 }
 

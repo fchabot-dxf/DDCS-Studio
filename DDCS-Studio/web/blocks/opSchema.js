@@ -172,18 +172,36 @@ for (const op in FIELD_BIND) for (const k in FIELD_BIND[op]) {
     else BIND_ORPHANS.push(`${op}.${k}`);
 }
 
-/** The { param → form-field id } binding for an op, derived from SCHEMA — the replacement for PARAM_FIELDS. */
+// ── the FEDERATED user layer (MID #6) ───────────────────────────────────────────────────────────────────────
+// SCHEMA above is the PRISTINE built-in layer — the FIELD_BIND fold attaches `.field` to it at load, and nothing
+// else mutates it. USER-authored ops register their spec into USER_SCHEMA, a SEPARATE object, so the built-ins
+// stay forkable/resettable and a distribution-install can be validated against an isolated layer. Read both
+// layers through specOf(); the helpers below (paramFields/canonOf/revCanon/validate) all resolve via specOf so a
+// user op gets its form binding, marker canon + validation. Precedence is BUILT-IN-FIRST — user opTypes are
+// `user_`-prefixed (USER_OP_PREFIX), so the key spaces are disjoint and precedence is academic today; Stage-6
+// forking (a user op OVERRIDING a built-in key) would flip it to user-first.
+const USER_SCHEMA = Object.create(null);
+
+/** Resolve an op's param-spec across the federated layers (built-in pristine layer, then the user layer). */
+export function specOf(opType) { return SCHEMA[opType] || USER_SCHEMA[opType] || null; }
+
+/** Install a USER op's spec into the user layer (the wizard-maker calls this — see blocks/userOps.js). */
+export function registerUserSpec(opType, spec) { USER_SCHEMA[opType] = spec; }
+/** Remove a USER op's spec from the user layer. */
+export function unregisterUserSpec(opType) { delete USER_SCHEMA[opType]; }
+
+/** The { param → form-field id } binding for an op, derived from its spec — the replacement for PARAM_FIELDS. */
 export function paramFields(opType) {
-    const spec = SCHEMA[opType] || {}, out = {};
+    const spec = specOf(opType) || {}, out = {};
     for (const k in spec) if (spec[k].field) out[k] = spec[k].field;
     return out;
 }
 
 // ── marker codec (op record <-> ( @DDCS:v {…} ) comment), mapping internal keys <-> canon names ──
 const escParens = (s) => s.replace(/\(/g, '\\u0028').replace(/\)/g, '\\u0029');   // keep payload paren-free
-const canonOf = (opType, key) => (SCHEMA[opType] && SCHEMA[opType][key] && SCHEMA[opType][key].canon) || key;
+const canonOf = (opType, key) => { const s = specOf(opType); return (s && s[key] && s[key].canon) || key; };
 function revCanon(opType) {                          // marker (canon) key -> internal param key
-    const spec = SCHEMA[opType] || {}, m = {};
+    const spec = specOf(opType) || {}, m = {};
     for (const key in spec) m[spec[key].canon || key] = key;
     return m;
 }
@@ -212,7 +230,7 @@ export function parseMarker(line) {
 
 /** Validate an op record against the schema → warning strings ([] = clean, or op not catalogued). */
 export function validate(opType, params) {
-    const spec = SCHEMA[opType];
+    const spec = specOf(opType);
     if (!spec) return [];
     const w = [];
     for (const k in (params || {})) {

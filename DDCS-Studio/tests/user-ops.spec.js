@@ -12,8 +12,8 @@ test('userOps: a runtime user op is fully compliant (build / round-trip / valida
 
   const r = await page.evaluate(async () => {
     const U = await import('/blocks/userOps.js');
-    const { BUILDERS, _builderAtoms } = await import('/blocks/opBuilders.js');
-    const { SCHEMA, paramFields, markerLine, parseMarker, validate } = await import('/blocks/opSchema.js');
+    const { builderOf, _builderAtoms } = await import('/blocks/opBuilders.js');
+    const { specOf, paramFields, markerLine, parseMarker, validate } = await import('/blocks/opSchema.js');
     const { opFromMarker } = await import('/blocks/programModel.js');
 
     // Fork a 2-atom stack, expose two numeric values as params (the dev-panel output).
@@ -33,12 +33,16 @@ test('userOps: a runtime user op is fully compliant (build / round-trip / valida
 
     return {
       opType: t,
-      registered: typeof BUILDERS[t] === 'function',
+      registered: typeof builderOf(t) === 'function',
+      // MID #6 pristine-layer invariant: the user op resolves via builderOf/specOf but does NOT pollute the raw
+      // built-in BUILDERS/SCHEMA objects (they stay forkable/resettable).
+      notInBuiltinBuilders: typeof (await import('/blocks/opBuilders.js')).BUILDERS[t] === 'undefined',
+      notInBuiltinSchema: typeof (await import('/blocks/opSchema.js')).SCHEMA[t] === 'undefined',
       template: def.template,
-      builtDefaults: BUILDERS[t](defaults),                  // == template (params-completeness)
-      builtCustom: BUILDERS[t](custom),                      // substitutes the bound values
+      builtDefaults: builderOf(t)(defaults),                 // == template (params-completeness)
+      builtCustom: builderOf(t)(custom),                     // substitutes the bound values
       glowBaseline: _builderAtoms(t, defaults),              // the glow's clean rebuild == template (no false glow)
-      schemaKeys: Object.keys(SCHEMA[t] || {}),
+      schemaKeys: Object.keys(specOf(t) || {}),
       fields: paramFields(t),
       validateClean: validate(t, custom),
       roundTrip: parseMarker(markerLine(t, custom)),
@@ -47,7 +51,10 @@ test('userOps: a runtime user op is fully compliant (build / round-trip / valida
   });
 
   const j = (x) => JSON.stringify(x);
-  expect(r.registered, 'BUILDERS got the user op').toBe(true);
+  expect(r.registered, 'builderOf resolves the user op').toBe(true);
+  // MID #6: the built-in registries stay PRISTINE — the user op lives only in the user layer (resolved by builderOf/specOf).
+  expect(r.notInBuiltinBuilders, 'user op did NOT mutate the built-in BUILDERS object').toBe(true);
+  expect(r.notInBuiltinSchema, 'user op did NOT mutate the built-in SCHEMA object').toBe(true);
   // Valid by construction: BUILDERS(defaults) and the glow baseline both reproduce the template exactly.
   expect(j(r.builtDefaults), 'BUILDERS(defaults) == template').toBe(j(r.template));
   expect(j(r.glowBaseline), 'glow baseline == template (no false glow)').toBe(j(r.template));
@@ -74,7 +81,7 @@ test('userOps: create / list / load (re-register) / delete persistence round-tri
 
   const r = await page.evaluate(async () => {
     const U = await import('/blocks/userOps.js');
-    const { BUILDERS } = await import('/blocks/opBuilders.js');
+    const { builderOf, unregisterUserBuilder } = await import('/blocks/opBuilders.js');
     localStorage.removeItem('ddcs_user_ops');                 // clean slate
 
     const def = U.userOpFromStack('persist_test', 'Persist Test',
@@ -82,18 +89,18 @@ test('userOps: create / list / load (re-register) / delete persistence round-tri
       [{ param: 'depth', blockIndex: 0, key: 'z', type: 'number', default: -2 }]);
 
     U.createUserOp(def);
-    const afterCreate = { count: U.listUserOps().length, registered: typeof BUILDERS[def.opType] === 'function' };
+    const afterCreate = { count: U.listUserOps().length, registered: typeof builderOf(def.opType) === 'function' };
 
-    // Simulate an app reload: drop the live builder, then loadUserOps() must re-register it from localStorage.
-    delete BUILDERS[def.opType];
+    // Simulate an app reload: drop the live builder from the user layer, then loadUserOps() must re-register it from localStorage.
+    unregisterUserBuilder(def.opType);
     const reloaded = U.loadUserOps();
-    const afterLoad = { reRegistered: typeof BUILDERS[def.opType] === 'function', count: reloaded };
+    const afterLoad = { reRegistered: typeof builderOf(def.opType) === 'function', count: reloaded };
 
     let dupThrew = false;
     try { U.createUserOp(def); } catch (_) { dupThrew = true; }   // duplicate opType rejected
 
     U.deleteUserOp(def.opType);
-    const afterDelete = { count: U.listUserOps().length, registered: typeof BUILDERS[def.opType] === 'function' };
+    const afterDelete = { count: U.listUserOps().length, registered: typeof builderOf(def.opType) === 'function' };
 
     localStorage.removeItem('ddcs_user_ops');                 // don't leak
     return { afterCreate, afterLoad, dupThrew, afterDelete };
