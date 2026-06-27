@@ -154,6 +154,7 @@ async function handleDash(request, env) {
     app:     `SELECT blob4 AS app, SUM(_sample_interval) AS n FROM ddcs_events WHERE blob1 IN ('visit','app_launch') ${devF} AND ${since} GROUP BY app ORDER BY n DESC`,
     version: `SELECT blob5 AS version, blob4 AS app, SUM(_sample_interval) AS n FROM ddcs_events WHERE blob1 IN ('visit','app_launch') ${devF} AND ${since} GROUP BY version, app ORDER BY n DESC LIMIT 25`,
     byCountryPeriod: `SELECT toStartOfInterval(timestamp, ${perInterval}) AS period, blob3 AS country, SUM(_sample_interval) AS visits FROM ddcs_events WHERE blob1 = 'visit' ${devF} AND ${since} GROUP BY period, country ORDER BY period`,
+    recentVisits: `SELECT toStartOfInterval(timestamp, INTERVAL '1' SECOND) AS ts, blob3 AS country, blob7 AS city, blob8 AS region, blob4 AS app, blob5 AS ver FROM ddcs_events WHERE blob1 = 'visit' ${devF} AND ${since} ORDER BY ts DESC LIMIT 200`,
   };
 
   const keys = Object.keys(Q);
@@ -210,6 +211,15 @@ function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myI
   const cpByPeriod = {};
   (data.byCountryPeriod || []).forEach((r) => { (cpByPeriod[r.period] = cpByPeriod[r.period] || []).push(r); });
   const cpPeriods = Object.keys(cpByPeriod).sort().reverse();
+  // Individual visits — one row per visit event (timestamp to the second, no IP).
+  const visits = data.recentVisits || [];
+  const visitsList = visits.length
+    ? `<div style="max-height:420px;overflow:auto"><table><tr><th>time (UTC)</th><th>place</th><th>app</th><th>version</th></tr>${visits.map((v) => {
+        const place = [v.city, v.region && v.region !== v.city ? v.region : '', countryName(v.country)].filter(Boolean).join(', ');
+        return `<tr><td style="white-space:nowrap">${esc(String(v.ts).slice(5, 19))}</td><td>${esc(place || '—')}</td><td>${esc(v.app || '—')}</td><td>${esc(v.ver || '—')}</td></tr>`;
+      }).join('')}</table></div>`
+    : '<span class="sub">no visits in range</span>';
+
   const cpList = cpPeriods.length
     ? `<div style="max-height:340px;overflow:auto"><table><tr><th>${per === 'week' ? 'week of' : 'day'}</th><th>countries</th><th>total</th></tr>${cpPeriods.map((p) => {
         const items = cpByPeriod[p].slice().sort((a, b) => (Number(b.visits) || 0) - (Number(a.visits) || 0));
@@ -287,6 +297,7 @@ function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myI
       <a class="${per === 'day' ? 'on' : ''}" href="${perLink('day')}">day</a><a class="${per === 'week' ? 'on' : ''}" href="${perLink('week')}">week</a>
     </div>
     ${cpList}</div>
+  <div class="card full"><h2>Individual visits · latest ${visits.length} (UTC)</h2>${visitsList}</div>
   <div class="card"><h2>Top countries</h2><canvas id="c_country"></canvas></div>
   <div class="card"><h2>Web vs exe</h2><canvas id="c_app"></canvas></div>
   <div class="card full"><h2>Top features used</h2><canvas id="c_feature"></canvas></div>
