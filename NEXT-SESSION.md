@@ -56,13 +56,22 @@ frontier format extensions the drill port surfaced) → self-host. See ROADMAP "
   placement}.js`, `blocks/blockEmitter.js`, `blocks/dataOps/drillData.js`, `drill-as-data.spec.js`.
 - Full suite **311 green serial** (parallel runner flakes ~5 UI specs under load — pass in isolation/serial).
 
-## ▶ Immediate next task — migrate the next placement ops, then the deep (conditional-structure) frontier
-1. **(optional) Commit + release** the uncommitted placement-bbox fix. Bump the `.ver` chip in `web/index.html` + push
-   only if a desktop exe/release is wanted; the web app redeploys to pages.dev on push regardless.
-2. **Migrate `surfacing` + `contour`** — give each its geometry atom an `extent(params)` (their `surfacingBBox`/`contourBBox`
-   functions already exist — lift them onto the atom), then port each to a `{template,bindings}` data def + prove
-   emit-equivalence (now reachable since placement is live). They're blocked by NOTHING ELSE → become fully portable.
-   Then `slot`/`text`. ONE op at a time, each gated — never batch.
+## ⚠️ CORRECTION — `surfacing`/`contour` are NOT clean next ports (the coverage map over-rated them)
+Investigated surfacing for the next migration; it CAN'T be a data-def even with the placement-bbox fix: its geometry
+`w`/`h` are NESTED in `stepover.params.region` (the flat `(blockIndex,key)` binding can't reach `region.w`), `so` is
+COMPUTED (`toolDia·stepoverPct/100`), `strategy` is MAPPED, and `originX`/`clearance` FAN OUT. So a surfacing data-def
+can't vary the footprint → the placement fix is undemonstrable there. `contour` is the same. **`drill` was the only
+cleanly-portable placement op; `atc_warmup` the only clean leaf.** The `liveFootprint` opt-in mechanism (declared
+`extent` + a per-op flag so shared atoms like `stepover` don't regress pocket) is DESIGNED and proven on drill, but
+landing it for surfacing was a NO-OP (footprint can't vary) so it was reverted — land it only after binding works.
+
+## ▶ Immediate next task — the data-def FORMAT extensions (no more easy ports)
+1. **(optional) commit/release** — the working tree is clean (drill fix already on `origin/main`); nothing to push unless
+   you also want the doc corrections (this file + ROADMAP STRATEGIC #3) published.
+2. **Build the binding-feasibility extensions** (the real Stage-5/6 lift — unblocks surfacing/contour AND the probe/ATC
+   family, NOT a per-op grind): (i) **nested-path binding** (`key:'region.w'` reaches a param inside a child/reporter);
+   (ii) **computed/derived bindings** (`so = f(toolDia, stepoverPct)`); (iii) **fan-out** (one param → many sockets).
+   Pick ONE, add it to `instantiate`/`extractParamBlocks` + the equivalence harness, then re-attempt surfacing.
 3. **Then the DEEP frontier — conditional STRUCTURE + computed ADDRESS** (gates the probe/ATC/comm/homing family, ~13 ops):
    rewrite an op's JS branches/loops/arithmetic into block-IR `iff`/`count`/`expr`/`assign` atoms so its stack is
    static-shape + the data-def can carry it. This is the real Stage-5/6 lift.
