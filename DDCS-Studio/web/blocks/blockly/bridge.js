@@ -44,7 +44,16 @@ const SELECTS = {
     state: ['on', 'off'],
     pattern: ['grid', 'line', 'circle', 'rect'],   // array (drill/bore) hole pattern
     ramp: ['step', 'helix'],                         // bore stepdown
-    side: ['outside', 'inside', 'on']                // contour/profile cutter side
+    side: ['outside', 'inside', 'on'],               // contour/profile cutter side
+    // Enum atom fields that were free TEXT — a one-letter typo silently mis-emits (e.g. coolant 'mist'→'mis'→M9).
+    // Registering them here makes them dropdowns: valid by construction, the bad state is unrepresentable.
+    dir: ['cw', 'ccw'],                              // spindle / Program Start spin direction (M3 / M4)
+    flow: ['flood', 'mist', 'off'],                  // coolant (M8 / M7 / M9)
+    arc: ['ccw', 'cw'],                              // arc move direction (G3 / G2)
+    end: ['M30', 'M2', 'M99'],                       // program end (M30 reset / M2 end / M99 subprogram return)
+    direction: ['bothways', 'oneway', 'otherway'],   // fill / step-over scan direction
+    order: ['outside-in', 'inside-out'],             // concentric-fill ring order
+    strategy: ['parallel', 'concentric'],            // step-over pass strategy
 };
 const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/[^a-z0-9]+/g, '');   // slug = alphanumerics only (so "Spindle & Feed" → spindlefeed, "Wizard UI" → wizardui)
 export const FN = (field) => field.toUpperCase();   // Blockly input/field name from an op field
