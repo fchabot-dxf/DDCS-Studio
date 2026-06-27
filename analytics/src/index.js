@@ -101,6 +101,12 @@ export default {
 
 const clampInt = (v, def, lo, hi) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : def; };
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let _REGION;   // ISO-3166 alpha-2 → full country name (server-side; falls back to the code)
+function countryName(code) {
+  const c = String(code || '').toUpperCase();
+  if (c.length !== 2) return String(code || '—');
+  try { if (_REGION === undefined) _REGION = new Intl.DisplayNames(['en'], { type: 'region' }); return (_REGION && _REGION.of(c)) || c; } catch { return c; }
+}
 
 async function aeQuery(env, sql) {
   const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${env.ACCOUNT_ID}/analytics_engine/sql`, {
@@ -208,7 +214,7 @@ function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myI
     ? `<div style="max-height:340px;overflow:auto"><table><tr><th>${per === 'week' ? 'week of' : 'day'}</th><th>countries</th><th>total</th></tr>${cpPeriods.map((p) => {
         const items = cpByPeriod[p].slice().sort((a, b) => (Number(b.visits) || 0) - (Number(a.visits) || 0));
         const tot = items.reduce((s, r) => s + (Number(r.visits) || 0), 0);
-        const cells = items.map((r) => `${esc(r.country || '—')} <b>${Number(r.visits) || 0}</b>`).join('   ·   ');
+        const cells = items.map((r) => `${esc(countryName(r.country) || '—')} <b>${Number(r.visits) || 0}</b>`).join('   ·   ');
         return `<tr><td>${esc(String(p).slice(5, 10))}</td><td>${cells}</td><td>${tot}</td></tr>`;
       }).join('')}</table></div>`
     : '<span class="sub">no data</span>';
@@ -309,7 +315,9 @@ function bar(id, rows, labelKey, valKey, color) {
   new Chart(el, { type: 'line', data: { labels: rows.map(r => fmt(r.day)), datasets: [{ data: rows.map(r => num(r.visits)), borderColor: '#1f6feb', backgroundColor: 'rgba(31,111,235,.2)', fill: true, tension: .25, pointRadius: 2 }] }, options: baseOpts });
 })();
 
-bar('c_country', D.country, 'country', 'visits', '#2ea043');
+const RN = (() => { try { return new Intl.DisplayNames(['en'], { type: 'region' }); } catch { return null; } })();
+const cname = (c) => { const s = String(c || '').toUpperCase(); if (s.length !== 2) return String(c || ''); try { return (RN && RN.of(s)) || c; } catch { return c; } };
+bar('c_country', (D.country || []).map(r => ({ country: cname(r.country), visits: r.visits })), 'country', 'visits', '#2ea043');
 bar('c_feature', D.feature, 'feature', 'uses', '#a371f7');
 
 (function () {
