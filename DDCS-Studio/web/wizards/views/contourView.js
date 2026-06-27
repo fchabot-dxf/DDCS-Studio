@@ -2,6 +2,7 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { ContourWizard, contourBBox } from '../contourWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
+import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams } from '../ops/placement.js';
 import { regionDesc } from '../ops/region.js';
@@ -41,23 +42,31 @@ function regionParams(params) {
  *  handle + a size handle. The offset contour comes from contourRegion so it matches the emitted G-code exactly. */
 function buildContourSpec(params, stock) {
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
-    const items = [], paths = [], handles = [{ id: 'origin', x: ox, y: oy, kind: 'move', label: 'pos' }];
+    const items = [], paths = [];
+    // DECLARE the handles via reusable gestures (same shape vocabulary as pocket): pos = `point`; the size handle is a
+    // `rect` corner (rect/ellipse — ellipse drags a half-extent, divisor 0.5) or a radius-only `radial` (circle/polygon).
+    const decls = [{ type: 'point', id: 'origin', fx: 'ct_originX', fy: 'ct_originY', x: ox, y: oy, label: 'pos' }];
 
     if (params.shape === 'circle') {
         const R = num(params.dia, 50) / 2;
         items.push({ kind: 'circle', cx: ox, cy: oy, r: R });
-        handles.push({ id: 'size', x: ox + R, y: oy, kind: 'size', label: 'Ø' });
+        decls.push({ type: 'radial', id: 'size', field: 'ct_dia', cx: ox, cy: oy, r: R, a: 0, rScale: 2, minR: 1, label: 'Ø' });
     } else if (params.shape === 'polygon' || params.shape === 'ellipse') {
         // No SVG primitive for polygon/ellipse — draw the TRUE boundary ring from the region kernel's contour.
         const brg = regionDesc(regionParams(params));
         const ring = (brg.contour && brg.contour[0]) || [];
         if (ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((p) => ({ x: p.x, y: p.y })), cls: 'fc-guide' });
-        if (params.shape === 'polygon') { const R = num(params.dia, 50) / 2; handles.push({ id: 'size', x: ox + R, y: oy, kind: 'size', label: 'Ø' }); }
-        else { const rx = num(params.w, 80) / 2, ry = num(params.h, 60) / 2; handles.push({ id: 'size', x: ox + rx, y: oy + ry, kind: 'size', label: 'W × H' }); }
+        if (params.shape === 'polygon') {
+            const R = num(params.dia, 50) / 2;
+            decls.push({ type: 'radial', id: 'size', field: 'ct_dia', cx: ox, cy: oy, r: R, a: 0, rScale: 2, minR: 1, label: 'Ø' });
+        } else {
+            const rx = num(params.w, 80) / 2, ry = num(params.h, 60) / 2;
+            decls.push({ type: 'rect', id: 'size', field: 'ct_w', fieldH: 'ct_h', ax: ox, ay: oy, ex: rx, ey: ry, sx: 0.5, sy: 0.5, minw: 1, minh: 1, label: 'W × H' });
+        }
     } else {
         const w = num(params.w, 80), h = num(params.h, 60);
         items.push({ kind: 'rect', x: ox, y: oy, w, h });
-        handles.push({ id: 'size', x: ox + w, y: oy + h, kind: 'size', label: 'W × H' });
+        decls.push({ type: 'rect', id: 'size', field: 'ct_w', fieldH: 'ct_h', ax: ox, ay: oy, ex: w, ey: h, sx: 1, sy: 1, minw: 1, minh: 1, label: 'W × H' });
     }
 
     // The OFFSET toolpath (tool-centre contour) — drawn as a closed polyline guide so 2D matches what's cut.
@@ -67,19 +76,14 @@ function buildContourSpec(params, stock) {
         paths.push({ pts: [...ring, ring[0]].map((p) => ({ x: p.x, y: p.y })), cls: 'fc-path' });
     }
 
+    const { handles, onDrag, onEdit } = buildCanvasWidgets(decls, setFields);
     const pl = placementSpec(params, contourBBox(params), 'ct_');
     return {
         stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
         placement: pl.placement, items, paths, handles,
         pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
         onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
-        onDrag(id, w) {
-            if (id === 'origin') { setFields({ ct_originX: w.x, ct_originY: w.y }); return; }
-            if (params.shape === 'circle') setFields({ ct_dia: Math.max(1, 2 * Math.hypot(w.x - ox, w.y - oy)) });
-            else if (params.shape === 'polygon') setFields({ ct_dia: Math.max(1, 2 * Math.hypot(w.x - ox, w.y - oy)) });
-            else if (params.shape === 'ellipse') setFields({ ct_w: Math.max(1, 2 * (w.x - ox)), ct_h: Math.max(1, 2 * (w.y - oy)) });
-            else setFields({ ct_w: Math.max(1, w.x - ox), ct_h: Math.max(1, w.y - oy) });
-        },
+        onDrag, onEdit,
     };
 }
 
