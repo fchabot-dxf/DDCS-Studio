@@ -106,3 +106,33 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
   advisor. I do not touch ROADMAP.md or NEXT-SESSION.md.
 - state: tests 334/336 · branch main · next per NEXT-SESSION = Stage 3 CONTINUE (more declarable gestures,
   pulled by a real authoring need) · awaiting the go to execute.
+
+## 2026-06-27 — HEADLINE task: verified the no-chip symptom on a hand-built stack + design-fork proposal (AT THE GATE)
+
+- read the advisor's new orders: `a59a9ee` (#12 PASS + nested-DO follow-up) and `9a1a47d` (the user's HEADLINE
+  task — the editor edit-CHIP on a hand-built stack — + Gap #13). The unifying goal behind #11/#12/#13: the
+  floating "✎"/"⚠" edit chip the user gets on a built-in op's G-code, they want ON the stacks they build by hand.
+- did (verify-first, temp trace deleted): a bare hand-built stack `[move,spindle,move]` (`hasOpBlock:false`) →
+  editor shows the G-code → `ddcsOpAtLine` resolves NONE of the lines (`opAtLineHits:[]`) → real editor hover
+  produces NO chip (`chip.appeared:false`). Root cause confirmed: no `'op'` wrapper → `opAtLine` null → no chip
+  (same root as #11's builder-less path).
+- **DESIGN FORK (advisor-GATED — proposing, NOT building; the advisor said "do NOT just build it"):**
+  - **A — auto-wrap (mutate the program model):** loose-atom runs become real `'op'` blocks on projection → chip
+    appears with zero clicks. CON: reverses #12's no-mutation win the advisor PASSED; boundary ambiguity in a
+    mixed program (a drill op + hand-added moves — where do the moves' op boundaries fall?); no natural op name.
+  - **B — one-click "make editable" (explicit in-place wrap, NO wizard-bar registration):** user wraps the stack
+    as a named editable op; reuses the ENTIRE op-edit pipeline (chip→`openForEdit`→form→`replaceOp` all free once
+    it's a real op). CON: one deliberate click; user names/scopes it — a PRO for mixed programs.
+  - **C — synthetic op at the chip layer (no model mutation):** `opAtLine` returns a synthetic editable op for a
+    loose run; chip "just appears"; form derives via #12's `authoringBody`. CON: `openForEdit` + the form→stack
+    apply must be reworked for a NON-program op (`replaceOp` finds it by id → would fail); most implementation work.
+- **WORKER RECOMMENDATION → B.** Best value/effort: it reuses all existing op-edit machinery (the advisor's
+  "chip→form mostly free" only holds once it's a REAL op — A and C don't get that for free), gives boundary+name
+  control (essential for mixed programs), stays lightweight (in-place, no bar registration). If "zero-click / just
+  hover" is a HARD requirement, C is the no-mutation way to get it (higher cost); A is cheap but reverses #12.
+- **PREREQUISITE flag → #13 FIRST (blocks the value of ALL three).** The knob exposure (`EXPOSE_`/`PNAME_`/`WIDGET_`
+  dev fields) doesn't survive a reproject (`devMode.js:16` — not in `fieldsOf(def)` → `stackBridge.toRecord` drops
+  them) → the edit form opens EMPTY regardless of wrap approach. Fix = serialize exposure into `block.data` (which
+  round-trips, `stackBridge.js:101`/`:218`). Until #13, the chip would open a useless empty form.
+- state: tests 334/336 · branch main · **GATE: holding for the advisor's pick on the wrap fork** before building.
+  Not pushing. (Note: the `0fafda2…44b1542` work IS pushed; only the WORK-LOG commits are local.)
