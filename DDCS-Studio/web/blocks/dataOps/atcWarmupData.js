@@ -8,14 +8,17 @@
  * comment, message, spindle, dwell, spindle-off, message, label, endprogram]. The 4 params map to plain scalar
  * sockets: rpm1→stage-1 spindle.rpm, time1→stage-1 dwell.sec, rpm2→stage-2 spindle.rpm, time2→stage-2 dwell.sec.
  *
- * THE NEW FRONTIER this port surfaces — COMPUTED ANNOTATION TEXT (cosmetic, distinct from drill's FUNCTIONAL blockers):
- * the builder interpolates the params into comment + operator-message TEXT (`( Stage 1: 6000 RPM for 30s )`,
- * `#1505=-5000(Starting at 6000 RPM)`), which a static template FREEZES at author-time. But this is COSMETIC — it
- * changes no machine behavior (a frozen comment/HMI-toast moves no axis, the spindle/dwell EXECUTABLE tokens are
- * correctly bound). So the spec proves the def is FUNCTIONALLY equivalent (emitEquivalence with stripAnnotations) and
- * documents the raw-text divergence as a tripwire. Contrast drill frontier #2 (frozen bbox → WRONG toolpath = functional).
- * ⇒ Stage-5 taxonomy: frozen DERIVED values split into FUNCTIONAL (placement/method/conditional-shape — must solve)
- *   and COSMETIC (annotation text — a simple "comment interpolation" template feature, or just accept frozen text).
+ * THE FRONTIER this port surfaced — COMPUTED ANNOTATION TEXT — is now CLOSED for this op (was: the builder interpolated
+ * params into comment + operator-message TEXT — `( Stage 1: 6000 RPM for 30s )`, `#1505=…(Starting at 6000 RPM)` — that a
+ * static template FROZE at author-time, so a forked 8000-RPM warmup would TELL THE OPERATOR "6000 RPM" — a stale message,
+ * a lie at the machine, NOT a mere cosmetic nit). FIXED at the SOURCE (north-star directive 1): the wizard's annotation
+ * text is now STATIC — the rpm/time are the single source of truth in the executable Spindle/Dwell atoms, never duplicated
+ * into prose (principle #4). The def is now BYTE-IDENTICAL to atcWarmupStack (no stripAnnotations), matching drill's standard.
+ * ⇒ Stage-5 taxonomy: frozen DERIVED values split into FUNCTIONAL (placement/method/conditional-shape — must solve) and
+ *   ANNOTATION TEXT. The latter splits again: VALUE-FREE messages → make them static (this op); VALUE-BEARING messages an
+ *   operator reads before acting (e.g. a probe "Probing 50mm — press Enter") → a future GENERAL annotation-text atom that
+ *   renders text from a BOUND param (like Spindle renders M3 S<rpm>), built when an op FORCES it — NOT speculatively. As
+ *   each op is ported, classify its messages droppable (static) vs value-bearing (needs the atom). See NEXT-SESSION.
  *
  * The template is SEEDED from atcWarmupStack(ATC_WARMUP_DEFAULTS) (== the canonical valid-by-construction default
  * stack); the hand-authored BINDINGS map is the independent artifact, proven by the structural binding-wiring check.

@@ -25,16 +25,20 @@ export function atcWarmupStack(params = {}) {
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
     const END = () => S.push(newBlock('endprogram'));
 
+    // Annotation text is STATIC (no param interpolation): the rpm/time are the single source of truth in the
+    // executable Spindle (M3 S<rpm>) + Dwell (G04 P<ms>) atoms below. Duplicating them into prose would let a
+    // forked/data-def warmup (rpm bound to a new value) emit a STALE operator message — a lie at the machine.
+    // Keeping them static makes the wizards-as-data port byte-identical with a dumb data-def (no text templating).
     C('Spindle Warm-up');
-    C(`Stage 1: ${rpm1} RPM for ${time1}s`);
-    C(`Stage 2: ${rpm2} RPM for ${time2}s`);
+    C('Stage 1: spin up + dwell');
+    C('Stage 2: spin up + dwell');
     CF('Warm up spindle? Press Enter', 999);
     SPOFF(); COOLOFF();                       // stop spindle & coolant first
     C('Stage 1');
-    MSG(`Starting at ${rpm1} RPM`);
+    MSG('Starting stage 1');
     SP(rpm1); DW(time1);
     C('Stage 2');
-    MSG(`Ramping to ${rpm2} RPM`);
+    MSG('Ramping to stage 2');
     SP(rpm2); DW(time2);
     SPOFF();
     MSG('Warmup complete - spindle ready');
