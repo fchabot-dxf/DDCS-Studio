@@ -59,17 +59,32 @@ function isAtom(blk) {
 // buildBindings groups them via groupCanvasBindings (a repeated role starts a new canvas).
 const WIDGET_CHOICES = [['#', 'number'], ['slider', 'slider'], ...CANVAS_ROLE_WIDGETS];
 
+// The authoring BODY for the live form / save: the op's children when there's an op wrapper, else the BARE top-level
+// atom stack (a program hand-built directly in Blocks — #12: a hand-built stack is form-editable too). Returns
+// { opRec, children, first } or null; `first` is the live Blockly block the bindings' pre-order indexes align to (the
+// op's DO-chain head, or the bare chain head). A bare stack gets a synthetic opType-less opRec so the rest is uniform.
+function authoringBody(ws) {
+    const stack = workspaceToStack(ws);
+    const opRec = stack.find((b) => b && b.type === 'op');
+    if (opRec && (opRec.children || []).length) {
+        const opBlk = ws.getAllBlocks().find((b) => b.type === 'op' || b.type.endsWith('_op'));
+        const doIn = opBlk && opBlk.getInput('DO');
+        return { opRec, children: opRec.children, first: (doIn && doIn.connection && doIn.connection.targetBlock()) || null };
+    }
+    const children = stack.filter((b) => b && b.type !== 'op' && !String(b.type || '').endsWith('_op') && b.type !== 'progstart' && b.type !== 'progend');
+    if (!children.length) return null;                                                     // empty workspace → nothing to author
+    const first = ws.getTopBlocks(true).find((b) => isAtom(b)) || null;                    // a bare stack = one connected chain head
+    return { opRec: { type: 'op', opType: null, params: {}, children }, children, first };
+}
+
 // Read the ticked exposures off the LIVE workspace → { opRec, exposures, varErr }. opRec is the active op (live
 // params); exposures are { param, blockIndex, key, default, widget } in pre-order; varErr names the first exposed
 // field that has a #var/expression plugged in (not a plain number) so the caller can refuse.
 function collectAuthoring(ws) {
-    const stack = workspaceToStack(ws);
-    const opRec = stack.find((b) => b && b.type === 'op');
-    if (!opRec || !(opRec.children || []).length) return null;
-    const flat = flattenBlocks(opRec.children);
-    const opBlk = ws.getAllBlocks().find((b) => b.type === 'op' || b.type.endsWith('_op'));
-    const doIn = opBlk && opBlk.getInput('DO');
-    const first = doIn && doIn.connection && doIn.connection.targetBlock();
+    const body = authoringBody(ws);
+    if (!body) return null;
+    const { opRec, children, first } = body;
+    const flat = flattenBlocks(children);
     const atomBlocks = first ? preorderAtoms(first) : [];                                  // aligns index-for-index with flat
     const exposures = [], used = new Set();
     let varErr = null;
@@ -153,10 +168,8 @@ export function writeAuthoredValue(ws, param, value) {
     const def = deriveAuthoredDef(ws);
     const b = def && def.bindings.find((x) => x.param === param);
     if (!b || b.blockIndex == null || b.key == null) return false;
-    const opBlk = ws.getAllBlocks().find((x) => x.type === 'op' || (x.type && x.type.endsWith('_op')));
-    const doIn = opBlk && opBlk.getInput('DO');
-    const first = doIn && doIn.connection && doIn.connection.targetBlock();
-    const blk = (first ? preorderAtoms(first) : [])[b.blockIndex];
+    const body = authoringBody(ws);                                                        // op DO-chain OR a bare stack head
+    const blk = (body && body.first ? preorderAtoms(body.first) : [])[b.blockIndex];
     const sock = blk && blk.getInput(FN(b.key));
     const tgt = sock && sock.connection && sock.connection.targetBlock();
     if (!tgt) return false;

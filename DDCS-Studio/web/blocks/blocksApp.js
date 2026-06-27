@@ -323,10 +323,13 @@ async function buildWorkspace() {
   function renderLiveForm() {
     const pane = document.getElementById('blk-formpane'), formHost = document.getElementById('blk-form');
     if (!pane || !formHost) return;
-    if (!editingWizardType()) { pane.hidden = true; formHost.innerHTML = ''; formHost.__sig = null; return; }
     let def = null;
     try { def = deriveAuthoredDef(ws); } catch (_) { /* a mid-edit derive can throw; keep the last good form */ return; }
-    if (!def) { pane.hidden = true; return; }
+    // Show the live form while EDITING a saved wizard, OR whenever the current stack EXPOSES knobs — so a hand-built
+    // stack (bare atoms or an inserted op, never saved) is form-editable too (#12). No knobs + not editing → nothing
+    // to show. (deriveAuthoredDef now derives a bare top-level atom stack via authoringBody, not just an op wrapper.)
+    const show = def && (editingWizardType() || (def.bindings && def.bindings.length));
+    if (!show) { pane.hidden = true; formHost.innerHTML = ''; formHost.__sig = null; return; }
     pane.hidden = false;
     const sig = formSig(def.bindings);
     if (formHost.__sig === sig && formHost.querySelector('[data-param]')) {        // structure unchanged → value-sync only
