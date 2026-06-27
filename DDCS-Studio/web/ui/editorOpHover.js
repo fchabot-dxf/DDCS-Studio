@@ -88,8 +88,33 @@ export function initEditorOpHover() {
 
     editor.addEventListener('mousemove', (e) => {
         if (typeof window.ddcsOpAtLine !== 'function') return;
-        const op = window.ddcsOpAtLine(lineAtY(e.clientY));
-        if (!op) { if (hoverOpId) hide(); return; }
+        const line = lineAtY(e.clientY);
+        const op = window.ddcsOpAtLine(line);
+        if (!op) {
+            // AUTO (advisor-gated): a PURE hand-built stack (whole program = one loose run, no real ops) auto-shows an
+            // editable chip with NO gesture. No mutation on render — the chip just appears; clicking it WRAPS the run
+            // in a group op (groupLooseAtoms) then opens the inc-2 form. A mixed program returns null here (the
+            // right-click "Group" gesture owns those), so the auto-chip never shows over a mixed program.
+            const run = (typeof window.ddcsAutoGroupRunAtLine === 'function') ? window.ddcsAutoGroupRunAtLine(line) : null;
+            if (run && run.length) {
+                if (hoverOpId === '__autorun__') return;        // already showing it → don't thrash
+                hoverOpId = '__autorun__';
+                clearHi();
+                const lines = (window.ddcsLinesForRun && window.ddcsLinesForRun(run)) || [];
+                lines.forEach((j) => { const s = overlay.querySelector(`.g-line[data-line-index="${j}"]`); if (s) s.classList.add('op-hover'); });
+                const first = lines.length ? lines[0] : 0;
+                chip.textContent = '✎ Hand-built';
+                chip.disabled = false;
+                chip.title = 'Edit this hand-built stack as a form';
+                chip.style.top = Math.max(2, Math.round(first * lineHeight() + padTop() - editor.scrollTop)) + 'px';
+                chip.dataset.opId = '';                          // no op yet — the wrap happens on click
+                chip.dataset.autoRun = JSON.stringify(run);
+                chip.hidden = false;
+                return;
+            }
+            if (hoverOpId) hide();
+            return;
+        }
         if (op.id === hoverOpId) return;            // unchanged → don't thrash
         hoverOpId = op.id;
         clearHi();
@@ -104,11 +129,25 @@ export function initEditorOpHover() {
         // Chip floats on the LEFT of the editor (left: 12px in CSS) — clear of the right-side 3D preview
         // drawer / view-cube gizmo, so it's always reachable (the "out of reach" report).
         chip.dataset.opId = op.id;
+        chip.dataset.autoRun = '';                  // a real op chip, not the auto-run chip
         chip.hidden = false;
     });
     // Keep the chip visible when the pointer moves onto it; hide otherwise.
     editor.addEventListener('mouseleave', () => setTimeout(() => { if (!chip.matches(':hover')) hide(); }, 60));
-    chip.addEventListener('click', () => { const id = chip.dataset.opId; hide(); if (id && window.ddcsEditOp) window.ddcsEditOp(id); });
+    chip.addEventListener('click', async () => {
+        const id = chip.dataset.opId;
+        let autoRun = null; try { autoRun = chip.dataset.autoRun ? JSON.parse(chip.dataset.autoRun) : null; } catch (_) { /* */ }
+        hide();
+        if (id && window.ddcsEditOp) { window.ddcsEditOp(id); return; }
+        // AUTO: wrap the lone loose run into a group op (explicit on the edit click, not on render), then open its form.
+        if (autoRun && autoRun.length) {
+            try {
+                const { groupLooseAtoms } = await import('../blocks/opSession.js');
+                const gid = groupLooseAtoms('Hand-built', autoRun);
+                if (gid && window.ddcsEditOp) window.ddcsEditOp(gid);
+            } catch (_) { /* */ }
+        }
+    });
     editor.addEventListener('scroll', () => { if (!chip.hidden) hide(); });   // avoid drift; re-hover to show again
 
     // Right-click an op → shared context menu (✎ Edit / ⧉ Duplicate / 🗑 Delete). Over a LOOSE hand-built run
