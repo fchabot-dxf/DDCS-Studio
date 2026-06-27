@@ -136,3 +136,25 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
   round-trips, `stackBridge.js:101`/`:218`). Until #13, the chip would open a useless empty form.
 - state: tests 334/336 · branch main · **GATE: holding for the advisor's pick on the wrap fork** before building.
   Not pushing. (Note: the `0fafda2…44b1542` work IS pushed; only the WORK-LOG commits are local.)
+
+## 2026-06-27 — advisor RESOLVED the fork (group block) + cleared to build; #13 (knob persistence) DONE `0233c72`
+
+- advisor verdict (`5e6cc6d`): the editable-unit boundary = a **simple GROUP block** (C-shaped, op-like but
+  unnamed/un-registered) the user drops around the atoms. Beats my pure-C synthetic op: declare-not-infer
+  boundary, REUSES the op machinery (chip/form/edit free, NO `replaceOp` rework), round-trips. Zero-click where
+  unambiguous; wrap-in-a-group to carve a boundary in a mixed program. Order: **#13 FIRST**, then the group block.
+- did (#13, verify-first): reproduced expose→reproject→reset — ticked a knob (`EXPOSE_MODE=TRUE`, name `myknob`,
+  binding present) → left Blocks + returned → `EXPOSE_=FALSE`, name reset, bindings `[]` (form gone). Then fixed
+  + a regression that REPROJECTS between expose and assert (the step every green-but-incomplete #12 test missed).
+- why this design (reserved `_expose` in block.data, OUT of params):
+  - **Couldn't ride params** — `recToJson:217` excludes OBJECT-valued params from `extra`, so an object exposure
+    blob in params is silently dropped on the next round-trip. Forced the clean record-level `_expose` path.
+  - Mirrors `augmentRegionPick`'s existing "spec rides block.data" pattern (precedent), but routed out of params
+    so it never pollutes the op's params / emitted G-code (the advisor's stated invariant).
+  - capture = a change listener on EXPOSE/PNAME/WIDGET edits → `saveExpose` (block.data); restore = `restoreExpose`
+    in `augment` when a (re)built block first grows its expose row (idempotent → runs once per rebuild, no clobber).
+- tried/abandoned: riding the existing block.data→params merge (toRecord:101) — rejected because (a) object params
+  don't survive recToJson, (b) it would pollute params. The record-level `_expose` is the only clean round-trip.
+- state: tests 335/337 · branch main · #13 committed `0233c72` (local, unpushed). NEXT (cleared): the GROUP-block
+  wrap-as-op core — implementation sub-choice (reuse op infra w/ generic opType vs a new `group` block type that
+  `findOpInStack` also matches); verify-first = drive the REAL editor hover on a grouped hand-built stack → chip.
