@@ -158,3 +158,28 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
 - state: tests 335/337 · branch main · #13 committed `0233c72` (local, unpushed). NEXT (cleared): the GROUP-block
   wrap-as-op core — implementation sub-choice (reuse op infra w/ generic opType vs a new `group` block type that
   `findOpInStack` also matches); verify-first = drive the REAL editor hover on a grouped hand-built stack → chip.
+
+## 2026-06-27 — headline GROUP-block, INCREMENT 1: wrap → chip appears `b2394e7` (advisor PASSED #13 `4e6a569`)
+
+- chose **reuse-op-infra** over a new block type (the advisor delegated the sub-choice): `makeOp('group', {}, loose)`
+  yields a real `type==='op'` block → `findOpInStack`/`opAtLine` (which already match `'op'`) resolve it with ZERO
+  matcher edits; a new `group` block type would force edits to every `type==='op'` site. The group's children ARE the
+  loose atoms → emit walks them = byte-identical G-code, and NO builder is needed (builderOf is only used to REBUILD
+  from params; a stored op emits its children).
+- did: `opSession.groupLooseAtoms(label)` — wraps the program's loose top-level atoms (skipping real ops + framing)
+  into one `group` op at the first loose slot. Verified by a REAL editor hover (`group-chip.spec.js`): before = loose,
+  `opAtLine` resolves nothing, no chip; after wrap = one group op (3 children), `opAtLine` resolves the lines → chip
+  APPEARS (`🔒 Hand-built`), G-code byte-identical. Full suite 336 green (the new opType broke nothing).
+- KNOWN GAP (increment-2 scope, by design): the chip is **disabled** (`🔒`) because `canEditOp('group')` is false.
+  No UI trigger exists for `groupLooseAtoms` yet → no user can make a group op → the locked chip is NOT exposed (safe
+  intermediate). 
+- **INCREMENT 2 plan (chip → form):** (a) `wizardManager.canEdit('group')`→true + `open()` routes `'group'`→`userOpView`
+  (like `user_*`); (b) `openForEdit` for the group derives its def from the op's STORED children — NOT the live ws —
+  reading each child's `block.data._expose` (persisted by #13) to rebuild bindings (a new derive path: stored-children
+  → bindings, the analogue of `collectAuthoring` but off records). (c) form→writeback to the group's children.
+  ⚠ The form-derive can't reuse `deriveAuthoredDef(ws)` verbatim (that reads workspace EXPOSE_ fields); it must read
+  `_expose` off the stored children — this is exactly why #13 (persist exposure) was the prerequisite.
+- **INCREMENT 3:** a UI trigger (zero-click auto-group a pure hand-built stack where unambiguous; a one-click "group"
+  for a mixed program) + the real-hover-survives-reproject regression the advisor demands.
+- state: tests 336/338 · branch main · increment 1 committed `b2394e7` (local). Checkpoint — increment 2 (editable
+  form from stored `_expose`) is the next substantial piece.
