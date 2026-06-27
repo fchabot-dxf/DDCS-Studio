@@ -192,7 +192,25 @@ declarable gesture.** Two parts:
    [[gui-blocks-roundtrip-target]], [[spatial-gui-form-vs-canvas]]. Files: `web/wizards/ops/panelTypes.js`,
    `web/blocks/userOps.js`, `web/blocks/devMode.js`.
 
-## ▶ Form-editability of custom & hand-built ops (★ strategy session 2026-06-27 — the user's HEADLINE goal)
+## ▶ Form-editability of custom & hand-built ops (★ the user's HEADLINE goal — BOTH gaps RESOLVED 2026-06-27)
+**✅ Status: both gaps handled (verify-first).**
+- **① Custom-op hover-Edit chip (Gap #11) — VERIFIED NOT REPRODUCIBLE + regression test (`e3f1afe`).** Drove the EXACT
+  repro (Save-as-wizard fork "Tool Length" `atc_length` → insert → hover) at runtime: the chip APPEARS (`✎ Tool Length
+  Copy`); `builderOf` defined, `commitActiveOp` true, commits AS an `'op'` block. The hypothesised builder-less mechanism
+  CAN'T fire — "probe/ATC = builder-less" is a STALE comment; every built-in has a builder now (`less: []`), and forking
+  registers one. The user's dead op is a LEGACY localStorage def (older builder-less build) OR the older DEPLOYED build
+  (the fixing commits are LOCAL until pushed — **the push is the actual fix for the live-site case**). `custom-op-chip.spec.js`
+  locks the working behavior. Defensive "wrap builder-less as op" NOT added (nothing to wrap; revisit if a legacy def surfaces one).
+- **② FORM [LIVE] for a fresh hand-built stack (Gap #12) — FIXED (`a22d252`).** Verified the symptom + Gate-5 op-wrapper
+  dependency first, then: `authoringBody(ws)` derives a BARE atom chain (not just an op wrapper) so collectAuthoring/
+  writeAuthoredValue work hand-built; the guard widened to show when the stack exposes knobs (not just while editing a saved
+  wizard). `hand-built-form.spec.js` (bare stack + knob → form shows + writes back; no-knob → hidden). Suite 334 green.
+
+**⚠ PUSH PENDING:** all session commits are LOCAL — the harness auto-mode classifier blocked `git push origin main`
+(bypasses PR + triggers the Cloudflare deploy). The user must `git push origin main` (clean fast-forward) — that ships the
+canvas-widget Stage 2/3 work AND, per #11 above, fixes the deployed-build case if their dead op was the older-build symptom.
+
+*(Original strategy-session diagnosis below, kept for reference.)*
 The user wants **any custom op / hand-built block stack editable via a FORM** (north-star "one stack, many views"). Two concrete gaps surfaced — both VERIFIED against code (not yet run); same goal at two surfaces:
 
 - **① Custom-op hover-Edit chip is DEAD in the Studio editor** *(= ROADMAP Gaps #11; USER-CONFIRMED).* Make a custom wizard → insert → hover its G-code in the editor → **NO ✎ Edit chip**; the "custom wiz → hover → Edit" loop is dead. Every gate reads wired (`canEdit(user_*)`=true, `openForEdit`→`userOpView`, `commitActiveOp` uses `builderOf`, `recordOp` on open, `findOpInStack` op-agnostic) → break is RUNTIME. **By elimination:** `wizardManager.insert()` runs `commitActiveOp() || commitDecodedCode(code)`; if `commitActiveOp()` returns **false** for a fresh custom op, the fallback decodes raw atoms with **no `'op'` wrapper** → `findOpInStack` finds no op → no chip. **Decisive 1-run trace:** log `commitActiveOp()`'s return (+ `getLastOp()`) for a just-opened custom op; false → make custom ops commit AS an `'op'` block. Files: `wizardManager.js`, `blocks/opSession.js`, `wizards/views/userOpView.js`, `blocks/programModel.js`, `ui/editorOpHover.js`.
