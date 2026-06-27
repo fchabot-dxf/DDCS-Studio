@@ -137,6 +137,8 @@ async function handleDash(request, env) {
   const fromReq = url.searchParams.get('from') || '2026-06-21';
   const from = /^\d{4}-\d{2}-\d{2}$/.test(fromReq) ? fromReq : '2026-06-21';
   const since = `timestamp > NOW() - INTERVAL '${days}' DAY AND timestamp >= toDateTime('${from} 00:00:00')`;
+  const per = url.searchParams.get('per') === 'week' ? 'week' : 'day';        // bucket size for "by country, per period"
+  const perInterval = per === 'week' ? "INTERVAL '7' DAY" : "INTERVAL '1' DAY";
 
   const Q = {
     total:   `SELECT SUM(_sample_interval) AS visits FROM ddcs_events WHERE blob1 = 'visit' ${devF} AND ${since}`,
@@ -145,6 +147,7 @@ async function handleDash(request, env) {
     feature: `SELECT blob2 AS feature, SUM(_sample_interval) AS uses FROM ddcs_events WHERE blob1 = 'feature' ${devF} AND ${since} GROUP BY feature ORDER BY uses DESC LIMIT 20`,
     app:     `SELECT blob4 AS app, SUM(_sample_interval) AS n FROM ddcs_events WHERE blob1 IN ('visit','app_launch') ${devF} AND ${since} GROUP BY app ORDER BY n DESC`,
     version: `SELECT blob5 AS version, blob4 AS app, SUM(_sample_interval) AS n FROM ddcs_events WHERE blob1 IN ('visit','app_launch') ${devF} AND ${since} GROUP BY version, app ORDER BY n DESC LIMIT 25`,
+    byCountryPeriod: `SELECT toStartOfInterval(timestamp, ${perInterval}) AS period, blob3 AS country, SUM(_sample_interval) AS visits FROM ddcs_events WHERE blob1 = 'visit' ${devF} AND ${since} GROUP BY period, country ORDER BY period`,
   };
 
   const keys = Object.keys(Q);
@@ -164,7 +167,7 @@ async function handleDash(request, env) {
   }
   const tagged = !!myIp && devIps.includes(myIp);
 
-  return new Response(renderDash({ data, errors, sql: Q, days, showDev, key, search: url.search, devIps, myIp, tagged, from }), {
+  return new Response(renderDash({ data, errors, sql: Q, days, showDev, key, search: url.search, devIps, myIp, tagged, from, per }), {
     headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
   });
 }
@@ -187,10 +190,11 @@ async function handleDashAction(request, env, url, key) {
   return Response.redirect(`${url.origin}${url.pathname}${url.search}`, 303);
 }
 
-function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myIp, tagged, from }) {
+function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myIp, tagged, from, per }) {
   const total = Number((data.total && data.total[0] && data.total[0].visits) || 0);
   const k = encodeURIComponent(key);
-  const link = (d, dev) => `/dash?key=${k}&days=${d}&dev=${dev ? 1 : 0}`;
+  const link = (d, dev) => `/dash?key=${k}&days=${d}&dev=${dev ? 1 : 0}&from=${esc(from)}&per=${per}`;
+  const perLink = (p) => `/dash?key=${k}&days=${days}&dev=${showDev ? 1 : 0}&from=${esc(from)}&per=${p}`;
   const rangeBtn = (d) => `<a class="${d === days ? 'on' : ''}" href="${link(d, showDev)}">${d}d</a>`;
   const errCount = Object.keys(errors).length;
   const payload = JSON.stringify({ data, errors }).replace(/</g, '\\u003c');
@@ -259,6 +263,11 @@ function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myI
 <main>
   <div class="card"><h2>Visits (${days}d)</h2><div class="big">${total.toLocaleString()}</div><div class="sub">event = visit · ${showDev ? 'all traffic' : 'excludes dev'}</div></div>
   <div class="card full"><h2>Visits per day</h2><canvas id="c_day"></canvas></div>
+  <div class="card full"><h2>Visits by country · per ${per}</h2>
+    <div class="controls" style="margin:0 0 10px">
+      <a class="${per === 'day' ? 'on' : ''}" href="${perLink('day')}">day</a><a class="${per === 'week' ? 'on' : ''}" href="${perLink('week')}">week</a>
+    </div>
+    <canvas id="c_cp"></canvas></div>
   <div class="card"><h2>Top countries</h2><canvas id="c_country"></canvas></div>
   <div class="card"><h2>Web vs exe</h2><canvas id="c_app"></canvas></div>
   <div class="card full"><h2>Top features used</h2><canvas id="c_feature"></canvas></div>
@@ -293,6 +302,24 @@ bar('c_feature', D.feature, 'feature', 'uses', '#a371f7');
 (function () {
   const el = document.getElementById('c_app'); const rows = D.app; if (!el || !rows) return;
   new Chart(el, { type: 'doughnut', data: { labels: rows.map(r => String(r.app || '—')), datasets: [{ data: rows.map(r => num(r.n)), backgroundColor: ['#1f6feb', '#e3a008', '#2ea043', '#a371f7'] }] }, options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e6edf3' } } } } });
+})();
+
+// visits by country, per period — stacked bar (one stack per country)
+(function () {
+  const el = document.getElementById('c_cp'); const rows = D.byCountryPeriod; if (!el || !rows || !rows.length) return;
+  const periods = [...new Set(rows.map(r => r.period))].sort();
+  const countries = [...new Set(rows.map(r => String(r.country || '—')))];
+  const pos = {}; periods.forEach((p, i) => { pos[p] = i; });
+  const PAL = ['#1f6feb', '#2ea043', '#a371f7', '#e3a008', '#db61a2', '#3fb950', '#f0883e', '#58a6ff', '#bc8cff', '#56d364', '#e3b341', '#ff7b72', '#79c0ff', '#d2a8ff'];
+  const fmtP = (p) => { try { return new Date(p).toISOString().slice(5, 10); } catch { return String(p); } };
+  const datasets = countries.map((c, ci) => {
+    const arr = new Array(periods.length).fill(0);
+    rows.forEach(r => { if (String(r.country || '—') === c) arr[pos[r.period]] = num(r.visits); });
+    return { label: c, data: arr, backgroundColor: PAL[ci % PAL.length] };
+  });
+  new Chart(el, { type: 'bar', data: { labels: periods.map(fmtP), datasets }, options: {
+    responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e6edf3', boxWidth: 10, font: { size: 10 } } } },
+    scales: { x: { stacked: true, grid: { color: GRID }, ticks: { color: TXT } }, y: { stacked: true, grid: { color: GRID }, ticks: { color: TXT }, beginAtZero: true } } } });
 })();
 
 (function () {
