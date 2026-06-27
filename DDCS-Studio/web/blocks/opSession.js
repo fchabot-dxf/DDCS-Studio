@@ -17,6 +17,7 @@ import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } };
 import { builderOf, makeOp, _framed, _builderAtoms } from './opBuilders.js';   // the BUILDERS leaf (federated resolver)
+import { flattenBlocks } from './userOps.js';   // ONE pre-order walk shared with devMode (group writeback indexes it)
 import { regionParamsFromDesc } from '../wizards/pocketWizard.js';
 import { regionDesc } from '../wizards/ops/region.js';
 import { offsetRegion } from '../wizards/ops/contour.js';
@@ -497,6 +498,28 @@ export function groupLooseAtoms(label, ids) {
     }
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
     return op.id;
+}
+
+/**
+ * Increment 2 — write a GROUP's form edits back into its STORED children. `edits` = [{ blockIndex, key, value }],
+ * where blockIndex indexes flattenBlocks(group.children) — the SAME pre-order deriveGroupDef's bindings use. A group
+ * has NO builder (its children ARE the program), so we mutate the bound child params IN PLACE (surgical — the form is
+ * a pure view, never a regenerate) on a COPY, then reload with the same op id so identity/selection stay stable.
+ * Returns false if `groupId` isn't a top-level group op.
+ */
+export function setGroupChildParams(groupId, edits) {
+    const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+    const idx = cur.findIndex((b) => b && b.type === 'op' && b.opType === 'group' && b.id === groupId);
+    if (idx < 0) return false;
+    const grp = JSON.parse(JSON.stringify(cur[idx]));                  // copy so we never mutate the live model in place
+    const flat = flattenBlocks(grp.children);
+    for (const e of (edits || [])) {
+        const rec = flat[e && e.blockIndex];
+        if (rec && rec.params && e.key != null) rec.params[e.key] = e.value;
+    }
+    const next = [...cur.slice(0, idx), grp, ...cur.slice(idx + 1)];
+    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
+    return true;
 }
 
 /**

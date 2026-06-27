@@ -13,7 +13,22 @@ import { renderOpForm } from '../../ui/formWidgets.js';
 import { recordOp } from '../../blocks/opRecord.js';
 import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
+import { flattenBlocks } from '../../blocks/userOps.js';   // group: index the stored children for the live preview
 import { panelType, renderLayout2D } from '../ops/panelTypes.js';
+
+// Apply the form values to a COPY of a group's stored children (via the bindings' blockIndex/key) → the records emit
+// walks for the live code preview. A group has no builder; its children ARE the program. The real writeback to the
+// program happens on insert (applyGroupEdits → opSession.setGroupChildParams) — this copy is preview-only.
+function applyGroupParams(def, params) {
+    const copy = JSON.parse(JSON.stringify((def && def.children) || []));
+    const flat = flattenBlocks(copy);
+    for (const b of ((def && def.bindings) || [])) {
+        if (b.blockIndex == null || b.key == null || !(b.param in params)) continue;
+        const rec = flat[b.blockIndex];
+        if (rec && rec.params) rec.params[b.key] = params[b.param];
+    }
+    return copy;
+}
 
 let _def = null;          // the active custom-op def (template + bindings + panel)
 let _seed = null;         // params to seed the widgets with (edit), or null (defaults)
@@ -65,13 +80,21 @@ export const userOpView = {
 
     update(mgr) {
         _mgr = mgr;
-        if (!_def || !builderOf(_def.opType)) return;
+        if (!_def) return;
+        const isGroup = _def.opType === 'group';
+        if (!isGroup && !builderOf(_def.opType)) return;
         const params = {};
         for (const read of _readers) { try { Object.assign(params, read()); } catch (_) { /* skip a broken widget */ } }
-        recordOp(_def.opType, params);                       // make it the active op → shared insert() commits/replaces it
         let gcode = '';
-        try { gcode = emitMapped(builderOf(_def.opType)(params)).text; }
-        catch (e) { gcode = '( error generating: ' + ((e && e.message) || e) + ' )'; }
+        if (isGroup) {
+            // group: no builder — emit the stored children with the form values applied (a pure view, no recordOp).
+            try { gcode = emitMapped(applyGroupParams(_def, params)).text; }
+            catch (e) { gcode = '( error generating: ' + ((e && e.message) || e) + ' )'; }
+        } else {
+            recordOp(_def.opType, params);                   // make it the active op → shared insert() commits/replaces it
+            try { gcode = emitMapped(builderOf(_def.opType)(params)).text; }
+            catch (e) { gcode = '( error generating: ' + ((e && e.message) || e) + ' )'; }
+        }
         const codeEl = el('wiz_user_code');
         if (codeEl) codeEl.innerHTML = UIUtils.formatGCode(gcode);
         // preview per panel type: 3D toolpath, a 2D stock layout, or nothing (form-only)
@@ -84,4 +107,18 @@ export const userOpView = {
 
     // EDIT seeding (manager._seedForm): show the op's params in the widgets, then update() re-reads them.
     setForm(params) { _seed = params || {}; render(); },
+
+    // Increment 2 — INSERT for a group: read the form values and write them surgically back into the group op's
+    // STORED children (opSession.setGroupChildParams), keyed by the bindings' (blockIndex, key). The form is a pure
+    // view; only the bound child params change. Returns true if the group was found + reloaded.
+    async applyGroupEdits(groupId) {
+        if (!_def || _def.opType !== 'group') return false;
+        const params = {};
+        for (const read of _readers) { try { Object.assign(params, read()); } catch (_) { /* skip a broken widget */ } }
+        const edits = (_def.bindings || [])
+            .filter((b) => b.blockIndex != null && b.key != null && (b.param in params))
+            .map((b) => ({ blockIndex: b.blockIndex, key: b.key, value: params[b.param] }));
+        const { setGroupChildParams } = await import('../../blocks/opSession.js');
+        return setGroupChildParams(groupId, edits);
+    },
 };

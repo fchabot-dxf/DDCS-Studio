@@ -77,6 +77,23 @@ function authoringBody(ws) {
     return { opRec: { type: 'op', opType: null, params: {}, children }, children, first };
 }
 
+// One NON-numeric inline exposure ({ param, blockIndex, key, default, type, widget?, widgetConfig? }) classified from
+// the field's kind. Shared by the live-workspace collectAuthoring and the off-records deriveGroupDef so both produce
+// IDENTICAL binding shapes (one source for the field → form-widget mapping).
+function inlineExposure(def, f, pname, blockIndex, defaultVal) {
+    const k = fieldKind(def, f);
+    let type = 'string', widget = null, widgetConfig = null;
+    if (k === 'dropdown') { type = 'enum'; widget = 'dropdown'; const opts = fieldOptions(def, f); if (opts) widgetConfig = { options: opts }; }
+    else if (k === 'checkbox') { type = 'bool'; widget = 'toggle'; }
+    else if (k === 'cornergrid') { type = 'string'; widget = 'corner-grid'; }
+    else if (k === 'coordlist') { type = 'list'; widget = 'coord-list'; }
+    else if (k === 'text') { type = 'string'; widget = 'text'; }
+    const bind = { param: pname, blockIndex, key: f, default: defaultVal, type };
+    if (widget) bind.widget = widget;
+    if (widgetConfig) bind.widgetConfig = widgetConfig;
+    return bind;
+}
+
 // Read the ticked exposures off the LIVE workspace → { opRec, exposures, varErr }. opRec is the active op (live
 // params); exposures are { param, blockIndex, key, default, widget } in pre-order; varErr names the first exposed
 // field that has a #var/expression plugged in (not a plain number) so the caller can refuse.
@@ -100,17 +117,7 @@ function collectAuthoring(ws) {
             if (isNumeric) {
                 exposures.push({ param: pname, blockIndex: i, key: f, default: rec.params[f], widget: blk.getFieldValue('WIDGET_' + FN(f)) || 'number' });
             } else {
-                const def = BLOCKS[blk.type], k = fieldKind(def, f);
-                let type = 'string', widget = null, widgetConfig = null;
-                if (k === 'dropdown') { type = 'enum'; widget = 'dropdown'; const opts = fieldOptions(def, f); if (opts) widgetConfig = { options: opts }; }
-                else if (k === 'checkbox') { type = 'bool'; widget = 'toggle'; }
-                else if (k === 'cornergrid') { type = 'string'; widget = 'corner-grid'; }
-                else if (k === 'coordlist') { type = 'list'; widget = 'coord-list'; }
-                else if (k === 'text') { type = 'string'; widget = 'text'; }
-                const bind = { param: pname, blockIndex: i, key: f, default: rec.params[f], type };
-                if (widget) bind.widget = widget;
-                if (widgetConfig) bind.widgetConfig = widgetConfig;
-                exposures.push(bind);
+                exposures.push(inlineExposure(BLOCKS[blk.type], f, pname, i, rec.params[f]));
             }
         };
         for (const f of numericFields(blk)) processField(f, true);
@@ -152,6 +159,38 @@ export function deriveAuthoredDef(ws) {
     const inlineBindings = buildBindings(a.exposures);
     const paramBindings = extractParamBlocks(a.opRec.children, new Set(inlineBindings.map((b) => b.param)));
     return { bindings: [...inlineBindings, ...paramBindings], children: a.opRec.children, varErr: a.varErr };
+}
+
+/** Increment 2 — derive a wizard def from a GROUP op's STORED children: the OFF-RECORDS analogue of
+ *  deriveAuthoredDef (which reads live workspace EXPOSE_ fields). Each child record carries its knobs in
+ *  `record._expose` ({ FN(field): { p:name, w:widget } }, persisted by #13 and round-tripped by stackBridge), so the
+ *  editor hover-chip can open a hand-built group's form WITHOUT the Blocks tab. Bindings index into
+ *  flattenBlocks(children) — the SAME pre-order opSession.setGroupChildParams writes back through. Returns a def
+ *  { opType:'group', label, bindings, children, panel:'form' } (panel:'form' = no preview pane; the group has no
+ *  builder — its children ARE the program). */
+export function deriveGroupDef(groupOp) {
+    const children = (groupOp && groupOp.children) || [];
+    const flat = flattenBlocks(children);
+    const exposures = [], used = new Set();
+    flat.forEach((rec, i) => {
+        const expo = rec && rec._expose;
+        if (!expo || !rec.params) return;
+        const def = BLOCKS[rec.type];
+        if (!def) return;
+        const handle = (f, isNumeric) => {
+            const e = expo[FN(f)];
+            if (!e) return;                                                       // this field isn't exposed
+            if (isNumeric && typeof rec.params[f] !== 'number') return;           // a #var/expression — not a plain-number knob
+            let pname = (e.p || f).trim().replace(/[^A-Za-z0-9_]/g, '_').replace(/^_+|_+$/g, '') || f;
+            if (used.has(pname)) { let k = 2; while (used.has(pname + '_' + k)) k++; pname += '_' + k; }
+            used.add(pname);
+            if (isNumeric) exposures.push({ param: pname, blockIndex: i, key: f, default: rec.params[f], widget: e.w || 'number' });
+            else exposures.push(inlineExposure(def, f, pname, i, rec.params[f]));
+        };
+        for (const f of numericFields(rec)) handle(f, true);                       // numericFields/getInlineFields read def off .type → work on a record
+        for (const f of getInlineFields(rec)) handle(f, false);
+    });
+    return { opType: 'group', label: (groupOp && groupOp.label) || 'Hand-built', bindings: buildBindings(exposures), children, panel: 'form' };
 }
 
 /** The opType being re-authored (the "editing a saved wizard" context), or null = building/authoring fresh. */

@@ -191,8 +191,9 @@ export class WizardManager {
         window.dispatchEvent(new CustomEvent('ddcs:stop-previews'));
         if (window.ddcsStopPreview) window.ddcsStopPreview();
 
-        const view = viewByType.get(type) || (isUserOp(type) ? userOpView : null);
-        if (view === userOpView) setUserOpDef(listUserOps().find((d) => d.opType === type) || null);   // tell the generic view which custom op
+        const view = viewByType.get(type) || (isUserOp(type) || type === 'group' ? userOpView : null);
+        // tell the generic view which custom op — EXCEPT a group, whose derived def is set by _openGroupForEdit (no library def to look up)
+        if (view === userOpView && type !== 'group') setUserOpDef(listUserOps().find((d) => d.opType === type) || null);
         const box = document.querySelector('.wiz-box');
         // Re-centre on open: clear any drag offset left from a previous session.
         if (box) Object.assign(box.style, { position: '', left: '', top: '', right: '', bottom: '', transform: '', margin: '' });
@@ -249,6 +250,8 @@ export class WizardManager {
     /** Does this op type support seeding its form from params (so it can be edited in place)? */
     canEdit(opType) {
         if (isUserOp(opType)) return true;                 // every custom op edits in the generic #wiz_user view
+        if (opType === 'group') return true;               // a hand-built group edits via its derived (off-records) form
+
         const view = viewByType.get(opType);
         return !!(opType && (Object.keys(paramFields(opType)).length || (view && typeof view.setForm === 'function')));
     }
@@ -289,10 +292,26 @@ export class WizardManager {
         }
     }
 
+    /** Open a hand-built GROUP op's form (the editor hover ✎ chip on a grouped run, increment 2). The group has no
+     *  builder/library def — derive it from the op's STORED children (devMode.deriveGroupDef, off the persisted
+     *  _expose) and drive the shared #wiz_user view. On insert, userOpView.applyGroupEdits writes the form values
+     *  surgically back to the group's children (no replaceOp rebuild — a group has no builder). */
+    async _openGroupForEdit(op) {
+        let deriveGroupDef;
+        try { ({ deriveGroupDef } = await import('./blocks/devMode.js')); } catch (_) { return; }
+        setUserOpDef(deriveGroupDef(op));              // set the derived def FIRST; open('group') won't clobber it
+        this.open('group');                            // routes to userOpView + #wiz_user, render()s the form, clears edit glow
+        this.update();                                 // emit the group's code preview from the seeded values
+        this.editingOpId = op.id;                      // now mark as editing this group
+        const box = document.querySelector('.wiz-box'); if (box) box.classList.add('editing');  // accent glow
+        this._formSnapshot = this._captureForm();
+    }
+
     openForEdit(opId) {
         const prog = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
         const op = prog.find((b) => b && b.type === 'op' && b.id === opId);
         if (!op || !op.opType) return;
+        if (op.opType === 'group') { this._openGroupForEdit(op); return; }   // group: derive the form from its stored children
         this.open(op.opType);                          // normal open (clears editing + glow, seeds defaults)
         let params = op.params;
         // Back-compat: old atc_change ops carry mode/magType, not method — derive method so the form shows right.
@@ -366,6 +385,14 @@ export class WizardManager {
             const ops = await import('./blocks/opSession.js');
             const { isOpBlockEdited, opEditSummary } = await import('./blocks/opGlow.js');
             if (this.editingOpId) {
+                // GROUP edit: a hand-built group has no builder, so apply the form values to its STORED children
+                // (surgical writeback) instead of a replaceOp rebuild. Detect by the op's type in the live program.
+                const prog = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+                const tgt = prog.find((b) => b && b.type === 'op' && b.id === this.editingOpId);
+                if (tgt && tgt.opType === 'group') {
+                    committed = await userOpView.applyGroupEdits(this.editingOpId);
+                    if (committed) { this.close(false, false); playClick(); return; }
+                }
                 // EDIT: rebuild THIS op from the new params (single source of truth) and replace it in place.
                 const { getLastOp } = await import('./blocks/opRecord.js');
                 const op = getLastOp();
