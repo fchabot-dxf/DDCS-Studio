@@ -4,7 +4,8 @@
  * or logged), and writes one row to Workers Analytics Engine (env.EVENTS). Fire-and-forget: always
  * returns 204 fast, never blocks the client. No auth, no cookies, no PII.
  *
- * Also serves a private dashboard at GET /dash?key=<DASH_KEY> — see handleDash() at the bottom.
+ * Also serves a private dashboard at /dash?key=<DASH_KEY> — GET renders the charts; POST runs a
+ * dev-IP management action (tag this network / add an IP / remove one). See handleDash() below.
  *
  * Event shape (JSON body): { event, name, id, app, version, os }
  *   event   "visit" | "feature" | "app_launch"
@@ -20,13 +21,15 @@ const CORS = {
   'access-control-allow-headers': 'content-type',
 };
 const clip = (v, n) => String(v == null ? '' : v).slice(0, n);
+const DEV_TTL = 60 * 60 * 24 * 120;   // dev-IP tag lifetime (~120 days)
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Private dashboard (secret-link gated). Checked before the POST/ingest path.
-    if (request.method === 'GET' && url.pathname === '/dash') return handleDash(url, env);
+    // Private dashboard (secret-link gated). Handles GET (render) AND POST (dev-IP management),
+    // so the ingest path below only ever sees real event POSTs.
+    if (url.pathname === '/dash') return handleDash(request, env);
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (request.method !== 'POST') return new Response('ddcs-analytics', { status: 200, headers: CORS });
@@ -41,7 +44,7 @@ export default {
     // Control signals (NOT recorded as usage): mark/unmark THIS network's IP as the developer's own,
     // so every device on it is auto-tagged dev. Stores only YOUR own IP, in a private KV, TTL ~120 days.
     if (event === 'dev_register' && env.DEV_IPS && ip) {
-      await env.DEV_IPS.put('ip:' + ip, '1', { expirationTtl: 60 * 60 * 24 * 120 });
+      await env.DEV_IPS.put('ip:' + ip, '1', { expirationTtl: DEV_TTL });
       return new Response(null, { status: 204, headers: CORS });
     }
     if (event === 'dev_unregister' && env.DEV_IPS && ip) {
@@ -57,7 +60,7 @@ export default {
         // self-heals when your ISP rotates your IP (next visit re-registers the new one). Once-per-session
         // events only, to keep KV writes low.
         if (event === 'visit' || event === 'app_launch') {
-          try { await env.DEV_IPS.put('ip:' + ip, '1', { expirationTtl: 60 * 60 * 24 * 120 }); } catch { /* ignore */ }
+          try { await env.DEV_IPS.put('ip:' + ip, '1', { expirationTtl: DEV_TTL }); } catch { /* ignore */ }
         }
       } else {
         try { if (await env.DEV_IPS.get('ip:' + ip)) dev = '1'; } catch { /* KV miss/err → treat as not-dev */ }
@@ -88,9 +91,10 @@ export default {
 };
 
 // ── Private dashboard ─────────────────────────────────────────────────────────────────────────────
-// GET /dash?key=<DASH_KEY>[&days=30][&dev=1]
-//   • key  — must equal the DASH_KEY secret (else 404 — the route stays invisible without the link).
-//   • days — lookback window, 1..365 (default 30).
+// GET  /dash?key=<DASH_KEY>[&days=30][&dev=1]  → charts.
+// POST /dash?key=<DASH_KEY>  (form: action=dev_tag_me|dev_add|dev_del [&ip=…])  → manage dev IPs, redirect back.
+//   • key   — must equal the DASH_KEY secret (else 404 — the route stays invisible without the link).
+//   • days  — lookback window, 1..365 (default 30).
 //   • dev=1 — INCLUDE your own/dev traffic (default: real users only, blob9 != '1').
 // Queries run server-side via the Analytics Engine SQL API using the AE_TOKEN secret (never exposed).
 // Each query is independent: one failing query degrades to an error note, the rest of the page renders.
@@ -110,12 +114,17 @@ async function aeQuery(env, sql) {
   return Array.isArray(j.data) ? j.data : [];
 }
 
-async function handleDash(url, env) {
+async function handleDash(request, env) {
+  const url = new URL(request.url);
   const key = url.searchParams.get('key') || '';
   // Constant-ish compare; 404 (not 401/403) so the route's existence isn't leaked without the key.
   if (!env.DASH_KEY || key.length !== env.DASH_KEY.length || key !== env.DASH_KEY) {
     return new Response('Not found', { status: 404 });
   }
+
+  // POST = a dev-IP management action → mutate KV, then Post/Redirect/Get back to the same view.
+  if (request.method === 'POST') return handleDashAction(request, env, url, key);
+
   if (!env.AE_TOKEN || !env.ACCOUNT_ID) {
     return new Response('Dashboard not configured — set the AE_TOKEN secret (Account Analytics → Read) and the ACCOUNT_ID var, then redeploy.', { status: 500 });
   }
@@ -123,7 +132,11 @@ async function handleDash(url, env) {
   const days = clampInt(url.searchParams.get('days'), 30, 1, 365);
   const showDev = url.searchParams.get('dev') === '1';
   const devF = showDev ? '' : "AND (blob9 != '1' OR blob9 IS NULL)";
-  const since = `timestamp > NOW() - INTERVAL '${days}' DAY`;
+  // Date floor — excludes the 2026-06-20 build-day self-test burst (162 hits that predate dev-tagging).
+  // It can't be DELETED (Analytics Engine is append-only), so we floor it out of every view. Override with ?from=YYYY-MM-DD.
+  const fromReq = url.searchParams.get('from') || '2026-06-21';
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(fromReq) ? fromReq : '2026-06-21';
+  const since = `timestamp > NOW() - INTERVAL '${days}' DAY AND timestamp >= toDateTime('${from} 00:00:00')`;
 
   const Q = {
     total:   `SELECT SUM(_sample_interval) AS visits FROM ddcs_events WHERE blob1 = 'visit' ${devF} AND ${since}`,
@@ -143,18 +156,65 @@ async function handleDash(url, env) {
     else errors[k] = String((s.reason && s.reason.message) || s.reason);
   });
 
-  return new Response(renderDash({ data, errors, sql: Q, days, showDev, key }), {
+  // Dev-IP management state: the registered IPs (KV list) + this visitor's IP / tag status.
+  let devIps = [];
+  const myIp = request.headers.get('CF-Connecting-IP') || '';
+  if (env.DEV_IPS) {
+    try { const l = await env.DEV_IPS.list({ prefix: 'ip:' }); devIps = l.keys.map((k) => k.name.slice(3)); } catch { /* list may lag; ignore */ }
+  }
+  const tagged = !!myIp && devIps.includes(myIp);
+
+  return new Response(renderDash({ data, errors, sql: Q, days, showDev, key, search: url.search, devIps, myIp, tagged, from }), {
     headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
   });
 }
 
-function renderDash({ data, errors, sql, days, showDev, key }) {
+async function handleDashAction(request, env, url, key) {
+  const okIp = (s) => /^[0-9a-fA-F:.]{3,45}$/.test(s);   // loose IPv4/IPv6 sanity
+  let form;
+  try { form = new URLSearchParams(await request.text()); } catch { form = new URLSearchParams(); }
+  const action = form.get('action') || '';
+  const ip = (form.get('ip') || '').trim();
+  const myIp = request.headers.get('CF-Connecting-IP') || '';
+  if (env.DEV_IPS) {
+    try {
+      if (action === 'dev_tag_me' && myIp) await env.DEV_IPS.put('ip:' + myIp, '1', { expirationTtl: DEV_TTL });
+      else if (action === 'dev_add' && okIp(ip)) await env.DEV_IPS.put('ip:' + ip, '1', { expirationTtl: DEV_TTL });
+      else if (action === 'dev_del' && ip) await env.DEV_IPS.delete('ip:' + ip);
+    } catch { /* KV error → just redirect back, no-op */ }
+  }
+  // Post/Redirect/Get — preserve the current view (key + days + dev) so the page doesn't reset/re-submit.
+  return Response.redirect(`${url.origin}${url.pathname}${url.search}`, 303);
+}
+
+function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myIp, tagged, from }) {
   const total = Number((data.total && data.total[0] && data.total[0].visits) || 0);
   const k = encodeURIComponent(key);
   const link = (d, dev) => `/dash?key=${k}&days=${d}&dev=${dev ? 1 : 0}`;
   const rangeBtn = (d) => `<a class="${d === days ? 'on' : ''}" href="${link(d, showDev)}">${d}d</a>`;
   const errCount = Object.keys(errors).length;
   const payload = JSON.stringify({ data, errors }).replace(/</g, '\\u003c');
+  const post = `/dash${esc(search || ('?key=' + k))}`;   // form action: preserves the current view across the redirect
+
+  const devRows = (devIps && devIps.length)
+    ? `<table><tr><th>dev IP (hidden from default view)</th><th></th></tr>${devIps.map((ip) =>
+        `<tr><td>${esc(ip)}${ip === myIp ? ' <span class="sub">(this device)</span>' : ''}</td>
+         <td><form method="post" action="${post}" style="margin:0"><input type="hidden" name="action" value="dev_del"><input type="hidden" name="ip" value="${esc(ip)}"><button class="btn del">✕</button></form></td></tr>`).join('')}</table>`
+    : '<span class="sub">no dev IPs tagged yet</span>';
+
+  const devCard = `<div class="card full"><h2>Dev traffic — excluded by default</h2>
+    <p class="sub">This device's IP: <b>${esc(myIp || '?')}</b> ${tagged ? '· <span style="color:#2ea043">tagged ✓</span>' : '· not tagged'}</p>
+    <div class="devbar">
+      <form method="post" action="${post}" style="margin:0"><input type="hidden" name="action" value="dev_tag_me"><button class="btn">Tag this network</button></form>
+      <form method="post" action="${post}" style="margin:0;display:flex;gap:6px">
+        <input type="hidden" name="action" value="dev_add">
+        <input name="ip" class="ipin" placeholder="add an IP, e.g. 96.22.121.45" pattern="[0-9a-fA-F:.]{3,45}" required>
+        <button class="btn">Add IP</button>
+      </form>
+    </div>
+    ${devRows}
+    <p class="sub" style="margin-top:8px">A tagged IP (and every device on that network) counts as your own and is hidden from the default view. TTL ~120 days; re-tag to refresh. Use <b>show dev</b> in the header to view it.</p>
+  </div>`;
 
   return `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -179,14 +239,18 @@ function renderDash({ data, errors, sql, days, showDev, key }) {
   td, th { text-align: left; padding: 4px 6px; border-bottom: 1px solid #1d242e; }
   th { color: #8b98a8; font-weight: 500; }
   td:last-child, th:last-child { text-align: right; }
+  .devbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0 12px; }
+  .btn { background: #1f6feb; border: 1px solid #1f6feb; color: #fff; border-radius: 6px; padding: 5px 11px; font-size: 12px; cursor: pointer; }
+  .btn.del { background: transparent; border-color: #5c2027; color: #ffb4ba; padding: 3px 8px; }
+  .ipin { background: #0b0e13; border: 1px solid #2a3340; color: #e6edf3; border-radius: 6px; padding: 5px 8px; font-size: 12px; min-width: 200px; }
   .err { background: #2d1418; border: 1px solid #5c2027; color: #ffb4ba; border-radius: 8px; padding: 10px 12px; font-size: 12px; }
   details { font-size: 12px; color: #8b98a8; }
-  pre { white-space: pre-wrap; word-break: break-word; background: #0b0e13; padding: 8px; border-radius: 6px; overflow:auto; }
+  pre { white-space: pre-wrap; word-break: break-word; background: #0b0e13; padding: 8px; border-radius: 6px; overflow: auto; }
   canvas { max-height: 260px; }
 </style></head><body>
 <header>
   <h1>DDCS Studio · usage</h1>
-  <span class="sub">last ${days} days · ${showDev ? '<b style="color:#e3a008">incl. your dev traffic</b>' : 'real users only'}</span>
+  <span class="sub">last ${days} days · since ${esc(from)} · ${showDev ? '<b style="color:#e3a008">incl. your dev traffic</b>' : 'real users only'}</span>
   <div class="controls">
     ${rangeBtn(7)}${rangeBtn(30)}${rangeBtn(90)}
     <a href="${link(days, !showDev)}">${showDev ? 'hide dev' : 'show dev'}</a>
@@ -199,7 +263,8 @@ function renderDash({ data, errors, sql, days, showDev, key }) {
   <div class="card"><h2>Web vs exe</h2><canvas id="c_app"></canvas></div>
   <div class="card full"><h2>Top features used</h2><canvas id="c_feature"></canvas></div>
   <div class="card full"><h2>Versions</h2><div id="t_version"></div></div>
-  ${errCount ? `<div class="card full err"><b>${errCount} quer${errCount === 1 ? 'y' : 'ies'} failed</b> — the rest of the page is real. Likely an Analytics Engine SQL-dialect difference; open below to see the exact error + the SQL to tweak.
+  ${devCard}
+  ${errCount ? `<div class="card full err"><b>${errCount} quer${errCount === 1 ? 'y' : 'ies'} failed</b> — the rest of the page is real. Likely an Analytics Engine SQL-dialect difference; open below for the exact error + the SQL to tweak.
     <details style="margin-top:8px"><summary>show errors</summary>
     ${Object.keys(errors).map((kk) => `<p><b>${esc(kk)}</b>: ${esc(errors[kk])}<pre>${esc(sql[kk])}</pre></p>`).join('')}
     </details></div>` : ''}
@@ -216,7 +281,6 @@ function bar(id, rows, labelKey, valKey, color) {
   new Chart(el, { type: 'bar', data: { labels: rows.map(r => String(r[labelKey] || '—')), datasets: [{ data: rows.map(r => num(r[valKey])), backgroundColor: color }] }, options: baseOpts });
 }
 
-// daily line
 (function () {
   const el = document.getElementById('c_day'); const rows = D.byDay; if (!el || !rows) return;
   const fmt = (d) => { try { return new Date(d).toISOString().slice(5, 10); } catch { return String(d); } };
@@ -226,13 +290,11 @@ function bar(id, rows, labelKey, valKey, color) {
 bar('c_country', D.country, 'country', 'visits', '#2ea043');
 bar('c_feature', D.feature, 'feature', 'uses', '#a371f7');
 
-// web vs exe doughnut
 (function () {
   const el = document.getElementById('c_app'); const rows = D.app; if (!el || !rows) return;
   new Chart(el, { type: 'doughnut', data: { labels: rows.map(r => String(r.app || '—')), datasets: [{ data: rows.map(r => num(r.n)), backgroundColor: ['#1f6feb', '#e3a008', '#2ea043', '#a371f7'] }] }, options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e6edf3' } } } } });
 })();
 
-// versions table
 (function () {
   const rows = D.version; const host = document.getElementById('t_version'); if (!host) return;
   if (!rows || !rows.length) { host.innerHTML = '<span class="sub">no data</span>'; return; }
