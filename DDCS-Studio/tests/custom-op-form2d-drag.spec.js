@@ -67,3 +67,58 @@ test('a real authored 2D-point op: the form2d preview handle drags and writes th
   expect(moved, 'dragging the preview wrote the point param fields').toBe(true);
   expect(after.code, 'the emitted G-code re-rendered after the drag').not.toBe(before.code);
 });
+
+test('Stage 3: a real authored 2D-circle op — dragging the RING (radial) handle in the real panel writes Ø + re-emits', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+
+  // AUTHOR a form2d bore op whose centre X/Y + holeØ are "2D circle" number params (the real authoring extraction).
+  await page.evaluate(async () => {
+    const U = await import('/blocks/userOps.js');
+    localStorage.removeItem('ddcs_user_ops');
+    const template = [{ type: 'bore', params: {
+      x: { type: 'param', params: { name: 'cx', value: 60, widget: 'ncirc-x' } },
+      y: { type: 'param', params: { name: 'cy', value: 50, widget: 'ncirc-y' } },
+      holeDia: { type: 'param', params: { name: 'cd', value: 30, widget: 'ncirc-d' } },
+      toolDia: 6, depth: 5, pitch: 0.5, ramp: 'step', feed: 120, clearance: 5,
+    } }];
+    const bindings = U.extractParamBlocks(template, new Set(), true);
+    U.createUserOp(U.userOpFromStack('circledrag', 'Circle Drag', template, bindings, 'form2d'));
+  });
+
+  await page.evaluate(() => window.openWiz('user_circledrag'));
+
+  // the form rendered the three circle params as writable number fields
+  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  const fieldParams = await page.$$eval('#wiz_user_form [data-param]', (ns) => ns.map((n) => n.dataset.param).sort());
+  expect(fieldParams, 'the form rendered the circle params as writable number fields').toEqual(['cd', 'cx', 'cy']);
+
+  // the RING handle is a SIZE handle → a circle element (not the move square); never exercised in a real panel before
+  const ring = page.locator('#userVizContainer circle.fc-handle').first();
+  await ring.waitFor({ state: 'visible' });
+
+  const before = await page.evaluate(() => ({
+    cd: document.querySelector('#wiz_user_form [data-param="cd"]').value,
+    code: (document.getElementById('wiz_user_code') || {}).textContent || '',
+  }));
+
+  // REAL drag: pull the ring outward (the exact Ø depends on the screen→world map; assert it MOVED + re-emitted).
+  const box = await ring.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 90, box.y + box.height / 2 + 50, { steps: 8 });
+  await page.mouse.up();
+
+  await expect.poll(async () => page.evaluate(() =>
+    document.querySelector('#wiz_user_form [data-param="cd"]').value
+  )).not.toBe(before.cd);
+
+  const after = await page.evaluate(() => ({
+    cd: document.querySelector('#wiz_user_form [data-param="cd"]').value,
+    code: (document.getElementById('wiz_user_code') || {}).textContent || '',
+  }));
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+
+  expect(Number(after.cd), 'dragging the ring wrote the Ø param field').not.toBe(Number(before.cd));
+  expect(after.code, 'the bore G-code re-rendered after the ring drag').not.toBe(before.code);
+});

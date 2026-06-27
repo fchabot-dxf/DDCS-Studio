@@ -6,6 +6,7 @@
  * (v2 authoring) is just a visual way to set def.panel — same registry.
  */
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
+import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 
 export const PANEL_TYPES = {
     form:   { id: 'form',   label: 'Form only', viz: false, mode: null },   // single column, no preview
@@ -25,41 +26,46 @@ const _field = (name) => (typeof document !== 'undefined') ? document.querySelec
 const _writable = (name) => !!_field(name);
 function _writeParam(name, val) { const f = _field(name); if (f) { f.value = r3(val); f.dispatchEvent(new Event('input', { bubbles: true })); } }
 
-// Derive a 2D FeatureCanvas spec from the op's xy/rect-bound params — a top-down summary that mirrors what the canvas
-// pickers set (xy group → a point; rect group → a rectangle), drawn on the configured stock — and now DRAGGABLE:
-// for groups whose params are writable fields, a handle drives them, so a custom wizard gets canvas drag-to-edit with
-// no per-op code (the handle is derived from the param-block roles, the same `x/y/w/h` the items are). See ROADMAP
-// "GUI over fields" + the spatial-gui-form-vs-canvas memory.
+// Derive a 2D FeatureCanvas spec from the op's xy / rect / circle-bound params — a top-down summary that mirrors what
+// the canvas pickers set (xy group → a point; rect group → a rectangle; circle group → a disc), drawn on the configured
+// stock — and DRAGGABLE: for groups whose params are writable fields, a handle drives them, so a custom wizard gets
+// canvas drag-to-edit with no per-op code. The handles are DECLARED from the param-block roles and built by the SAME
+// reusable gesture registry the built-in views use (viz/canvasWidgets — point / rect / radial), not a parallel onDrag.
+// See ROADMAP "CANVAS-WIDGET consolidation" Stage 3 + the spatial-gui-form-vs-canvas memory.
 export function layoutSpecFromOp(def, params) {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y, ox: 0, oy: 0 } : { w: 200, h: 150, ox: 0, oy: 0 };
     const groups = {};
     for (const b of (def.bindings || [])) { if (b.group) (groups[b.group] = groups[b.group] || []).push(b); }
-    const items = [], handles = [], map = {};   // map: handleId → the param(s) it writes
+    const items = [], decls = [];
     for (const gid in groups) {
         const byRole = {};
         for (const b of groups[gid]) byRole[b.role] = b;
         const p = (r) => byRole[r] ? num(params[byRole[r].param]) : undefined;
+        const wr = (r) => byRole[r] && _writable(byRole[r].param);   // a role whose param is a settable form field
+        // pos handle = a `point` gesture over the x/y params (built only when both are writable — never a dead handle).
+        const pos = () => { if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: p('x'), y: p('y'), label: 'pos' }); };
         if (byRole.x && byRole.y && byRole.w && byRole.h) {
             const x = p('x'), y = p('y'), w = p('w'), h = p('h');
             items.push({ kind: 'rect', x, y, w, h });
-            if (_writable(byRole.x.param) && _writable(byRole.y.param)) { handles.push({ id: gid + '_pos', x, y, kind: 'move', label: 'pos' }); map[gid + '_pos'] = { x: byRole.x.param, y: byRole.y.param }; }
-            if (_writable(byRole.w.param) && _writable(byRole.h.param)) { handles.push({ id: gid + '_size', x: x + w, y: y + h, kind: 'size', label: 'W', value: w }); map[gid + '_size'] = { w: byRole.w.param, h: byRole.h.param, ox: x, oy: y }; }
+            pos();
+            if (wr('w') && wr('h')) decls.push({ type: 'rect', id: gid + '_size', field: byRole.w.param, fieldH: byRole.h.param, ax: x, ay: y, ex: w, ey: h, sx: 1, sy: 1, minw: 1, minh: 1, label: 'W', value: w });
+        } else if (byRole.x && byRole.y && byRole.dia) {
+            const x = p('x'), y = p('y'), dia = p('dia'), R = dia / 2;
+            items.push({ kind: 'circle', cx: x, cy: y, r: R });
+            pos();
+            if (wr('dia')) decls.push({ type: 'radial', id: gid + '_size', field: byRole.dia.param, cx: x, cy: y, r: R, a: 0, rScale: 2, minR: 1, label: 'Ø', value: dia });
         } else if (byRole.x && byRole.y) {
             const x = p('x'), y = p('y');
             items.push({ kind: 'hole', x, y, n: 1, r: Math.max(1, stock.w * 0.012) });
-            if (_writable(byRole.x.param) && _writable(byRole.y.param)) { handles.push({ id: gid + '_pos', x, y, kind: 'move', label: 'pos' }); map[gid + '_pos'] = { x: byRole.x.param, y: byRole.y.param }; }
+            pos();
         }
     }
-    return {
-        stock, items, handles,
-        // Drag a handle → write the bound param fields (their 'input' bubbles → userOpView.update() redraws).
-        onDrag(id, w) {
-            const m = map[id]; if (!m) return;
-            if (m.w !== undefined) { _writeParam(m.w, Math.max(1, w.x - m.ox)); _writeParam(m.h, Math.max(1, w.y - m.oy)); }   // size a rect from its origin
-            else { _writeParam(m.x, w.x); _writeParam(m.y, w.y); }                                                            // move a point
-        },
-    };
+    // Drag a handle → write the bound param FIELDS (their 'input' bubbles → userOpView.update() redraws). The gesture
+    // math (corner/radius) lives in the registry; here `setFields` just routes each {param: value} to its form field.
+    const setFields = (m) => { for (const k in m) _writeParam(k, m[k]); };
+    const { handles, onDrag } = buildCanvasWidgets(decls, setFields);
+    return { stock, items, handles, onDrag };
 }
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).

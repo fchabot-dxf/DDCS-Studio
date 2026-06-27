@@ -81,3 +81,71 @@ test('a writable xywh group → a position + a size handle; size drag writes w/h
   expect(r.newW, 'size drag set w = dragX − originX').toBe(90);
   expect(r.newH, 'size drag set h = dragY − originY').toBe(70);
 });
+
+test('Stage 3: a writable xy+dia group → a position + a radius (radial) handle; drag writes Ø = 2·distance', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => !!window.ddcsStudio);
+
+  const r = await page.evaluate(async () => {
+    const PT = await import('/wizards/ops/panelTypes.js');
+    const def = { bindings: [{ param: 'qx', group: 'cg', role: 'x' }, { param: 'qy', group: 'cg', role: 'y' }, { param: 'qd', group: 'cg', role: 'dia' }] };
+    const form = document.createElement('div'); form.id = 'wiz_user_form';
+    const fields = {};
+    for (const [role, val] of [['x', 50], ['y', 40], ['dia', 30]]) { const f = document.createElement('input'); f.dataset.param = ({ x: 'qx', y: 'qy', dia: 'qd' })[role]; f.value = val; form.append(f); fields[role] = f; }
+    document.body.appendChild(form);
+
+    const spec = PT.layoutSpecFromOp(def, { qx: 50, qy: 40, qd: 30 });
+    const size = spec.handles.find((h) => /_size$/.test(h.id));
+    spec.onDrag(size.id, { x: 50, y: 80 });   // drag the ring perpendicular: dist = 40 → Ø = 80
+    const out = {
+      drawnCircle: spec.items.filter((i) => i.kind === 'circle').length,
+      handles: spec.handles.length, kinds: spec.handles.map((h) => h.kind).sort(),
+      ringAt: [size.x, size.y],
+      newDia: Number(fields.dia.value),
+    };
+    form.remove();
+    return out;
+  });
+
+  expect(r.drawnCircle, 'the circle is drawn from x/y/dia').toBe(1);
+  expect(r.handles, 'a position + a radius handle').toBe(2);
+  expect(r.kinds).toEqual(['move', 'size']);
+  expect(r.ringAt, 'ring handle on the +X radius (x + dia/2, y)').toEqual([65, 40]);
+  expect(r.newDia, 'radius drag set Ø = 2 · distance from centre').toBe(80);
+});
+
+test('Stage 3: the 2D-circle role family is declarable end-to-end (decode + complete-group)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => !!window.ddcsStudio);
+
+  const r = await page.evaluate(async () => {
+    const U = await import('/blocks/userOps.js');
+    // the author picks "2D circle · X/Y/Ø" on three number knobs → role-encoded widget values
+    const decoded = ['ncirc-x', 'ncirc-y', 'ncirc-d'].map((w) => U.decodeCanvasWidget(w));
+    const canvas = [
+      { param: 'cx', _widget: 'ncircle', role: 'x', type: 'number', default: 0 },
+      { param: 'cy', _widget: 'ncircle', role: 'y', type: 'number', default: 0 },
+      { param: 'cd', _widget: 'ncircle', role: 'dia', type: 'number', default: 20 },
+    ];
+    const grouped = U.groupCanvasBindings(canvas, 'g');
+    // an INCOMPLETE circle (missing Ø) must degrade to plain knobs (no group)
+    const incomplete = U.groupCanvasBindings(canvas.slice(0, 2), 'g');
+    return {
+      decoded,
+      groupCount: new Set(grouped.map((b) => b.group)).size,
+      allSameGroup: grouped.every((b) => b.group === grouped[0].group),
+      roles: grouped.map((b) => b.role).sort(),
+      headWidget: grouped[0].widget,
+      incompleteGrouped: incomplete.some((b) => b.group),
+    };
+  });
+
+  expect(r.decoded, 'each role-encoded value decodes to the ncircle widget + its role').toEqual([
+    { widget: 'ncircle', role: 'x' }, { widget: 'ncircle', role: 'y' }, { widget: 'ncircle', role: 'dia' },
+  ]);
+  expect(r.groupCount, 'the three roles form ONE complete circle group').toBe(1);
+  expect(r.allSameGroup).toBe(true);
+  expect(r.roles).toEqual(['dia', 'x', 'y']);
+  expect(r.headWidget, 'group head carries the ncircle widget (resolveFormWidget reads it)').toBe('ncircle');
+  expect(r.incompleteGrouped, 'an incomplete circle degrades to plain knobs (no group)').toBe(false);
+});

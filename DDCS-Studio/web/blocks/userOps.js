@@ -53,20 +53,20 @@ export function parseParamOptions(str) {
 // Role-encoded widget values fold a spatial ROLE into the widget so it's DECLARED, never inferred from pool
 // position — reordering / deleting+re-adding a knob can't silently remap x↔y (audit #6-B). Two families share the
 // encoding: CANVAS widgets (xy-pad / rect) render as a form mini-canvas that owns its value; NUMBER-ROLE widgets
-// (point / nrect) render as PLAIN number fields but still carry the role, so the Form+2D preview derives a drag
-// handle over them (the spatial-GUI decision: continuous positions = drag the preview, plain numbers on the block).
+// (point / nrect / ncircle) render as PLAIN number fields but still carry the role, so the Form+2D preview derives a
+// drag handle over them (the spatial-GUI decision: continuous positions = drag the preview, plain numbers on the block).
 // decodeCanvasWidget → { widget, role } (role null = a plain, role-less widget).
-const CANVAS_DECODE = { 'xy-x': ['xy-pad', 'x'], 'xy-y': ['xy-pad', 'y'], 'rect-x': ['rect', 'x'], 'rect-y': ['rect', 'y'], 'rect-w': ['rect', 'w'], 'rect-h': ['rect', 'h'], 'point-x': ['point', 'x'], 'point-y': ['point', 'y'], 'nrect-x': ['nrect', 'x'], 'nrect-y': ['nrect', 'y'], 'nrect-w': ['nrect', 'w'], 'nrect-h': ['nrect', 'h'] };
+const CANVAS_DECODE = { 'xy-x': ['xy-pad', 'x'], 'xy-y': ['xy-pad', 'y'], 'rect-x': ['rect', 'x'], 'rect-y': ['rect', 'y'], 'rect-w': ['rect', 'w'], 'rect-h': ['rect', 'h'], 'point-x': ['point', 'x'], 'point-y': ['point', 'y'], 'nrect-x': ['nrect', 'x'], 'nrect-y': ['nrect', 'y'], 'nrect-w': ['nrect', 'w'], 'nrect-h': ['nrect', 'h'], 'ncirc-x': ['ncircle', 'x'], 'ncirc-y': ['ncircle', 'y'], 'ncirc-d': ['ncircle', 'dia'] };
 /** The role-encoded widget choices ([label, value]) — shared by the param-block dropdown (bridge) and the dev-mode
  *  inline-expose dropdown so all three (author / decode / form) agree on the encoding. "XY pad / Rect" = a form
- *  mini-canvas; "2D point / 2D rect" = plain number fields that the Form+2D preview makes drag-to-edit. */
-export const CANVAS_ROLE_WIDGETS = [['XY pad · X', 'xy-x'], ['XY pad · Y', 'xy-y'], ['Rect · X', 'rect-x'], ['Rect · Y', 'rect-y'], ['Rect · W', 'rect-w'], ['Rect · H', 'rect-h'], ['2D point · X', 'point-x'], ['2D point · Y', 'point-y'], ['2D rect · X', 'nrect-x'], ['2D rect · Y', 'nrect-y'], ['2D rect · W', 'nrect-w'], ['2D rect · H', 'nrect-h']];
+ *  mini-canvas; "2D point / 2D rect / 2D circle" = plain number fields that the Form+2D preview makes drag-to-edit. */
+export const CANVAS_ROLE_WIDGETS = [['XY pad · X', 'xy-x'], ['XY pad · Y', 'xy-y'], ['Rect · X', 'rect-x'], ['Rect · Y', 'rect-y'], ['Rect · W', 'rect-w'], ['Rect · H', 'rect-h'], ['2D point · X', 'point-x'], ['2D point · Y', 'point-y'], ['2D rect · X', 'nrect-x'], ['2D rect · Y', 'nrect-y'], ['2D rect · W', 'nrect-w'], ['2D rect · H', 'nrect-h'], ['2D circle · X', 'ncirc-x'], ['2D circle · Y', 'ncirc-y'], ['2D circle · Ø', 'ncirc-d']];
 /** Decode a (possibly role-encoded) widget value → { widget, role }. role is null for plain widgets. */
 export function decodeCanvasWidget(w) { const d = CANVAS_DECODE[w]; return d ? { widget: d[0], role: d[1] } : { widget: w, role: null }; }
 
-// The roles a complete group needs (an incomplete one degrades to plain number knobs). A number-role point/nrect
-// shares its canvas twin's shape (a point = an xy-pad's x/y; an nrect = a rect's x/y/w/h).
-const CANVAS_ROLES = { 'xy-pad': ['x', 'y'], rect: ['x', 'y', 'w', 'h'], point: ['x', 'y'], nrect: ['x', 'y', 'w', 'h'] };
+// The roles a complete group needs (an incomplete one degrades to plain number knobs). A number-role point/nrect/ncircle
+// shares its canvas twin's shape (a point = an xy-pad's x/y; an nrect = a rect's x/y/w/h; an ncircle = a centre + Ø).
+const CANVAS_ROLES = { 'xy-pad': ['x', 'y'], rect: ['x', 'y', 'w', 'h'], point: ['x', 'y'], nrect: ['x', 'y', 'w', 'h'], ncircle: ['x', 'y', 'dia'] };
 const cleanBinding = (b) => ({ param: b.param, blockIndex: b.blockIndex, key: b.key, type: b.type, default: b.default, label: b.label });
 
 /** Assemble canvas bindings (each carrying `_widget` + a DECLARED `role`) into form groups: consecutive same-widget
