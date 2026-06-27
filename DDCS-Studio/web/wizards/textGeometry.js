@@ -28,13 +28,14 @@ export function layoutText(params) {
     const linePitch = H * 1.6;
 
     const strokes = [];
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, maxLw = 0;
     const acc = (px, py) => { if (px < x0) x0 = px; if (py < y0) y0 = py; if (px > x1) x1 = px; if (py > y1) y1 = py; };
 
     lines.forEach((ln, li) => {
         let lw = 0;
         for (const ch of ln) lw += glyph(ch).w * width * scale + tracking;
         if (ln.length) lw -= tracking;
+        if (lw > maxLw) maxLw = lw;   // widest line's advance (baseline span) — the width/slant handle anchors
         const baseY = oy - li * linePitch;
         let cx = align === 'center' ? ox - lw / 2 : align === 'right' ? ox - lw : ox;
         for (const ch of ln) {
@@ -50,7 +51,7 @@ export function layoutText(params) {
     });
 
     if (!isFinite(x0)) { x0 = x1 = ox; y0 = y1 = oy; }
-    return { strokes, bbox: { x0, y0, x1, y1 }, scale, height: H };
+    return { strokes, bbox: { x0, y0, x1, y1 }, scale, height: H, lineW: maxLw };
 }
 
 const ccw = (pts) => {

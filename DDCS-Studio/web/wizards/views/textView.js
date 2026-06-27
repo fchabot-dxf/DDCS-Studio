@@ -2,6 +2,7 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { TextWizard, layoutText, textBBox } from '../textWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
+import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams } from '../ops/placement.js';
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
@@ -29,27 +30,30 @@ function applyTool() {
 /** 2D layout: the glyph centrelines (preview of the letters) + a place handle and a height handle. */
 function buildTextSpec(params, stock) {
     const ox = num(params.x, 0), oy = num(params.y, 0), H = num(params.height, 12);
-    const { strokes } = layoutText(params);
+    const width = num(params.width, 1), slant = num(params.slant, 0);
+    const lay = layoutText(params);
     const items = [];
-    for (const poly of strokes) {
+    for (const poly of lay.strokes) {
         for (let i = 0; i + 1 < poly.length; i++) {
             items.push({ kind: 'line', x1: poly[i][0], y1: poly[i][1], x2: poly[i + 1][0], y2: poly[i + 1][1] });
         }
     }
+    const lineW = lay.lineW || 1;   // baseline advance (width-scaled, no slant) — anchors the width/slant handles
+    // DECLARE the handles via reusable gestures (not hand-rolled): the four corners of the text box —
+    // pos=point (bottom-left), height=length (top-left), width=scaleX (baseline right), slant=shear (slanted top-right).
+    const { handles, onDrag, onEdit } = buildCanvasWidgets([
+        { type: 'point', fx: 'tx_x', fy: 'tx_y', x: ox, y: oy, label: 'pos' },
+        { type: 'length', field: 'tx_height', ax: ox, ay: oy, axis: 'y', value: H, min: 2, label: 'height' },
+        { type: 'scaleX', field: 'tx_width', ax: ox, edgeX: ox + lineW, ay: oy, value: width, min: 0.2, label: 'width' },
+        { type: 'shear', field: 'tx_slant', ax: ox + lineW, ay: oy, h: H, value: slant, label: 'slant°' },
+    ], setFields);
     const pl = placementSpec(params, textBBox(params), 'tx_');   // opt-in: stays at x/y unless you pick a stock corner
     return {
         stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
-        placement: pl.placement, items,
-        handles: [
-            { id: 'origin', x: ox, y: oy, kind: 'move', label: 'pos' },
-            { id: 'height', x: ox, y: oy + H, kind: 'size', label: 'height' },
-        ],
+        placement: pl.placement, items, handles,
         pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
         onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
-        onDrag(id, w) {
-            if (id === 'origin') setFields({ tx_x: w.x, tx_y: w.y });
-            else setFields({ tx_height: Math.max(2, w.y - oy) });
-        },
+        onDrag, onEdit,
     };
 }
 
