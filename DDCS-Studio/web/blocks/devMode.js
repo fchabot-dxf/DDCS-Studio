@@ -213,9 +213,12 @@ export function mountDevMode(ws, B, hostEl) {
     // is a construction-time class, reliable across the async render queue; the lit class rides the live <text>).
     ws.addChangeListener((e) => {
         if (!e || e.type !== B.Events.BLOCK_CHANGE || e.element !== 'field') return;
-        if (typeof e.name !== 'string' || e.name.indexOf('EXPOSE_') !== 0) return;
+        const n = typeof e.name === 'string' ? e.name : '';
+        if (n.indexOf('EXPOSE_') !== 0 && n.indexOf('PNAME_') !== 0 && n.indexOf('WIDGET_') !== 0) return;
         const blk = ws.getBlockById(e.blockId);
-        if (blk) refreshExposeMark(blk, e.name.slice(7));   // 'EXPOSE_'.length
+        if (!blk) return;
+        if (n.indexOf('EXPOSE_') === 0) refreshExposeMark(blk, n.slice(7));   // 'EXPOSE_'.length
+        saveExpose(blk);   // #13: mirror the exposure into block.data so it survives a reprojection
     });
 
     hostEl.append(_savebtn, _editChip);
@@ -244,6 +247,37 @@ function refreshExposeMark(blk, vk) {
     if (textEl) textEl.classList.toggle('blk-expose-lit', blk.getFieldValue('EXPOSE_' + vk) === 'TRUE');
 }
 
+// ── #13: persist knob exposure across a reprojection ──────────────────────────────────────────────────────────
+// The EXPOSE_/PNAME_/WIDGET_ dev fields aren't in fieldsOf(def), so the round-trip (workspaceToStack→stackToWorkspace)
+// rebuilds the block WITHOUT them → a ticked knob (and the live form) vanishes. Fix: mirror the exposure into the
+// block's `data._expose` (which DOES round-trip — stackBridge routes it out of params), save it whenever the user
+// edits an EXPOSE/PNAME/WIDGET field, and restore it in augment() when the (re)built block grows its expose row.
+function exposeBlobOf(blk) {
+    const x = {};
+    for (const input of blk.inputList) for (const field of input.fieldRow) {
+        const n = field.name || '';
+        if (n.indexOf('EXPOSE_') !== 0 || blk.getFieldValue(n) !== 'TRUE') continue;
+        const vk = n.slice(7), entry = { p: blk.getFieldValue('PNAME_' + vk) || '' };
+        if (blk.getField('WIDGET_' + vk)) entry.w = blk.getFieldValue('WIDGET_' + vk) || 'number';   // numeric fields only
+        x[vk] = entry;
+    }
+    return x;
+}
+function saveExpose(blk) {
+    let d = {}; try { d = blk.data ? JSON.parse(blk.data) : {}; } catch (_) { /* keep none */ }
+    const x = exposeBlobOf(blk);
+    if (Object.keys(x).length) d._expose = x; else delete d._expose;
+    blk.data = Object.keys(d).length ? JSON.stringify(d) : null;
+}
+function restoreExpose(blk, vk) {
+    let d = {}; try { d = blk.data ? JSON.parse(blk.data) : {}; } catch (_) { return; }
+    const e = d._expose && d._expose[vk]; if (!e) return;
+    blk.setFieldValue('TRUE', 'EXPOSE_' + vk);
+    if (e.p != null && blk.getField('PNAME_' + vk)) blk.setFieldValue(e.p, 'PNAME_' + vk);
+    if (e.w != null && blk.getField('WIDGET_' + vk)) blk.setFieldValue(e.w, 'WIDGET_' + vk);
+    refreshExposeMark(blk, vk);
+}
+
 // grow each atom with an inline "knob [☐] <name> [#]" expose row per numeric/inline field (Events.disable → no reproject).
 function augment() {
     const B = _B, ws = _ws;
@@ -265,6 +299,7 @@ function augment() {
                     .appendField(new B.FieldCheckbox('FALSE'), 'EXPOSE_' + FN(f))
                     .appendField(new B.FieldTextInput(f), 'PNAME_' + FN(f))
                     .appendField(new B.FieldDropdown(WIDGET_CHOICES), 'WIDGET_' + FN(f));   // how it renders in the form
+                restoreExpose(blk, FN(f));   // #13: re-apply a persisted exposure after a round-trip rebuilt the block
             }
             for (const f of getInlineFields(blk)) {
                 const inputName = 'DECL_' + FN(f);
@@ -273,6 +308,7 @@ function augment() {
                     .appendField(new B.FieldLabel('knob', 'blk-expose-mark'), 'XMARK_' + FN(f))   // dim marker; lights up when exposed
                     .appendField(new B.FieldCheckbox('FALSE'), 'EXPOSE_' + FN(f))
                     .appendField(new B.FieldTextInput(f), 'PNAME_' + FN(f));
+                restoreExpose(blk, FN(f));   // #13: re-apply a persisted exposure after a round-trip rebuilt the block
             }
             if (blk.queueRender) blk.queueRender();
         }

@@ -98,7 +98,7 @@ function toRecord(b) {
     }
     // Non-field params (snapshots like PlaceOnStock's stock dims + bbox) ride in `data` — restore them WITHOUT
     // clobbering live field values, so editing the block keeps the context emit needs.
-    if (b.data) { try { const d = JSON.parse(b.data); for (const k in d) if (!(k in r.params)) r.params[k] = d[k]; } catch (_) { /* keep fields */ } }
+    if (b.data) { try { const d = JSON.parse(b.data); if (d._expose) r._expose = d._expose; for (const k in d) if (k !== '_expose' && !(k in r.params)) r.params[k] = d[k]; } catch (_) { /* keep fields */ } }
     if (isWrap(def)) {
         const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
         r.children = first ? chain(first) : [];
@@ -215,6 +215,9 @@ function recToJson(rec) {
     // Non-field params (snapshots like PlaceOnStock's stock dims + bbox) → `data`, so they survive a block edit.
     const fset = new Set(fieldsOf(def)), extra = {};
     for (const k in (rec.params || {})) { const v = rec.params[k]; if (!fset.has(k) && v !== undefined && (v === null || typeof v !== 'object')) extra[k] = v; }
+    // The authoring EXPOSE/PNAME/WIDGET state rides `data._expose` (NOT params — it's dev-only, never emitted), so a
+    // ticked knob survives a round-trip → the live form persists across a reprojection (#13). devMode reads it in augment.
+    if (rec._expose) extra._expose = rec._expose;
     if (Object.keys(extra).length) node.data = JSON.stringify(extra);
     if (isWrap(def) && rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
     if (Object.keys(fields).length) node.fields = fields;
