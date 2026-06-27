@@ -102,20 +102,22 @@ Shipped:
   annotation-text atom that renders from a BOUND param (like Spindle renders `M3 S<rpm>`), built when an op FORCES it, NOT
   speculatively. Never silently drop a number an operator confirms against.
 
-## ▶ Immediate next task — finish surfacing-as-DATA, then contour/slot/text the same way
-Surfacing's wizard is now FLAT + glow-safe; the remaining piece is the actual Stage-5 **data-def port**.
-1. **`dataOps/surfacingData.js` + `tests/surfacing-as-data.spec.js`** (byte-identical sweep + structural binding-wiring,
-   per `drillData.js`). Bindings: geometry/cut on the `surfacefill` leaf (block 4: x/y/w/h/stepover/strategy/feed/plunge),
-   depth/stepdown on `stepdown` (block 3: to/by), `wcs` (block 1), placement scalars on `placeonstock` (block 2). FAN-OUT
-   to watch: `clearance` feeds progstart + surfacefill (hold unbound, like drill #3); `originX` feeds surfacefill.x AND
-   placeonstock.offX — the reframe's "region at 0,0 + placement owns origin" makes this 1-socket (verify byte-identical via
-   placeShiftFromParams = offX − bbox.minX). The surfacingStack `so = tool·%` math: the FORM precomputes, store a flat
-   `stepover`; `strategy` raster→parallel mapping → accept `parallel`/`concentric` directly (byte-identical, both → same).
-2. **Then `contour`, `slot`, `text`** the same way — one at a time, each gated by the equivalence test. Keep the
+## ▶ Immediate next task — contour / slot / text, the same way (surfacing-as-data is DONE)
+✅ **`surfacingData.js` + `surfacing-as-data.spec.js` SHIPPED** (`8b43c19`) — Stage-5 port #3, the first FILL-family op,
+BYTE-IDENTICAL across a placement/size/parallel-concentric/depth/stock-attach sweep, all 18 bindings wired. The reframe
+validated end-to-end: flat `stepover` (form precomputes tool·%), direct `strategy` ('raster'→'parallel' maps in the
+stack), and the `originX` fan-out resolved by defining the region LOCALLY at (0,0) so PlaceOnStock owns the position
+(offX=originX) — byte-identical because `placementShift` anchors the bbox min-corner (`x = originX − bbox.minX`). The
+2D view is untouched (`surfacingBBox` still returns part-coords; the makePlace snapshot is local + unused — the place
+fold recomputes live from `surfacefill.extent`). Frontier held unbound: `clearance` (fan-out → progstart + leaf, like drill #3).
+1. **Next: `contour`, `slot`, `text`** the same way — one at a time, each gated by the equivalence test. Keep the
    byte-identical gate where legacy output is fine; relax to "equivalent toolpath" only DELIBERATELY, per-wizard.
-3. **Genuine BRANCHING** (the probe/ATC/comm/homing family, conditional-structure-dominated) is the only place that may
+2. **Genuine BRANCHING** (the probe/ATC/comm/homing family, conditional-structure-dominated) is the only place that may
    still need `iff`/`count` atoms IN the stack or a split into wizard variants — restructure those too, don't grow the format.
-4. **Then STRATEGIC #4 — Stage 6 self-host** (gated on the ports + the federated registry): built-ins become forkable; a
+   ⚠ When you reach a wizard with a VALUE-BEARING operator message (a number the operator confirms before acting, e.g. a
+   probe `Probing 50mm — press Enter`), that's the op that FORCES the general annotation-text atom (renders text from a
+   bound param) — build it then, NOT speculatively. Classify each op's messages droppable-vs-value-bearing as you port.
+3. **Then STRATEGIC #4 — Stage 6 self-host** (gated on the ports + the federated registry): built-ins become forkable; a
    `resetToFactory` re-registers shipped defs by clearing the `USER_*` layers.
 **DIRECTIVE: when a port is blocked by wizard structure, ASK whether the source can change + propose restructuring it —
 don't silently build machinery to preserve a structure the user doesn't care about.**
