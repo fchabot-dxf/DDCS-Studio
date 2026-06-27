@@ -2,6 +2,7 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { DrillWizard, patternPoints } from '../drillWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
+import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { toolOptionsHTML, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams, pointsBBox } from '../ops/placement.js';
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
@@ -48,31 +49,37 @@ function buildDrillSpec(params, stock) {
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
     const holeR = Math.max(0.5, num(params.holeDia, 6) / 2);
 
-    const handles = [{ id: 'origin', x: ox, y: oy, kind: 'move', label: 'pos' }];
+    // DECLARE the handles via reusable gestures (not hand-rolled): the position is a `point`; each pattern's size
+    // handle is a `rect` (2D corner, optionally per-axis-divided for grid pitch) or a `radial` (Ø/pitch + angle).
+    // Every handle still drives a wizard PARAMETER via setFields() — never freeform geometry.
+    const decls = [{ type: 'point', id: 'origin', fx: 'd_originX', fy: 'd_originY', x: ox, y: oy, label: 'pos' }];
     const items = [];
 
     if (pat === 'circle') {
         const R = num(params.dia, 50) / 2, a0 = num(params.startAngle, 0) * Math.PI / 180;
         items.push({ kind: 'circle', cx: ox, cy: oy, r: R });
-        handles.push({ id: 'ring', x: ox + R * Math.cos(a0), y: oy + R * Math.sin(a0), kind: 'size', label: 'Ø', value: num(params.dia, 50) });
+        decls.push({ type: 'radial', id: 'ring', field: 'd_dia', fieldA: 'd_startAngle', cx: ox, cy: oy, r: R, a: a0, rScale: 2, editMin: 0, label: 'Ø', value: num(params.dia, 50) });
     } else if (pat === 'grid') {
         const cols = Math.max(1, Math.round(num(params.cols, 3))), rows = Math.max(1, Math.round(num(params.rows, 3)));
         const dx = num(params.dx, 20), dy = num(params.dy, 20);
         items.push({ kind: 'rect', x: ox, y: oy, w: (cols - 1) * dx, h: (rows - 1) * dy });
-        handles.push({ id: 'size', x: ox + (cols - 1) * dx, y: oy + (rows - 1) * dy, kind: 'size', label: 'dx', value: dx });
+        // Signed pitch (no min) — drag left/down for a -X/-Y grid; a single col/row (divisor 0) leaves that axis alone.
+        decls.push({ type: 'rect', id: 'size', field: 'd_dx', fieldH: 'd_dy', ax: ox, ay: oy, ex: (cols - 1) * dx, ey: (rows - 1) * dy, sx: cols - 1, sy: rows - 1, editMin: 0, label: 'dx', value: dx });
     } else if (pat === 'rect') {
         const w = num(params.w, 100), h = num(params.h, 80);
         items.push({ kind: 'rect', x: ox, y: oy, w, h });
-        handles.push({ id: 'size', x: ox + w, y: oy + h, kind: 'size', label: 'W', value: w });
+        decls.push({ type: 'rect', id: 'size', field: 'd_w', fieldH: 'd_h', ax: ox, ay: oy, ex: w, ey: h, sx: 1, sy: 1, minw: 1, minh: 1, editMin: 1, label: 'W', value: w });
     } else if (pat === 'line') {
         const n = Math.max(1, Math.round(num(params.count, 3))), s = num(params.spacing, 20), a = num(params.angle, 0) * Math.PI / 180;
         const ex = ox + (n - 1) * s * Math.cos(a), ey = oy + (n - 1) * s * Math.sin(a);
         items.push({ kind: 'line', x1: ox, y1: oy, x2: ex, y2: ey });
-        handles.push({ id: 'end', x: ex, y: ey, kind: 'size', label: 'pitch', value: num(params.spacing, 20) });
+        decls.push({ type: 'radial', id: 'end', field: 'd_spacing', fieldA: 'd_angle', cx: ox, cy: oy, r: (n - 1) * s, a, rScale: n > 1 ? 1 / (n - 1) : null, minR: 0, editMin: 0, label: 'pitch', value: num(params.spacing, 20) });
     }
 
     const skip = parseSkip(params.skip);
     patternPoints(params).forEach((p, i) => items.push({ kind: 'hole', x: p.x, y: p.y, n: i + 1, r: holeR, skipped: skip.has(i + 1) }));
+
+    const { handles, onDrag, onEdit } = buildCanvasWidgets(decls, setFields);
 
     // Shared placement fragment — same shift the G-code is baked with, the stock datum offset, + the two corner
     // pickers (PATH ⌖ widget = path datum; markers on the stock corners = stock attach). One drop-in per wizard.
@@ -82,34 +89,7 @@ function buildDrillSpec(params, stock) {
         placement: pl.placement, items, handles,
         pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
         onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
-        onDrag(id, w) {
-            if (id === 'origin') { setFields({ d_originX: w.x, d_originY: w.y }); return; }
-            if (pat === 'circle') {
-                const dx = w.x - ox, dy = w.y - oy;
-                setFields({ d_dia: 2 * Math.hypot(dx, dy), d_startAngle: Math.atan2(dy, dx) * 180 / Math.PI });
-            } else if (pat === 'grid') {
-                const cols = Math.max(1, Math.round(num(params.cols, 3))), rows = Math.max(1, Math.round(num(params.rows, 3)));
-                const m = {};
-                if (cols > 1) m.d_dx = (w.x - ox) / (cols - 1);   // signed — drag left/down for a -X/-Y grid
-                if (rows > 1) m.d_dy = (w.y - oy) / (rows - 1);
-                setFields(m);
-            } else if (pat === 'rect') {
-                setFields({ d_w: Math.max(1, w.x - ox), d_h: Math.max(1, w.y - oy) });
-            } else if (pat === 'line') {
-                const n = Math.max(1, Math.round(num(params.count, 3)));
-                const dx = w.x - ox, dy = w.y - oy, m = { d_angle: Math.atan2(dy, dx) * 180 / Math.PI };
-                if (n > 1) m.d_spacing = Math.max(0, Math.hypot(dx, dy) / (n - 1));
-                setFields(m);
-            }
-        },
-        // Type a dimension on its on-canvas label (the Centroid touch) → the matching wizard field. The handle still
-        // drags for the 2-DOF tweak; this sets the primary value precisely.
-        onEdit(id, val) {
-            if (pat === 'circle' && id === 'ring') setFields({ d_dia: Math.max(0, val) });
-            else if (pat === 'grid' && id === 'size') setFields({ d_dx: Math.max(0, val) });
-            else if (pat === 'rect' && id === 'size') setFields({ d_w: Math.max(1, val) });
-            else if (pat === 'line' && id === 'end') setFields({ d_spacing: Math.max(0, val) });
-        },
+        onDrag, onEdit,
     };
 }
 

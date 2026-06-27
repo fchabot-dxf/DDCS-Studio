@@ -47,6 +47,81 @@ test('canvasWidgets registry: each gesture places its handle + maps a drag to th
   expect(r.ed, 'click-to-edit writes the field directly').toBe(1.5);
 });
 
+test('canvasWidgets registry: rect + radial gestures place + drag byte-identically to the hand-rolled drill math', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const r = await page.evaluate(async () => {
+    const { buildCanvasWidgets } = await import('/viz/canvasWidgets.js');
+    const out = {};
+    const mk = (decls) => { const cap = {}; const w = buildCanvasWidgets(decls, (m) => Object.assign(cap, m)); return { ...w, cap }; };
+
+    // rect — grid pitch (cols=3, rows=2, dx=20, dy=15): handle at anchor+extents; a drag divides by (cols-1)/(rows-1).
+    const grid = mk([{ type: 'rect', id: 'size', field: 'd_dx', fieldH: 'd_dy', ax: 0, ay: 0, ex: 40, ey: 15, sx: 2, sy: 1, editMin: 0, label: 'dx', value: 20 }]);
+    out.gridPlace = (() => { const h = grid.handles[0]; return { x: h.x, y: h.y, value: h.value }; })();
+    grid.onDrag('size', { x: 60, y: 30 }); out.gridDrag = { ...grid.cap };              // d_dx=60/2=30, d_dy=30/1=30
+
+    // single-column grid: divisor sx=0 leaves that axis untouched (signed pitch, no min — drag down for a -Y grid).
+    const gridCol = mk([{ type: 'rect', id: 'size', field: 'd_dx', fieldH: 'd_dy', ax: 0, ay: 0, ex: 0, ey: 10, sx: 0, sy: 1, label: 'dx' }]);
+    gridCol.onDrag('size', { x: 99, y: 25 }); out.gridColDrag = { ...gridCol.cap };      // only d_dy=25
+
+    // rect — literal W/H (divisor 1, min 1) + click-to-edit clamp.
+    const rect = mk([{ type: 'rect', id: 'size', field: 'd_w', fieldH: 'd_h', ax: 10, ay: 5, ex: 100, ey: 80, sx: 1, sy: 1, minw: 1, minh: 1, editMin: 1, label: 'W', value: 100 }]);
+    out.rectPlace = (() => { const h = rect.handles[0]; return { x: h.x, y: h.y, value: h.value }; })();
+    rect.onDrag('size', { x: 5, y: 90 }); out.rectDrag = { ...rect.cap };                // d_w=max(1,-5)=1, d_h=max(1,85)=85
+    rect.onEdit('size', -3); out.rectEditClamp = rect.cap.d_w;                           // max(1,-3)=1
+
+    // radial — circle ring (r=25 → Ø50, a=0, rScale=2): drag sets angle (atan2) + Ø (2·distance).
+    const circ = mk([{ type: 'radial', id: 'ring', field: 'd_dia', fieldA: 'd_startAngle', cx: 0, cy: 0, r: 25, a: 0, rScale: 2, editMin: 0, label: 'Ø', value: 50 }]);
+    out.circPlace = (() => { const h = circ.handles[0]; return { x: h.x, y: h.y, value: h.value }; })();
+    circ.onDrag('ring', { x: 0, y: 30 }); out.circDrag = { ...circ.cap };                // d_dia=2·30=60, d_startAngle=90
+
+    // radial — line end (n=3, s=20 → r=40, rScale=1/2): drag sets angle + pitch (distance/(n-1)).
+    const line = mk([{ type: 'radial', id: 'end', field: 'd_spacing', fieldA: 'd_angle', cx: 0, cy: 0, r: 40, a: 0, rScale: 0.5, minR: 0, label: 'pitch', value: 20 }]);
+    line.onDrag('end', { x: 0, y: 40 }); out.lineDrag = { ...line.cap };                 // d_spacing=40/2=20, d_angle=90
+
+    // single-point line (rScale null) → pure rotate: angle only, no pitch.
+    const line1 = mk([{ type: 'radial', id: 'end', field: 'd_spacing', fieldA: 'd_angle', cx: 0, cy: 0, r: 0, a: 0, rScale: null, label: 'pitch' }]);
+    line1.onDrag('end', { x: 3, y: 3 }); out.line1Drag = { ...line1.cap };               // d_angle=45 only
+    return out;
+  });
+  expect(r.gridPlace, 'grid size handle sits at anchor + extents, showing its pitch').toEqual({ x: 40, y: 15, value: 20 });
+  expect(r.gridDrag, 'grid drag → pitch = corner offset / (count-1)').toEqual({ d_dx: 30, d_dy: 30 });
+  expect(r.gridColDrag, 'a zero divisor skips its axis').toEqual({ d_dy: 25 });
+  expect(r.rectPlace).toEqual({ x: 110, y: 85, value: 100 });
+  expect(r.rectDrag, 'rect drag → W/H clamped to min 1').toEqual({ d_w: 1, d_h: 85 });
+  expect(r.rectEditClamp, 'click-to-edit honours editMin').toBe(1);
+  expect(r.circPlace, 'ring handle on the circle at the start angle').toEqual({ x: 25, y: 0, value: 50 });
+  expect(r.circDrag.d_dia, 'radial drag → Ø = 2 · distance').toBe(60);
+  expect(r.circDrag.d_startAngle, 'radial drag → start angle').toBeCloseTo(90, 6);
+  expect(r.lineDrag.d_spacing, 'line drag → pitch = distance / (n-1)').toBe(20);
+  expect(r.lineDrag.d_angle).toBeCloseTo(90, 6);
+  expect(Object.keys(r.line1Drag), 'pure-rotate radial sets only the angle').toEqual(['d_angle']);
+  expect(r.line1Drag.d_angle).toBeCloseTo(45, 6);
+});
+
+test('drill wizard renders its handles from the registry (point + radial)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
+  await page.waitForSelector('#wiz_drill', { state: 'visible' });
+  // Switch to the bolt-circle pattern so the radial 'ring' handle (with its Ø value label) renders.
+  await page.evaluate(() => { const e = document.getElementById('d_pattern'); if (e) e.value = 'circle'; window.ddcsStudio.wizardManager.update(); });
+  await page.waitForTimeout(200);
+  const r = await page.evaluate(() => {
+    const cont = document.getElementById('drillLayoutCanvas');
+    if (!cont) return { handles: -1 };
+    const labels = [...cont.querySelectorAll('.fc-handle-label')].map((t) => t.textContent);
+    return {
+      handles: cont.querySelectorAll('.fc-handle').length,
+      moves: cont.querySelectorAll('.fc-handle-move').length,
+      hasDia: labels.some((t) => /Ø/.test(t)),
+    };
+  });
+  expect(r.handles, 'origin (point) + ring (radial) both render').toBe(2);
+  expect(r.moves, 'origin is a move/snap handle').toBe(1);
+  expect(r.hasDia, 'the radial ring shows its Ø value label').toBe(true);
+});
+
 test('text wizard renders its four canvas handles from the registry', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);

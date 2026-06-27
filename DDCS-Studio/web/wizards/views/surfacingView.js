@@ -2,6 +2,7 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { SurfacingWizard, surfacingBBox } from '../surfacingWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
+import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams } from '../ops/placement.js';
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
@@ -30,21 +31,20 @@ function applyTool() {
 function buildSurfacingSpec(params, stock) {
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
     const w = num(params.w, 100), h = num(params.h, 80);
+    // DECLARE the handles via reusable gestures (not hand-rolled): pos = `point`, the face area = a `rect` corner.
+    const { handles, onDrag, onEdit } = buildCanvasWidgets([
+        { type: 'point', id: 'origin', fx: 'sf_originX', fy: 'sf_originY', x: ox, y: oy, label: 'pos' },
+        { type: 'rect', id: 'size', field: 'sf_w', fieldH: 'sf_h', ax: ox, ay: oy, ex: w, ey: h, sx: 1, sy: 1, minw: 1, minh: 1, label: 'W × H' },
+    ], setFields);
     const pl = placementSpec(params, surfacingBBox(params), 'sf_');
     return {
         stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
         placement: pl.placement,
         items: [{ kind: 'rect', x: ox, y: oy, w, h }],
-        handles: [
-            { id: 'origin', x: ox, y: oy, kind: 'move', label: 'pos' },
-            { id: 'size', x: ox + w, y: oy + h, kind: 'size', label: 'W × H' },
-        ],
+        handles,
         pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
         onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
-        onDrag(id, p) {
-            if (id === 'origin') setFields({ sf_originX: p.x, sf_originY: p.y });
-            else setFields({ sf_w: Math.max(1, p.x - ox), sf_h: Math.max(1, p.y - oy) });
-        },
+        onDrag, onEdit,
     };
 }
 

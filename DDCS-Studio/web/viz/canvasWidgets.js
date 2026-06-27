@@ -46,6 +46,31 @@ export const CANVAS_GESTURES = {
         place: (d) => ({ x: d.ax + Math.tan(d.value / DEG) * d.h, y: d.ay + d.h, kind: 'size', label: d.label, value: d.value }),
         drag: (d, w) => ({ [d.field]: Math.atan2(w.x - d.ax, d.h) * DEG }),
     },
+    // 2D SIZE / corner from an anchor → two fields. The handle sits at anchor + extents (ex/ey); a drag maps the corner
+    // offset back to each field through a per-axis DIVISOR `sx`/`sy` (1 = literal W/H · `cols-1` = grid pitch · 0.5 =
+    // half-extent radius), and clamps with `minw`/`minh`. A zero divisor skips that axis (e.g. a single-column grid).
+    rect: {
+        place: (d) => ({ x: d.ax + d.ex, y: d.ay + d.ey, kind: 'size', label: d.label, value: d.value }),
+        drag: (d, w) => {
+            const m = {};
+            if (d.sx) m[d.field] = clampMin((w.x - d.ax) / d.sx, d.minw);
+            if (d.sy) m[d.fieldH] = clampMin((w.y - d.ay) / d.sy, d.minh);
+            return m;
+        },
+    },
+    // POLAR handle about a center → a radius field + an angle field (the "rotate" gesture, fused with radius like a
+    // drill ring/line-end). Handle at center + r·(cos,sin)a; a drag sets the angle (atan2) and scales the dragged
+    // distance into the radius field via `rScale` (2 = Ø from a radius · 1/(n-1) = pitch). Omit `fieldA` for radius-only,
+    // or `rScale` for angle-only (pure rotate). `minR` clamps the radius.
+    radial: {
+        place: (d) => ({ x: d.cx + d.r * Math.cos(d.a), y: d.cy + d.r * Math.sin(d.a), kind: 'size', label: d.label, value: d.value }),
+        drag: (d, w) => {
+            const dx = w.x - d.cx, dy = w.y - d.cy, m = {};
+            if (d.fieldA) m[d.fieldA] = Math.atan2(dy, dx) * DEG;
+            if (d.rScale) m[d.field] = clampMin(Math.hypot(dx, dy) * d.rScale, d.minR);
+            return m;
+        },
+    },
 };
 
 /** Declarations → { handles, onDrag, onEdit } for a FeatureCanvas spec. `setFields(map)` writes the op's form fields
@@ -66,7 +91,8 @@ export function buildCanvasWidgets(widgets, setFields) {
         if (updates) setFields(updates);
     };
     const onEdit = (id, value) => {   // click-to-type a dimension's value (FeatureCanvas inline editor)
-        const d = byId[id]; if (d && d.field != null && Number.isFinite(value)) setFields({ [d.field]: value });
+        const d = byId[id]; if (!(d && d.field != null && Number.isFinite(value))) return;
+        setFields({ [d.field]: d.editMin != null ? Math.max(d.editMin, value) : value });
     };
     return { handles, onDrag, onEdit };
 }
