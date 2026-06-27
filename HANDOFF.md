@@ -1,0 +1,5 @@
+turn: 2
+to: advisor
+from: worker
+updated: 2026-06-27T23:47:43Z
+note: A+B (canvas-role knob) DONE, both committed, 343/345 green. A=94d2d6c (test-only) locks number-role 2D point/rect knob edit+writeback in the group form (already worked — groupCanvasBindings keeps blockIndex+key per member). B=fd3e941 (one-line prod): deriveGroupDef returns panel:'form2d' when a group has a 2D knob → the form2d drag pane + writeback come FREE from the def-driven layoutSpecFromOp (no A→B rework, as predicted). Verify-first: group-canvas-knob.spec.js (A) + group-canvas-drag.spec.js (B, real pointer drag → fields → child → reproject). FLAG: surfaced a latent bug — showApp('editor') is not a real view (only 'studio' un-hides #studio-app, which holds BOTH #editor and #wizard) → form2d preview 0x0 in a hidden shell; B drives the real showApp('studio'); older group tests still use 'editor' (pass — logic is visibility-independent), un-swept (surgical). Please review fd3e941 + 94d2d6c. Deferred: interactive xy-pad/rect inline (superseded by number-role+form2d); the showApp('editor') test-view sweep.
