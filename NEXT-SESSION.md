@@ -75,18 +75,39 @@ cleanly-portable placement op; `atc_warmup` the only clean leaf.** The `liveFoot
 `extent` + a per-op flag so shared atoms like `stepover` don't regress pocket) is DESIGNED and proven on drill, but
 landing it for surfacing was a NO-OP (footprint can't vary) so it was reverted — land it only after binding works.
 
-## ▶ Immediate next task — the data-def FORMAT extensions (no more easy ports)
-1. **(optional) commit/release** — the working tree is clean (drill fix already on `origin/main`); nothing to push unless
-   you also want the doc corrections (this file + ROADMAP STRATEGIC #3) published.
-2. **Build the binding-feasibility extensions** (the real Stage-5/6 lift — unblocks surfacing/contour AND the probe/ATC
-   family, NOT a per-op grind): (i) **nested-path binding** (`key:'region.w'` reaches a param inside a child/reporter);
-   (ii) **computed/derived bindings** (`so = f(toolDia, stepoverPct)`); (iii) **fan-out** (one param → many sockets).
-   Pick ONE, add it to `instantiate`/`extractParamBlocks` + the equivalence harness, then re-attempt surfacing.
-3. **Then the DEEP frontier — conditional STRUCTURE + computed ADDRESS** (gates the probe/ATC/comm/homing family, ~13 ops):
-   rewrite an op's JS branches/loops/arithmetic into block-IR `iff`/`count`/`expr`/`assign` atoms so its stack is
-   static-shape + the data-def can carry it. This is the real Stage-5/6 lift.
-4. **Then STRATEGIC #4 — Stage 6 self-host** (gated on Stage 5 + the federated registry): built-ins become forkable; a
+## ⚠️ BLOCKER FOUND (2026-06-27) — the Blockly BRIDGE recurses on a flat-geometry `fill` block (prerequisite to fix)
+Restructuring `surfacing` to flat geometry was attempted TWO ways and **both proved BYTE-IDENTICAL at the EMIT level**
+(captured a baseline, diffed — identical): (1) geometry flat on the SHARED `stepover` (built its rect region from flat
+`shape/x/y/w/h` via a `fillRegion` helper when no Region reporter is plugged); (2) a DEDICATED `surfacefill` atom (flat
+geometry, NO region socket, reuses the `fillStrategy`/`fillSegments` kernels). **So the reframe is validated — flattening
+surfacing's emit works.** BUT BOTH hit the SAME wall: **`Maximum call stack size exceeded` in `emit` during the Blockly
+BRIDGE round-trip** (insert surfacing → open Blocks tab → reproject). The FINAL model is CLEAN (a cycle-walk found no
+cycle: `progstart, op{wcs, placeonstock{stepdown{surfacefill}}}, progend` with flat primitive params) — so it's a
+**TRANSIENT cyclic stack the bridge builds mid-reproject** for a flat-geometry `fill` block, then emits → recursion.
+The original StepOver(**Region reporter**) round-trips fine (the geometry is a child reporter block, not value sockets),
+so the trigger is **flat value-socket geometry on a `fill`-kind block**. NOT the atom design (shared vs dedicated). All
+reverted to green. The op container also carries `spindle`/`head`/`endProgram` SETTINGS objects with `type:` fields that
+look like reporter pills (`head:{type:'spindle'}`) — a suspected accomplice (resolveValue may treat them as reporters),
+worth checking, though the original surfacing carries them too. ⇒ **FIX THE BRIDGE round-trip of flat-geometry fill
+blocks FIRST** (instrument `stackBridge` stackToWorkspace/workspaceToStack + the blocksApp reproject change-listener);
+it's a PREREQUISITE that unblocks ALL fill-op restructures (surfacing/contour/slot/pocket). The emit-level data-def port
+(`surfacingData.js` + a byte-identical sweep incl. live-footprint placement) works and can land once the bridge is fixed.
+
+## ▶ Immediate next task — RESTRUCTURE awkward wizards to fit the dumb format (per the 2026-06-27 reframe)
+**Do NOT build binding-format extensions.** Flatten each blocked wizard so every param maps to ONE flat `(blockIndex,key)`
+socket, keeping the data-def format dumb (directive 1 / [[restructure-source-not-abstraction]]). **GATED on the bridge
+fix above for the fill-ops (surfacing/contour/slot).**
+1. **FIX the Blockly bridge** flat-geometry-fill recursion (above) — then **RESTRUCTURE `surfacing`** (proven byte-identical
+   at emit): a dedicated `surfacefill` atom (flat `shape/x/y/w/h` + the form-computed `stepover` + `strategy` socket value +
+   live-footprint placement). Then `dataOps/surfacingData.js` + `surfacing-as-data.spec` (byte-identical + binding-wiring).
+2. **Then `contour`, `slot`, `text`** the same way — one at a time, each gated by the equivalence test. Keep the
+   byte-identical gate where legacy output is fine; relax to "equivalent toolpath" only DELIBERATELY, per-wizard.
+3. **Genuine BRANCHING** (the probe/ATC/comm/homing family, conditional-structure-dominated) is the only place that may
+   still need `iff`/`count` atoms IN the stack or a split into wizard variants — restructure those too, don't grow the format.
+4. **Then STRATEGIC #4 — Stage 6 self-host** (gated on the ports + the federated registry): built-ins become forkable; a
    `resetToFactory` re-registers shipped defs by clearing the `USER_*` layers.
+**DIRECTIVE: when a port is blocked by wizard structure, ASK whether the source can change + propose restructuring it —
+don't silently build machinery to preserve a structure the user doesn't care about.**
 
 *Loose ends (optional):* round-trip **step 5** — a referential-integrity guard when a removed knobbed block is
 referenced elsewhere (the corner `#1→#7/#8` case); edge-casey, deferred. More learner-library **curation** (the real
