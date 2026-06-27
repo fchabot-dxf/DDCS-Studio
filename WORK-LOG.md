@@ -298,3 +298,36 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
   with a click handler that wraps-then-edits. Dominates both poles (B's purity on render + A's reuse on click).
 - state: tests 338/341 green · branch main · inc 2 `8de09a6`/`fcea911` committed (local). **GATE: holding for the advisor's
   pick on the AUTO design before building. Watcher armed on NEXT-SESSION.md (Monitor b3obi8v5b).** Not building yet.
+
+## 2026-06-27 — AUTO built (advisor PASSED the gate) — pure stack auto-shows the chip `c8f6890`
+
+- advisor PASSED my gate synthesis (`4b00fa8`): auto-SHOW the chip on a lone loose run (no mutation on render) +
+  auto-WRAP on CLICK (groupLooseAtoms → openForEdit). ADDED CONSTRAINT: auto-show ONLY when the WHOLE program is a
+  single loose run (no real ops); mixed programs keep the right-click gesture. Verify-first incl. the mixed no-show case.
+- did:
+  - `programModel.autoGroupRunAtLine(i)` — `looseRunAtLine(i)` but returns null the moment any `type==='op'` exists in
+    the stack → encodes the "unambiguous single-run ONLY" policy in ONE place (the model, declared). `linesForRun(ids)`
+    (the auto-chip highlight, the loose-run analogue of `linesForOp`). Both exposed on window (gated by
+    editorMatchesProjection like the inc-3 hooks).
+  - `editorOpHover` mousemove: when `opAtLine` is null, try `ddcsAutoGroupRunAtLine` → if a run, show an ENABLED
+    `✎ Hand-built` chip (highlight via `ddcsLinesForRun`), tagged `dataset.autoRun = JSON.stringify(run)`, `opId=''`.
+    The op-chip path clears `autoRun=''` so the two never cross. Click handler: if `opId` → `ddcsEditOp` (unchanged);
+    else if `autoRun` → dyn-import opSession, `groupLooseAtoms('Hand-built', autoRun)` → `ddcsEditOp(newGroupId)`.
+- why this shape:
+  - **No mutation on render** (the advisor's + #12's invariant): the chip is a pure VIEW (`autoGroupRunAtLine` reads,
+    never writes); the model only changes on the explicit edit CLICK. Avoids the "every pure stack silently becomes a
+    group on load" cost of pure-auto-WRAP AND the reproject-loop fragility of mutating during projection.
+  - **Wrap-on-click reuses everything**: by the time the form opens it's a real `group` op, so increment 2's derive +
+    writeback apply UNCHANGED — no synthetic-bare-run rework (the cost that sank pure-auto-SHOW / the rejected option C).
+  - **Constraint in the model, not the UI**: `autoGroupRunAtLine` returns null if ANY real op exists, so the auto-chip
+    can't appear over a mixed program — the boundary policy is one declared guard, not scattered UI checks.
+- tried/considered: highlighting the run needed line indices, not block ids → added `linesForRun` (mirrors `linesForOp`)
+  rather than recomputing in the UI. Used a `'__autorun__'` sentinel for the hover thrash-guard (no op id to key on).
+- VERIFY-FIRST (`group-auto.spec.js`, both green): (1) a PURE stack — `autoGroupRunAtLine` resolves all 3 atoms as one
+  run → hover (NO right-click) → the ✎ chip appears ENABLED → click → exactly one `group` op now exists (wrapped on
+  click) + the form opened with the `depth` knob (-2) → edit to -7 → insert writes back (child z=-7, G-code `Z-7`) →
+  survives a Blocks-tab reprojection. (2) a MIXED program (loose + a real drill) — `autoGroupRunAtLine` is null on
+  EVERY line, `looseRunAtLine` still resolves (gesture intact), and hovering a loose line shows NO chip.
+- state: tests 340/343 green (2 skipped; known `middle-animator` flake) · branch main · AUTO committed `c8f6890`
+  (LOCAL, not pushed — user's call; no `.ver` bump → no release). backup branch updated. Watcher (Monitor `b3obi8v5b`)
+  still armed on NEXT-SESSION.md. NEXT (deferred, advisor's call): canvas-role knob writeback gap. Holding for review.
