@@ -137,7 +137,7 @@ Shipped:
   annotation-text atom that renders from a BOUND param (like Spindle renders `M3 S<rpm>`), built when an op FORCES it, NOT
   speculatively. Never silently drop a number an operator confirms against.
 
-## ▶ Immediate next task — CANVAS-WIDGET consolidation, Stage 3 (Stage 2 COMPLETE — all 6 views migrated)
+## ▶ Immediate next task — CANVAS-WIDGET consolidation, Stage 3 (IN PROGRESS — first increment shipped `46c4195`)
 Stage 1 (the reusable registry `web/viz/canvasWidgets.js` + text) `6b08676`. **Stage 2 is DONE** — agreed SCOPE met:
 every milling op's **handcoded** 2D-canvas GUI now DECLARES its handles via `buildCanvasWidgets([...])` (the canvas
 analogue of `formWidgets.js`). All 6 views with draggable handles are migrated: **text, drill, surfacing, pocket, slot,
@@ -160,12 +160,30 @@ separate canvas views: bore is a drill variant; the rest are probe/rotary views 
   — fields actually move). Byte-identical, not waved through as "free reuse." Full suite **326 green** (lone flake =
   known `middle-animator`). Gesture set now: `point · length · scaleX · shear · rect · radial · projLength`.
 
-1. **STAGE 3 (THE NEXT INITIATIVE) — make the handles DECLARABLE-AS-DATA in the wizard maker** — the end-user reach, the
-   whole point of the consolidation. A binding maps a param to a canvas GESTURE exactly as it maps to a `formWidgets`
-   form widget today, and the custom-op preview renders its handles FROM the bindings (the canvas analogue of the
-   form-render-from-bindings that already exists). REUSE the binding/widget-as-data system (`formWidgets`, `userOps`, the
-   custom-op panel) — NOT a parallel registry. [[widget-library-custom-op-wizards]], [[gui-blocks-roundtrip-target]],
-   [[spatial-gui-form-vs-canvas]]. Files: `web/blocks/userOps.js`, `web/ui/formWidgets.js`, the custom-op preview render.
+**✅ Stage 3 first increment shipped (`46c4195`) — the custom-op preview renders its handles FROM the registry, + a new
+declarable gesture.** Two parts:
+- **Part A (unify):** `panelTypes.layoutSpecFromOp` (the custom-op Form+2D preview) stopped hand-rolling its onDrag — it
+  now DECLARES its handles and builds them with the SAME `buildCanvasWidgets` registry the built-in views use
+  (`point`/`rect`), `setFields → _writeParam` to the bound form fields. Behavior-preserving (the existing point/rect
+  handle tests pass unchanged). The custom-op canvas now shares gesture code with drill/pocket/slot — every registry
+  gesture is one role-mapping away.
+- **Part B (declarable reach):** a NEW **`ncircle`** number-role family (2D circle · X/Y/Ø) is authorable end-to-end
+  (`userOps` CANVAS_DECODE/ROLE_WIDGETS/ROLES), and the preview maps an `{x,y,dia}` group → `point` + a radius-only
+  `radial` — so an author who tags three number params gets a draggable circle with a Ø ring, ZERO per-op code. The
+  rule-of-three third spatial shape (point/rect → +circle), proving the registry generalizes to custom ops. Rigor:
+  unit + end-to-end declarability + a REAL panel drag of the RING (a size handle, never exercised in a real panel
+  before). `tests/custom-op-canvas-handles.spec.js`, `tests/custom-op-form2d-drag.spec.js`.
+
+1. **STAGE 3 — CONTINUE.** The seam is proven; remaining work is breadth + reach, each pulled by a real authoring need
+   (rule-of-three, not speculative): **(a)** more declarable gestures as authors want them — `length`/`scaleX`/`shear`
+   (text-like) and `projLength` (slot-like) each = one `CANVAS_*` role family + one `layoutSpecFromOp` mapping, same
+   pattern as `ncircle`; **(b)** surface the new "2D circle" choice in the dev-mode inline-expose UI flow + a learner/
+   docs note (the dropdown already lists it via `CANVAS_ROLE_WIDGETS`, but confirm the authoring gesture is discoverable);
+   **(c)** OPTIONAL — the form mini-canvases (`xyPadWidget`/`rectPadWidget` in `formWidgets.js`) still hand-roll their
+   FeatureCanvas onDrag; the ROADMAP calls them "spare parts" (preview-canvas-first), so migrate only if kept. REUSE the
+   binding/widget-as-data system — NOT a parallel registry. [[widget-library-custom-op-wizards]],
+   [[gui-blocks-roundtrip-target]], [[spatial-gui-form-vs-canvas]]. Files: `web/wizards/ops/panelTypes.js`,
+   `web/blocks/userOps.js`, `web/blocks/devMode.js`.
 
 ## ▶ Independent tracks (NOT blockers for the widget work)
 - **`contour`-as-data EMIT port** — the LAST of the wizards-as-data trio (its design agent failed mid-run; not built).
