@@ -31,4 +31,7 @@ export const drillBlock = {
     defaults: { x: 0, y: 0, depth: 5, peck: 5, feed: 100, clearance: 5, zOff: 0 },
     fields: ['x', 'y', 'depth', 'peck', 'feed', 'clearance'],
     emit: (p, dx = 0, dy = 0) => peckDrill({ x: r3(num(p.x, 0) + dx), y: r3(num(p.y, 0) + dy) }, p),
+    // Declared geometry extent (centre-based, like the rest of placement): a hole is a POINT at its local x,y. Lets a
+    // container (Array) recompute the placement bbox LIVE from params instead of a frozen snapshot — see placeOnStock.
+    extent: (p) => ({ minX: num(p.x, 0), maxX: num(p.x, 0), minY: num(p.y, 0), maxY: num(p.y, 0) }),
 };

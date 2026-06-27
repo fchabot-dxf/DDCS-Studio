@@ -7,9 +7,11 @@
  * port (Stage 5) reuses it, and so a distribution-install can validate a community data-op claims-to-BE-X by the
  * same yardstick (MID #6's "distribution-install validation").
  *
- * emitEquivalence(builderA, builderB, sweep, settings): run EVERY param set in `sweep` through both builders, emit
- * each with the SAME settings (pin one dialect — emit output is dialect-dependent), and compare the `.text`. Block
- * ids never reach `.text` (they only tag the line→source map), so the comparison is deterministic across builds.
+ * emitEquivalence(builderA, builderB, sweep, settings, normalize): run EVERY param set in `sweep` through both
+ * builders, emit each with the SAME settings (pin one dialect — emit output is dialect-dependent), and compare the
+ * `.text`. Block ids never reach `.text` (they only tag the line→source map), so the comparison is deterministic
+ * across builds. `normalize` (default identity) lets a port prove FUNCTIONAL equivalence when a builder bakes
+ * param-interpolated annotation TEXT a static template can't recompute — see stripAnnotations.
  *
  * Pure module — no DOM. Runs in the browser test context (where blockEmitter lives).
  */
@@ -21,15 +23,26 @@ import { emitMapped } from '../blockEmitter.js';
  * @param {(p:object)=>object[]} builderB  e.g. builderOf('user_drill_data') (the data-def, via instantiate)
  * @param {object[]} sweep                 param sets to test (each passed verbatim to BOTH builders)
  * @param {object} [settings]              emit settings ({ dialect?, profileId? }) — MUST be identical for both sides
+ * @param {(t:string)=>string} [normalize] applied to BOTH sides' text before compare (default identity); pass
+ *                                          stripAnnotations to compare only the executable G-code (cosmetic-frontier).
  * @returns {{ pass:boolean, count:number, diffs:Array<{i:number,params:object,a:string,b:string}>, firstDiff:object|null }}
  */
-export function emitEquivalence(builderA, builderB, sweep, settings = {}) {
+export function emitEquivalence(builderA, builderB, sweep, settings = {}, normalize = (t) => t) {
     const diffs = [];
     for (let i = 0; i < (sweep || []).length; i++) {
         const params = sweep[i];
-        const a = emitMapped(builderA(params), settings).text;
-        const b = emitMapped(builderB(params), settings).text;
+        const a = normalize(emitMapped(builderA(params), settings).text);
+        const b = normalize(emitMapped(builderB(params), settings).text);
         if (a !== b) diffs.push({ i, params, a, b });
     }
     return { pass: diffs.length === 0, count: (sweep || []).length, diffs, firstDiff: diffs[0] || null };
+}
+
+/** A normalizer for emitEquivalence: drop every parenthetical ( … ) annotation (pure comments AND HMI-toast
+ *  payloads like `#1505=-5000(msg)`) plus the now-blank lines, leaving only the executable G/M-code tokens. Lets a
+ *  data-def be proven FUNCTIONALLY equivalent (identical machine behavior) even when a builder bakes
+ *  param-interpolated comment/message TEXT that a static {template,bindings} can't recompute — a COSMETIC frontier
+ *  (distinct from drill's FUNCTIONAL blockers: a frozen comment changes no motion; a frozen bbox/method does). */
+export function stripAnnotations(text) {
+    return String(text).split('\n').map((l) => l.replace(/\([^)]*\)/g, '').trim()).filter(Boolean).join('\n');
 }

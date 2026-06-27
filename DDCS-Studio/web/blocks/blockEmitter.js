@@ -72,6 +72,26 @@ function resolveParams(params, scope) {
     return out;
 }
 
+/** The DECLARED geometry extent of the first wrapped atom that can measure itself ({minX,maxX,minY,maxY}), or null.
+ *  A container atom (Array) composes its OWN extent with its child's (computed bottom-up), so a hole-pattern reports
+ *  the pattern footprint. Recomputed from LIVE params (resolveParams) so placement tracks the geometry — the ONE
+ *  source of truth, replacing the placeOnStock bbox SNAPSHOT for migrated atoms. Null (no atom declares an extent, or
+ *  a container's child can't measure itself) → the place fold keeps the frozen snapshot, so un-migrated ops are unchanged. */
+function liveExtent(blocks, scope) {
+    for (const b of (blocks || [])) {
+        if (!b) continue;
+        const def = BLOCKS[b.type];
+        if (!def) continue;
+        if (def.extent) {                                   // an atom that knows its own footprint
+            const childExt = b.children ? liveExtent(b.children, scope) : null;
+            try { const e = def.extent(resolveParams(b.params, scope), childExt); if (e) return e; } catch { /* unmeasurable → fall through to the snapshot */ }
+        } else if (b.children) {                            // a transparent wrapper → look inside
+            const e = liveExtent(b.children, scope); if (e) return e;
+        }
+    }
+    return null;
+}
+
 /** Recursive fold → tagged lines. `anc` = ancestry of block ids; `scope` = the variable environment. */
 function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dialect = DEFAULT_DIALECT) {
     const def = BLOCKS[block.type];
@@ -148,7 +168,9 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     if (def.kind === 'place') {                // PLACE ON STOCK: emit the wrapped op, then TRANSLATE its output so
         const inner = [];                      // the path's datum corner lands on the stock-attach corner (+ offset).
         (block.children || []).forEach((c) => inner.push(...emit(c, dx, dy, own, scope, dialect)));
-        const s = placeShiftFromParams(p);     // {x,y,z} from the block's own bbox + stock snapshot (self-contained)
+        // Prefer the wrapped geometry's LIVE declared extent (recomputed from params) over the frozen bbox snapshot —
+        // so the placement tracks the pattern (one source of truth). Falls back to the snapshot for un-migrated ops.
+        const s = placeShiftFromParams(p, liveExtent(block.children, scope));
         if (!s.x && !s.y && !s.z) return inner;
         const moved = translateProgram(inner.map((t) => t.line).join('\n'), s.x, s.y, s.z).text.split('\n');
         return inner.map((t, i) => ({ line: moved[i], src: t.src }));   // keep each line's provenance (1:1 translate)

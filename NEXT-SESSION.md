@@ -33,35 +33,41 @@ loops/control (`count`/`iff`/`array`/`flow`), and raw-emit atoms (`macro.js`) al
 as data + the equivalence harness) is now done** (drill). What remains is **Stages 5–6** — port the rest (gated on the 3
 frontier format extensions the drill port surfaced) → self-host. See ROADMAP "Key reframe" + STRATEGIC #2/#3.
 
-## ✅ Shipped this session (2026-06-26, UNCOMMITTED in the working tree — `feat/learner-library` already merged to `main`)
-- **MID #6 — Federated schema registry `[S]`** — built-in `BUILDERS`/`SCHEMA` are now PRISTINE; user ops register into
-  separate `USER_BUILDERS`/`USER_SCHEMA`/`USER_LABELS` layers, resolved by `builderOf(op)`/`specOf(op)` (built-in-first;
-  `user_`-prefixed → disjoint). All ~13 `BUILDERS[op]` read-sites + the 4 opSchema helpers route through the resolvers;
-  `USER_LABELS` split fixes the `OP_LABELS`-delete leak (a user-op delete can never drop a built-in label). Adversarially
-  reviewed — audited complete, no missed consumer. `blocks/opSchema.js`, `blocks/opBuilders.js`, `blocks/userOps.js` +
-  `federated-registry.spec.js`.
-- **STRATEGIC #2 — Wizards-as-data Stage 4 `[L]`** — **drill expressed as a `{template, bindings}` data def**
-  (`blocks/dataOps/drillData.js`) consumed by `registerUserOp`/`instantiate` via the federated user layer, + the reusable
-  **equivalence harness** (`blocks/dataOps/equivalence.js`). `drill-as-data.spec.js` proves it BOTH ways: emit-equivalence
-  (byte-identical to `drillStack` across a grid-at-origin/cut/skip/wcs sweep) AND structural binding-wiring (all 21
-  bindings route to the same socket `drillStack` uses). Drill is **~90% data-expressible**; the **3 frontier blockers**
-  are failing-on-purpose tripwires: **(2, primary) live bbox** (`placeOnStock`'s frozen snapshot ≠ a moved pattern bbox),
-  **(1) method swap** (helical→bore child-type), **(3) clearance fan-out** (1 param → 2 sockets).
-- Full suite **310 green** (added `federated-registry.spec` + `drill-as-data.spec`; gui-blocks-roundtrip updated to the
-  resolver API). NOT yet committed — awaiting the go-ahead (no `.ver` bump → no desktop release).
+## ✅ Shipped this session (2026-06-26)
+- **MID #6 — Federated schema registry `[S]` + STRATEGIC #2 — Wizards-as-data Stage 4 `[L]` — COMMITTED `128ae7e` (pushed to `main`).**
+  MID #6: built-in `BUILDERS`/`SCHEMA` PRISTINE; user ops in separate `USER_BUILDERS`/`USER_SCHEMA`/`USER_LABELS` layers
+  resolved by `builderOf`/`specOf` (built-in-first; `user_`-prefixed → disjoint); ~13 read-sites + 4 opSchema helpers
+  rerouted; `USER_LABELS` split fixes the `OP_LABELS` leak. Stage 4: **drill as a `{template,bindings}` data def**
+  (`dataOps/drillData.js`) + reusable **equivalence harness** (`dataOps/equivalence.js`); proven via emit-equivalence
+  (grid-at-origin/cut/skip/wcs sweep) AND structural binding-wiring (all 21 bindings). Adversarially reviewed.
+- **STRATEGIC #3 — Stage 5, 1st additional port — `atc_warmup`** (COMMITTED `cd0537f` — note: that commit is
+  MISLABELLED "feat(analytics)" because a concurrent session's `git add -A` swept it up; the work is all there). Spindle
+  warmup as `{template,bindings}` — STATIC-shape, 4 numeric bindings; FUNCTIONAL emit-equivalence via the new reusable
+  **`stripAnnotations`** normalizer + binding-wiring. Surfaced the **4th frontier — computed annotation TEXT** (COSMETIC).
+  *(`wcs` REJECTED — conditional branch + boolean-gated inclusion → not `{template,bindings}`-able.)*
+- **⚑ Frontier-coverage map (all 19 remaining built-ins classified) + ✅ FUNCTIONAL blocker (a) placement-bbox SOLVED**
+  (the north-star fix — UNCOMMITTED in the working tree). Map: `atc_warmup` was the ONLY free port; everything else hits
+  a FUNCTIONAL blocker (most are conditional-structure-dominated → unportable as pure data). **The bbox fix** (principle
+  #4 — the frozen snapshot was a duplicate that goes stale): geometry atoms now DECLARE `extent(params)` (`drill`/`bore`
+  = a point; `array` = points ⊕ child extent) and the place fold recomputes it LIVE (`blockEmitter.liveExtent`),
+  falling back to the snapshot for un-migrated ops. **`drill` is now fully placement-portable** (off-origin/circle/line/
+  rect/stock-attach all byte-identical; a latent circle-`x0` placement bug fixed). Behavior-preserved (full suite green);
+  an adversarial check caught the circle-`x0` regression a test gap had missed. Files: `wizards/ops/{drill,bore,array,
+  placement}.js`, `blocks/blockEmitter.js`, `blocks/dataOps/drillData.js`, `drill-as-data.spec.js`.
+- Full suite **311 green serial** (parallel runner flakes ~5 UI specs under load — pass in isolation/serial).
 
-## ▶ Immediate next task — Stage 5 (port more built-ins), gated on the 3 frontier extensions
-1. **(optional) Commit + release** this session's work. Bump the `.ver` chip in `web/index.html` + push only if a desktop
-   exe/release is wanted (`desktop-release.yml`); the web app redeploys to pages.dev on push regardless.
-2. **STRATEGIC #5/#3 → Stage 5** — port the next built-in to data, reusing `dataOps/equivalence.js` (emit-equivalence +
-   binding-wiring). **The drill port sharpened the frontier into 3 concrete format extensions Stage 5 must grow** (now in
-   ROADMAP STRATEGIC #3): **(a) computed/derived bindings OR a live-bbox `placeOnStock`** — the *primary* blocker; the
-   baked bbox snapshot is incompatible with parametric data-defs and affects EVERY placed op; **(b) conditional
-   block-TYPE** (drill↔bore, probe IF-GOTO families); **(c) one-param-→-many-sockets** fan-out. A **leaf op with no
-   placement + static shape** (e.g. a WCS-set or a single fixed-method op) is the cleanest NEXT port to prove the harness
-   on a 2nd op before tackling a placement extension.
-3. **Then STRATEGIC #4 — Stage 6 self-host** (gated on Stage 5 + the now-shipped federated registry): built-ins become
-   forkable; a `resetToFactory` re-registers shipped defs by clearing the `USER_*` layers.
+## ▶ Immediate next task — migrate the next placement ops, then the deep (conditional-structure) frontier
+1. **(optional) Commit + release** the uncommitted placement-bbox fix. Bump the `.ver` chip in `web/index.html` + push
+   only if a desktop exe/release is wanted; the web app redeploys to pages.dev on push regardless.
+2. **Migrate `surfacing` + `contour`** — give each its geometry atom an `extent(params)` (their `surfacingBBox`/`contourBBox`
+   functions already exist — lift them onto the atom), then port each to a `{template,bindings}` data def + prove
+   emit-equivalence (now reachable since placement is live). They're blocked by NOTHING ELSE → become fully portable.
+   Then `slot`/`text`. ONE op at a time, each gated — never batch.
+3. **Then the DEEP frontier — conditional STRUCTURE + computed ADDRESS** (gates the probe/ATC/comm/homing family, ~13 ops):
+   rewrite an op's JS branches/loops/arithmetic into block-IR `iff`/`count`/`expr`/`assign` atoms so its stack is
+   static-shape + the data-def can carry it. This is the real Stage-5/6 lift.
+4. **Then STRATEGIC #4 — Stage 6 self-host** (gated on Stage 5 + the federated registry): built-ins become forkable; a
+   `resetToFactory` re-registers shipped defs by clearing the `USER_*` layers.
 
 *Loose ends (optional):* round-trip **step 5** — a referential-integrity guard when a removed knobbed block is
 referenced elsewhere (the corner `#1→#7/#8` case); edge-casey, deferred. More learner-library **curation** (the real

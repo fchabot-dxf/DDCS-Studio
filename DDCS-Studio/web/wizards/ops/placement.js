@@ -112,11 +112,13 @@ export function stockPinXY(stock, machine) {
     return { x: (Number(t.x) || 0) - (wo.x || 0), y: (Number(t.y) || 0) - (wo.y || 0) };
 }
 
-/** Placement shift for a PlaceOnStock atom, from its FLAT snapshot params (bbox bminX.. + stock + intent). Used by
- *  the emit fold so the block is self-contained. */
-export function placeShiftFromParams(p = {}) {
+/** Placement shift for a PlaceOnStock atom, from its FLAT snapshot params (stock + intent) + a bbox. `liveBbox`, when
+ *  given, OVERRIDES the frozen bminX.. snapshot — the place fold passes the wrapped geometry's DECLARED extent so the
+ *  placement tracks the params (one source of truth) instead of a stale author-time copy. Falls back to the snapshot
+ *  (liveBbox null) for ops whose geometry atom doesn't yet declare an extent — so un-migrated ops are unchanged. */
+export function placeShiftFromParams(p = {}, liveBbox = null) {
     return placementShift(
-        { minX: numv(p.bminX), maxX: numv(p.bmaxX), minY: numv(p.bminY), maxY: numv(p.bmaxY) },
+        liveBbox || { minX: numv(p.bminX), maxX: numv(p.bmaxX), minY: numv(p.bminY), maxY: numv(p.bmaxY) },
         { pathDatum: p.pathDatum, stockAttach: p.stockAttach, stockDatum: p.stockDatum, stockW: p.stockW, stockH: p.stockH, stockZ: p.stockZ, originX: p.offX, originY: p.offY, offZ: p.offZ, optIn: p.optIn },
     );
 }

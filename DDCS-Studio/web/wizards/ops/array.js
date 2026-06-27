@@ -5,6 +5,7 @@
  * `patternPoints` is shared with the STUDIO drill generator and the 2D layout canvas.
  */
 import { num, r3 } from './util.js';
+import { pointsBBox } from './placement.js';
 
 /** Pattern → XY list (work coords). grid / line / circle / rect. */
 export function patternPoints(p) {
@@ -42,6 +43,18 @@ export const arrayBlock = {
     dynamic: 'pattern',
     /** Pattern points; mirrors x0/y0 → cx/cy so circle reads the same origin. */
     points: (p) => patternPoints({ ...p, cx: num(p.x0, 0), cy: num(p.y0, 0) }),
+    /** Declared geometry extent = the stamped footprint: the pattern-point bbox grown by the stamped child's OWN extent
+     *  (Minkowski sum — a hole is a point, a slot has size). The place fold recomputes this LIVE from params, so the
+     *  placement tracks the pattern instead of a frozen snapshot. Returns null when the child can't measure itself
+     *  (e.g. an un-migrated slot leaf) → the place fold falls back to the snapshot, so nothing else changes.
+     *  Measures the SAME points the container STAMPS — `arrayBlock.points(p)` (which mirrors x0→cx so a circle reads
+     *  the pattern origin), NOT raw patternPoints — so the extent can never diverge from the emitted geometry. */
+    extent: (p, childExt) => {
+        if (!childExt) return null;
+        const bb = pointsBBox(arrayBlock.points(p));
+        if (!bb) return null;
+        return { minX: bb.minX + childExt.minX, maxX: bb.maxX + childExt.maxX, minY: bb.minY + childExt.minY, maxY: bb.maxY + childExt.maxY };
+    },
     /** Which fields to show depends on the chosen pattern. */
     fieldsFor(p) {
         const base = ['pattern', 'x0', 'y0'];

@@ -44,4 +44,6 @@ export const boreBlock = {
     defaults: { x: 0, y: 0, holeDia: 12, toolDia: 6, depth: 5, pitch: 0.5, ramp: 'step', feed: 120, clearance: 5, zOff: 0 },
     fields: ['x', 'y', 'holeDia', 'toolDia', 'depth', 'pitch', 'ramp', 'feed', 'clearance'],   // ramp: step / helix
     emit: (p, dx = 0, dy = 0) => helicalBore({ x: r3(num(p.x, 0) + dx), y: r3(num(p.y, 0) + dy) }, p),
+    // Declared geometry extent (centre-based, like placement): a bored hole is a POINT at its local x,y. (See drill.js.)
+    extent: (p) => ({ minX: num(p.x, 0), maxX: num(p.x, 0), minY: num(p.y, 0), maxY: num(p.y, 0) }),
 };

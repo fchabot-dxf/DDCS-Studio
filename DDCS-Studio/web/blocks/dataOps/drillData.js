@@ -1,5 +1,5 @@
 /**
- * blocks/dataOps/drillData.js — the DRILL built-in expressed as a pure DATA definition (ROADMAP Stage 4).
+ * blocks/dataOps/drillData.js — the DRILL built-in expressed as a pure DATA definition (ROADMAP Stage 4 + 5).
  *
  * The endgame (wizards-as-data): every built-in becomes a { template, bindings } def — open, fork, override,
  * reset-to-factory — exactly like a user op. This is the FIRST port: drill, expressed as data and PROVEN to emit
@@ -13,31 +13,28 @@
  * fixed socket — precisely what a {template, bindings} def + instantiate() substitute. Pattern variety (grid /
  * circle / line / rect) is just the `pattern` enum + numbers, NOT a shape change.
  *
- * THE FRONTIER (what a pure {template,bindings} def CANNOT yet express — the vocabulary Stage 5 must grow,
- * each demonstrated as an executable divergence in the spec):
- *   2. LIVE BBOX — *the primary blocker.* makePlace bakes pointsBBox(patternPoints(params)) into the placeonstock
- *      snapshot, and the DEFAULT placement (stockDatum 'nnp') shifts the program by -bbox.min (re-references the
- *      path's min-corner to origin). A static template FREEZES that bbox at author-time, so the moment the pattern's
- *      bounding box moves — ANY x0/y0 offset, or a circle/line/rect shape — the placement shift is computed against
- *      the wrong box and the output diverges. NOT inert by default (the placeShift is non-zero whenever bbox.min ≠
- *      the author-time bbox.min). The bindings here are all CORRECT — the array faithfully stamps at the bound
- *      points — but placeOnStock's baked snapshot can't track them. This is the sharpest signal for Stage 5: the
- *      format needs computed/derived bindings, OR placeOnStock must compute its shift from a live (param-derived)
- *      bbox instead of a frozen snapshot. Until then, the equivalence sweep holds bbox.min fixed (grid at origin).
+ * ✅ FRONTIER #2 (live bbox) — SOLVED in Stage 5 (the north-star fix). makePlace USED to bake
+ * pointsBBox(patternPoints(params)) into the placeonstock snapshot, frozen at author time — so any moved/reshaped
+ * pattern placed wrong (the snapshot was a DUPLICATE of derivable geometry → principle #4 "duplication is the enemy").
+ * Now the geometry atom declares its own extent (drill/bore = a point; `array` = pattern-points ⊕ child extent) and
+ * the place fold recomputes the bbox LIVE from params (blockEmitter.liveExtent → placeShiftFromParams override). So
+ * the placement tracks the pattern (ONE source of truth, declared not inferred-from-motion), and this def is now FULLY
+ * placement-portable: x0/y0 offsets, circle/line/rect shapes, AND stock-attach all emit byte-identical to drillStack.
+ *
+ * REMAINING FRONTIER (the vocabulary Stage 5 must still grow, each an executable divergence tripwire in the spec):
  *   1. METHOD SWAP — params.method==='helical' makes drillStack build a `bore` child (different block TYPE + key
  *      set) instead of `drill`. instantiate substitutes VALUES, never a block type. → this def covers the peck path.
  *   3. FAN-OUT PARAM — `clearance` feeds TWO sockets (progstart + the drill leaf); a binding is 1 param → 1 socket,
  *      and duplicate param names are rejected. → clearance is held at its default here.
  *
- * Stage-4 scope note: the template is SEEDED from drillStack(DRILL_DEFAULTS) (== "BUILDERS(defaults)", the canonical
+ * Scope note: the template is SEEDED from drillStack(DRILL_DEFAULTS) (== "BUILDERS(defaults)", the canonical
  * valid-by-construction template). The INDEPENDENT artifact under test is the hand-authored BINDINGS map below, proven
- * TWO ways by the spec (so the proof isn't vacuous for the params the emit sweep can't reach):
+ * TWO ways by the spec:
+ *   • EMIT-EQUIVALENCE — byte-identical to drillStack across a sweep that now spans off-origin x0/y0, circle/line/rect
+ *     shapes, stock-attach placement, cut params, skip + wcs (frontier #2 solved → the bbox tracks the pattern live).
  *   • WIRING (structural, all bindings) — set one param to a sentinel and assert BOTH instantiate AND drillStack land
- *     it in the binding's (blockIndex,key); a wrong/dropped/swapped key fails. This is the ONLY thing that can validate
- *     the x0/y0 + pattern-SHAPE bindings, which emit-equivalence structurally cannot reach (any pattern that moves the
- *     bounding box diverges on frontier #2 regardless of whether its binding is correct).
- *   • EMIT-EQUIVALENCE (the params a static template fully reproduces) — grid-at-origin geometry + cut + skip + wcs
- *     emit byte-identical to drillStack across a sweep.
+ *     it in the binding's (blockIndex,key); a wrong/dropped/swapped key fails. Belt-and-suspenders alongside the emit
+ *     sweep (it also covers the unbound method/clearance sockets staying put).
  * Stage 6 authors the template independently too (then the builder can be deleted); that's the self-host step, not this one.
  */
 import { drillStack } from '../../wizards/drillWizard.js';
@@ -48,16 +45,29 @@ export const DRILL_DEFAULTS = {
     pattern: 'grid', x0: 0, y0: 0, cols: 3, rows: 2, dx: 20, dy: 20,
     count: 4, spacing: 20, angle: 0, dia: 50, startAngle: 0, w: 100, h: 80, nx: 2, ny: 2, skip: '',
     depth: 5, peck: 5, feed: 100, clearance: 5, wcs: 'active', method: 'peck',
+    // placement (makePlace) — now bindable: the placeOnStock bbox snapshot is computed LIVE from the pattern at emit
+    // (array.extent → place fold), so binding the placement scalars + a moved/attached pattern stays correct.
+    stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, originX: 0, originY: 0, offZ: 0,
 };
 
 // The hand-authored binding map: each drill param → its (blockIndex, key) socket in the flattened default template.
 // Flatten (pre-order) of drillStack's [progstart, wcs, placeonstock{array{drill}}, progend]:
 //   0 progstart · 1 wcs · 2 placeonstock · 3 array · 4 drill · 5 progend
-// (clearance is deliberately NOT bound — frontier #3; method is NOT bound — frontier #1; the placeonstock bbox
-//  snapshot on block 2 is a DERIVED value, not a scalar socket — frontier #2, which is why placement params are
-//  intentionally absent here: this def does not claim to support stock-placement.)
+// (clearance is deliberately NOT bound — frontier #3; method is NOT bound — frontier #1. The placeonstock bbox
+//  snapshot on block 2 is NO LONGER a frontier — the place fold recomputes it LIVE from the array's params, so
+//  placement is fully bindable now; only the 4 bbox-snapshot keys (bminX..) stay vestigial/ignored.)
 export const DRILL_BINDINGS = [
     { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: DRILL_DEFAULTS.wcs },
+    // placement scalars (block 2, placeonstock) — now correct because the bbox tracks the pattern live (array.extent)
+    { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: DRILL_DEFAULTS.stockAttach },
+    { param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: DRILL_DEFAULTS.pathDatum },
+    { param: 'stockDatum', blockIndex: 2, key: 'stockDatum', type: 'enum', default: DRILL_DEFAULTS.stockDatum },
+    { param: 'stockW', blockIndex: 2, key: 'stockW', type: 'number', default: DRILL_DEFAULTS.stockW },
+    { param: 'stockH', blockIndex: 2, key: 'stockH', type: 'number', default: DRILL_DEFAULTS.stockH },
+    { param: 'stockZ', blockIndex: 2, key: 'stockZ', type: 'number', default: DRILL_DEFAULTS.stockZ },
+    { param: 'originX', blockIndex: 2, key: 'offX', type: 'number', default: DRILL_DEFAULTS.originX },
+    { param: 'originY', blockIndex: 2, key: 'offY', type: 'number', default: DRILL_DEFAULTS.originY },
+    { param: 'offZ', blockIndex: 2, key: 'offZ', type: 'number', default: DRILL_DEFAULTS.offZ },
     // pattern + geometry (block 3, the `array` container — patternPoints reads these scalars at emit)
     { param: 'pattern', blockIndex: 3, key: 'pattern', type: 'enum', default: DRILL_DEFAULTS.pattern },
     { param: 'x0', blockIndex: 3, key: 'x0', type: 'number', default: DRILL_DEFAULTS.x0 },
