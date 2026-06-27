@@ -296,7 +296,7 @@ function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myI
     <div class="controls" style="margin:0 0 10px">
       <a class="${per === 'day' ? 'on' : ''}" href="${perLink('day')}">day</a><a class="${per === 'week' ? 'on' : ''}" href="${perLink('week')}">week</a>
     </div>
-    ${cpList}</div>
+    <canvas id="c_cp"></canvas></div>
   <div class="card full"><h2>Individual visits · latest ${visits.length} (UTC)</h2>${visitsList}</div>
   <div class="card"><h2>Top countries</h2><canvas id="c_country"></canvas></div>
   <div class="card"><h2>Web vs exe</h2><canvas id="c_app"></canvas></div>
@@ -336,7 +336,24 @@ bar('c_feature', D.feature, 'feature', 'uses', '#a371f7');
   new Chart(el, { type: 'doughnut', data: { labels: rows.map(r => String(r.app || '—')), datasets: [{ data: rows.map(r => num(r.n)), backgroundColor: ['#1f6feb', '#e3a008', '#2ea043', '#a371f7'] }] }, options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e6edf3' } } } } });
 })();
 
-// (Visits by country, per period is now a server-rendered list — no chart.)
+// visits by country, per period — stacked bar (one stack per country, full names in the legend)
+(function () {
+  const el = document.getElementById('c_cp'); const rows = D.byCountryPeriod; if (!el || !rows || !rows.length) return;
+  const periods = [...new Set(rows.map(r => r.period))].sort();
+  const countries = [...new Set(rows.map(r => String(r.country || '—')))];
+  const pos = {}; periods.forEach((p, i) => { pos[p] = i; });
+  const PAL = ['#1f6feb', '#2ea043', '#a371f7', '#e3a008', '#db61a2', '#3fb950', '#f0883e', '#58a6ff', '#bc8cff', '#56d364', '#e3b341', '#ff7b72', '#79c0ff', '#d2a8ff'];
+  const fmtP = (p) => { try { return new Date(p).toISOString().slice(5, 10); } catch { return String(p); } };
+  const datasets = countries.map((c, ci) => {
+    const arr = new Array(periods.length).fill(0);
+    rows.forEach(r => { if (String(r.country || '—') === c) arr[pos[r.period]] = num(r.visits); });
+    return { label: cname(c), data: arr, backgroundColor: PAL[ci % PAL.length] };
+  });
+  new Chart(el, { type: 'bar', data: { labels: periods.map(fmtP), datasets }, options: {
+    responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e6edf3', boxWidth: 10, font: { size: 10 } } } },
+    scales: { x: { stacked: true, grid: { color: GRID }, ticks: { color: TXT } }, y: { stacked: true, grid: { color: GRID }, ticks: { color: TXT }, beginAtZero: true } } } });
+})();
+
 (function () {
   const rows = D.version; const host = document.getElementById('t_version'); if (!host) return;
   if (!rows || !rows.length) { host.innerHTML = '<span class="sub">no data</span>'; return; }
