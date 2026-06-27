@@ -99,6 +99,38 @@ test('canvasWidgets registry: rect + radial gestures place + drag byte-identical
   expect(r.line1Drag.d_angle).toBeCloseTo(45, 6);
 });
 
+test('canvasWidgets registry: pocket gesture params (ellipse half-extent rect + radius-only radial) match the old formulas', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const r = await page.evaluate(async () => {
+    const { buildCanvasWidgets } = await import('/viz/canvasWidgets.js');
+    const out = {};
+    const mk = (decls) => { const cap = {}; const w = buildCanvasWidgets(decls, (m) => Object.assign(cap, m)); return { ...w, cap }; };
+
+    // ELLIPSE size = a rect whose handle rides the half-extent (rx,ry); divisor 0.5 → full W/H = 2·offset (min 1).
+    const ell = mk([{ type: 'rect', id: 'size', field: 'p_w', fieldH: 'p_h', ax: 10, ay: 20, ex: 40, ey: 30, sx: 0.5, sy: 0.5, minw: 1, minh: 1, label: 'W × H' }]);
+    out.ellPlace = (() => { const h = ell.handles[0]; return { x: h.x, y: h.y, value: h.value }; })();   // 10+40, 20+30
+    ell.onDrag('size', { x: 40, y: 60 }); out.ellDrag = { ...ell.cap };                  // p_w=2·30=60, p_h=2·40=80
+    const ell2 = mk([{ type: 'rect', id: 'size', field: 'p_w', fieldH: 'p_h', ax: 10, ay: 20, ex: 40, ey: 30, sx: 0.5, sy: 0.5, minw: 1, minh: 1, label: 'W × H' }]);
+    ell2.onDrag('size', { x: 9, y: 19 }); out.ellClamp = { ...ell2.cap };                // both clamp to 1
+
+    // CIRCLE/POLYGON size = a radius-only radial (no angle field): Ø = 2·distance (min 1); never writes an angle.
+    const circ = mk([{ type: 'radial', id: 'size', field: 'p_dia', cx: 0, cy: 0, r: 25, a: 0, rScale: 2, minR: 1, label: 'Ø' }]);
+    out.circPlace = (() => { const h = circ.handles[0]; return { x: h.x, y: h.y, value: h.value == null ? 'none' : h.value }; })();
+    circ.onDrag('size', { x: 0, y: 30 }); out.circDrag = { ...circ.cap };                // p_dia=2·30=60, no angle key
+    const circ2 = mk([{ type: 'radial', id: 'size', field: 'p_dia', cx: 0, cy: 0, r: 25, a: 0, rScale: 2, minR: 1, label: 'Ø' }]);
+    circ2.onDrag('size', { x: 0.1, y: 0 }); out.circClamp = circ2.cap.p_dia;             // max(1, 0.2) = 1
+    return out;
+  });
+  expect(r.ellPlace, 'ellipse handle at the half-extent corner, no value label').toEqual({ x: 50, y: 50, value: undefined });
+  expect(r.ellDrag, 'ellipse drag → full W/H = 2 · offset').toEqual({ p_w: 60, p_h: 80 });
+  expect(r.ellClamp, 'ellipse W/H clamp to 1').toEqual({ p_w: 1, p_h: 1 });
+  expect(r.circPlace, 'circle handle on the +X radius, valueless (drag-only)').toEqual({ x: 25, y: 0, value: 'none' });
+  expect(Object.keys(r.circDrag), 'radius-only radial writes ONLY the Ø field — never an angle').toEqual(['p_dia']);
+  expect(r.circDrag.p_dia, 'Ø = 2 · distance').toBe(60);
+  expect(r.circClamp, 'Ø clamps to 1').toBe(1);
+});
+
 test('drill wizard renders its handles from the registry (point + radial)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);

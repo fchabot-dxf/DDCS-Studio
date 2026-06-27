@@ -2,6 +2,7 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { PocketWizard, pocketBBox } from '../pocketWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
+import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams } from '../ops/placement.js';
 import { regionDesc } from '../ops/region.js';
@@ -30,12 +31,16 @@ function applyTool() {
 /** 2D layout: the pocket outline (what the finished walls will be) + a place handle + a size handle. */
 function buildPocketSpec(params, stock) {
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
-    const items = [], paths = [], handles = [{ id: 'origin', x: ox, y: oy, kind: 'move', label: 'pos' }];
+    const items = [], paths = [];
+    // DECLARE the handles via reusable gestures (not hand-rolled): pos = `point`; the size handle is a `rect` corner
+    // (rect/ellipse — ellipse drags a half-extent, so divisor 0.5 → full W/H) or a radius-only `radial` (circle/polygon,
+    // Ø = 2·distance). Each still drives a wizard PARAMETER via setFields() — never freeform geometry.
+    const decls = [{ type: 'point', id: 'origin', fx: 'p_originX', fy: 'p_originY', x: ox, y: oy, label: 'pos' }];
 
     if (params.shape === 'circle') {
         const R = num(params.dia, 50) / 2;
         items.push({ kind: 'circle', cx: ox, cy: oy, r: R });
-        handles.push({ id: 'size', x: ox + R, y: oy, kind: 'size', label: 'Ø' });
+        decls.push({ type: 'radial', id: 'size', field: 'p_dia', cx: ox, cy: oy, r: R, a: 0, rScale: 2, minR: 1, label: 'Ø' });
     } else if (params.shape === 'polygon' || params.shape === 'ellipse') {
         // No SVG primitive for polygon/ellipse — draw the boundary ring from the region kernel's contour.
         const rg = regionDesc(params.shape === 'polygon'
@@ -43,27 +48,27 @@ function buildPocketSpec(params, stock) {
             : { shape: 'ellipse', x: ox, y: oy, w: num(params.w, 80), h: num(params.h, 60) });
         const ring = (rg.contour && rg.contour[0]) || [];
         if (ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((p) => ({ x: p.x, y: p.y })), cls: 'fc-guide' });
-        if (params.shape === 'polygon') { const R = num(params.dia, 50) / 2; handles.push({ id: 'size', x: ox + R, y: oy, kind: 'size', label: 'Ø' }); }
-        else { const rx = num(params.w, 80) / 2, ry = num(params.h, 60) / 2; handles.push({ id: 'size', x: ox + rx, y: oy + ry, kind: 'size', label: 'W × H' }); }
+        if (params.shape === 'polygon') {
+            const R = num(params.dia, 50) / 2;
+            decls.push({ type: 'radial', id: 'size', field: 'p_dia', cx: ox, cy: oy, r: R, a: 0, rScale: 2, minR: 1, label: 'Ø' });
+        } else {
+            const rx = num(params.w, 80) / 2, ry = num(params.h, 60) / 2;
+            decls.push({ type: 'rect', id: 'size', field: 'p_w', fieldH: 'p_h', ax: ox, ay: oy, ex: rx, ey: ry, sx: 0.5, sy: 0.5, minw: 1, minh: 1, label: 'W × H' });
+        }
     } else {
         const w = num(params.w, 80), h = num(params.h, 60);
         items.push({ kind: 'rect', x: ox, y: oy, w, h });
-        handles.push({ id: 'size', x: ox + w, y: oy + h, kind: 'size', label: 'W × H' });
+        decls.push({ type: 'rect', id: 'size', field: 'p_w', fieldH: 'p_h', ax: ox, ay: oy, ex: w, ey: h, sx: 1, sy: 1, minw: 1, minh: 1, label: 'W × H' });
     }
 
+    const { handles, onDrag, onEdit } = buildCanvasWidgets(decls, setFields);
     const pl = placementSpec(params, pocketBBox(params), 'p_');
     return {
         stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
         placement: pl.placement, items, paths, handles,
         pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
         onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
-        onDrag(id, w) {
-            if (id === 'origin') { setFields({ p_originX: w.x, p_originY: w.y }); return; }
-            if (params.shape === 'circle') setFields({ p_dia: Math.max(1, 2 * Math.hypot(w.x - ox, w.y - oy)) });
-            else if (params.shape === 'polygon') setFields({ p_dia: Math.max(1, 2 * Math.hypot(w.x - ox, w.y - oy)) });
-            else if (params.shape === 'ellipse') setFields({ p_w: Math.max(1, 2 * (w.x - ox)), p_h: Math.max(1, 2 * (w.y - oy)) });
-            else setFields({ p_w: Math.max(1, w.x - ox), p_h: Math.max(1, w.y - oy) });
-        },
+        onDrag, onEdit,
     };
 }
 
