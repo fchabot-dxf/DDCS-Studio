@@ -18,6 +18,14 @@ export function helicalBore(pt, p) {
     const zb = num(p.zOff, 0);
     const cx = pt.x, cy = pt.y;
     if (r <= 0.01) return shiftZ([`G0 X${cx} Y${cy}`, `G0 Z${clr}`, `G1 Z${r3(-depth)} F${feed}`, `G0 Z${clr}`], zb);  // hole ≤ tool → plunge
+    // Runaway-pass guard (depth/pitch). A real bore is a few thousand passes at most. A pathological depth — e.g. the
+    // value-glow perturbs `depth` to its ~1e6 sentinel to localize that token — would build tens of MILLIONS of lines in
+    // the synchronous loop below and FREEZE the tab. The build hangs BEFORE the emitter's push-spread can throw, so the
+    // localizer's try/catch (opGlow) can't catch it — it must be bounded HERE (cf. blockEmitter's Math.min(steps,100000)
+    // runaway guard). Real bores never reach the cap, so emit stays byte-identical; an absurd one emits a clear placeholder.
+    const linesPerPass = ramp === 'helix' ? 24 : 2, passes = Math.max(1, Math.ceil(depth / pitch));
+    if (passes * linesPerPass > 100000)
+        return shiftZ([`G0 X${cx} Y${cy}`, `G0 Z${clr}`, `( bore: ${ramp} too fine — ${passes} passes capped )`, `G0 Z${clr}`], zb);
     const L = [`G0 X${r3(cx + r)} Y${cy}   ( bore radius )`, `G0 Z${clr}`];
     const arc = `G3 X${r3(cx + r)} Y${cy} I${r3(-r)} J0`;   // full CCW flat circle back to start
     if (ramp === 'helix') {
