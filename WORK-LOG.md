@@ -226,3 +226,54 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
 - state: tests 338/340 (2 skipped, 0 fail) serial — the lone `middle-animator` flake didn't even surface this run · branch
   main · increment 3 committed `04c4871` (local, NOT pushed). GATE: holding for the advisor to review increment 3, then
   commission increment 2 (chip→form, off-records `_expose`→bindings derive) as a separate run.
+
+## 2026-06-27 — headline GROUP-block, INCREMENT 2: chip → editable form `8de09a6`
+
+- context on entry: picked up the tree mid-flight — inc-3's source edits showed as "uncommitted" + I was hunting a
+  message inbox. The advisor (shares this working dir) resolved both: committed inc 3 as `04c4871` + `14fcb1b`, left
+  the directive `ec001df` (no inbox — the channel IS NEXT-SESSION.md; on main inc 3 is committed, tree clean, build
+  inc 2). Confirmed: HEAD `ec001df`, `git diff` empty, inc-3 work == `04c4871`. Nothing to re-commit. Backed my work
+  to `backup/worker-group-feature` first (force-push insurance, per [[concurrent-analytics-agent-and-git]]).
+- did (inc 2 = the chip's form, off-records `_expose` → bindings + surgical writeback):
+  - `devMode.deriveGroupDef(groupOp)` — the OFF-RECORDS analogue of `deriveAuthoredDef`. Reads each stored child
+    record's `_expose` (the blob #13 persists + stackBridge round-trips to `record._expose`, keyed `FN(field)` =
+    `field.toUpperCase()`), not live workspace `EXPOSE_` fields → bindings via the existing `buildBindings`. Returns
+    `{ opType:'group', label, bindings, children, panel:'form' }`.
+  - `opSession.setGroupChildParams(groupId, edits)` — the writeback primitive: `edits=[{blockIndex,key,value}]`
+    indexing `flattenBlocks(group.children)` (the SAME pre-order the bindings use); mutates the bound child params on
+    a deep COPY, reloads with the same op id. Imports `flattenBlocks` from userOps (the ONE shared walk — no cycle:
+    userOps imports only opBuilders/opSchema/opSimContext).
+  - `wizardManager`: `canEdit('group')`→true (unlocks the chip → ✎); `open()` routes `'group'`→userOpView WITHOUT
+    clobbering the derived def (the `setUserOpDef(listUserOps…)` line skips `type==='group'`); `openForEdit` branches a
+    group to `_openGroupForEdit` (dyn-import devMode → derive → open → mark editing); `insert()` branches a group
+    (detected by the live op's type) to `userOpView.applyGroupEdits` BEFORE the replaceOp/edit-notice path.
+  - `userOpView`: a group branch in `update()` (no builder → emit a children COPY with the form values applied, via
+    `applyGroupParams`, for the live preview; no `recordOp`) + `applyGroupEdits(groupId)` (read the form → map bindings
+    → `setGroupChildParams`).
+  - extracted `inlineExposure(def,f,pname,blockIndex,defaultVal)` so `collectAuthoring` + `deriveGroupDef` share ONE
+    field→form-widget classification (one-source; the suite's save-wizard/op-declared-edits specs cover the refactor).
+- why these calls:
+  - **No builder for a group** (its children ARE the program), so the whole thing is the FORM-LIVE model — *write
+    surgically, never regenerate* (the "Matrix" rule) — NOT the userOpView builder-regenerate path. That's why
+    `replaceOp` (builder-only → returns false for a group) is bypassed and `setGroupChildParams` mutates child params.
+  - **Off-records, not deriveAuthoredDef(ws):** the chip opens from the EDITOR, the Blocks workspace may not even be
+    mounted; the persisted `record._expose` is the source of truth, so the derive reads records, not live fields
+    (exactly the advisor's stated constraint).
+  - **Re-derive on each open** (no stored bindings on the group op) keeps the group record DUMB (`{opType,children,
+    label}`) — the bindings are a pure function of the children's `_expose`, so a reproject can't desync them.
+- tried/considered + rejected: (a) routing group→userOpView verbatim — breaks: `update()` early-returns on
+  `!builderOf('group')` and code-gen calls a non-existent builder → added the group branch instead. (b) storing the
+  bindings on the group op — rejected (pollutes the record + can go stale; re-derivation is cheap + canonical).
+  (c) loading the group into the Blocks tab to reuse `deriveAuthoredDef(ws)` — rejected (wrong surface; the advisor
+  explicitly wanted the off-records path). Canvas-role group knobs (point/rect) are a v1 GAP — the writeback filter
+  needs `blockIndex+key`, which grouped canvas bindings lack; number/slider/dropdown/toggle/text/cornergrid/coordlist
+  all work. Hand-built stacks expose plain number knobs in the common case, so this is acceptable for v1.
+- VERIFY-FIRST (`group-edit.spec.js`, real gesture end-to-end, desktop viewport): right-click→Group → the chip is ✎
+  (asserted NOT `disabled`, vs inc 1's 🔒) → click the REAL chip → the form opens (#wizard active, #wiz_user shown) with
+  a `depth` field derived from the child's exposed `z`, seeded at -2 → edit to -5 → `insertWiz()` → the group child's
+  `z` is -5 AND the emitted G-code shows `Z-5` (still 3 children — surgical, not a regenerate) → leave to Blocks + back
+  (real reprojection) → group + edit + `_expose` all survive → re-open the chip → the form shows -5.
+- state: tests 338/341 green (2 skipped; lone known `middle-animator` flake passed on retry) · branch main · inc 2
+  committed `8de09a6` (LOCAL, not pushed — the push is the user's call; no `.ver` bump → no release). backup branch
+  updated to HEAD. NEXT per NEXT-SESSION: AUTO layer (a single loose run auto-applying the same group op, deferred) +
+  the canvas-role knob writeback gap if a real authoring need surfaces it. Holding for advisor review of inc 2.
