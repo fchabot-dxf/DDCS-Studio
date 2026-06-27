@@ -52,6 +52,13 @@ export const SNIPPETS = [
               stack: [cmt('Dwell — pause 2 seconds'), { type: 'dwell', params: { sec: 2 } }] },
         ],
     },
+    {
+        category: 'Probing',
+        entries: [
+            { id: 'z-touch', label: 'Z touch-off', desc: 'Probe straight down (G31) until the probe triggers, then store the touch Z in #50.',
+              stack: [cmt('Z touch-off — probe down, store the result in #50'), { type: 'probe', params: { axis: 'Z', to: -20, feed: 100, port: 3, level: 0 } }, { type: 'proberead', params: { axis: 'Z', var: '#50' } }] },
+        ],
+    },
 ];
 
 /** Complete Programs — FRAMED stacks (progstart … progend) that run / sim as-is, grouped into themed sub-categories. */
@@ -93,6 +100,20 @@ export const PROGRAMS = [
                   { type: 'move', params: { mode: 'cut', x: 25, y: 25, z: -5, feed: 120 } },        // plunge to depth
                   { type: 'move', params: { mode: 'rapid', x: 25, y: 25, z: 10, feed: 200 } },      // retract clear
                   { type: 'progend', params: { spindleOff: true, coolantOff: true, retract: true, retractZ: 10, park: false, parkX: 0, parkY: 0, end: 'M30' } },
+              ] },
+        ],
+    },
+    {
+        category: 'Probing',
+        entries: [
+            { id: 'z-touch-prog', label: 'Z touch-off (program)', desc: 'Position above the surface, probe down (G31), store the touch Z, then retract. No spindle — the probe is in the spindle.',
+              stack: [
+                  cmt('Simple Z touch-off — position, probe down, store Z, retract'),
+                  { type: 'move', params: { mode: 'rapid', x: 0, y: 0, z: 10, feed: 200 } },        // position above the surface
+                  { type: 'probe', params: { axis: 'Z', to: -30, feed: 100, port: 3, level: 0 } },   // probe straight down (G31)
+                  { type: 'proberead', params: { axis: 'Z', var: '#50' } },                          // store the touch Z in #50
+                  { type: 'move', params: { mode: 'rapid', x: 0, y: 0, z: 20, feed: 200 } },         // retract clear
+                  { type: 'progend', params: { spindleOff: true, coolantOff: true, retract: false, retractZ: 0, park: false, parkX: 0, parkY: 0, end: 'M30' } },
               ] },
         ],
     },
