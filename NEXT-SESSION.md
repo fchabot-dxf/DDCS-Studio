@@ -1,5 +1,40 @@
 # NEXT SESSION — handoff
 
+## ⭐ Current state (2026-06-27) — READ THIS FIRST
+Everything below is on `main` (pushed; full suite **320 green**, the lone flake is the known `middle-animator` anim test).
+Two threads ran this session:
+
+**A · Wizards-as-data Stage 5 — three more ports + a restructure pass (DONE).**
+- The two-session surfacing **"Blockly bridge recursion" was ROOT-CAUSED + fixed** — it was NEVER the bridge: the value-GLOW
+  (`opGlow._localizeValue`) perturbs each flat numeric param to a ~1e6 sentinel to localize its token, and surfacing's
+  flattened `h` exploded the scanline fill → `push(...bigArray)` overflow. Surfacing flattened to a `surfacefill` atom
+  (byte-identical) + the glow now bails on a throwing perturbation. `8404429`. ⇒ [[glow-safety-childless-multiplier]].
+- **Restructure pass** (drill/bore/array/atc_warmup, adversarially verified) found 2 real defects: bore's helical glow
+  **HANG** (a synchronous 47M-line build BEFORE any throw → uncatchable by try/catch → a KERNEL cap in bore.js, `7248bce`)
+  and atc_warmup's **stale operator message** on a fork (interpolated rpm froze in the template → a lie at the machine →
+  made static, byte-identical, `45c6c2c`).
+- **Ports shipped byte-identical** (`{template,bindings}` data-def + sweep + structural binding-wiring): **surfacing**
+  `8b43c19`, **slot** `38b2260`, **text** `b4ef8ee` (drill/atc_warmup were already done). Each RESTRUCTURED THE SOURCE,
+  not the format: a flat atom / the FORM precomputes `tool·%` → a flat `stepover` / region-local-at-0 so PlaceOnStock owns
+  the origin / a leaf `extent()` so stock-attach tracks live. Frontiers held UNBOUND (clearance fan-out, pattern
+  structure-swap). The old "grow the format" take is SUPERSEDED — see ROADMAP + [[restructure-source-not-abstraction]].
+
+**B · Text customization + the CANVAS-WIDGET consolidation (the ACTIVE initiative).**
+- Text engraving made customizable: **width** (condense/extend) + **slant** (oblique) — pure layout transforms,
+  byte-identical at the defaults, bound in text-as-data, GUI-verified. `7c4007e`. A **font registry SEAM** also shipped
+  (`font` is a bound socket, `strokeFont` FONTS/getFont/registerFont) — but **TTF/OTF + V-carve fonts were PARKED on
+  purpose** (V-carve is a whole toolpath engine, not a font tweak); the seam stays so they land later with no rework.
+- **CANVAS-WIDGET consolidation — STAGE 1 SHIPPED `6b08676`.** The agreed scope: every milling op's **handcoded** 2D-canvas
+  GUI → ONE declarative, reusable, end-user-authorable widget system (the canvas analogue of `formWidgets.js`). Built:
+  `web/viz/canvasWidgets.js` — gesture types **point/length/scaleX/shear**, each owning place + drag + click-to-edit,
+  behind `buildCanvasWidgets(decls, setFields) → {handles,onDrag,onEdit}`. **Text is the first consumer** (textView): pos +
+  height REUSE point/length (hand-rolled onDrag deleted), width=scaleX, slant=shear — the four corners of the text box.
+  FeatureCanvas's move/size/corner/stock-snap plumbing reused as-is; only the two missing gestures were added. Proven by
+  `tests/canvas-widgets.spec.js`. **This is the "Stage 1 first, then decide" checkpoint** — see the next-task section.
+
+---
+
+## Earlier (2026-06-26 session)
 **Current state (2026-06-26):** a large wizard-maker session is **merged to `main` @ `0422cbe`** (redeployed to
 ddcs-studio.pages.dev; no `.ver` bump yet → no new desktop release). Shipped this session, on `main`:
 - **Spatial-GUI PRODUCER seam** (the prior handoff's "next task", done) — "2D point/rect (numbers)" authoring → custom-op
@@ -102,25 +137,36 @@ Shipped:
   annotation-text atom that renders from a BOUND param (like Spindle renders `M3 S<rpm>`), built when an op FORCES it, NOT
   speculatively. Never silently drop a number an operator confirms against.
 
-## ▶ Immediate next task — contour / slot / text, the same way (surfacing-as-data is DONE)
-✅ **`surfacingData.js` + `surfacing-as-data.spec.js` SHIPPED** (`8b43c19`) — Stage-5 port #3, the first FILL-family op,
-BYTE-IDENTICAL across a placement/size/parallel-concentric/depth/stock-attach sweep, all 18 bindings wired. The reframe
-validated end-to-end: flat `stepover` (form precomputes tool·%), direct `strategy` ('raster'→'parallel' maps in the
-stack), and the `originX` fan-out resolved by defining the region LOCALLY at (0,0) so PlaceOnStock owns the position
-(offX=originX) — byte-identical because `placementShift` anchors the bbox min-corner (`x = originX − bbox.minX`). The
-2D view is untouched (`surfacingBBox` still returns part-coords; the makePlace snapshot is local + unused — the place
-fold recomputes live from `surfacefill.extent`). Frontier held unbound: `clearance` (fan-out → progstart + leaf, like drill #3).
-1. **Next: `contour`, `slot`, `text`** the same way — one at a time, each gated by the equivalence test. Keep the
-   byte-identical gate where legacy output is fine; relax to "equivalent toolpath" only DELIBERATELY, per-wizard.
-2. **Genuine BRANCHING** (the probe/ATC/comm/homing family, conditional-structure-dominated) is the only place that may
-   still need `iff`/`count` atoms IN the stack or a split into wizard variants — restructure those too, don't grow the format.
-   ⚠ When you reach a wizard with a VALUE-BEARING operator message (a number the operator confirms before acting, e.g. a
-   probe `Probing 50mm — press Enter`), that's the op that FORCES the general annotation-text atom (renders text from a
-   bound param) — build it then, NOT speculatively. Classify each op's messages droppable-vs-value-bearing as you port.
-3. **Then STRATEGIC #4 — Stage 6 self-host** (gated on the ports + the federated registry): built-ins become forkable; a
-   `resetToFactory` re-registers shipped defs by clearing the `USER_*` layers.
-**DIRECTIVE: when a port is blocked by wizard structure, ASK whether the source can change + propose restructuring it —
-don't silently build machinery to preserve a structure the user doesn't care about.**
+## ▶ Immediate next task — CANVAS-WIDGET consolidation, Stage 2 (the active initiative)
+Stage 1 (the reusable registry `web/viz/canvasWidgets.js` + text migrated onto it) is SHIPPED `6b08676`; this is the
+"Stage 1 first, then decide" checkpoint. Agreed SCOPE: every milling op's **handcoded** 2D-canvas GUI → the ONE
+declarative, reusable, end-user-authorable widget registry (the canvas analogue of `formWidgets.js`).
+1. **STAGE 2 — migrate the handcoded `*View.js` onto the registry. FIRST op = drill or surfacing, NOT another text-like
+   one** (advisor-confirmed): text proved `shear`; the real milling load is `scaleX · rotate · corner`, so stress the
+   registry against the rich shapes EARLY — you'll likely ADD a **`rotate`** gesture (and maybe a `corner`/anchor type —
+   but FeatureCanvas already owns corner-pick + stock-snap, so REUSE those, don't reinvent). Each migration: replace the
+   view's hand-rolled `handles[]` + `onDrag`/`onEdit` with `buildCanvasWidgets([...])`; **byte-identical drag behaviour**
+   (verify by actually dragging). Then sweep slot/array/pocket/bore/middle/circular/… Files: `web/wizards/views/*View.js`.
+2. **STAGE 3 — make the handles DECLARABLE-AS-DATA in the wizard maker** (the end-user reach, the whole point): a binding
+   maps a param to a canvas GESTURE exactly as it maps to a `formWidgets` form widget today, and the custom-op preview
+   renders its handles FROM the bindings (the canvas analogue of the form-render-from-bindings that already exists). REUSE
+   the binding/widget-as-data system (`formWidgets`, `userOps`, the custom-op panel) — NOT a parallel registry.
+   [[widget-library-custom-op-wizards]], [[gui-blocks-roundtrip-target]], [[spatial-gui-form-vs-canvas]].
+
+## ▶ Independent tracks (NOT blockers for the widget work)
+- **`contour`-as-data EMIT port** — the LAST of the wizards-as-data trio (its design agent failed mid-run; not built).
+  Surfacing-shaped (a Region reporter pill + a StepDown) → needs a dedicated flat atom like `surfacefill`, then
+  `contourData.js` + `contour-as-data.spec.js`. Orthogonal to the widgets (contour's canvas GUI just rides the Stage-2 sweep).
+- **Genuine BRANCHING** (probe/ATC/comm/homing, conditional-structure-dominated) — the only ports that may still need
+  `iff`/`count` atoms IN the stack or wizard variants. ⚠ The first op with a VALUE-BEARING operator message (a number the
+  operator confirms before acting, e.g. a probe `Probing 50mm — press Enter`) FORCES the general annotation-text atom
+  (renders from a bound param) — build it THEN, not speculatively. Classify each op's messages droppable-vs-value-bearing.
+- **Stage 6 self-host** (STRATEGIC #4, gated on the ports + registry): built-ins become forkable; `resetToFactory` clears `USER_*`.
+- **TTF/OTF + V-carve fonts** — PARKED (user call). The font seam is in (`font` bound socket + `strokeFont` registry); a
+  loader just `registerFont`s an outline font. V-carve = a SEPARATE toolpath engine (medial-axis / depth-mapped) — the big piece.
+
+**DIRECTIVE: when a port/migration is blocked by wizard structure, ASK whether the source can change + propose restructuring
+it — don't silently build machinery to preserve a structure the user doesn't care about.**
 
 *Loose ends (optional):* round-trip **step 5** — a referential-integrity guard when a removed knobbed block is
 referenced elsewhere (the corner `#1→#7/#8` case); edge-casey, deferred. More learner-library **curation** (the real
