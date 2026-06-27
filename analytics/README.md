@@ -78,6 +78,32 @@ GROUP BY country ORDER BY launches DESC;
 
 `_sample_interval` un-samples the counts (Analytics Engine samples at high volume). For low traffic it's 1.
 
+## Dashboard (`/dash`)
+
+A private, remote dashboard is served by the same worker at **`/dash`** — charts (visits/day, top
+countries, web vs exe, top features, versions), gated by a secret URL key. It reads the data
+server-side via the Analytics Engine SQL API (the API token never reaches the browser).
+
+**One-time setup** (from `analytics/`):
+
+```
+wrangler secret put AE_TOKEN     # a Cloudflare API token with permission: Account Analytics → Read
+wrangler secret put DASH_KEY     # a long random string — your private dashboard key
+wrangler deploy
+```
+
+`ACCOUNT_ID` is already set in `wrangler.toml` (not secret). Then open:
+
+```
+https://ddcs-analytics.dansemur.workers.dev/dash?key=<DASH_KEY>
+```
+
+- `&days=7|30|90` — lookback window (default 30; buttons in the header).
+- `&dev=1` — INCLUDE your own/dev traffic (default: real users only). Toggle in the header.
+- Wrong/missing key → `404` (the route stays invisible without the link). "Revoke" = `wrangler secret put DASH_KEY` with a new value + redeploy.
+- Each chart's query runs independently — if Analytics Engine rejects one (SQL-dialect quirk), the rest still render and the failed query + its error show in a debug panel at the bottom.
+- Want real login instead of a secret link later: put **Cloudflare Access** (Zero Trust, free) in front of the `/dash` path — no code change.
+
 ## Separating your own activity (dev)
 
 Your own usage is tagged `dev = 1` (blob9) so you can exclude it — or look at only it:

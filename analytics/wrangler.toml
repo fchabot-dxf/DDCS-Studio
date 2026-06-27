@@ -11,6 +11,14 @@ name = "ddcs-analytics"
 main = "src/index.js"
 compatibility_date = "2024-11-01"
 
+# Private dashboard at GET /dash?key=<DASH_KEY>. It reads the data via the Analytics Engine SQL API,
+# which needs an account id (below, not secret) + an API token (a SECRET, never in the toml):
+#   wrangler secret put AE_TOKEN     # a Cloudflare API token with permission: Account Analytics → Read
+#   wrangler secret put DASH_KEY     # a long random string = your private dashboard URL key
+# Then:  wrangler deploy   →   open  https://ddcs-analytics.dansemur.workers.dev/dash?key=<DASH_KEY>
+[vars]
+ACCOUNT_ID = "014e18b89793d634a95538e7910dce19"
+
 # Analytics Engine dataset — auto-created on first write. Bound here as env.EVENTS.
 [[analytics_engine_datasets]]
 binding = "EVENTS"
