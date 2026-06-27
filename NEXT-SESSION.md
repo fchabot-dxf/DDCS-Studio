@@ -90,8 +90,17 @@ Shipped:
   the tab HANGS *before* the push-spread can throw → `try/catch` can't catch it. Fixed with a **kernel cap** in bore.js
   (real bores untouched → byte-identical; absurd → tiny capped placeholder → glow line-count bail). `tests/bore-glow-cap.spec.js`.
   Rejected (not real gaps): `line.depth` (throws fast → already caught), `concentricRect` NaN-hang (finite sentinel never
-  triggers it; polygon/ellipse already fall through to scanline). atc_warmup frozen annotation text = declared COSMETIC
-  frontier (no engine change). ⇒ the new design rule for every future fill-op restructure: [[glow-safety-childless-multiplier]].
+  triggers it; polygon/ellipse already fall through to scanline). ⇒ design rule for every future fill-op restructure:
+  [[glow-safety-childless-multiplier]].
+- `45c6c2c` — **atc_warmup → byte-identical** (NOT the "cosmetic frozen text" I first wrote off): the wizard interpolated
+  rpm/time into comment + **operator HMI-message** text the data-def freezes, so a forked 8000-RPM warmup told the operator
+  "6000 RPM" — a *stale message = a lie at the machine*, not cosmetic. Fixed at source: made the annotation text STATIC
+  (rpm/time stay the single source of truth in the executable Spindle/Dwell atoms; principle #4). Spec now asserts FULL
+  byte-identical (no stripAnnotations) + a no-stale-message regression.
+  **Annotation-TEXT taxonomy (apply to EVERY future port):** classify each op's messages — VALUE-FREE → make static (done
+  here); VALUE-BEARING (an operator reads it before acting, e.g. a probe `Probing 50mm — press Enter`) → needs a GENERAL
+  annotation-text atom that renders from a BOUND param (like Spindle renders `M3 S<rpm>`), built when an op FORCES it, NOT
+  speculatively. Never silently drop a number an operator confirms against.
 
 ## ▶ Immediate next task — finish surfacing-as-DATA, then contour/slot/text the same way
 Surfacing's wizard is now FLAT + glow-safe; the remaining piece is the actual Stage-5 **data-def port**.
