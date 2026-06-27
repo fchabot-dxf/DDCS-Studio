@@ -137,37 +137,35 @@ Shipped:
   annotation-text atom that renders from a BOUND param (like Spindle renders `M3 S<rpm>`), built when an op FORCES it, NOT
   speculatively. Never silently drop a number an operator confirms against.
 
-## ▶ Immediate next task — CANVAS-WIDGET consolidation, Stage 2 (IN PROGRESS — 3 views migrated, slot next)
-Stage 1 (the reusable registry `web/viz/canvasWidgets.js` + text migrated onto it) is SHIPPED `6b08676`. **Stage 2 is
-now under way** — agreed SCOPE: every milling op's **handcoded** 2D-canvas GUI → the ONE declarative, reusable,
-end-user-authorable widget registry (the canvas analogue of `formWidgets.js`).
+## ▶ Immediate next task — CANVAS-WIDGET consolidation, Stage 3 (Stage 2 COMPLETE — all 6 views migrated)
+Stage 1 (the reusable registry `web/viz/canvasWidgets.js` + text) `6b08676`. **Stage 2 is DONE** — agreed SCOPE met:
+every milling op's **handcoded** 2D-canvas GUI now DECLARES its handles via `buildCanvasWidgets([...])` (the canvas
+analogue of `formWidgets.js`). All 6 views with draggable handles are migrated: **text, drill, surfacing, pocket, slot,
+contour**. (`grep onDrag wizards/views` = exactly those 6 — "array/bore/circular" from the old sweep list are NOT
+separate canvas views: bore is a drill variant; the rest are probe/rotary views without FeatureCanvas drag handles.)
 
-**✅ Shipped this session (2026-06-27):**
-- **`0fafda2` — drill + surfacing** onto the registry (the "rich shapes first" stress test, advisor-confirmed). Added
-  the **two milling gestures** the doc predicted as "rotate + corner": **`rect`** (2D corner from an anchor → two fields
-  via a per-axis DIVISOR: `1`=literal W/H · `cols-1`=grid pitch · `0.5`=half-extent radius · `0`=skip that axis) and
-  **`radial`** (polar handle → radius + angle field; the "rotate" fused with radius; `rScale` maps drag-distance→Ø/pitch;
-  omit `fieldA` for radius-only, omit `rScale` for pure rotate). `onEdit` gained an optional `editMin` clamp. Drill's
-  4 patterns (grid/circle/rect/line) + surfacing all reduce to `point` + `rect`/`radial`.
-- **`a6d8f91` — pocket** onto the SAME two gestures, NO new code — chosen 2nd deliberately because the whole sweep rests
-  on "rect+radial cover pocket, no rework," and that was held only by **inspection**. Migrating pocket *discharges the
-  claim by construction* (rect/ellipse=`rect` incl. the `0.5` half-extent divisor; circle/polygon=radius-only `radial`).
-- **Rigor (per review):** each gated by exact-formula **unit math** (`canvas-widgets.spec` — the old formulas as
-  constants) **AND real pointer drags** through the migrated path (`drill-canvas` / `pocket-canvas` — fields actually
-  move: drill `d_dia 50→74.145`, pocket `circle p_dia 50→70.955`, `ellipse p_w 101.68→117.166`). Byte-identical, not
-  waved through. Full suite **324 green**.
+**✅ Stage 2 shipped this session (2026-06-27):**
+- **`0fafda2` drill + surfacing** — the "rich shapes first" stress test. Added the two gestures the doc predicted as
+  "rotate + corner": **`rect`** (2D corner via a per-axis DIVISOR: `1`=W/H · `cols-1`=grid pitch · `0.5`=half-extent
+  radius · `0`=skip axis) and **`radial`** (polar → radius + angle; the "rotate" fused with radius; `rScale` maps
+  drag-distance→Ø/pitch; omit `fieldA`=radius-only, omit `rScale`=pure rotate). `onEdit` gained an `editMin` clamp.
+- **`a6d8f91` pocket** — SAME two gestures, no new code; done 2nd on purpose to discharge the sweep's load-bearing
+  "rect+radial cover pocket, no rework" claim BY CONSTRUCTION (was inspection-only).
+- **`5e6ccae` slot** — the op that FORCED the **3rd gesture, `projLength`** (width = a perpendicular projection onto the
+  slot normal: |cursor·n̂|·scale clamped to the tool Ø; A↔B reuse `point`). The real proof the registry absorbs new
+  gesture TYPES cleanly — one new gesture, declared.
+- **`c192b36` contour** — last draggable view; reuses pocket's vocabulary, zero new code → Stage 2 complete.
+- **Rigor (held to, per review):** every view gated by exact-formula **unit math** (`canvas-widgets.spec` — old formulas
+  as constants, incl. a tilted-axis projLength case) **AND real pointer drags** (`{drill,pocket,slot,contour}-canvas.spec`
+  — fields actually move). Byte-identical, not waved through as "free reuse." Full suite **326 green** (lone flake =
+  known `middle-animator`). Gesture set now: `point · length · scaleX · shear · rect · radial · projLength`.
 
-1. **STAGE 2 — continue the sweep. NEXT op = `slot`** (the one that FORCES the **3rd gesture**): slot width is a
-   **perpendicular projection** onto the slot normal (`proj = (w−mid)·n̂`), and A↔B are two `point` handles — so it adds
-   a `projLength`-style gesture, the real test of "the registry absorbs new gesture TYPES cleanly." Then the rest:
-   **array / bore / middle / circular / contour** (contour rides this sweep too — see Independent tracks). Each
-   migration: replace the view's hand-rolled `handles[]` + `onDrag`/`onEdit` with `buildCanvasWidgets([...])`;
-   **byte-identical** (unit math + a real drag). Files: `web/wizards/views/*View.js`, `web/viz/canvasWidgets.js`.
-2. **STAGE 3 — make the handles DECLARABLE-AS-DATA in the wizard maker** (the end-user reach, the whole point): a binding
-   maps a param to a canvas GESTURE exactly as it maps to a `formWidgets` form widget today, and the custom-op preview
-   renders its handles FROM the bindings (the canvas analogue of the form-render-from-bindings that already exists). REUSE
-   the binding/widget-as-data system (`formWidgets`, `userOps`, the custom-op panel) — NOT a parallel registry.
-   [[widget-library-custom-op-wizards]], [[gui-blocks-roundtrip-target]], [[spatial-gui-form-vs-canvas]].
+1. **STAGE 3 (THE NEXT INITIATIVE) — make the handles DECLARABLE-AS-DATA in the wizard maker** — the end-user reach, the
+   whole point of the consolidation. A binding maps a param to a canvas GESTURE exactly as it maps to a `formWidgets`
+   form widget today, and the custom-op preview renders its handles FROM the bindings (the canvas analogue of the
+   form-render-from-bindings that already exists). REUSE the binding/widget-as-data system (`formWidgets`, `userOps`, the
+   custom-op panel) — NOT a parallel registry. [[widget-library-custom-op-wizards]], [[gui-blocks-roundtrip-target]],
+   [[spatial-gui-form-vs-canvas]]. Files: `web/blocks/userOps.js`, `web/ui/formWidgets.js`, the custom-op preview render.
 
 ## ▶ Independent tracks (NOT blockers for the widget work)
 - **`contour`-as-data EMIT port** — the LAST of the wizards-as-data trio (its design agent failed mid-run; not built).
