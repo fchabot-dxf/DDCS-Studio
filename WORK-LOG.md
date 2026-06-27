@@ -362,3 +362,34 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
   number-role + form2d-preview path supersedes them.
 - state: tests 340/343 green · branch main · NO code shipped (investigation only; dbg spec deleted). **GATE: holding for
   the advisor's pick (A / B / synthesis) before building.** Watcher armed (Monitor b3obi8v5b).
+
+## 2026-06-27 — canvas-role knob writeback: A (lock number-role) + B (form2d drag) `94d2d6c` + `fd3e941`
+
+- advisor decided the gate = **A + B** (`88c06b6`): A = lock the already-working number-role 2D knobs with a
+  verify-first test; B = give the group form a form2d 2D-preview DRAG pane. A first, then B, one commit each.
+- **A (`94d2d6c`, test-only — no prod code):** number-role point/nrect/ncircle 2D knobs ALREADY edit + write back
+  in the group form (proven in the gate investigation: groupCanvasBindings keeps blockIndex+key on every member, each
+  renders as its own data-param number field the inc-2 writeback catches). `group-canvas-knob.spec.js` locks it: a
+  move's x/y exposed as a 2D-point knob → auto-chip → the form shows x/y fields → edit BOTH → writes back (X33 Y44) →
+  survives a reprojection. No production change — the floor B must preserve.
+- **B (`fd3e941`):** ONE-LINE prod change — `deriveGroupDef` returns `panel:'form2d'` when a binding has a `group`
+  (a complete point/rect/circle 2D knob); else stays `'form'`. That's all: `layoutSpecFromOp` is fully def-driven
+  (reads bindings' group/role → a point/rect/radial drag handle → `_writeParam` to the bound x/y FORM FIELDS), so the
+  whole drag pane + writeback come FREE from the custom-op machinery (the advisor's "no A→B rework" held). On insert,
+  applyGroupEdits writes the dragged field values back to the group child. `group-canvas-drag.spec.js` drives a REAL
+  pointer drag on the preview handle → fields move + re-emit → insert writes the child → survives a reprojection.
+- ⚠ **LATENT BUG SURFACED + worked around in-test (flag for the advisor):** `window.showApp('editor')` is NOT a real
+  view — showApp only un-hides `#studio-app` for `which==='studio'`; ANY other arg (incl. 'editor') sets `#studio-app`
+  to `display:none`. Both `#editor` AND `#wizard` live inside `#studio-app`, so opening the wizard "from the editor"
+  in that arg renders it inside a HIDDEN shell → the form2d preview container is 0×0 → the drag handle is invisible.
+  EVERY prior group/chip test used `showApp('editor')` and passed ONLY because DOM-value edits don't need visibility;
+  the B drag is the first test that does. Fixed in the B test by driving the REAL `showApp('studio')` view (where the
+  user actually is when they hover the editor chip → the wizard opens visibly). The older group tests still use
+  'editor' (they pass — logic is visibility-independent); not retro-changed (surgical), but worth a sweep if the
+  advisor wants the suite to model the real view. [[verify-real-symptom-not-just-test]] — the right viewport matters.
+- tried/abandoned: a re-`update()` to fix the 0×0 (no help — the container is structurally 0 in a hidden shell, not a
+  measure-timing miss); supporting the interactive xy-pad/rect inline (rejected at the gate — 0×0 in form-only; the
+  number-role + form2d-preview path supersedes them).
+- state: tests 343/345 green (2 skipped, 0 fail, flake passed) · branch main · A `94d2d6c` + B `fd3e941` committed
+  (LOCAL, unpushed). Handing back to the advisor (HANDOFF turn → advisor). Deferred: interactive xy-pad/rect inline
+  (superseded); the showApp('editor') test-view sweep (advisor's call).
