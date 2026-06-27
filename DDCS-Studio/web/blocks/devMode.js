@@ -190,7 +190,12 @@ export function deriveGroupDef(groupOp) {
         for (const f of numericFields(rec)) handle(f, true);                       // numericFields/getInlineFields read def off .type → work on a record
         for (const f of getInlineFields(rec)) handle(f, false);
     });
-    return { opType: 'group', label: (groupOp && groupOp.label) || 'Hand-built', bindings: buildBindings(exposures), children, panel: 'form' };
+    const bindings = buildBindings(exposures);
+    // A complete canvas group (point/rect/circle → a `group` binding) gets a form2d 2D-PREVIEW so its handle is
+    // DRAG-editable (layoutSpecFromOp drives the bound x/y fields) — the spatial-gui "drag the preview" path. A
+    // plain-number-only group stays form-only (no preview pane needed).
+    const has2D = bindings.some((b) => b && b.group);
+    return { opType: 'group', label: (groupOp && groupOp.label) || 'Hand-built', bindings, children, panel: has2D ? 'form2d' : 'form' };
 }
 
 /** The opType being re-authored (the "editing a saved wizard" context), or null = building/authoring fresh. */
