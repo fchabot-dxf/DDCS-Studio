@@ -1,9 +1,26 @@
 # NEXT SESSION — handoff
 
-**Current state (2026-06-25):** **V10.36 shipped** — web is live via GitHub Pages; the desktop exe + `v10.36` tag
-are built/published by `desktop-release.yml`. On `main`, in sync with `origin`. The wizard-maker is built
-end-to-end (fork an op → expose values as widget knobs → reuse the built-in wizard panel → edit from Studio →
-save/re-author). The region editor, selection model, and coordinate-list positioner are banked in V10.36.
+**Current state (2026-06-26):** a large wizard-maker session is **merged to `main` @ `0422cbe`** (redeployed to
+ddcs-studio.pages.dev; no `.ver` bump yet → no new desktop release). Shipped this session, on `main`:
+- **Spatial-GUI PRODUCER seam** (the prior handoff's "next task", done) — "2D point/rect (numbers)" authoring → custom-op
+  preview **drag-to-edit**; both author paths (param-pill + dev-mode expose). `userOps`/`formWidgets`/`bridge`/`devMode`.
+- **ONE Blocks mode** — dissolved the normal/dev toggle; authoring is **always on** (quiet "knob" markers that light up
+  when a value is exposed). One render path. `devMode.js`.
+- **Live block↔form round-trip (custom ops)** — the centrepiece: a `FORM [LIVE]` pane in the Blocks tab derives the
+  wizard's form from the blocks (no save), **two-way** (edit a block → the form updates; edit the form → it writes
+  surgically back to the block + the G-code/preview), with an editing-context UI (breathing glow + "✎ Editing: <name>"
+  chip) and **non-destructive save** (Save-as-new vs an explicit Update). `blocksApp`/`devMode`/`stackBridge`.
+- **Polish/fixes** — one form frame (no doubled section borders) + probe-input/STOP overlap; `recordBlockEdit` ignores
+  the dev fields; centred toolbox ✕ + smoother palette slide; `macros-tabs.spec` refreshed to the sidebar-tree layout.
+
+**Unmerged on branch `feat/learner-library`** (5 commits, suite 308 green — **MERGE / RELEASE is the obvious next step**):
+- **Learner library** (ROADMAP MID #14, shipped) — the Blocks toolbox is now a TREE: **⚛ Atoms · 📚 Snippets · 📦 Complete
+  Programs**, where Snippets/Programs hold themed sub-categories of curated, drag-in compositions (each a stack rendered
+  as ONE connected flyout block via `stackBridge.stackToFlyoutBlock`). Validator-gated (`learner-library.spec`). Starter
+  set incl. a Probing snippet + program. `data/learnerLibrary.js`, `bridge.buildToolbox(extraCategories)`.
+- **Enum atom fields → dropdowns** — `dir`/`flow`/`arc`/`end`/`direction`/`order`/`strategy` were free TEXT (a one-letter
+  typo silently mis-emitted — coolant `mist`→`mis`→M9); registered in `bridge.SELECTS` → valid by construction.
+  (`filltext.align` still text — value set unconfirmed; see ROADMAP Gaps.)
 
 **The backlog lives in one place now:** [`ROADMAP.md`](ROADMAP.md) — the code-verified canonical roadmap
 (NEAR / MID / STRATEGIC + non-wizard + gaps + parked). This handoff is only *"where we are + the next task."*
@@ -15,32 +32,21 @@ The "wizards-as-data engine" the vision treated as future is mostly **already bu
 loops/control (`count`/`iff`/`array`/`flow`), and raw-emit atoms (`macro.js`) all ship. What remains is **Stages 4–6**
 — express ONE built-in *as data* + assert output-equivalence → port the rest → self-host. See ROADMAP "Key reframe."
 
-## ▶ Immediate next task — finish the spatial-GUI feature (the PRODUCER half)
-**"2D point (numbers)" authoring path** `[M]` — complete custom-op preview drag-to-edit. **Context (the big
-spatial-GUI thread, session 2):** decided + recorded in [[spatial-gui-form-vs-canvas]] + ROADMAP "GUI over fields" —
-spatial input belongs on the **interactive preview canvas** (drag a feature → params, value as plain numbers on the
-block), NOT a mini-canvas in a form row; discrete picks (datum/zone) stay as small form/block-field dual-render. Key
-realisation: a wizard's **output = template + params**; the GUI is a **swappable layer of input blocks** over those
-params — so the same output can be built with different GUI blocks (one source of truth). MID #3 (region poly tool)
-**parked** as low-leverage (authoring modal, not the operator loop). drill ALREADY does full canvas write-back
-(`drillView.buildDrillSpec` — handles + `onDrag`, the proven template); the gap is custom ops.
-- ✅ **CONSUMER seam SHIPPED (`8b268c6`, tested, suite green, drill untouched):** `layoutSpecFromOp`
-  (`wizards/ops/panelTypes.js`) now derives draggable point/rect handles from the grouped `x/y(/w/h)` param-block roles
-  it already read to DRAW, + an `onDrag` that writes the bound number FIELDS (`formWidgets` number/slider now tag
-  `data-param`; fires `'input'` → `userOpView.update()` redraws). Guarded to WRITABLE fields only (no dead handle over
-  a canvas-widget param). Test: `custom-op-canvas-handles.spec`.
-- 🛑 **INERT until the PRODUCER lands** (verify-real-symptom catch): the authoring couples "role" with the
-  `xy-pad`/`rect` FORM-canvas widget — `CANVAS_DECODE` (`blocks/userOps.js:54`) has `'xy-x'→['xy-pad','x']`, **no
-  `number+role`** — so a role-tagged param renders as the form mini-canvas (which the writability guard skips); the
-  handle NEVER fires for a real authored op. **Build:** (1) add decode entries `point-x→[number,x]` /
-  `point-y→[number,y]` (+rect) to `CANVAS_DECODE`/`CANVAS_ROLE_WIDGETS`; (2) **the fiddly bit** — render a number-role
-  GROUP as PAIRED `data-param` number fields, NOT a multi-param canvas widget (`groupCanvasBindings` /
-  `renderOpForm`'s grouping currently assumes a role-group IS a canvas widget). Then an author tags x/y as "2D point
-  (numbers)" + Form+2D panel → the big preview is drag-to-edit. **VERIFY END-TO-END** (a real authored custom op's
-  preview drags + writes the form), not just the unit seam. (Stages 2–3 = preset patterns + parametric-handle presets
-  extracted from drill — ROADMAP STRATEGIC #8.)
+## ▶ Immediate next task — merge `feat/learner-library`, then the wizards-as-data endgame
+1. **Merge + (optional) release** `feat/learner-library` → `main` (clean fast-forward; redeploys pages.dev). Bump the
+   `.ver` chip in `web/index.html` + push **only** if a new desktop exe/release is wanted (`desktop-release.yml`).
+2. **Then the endgame spine** — ROADMAP "Key reframe": what remains of wizards-as-data is **Stages 4–6**. The live
+   round-trip just made CUSTOM ops first-class editable; the convergence is to make BUILT-INS data too (they'd inherit
+   the same round-trip). Recommended order:
+   - **MID #6 — federated schema registry `[S]`** — a pristine/forkable layer (user specs stop mutating the shared
+     factory object); substrate for self-host + distribution-install validation.
+   - **STRATEGIC #2 — wizards-as-data Stage 4 `[L]`** — express ONE built-in (drill) as a pure data definition + an
+     output-equivalence harness (`emitMapped(interpreter) === drillStack(params)` across a param sweep).
 
-*(Parked: MID #3 region poly tool — low-leverage, see ROADMAP. The false-glow + hover work is archived below.)*
+*Loose ends (optional):* round-trip **step 5** — a referential-integrity guard when a removed knobbed block is
+referenced elsewhere (the corner `#1→#7/#8` case); edge-casey, deferred. More learner-library **curation** (the real
+ongoing work). `filltext.align` → dropdown (value set unconfirmed). The earlier false-glow / spatial-GUI diagnosis
+archive below is historical reference.
 
 ## 🗄️ Session-2 diagnosis archive (false-glow → declare-edit; SHIPPED `2789c37`, kept for reference)
 **Middle false-glow bug — ✅ SHIPPED (`2789c37`, declare-edit B).** The glow/chip/merge-guard now read the user's
