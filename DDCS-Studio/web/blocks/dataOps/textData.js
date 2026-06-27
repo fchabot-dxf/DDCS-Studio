@@ -26,7 +26,7 @@ import { userOpFromStack } from '../userOps.js';
  *  must carry it). font 'single-stroke' = the built-in; stepdown defaults to depth (engraving is usually one pass). */
 export const TEXT_DEFAULTS = {
     optIn: true,
-    text: 'TEXT', font: 'single-stroke', height: 12, spacing: 1.2, align: 'left', x: 0, y: 0,
+    text: 'TEXT', font: 'single-stroke', height: 12, width: 1, slant: 0, spacing: 1.2, align: 'left', x: 0, y: 0,
     strokeWidth: 2.5, toolDia: 1.5, stepoverPct: 50, depth: 0.4, stepdown: 0.4, feed: 400, plunge: 120, clearance: 4,
     originX: 0, originY: 0, offZ: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0,
 };
@@ -51,6 +51,8 @@ export const TEXT_BINDINGS = [
     { param: 'text', blockIndex: 5, key: 'text', type: 'string', default: TEXT_DEFAULTS.text },
     { param: 'font', blockIndex: 5, key: 'font', type: 'enum', default: TEXT_DEFAULTS.font },
     { param: 'height', blockIndex: 5, key: 'height', type: 'number', default: TEXT_DEFAULTS.height },
+    { param: 'width', blockIndex: 5, key: 'width', type: 'number', default: TEXT_DEFAULTS.width },
+    { param: 'slant', blockIndex: 5, key: 'slant', type: 'number', default: TEXT_DEFAULTS.slant },
     { param: 'spacing', blockIndex: 5, key: 'spacing', type: 'number', default: TEXT_DEFAULTS.spacing },
     { param: 'align', blockIndex: 5, key: 'align', type: 'enum', default: TEXT_DEFAULTS.align },
     { param: 'x', blockIndex: 5, key: 'x', type: 'number', default: TEXT_DEFAULTS.x },

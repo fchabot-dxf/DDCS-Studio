@@ -19,6 +19,8 @@ export function layoutText(params) {
     const text = (params.text == null ? 'TEXT' : String(params.text));
     const H = Math.max(1, num(params.height, 12));
     const scale = H / font.capHeight;
+    const width = Math.max(0.1, num(params.width, 1));               // horizontal scale: <1 condensed, >1 extended
+    const tanSlant = Math.tan(num(params.slant, 0) * Math.PI / 180);  // oblique/italic skew (deg, about the baseline)
     const tracking = num(params.spacing, 1.2);   // extra mm between glyphs
     const align = params.align || 'left';
     const ox = num(params.x, 0), oy = num(params.y, 0);
@@ -31,18 +33,19 @@ export function layoutText(params) {
 
     lines.forEach((ln, li) => {
         let lw = 0;
-        for (const ch of ln) lw += glyph(ch).w * scale + tracking;
+        for (const ch of ln) lw += glyph(ch).w * width * scale + tracking;
         if (ln.length) lw -= tracking;
         const baseY = oy - li * linePitch;
         let cx = align === 'center' ? ox - lw / 2 : align === 'right' ? ox - lw : ox;
         for (const ch of ln) {
             const g = glyph(ch);
             for (const stroke of g.s) {
-                const placed = stroke.map(([x, y]) => [cx + x * scale, baseY + y * scale]);
+                // width-stretch x, then slant-skew x by glyph height (about the baseline) — both in glyph units, then scale
+                const placed = stroke.map(([x, y]) => [cx + (x * width + y * tanSlant) * scale, baseY + y * scale]);
                 strokes.push(placed);
                 for (const [px, py] of placed) acc(px, py);
             }
-            cx += g.w * scale + tracking;
+            cx += g.w * width * scale + tracking;
         }
     });
 

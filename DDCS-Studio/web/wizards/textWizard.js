@@ -45,7 +45,8 @@ export function textStack(params = {}) {
     ft.params = {
         ...ft.params,
         text: params.text == null ? 'TEXT' : String(params.text), font: params.font || 'single-stroke',
-        height: num(params.height, 12), spacing: num(params.spacing, 1.2), align: params.align || 'left',
+        height: num(params.height, 12), width: num(params.width, 1), slant: num(params.slant, 0),
+        spacing: num(params.spacing, 1.2), align: params.align || 'left',
         x: num(params.x, 0), y: num(params.y, 0), strokeWidth: num(params.strokeWidth, 2.5),
         toolDia: tool, stepoverPct: num(params.stepoverPct, 50),
         z: 'z', feed: num(params.feed, 400), plunge: num(params.plunge, 120), clearance: clr,

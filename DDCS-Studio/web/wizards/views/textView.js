@@ -60,7 +60,7 @@ export const textView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'tx_text', 'tx_x', 'tx_y', 'tx_offX', 'tx_offY', 'tx_offZ', 'tx_pathDatum', 'tx_stockAttach', 'tx_height', 'tx_spacing', 'tx_align', 'tx_strokeWidth',
+        'tx_text', 'tx_x', 'tx_y', 'tx_offX', 'tx_offY', 'tx_offZ', 'tx_pathDatum', 'tx_stockAttach', 'tx_height', 'tx_width', 'tx_slant', 'tx_spacing', 'tx_align', 'tx_strokeWidth',
         'tx_toolDia', 'tx_stepoverPct', 'tx_depth', 'tx_stepdown', 'tx_clearance', 'tx_feed', 'tx_plunge', 'tx_rpm',
     ],
     probeSrcFields: {},
@@ -76,6 +76,7 @@ export const textView = {
         const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
         const params = {
             text: v('tx_text'), x: v('tx_x'), y: v('tx_y'), height: v('tx_height'),
+            width: v('tx_width'), slant: v('tx_slant'),
             spacing: v('tx_spacing'), align: v('tx_align') || 'left', strokeWidth: v('tx_strokeWidth'),
             toolDia: v('tx_toolDia'), stepoverPct: v('tx_stepoverPct'),
             depth: v('tx_depth'), stepdown: v('tx_stepdown'), clearance: v('tx_clearance'),
