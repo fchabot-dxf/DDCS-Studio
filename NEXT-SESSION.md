@@ -33,6 +33,16 @@ loops/control (`count`/`iff`/`array`/`flow`), and raw-emit atoms (`macro.js`) al
 as data + the equivalence harness) is now done** (drill). What remains is **Stages 5–6** — port the rest (gated on the 3
 frontier format extensions the drill port surfaced) → self-host. See ROADMAP "Key reframe" + STRATEGIC #2/#3.
 
+**⇒ REFRAME (user, 2026-06-27) — restructure the wizards, don't extend the format.** The Stage-5 wall (surfacing/
+contour resist binding — nested params, computed stepover, fan-out) is better solved by **rebuilding those awkward
+wizards into flat, port-friendly shapes** (lift nested geometry to top-level params; let the **FORM** do the `tool·%`
+math and store a flat value; one-param-one-socket) than by building 4 engine-level binding-format extensions — **~3
+of the 4 evaporate** this way, only genuine branching may still need `iff`/`count` atoms or wizard variants. Keep the
+**byte-identical** equivalence gate where legacy output is fine; relax only deliberately. Existing wizard internals
+are NOT sacred; keep the data-def format DUMB. **DIRECTIVE (general): the worker agent should ASK the user whether a
+wizard/builder can be CHANGED to align with the north star, rather than building machinery to preserve a structure
+the user doesn't care about.** See ROADMAP Conventions + STRATEGIC #3 + memory [[restructure-source-not-abstraction]].
+
 ## ✅ Shipped this session (2026-06-26)
 - **MID #6 — Federated schema registry `[S]` + STRATEGIC #2 — Wizards-as-data Stage 4 `[L]` — COMMITTED `128ae7e` (pushed to `main`).**
   MID #6: built-in `BUILDERS`/`SCHEMA` PRISTINE; user ops in separate `USER_BUILDERS`/`USER_SCHEMA`/`USER_LABELS` layers
