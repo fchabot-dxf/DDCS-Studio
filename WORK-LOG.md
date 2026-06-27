@@ -331,3 +331,34 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
 - state: tests 340/343 green (2 skipped; known `middle-animator` flake) · branch main · AUTO committed `c8f6890`
   (LOCAL, not pushed — user's call; no `.ver` bump → no release). backup branch updated. Watcher (Monitor `b3obi8v5b`)
   still armed on NEXT-SESSION.md. NEXT (deferred, advisor's call): canvas-role knob writeback gap. Holding for review.
+
+## 2026-06-27 — canvas-role knob writeback — AT THE GATE (verify-real-symptom first)
+
+- task `19800ee`: extend the group form's derive + writeback to canvas-role (point/rect) knobs, not just number knobs.
+  Advisor flagged: gate if a real 2D-widget design choice surfaces. Investigated the machinery + drove the REAL symptom
+  before building (verify-real-symptom) — and the picture is NOT what the task assumed:
+- DISCOVERY 1 — **number-role point/nrect/ncircle knobs ALREADY write back** in the group form (verified empirically: a
+  move with x→`point-x`, y→`point-y` → Group → chip → the form shows two number fields `posx`/`posy` → edit `posx`=99 →
+  insert → child.params.x=99, G-code `G0 X99 Y20`). They work through the EXISTING inc-2 writeback: `groupCanvasBindings`
+  keeps `blockIndex`+`key` on every member (`cleanBinding`), and the number-role group renders each member as its own
+  `data-param` field whose reader is param-keyed → `applyGroupEdits`'s filter already catches them. ⇒ **my earlier
+  WORK-LOG "gap" note (that grouped canvas bindings lack blockIndex/key) was WRONG.** No code needed for number-role.
+- DISCOVERY 2 — the ONLY real gap is the INTERACTIVE `xy-pad`/`rect` widgets (`MULTI_WIDGETS`): they render an inline
+  canvas (no `data-param` field) that comes up **0×0** in the form-only group panel (panel:'form') → invisible/undraggable
+  → can't be edited (the reader returns only the unchanged default). Bindings + reader are structurally correct; what's
+  missing is a SIZED 2D surface to drag.
+- THE GATE (the real 2D-widget design choice the advisor named) — how should a draggable 2D knob work in the group form:
+  - **A (minimal):** keep the group form form-only. Number-role point/nrect/ncircle already work as labeled number
+    fields (edit + writeback verified) — just LOCK it with a verify-first test. Interactive xy-pad/rect stay unsupported
+    (they need a 2D surface). Lowest effort; satisfies "point/rect knob → form → edit → writeback" via numbers.
+  - **B (drag, north-star-aligned):** give the group form a `form2d` 2D-preview pane (reuse the custom-op
+    `renderLayout2D` + `layoutSpecFromOp` drag handles) so the number-role 2D knobs are DRAG-editable on a preview canvas
+    — the "canvas-preview write-back path" the advisor mentioned, and exactly the [[spatial-gui-form-vs-canvas]] pattern
+    (drag the preview + plain numbers on the form). Bigger; reuses existing custom-op machinery; supersedes the 0×0
+    inline xy-pad/rect entirely (no need for MULTI_WIDGETS in the group form).
+- WORKER RECOMMENDATION → **A now + B as the committed fast-follow** (or B directly if the user wants drag immediately).
+  A is the already-working floor (ship the test); B is the GUI-over-fields value-add and is separable, same machinery
+  custom ops already use — no rework to go A→B. Interactive xy-pad/rect (0×0) are NOT worth supporting inline; the
+  number-role + form2d-preview path supersedes them.
+- state: tests 340/343 green · branch main · NO code shipped (investigation only; dbg spec deleted). **GATE: holding for
+  the advisor's pick (A / B / synthesis) before building.** Watcher armed (Monitor b3obi8v5b).
