@@ -1,0 +1,69 @@
+/**
+ * blocks/dataOps/slotData.js — the SLOT built-in expressed as a pure DATA definition (Stage 5, port #4).
+ *
+ * Slot is the cleanest fill-family port yet: its leaf (web/wizards/ops/slot.js) was ALREADY flat — a widened channel
+ * from (x0,y0)→(x1,y1), all flat scalar sockets, NO Region pill — so NO new atom and NO stepover-math relocation was
+ * needed (the width>tool band passes + tool·% stepover are computed INSIDE slotPath over already-flat leaf fields, not
+ * in the stack). Slot is also an OPT-IN placement op (placement.js:44): with no stock-attach the placement returns the
+ * raw originX/originY, so the absolute A↔B geometry needs no region-local-at-0 move — originX is already its own socket.
+ *
+ * The ONE source touch: the slot leaf gained an `extent()` (== slotBBox) so the place fold's liveExtent recomputes the
+ * placement bbox from LIVE params — REQUIRED, not optional: without it a stock-attach sweep with varied geometry diverges
+ * (instantiate freezes the placeOnStock snapshot at the template default; live slotStack recomputes slotBBox). With it,
+ * stock-attach tracks the geometry byte-identical (exactly how array.extent solved drill's frozen-bbox frontier).
+ *
+ * FRONTIERS held UNBOUND (asserted as divergence tripwires, like drill/surfacing):
+ *   • `pattern` — slotStack wraps the leaf in an `array` only when patterned (a CONDITIONAL STRUCTURE swap instantiate
+ *     can't do — drill frontier #1). This def is the SINGLE-slot template; pattern stays 'single'. (Array-slot = a future port.)
+ *   • `clearance` — TRUE fan-out: feeds progstart (block 0) AND the slot leaf (block 3). 1 binding = 1 socket → held at default.
+ *
+ * Template SEEDED from slotStack(SLOT_DEFAULTS) (pattern:'single', optIn:true — the real wizard always sets opt-in);
+ * the BINDINGS map is the independent artifact, proven byte-identical + binding-wiring by tests/slot-as-data.spec.js.
+ */
+import { slotStack } from '../../wizards/slotWizard.js';
+import { userOpFromStack } from '../userOps.js';
+
+/** Author defaults — match slotStack's num() fallbacks. width default == toolDia (a slot is ≥ tool wide). pattern:'single'
+ *  (bare leaf, no array) + optIn:true (slot is an opt-in/absolute placement op — the seed must carry it). */
+export const SLOT_DEFAULTS = {
+    pattern: 'single', optIn: true,
+    ax: 0, ay: 0, bx: 60, by: 0, width: 6, toolDia: 6, stepoverPct: 40, depth: 4, stepdown: 1.5,
+    feed: 600, plunge: 150, clearance: 5, wcs: 'active',
+    originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
+};
+
+// Pre-order flatten of the bare-leaf single-slot template [progstart, wcs, placeonstock{ slot }, progend]:
+//   0 progstart · 1 wcs · 2 placeonstock · 3 slot · 4 progend
+// (No intermediate container — the slot leaf does its own depth passes internally — so it sits at index 3, not 4.)
+export const SLOT_BINDINGS = [
+    { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: SLOT_DEFAULTS.wcs },
+    // placement scalars (block 2, placeonstock) — opt-in: originX/originY are the raw offset; stock-attach uses the live extent
+    { param: 'originX', blockIndex: 2, key: 'offX', type: 'number', default: SLOT_DEFAULTS.originX },
+    { param: 'originY', blockIndex: 2, key: 'offY', type: 'number', default: SLOT_DEFAULTS.originY },
+    { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: SLOT_DEFAULTS.stockAttach },
+    { param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: SLOT_DEFAULTS.pathDatum },
+    { param: 'stockDatum', blockIndex: 2, key: 'stockDatum', type: 'enum', default: SLOT_DEFAULTS.stockDatum },
+    { param: 'stockW', blockIndex: 2, key: 'stockW', type: 'number', default: SLOT_DEFAULTS.stockW },
+    { param: 'stockH', blockIndex: 2, key: 'stockH', type: 'number', default: SLOT_DEFAULTS.stockH },
+    { param: 'stockZ', blockIndex: 2, key: 'stockZ', type: 'number', default: SLOT_DEFAULTS.stockZ },
+    { param: 'offZ', blockIndex: 2, key: 'offZ', type: 'number', default: SLOT_DEFAULTS.offZ },
+    // geometry + cut (block 3, the slot leaf). Wizard names ax/ay/bx/by/toolDia → leaf keys x0/y0/x1/y1/tool.
+    { param: 'ax', blockIndex: 3, key: 'x0', type: 'number', default: SLOT_DEFAULTS.ax },
+    { param: 'ay', blockIndex: 3, key: 'y0', type: 'number', default: SLOT_DEFAULTS.ay },
+    { param: 'bx', blockIndex: 3, key: 'x1', type: 'number', default: SLOT_DEFAULTS.bx },
+    { param: 'by', blockIndex: 3, key: 'y1', type: 'number', default: SLOT_DEFAULTS.by },
+    { param: 'width', blockIndex: 3, key: 'width', type: 'number', default: SLOT_DEFAULTS.width },
+    { param: 'toolDia', blockIndex: 3, key: 'tool', type: 'number', default: SLOT_DEFAULTS.toolDia },
+    { param: 'stepoverPct', blockIndex: 3, key: 'stepoverPct', type: 'number', default: SLOT_DEFAULTS.stepoverPct },
+    { param: 'depth', blockIndex: 3, key: 'depth', type: 'number', default: SLOT_DEFAULTS.depth },
+    { param: 'stepdown', blockIndex: 3, key: 'stepdown', type: 'number', default: SLOT_DEFAULTS.stepdown },
+    { param: 'feed', blockIndex: 3, key: 'feed', type: 'number', default: SLOT_DEFAULTS.feed },
+    { param: 'plunge', blockIndex: 3, key: 'plunge', type: 'number', default: SLOT_DEFAULTS.plunge },
+];
+
+export const SLOT_DATA_OPTYPE = 'user_slot_data';
+
+/** Build the slot-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. */
+export function slotDataDef() {
+    return userOpFromStack('slot_data', 'Slot (data)', slotStack(SLOT_DEFAULTS), SLOT_BINDINGS, 'form2d');
+}

@@ -9,6 +9,7 @@
  */
 import { num, r3 } from './util.js';
 import { depthLevels } from '../clearing.js';
+import { pointsBBox } from './placement.js';
 
 /** Slot toolpath: clearance preamble + zig-zag offset passes stepping down (+ zero-length single-plunge guard). */
 export function slotPath(p) {
@@ -60,4 +61,14 @@ export const slotBlock = {
         x0: num(p.x0, 0) + dx, y0: num(p.y0, 0) + dy,
         x1: num(p.x1, 60) + dx, y1: num(p.y1, 0) + dy,
     }),
+    // Declared footprint = the A↔B centreline widened by the cut width (== slotWizard's slotBBox). So the place fold's
+    // liveExtent recomputes the placement bbox from LIVE leaf params (one source of truth) instead of a frozen snapshot
+    // — makes stock-attach track the geometry, and lets an enclosing Array compose the pattern footprint. (See drill/array.)
+    extent: (p) => {
+        const x0 = num(p.x0, 0), y0 = num(p.y0, 0), x1 = num(p.x1, 60), y1 = num(p.y1, 0);
+        const tool = Math.max(0.1, num(p.tool, 6)), W = Math.max(tool, num(p.width, tool));
+        const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1;
+        const px = (-dy / len) * (W / 2), py = (dx / len) * (W / 2);
+        return pointsBBox([{ x: x0 + px, y: y0 + py }, { x: x0 - px, y: y0 - py }, { x: x1 + px, y: y1 + py }, { x: x1 - px, y: y1 - py }]);
+    },
 };
