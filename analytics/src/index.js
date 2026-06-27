@@ -200,6 +200,19 @@ function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myI
   const payload = JSON.stringify({ data, errors }).replace(/</g, '\\u003c');
   const post = `/dash${esc(search || ('?key=' + k))}`;   // form action: preserves the current view across the redirect
 
+  // "Visits by country, per period" as a simple grouped list (period → countries with counts → total).
+  const cpByPeriod = {};
+  (data.byCountryPeriod || []).forEach((r) => { (cpByPeriod[r.period] = cpByPeriod[r.period] || []).push(r); });
+  const cpPeriods = Object.keys(cpByPeriod).sort().reverse();
+  const cpList = cpPeriods.length
+    ? `<div style="max-height:340px;overflow:auto"><table><tr><th>${per === 'week' ? 'week of' : 'day'}</th><th>countries</th><th>total</th></tr>${cpPeriods.map((p) => {
+        const items = cpByPeriod[p].slice().sort((a, b) => (Number(b.visits) || 0) - (Number(a.visits) || 0));
+        const tot = items.reduce((s, r) => s + (Number(r.visits) || 0), 0);
+        const cells = items.map((r) => `${esc(r.country || '—')} <b>${Number(r.visits) || 0}</b>`).join('   ·   ');
+        return `<tr><td>${esc(String(p).slice(5, 10))}</td><td>${cells}</td><td>${tot}</td></tr>`;
+      }).join('')}</table></div>`
+    : '<span class="sub">no data</span>';
+
   const devRows = (devIps && devIps.length)
     ? `<table><tr><th>dev IP (hidden from default view)</th><th></th></tr>${devIps.map((ip) =>
         `<tr><td>${esc(ip)}${ip === myIp ? ' <span class="sub">(this device)</span>' : ''}</td>
@@ -267,7 +280,7 @@ function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myI
     <div class="controls" style="margin:0 0 10px">
       <a class="${per === 'day' ? 'on' : ''}" href="${perLink('day')}">day</a><a class="${per === 'week' ? 'on' : ''}" href="${perLink('week')}">week</a>
     </div>
-    <canvas id="c_cp"></canvas></div>
+    ${cpList}</div>
   <div class="card"><h2>Top countries</h2><canvas id="c_country"></canvas></div>
   <div class="card"><h2>Web vs exe</h2><canvas id="c_app"></canvas></div>
   <div class="card full"><h2>Top features used</h2><canvas id="c_feature"></canvas></div>
@@ -304,24 +317,7 @@ bar('c_feature', D.feature, 'feature', 'uses', '#a371f7');
   new Chart(el, { type: 'doughnut', data: { labels: rows.map(r => String(r.app || '—')), datasets: [{ data: rows.map(r => num(r.n)), backgroundColor: ['#1f6feb', '#e3a008', '#2ea043', '#a371f7'] }] }, options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e6edf3' } } } } });
 })();
 
-// visits by country, per period — stacked bar (one stack per country)
-(function () {
-  const el = document.getElementById('c_cp'); const rows = D.byCountryPeriod; if (!el || !rows || !rows.length) return;
-  const periods = [...new Set(rows.map(r => r.period))].sort();
-  const countries = [...new Set(rows.map(r => String(r.country || '—')))];
-  const pos = {}; periods.forEach((p, i) => { pos[p] = i; });
-  const PAL = ['#1f6feb', '#2ea043', '#a371f7', '#e3a008', '#db61a2', '#3fb950', '#f0883e', '#58a6ff', '#bc8cff', '#56d364', '#e3b341', '#ff7b72', '#79c0ff', '#d2a8ff'];
-  const fmtP = (p) => { try { return new Date(p).toISOString().slice(5, 10); } catch { return String(p); } };
-  const datasets = countries.map((c, ci) => {
-    const arr = new Array(periods.length).fill(0);
-    rows.forEach(r => { if (String(r.country || '—') === c) arr[pos[r.period]] = num(r.visits); });
-    return { label: c, data: arr, backgroundColor: PAL[ci % PAL.length] };
-  });
-  new Chart(el, { type: 'bar', data: { labels: periods.map(fmtP), datasets }, options: {
-    responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e6edf3', boxWidth: 10, font: { size: 10 } } } },
-    scales: { x: { stacked: true, grid: { color: GRID }, ticks: { color: TXT } }, y: { stacked: true, grid: { color: GRID }, ticks: { color: TXT }, beginAtZero: true } } } });
-})();
-
+// (Visits by country, per period is now a server-rendered list — no chart.)
 (function () {
   const rows = D.version; const host = document.getElementById('t_version'); if (!host) return;
   if (!rows || !rows.length) { host.innerHTML = '<span class="sub">no data</span>'; return; }
