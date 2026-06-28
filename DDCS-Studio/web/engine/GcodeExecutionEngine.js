@@ -729,6 +729,8 @@ export class GcodeExecutionEngine {
         };
 
         let waiting = false;
+        let homedMove = null;       // M98 P501 X<N> native home — { axis, machine } resolved below, applied after the wait guard
+        let wasNativeHome = false;  // any M98 P501 home line — short-circuit so its X-word (axis index) is never read as a coord
         for (const m of mcodes) {
             if (m === 6) {
                 // Tool change request: M6 Tn stores the target tool in #1504 (real DDCS
@@ -783,6 +785,31 @@ export class GcodeExecutionEngine {
                 // the touch), M102 disarms. The next motion line is treated as a probe so it clamps to the
                 // stock surface like a G31 (DM500 has no G31). No status var on this controller — motion just halts.
                 this._probeArmed = (m === 101);
+            } else if (m === 98 && Math.round(wm.P) === 501 && wm.X != null && Number.isFinite(wm.X)) {
+                // NATIVE HOMING — M98 P501 X<N> (N = axis index 0=X 1=Y 2=Z 3=A 4=B). The homingWizard emits this
+                // for the `native` method; the real controller runs subprogram O501 (its switch/dir/speed config) and
+                // sets the homed flag itself. The sim has no controller, so we MODEL it exactly like homingSimProxy:
+                // home end = SIGNED machine travel (settings.machine[ax]) + offset, then a short back-off toward centre,
+                // and we set the homed flag #[1515+N] ourselves (sim-only state, like the probe-result vars). Scoped
+                // to P501 only — M98 P503/other subs stay unhandled (follow-up). Here X is the axis INDEX, not a coord,
+                // so this is short-circuited after the wait guard (the coordinate-move path never sees wm.X).
+                const num = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
+                const N = Math.round(wm.X);
+                const AX = ['x', 'y', 'z', 'a', 'b'][N];
+                if (AX === 'x' || AX === 'y' || AX === 'z') {   // only the linear axes draw motion (A/B home is set-zero)
+                    const s = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings() : {};
+                    const machine = s.machine || {};
+                    const cfg = ((s.homing || {}).axes || {})[AX] || {};
+                    const travel = AX === 'z' ? num(machine.z, -120) : num(machine[AX], 300);
+                    // Home end follows the SIGNED travel (its sign = home direction); an explicit cfg.dir overrides.
+                    const end = (cfg.dir === '+' ? Math.abs(travel) : cfg.dir === '-' ? -Math.abs(travel) : travel) + num(cfg.offset, 0);
+                    // Final homed spot = home end backed off toward centre, so it isn't sitting on the switch (proxy parity).
+                    const homePos = end - Math.sign(end || 1) * num(cfg.backoff, 5);
+                    homedMove = { axis: AX, machine: Math.round(homePos * 1000) / 1000 };
+                }
+                this.vars.set(1515 + N, 1);   // homed flag #[1515+N] — the controller sets it on real hardware
+                this._setStatus(`M98 P501 — home ${(AX || N).toString().toUpperCase()} (axis ${N})`, true);
+                wasNativeHome = true;
             }
         }
 
@@ -792,6 +819,43 @@ export class GcodeExecutionEngine {
             return false;
         }
         this._setWaitPin(null);   // this line is past any input wait
+
+        // NATIVE HOMING motion (M98 P501 X<N>, resolved above) — rapid the homed axis to its home end (machine frame,
+        // mapped to the part frame: part = machine - wcsOffset, the same map the G53 path uses) so the spindle visibly
+        // homes. The homed flag is already set. This is its OWN motion (X here was the axis INDEX, not a coordinate),
+        // so it must NOT fall through to the coordinate-move path — we apply it and advance IP here. An A/B set-zero
+        // home has no motion (homedMove null) but still short-circuits so its X<N> word is never read as a coordinate.
+        if (wasNativeHome && !homedMove) { this.ip += 1; return false; }
+        if (homedMove) {
+            const target = { ...this.pos };
+            target[homedMove.axis] = homedMove.machine * this.unitScale - (this._wcsOffset[homedMove.axis] || 0);
+            this.stats.absolute = true;   // a homed axis is a fixed machine position, not start-relative
+            if (this._traceSink) {
+                this._traceSink.push({
+                    x1: this.pos.x, y1: this.pos.y, z1: this.pos.z,
+                    x2: target.x, y2: target.y, z2: target.z,
+                    rapid: true, probe: false, type: 'rapid', feed: this.feedVal,
+                    pass: this._pass, line: step.lineIndex,
+                });
+                this.pos = target;
+                this.ip += 1;
+                return false;
+            }
+            const d = Math.hypot(target.x - this.pos.x, target.y - this.pos.y, target.z - this.pos.z);
+            const realMs = this.rapidRate > 0 ? (d / this.rapidRate) * 60000 : 0;
+            const speed = this.simSpeed > 0 ? this.simSpeed : 1;
+            if (realMs / speed > 50) {
+                this._move = { from: { ...this.pos }, to: target, durMs: realMs, elapsed: 0, last: null, touchName: null };
+                this._setStatus(`Homing ${homedMove.axis.toUpperCase()} — G0 ${d.toFixed(1)} mm`, true);
+                this._nextDelayMs = 16;
+                this.ip += 1;
+                return false;   // ticks now advance the move; next line runs when it lands
+            }
+            this.pos = target;
+            if (typeof this.onPositionChange === 'function') this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
+            this.ip += 1;
+            return false;
+        }
 
         // G4 dwell — DDCS unit is ms (dispatcher capture: G04 P500). Paced by simSpeed.
         if (gcodes.includes(4) && wm.P != null && Number.isFinite(wm.P) && wm.P > 0) {
