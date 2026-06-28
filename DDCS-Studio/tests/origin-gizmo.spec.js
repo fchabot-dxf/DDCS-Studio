@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-// The WCS work-origin gizmo: a labelled crosshair + dot at part-zero, riding the part frame, kept CONSTANT screen
-// size by _scaleMarkers (so it doesn't grow with zoom), and tracking the datum (datum-Z) when it changes.
+// The stock-WCS work-origin gizmo: a crosshair + dot at part-zero (a hover "stock" tooltip, no persistent label),
+// riding the part frame, kept CONSTANT screen size by _scaleMarkers (so it doesn't grow with zoom), tracking datum-Z.
 test.use({ viewport: { width: 1280, height: 900 } });
 
 test('work-origin gizmo: exists at part-zero, constant size on zoom, tracks the datum', async ({ page }) => {
@@ -22,9 +22,11 @@ test('work-origin gizmo: exists at part-zero, constant size on zoom, tracks the 
   const r = await page.evaluate(() => {
     const viz = window.ddcsStudio.wizardManager._activePanel.viz;
     const og = viz._originGizmo;
-    // It rides the part frame (so a WCS shift moves it with the part) and carries a "WCS" text label child.
+    // It rides the part frame (so a WCS shift moves it with the part). NO persistent text label — the yellow square IS
+    // the stock WCS; a hover "stock" TOOLTIP (_stockTip) identifies it instead of a floating "WCS" label (user request).
     const onPartFrame = og.parent === viz.partFrame.group;
-    const hasLabel = !!viz._originLabel && og.children.includes(viz._originLabel);
+    const noLabel = !viz._originLabel;
+    const hasTip = !!viz._stockTip && viz._stockTip.textContent === 'stock';
     // X/Y are part-zero (it marks the WCS origin); Z tracks the datum exactly like the X axis line.
     const pos = { x: og.position.x, y: og.position.y, z: og.position.z };
     const axisZ = viz._axisLineX.geometry.attributes.position.getZ(0);   // the X axis line's datum Z
@@ -35,11 +37,12 @@ test('work-origin gizmo: exists at part-zero, constant size on zoom, tracks the 
     viz.radius = 80; viz._applyCamera(); viz.render();
     const sNear = og.scale.x;
 
-    return { onPartFrame, hasLabel, pos, axisZ, sFar, sNear };
+    return { onPartFrame, noLabel, hasTip, pos, axisZ, sFar, sNear };
   });
 
   expect(r.onPartFrame, 'gizmo rides the part frame (tracks the WCS shift)').toBeTruthy();
-  expect(r.hasLabel, 'gizmo carries the WCS text label').toBeTruthy();
+  expect(r.noLabel, 'no persistent text label (replaced by a tooltip)').toBeTruthy();
+  expect(r.hasTip, 'gizmo has a "stock" hover tooltip identifying the stock-WCS').toBeTruthy();
   expect(Math.abs(r.pos.x), 'X at part-zero').toBeLessThan(1e-6);
   expect(Math.abs(r.pos.y), 'Y at part-zero').toBeLessThan(1e-6);
   expect(r.pos.z, 'Z tracks the datum (same floor as the axis lines)').toBeCloseTo(r.axisZ, 6);

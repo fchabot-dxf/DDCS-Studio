@@ -3223,6 +3223,13 @@ body #editor.editor-layer {
 #editor-highlight .g-line.active-line,
 pre[id^="wiz_"][id$="_code"] .g-line.active-line { background: rgba(64, 110, 171, 0.30); border-radius: 2px; animation: ddcs-exec-pulse 0.4s ease; }
 
+/* SLICE 2 — WCS VISIBLE: a temporal FLASH on a WCS/start call line as the sim reaches it (paired with the 3D marker
+   glow). flash-wcs = amber (WCS select/set), flash-start = warm red (spindle/program start); both fade out. */
+@keyframes ddcs-flash-wcs   { 0% { background: rgba(255, 214, 107, 0); } 14% { background: rgba(255, 214, 107, 0.55); } 100% { background: rgba(255, 214, 107, 0); } }
+@keyframes ddcs-flash-start { 0% { background: rgba(255, 138, 122, 0); } 14% { background: rgba(255, 138, 122, 0.55); } 100% { background: rgba(255, 138, 122, 0); } }
+#editor-highlight .g-line.flash-event.flash-wcs   { border-radius: 2px; animation: ddcs-flash-wcs 0.7s ease-out; }
+#editor-highlight .g-line.flash-event.flash-start { border-radius: 2px; animation: ddcs-flash-start 0.7s ease-out; }
+
 /* Line-number gutter — dark grey, left, scroll-synced with the editor */
 #editor-gutter {
     position: absolute;

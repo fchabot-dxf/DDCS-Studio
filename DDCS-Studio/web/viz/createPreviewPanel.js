@@ -74,6 +74,16 @@ const PANEL_HTML = `
   <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan</div>
 `;
 
+// SLICE 2 (WCS VISIBLE): classify an executing line as a WCS call or a spindle/start call, from the RAW text only
+// (no engine parsing — the verify-first confirmed raw suffices). Comments ( … ) are stripped first so a mention of a
+// code inside a comment can't false-fire. Exported for unit tests. Returns 'wcs' | 'start' | null.
+export function classifyCall(raw) {
+    const code = String(raw || '').replace(/\([^)]*\)/g, ' ');
+    if (/\bG5[4-9]\b/.test(code) || /\bG10\b/.test(code)) return 'wcs';    // WCS select (G54–G59) / set (G10 L2/L20)
+    if (/\bM0*[34]\b/.test(code)) return 'start';                          // spindle on (M3 / M4) = program start
+    return null;
+}
+
 export function createPreviewPanel(container, opts = {}) {
     const get = (k) => (typeof opts[k] === 'function' ? opts[k]() : opts[k]);
     container.classList.add('preview-panel');
@@ -150,7 +160,16 @@ export function createPreviewPanel(container, opts = {}) {
             wcsOffset: wcsForViz(),
             simSpeed: simSpeed(),
             createVarStore: opts.createVarStore || null,
-            onLineChange: ({ lineIndex, raw }) => { if (typeof opts.onLine === 'function') opts.onLine(lineIndex); if (raw) setStatus(`Executing line ${lineIndex + 1}: ${raw.trim()}`); },
+            onLineChange: ({ lineIndex, raw }) => {
+                if (typeof opts.onLine === 'function') opts.onLine(lineIndex);
+                if (raw) setStatus(`Executing line ${lineIndex + 1}: ${raw.trim()}`);
+                // WCS VISIBLE: a WCS/start call fires a temporal FLASH — the 3D marker glows + the code line glows/fades.
+                const kind = raw ? classifyCall(raw) : null;
+                if (kind) {
+                    if (viz && viz.flashMarker) viz.flashMarker(kind);
+                    if (typeof opts.onCallFlash === 'function') opts.onCallFlash(lineIndex, kind);
+                }
+            },
             onPositionChange: (pos) => { if (viz && viz.setToolPosition) viz.setToolPosition(pos); if (mode === '2d' && segs.length) t2.seek(nearest2d(pos)); },
             onStatus: ({ message }) => setStatus(message),
             onWait: (wait) => { if (!window.ioPanel) return; if (wait) window.ioPanel.show(); window.ioPanel.setWait(wait); },   // float the I/O panel during a probe/M-code wait

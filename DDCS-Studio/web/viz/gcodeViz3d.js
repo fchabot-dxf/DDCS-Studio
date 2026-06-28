@@ -147,12 +147,19 @@ export class GcodeViz3D {
         const cross = new THREE.LineSegments(ogeo, omat); cross.renderOrder = 14; og.add(cross);
         const dot = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffe08a, depthTest: false }));
         dot.renderOrder = 14; og.add(dot);
-        const olabel = this._makeTextSprite('WCS', '#ffe08a');
-        olabel.position.set(1.2, 1.2, 0.2);   // float up-right of the dot (re-scaled with the group)
-        og.add(olabel);
+        // NO persistent text label — the yellow square IS the STOCK WCS (the datum/pin saved in settings.stock). A
+        // hover TOOLTIP ("stock") identifies it instead of a floating label (user request). _scaleMarkers guards null.
         this._originGizmo = og;
-        this._originLabel = olabel;
+        this._originLabel = null;
         this.partFrame.add(og);   // rides the part frame → tracks the datum exactly like the axis lines
+        if (typeof document !== 'undefined' && this.container) {
+            if (getComputedStyle(this.container).position === 'static') this.container.style.position = 'relative';
+            const tip = document.createElement('div');
+            tip.className = 'viz-stock-tip'; tip.textContent = 'stock';
+            tip.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:20;padding:2px 7px;font:600 11px/1.2 system-ui,sans-serif;color:#241a06;background:#ffe08a;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,.45);transform:translate(-50%,-150%);white-space:nowrap;display:none;';
+            this.container.appendChild(tip);
+            this._stockTip = tip;
+        }
         // Direction labels on the grid edges (repositioned to the footprint in setSegments)
         this._gridLabels = {
             xp: this._makeTextSprite('+X', '#ff6b6b'), xn: this._makeTextSprite('-X', '#ff6b6b'),
@@ -1438,8 +1445,9 @@ export class GcodeViz3D {
             this._highlightCubeFace(-1);
             const g = this._pickGizmo(e);
             this._setHighlight(g ? g.pass : null, g ? g.axis : null);
+            this._updateStockTip(e);   // "stock" tooltip when hovering the stock-WCS marker
         });
-        el.addEventListener('pointerleave', () => { if (!mode) { this._setHighlight(null, null); this._highlightCubeFace(-1); } });
+        el.addEventListener('pointerleave', () => { if (!mode) { this._setHighlight(null, null); this._highlightCubeFace(-1); } if (this._stockTip) this._stockTip.style.display = 'none'; });
         el.addEventListener('wheel', (e) => {
             e.preventDefault();
             const old = this.radius;
@@ -1517,6 +1525,64 @@ export class GcodeViz3D {
             cancelAnimationFrame(this._animRaf);
             this._animRaf = null;
         }
+    }
+
+    // SLICE 2 (WCS VISIBLE): a momentary GLOW pulse at a marker when its call fires in the sim timeline. kind 'wcs' →
+    // the WCS origin gizmo (part-zero / stock datum); 'start' → the first spindle start marker. A soft additive sprite
+    // (radial-gradient = a blurred halo of light), expanded + faded over ~0.7s. Self-contained (added → animated →
+    // removed) so it never fights the per-frame _scaleMarkers sizing. No engine change — driven by onLineChange.
+    _glowTexture() {
+        if (this._glowTex) return this._glowTex;
+        const c = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
+        if (!c) return null;
+        c.width = c.height = 128;
+        const g = c.getContext('2d');
+        const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+        grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.22, 'rgba(255,255,255,0.85)');
+        grd.addColorStop(0.55, 'rgba(255,255,255,0.28)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+        this._glowTex = new this.THREE.CanvasTexture(c);
+        return this._glowTex;
+    }
+
+    flashMarker(kind) {
+        const THREE = this.THREE;
+        const anchor = kind === 'wcs' ? this._originGizmo : (this.spindleMarkers && this.spindleMarkers[0]);
+        const tex = this._glowTexture();
+        if (!anchor || !THREE || !tex || !this.scene) return;
+        const pos = anchor.getWorldPosition(new THREE.Vector3());
+        const span = (this._stock && Math.max(this._stock.x || 0, this._stock.y || 0)) || 60;
+        const baseR = Math.max(6, span * 0.18);
+        const col = kind === 'wcs' ? 0xffe08a : 0xff7a6a;
+        const mat = new THREE.SpriteMaterial({ map: tex, color: new THREE.Color(col), transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false });
+        const sprite = new THREE.Sprite(mat);
+        sprite.position.copy(pos); sprite.renderOrder = 999;
+        this.scene.add(sprite);
+        const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+        const t0 = now(), dur = 700;
+        const tick = () => {
+            const u = Math.min(1, (now() - t0) / dur);
+            const s = baseR * (1.2 + 2.2 * u);
+            sprite.scale.set(s, s, 1);
+            mat.opacity = 0.95 * (1 - u) * (1 - u);                  // ease-out fade
+            this.render();
+            if (u < 1) requestAnimationFrame(tick);
+            else { this.scene.remove(sprite); mat.dispose(); }
+        };
+        requestAnimationFrame(tick);
+    }
+
+    // Hover tooltip for the STOCK-WCS marker (the yellow origin square = settings.stock's saved WCS). Projects the
+    // gizmo to screen; shows "stock" when the cursor is near it. Replaces the old persistent floating label.
+    _updateStockTip(e) {
+        const tip = this._stockTip, og = this._originGizmo;
+        if (!tip || !og || !this.container) return;
+        const v = og.getWorldPosition(this._ogV3 || (this._ogV3 = new this.THREE.Vector3())).clone().project(this.camera);
+        const rect = this.container.getBoundingClientRect();
+        const sx = (v.x * 0.5 + 0.5) * rect.width, sy = (-v.y * 0.5 + 0.5) * rect.height;
+        const near = v.z < 1 && Math.hypot((e.clientX - rect.left) - sx, (e.clientY - rect.top) - sy) < 20;
+        if (near) { tip.style.left = sx + 'px'; tip.style.top = sy + 'px'; tip.style.display = 'block'; }
+        else if (tip.style.display !== 'none') tip.style.display = 'none';
     }
 
     render() {

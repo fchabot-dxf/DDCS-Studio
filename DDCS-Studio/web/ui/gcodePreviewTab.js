@@ -49,6 +49,8 @@ function ensurePanel() {
             if (i == null) { if (em.clearActiveLine) em.clearActiveLine(); }
             else if (em.setActiveLine) em.setActiveLine(i);
         },
+        // WCS VISIBLE (slice 2): a WCS/start call line flashes in the editor as the sim reaches it (the 3D marker glows too).
+        onCallFlash: (i, kind) => { const em = window.editorManager; if (em && em.flashLine) em.flashLine(i, kind); },
         // A wizard insert hands off the start it was previewing — consume it once.
         getStart: () => { const ps = window.__pendingSpindleStart; window.__pendingSpindleStart = null; return ps; },
         createVarStore: gpSeededVarStore,

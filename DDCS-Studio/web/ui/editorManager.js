@@ -235,6 +235,21 @@ export class EditorManager {
         this.setActiveLine(null);
     }
 
+    // SLICE 2 (WCS VISIBLE): a momentary glow on a code line when its WCS/start call fires in the sim timeline. `kind`
+    // ('wcs' / 'start') tints it; the CSS keyframe fades it out; the class is stripped after so the SAME line can
+    // re-fire on a later pass. Reuses the #editor-highlight .g-line[data-line-index] overlay (same as setActiveLine).
+    flashLine(lineIndex, kind) {
+        if (!this.highlight || lineIndex == null) return;
+        const el = this.highlight.querySelector(`.g-line[data-line-index="${lineIndex}"]`);
+        if (!el) return;
+        const tint = kind === 'start' ? 'flash-start' : 'flash-wcs';
+        el.classList.remove('flash-event', 'flash-wcs', 'flash-start');
+        void el.offsetWidth;                          // restart the CSS animation if the same line re-fires
+        el.classList.add('flash-event', tint);
+        clearTimeout(el._flashT);
+        el._flashT = setTimeout(() => el.classList.remove('flash-event', 'flash-wcs', 'flash-start'), 750);
+    }
+
     _restoreActiveLine() {
         if (this.activeLineIndex == null) return;
         const next = this.highlight.querySelector(`.g-line[data-line-index="${this.activeLineIndex}"]`);
