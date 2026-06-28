@@ -1300,3 +1300,24 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   vs "jog clear", OR the wizard exposes a per-pass-source array alongside inferStarts) + a 2-colour choice (auto vs
   manual). Both the source-mechanism and the colours are small design calls → surfacing rather than guessing the
   palette. Pausing here (turn is very large; INC4 needs human-eyes; the marker-colour palette is the human's call).
+
+## 2026-06-28 — turn 57: marker colour by source (LAST middle increment) — MIDDLE BATCH DONE
+
+- **Marker colour by source (`1611940`).** Human picked the palette: AUTO-traverse start = CYAN (kept), MANUAL-jog
+  start = AMBER (`#ffb300` / `0xffb300` — clear of the yellow rapid `#ffcc00`, the probe blue, the tool orange).
+  Plumbing: the engine tags each pass from its REPOSITION message (`/auto-traverse/`→auto, else manual) into a new
+  `this._passSources` → `stats.passSources` (pass 0 = the start = auto/default); `createPreviewPanel` feeds it to
+  `t2.setStartSources` + `viz.setStartSources` alongside `passStarts`; the 2D `drawStartHandles` colours the diamond /
+  ring / badge per-pass, and the 3D start sprite became a WHITE lozenge tinted by `material.color` (so the same sprite
+  shows cyan or amber via `_highlightSelectedStart`, which now sets colour-by-source AND the select/dim opacity).
+  Verify-first the data: passSources = auto-both `['auto','auto']`, manual-both `['auto','manual','manual','manual']`,
+  mixed (in-axis auto + trans manual) `['auto','manual']`, pocket `['auto']`. `marker-colour-by-source.spec` (trace
+  sources; 3D markers cyan/amber; 2D markers carry the source). Pocket/single-axis = all cyan (unchanged). Full suite
+  384 green + 2 KNOWN parallel flakes (middle-animator, project-drawer-smoke — both pass isolated). **HUMAN-eyes** = the
+  look (manual-jog starts amber, auto-traverse starts cyan).
+
+- **⇒ THE MIDDLE/BOSS 2nd-START BATCH IS DONE.** INC1 (2D per-pass markers) · INC2 (jog ② sticks) · INC3 (auto
+  trans-traverse + two toggles + Diag travel + corner relabel + round-trip + the move-before-REPOSITION fix) · INC4
+  (per-pass live anchoring) · refinements (glyph match already unified turn-45; marker colour by source). All committed,
+  suite green. Remaining HUMAN-eyes checks across the batch: auto/manual boss live tool lands the 2nd probe on ② (tune
+  Diag travel); manual starts amber / auto cyan; ② jogs live.
