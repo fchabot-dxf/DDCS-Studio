@@ -246,6 +246,29 @@ const M3K_TRUTH_TABLE = {
 };
 
 // ---------------------------------------------------------------------------
+// Home / limit switches (envelope edges)
+// ---------------------------------------------------------------------------
+
+/**
+ * The home/limit switches aren't output→input handshakes (no OUT_ fires them), so they don't live in
+ * M3K_TRUTH_TABLE. They are POSITION-DERIVED inputs, set straight from engine/limitSwitches.js
+ * (limitSwitchTrips) the same way triggerProbeCollision sets IN_PROBE_COLLISION when the tool reaches
+ * a surface. KEY FACT (human): HOME == LIMIT — the home switch IS the limit switch at the envelope
+ * edge, so one semantic input per axis-end serves both (IN_LIMIT_*); the one at the machine-0 end is
+ * also the home switch (queryable via IN_HOME_<AXIS>).
+ *
+ * Names mirror the six edges ioTable.js exposes (x_min … z_max). Pin numbers come from the operator's
+ * settings.limits config (resolveVirtualPin maps the numbered IN_<pin> the same way the probe does).
+ */
+export const LIMIT_SWITCH_PINS = {
+    x_min: 'IN_LIMIT_X_MIN', x_max: 'IN_LIMIT_X_MAX',
+    y_min: 'IN_LIMIT_Y_MIN', y_max: 'IN_LIMIT_Y_MAX',
+    z_min: 'IN_LIMIT_Z_MIN', z_max: 'IN_LIMIT_Z_MAX',
+};
+/** The per-axis home switch alias — the limit switch at the machine-0 end of each axis. */
+export const HOME_SWITCH_PINS = { x: 'IN_HOME_X', y: 'IN_HOME_Y', z: 'IN_HOME_Z' };
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -366,6 +389,44 @@ export function triggerProbeCollision() {
     ioState.inputs.set(pin, true);
     console.log(`[VIRTUAL IO] Probe collision detected — alarm ${pin} asserted`);
     _dispatchIoChange(pin, true);
+}
+
+/**
+ * Set the home/limit switch inputs from a limitSwitchTrips() result (engine/limitSwitches.js).
+ * Position-derived — call this whenever the tool's machine position changes (mirrors how
+ * triggerProbeCollision flips the probe input when the tool reaches a surface). For each of the six
+ * edges it asserts/clears:
+ *   • the semantic edge input  IN_LIMIT_<AXIS>_<MIN|MAX>   (always)
+ *   • the home alias           IN_HOME_<AXIS>              (when that edge is the machine-0 / home end)
+ *   • the numbered pin input   IN_<pin>                    (so the I/O panel shows it, like the probe pin)
+ * Only edges that have a pin assigned (i.e. appear in `trips`) are driven true; the others are cleared.
+ *
+ * @param {Array<{edge:string, axis:string, side:string, pin:(number|string), isHome:boolean}>} trips
+ *        The output of limitSwitchTrips(toolPosMachine, machine, ioConfig).
+ */
+export function setLimitSwitches(trips = []) {
+    const tripped = new Map();   // semantic input name → true, for every input this call asserts
+    for (const t of trips) {
+        const sem = LIMIT_SWITCH_PINS[t.edge];
+        if (sem) tripped.set(sem, true);
+        if (t.isHome && HOME_SWITCH_PINS[t.axis]) tripped.set(HOME_SWITCH_PINS[t.axis], true);
+        if (t.pin != null && t.pin !== '' && Number.isFinite(Number(t.pin))) {
+            tripped.set(resolveVirtualPin(Number(t.pin), 'IN'), true);
+        }
+    }
+    // Drive every limit/home semantic input to its new state (assert the tripped ones, clear the rest),
+    // dispatching io_change only on a real transition so wait loops aren't spammed.
+    const all = [...Object.values(LIMIT_SWITCH_PINS), ...Object.values(HOME_SWITCH_PINS), ...tripped.keys()];
+    for (const name of new Set(all)) {
+        const next = tripped.get(name) === true;
+        if ((ioState.inputs.get(name) ?? false) !== next) {
+            ioState.inputs.set(name, next);
+            console.log(`[VIRTUAL IO] Limit/home switch ${name} → ${next}`);
+            _dispatchIoChange(name, next);
+        } else {
+            ioState.inputs.set(name, next);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
