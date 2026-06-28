@@ -1034,3 +1034,23 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   path rides the pin (before the fix nothing snapped there). preview-2d-snap + preview-2d-default still green (pin=0
   path unchanged). Full suite 366 passed / 2 skipped. **HUMAN's eyes pending** (toolpath ON a WCS-pinned stock across a
   drill grid + a probe — the advisor's real-symptom check).
+
+## 2026-06-28 — turn 40: 2D probe/tool MOVEMENT animation (in sync with the 3D)
+
+- task (advisor #14; #13 A human-CONFIRMED + pushed): animate the 2D probe/tool head in toolpath2d.js, in sync with the
+  3D, by riding the SAME engine onPositionChange signal (one sim, many views) + the #13 ptx/pty pin so it stays on the
+  pinned stock.
+- did:
+  - toolpath2d.js: added `toolPos` (live sim position) + `setToolPosition(p)` (exported); drawPath's HEAD marker now
+    rides `toolPos` (the live pos) when present — via ptx/pty (the #13 pin) — instead of snapping to the current segment
+    NODE; falls back to the node when there's no live pos. `stop()` clears toolPos. Exposed `canvas.__t2head` (debug/tests).
+  - createPreviewPanel.js: onPositionChange now also calls `t2.setToolPosition(pos)` in the 2D branch (alongside the
+    existing `t2.seek(nearest2d(pos))` that drives the executed/upcoming TRAIL) → the 2D head follows the exact live
+    position the 3D tool + probe cue ride, so it's frame-synced with no new motion logic.
+- WHY the live pos (not the existing nearest2d seek): seek snaps the head to the nearest segment NODE — coarse, and a
+  slow probe MID-segment wouldn't visibly travel. The live pos makes the probe marker move smoothly along the path.
+- VERIFY: toolpath2d-anim.spec.js (NEW) — with a pinned stock + a probe segment, after seek(0)+setToolPosition(50,0)
+  the drawn head is at program 50 + pin 40 → screen x=90 (NOT the node x=0+pin), and Y rides the pin too. toolpath2d-pin
+  + preview-2d snap/default still green. Full suite 366 passed (the lone failure = the KNOWN middle-animator
+  parallel-load flake; passes 6/6 isolated — unrelated, my change doesn't touch the SVG animator). **HUMAN's eyes
+  pending** (advisor's real-symptom: a probe Simulate → the 2D marker travels the path in time with the 3D, on the stock).

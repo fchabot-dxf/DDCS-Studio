@@ -52,6 +52,7 @@ export function createToolpath2d(canvas, opts = {}) {
     let view = null;                 // { ox, oy, scale }: screenX = ox + x*scale, screenY = oy - y*scale (Y up)
     let cursor = null;               // program coords under the pointer → readout chip
     let start = null;                // operator start {x,y,z} → a DRAGGABLE handle (re-traces on release via opts.onStartDrag)
+    let toolPos = null;              // LIVE tool/probe position from the sim (engine onPositionChange) → the moving head marker
     let drag = null, dragStart = false;
     const anim = { playing: false, k: 0, raf: null };
 
@@ -191,8 +192,13 @@ export function createToolpath2d(canvas, opts = {}) {
         const n = Math.max(0, Math.min(k, segs.length));
         strokeSegs(ctx, n, segs.length, 0.22, 1.5, zMin, zR, maxPF);
         strokeSegs(ctx, 0, n, 1, 2.6, zMin, zR, maxPF);
-        const head = segs[n - 1] || segs[0]; const hx = ptx(n > 0 ? head.x2 : head.x1), hy = pty(n > 0 ? head.y2 : head.y1);
+        // Head marker: ride the LIVE sim position (engine onPositionChange) when we have it, so the probe/tool travels
+        // the path smoothly in sync with the 3D; else fall back to the current segment node. Both via ptx/pty (#13 pin).
+        const head = segs[n - 1] || segs[0];
+        const hx = toolPos ? ptx(toolPos.x) : ptx(n > 0 ? head.x2 : head.x1);
+        const hy = toolPos ? pty(toolPos.y) : pty(n > 0 ? head.y2 : head.y1);
         ctx.fillStyle = '#ffd24a'; ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI * 2); ctx.fill();
+        canvas.__t2head = { sx: hx, sy: hy, live: !!toolPos };   // debug + tests: the drawn head (screen px)
     }
     function drawLabels(ctx, foot, step, w, h) {   // sparse coord labels along the bottom (X) + left (Y) frame
         if (!(step > 0)) return;
@@ -238,10 +244,11 @@ export function createToolpath2d(canvas, opts = {}) {
     function setWcs(w) { wcs = w || null; }
     function setGridStep(s) { gridStep = Number(s) || 0; if (view) paint(); }
     function setStart(p) { start = p ? { x: +p.x || 0, y: +p.y || 0, z: +p.z || 0 } : null; if (view) paint(); }
+    function setToolPosition(p) { toolPos = p ? { x: +p.x || 0, y: +p.y || 0 } : null; if (view && anim.playing) paint(); }   // live sim head (in sync with the 3D)
     function setGcode(text) { setSegments(traceToolpath(text).segments); }
 
     // ---- play / progress ----
-    function stop() { if (anim.playing) { anim.playing = false; if (anim.raf) cancelAnimationFrame(anim.raf); anim.raf = null; } redraw(); }
+    function stop() { if (anim.playing) { anim.playing = false; if (anim.raf) cancelAnimationFrame(anim.raf); anim.raf = null; } toolPos = null; redraw(); }   // clear the live head when the sim stops
     function loop() { if (!anim.playing) return; anim.k += 1.2; if (anim.k >= segs.length) anim.k = 0; paint(); anim.raf = requestAnimationFrame(loop); }
     function play() { if (anim.playing || !segs.length) return; anim.playing = true; anim.k = 0; loop(); }
     function toggle() { if (anim.playing) { stop(); return false; } play(); return anim.playing; }
@@ -280,7 +287,7 @@ export function createToolpath2d(canvas, opts = {}) {
     canvas.addEventListener('mouseleave', () => { cursor = null; if (!anim.playing) paint(); });
 
     return {
-        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, redraw, fit, play, stop, toggle, seek,
+        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setToolPosition, redraw, fit, play, stop, toggle, seek,
         get playing() { return anim.playing; },
         get count() { return segs.length; },
     };
