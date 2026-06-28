@@ -1105,3 +1105,35 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   wizard-preview-2d all green. **Full suite 369 passed / 2 skipped, ZERO failures** (the middle-animator flake passed too).
   **HUMAN-CONFIRMED ("good" + screenshot):** the probe path now emanates from the ruby START marker and runs to the
   stock — it starts at the spindle start, not on G54. Absolute/mill still pinned (no #13 regression). Start handle still draggable.
+
+## 2026-06-28 — turn 45: GLYPH/COLOR coherence (RED=moving probe, START=static glyph) — VERIFY-FIRST + GATE on the 3D probe-tip
+
+- task (dispatched turn 45): flip 4 things so RED = the MOVING probe tip (ruby) and the START = a distinct STATIC non-red
+  glyph (today inverted in both views): (2D) head `#ffd24a`→RED + start ◎→hollow ◇; (3D) anim tool tip `0xffab40`→RED for
+  a probe + start ruby `0xc4122e/0xff2a44`→non-red diamond/octahedron (+ select/dim off-red). GATE on "whole tool vs tip".
+
+- VERIFY-FIRST (located every literal; no guessing):
+  - 2D `toolpath2d.js:207` head `#ffd24a` (UNAMBIGUOUS → red). `drawStartHandle` = a filled red disc `rgba(231,76,91)` +
+    grab-ring (UNAMBIGUOUS → hollow amber diamond, keep the ring; `nearHandle` is a 12px radius test → works for a diamond,
+    no adapt needed).
+  - 3D start marker `_makeMarker` (`gcodeViz3d.js:219-227`) = a `SphereGeometry(3)` ruby `0xc4122e`; `_highlightSelectedStart`
+    (`:286-294`) sets `sel?0xff2a44:0xc4122e` + opacity. UNAMBIGUOUS → swap to `OctahedronGeometry` (a 3D diamond) in a
+    non-red amber/white, and recolor select/dim to amber-bright/amber-dim (off-red), keeping the brighten/dim+opacity logic.
+  - 3D anim tool `_buildAnimTool` (`:412`): `_animParts.tool = part(tgeo, 0xffab40, …)`. The tool is ONE `LatheGeometry`
+    revolved from `toolHalfProfile` (toolProfile.js); for a PROBE that single mesh IS the whole profile **ruby ball ▸
+    stylus ▸ body ▸ shank** (toolProfile.js:49-69). collet+spindle are SEPARATE grey meshes (their visibility is user-driven
+    via Preview `pv.parts`, so the rig CAN be on-screen for a probe). `0xffab40` also appears at `:1238` but that's the
+    MAGAZINE tool render, NOT the moving anim tool → leave it.
+
+- 🛑 GATE (advisor-flagged "whole tool vs tip" — surfacing, NOT guessing; the human is particular about probe visuals):
+  the probe `tool` is a SINGLE lathe mesh, so colouring "just the ruby tip" ≠ "the whole probe part" is a real fork:
+  - **A — whole probe `tool` part RED** (one conditional: `part(tgeo, isProbe ? RED : 0xffab40, …)`); collet+spindle stay
+    grey; mill tool stays orange. Simplest, reads as "a red probe", no geometry change. BUT the stylus+body+shank also go
+    red (not JUST the ruby ball) — which is what the advisor's "not the whole tool" cautions against.
+  - **B — ruby BALL only RED** (split the probe lathe into ruby=pts[0..segs] + rest, two meshes; or add a red tip sphere):
+    precise "red tip", matches the advisor's lean, BUT two-tone probe (red ball + orange stylus) + a structural change to
+    `_buildAnimTool`/`_animParts`/`setPartVisible` (adds a 'ruby' part to the tool/collet/spindle set).
+  - **Recommendation: A** — simplest + reads cleanly as "the moving probe is red"; B's two-tone look + structural cost
+    aren't obviously worth it for a thin stylus. But this is a VISUAL call the human cares about → deferring to the advisor.
+  - The OTHER three (2D head, 2D start ◇, 3D start octahedron) are unambiguous; I'll implement all four in ONE commit once
+    the probe-tip choice is set. Nothing committed yet (gate before the single coherent commit).
