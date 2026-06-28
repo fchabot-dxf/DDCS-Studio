@@ -847,6 +847,8 @@ function renderHomingGui() {
         return `<option value="${m.v}"${m.v === sel ? ' selected' : ''}${dis ? ' disabled title="Unverified on this post"' : ''}>${m.label}</option>`;
     }).join('');
     const followOpts = (sel) => `<option value="">none</option>` + list.map((a) => `<option value="${HOMING_AX_IDX[a]}"${String(HOMING_AX_IDX[a]) === String(sel) ? ' selected' : ''}>${HOMING_AX_LABEL[a]} (idx ${HOMING_AX_IDX[a]})</option>`).join('');
+    // Home-direction override: '' = Auto (derive from the signed machine-travel sign), '+' / '-' force it.
+    const dirOpts = (sel) => [['', 'Auto (envelope)'], ['+', '+'], ['-', '−']].map(([v, lbl]) => `<option value="${v}"${v === (sel || '') ? ' selected' : ''}>${lbl}</option>`).join('');
 
     host.innerHTML = ordered.map((ax, pos) => {
         const c = cfg[ax] || {}, rotary = ax === 'a' || ax === 'b';
@@ -858,6 +860,7 @@ function renderHomingGui() {
                 <label style="font-weight:600;"><input type="checkbox" class="hm-enable" ${c.enable !== false ? 'checked' : ''}/> ${HOMING_AX_LABEL[ax]}</label>
                 <input type="hidden" class="hm-order" value="${pos + 1}">
                 <label style="font-size:12px;">Method <select class="hm-method">${methodOpts(c.method || 'native')}</select></label>
+                <label style="font-size:12px;" title="Home direction. Auto derives it from the signed machine travel (envelope) — one source. + / − force it. Signs the switch-seek (G31) move and the sim animation; for native (M98 P501) the controller uses its OWN config, so the override is sim/informational only.">Home dir <select class="hm-dir">${dirOpts(c.dir || '')}</select></label>
             </div>
             <div class="hm-motion" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
                 <label>Seek feed <input type="number" class="hm-seekfeed" value="${num(c.seekFeed, 800)}" style="width:60px;"></label>
@@ -902,6 +905,7 @@ function commitHoming() {
             backoff: num(g('.hm-backoff').value, prev.backoff || 5),
             slowFeed: num(g('.hm-slowfeed').value, prev.slowFeed || 100),
             offset: num(g('.hm-offset').value, prev.offset || 0),
+            dir: g('.hm-dir') ? g('.hm-dir').value : (prev.dir || ''),
             slaveFollows: g('.hm-follow').value,
             rotary: g('.hm-rotmode') ? g('.hm-rotmode').value : (prev.rotary || 'setzero'),
             continuous: g('.hm-continuous') ? g('.hm-continuous').checked : !!prev.continuous,

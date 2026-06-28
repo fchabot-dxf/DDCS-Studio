@@ -146,10 +146,12 @@ export const SETTINGS_DEFAULTS = {
     // choice ('' = not yet chosen → stays ⚠ | 'local' | 'cloud' | 'both'); we never auto-default it to local.
     setup: { dismissed: false, saveDest: '' },
     // Persisted machine HOMING profile — authored in the Homing Setup modal, consumed by the Homing wizard.
-    // PER-AXIS: enable, order (1..N — lower homes first), method, feeds, back-off, home offset.
-    // Home DIRECTION is NOT stored here / not in the settings form — it's derived from the SIGNED machine travel for
-    // the sim animation; a Homing block can override it per-axis (kept on the axis via ...prev). The real seek
-    // direction is the controller's #612 (read at runtime by the M98 P503 switch-seek path) — Studio never authors it.
+    // PER-AXIS: enable, order (1..N — lower homes first), method, feeds, back-off, home offset, dir.
+    // Home DIRECTION default = the SIGNED machine travel (settings.machine.<axis> sign) — ONE source, valid by
+    // construction. `dir` is an explicit per-axis OVERRIDE: '' = Auto (derive from the signed envelope), '+' / '-'
+    // force it. It signs the SEEK (G31) emitted direction + the sim animation; native (M98 P501) reads the
+    // controller's OWN config so the override is sim/informational only for it. When dir='' AND the envelope sign
+    // is unknown (0), the seek path defers to the controller's #612 register (read at runtime by M98 P503).
     //   method: 'native'  — controller built-in M98 P501 X<idx> (safest; uses the controller's own config + flag)
     //           'seek'     — low-level switch-seek + back-off + slow re-seek (M98 P503), composed in the macro
     //           'setzero'  — set current position AS home (#[880+N]=0, #[1515+N]=1) — NO motion
@@ -162,11 +164,11 @@ export const SETTINGS_DEFAULTS = {
     homing: {
         philosophy: 'sequential',
         axes: {
-            x: { enable: true,  order: 2, method: 'native', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
-            y: { enable: true,  order: 3, method: 'native', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
-            z: { enable: true,  order: 1, method: 'native', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'switch', continuous: false },
-            a: { enable: false, order: 4, method: 'setzero', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'setzero', continuous: true },
-            b: { enable: false, order: 5, method: 'setzero', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, slaveFollows: '', rotary: 'setzero', continuous: true }
+            x: { enable: true,  order: 2, method: 'native', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
+            y: { enable: true,  order: 3, method: 'native', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
+            z: { enable: true,  order: 1, method: 'native', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
+            a: { enable: false, order: 4, method: 'setzero', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'setzero', continuous: true },
+            b: { enable: false, order: 5, method: 'setzero', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'setzero', continuous: true }
         }
     }
 };
