@@ -1137,3 +1137,10 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
     aren't obviously worth it for a thin stylus. But this is a VISUAL call the human cares about → deferring to the advisor.
   - The OTHER three (2D head, 2D start ◇, 3D start octahedron) are unambiguous; I'll implement all four in ONE commit once
     the probe-tip choice is set. Nothing committed yet (gate before the single coherent commit).
+- ⊕ **HUMAN STEER (direct to the worker, right after the gate pass): "youre correct the ruby is the tip only" → option B.**
+  The probe's RED lands on the RUBY BALL (the tip) ONLY — NOT the whole probe `tool` part (stylus/body/shank stay the tool
+  colour). This RESOLVES the design fork (B over my A recommendation). I'm holding for the advisor's synthesis of the
+  STRUCTURAL implementation (the advisor gated this): build B by either (i) splitting the probe lathe at the ball/stylus
+  boundary into a red ruby mesh + an orange body mesh, or (ii) overlaying a small red ruby sphere at the tip (origin,
+  radius=ballDia/2, depthTest:false) over the existing orange lathe — (ii) reuses the start-marker ruby pattern + avoids a
+  geometry split but adds a mesh to `_animParts`/`setPartVisible`. Plus the unambiguous 3. One coherent commit on the advisor's go.
