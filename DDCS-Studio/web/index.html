@@ -252,7 +252,7 @@
                         <div><span class="label">RETRACT</span><input type="number" id="c_retract" value="5" title="Retract distance after fast probe, before slow pass (mm). Stored as #2. Used as #9=[0-#2] (neg) or #10=#2 (pos)."/></div>
                         <div><span class="label">PROBE RADIUS</span><input type="number" id="c_radius" value="2.0" step="0.001" title="Radius of the probe stylus ruby tip. Used for coordinate compensation."/></div>
                         <div><span class="label">SAFE Z</span><input type="number" id="c_safe_z" value="10" title="Z lift distance for moves between walls (mm). Stored as #19. Also used in plunge: #17=safeZ+scanDepth."/></div>
-                        <div><span class="label">TRAVEL</span><input type="number" id="c_travel_dist" value="50" title="Distance to travel along first wall before probing second wall (mm). Stored as #15 (pos) / #16=[0-travel] (neg)."/></div>
+                        <div><span class="label">DIAG TRAVEL</span><input type="number" id="c_travel_dist" value="50" title="Diagonal trans-axis reposition: distance to travel from the first wall across to set up the second-wall probe (mm) — the same diagonal-step idea as the middle's Diag travel. Stored as #15 (pos) / #16=[0-travel] (neg)."/></div>
                         <div><span class="label">SCAN DEPTH</span><input type="number" id="c_scan_depth" value="5" title="Extra Z plunge below safeZ before probing a wall (mm). #17=safeZ+scanDepth. #18=[0-#17]."/></div>
                     </div>
                 </div>
@@ -354,16 +354,29 @@
                 </div>
 
                 <div class="grid-2">
-                    <div id="m_approach_block">
-                        <span class="label">PROBE MODE</span>
-                        <select id="m_approach" title="Boss only. Auto: hands-free — crosses over the part to probe the far wall automatically. Manual jog: pauses so you can jog to each wall before the touch. (A pocket reaches both walls from the centre, so Manual does nothing for a pocket.)">
+                    <div id="m_inaxis_block">
+                        <span class="label">IN-AXIS TRAVERSE</span>
+                        <select id="m_inaxis" title="Boss only. The wall→wall move WITHIN an axis. Auto: hands-free cross-over (#19/#20). Manual jog: pauses so you can jog to the opposite wall. (A pocket reaches both walls from the centre, so this does nothing for a pocket.)">
                             <option value="auto">auto (hands-free)</option>
-                            <option value="manual">manual jog (pause to adjust)</option>
+                            <option value="manual">manual jog (pause)</option>
                         </select>
                     </div>
+                    <div id="m_transaxis_block" class="hidden">
+                        <span class="label">TRANS-AXIS TRAVERSE (X↔Y)</span>
+                        <select id="m_transaxis" title="Boss probe-both only. The X→Y move BETWEEN axes. Auto: hands-free diagonal traverse to the perpendicular walls (Diag travel). Manual jog: pauses so you can jog around.">
+                            <option value="auto">auto (hands-free)</option>
+                            <option value="manual">manual jog (pause)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid-2">
                     <div id="m_clear_block" class="hidden">
                         <span class="label">TRAVERSE HEIGHT (mm)</span>
                         <input id="m_clear" value="15" title="Boss auto only: how high to lift before crossing over the part to the far wall. Set it to clear the top of your boss with margin. Stored as #18."/>
+                    </div>
+                    <div id="m_diag_block" class="hidden">
+                        <span class="label">DIAG TRAVEL</span>
+                        <input id="m_diag_travel" value="[#19+#20]/2" title="Boss probe-both (auto trans-axis): the diagonal probe-move distance from the primary-axis walls across to the perpendicular walls. Default [#19+#20]/2 (≈ half the mean cross-over). Tune it so the 2nd-axis probe reaches its start ②. Stored as #21."/>
                     </div>
                 </div>
 

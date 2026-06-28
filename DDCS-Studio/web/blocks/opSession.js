@@ -184,6 +184,16 @@ const RECONCILERS = {
         const wcs = active ? 'active' : (wb && wcsByBase[Math.round(num(wb.params.value, 0))]) || 'active';
         const f = { m_circular: circular, m_both: twoAxis, m_axis: axis, m_wcs: wcs };
         if (m) f.m_dir2 = m[2];
+        // INC3: the per-traverse toggles + Diag travel, recoverable from the BOSS structure — the in-axis traverse is a
+        // jog ("opposite wall" REPOSITION) vs an auto cross-over; the trans-axis is a jog ("...perpendicular walls"
+        // REPOSITION) vs an auto-traverse (#21). featureType/dir1 stay the form's current value (not distinguishable).
+        const cmts = all.filter((b) => b.type === 'comment').map((b) => (b.params && b.params.text) || '');
+        const isBoss = cmts.some((t) => /REPOSITION/i.test(t)) || !!asn('#19') || !!asn('#21');
+        if (isBoss) {
+            f.m_inaxis = cmts.some((t) => /opposite wall/i.test(t)) ? 'manual' : 'auto';
+            if (twoAxis) f.m_transaxis = cmts.some((t) => /jog[^]*perpendicular/i.test(t)) ? 'manual' : 'auto';
+            const d21 = asn('#21'); if (d21 && d21.params && d21.params.value != null) f.m_diag_travel = String(d21.params.value);
+        }
         return f;
     },
     // ── ATC reconcilers ──────────────────────────────────────────────────────────────────────────────────

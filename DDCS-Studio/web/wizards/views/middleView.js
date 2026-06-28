@@ -12,8 +12,8 @@ export const middleView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'm_type', 'm_approach', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_circular', 'm_sync_a', 'm_wcs', 'm_slave',
-        'm_dist', 'm_retract', 'm_safe_z', 'm_clear', 'm_crossX', 'm_crossY',
+        'm_type', 'm_inaxis', 'm_transaxis', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_circular', 'm_sync_a', 'm_wcs', 'm_slave',
+        'm_dist', 'm_retract', 'm_safe_z', 'm_clear', 'm_crossX', 'm_crossY', 'm_diag_travel',
         'm_feed_fast', 'm_feed_slow', 'm_port', 'm_level', 'm_q',
     ],
     // Controller-source chips (PROBE-CONFIG-SOURCE.md)
@@ -30,10 +30,12 @@ export const middleView = {
 
         const params = {
             featureType: el('m_type')?.value || 'pocket',
-            approach: el('m_approach')?.value || 'auto',
+            inAxis: el('m_inaxis')?.value || 'auto',        // INC3: per-traverse toggles (replace the single approach)
+            transAxis: el('m_transaxis')?.value || 'auto',
             clearOver: el('m_clear')?.value || '15',
             crossX: el('m_crossX')?.value,   // boss-auto per-axis cross-over (string: a number or the [#1+#2] expression default)
             crossY: el('m_crossY')?.value,
+            diagTravel: el('m_diag_travel')?.value,   // boss probe-both auto trans-axis: the diagonal traverse distance (#21)
             axis: el('m_axis')?.value || 'X',
             dir1: dir1val,
             dir2: dir2val,
@@ -54,11 +56,12 @@ export const middleView = {
             sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 
-        // Manual jog is useless for a POCKET — both walls are reached from the centre, so there is nothing to
-        // reposition. Force auto and hide the Probe-Mode control unless the feature is a boss.
-        if (params.featureType !== 'boss') params.approach = 'auto';
-        const approachBlock = el('m_approach_block');
-        if (approachBlock) approachBlock.classList.toggle('hidden', params.featureType !== 'boss');
+        // POCKET reaches both walls from the centre → no reposition ever → force both auto + hide the toggles.
+        // BOSS: the IN-axis toggle always applies; the TRANS-axis toggle only when probing BOTH axes.
+        const isBoss = params.featureType === 'boss';
+        if (!isBoss) { params.inAxis = 'auto'; params.transAxis = 'auto'; }
+        const inAxisBlock = el('m_inaxis_block'); if (inAxisBlock) inAxisBlock.classList.toggle('hidden', !isBoss);
+        const transAxisBlock = el('m_transaxis_block'); if (transAxisBlock) transAxisBlock.classList.toggle('hidden', !(isBoss && params.findBoth));
 
         const middleDesc = el('middle_desc');
         if (middleDesc) {
@@ -84,12 +87,13 @@ export const middleView = {
         if (dir2Block) dir2Block.classList.toggle('hidden', !params.findBoth);
         if (params.findBoth && dir2El) dir2El.value = dir2val;
 
-        // Traverse-over clearance only applies to a BOSS probed in AUTO mode (it crosses over the part).
-        const clearBlock = el('m_clear_block');
-        if (clearBlock) clearBlock.classList.toggle('hidden', !(params.featureType === 'boss' && params.approach === 'auto'));
-        // Per-axis cross-over distances also apply only to a boss in AUTO (used by traverseOver).
-        const crossBlock = el('m_crossover_block');
-        if (crossBlock) crossBlock.classList.toggle('hidden', !(params.featureType === 'boss' && params.approach === 'auto'));
+        // Traverse-over clearance + per-axis cross-over apply to a BOSS with the IN-axis traverse on AUTO (traverseOver).
+        const inAxisAuto = isBoss && params.inAxis === 'auto';
+        const clearBlock = el('m_clear_block'); if (clearBlock) clearBlock.classList.toggle('hidden', !inAxisAuto);
+        const crossBlock = el('m_crossover_block'); if (crossBlock) crossBlock.classList.toggle('hidden', !inAxisAuto);
+        // Diag travel applies to a BOSS probe-both with the TRANS-axis traverse on AUTO (transTraverse uses #21).
+        const diagBlock = el('m_diag_block');
+        if (diagBlock) diagBlock.classList.toggle('hidden', !(isBoss && params.findBoth && params.transAxis === 'auto'));
 
         const gcode = wizard.generate(params);
         el('wiz_middle_code').innerHTML = UIUtils.formatGCode(gcode);

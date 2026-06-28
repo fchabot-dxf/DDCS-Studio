@@ -22,7 +22,10 @@ const sgn = (plus) => (plus ? 'pos' : 'neg');
 /** Middle params → its probe-macro block stack. The one source of truth for both displays. */
 export function middleStack(params = {}) {
     const featureType = params.featureType === 'boss' ? 'boss' : 'pocket';
-    const approach = params.approach === 'manual' ? 'manual' : 'auto';   // hands-free cycle vs operator-jogged repositions
+    const approach = params.approach === 'manual' ? 'manual' : 'auto';   // LEGACY single toggle — the per-traverse default (back-compat)
+    const oneMode = (v) => (v === 'manual' || v === 'auto') ? v : approach;
+    const inAxis = oneMode(params.inAxis);        // INC3: wall1→wall2 WITHIN an axis — auto cross-over (#19/#20) vs manual jog
+    const transAxis = oneMode(params.transAxis);   // INC3: X→Y BETWEEN axes — auto diagonal traverse (#21) vs manual jog
     const axis = params.axis === 'Y' ? 'Y' : 'X';
     const dir1Plus = (params.dir1 || 'pos') === 'pos';
     const twoAxis = !!params.twoAxis || !!params.findBoth;
@@ -39,6 +42,9 @@ export function middleStack(params = {}) {
     // to span the feature. Kept as a string so the [#1+#2] default (an expression) round-trips intact.
     const crossX = (params.crossX === '' || params.crossX == null) ? '[#1+#2]' : String(params.crossX);
     const crossY = (params.crossY === '' || params.crossY == null) ? '[#1+#2]' : String(params.crossY);
+    // INC3: the TRANS-axis (X→Y) auto-traverse distance — a raw diagonal probe-move to the perpendicular walls. Default
+    // [#19+#20]/2 (≈ half the mean cross-over) but EDITABLE (the human tunes it so the 2nd-axis probe reaches ②). #21.
+    const diagTravel = (params.diagTravel === '' || params.diagTravel == null) ? '[#19+#20]/2' : String(params.diagTravel);
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
 
     const S = [];
@@ -49,6 +55,7 @@ export function middleStack(params = {}) {
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
     const MM = (ax, ref) => { const b = newBlock('machinemove'); b.params = { axis: ax, to: ref }; S.push(b); };
     const MV = (ax, v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [ax.toLowerCase()]: v }; S.push(b); };
+    const MOVE = (props) => { const b = newBlock('move'); b.params = { mode: 'rapid', ...props }; S.push(b); };   // 2-axis rapid (trans-axis diagonal)
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
     const PR = (ax, to, feed) => { const b = newBlock('probe'); b.params = { axis: ax, to, feed, port: '#5', level: 0 }; S.push(b); };
     const CK = (ax, g) => { const b = newBlock('probecheck'); b.params = { axis: ax, goto: g }; S.push(b); };   // folds where there's no status var
@@ -75,12 +82,23 @@ export function middleStack(params = {}) {
     // over-estimate of the feature width (the operator already sets it >= the feature for the probes to reach),
     // so traversing #1+retract past the first face lands beyond the second; then drop back to probe height.
     const traverseOver = (ax, firstPlus) => { const cv = ax === 'X' ? '#19' : '#20'; MV('Z', '#18'); MV(ax, firstPlus ? cv : `[0-${cv}]`); MV('Z', '[0-#18]'); };
+    // INC3: BOSS trans-axis AUTO traverse — hands-free move from the primary-axis walls across to the perpendicular
+    // (secondary-axis) walls: lift, a 2-axis diagonal step of #21 (Diag travel) toward the secondary first wall, drop.
+    // Emits "REPOSITION:" so the parser counts a NEW pass (the 2nd start ②). Signs follow dir1/dir2; the human tunes #21.
+    const transTraverse = () => {
+        MV('Z', '#18');
+        C('REPOSITION: auto-traverse to the perpendicular walls');
+        const pmove = dir1Plus ? '#21' : '[0-#21]';     // primary axis: retreat back toward the centre (off its last wall)
+        const smove = dir2Plus ? '[0-#21]' : '#21';     // secondary axis: out toward its first wall
+        MOVE({ [axis.toLowerCase()]: pmove, [second.toLowerCase()]: smove });
+        MV('Z', '[0-#18]'); DM('inc');
+    };
     const between = (ax, firstPlus) => {
         // The two opposite walls. POCKET probes both from the centre (no move - manual is N/A, never reposition).
-        // BOSS needs the 2nd face from the far side: MANUAL pauses for the operator to jog over; AUTO traverses
-        // over hands-free.
+        // BOSS needs the 2nd face from the far side: the IN-AXIS toggle — MANUAL pauses for the operator to jog over,
+        // AUTO traverses over hands-free (#19/#20 cross-over).
         if (featureType !== 'boss') return;
-        if (approach === 'manual') reposition('jog clear, around to the opposite wall'); else traverseOver(ax, firstPlus);
+        if (inAxis === 'manual') reposition('jog clear, around to the opposite wall'); else traverseOver(ax, firstPlus);
     };
     const seq = (ax, firstPlus, base) => {
         twoPass(ax, firstPlus, `#${base}`);
@@ -96,10 +114,15 @@ export function middleStack(params = {}) {
     A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
     A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract'); A('#17', safeZ, 'Safe Z retract');
     A('#18', clearOver, 'Traverse-over clearance (boss auto: lift this high to clear the part before crossing)');
-    // Per-axis cross-over distances — only boss-AUTO uses traverseOver, so pocket/manual macros stay unchanged.
-    if (featureType === 'boss' && approach === 'auto') {
+    // #19/#20 = the IN-axis cross-over (traverseOver); #21 = the TRANS-axis Diag travel (transTraverse). Assigned only
+    // when their auto-traverse is active, so pocket/manual macros stay unchanged. #21's default references #19/#20, so
+    // they're also assigned whenever the trans-axis is auto (even if the in-axis is manual).
+    if (featureType === 'boss' && (inAxis === 'auto' || (transAxis === 'auto' && twoAxis))) {
         A('#19', crossX, 'X cross-over: probe-move from wall 1 to wall 2 (default [#1+#2] = max probe + retract)');
         A('#20', crossY, 'Y cross-over: probe-move from wall 1 to wall 2 (default [#1+#2] = max probe + retract)');
+    }
+    if (featureType === 'boss' && transAxis === 'auto' && twoAxis) {
+        A('#21', diagTravel, 'Diag travel: X→Y trans-axis auto-traverse distance (default [#19+#20]/2)');
     }
     if (wcs === 'active') { A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'); A('#72', '[#71-1]', 'Zero-based index'); A('#70', '[805+[#72*5]]', 'Base WCS address'); }
     else A('#70', WCS_BASE[wcs]);
@@ -107,9 +130,10 @@ export function middleStack(params = {}) {
 
     seq(axis, dir1Plus, 51);
     if (twoAxis) {
-        // Between axes: only a BOSS needs the probe physically moved to the perpendicular walls (a pocket stays at
-        // the centre — no reposition, matching the manual-pocket fix). Boss pauses for the operator either way.
-        if (featureType === 'boss') reposition('jog clear, around to the perpendicular walls');
+        // Between axes: a BOSS moves the probe to the perpendicular walls (a pocket stays at the centre — no reposition).
+        // The TRANS-axis toggle: MANUAL pauses for the operator to jog (INC4 simulates it); AUTO traverses there
+        // hands-free via the Diag-travel (#21). Either way it's a REPOSITION pass → the 2nd start ② appears.
+        if (featureType === 'boss') { if (transAxis === 'manual') reposition('jog clear, around to the perpendicular walls'); else transTraverse(); }
         // CIRCULAR + 2-axis: re-centre to the found PRIMARY-axis centre (#53, machine frame) before probing the
         // perpendicular axis, so the secondary touches cross the true diameter instead of an off-centre chord.
         if (circular) MM(axis, '#53');
@@ -160,7 +184,7 @@ export class MiddleWizard {
         const centre = { x: cx, y: cy, z: probeZ };
         const boss = (params.featureType || 'pocket') === 'boss';
         const twoAxis = !!params.twoAxis || !!params.findBoth;
-        const manual = params.approach === 'manual';
+        const inAxisManual = (params.inAxis || params.approach) === 'manual';   // INC3: the IN-axis toggle drives the per-axis pass count (manual → each wall is its own pass)
         const axis = (params.axis || 'X') === 'Y' ? 'Y' : 'X';
         const second = axis === 'X' ? 'Y' : 'X';
         const dir1Plus = (params.dir1 || 'pos') === 'pos';
@@ -171,10 +195,10 @@ export class MiddleWizard {
             : { x: cx, y: plus ? -outset : sy + outset, z: probeZ };
 
         if (!boss) return [centre];                                  // pocket: always one pass, from the centre
-        const prim = [outside(axis, dir1Plus), outside(axis, !dir1Plus)];
-        if (!twoAxis) return manual ? prim : [prim[0]];
-        const sec = [outside(second, dir2Plus), outside(second, !dir2Plus)];
-        return manual ? [...prim, ...sec] : [prim[0], sec[0]];
+        const prim = inAxisManual ? [outside(axis, dir1Plus), outside(axis, !dir1Plus)] : [outside(axis, dir1Plus)];
+        if (!twoAxis) return prim;                                   // single-axis: in-axis manual → 2 walls, auto → 1
+        const sec = inAxisManual ? [outside(second, dir2Plus), outside(second, !dir2Plus)] : [outside(second, dir2Plus)];
+        return [...prim, ...sec];                                    // the trans pass (auto or manual) always adds the secondary marker(s)
     }
 
     /** Preview/sim start hint = the first pass's start. */
