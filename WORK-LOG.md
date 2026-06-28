@@ -1321,3 +1321,19 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   (per-pass live anchoring) · refinements (glyph match already unified turn-45; marker colour by source). All committed,
   suite green. Remaining HUMAN-eyes checks across the batch: auto/manual boss live tool lands the 2nd probe on ② (tune
   Diag travel); manual starts amber / auto cyan; ② jogs live.
+
+## 2026-06-28 — turn 61: colour the 2D toolpath VECTORS by source (advisor verify-the-diff catch)
+
+- **Path-vector colour (`f5e6ff2`).** The advisor's verify-the-diff caught that turn-57's marker work coloured only the
+  start CHIPS, not the toolpath VECTORS (the turn-58/59 vector extension was lost to a re-pass timing race). Fix: the 2D
+  `strokeSegs` now colours the trans-axis traverse/reposition VECTOR by its pass source too, matching its chip — a
+  2-axis RAPID (the ONLY 2-axis rapid the macro emits is the trans-axis diagonal `G0 X#21 Y#21`; the in-axis cross-over /
+  lift / drop / retract are 1-axis) → cyan (auto) / amber (manual) via `startSources[s.pass]`; everything else
+  (single-axis rapids = in-axis, probe, feed) keeps its TYPE colour, exactly as the advisor scoped. Reused the
+  `startSources` already plumbed for the chips. Test pixel-checks: the 2-axis rapid renders cyan, the 1-axis rapid yellow.
+  - **Honest scope note:** a MANUAL jog emits no lateral move, so it has no 2D vector to colour — its amber lives on the
+    chip (+ the 3D inter-pass jog line). And the 3D PATH is type-grouped `LineSegments` (one colour per move-type), so
+    colouring an individual 3D trans segment is a structural change, NOT done here (the advisor's ask was the 2D
+    `segColor`/path stroke). Flagged as a follow-up if the human wants the 3D path vectors coloured too.
+  - Suite 385 green + the 2 KNOWN parallel flakes (middle-animator, project-drawer-smoke — both pass isolated). HUMAN-eyes
+    = the auto traverse vectors read cyan (matching the auto chips). **The middle batch's vector-colour gap is closed.**
