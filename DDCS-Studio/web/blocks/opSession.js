@@ -487,13 +487,22 @@ export function groupLooseAtoms(label, ids) {
     const inRun = (b) => _isLooseTop(b) && (!idSet || idSet.has(b.id));
     const loose = cur.filter(inRun);
     if (!loose.length) return null;
-    const looseIds = new Set(loose.map((b) => b.id));
-    const op = makeOp('group', {}, loose);                             // children = the loose atoms (emit = same G-code)
+    // SPAN the program's ADJACENT framing into the group (parity with built-in ops, whose stacks include
+    // progstart/progend → so their forms can expose spindle rpm / clearance / retractZ). The run-finder
+    // (looseRunAtLine) still excludes framing — only the WRAP pulls it in, so the editor gesture is undisturbed.
+    // Framing keeps its relative position (progstart first, progend last) so emit stays byte-identical. NO guardrail:
+    // for a MULTI-op program the user prunes start/end out of the group themselves (per the advisor).
+    const firstIdx = cur.indexOf(loose[0]), lastIdx = cur.indexOf(loose[loose.length - 1]);
+    const start = (firstIdx > 0 && cur[firstIdx - 1] && cur[firstIdx - 1].type === 'progstart') ? cur[firstIdx - 1] : null;
+    const end = (lastIdx < cur.length - 1 && cur[lastIdx + 1] && cur[lastIdx + 1].type === 'progend') ? cur[lastIdx + 1] : null;
+    const members = [...(start ? [start] : []), ...loose, ...(end ? [end] : [])];
+    const memberIds = new Set(members.map((b) => b.id));
+    const op = makeOp('group', {}, members);                           // children = framing + loose atoms (emit = same G-code)
     op.label = label || 'Hand-built';
     const next = [];
     let placed = false;
     for (const b of cur) {
-        if (looseIds.has(b.id)) { if (!placed) { next.push(op); placed = true; } continue; }   // first loose slot → the group
+        if (memberIds.has(b.id)) { if (!placed) { next.push(op); placed = true; } continue; }   // first member slot → the group
         next.push(b);
     }
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);

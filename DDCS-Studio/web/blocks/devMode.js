@@ -161,6 +161,10 @@ export function deriveAuthoredDef(ws) {
     return { bindings: [...inlineBindings, ...paramBindings], children: a.opRec.children, varErr: a.varErr };
 }
 
+// Framing knobs auto-surfaced into a hand-built group's form (parity with built-in ops whose stacks carry framing):
+// progstart owns spindle rpm + clearance; progend owns the retract height. Numeric params on the framing records.
+const FRAMING_KNOBS = { progstart: ['rpm', 'clearance'], progend: ['retractZ'] };
+
 /** Increment 2 — derive a wizard def from a GROUP op's STORED children: the OFF-RECORDS analogue of
  *  deriveAuthoredDef (which reads live workspace EXPOSE_ fields). Each child record carries its knobs in
  *  `record._expose` ({ FN(field): { p:name, w:widget } }, persisted by #13 and round-tripped by stackBridge), so the
@@ -173,6 +177,22 @@ export function deriveGroupDef(groupOp) {
     const flat = flattenBlocks(children);
     const exposures = [], used = new Set();
     flat.forEach((rec, i) => {
+        // FRAMING parity: progstart/progend carry the spindle/clearance/retract the user expects as knobs (a built-in
+        // op's form exposes them). They have no _expose (devMode.augment's isAtom skips them, so they can't be ticked
+        // in Blocks), so auto-surface a FIXED set by type. The writeback (setGroupChildParams) reaches them by the same
+        // blockIndex/key as any other binding.
+        const framing = rec && FRAMING_KNOBS[rec.type];
+        if (framing) {
+            if (!rec.params) return;
+            for (const key of framing) {
+                if (typeof rec.params[key] !== 'number') continue;
+                let pname = key;
+                if (used.has(pname)) { let k = 2; while (used.has(pname + '_' + k)) k++; pname += '_' + k; }
+                used.add(pname);
+                exposures.push({ param: pname, blockIndex: i, key, default: rec.params[key], widget: 'number' });
+            }
+            return;
+        }
         const expo = rec && rec._expose;
         if (!expo || !rec.params) return;
         const def = BLOCKS[rec.type];
