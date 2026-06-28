@@ -41,6 +41,32 @@ test('3D start markers colour by source (auto=cyan 0x22d3ee, manual=amber 0xffb3
   expect(r.c1, 'pass 1 (manual) = amber').toBe(0xffb300);
 });
 
+test('2D path colours the trans-axis TRAVERSE vector (2-axis rapid) by source; in-axis rapid keeps its type colour', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio);
+  const r = await page.evaluate(async () => {
+    const { createToolpath2d } = await import('/viz/toolpath2d.js');
+    const cv = document.createElement('canvas');
+    cv.style.cssText = 'position:fixed;left:0;top:0;width:600px;height:400px;z-index:99999';
+    document.body.appendChild(cv);
+    const t2 = createToolpath2d(cv, {});
+    t2.setMachine(null); t2.setAnchor(true);
+    t2.setStarts([{ x: 0, y: 0, z: 0 }]); t2.setStartSources(['auto']);
+    t2.setSegments([
+      { x1: -40, y1: -40, x2: 40, y2: 40, z1: 0, z2: 0, type: 'rapid', pass: 0 },   // 2-axis rapid = the trans-axis traverse → cyan
+      { x1: -40, y1: -40, x2: 40, y2: -40, z1: 0, z2: 0, type: 'rapid', pass: 0 },   // 1-axis rapid = in-axis → keeps its TYPE colour (yellow)
+    ]);
+    t2.fit();
+    const v = cv.__t2view, ctx = cv.getContext('2d'), dpr = window.devicePixelRatio || 1;
+    const scan = (x1, y1, x2, y2) => { let best = [0, 0, 0]; for (let k = 0; k <= 40; k++) { const u = k / 40, wx = x1 + (x2 - x1) * u, wy = y1 + (y2 - y1) * u; const d = ctx.getImageData(Math.round((v.ox + wx * v.scale) * dpr), Math.round((v.oy - wy * v.scale) * dpr), 1, 1).data; if (d[0] + d[1] + d[2] > best[0] + best[1] + best[2]) best = [d[0], d[1], d[2]]; } return best; };
+    const diag = scan(-40, -40, 40, 40), inaxis = scan(-40, -40, 40, -40);
+    cv.remove();
+    return { diag, inaxis };
+  });
+  expect(r.diag[2], 'trans-axis traverse (2-axis rapid) is cyan: blue > red').toBeGreaterThan(r.diag[0]);
+  expect(r.inaxis[0], 'in-axis rapid keeps its type colour (yellow): red > blue').toBeGreaterThan(r.inaxis[2]);
+});
+
 test('2D start markers carry the per-pass source (auto / manual)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);

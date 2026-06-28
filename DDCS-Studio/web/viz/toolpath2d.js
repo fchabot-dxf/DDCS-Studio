@@ -216,7 +216,11 @@ export function createToolpath2d(canvas, opts = {}) {
         ctx.globalAlpha = alpha;
         for (let i = from; i < to; i++) {
             const s = segs[i], t = typeOf(s);
-            ctx.strokeStyle = segColor(s, zMin, zRange, maxPF);
+            // a 2-axis RAPID is a trans-axis TRAVERSE/reposition vector → colour it by its pass SOURCE (auto=cyan,
+            // manual=amber), MATCHING its start chip. Single-axis rapids (in-axis cross-over, lift/drop, retract) +
+            // probe/feed keep their TYPE colours.
+            const transV = t === 'rapid' && Math.abs((s.x2 || 0) - (s.x1 || 0)) > 0.05 && Math.abs((s.y2 || 0) - (s.y1 || 0)) > 0.05;
+            ctx.strokeStyle = transV ? (startSources[s.pass] === 'manual' ? '#ffb300' : '#22d3ee') : segColor(s, zMin, zRange, maxPF);
             ctx.lineWidth = t === 'rapid' ? width * 0.6 : width;
             ctx.setLineDash(t === 'probe' ? [2, 3] : (t === 'rapid' ? [5, 4] : []));   // probe dotted, rapid dashed (match 3D)
             ctx.beginPath(); ctx.moveTo(ptx(s.x1, s.pass), pty(s.y1, s.pass)); ctx.lineTo(ptx(s.x2, s.pass), pty(s.y2, s.pass)); ctx.stroke();   // each pass rides its own start (INC4)
