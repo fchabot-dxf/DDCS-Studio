@@ -1337,3 +1337,32 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
     `segColor`/path stroke). Flagged as a follow-up if the human wants the 3D path vectors coloured too.
   - Suite 385 green + the 2 KNOWN parallel flakes (middle-animator, project-drawer-smoke — both pass isolated). HUMAN-eyes
     = the auto traverse vectors read cyan (matching the auto chips). **The middle batch's vector-colour gap is closed.**
+
+## 2026-06-28 — turn 63: BOSS PROBE-BOTH motion BROKEN both modes — VERIFY-FIRST + PROPOSE (GATE, no build)
+
+- **VERIFY-FIRST (empirical, real Corner/MiddleWizard macros, dist=100 boss):** ① `(-15,40)`, ② `(50,95)`.
+  - **AUTO (inAxis/transAxis auto):** pass-0 X probes `[15, 2, 100, 2]` (1st wall HITS at 15; 2nd wall MISSES — full 100);
+    **pass-1 Y probes `[100,100,100,100]` ALL MISS** (full max-probe, no contact). The trans diagonal runs `(17,0)→(119,102)`
+    = a (+102,+102) move (`#21=[#19+#20]/2≈102`) → lands at **(119,102)**, far past ② `(50,95)` and off-stock.
+  - **MANUAL (inAxis/transAxis manual, 4 passes):** ① `(-15,40)` ② `(115,40)` ③ `(50,95)` ④ `(50,-15)`. Only the pass-0
+    probe collides (`[15,2]`); **passes 1/2/3 ALL MISS** (`[100,100]` each).
+- **ROOT (unified, both modes):** the engine's probe COLLISION ([GcodeExecutionEngine.js:953-955](DDCS-Studio/web/engine/GcodeExecutionEngine.js#L953))
+  computes `aStart = O + this.pos` with `O = this._stockOffset` (= ① = pass-0's operator start). A REPOSITION resets
+  `this.pos={0,0,0}` (correct, for the static per-pass anchoring), so EVERY probe after pass 0 fires from `_stockOffset`=①
+  → misses (the per-pass walls are at ②③④). **INC4 anchored each pass's MARKER + live tool to `starts[_pass]`=②, but the
+  COLLISION still references `_stockOffset`=① → marker right, motion wrong, BOTH modes.** (Plus the AUTO diagonal is
+  mis-built — a symmetric `#21` can't hit a non-square ②, and `pmove=+#21` overshoots away from centre.)
+- **PROPOSED UNIFIED FIX (GATE — surfaced, not built):**
+  - **Part 1 (the CORE — fixes both modes' SIM):** plumb the per-pass starts (`passStarts`) into the engine (mirror INC4's
+    pass-report); the probe collision uses **`O = passStarts[_pass] || _stockOffset`** instead of `_stockOffset`. So every
+    probe fires from ITS pass's start (②③④) → collides with the real wall. Single-pass UNCHANGED (`passStarts[0]` ==
+    `_stockOffset` == ①). This IS the "simulated reposition" for MANUAL (the sim places the probe at ② as the operator
+    would jog) AND completes the AUTO probe — ONE change, both modes.
+  - **Part 2 (AUTO only — the REAL MACHINE + the static-path diagonal):** correct `transTraverse` so the diagonal LANDS on ②.
+    Design fork (advisor's call): **(A)** per-axis legs (X→②'s X, Y→②'s Y) with per-axis Diag-travel, or **(B)** the wizard
+    computes the legs to reach ② (it knows ②=`inferStarts[1]`) with one "Diag travel" as a tweak. ⚠ Constraint: reaching ②'s
+    X exactly needs the found centre `#53` via a machine-move (= ABSOLUTE → breaks per-pass anchoring per the `reposition`
+    comment), so the diagonal can only APPROXIMATE ② incrementally — directionally correct + tunable. **With Part 1 the SIM
+    no longer depends on the diagonal's exactness (cosmetic for the sim); the REAL MACHINE needs it directionally right + tunable.**
+  - **Why Part 1 is the keystone:** it makes AUTO + MANUAL probes COLLIDE + land on ② in the sim regardless of the diagonal;
+    Part 2 is the real-machine/cosmetic geometry. STOP + pass to advisor with the proposal (geometry + sim-collision design).
