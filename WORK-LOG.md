@@ -463,3 +463,31 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
   no run) — fixed by finding a loose-run line via ddcsAutoGroupRunAtLine (the chip resolves fine with framing present).
 - state: tests 344/346 green (2 skipped) · branch main · committed `b4de899` (LOCAL, unpushed). One commit, as asked.
   Run-finder untouched (gate criterion held). Passing back.
+
+## 2026-06-28 — turn 9: 'length' declarable gesture for custom-op authoring `f1e323a`
+
+- task (advisor turn 9): add the 'length' declarable gesture to custom-op authoring (point/rect/ncircle already
+  declarable). Mirror the ncircle increment 46c4195. GATE if 'length' needs an explicit author-choice (not
+  role-inferable like ncircle) → propose the choice-UI separately + pass back. One gesture only, suite green.
+- GATE DECISION = BUILD (role-inferable, no choice-UI). Investigation: the 'length' gesture (canvasWidgets.js) is
+  `{type:'length', field, ax, ay, axis:'x'|'y', value, min}` — it needs an ANCHOR (ax,ay) + an AXIS, which a circle
+  (radially symmetric) doesn't. textView declares it `{ax:ox, ay:oy, axis:'y'}` (text height). The anchor maps to roles
+  exactly like ncircle's x/y; the ONLY thing ncircle lacks is the axis. I FIX the axis to Y (the canonical extent) → no
+  author-choice → role-inferable → no new choice-UI → the gate's condition is NOT met → build. (X/Y-selectable axis is a
+  future gesture variant — would need either role-variants or a choice-UI; deferred, flagged for the advisor.)
+- did (mirror ncircle exactly):
+  - `userOps.js`: nlength role family — CANVAS_ROLE_WIDGETS adds '2D length · X/Y/L'; CANVAS_DECODE adds nlen-x/y/l →
+    [nlength, x/y/len]; CANVAS_ROLES adds nlength:['x','y','len'] (a complete group = anchor + extent).
+  - `panelTypes.layoutSpecFromOp`: a complete {x,y,len} group → pos() (a point handle) + a `length` decl
+    {field: len.param, ax:x, ay:y, axis:'y', min:1} → buildCanvasWidgets builds the drag handle; setFields writes the
+    bound form field. Placed BEFORE the bare x+y branch (so {x,y,len} matches before {x,y}).
+- why {x,y,len} (3 roles, not {len}-only): direct mirror of ncircle's {x,y,dia}; the anchor reuses the point pattern so
+  the length extends from a draggable position (like text pos+height). An incomplete group (len without x/y) degrades to
+  a plain number knob (existing groupCanvasBindings behavior) — graceful.
+- VERIFY-FIRST (custom-op-length.spec.js): the nlen values decode to nlength + roles; AUTHOR a form2d op with x/y/depth
+  tagged nlen-x/y/l → the form shows ll/lx/ly number fields → the length handle (a size circle, distinct from the point
+  move-square) is visible → a REAL pointer drag along Y writes the len field AND re-emits the op G-code. (Cleared the
+  stale playwright cache after editing specs.)
+- state: tests 345/347 green (2 skipped) · branch main · committed `f1e323a` (LOCAL, unpushed). One gesture, one commit
+  as asked. Passing back. NOTE for advisor: axis fixed Y; if you want author-selectable X/Y, that's the next gesture
+  (role-variants stay role-inferable; only a richer per-gesture config would need a choice-UI = the original gate).
