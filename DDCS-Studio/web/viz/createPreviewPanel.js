@@ -178,8 +178,9 @@ export function createPreviewPanel(container, opts = {}) {
         const cp = q('.pp-copy'); if (cp) cp.classList.toggle('visible', !!(text && text.length));
     };
     const SPEEDS = [1, 2, 5, 10];
-    let speedIx = Math.max(0, SPEEDS.indexOf(Number(previewPrefs().defaultSpeed) || 1));
+    let speedIx = Math.max(0, SPEEDS.indexOf(Number(previewPrefs().defaultSpeed) || 2));   // STICKY: defaults to 2×, restores the user's last pick
     const simSpeed = () => SPEEDS[speedIx] || 1;
+    if (q('.pp-speed')) q('.pp-speed').textContent = simSpeed() + '×';   // reflect the (sticky) speed on load, not the hardcoded 1×
     // Apply the Settings → Preview options to the live viz (follow-cam damping + show-rapids).
     function applyPreviewSettings() {
         const pv = previewPrefs();
@@ -493,6 +494,10 @@ export function createPreviewPanel(container, opts = {}) {
         q('.pp-speed').textContent = SPEEDS[speedIx] + '×';
         if (engine) engine.simSpeed = simSpeed();
         if (viz && viz.setSimSpeed) viz.setSimSpeed(simSpeed());   // live: re-speed the in-flight disc fades too
+        // STICKY: persist the pick to settings.preview.defaultSpeed (the same value the Settings → Preview field shows),
+        // so the chosen speed survives a refresh instead of resetting to the default each session.
+        const s = window.ddcsGetSettings && window.ddcsGetSettings();
+        if (s && s.preview && s.preview.defaultSpeed !== simSpeed()) { s.preview.defaultSpeed = simSpeed(); window.ddcsSaveSettings && window.ddcsSaveSettings(); }
     });
     q('.pp-copy').addEventListener('click', () => { if (statusEl && statusEl.textContent && navigator.clipboard) navigator.clipboard.writeText(statusEl.textContent); });
     q('.pp-jog').addEventListener('click', () => {

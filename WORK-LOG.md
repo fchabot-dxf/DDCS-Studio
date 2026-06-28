@@ -883,3 +883,54 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   default is already 100; the user's stale persisted global of 25 is their localStorage data — the sticky fix lets
   them lock 100 per-wizard, or they can set Settings▸Probe defaults▸Max search→100 (global). Not separately migrated.
 - state: branch main · committed this turn (LOCAL, unpushed) · suite 362/364 (2 skipped). Boss cross-over pending.
+
+## 2026-06-28 — turn 32 (cont.): PROBE-CUE visual tuning (live human-steered, eyes-verified)
+
+- Same wake as the sticky-field fix above; the human kept live-iterating on the probe-WCS cue (gcodeViz3d.js), all
+  eyeballed in a real Corner-probe Simulate (3D visibility is not headlessly assertable — [[verify-real-symptom-not-just-test]]).
+  Final knobs:
+  - DISC bigger (base 55→200 px) AND the feed-scale floor raised (clamp .4→.6, ceiling 2.2→1.8) — the slow FINE-touch
+    discs (low feed) were the ones the user saw, and the old ×0.4 floor shrank them to <half base; now ~120–360px.
+  - OPACITY lowered ~3× (0.10+0.13·pulse → 0.03+0.05·pulse) — discs were too solid at the new size.
+  - LIFETIME 9 s→16 s @1× (`_probeDiscFadeMs`, still scales with the sim-speed button).
+  - FLASH count by feed: SLOW/fine touch (feed < refFeed·0.5) pulses 4×, fast 3× (`flashes` in `_probeDiscBurst`).
+  - DATUM dot 18→26 px (`_scaleMarkers`). LINE made THIN (radPx 1.2→0.8) and spans the WHOLE scene (length = fixed
+    100000 world units instead of constant-screen `_probeLinePx` — the "infinite line" the user asked for).
+- VERIFY: probe specs 10/10 (probe-wcs · probe-anim-pipeline · probe-cue-refine · wcs-flash · probe-anim-visible — the
+  pixel-coverage guard now reads peak 7.82% / +6.68%, so the bigger discs more than offset the lower opacity; FEED→SIZE
+  still holds: slow < fast since the clamp keeps .6<1.8). Full suite 361 passed / 2 skipped / 1 known flaky
+  (middle-animator). HUMAN confirmed "good".
+
+## 2026-06-28 — turn 32 SUMMARY for the advisor (the whole wake was human-redirected off the dispatch)
+
+- DISPATCHED turn-32 task = BOSS CROSS-OVER (#19/#20 per-axis). NOT built — the human redirected the entire wake. Still
+  scoped + ready (NEXT-SESSION turn-31 spec); advisor should RE-DISPATCH.
+- SHIPPED this wake (2 commits, LOCAL/unpushed): (a) per-wizard STICKY probe fields `a1bc2b9`; (b) probe-cue visual
+  tuning (this commit).
+- EXPLORED but NOT built — CORNER TRAVEL → expression (backlog #7 territory). Long live design with the human, landed
+  here: backlog #7 (scale off #1) is the START position; the TRAVEL (the diagonal hop between the two corner walls,
+  `#15`/`#16`, cornerWizard.js:140) should FOLLOW the start offset. The diagonal currently uses ONE symmetric distance
+  for both axes → it overshoots along the first axis (that's the "too long"). Design conclusions the human reached: the
+  start position should be an expression of MAX PROBE (`#1`), and travel = that start offset (symmetric). Then the human
+  PIVOTED — "just make max probe higher, that solves everything" — which the sticky-field fix now enables (set max probe
+  high once, it sticks). So the corner travel/start-expression rework is PARKED (not built); capture it under backlog #7
+  if/when re-dispatched.
+- Max-probe "default 100": code default is already 100; the user's stale persisted global of 25 is their localStorage —
+  the sticky fix lets them lock a higher value per-wizard. No migration done.
+
+## 2026-06-28 — turn 32 (cont.): SIM SPEED default 2× + STICKY (live human-steered)
+
+- Same wake. Human: "default the sim speed to 2x" + "it should be a sticky value". One source = `settings.preview.defaultSpeed`.
+  - `SETTINGS_DEFAULTS.preview.defaultSpeed` 1→2 (settingsPanel.js) → fresh installs start at 2×.
+  - createPreviewPanel: `speedIx` fallback `||1`→`||2`; the `.pp-speed` button label is now INITIALIZED from `simSpeed()`
+    on load (was hardcoded `1×`, only updated on click — so it showed 1× even when the pref said otherwise).
+  - STICKY: the speed-button click now writes `settings.preview.defaultSpeed = simSpeed()` + `window.ddcsSaveSettings()`
+    (the same value the Settings → Preview field shows + the init reads), so the pick survives a refresh instead of
+    resetting each session. Same one-source idea as the probe-field sticky, but the value already lived in settings so
+    no new store — just persist on click + read on init.
+- VERIFY: preview-speed-sticky.spec.js (NEW) — default 2× → click → 5× → `defaultSpeed===5` (≠2, proves the write) →
+  reload+reopen → button restores 5×. preview-controls.spec.js cycle expectation updated (`1×→2×→5×→10×→1×` →
+  `2×→5×→10×→1×→2×`). probe/dro specs re-run green at the new 2× default (no timing regression; cue coverage 14% peak).
+  Full suite 362 passed / 2 skipped / 1 known flaky (middle-animator). Human confirmed "ok great".
+- This + the probe-cue tuning above land in ONE commit (the cue tweaks + sim-speed). Still no boss cross-over (the
+  dispatched task) — advisor to re-dispatch.

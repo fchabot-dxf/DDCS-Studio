@@ -102,7 +102,7 @@ export const SETTINGS_DEFAULTS = {
     // 3D/2D toolpath preview (read by viz/createPreviewPanel via window.ddcsGetSettings().preview).
     // head = the sim spindle/collet body sizes (VISUAL ONLY — they change the render, never the G-code, so they
     // live here with the view options, not under Machine). parts = which assembly pieces are shown.
-    preview: { followDamp: 50, showRapids: true, defaultView: '3d', defaultSpeed: 1, followDefault: true, autoLoop: true, gridStep: 0,
+    preview: { followDamp: 50, showRapids: true, defaultView: '3d', defaultSpeed: 2, followDefault: true, autoLoop: true, gridStep: 0,
         head: { spindleDia: 80, spindleLen: 200, colletDia: 20, colletLen: 30 }, parts: { spindle: true, collet: true, tool: true },
         // 3D touch probe SIM body sizes (VISUAL ONLY — same contract as head: change the render, never the G-code; the
         // probing radius comes from the Stylus radius field under 3D PROBE DEFAULTS). ballDia defaults to 2× a typical 1mm stylus radius.

@@ -171,9 +171,9 @@ export class GcodeViz3D {
         // the AXIS LINE (the 2-plane intersection, along the un-probed axis — CYAN) + the DATUM point (where the planes
         // cross — GOLD, a different colour). Both vanish when the next probe LOOP starts. Constant-screen in _scaleMarkers.
         this._datumColor = 0xffce3a; this._lineColor = 0x00e5ff;
-        this._probeDiscFadeMs = 9000;                                   // disc lifetime at 1× (scaled by the live sim speed)
-        this._probeBurstBasePx = 55; this._probeBurstRefFeed = 250;     // disc radius px = base × clamp(√(feed/ref), .4, 2.2) — FASTER → bigger
-        this._probeLinePx = 150; this._probeLineRadPx = 1.2; this._simSpeed = 1;
+        this._probeDiscFadeMs = 16000;                                  // disc lifetime at 1× (scaled by the live sim speed) — longer-lived (user request)
+        this._probeBurstBasePx = 200; this._probeBurstRefFeed = 250;    // disc radius px = base × clamp(√(feed/ref), .6, 1.8) — FASTER → bigger (LARGER disc, user)
+        this._probeLinePx = 200; this._probeLineRadPx = 0.8; this._simSpeed = 1;   // THIN axis line (length spans the scene — see _scaleMarkers)
         const pg = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 18), new THREE.MeshBasicMaterial({ color: this._datumColor, depthTest: false, depthWrite: false }));
         pg.renderOrder = 20; pg.visible = false;   // renders OVER the line (20 > 13)
         this._probeGizmo = pg;   // the DATUM — where the probed planes cross (shown ≥2 axes; GOLD, distinct from the line)
@@ -336,13 +336,13 @@ export class GcodeViz3D {
         }
         if (this._probeGizmo && this._probeGizmo.visible) {   // DATUM dot — constant on-screen size (peer of the stock-WCS dot)
             const wpp = worldPerPxAt(this._probeGizmo.getWorldPosition(this._pgV3 || (this._pgV3 = new this.THREE.Vector3())));
-            this._probeGizmo.scale.setScalar(Math.max(1e-4, 18 * wpp));
+            this._probeGizmo.scale.setScalar(Math.max(1e-4, 26 * wpp));
         }
         // The persistent AXIS LINE: CONSTANT on-screen length + thickness (a big WCS offset can't shrink it to a speck).
         if (this._probeLine && this._probeLine.visible) {
             const wpp = worldPerPxAt(this._probeLine.getWorldPosition(this._plV3 || (this._plV3 = new this.THREE.Vector3())));
-            const rad = Math.max(1e-4, this._probeLineRadPx * 2 * wpp);   // CylinderGeometry radius 0.5 → ×2 to read as px
-            const len = Math.max(1e-4, this._probeLinePx * wpp);
+            const rad = Math.max(1e-4, this._probeLineRadPx * 2 * wpp);   // CylinderGeometry radius 0.5 → ×2 to read as px (thin)
+            const len = 100000;   // span "infinitely" across the whole scene — fixed world length, not constant-screen (user)
             this._probeLine.scale.set(rad, len, rad);
         }
         // Direction labels (+X/-X/+Y/-Y): constant on-screen width too (canvas is 2:1), so they don't grow with zoom.
@@ -1672,7 +1672,7 @@ export class GcodeViz3D {
     // Feed → disc radius in PX: SLOWER/fine probe (small feed) → SMALLER disc, FASTER/rough → bigger (clamped). User's request.
     _burstRadiusPx(feed) {
         const f = feed > 0 ? feed : this._probeBurstRefFeed;
-        return this._probeBurstBasePx * Math.max(0.4, Math.min(2.2, Math.sqrt(f / this._probeBurstRefFeed)));
+        return this._probeBurstBasePx * Math.max(0.6, Math.min(1.8, Math.sqrt(f / this._probeBurstRefFeed)));
     }
 
     // (A) A TRANSIENT SOLID additive disc (no blur) in the plane PERP to `axis`, IMMOBILE at the probe contact `localPos`
@@ -1682,6 +1682,7 @@ export class GcodeViz3D {
         const THREE = this.THREE;
         if (!localPos || !THREE || !this.partFrame) return;
         const px = this._burstRadiusPx(feed);
+        const flashes = (feed > 0 && feed < this._probeBurstRefFeed * 0.5) ? 4 : 3;   // SLOW/fine touch (low feed) flashes 4×, fast 3× (user)
         const normal = axis === 'x' ? new THREE.Vector3(1, 0, 0) : axis === 'y' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
         const mat = new THREE.MeshBasicMaterial({ color: this._lineColor, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, side: THREE.DoubleSide });
         const disc = new THREE.Mesh(new THREE.CircleGeometry(1, 48), mat);
@@ -1696,9 +1697,9 @@ export class GcodeViz3D {
             const t = now(), dt = t - last; last = t;
             prog = Math.min(1, prog + (dt * (this._simSpeed || 1)) / (this._probeDiscFadeMs || 9000));   // fade in SIM time
             const u = prog;
-            const pulse = Math.abs(Math.sin(u * 3 * Math.PI));
+            const pulse = Math.abs(Math.sin(u * flashes * Math.PI));         // 3× fast / 4× slow (see `flashes`)
             const fade = u < 0.75 ? 1 : Math.max(0, 1 - (u - 0.75) / 0.25);
-            mat.opacity = (0.1 + 0.13 * pulse) * fade;                       // LOW, SOLID, never dark until the end
+            mat.opacity = (0.03 + 0.05 * pulse) * fade;                      // LOWER opacity (user); SOLID, never dark until the end
             const s = Math.max(1e-4, px * this._worldPerPx(disc.getWorldPosition(wv)));   // constant-screen, feed-scaled
             disc.scale.set(s, s, 1);
             this.render();

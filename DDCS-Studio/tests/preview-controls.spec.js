@@ -62,5 +62,5 @@ test('preview: single 2D/3D toggle, one Stock, always-visible compact controls',
     return { tag: s.tagName, seq };
   });
   expect(sp.tag, 'speed is a button, not a select').toBe('BUTTON');
-  expect(sp.seq, 'cycles 1×→2×→5×→10×→1×').toEqual(['1×', '2×', '5×', '10×', '1×']);
+  expect(sp.seq, 'defaults to 2× and cycles 2×→5×→10×→1×→2×').toEqual(['2×', '5×', '10×', '1×', '2×']);
 });
