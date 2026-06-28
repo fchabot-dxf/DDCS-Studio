@@ -51,9 +51,9 @@ export function createToolpath2d(canvas, opts = {}) {
     let segs = [], machine = null, stock = null, wcs = null, gridStep = 0, anchorToStart = false;
     let view = null;                 // { ox, oy, scale }: screenX = ox + x*scale, screenY = oy - y*scale (Y up)
     let cursor = null;               // program coords under the pointer → readout chip
-    let start = null;                // operator start {x,y,z} → a DRAGGABLE handle (re-traces on release via opts.onStartDrag)
+    let starts = [];                 // per-pass operator starts [{x,y,z}] → numbered DRAGGABLE handles (onStartDrag(pos, pass) on release)
     let toolPos = null;              // LIVE tool/probe position from the sim (engine onPositionChange) → the moving head marker
-    let drag = null, dragStart = false;
+    let drag = null, dragStart = null;   // dragStart = the per-pass start INDEX being dragged (null = none)
     const anim = { playing: false, k: 0, raf: null };
 
     const W = () => canvas.clientWidth, H = () => canvas.clientHeight;
@@ -70,8 +70,8 @@ export function createToolpath2d(canvas, opts = {}) {
         const t = machine.wcs.table[gi], wo = machine.workOrigin || {};
         return t ? { x: (Number(t.x) || 0) - (wo.x || 0), y: (Number(t.y) || 0) - (wo.y || 0) } : { x: 0, y: 0 };
     };
-    // PATH transform: anchored → emanate from the operator start (spindle pos); else → the stock WCS pin (#13).
-    const pathOff = () => (anchorToStart && start) ? { x: start.x, y: start.y } : stockPin();
+    // PATH transform: anchored → emanate from the operator start (pass 0); else → the stock WCS pin (#13).
+    const pathOff = () => (anchorToStart && starts[0]) ? { x: starts[0].x, y: starts[0].y } : stockPin();
     const ptx = (x) => tx(x + pathOff().x);
     const pty = (y) => ty(y + pathOff().y);
     // STOCK-PIN transform: the stock + the draggable start HANDLE ride the WCS pin. When anchored, machine=null →
@@ -151,7 +151,8 @@ export function createToolpath2d(canvas, opts = {}) {
         drawOriginAxes(ctx, foot);
         drawPath(ctx, anim.playing ? Math.floor(anim.k) : null);
         drawLabels(ctx, foot, step, w, h);
-        if (start) drawStartHandle(ctx);
+        if (starts.length) drawStartHandles(ctx);
+        canvas.__t2starts = starts.map((s, i) => ({ i, sx: sptx(s.x), sy: spty(s.y), x: s.x, y: s.y }));   // debug + tests: the drawn per-pass start handles
         canvas.__t2cursor = cursor;   // debug + tests
         if (cursor) { if (cursor.snapped) drawSnap(ctx, cursor); drawReadout(ctx, cursor, w, h); }
     }
@@ -159,13 +160,22 @@ export function createToolpath2d(canvas, opts = {}) {
         const hx = tx(c.x), hy = ty(c.y);
         ctx.save(); ctx.strokeStyle = '#33d6ff'; ctx.lineWidth = 1.6; ctx.strokeRect(hx - 5, hy - 5, 10, 10); ctx.restore();
     }
-    function drawStartHandle(ctx) {   // STATIC operator start = a hollow amber DIAMOND ◇ (distinct from the RED moving head) + grab-ring — draggable
-        const hx = sptx(start.x), hy = spty(start.y);   // rides the stock pin (#13); when anchored (pin=0) it sits AT the start = the path origin
-        ctx.save();
-        ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2.8; ctx.lineJoin = 'round';   // hollow CYAN diamond (a rotated square) — a static reference, NOT red (probe) or orange (tool)
-        ctx.beginPath(); ctx.moveTo(hx, hy - 6.5); ctx.lineTo(hx + 6.5, hy); ctx.lineTo(hx, hy + 6.5); ctx.lineTo(hx - 6.5, hy); ctx.closePath(); ctx.stroke();
-        ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(34,211,238,0.45)'; ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI * 2); ctx.stroke();   // grab-ring (drag affordance; nearHandle's 12px hit-test unchanged)
-        ctx.restore();
+    // Each per-pass operator start = a hollow CYAN diamond ◇ + grab-ring + a NUMBERED badge (①②…), parity with the 3D
+    // markers. All draggable (distinct from the RED moving head). A multi-pass probe (boss/middle probe-both) shows one per pass.
+    function drawStartHandles(ctx) {
+        for (let i = 0; i < starts.length; i++) {
+            const s = starts[i], hx = sptx(s.x), hy = spty(s.y);
+            ctx.save();
+            ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2.8; ctx.lineJoin = 'round';   // hollow cyan diamond — a static reference, NOT red (probe) or orange (tool)
+            ctx.beginPath(); ctx.moveTo(hx, hy - 6.5); ctx.lineTo(hx + 6.5, hy); ctx.lineTo(hx, hy + 6.5); ctx.lineTo(hx - 6.5, hy); ctx.closePath(); ctx.stroke();
+            ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(34,211,238,0.45)'; ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI * 2); ctx.stroke();   // grab-ring (nearHandle's 12px hit-test)
+            const bx = hx + 11, by = hy - 9;   // numbered badge (1-based), like the 3D number sprite
+            ctx.fillStyle = 'rgba(13,17,23,0.85)'; ctx.beginPath(); ctx.arc(bx, by, 7, 0, Math.PI * 2); ctx.fill();
+            ctx.lineWidth = 1; ctx.strokeStyle = '#22d3ee'; ctx.stroke();
+            ctx.fillStyle = '#cdeffb'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(String(i + 1), bx, by + 0.5);
+            ctx.restore();
+        }
     }
     function drawGrid(ctx, foot, step) {
         if (!(step > 0)) return;
@@ -264,7 +274,8 @@ export function createToolpath2d(canvas, opts = {}) {
     function setStock(s) { stock = s || null; if (view) paint(); }
     function setWcs(w) { wcs = w || null; }
     function setGridStep(s) { gridStep = Number(s) || 0; if (view) paint(); }
-    function setStart(p) { start = p ? { x: +p.x || 0, y: +p.y || 0, z: +p.z || 0 } : null; if (view) paint(); }
+    function setStarts(arr) { starts = Array.isArray(arr) ? arr.filter(Boolean).map((p) => ({ x: +p.x || 0, y: +p.y || 0, z: +p.z || 0 })) : []; if (view) paint(); }   // per-pass operator starts (①②…)
+    function setStart(p) { setStarts(p ? [p] : []); }   // back-compat: a single operator start = pass 0
     function setAnchor(v) { anchorToStart = !!v; if (view) paint(); }   // mirror the 3D's _anchorToStart: anchored → path emanates from the start, not the stock pin
     function setToolPosition(p) { toolPos = p ? { x: +p.x || 0, y: +p.y || 0 } : null; if (view && anim.playing) paint(); }   // live sim head (in sync with the 3D)
     function setGcode(text) { setSegments(traceToolpath(text).segments); }
@@ -284,32 +295,37 @@ export function createToolpath2d(canvas, opts = {}) {
         const ns = Math.max(0.02, Math.min(400, view.scale * Math.exp(-e.deltaY * 0.0015)));
         view.scale = ns; view.ox = sx - wx * ns; view.oy = sy + wy * ns; paint();
     }, { passive: false });
-    const nearHandle = (e) => { if (!start || !view) return false; const r = canvas.getBoundingClientRect(); return Math.hypot(e.clientX - r.left - sptx(start.x), e.clientY - r.top - spty(start.y)) <= 12; };
+    const nearHandle = (e) => {   // → the per-pass start INDEX under the pointer (within 12px), or -1
+        if (!starts.length || !view) return -1;
+        const r = canvas.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+        for (let i = starts.length - 1; i >= 0; i--) { if (Math.hypot(px - sptx(starts[i].x), py - spty(starts[i].y)) <= 12) return i; }   // reverse → topmost/highest pass wins on overlap
+        return -1;
+    };
     canvas.addEventListener('pointerdown', (e) => {
         if (!view) return;
-        if (nearHandle(e)) { dragStart = true; try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* */ } return; }   // grab the start handle (not a pan)
+        const hi = nearHandle(e); if (hi >= 0) { dragStart = hi; try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* */ } return; }   // grab a start handle (not a pan)
         drag = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy }; try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* */ }
     });
     canvas.addEventListener('pointermove', (e) => {
         if (!view) return;
         const r = canvas.getBoundingClientRect();
-        if (dragStart) { const p = stockPin(); start = { x: (e.clientX - r.left - view.ox) / view.scale - p.x, y: (view.oy - (e.clientY - r.top)) / view.scale - p.y, z: start ? start.z : 0 }; paint(); return; }   // un-pin: the handle is drawn at +pin, so the program start = drawn − pin
+        if (dragStart != null) { const p = stockPin(), cur = starts[dragStart]; starts[dragStart] = { x: (e.clientX - r.left - view.ox) / view.scale - p.x, y: (view.oy - (e.clientY - r.top)) / view.scale - p.y, z: cur ? cur.z : 0 }; paint(); return; }   // un-pin: handle drawn at +pin → program start = drawn − pin
         if (drag) { view.ox = drag.ox + (e.clientX - drag.x); view.oy = drag.oy + (e.clientY - drag.y); paint(); return; }
         const px = e.clientX - r.left, py = e.clientY - r.top, snap = snapPoint(px, py);
         cursor = snap ? { x: snap.x, y: snap.y, snapped: true } : { x: (px - view.ox) / view.scale, y: (view.oy - py) / view.scale, snapped: false };
-        canvas.style.cursor = nearHandle(e) ? 'move' : (snap ? 'crosshair' : '');
+        canvas.style.cursor = nearHandle(e) >= 0 ? 'move' : (snap ? 'crosshair' : '');
         if (!anim.playing) paint();
     });
     const endDrag = (e) => {
-        if (dragStart && start && opts.onStartDrag) opts.onStartDrag({ x: start.x, y: start.y, z: start.z });   // re-trace once on release (not per move)
-        dragStart = false; drag = null;
+        if (dragStart != null && starts[dragStart] && opts.onStartDrag) { const s = starts[dragStart]; opts.onStartDrag({ x: s.x, y: s.y, z: s.z }, dragStart); }   // re-trace once on release (not per move), with the dragged pass index
+        dragStart = null; drag = null;
         try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* */ }
     };
     canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
     canvas.addEventListener('mouseleave', () => { cursor = null; if (!anim.playing) paint(); });
 
     return {
-        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setAnchor, setToolPosition, redraw, fit, play, stop, toggle, seek,
+        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setStarts, setAnchor, setToolPosition, redraw, fit, play, stop, toggle, seek,
         get playing() { return anim.playing; },
         get count() { return segs.length; },
     };

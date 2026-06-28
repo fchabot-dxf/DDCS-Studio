@@ -115,10 +115,17 @@ export function createPreviewPanel(container, opts = {}) {
     const q = (sel) => container.querySelector(sel);
     const cv2d = q('.pp-2d');
     const statusEl = q('.pp-status');
-    let curStart = null;   // operator start the user dragged (2D handle / 3D marker); getStartPos() reads it
+    let curStart = null;   // operator start the user dragged (2D handle / 3D marker); getStartPos() reads it (pass 0)
+    let passStarts = [];   // INC1: per-pass operator starts [{x,y,z}] — the shared source of truth for BOTH views' numbered markers
     const t2 = createToolpath2d(cv2d, {
-        // 2D start-handle drag → record it, mirror to the 3D marker, and re-trace from the new start.
-        onStartDrag: (pos) => { curStart = { x: +pos.x || 0, y: +pos.y || 0, z: +pos.z || 0 }; if (viz && viz.starts) viz.starts[0] = curStart; setGcode(); replayFromStart(); },   // #18: re-run the sim from the new start
+        // 2D start-handle drag (any pass) → record it, mirror to the 3D marker, re-trace + replay from the new start.
+        onStartDrag: (pos, pass) => {
+            const p = pass | 0, np = { x: +pos.x || 0, y: +pos.y || 0, z: +pos.z || 0 };
+            passStarts[p] = np;                              // shared source of truth (persists across re-traces)
+            if (p === 0) curStart = np;                      // pass 0 = the operator start getStartPos() reads
+            if (viz && viz.starts) viz.starts[p] = np;       // mirror to the 3D marker
+            setGcode(); replayFromStart();                   // #18: re-run the sim from the new start
+        },
     });
     t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.setWcs(wcsForViz());   // 2D mirrors the 3D scene
 
@@ -213,7 +220,12 @@ export function createPreviewPanel(container, opts = {}) {
         try { viz = new GcodeViz3D(container); viz._gizmoPx = 36; viz._animOn = false; viz.setStock(stockForViz()); viz.setMachine(machineForViz()); applyPreviewSettings(); }
         catch (e) { console.warn('preview 3D unavailable — using 2D', e); viz = null; setMode('2d'); }
         // Dragging the 3D start marker is a user override (like the 2D handle) — record it so getStartPos() reads it.
-        if (viz) viz.onStartChange = (starts) => { const s = starts && starts[0]; if (s) { curStart = { x: +s.x || 0, y: +s.y || 0, z: +s.z || 0 }; setGcode(); replayFromStart(); } };   // #18: 3D marker drag also re-runs the sim from the new start
+        if (viz) viz.onStartChange = (starts) => {   // a 3D marker drag (any pass) → sync ALL passes to the shared starts, re-trace + replay (#18)
+            if (!Array.isArray(starts) || !starts.length) return;
+            passStarts = starts.map((s) => ({ x: +s.x || 0, y: +s.y || 0, z: +s.z || 0 }));
+            curStart = passStarts[0];
+            setGcode(); replayFromStart();
+        };
         if (viz && rotaryFixture && viz.setRotaryFixture) viz.setRotaryFixture(true);   // persist the rig hint across lazy viz creation
         return viz;
     }
@@ -309,8 +321,21 @@ export function createPreviewPanel(container, opts = {}) {
         // position (an incremental probe) is start-relative → the path emanates from the operator START; an absolute
         // (G90/G53 mill) op sits at its own coords. forceMachine (ATC) pins to the machine frame regardless.
         curAnchor = !forceMachine && !(parsed.stats && parsed.stats.absolute);
+        // INC1: per-pass operator starts, mode-independent so BOTH views render them. Pass 0 honours the user drag (st
+        // via getStartPos); p>0 falls back to the wizard's per-pass HINT, then the last position (a dragged ② persists).
+        {
+            const hints = get('getStartHints');
+            const hintFor = (p) => Array.isArray(hints) ? (hints[p] || hints[0]) : null;
+            const passCount = (parsed.stats && parsed.stats.passes) || 1;
+            const next = [];
+            for (let p = 0; p < passCount; p++) {
+                const h = (p === 0 && st) || hintFor(p) || passStarts[p] || { x: 0, y: 0, z: 0 };
+                next.push({ x: +h.x || 0, y: +h.y || 0, z: +h.z || 0 });
+            }
+            passStarts = next;
+        }
         t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
-        t2.setStart(st);        // the draggable 2D start handle
+        t2.setStarts(passStarts);   // the draggable 2D start handles — ALL per-pass starts, numbered (①②…)
         t2.setAnchor(curAnchor);                              // 2D mirrors the 3D anchor: anchored → path emanates from the start, not the stock pin
         t2.setMachine(curAnchor ? null : machineForViz());   // anchored (probe) → LOCAL scene (no envelope), like the 3D's setMachine(null)
         if (mode === '3d') {
@@ -338,15 +363,8 @@ export function createPreviewPanel(container, opts = {}) {
                 // each; the wizard supplies a per-pass hint array (getStartHints) so the passes land at DISTINCT points
                 // (else all passes default to the same start and the circle solve is degenerate). Pass 0 also honours a
                 // user drag (curStart, via st). setSegments has already grown viz.starts to passCount.
-                if (v.starts) {
-                    const hints = get('getStartHints');
-                    const hint = (p) => Array.isArray(hints) ? (hints[p] || hints[0]) : null;
-                    const passCount = (parsed.stats && parsed.stats.passes) || 1;
-                    for (let p = 0; p < passCount; p++) {
-                        // pass 0 honours the user's drag (st); every pass falls back to its hint, then its existing start.
-                        const h = (p === 0 && st) || hint(p) || v.starts[p] || { x: 0, y: 0, z: 0 };
-                        v.starts[p] = { x: +h.x || 0, y: +h.y || 0, z: +h.z || 0 };
-                    }
+                if (v.starts) {   // sync the 3D markers from the shared per-pass starts (computed above for both views)
+                    for (let p = 0; p < passStarts.length; p++) v.starts[p] = { x: passStarts[p].x, y: passStarts[p].y, z: passStarts[p].z };
                 }
                 v.setSegments(parsed, !fitted); fitted = true;
                 if (v.setSimTool) v.setSimTool(simTool(code, parsed));   // per-op tool from the tool table (see simTool)
