@@ -154,11 +154,12 @@ export function createToolpath2d(canvas, opts = {}) {
         const hx = tx(c.x), hy = ty(c.y);
         ctx.save(); ctx.strokeStyle = '#33d6ff'; ctx.lineWidth = 1.6; ctx.strokeRect(hx - 5, hy - 5, 10, 10); ctx.restore();
     }
-    function drawStartHandle(ctx) {   // ruby start marker + grab-ring — the draggable operator start (matches the 3D ① marker)
+    function drawStartHandle(ctx) {   // STATIC operator start = a hollow amber DIAMOND ◇ (distinct from the RED moving head) + grab-ring — draggable
         const hx = sptx(start.x), hy = spty(start.y);   // rides the stock pin (#13); when anchored (pin=0) it sits AT the start = the path origin
         ctx.save();
-        ctx.fillStyle = 'rgba(231,76,91,0.9)'; ctx.beginPath(); ctx.arc(hx, hy, 5.5, 0, Math.PI * 2); ctx.fill();
-        ctx.lineWidth = 1.6; ctx.strokeStyle = 'rgba(231,76,91,0.7)'; ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2.8; ctx.lineJoin = 'round';   // hollow CYAN diamond (a rotated square) — a static reference, NOT red (probe) or orange (tool)
+        ctx.beginPath(); ctx.moveTo(hx, hy - 6.5); ctx.lineTo(hx + 6.5, hy); ctx.lineTo(hx, hy + 6.5); ctx.lineTo(hx - 6.5, hy); ctx.closePath(); ctx.stroke();
+        ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(34,211,238,0.45)'; ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI * 2); ctx.stroke();   // grab-ring (drag affordance; nearHandle's 12px hit-test unchanged)
         ctx.restore();
     }
     function drawGrid(ctx, foot, step) {
@@ -204,7 +205,7 @@ export function createToolpath2d(canvas, opts = {}) {
         const head = segs[n - 1] || segs[0];
         const hx = toolPos ? ptx(toolPos.x) : ptx(n > 0 ? head.x2 : head.x1);
         const hy = toolPos ? pty(toolPos.y) : pty(n > 0 ? head.y2 : head.y1);
-        ctx.fillStyle = '#ffd24a'; ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ff2a44'; ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI * 2); ctx.fill();   // RED = the moving probe tip (the ruby that touches), matching the 3D
         canvas.__t2head = { sx: hx, sy: hy, live: !!toolPos };   // debug + tests: the drawn head (screen px)
     }
     function drawLabels(ctx, foot, step, w, h) {   // sparse coord labels along the bottom (X) + left (Y) frame

@@ -212,18 +212,30 @@ export class GcodeViz3D {
     _highlightCubeFace(idx) { highlightCubeFace(this, idx); }
     _pickCube(e) { return pickCube(this, e); }
 
-    // A draggable start marker for one pass: ruby probe tip
+    // A draggable start marker for one pass. RED is reserved for the moving probe tip (the ruby that touches), so the
+    // STATIC start gets a distinct non-red glyph: a CAMERA-LOCKED hollow CYAN diamond (lozenge) that reads identically
+    // to the 2D canvas ◇ from any angle.
     _makeMarker(pass) {
         const THREE = this.THREE;
         const grp = new THREE.Group();
-        const ruby = new THREE.Mesh(
-            new THREE.SphereGeometry(3, 20, 20),
-            new THREE.MeshBasicMaterial({ color: 0xc4122e, depthTest: false })
-        );
-        ruby.renderOrder = 11;
-        grp.add(ruby);
+        grp.add(this._makeStartGlyph());            // the camera-locked hollow cyan lozenge (children[0])
         grp.add(this._makeNumberSprite(pass + 1)); // execution order (1-based)
         return grp;
+    }
+
+    // The start glyph: a camera-facing (billboard) hollow CYAN diamond drawn on a sprite, so it always shows as a clean
+    // lozenge ◇ — the 3D twin of the 2D start handle. depthTest:false → always visible against the scene.
+    _makeStartGlyph() {
+        const THREE = this.THREE;
+        const c = document.createElement('canvas');
+        c.width = c.height = 128;
+        const ctx = c.getContext('2d');
+        ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 18; ctx.lineJoin = 'round';   // thick stroke (hi-res canvas keeps it crisp)
+        ctx.beginPath(); ctx.moveTo(64, 14); ctx.lineTo(114, 64); ctx.lineTo(64, 114); ctx.lineTo(14, 64); ctx.closePath(); ctx.stroke();   // hollow diamond outline (inset for the thick line)
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+        sp.scale.set(9, 9, 1);   // ~9 mm
+        sp.renderOrder = 11;
+        return sp;
     }
 
     // A camera-facing numbered badge floating above the ruby (order of execution)
@@ -282,15 +294,14 @@ export class GcodeViz3D {
         this.render();
     }
 
-    // Brighten the selected ruby, dim the rest, so it's clear which start the pendant jogs.
+    // Brighten the selected start glyph, dim the rest, so it's clear which start the pendant jogs. The cyan comes from
+    // the lozenge texture; brighten/dim via OPACITY (red belongs to the moving probe tip now).
     _highlightSelectedStart() {
         for (let p = 0; p < this.spindleMarkers.length; p++) {
-            const ruby = this.spindleMarkers[p].children[0];
-            if (!ruby || !ruby.material) continue;
+            const glyph = this.spindleMarkers[p].children[0];
+            if (!glyph || !glyph.material) continue;
             const sel = p === this.selectedStart;
-            ruby.material.color.setHex(sel ? 0xff2a44 : 0xc4122e);
-            ruby.material.transparent = !sel;
-            ruby.material.opacity = sel ? 1 : 0.5;
+            glyph.material.opacity = sel ? 1 : 0.45;   // selected = full cyan, the rest dimmed
         }
     }
 
@@ -412,10 +423,24 @@ export class GcodeViz3D {
         this._animParts = { tool: part(tgeo, 0xffab40, 0.9, 'tool'), collet: part(cgeo, 0x9aa6b2, 0.9, 'collet'), spindle: part(sgeo, 0x6b7682, 0.85, 'spindle') };
         const grp = new THREE.Group();
         grp.add(this._animParts.spindle, this._animParts.collet, this._animParts.tool);
+        // PROBE op: the touching RUBY BALL is RED (mirrors the 2D red head + the real touch-probe look). ONLY the ball —
+        // the stylus/body/shank stay the orange tool colour, collet/spindle grey, the MILL tool stays orange. A solid red
+        // sphere at the tip (depthTest:false, higher renderOrder → drawn on top) overlays the lathe's ball; radius matches
+        // toolProfile's ruby (probeDims.ballDia, else dia/4) so it coincides exactly. No ruby for a mill.
+        if (tool.type === 'probe') {
+            const pd = tool.probeDims || {};
+            const rball = (pd.ballDia > 0) ? Number(pd.ballDia) / 2 : Math.max(1, ((Number(tool.dia) || 6) / 2) * 0.5);
+            // transparent:true (opacity 1) + a HIGH renderOrder so the ruby sorts into the SAME (transparent) pass as the
+            // orange tool and draws LAST → it covers the lathe's orange ball. (An OPAQUE ruby renders in the opaque pass
+            // BEFORE the transparent orange tool, so the orange would draw over it → it would NOT read red. The user hit that.)
+            const ruby = new THREE.Mesh(new THREE.SphereGeometry(rball * 1.04, 20, 20), new THREE.MeshBasicMaterial({ color: 0xff2a44, depthTest: false, transparent: true, opacity: 1 }));
+            ruby.position.set(0, 0, rball); ruby.renderOrder = 30; ruby.name = 'ruby';   // ball centred at z=rball (lathe ball spans z∈[0,2·rball]); ×1.04 so no orange rim peeks
+            this._animParts.ruby = ruby; grp.add(ruby);
+        }
         grp.renderOrder = 25; grp.visible = !!this._animOn;
         this._animTool = grp; this._applyPartVis(); this.partFrame.add(grp);   // tool rides the part frame
     }
-    _applyPartVis() { const v = this._partVis || {}; if (this._animParts) for (const k of ['tool', 'collet', 'spindle']) if (this._animParts[k]) this._animParts[k].visible = v[k] !== false; }
+    _applyPartVis() { const v = this._partVis || {}; if (this._animParts) { for (const k of ['tool', 'collet', 'spindle']) if (this._animParts[k]) this._animParts[k].visible = v[k] !== false; if (this._animParts.ruby) this._animParts.ruby.visible = v.tool !== false; } }   // the red ruby tip follows the tool
     // Show/hide spindle / collet / tool independently, e.g. setPartVisible({ spindle: false }).
     setPartVisible(parts) { this._partVis = Object.assign({ tool: true, collet: true, spindle: true }, this._partVis, parts); this._applyPartVis(); this.render(); }
     // Set the PER-OP tool { type, dia, length } → rebuild the assembly's tool to its real profile.
