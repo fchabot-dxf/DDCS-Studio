@@ -653,3 +653,36 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   floor are eyeballed — the human may tune live. (c) START-widget + offset-axis-line refinements (flagged turn 15) still
   deferred.
 - state: branch main · committed this turn (LOCAL, unpushed) · hash in the pass note. Passing back.
+
+## 2026-06-27 — turn 17 (cont.): DRO — dual Work/Mach readout (shipped as a VIEW)
+
+- context: built at the HUMAN's direct request ("do the dro still") AFTER turn 17's slice-3 pass — so during the
+  advisor's turn 18. Honors the advisor's turn-18 synthesis: Option 1 (ship the DRO now as a VIEW) + the GRAFT — read
+  the active WCS offset LIVE through one accessor, never hardcode the single value. Advisor is tracking "real per-WCS
+  offset table" as the committed follow-up.
+- GATE RESOLVED (todo): Mach = Work + the active WCS offset is computable WITHOUT an engine WCS table — wcsForViz() =
+  settings.machine.workOrigin. VERIFIED the engine has NO G54-G59 offset table (a single `_wcsOffset` used only for the
+  G53 machine→part mapping at GcodeExecutionEngine.js:824-839; the only 15[45] matches are M154/M155 drawbar). So the sim
+  genuinely has ONE offset today (G54=G55=G59); the DRO reflects that truthfully — the active-WCS label shows which code
+  is selected. User chose ship-as-view; advisor confirmed it's truthful, zero-waste, and doesn't front-load the engine change.
+- did (createPreviewPanel.js + styles.css):
+  - a `.pp-dro` top-right overlay (the one free corner — statusbar/legend are top-left, controls bottom-right, jog
+    bottom-left): an active-WCS chip + a Work/Mach table, rows X/Y/Z (+ A/B when the rotary rig is shown). Monospace,
+    tabular-nums so digits don't jitter.
+  - Work = onPositionChange pos; Mach = Work + `activeWcsOffset()` — the SINGLE future swap-point (today wcsForViz(),
+    later the per-G54-G59 table), read LIVE each update (the advisor's graft → the real table lands with zero DRO rework).
+  - the Work column FLASHES (ddcs-dro-flash keyframe) + the label re-references on a WCS call (classifyCall 'wcs' →
+    setDroWcs + flashDro) AND on a probe completion. Reset to the start position on run-start. A/B rows rebuild via
+    buildDro() when setRotaryFixture toggles.
+- tried/abandoned: Option 3 (Abs-only, the advisor's fallback) — rejected: single-offset Mach is TRUTHFUL (matches the
+  sim's real model), so dropping it would throw away half the dual readout to avoid an honest number. Option 2 (build the
+  per-WCS table first) — deferred to its own roadmap item ([[machine-frame-sim-spec]]); gating the DRO on it would bundle
+  two features and stall this one.
+- VERIFY (dro.spec.js, real Simulate, 3/3): structure (Work+Mach cols, XYZ rows, label 'G54'); live (Work tracks the
+  tool + Mach = Work + offset per axis — the graft proven with a non-zero workOrigin {100,200,50}); WCS event (G55 call →
+  label 'G55' + Work-column flash, none before the call). Regression 36/36: preview-controls · cam-slot-sim · probe-wcs ·
+  wcs-flash · origin-gizmo · followcam · atc-preview.
+- HANDOFF: the advisor holds turn 18; I did NOT pass (direction is one-way; the advisor holds the ball). This entry + the
+  commit are the record — the advisor reads the WORK-LOG tail on entry, so the DRO won't be re-dispatched. The re-armed
+  worker `wait` is still live for the advisor's next pass.
+- state: branch main · committed this turn (LOCAL, unpushed). Tests dro 3/3 · regression 36/36.

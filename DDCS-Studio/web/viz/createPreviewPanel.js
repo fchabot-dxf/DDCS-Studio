@@ -71,6 +71,10 @@ const PANEL_HTML = `
     <button class="pp-io" type="button" title="Show/hide the virtual I/O panel (sensors and outputs)">I/O</button>
   </div>
   <div class="viz3d-legend"></div>
+  <div class="pp-dro" aria-hidden="true">
+    <div class="pp-dro-wcs" title="Active work-coordinate system">G54</div>
+    <table class="pp-dro-tbl"><thead><tr><th></th><th>Work</th><th>Mach</th></tr></thead><tbody></tbody></table>
+  </div>
   <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan</div>
 `;
 
@@ -116,6 +120,38 @@ export function createPreviewPanel(container, opts = {}) {
     let rotaryFixture = false;   // host hint: show the 4th-axis rig (rotary probe ops). Applied to the lazy viz on create + on toggle.
     let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null, lastStockKey = '';
     let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false, liveTimer = null;
+
+    // DRO — a dual numeric readout mirroring the DDCS controller: Work (the tool's program position) + Mach. Work comes
+    // straight from onPositionChange; Mach = Work + the ACTIVE WCS offset. `activeWcsOffset()` is the SINGLE swap-point:
+    // today the sim has one offset (wcsForViz = settings.machine.workOrigin, so G54=G55=G59), but reading it LIVE here
+    // means when the engine gains a real per-G54-G59 WCS table, this call returns the active WCS's offset and the Mach
+    // column becomes truly per-WCS with NO change to the DRO. The Work column flashes + the WCS label updates on a
+    // WCS/probe event (reusing the slice-2 classify hook). Rows = X/Y/Z, plus A/B when the rotary rig is shown.
+    const droEl = q('.pp-dro'), droWcsEl = q('.pp-dro-wcs'), droBody = q('.pp-dro-tbl tbody');
+    const activeWcsOffset = () => wcsForViz() || { x: 0, y: 0, z: 0 };   // ← future per-WCS table drops in HERE
+    let droAxes = ['x', 'y', 'z'];
+    function buildDro() {
+        droAxes = rotaryFixture ? ['x', 'y', 'z', 'a', 'b'] : ['x', 'y', 'z'];
+        if (droBody) droBody.innerHTML = droAxes.map((ax) => `<tr data-ax="${ax}"><th>${ax.toUpperCase()}</th><td class="pp-dro-w">0.000</td><td class="pp-dro-m">0.000</td></tr>`).join('');
+    }
+    function updateDro(pos) {
+        if (!droBody) return;
+        const off = activeWcsOffset();
+        droAxes.forEach((ax) => {
+            const w = +(pos && pos[ax]) || 0, m = w + (+off[ax] || 0);
+            const row = droBody.querySelector(`tr[data-ax="${ax}"]`);
+            if (row) { row.children[1].textContent = w.toFixed(3); row.children[2].textContent = m.toFixed(3); }
+        });
+    }
+    function setDroWcs(raw) {   // a G54-G59 select updates the active-WCS label (G10 set-offset keeps the current label)
+        const m = String(raw || '').replace(/\([^)]*\)/g, ' ').match(/\bG5[4-9]\b/);
+        if (m && droWcsEl) droWcsEl.textContent = m[0];
+    }
+    function flashDro() {       // re-trigger the CSS flash on the Work column (the re-reference cue)
+        if (!droEl) return;
+        droEl.classList.remove('pp-dro-flash'); void droEl.offsetWidth; droEl.classList.add('pp-dro-flash');
+    }
+    buildDro();
 
     // The 2D canvas only repaints when told to; without this it goes blank if first drawn at a transient/zero
     // size (drawer slide-in) or after the panel is resized. Re-fit the 2D route whenever the container resizes.
@@ -175,17 +211,18 @@ export function createPreviewPanel(container, opts = {}) {
                 if (raw) setStatus(`Executing line ${lineIndex + 1}: ${raw.trim()}`);
                 // SLICE 3: a previous G31 has now FINISHED (the engine clamped it to the contact; the tool sits there) →
                 // build that axis of the probe-WCS. Resolving on the NEXT line guarantees the tool is at the contact.
-                if (pendingProbe && viz && viz.probeAxisTouched) viz.probeAxisTouched(pendingProbe);
+                if (pendingProbe && viz && viz.probeAxisTouched) { viz.probeAxisTouched(pendingProbe); flashDro(); }   // probe re-references the DRO
                 pendingProbe = null;
                 // WCS VISIBLE: a WCS/start call fires a temporal FLASH — the 3D marker glows + the code line glows/fades.
                 const kind = raw ? classifyCall(raw) : null;
                 if (kind) {
                     if (viz && viz.flashMarker) viz.flashMarker(kind);
                     if (typeof opts.onCallFlash === 'function') opts.onCallFlash(lineIndex, kind);
+                    if (kind === 'wcs') { setDroWcs(raw); flashDro(); }   // DRO: update the active-WCS label + flash the Work column (re-zero cue)
                 }
                 if (raw) { const pa = probeAxis(raw); if (pa) pendingProbe = pa; }   // a G31 → resolve on the next line
             },
-            onPositionChange: (pos) => { if (viz && viz.setToolPosition) viz.setToolPosition(pos); if (mode === '2d' && segs.length) t2.seek(nearest2d(pos)); },
+            onPositionChange: (pos) => { if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); if (mode === '2d' && segs.length) t2.seek(nearest2d(pos)); },
             onStatus: ({ message }) => setStatus(message),
             onWait: (wait) => { if (!window.ioPanel) return; if (wait) window.ioPanel.show(); window.ioPanel.setWait(wait); },   // float the I/O panel during a probe/M-code wait
             onFinish: () => {
@@ -383,6 +420,7 @@ export function createPreviewPanel(container, opts = {}) {
         eng._wcsOffset = wcsForViz() || { x: 0, y: 0, z: 0 };          // G53 machine moves draw in the part frame (see trace.js)
         if (mode === '3d') ensureViz();
         if (viz && viz.resetProbe) viz.resetProbe();    // SLICE 3: fresh probe-WCS each run (superimposed on the stock-WCS)
+        updateDro(getStartPos() || { x: 0, y: 0, z: 0 });   // DRO: reset to the start position for the fresh run
         if (viz) viz.setAnimate(false);                 // engine drives the tool/trail, not the geometric sweep
         lastRunCode = get('getGcode') || '';
         eng.run(lastRunCode);
@@ -511,6 +549,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (on === rotaryFixture) return;
         rotaryFixture = on;
         if (viz && viz.setRotaryFixture) viz.setRotaryFixture(on);   // rebuilds the stock so the rig appears/disappears
+        buildDro();   // DRO gains/loses the A/B rows with the rotary rig
     }
 
     return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, get viz() { return viz; }, get engine() { return engine; }, el: container };

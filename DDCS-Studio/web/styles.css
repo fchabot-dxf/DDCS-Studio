@@ -4216,6 +4216,28 @@ svg [id$="_wcs"] { display: none; }
     max-width: 70%; pointer-events: none;
 }
 .viz3d-legend span { white-space: nowrap; }   /* text coloured by its path type (set inline); no line swatch */
+
+/* DRO — dual numeric readout (Work + Mach) mirroring the DDCS controller. Top-right overlay; monospace so the digits
+   don't jitter; the active-WCS chip on top (amber = the stock-WCS colour). The Work column flashes on a WCS/probe
+   re-reference. Mach = Work + the active WCS offset (one offset today; per-G54-G59 when the engine WCS table lands). */
+.pp-dro {
+    position: absolute; top: 6px; right: 8px; z-index: 6;
+    background: rgba(0, 0, 0, 0.55); border-radius: 6px; padding: 3px 6px 4px;
+    font: 600 9px/1.25 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    color: #cdd9e6; pointer-events: none; user-select: none;
+}
+.pp-dro-wcs { text-align: center; font-weight: 700; color: #ffe08a; letter-spacing: 0.5px; margin-bottom: 2px; }
+.pp-dro-tbl { border-collapse: collapse; }
+.pp-dro-tbl th, .pp-dro-tbl td { padding: 0 4px; }
+.pp-dro-tbl thead th { font-weight: 600; color: #7f93a6; font-size: 8px; text-align: right; }
+.pp-dro-tbl tbody th { color: #9fc4e6; text-align: left; font-weight: 700; }   /* axis letter */
+.pp-dro-w, .pp-dro-m { text-align: right; font-variant-numeric: tabular-nums; min-width: 50px; }
+.pp-dro-m { color: #8fa8bf; }   /* Mach a touch dimmer than Work */
+@keyframes ddcs-dro-flash {
+    0% { color: #fff; text-shadow: 0 0 6px rgba(255, 224, 138, 0.95); }
+    100% { color: inherit; text-shadow: none; }
+}
+.pp-dro-flash .pp-dro-w { animation: ddcs-dro-flash 0.75s ease-out; }
 .viz3d-views { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 3; display: flex; gap: 4px; }
 .viz3d-views button {
     font-size: 10px;
