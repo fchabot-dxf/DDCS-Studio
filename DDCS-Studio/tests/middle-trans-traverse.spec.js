@@ -20,6 +20,9 @@ test('macro: boss auto trans-axis emits the diagonal traverse (#21); manual jogs
       autoHas21: /#21\s*=/.test(auto),
       autoHasTransMove: /G0 X#21 Y#21/.test(auto),
       autoHasAutoTraverse: /auto-traverse to the perpendicular/.test(auto),
+      // the diagonal move must come BEFORE the REPOSITION (the connecting travel of the PRIOR pass) — else the trace
+      // anchors it to ② and pushes the 2nd probe AWAY (the bug the human caught). So the Y pass starts cleanly at ②.
+      moveBeforeReposition: auto.indexOf('G0 X#21 Y#21') < auto.indexOf('auto-traverse to the perpendicular'),
       manualHas21: /#21/.test(manual),
       manualHasJogPerp: /jog clear, around to the perpendicular/.test(manual),
       legacyAutoMatches: w.generate({ ...base, approach: 'auto' }) === auto,
@@ -31,6 +34,7 @@ test('macro: boss auto trans-axis emits the diagonal traverse (#21); manual jogs
   expect(r.autoHas21, 'auto trans-axis assigns the Diag travel #21').toBe(true);
   expect(r.autoHasTransMove, 'auto trans-axis emits the diagonal G0 move (the fix — it used to just jog)').toBe(true);
   expect(r.autoHasAutoTraverse, 'auto trans-axis is hands-free, not an operator jog').toBe(true);
+  expect(r.moveBeforeReposition, 'the diagonal move is the connecting travel BEFORE the REPOSITION (so the Y pass anchors at ②)').toBe(true);
   expect(r.manualHas21, 'manual has no Diag travel').toBe(false);
   expect(r.manualHasJogPerp, 'manual trans-axis is an operator jog').toBe(true);
   expect(r.legacyAutoMatches, 'a legacy approach:auto == inAxis/transAxis:auto (byte-identical)').toBe(true);

@@ -86,12 +86,16 @@ export function middleStack(params = {}) {
     // (secondary-axis) walls: lift, a 2-axis diagonal step of #21 (Diag travel) toward the secondary first wall, drop.
     // Emits "REPOSITION:" so the parser counts a NEW pass (the 2nd start ②). Signs follow dir1/dir2; the human tunes #21.
     const transTraverse = () => {
-        MV('Z', '#18');
-        C('REPOSITION: auto-traverse to the perpendicular walls');
-        const pmove = dir1Plus ? '#21' : '[0-#21]';     // primary axis: retreat back toward the centre (off its last wall)
+        // The lateral travel is the CONNECTING move (lift → diagonal → drop) and MUST come BEFORE the REPOSITION
+        // comment so it belongs to the PRIOR (primary-axis) pass — the trace anchors the NEXT pass to ②, so a move
+        // emitted AFTER the REPOSITION would draw FROM ② and push the 2nd probe away. Then REPOSITION marks the Y pass.
+        const pmove = dir1Plus ? '#21' : '[0-#21]';     // primary axis: toward the centre / the perpendicular walls
         const smove = dir2Plus ? '[0-#21]' : '#21';     // secondary axis: out toward its first wall
-        MOVE({ [axis.toLowerCase()]: pmove, [second.toLowerCase()]: smove });
-        MV('Z', '[0-#18]'); DM('inc');
+        MV('Z', '#18');                                  // lift clear of the boss
+        MOVE({ [axis.toLowerCase()]: pmove, [second.toLowerCase()]: smove });   // travel across to ② (Diag travel #21)
+        MV('Z', '[0-#18]');                              // back to probe height
+        C('REPOSITION: auto-traverse to the perpendicular walls');   // mark the Y pass (anchored to ②); no operator wait
+        DM('inc');
     };
     const between = (ax, firstPlus) => {
         // The two opposite walls. POCKET probes both from the centre (no move - manual is N/A, never reposition).
