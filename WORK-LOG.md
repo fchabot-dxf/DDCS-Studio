@@ -1246,3 +1246,34 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
     `[#19+#20]/2` (half the mean cross-over ≈ to the perpendicular wall) — needs confirmation; it's geometry the human/advisor should set.
   - Plus relabel the corner's `travelDist` "Travel"→"Diag travel". Blockly round-trip for the new fields/toggles.
   Holding the build for the advisor's synthesis (bless the plan + the Diag-travel default), per the explicit gate.
+
+## 2026-06-28 — turn 53: MIDDLE batch — INC2 redo + INC3 (built + human-bug-fixed) + INC4 scoped
+
+- **INC2 REDO (`0418a84`).** The advisor + human re-opened it: my first verify moved `viz.starts[1]`
+  PROGRAMMATICALLY in the MAIN editor (no inferStarts hints) → green on the WRONG path. The REAL bug (reproduced in
+  the WIZARD via the real pendant ② button + jog): the middle wizard passes `inferStarts` as the per-pass `startHints`
+  (middleView:98), so on every re-trace the per-pass loop's `hintFor(p)` OVERRODE a jogged ② → it snapped back (jog X+
+  → 50→60→snaps to 50, synchronously). Fix = per-pass USER overrides `userStarts`: a jog (onStartChange pins the moved
+  pass) or a drag (onStartDrag) records it, and it BEATS the hint in the per-pass loop. Regression drives the REAL
+  pendant gesture in the wizard (jog ② → moves + STICKS + reflects in 2D).
+
+- **INC3 (`b9975e2` + fix `d5747c3`) — the core positioning fix (human chose TWO TOGGLES, advisor blessed).** Split the
+  single `approach` into per-traverse `inAxis`/`transAxis` (auto/manual, default from approach = back-compat
+  byte-identical, MIX-able). The trans-axis bug: `reposition()` emitted NO lateral move → AUTO never reached ②. New
+  `transTraverse()` = a real 2-axis diagonal move (corner MOVE/travelOwn/travelOpp idea) fed by a NEW editable "Diag
+  travel" field → #21, default [#19+#20]/2. inferStarts follows the in-axis toggle (manual 2/axis, auto 1). Form = two
+  toggles + Diag travel (boss-gated); relabelled the corner's Travel→Diag travel. Round-trip = SCHEMA + paramFields +
+  the reconciler now recovers the toggles (REPOSITION messages / #19 / #21). **HUMAN-bug (`d5747c3`):** still didn't
+  reach ② — the diagonal move was AFTER the REPOSITION → landed in the Y pass (anchored to ②) → pushed the probe AWAY.
+  Fixed: emit the move BEFORE the REPOSITION (the connecting travel of the prior pass) → the Y pass anchors cleanly at ②
+  (trace-verified: pass-1 first seg = local 0,0). Signs track dir1/dir2 (toward ②); the magnitude is the human-tuned knob.
+
+- **INC4 VERIFY-FIRST (scoped, GATE answered — NOT a feature-type bug).** The boss-manual "looks like a pocket" is the
+  UN-SIMMED JOG, not a wizard bug: the MACRO probes the walls correctly (PR toward ±max from outside ①), but the SIM's
+  reposition handling (`GcodeExecutionEngine:571-575`) resets `this.pos={0,0,0}` on a REPOSITION while the LIVE tool
+  anchors to `starts[0]` (①) — so after a reposition the tool sits at ①≈Y-centre and the Y probes look pocket-ish.
+  Same reset undoes INC3's AUTO move's LIVE effect (the static trace anchors per-pass to ②, but the live tool rides
+  starts[0]). **So INC4 = anchor the LIVE tool to `starts[_pass]`** (engine reports the pass; 3D `setToolPosition` +
+  the 2D head anchor per-pass) — a moderate engine+viz change that completes BOTH the auto + manual live cases. GATE
+  doesn't trip (un-simmed jog). Passing back here (turn is large; INC3 needs human-eyes on the live tool; the per-pass
+  live-anchoring is worth the advisor's eyes before I build it) — INC4 + the refinements next.
