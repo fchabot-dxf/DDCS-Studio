@@ -164,10 +164,21 @@ export class GcodeViz3D {
         // importance, different COLOUR (cyan vs the stock amber). A plain POINT (dot, NO crosshair — user request) so it
         // reads as a result, not a gizmo. Always visible; starts superimposed on part-zero (setup-right) and each G31
         // converges its probed axis to the contact. Rides the part frame + scaled by _scaleMarkers like the origin dot.
-        const pg = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 18), new THREE.MeshBasicMaterial({ color: 0x4f8fff, depthTest: false }));
+        const pg = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 18), new THREE.MeshBasicMaterial({ color: 0x4f8fff, transparent: true, opacity: 0.5, depthTest: false }));
         pg.renderOrder = 15;
-        this._probeGizmo = pg;
+        this._probeGizmo = pg;   // the PREDICTED probe-WCS origin — always shown at 50% opacity (a best-guess, refined per axis)
         this.partFrame.add(pg);
+        // The probe-WCS REDUCES dimension as axes are probed (each G31 determines a PLANE): 1 axis → a DISC in the
+        // perp plane (Z→XY, X→YZ, Y→XZ); 2 axes → a LINE (the planes' intersection, along the un-probed axis); 3 → the
+        // POINT (pg). Drawn progressively across the probe moves. Disc = a soft blue glow plane; line = a thin blue bar.
+        // The constraint shape spans the WHOLE scene (bigger than the model) at LOW opacity, and FLASHES (brightens) on
+        // each probe event. Disc = a faint solid plane; line = a faint thin bar. base opacities below.
+        this._probeDiscBase = 0.14; this._probeLineBase = 0.32;
+        this._probeDisc = new THREE.Mesh(new THREE.CircleGeometry(1, 56), new THREE.MeshBasicMaterial({ color: 0x4f8fff, transparent: true, opacity: this._probeDiscBase, depthTest: false, side: THREE.DoubleSide }));
+        this._probeDisc.renderOrder = 12; this._probeDisc.visible = false; this.partFrame.add(this._probeDisc);
+        this._probeLine = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 12), new THREE.MeshBasicMaterial({ color: 0x4f8fff, transparent: true, opacity: this._probeLineBase, depthTest: false }));
+        this._probeLine.renderOrder = 13; this._probeLine.visible = false; this.partFrame.add(this._probeLine);
+        this._probeVals = { x: 0, y: 0, z: 0 }; this._probeAxes = {};
         // Direction labels on the grid edges (repositioned to the footprint in setSegments)
         this._gridLabels = {
             xp: this._makeTextSprite('+X', '#ff6b6b'), xn: this._makeTextSprite('-X', '#ff6b6b'),
@@ -1563,18 +1574,17 @@ export class GcodeViz3D {
         const THREE = this.THREE, tex = this._glowTexture();
         if (!worldPos || !THREE || !tex || !this.scene) return;
         const span = (this._stock && Math.max(this._stock.x || 0, this._stock.y || 0)) || 60;
-        const baseR = Math.max(6, span * 0.18);
-        const mat = new THREE.SpriteMaterial({ map: tex, color: new THREE.Color(color), transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false });
+        const r0 = Math.max(12, span * 0.26), r1 = r0 * 2.3;
+        const mat = new THREE.SpriteMaterial({ map: tex, color: new THREE.Color(color), transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false });
         const sprite = new THREE.Sprite(mat);
         sprite.position.copy(worldPos); sprite.renderOrder = 999;
         this.scene.add(sprite);
         const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
-        const t0 = now(), dur = 700;
+        const t0 = now(), dur = 850;
         const tick = () => {
             const u = Math.min(1, (now() - t0) / dur);
-            const s = baseR * (1.2 + 2.2 * u);
-            sprite.scale.set(s, s, 1);
-            mat.opacity = 0.95 * (1 - u) * (1 - u);                  // ease-out fade
+            sprite.scale.set(r0 + (r1 - r0) * u, r0 + (r1 - r0) * u, 1);
+            mat.opacity = u < 0.28 ? 1 : Math.max(0, 1 - (u - 0.28) / 0.72);   // HOLD bright, then fade (visible)
             this.render();
             if (u < 1) requestAnimationFrame(tick);
             else { this.scene.remove(sprite); mat.dispose(); }
@@ -1591,45 +1601,82 @@ export class GcodeViz3D {
 
     // SLICE 3 — reset the derived probe-WCS back onto part-zero (superimposed on the stock-WCS). Called at each run start.
     resetProbe() {
-        if (this._probeGizmo) { this._probeGizmo.position.set(0, 0, 0); this.render(); }
+        this._probeVals = { x: 0, y: 0, z: 0 };
         this._probeAxes = {};
+        this._updateProbeShape();   // → superimposed point at part-zero
     }
 
-    // SLICE 3 — a G31 just finished on `axis` (the tool sits at the contact). BUILD that axis of the probe-WCS PER-AXIS:
-    // glow at the point (the probe event), flash the probed axis LINE, and animate the point's axis converging to the
-    // contact (the tool's part-local position — same frame as the markers). The contact may be OFF the stock (a miss) —
-    // we DON'T clamp; an off-stock probe-WCS is the correctness signal. Z first by program order (a Z touch-off probes Z first).
+    // The constraint shape spans the WHOLE scene (bigger than the stock model). Use the machine envelope if present, else
+    // a generous multiple of the stock, floored so it always reads as "scene-wide".
+    _bigSpan() {
+        const m = this._machine, s = this._stock;
+        const mm = m ? Math.max(m.x || 0, m.y || 0, m.z || 0) : 0;
+        const ss = s ? Math.max(s.x || 0, s.y || 0, s.z || 0) : 0;
+        return Math.max(mm, ss * 3, 400);
+    }
+
+    // SLICE 3 — a G31 just finished on `axis` (the tool sits at the contact). Record the determined axis value (NOT
+    // clamped — off-stock is the correctness signal), redraw the constraint shape at its now-reduced dimension, and
+    // FLASH it (brighten then settle to its low base opacity): 1st axis → the disc, 2nd → the line, 3rd → the point.
     probeAxisTouched(axis) {
-        const pg = this._probeGizmo, tool = this._animTool, THREE = this.THREE;
-        if (!pg || !tool || !THREE || 'xyz'.indexOf(axis) < 0) return;
-        const target = tool.position[axis];               // the contact (part-local) — NOT clamped to stock
-        const from = pg.position[axis];
+        const tool = this._animTool, THREE = this.THREE;
+        if (!tool || !THREE || 'xyz'.indexOf(axis) < 0) return;
+        (this._probeVals || (this._probeVals = { x: 0, y: 0, z: 0 }))[axis] = tool.position[axis];
         (this._probeAxes || (this._probeAxes = {}))[axis] = true;
-        this._flashAxisLine(axis);                         // the per-axis cue: brighten the probed axis line
-        this._glowAt(pg.getWorldPosition(new THREE.Vector3()), 0x4f8fff);   // a cyan glow at the point — the probe event
-        const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
-        const t0 = now(), dur = 380, ease = (u) => 1 - (1 - u) * (1 - u);
-        const tick = () => {
-            const u = Math.min(1, (now() - t0) / dur);
-            pg.position[axis] = from + (target - from) * ease(u);
-            this.render();
-            if (u < 1) requestAnimationFrame(tick); else pg.position[axis] = target;
-        };
-        requestAnimationFrame(tick);
+        this._updateProbeShape();
+        const n = ['x', 'y', 'z'].filter((a) => this._probeAxes[a]).length;
+        if (n === 1) this._flashProbeShape(this._probeDisc, this._probeDiscBase);        // 1st → flash the disc
+        else if (n === 2) this._flashProbeShape(this._probeLine, this._probeLineBase);   // 2nd → flash the line
+        else {                                                                            // 3rd → flash the point (a glow)
+            const v = this._probeVals, a = this._probeAxes;
+            const land = new THREE.Vector3(a.x ? v.x : 0, a.y ? v.y : 0, a.z ? v.z : 0);
+            const parent = this._probeGizmo.parent;
+            if (parent) { parent.updateWorldMatrix(true, false); land.applyMatrix4(parent.matrixWorld); }
+            this._glowAt(land, 0x4f8fff);
+        }
     }
 
-    // Briefly brighten the probed axis line (X red / Y green / Z blue), then restore — the per-axis "which axis" cue.
-    _flashAxisLine(axis) {
-        const ln = axis === 'x' ? this._axisLineX : axis === 'y' ? this._axisLineY : this._axisLineZ;
-        if (!ln || !ln.material) return;
-        const mat = ln.material, base = mat.opacity;
+    // Persistent draw of the probe-WCS at the dimension the JOB determines: the POINT (predicted origin) is ALWAYS shown
+    // at 50% opacity; PLUS, at LOW opacity spanning the whole scene, a DISC (1 axis → the plane perp to it) or a LINE
+    // (2 axes → the planes' intersection along the un-probed axis). 3 axes → just the point. Undetermined axes sit at 0.
+    _updateProbeShape() {
+        const THREE = this.THREE, ax = this._probeAxes || {}, v = this._probeVals || { x: 0, y: 0, z: 0 };
+        const pt = this._probeGizmo, disc = this._probeDisc, line = this._probeLine;
+        if (!THREE || !pt) return;
+        const probed = ['x', 'y', 'z'].filter((a) => ax[a]);
+        const big = this._bigSpan();
+        const c = { x: ax.x ? v.x : 0, y: ax.y ? v.y : 0, z: ax.z ? v.z : 0 };
+        pt.position.set(c.x, c.y, c.z); pt.visible = true;
+        if (disc) { disc.visible = false; disc.material.opacity = this._probeDiscBase; }
+        if (line) { line.visible = false; line.material.opacity = this._probeLineBase; }
+        if (probed.length === 1 && disc) {                 // + DISC — the plane PERP to the one probed axis
+            const a = probed[0];
+            const normal = a === 'x' ? new THREE.Vector3(1, 0, 0) : a === 'y' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+            disc.position.set(c.x, c.y, c.z);
+            disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);   // circle +Z normal → the probed axis
+            disc.scale.setScalar(big * 0.5); disc.visible = true;
+        } else if (probed.length === 2 && line) {          // + LINE — along the UN-probed axis (the planes' intersection)
+            const un = ['x', 'y', 'z'].find((a) => !ax[a]);
+            const dir = un === 'x' ? new THREE.Vector3(1, 0, 0) : un === 'y' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+            line.position.set(c.x, c.y, c.z);
+            line.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);   // cylinder +Y → the un-probed axis
+            line.scale.set(1, big, 1); line.visible = true;
+        }
+        this.render();
+    }
+
+    // FLASH a constraint shape: snap it bright, then ease back to its low base opacity (the probe-event cue).
+    _flashProbeShape(mesh, baseOp) {
+        if (!mesh || !mesh.material) return;
+        mesh.visible = true;
+        const mat = mesh.material, peak = 0.9;
         const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
-        const t0 = now(), dur = 650;
+        const t0 = now(), dur = 850;
         const tick = () => {
             const u = Math.min(1, (now() - t0) / dur);
-            mat.opacity = base + (1 - base) * (1 - u);    // 1.0 → base
+            mat.opacity = u < 0.18 ? peak : Math.max(baseOp, peak - (peak - baseOp) * (u - 0.18) / 0.82);
             this.render();
-            if (u < 1) requestAnimationFrame(tick); else mat.opacity = base;
+            if (u < 1) requestAnimationFrame(tick); else mat.opacity = baseOp;
         };
         requestAnimationFrame(tick);
     }

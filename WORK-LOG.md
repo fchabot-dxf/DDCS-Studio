@@ -617,3 +617,39 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   each contact (Z + X within tol of the tool contact), the unprobed Y stays superimposed, the datum moved off part-zero.
 - state: tests 346/349 green (2 skipped; 1 known form-widgets xy-pad flake — passes 5/5 in isolation, unrelated to this
   change) · branch main · committed `384c992` (LOCAL, unpushed). One commit as asked. Passing back.
+
+## 2026-06-27 — turn 17: SLICE-3 REDESIGN (probe-WCS drawn BY DIMENSION) — DRO deferred
+
+- task (advisor turn 17) = the dual Mach/Abs DRO. **NOT BUILT this turn.** The human took the whole turn live-redesigning
+  the slice-3 probe-WCS visualization (below). The advisor's DRO note STILL STANDS — it is the next task.
+- WHY the redirect: turn-13's human note ("some probe output only give a line or an x not always a 3 axis pos") matured,
+  co-designed live, into a full geometric model. A G31 determines a PLANE; intersecting planes reduce dimension. So the
+  probe-WCS is drawn BY DIMENSION, not as one converging point:
+    1 axis (e.g. Z touch-off)  → a DISC  in the plane PERP to it (Z→XY, X→YZ, Y→XZ)
+    2 axes (e.g. Z+X)          → a LINE  along the UN-probed axis (the two planes' intersection)
+    3 axes (Z+X+Y)             → the POINT (the datum)
+  This is the honest answer to "not always a 3-axis point": a 1-/2-axis job legitimately ENDS on a disc/line.
+- did (gcodeViz3d.js):
+  - `_probeGizmo` (the predicted origin POINT) is now ALWAYS shown at 50% opacity — a running best-guess datum, refined
+    per axis, sitting ON the constraint (human: "the predicted probe wcs origin should still be shown at all time").
+  - `_probeDisc` (faint SOLID plane) + `_probeLine` (faint thin bar): the persistent constraint shape for 1-/2-axis jobs,
+    LOW base opacity (0.14 / 0.32), SPANNING THE WHOLE SCENE (`_bigSpan()` = machine envelope, else stock×3, floor 400 —
+    "bigger than the model").
+  - `_updateProbeShape()` draws point(always) + disc(1)/line(2)/—(3). `probeAxisTouched` FLASHES the current shape
+    (`_flashProbeShape` brighten→settle): 1st axis = disc, 2nd = line, 3rd = point-glow.
+  - REMOVED `_flashAxisLine` (turn-15's bold axis-bar) — superseded by the disc/line/point flash (human: "flash anim is
+    only disc on first axis probe, line on second and point on third").
+- tried/abandoned:
+  - turn-15's "point converges per-axis" (384c992) — replaced wholesale by the dimensional model.
+  - an ADDITIVE glow-texture disc (radial gradient) — abandoned: a scene-spanning gradient reads as a centre-blob, not a
+    plane. Switched to a solid faint disc so the plane reads uniformly across the scene.
+  - **VERIFY-REAL-SYMPTOM GAP (the real lesson):** the earlier flash tests asserted the methods FIRE, not that the flash
+    is VISIBLE. The human initially "didn't see any anim of new" while every test was green — a test masking an invisible
+    result. Resolved only by the human's live eyes (hard reload + the redesign). 3D visibility is not headlessly
+    assertable; the human is the verifier. The "maybe we need advisor" moment passed once the human reloaded + saw it.
+- VERIFY (probe-wcs.spec.js rewritten, real Simulate): classifier + two distinct peers; 1-axis→DISC (point always
+  visible); 2-axis→LINE; 3-axis→POINT off part-zero. 4/4. origin-gizmo + wcs-flash still green.
+- OPEN for the advisor: (a) the DRO (turn 17's actual task) is still PENDING. (b) disc/line base opacities + `_bigSpan`
+  floor are eyeballed — the human may tune live. (c) START-widget + offset-axis-line refinements (flagged turn 15) still
+  deferred.
+- state: branch main · committed this turn (LOCAL, unpushed) · hash in the pass note. Passing back.
