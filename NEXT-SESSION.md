@@ -296,6 +296,16 @@ The user wants **any custom op / hand-built block stack editable via a FORM** (n
 
 **▶ PROBE-ANIM CUE — MAKE IT PERCEPTIBLE (human picked A, turn 24) — ACTIVE.** Rebuild the cue on the three diagnosed levers: **(1) CONSTANT-SCREEN-SIZE** — scale the glow/disc/line to a fixed SCREEN size (reuse the `_scaleMarkers` approach) so it never shrinks to a speck when the scene zooms out for a big WCS offset; **(2) HIGH-CONTRAST** — bright/saturated, not the faint 0.14/0.32; **(3) SUSTAINED** — the cue persists across the whole probe move (not a <1s blip in a 7.5s move). The animation stands: each probe move → the shape GLOWS (3 pulses) + the DISC GROWS + the LINE EXTENDS from the probe; the point glows. **Verify TWO ways:** (a) PIXEL-DELTA (the headless `gl.readPixels` method the worker found — prove it renders + the bright-px coverage is now a meaningful %, not ~0.1%); (b) the HUMAN's eyes (the final perceptibility check in a real Corner-probe Simulate at the user's real WCS offset). One commit, suite green.
 
+**🔁 PERCEPTIBILITY FIX BUILT (`4928456`, advisor turn 26) — VISIBILITY SOLVED, WRONG LOOK → redirected.** Pixel-delta (`gl.readPixels` on a real probe WITH the large WCS offset — the breaking condition) shows the cue now peaks at **2.16% of canvas vs the old ~0.1% speck** → visibility IS solved. But the human says "NOT THE RIGHT FIX" — it's the REPRESENTATION (constant-screen big disc + pulsing glow + extending line) they dislike, not invisibility. **KEEP:** the pixel-delta tool (`probe-anim-visible.spec.js`) — a reusable verify-real-symptom guard for ANY visual; + the `_scaleMarkers` worldPerPx machinery where ruby-anchoring can reuse it. The worker's "align on the visual" gate is **ANSWERED — the human specified it (in parallel with the advisor):**
+
+**▶ PROBE CUE — RUBY-ANCHORED SOFT GLOW (human-locked spec, turn 26) — ACTIVE.** Everything is a **SOFT, blurred additive GLOW** (like `_glowAt`) — no hard edges, no opacity-flash, no `_bigSpan` scene-span. Per probe move, anchored to the RUBY (the human's proven-visible yardstick — its rendered size / `probeDims.ballDia`):
+- **1st axis → a glowing DISC that GROWS 1× ruby → 10× ruby** (radius)
+- **2nd axis → a glowing LINE that EXTENDS 1× ruby → 10× ruby** along the UN-probed axis
+- **3rd axis → a glowing POINT at ~1× ruby**
+- each **PULSES 3×** on its probe move
+
+Starting at 1× ruby (size AND position at the contact) → visible from frame one (the ruby is visible) AND where the user's looking; grows to 10× ruby = unmistakable. **Verify TWO ways:** the pixel-delta guard + the HUMAN's eyes (must look RIGHT, not just be visible). One commit, suite green.
+
 ---
 
 ## ▶ BACKLOG (human-curated, 2026-06-28) — queued, not yet sequenced/dispatched
