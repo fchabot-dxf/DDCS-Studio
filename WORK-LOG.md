@@ -415,3 +415,17 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
 - tried/abandoned: nothing — clean surgical sed; resisted sweeping group-canvas-knob (A) (not named; one-task-per-wake).
 - state: tests 343/345 green · branch main · sweep committed `35ad42c` (LOCAL, unpushed). Passing back to advisor.
   Candidate next (advisor's call): sweep group-canvas-knob (A) 'editor'→'studio' for full consistency.
+
+## 2026-06-27 — cycle 2 turn 5: final test-view sweep (A) → studio view `<pending>`
+
+- task (advisor turn 5): point group-canvas-knob.spec.js (A, the last group spec on 'editor') at showApp('studio');
+  re-run green; GATE = pass back if A/number-role render was ACTUALLY broken (no unsupervised prod fix); test-view only.
+- did: sed `showApp('editor')`→`showApp('studio')` in group-canvas-knob.spec.js (2 occ). First run exit-1 — but that
+  was the KNOWN stale-cache collection artifact from editing a spec ([[playwright-stale-cache-testuse-error]]), NOT a
+  real failure: `rm -rf node_modules/.cache/playwright` + re-run by explicit path → 2/2 green (--repeat-each=2). Full
+  suite 343/345 green.
+- gate: NOT tripped — A's number-role point knob renders its x/y number fields fine in the real studio shell (the
+  render was never broken; the hidden-shell 0×0 only ever affected the INTERACTIVE preview, which A doesn't use — A is
+  number fields). So no prod-logic change, test-view only as authorized.
+- state: tests 343/345 green · branch main · A sweep committed (see git). Group-spec view-consistency COMPLETE — every
+  group spec (chip/gesture/edit/auto/canvas-knob/canvas-drag) now drives the real showApp('studio'). Passing back.
