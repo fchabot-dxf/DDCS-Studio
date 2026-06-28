@@ -746,3 +746,28 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   probeAxisTouched fires per axis w/ live _animTool, glowPulse ×3, growDisc ×1, extendLine ×1, render() >100, no JS errors.
   probe-wcs 4/4 + wcs-flash + origin-gizmo still green.
 - state: branch main · committed this turn (LOCAL, unpushed). PENDING the human's eyes-on confirmation. Passing back.
+
+## 2026-06-28 — turn 23 (cont.): PROBE ANIM still invisible — pixel-readback diagnosis (NOT a dead path)
+
+- HUMAN VERDICT on aad9956: still "nothing" — the 3-pulse glow + disc-grow/line-extend is NOT perceptible during a real
+  (wizard Corner-probe) Simulate. Screenshots provided.
+- SCREENSHOTS confirm the OTHER turns landed: the DRO renders correctly (G54 chip, Work/Mach cols, top-left UNDER the
+  status block, clear of the ViewCube) and Mach ≠ Work (Y 56→-494, Z -15→485) — the wcs.table offset fix (bfc90a4) is
+  LIVE with the user's REAL controller table. The blue probe-WCS dot shows. ONLY the probe animation is invisible.
+- PIXEL-READBACK DIAGNOSIS (throwaway, removed): 3D visibility IS checkable headlessly via gl.readPixels on the drawing
+  buffer. An additive glow sprite (the _glowPulse primitive) at full opacity DOES render — +130 bright px (added to
+  scene) / +180 (partFrame) on a 399×382 buffer. ⇒ the render path is NOT dead; sprites paint. The failure is
+  PERCEPTIBILITY: +130 px ≈ 0.1% of the canvas — the glow is too SMALL (world-unit r0 = max(18, stock·0.35) shrinks to a
+  speck when the camera is zoomed out for a large machine/WCS offset), the disc/line too FAINT (0.14/0.32), the event too
+  BRIEF, against a slow feed-timed probe (F200 = 7.5 s/move in the user's job).
+  Readback snippet for the next turn:
+    const gl = v.renderer.getContext(); v.render();
+    const px = new Uint8Array(gl.drawingBufferWidth*gl.drawingBufferHeight*4);
+    gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,px);
+    // count px[i]+px[i+1]+px[i+2] > 500  → bright-pixel delta before/after the probe event
+- KEY: the animation no longer has to be tuned BLIND — verify by PIXEL DELTA (a probe contact must add >> 130 bright px).
+- RECOMMENDATION: rebuild the probe cue as CONSTANT-SCREEN-SIZE (like _scaleMarkers, so it doesn't shrink when zoomed
+  out), HIGH-CONTRAST, SUSTAINED across the probe move (not a 1.5 s one-shot at contact). Verify by pixel-delta. OR
+  reconsider scope — many turns spent here with diminishing returns; the DRO/offset/reposition all shipped + confirmed.
+- state: aad9956 stands (motion > the old opacity flash — a real improvement, just insufficient). Passing back for the
+  advisor to direct the perceptibility rebuild (now pixel-verifiable).
