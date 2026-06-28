@@ -63,6 +63,22 @@ test('#var / [expr] coordinates survive as literals; unknown lines → raw', asy
   expect(r.blank).toBe(null);
 });
 
+test('#5: G28 recovers #var / [expr] axes (the probeAxis twin) — does not drop them to the Z default', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { parseLine } = await import('/blocks/gcodeToStack.js');
+    return {
+      vars: parseLine('G28 X#5 Y#6'),               // BOTH axes are #vars → must recover 'XY', NOT the 'Z' fallback
+      mixed: parseLine('G28 X10 Y#6 Z[#1+1]'),       // literal + #var + [expr] → all three recovered
+      literal: parseLine('G28 Z0'),                  // unaffected: a plain literal still recovers
+    };
+  });
+  // Before the fix the #var axes failed the (?=[-+.\d]) lookahead → axes=[] → join||'Z' = 'Z' (the silent drop).
+  expect(r.vars, 'both #var axes recovered, not dropped to the Z default').toEqual({ type: 'home', params: { axes: 'XY' } });
+  expect(r.mixed.params.axes, 'literal + #var + [expr] axes all recovered').toBe('XYZ');
+  expect(r.literal.params.axes, 'plain literal still works').toBe('Z');
+});
+
 test('standard atoms (plane / feed-mode / home / call / return) decode instead of falling to raw, and round-trip', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {

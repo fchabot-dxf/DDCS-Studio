@@ -80,7 +80,7 @@ export function parseLine(line, opts = {}) {
     if (G(94)) return { type: 'feedmode', params: { fmode: 'G94' } };
     if (G(95)) return { type: 'feedmode', params: { fmode: 'G95' } };
     if (G(28)) {   // reference return → Home; recover the referenced axes from their words
-        const axes = (code.toUpperCase().match(/[XYZA](?=[-+.\d])/g) || []).filter((a, i, arr) => arr.indexOf(a) === i);
+        const axes = (code.toUpperCase().match(/[XYZA](?=[-+.\d#[])/g) || []).filter((a, i, arr) => arr.indexOf(a) === i);   // include #var / [expr] axes (the probeAxis twin) so they survive the round-trip
         return { type: 'home', params: { axes: axes.join('') || 'Z' } };
     }
 
