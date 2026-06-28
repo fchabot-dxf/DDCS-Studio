@@ -16,7 +16,7 @@
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
-import { toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
+import { toNum as toNumShared, srcVal, srcNote, travelOwn as travelOwnExpr, travelOpp as travelOppExpr } from './probeBlocks.js';
 
 const AX = {
     X: { status: '#1920', result: '#1925', off: 0 },
@@ -60,8 +60,9 @@ export function cornerStack(params = {}) {
     const RAW = (text) => { const b = newBlock('raw'); b.params = { text }; S.push(b); };
     const END = () => S.push(newBlock('endprogram'));
 
-    const travelOwn = (d) => (d === '+' ? '#15' : '#16');   // travel IN the probe direction
-    const travelOpp = (d) => (d === '+' ? '#16' : '#15');   // travel the OTHER way (off the far side)
+    // Shared with the middle wizard (probeBlocks): travel IN the probe direction (#15/#16 = +/−travelDist) vs the OTHER way.
+    const travelOwn = (d) => travelOwnExpr(d === '+', '#15', '#16');   // travel IN the probe direction
+    const travelOpp = (d) => travelOppExpr(d === '+', '#15', '#16');   // travel the OTHER way (off the far side)
 
     // Probe one wall: fast touch → check → retract → slow touch → check → radius-comp WCS write → retract + safe-Z.
     const probeWall = (ax, dir) => {

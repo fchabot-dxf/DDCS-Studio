@@ -43,6 +43,34 @@ test('macro: boss auto trans-axis emits the diagonal traverse (#21); manual jogs
   expect(r.manualStarts, 'manual → 4 per-pass starts').toBe(4);
 });
 
+// Part 2a: the trans-axis diagonal LANDS near ② — its distance #21 is a SANE fixed default (50, like the corner's
+// travelDist), NOT [#19+#20]/2 (≈ max-probe) which scaled with the probe distance and overshot FAR off-stock when
+// max-probe >> the feature. The DIRECTION (travelOwn primary / travelOpp secondary, shared with the corner via
+// probeBlocks) was already correct; only the magnitude was wrong. So the endpoint is now max-probe-INDEPENDENT.
+test('the diagonal lands near ② and is independent of max-probe (sane #21=50, not scaled to dist)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio);
+  const r = await page.evaluate(async () => {
+    const { MiddleWizard } = await import('/wizards/middleWizard.js');
+    const { traceToolpath } = await import('/engine/trace.js');
+    const w = new MiddleWizard();
+    const stock = { x: 100, y: 80, z: 20, shape: 'boss' };
+    const endpointErr = (dist) => {
+      const p = { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', stockX: 100, stockY: 80, stockZ: 20, dist, inAxis: 'auto', transAxis: 'auto' };
+      const code = w.generate(p), starts = w.inferStarts(p, stock);
+      const segs = traceToolpath(code, { stock, start: starts[0], passStarts: starts }).segments || [];
+      const diag = segs.filter((s) => (s.type === 'rapid' || s.rapid) && Math.abs(s.x2 - s.x1) > 1 && Math.abs(s.y2 - s.y1) > 1)[0];
+      const twoLocal = { x: starts[1].x - starts[0].x, y: starts[1].y - starts[0].y };
+      return Math.hypot(diag.x2 - twoLocal.x, diag.y2 - twoLocal.y);   // distance from the diagonal endpoint to ②
+    };
+    return { err60: endpointErr(60), err100: endpointErr(100), default21: /#21\s*=\s*50\b/.test(w.generate({ featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', stockX: 100, stockY: 80, stockZ: 20, inAxis: 'auto', transAxis: 'auto' })) };
+  });
+  expect(r.default21, 'the Diag-travel default is a sane fixed 50, not [#19+#20]/2').toBe(true);
+  expect(r.err60, 'diagonal lands near ② at dist=60').toBeLessThan(12);
+  expect(r.err100, 'diagonal lands near ② at dist=100 (the old overshoot case)').toBeLessThan(12);
+  expect(Math.abs(r.err60 - r.err100), 'endpoint is max-probe-INDEPENDENT (decoupled from dist)').toBeLessThan(1);
+});
+
 test('round-trip: the per-traverse toggles + Diag travel reverse-sync from the block stack', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);

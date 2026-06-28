@@ -11,6 +11,7 @@
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
+import { travelOwn, travelOpp } from './probeBlocks.js';
 
 const AX = {
     X: { stop: '#1905', limit: '#1915', status: '#1920', result: '#1925', off: 0 },
@@ -43,8 +44,10 @@ export function middleStack(params = {}) {
     const crossX = (params.crossX === '' || params.crossX == null) ? '[#1+#2]' : String(params.crossX);
     const crossY = (params.crossY === '' || params.crossY == null) ? '[#1+#2]' : String(params.crossY);
     // INC3: the TRANS-axis (X→Y) auto-traverse distance — a raw diagonal probe-move to the perpendicular walls. Default
-    // [#19+#20]/2 (≈ half the mean cross-over) but EDITABLE (the human tunes it so the 2nd-axis probe reaches ②). #21.
-    const diagTravel = (params.diagTravel === '' || params.diagTravel == null) ? '[#19+#20]/2' : String(params.diagTravel);
+    // 50 (a SANE fixed value, like the corner's travelDist) — NOT [#19+#20]/2 (≈ max-probe), which scaled with the probe
+    // distance and overshot FAR off-stock when max-probe >> the feature. EDITABLE (the human tunes it so the 2nd-axis
+    // probe reaches ②); the direction is verified-correct for all dir1/dir2 — only this magnitude was wrong. #21.
+    const diagTravel = (params.diagTravel === '' || params.diagTravel == null) ? '50' : String(params.diagTravel);
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
 
     const S = [];
@@ -89,8 +92,13 @@ export function middleStack(params = {}) {
         // The lateral travel is the CONNECTING move (lift → diagonal → drop) and MUST come BEFORE the REPOSITION
         // comment so it belongs to the PRIOR (primary-axis) pass — the trace anchors the NEXT pass to ②, so a move
         // emitted AFTER the REPOSITION would draw FROM ② and push the 2nd probe away. Then REPOSITION marks the Y pass.
-        const pmove = dir1Plus ? '#21' : '[0-#21]';     // primary axis: toward the centre / the perpendicular walls
-        const smove = dir2Plus ? '[0-#21]' : '#21';     // secondary axis: out toward its first wall
+        // SAME directional pattern as the corner's diagonal (probeBlocks travelOwn/travelOpp): the PRIMARY leg travels
+        // IN the primary probe direction (back across to the centre), the SECONDARY leg travels the OTHER way (out to ②'s
+        // side, opposite its probe direction). #21 = the Diag-travel distance (a SANE fixed default, NOT scaled to max-probe
+        // which overshot far off-stock). Empirically these signs already head toward ② for all dir1/dir2 — only the
+        // magnitude was wrong; the human tunes #21 so the 2nd-axis probe lands at ②.
+        const pmove = travelOwn(dir1Plus, '#21', '[0-#21]');   // primary axis: toward the centre / the perpendicular walls
+        const smove = travelOpp(dir2Plus, '#21', '[0-#21]');   // secondary axis: out toward ② (opposite its first probe dir)
         MV('Z', '#18');                                  // lift clear of the boss
         MOVE({ [axis.toLowerCase()]: pmove, [second.toLowerCase()]: smove });   // travel across to ② (Diag travel #21)
         MV('Z', '[0-#18]');                              // back to probe height
@@ -126,7 +134,7 @@ export function middleStack(params = {}) {
         A('#20', crossY, 'Y cross-over: probe-move from wall 1 to wall 2 (default [#1+#2] = max probe + retract)');
     }
     if (featureType === 'boss' && transAxis === 'auto' && twoAxis) {
-        A('#21', diagTravel, 'Diag travel: X→Y trans-axis auto-traverse distance (default [#19+#20]/2)');
+        A('#21', diagTravel, 'Diag travel: X→Y trans-axis auto-traverse distance (default 50; tune so the 2nd-axis probe reaches ②)');
     }
     if (wcs === 'active') { A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'); A('#72', '[#71-1]', 'Zero-based index'); A('#70', '[805+[#72*5]]', 'Base WCS address'); }
     else A('#70', WCS_BASE[wcs]);

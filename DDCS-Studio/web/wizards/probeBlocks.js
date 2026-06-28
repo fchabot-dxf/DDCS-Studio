@@ -41,6 +41,16 @@ export function srcVal(src, literal) { return src ? src.ctrl : literal; }
 export function srcNote(src, note) { return src ? `${note} - controller ${src.pr}` : note; }
 
 /**
+ * Diagonal-traverse leg direction, shared by the CORNER and the MIDDLE (boss-both) wizards. After probing a wall, the
+ * connecting move to the next wall is a 2-axis diagonal; each axis leg travels EITHER in its probe direction or the
+ * opposite. `travelOwn` = travel IN the probe direction; `travelOpp` = the OTHER way. `plus` is the probe direction
+ * (true = +), `posExpr`/`negExpr` are the +/- travel distance expressions (e.g. '#15'/'#16' for the corner's travelDist,
+ * '#21'/'[0-#21]' for the middle's Diag-travel). One source of truth for "which sign does this leg get".
+ */
+export const travelOwn = (plus, posExpr, negExpr) => (plus ? posExpr : negExpr);
+export const travelOpp = (plus, posExpr, negExpr) => (plus ? negExpr : posExpr);
+
+/**
  * Two-pass probe block: [safety setup] → fast probe → check → retract →
  * slow probe → check → [save result] → [retract].
  *

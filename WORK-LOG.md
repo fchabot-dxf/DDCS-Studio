@@ -1392,3 +1392,26 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   outsets — that's the IN-AXIS cross-over (`traverseOver`, the `#19=[#1+#2]` traverse WITHIN one pass, fires from ①), not the
   per-pass reposition. It's PRE-EXISTING and dist-dependent (with dist=130 it clears; with dist=100 the cross-over lands inside
   the boss). Part 1 (per-pass) doesn't touch it; the trans-axis diagonal is Part 2a. Noting it as a possible separate follow-up.
+
+## 2026-06-28 — turn 65 PART 2a: shared diagonal helper (corner↔middle) + the trans-axis diagonal lands near ②
+
+- **EXTRACTED the shared helper** (DRY): `travelOwn`/`travelOpp` now live in [probeBlocks.js](DDCS-Studio/web/wizards/probeBlocks.js)
+  — `travelOwn(plus, posExpr, negExpr)` = travel IN the probe direction, `travelOpp` = the OTHER way; the +/- expressions
+  are the wizard's travel vars (`#15`/`#16` corner, `#21`/`[0-#21]` middle). ONE source of truth for "which sign each leg gets".
+  - [cornerWizard.js](DDCS-Studio/web/wizards/cornerWizard.js): imports it; the local `travelOwn(d)`/`travelOpp(d)` now delegate
+    (`travelOwnExpr(d==='+','#15','#16')`) → **byte-identical** output (4 corner specs green; the helper is the same map).
+  - [middleWizard.js](DDCS-Studio/web/wizards/middleWizard.js) `transTraverse`: `pmove = travelOwn(dir1Plus,'#21','[0-#21]')`,
+    `smove = travelOpp(dir2Plus,'#21','[0-#21]')` — the SAME directional pattern as the corner (primary = own, secondary = opp).
+- **⚠ VERIFY-DON'T-REASON correction (own it):** the advisor's gate said the diagonal went the WRONG DIRECTION ("X leg away
+  from centre"). **I VERIFIED first — the direction was ALREADY correct for all 4 dir1/dir2 combos.** Traced endpoints vs ②local:
+  pos/neg `(79,62)` vs ②`(65,55)`; pos/pos `(79,-62)` vs `(65,-55)`; neg/neg `(-79,62)` vs `(-65,55)`; neg/pos `(-79,-62)` vs
+  `(-65,-55)` — every one HEADS TOWARD ②. **The real bug was purely MAGNITUDE:** `#21` defaulted to `[#19+#20]/2` (≈ max-probe
+  `#1`), so when max-probe >> the feature it overshot FAR off-stock (dist=100 → endpoint `(119,102)`, **67 mm** past ②).
+- **THE FIX = a sane fixed default, decoupled from max-probe:** `#21` default `[#19+#20]/2` → **`50`** (like the corner's
+  travelDist), in [middleWizard.js:47](DDCS-Studio/web/wizards/middleWizard.js#L47) + the field [index.html](DDCS-Studio/web/index.html)
+  `m_diag_travel value="50"`. **VERIFIED:** the endpoint now lands **5 mm** from ② at BOTH dist=60 and dist=100 (was 67 mm off
+  at 100), and is **max-probe-INDEPENDENT** (both → `(67,50)`). The human tunes #21 for their feature; the direction is correct.
+- New permanent test in `middle-trans-traverse.spec.js` (endpoint < 12 mm from ② at dist 60 + 100; #21 default = 50;
+  max-probe-independent). Full suite: 396 passed + 2 parallel-load flakes (custom-op-chip, project-drawer-smoke — both pass
+  isolated, unrelated to the probe/engine changes). Corner byte-identical, Part-1 collisions intact.
+- **HUMAN-eyes verify:** AUTO + MANUAL boss-both both COLLIDE with the walls (Part 1) + the diagonal now heads to ② (Part 2a).
