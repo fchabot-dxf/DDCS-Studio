@@ -70,10 +70,16 @@ export function createToolpath2d(canvas, opts = {}) {
         const t = machine.wcs.table[gi], wo = machine.workOrigin || {};
         return t ? { x: (Number(t.x) || 0) - (wo.x || 0), y: (Number(t.y) || 0) - (wo.y || 0) } : { x: 0, y: 0 };
     };
-    // PATH transform: anchored → emanate from the operator start (pass 0); else → the stock WCS pin (#13).
-    const pathOff = () => (anchorToStart && starts[0]) ? { x: starts[0].x, y: starts[0].y } : stockPin();
-    const ptx = (x) => tx(x + pathOff().x);
-    const pty = (y) => ty(y + pathOff().y);
+    // PATH transform: anchored → emanate from a pass's start marker (INC4: each REPOSITION pass rides its OWN start ②,
+    // not always pass-0/①, so a boss-both 2nd-axis probe sits at ②); else → the stock WCS pin (#13). Single-pass /
+    // no pass → pass 0, so existing single-pass behaviour is unchanged.
+    const passOff = (pass) => {
+        const i = (pass != null && pass >= 0 && pass < starts.length) ? pass : 0;
+        return (anchorToStart && starts[i]) ? { x: starts[i].x, y: starts[i].y } : stockPin();
+    };
+    const pathOff = () => passOff(0);   // pass-0 default (where no per-segment pass applies)
+    const ptx = (x, pass) => tx(x + passOff(pass).x);
+    const pty = (y, pass) => ty(y + passOff(pass).y);
     // STOCK-PIN transform: the stock + the draggable start HANDLE ride the WCS pin. When anchored, machine=null →
     // pin=0, so the handle sits AT the start (= where the anchored path emanates); when absolute, both ride the pin (#13).
     const sptx = (x) => tx(x + stockPin().x);
@@ -97,7 +103,7 @@ export function createToolpath2d(canvas, opts = {}) {
         let bb = null;
         const ext = (r) => { if (!r) return; bb = bb ? { minX: Math.min(bb.minX, r.minX), minY: Math.min(bb.minY, r.minY), maxX: Math.max(bb.maxX, r.maxX), maxY: Math.max(bb.maxY, r.maxY) } : { minX: r.minX, minY: r.minY, maxX: r.maxX, maxY: r.maxY }; };
         ext(envelopeRect()); ext(stockRect());
-        if (segs.length) { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; segs.forEach((s) => { a = Math.min(a, s.x1, s.x2); c = Math.max(c, s.x1, s.x2); b = Math.min(b, s.y1, s.y2); d = Math.max(d, s.y1, s.y2); }); const p = pathOff(); ext({ minX: a + p.x, minY: b + p.y, maxX: c + p.x, maxY: d + p.y }); }
+        if (segs.length) { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; segs.forEach((s) => { const o = passOff(s.pass); a = Math.min(a, s.x1 + o.x, s.x2 + o.x); c = Math.max(c, s.x1 + o.x, s.x2 + o.x); b = Math.min(b, s.y1 + o.y, s.y2 + o.y); d = Math.max(d, s.y1 + o.y, s.y2 + o.y); }); ext({ minX: a, minY: b, maxX: c, maxY: d }); }
         if (!bb) bb = { minX: 0, minY: 0, maxX: 100, maxY: 100 };
         return { minX: Math.min(0, bb.minX), minY: Math.min(0, bb.minY), maxX: Math.max(0, bb.maxX), maxY: Math.max(0, bb.maxY) };   // always include the origin
     }
@@ -109,14 +115,13 @@ export function createToolpath2d(canvas, opts = {}) {
     // stock edges or a path segment (perpendicular projection). Returns the snapped world point, or null (→ free).
     function snapPoint(px, py) {
         const TH2 = 11 * 11;
-        const sr = stockRect();
-        const p = pathOff();   // path nodes ride the same frame as the drawn toolpath (anchored→start, else→pin; stock corners use stockRect)
+        const sr = stockRect();   // path nodes ride the same per-pass frame as the drawn toolpath (passOff(s.pass)); stock corners use stockRect
         // tier 1: discrete points
         let bestPt = null, bestPtD = TH2;
         const pt = (wx, wy) => { const dx = tx(wx) - px, dy = ty(wy) - py, d = dx * dx + dy * dy; if (d < bestPtD) { bestPtD = d; bestPt = { x: wx, y: wy }; } };
         pt(0, 0);
         if (sr) { pt(sr.minX, sr.minY); pt(sr.maxX, sr.minY); pt(sr.minX, sr.maxY); pt(sr.maxX, sr.maxY); pt((sr.minX + sr.maxX) / 2, (sr.minY + sr.maxY) / 2); }
-        for (let i = 0; i < segs.length; i++) { const s = segs[i]; pt(s.x1 + p.x, s.y1 + p.y); pt(s.x2 + p.x, s.y2 + p.y); }
+        for (let i = 0; i < segs.length; i++) { const s = segs[i], o = passOff(s.pass); pt(s.x1 + o.x, s.y1 + o.y); pt(s.x2 + o.x, s.y2 + o.y); }
         if (bestPt) return bestPt;
         // tier 2: nearest point on an edge (clamped perpendicular projection, in screen space)
         let bestE = null, bestED = TH2;
@@ -127,7 +132,7 @@ export function createToolpath2d(canvas, opts = {}) {
             if (d < bestED) { bestED = d; bestE = { x: ax + t * (bx - ax), y: ay + t * (by - ay) }; }
         };
         if (sr) { edge(sr.minX, sr.minY, sr.maxX, sr.minY); edge(sr.maxX, sr.minY, sr.maxX, sr.maxY); edge(sr.maxX, sr.maxY, sr.minX, sr.maxY); edge(sr.minX, sr.maxY, sr.minX, sr.minY); }
-        for (let i = 0; i < segs.length; i++) { const s = segs[i]; edge(s.x1 + p.x, s.y1 + p.y, s.x2 + p.x, s.y2 + p.y); }
+        for (let i = 0; i < segs.length; i++) { const s = segs[i], o = passOff(s.pass); edge(s.x1 + o.x, s.y1 + o.y, s.x2 + o.x, s.y2 + o.y); }
         return bestE;
     }
 
@@ -210,7 +215,7 @@ export function createToolpath2d(canvas, opts = {}) {
             ctx.strokeStyle = segColor(s, zMin, zRange, maxPF);
             ctx.lineWidth = t === 'rapid' ? width * 0.6 : width;
             ctx.setLineDash(t === 'probe' ? [2, 3] : (t === 'rapid' ? [5, 4] : []));   // probe dotted, rapid dashed (match 3D)
-            ctx.beginPath(); ctx.moveTo(ptx(s.x1), pty(s.y1)); ctx.lineTo(ptx(s.x2), pty(s.y2)); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ptx(s.x1, s.pass), pty(s.y1, s.pass)); ctx.lineTo(ptx(s.x2, s.pass), pty(s.y2, s.pass)); ctx.stroke();   // each pass rides its own start (INC4)
         }
         ctx.globalAlpha = 1; ctx.setLineDash([]);
     }
@@ -226,8 +231,9 @@ export function createToolpath2d(canvas, opts = {}) {
         // Head marker: ride the LIVE sim position (engine onPositionChange) when we have it, so the probe/tool travels
         // the path smoothly in sync with the 3D; else fall back to the current segment node. Both via ptx/pty (#13 pin).
         const head = segs[n - 1] || segs[0];
-        const hx = toolPos ? ptx(toolPos.x) : ptx(n > 0 ? head.x2 : head.x1);
-        const hy = toolPos ? pty(toolPos.y) : pty(n > 0 ? head.y2 : head.y1);
+        const hp = toolPos ? toolPos.pass : (head && head.pass);   // INC4: the live tool rides its CURRENT pass's start ②
+        const hx = toolPos ? ptx(toolPos.x, hp) : ptx(n > 0 ? head.x2 : head.x1, hp);
+        const hy = toolPos ? pty(toolPos.y, hp) : pty(n > 0 ? head.y2 : head.y1, hp);
         ctx.fillStyle = '#ff2a44'; ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI * 2); ctx.fill();   // RED = the moving probe tip (the ruby that touches), matching the 3D
         canvas.__t2head = { sx: hx, sy: hy, live: !!toolPos };   // debug + tests: the drawn head (screen px)
     }
@@ -277,7 +283,7 @@ export function createToolpath2d(canvas, opts = {}) {
     function setStarts(arr) { starts = Array.isArray(arr) ? arr.filter(Boolean).map((p) => ({ x: +p.x || 0, y: +p.y || 0, z: +p.z || 0 })) : []; if (view) paint(); }   // per-pass operator starts (①②…)
     function setStart(p) { setStarts(p ? [p] : []); }   // back-compat: a single operator start = pass 0
     function setAnchor(v) { anchorToStart = !!v; if (view) paint(); }   // mirror the 3D's _anchorToStart: anchored → path emanates from the start, not the stock pin
-    function setToolPosition(p) { toolPos = p ? { x: +p.x || 0, y: +p.y || 0 } : null; if (view && anim.playing) paint(); }   // live sim head (in sync with the 3D)
+    function setToolPosition(p) { toolPos = p ? { x: +p.x || 0, y: +p.y || 0, pass: p.pass } : null; if (view && anim.playing) paint(); }   // live sim head (in sync with the 3D); pass → per-pass anchor (INC4)
     function setGcode(text) { setSegments(traceToolpath(text).segments); }
 
     // ---- play / progress ----

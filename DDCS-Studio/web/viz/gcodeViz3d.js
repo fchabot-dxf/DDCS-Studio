@@ -503,9 +503,11 @@ export class GcodeViz3D {
         if (!pos || (!Number.isFinite(pos.x) && !Number.isFinite(pos.y) && !Number.isFinite(pos.z))) return;
         this._ensureAnimTool();
         this._animTool.visible = true;
-        // The toolpath is drawn offset by the spindle-start marker (starts[0]) ONLY when anchored (probe/incremental);
-        // for absolute/mill the route sits at its own coords, so no offset (else the dot floats off the path).
-        const o = this._anchorToStart ? (this.starts[0] || { x: 0, y: 0, z: 0 }) : { x: 0, y: 0, z: 0 };
+        // The live tool is offset by the start marker of its CURRENT pass (INC4: a REPOSITION moves to the next start ②,
+        // not back to starts[0]=① — else a boss-manual probes the Y walls from ① and looks like a pocket). Single-pass /
+        // no pass → starts[0]. ONLY when anchored (probe/incremental); absolute/mill sits at its own coords (no offset).
+        const pass = (pos.pass != null && pos.pass >= 0 && pos.pass < this.starts.length) ? pos.pass : 0;
+        const o = this._anchorToStart ? (this.starts[pass] || { x: 0, y: 0, z: 0 }) : { x: 0, y: 0, z: 0 };
         this._animTool.position.set((pos.x || 0) + o.x, (pos.y || 0) + o.y, (pos.z || 0) + o.z);
         // Engine-driven trail: bold the executed route up to the tool head (option B — what you see is the path
         // the engine actually ran). Enable trail mode lazily; setAnimate(false)/ddcsStopPreview restores it.

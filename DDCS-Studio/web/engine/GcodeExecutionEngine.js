@@ -472,6 +472,7 @@ export class GcodeExecutionEngine {
             } else {
                 p = { x: mv.from.x + (mv.to.x - mv.from.x) * t, y: mv.from.y + (mv.to.y - mv.from.y) * t, z: mv.from.z + (mv.to.z - mv.from.z) * t };
             }
+            p.pass = this._pass;   // INC4: report the current REPOSITION pass so the live tool anchors to starts[_pass] (not always ①)
             this.onPositionChange(p);
         }
         this._nextDelayMs = 16;   // ~60 fps while travelling
@@ -484,7 +485,7 @@ export class GcodeExecutionEngine {
         this._move = null;
         this.pos = { ...mv.to };
         if (typeof this.onPositionChange === 'function') {
-            this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
+            this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z, pass: this._pass });   // INC4: per-pass anchor
         }
         if (mv.touchName) this._touchPulse(mv.touchName);
     }
