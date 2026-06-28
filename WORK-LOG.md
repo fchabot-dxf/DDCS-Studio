@@ -555,3 +555,34 @@ callbacks, wired by `viz/createPreviewPanel.js:147-159`:
   (which can read the probe-WCS from `#1925–1927` that the engine already sets).
 
 state: report only, no feature code · branch main · suite untouched (345/347 from turn 9). Passing back with the map.
+
+## 2026-06-28 — turn 13: SLICE 2 — WCS VISIBLE (the flash) + stock-WCS tooltip `aaeecc5`
+
+- task (advisor turn 13): in onLineChange classify the raw line — WCS select(G54-59)/set(G10) → flash the WCS marker;
+  progstart/M3 → flash the START marker. Flash = a temporal CSS glow on the code line + a 3D marker pulse. Zero engine
+  change. EVENT only, no glide. Scope = the flash only. GATE if raw-text classification is ambiguous.
+- GATE DECISION = BUILD (classification unambiguous). The wcs op emits `G54   ( work offset )` (G54-G59), progstart's
+  header emits M3 (spindle on). Distinct tokens: WCS = /\bG5[4-9]\b/ | /\bG10\b/, start = /\bM0*[34]\b/ (M3/M4, NOT
+  M30). Comments ( … ) stripped first so a code mentioned in a comment can't false-fire. No engine parsing needed.
+- did (one commit, 5 src + 2 tests):
+  - `createPreviewPanel.classifyCall(raw)` (exported, unit-tested) + the onLineChange hook: on a call kind, `viz.flashMarker(kind)`
+    (3D) + `opts.onCallFlash(lineIndex, kind)` (code line).
+  - `gcodeViz3d.flashMarker(kind)` — a soft GLOW pulse: a blurred additive radial-gradient SPRITE (user asked for a
+    glow, "a bit blurred") expanded + faded over 0.7s, anchored at the WCS origin gizmo ('wcs') or the first spindle
+    marker ('start'). Self-contained (added → animated → removed) so it never fights _scaleMarkers.
+  - `editorManager.flashLine(i, kind)` + `ddcs-flash-wcs`/`ddcs-flash-start` keyframes (amber / warm-red), auto-stripped
+    after 0.75s. Wired in gcodePreviewTab via `onCallFlash`.
+- USER-REQUESTED tweak (human, while building — captured): the persistent floating "WCS" text label on the yellow
+  origin square is REMOVED; the square IS the stock-WCS (settings.stock's saved datum/pin) and is now identified by a
+  hover "stock" TOOLTIP (_stockTip, screen-projected on pointermove). _scaleMarkers already guarded a null label;
+  origin-gizmo.spec.js updated (asserts no label + the tooltip).
+- VERIFY-FIRST (wcs-flash.spec.js, real Simulate): classifier unit (G54/G10→wcs, M3/M4→start, G53/G0/M30/comment→null);
+  then STEP the sim → the G54 line flashes amber (flash-wcs) + the M3 line warm-red (flash-start) → fades (class gone).
+  Full suite 346/348.
+- ⇒ HUMAN SLICE-3 DESIGN INPUT (capture for the advisor — NOT built, slice 2 is flash-only): (1) the stock-WCS point is
+  ALWAYS on the stock model (declared datum) — but the PROBE-WCS can land OFF the stock (a miss / wrong setup), which is
+  exactly the correctness signal. (2) For the probe, an ANIMATION per probe move is better than a flash: sequence =
+  axis-LINE flash on the first axis probed → then X → then the point. So slice 3's probe = a per-axis touch animation,
+  not a single flash. Lead with the Z touch-off (per the existing design lock).
+- state: tests 346/348 green (2 skipped) · branch main · committed `aaeecc5` (LOCAL, unpushed). One commit as asked.
+  Passing back.
