@@ -491,3 +491,67 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
 - state: tests 345/347 green (2 skipped) · branch main · committed `f1e323a` (LOCAL, unpushed). One gesture, one commit
   as asked. Passing back. NOTE for advisor: axis fixed Y; if you want author-selectable X/Y, that's the next gesture
   (role-variants stay role-inferable; only a richer per-gesture config would need a choice-UI = the original gate).
+
+## 2026-06-28 — turn 11: VERIFY-FIRST map — WCS/probe sim (report only, NO feature code) `<docs>`
+
+Deliverable = a behavior map of the sim TODAY + the smallest hooks for slice 2. Investigated via 3 read agents +
+verified the load-bearing hook directly. Files cited are under DDCS-Studio/web.
+
+### ★ LOAD-BEARING ANSWER — YES, the sim exposes a per-instruction execution event the 3D can hook.
+`engine/GcodeExecutionEngine.js` runs line-by-line (`_tick`→`_executeStep`, ip = instruction pointer). It fires
+callbacks, wired by `viz/createPreviewPanel.js:147-159`:
+- **`onLineChange({ lineIndex, ip, raw })`** — `_setCurrentLine` (`GcodeExecutionEngine.js:420-424`), fires once per
+  executing source line, carrying the **line index + the RAW line text**. THIS is the call-event/timeline hook.
+- **`onPositionChange({x,y,z})`** — during move interpolation + at completion (`:466,:486`) → `viz.setToolPosition` (the
+  live tool). Plus `onStatus`/`onWait`/`onFinish`.
+- A SEPARATE smooth-animation timeline `_animSegs[]` lives in `viz/gcodeViz3d.js:618-678` (precomputed seg durations);
+  it's viz-only, decoupled from the engine but visually synced via `onPositionChange`. The engine's per-line events are
+  the authoritative execution timeline; `_animSegs` is the cosmetic interpolation.
+- chain:  `engine._setCurrentLine → onLineChange(lineIndex,raw) → createPreviewPanel.onLine(i) → editorManager.setActiveLine(i) → .g-line[data-line-index=i].active-line`  (and `onPositionChange → viz.setToolPosition`).
+
+### What the sim does TODAY at each instruction
+- **WCS SELECT (G54–G59): NOT parsed.** The engine holds ONE fixed `_wcsOffset {x,y,z}` (part-zero in machine coords,
+  `:45`), set at construction, used only by G53 moves (`:839`). No WCS table; G54–G59 are ignored. ⇒ a flash on a WCS
+  SELECT can be driven purely from the `raw` text in `onLineChange` (no engine change); a position-GLIDE to a known
+  offset WOULD need the engine to start tracking a WCS table (later refinement, matches the design lock: glide only
+  where known).
+- **WCS SET (G10 L2/L20): NOT parsed.** Same — flash from `raw`; no offset table updated.
+- **G31 PROBE: fully modeled.** `:858-933` — tests the probe ray against the modeled stock via
+  `engine/probeGeometry.js stockProbeStop(A,B,stock,rotaryAxis)` (box/pocket/cylinder), CLAMPS the move to the contact
+  point, and records: status `#1920–1922` (1 armed / 2 detected per axis) + **contact machine coords `#1925–1927`**.
+  ⇒ the **probe WCS (derived) is ALREADY computed** at the G31 — slice 3's "probe touch" data exists; the work is
+  rendering + comparing, not detecting.
+- **progstart / M3-M5:** minimal — M3/M4 set `OUT_SPINDLE` true (I/O panel), M5 false (`:739-742`). No rpm. A progstart
+  flash = classify `raw` (M3/program-start) in `onLineChange`.
+
+### Stock geometry + position (for probe-touch + stock-WCS)
+- Model: `settings.stock = { x, y, z, shape:'boss'|'pocket'|'cylinder', datum:'nnp' (3-char min/centre/max per axis),
+  pin:'origin'|'g54'…, show }` (`ui/settingsPanel.js:73`; persisted localStorage; broadcast `ddcs:settings-changed`;
+  `ui/stockEditor.js` edits it). **`datum` + `pin` ARE the declared "stock WCS"** (intent).
+- 3D: `viz/gcodeViz3d.js setStock()` (`:913-1016`) builds Box/Extrude/Cylinder, rides `_partGroup`/partFrame and is
+  offset to the WCS by `_partShift()` (`:1118-1134`).
+- Collision: `probeGeometry.stockProbeStop` is SHARED by the engine (G31) + the viz (probe path render) → the stock is
+  collision-aware (a probe stops at the real modeled face), not just visual. ⇒ both KNOWNS for the two-WCS compare are
+  available: **stock-WCS** = settings.stock datum/pin; **probe-WCS** = the G31 contact (`#1925–1927`).
+
+### Code↔sim hover-highlight (for the guilty-line trace + the flash)
+- Active-line during play: `#editor-highlight` overlay has `.g-line[data-line-index="${i}"]`; `editorManager.setActiveLine(i)`
+  (`ui/editorManager.js:227`) adds `.active-line`. Given ANY line index → glow it via that selector (direct, existing).
+- `blocks/opGlow.js`: `editedLinesForOp`→line indices, `editedRangesForOp`→`{line,range}` word spans (sentinel/emit-diff,
+  declared-not-inferred). Reusable to glow a specific line/token. NO temporal fade today → a `.flash-event` CSS keyframe
+  is the one new bit for the momentary flash.
+- code→3D exists (`createPreviewPanel.seekLine(i)` → `setToolPosition`); 3D→code does NOT (no reverse hover callback yet).
+
+### ▶ Smallest hooks for slice 2 (WCS VISIBLE — start + WCS markers flash on their call)
+1. **Classify the call in the existing `onLineChange` consumer** (createPreviewPanel's `onLine`, or a thin wrapper):
+   `raw` matches `G54–G59 | G10 | M3/progstart` → emit a "call event {lineIndex, kind}". NO engine change.
+2. **Temporal flash on the line**: add a `.g-line.flash-event` CSS keyframe; apply it to `[data-line-index=lineIndex]`
+   in the overlay (reuse the active-line path). This is the universal/atom-level flash (design lock: flash = the call).
+3. **3D WCS/start marker** in `partFrame` (where stock already lives) that pulses on the same event — a marker mesh +
+   an opacity/scale pulse keyed off the call event. (Position-glide for a KNOWN offset is the optional refinement and is
+   the only thing that needs the engine to track a WCS table.)
+- Net: slice 2 is achievable with ZERO engine changes — it rides `onLineChange.raw` + a CSS flash + a 3D marker. The
+  engine work (a WCS-offset table) is only needed for the position-glide refinement and for slice 3's full two-WCS render
+  (which can read the probe-WCS from `#1925–1927` that the engine already sets).
+
+state: report only, no feature code · branch main · suite untouched (345/347 from turn 9). Passing back with the map.
