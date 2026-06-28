@@ -21,7 +21,7 @@ test('AUTO: a pure stack auto-shows the chip (no gesture) → click wraps + edit
     { id: 's1', type: 'spindle', params: { rpm: 12000, on: true } },
     { id: 'm2', type: 'move', params: { mode: 'cut', x: 50, y: 60, z: -2, feed: 800 } },
   ]));
-  await page.evaluate(() => window.showApp('editor'));
+  await page.evaluate(() => window.showApp('studio'));
   await page.waitForTimeout(300);
 
   // BEFORE: no op; the WHOLE program resolves as one auto-group run (all 3 atoms).
@@ -84,7 +84,7 @@ test('AUTO: a pure stack auto-shows the chip (no gesture) → click wraps + edit
   // SURVIVES A REPROJECTION.
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForTimeout(400);
-  await page.evaluate(() => window.showApp('editor'));
+  await page.evaluate(() => window.showApp('studio'));
   await page.waitForTimeout(400);
   const reproj = await page.evaluate(() => {
     const prog = window.ddcsGetBlockProgram() || [];
@@ -110,7 +110,7 @@ test('AUTO: a MIXED program does NOT auto-show — the right-click "Group" gestu
       makeOp('drill', params, _builderAtoms('drill', params)),
     ]);
   });
-  await page.evaluate(() => window.showApp('editor'));
+  await page.evaluate(() => window.showApp('studio'));
   await page.waitForTimeout(300);
 
   // autoGroupRunAtLine returns null for EVERY line (a real op exists), but looseRunAtLine still resolves the run (the gesture works).

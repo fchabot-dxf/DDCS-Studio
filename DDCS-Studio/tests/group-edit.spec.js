@@ -54,7 +54,7 @@ test('increment 2: group chip → editable form → edit a knob → writes back 
     { id: 's1', type: 'spindle', params: { rpm: 12000, on: true } },
     { id: 'm2', type: 'move', params: { mode: 'cut', x: 50, y: 60, z: -2, feed: 800 } },
   ]));
-  await page.evaluate(() => window.showApp('editor'));
+  await page.evaluate(() => window.showApp('studio'));
   await page.waitForTimeout(300);
 
   // GESTURE: right-click a loose-run line → "Group" → the run becomes one group op.
@@ -117,7 +117,7 @@ test('increment 2: group chip → editable form → edit a knob → writes back 
   // knob exposure all persist, so re-opening the chip re-derives the form showing -5 (the step incomplete tests skip).
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForTimeout(400);
-  await page.evaluate(() => window.showApp('editor'));
+  await page.evaluate(() => window.showApp('studio'));
   await page.waitForTimeout(400);
 
   const reproj = await page.evaluate(() => {

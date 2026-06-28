@@ -36,7 +36,7 @@ test('increment 3: right-click a loose atom → "Group" wraps its contiguous run
     { id: 's1', type: 'spindle', params: { rpm: 12000, on: true } },
     { id: 'm2', type: 'move', params: { x: 50, y: 60, z: -2, mode: 'feed', f: 800 } },
   ]));
-  await page.evaluate(() => window.showApp('editor'));
+  await page.evaluate(() => window.showApp('studio'));
   await page.waitForTimeout(300);
 
   // BEFORE: loose, no op; a middle-ish line resolves to a loose RUN (not an op).
@@ -106,7 +106,7 @@ test('increment 3: right-click a loose atom → "Group" wraps its contiguous run
   // op is still ONE op and the chip still appears (the step every green-but-incomplete test skipped).
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForTimeout(400);
-  await page.evaluate(() => window.showApp('editor'));
+  await page.evaluate(() => window.showApp('studio'));
   await page.waitForTimeout(400);
 
   const reproj = await page.evaluate(async () => {
@@ -148,7 +148,7 @@ test('increment 3: a MIXED program groups ONLY the clicked loose run — the rea
       { id: 'b2', type: 'dwell', params: { sec: 1 } },
     ]);
   });
-  await page.evaluate(() => window.showApp('editor'));
+  await page.evaluate(() => window.showApp('studio'));
   await page.waitForTimeout(300);
 
   // the two loose runs resolve to DISTINCT runs; the drill lines resolve to NO loose run (it's a real op).

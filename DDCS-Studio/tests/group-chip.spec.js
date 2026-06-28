@@ -22,7 +22,7 @@ test('increment 1: groupLooseAtoms wraps a hand-built stack → the editor chip 
     { type: 'spindle', params: { rpm: 12000, on: true } },
     { type: 'move', params: { x: 50, y: 60, z: -2, mode: 'feed', f: 800 } },
   ]));
-  await page.evaluate(() => window.showApp('editor'));
+  await page.evaluate(() => window.showApp('studio'));
   await page.waitForTimeout(300);
 
   // BEFORE: no op, no chip (the symptom — re-asserted so the wrap is the cause).
