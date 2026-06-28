@@ -1656,16 +1656,9 @@ export class GcodeViz3D {
         const probed = ['x', 'y', 'z'].filter((a) => ax[a]);
         const mean = (a) => (cs.length ? cs.reduce((s, c) => s + (c[a] || 0), 0) / cs.length : 0);
         const d = { x: ax.x ? v.x : mean('x'), y: ax.y ? v.y : mean('y'), z: ax.z ? v.z : mean('z') };
-        if (line) line.visible = false;
+        if (line) line.visible = false;   // AXIS LINE REMOVED (user) — only the DATUM point + the discs remain; the line never shows
         pt.visible = false;
         if (probed.length >= 2) { pt.position.set(d.x, d.y, d.z); pt.visible = true; }
-        if (probed.length === 2 && line) {
-            const un = ['x', 'y', 'z'].find((a) => !ax[a]);
-            const dir = un === 'x' ? new THREE.Vector3(1, 0, 0) : un === 'y' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
-            line.position.set(d.x, d.y, d.z);
-            line.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-            line.visible = true;
-        }
         this.render();
     }
 

@@ -2,9 +2,9 @@ import { test, expect } from '@playwright/test';
 
 /**
  * Probe-WCS cue — TRANSIENT-DISC model (advisor turn 30). Each probe drops a transient feed-sized soft disc at its
- * contact (self-fades; covered by probe-anim-pipeline/visible). The PERSISTENT layer is built at the REAL datum: the
- * DATUM point (GOLD, where the probed planes cross — shown ≥2 axes) + the AXIS LINE (CYAN, the 2-plane intersection
- * along the un-probed axis — exactly 2 axes). Drives the REAL Simulate.
+ * contact (self-fades; covered by probe-anim-pipeline/visible). The PERSISTENT layer is the DATUM point (GOLD, where
+ * the probed planes cross — shown ≥2 axes). The axis line was REMOVED (user); _probeLine stays as a hidden object
+ * (never shown) + _lineColor remains the disc colour. Drives the REAL Simulate.
  */
 const BASE = process.env.STUDIO_URL || 'http://localhost:3211';
 const RUN = '#viz3d-panel-host .pp-run';
@@ -54,13 +54,12 @@ test('1-axis probe → no persistent datum/line yet (one plane, nothing crosses)
   expect(s.line.vis, 'no line from a single plane').toBe(false);
 });
 
-test('2-axis probe → the AXIS LINE (cyan) + the DATUM (gold) both show', async ({ page }) => {
+test('2-axis probe → the DATUM (gold) shows; the axis line is REMOVED (user)', async ({ page }) => {
   await setup(page, 'G54\nM3 S12000\nG31 Z-15 F3000\nG31 X-25 F3000\nM30');
   const s = await runShape(page);
-  expect(s.line.vis, 'two planes intersect → the axis line shows').toBe(true);
-  expect(s.line.color).toBe(0x00e5ff);
   expect(s.datum.vis, 'the datum shows where the planes cross').toBe(true);
   expect(s.datum.color).toBe(0xffce3a);
+  expect(s.line.vis, 'the axis line was removed — it never shows now').toBe(false);
 });
 
 test('3-axis probe → the DATUM point (no line — three planes cross at a point)', async ({ page }) => {

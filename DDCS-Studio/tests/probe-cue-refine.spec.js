@@ -33,7 +33,7 @@ test('REAL DATUM: the un-probed axis rides the contact, not the WCS', async ({ p
     return { datumVis: v._probeGizmo.visible, lineVis: v._probeLine.visible, z: v._probeGizmo.position.z, contactZ: v._probeContact && v._probeContact.z };
   });
   expect(d.datumVis, 'datum shows for the 2-axis corner').toBe(true);
-  expect(d.lineVis, 'the axis line shows (along the un-probed Z)').toBe(true);
+  expect(d.lineVis, 'the axis line was removed (user) — never shows').toBe(false);
   expect(Math.abs(d.contactZ), 'the probe happened off the WCS Z (at Z-3)').toBeGreaterThan(1);
   expect(d.z, 'datum Z = the contact Z, NOT the WCS 0').toBeCloseTo(d.contactZ, 2);
 });
@@ -47,7 +47,7 @@ test('a re-probe REFINES the axis (fast→slow), it does NOT reset the accumulat
     return { datum: v._probeGizmo.visible, line: v._probeLine.visible, axes: Object.keys(v._probeAxes).filter((a) => v._probeAxes[a]).sort() };
   });
   expect(s.axes, 'the slow re-probe refined Z, keeping both axes').toEqual(['x', 'z']);
-  expect(s.line, 'still a 2-axis line (not reset)').toBe(true);
+  expect(s.line, 'the axis line was removed (user) — never shows').toBe(false);
   expect(s.datum, 'datum still shown (not reset)').toBe(true);
 });
 

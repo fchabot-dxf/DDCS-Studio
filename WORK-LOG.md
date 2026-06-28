@@ -934,3 +934,16 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   Full suite 362 passed / 2 skipped / 1 known flaky (middle-animator). Human confirmed "ok great".
 - This + the probe-cue tuning above land in ONE commit (the cue tweaks + sim-speed). Still no boss cross-over (the
   dispatched task) — advisor to re-dispatch.
+
+## 2026-06-28 — turn 34 (part 1): REMOVE the probe-cue AXIS LINE (human, before boss cross-over)
+
+- Turn 34 = advisor RE-DISPATCH of BOSS CROSS-OVER, but the human first asked to drop the persistent cyan AXIS LINE
+  from the probe cue (keep the gold DATUM point + the discs). Human picked "remove the line now, then boss".
+- did (gcodeViz3d.js `_updateDatum`): removed the 2-axis line-show block; `_probeLine` stays as a hidden object (never
+  set visible) so re-enabling is trivial and `_scaleMarkers`'s `&& visible` guard skips it. `_lineColor` remains — it's
+  also the DISC colour, untouched.
+- tests: probe-wcs 2-axis test → asserts datum shows + line.vis=false (was line.vis=true); probe-cue-refine two
+  line.vis assertions flipped to false; headers updated. The datum/refine LOGIC each test guards is unchanged.
+- VERIFY: probe-wcs + probe-cue-refine 7/7; full suite 363 passed / 2 skipped (no flake this run). HUMAN's eyes pending
+  on a real probe Simulate.
+- NEXT (same wake): the dispatched BOSS CROSS-OVER.
