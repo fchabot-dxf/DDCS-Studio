@@ -1144,3 +1144,45 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   boundary into a red ruby mesh + an orange body mesh, or (ii) overlaying a small red ruby sphere at the tip (origin,
   radius=ballDia/2, depthTest:false) over the existing orange lathe — (ii) reuses the start-marker ruby pattern + avoids a
   geometry split but adds a mesh to `_animParts`/`setPartVisible`. Plus the unambiguous 3. One coherent commit on the advisor's go.
+
+## 2026-06-28 — turn 47: 5-commit BATCH (glyph/colour + 4 batch-safe backlog items), each its own commit
+
+Advisor resolved the gate (RUBY BALL ONLY red) + dispatched a batch (each its own commit; stop+pass if any forks).
+Full suite **374 passed / 2 skipped, 0 fail**. Five commits:
+
+- **GLYPH — `38843fc`** (RED = moving probe tip · START = cyan lozenge, 2D+3D). The 4 flips, then HEAVILY human-tuned live:
+  - 3D probe ruby → RED (ball only). **Perceptibility bug the human caught + I fixed:** an OPAQUE ruby renders in the
+    opaque pass BEFORE the transparent orange tool → the orange covered it (the human: "tip still orange", "probably a
+    grouping thing"). Fix = make the ruby TRANSPARENT (opacity 1) + renderOrder 30 → it sorts into the orange tool's
+    transparent pass and draws LAST (on top). ×1.04 radius so no orange rim peeks. ⇒ a structural test passed while the
+    pixels were wrong — [[verify-real-symptom-not-just-test]]; the human's eyes are the real verifier for a 3D look.
+  - 3D start glyph → the human iterated live: octahedron → "camera locked simple lozenge" → "same as 2d" → a SPRITE
+    (camera-locked billboard) drawing a hollow CYAN diamond, so it reads identically to the 2D ◇ from any angle.
+    Colour CHOSEN by the human via AskUserQuestion = **cyan** (#22d3ee); thickness bumped twice on request (3D 18px on a
+    128px canvas). select/dim via opacity (texture carries the colour).
+  - 2D head → RED (#ff2a44); 2D start handle → hollow CYAN diamond (was a red disc), grab-ring + 12px hit-test kept.
+  - `glyph-colors.spec.js` locks the intent + the draw-order fix (ruby red + transparent + renderOrder > tool; start =
+    a textured Sprite). Human-confirmed by eye ("ok good").
+
+- **#5 — `a6f452b`** (parser #var twin). `gcodeToStack` G28 axis-recovery `/[XYZA](?=[-+.\d])/` dropped a #var/[expr]
+  axis → `axes=[]` → `join||'Z'` silently collapsed to 'Z'. Added `#[` to the lookahead. Test uses REAL #var/[expr]
+  lines (`G28 X#5 Y#6` → 'XY', not the 'Z' default; `G28 X10 Y#6 Z[#1+1]` → 'XYZ').
+
+- **#4 — `49d0a07`** (program line → SIM active WCS, DISPLAY ONLY). `classifyCall` already flipped the DRO label, but the
+  OFFSET read settings.active so Mach was wrong after a switch. Added a sim-local `simActiveWcs` override (G54→1…G59→6)
+  that `activeWcsOffset`/`activeWcsName` + the engine `_wcsOffset` (G53) read; **never** writes `settings.machine.wcs.active`;
+  `play()` resets it to null each run so the program re-drives it. Test: mid-program G55 → label=G55 + Mach = Work + G55
+  offset + settings.active stays 1.
+
+- **#15 — `8b5d452`** (2D pocket cavity). The 2D drew a plain tinted rect for a pocket. Verify-first the 3D: it builds a
+  "square donut" (extruded block + inner hole inset by `max(8, 25% of the smaller side)`). Mirrored that intent —
+  `drawPocketCavity` insets the cavity by the SAME formula, draws it darker (recessed) with a bright inner wall. Boss
+  unchanged. Pixel-verified (cavity centre darker than the frame for a pocket; uniform for a boss). Human-eyes = final look.
+
+- **#18 — `7ce35eb`** (start-drag replays the sim). Added `replayFromStart()` (stopPlay+play, guarded on active+segs) and
+  wired it into BOTH start-drag paths — `onStartDrag` (2D handle) AND `viz.onStartChange` (3D marker), so one behaviour
+  spans both views. `play()` reads the moved start via `getStartPos()`→`_stockOffset` so the re-run emanates from there.
+  Test: autoLoop off + nothing running → a handle drag starts a run (engine.running) from the moved start. Human-eyes = look.
+
+NOTE: the glyph turned into a long live human-tuning loop (colour/shape/thickness/the perceptibility fix). The other 4
+were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending caveat; rendering is verified headlessly.)
