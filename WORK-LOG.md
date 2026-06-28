@@ -947,3 +947,23 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
 - VERIFY: probe-wcs + probe-cue-refine 7/7; full suite 363 passed / 2 skipped (no flake this run). HUMAN's eyes pending
   on a real probe Simulate.
 - NEXT (same wake): the dispatched BOSS CROSS-OVER.
+
+## 2026-06-28 — turn 34 (part 2): BOSS CROSS-OVER MOVE DISTANCE (per axis) — the dispatched task
+
+- task (advisor turn 34 re-dispatch): middleWizard boss "probe both" wall1→wall2 cross-over was hard-coded [#1+#2] in
+  traverseOver → only reached the far wall if MAX PROBE happened to span the feature (MAX PROBE abused as a width proxy).
+- did:
+  - middleWizard.js: two new STRING params crossX/crossY (default the expression `[#1+#2]` = old behaviour; a number
+    overrides for a feature wider than MAX PROBE). Emit `#19`=crossX / `#20`=crossY ONLY for boss-AUTO (so pocket/manual
+    macros are byte-unchanged). traverseOver(ax) now crosses by `#19` (X) / `#20` (Y) — keeps the Z lift/drop `#18`.
+    Kept as strings so the `[#1+#2]` expression default round-trips (number type would trip the validator + risk coercion).
+  - index.html: a gated `m_crossover_block` (grid-2) with X CROSS-OVER / Y CROSS-OVER, prefilled `[#1+#2]`.
+  - middleView.js: inputIds + read m_crossX/m_crossY; show/hide the block for boss+auto (same gate as TRAVERSE HEIGHT).
+  - opSchema.js: SCHEMA.middle += crossX/crossY Str(); FIELD_BIND.middle += m_crossX/m_crossY → the Blockly round-trip +
+    reverse-sync carry them (same path as clearOver — not a Blockly block-field; geometry params ride the marker/data).
+- VERIFY (middle-crossover.spec.js): wiring — default boss-auto emits `#19=[#1+#2]`/`#20=[#1+#2]` + crosses by #19/#20
+  (no hard-coded [#1+#2] move left); explicit 130/70 flow into the vars; manual/pocket emit no cross-over vars; marker
+  round-trip keeps crossX='130' AND crossY='[#1+#2]' intact. SIM — a 120-wide boss with MAX PROBE 40 + crossX 130 →
+  centre X = 60 (reached!), while the default [#1+#2]=42 falls short (>5mm off). (2-axis sim centre needs the operator's
+  between-axes jog the sim can't auto-model — so the sim test is single-axis, like middle-center-sim.) Full suite 365
+  passed / 2 skipped. HUMAN's eyes still the real verifier on a non-square boss probe-both Simulate.

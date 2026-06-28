@@ -13,7 +13,7 @@ export const middleView = {
     twoPane: true,
     inputIds: [
         'm_type', 'm_approach', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_circular', 'm_sync_a', 'm_wcs', 'm_slave',
-        'm_dist', 'm_retract', 'm_safe_z', 'm_clear',
+        'm_dist', 'm_retract', 'm_safe_z', 'm_clear', 'm_crossX', 'm_crossY',
         'm_feed_fast', 'm_feed_slow', 'm_port', 'm_level', 'm_q',
     ],
     // Controller-source chips (PROBE-CONFIG-SOURCE.md)
@@ -32,6 +32,8 @@ export const middleView = {
             featureType: el('m_type')?.value || 'pocket',
             approach: el('m_approach')?.value || 'auto',
             clearOver: el('m_clear')?.value || '15',
+            crossX: el('m_crossX')?.value,   // boss-auto per-axis cross-over (string: a number or the [#1+#2] expression default)
+            crossY: el('m_crossY')?.value,
             axis: el('m_axis')?.value || 'X',
             dir1: dir1val,
             dir2: dir2val,
@@ -85,6 +87,9 @@ export const middleView = {
         // Traverse-over clearance only applies to a BOSS probed in AUTO mode (it crosses over the part).
         const clearBlock = el('m_clear_block');
         if (clearBlock) clearBlock.classList.toggle('hidden', !(params.featureType === 'boss' && params.approach === 'auto'));
+        // Per-axis cross-over distances also apply only to a boss in AUTO (used by traverseOver).
+        const crossBlock = el('m_crossover_block');
+        if (crossBlock) crossBlock.classList.toggle('hidden', !(params.featureType === 'boss' && params.approach === 'auto'));
 
         const gcode = wizard.generate(params);
         el('wiz_middle_code').innerHTML = UIUtils.formatGCode(gcode);

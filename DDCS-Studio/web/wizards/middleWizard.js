@@ -33,6 +33,12 @@ export function middleStack(params = {}) {
     const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
     const dist = num(params.dist, 20), retract = num(params.retract, 2), safeZ = num(params.safeZ, 10);
     const clearOver = num(params.clearOver, 15);   // boss AUTO: how high to lift before crossing over the part
+    // Boss-AUTO probe-both: the wall1→wall2 cross-over, a RAW probe-move distance, SEPARATE per axis (non-square boss).
+    // Default = [#1+#2] (max probe + retract) = the old hard-coded behaviour, so saved ops are unchanged; a feature
+    // WIDER than MAX PROBE needs an explicit number (≈ feature width + 2×approach + retract) — MAX PROBE no longer has
+    // to span the feature. Kept as a string so the [#1+#2] default (an expression) round-trips intact.
+    const crossX = (params.crossX === '' || params.crossX == null) ? '[#1+#2]' : String(params.crossX);
+    const crossY = (params.crossY === '' || params.crossY == null) ? '[#1+#2]' : String(params.crossY);
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
 
     const S = [];
@@ -68,7 +74,7 @@ export function middleStack(params = {}) {
     // Boss, AUTO: clear over the feature to the far side, hands-free. Uses the max probe distance #1 as the
     // over-estimate of the feature width (the operator already sets it >= the feature for the probes to reach),
     // so traversing #1+retract past the first face lands beyond the second; then drop back to probe height.
-    const traverseOver = (ax, firstPlus) => { MV('Z', '#18'); MV(ax, firstPlus ? '[#1+#2]' : '[0-#1-#2]'); MV('Z', '[0-#18]'); };
+    const traverseOver = (ax, firstPlus) => { const cv = ax === 'X' ? '#19' : '#20'; MV('Z', '#18'); MV(ax, firstPlus ? cv : `[0-${cv}]`); MV('Z', '[0-#18]'); };
     const between = (ax, firstPlus) => {
         // The two opposite walls. POCKET probes both from the centre (no move - manual is N/A, never reposition).
         // BOSS needs the 2nd face from the far side: MANUAL pauses for the operator to jog over; AUTO traverses
@@ -90,6 +96,11 @@ export function middleStack(params = {}) {
     A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
     A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract'); A('#17', safeZ, 'Safe Z retract');
     A('#18', clearOver, 'Traverse-over clearance (boss auto: lift this high to clear the part before crossing)');
+    // Per-axis cross-over distances — only boss-AUTO uses traverseOver, so pocket/manual macros stay unchanged.
+    if (featureType === 'boss' && approach === 'auto') {
+        A('#19', crossX, 'X cross-over: probe-move from wall 1 to wall 2 (default [#1+#2] = max probe + retract)');
+        A('#20', crossY, 'Y cross-over: probe-move from wall 1 to wall 2 (default [#1+#2] = max probe + retract)');
+    }
     if (wcs === 'active') { A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'); A('#72', '[#71-1]', 'Zero-based index'); A('#70', '[805+[#72*5]]', 'Base WCS address'); }
     else A('#70', WCS_BASE[wcs]);
     A('#1505', '1', 'Press Enter to probe - ESC=cancel'); IF('#1505', '==', '0', 2); DM('inc');

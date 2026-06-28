@@ -418,6 +418,10 @@
                         <div><span class="label">RETRACT</span><input id="m_retract" value="2" title="Retract between fast and slow probe passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)."/></div>
                         <div><span class="label">SAFE Z</span><input id="m_safe_z" value="10" title="Z retract height between probing moves (mm). Stored as #17. Used as G0 Z#17."/></div>
                     </div>
+                    <div id="m_crossover_block" class="grid-2 hidden">
+                        <div><span class="label">X CROSS-OVER</span><input id="m_crossX" value="[#1+#2]" title="Boss probe-both (auto): raw probe-move distance from the X wall 1 across to wall 2. Default [#1+#2] = max probe + retract; for a feature WIDER than max probe set a number ≈ feature width + 2×approach + retract. Stored as #19."/></div>
+                        <div><span class="label">Y CROSS-OVER</span><input id="m_crossY" value="[#1+#2]" title="Boss probe-both (auto): raw probe-move distance from the Y wall 1 across to wall 2. Default [#1+#2] = max probe + retract; set a number for a non-square / wide boss. Stored as #20."/></div>
+                    </div>
                 </div>
 
                 <div>
