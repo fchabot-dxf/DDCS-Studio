@@ -817,3 +817,32 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
 - ⇒ HUMAN-CONFIRMED (turn 28): R1/R2 "works great" on the REAL Corner-probe — the disc emerges from the contact + the
   re-probe re-shows it. Human says "not done" (more probe-cue work remains, unspecified) but chose to pass on now, not
   continue this turn. R1/R2 (ccc0d9d) is COMPLETE + verified (2/2 + regression 14/14); the "more" is a NEXT task.
+
+## 2026-06-28 — turn 30: PROBE CUE = TRANSIENT-DISC model + sim-bug findings (escalated)
+
+- task (advisor turn 30 + heavy live human co-design): rebuild the probe cue as transient discs + a persistent line/datum.
+- did (gcodeViz3d.js + createPreviewPanel.js) — all HUMAN-confirmed live:
+  - TRANSIENT DISCS: each G31 drops a SOLID (no blur) low-opacity additive disc in the perp plane, IMMOBILE at the
+    contact, riding the PART FRAME (same frame as the line/datum — that was the X/Y offset: discs had been in world
+    space). Size ∝ feed: `_burstRadiusPx = base·clamp(√(feed/ref),.4,2.2)` → FASTER probe = BIGGER disc, slower/fine =
+    smaller (user reversed this mid-turn). Fades over `_probeDiscFadeMs` of SIM time (progress advances by dt·simSpeed →
+    tracks the speed button; createPreviewPanel calls viz.setSimSpeed on play + the speed toggle). Lingers (~9 s @1×) so
+    discs overlap → the crossing reads thicker.
+  - PERSISTENT DATUM (gold, renders OVER the line) + AXIS LINE (cyan, thinner) at the REAL datum: determined axes at
+    their probed value, un-probed axes at the MEAN of the contacts (sits among the discs). Datum ≥2 axes; line exactly 2.
+  - RE-PROBE = REFINE, NOT reset: the routine probes each axis twice (fast approach + slow fine) — so a re-probe of an
+    already-determined axis just UPDATES the value + drops another disc; removed the turn-28 R2 reset (it was wiping the
+    accumulated axes across the fast/slow passes). feed passed from the engine (engine.feedVal, the just-finished probe's
+    resolved feed — handles #var feeds).
+- VERIFY: probe-cue-refine (real-datum · refine-not-reset · feed→size) + probe-wcs (datum/line by axis count, distinct
+  colours) + probe-anim-pipeline (fires + renders) + probe-anim-visible (gl.readPixels cue-coverage, ~12% peak) +
+  origin-gizmo + dro + dro-position + wcs-flash = 17/17.
+- ⇒ SIM/PARSER BUGS the human uncovered (NOT the cue; ESCALATED to the advisor — likely affect MULTIPLE probe wizards):
+  (1) PROBE STOPS IN PLAYBACK: the engine sets the success status #1920/#1921/#1922 = 2 ONLY on a real stock contact
+      (GcodeExecutionEngine.js:903-920); a probe that MISSES leaves it at 1, so the DDCS pattern `IF #192x!=2 GOTO1`
+      branches to the error handler + the macro aborts. The static TRACE always auto-detects (:925-932) so the route
+      preview looks fine, but PLAYBACK doesn't → the corner macro dies at the Y check, Y-slow + the whole X probe never
+      run (hence "2 discs then 1"). Fix is a design call: auto-detect in playback (hands-free, like trace) vs. real
+      geometry (a miss = the correctness signal, the macro SHOULD error). (2) spindle "doesn't execute correctly".
+      (3) a separate parser report. The human is confident these hit other wizards too.
+- state: branch main · committed this turn (LOCAL, unpushed) · 17/17. Cue DONE + confirmed; sim bugs passed up.

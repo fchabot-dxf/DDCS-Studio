@@ -223,7 +223,7 @@ export function createPreviewPanel(container, opts = {}) {
                 if (raw) setStatus(`Executing line ${lineIndex + 1}: ${raw.trim()}`);
                 // SLICE 3: a previous G31 has now FINISHED (the engine clamped it to the contact; the tool sits there) →
                 // build that axis of the probe-WCS. Resolving on the NEXT line guarantees the tool is at the contact.
-                if (pendingProbe && viz && viz.probeAxisTouched) { viz.probeAxisTouched(pendingProbe); flashDro(); }   // probe re-references the DRO
+                if (pendingProbe && viz && viz.probeAxisTouched) { viz.probeAxisTouched(pendingProbe, engine.feedVal); flashDro(); }   // probe re-references the DRO (feedVal = the just-finished probe's feed → disc size)
                 pendingProbe = null;
                 // WCS VISIBLE: a WCS/start call fires a temporal FLASH — the 3D marker glows + the code line glows/fades.
                 const kind = raw ? classifyCall(raw) : null;
@@ -238,7 +238,7 @@ export function createPreviewPanel(container, opts = {}) {
             onStatus: ({ message }) => setStatus(message),
             onWait: (wait) => { if (!window.ioPanel) return; if (wait) window.ioPanel.show(); window.ioPanel.setWait(wait); },   // float the I/O panel during a probe/M-code wait
             onFinish: () => {
-                if (pendingProbe && viz && viz.probeAxisTouched) viz.probeAxisTouched(pendingProbe);   // SLICE 3: a trailing G31 (last line)
+                if (pendingProbe && viz && viz.probeAxisTouched) viz.probeAxisTouched(pendingProbe, engine.feedVal);   // SLICE 3: a trailing G31 (last line)
                 pendingProbe = null;
                 updateRunBtn();
                 if (typeof opts.onLine === 'function') opts.onLine(null);
@@ -431,6 +431,7 @@ export function createPreviewPanel(container, opts = {}) {
         eng._stockOffset = getStartPos() || { x: 0, y: 0, z: 0 };   // probes test from the operator start (see trace.js)
         eng._wcsOffset = wcsForViz() || { x: 0, y: 0, z: 0 };          // G53 machine moves draw in the part frame (see trace.js)
         if (mode === '3d') ensureViz();
+        if (viz && viz.setSimSpeed) viz.setSimSpeed(simSpeed());   // probe discs fade in SIM time (track the speed button)
         if (viz && viz.resetProbe) viz.resetProbe();    // SLICE 3: fresh probe-WCS each run (superimposed on the stock-WCS)
         updateDro(getStartPos() || { x: 0, y: 0, z: 0 });   // DRO: reset to the start position for the fresh run
         if (droWcsEl) droWcsEl.textContent = activeWcsName();   // refresh the label to the active WCS (catches a settings switch)
@@ -491,6 +492,7 @@ export function createPreviewPanel(container, opts = {}) {
         speedIx = (speedIx + 1) % SPEEDS.length;
         q('.pp-speed').textContent = SPEEDS[speedIx] + '×';
         if (engine) engine.simSpeed = simSpeed();
+        if (viz && viz.setSimSpeed) viz.setSimSpeed(simSpeed());   // live: re-speed the in-flight disc fades too
     });
     q('.pp-copy').addEventListener('click', () => { if (statusEl && statusEl.textContent && navigator.clipboard) navigator.clipboard.writeText(statusEl.textContent); });
     q('.pp-jog').addEventListener('click', () => {

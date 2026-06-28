@@ -26,28 +26,25 @@ test('probe-WCS animation fires + renders during a real probe Simulate (Z→X→
 
   await page.evaluate(() => {
     const v = window.__gpPanel.viz;
-    window.__diag = { probe: [], glowPulse: 0, growDisc: 0, extendLine: 0, render: 0 };
+    window.__diag = { probe: [], discBurst: 0, render: 0 };
     const wrap = (name, after) => { const o = v[name].bind(v); v[name] = (...a) => { const r = o(...a); after(); return r; }; };
     const op = v.probeAxisTouched.bind(v);
-    v.probeAxisTouched = (ax) => { window.__diag.probe.push({ ax, animToolNull: !v._animTool }); return op(ax); };
-    wrap('_glowPulse', () => { window.__diag.glowPulse++; });
-    wrap('_growDisc', () => { window.__diag.growDisc++; });
-    wrap('_extendLine', () => { window.__diag.extendLine++; });
+    v.probeAxisTouched = (ax, feed) => { window.__diag.probe.push({ ax, feed, animToolNull: !v._animTool }); return op(ax, feed); };
+    wrap('_probeDiscBurst', () => { window.__diag.discBurst++; });
     wrap('render', () => { window.__diag.render++; });
   });
 
   await page.locator(RUN).click();
-  await page.waitForTimeout(7000);   // feed-timed probes + the rAF pulse/grow animations
+  await page.waitForTimeout(7000);   // feed-timed probes + the rAF disc-burst animations
   const d = await page.evaluate(() => window.__diag);
 
   // probeAxisTouched fired once per axis, each with a LIVE _animTool (the advisor's first hypothesis: it must not bail)
   expect(d.probe.map((p) => p.ax)).toEqual(['z', 'x', 'y']);
   expect(d.probe.every((p) => p.animToolNull === false), '_animTool is non-null on every probe').toBe(true);
-  // the prominent animation fired: a glow pulse on every probe, the disc grew (1st axis), the line extended (2nd axis)
-  expect(d.glowPulse, 'glow pulses on every probe').toBe(3);
-  expect(d.growDisc, 'disc grows on the 1st axis').toBe(1);
-  expect(d.extendLine, 'line extends on the 2nd axis').toBe(1);
-  // render() was driven many times (the rAF animations self-render — the "does it reach the screen" hypothesis)
+  // a transient disc burst fired on EVERY probe, carrying the resolved feed (drives the disc size)
+  expect(d.discBurst, 'a disc burst on every probe').toBe(3);
+  expect(d.probe.every((p) => p.feed > 0), 'each probe carried a resolved feed').toBe(true);
+  // render() was driven many times (the rAF disc bursts self-render — the "does it reach the screen" hypothesis)
   expect(d.render, 'render() is driven by the animation').toBeGreaterThan(100);
   expect(errors, 'no JS errors during the probe animation').toEqual([]);
 });
