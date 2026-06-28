@@ -1616,8 +1616,11 @@ export class GcodeViz3D {
     }
 
     // SLICE 3 — a G31 just finished on `axis` (the tool sits at the contact). Record the determined axis value (NOT
-    // clamped — off-stock is the correctness signal), redraw the constraint shape at its now-reduced dimension, and
-    // FLASH it (brighten then settle to its low base opacity): 1st axis → the disc, 2nd → the line, 3rd → the point.
+    // clamped — off-stock is the correctness signal), redraw the constraint shape, then ANIMATE the event so it is
+    // UNMISSABLE: a soft additive GLOW pulses 3× at the contact (EVERY probe), AND the determined shape draws IN from the
+    // contact — the disc GROWS from the point to full span (1st axis), the line EXTENDS along the un-probed axis (2nd).
+    // The 3rd axis is just the glow (the point is the datum). Diagnosed: the pipeline + rAF self-render fire — the old
+    // opacity flash at 0.14 base was simply too subtle to perceive during a slow feed-timed probe; motion fixes that.
     probeAxisTouched(axis) {
         const tool = this._animTool, THREE = this.THREE;
         if (!tool || !THREE || 'xyz'.indexOf(axis) < 0) return;
@@ -1625,15 +1628,14 @@ export class GcodeViz3D {
         (this._probeAxes || (this._probeAxes = {}))[axis] = true;
         this._updateProbeShape();
         const n = ['x', 'y', 'z'].filter((a) => this._probeAxes[a]).length;
-        if (n === 1) this._flashProbeShape(this._probeDisc, this._probeDiscBase);        // 1st → flash the disc
-        else if (n === 2) this._flashProbeShape(this._probeLine, this._probeLineBase);   // 2nd → flash the line
-        else {                                                                            // 3rd → flash the point (a glow)
-            const v = this._probeVals, a = this._probeAxes;
-            const land = new THREE.Vector3(a.x ? v.x : 0, a.y ? v.y : 0, a.z ? v.z : 0);
-            const parent = this._probeGizmo.parent;
-            if (parent) { parent.updateWorldMatrix(true, false); land.applyMatrix4(parent.matrixWorld); }
-            this._glowAt(land, 0x4f8fff);
-        }
+        const v = this._probeVals, a = this._probeAxes;
+        const land = new THREE.Vector3(a.x ? v.x : 0, a.y ? v.y : 0, a.z ? v.z : 0);
+        const parent = this._probeGizmo.parent;
+        if (parent) { parent.updateWorldMatrix(true, false); land.applyMatrix4(parent.matrixWorld); }
+        this._glowPulse(land, 0x4f8fff);          // GLOW pulses 3× at the contact — on every probe
+        if (n === 1) this._growDisc();            // 1st axis → the disc grows from the point to full span
+        else if (n === 2) this._extendLine();     // 2nd axis → the line extends along the un-probed axis
+        // n >= 3 → just the glow (the datum point)
     }
 
     // Persistent draw of the probe-WCS at the dimension the JOB determines: the POINT (predicted origin) is ALWAYS shown
@@ -1665,18 +1667,68 @@ export class GcodeViz3D {
         this.render();
     }
 
-    // FLASH a constraint shape: snap it bright, then ease back to its low base opacity (the probe-event cue).
-    _flashProbeShape(mesh, baseOp) {
-        if (!mesh || !mesh.material) return;
-        mesh.visible = true;
-        const mat = mesh.material, peak = 0.9;
+    // A soft additive glow that PULSES `pulses` times at a world position — the probe-event cue, far more visible than a
+    // one-shot fade. Reuses the radial-glow sprite; self-contained (added → pulsed → removed). The rAF tick self-renders.
+    _glowPulse(worldPos, color, pulses = 3) {
+        const THREE = this.THREE, tex = this._glowTexture();
+        if (!worldPos || !THREE || !tex || !this.scene) return;
+        const span = (this._stock && Math.max(this._stock.x || 0, this._stock.y || 0)) || 60;
+        const r0 = Math.max(18, span * 0.35), r1 = r0 * 1.6;
+        const mat = new THREE.SpriteMaterial({ map: tex, color: new THREE.Color(color), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false });
+        const sprite = new THREE.Sprite(mat);
+        sprite.position.copy(worldPos); sprite.renderOrder = 999;
+        this.scene.add(sprite);
         const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
-        const t0 = now(), dur = 850;
+        const t0 = now(), dur = 1500;
         const tick = () => {
             const u = Math.min(1, (now() - t0) / dur);
-            mat.opacity = u < 0.18 ? peak : Math.max(baseOp, peak - (peak - baseOp) * (u - 0.18) / 0.82);
+            const p = Math.abs(Math.sin(u * pulses * Math.PI));   // 0→1→0, `pulses` times
+            mat.opacity = p;
+            const s = r0 + (r1 - r0) * p;
+            sprite.scale.set(s, s, 1);
             this.render();
-            if (u < 1) requestAnimationFrame(tick); else mat.opacity = baseOp;
+            if (u < 1) requestAnimationFrame(tick);
+            else { this.scene.remove(sprite); mat.dispose(); }
+        };
+        requestAnimationFrame(tick);
+    }
+
+    // The disc DRAWS IN: scales from the contact point out to its full span (set by _updateProbeShape) over ~0.6s, while
+    // its opacity eases from a visible peak down to the faint persistent base — so the growth itself reads.
+    _growDisc() {
+        const disc = this._probeDisc; if (!disc || !disc.visible) return;
+        const full = disc.scale.x, base = this._probeDiscBase, peak = 0.6;
+        disc.scale.set(0.001, 0.001, 1); disc.material.opacity = peak; this.render();   // start collapsed (no full-size flash)
+        const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+        const t0 = now(), dur = 600, ease = (u) => 1 - Math.pow(1 - u, 3);
+        const id = (this._discGrow = (this._discGrow || 0) + 1);
+        const tick = () => {
+            if (this._discGrow !== id) return;   // a newer disc superseded this grow
+            const u = Math.min(1, (now() - t0) / dur), s = Math.max(0.001, full * ease(u));
+            disc.scale.set(s, s, 1);
+            disc.material.opacity = peak - (peak - base) * u;
+            this.render();
+            if (u < 1) requestAnimationFrame(tick); else { disc.scale.set(full, full, 1); disc.material.opacity = base; }
+        };
+        requestAnimationFrame(tick);
+    }
+
+    // The line EXTENDS: grows from the contact out along the un-probed axis to its full span (set by _updateProbeShape),
+    // opacity easing peak → faint base as it draws.
+    _extendLine() {
+        const line = this._probeLine; if (!line || !line.visible) return;
+        const full = line.scale.y, base = this._probeLineBase, peak = 0.75;
+        line.scale.set(1, 0.001, 1); line.material.opacity = peak; this.render();   // start collapsed (no full-length flash)
+        const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+        const t0 = now(), dur = 600, ease = (u) => 1 - Math.pow(1 - u, 3);
+        const id = (this._lineGrow = (this._lineGrow || 0) + 1);
+        const tick = () => {
+            if (this._lineGrow !== id) return;
+            const u = Math.min(1, (now() - t0) / dur);
+            line.scale.set(1, Math.max(0.001, full * ease(u)), 1);
+            line.material.opacity = peak - (peak - base) * u;
+            this.render();
+            if (u < 1) requestAnimationFrame(tick); else { line.scale.set(1, full, 1); line.material.opacity = base; }
         };
         requestAnimationFrame(tick);
     }

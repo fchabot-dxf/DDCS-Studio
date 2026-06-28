@@ -720,3 +720,29 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   the status pill, and does NOT overlap the cube — at 1280×900 AND a narrow 760×560 two-pane size. Functional dro.spec.js
   4/4 + preview-controls still green (CSS-only, no logic touched).
 - state: branch main · committed this turn (LOCAL, unpushed) · dro 4/4 · dro-position 2/2. Passing back.
+
+## 2026-06-28 — turn 23: PROBE ANIM — diagnose (pipeline fires, too subtle) THEN build prominent motion
+
+- task (advisor turn 23): the human (sees pixels) reports NONE of the probe-WCS animations render (disc/line/point). The
+  advisor flagged its own earlier "the glow works" as a CODE-read, not a render — verify-real-symptom. Diagnose first, then
+  build: glow PULSES 3× (not the opacity flash) + the disc GROWS from the probe point + the line EXTENDS along the un-probed
+  axis; the point just glows 3×.
+- DIAGNOSIS (throwaway tests/_diag-probe.spec.js, instrumented a REAL probe Simulate — now removed): the pipeline is
+  ALIVE. probeAxisTouched fired for z/x/y (animTool NON-null, so it does NOT bail @1623), _glowAt ×3, _updateProbeShape
+  ×4, render() ×471, partFrame visible, shapes positioned at the contacts. The failure was PERCEPTUAL: the disc base
+  opacity 0.14, a single 850 ms opacity flash, NO motion — invisible against a slow feed-timed probe (a probe move is
+  feed-rate-timed; F300 took ~12 s, the test had to use F3000). So "nothing renders" = "too subtle to perceive", not a
+  dead pipeline. Also found: with the default stock the test probes MISS (tool travels the full G31 distance), so the
+  datum lands off-stock — a real-probe contact would sit on the surface.
+- did (gcodeViz3d.js): replaced _flashProbeShape (opacity-only flash) with MOTION:
+  - `_glowPulse(worldPos,color,3)` — a soft additive sprite that PULSES 3× (|sin(u·3π)| opacity + size), fired at the
+    contact on EVERY probe. (Reuses the radial glow texture; self-contained add→pulse→remove; the rAF tick self-renders.)
+  - `_growDisc()` — the disc scales 0.001→full from the contact over 0.6 s, opacity easing peak 0.6→base (the growth reads).
+  - `_extendLine()` — the line grows 0.001→full along the un-probed axis, opacity peak 0.75→base.
+  - probeAxisTouched now: glow-pulse every probe + grow disc (1st axis) + extend line (2nd); 3rd axis = just the glow.
+    Each grow starts by collapsing scale + rendering SYNCHRONOUSLY so there's no full-size flash before the rAF.
+- VERIFY: a real-symptom gap remains by nature — 3D on-screen visibility is NOT headlessly assertable, so the HUMAN does
+  the final visual check (reload + run a probe). Headless guard added (probe-anim-pipeline.spec.js, HONEST scope comment):
+  probeAxisTouched fires per axis w/ live _animTool, glowPulse ×3, growDisc ×1, extendLine ×1, render() >100, no JS errors.
+  probe-wcs 4/4 + wcs-flash + origin-gizmo still green.
+- state: branch main · committed this turn (LOCAL, unpushed). PENDING the human's eyes-on confirmation. Passing back.
