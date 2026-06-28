@@ -813,3 +813,7 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   only {z} active. Regression 14/14 (probe-wcs · probe-anim-visible 2.14% · probe-anim-pipeline · origin-gizmo · wcs-flash
   · dro). HUMAN eyes pending (real Corner-probe Simulate).
 - state: branch main · committed this turn (LOCAL, unpushed) · R1/R2 2/2 · regression 14/14.
+
+- ⇒ HUMAN-CONFIRMED (turn 28): R1/R2 "works great" on the REAL Corner-probe — the disc emerges from the contact + the
+  re-probe re-shows it. Human says "not done" (more probe-cue work remains, unspecified) but chose to pass on now, not
+  continue this turn. R1/R2 (ccc0d9d) is COMPLETE + verified (2/2 + regression 14/14); the "more" is a NEXT task.
