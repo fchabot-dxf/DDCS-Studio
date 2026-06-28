@@ -429,3 +429,37 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
   number fields). So no prod-logic change, test-view only as authorized.
 - state: tests 343/345 green · branch main · A sweep committed (see git). Group-spec view-consistency COMPLETE — every
   group spec (chip/gesture/edit/auto/canvas-knob/canvas-drag) now drives the real showApp('studio'). Passing back.
+
+## 2026-06-27 — turn 7: hand-built group spans framing → form exposes rpm/clearance/retractZ `b4de899`
+
+- task (advisor turn 7): a built-in op's stack has progstart..progend (spindle/clearance/retract), so its form can
+  expose them; a hand-built group excluded framing. Make a group span the framing so deriveGroupDef derives
+  rpm/clearance/retractZ as knobs. NO guardrail (user prunes start/end for multi-op). GATE if the run-finder change
+  can't be cleanly scoped without disturbing the explicit/multi-op gesture → pass back A/B.
+- GATE DECISION = BUILD (run-finder cleanly scoped → criterion not met). Investigation: a group emits its children
+  IN ORDER at its slot (blockEmitter "transparent"); no auto-framing (program == its blocks). So pulling the
+  PROGRAM-LEVEL progstart/progend into a WHOLE-program group keeps them at the edges → byte-identical emit. Key
+  insight: I can do this ENTIRELY in groupLooseAtoms (the wrap) and leave looseRunAtLine/autoGroupRunAtLine/_isLooseTop
+  (the run-finder) UNTOUCHED → the editor gesture is undisturbed → the gate's stated criterion is satisfied → no gate.
+- did:
+  - `opSession.groupLooseAtoms`: after the loose run, include the ADJACENT progstart (cur[firstIdx-1]) / progend
+    (cur[lastIdx+1]) in the group's children, ordered [progstart, …loose…, progend]; place the group at the first
+    member slot. Framing keeps its relative position → emit byte-identical (verified). Framingless stacks: no adjacent
+    progstart/progend → members == loose → behavior unchanged (full suite confirms).
+  - `devMode.deriveGroupDef`: a framing branch — progstart/progend have NO `_expose` (augment's isAtom skips them, so
+    they can't be ticked in Blocks), so auto-surface a FIXED set by type via `FRAMING_KNOBS = {progstart:[rpm,
+    clearance], progend:[retractZ]}`. Each → a plain-number binding {param,blockIndex,key,default}; the EXISTING
+    setGroupChildParams writeback reaches them by blockIndex/key (flattenBlocks includes the framing children).
+- why a FIXED set (not all framing numerics): the advisor named rpm/clearance/retractZ; spinUp/parkX/parkY are rarely
+  tuned and would clutter the form. Auto-surface (not the _expose path) because the task says the form "derives" them
+  (automatic parity), and framing isn't exposable in Blocks today anyway.
+- tried/abandoned: changing `_isLooseTop` to include framing (the broad approach) — rejected: it disturbs looseRunAtLine
+  → the explicit gesture would grab framing on sub-runs (the gate's exact failure mode). Doing it in the WRAP only
+  avoids that entirely.
+- VERIFY-FIRST (group-framing.spec.js, real studio view + auto-chip): a full program [progstart, m1, m2, progend] →
+  auto-chip → group children = [progstart, move, move, progend], G-code byte-identical → form shows rpm(10000)/
+  clearance(5)/retractZ(25) → edit rpm→8000 → writes back to the progstart child + G-code S8000 → survives a reproject
+  (framing stays inside the group). First run failed only because my hover line hit progstart's EMITTED rows (framing,
+  no run) — fixed by finding a loose-run line via ddcsAutoGroupRunAtLine (the chip resolves fine with framing present).
+- state: tests 344/346 green (2 skipped) · branch main · committed `b4de899` (LOCAL, unpushed). One commit, as asked.
+  Run-finder untouched (gate criterion held). Passing back.
