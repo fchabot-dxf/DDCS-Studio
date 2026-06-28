@@ -1012,3 +1012,25 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
     `_partShift` so the stock+toolpath share the 3D's exact frame" (= B, if you want the absolute position aligned too).
 - No code changed. Passing to advisor for the frame-model pick before implementing. (verify-real-symptom: I will drive
   a real Simulate with a WCS-pinned stock — toolpath ON the stock across drill + a probe — once the approach is chosen.)
+
+## 2026-06-28 — turn 38: 2D-canvas FRAME fix — Option A (toolpath + start ride the stock pin)
+
+- task (advisor #13, decision A): in viz/toolpath2d.js make the toolpath + start ride the SAME "Sits at WCS" pin the
+  stock uses, so a WCS-pinned stock no longer has the toolpath float off it by the WCS offset. Leave the stock formula
+  as-is (NOT B / the shared _partShift — deferred follow-up).
+- did (toolpath2d.js): extracted the stock pin into ONE helper `stockPin()` (= table[pin] − workOrigin, the exact
+  formula stockRect already used; stockRect now calls it). Added `ptx/pty = tx/ty + stockPin()` (the part-frame
+  transform) and routed the TOOLPATH (strokeSegs + the playback head dot), the START handle (drawStartHandle +
+  nearHandle), the SNAP path nodes/edges, and the FIT bounds through it; the start-DRAG inverse subtracts the pin
+  (handle drawn at +pin → program start = drawn − pin). The origin crosshair, grid, envelope stay in the scene frame.
+- SANITY-CHECK (advisor-required): default stock (pin='origin') → pin=0 → origin+stock+toolpath all coincide at
+  part-zero, ZERO behaviour change (existing 2D tests untouched). Pinned stock → stock+toolpath now coincide at the WCS
+  spot (symptom fixed); the stock's ABSOLUTE position is unchanged (still its pinned G54 spot, where the user set it) →
+  NOT the "stock looks wrong" trigger, so NOT flagging B. Residual (the B follow-up): the part-zero CROSSHAIR stays at
+  scene-0 rather than moving to the stock datum — the pre-existing behaviour; B (one shared _partShift, 2D==3D) unifies
+  it but moves the stock + touches preview-2d/dro tests, so it stays the tracked follow-up the advisor deferred.
+- VERIFY: toolpath2d-pin.spec.js (NEW, behavioural) — a pinned stock (G54=40,-50) + a toolpath node at program (60,40)
+  snaps at the DRAWN point (100,-10) = program+pin, a mid-stock point that is NOT a stock corner → only holds once the
+  path rides the pin (before the fix nothing snapped there). preview-2d-snap + preview-2d-default still green (pin=0
+  path unchanged). Full suite 366 passed / 2 skipped. **HUMAN's eyes pending** (toolpath ON a WCS-pinned stock across a
+  drill grid + a probe — the advisor's real-symptom check).

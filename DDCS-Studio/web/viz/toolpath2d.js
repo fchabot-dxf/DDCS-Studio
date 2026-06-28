@@ -58,6 +58,18 @@ export function createToolpath2d(canvas, opts = {}) {
     const W = () => canvas.clientWidth, H = () => canvas.clientHeight;
     const tx = (x) => view.ox + x * view.scale;
     const ty = (y) => view.oy - y * view.scale;
+    // The STOCK rides its "Sits at WCS" pin (table offset − workOrigin); the TOOLPATH + start are in the program/part
+    // frame (part-zero). Option A (advisor #13): make the toolpath + start ride the SAME pin so they sit ON the stock
+    // instead of floating off it by the WCS offset. ptx/pty = the part-frame transform (tx/ty + the stock pin).
+    const stockPin = () => {
+        const s = stock;
+        if (!s || !s.pin || s.pin === 'origin' || !(machine && machine.wcs && machine.wcs.table)) return { x: 0, y: 0 };
+        const gi = parseInt(String(s.pin).replace(/[^0-9]/g, ''), 10) - 54;
+        const t = machine.wcs.table[gi], wo = machine.workOrigin || {};
+        return t ? { x: (Number(t.x) || 0) - (wo.x || 0), y: (Number(t.y) || 0) - (wo.y || 0) } : { x: 0, y: 0 };
+    };
+    const ptx = (x) => tx(x + stockPin().x);
+    const pty = (y) => ty(y + stockPin().y);
 
     // ---- scene geometry (program/work frame; part-zero at 0,0) ----
     function envelopeRect() {
@@ -70,19 +82,14 @@ export function createToolpath2d(canvas, opts = {}) {
         const s = stock;
         if (!s || s.show === false || !(s.x > 0) || !(s.y > 0)) return null;
         const [Dx, Dy] = datumXY(s);
-        let pinX = 0, pinY = 0;
-        if (s.pin && s.pin !== 'origin' && machine && machine.wcs && machine.wcs.table) {
-            const gi = parseInt(String(s.pin).replace(/[^0-9]/g, ''), 10) - 54;
-            const t = machine.wcs.table[gi], wo = machine.workOrigin || {};
-            if (t) { pinX = (Number(t.x) || 0) - (wo.x || 0); pinY = (Number(t.y) || 0) - (wo.y || 0); }
-        }
+        const { x: pinX, y: pinY } = stockPin();   // one source for the stock's WCS-pin offset (shared with the toolpath)
         return { minX: -Dx + pinX, maxX: s.x - Dx + pinX, minY: -Dy + pinY, maxY: s.y - Dy + pinY, shape: s.shape };
     }
     function sceneBounds() {
         let bb = null;
         const ext = (r) => { if (!r) return; bb = bb ? { minX: Math.min(bb.minX, r.minX), minY: Math.min(bb.minY, r.minY), maxX: Math.max(bb.maxX, r.maxX), maxY: Math.max(bb.maxY, r.maxY) } : { minX: r.minX, minY: r.minY, maxX: r.maxX, maxY: r.maxY }; };
         ext(envelopeRect()); ext(stockRect());
-        if (segs.length) { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; segs.forEach((s) => { a = Math.min(a, s.x1, s.x2); c = Math.max(c, s.x1, s.x2); b = Math.min(b, s.y1, s.y2); d = Math.max(d, s.y1, s.y2); }); ext({ minX: a, minY: b, maxX: c, maxY: d }); }
+        if (segs.length) { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; segs.forEach((s) => { a = Math.min(a, s.x1, s.x2); c = Math.max(c, s.x1, s.x2); b = Math.min(b, s.y1, s.y2); d = Math.max(d, s.y1, s.y2); }); const p = stockPin(); ext({ minX: a + p.x, minY: b + p.y, maxX: c + p.x, maxY: d + p.y }); }
         if (!bb) bb = { minX: 0, minY: 0, maxX: 100, maxY: 100 };
         return { minX: Math.min(0, bb.minX), minY: Math.min(0, bb.minY), maxX: Math.max(0, bb.maxX), maxY: Math.max(0, bb.maxY) };   // always include the origin
     }
@@ -95,12 +102,13 @@ export function createToolpath2d(canvas, opts = {}) {
     function snapPoint(px, py) {
         const TH2 = 11 * 11;
         const sr = stockRect();
+        const p = stockPin();   // path nodes ride the same pin as the drawn toolpath (stock corners already do, via stockRect)
         // tier 1: discrete points
         let bestPt = null, bestPtD = TH2;
         const pt = (wx, wy) => { const dx = tx(wx) - px, dy = ty(wy) - py, d = dx * dx + dy * dy; if (d < bestPtD) { bestPtD = d; bestPt = { x: wx, y: wy }; } };
         pt(0, 0);
         if (sr) { pt(sr.minX, sr.minY); pt(sr.maxX, sr.minY); pt(sr.minX, sr.maxY); pt(sr.maxX, sr.maxY); pt((sr.minX + sr.maxX) / 2, (sr.minY + sr.maxY) / 2); }
-        for (let i = 0; i < segs.length; i++) { const s = segs[i]; pt(s.x1, s.y1); pt(s.x2, s.y2); }
+        for (let i = 0; i < segs.length; i++) { const s = segs[i]; pt(s.x1 + p.x, s.y1 + p.y); pt(s.x2 + p.x, s.y2 + p.y); }
         if (bestPt) return bestPt;
         // tier 2: nearest point on an edge (clamped perpendicular projection, in screen space)
         let bestE = null, bestED = TH2;
@@ -111,7 +119,7 @@ export function createToolpath2d(canvas, opts = {}) {
             if (d < bestED) { bestED = d; bestE = { x: ax + t * (bx - ax), y: ay + t * (by - ay) }; }
         };
         if (sr) { edge(sr.minX, sr.minY, sr.maxX, sr.minY); edge(sr.maxX, sr.minY, sr.maxX, sr.maxY); edge(sr.maxX, sr.maxY, sr.minX, sr.maxY); edge(sr.minX, sr.maxY, sr.minX, sr.minY); }
-        for (let i = 0; i < segs.length; i++) { const s = segs[i]; edge(s.x1, s.y1, s.x2, s.y2); }
+        for (let i = 0; i < segs.length; i++) { const s = segs[i]; edge(s.x1 + p.x, s.y1 + p.y, s.x2 + p.x, s.y2 + p.y); }
         return bestE;
     }
 
@@ -139,7 +147,7 @@ export function createToolpath2d(canvas, opts = {}) {
         ctx.save(); ctx.strokeStyle = '#33d6ff'; ctx.lineWidth = 1.6; ctx.strokeRect(hx - 5, hy - 5, 10, 10); ctx.restore();
     }
     function drawStartHandle(ctx) {   // ruby start marker + grab-ring — the draggable operator start (matches the 3D ① marker)
-        const hx = tx(start.x), hy = ty(start.y);
+        const hx = ptx(start.x), hy = pty(start.y);   // rides the stock pin (Option A) so it sits on the stock with the path
         ctx.save();
         ctx.fillStyle = 'rgba(231,76,91,0.9)'; ctx.beginPath(); ctx.arc(hx, hy, 5.5, 0, Math.PI * 2); ctx.fill();
         ctx.lineWidth = 1.6; ctx.strokeStyle = 'rgba(231,76,91,0.7)'; ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI * 2); ctx.stroke();
@@ -170,7 +178,7 @@ export function createToolpath2d(canvas, opts = {}) {
             ctx.strokeStyle = segColor(s, zMin, zRange, maxPF);
             ctx.lineWidth = t === 'rapid' ? width * 0.6 : width;
             ctx.setLineDash(t === 'probe' ? [2, 3] : (t === 'rapid' ? [5, 4] : []));   // probe dotted, rapid dashed (match 3D)
-            ctx.beginPath(); ctx.moveTo(tx(s.x1), ty(s.y1)); ctx.lineTo(tx(s.x2), ty(s.y2)); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ptx(s.x1), pty(s.y1)); ctx.lineTo(ptx(s.x2), pty(s.y2)); ctx.stroke();
         }
         ctx.globalAlpha = 1; ctx.setLineDash([]);
     }
@@ -183,7 +191,7 @@ export function createToolpath2d(canvas, opts = {}) {
         const n = Math.max(0, Math.min(k, segs.length));
         strokeSegs(ctx, n, segs.length, 0.22, 1.5, zMin, zR, maxPF);
         strokeSegs(ctx, 0, n, 1, 2.6, zMin, zR, maxPF);
-        const head = segs[n - 1] || segs[0]; const hx = tx(n > 0 ? head.x2 : head.x1), hy = ty(n > 0 ? head.y2 : head.y1);
+        const head = segs[n - 1] || segs[0]; const hx = ptx(n > 0 ? head.x2 : head.x1), hy = pty(n > 0 ? head.y2 : head.y1);
         ctx.fillStyle = '#ffd24a'; ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI * 2); ctx.fill();
     }
     function drawLabels(ctx, foot, step, w, h) {   // sparse coord labels along the bottom (X) + left (Y) frame
@@ -247,7 +255,7 @@ export function createToolpath2d(canvas, opts = {}) {
         const ns = Math.max(0.02, Math.min(400, view.scale * Math.exp(-e.deltaY * 0.0015)));
         view.scale = ns; view.ox = sx - wx * ns; view.oy = sy + wy * ns; paint();
     }, { passive: false });
-    const nearHandle = (e) => { if (!start || !view) return false; const r = canvas.getBoundingClientRect(); return Math.hypot(e.clientX - r.left - tx(start.x), e.clientY - r.top - ty(start.y)) <= 12; };
+    const nearHandle = (e) => { if (!start || !view) return false; const r = canvas.getBoundingClientRect(); return Math.hypot(e.clientX - r.left - ptx(start.x), e.clientY - r.top - pty(start.y)) <= 12; };
     canvas.addEventListener('pointerdown', (e) => {
         if (!view) return;
         if (nearHandle(e)) { dragStart = true; try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* */ } return; }   // grab the start handle (not a pan)
@@ -256,7 +264,7 @@ export function createToolpath2d(canvas, opts = {}) {
     canvas.addEventListener('pointermove', (e) => {
         if (!view) return;
         const r = canvas.getBoundingClientRect();
-        if (dragStart) { start = { x: (e.clientX - r.left - view.ox) / view.scale, y: (view.oy - (e.clientY - r.top)) / view.scale, z: start ? start.z : 0 }; paint(); return; }
+        if (dragStart) { const p = stockPin(); start = { x: (e.clientX - r.left - view.ox) / view.scale - p.x, y: (view.oy - (e.clientY - r.top)) / view.scale - p.y, z: start ? start.z : 0 }; paint(); return; }   // un-pin: the handle is drawn at +pin, so the program start = drawn − pin
         if (drag) { view.ox = drag.ox + (e.clientX - drag.x); view.oy = drag.oy + (e.clientY - drag.y); paint(); return; }
         const px = e.clientX - r.left, py = e.clientY - r.top, snap = snapPoint(px, py);
         cursor = snap ? { x: snap.x, y: snap.y, snapped: true } : { x: (px - view.ox) / view.scale, y: (view.oy - py) / view.scale, snapped: false };
