@@ -77,6 +77,32 @@ function magazinePockets(a) {
     return mag.map((p, i) => ({ x: p.x, y: p.y, z: p.z, pocket: p.pocket != null ? p.pocket : i + 1, tool: toolOf(p) }));
 }
 
+/**
+ * Bold "UNVERIFIED" banner for the generic/disk auto tool-change methods (A2). `autoStack` / `diskAutoStack`
+ * model an ASSUMED drawbar pick&place — the real M350 O10102 is a pneumatic push station, NEVER verified on
+ * real firmware. So we show a prominent in-UI warning the user can't miss; the subtle .wiz-usage hint stays.
+ * Created once (lazily, anchored above the method-specific rows) then toggled per method.
+ */
+function syncChangeUnverifiedBanner(method) {
+    const unverified = method === 'generic' || method === 'auto' || method === 'disk';
+    let banner = el('atc_change_unverified');
+    if (!banner) {
+        const anchor = el('atc_change_manual_params');   // first method-specific row, right under the Method selector
+        if (!anchor || !anchor.parentNode) return;
+        banner = document.createElement('div');
+        banner.id = 'atc_change_unverified';
+        banner.setAttribute('role', 'alert');
+        banner.style.cssText = 'display:none; margin:4px 0 8px; padding:8px 10px; border:1px solid var(--danger,#ef4444);'
+            + ' border-left:4px solid var(--danger,#ef4444); border-radius:5px; background:rgba(239,68,68,0.10);'
+            + ' color:var(--danger,#ef4444); font-size:12px; line-height:1.5;';
+        banner.innerHTML = '<b>⚠ UNVERIFIED on real DDCS firmware</b> — this magazine pick &amp; place model is an'
+            + ' ASSUMPTION (the real M350 O10102 is a pneumatic push station, not a drawbar changer).'
+            + ' <b>Review every emitted line before running</b>, with no tool in the spindle and a hand on e-stop.';
+        anchor.parentNode.insertBefore(banner, anchor);
+    }
+    banner.style.display = unverified ? '' : 'none';
+}
+
 /** Pop the full magazine editor as a modal with a Done button — the wizard's own table stays read-only/compact. */
 function openMagazineModal(refresh) {
     const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
@@ -214,6 +240,7 @@ export const atcChangeView = {
         if (m6Row) m6Row.style.display = method === 'm6' ? '' : 'none';
         if (autoRow) autoRow.style.display = (method === 'generic' || method === 'disk') ? '' : 'none';
         if (fwRow) fwRow.style.display = method === 'firmware' ? '' : 'none';
+        syncChangeUnverifiedBanner(method);   // A2: bold UNVERIFIED warning for generic/disk auto change
 
         const params = {
             method,

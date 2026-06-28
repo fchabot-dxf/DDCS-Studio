@@ -50,6 +50,29 @@ test('Tool Change wizard: method switching shows the right fields and dialect', 
   await expect(code).not.toContainText('M154');
 });
 
+test('Tool Change wizard: bold UNVERIFIED banner only for generic/disk auto change', async ({ page }) => {
+  await openWizard(page, 'atc_change');
+  const banner = page.locator('#atc_change_unverified');
+
+  // M6 (default) — verified path, no warning banner.
+  await expect(banner).toBeHidden();
+
+  // Generic / Disk — ASSUMED drawbar model, bold UNVERIFIED banner shows.
+  await page.locator('#atc_change_method').selectOption('generic');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('UNVERIFIED');
+  await expect(banner.locator('b').first()).toBeVisible();   // the warning is bolded
+
+  await page.locator('#atc_change_method').selectOption('disk');
+  await expect(banner).toBeVisible();
+
+  // Firmware + Manual — fine, no warning.
+  await page.locator('#atc_change_method').selectOption('firmware');
+  await expect(banner).toBeHidden();
+  await page.locator('#atc_change_method').selectOption('manual');
+  await expect(banner).toBeHidden();
+});
+
 test('ATC Test wizard: drawbar and pocket modes', async ({ page }) => {
   await openWizard(page, 'atc_test');
 
