@@ -707,3 +707,16 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   Regression 55/55 across two batches: atc-preview/envelope · cam-slot-sim · probe-wcs · wcs-flash · origin-gizmo ·
   preview-controls · placement-rollout · place-on-stock · g53-and-cut-legend · grid-envelope.
 - state: branch main · committed this turn (LOCAL, unpushed) · tests dro 4/4 · regression 55/55. Passing back.
+
+## 2026-06-28 — turn 21: DRO REPOSITION — left side, under the status block (off the ViewCube)
+
+- task (advisor turn 21): the DRO overlay sat OVER the ViewCube — both top-right (confirmed navCube.js renders the cube
+  at canvas [width-size-m, m], top-right corner). Move it to the LEFT, stacked under the top-left status block, clear of
+  the cube. Pure CSS/positioning, no logic.
+- did (styles.css): `.pp-dro` top:6px/right:8px → top:52px/left:8px/right:auto. top:52 clears the status pill (top:6) +
+  the legend (top:28) on the left; left-anchored keeps it fully in the left half so it can't reach the top-right cube.
+- VERIFY (dro-position.spec.js, REAL bounding rects, 2 sizes): computes the actual ViewCube screen rect from
+  viz._cubeRect {size,m} + the canvas rect, and asserts the DRO hugs the left edge, stays in the left half, sits below
+  the status pill, and does NOT overlap the cube — at 1280×900 AND a narrow 760×560 two-pane size. Functional dro.spec.js
+  4/4 + preview-controls still green (CSS-only, no logic touched).
+- state: branch main · committed this turn (LOCAL, unpushed) · dro 4/4 · dro-position 2/2. Passing back.

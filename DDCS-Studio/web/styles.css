@@ -4221,7 +4221,8 @@ svg [id$="_wcs"] { display: none; }
    don't jitter; the active-WCS chip on top (amber = the stock-WCS colour). The Work column flashes on a WCS/probe
    re-reference. Mach = Work + the active WCS offset (one offset today; per-G54-G59 when the engine WCS table lands). */
 .pp-dro {
-    position: absolute; top: 6px; right: 8px; z-index: 6;
+    /* LEFT side, stacked UNDER the status pill (top:6) + legend (top:28) — clear of the top-right ViewCube (navCube.js). */
+    position: absolute; top: 52px; left: 8px; right: auto; z-index: 6;
     background: rgba(0, 0, 0, 0.55); border-radius: 6px; padding: 3px 6px 4px;
     font: 600 9px/1.25 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
     color: #cdd9e6; pointer-events: none; user-select: none;
