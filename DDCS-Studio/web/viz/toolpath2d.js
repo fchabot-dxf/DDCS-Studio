@@ -142,7 +142,12 @@ export function createToolpath2d(canvas, opts = {}) {
         const foot = footprint(), step = stepFor(foot);
         drawGrid(ctx, foot, step);
         const env = envelopeRect(); if (env) drawRect(ctx, env, 'rgba(108,122,140,0.55)', null);
-        const st = stockRect(); if (st) drawRect(ctx, st, st.shape === 'pocket' ? 'rgba(134,182,255,0.65)' : 'rgba(166,215,124,0.65)', st.shape === 'pocket' ? 'rgba(106,143,190,0.10)' : 'rgba(143,174,106,0.10)');
+        const st = stockRect();
+        if (st) {
+            const isPk = st.shape === 'pocket';
+            drawRect(ctx, st, isPk ? 'rgba(134,182,255,0.65)' : 'rgba(166,215,124,0.65)', isPk ? 'rgba(106,143,190,0.10)' : 'rgba(143,174,106,0.10)');
+            if (isPk) drawPocketCavity(ctx, st);   // #15: the inner cavity so a pocket READS as a pocket (mirrors the 3D square-donut)
+        }
         drawOriginAxes(ctx, foot);
         drawPath(ctx, anim.playing ? Math.floor(anim.k) : null);
         drawLabels(ctx, foot, step, w, h);
@@ -173,6 +178,14 @@ export function createToolpath2d(canvas, opts = {}) {
         const x0 = tx(r.minX), x1 = tx(r.maxX), yTop = ty(r.maxY), yBot = ty(r.minY);
         if (fill) { ctx.fillStyle = fill; ctx.fillRect(x0, yTop, x1 - x0, yBot - yTop); }
         if (line) { ctx.strokeStyle = line; ctx.lineWidth = 1.4; ctx.strokeRect(x0, yTop, x1 - x0, yBot - yTop); }
+    }
+    // #15: a POCKET reads as a FRAME of material around a CAVITY. Mirror the 3D "square donut" (gcodeViz3d): inset the
+    // cavity by the SAME wall thickness — max(8, 25% of the smaller side) — and darken it (a recess) with a wall outline.
+    function drawPocketCavity(ctx, st) {
+        const w = Math.max(8, Math.min(st.maxX - st.minX, st.maxY - st.minY) * 0.25);
+        const c = { minX: st.minX + w, minY: st.minY + w, maxX: st.maxX - w, maxY: st.maxY - w };
+        if (!(c.maxX > c.minX && c.maxY > c.minY)) return;   // wall too thick for the stock → no cavity
+        drawRect(ctx, c, 'rgba(134,182,255,0.85)', 'rgba(10,14,22,0.45)');   // recessed (darker) cavity + a bright inner wall
     }
     function drawOriginAxes(ctx, foot) {   // X axis (red) at y=0, Y axis (green) at x=0 — matches the 3D colours
         ctx.save(); ctx.lineWidth = 1.4;
