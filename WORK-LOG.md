@@ -979,3 +979,36 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
     bumped to 26 on the "both bigger" pass; human now wants it smaller). Constant-screen, visibility-only.
 - VERIFY: probe specs 8/8 (datum still shows; cue coverage ~14%); no test asserts the maxDist default. Full suite was
   365 green with maxDist 200 in tree; the datum-size change is a cosmetic _scaleMarkers constant. HUMAN's eyes on the cue.
+
+## 2026-06-28 — turn 36: 2D-canvas FRAME bug — VERIFY-FIRST report (GATE, no code yet)
+
+- DISPATCH #13 named viz/featureCanvas.js; the advisor asked to VERIFY-FIRST where the toolpath/start vs stock coords
+  are set. Verification result (file correction + a 2nd divergence the dispatch didn't anticipate):
+- **The shared 2D canvas is `viz/toolpath2d.js`, NOT featureCanvas.js.** featureCanvas.js is the per-wizard drill/contour
+  LAYOUT editor (pure part coords, no machine frame). The preview panel's 2D view (the one with the toolpath + ruby ①
+  start + the DRO evidence) is toolpath2d.js, created by createPreviewPanel and used by ALL wizards → the "one shared fix".
+- **Frame map:**
+  - `engine/trace.js` emits segments in the PART/WORK frame (part-zero); `wcsOffset` only folds G53 machine moves into
+    that frame. → the toolpath is CORRECTLY at part-zero.
+  - 3D (`gcodeViz3d`): stock + op + tool all live in `partFrame`, shifted TOGETHER by `_partShift()`
+    (gcodeViz3d.js:1165) — gated on `machine.show`, XY = the raw WCS-table pin (NOT minus workOrigin). "ONE source for
+    op+stock so they never diverge" (machine-frame-sim-spec).
+  - 2D (`toolpath2d`): `stockRect()` shifts ONLY the stock by `pinX = table[pin].x - workOrigin` (toolpath2d.js:74-79),
+    NOT gated on machine.show; the toolpath (strokeSegs) + start (drawStartHandle) are drawn at part-zero with NO shift.
+  - ⇒ BUG: stock rides the pin, toolpath/start don't → they diverge by the WCS pin (= the human's DRO Work-vs-Mach 40 /
+    -550). Confirmed the advisor's diagnosis (just the file + the exact mechanism differ).
+- **A 2nd divergence the dispatch's "match the stock" doesn't cover:** the 2D STOCK's pin formula itself ≠ the 3D
+  `_partShift` — it subtracts workOrigin and skips the envelope-show gate. So "make the toolpath match the stock" and
+  "make 2D mirror the 3D" are NOT the same fix when workOrigin≠0 or the envelope is hidden.
+- **OPTIONS (gate — need the advisor's pick):**
+  - **A (minimal / surgical):** apply stockRect's EXISTING pin offset to the toolpath + start (+snap + fit-bounds + the
+    start-drag inverse) so they ride the stock. Fixes the reported relative float (the symptom). Leaves the 2D stock's
+    absolute position as-is (still differs from the 3D when workOrigin≠0 / envelope hidden). Lowest risk.
+  - **B (true "2D mirrors 3D"):** replace the 2D part placement with the 3D `_partShift` as ONE shared shift applied to
+    stock + toolpath + start. 2D == 3D by construction + matches toolpath2d.js's own header ("mirrors the 3D"). BIGGER:
+    changes the stock's formula (drops the workOrigin subtraction, adds the show-gate) → may move existing 2D stock-pin
+    behavior + touch preview-2d / dro tests.
+  - Recommend **A** for the symptom now (surgical), OR a synthesis: "A's effect but compute the shift via the 3D
+    `_partShift` so the stock+toolpath share the 3D's exact frame" (= B, if you want the absolute position aligned too).
+- No code changed. Passing to advisor for the frame-model pick before implementing. (verify-real-symptom: I will drive
+  a real Simulate with a WCS-pinned stock — toolpath ON the stock across drill + a probe — once the approach is chosen.)
