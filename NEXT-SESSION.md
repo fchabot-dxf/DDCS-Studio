@@ -322,6 +322,14 @@ Starting at 1× ruby (size AND position at the contact) → visible from frame o
 - **AXIS LINE + DATUM (persistent — NO fade):** the **AXIS LINE = the disc INTERSECTION** (along the un-probed axis, **AT the real datum — NOT the projected `c`**; today `_updateProbeShape` rides the projected probe-WCS `c` where un-probed axes → 0 = the WCS → the WRONG position the human sees on screen). The **DATUM** = where the discs all cross. They do **NOT fade**; they **DISAPPEAR on the next probe LOOP** (reset). **Axis line = a DIFFERENT COLOR than the datum.**
 **Verify-real-symptom (HUMAN's eyes ONLY):** real Corner-probe → discs at each contact glow 3× slowly + fade over 40% of the run; the line sits at the REAL datum (the disc intersection, not the projected `c`) in a distinct color from the datum; line+datum persist until the loop wipes them. One commit, suite green.
 
+**⏸ QUEUED (pass AFTER the anim review) — BOSS CROSS-OVER MOVE DISTANCE (per axis).** In middleWizard boss "probe both axes" the wall1→wall2 cross-over is hard-coded `[#1+#2]` in `traverseOver` ([middleWizard.js:71](DDCS-Studio/web/wizards/middleWizard.js#L71)) = MAX PROBE + RETRACT — so the probe only reaches the far wall if MAX PROBE happens to span the feature (geometrically broken on any feature wider than MAX; MAX PROBE is being abused as a feature-width proxy, see the [:69](DDCS-Studio/web/wizards/middleWizard.js#L69) comment). Human wants an EXPLICIT probe-move distance (NOT a stock dim — consistent with the wizard's all-distance fields: max probe / retract / safe Z / traverse-over), **SEPARATE for X and Y** (non-square bosses):
+- Two new GEOMETRY fields: **X cross-over** + **Y cross-over** — raw probe-move distances (how far to cross to the far wall). Label hint: ≈ feature width + 2×approach + retract.
+- Two new #-vars (e.g. #19/#20 if free — worker confirms). `traverseOver(ax, firstPlus)` uses #crossX when `ax==='X'`, #crossY when `ax==='Y'` (replaces the `[#1+#2]` lateral move; keep the Z lift/drop `#18`).
+- Default/prefill to today's `[#1+#2]` so existing saved ops are byte-unchanged (back-compat).
+- Wire the Blockly round-trip (new vars → blocks + reverse-sync), per the platform rule.
+- Verify (HUMAN's eyes): real boss probe-both Simulate on a NON-square boss → probe crosses the set X distance, then the set Y distance, reaching each far wall; MAX PROBE no longer has to span the feature. One commit, suite green.
+- (Separate/later, NOT this task: the between-AXES reposition still PAUSES for a boss at [:101](DDCS-Studio/web/wizards/middleWizard.js#L101) — could go hands-free with these same distances.)
+
 ---
 
 ## ▶ BACKLOG (human-curated, 2026-06-28) — queued, not yet sequenced/dispatched
