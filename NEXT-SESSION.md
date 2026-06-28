@@ -315,6 +315,13 @@ Starting at 1× ruby (size AND position at the contact) → visible from frame o
 - **(R2) RE-USE the disc at the START of each probe LOOP** — when the macro re-probes (`GOTO1` retry), once 2 axes are probed it stays the LINE forever (wrong); the disc should re-appear per new probe, not the stale line.
 **Verify-real-symptom (HUMAN's eyes):** real Corner-probe Simulate → disc emerges from the contact + re-appears per probe loop. One commit, suite green. *(The ruby-soft-glow LOOK spec stays on file above if the human wants it after these.)*
 
+**✅ R1/R2 DONE (`ccc0d9d`) — but the spec then EVOLVED.** R1 (disc from contact) + R2 (re-probe re-shows disc) committed (no marker pass — direct-steered). The human then redesigned the whole cue → PURELY TRANSIENT DISCS; the dimension model (disc→line→point) is OUT.
+
+**▶ PROBE CUE — TRANSIENT-DISC MODEL (human-LOCKED, turn 29; SUPERSEDES R1/R2 + the earlier "no-persistent-shape" draft) — ACTIVE.** Build on `ccc0d9d` (disc-at-contact already there). Two layers:
+- **DISCS (transient, per probe at the CONTACT):** each probe (ANY axis) → a disc at its contact; **glows 3× SLOWLY**, then **FADES OUT over 40% of the TOTAL toolpath time** (duration = 0.4 × total run time → ≈4s on a 10s run). A FRESH disc per probe / per loop iteration. Where discs OVERLAP, the additive glow reads thicker/brighter — **make the intersection THICKER / emphasized ("play with it", tunable)**.
+- **AXIS LINE + DATUM (persistent — NO fade):** the **AXIS LINE = the disc INTERSECTION** (along the un-probed axis, **AT the real datum — NOT the projected `c`**; today `_updateProbeShape` rides the projected probe-WCS `c` where un-probed axes → 0 = the WCS → the WRONG position the human sees on screen). The **DATUM** = where the discs all cross. They do **NOT fade**; they **DISAPPEAR on the next probe LOOP** (reset). **Axis line = a DIFFERENT COLOR than the datum.**
+**Verify-real-symptom (HUMAN's eyes ONLY):** real Corner-probe → discs at each contact glow 3× slowly + fade over 40% of the run; the line sits at the REAL datum (the disc intersection, not the projected `c`) in a distinct color from the datum; line+datum persist until the loop wipes them. One commit, suite green.
+
 ---
 
 ## ▶ BACKLOG (human-curated, 2026-06-28) — queued, not yet sequenced/dispatched
