@@ -393,3 +393,25 @@ Canvas-widget consolidation Stage 2+3, then the user's form-editability headline
 - state: tests 343/345 green (2 skipped, 0 fail, flake passed) · branch main · A `94d2d6c` + B `fd3e941` committed
   (LOCAL, unpushed). Handing back to the advisor (HANDOFF turn → advisor). Deferred: interactive xy-pad/rect inline
   (superseded); the showApp('editor') test-view sweep (advisor's call).
+
+## 2026-06-27 — cycle 1 turn 3: test-view sweep → the real studio view `35ad42c`
+
+- task (advisor turn 3): point the older group specs (chip/gesture/edit/auto) at showApp('studio') (the real view,
+  not the hidden 'editor' shell); re-run green; GATE = pass back if a REAL visibility bug surfaces (no unsupervised
+  prod-logic fix); test-view only, surgical.
+- did: `sed` replaced `showApp('editor')` → `showApp('studio')` in exactly the 4 NAMED specs (group-chip,
+  group-gesture, group-edit, group-auto) — 9 occurrences (incl. the reproject-return legs). Scoped to the named set
+  per "one task per wake / exactly the named task": group-canvas-knob (A) ALSO uses 'editor' but is NEW this cycle
+  (not "older") → left it, flagged in the commit + this log for the advisor to sweep next if wanted; group-canvas-drag
+  (B) already on 'studio'.
+- why 'studio' is correct: showApp only un-hides #studio-app for which==='studio'; ANY other arg (incl. the bogus
+  'editor') sets #studio-app display:none. Both #editor (the chip's host) AND #wizard (the form) live inside
+  #studio-app, so the old specs opened the wizard inside a HIDDEN shell — fine for DOM-value assertions (no visibility
+  needed), wrong as a model of real use. 'studio' is the view the user is actually in when they hover the editor chip.
+- VERIFY (gate check): re-ran all 4 swept files → 6/6 green in the real shell; then the FULL suite → 343/345 green
+  (2 skipped, 0 fail). NO real visibility bug surfaced (the gate did NOT trip), so NO prod-logic change — purely the
+  test-view edit the advisor authorized. Note: group-chip (inc 1) now logs the chip as `✎ Hand-built` enabled (not
+  the old 🔒) — expected, inc 2 unlocked canEdit('group'); the test asserts appearance, not the lock state, so green.
+- tried/abandoned: nothing — clean surgical sed; resisted sweeping group-canvas-knob (A) (not named; one-task-per-wake).
+- state: tests 343/345 green · branch main · sweep committed `35ad42c` (LOCAL, unpushed). Passing back to advisor.
+  Candidate next (advisor's call): sweep group-canvas-knob (A) 'editor'→'studio' for full consistency.
