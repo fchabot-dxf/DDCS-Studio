@@ -846,3 +846,40 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
       geometry (a miss = the correctness signal, the macro SHOULD error). (2) spindle "doesn't execute correctly".
       (3) a separate parser report. The human is confident these hit other wizards too.
 - state: branch main · committed this turn (LOCAL, unpushed) · 17/17. Cue DONE + confirmed; sim bugs passed up.
+
+## 2026-06-28 — turn 32: PER-WIZARD STICKY probe field (human-redirected from the dispatched boss cross-over)
+
+- DISPATCH vs DONE: turn 32 was dispatched as **BOSS CROSS-OVER** (middleWizard #19/#20 per-axis cross-over). The
+  human REDIRECTED mid-turn — while testing they hit a different, more pressing bug: probe MAX PROBE kept reverting
+  to the global 25 on every open/refresh. Built + verified the sticky fix instead; **boss cross-over is NOT done**
+  (still scoped + ready — see NEXT-SESSION turn-31 spec — advisor should re-dispatch).
+- SYMPTOM (human, with screenshots of Corner + Middle both showing MAX PROBE = 25): set the wizard's MAX PROBE to
+  100, Insert, refresh → back to 25. The box LOOKED like where you set a default but was a volatile MIRROR of the
+  one global setting.
+- ROOT CAUSE: `wizardManager.applyProbeDefaults()` (called on EVERY `open()`, :236) re-seeds every probe field from
+  `settings.probes[key]` (PROBE_DEFAULT_FIELDS: m_dist/c_dist/... ← maxDist). There was NO per-wizard persistence at
+  all — a wizard-field edit lived only in the DOM until reopen. (`app.saveDefaults()` is unrelated — it bakes
+  defaults into a DOWNLOADED standalone HTML, not localStorage.) The user's persisted `settings.probes.maxDist=25`
+  (legacy localStorage) won; the CODE default is already 100 (settingsPanel.js:85), so this is their saved data, not
+  a code default.
+- FIX (wizardManager.js, ~20 lines, all no-op when no override exists):
+  - `ddcs_probe_field_overrides` localStorage map (load/save helpers). `applyProbeDefaults()` now prefers an
+    override over the global: `v = (id in overrides) ? overrides[id] : p[key]`.
+  - `setupWizardInputListeners()` adds a `change` listener on each PROBE_DEFAULT_FIELDS field that persists the value.
+    `change` fires on USER commit (blur/Enter), NOT on applyProbeDefaults' programmatic `.value` set — so ONLY
+    genuine edits persist; an untouched field still follows the global. Overrides ONLY its own field (by id) — never
+    writes the global setting.
+  - Edit-an-op path UNAFFECTED: `openForEdit → _seedForm` seeds from the op's params (single truth), independent of
+    applyProbeDefaults → no regression.
+- WHY THIS over the human's offered alternative ("we can remove global"): keeps "set my probe once in Settings →
+  inherited by every fresh wizard"; smaller + non-destructive (removing the global = ripping out PROBE_DEFAULT_FIELDS
+  seeding + the Settings probe-defaults plumbing). Human greenlit the sticky direction ("no fix it").
+- VERIFY (probe-field-sticky.spec.js, real DOM, global 33 / sticky 77 so global≠sticky disambiguates): fresh open →
+  m_dist=33 (global beats HTML); edit→77 + `change` → override has 77 AND global UNCHANGED (33); page.reload() + reopen
+  → m_dist=77 (survives refresh); open corner → c_dist=33 (un-edited field still follows the global). Full suite
+  **362 passed / 2 skipped** (incl. the new test; middle-animator + form-widgets flakes passed this run). HUMAN's eyes
+  pending (they were testing live).
+- OPEN for the advisor: (1) RE-DISPATCH boss cross-over (the real turn-32 task). (2) The "default = 100" ask: code
+  default is already 100; the user's stale persisted global of 25 is their localStorage data — the sticky fix lets
+  them lock 100 per-wizard, or they can set Settings▸Probe defaults▸Max search→100 (global). Not separately migrated.
+- state: branch main · committed this turn (LOCAL, unpushed) · suite 362/364 (2 skipped). Boss cross-over pending.

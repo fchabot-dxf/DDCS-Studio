@@ -33,6 +33,21 @@ const PROBE_DEFAULT_FIELDS = {
     al_q: 'qStop', c_q: 'qStop', circ_q: 'qStop', m_q: 'qStop', p_q: 'qStop', rc_q: 'qStop', rcl_q: 'qStop',
 };
 
+// Per-wizard STICKY overrides: editing a probe field (e.g. corner MAX PROBE) is remembered for THAT wizard,
+// keyed by its field id — so it survives reopen/refresh and overrides ONLY its own field, never the global
+// probe-default (settings.probes). A field the user never touched still follows the global on open. The wizard
+// box looked like where you set a default but was really a volatile mirror of the one global setting; this makes
+// the per-field edit stick where the user expects it.
+const PROBE_FIELD_OVERRIDE_KEY = 'ddcs_probe_field_overrides';
+function loadProbeFieldOverrides() {
+    try { return JSON.parse(localStorage.getItem(PROBE_FIELD_OVERRIDE_KEY)) || {}; } catch (_) { return {}; }
+}
+function saveProbeFieldOverride(id, value) {
+    const o = loadProbeFieldOverrides();
+    o[id] = value;
+    try { localStorage.setItem(PROBE_FIELD_OVERRIDE_KEY, JSON.stringify(o)); } catch (_) { /* storage full / disabled — non-fatal */ }
+}
+
 // EDIT seeding: the form-field binding now lives ON each SCHEMA param (blocks/opSchema.js, SCHEMA[op][param].field).
 // paramFields(opType) returns the { param → field id } map for an op (the old PARAM_FIELDS, derived from the schema);
 // _seedForm() uses it to restore params into the form when re-opening a wizard to edit an op (params = single truth).
@@ -123,16 +138,24 @@ export class WizardManager {
             } else {
                 element.addEventListener('input', () => this.update());
             }
+            // Per-wizard sticky: a committed edit to a probe-default field is remembered (its own field only,
+            // not the global). 'change' fires on user commit (blur/Enter) — NOT on applyProbeDefaults' programmatic
+            // .value set — so only genuine edits persist; untouched fields keep following the global default.
+            if (id in PROBE_DEFAULT_FIELDS) {
+                element.addEventListener('change', () => saveProbeFieldOverride(id, element.value));
+            }
         });
     }
 
 
-    /** Pre-fill the touch-probe wizards' per-op fields from the global 3D-probe defaults. */
+    /** Pre-fill the touch-probe wizards' per-op fields from the global 3D-probe defaults — but a per-wizard
+     *  STICKY override (a value the user edited in THIS wizard) wins, so the edit survives reopen/refresh. */
     applyProbeDefaults() {
         const p = (window.ddcsGetSettings && window.ddcsGetSettings().probes) || null;
         if (!p) return;
+        const overrides = loadProbeFieldOverrides();
         for (const [id, key] of Object.entries(PROBE_DEFAULT_FIELDS)) {
-            const v = p[key];
+            const v = (id in overrides) ? overrides[id] : p[key];   // sticky per-field edit beats the global default
             if (v == null) continue;
             const e = el(id);
             if (e) e.value = v;
