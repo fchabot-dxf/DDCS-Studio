@@ -39,6 +39,11 @@ export class GcodeExecutionEngine {
         // runs. The probe-vs-stock collision test adds this so probes touch the real surface; the recorded
         // route stays origin-relative (the viz offsets it by the start marker). Default = origin.
         this._stockOffset = stockOffset || { x: 0, y: 0, z: 0 };
+        // Per-pass operator starts (one per REPOSITION pass) in STOCK coords. After a reposition the operator re-parks
+        // the probe at the NEXT start (②③④), so the probe-vs-stock collision must run from THAT pass's start, not the
+        // pass-0 _stockOffset (① — else a boss-both's 2nd-axis probe fires from ① into open space and misses). Set
+        // externally (trace.js / the live run); falls back to _stockOffset for pass 0 / single-pass (byte-identical).
+        this._passStarts = null;
         // Work origin (active WCS) expressed in MACHINE coords — the machine coordinate of part-zero.
         // Lets G53 machine-frame moves draw in the part/WCS frame the rest of the route uses:
         // part = machine - wcsOffset. Default = origin, so when unknown (no dump/profile) G53 is unchanged.
@@ -950,7 +955,8 @@ export class GcodeExecutionEngine {
                 // Probe-vs-stock geometry runs in STOCK space: the tool's real position is the operator start
                 // (_stockOffset) + the local pos. The recorded route stays origin-relative (the viz offsets it
                 // by the start marker), so dir is the same in both frames — only the start point shifts.
-                const O = this._stockOffset || { x: 0, y: 0, z: 0 };
+                // Part 1: the probe fires from its CURRENT pass's start (②③④ after a reposition), not always pass-0's ①.
+                const O = (this._passStarts && this._passStarts[this._pass]) || this._stockOffset || { x: 0, y: 0, z: 0 };
                 const aStart = { x: O.x + this.pos.x, y: O.y + this.pos.y, z: O.z + this.pos.z };
                 const bEnd = { x: O.x + target.x, y: O.y + target.y, z: O.z + target.z };
                 const dir = { x: target.x - this.pos.x, y: target.y - this.pos.y, z: target.z - this.pos.z };

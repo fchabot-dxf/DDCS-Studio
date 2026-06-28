@@ -308,17 +308,35 @@ export function createPreviewPanel(container, opts = {}) {
         // Inferred operator start (wizard preview): probes test from the real tool position so an incremental
         // probe macro doesn't trace from the origin (on the stock face) and clamp its first probe to zero.
         const st = getStartPos();
+        // INC1/Part1: per-pass operator starts, computed BEFORE the trace so the probe COLLISION fires from each pass's
+        // start ② (not always pass-0's ① — else a boss-both 2nd-axis probe misses). Mode-independent so BOTH views render
+        // them. Pass 0 honours the user drag (st via getStartPos); p>0 falls back to the wizard's per-pass HINT, then the
+        // last position (a dragged ② persists). The pass COUNT comes from the wizard's hints (the middle's inferStarts
+        // mirror its reposition() calls); single-pass ops have no hints → one start; the engine falls back to _stockOffset.
+        {
+            const hints = get('getStartHints');
+            const hintFor = (p) => Array.isArray(hints) ? (hints[p] || hints[0]) : null;
+            const count = Math.max(Array.isArray(hints) ? hints.length : 0, 1);
+            const next = [];
+            for (let p = 0; p < count; p++) {
+                // a USER edit (userStarts) beats everything; then pass 0's getStartPos (st); then the wizard HINT; then the last value.
+                const h = userStarts[p] || (p === 0 && st) || hintFor(p) || passStarts[p] || { x: 0, y: 0, z: 0 };
+                next.push({ x: +h.x || 0, y: +h.y || 0, z: +h.z || 0 });
+            }
+            passStarts = next;
+        }
         const stk = stockForViz(), mch = machineForViz(), wo = wcsForViz() || {};
         let parsed;
         try {
-            parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: wcsForViz() });
+            // passStarts → the engine fires each REPOSITION pass's probe from ITS start ② (Part 1), so boss-both collides.
+            parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: wcsForViz(), passStarts });
             // (b) Faithful machine frame: an ABSOLUTE (mill) program's G53 / machine moves must resolve to where the
             // part actually SITS in the envelope, not at part-zero. Part-zero's machine Z = the table + the datum's
             // height above the stock bottom. Re-trace once with that as the work-origin Z so e.g. `G53 Z0` (the
             // end "safe Z" retract) draws at machine home (the top) instead of plunging onto a bottom-datum origin.
             if (mch && mch.show && stk && stk.x > 0 && parsed.stats && parsed.stats.absolute) {
                 const z = Math.min(0, mch.z || 0) + datumZFrac(stk.datum) * (Number(stk.z) || 0);
-                parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: { x: wo.x || 0, y: wo.y || 0, z } });
+                parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: { x: wo.x || 0, y: wo.y || 0, z }, passStarts });
             }
         } catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
         segs = parsed.segments || [];
@@ -326,20 +344,6 @@ export function createPreviewPanel(container, opts = {}) {
         // position (an incremental probe) is start-relative → the path emanates from the operator START; an absolute
         // (G90/G53 mill) op sits at its own coords. forceMachine (ATC) pins to the machine frame regardless.
         curAnchor = !forceMachine && !(parsed.stats && parsed.stats.absolute);
-        // INC1: per-pass operator starts, mode-independent so BOTH views render them. Pass 0 honours the user drag (st
-        // via getStartPos); p>0 falls back to the wizard's per-pass HINT, then the last position (a dragged ② persists).
-        {
-            const hints = get('getStartHints');
-            const hintFor = (p) => Array.isArray(hints) ? (hints[p] || hints[0]) : null;
-            const passCount = (parsed.stats && parsed.stats.passes) || 1;
-            const next = [];
-            for (let p = 0; p < passCount; p++) {
-                // a USER edit (userStarts) beats everything; then pass 0's getStartPos (st); then the wizard HINT; then the last value.
-                const h = userStarts[p] || (p === 0 && st) || hintFor(p) || passStarts[p] || { x: 0, y: 0, z: 0 };
-                next.push({ x: +h.x || 0, y: +h.y || 0, z: +h.z || 0 });
-            }
-            passStarts = next;
-        }
         t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
         t2.setStarts(passStarts);   // the draggable 2D start handles — ALL per-pass starts, numbered (①②…)
         const passSources = (parsed.stats && parsed.stats.passSources) || [];   // per-pass reposition source → marker colour (auto=cyan, manual=amber)
@@ -472,6 +476,7 @@ export function createPreviewPanel(container, opts = {}) {
         eng.autoAnswer = window.ioPanel ? window.ioPanel.isAutoSensors() : true;
         eng.stock = stockForViz();
         eng._stockOffset = getStartPos() || { x: 0, y: 0, z: 0 };   // probes test from the operator start (see trace.js)
+        eng._passStarts = (passStarts && passStarts.length) ? passStarts : null;   // Part 1: each REPOSITION pass probes from ITS start ② (boss-both)
         eng._wcsOffset = wcsForViz() || { x: 0, y: 0, z: 0 };          // G53 machine moves draw in the part frame (see trace.js)
         if (mode === '3d') ensureViz();
         if (viz && viz.setSimSpeed) viz.setSimSpeed(simSpeed());   // probe discs fade in SIM time (track the speed button)

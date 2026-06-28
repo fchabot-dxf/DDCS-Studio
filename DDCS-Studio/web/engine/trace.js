@@ -25,6 +25,7 @@ export function traceToolpath(text, opts = {}) {
         wcsOffset: opts.wcsOffset || null,   // work origin in MACHINE coords → G53 moves draw in the part frame
         createVarStore: opts.createVarStore || null,
     });
+    eng._passStarts = opts.passStarts || null;   // Part 1: per-pass starts → the probe collision fires from each pass's start ②
     const result = eng.trace(String(text || ''));
     eng.dispose();   // transient per-call engine — detach its io_change bridge listener so it doesn't leak
     return result;

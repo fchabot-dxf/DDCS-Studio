@@ -1366,3 +1366,29 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
     no longer depends on the diagonal's exactness (cosmetic for the sim); the REAL MACHINE needs it directionally right + tunable.**
   - **Why Part 1 is the keystone:** it makes AUTO + MANUAL probes COLLIDE + land on ② in the sim regardless of the diagonal;
     Part 2 is the real-machine/cosmetic geometry. STOP + pass to advisor with the proposal (geometry + sim-collision design).
+
+## 2026-06-28 — turn 65 PART 1 (CORE, both modes): the probe COLLISION follows the per-pass start ②
+
+- **Advisor CONFIRMED the gate → built Part 1.** The engine's probe-vs-stock collision now fires from each REPOSITION
+  pass's start (②③④), not always pass-0's ① (`_stockOffset`).
+- **Plumbing (3 files):**
+  - [GcodeExecutionEngine.js](DDCS-Studio/web/engine/GcodeExecutionEngine.js): added `this._passStarts = null`; the collision
+    (was `const O = this._stockOffset`) → **`O = (this._passStarts && this._passStarts[this._pass]) || this._stockOffset`**.
+    So the probe ray starts at `passStarts[_pass] + this.pos` = ② + local. Falls back to `_stockOffset` for pass 0 / when
+    unset → **single-pass byte-identical** (`passStarts[0]` == `_stockOffset` == ①).
+  - [trace.js](DDCS-Studio/web/engine/trace.js): `eng._passStarts = opts.passStarts || null` so the STATIC trace clamps too.
+  - [createPreviewPanel.js](DDCS-Studio/web/viz/createPreviewPanel.js): moved the per-pass `passStarts` computation BEFORE
+    the trace (it only needs the wizard hints + userStarts + st — no `parsed` dependency), pass `passStarts` into both
+    `traceToolpath` calls, and set `eng._passStarts` at play (the live run). Count now = `max(hints.length, 1)` (the middle's
+    inferStarts mirror its reposition() calls; single-pass ops have no hints → 1; the engine falls back safely past the array).
+- **VERIFIED the real symptom** (real MiddleWizard macros, boss stock, dist=130):
+  - **MANUAL (4 passes):** WITHOUT passStarts, passes 1/2/3 ran the full max-probe (~130 = MISS); WITH, all 4 fast probes
+    clamp (`[15,2]` each = COLLIDE). Fully fixed.
+  - **AUTO (2 passes):** the 2nd-axis (Y, pass 1) probe went `100`→`[15,2,20,2]` (MISS→COLLIDE) once it fires from ②.
+  - 40 targeted specs green (engine-trace · cam-slot-sim · middle-trans-traverse · per-pass-live-anchor · per-pass-starts-2d
+    · marker-colour · the new boss-probe-collision) — single-pass byte-identical, no regression. New permanent test
+    `boss-probe-collision.spec.js` (the per-pass collision = the regression guard).
+- **⚠ OBSERVED, OUT OF THIS DISPATCH (flagged for the advisor):** AUTO pass-0's 2nd X wall still misses when `dist` < boss +
+  outsets — that's the IN-AXIS cross-over (`traverseOver`, the `#19=[#1+#2]` traverse WITHIN one pass, fires from ①), not the
+  per-pass reposition. It's PRE-EXISTING and dist-dependent (with dist=130 it clears; with dist=100 the cross-over lands inside
+  the boss). Part 1 (per-pass) doesn't touch it; the trans-axis diagonal is Part 2a. Noting it as a possible separate follow-up.
