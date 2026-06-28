@@ -128,7 +128,7 @@ export function createPreviewPanel(container, opts = {}) {
     // loaded, warmup/drawbar with no motion, the parameter-write table). Set by the host via setForceMachine().
     let forceMachine = false;
     let rotaryFixture = false;   // host hint: show the 4th-axis rig (rotary probe ops). Applied to the lazy viz on create + on toggle.
-    let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null, lastStockKey = '';
+    let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null, lastStockKey = '', curAnchor = false;
     let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false, liveTimer = null;
 
     // DRO — a dual numeric readout mirroring the DDCS controller: Work (the tool's program position) + Mach. Work comes
@@ -296,8 +296,14 @@ export function createPreviewPanel(container, opts = {}) {
             }
         } catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
         segs = parsed.segments || [];
+        // ONE anchor flag for BOTH views (mirrors the 3D's v._anchorToStart): an op with no established absolute
+        // position (an incremental probe) is start-relative → the path emanates from the operator START; an absolute
+        // (G90/G53 mill) op sits at its own coords. forceMachine (ATC) pins to the machine frame regardless.
+        curAnchor = !forceMachine && !(parsed.stats && parsed.stats.absolute);
         t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
         t2.setStart(st);        // the draggable 2D start handle
+        t2.setAnchor(curAnchor);                              // 2D mirrors the 3D anchor: anchored → path emanates from the start, not the stock pin
+        t2.setMachine(curAnchor ? null : machineForViz());   // anchored (probe) → LOCAL scene (no envelope), like the 3D's setMachine(null)
         if (mode === '3d') {
             const v = ensureViz();
             if (v) {
@@ -308,7 +314,7 @@ export function createPreviewPanel(container, opts = {}) {
                 // and moving it must not drag the path. Set BEFORE setSegments so _rebuild uses it.
                 // forceMachine (ATC) pins the op to the machine frame: never anchor to the start, always show the
                 // envelope — tool changes are G53 even when this particular trace didn't reach one.
-                const anchor = !forceMachine && !(parsed.stats && parsed.stats.absolute);
+                const anchor = curAnchor;
                 v._anchorToStart = anchor;
                 // ONE flag drives the whole frame: an incremental / operator-relative op (a probe) is LOCAL —
                 // stock top-at-0 AND no machine envelope; an absolute / WCS op (mill, WCS setup) shows the MACHINE
@@ -316,8 +322,7 @@ export function createPreviewPanel(container, opts = {}) {
                 if (anchor !== lastAnchor) {
                     v.setStock(stockForViz());
                     v.setMachine(anchor ? null : machineForViz());     // probe → no envelope; mill → per settings
-                    t2.setMachine(anchor ? null : machineForViz());    // 2D mirrors
-                    lastAnchor = anchor;
+                    lastAnchor = anchor;                               // (the 2D's anchor/machine are set above, for both views)
                 }
                 // Place EVERY pass's start marker before setSegments so each anchored (probe) pass offsets to its own
                 // start. A multi-point probe (rotary 3-point fit, alignment A/B) repositions between touches → one pass
@@ -412,7 +417,7 @@ export function createPreviewPanel(container, opts = {}) {
             if (v) { if (v.renderer) v.renderer.domElement.style.display = ''; v.setActive(true); }
         }
         if (active) setGcode();
-        if (mode === '2d') { t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.fit(); }   // frame the full scene on toggle
+        if (mode === '2d') { t2.setMachine(curAnchor ? null : machineForViz()); t2.setStock(stockForViz()); t2.fit(); }   // frame the full scene on toggle (anchored → local, like the 3D)
         syncJog();
     }
     // The I/O button toggles the FLOATING virtual-I/O panel (mounts in <body>, draggable). It OVERLAYS the

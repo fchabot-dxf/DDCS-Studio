@@ -48,7 +48,7 @@ function datumXY(s) {
 
 /** Bind a canvas → a 2D top-down scene controller (mirrors the GcodeViz3D inputs that matter in plan view). */
 export function createToolpath2d(canvas, opts = {}) {
-    let segs = [], machine = null, stock = null, wcs = null, gridStep = 0;
+    let segs = [], machine = null, stock = null, wcs = null, gridStep = 0, anchorToStart = false;
     let view = null;                 // { ox, oy, scale }: screenX = ox + x*scale, screenY = oy - y*scale (Y up)
     let cursor = null;               // program coords under the pointer → readout chip
     let start = null;                // operator start {x,y,z} → a DRAGGABLE handle (re-traces on release via opts.onStartDrag)
@@ -59,9 +59,10 @@ export function createToolpath2d(canvas, opts = {}) {
     const W = () => canvas.clientWidth, H = () => canvas.clientHeight;
     const tx = (x) => view.ox + x * view.scale;
     const ty = (y) => view.oy - y * view.scale;
-    // The STOCK rides its "Sits at WCS" pin (table offset − workOrigin); the TOOLPATH + start are in the program/part
-    // frame (part-zero). Option A (advisor #13): make the toolpath + start ride the SAME pin so they sit ON the stock
-    // instead of floating off it by the WCS offset. ptx/pty = the part-frame transform (tx/ty + the stock pin).
+    // The STOCK rides its "Sits at WCS" pin (table offset − workOrigin). The PATH has TWO frames, mirroring the 3D's
+    // _anchorToStart (gcodeViz3d): an ANCHORED op (incremental/probe) EMANATES from the operator START marker (the
+    // spindle pos) — the 3D's +starts[0] — while an ABSOLUTE/mill op rides the stock's WCS pin (#13). When anchored the
+    // panel sets machine=null → the scene is LOCAL (pin=0) → the stock sits at part-zero and the start marker AT the path origin.
     const stockPin = () => {
         const s = stock;
         if (!s || !s.pin || s.pin === 'origin' || !(machine && machine.wcs && machine.wcs.table)) return { x: 0, y: 0 };
@@ -69,8 +70,14 @@ export function createToolpath2d(canvas, opts = {}) {
         const t = machine.wcs.table[gi], wo = machine.workOrigin || {};
         return t ? { x: (Number(t.x) || 0) - (wo.x || 0), y: (Number(t.y) || 0) - (wo.y || 0) } : { x: 0, y: 0 };
     };
-    const ptx = (x) => tx(x + stockPin().x);
-    const pty = (y) => ty(y + stockPin().y);
+    // PATH transform: anchored → emanate from the operator start (spindle pos); else → the stock WCS pin (#13).
+    const pathOff = () => (anchorToStart && start) ? { x: start.x, y: start.y } : stockPin();
+    const ptx = (x) => tx(x + pathOff().x);
+    const pty = (y) => ty(y + pathOff().y);
+    // STOCK-PIN transform: the stock + the draggable start HANDLE ride the WCS pin. When anchored, machine=null →
+    // pin=0, so the handle sits AT the start (= where the anchored path emanates); when absolute, both ride the pin (#13).
+    const sptx = (x) => tx(x + stockPin().x);
+    const spty = (y) => ty(y + stockPin().y);
 
     // ---- scene geometry (program/work frame; part-zero at 0,0) ----
     function envelopeRect() {
@@ -90,7 +97,7 @@ export function createToolpath2d(canvas, opts = {}) {
         let bb = null;
         const ext = (r) => { if (!r) return; bb = bb ? { minX: Math.min(bb.minX, r.minX), minY: Math.min(bb.minY, r.minY), maxX: Math.max(bb.maxX, r.maxX), maxY: Math.max(bb.maxY, r.maxY) } : { minX: r.minX, minY: r.minY, maxX: r.maxX, maxY: r.maxY }; };
         ext(envelopeRect()); ext(stockRect());
-        if (segs.length) { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; segs.forEach((s) => { a = Math.min(a, s.x1, s.x2); c = Math.max(c, s.x1, s.x2); b = Math.min(b, s.y1, s.y2); d = Math.max(d, s.y1, s.y2); }); const p = stockPin(); ext({ minX: a + p.x, minY: b + p.y, maxX: c + p.x, maxY: d + p.y }); }
+        if (segs.length) { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; segs.forEach((s) => { a = Math.min(a, s.x1, s.x2); c = Math.max(c, s.x1, s.x2); b = Math.min(b, s.y1, s.y2); d = Math.max(d, s.y1, s.y2); }); const p = pathOff(); ext({ minX: a + p.x, minY: b + p.y, maxX: c + p.x, maxY: d + p.y }); }
         if (!bb) bb = { minX: 0, minY: 0, maxX: 100, maxY: 100 };
         return { minX: Math.min(0, bb.minX), minY: Math.min(0, bb.minY), maxX: Math.max(0, bb.maxX), maxY: Math.max(0, bb.maxY) };   // always include the origin
     }
@@ -103,7 +110,7 @@ export function createToolpath2d(canvas, opts = {}) {
     function snapPoint(px, py) {
         const TH2 = 11 * 11;
         const sr = stockRect();
-        const p = stockPin();   // path nodes ride the same pin as the drawn toolpath (stock corners already do, via stockRect)
+        const p = pathOff();   // path nodes ride the same frame as the drawn toolpath (anchored→start, else→pin; stock corners use stockRect)
         // tier 1: discrete points
         let bestPt = null, bestPtD = TH2;
         const pt = (wx, wy) => { const dx = tx(wx) - px, dy = ty(wy) - py, d = dx * dx + dy * dy; if (d < bestPtD) { bestPtD = d; bestPt = { x: wx, y: wy }; } };
@@ -148,7 +155,7 @@ export function createToolpath2d(canvas, opts = {}) {
         ctx.save(); ctx.strokeStyle = '#33d6ff'; ctx.lineWidth = 1.6; ctx.strokeRect(hx - 5, hy - 5, 10, 10); ctx.restore();
     }
     function drawStartHandle(ctx) {   // ruby start marker + grab-ring — the draggable operator start (matches the 3D ① marker)
-        const hx = ptx(start.x), hy = pty(start.y);   // rides the stock pin (Option A) so it sits on the stock with the path
+        const hx = sptx(start.x), hy = spty(start.y);   // rides the stock pin (#13); when anchored (pin=0) it sits AT the start = the path origin
         ctx.save();
         ctx.fillStyle = 'rgba(231,76,91,0.9)'; ctx.beginPath(); ctx.arc(hx, hy, 5.5, 0, Math.PI * 2); ctx.fill();
         ctx.lineWidth = 1.6; ctx.strokeStyle = 'rgba(231,76,91,0.7)'; ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI * 2); ctx.stroke();
@@ -244,6 +251,7 @@ export function createToolpath2d(canvas, opts = {}) {
     function setWcs(w) { wcs = w || null; }
     function setGridStep(s) { gridStep = Number(s) || 0; if (view) paint(); }
     function setStart(p) { start = p ? { x: +p.x || 0, y: +p.y || 0, z: +p.z || 0 } : null; if (view) paint(); }
+    function setAnchor(v) { anchorToStart = !!v; if (view) paint(); }   // mirror the 3D's _anchorToStart: anchored → path emanates from the start, not the stock pin
     function setToolPosition(p) { toolPos = p ? { x: +p.x || 0, y: +p.y || 0 } : null; if (view && anim.playing) paint(); }   // live sim head (in sync with the 3D)
     function setGcode(text) { setSegments(traceToolpath(text).segments); }
 
@@ -262,7 +270,7 @@ export function createToolpath2d(canvas, opts = {}) {
         const ns = Math.max(0.02, Math.min(400, view.scale * Math.exp(-e.deltaY * 0.0015)));
         view.scale = ns; view.ox = sx - wx * ns; view.oy = sy + wy * ns; paint();
     }, { passive: false });
-    const nearHandle = (e) => { if (!start || !view) return false; const r = canvas.getBoundingClientRect(); return Math.hypot(e.clientX - r.left - ptx(start.x), e.clientY - r.top - pty(start.y)) <= 12; };
+    const nearHandle = (e) => { if (!start || !view) return false; const r = canvas.getBoundingClientRect(); return Math.hypot(e.clientX - r.left - sptx(start.x), e.clientY - r.top - spty(start.y)) <= 12; };
     canvas.addEventListener('pointerdown', (e) => {
         if (!view) return;
         if (nearHandle(e)) { dragStart = true; try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* */ } return; }   // grab the start handle (not a pan)
@@ -287,7 +295,7 @@ export function createToolpath2d(canvas, opts = {}) {
     canvas.addEventListener('mouseleave', () => { cursor = null; if (!anim.playing) paint(); });
 
     return {
-        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setToolPosition, redraw, fit, play, stop, toggle, seek,
+        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setAnchor, setToolPosition, redraw, fit, play, stop, toggle, seek,
         get playing() { return anim.playing; },
         get count() { return segs.length; },
     };

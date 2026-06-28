@@ -1054,3 +1054,54 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   + preview-2d snap/default still green. Full suite 366 passed (the lone failure = the KNOWN middle-animator
   parallel-load flake; passes 6/6 isolated — unrelated, my change doesn't touch the SVG animator). **HUMAN's eyes
   pending** (advisor's real-symptom: a probe Simulate → the 2D marker travels the path in time with the 3D, on the stock).
+
+## 2026-06-28 — turn 42: 2D INCREMENTAL toolpath anchors to the SPINDLE START (mirror the 3D's _anchorToStart)
+
+- task (dispatched turn 41): the 2D INCREMENTAL probe path wrongly began on G54 (the stock pin); it must EMANATE from
+  the operator SPINDLE START. #13 (`bf6de65`) applied the stock-WCS pin to the path UNCONDITIONALLY — right for
+  absolute/mill (turn-39 confirmed), wrong for incremental. The 3D already distinguishes via
+  `v._anchorToStart = !forceMachine && !stats.absolute` (createPreviewPanel:311); the 2D did NOT mirror it. Verify-first,
+  then mirror it (incremental→anchor to start, absolute→keep #13). GATE if not cleanly scopable without #13 regression.
+
+- VERIFY-FIRST (mechanism, code + EMPIRICAL on the REAL CornerWizard macro — not literals, per [[verify-real-symptom-not-just-test]]):
+  - The trace is ORIGIN-RELATIVE — trace.js doc (`opts.start`): *"The route stays origin-relative; the viz offsets it by
+    the start."* The 3D offsets by `starts[0]` when anchored (`gcodeViz3d.js:483` anim tool, `:685` rebuild:
+    `off = _anchorToStart ? mk : {0,0,0}`). The 2D offset EVERYTHING by `stockPin()` (ptx/pty) regardless → for an
+    incremental op the origin-relative path emanates from part-zero, drawn at the stock G54 corner, NOT the start.
+  - Empirical (throwaway spec, real `new CornerWizard().generate({corner:'fl',probeZ:true})` traced with start
+    `(-25.7,77.4)` + a G54-pinned stock): **`absolute:false`, `passes:1` (SINGLE-PASS → the "2nd probe offset" is the
+    SAME root, no per-pass component), first node `x1:0,y1:0` (origin-relative), `probe:6`.** The 2D drew the path
+    origin at the stock pin (screen 137.5,354.7) while the start marker sat at the spindle pos (128.6,328.0) — a gap of
+    exactly the start vector. Symptom reproduced. (DRO repro matched: start work `(-25.7,77.4)` → machine `(14.3,-472.6)`.)
+  - **2nd-probe-offset cause = SAME root** (single-pass): once the whole path emanates from the start, the later probe
+    moves are part of that same continuous path and land correctly. NOT the multi-pass `getStartHints` path (corner has
+    no REPOSITION → passes=1; only middle/alignment/rotary are multi-pass, a separate pre-existing 2D limitation).
+  - **GATE → did NOT trip (cleanly scopable):** the absolute case is BYTE-IDENTICAL by construction (anchor=false →
+    `pathOff()=stockPin()`, machine stays set → exactly #13); only the incremental branch changes. So no #13 regression risk.
+  - **Declared-vs-inferred (addendum):** today's preview start = the wizard's `inferStart` via `getStart` (INFERRED),
+    overridable by `curStart` (a user drag = DECLARED); `getStartPos()` prefers curStart→getStart→viz.starts[0]. The fix
+    anchors the path to the SAME `st` already fed to `t2.setStart(st)` (the start marker) → ONE source for both the path
+    origin AND the marker, so they can't diverge again. No NEW inference is baked in (reuses the existing resolution).
+    Advisor said they'll make the start first-class DECLARED next turn — so I did NOT build backlog #7/#8 here.
+
+- did (the scoped mirror):
+  - `viz/toolpath2d.js`: added an `anchorToStart` flag + `setAnchor(v)` (exported). Split the transform into TWO:
+    `pathOff() = (anchorToStart && start) ? start : stockPin()` drives the PATH (`ptx/pty` → strokeSegs, the live head,
+    snap path-nodes, fit-bounds); a new `sptx/spty = tx/ty + stockPin()` drives the STOCK-PIN-frame items (the draggable
+    start HANDLE + nearHandle). When anchored the panel sends machine=null → stockPin=0 → the handle sits AT the start =
+    where the anchored path emanates (they coincide); the start-drag inverse already subtracts stockPin (unchanged).
+  - `viz/createPreviewPanel.js`: compute `curAnchor` ONCE per `setGcode` (hoisted out of the 3D-only branch so BOTH
+    views get it), then `t2.setAnchor(curAnchor)` + `t2.setMachine(curAnchor ? null : machineForViz())` for the 2D. The
+    3D branch now reuses `curAnchor`; its redundant 2D `t2.setMachine` line removed. The 2D-toggle (`setMode`) now also
+    sends `curAnchor ? null : machineForViz()` (was unconditional `machineForViz()` → it clobbered the anchor in 2D mode).
+- WHY machine=null when anchored (not just the path offset): mirrors the 3D's `setMachine(null)` — an incremental probe
+  is operator-relative, no meaningful machine frame. If the stock stayed PINNED (~+550mm at the WCS pin) while the path
+  moved to the start (work frame), the stock would sit ~600mm from the probe path = incoherent (probe nowhere near the
+  stock). Going LOCAL keeps the stock at part-zero, near the start, so the probe approach reads correctly — same as 3D.
+
+- VERIFY (real-symptom): `tests/toolpath2d-anchor.spec.js` (NEW, REAL CornerWizard macro): ANCHORED → the origin-relative
+  first node + the LIVE head are drawn EXACTLY at the start marker (gap <1px, `head.live=true`); ABSOLUTE → the path node
+  still snaps at program+pin (100,-10) = #13 preserved. toolpath2d-pin/anim + preview-2d snap/default/start-handle +
+  wizard-preview-2d all green. **Full suite 369 passed / 2 skipped, ZERO failures** (the middle-animator flake passed too).
+  **HUMAN-CONFIRMED ("good" + screenshot):** the probe path now emanates from the ruby START marker and runs to the
+  stock — it starts at the spindle start, not on G54. Absolute/mill still pinned (no #13 regression). Start handle still draggable.
