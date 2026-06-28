@@ -342,6 +342,8 @@ export function createPreviewPanel(container, opts = {}) {
         }
         t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
         t2.setStarts(passStarts);   // the draggable 2D start handles — ALL per-pass starts, numbered (①②…)
+        const passSources = (parsed.stats && parsed.stats.passSources) || [];   // per-pass reposition source → marker colour (auto=cyan, manual=amber)
+        if (t2.setStartSources) t2.setStartSources(passSources);
         t2.setAnchor(curAnchor);                              // 2D mirrors the 3D anchor: anchored → path emanates from the start, not the stock pin
         t2.setMachine(curAnchor ? null : machineForViz());   // anchored (probe) → LOCAL scene (no envelope), like the 3D's setMachine(null)
         if (mode === '3d') {
@@ -372,6 +374,7 @@ export function createPreviewPanel(container, opts = {}) {
                 if (v.starts) {   // sync the 3D markers from the shared per-pass starts (computed above for both views)
                     for (let p = 0; p < passStarts.length; p++) v.starts[p] = { x: passStarts[p].x, y: passStarts[p].y, z: passStarts[p].z };
                 }
+                if (v.setStartSources) v.setStartSources(passSources);   // colour each start marker by its reposition source (auto=cyan, manual=amber)
                 v.setSegments(parsed, !fitted); fitted = true;
                 if (v.setSimTool) v.setSimTool(simTool(code, parsed));   // per-op tool from the tool table (see simTool)
                 if (v.setSimMode) v.setSimMode(((parsed.stats && parsed.stats.probe) > 0) ? 'probe' : 'mill');   // probe = translucent stock, mill = solid

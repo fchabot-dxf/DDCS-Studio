@@ -230,9 +230,9 @@ export class GcodeViz3D {
         const c = document.createElement('canvas');
         c.width = c.height = 128;
         const ctx = c.getContext('2d');
-        ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 18; ctx.lineJoin = 'round';   // thick stroke (hi-res canvas keeps it crisp)
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 18; ctx.lineJoin = 'round';   // WHITE so material.color tints it per-pass (cyan=auto / amber=manual); hi-res keeps it crisp
         ctx.beginPath(); ctx.moveTo(64, 14); ctx.lineTo(114, 64); ctx.lineTo(64, 114); ctx.lineTo(14, 64); ctx.closePath(); ctx.stroke();   // hollow diamond outline (inset for the thick line)
-        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), color: 0x22d3ee, depthTest: false, transparent: true }));   // cyan default (auto)
         sp.scale.set(9, 9, 1);   // ~9 mm
         sp.renderOrder = 11;
         return sp;
@@ -294,16 +294,20 @@ export class GcodeViz3D {
         this.render();
     }
 
-    // Brighten the selected start glyph, dim the rest, so it's clear which start the pendant jogs. The cyan comes from
-    // the lozenge texture; brighten/dim via OPACITY (red belongs to the moving probe tip now).
+    // Brighten the selected start glyph, dim the rest (via OPACITY), AND colour each by its reposition SOURCE: AUTO
+    // traverse = CYAN, MANUAL jog = AMBER (the white lozenge texture is tinted by material.color). Red is the probe tip.
     _highlightSelectedStart() {
         for (let p = 0; p < this.spindleMarkers.length; p++) {
             const glyph = this.spindleMarkers[p].children[0];
             if (!glyph || !glyph.material) continue;
             const sel = p === this.selectedStart;
-            glyph.material.opacity = sel ? 1 : 0.45;   // selected = full cyan, the rest dimmed
+            glyph.material.opacity = sel ? 1 : 0.45;
+            const src = (this._startSources && this._startSources[p]) || 'auto';
+            glyph.material.color.setHex(src === 'manual' ? 0xffb300 : 0x22d3ee);   // amber = manual jog, cyan = auto traverse
         }
     }
+    // Per-pass reposition sources (['auto'|'manual',…]) → start-marker colour. Re-applies via the highlight pass.
+    setStartSources(sources) { this._startSources = Array.isArray(sources) ? sources : []; this._highlightSelectedStart(); this.render(); }
 
     // Ray-pick a start marker (ruby + numbered badge) under the pointer; returns pass index or -1.
     _pickMarker(e) {

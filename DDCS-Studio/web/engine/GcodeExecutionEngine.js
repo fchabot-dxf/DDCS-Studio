@@ -211,6 +211,7 @@ export class GcodeExecutionEngine {
         this._traceSink = null;   // when non-null (trace()), moves snap + push a segment here instead of animating
         this._pass = 0;           // manual-REPOSITION pass index (mirrors gcodeParser): each reposition starts a new pass
         this._maxPass = 0;        // highest pass reached → stats.passes = _maxPass + 1
+        this._passSources = ['auto'];   // per-pass reposition SOURCE: 'auto' (auto-traverse) / 'manual' (operator jog) → start-marker colour. Pass 0 = the start (auto/default).
         this.timer = null;
         this.stats = {
             feed: 0,
@@ -321,7 +322,7 @@ export class GcodeExecutionEngine {
         return {
             segments,
             bounds: segments.length ? b : null,
-            stats: { feed, rapid, probe, retract: 0, passes: this._maxPass + 1, skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped, absolute: this.stats.absolute },
+            stats: { feed, rapid, probe, retract: 0, passes: this._maxPass + 1, passSources: this._passSources.slice(0, this._maxPass + 1), skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped, absolute: this.stats.absolute },
         };
     }
 
@@ -572,6 +573,7 @@ export class GcodeExecutionEngine {
         if (/reposition:/i.test(step.raw)) {
             this._pass += 1;
             if (this._pass > this._maxPass) this._maxPass = this._pass;
+            this._passSources[this._pass] = /auto-traverse/i.test(step.raw) ? 'auto' : 'manual';   // marker colour by source: auto-traverse vs operator jog
             this.pos = { x: 0, y: 0, z: 0 };
         }
 
