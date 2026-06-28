@@ -967,3 +967,15 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   centre X = 60 (reached!), while the default [#1+#2]=42 falls short (>5mm off). (2-axis sim centre needs the operator's
   between-axes jog the sim can't auto-model — so the sim test is single-axis, like middle-center-sim.) Full suite 365
   passed / 2 skipped. HUMAN's eyes still the real verifier on a non-square boss probe-both Simulate.
+
+## 2026-06-28 — turn 34 (part 3): default MAX PROBE 200 + probe datum dot smaller (human)
+
+- Human: "200 max probe" + "make amber datum smaller".
+  - settingsPanel.js: SETTINGS_DEFAULTS.probes.maxDist 100→200 (the one source that seeds every probe wizard's MAX
+    PROBE via applyProbeDefaults). Now that the boss CROSS-OVER is decoupled, MAX PROBE is just the wall-search distance,
+    so 200 is a generous default. NB: a user's PERSISTED maxDist (the human's stale 25) still wins — they set 200 in
+    Settings → Probe defaults or per-wizard (now sticky); the 200 default is for fresh/unset installs.
+  - gcodeViz3d.js `_scaleMarkers`: the probe-WCS DATUM dot (`_probeGizmo`, gold/amber 0xffce3a) 26→14 px (it had been
+    bumped to 26 on the "both bigger" pass; human now wants it smaller). Constant-screen, visibility-only.
+- VERIFY: probe specs 8/8 (datum still shows; cue coverage ~14%); no test asserts the maxDist default. Full suite was
+  365 green with maxDist 200 in tree; the datum-size change is a cosmetic _scaleMarkers constant. HUMAN's eyes on the cue.

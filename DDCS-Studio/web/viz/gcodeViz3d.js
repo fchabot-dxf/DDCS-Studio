@@ -336,7 +336,7 @@ export class GcodeViz3D {
         }
         if (this._probeGizmo && this._probeGizmo.visible) {   // DATUM dot — constant on-screen size (peer of the stock-WCS dot)
             const wpp = worldPerPxAt(this._probeGizmo.getWorldPosition(this._pgV3 || (this._pgV3 = new this.THREE.Vector3())));
-            this._probeGizmo.scale.setScalar(Math.max(1e-4, 26 * wpp));
+            this._probeGizmo.scale.setScalar(Math.max(1e-4, 14 * wpp));
         }
         // The persistent AXIS LINE: CONSTANT on-screen length + thickness (a big WCS offset can't shrink it to a speck).
         if (this._probeLine && this._probeLine.visible) {
