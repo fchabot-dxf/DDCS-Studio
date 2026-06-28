@@ -1277,3 +1277,26 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   the 2D head anchor per-pass) — a moderate engine+viz change that completes BOTH the auto + manual live cases. GATE
   doesn't trip (un-simmed jog). Passing back here (turn is large; INC3 needs human-eyes on the live tool; the per-pass
   live-anchoring is worth the advisor's eyes before I build it) — INC4 + the refinements next.
+
+## 2026-06-28 — turn 55: INC4 per-pass live anchoring (advisor-confirmed) + refinements status
+
+- **INC4 (`329daa7`) — the live tool anchors to its CURRENT pass start ② (advisor PASS to build).** Root (shared by
+  boss-manual-looks-like-pocket AND INC3's auto live tool not reaching ②): on a REPOSITION the engine resets
+  `pos→{0,0,0}` (correct — keeps each pass start-anchored for the STATIC trace) but the LIVE tool always added
+  `starts[0]=①` → after a reposition it sat at ①≈Y-centre and probed the Y walls from there. Fix (scoped exactly as
+  the advisor set): the engine REPORTS the current pass via `onPositionChange({...,pass})`; the 3D `setToolPosition`
+  + the 2D head AND path ride `passOff(pass)`=`starts[pass]` instead of always `starts[0]`. The engine reset is
+  UNTOUCHED (only the live-tool/2D-path ANCHOR changed). Single-pass / no pass → `starts[0]` (byte-unchanged; the 2D
+  single-pass + #13 absolute tests all still green). The 2D PATH (not just the head) went per-pass too — else the
+  per-pass head would float off a single-anchored path (each seg carries `s.pass` from the trace). Test
+  `per-pass-live-anchor.spec`: 2D head + 3D tool ride pass-0→① / pass-1→② / no-pass→①. Full suite 382 green + the
+  KNOWN middle-animator flake (passed on retry). **HUMAN-eyes** = auto-boss live tool traverses to ②+probes Y walls;
+  manual-boss live tool repositions to ② (not a pocket); pocket/single-axis UNCHANGED.
+
+- **Refinements status:** (1) **Glyph match — already RESOLVED** (turn-45 work): the 3D start is a camera-locked CYAN
+  LOZENGE sprite = the 2D ◇'s look ("same as 2d", human-steered) → 2D & 3D already unified, no action. (2) **Marker
+  colour by source** — REMAINING: colour each start ①②… by whether its reposition is an AUTO-traverse or a MANUAL-jog.
+  It needs per-pass SOURCE plumbing (the engine/trace can tag each pass from the REPOSITION message: "auto-traverse"
+  vs "jog clear", OR the wizard exposes a per-pass-source array alongside inferStarts) + a 2-colour choice (auto vs
+  manual). Both the source-mechanism and the colours are small design calls → surfacing rather than guessing the
+  palette. Pausing here (turn is very large; INC4 needs human-eyes; the marker-colour palette is the human's call).
