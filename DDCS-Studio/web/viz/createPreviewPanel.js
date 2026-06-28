@@ -118,7 +118,7 @@ export function createPreviewPanel(container, opts = {}) {
     let curStart = null;   // operator start the user dragged (2D handle / 3D marker); getStartPos() reads it
     const t2 = createToolpath2d(cv2d, {
         // 2D start-handle drag → record it, mirror to the 3D marker, and re-trace from the new start.
-        onStartDrag: (pos) => { curStart = { x: +pos.x || 0, y: +pos.y || 0, z: +pos.z || 0 }; if (viz && viz.starts) viz.starts[0] = curStart; setGcode(); },
+        onStartDrag: (pos) => { curStart = { x: +pos.x || 0, y: +pos.y || 0, z: +pos.z || 0 }; if (viz && viz.starts) viz.starts[0] = curStart; setGcode(); replayFromStart(); },   // #18: re-run the sim from the new start
     });
     t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.setWcs(wcsForViz());   // 2D mirrors the 3D scene
 
@@ -213,7 +213,7 @@ export function createPreviewPanel(container, opts = {}) {
         try { viz = new GcodeViz3D(container); viz._gizmoPx = 36; viz._animOn = false; viz.setStock(stockForViz()); viz.setMachine(machineForViz()); applyPreviewSettings(); }
         catch (e) { console.warn('preview 3D unavailable — using 2D', e); viz = null; setMode('2d'); }
         // Dragging the 3D start marker is a user override (like the 2D handle) — record it so getStartPos() reads it.
-        if (viz) viz.onStartChange = (starts) => { const s = starts && starts[0]; if (s) { curStart = { x: +s.x || 0, y: +s.y || 0, z: +s.z || 0 }; setGcode(); } };
+        if (viz) viz.onStartChange = (starts) => { const s = starts && starts[0]; if (s) { curStart = { x: +s.x || 0, y: +s.y || 0, z: +s.z || 0 }; setGcode(); replayFromStart(); } };   // #18: 3D marker drag also re-runs the sim from the new start
         if (viz && rotaryFixture && viz.setRotaryFixture) viz.setRotaryFixture(true);   // persist the rig hint across lazy viz creation
         return viz;
     }
@@ -464,6 +464,13 @@ export function createPreviewPanel(container, opts = {}) {
         if (viz) viz.setAnimate(false);
         if (typeof opts.onLine === 'function') opts.onLine(null);
         updateRunBtn();
+    }
+    // #18: dragging/declaring the start re-runs the sim animation from the NEW start (not just the static re-trace), so
+    // you SEE the probe travel from where you moved it. Once per drag (the handle fires on release). play() reads the
+    // updated start via getStartPos() → _stockOffset, so the re-run emanates from there.
+    function replayFromStart() {
+        if (!active || !segs.length) return;
+        stopPlay(); play();
     }
 
     // Static scrub: place the tool at the position the program reaches by the END of source line `i` (or the
