@@ -793,3 +793,23 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   advisor should align with the user on WHAT the probe-WCS cue should look like (a sketch / options) BEFORE more building.
 - state: branch main · committed this turn (LOCAL, unpushed) · pixel 2.16% · regression 14/14. Passing back — user
   rejected the approach (not the visibility).
+
+## 2026-06-28 — turn 28: PROBE-CUE refinements R1 (disc at contact) + R2 (re-probe re-shows disc)
+
+- CONTEXT REFRAME: the real root cause of "I see nothing" was NOT the look — it was ada5907 (probeAxis only matched a
+  LITERAL G31 Y-10, not real DDCS `G31 Y#8` #var values), so the cue never fired on real macros. With that fixed, the
+  turn-25 constant-screen cue is back (the user's "not the right fix" was it never firing on their real Corner-probe).
+  Turn 27's ruby-glow is SUPERSEDED. Turn 28 = two refinements on the current cue.
+- did (gcodeViz3d.js):
+  - R1 — probeAxisTouched records the FULL tool position at the touch (this._probeContact = {x,y,z}); _updateProbeShape
+    centres the DISC at the contact (k), not the WCS-projected datum c (un-probed axes had been forced to 0 = part-zero),
+    so the disc emerges where the probe physically touched. The glow moves to the contact too. The LINE stays at c (the
+    geometric intersection — x/z determined, spans the un-probed axis) and the POINT stays at c (the predicted datum).
+  - R2 — probeAxisTouched: if the incoming axis is ALREADY in _probeAxes, the macro looped back (GOTO1 retry) into a new
+    sequence → reset _probeAxes/_probeVals first, so the cue restarts at the DISC instead of staying the stale LINE.
+  - resetProbe clears _probeContact.
+- VERIFY (probe-cue-refine.spec.js, real Simulate, 2/2): R1 — after G0 X12 Y7 + G31 Z, the disc sits at the contact
+  (pos ≈ _probeContact, |contact.x| > 5, off the WCS); R2 — Z→X→Z re-probe ends with the DISC visible + the line hidden +
+  only {z} active. Regression 14/14 (probe-wcs · probe-anim-visible 2.14% · probe-anim-pipeline · origin-gizmo · wcs-flash
+  · dro). HUMAN eyes pending (real Corner-probe Simulate).
+- state: branch main · committed this turn (LOCAL, unpushed) · R1/R2 2/2 · regression 14/14.

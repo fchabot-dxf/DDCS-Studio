@@ -1628,6 +1628,7 @@ export class GcodeViz3D {
     resetProbe() {
         this._probeVals = { x: 0, y: 0, z: 0 };
         this._probeAxes = {};
+        this._probeContact = null;
         this._updateProbeShape();   // → superimposed point at part-zero
     }
 
@@ -1639,16 +1640,21 @@ export class GcodeViz3D {
     probeAxisTouched(axis) {
         const tool = this._animTool, THREE = this.THREE;
         if (!tool || !THREE || 'xyz'.indexOf(axis) < 0) return;
+        // R2 — a re-probe of an ALREADY-determined axis means the macro looped back (GOTO1 retry) into a NEW probe
+        // sequence; reset so the cue starts over at the DISC, not staying the stale LINE from the previous loop forever.
+        if (this._probeAxes && this._probeAxes[axis]) { this._probeAxes = {}; this._probeVals = { x: 0, y: 0, z: 0 }; }
         (this._probeVals || (this._probeVals = { x: 0, y: 0, z: 0 }))[axis] = tool.position[axis];
         (this._probeAxes || (this._probeAxes = {}))[axis] = true;
+        // R1 — the FULL tool position at the touch (all axes), so the DISC + glow EMERGE FROM THE CONTACT, not the WCS.
+        this._probeContact = { x: tool.position.x, y: tool.position.y, z: tool.position.z };
         this._updateProbeShape();
         const n = ['x', 'y', 'z'].filter((a) => this._probeAxes[a]).length;
-        const v = this._probeVals, a = this._probeAxes;
-        const land = new THREE.Vector3(a.x ? v.x : 0, a.y ? v.y : 0, a.z ? v.z : 0);
+        const k = this._probeContact;
+        const land = new THREE.Vector3(k.x, k.y, k.z);   // glow at the contact (where the probe actually touched)
         const parent = this._probeGizmo.parent;
         if (parent) { parent.updateWorldMatrix(true, false); land.applyMatrix4(parent.matrixWorld); }
         this._glowPulse(land, 0x4f8fff);          // GLOW pulses 3× at the contact — on every probe
-        if (n === 1) this._growDisc();            // 1st axis → the disc grows from the point to full span
+        if (n === 1) this._growDisc();            // 1st axis → the disc grows from the contact
         else if (n === 2) this._extendLine();     // 2nd axis → the line extends along the un-probed axis
         // n >= 3 → just the glow (the datum point)
     }
@@ -1661,14 +1667,15 @@ export class GcodeViz3D {
         const pt = this._probeGizmo, disc = this._probeDisc, line = this._probeLine;
         if (!THREE || !pt) return;
         const probed = ['x', 'y', 'z'].filter((a) => ax[a]);
-        const c = { x: ax.x ? v.x : 0, y: ax.y ? v.y : 0, z: ax.z ? v.z : 0 };
+        const c = { x: ax.x ? v.x : 0, y: ax.y ? v.y : 0, z: ax.z ? v.z : 0 };   // reduced datum → the predicted POINT / the line
+        const k = this._probeContact || c;                                        // R1 — the actual contact (the DISC emerges here)
         pt.position.set(c.x, c.y, c.z); pt.visible = true;
         if (disc) { disc.visible = false; disc.material.opacity = this._probeDiscBase; }
         if (line) { line.visible = false; line.material.opacity = this._probeLineBase; }
         if (probed.length === 1 && disc) {                 // + DISC — the plane PERP to the one probed axis
             const a = probed[0];
             const normal = a === 'x' ? new THREE.Vector3(1, 0, 0) : a === 'y' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
-            disc.position.set(c.x, c.y, c.z);
+            disc.position.set(k.x, k.y, k.z);   // R1 — emerges from the CONTACT (un-probed axes = where the tool touched, not 0/WCS)
             disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);   // circle +Z normal → the probed axis
             disc.visible = true;   // on-screen radius = _probeDiscPx × _discProgress, applied per-frame in _scaleMarkers
         } else if (probed.length === 2 && line) {          // + LINE — along the UN-probed axis (the planes' intersection)
