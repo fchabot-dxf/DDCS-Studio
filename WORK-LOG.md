@@ -1186,3 +1186,29 @@ Full suite **374 passed / 2 skipped, 0 fail**. Five commits:
 
 NOTE: the glyph turned into a long live human-tuning loop (colour/shape/thickness/the perceptibility fix). The other 4
 were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending caveat; rendering is verified headlessly.)
+
+## 2026-06-28 — turn 49: INC1 — 2D shows ALL per-pass start markers (numbered, draggable), parity with 3D
+
+- task (advisor turn 48, the MIDDLE/BOSS 2nd-start thread, INC 1): the 2D drew ONE start handle (pass 0 via
+  `t2.setStart`); a multi-pass probe (boss/middle probe-both) hid its 2nd start ②. Show ALL per-pass starts as numbered
+  draggable cyan lozenges (parity with the 3D markers + number badges). `af83777`.
+- verify-first: `toolpath2d` had a single `start`; `createPreviewPanel` only set pass 0 (`t2.setStart(st)`); the 3D's
+  per-pass loop populated `v.starts[p]` from `(p===0&&st)||hint(p)||existing`. **No wizard sets `startHints`** (grep =
+  none) → `getStartHints` is null → p>0 falls back to the last value, so a dragged ② PERSISTS (clean). A real boss
+  probe-both is multi-pass (`MiddleWizard.inferStarts` doc: each REPOSITION = a pass; boss two-axis manual = 4, auto = 2).
+- did:
+  - `toolpath2d.js`: `start` (single) → `starts` (per-pass array). `drawStartHandles` draws EACH as a cyan lozenge + a
+    NUMBERED badge (①②…, like the 3D number sprite). `nearHandle` returns the start INDEX under the pointer (reverse
+    scan → topmost wins); the drag tracks that index (`dragStart`=index, not bool); `onStartDrag(pos, pass)` reports
+    which. `pathOff` anchors to `starts[0]`. `setStarts(arr)` added; `setStart` kept as back-compat (single = pass 0).
+    `__t2starts` exposed (debug/tests).
+  - `createPreviewPanel.js`: the per-pass-start computation HOISTED out of the 3D-only branch into a shared `passStarts`
+    (one source of truth for both views) → `t2.setStarts(passStarts)` (2D) + the 3D `v.starts` syncs from it. BOTH drag
+    paths feed it: `onStartDrag(pos, pass)` (2D handle) and `viz.onStartChange(starts)` (3D marker) update `passStarts`
+    (+ `curStart` for pass 0), so a drag in either view persists + mirrors to the other.
+- WHY a shared `passStarts` (not just reading `v.starts`): the 2D must work when the 3D viz is null/not-current; the
+  per-pass logic was 3D-only. Hoisting it makes the markers mode-independent and keeps ONE source for both views.
+- VERIFY: `per-pass-starts-2d.spec.js` — (1) `setStarts([a,b])` → 2 numbered markers drawn + the 2nd is draggable (drag
+  → `onStartDrag(pos, 1)` with the moved X); (2) a REAL `MiddleWizard` boss-probe-both macro traces to >1 pass. Full 2D/
+  start suite green; full suite 376 passed + the KNOWN middle-animator parallel flake (6/6 isolated, untouched by me).
+  **HUMAN-eyes** = the final look (a boss probe-both → 2D shows ① AND ② labelled, both draggable). INC 2/3/4 queued.
