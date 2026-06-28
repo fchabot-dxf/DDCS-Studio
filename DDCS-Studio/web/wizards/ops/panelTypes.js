@@ -55,6 +55,12 @@ export function layoutSpecFromOp(def, params) {
             items.push({ kind: 'circle', cx: x, cy: y, r: R });
             pos();
             if (wr('dia')) decls.push({ type: 'radial', id: gid + '_size', field: byRole.dia.param, cx: x, cy: y, r: R, a: 0, rScale: 2, minR: 1, label: 'Ø', value: dia });
+        } else if (byRole.x && byRole.y && byRole.len) {
+            const x = p('x'), y = p('y'), len = p('len');
+            items.push({ kind: 'hole', x, y, n: 1, r: Math.max(1, stock.w * 0.012) });   // anchor marker
+            pos();
+            // 1D extent: drag `len` along Y from the anchor (like text height) — axis FIXED Y (one gesture; X variant later).
+            if (wr('len')) decls.push({ type: 'length', id: gid + '_len', field: byRole.len.param, ax: x, ay: y, axis: 'y', value: len, min: 1, label: 'len' });
         } else if (byRole.x && byRole.y) {
             const x = p('x'), y = p('y');
             items.push({ kind: 'hole', x, y, n: 1, r: Math.max(1, stock.w * 0.012) });
