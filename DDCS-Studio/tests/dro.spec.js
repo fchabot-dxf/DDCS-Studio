@@ -38,24 +38,50 @@ test('DRO structure: Work + Mach columns, X/Y/Z rows, active-WCS label', async (
   expect(s.wcs).toBe('G54');
 });
 
-test('DRO live: Work tracks the tool + Mach = Work + the active offset (the live-offset graft)', async ({ page }) => {
+test('DRO live: Mach = Work + the active-WCS TABLE offset (reads the table, not the stale workOrigin cache)', async ({ page }) => {
   await setup(page, 'G54\nG0 X30 Y15\nG1 Z-4 F300\nM30');
-  // a non-zero work origin so Mach ≠ Work proves the live addition (not a hardcoded single value)
-  await page.evaluate(() => { window.ddcsGetSettings().machine.workOrigin = { x: 100, y: 200, z: 50 }; });
+  // the FIX: the G54 offset lives in machine.wcs.table[0]. workOrigin is the STALE cache the bug read — if the DRO read
+  // THAT here ({0,0,0}), Mach would equal Work (the reported symptom). Reading the table makes Mach = Work + G54.
+  await page.evaluate(() => {
+    const m = window.ddcsGetSettings().machine;
+    m.wcs = { active: 1, table: [{ x: 100, y: 200, z: 50 }, { x: -30, y: -40, z: -5 }] };
+    m.workOrigin = { x: 0, y: 0, z: 0 };
+  });
   await page.locator(RUN).click();
   await expect(page.locator(STATUS)).toContainText('complete', { timeout: 12000 });
   await page.waitForTimeout(300);
   const r = await page.evaluate(() => {
-    const off = window.ddcsGetSettings().machine.workOrigin;
     const rr = (ax) => { const tr = document.querySelector(`#viz3d-panel-host .pp-dro tr[data-ax="${ax}"]`); return { w: +tr.children[1].textContent, m: +tr.children[2].textContent }; };
-    return { off, x: rr('x'), y: rr('y'), z: rr('z') };
+    return { x: rr('x'), y: rr('y'), z: rr('z') };
   });
-  // Work tracked the tool away from the start (it moved) — the real live symptom
   expect(Math.abs(r.x.w) + Math.abs(r.y.w) + Math.abs(r.z.w), 'Work tracked the tool (non-zero)').toBeGreaterThan(1);
-  // Mach = Work + the active offset, per axis — read live, so the future per-WCS table lands for free
-  expect(r.x.m).toBeCloseTo(r.x.w + r.off.x, 2);
-  expect(r.y.m).toBeCloseTo(r.y.w + r.off.y, 2);
-  expect(r.z.m).toBeCloseTo(r.z.w + r.off.z, 2);
+  // Mach = Work + the G54 TABLE offset, per axis — proves the one-source fix (table, not stale workOrigin {0,0,0})
+  expect(r.x.m).toBeCloseTo(r.x.w + 100, 2);
+  expect(r.y.m).toBeCloseTo(r.y.w + 200, 2);
+  expect(r.z.m).toBeCloseTo(r.z.w + 50, 2);
+  expect(r.x.m, 'Mach ≠ Work — the bug symptom is gone').not.toBeCloseTo(r.x.w, 1);
+});
+
+test('DRO: switching the active WCS changes Mach (G54 → G55 offset)', async ({ page }) => {
+  await setup(page, 'G0 X20 Y10\nM30');
+  await page.evaluate(() => {
+    const m = window.ddcsGetSettings().machine;
+    m.wcs = { active: 1, table: [{ x: 100, y: 200, z: 0 }, { x: -30, y: -40, z: 0 }] };
+    m.workOrigin = { x: 0, y: 0, z: 0 };
+  });
+  const readX = () => { const tr = document.querySelector('#viz3d-panel-host .pp-dro tr[data-ax="x"]'); return { w: +tr.children[1].textContent, m: +tr.children[2].textContent }; };
+  await page.locator(RUN).click();
+  await expect(page.locator(STATUS)).toContainText('complete', { timeout: 12000 });
+  await page.waitForTimeout(200);
+  const g54 = await page.evaluate(readX);
+  await page.evaluate(() => { window.ddcsGetSettings().machine.wcs.active = 2; });   // switch active → G55
+  await page.locator(RUN).click();
+  await expect(page.locator(STATUS)).toContainText('complete', { timeout: 12000 });
+  await page.waitForTimeout(200);
+  const g55 = await page.evaluate(readX);
+  expect(g54.m, 'G54: Mach = Work + 100').toBeCloseTo(g54.w + 100, 2);
+  expect(g55.m, 'G55: Mach = Work - 30').toBeCloseTo(g55.w - 30, 2);
+  expect(g55.m, 'switching the active WCS changed Mach').not.toBeCloseTo(g54.m, 1);
 });
 
 test('DRO WCS event: a G55 call updates the active-WCS label + flashes the Work column', async ({ page }) => {

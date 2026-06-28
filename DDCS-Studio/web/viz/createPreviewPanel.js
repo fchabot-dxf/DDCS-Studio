@@ -27,7 +27,17 @@ import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock mo
 // broadcasts ddcs:settings-changed; every panel reads it here + re-renders, so all previews show the same stock.
 const stockForViz = () => { const s = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null; return (s && s.show) ? s : null; };
 const toolsForViz = () => { const a = (window.ddcsGetSettings && window.ddcsGetSettings().atc) || {}; return Array.isArray(a.tools) ? a.tools : []; };   // tool table → sim tool spec
-const wcsForViz = () => { const m = (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null; return (m && m.workOrigin) ? m.workOrigin : null; };   // work origin in MACHINE coords → G53 moves draw in the part frame
+// The active WCS offset (work origin in MACHINE coords) → drives the engine's G53 moves AND the DRO Mach column. ONE
+// SOURCE: derive it straight from the G54-G59 table row for the active WCS, NOT the machine.workOrigin cache — that
+// cache is only refreshed by syncWorkOrigin() (settingsPanel) and is stale {0,0,0} until the user touches the table, so
+// reading it made Mach == Work. workOrigin stays the fallback for legacy paths / before a table exists.
+const wcsForViz = () => {
+    const m = (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null;
+    if (!m) return null;
+    const w = m.wcs, r = w && Array.isArray(w.table) && w.table[(w.active || 1) - 1];
+    if (r) return { x: +r.x || 0, y: +r.y || 0, z: +r.z || 0 };
+    return m.workOrigin || null;
+};
 const machineForViz = () => (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null;   // envelope: travel + show + ox/oy/oz (drawn by viz.setMachine, gated on machine.show)
 const previewPrefs = () => (window.ddcsGetSettings && window.ddcsGetSettings().preview) || {};   // Settings → Preview tab
 // Z-fraction of the stock datum (0=bottom, 0.5=centre, 1=top) — the datum's height above the stock bottom, as a
@@ -129,6 +139,7 @@ export function createPreviewPanel(container, opts = {}) {
     // WCS/probe event (reusing the slice-2 classify hook). Rows = X/Y/Z, plus A/B when the rotary rig is shown.
     const droEl = q('.pp-dro'), droWcsEl = q('.pp-dro-wcs'), droBody = q('.pp-dro-tbl tbody');
     const activeWcsOffset = () => wcsForViz() || { x: 0, y: 0, z: 0 };   // ← future per-WCS table drops in HERE
+    const activeWcsName = () => { const m = window.ddcsGetSettings && window.ddcsGetSettings().machine; const a = (m && m.wcs && m.wcs.active) || 1; return 'G' + (53 + a); };   // table[0]=G54
     let droAxes = ['x', 'y', 'z'];
     function buildDro() {
         droAxes = rotaryFixture ? ['x', 'y', 'z', 'a', 'b'] : ['x', 'y', 'z'];
@@ -152,6 +163,7 @@ export function createPreviewPanel(container, opts = {}) {
         droEl.classList.remove('pp-dro-flash'); void droEl.offsetWidth; droEl.classList.add('pp-dro-flash');
     }
     buildDro();
+    if (droWcsEl) droWcsEl.textContent = activeWcsName();   // start the label on the active WCS (whose offset Mach uses)
 
     // The 2D canvas only repaints when told to; without this it goes blank if first drawn at a transient/zero
     // size (drawer slide-in) or after the panel is resized. Re-fit the 2D route whenever the container resizes.
@@ -421,6 +433,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (mode === '3d') ensureViz();
         if (viz && viz.resetProbe) viz.resetProbe();    // SLICE 3: fresh probe-WCS each run (superimposed on the stock-WCS)
         updateDro(getStartPos() || { x: 0, y: 0, z: 0 });   // DRO: reset to the start position for the fresh run
+        if (droWcsEl) droWcsEl.textContent = activeWcsName();   // refresh the label to the active WCS (catches a settings switch)
         if (viz) viz.setAnimate(false);                 // engine drives the tool/trail, not the geometric sweep
         lastRunCode = get('getGcode') || '';
         eng.run(lastRunCode);

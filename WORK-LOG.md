@@ -686,3 +686,24 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   commit are the record — the advisor reads the WORK-LOG tail on entry, so the DRO won't be re-dispatched. The re-armed
   worker `wait` is still live for the advisor's next pass.
 - state: branch main · committed this turn (LOCAL, unpushed). Tests dro 3/3 · regression 36/36.
+
+## 2026-06-28 — turn 19: FIX — DRO Mach == Work (wcsForViz read the stale workOrigin cache, not the WCS table)
+
+- task (advisor turn 19): the DRO Mach equalled Work even with G54 set, because wcsForViz() read settings.machine.
+  workOrigin — a CACHE only refreshed by syncWorkOrigin() (settingsPanel) on a table/active change, so it sits stale
+  {0,0,0} until the user touches the table. FIX: derive the offset from machine.wcs.table[(active||1)-1] directly
+  (one-source), workOrigin as fallback. Fixes BOTH the DRO Mach AND the engine G53 moves (both read wcsForViz).
+- did (createPreviewPanel.js):
+  - wcsForViz() now derives the active WCS offset straight from the G54-G59 table row (machine.wcs.table[active-1]),
+    falling back to machine.workOrigin (legacy / no-table). A row may hold '' empties → coerced to 0 (+r.x || 0).
+  - DRO label now STARTS on the active WCS (activeWcsName = 'G'+(53+active), table[0]=G54) instead of a hardcoded 'G54',
+    and refreshes on run-start so a settings active-WCS switch is reflected. A program WCS call still overrides it.
+- WHY one-source, not "re-run syncWorkOrigin": reading the table at the point of use can't go stale — there's no
+  ordering dependency on a sync step. workOrigin stays the fallback so legacy paths + the engine default are unchanged.
+- NO regression BY CONSTRUCTION: default settings have wcs.table=null → wcsForViz falls back to workOrigin, byte-identical
+  to the old behavior. The fix only CHANGES output once the table is populated (controller pull / settings UI / a test).
+- VERIFY (dro.spec.js, real Simulate, 4/4): Mach = Work + the G54 TABLE offset with workOrigin left STALE {0,0,0} (proves
+  it reads the table — Mach ≠ Work, the bug symptom gone); switching active 1→2 changes Mach (G54 +100 → G55 −30).
+  Regression 55/55 across two batches: atc-preview/envelope · cam-slot-sim · probe-wcs · wcs-flash · origin-gizmo ·
+  preview-controls · placement-rollout · place-on-stock · g53-and-cut-legend · grid-envelope.
+- state: branch main · committed this turn (LOCAL, unpushed) · tests dro 4/4 · regression 55/55. Passing back.
