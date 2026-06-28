@@ -771,3 +771,25 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   reconsider scope — many turns spent here with diminishing returns; the DRO/offset/reposition all shipped + confirmed.
 - state: aad9956 stands (motion > the old opacity flash — a real improvement, just insufficient). Passing back for the
   advisor to direct the perceptibility rebuild (now pixel-verifiable).
+
+## 2026-06-28 — turn 25: PROBE CUE constant-screen + high-contrast + sustained — USER SAYS "NOT THE RIGHT FIX"
+
+- task (advisor turn 25): rebuild the probe cue on 3 levers — constant-screen-size, high-contrast, sustained — verify by
+  pixel-delta + the human's eyes.
+- did (gcodeViz3d.js):
+  - `_worldPerPx(pos)` helper (the worldPerPx formula extracted from _scaleMarkers).
+  - _scaleMarkers now sizes the probe DISC + LINE to CONSTANT SCREEN size (_probeDiscPx=95 / _probeLinePx=170 ×
+    worldPerPx × a 0→1 grow factor) — a big WCS offset can no longer shrink them to a speck.
+  - disc/line opacity 0.14/0.32 → 0.4/0.7 (high-contrast); colour 0x4f8fff → 0x6cc4ff (brighter).
+  - _glowPulse rebuilt: constant-screen (_probeGlowPx=84 × worldPerPx, recomputed each tick), SUSTAINED ~2.5 s (3 pulses,
+    never fully dark between). _growDisc/_extendLine now drive _discProgress/_lineProgress (0→1) that _scaleMarkers
+    multiplies into the screen size. Removed _bigSpan (dead).
+- VERIFY (a) PIXEL-DELTA (probe-anim-visible.spec.js — gl.readPixels during a real probe WITH a large WCS offset, the
+  breaking condition): peak bright coverage 2.16% of canvas vs the old ~0.1% speck (baseline 0.71%). Regression 14/14
+  (probe-wcs · probe-anim-pipeline · origin-gizmo · wcs-flash · dro · dro-position).
+- VERIFY (b) HUMAN: ✗ — the USER says "NOT THE RIGHT FIX" and escalated. KEY: the pixel-delta proves the cue now renders
+  prominently (20× more screen), so "not the right fix" is NO LONGER about visibility — it's the APPROACH/representation
+  the user dislikes (constant-screen big disc/glow). The desired visual is UNSPECIFIED. → design-direction gate: the
+  advisor should align with the user on WHAT the probe-WCS cue should look like (a sketch / options) BEFORE more building.
+- state: branch main · committed this turn (LOCAL, unpushed) · pixel 2.16% · regression 14/14. Passing back — user
+  rejected the approach (not the visibility).

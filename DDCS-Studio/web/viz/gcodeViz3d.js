@@ -171,12 +171,16 @@ export class GcodeViz3D {
         // The probe-WCS REDUCES dimension as axes are probed (each G31 determines a PLANE): 1 axis → a DISC in the
         // perp plane (Z→XY, X→YZ, Y→XZ); 2 axes → a LINE (the planes' intersection, along the un-probed axis); 3 → the
         // POINT (pg). Drawn progressively across the probe moves. Disc = a soft blue glow plane; line = a thin blue bar.
-        // The constraint shape spans the WHOLE scene (bigger than the model) at LOW opacity, and FLASHES (brightens) on
-        // each probe event. Disc = a faint solid plane; line = a faint thin bar. base opacities below.
-        this._probeDiscBase = 0.14; this._probeLineBase = 0.32;
-        this._probeDisc = new THREE.Mesh(new THREE.CircleGeometry(1, 56), new THREE.MeshBasicMaterial({ color: 0x4f8fff, transparent: true, opacity: this._probeDiscBase, depthTest: false, side: THREE.DoubleSide }));
+        // PERCEPTIBILITY (advisor turn 25 — the old scene-spanning faint version was a 0.1%-of-canvas speck when zoomed
+        // out for a big WCS offset): the cue is CONSTANT-SCREEN-SIZE (sized in PIXELS, applied in _scaleMarkers via
+        // worldPerPx so it never shrinks with zoom), HIGH-CONTRAST (bright, not faint 0.14/0.32), and SUSTAINED (the
+        // disc/line persist; the glow pulses ~2.5 s). Disc/line GROW/EXTEND from the contact via a 0→1 progress factor.
+        this._probeDiscPx = 95; this._probeLinePx = 170; this._probeLineRadPx = 3.5; this._probeGlowPx = 84;
+        this._probeDiscBase = 0.4; this._probeLineBase = 0.7;
+        this._discProgress = 1; this._lineProgress = 1;
+        this._probeDisc = new THREE.Mesh(new THREE.CircleGeometry(1, 56), new THREE.MeshBasicMaterial({ color: 0x6cc4ff, transparent: true, opacity: this._probeDiscBase, depthTest: false, side: THREE.DoubleSide }));
         this._probeDisc.renderOrder = 12; this._probeDisc.visible = false; this.partFrame.add(this._probeDisc);
-        this._probeLine = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 12), new THREE.MeshBasicMaterial({ color: 0x4f8fff, transparent: true, opacity: this._probeLineBase, depthTest: false }));
+        this._probeLine = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 12), new THREE.MeshBasicMaterial({ color: 0x6cc4ff, transparent: true, opacity: this._probeLineBase, depthTest: false }));
         this._probeLine.renderOrder = 13; this._probeLine.visible = false; this.partFrame.add(this._probeLine);
         this._probeVals = { x: 0, y: 0, z: 0 }; this._probeAxes = {};
         // Direction labels on the grid edges (repositioned to the footprint in setSegments)
@@ -306,6 +310,14 @@ export class GcodeViz3D {
 
     // Keep on-screen gizmos a CONSTANT screen size (independent of zoom): world size ∝ the world-per-pixel at the
     // object (camera distance for perspective, frustum for ortho). Applies to the start markers AND the axis labels.
+    // World units per screen pixel at a world position — the basis for constant on-screen sizing (see _scaleMarkers).
+    _worldPerPx(pos) {
+        const H = this.container.clientHeight || 1;
+        if (this.camera.isOrthographicCamera) return (this.camera.top - this.camera.bottom) / H;
+        const tanHalf = Math.tan((this.persp.fov * Math.PI / 180) / 2);
+        return (2 * this.camera.position.distanceTo(pos) * tanHalf) / H;
+    }
+
     _scaleMarkers() {
         const H = this.container.clientHeight || 1;
         const ortho = this.camera.isOrthographicCamera;
@@ -327,6 +339,19 @@ export class GcodeViz3D {
         if (this._probeGizmo) {   // probe-WCS dot — same constant on-screen size as the stock-WCS dot (peer)
             const wpp = worldPerPxAt(this._probeGizmo.getWorldPosition(this._pgV3 || (this._pgV3 = new this.THREE.Vector3())));
             this._probeGizmo.scale.setScalar(Math.max(1e-4, 18 * wpp));
+        }
+        // Probe DISC / LINE: CONSTANT on-screen size (so a big WCS offset can't shrink them to a speck) × the 0→1 grow
+        // factor. Disc = a screen-radius circle; line = a screen-length bar of fixed screen thickness.
+        if (this._probeDisc && this._probeDisc.visible) {
+            const wpp = worldPerPxAt(this._probeDisc.getWorldPosition(this._pdV3 || (this._pdV3 = new this.THREE.Vector3())));
+            const s = Math.max(1e-4, this._probeDiscPx * wpp * (this._discProgress != null ? this._discProgress : 1));
+            this._probeDisc.scale.set(s, s, 1);
+        }
+        if (this._probeLine && this._probeLine.visible) {
+            const wpp = worldPerPxAt(this._probeLine.getWorldPosition(this._plV3 || (this._plV3 = new this.THREE.Vector3())));
+            const rad = Math.max(1e-4, this._probeLineRadPx * 2 * wpp);   // CylinderGeometry radius 0.5 → ×2 to read as px
+            const len = Math.max(1e-4, this._probeLinePx * wpp * (this._lineProgress != null ? this._lineProgress : 1));
+            this._probeLine.scale.set(rad, len, rad);
         }
         // Direction labels (+X/-X/+Y/-Y): constant on-screen width too (canvas is 2:1), so they don't grow with zoom.
         const L = this._gridLabels;
@@ -1606,21 +1631,11 @@ export class GcodeViz3D {
         this._updateProbeShape();   // → superimposed point at part-zero
     }
 
-    // The constraint shape spans the WHOLE scene (bigger than the stock model). Use the machine envelope if present, else
-    // a generous multiple of the stock, floored so it always reads as "scene-wide".
-    _bigSpan() {
-        const m = this._machine, s = this._stock;
-        const mm = m ? Math.max(m.x || 0, m.y || 0, m.z || 0) : 0;
-        const ss = s ? Math.max(s.x || 0, s.y || 0, s.z || 0) : 0;
-        return Math.max(mm, ss * 3, 400);
-    }
-
     // SLICE 3 — a G31 just finished on `axis` (the tool sits at the contact). Record the determined axis value (NOT
     // clamped — off-stock is the correctness signal), redraw the constraint shape, then ANIMATE the event so it is
-    // UNMISSABLE: a soft additive GLOW pulses 3× at the contact (EVERY probe), AND the determined shape draws IN from the
-    // contact — the disc GROWS from the point to full span (1st axis), the line EXTENDS along the un-probed axis (2nd).
-    // The 3rd axis is just the glow (the point is the datum). Diagnosed: the pipeline + rAF self-render fire — the old
-    // opacity flash at 0.14 base was simply too subtle to perceive during a slow feed-timed probe; motion fixes that.
+    // UNMISSABLE: a bright additive GLOW pulses 3× at the contact (EVERY probe), AND the determined shape draws IN from
+    // the contact — the disc GROWS (1st axis), the line EXTENDS along the un-probed axis (2nd). The 3rd axis is just the
+    // glow (the point is the datum). All sized CONSTANT-SCREEN (can't shrink when zoomed out — the perceptibility fix).
     probeAxisTouched(axis) {
         const tool = this._animTool, THREE = this.THREE;
         if (!tool || !THREE || 'xyz'.indexOf(axis) < 0) return;
@@ -1646,7 +1661,6 @@ export class GcodeViz3D {
         const pt = this._probeGizmo, disc = this._probeDisc, line = this._probeLine;
         if (!THREE || !pt) return;
         const probed = ['x', 'y', 'z'].filter((a) => ax[a]);
-        const big = this._bigSpan();
         const c = { x: ax.x ? v.x : 0, y: ax.y ? v.y : 0, z: ax.z ? v.z : 0 };
         pt.position.set(c.x, c.y, c.z); pt.visible = true;
         if (disc) { disc.visible = false; disc.material.opacity = this._probeDiscBase; }
@@ -1656,35 +1670,35 @@ export class GcodeViz3D {
             const normal = a === 'x' ? new THREE.Vector3(1, 0, 0) : a === 'y' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
             disc.position.set(c.x, c.y, c.z);
             disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);   // circle +Z normal → the probed axis
-            disc.scale.setScalar(big * 0.5); disc.visible = true;
+            disc.visible = true;   // on-screen radius = _probeDiscPx × _discProgress, applied per-frame in _scaleMarkers
         } else if (probed.length === 2 && line) {          // + LINE — along the UN-probed axis (the planes' intersection)
             const un = ['x', 'y', 'z'].find((a) => !ax[a]);
             const dir = un === 'x' ? new THREE.Vector3(1, 0, 0) : un === 'y' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
             line.position.set(c.x, c.y, c.z);
             line.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);   // cylinder +Y → the un-probed axis
-            line.scale.set(1, big, 1); line.visible = true;
+            line.visible = true;   // on-screen length = _probeLinePx × _lineProgress, applied per-frame in _scaleMarkers
         }
         this.render();
     }
 
-    // A soft additive glow that PULSES `pulses` times at a world position — the probe-event cue, far more visible than a
-    // one-shot fade. Reuses the radial-glow sprite; self-contained (added → pulsed → removed). The rAF tick self-renders.
+    // The primary probe-event cue: a bright additive glow that PULSES `pulses` times at a world position. CONSTANT
+    // SCREEN SIZE (this._probeGlowPx × worldPerPx, recomputed each tick so it can't shrink when zoomed out for a big WCS
+    // offset) and SUSTAINED (~2.5 s, never fully dark between pulses). Self-contained (added → pulsed → removed).
     _glowPulse(worldPos, color, pulses = 3) {
         const THREE = this.THREE, tex = this._glowTexture();
         if (!worldPos || !THREE || !tex || !this.scene) return;
-        const span = (this._stock && Math.max(this._stock.x || 0, this._stock.y || 0)) || 60;
-        const r0 = Math.max(18, span * 0.35), r1 = r0 * 1.6;
         const mat = new THREE.SpriteMaterial({ map: tex, color: new THREE.Color(color), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false });
         const sprite = new THREE.Sprite(mat);
         sprite.position.copy(worldPos); sprite.renderOrder = 999;
         this.scene.add(sprite);
         const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
-        const t0 = now(), dur = 1500;
+        const t0 = now(), dur = 2500;
         const tick = () => {
             const u = Math.min(1, (now() - t0) / dur);
             const p = Math.abs(Math.sin(u * pulses * Math.PI));   // 0→1→0, `pulses` times
-            mat.opacity = p;
-            const s = r0 + (r1 - r0) * p;
+            mat.opacity = 0.3 + 0.7 * p;                          // never fully dark between pulses → sustained presence
+            const px = this._probeGlowPx * (0.72 + 0.28 * p);
+            const s = Math.max(1e-4, px * this._worldPerPx(sprite.position));   // constant on-screen size
             sprite.scale.set(s, s, 1);
             this.render();
             if (u < 1) requestAnimationFrame(tick);
@@ -1693,42 +1707,36 @@ export class GcodeViz3D {
         requestAnimationFrame(tick);
     }
 
-    // The disc DRAWS IN: scales from the contact point out to its full span (set by _updateProbeShape) over ~0.6s, while
-    // its opacity eases from a visible peak down to the faint persistent base — so the growth itself reads.
+    // The disc DRAWS IN: its 0→1 grow factor eases up over ~0.6 s. The on-screen radius (= _probeDiscPx × _discProgress)
+    // is applied per-frame in _scaleMarkers, so the disc visibly grows from the contact to full constant-screen size.
     _growDisc() {
-        const disc = this._probeDisc; if (!disc || !disc.visible) return;
-        const full = disc.scale.x, base = this._probeDiscBase, peak = 0.6;
-        disc.scale.set(0.001, 0.001, 1); disc.material.opacity = peak; this.render();   // start collapsed (no full-size flash)
         const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
         const t0 = now(), dur = 600, ease = (u) => 1 - Math.pow(1 - u, 3);
         const id = (this._discGrow = (this._discGrow || 0) + 1);
+        this._discProgress = 0.001; this.render();
         const tick = () => {
             if (this._discGrow !== id) return;   // a newer disc superseded this grow
-            const u = Math.min(1, (now() - t0) / dur), s = Math.max(0.001, full * ease(u));
-            disc.scale.set(s, s, 1);
-            disc.material.opacity = peak - (peak - base) * u;
+            const u = Math.min(1, (now() - t0) / dur);
+            this._discProgress = Math.max(0.001, ease(u));
             this.render();
-            if (u < 1) requestAnimationFrame(tick); else { disc.scale.set(full, full, 1); disc.material.opacity = base; }
+            if (u < 1) requestAnimationFrame(tick); else this._discProgress = 1;
         };
         requestAnimationFrame(tick);
     }
 
-    // The line EXTENDS: grows from the contact out along the un-probed axis to its full span (set by _updateProbeShape),
-    // opacity easing peak → faint base as it draws.
+    // The line EXTENDS: its 0→1 factor eases up over ~0.6 s; the on-screen length (= _probeLinePx × _lineProgress) is
+    // applied per-frame in _scaleMarkers, so it grows from the contact out along the un-probed axis.
     _extendLine() {
-        const line = this._probeLine; if (!line || !line.visible) return;
-        const full = line.scale.y, base = this._probeLineBase, peak = 0.75;
-        line.scale.set(1, 0.001, 1); line.material.opacity = peak; this.render();   // start collapsed (no full-length flash)
         const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
         const t0 = now(), dur = 600, ease = (u) => 1 - Math.pow(1 - u, 3);
         const id = (this._lineGrow = (this._lineGrow || 0) + 1);
+        this._lineProgress = 0.001; this.render();
         const tick = () => {
             if (this._lineGrow !== id) return;
             const u = Math.min(1, (now() - t0) / dur);
-            line.scale.set(1, Math.max(0.001, full * ease(u)), 1);
-            line.material.opacity = peak - (peak - base) * u;
+            this._lineProgress = Math.max(0.001, ease(u));
             this.render();
-            if (u < 1) requestAnimationFrame(tick); else { line.scale.set(1, full, 1); line.material.opacity = base; }
+            if (u < 1) requestAnimationFrame(tick); else this._lineProgress = 1;
         };
         requestAnimationFrame(tick);
     }
