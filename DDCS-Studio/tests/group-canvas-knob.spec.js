@@ -20,7 +20,7 @@ test('A: a point knob in a grouped run\'s form edits + writes back BOTH axes + s
     { id: 'm1', type: 'move', params: { mode: 'rapid', x: 10, y: 20, z: -2 }, _expose: { X: { p: 'px', w: 'point-x' }, Y: { p: 'py', w: 'point-y' } } },
     { id: 's1', type: 'spindle', params: { rpm: 12000, on: true } },
   ]));
-  await page.evaluate(() => window.showApp('editor'));
+  await page.evaluate(() => window.showApp('studio'));
   await page.waitForTimeout(300);
 
   // REAL path: hover → the auto ✎ chip appears (pure stack) → click → wraps the run + opens the inc-2 form.
@@ -68,7 +68,7 @@ test('A: a point knob in a grouped run\'s form edits + writes back BOTH axes + s
   // SURVIVES A REPROJECTION (the exposure + both edited values persist).
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForTimeout(400);
-  await page.evaluate(() => window.showApp('editor'));
+  await page.evaluate(() => window.showApp('studio'));
   await page.waitForTimeout(400);
   const reproj = await page.evaluate(() => {
     const prog = window.ddcsGetBlockProgram() || [];
