@@ -117,11 +117,12 @@ export function createPreviewPanel(container, opts = {}) {
     const statusEl = q('.pp-status');
     let curStart = null;   // operator start the user dragged (2D handle / 3D marker); getStartPos() reads it (pass 0)
     let passStarts = [];   // INC1: per-pass operator starts [{x,y,z}] — the shared source of truth for BOTH views' numbered markers
+    let userStarts = [];   // INC2: per-pass USER overrides (a jog or a drag) — these BEAT the wizard's inferStarts HINT so an edited ② STICKS (the hint only positions an un-touched pass)
     const t2 = createToolpath2d(cv2d, {
         // 2D start-handle drag (any pass) → record it, mirror to the 3D marker, re-trace + replay from the new start.
         onStartDrag: (pos, pass) => {
             const p = pass | 0, np = { x: +pos.x || 0, y: +pos.y || 0, z: +pos.z || 0 };
-            passStarts[p] = np;                              // shared source of truth (persists across re-traces)
+            passStarts[p] = np; userStarts[p] = np;          // shared source of truth + USER override (beats the hint, persists)
             if (p === 0) curStart = np;                      // pass 0 = the operator start getStartPos() reads
             if (viz && viz.starts) viz.starts[p] = np;       // mirror to the 3D marker
             setGcode(); replayFromStart();                   // #18: re-run the sim from the new start
@@ -220,9 +221,13 @@ export function createPreviewPanel(container, opts = {}) {
         try { viz = new GcodeViz3D(container); viz._gizmoPx = 36; viz._animOn = false; viz.setStock(stockForViz()); viz.setMachine(machineForViz()); applyPreviewSettings(); }
         catch (e) { console.warn('preview 3D unavailable — using 2D', e); viz = null; setMode('2d'); }
         // Dragging the 3D start marker is a user override (like the 2D handle) — record it so getStartPos() reads it.
-        if (viz) viz.onStartChange = (starts) => {   // a 3D marker drag (any pass) → sync ALL passes to the shared starts, re-trace + replay (#18)
+        if (viz) viz.onStartChange = (starts) => {   // a 3D jog/drag (any pass) → sync the shared starts, PIN the moved pass, re-trace + replay (#18, INC2)
             if (!Array.isArray(starts) || !starts.length) return;
-            passStarts = starts.map((s) => ({ x: +s.x || 0, y: +s.y || 0, z: +s.z || 0 }));
+            starts.forEach((s, p) => {
+                const np = { x: +s.x || 0, y: +s.y || 0, z: +s.z || 0 }, cur = passStarts[p];
+                if (!cur || cur.x !== np.x || cur.y !== np.y || cur.z !== np.z) userStarts[p] = np;   // pin only the pass that actually MOVED (the jogged one) → its edit beats the hint
+                passStarts[p] = np;
+            });
             curStart = passStarts[0];
             setGcode(); replayFromStart();
         };
@@ -329,7 +334,8 @@ export function createPreviewPanel(container, opts = {}) {
             const passCount = (parsed.stats && parsed.stats.passes) || 1;
             const next = [];
             for (let p = 0; p < passCount; p++) {
-                const h = (p === 0 && st) || hintFor(p) || passStarts[p] || { x: 0, y: 0, z: 0 };
+                // a USER edit (userStarts) beats everything; then pass 0's getStartPos (st); then the wizard HINT; then the last value.
+                const h = userStarts[p] || (p === 0 && st) || hintFor(p) || passStarts[p] || { x: 0, y: 0, z: 0 };
                 next.push({ x: +h.x || 0, y: +h.y || 0, z: +h.z || 0 });
             }
             passStarts = next;
