@@ -103,7 +103,7 @@ export function classifyCall(raw) {
 export function probeAxis(raw) {
     const code = String(raw || '').replace(/\([^)]*\)/g, ' ');
     if (!/\bG31\b/.test(code)) return null;
-    const m = code.match(/\bG31\b[^()]*?([XYZ])\s*-?[\d.]/i);
+    const m = code.match(/\bG31\b[^()]*?([XYZ])\s*[-#\[\d.]/i);   // value may be a literal (-10), a #var (#8), or an expr ([0-#1])
     return m ? m[1].toLowerCase() : null;
 }
 
