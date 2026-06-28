@@ -355,18 +355,27 @@ export const atcTableView = {
             const magAll = Array.isArray(a.magazine) ? a.magazine : [];
             const byNum = {}; (a.tools || []).forEach((t) => { if (t && t.num != null && t.num !== '') byNum[Number(t.num)] = t; });
             const td = 'padding:3px 7px; border-bottom:1px solid var(--border);';
+            let orphanCount = 0;   // A7: pockets referencing a tool# no longer in the library
             const rows = magAll.map((p, i) => {
                 const t = byNum[Number(p.tool)] || {};
                 const has = p.tool !== '' && p.tool != null;
-                const name = has ? (t.name || [t.type, t.dia ? 'Ø' + t.dia : ''].filter(Boolean).join(' ') || '—') : '(empty)';
+                const orphan = has && !byNum[Number(p.tool)];   // tool# set but missing from the library
+                if (orphan) orphanCount++;
+                const name = orphan ? `⚠ tool #${p.tool} not in library` : (has ? (t.name || [t.type, t.dia ? 'Ø' + t.dia : ''].filter(Boolean).join(' ') || '—') : '(empty)');
                 const len = (has && t.length !== '' && t.length != null) ? t.length + 'mm' : '';
-                const icon = has ? toolProfileSvg({ type: t.type || 'endmill', dia: num(t.dia, 6), angle: t.angle, length: num(t.length, 30) }, { w: 18, h: 26 }) : '';
-                return `<tr><td style="${td} color:var(--text-dim);">P${p.pocket != null ? p.pocket : i + 1}</td><td style="${td} width:22px; text-align:center;">${icon}</td><td style="${td} font-weight:600;">${has ? 'T' + p.tool : '—'}</td><td style="${td}">${name}</td><td style="${td} color:var(--text-dim);">${len}</td></tr>`;
+                const icon = (has && !orphan) ? toolProfileSvg({ type: t.type || 'endmill', dia: num(t.dia, 6), angle: t.angle, length: num(t.length, 30) }, { w: 18, h: 26 }) : '';
+                const rowBg = orphan ? ' background:rgba(239,68,68,0.08);' : '';
+                const dCol = orphan ? 'var(--danger,#ef4444)' : 'inherit';
+                const ttl = orphan ? ` title="Tool #${p.tool} is not in the library — re-add it or reassign this pocket."` : '';
+                return `<tr style="${rowBg}"${ttl}><td style="${td} color:var(--text-dim);">P${p.pocket != null ? p.pocket : i + 1}</td><td style="${td} width:22px; text-align:center;">${icon}</td><td style="${td} font-weight:600; color:${orphan ? 'var(--danger,#ef4444)' : 'inherit'};">${has ? 'T' + p.tool : '—'}</td><td style="${td} color:${dCol};">${name}</td><td style="${td} color:var(--text-dim);">${len}</td></tr>`;
             }).join('');
             const table = magAll.length
                 ? `<table style="width:100%; border-collapse:collapse; font-size:11px; margin-top:6px;"><thead><tr style="color:var(--text-dim); text-align:left; font-size:10px;"><th style="padding:0 7px 3px;">Pocket</th><th></th><th style="padding:0 7px 3px;">Tool</th><th style="padding:0 7px 3px;">Description</th><th style="padding:0 7px 3px;">Length</th></tr></thead><tbody>${rows}</tbody></table>`
                 : '<div class="settings-hint" style="margin:6px 0 0;">No pockets yet — click Edit table to build the magazine.</div>';
-            host.innerHTML = `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><button class="toolbar-btn settings-io" data-edit-mag>✎ Edit table…</button><span class="settings-hint" style="margin:0;">${magAll.length} pocket${magAll.length === 1 ? '' : 's'} · ${a.magType === 'disk' ? 'disk / carousel' : 'linear'}</span></div>${table}`;
+            const orphanBanner = orphanCount
+                ? `<div data-mag-orphan style="margin:6px 0 0; padding:6px 9px; border:1px solid var(--danger,#ef4444); border-left:3px solid var(--danger,#ef4444); border-radius:5px; background:rgba(239,68,68,0.10); color:var(--danger,#ef4444); font-size:11px; line-height:1.45;"><b>⚠ ${orphanCount} pocket${orphanCount === 1 ? '' : 's'} reference a tool that is no longer in the library.</b> Re-add the tool or reassign the pocket (Edit table).</div>`
+                : '';
+            host.innerHTML = `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><button class="toolbar-btn settings-io" data-edit-mag>✎ Edit table…</button><span class="settings-hint" style="margin:0;">${magAll.length} pocket${magAll.length === 1 ? '' : 's'} · ${a.magType === 'disk' ? 'disk / carousel' : 'linear'}</span></div>${orphanBanner}${table}`;
             host.querySelector('[data-edit-mag]').addEventListener('click', () => openMagazineModal(() => this.update(mgr)));
         }
         const lens = (a.tools || []).filter((t) => t && t.length !== '' && t.length != null).map((t) => `T${t.num} ${t.length}`).join(' · ');

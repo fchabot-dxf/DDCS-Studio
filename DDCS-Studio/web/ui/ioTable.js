@@ -237,16 +237,26 @@ export function renderMagazineTable(container, atc, onChange) {
         const pk = document.createElement('span'); pk.textContent = i + 1; pk.style.cssText = 'width:46px; font-weight:600; color:#3a3a3a;'; tr.appendChild(pk);
 
         // Tool = a picker into the tool library (T-number); Description shows what that tool is.
-        const sel = document.createElement('select'); sel.innerHTML = toolOptionsHTML('— empty —');
-        sel.value = (row.tool === '' || row.tool == null) ? '' : String(row.tool);
-        sel.style.cssText = INP + ' width:158px;';
+        // A7: a pocket may reference a tool# that was DELETED from the library — the picker would silently
+        // drop it (looks empty though row.tool is still set). Detect that orphan, keep it visible as a flagged
+        // option, and mark the row so the user knows the reference is dangling.
+        const has = row.tool !== '' && row.tool != null;
+        const orphan = has && !getTool(row.tool);
+        const sel = document.createElement('select');
+        sel.innerHTML = toolOptionsHTML('— empty —')
+            + (orphan ? `<option value="${row.tool}">⚠ T${row.tool} — not in library</option>` : '');
+        sel.value = has ? String(row.tool) : '';
+        sel.style.cssText = INP + ' width:158px;' + (orphan ? ' border-color:var(--danger,#ef4444); color:var(--danger,#ef4444);' : '');
         const desc = document.createElement('span'); desc.style.cssText = 'width:150px; font-size:11px; color:#6b6150; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
         const fillDesc = () => {
             const t = getTool(row.tool);
-            desc.textContent = t ? ([t.type, t.flutes !== '' ? t.flutes + 'F' : '', t.feed !== '' ? 'F' + t.feed : ''].filter(Boolean).join(' · ') || t.name || '—') : '(empty)';
+            if (t) { desc.style.color = '#6b6150'; desc.removeAttribute('title'); desc.textContent = [t.type, t.flutes !== '' ? t.flutes + 'F' : '', t.feed !== '' ? 'F' + t.feed : ''].filter(Boolean).join(' · ') || t.name || '—'; }
+            else if (row.tool !== '' && row.tool != null) { desc.style.color = 'var(--danger,#ef4444)'; desc.title = `Tool #${row.tool} is not in the library — pick a tool or clear this pocket.`; desc.textContent = `⚠ tool #${row.tool} not in library`; }
+            else { desc.style.color = '#6b6150'; desc.removeAttribute('title'); desc.textContent = '(empty)'; }
         };
         fillDesc();
-        sel.addEventListener('change', () => { row.tool = sel.value === '' ? '' : Number(sel.value); fillDesc(); onChange(); });
+        if (orphan) tr.style.background = 'rgba(239,68,68,0.08)';
+        sel.addEventListener('change', () => { row.tool = sel.value === '' ? '' : Number(sel.value); rerender(); onChange(); });
         tr.appendChild(sel); tr.appendChild(desc);
 
         const cell = (key, w) => {

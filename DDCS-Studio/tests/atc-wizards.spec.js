@@ -73,6 +73,46 @@ test('Tool Change wizard: bold UNVERIFIED banner only for generic/disk auto chan
   await expect(banner).toBeHidden();
 });
 
+test('ATC table wizard: flags magazine pockets that reference a deleted library tool (A7)', async ({ page }) => {
+  // Library has only T1; the magazine references T5 (deleted) in pocket 2 → orphan.
+  await page.addInitScript(() => localStorage.setItem('ddcs_studio_settings', JSON.stringify({
+    atc: {
+      magType: 'straight',
+      tools: [{ num: 1, type: 'endmill', dia: 6, length: 40 }],
+      magazine: [{ pocket: 1, tool: 1, x: 0, y: 0, z: 0 }, { pocket: 2, tool: 5, x: 10, y: 0, z: 0 }],
+    },
+  })));
+  await openWizard(page, 'atc_table');
+  const host = page.locator('#atc_table_magazine');
+
+  // Orphan banner appears and names the count.
+  const banner = host.locator('[data-mag-orphan]');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('1 pocket');
+  await expect(banner).toContainText('no longer in the library');
+  // The flagged row carries the orphan note.
+  await expect(host).toContainText('tool #5 not in library');
+
+  // The edit modal (renderMagazineTable) also surfaces the orphan + keeps it visible in the picker.
+  await host.locator('[data-edit-mag]').click();
+  const modal = page.locator('.mag-edit-host');
+  await expect(modal).toBeVisible();
+  await expect(modal).toContainText('not in library');
+  await expect(modal.locator('option', { hasText: 'T5 — not in library' })).toHaveCount(1);
+});
+
+test('ATC table wizard: no orphan banner when every pocket tool exists (A7)', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('ddcs_studio_settings', JSON.stringify({
+    atc: {
+      magType: 'straight',
+      tools: [{ num: 1, type: 'endmill', dia: 6, length: 40 }, { num: 2, type: 'ballnose', dia: 6, length: 45 }],
+      magazine: [{ pocket: 1, tool: 1, x: 0, y: 0, z: 0 }, { pocket: 2, tool: 2, x: 10, y: 0, z: 0 }],
+    },
+  })));
+  await openWizard(page, 'atc_table');
+  await expect(page.locator('#atc_table_magazine [data-mag-orphan]')).toHaveCount(0);
+});
+
 test('ATC Test wizard: drawbar and pocket modes', async ({ page }) => {
   await openWizard(page, 'atc_test');
 
