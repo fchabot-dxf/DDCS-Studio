@@ -160,6 +160,14 @@ export class GcodeViz3D {
             this.container.appendChild(tip);
             this._stockTip = tip;
         }
+        // PROBE-WCS marker (slice 3): the datum DERIVED by the probe, a PEER of the stock-WCS — same size, EQUAL
+        // importance, different COLOUR (cyan vs the stock amber). A plain POINT (dot, NO crosshair — user request) so it
+        // reads as a result, not a gizmo. Always visible; starts superimposed on part-zero (setup-right) and each G31
+        // converges its probed axis to the contact. Rides the part frame + scaled by _scaleMarkers like the origin dot.
+        const pg = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 18), new THREE.MeshBasicMaterial({ color: 0x4f8fff, depthTest: false }));
+        pg.renderOrder = 15;
+        this._probeGizmo = pg;
+        this.partFrame.add(pg);
         // Direction labels on the grid edges (repositioned to the footprint in setSegments)
         this._gridLabels = {
             xp: this._makeTextSprite('+X', '#ff6b6b'), xn: this._makeTextSprite('-X', '#ff6b6b'),
@@ -304,6 +312,10 @@ export class GcodeViz3D {
             const gs = Math.max(1e-4, 18 * wpp);   // ±18px crosshair half-length
             this._originGizmo.scale.setScalar(gs);
             if (this._originLabel) { const w = Math.max(1e-4, 48 * wpp / gs); this._originLabel.scale.set(w, w / 2, 1); }
+        }
+        if (this._probeGizmo) {   // probe-WCS dot — same constant on-screen size as the stock-WCS dot (peer)
+            const wpp = worldPerPxAt(this._probeGizmo.getWorldPosition(this._pgV3 || (this._pgV3 = new this.THREE.Vector3())));
+            this._probeGizmo.scale.setScalar(Math.max(1e-4, 18 * wpp));
         }
         // Direction labels (+X/-X/+Y/-Y): constant on-screen width too (canvas is 2:1), so they don't grow with zoom.
         const L = this._gridLabels;
@@ -1545,18 +1557,16 @@ export class GcodeViz3D {
         return this._glowTex;
     }
 
-    flashMarker(kind) {
-        const THREE = this.THREE;
-        const anchor = kind === 'wcs' ? this._originGizmo : (this.spindleMarkers && this.spindleMarkers[0]);
-        const tex = this._glowTexture();
-        if (!anchor || !THREE || !tex || !this.scene) return;
-        const pos = anchor.getWorldPosition(new THREE.Vector3());
+    // A soft blurred additive GLOW pulse at a WORLD position (the shared primitive for the WCS/start flash + the probe
+    // touch glow). Expands + fades over 0.7s, then disposes. Self-contained so it never fights _scaleMarkers.
+    _glowAt(worldPos, color) {
+        const THREE = this.THREE, tex = this._glowTexture();
+        if (!worldPos || !THREE || !tex || !this.scene) return;
         const span = (this._stock && Math.max(this._stock.x || 0, this._stock.y || 0)) || 60;
         const baseR = Math.max(6, span * 0.18);
-        const col = kind === 'wcs' ? 0xffe08a : 0xff7a6a;
-        const mat = new THREE.SpriteMaterial({ map: tex, color: new THREE.Color(col), transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false });
+        const mat = new THREE.SpriteMaterial({ map: tex, color: new THREE.Color(color), transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false });
         const sprite = new THREE.Sprite(mat);
-        sprite.position.copy(pos); sprite.renderOrder = 999;
+        sprite.position.copy(worldPos); sprite.renderOrder = 999;
         this.scene.add(sprite);
         const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
         const t0 = now(), dur = 700;
@@ -1568,6 +1578,58 @@ export class GcodeViz3D {
             this.render();
             if (u < 1) requestAnimationFrame(tick);
             else { this.scene.remove(sprite); mat.dispose(); }
+        };
+        requestAnimationFrame(tick);
+    }
+
+    // SLICE 2 — WCS/start flash: glow the WCS origin gizmo ('wcs', amber) or the first spindle start marker ('start', red).
+    flashMarker(kind) {
+        const anchor = kind === 'wcs' ? this._originGizmo : (this.spindleMarkers && this.spindleMarkers[0]);
+        if (!anchor || !this.THREE) return;
+        this._glowAt(anchor.getWorldPosition(new this.THREE.Vector3()), kind === 'wcs' ? 0xffe08a : 0xff7a6a);
+    }
+
+    // SLICE 3 — reset the derived probe-WCS back onto part-zero (superimposed on the stock-WCS). Called at each run start.
+    resetProbe() {
+        if (this._probeGizmo) { this._probeGizmo.position.set(0, 0, 0); this.render(); }
+        this._probeAxes = {};
+    }
+
+    // SLICE 3 — a G31 just finished on `axis` (the tool sits at the contact). BUILD that axis of the probe-WCS PER-AXIS:
+    // glow at the point (the probe event), flash the probed axis LINE, and animate the point's axis converging to the
+    // contact (the tool's part-local position — same frame as the markers). The contact may be OFF the stock (a miss) —
+    // we DON'T clamp; an off-stock probe-WCS is the correctness signal. Z first by program order (a Z touch-off probes Z first).
+    probeAxisTouched(axis) {
+        const pg = this._probeGizmo, tool = this._animTool, THREE = this.THREE;
+        if (!pg || !tool || !THREE || 'xyz'.indexOf(axis) < 0) return;
+        const target = tool.position[axis];               // the contact (part-local) — NOT clamped to stock
+        const from = pg.position[axis];
+        (this._probeAxes || (this._probeAxes = {}))[axis] = true;
+        this._flashAxisLine(axis);                         // the per-axis cue: brighten the probed axis line
+        this._glowAt(pg.getWorldPosition(new THREE.Vector3()), 0x4f8fff);   // a cyan glow at the point — the probe event
+        const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+        const t0 = now(), dur = 380, ease = (u) => 1 - (1 - u) * (1 - u);
+        const tick = () => {
+            const u = Math.min(1, (now() - t0) / dur);
+            pg.position[axis] = from + (target - from) * ease(u);
+            this.render();
+            if (u < 1) requestAnimationFrame(tick); else pg.position[axis] = target;
+        };
+        requestAnimationFrame(tick);
+    }
+
+    // Briefly brighten the probed axis line (X red / Y green / Z blue), then restore — the per-axis "which axis" cue.
+    _flashAxisLine(axis) {
+        const ln = axis === 'x' ? this._axisLineX : axis === 'y' ? this._axisLineY : this._axisLineZ;
+        if (!ln || !ln.material) return;
+        const mat = ln.material, base = mat.opacity;
+        const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+        const t0 = now(), dur = 650;
+        const tick = () => {
+            const u = Math.min(1, (now() - t0) / dur);
+            mat.opacity = base + (1 - base) * (1 - u);    // 1.0 → base
+            this.render();
+            if (u < 1) requestAnimationFrame(tick); else mat.opacity = base;
         };
         requestAnimationFrame(tick);
     }

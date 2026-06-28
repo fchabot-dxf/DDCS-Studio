@@ -84,6 +84,15 @@ export function classifyCall(raw) {
     return null;
 }
 
+// SLICE 3: the axis a G31 PROBE move targets (the first axis word carrying a value), or null if the line isn't a G31.
+// Exported for unit tests. The per-axis probe-WCS is built one G31 at a time, so we only need which axis each touches.
+export function probeAxis(raw) {
+    const code = String(raw || '').replace(/\([^)]*\)/g, ' ');
+    if (!/\bG31\b/.test(code)) return null;
+    const m = code.match(/\bG31\b[^()]*?([XYZ])\s*-?[\d.]/i);
+    return m ? m[1].toLowerCase() : null;
+}
+
 export function createPreviewPanel(container, opts = {}) {
     const get = (k) => (typeof opts[k] === 'function' ? opts[k]() : opts[k]);
     container.classList.add('preview-panel');
@@ -152,6 +161,7 @@ export function createPreviewPanel(container, opts = {}) {
     }
 
     let engine = null;
+    let pendingProbe = null;   // SLICE 3: the axis of a G31 awaiting completion (resolved on the next onLineChange)
     function ensureEngine() {
         if (engine) return engine;
         engine = new GcodeExecutionEngine({
@@ -163,17 +173,24 @@ export function createPreviewPanel(container, opts = {}) {
             onLineChange: ({ lineIndex, raw }) => {
                 if (typeof opts.onLine === 'function') opts.onLine(lineIndex);
                 if (raw) setStatus(`Executing line ${lineIndex + 1}: ${raw.trim()}`);
+                // SLICE 3: a previous G31 has now FINISHED (the engine clamped it to the contact; the tool sits there) →
+                // build that axis of the probe-WCS. Resolving on the NEXT line guarantees the tool is at the contact.
+                if (pendingProbe && viz && viz.probeAxisTouched) viz.probeAxisTouched(pendingProbe);
+                pendingProbe = null;
                 // WCS VISIBLE: a WCS/start call fires a temporal FLASH — the 3D marker glows + the code line glows/fades.
                 const kind = raw ? classifyCall(raw) : null;
                 if (kind) {
                     if (viz && viz.flashMarker) viz.flashMarker(kind);
                     if (typeof opts.onCallFlash === 'function') opts.onCallFlash(lineIndex, kind);
                 }
+                if (raw) { const pa = probeAxis(raw); if (pa) pendingProbe = pa; }   // a G31 → resolve on the next line
             },
             onPositionChange: (pos) => { if (viz && viz.setToolPosition) viz.setToolPosition(pos); if (mode === '2d' && segs.length) t2.seek(nearest2d(pos)); },
             onStatus: ({ message }) => setStatus(message),
             onWait: (wait) => { if (!window.ioPanel) return; if (wait) window.ioPanel.show(); window.ioPanel.setWait(wait); },   // float the I/O panel during a probe/M-code wait
             onFinish: () => {
+                if (pendingProbe && viz && viz.probeAxisTouched) viz.probeAxisTouched(pendingProbe);   // SLICE 3: a trailing G31 (last line)
+                pendingProbe = null;
                 updateRunBtn();
                 if (typeof opts.onLine === 'function') opts.onLine(null);
                 if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; engine.run(lastRunCode); updateRunBtn(); }, 800); }
@@ -365,6 +382,7 @@ export function createPreviewPanel(container, opts = {}) {
         eng._stockOffset = getStartPos() || { x: 0, y: 0, z: 0 };   // probes test from the operator start (see trace.js)
         eng._wcsOffset = wcsForViz() || { x: 0, y: 0, z: 0 };          // G53 machine moves draw in the part frame (see trace.js)
         if (mode === '3d') ensureViz();
+        if (viz && viz.resetProbe) viz.resetProbe();    // SLICE 3: fresh probe-WCS each run (superimposed on the stock-WCS)
         if (viz) viz.setAnimate(false);                 // engine drives the tool/trail, not the geometric sweep
         lastRunCode = get('getGcode') || '';
         eng.run(lastRunCode);
