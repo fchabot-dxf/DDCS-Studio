@@ -84,6 +84,31 @@ test('DRO: switching the active WCS changes Mach (G54 → G55 offset)', async ({
   expect(g55.m, 'switching the active WCS changed Mach').not.toBeCloseTo(g54.m, 1);
 });
 
+test('#4: a G54-G59 PROGRAM LINE drives the SIM active WCS (Mach offset + label) WITHOUT touching settings', async ({ page }) => {
+  await setup(page, 'G54\nG0 X20 Y10\nG55 ( switch WCS )\nG0 X30 Y15\nM30');   // starts G54, switches to G55 mid-program
+  await page.evaluate(() => {
+    const m = window.ddcsGetSettings().machine;
+    m.wcs = { active: 1, table: [{ x: 100, y: 200, z: 0 }, { x: -30, y: -40, z: 0 }] };   // G54 vs G55 — distinct offsets
+    m.workOrigin = { x: 0, y: 0, z: 0 };
+  });
+  await page.locator(RUN).click();
+  await expect(page.locator(STATUS)).toContainText('complete', { timeout: 12000 });
+  await page.waitForTimeout(300);
+  const r = await page.evaluate(() => {
+    const rr = (ax) => { const tr = document.querySelector(`#viz3d-panel-host .pp-dro tr[data-ax="${ax}"]`); return { w: +tr.children[1].textContent, m: +tr.children[2].textContent }; };
+    return {
+      x: rr('x'), y: rr('y'),
+      label: document.querySelector('#viz3d-panel-host .pp-dro-wcs').textContent.trim(),
+      settingsActive: window.ddcsGetSettings().machine.wcs.active,
+    };
+  });
+  // after the mid-program G55, Mach uses the G55 offset (-30,-40), NOT the settings/G54 offset (+100,+200)
+  expect(r.label, 'the program G55 line drove the active-WCS label').toBe('G55');
+  expect(r.x.m, 'Mach X = Work + the G55 offset (-30)').toBeCloseTo(r.x.w - 30, 2);
+  expect(r.y.m, 'Mach Y = Work + the G55 offset (-40)').toBeCloseTo(r.y.w - 40, 2);
+  expect(r.settingsActive, 'settings.machine.wcs.active was NOT modified (sim display only)').toBe(1);
+});
+
 test('DRO WCS event: a G55 call updates the active-WCS label + flashes the Work column', async ({ page }) => {
   await setup(page, 'G0 X5\nG55 ( switch WCS )\nG0 X10\nM30');   // no leading G54 → label is the default until the call
   const before = await page.evaluate(() => ({

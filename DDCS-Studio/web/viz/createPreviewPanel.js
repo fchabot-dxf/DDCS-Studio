@@ -138,8 +138,14 @@ export function createPreviewPanel(container, opts = {}) {
     // column becomes truly per-WCS with NO change to the DRO. The Work column flashes + the WCS label updates on a
     // WCS/probe event (reusing the slice-2 classify hook). Rows = X/Y/Z, plus A/B when the rotary rig is shown.
     const droEl = q('.pp-dro'), droWcsEl = q('.pp-dro-wcs'), droBody = q('.pp-dro-tbl tbody');
-    const activeWcsOffset = () => wcsForViz() || { x: 0, y: 0, z: 0 };   // ← future per-WCS table drops in HERE
-    const activeWcsName = () => { const m = window.ddcsGetSettings && window.ddcsGetSettings().machine; const a = (m && m.wcs && m.wcs.active) || 1; return 'G' + (53 + a); };   // table[0]=G54
+    let simActiveWcs = null;   // #4: a G54-G59 PROGRAM LINE overrides the active WCS for the SIM/DRO ONLY (never settings.machine.wcs.active); reset each run
+    const activeWcsIdx = () => { if (simActiveWcs) return simActiveWcs; const m = machineForViz(); return (m && m.wcs && m.wcs.active) || 1; };
+    const activeWcsOffset = () => {   // Mach = Work + this; follows the program-driven active WCS once a G54-G59 line fired, else the settings active
+        const m = machineForViz(); if (!m) return { x: 0, y: 0, z: 0 };
+        const w = m.wcs, r = w && Array.isArray(w.table) && w.table[activeWcsIdx() - 1];
+        return r ? { x: +r.x || 0, y: +r.y || 0, z: +r.z || 0 } : (m.workOrigin || { x: 0, y: 0, z: 0 });
+    };
+    const activeWcsName = () => 'G' + (53 + activeWcsIdx());   // table[0]=G54
     let droAxes = ['x', 'y', 'z'];
     function buildDro() {
         droAxes = rotaryFixture ? ['x', 'y', 'z', 'a', 'b'] : ['x', 'y', 'z'];
@@ -154,9 +160,12 @@ export function createPreviewPanel(container, opts = {}) {
             if (row) { row.children[1].textContent = w.toFixed(3); row.children[2].textContent = m.toFixed(3); }
         });
     }
-    function setDroWcs(raw) {   // a G54-G59 select updates the active-WCS label (G10 set-offset keeps the current label)
-        const m = String(raw || '').replace(/\([^)]*\)/g, ' ').match(/\bG5[4-9]\b/);
-        if (m && droWcsEl) droWcsEl.textContent = m[0];
+    function setDroWcs(raw) {   // a G54-G59 select drives the SIM active WCS — label + Mach offset (G10 set-offset keeps the current label)
+        const m = String(raw || '').replace(/\([^)]*\)/g, ' ').match(/\bG5([4-9])\b/);
+        if (!m) return;
+        simActiveWcs = +m[1] - 3;                            // G54→1 … G59→6 — SIM/viz DISPLAY ONLY, never settings.machine.wcs.active
+        if (engine) engine._wcsOffset = activeWcsOffset();   // the engine's G53 moves track the program's WCS change too
+        if (droWcsEl) droWcsEl.textContent = m[0];
     }
     function flashDro() {       // re-trigger the CSS flash on the Work column (the re-reference cue)
         if (!droEl) return;
@@ -431,6 +440,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     function play() {
         const eng = ensureEngine();
+        simActiveWcs = null;   // #4: each run reverts to the settings active WCS; the program's G54-G59 lines re-drive it (display only)
         eng.simSpeed = simSpeed();
         eng.autoAnswer = window.ioPanel ? window.ioPanel.isAutoSensors() : true;
         eng.stock = stockForViz();
