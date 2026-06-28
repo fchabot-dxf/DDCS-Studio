@@ -586,3 +586,34 @@ state: report only, no feature code · branch main · suite untouched (345/347 f
   not a single flash. Lead with the Z touch-off (per the existing design lock).
 - state: tests 346/348 green (2 skipped) · branch main · committed `aaeecc5` (LOCAL, unpushed). One commit as asked.
   Passing back.
+
+## 2026-06-28 — turn 15: SLICE 3 — probe per-axis touch animation + two distinct WCS `384c992`
+
+- task (advisor turn 15): as each G31 executes, ANIMATE the probe-WCS PER-AXIS (axis-line flash → value → point), Z
+  first; render probe-WCS distinct from stock-WCS (BOTH POINTS, same size, equal importance, different colour, peers);
+  probe-WCS CAN land OFF stock (no clamp = correctness signal). Reuse slice-2 + the engine contacts. GATE if it needs an
+  engine change.
+- GATE DECISION = BUILD (NO engine change). The engine already clamps G31 to the contact (probeGeometry.stockProbeStop)
+  and the tool's part-local position at completion IS the contact. So: createPreviewPanel tracks each G31 (probeAxis)
+  and resolves it on the NEXT onLineChange (when the tool sits at the contact) → viz.probeAxisTouched(axis) reads
+  _animTool.position[axis]. No new engine callback, no var-store reach — derived from existing onLineChange/onPositionChange.
+- did:
+  - `gcodeViz3d`: a `_probeGizmo` (a plain BLUE dot — a point, NOT a crosshair, per the user; same dot size as the stock
+    dot, scaled in _scaleMarkers), always visible, starts at part-zero. `probeAxisTouched(axis)` = flash the probed axis
+    LINE (_flashAxisLine) + a blue glow at the point (_glowAt) + animate the point's axis converging to the contact.
+    `resetProbe()` (run start). Refactored flashMarker → a shared `_glowAt(worldPos,color)`.
+  - `createPreviewPanel`: `probeAxis(raw)` (exported) + a `pendingProbe` resolved on the next line / onFinish; `resetProbe()`
+    in play().
+- LIVE USER DECISIONS folded in (captured): glow = a soft blurred sprite (turn 13); probe = a POINT not a crosshair;
+  colour = BLUE (0x4f8fff, not cyan — "cyan is not blue") because the compare is INFORMATIONAL not an alarm (red would
+  mis-signal; a Z touch-off SHOULD differ = a confirmation). The probe point flashes + the axis line that crosses it
+  flashes (confirmed by the user). Three-colour reference scheme: stock=amber · probe=blue · start=red.
+- DEFERRED / flagged for the advisor (user design notes, NOT built — out of slice-3 scope): (a) the START position could
+  be a DIFFERENT WIDGET (shape, not just colour) to distinguish it from the WCS points; (b) the axis line could be
+  repositioned to cross the probe-WCS point exactly when the point is offset (today it flashes the origin axis line for
+  the probed axis — crosses the point while superimposed / on the probed axis). Both are refinements for a later slice.
+- VERIFY-FIRST (probe-wcs.spec.js, real Simulate): probeAxis unit; two distinct peer markers (blue probe ≠ amber stock,
+  visible, superimposed at part-zero); RUN a probe (Z touch-off + X edge) → the probe-WCS builds per-axis converging to
+  each contact (Z + X within tol of the tool contact), the unprobed Y stays superimposed, the datum moved off part-zero.
+- state: tests 346/349 green (2 skipped; 1 known form-widgets xy-pad flake — passes 5/5 in isolation, unrelated to this
+  change) · branch main · committed `384c992` (LOCAL, unpushed). One commit as asked. Passing back.
