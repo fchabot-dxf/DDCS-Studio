@@ -1212,3 +1212,37 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   → `onStartDrag(pos, 1)` with the moved X); (2) a REAL `MiddleWizard` boss-probe-both macro traces to >1 pass. Full 2D/
   start suite green; full suite 376 passed + the KNOWN middle-animator parallel flake (6/6 isolated, untouched by me).
   **HUMAN-eyes** = the final look (a boss probe-both → 2D shows ① AND ② labelled, both draggable). INC 2/3/4 queued.
+
+## 2026-06-28 — turn 51: MIDDLE-PROBE batch — INC2 (verified-working) + INC3 GATE (two-toggles UX)
+
+- **INC2 (`d9cd124`) — verify-first found it ALREADY WORKS; regression test, no prod change.** The advisor's premise
+  ("p>0 starts aren't jog-editable") is stale. Empirical (real boss-probe-both macro, real jog buttons): select ② →
+  jog X+/Y+ → `viz.starts[1]` moves 0→10, PERSISTS across a re-trace, REFLECTS in the 2D ② marker. Resolved by INC1's
+  plumbing (`viz.starts` grown to passCount; jog handler jogs `viz.starts[selectedStart]`; `onStartChange` syncs ALL
+  passes to the shared `passStarts`). The human's "selects ② but won't move" was the PRE-INC1 invisibility of ② (no 2D
+  marker to watch move). `jog-move-2nd-start.spec.js` locks it.
+
+- **INC3 verify-first (the core bug) — CONFIRMED, code + the HUMAN's screenshot.** A boss probe-both in AUTO: the
+  trans-axis (X→Y) reposition is `reposition()` ([middleWizard.js:64-73,:112](DDCS-Studio/web/wizards/middleWizard.js#L112))
+  which LIFTS + waits + DROPS but emits **NO lateral XY move** → in AUTO the tool never traverses to the perpendicular
+  walls, so the 2nd-axis probe starts from the wrong spot (the human: "second middle boss probe in auto isnt using the
+  second pos" + a screenshot: ② sits at the inferred Y-wall but the orange toolpath stays near the X walls). The marker ②
+  IS positioned (middleView.js:98 passes `inferStarts` as the `startHints` arg — my earlier "no wizard sets startHints"
+  grep missed it: the var is named `inferStarts`). So the MARKER is right but the macro MOTION isn't — trace-vs-execution
+  divergence. The in-axis traverse (`between`→`traverseOver`, #19/#20) already auto-traverses; only the trans-axis jogs.
+
+- 🛑 **GATE (advisor-flagged "two-toggles UX") — the HUMAN resolved the UX half (chose TWO TOGGLES via AskUserQuestion):**
+  replace the single `approach` Auto/Manual with TWO per-traverse controls — **In-axis traverse** (Auto/Manual) +
+  **Trans-axis (X→Y) traverse** (Auto/Manual), mix-able, boss-only (hidden for pocket). Proposed implementation (for the
+  advisor to bless + answer the open Q before I build the macro+form+Blockly):
+  - **(a)** New params `inAxis`/`transAxis` (auto|manual), each DEFAULT from the old `approach` (back-compat byte-identical:
+    a saved op `approach:'auto'` → both auto). The macro: `between()` reads `inAxis`; the trans-axis (line 112) reads
+    `transAxis` → `transTraverse()` (auto) vs `reposition()` (manual, INC4 simulates it).
+  - **(b)** `transTraverse()` = a real 2-axis MOVE to the perpendicular walls, reusing the corner's diagonal
+    `MOVE({[ax]:travelOwn,[ax2]:travelOpp})` pattern ([cornerWizard.js:58-64,:140](DDCS-Studio/web/wizards/cornerWizard.js#L140)),
+    fed by a NEW **"Diag travel"** field (a new #-var, e.g. #21).
+  - **❓ OPEN Q for the advisor:** the **Diag travel DEFAULT expression** — "derived from the #19/#20 cross-over" but the
+    cross-over is the IN-axis wall→wall distance while the trans-axis move is from an X-wall to a Y-wall. Proposed default
+    `[#19+#20]/2` (half the mean cross-over ≈ to the perpendicular wall) — needs confirmation; it's geometry the human/advisor should set.
+  - Plus relabel the corner's `travelDist` "Travel"→"Diag travel". Blockly round-trip for the new fields/toggles.
+  Holding the build for the advisor's synthesis (bless the plan + the Diag-travel default), per the explicit gate.
