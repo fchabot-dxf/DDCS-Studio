@@ -41,6 +41,34 @@ test('3D start markers colour by source (auto=cyan 0x22d3ee, manual=amber 0xffb3
   expect(r.c1, 'pass 1 (manual) = amber').toBe(0xffb300);
 });
 
+// The 3D draws a dashed inter-pass jog (prevEnd → this pass's start anchor). A MANUAL reposition IS an operator jog, so
+// it draws; an AUTO traverse is hands-free (its diagonal IS the connecting move) so the jog is a PHANTOM — it must NOT
+// draw (the dashed line "after the diag to ②" the user flagged). gcodeViz3d gates the jog on the per-pass SOURCE.
+test('3D inter-pass jog: AUTO traverse draws NO jog line; MANUAL keeps its jog', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
+  await page.waitForSelector('#wiz_drill', { state: 'visible' });
+  await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.viz; });
+  const r = await page.evaluate(() => {
+    const viz = window.ddcsStudio.wizardManager._activePanel.viz;
+    viz._anchorToStart = true;
+    viz.starts = [{ x: 0, y: 0, z: 0 }, { x: 50, y: -50, z: 0 }];
+    // 2 passes, each with a move (so pass 0 produces a prevEnd that the pass-1 jog would bridge to ②)
+    const parsed = { stats: { passes: 2 }, segments: [
+      { x1: 0, y1: 0, z1: 0, x2: 10, y2: 0, z2: 0, type: 'rapid', pass: 0 },
+      { x1: 0, y1: 0, z1: 0, x2: 0, y2: 10, z2: 0, type: 'rapid', pass: 1 },
+    ] };
+    viz.setStartSources(['auto', 'auto']); viz.setSegments(parsed, false);
+    const autoJog = !!viz.lineGroups.jog;
+    viz.setStartSources(['auto', 'manual']); viz.setSegments(parsed, false);
+    const manualJog = !!viz.lineGroups.jog;
+    return { autoJog, manualJog };
+  });
+  expect(r.autoJog, 'AUTO traverse → no phantom jog line').toBe(false);
+  expect(r.manualJog, 'MANUAL reposition → keeps its jog line').toBe(true);
+});
+
 test('2D path colours the trans-axis TRAVERSE vector (2-axis rapid) by source; in-axis rapid keeps its type colour', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);

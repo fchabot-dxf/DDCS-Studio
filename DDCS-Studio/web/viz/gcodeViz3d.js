@@ -714,8 +714,11 @@ export class GcodeViz3D {
             // Route anchor: probe ops draw from the start MARKER (the incremental macro emanates from the real tool
             // position); mill/absolute programs draw at their own coords so moving the start does NOT drag the path.
             const off = this._anchorToStart ? mk : { x: 0, y: 0, z: 0 };
-            // manual jog from the previous pass's end to this pass's start anchor
-            if (prevEnd) { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, off.x, off.y, off.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(off.x, off.y, off.z); pushSeg(prevEnd.x, prevEnd.y, prevEnd.z, off.x, off.y, off.z, 6000, 0, 0, 0, 0, 0xff9a0d); }
+            // A MANUAL reposition draws a dashed jog from the previous pass's end to this pass's start (the operator
+            // physically moves there). An AUTO traverse does NOT — its auto-traverse move (the diagonal) IS the connecting
+            // travel, so a jog line here is a PHANTOM (the dashed line that "shouldn't be there" in auto). Gate by source.
+            const jogSrc = (this._startSources && this._startSources[p]) || 'auto';
+            if (prevEnd && jogSrc === 'manual') { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, off.x, off.y, off.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(off.x, off.y, off.z); pushSeg(prevEnd.x, prevEnd.y, prevEnd.z, off.x, off.y, off.z, 6000, 0, 0, 0, 0, 0xff9a0d); }
             let cur = { x: 0, y: 0, z: 0 }; // pass-local, relative to the marker
             for (const s of segs) {
                 const dx = s.x2 - s.x1, dy = s.y2 - s.y1, dz = s.z2 - s.z1;
