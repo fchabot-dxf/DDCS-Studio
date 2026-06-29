@@ -126,7 +126,7 @@ export function cornerStack(params = {}) {
         MV('Z', '#10');
         PR('Z', '#7', '#4'); CK('Z', 1);
         A('#73', '[#70+2]', 'WCS Z Address');
-        A('#[#73]', '#1927', `Save ${wcsLabel} Z offset - machine coord`);
+        A('#[#73]', '[#1927-#6]', `Save ${wcsLabel} Z offset - machine coord (− stylus radius)`);   // Z-down contact is the tool centre a radius above the surface
         MV('Z', '#19');
         MV(firstAx, firstTravelVar);
     }

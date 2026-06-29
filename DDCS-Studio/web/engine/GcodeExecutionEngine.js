@@ -971,7 +971,8 @@ export class GcodeExecutionEngine {
                     // Stock — boss (outer box), pocket (box + cavity wall) or cylinder (round OD). Shared with the
                     // 3D preview via probeGeometry, so the simulated touch matches what the viz draws.
                     const motors = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings().motors : null;
-                    tt = stockProbeStop(aStart, bEnd, this.stock, rotaryAxisOf(motors));
+                    const tipR = (probes && Number.isFinite(probes.radius)) ? probes.radius : 0;   // DECLARED probe tip radius → collide the SURFACE
+                    tt = stockProbeStop(aStart, bEnd, this.stock, rotaryAxisOf(motors), tipR);
                 }
                 if (tt != null) {
                     // Clamp the recorded target to the contact surface (in LOCAL coords).

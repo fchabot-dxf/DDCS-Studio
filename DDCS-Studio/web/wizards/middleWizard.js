@@ -54,6 +54,7 @@ export function middleStack(params = {}) {
     // probe reaches ②); the direction is verified-correct for all dir1/dir2 — only this magnitude was wrong. #21.
     const diagTravel = (params.diagTravel === '' || params.diagTravel == null) ? '50' : String(params.diagTravel);
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
+    const radius = num(params.radius, 2);   // stylus tip radius (#6) — for the DIAMETER (∓2r) + Z-surface (−r) comp; the CENTRE (bisect) needs none
 
     const S = [];
     const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
@@ -129,6 +130,7 @@ export function middleStack(params = {}) {
 
     A('#1', dist, 'Max probe distance'); A('#2', retract, 'Retract distance');
     A('#3', fFast, 'Fast feedrate'); A('#4', fSlow, 'Slow feedrate'); A('#5', port, 'Probe port');
+    if (circular || probeZ) A('#6', radius, 'Probe stylus radius');   // declared ONE source for the comp (only emitted where it's used)
     A('#51', 0, 'Wall 1 pos'); A('#52', 0, 'Wall 2 pos'); A('#53', 0, 'Center pos');
     A('#54', 0, 'Wall 3 pos'); A('#55', 0, 'Wall 4 pos'); A('#56', 0, 'Center pos 2');
     A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
@@ -155,7 +157,7 @@ export function middleStack(params = {}) {
     if (probeZ) {
         C('Z Surface - set Z datum first');
         twoPass('Z', false, '#57');                          // two-pass down-probe the top surface → #57 (= Z trigger #1927)
-        A('#[#70+2]', '#57', `Save ${wcsLabel} Z offset`);   // Z0 write — middle's #[#70+off] convention (Z off=2)
+        A('#[#70+2]', '[#57-#6]', `Save ${wcsLabel} Z offset (− stylus radius)`);   // Z0 write — STYLUS-RADIUS COMP: the Z-down contact is the tool CENTRE a radius ABOVE the top, so the true surface = trigger − r (matches Expert 3D-probe `G10 L20 P2 Z[#110]`)
         reposition('jog clear, to the first wall');           // Z pass done → reposition to the XY start (existing helper)
     }
 
@@ -181,9 +183,13 @@ export function middleStack(params = {}) {
     if (circular) {
         // Round feature: the opposite-touch span IS the diameter. #58 = primary-axis Ø; with 2-axis, #59 = the
         // perpendicular Ø and #60 the mean. ABS so the result is direction-agnostic (dir1 pos/neg ordering).
-        A('#58', `ABS[#51-#52]`, 'Primary-axis diameter');
+        // STYLUS-RADIUS COMP: each opposite contact is the tool CENTRE a radius off its wall, so the centre-span is off by
+        // TWO balls — a BOSS (outside) reads 2r TOO BIG (subtract), a BORE/pocket (inside) reads 2r TOO SMALL (add). Derived
+        // from the native edge convention (#1925±#6 toward the probe dir) applied to two opposite walls; bisect (centre) cancels.
+        const dia = featureType === 'boss' ? '-[2*#6]' : '+[2*#6]';
+        A('#58', `ABS[#51-#52]${dia}`, 'Primary-axis diameter (∓ 2× stylus radius)');
         if (twoAxis) {
-            A('#59', `ABS[#54-#55]`, 'Secondary-axis diameter'); A('#60', '[#58+#59]/2', 'Mean diameter');
+            A('#59', `ABS[#54-#55]${dia}`, 'Secondary-axis diameter (∓ 2× stylus radius)'); A('#60', '[#58+#59]/2', 'Mean diameter');
             A('#61', '[#58-#59]', 'Out-of-round (primary dia - secondary dia)');   // roundness metric (same as the Circular wizard)
         }
         MSG(twoAxis ? 'Centre #53/#56 - mean dia #60 - round #61' : 'Centre #53 - dia #58');

@@ -19,8 +19,10 @@ test('probe stops at the round cylinder OD, not the bounding-box corner', async 
     return p ? { y2: p.y2, z2: p.z2 } : null;
   });
   expect(r, 'a probe segment was traced').not.toBeNull();
-  expect(r.y2, 'stops at the round OD (35.36), not the 40 a bounding box would allow').toBeCloseTo(35.36, 0);
-  expect(r.z2).toBeCloseTo(35.36, 0);
+  // STYLUS-RADIUS COMP (turn 116): the OD collides at R + tip radius (the tool CENTRE stops a radius off the surface —
+  // correct for the rotary's real OUTSIDE probes). So R=50→52, diagonal 52/√2≈36.77. Still round, not the 70.7 box corner.
+  expect(r.y2, 'stops at the round OD + tip radius (52/√2 ≈ 36.77), not the 40 a bounding box would allow').toBeCloseTo(36.77, 0);
+  expect(r.z2).toBeCloseTo(36.77, 0);
 });
 
 test('radial probe from the axis stops at the cylinder radius', async ({ page }) => {
@@ -35,5 +37,6 @@ test('radial probe from the axis stops at the cylinder radius', async ({ page })
     return p ? { y2: p.y2 } : null;
   });
   expect(r).not.toBeNull();
-  expect(r.y2, 'stops at the +Y OD (50 mm from the axis), not the full 80').toBeCloseTo(50, 0);
+  // R=50 + tip radius 2 = 52 (the tool centre stops a radius off the OD).
+  expect(r.y2, 'stops at the +Y OD + tip radius (52 from the axis), not the full 80').toBeCloseTo(52, 0);
 });

@@ -23,7 +23,7 @@ test('macro: OFF byte-identical; ON probes Z first + writes Z0 + reposition befo
       off, offFalse, on,
       zCommentLine: lines.findIndex((l) => /Z Surface/.test(l)),
       zProbeLine: lines.findIndex((l) => /G31 Z/.test(l)),
-      z0WriteLine: lines.findIndex((l) => /#\[#70\+2\]=#57/.test(l)),
+      z0WriteLine: lines.findIndex((l) => /#\[#70\+2\]=\[#57-#6\]/.test(l)),   // Z0 = trigger − stylus radius (turn 116 comp)
       repoLine: lines.findIndex((l) => /REPOSITION: jog clear, to the first wall/.test(l)),
       firstXProbeLine: lines.findIndex((l) => /G31 X/.test(l)),
     };

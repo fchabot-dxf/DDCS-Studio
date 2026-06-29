@@ -2165,3 +2165,36 @@ the simpler build). SIM-ONLY, no macro change, the probe-contact DISCS + the TOO
   - **(B)** ship the tip radius for corner/edge XY only — NOT geometrically clean (the uniform collision can't spare the XY
     diameter span); rejected.
   - Need your call on scope (A is the real fix but spans several macros = a bigger increment than inc1's "sim collision only").
+
+---
+
+## 🔨 turn 116 — STYLUS-RADIUS COMP (the gate's option A, implemented) — the un-comp'd macros now compensate
+
+Advisor chose **(A)**: pair the re-applied tip radius with radius-comp in every un-comp'd surface macro, all via the
+DECLARED `#6` (one source, like corner/edge — NEVER a literal). Ground-truthed every sign vs the M350 dumps; nothing guessed.
+
+- **Tip radius re-applied (inc1):** `stockProbeStop(A,B,stock,rotaryAxis,tipR=0)` grows the box / shrinks the pocket cavity /
+  grows the cylinder OD by `settings.probes.radius`; engine + viz `_rebuild` pass it. Tool CENTRE stops a radius short.
+- **Comps added (all `#6`):**
+  - **DIAMETER** (middle `#58/#59`): `ABS[#51-#52] ∓ [2*#6]` — BOSS −2r, BORE/pocket +2r. Two opposite contacts are each a
+    ball off their wall → the centre-span is off by TWO balls. Sign by `featureType`. Derived from the native edge
+    convention (`#1925±#6` toward the probe dir) applied to opposite walls; the bisect centre cancels (left alone).
+  - **Z-SURFACE** (−#6): middle Z-first Z0 `#[#70+2]=[#57-#6]`, rotary Zc `#56=[#50-#6-#55]`, corner Z `#[#73]=[#1927-#6]`.
+    The Z-down contact is the tool centre a radius ABOVE the surface. GROUND TRUTH: Expert "3D PROBE G55" `G10 L20 P2 Z[#110]`
+    ("current position = ball radius"). Edge Z already comped (`#50=#1925±#6`) — untouched.
+  - **CENTRE / Yc:** untouched — `#53/#56` and rotary `#54` are bisects; the ∓ contacts cancel (ground truth: centerx.nc /2).
+  - `#6` declared in middle (only when `circular||probeZ`, keeping the basic middle byte-identical) + rotary known-method;
+    middleView now passes `radius: probes.radius` so `#6` == the sim's tip radius.
+- **Real-machine BUG the tip radius EXPOSED (rotary flank approach):** `#11 = R+retract` *grazes* the OD when `retract==r`
+  (both 2) — the tool centre must clear the OD by `retract`, but the tip sticks out `r`. Point-collision masked it; the
+  expanded OD surfaced it (flank probe started ON the surface → took the FAR wall → Yc overshot ~30mm). Fixed: `#11=[#55+#2+#6]`.
+  This is correct for the real machine too (not a sim hack), so it's baked into the emitted macro.
+- **Tests (7 touched; signs verified EMPIRICALLY — the comp RECOVERS the true geometry):**
+  - middle-circular-sim, rotary-center-sim ×2 — **pass AS-IS** (the comp recovers true Ø / true Zc=−38.1 / Yc=38.1).
+  - probe-cavity-collision ×2 (25→23, 10→8) + rotary-collision ×2 (OD 50→52, 35.36→36.77) — the COLLISION contact is now a
+    tip-radius off the wall (legitimate; the macro comp recovers the true wall).
+  - middle-probe-z-first — Z0 write regex → `#[#70+2]=[#57-#6]`.
+- **VERIFIED:** probe regression 33/33, **full suite 424 passed / 0 failed**. Live render captured (drove a real middle-circular
+  BOSS through the wizard viz + datum hook): **Ø reads true 60**, centre 30/30 (unchanged) — opened in a VS Code tab for the human.
+- **Declare-or-handroll:** every comp reads the ONE declared `#6` (no literals); the diameter sign is the only *derived* term
+  (no native diameter macro exists) — derived from the edge convention + confirmed by the expanded-box geometry, not guessed.

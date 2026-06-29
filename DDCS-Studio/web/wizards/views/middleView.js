@@ -132,6 +132,8 @@ export const middleView = {
             qStop: el('m_q')?.value || '1',
             port: window.ddcsGetSettings().probes.probePin,
             level: window.ddcsGetSettings().probes.probeLevel,
+            radius: window.ddcsGetSettings().probes.radius,   // stylus tip radius → #6 (diameter/Z-surface comp); matches the sim collision
+
             sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
 

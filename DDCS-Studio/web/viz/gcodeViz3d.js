@@ -681,6 +681,7 @@ export class GcodeViz3D {
         const st = this._stock;
         const probeable = !!(st && st.show && st.x > 0 && st.y > 0 && st.z > 0);   // a stock to collide a probe against
         const rotaryAxis = Object.values(getRotaryAxes())[0] || 'x';              // cylinder lies along this (matches setStock)
+        const tipR = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().probes && Number.isFinite(window.ddcsGetSettings().probes.radius)) ? window.ddcsGetSettings().probes.radius : 0;   // probe tip radius → SURFACE collision (matches the engine)
         const CAP = 20; // fallback probe length when it never contacts the stock
 
         const byPass = [];
@@ -732,7 +733,7 @@ export class GcodeViz3D {
                 if (type === 'probe' && probeable) {
                     const Aw = { x: start.x + off.x, y: start.y + off.y, z: start.z + off.z };
                     const Bw = { x: end.x + off.x, y: end.y + off.y, z: end.z + off.z };
-                    const tt = stockProbeStop(Aw, Bw, st, rotaryAxis);
+                    const tt = stockProbeStop(Aw, Bw, st, rotaryAxis, tipR);
                     if (tt != null) { end = { x: start.x + dx * tt, y: start.y + dy * tt, z: start.z + dz * tt }; }
                 }
 

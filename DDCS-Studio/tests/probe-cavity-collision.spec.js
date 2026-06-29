@@ -21,7 +21,9 @@ test('bore probe stops at the pocket cavity wall, not the outer block (no tunnel
   });
   expect(r, 'a probe segment was traced').not.toBeNull();
   expect(Math.abs(r.x1), 'probe starts at the centre').toBeLessThan(0.01);
-  expect(r.x2, 'probe stops at the cavity wall (25 mm), not the full 40 mm').toBeCloseTo(25, 1);
+  // STYLUS-RADIUS COMP (turn 116): the tool CENTRE stops a tip-radius (2 mm) SHORT of the 25 mm cavity wall — the tip
+  // touches the wall (no penetration); the wizards' #50/#58 comp recovers the true 25 mm. Still nowhere near the 40 mm cap.
+  expect(r.x2, 'tool centre stops a radius short of the cavity wall (25 − 2 = 23)').toBeCloseTo(23, 1);
 });
 
 test('external probe into a solid block still stops at the block face (no regression)', async ({ page }) => {
@@ -37,5 +39,6 @@ test('external probe into a solid block still stops at the block face (no regres
     return probe ? { x1: probe.x1, x2: probe.x2 } : null;
   });
   expect(r, 'a probe segment was traced').not.toBeNull();
-  expect(r.x2, 'external probe stops at the block face (10 mm)').toBeCloseTo(10, 1);
+  // STYLUS-RADIUS COMP: the tool centre stops a tip-radius (2 mm) short of the 10 mm face (the tip touches it).
+  expect(r.x2, 'tool centre stops a radius short of the block face (10 − 2 = 8)').toBeCloseTo(8, 1);
 });

@@ -72,23 +72,30 @@ export function rayCylinder(A, B, cyl) {
  *   • pocket → outer box + an inset CAVITY whose wall stops a bore probe coming from inside the hole.
  *   • cylinder → the round OD (rotary stock), at the rotary axis.
  */
-export function stockProbeStop(A, B, stock, rotaryAxis) {
+export function stockProbeStop(A, B, stock, rotaryAxis, tipR = 0) {
     if (!stock || !(stock.x > 0 && stock.y > 0 && stock.z > 0)) return null;
+    const r = Number.isFinite(tipR) && tipR > 0 ? tipR : 0;   // probe TIP radius: collide the SURFACE, so the tool CENTRE
+    // stops a radius SHORT of the wall (the tip touches it, no penetration). The recorded contact is then the centre — a
+    // radius from the wall, like a real machine — which is exactly what the wizards' radius-comp expects (corner/edge
+    // #1925±#6, diameter ∓2r, Z-surface −r). A bisect (centre) is radius-independent → unchanged. Outer surfaces grow by r
+    // (centre stops outside); a pocket cavity shrinks by r (probing from inside, the centre stops before the inner wall).
     let tt = null;
     const take = (t) => { if (t != null && t > 1e-6 && t <= 1 && (tt == null || t < tt)) tt = t; };
 
     if (stock.shape === 'cylinder') {
-        const rc = rayCylinder(A, B, cylinderOf(stock, rotaryAxis));
+        const cyl = cylinderOf(stock, rotaryAxis);
+        cyl.r += r;   // the ball touches the OD a radius out
+        const rc = rayCylinder(A, B, cyl);
         if (rc.hit) { if (rc.tEnter > 1e-6) take(rc.tEnter); else if (rc.tExit > 1e-6) take(rc.tExit); }
         return tt;
     }
 
-    const box = { min: { x: 0, y: 0, z: -stock.z }, max: { x: stock.x, y: stock.y, z: 0 } };
+    const box = { min: { x: -r, y: -r, z: -stock.z - r }, max: { x: stock.x + r, y: stock.y + r, z: r } };
     const ro = rayBox(A, B, box.min, box.max);
     if (ro.hit) { if (ro.tEnter > 1e-6) take(ro.tEnter); else if (ro.tExit > 1e-6) take(ro.tExit); }
     if (stock.shape === 'pocket') {                       // a hole in the block — same inset the 3D view renders
         const w = Math.max(8, Math.min(stock.x, stock.y) * 0.25);
-        const cav = { min: { x: w, y: w, z: -stock.z }, max: { x: stock.x - w, y: stock.y - w, z: 0 } };
+        const cav = { min: { x: w + r, y: w + r, z: -stock.z }, max: { x: stock.x - w - r, y: stock.y - w - r, z: 0 } };
         const rc = rayBox(A, B, cav.min, cav.max);
         if (rc.hit && rc.tEnter <= 1e-6 && rc.tExit > 1e-6) take(rc.tExit);   // probing from inside the hole → its wall
     }

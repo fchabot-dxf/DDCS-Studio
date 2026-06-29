@@ -21,6 +21,7 @@ export function rotaryCenterStack(params = {}) {
     const datum = params.datum === 'top' ? 'top' : 'center';
     const level = num(params.level, 0), diameter = num(params.diameter, 76.2), dist = num(params.dist, 30);
     const retract = num(params.retract, 2), safeZ = num(params.safeZ, 15), fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
+    const radius = num(params.radius, 2);   // stylus tip radius (#6) — the Z-down top probe lands a radius high, so Zc subtracts it (Yc bisect cancels)
     const src = params.sources || {};
     const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
     const wcsArg = wcs === 'active' ? '#578' : String(parseInt(String(wcs).replace('G', ''), 10) - 53);
@@ -76,7 +77,8 @@ export function rotaryCenterStack(params = {}) {
     if (method === 'known') {
         C(`=== Known diameter: top + two flanks (${approach === 'auto' ? 'auto-centring' : 'operator-guided'}) ===`);
         A('#55', `${diameter}/2`, 'R = known diameter / 2');
-        A('#11', '[#55+#2]', 'Flank approach = R + retract (lateral offset AND top->centreline drop)');
+        A('#6', radius, 'Probe stylus radius');   // declared ONE source for the Z-surface comp
+        A('#11', '[#55+#2+#6]', 'Flank approach = R + retract + stylus radius (the tool CENTRE must clear the OD by retract — the tip sticks out r)');
         // A solid bar can't be probed from its axis — approach each flank from OUTSIDE at the centreline.
         // Traverses run at a SAFE height clear above the bar (#17 over the top, so the rapid never skims the OD);
         // drops land beside the bar in free space. #11 = R+retract = lateral offset (clears the OD); #12 = safeZ+R
@@ -100,7 +102,7 @@ export function rotaryCenterStack(params = {}) {
         MV('Z', '#12');              // raise clear of the bar before the final retract
         C('Centre + radius');
         A('#54', '[#52+#53]/2', 'Yc = midpoint of flanks');
-        A('#56', '[#50-#55]', 'Zc = top - R');
+        A('#56', '[#50-#6-#55]', 'Zc = top - R (− stylus radius: the Z-down top contact is the tool centre a radius above the OD)');
     } else {
         C('=== 3-point circle fit (no diameter) === ADVANCED: verify on machine');
         C('Point 1: top (capture Z trigger + current Y)'); pp('Z', false, '#51');
