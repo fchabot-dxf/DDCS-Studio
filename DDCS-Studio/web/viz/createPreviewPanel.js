@@ -303,28 +303,35 @@ export function createPreviewPanel(container, opts = {}) {
         if ((parsed && parsed.stats && parsed.stats.probe) > 0) return withProbe({ type: 'probe', dia: 6 });
         return { type: 'endmill', dia: 6 };
     }
+    // THE one declared source of the per-pass starts (inc2): the precedence userStarts > pass-0 start > registry hint
+    // (getStartHints) > prev. Pure (reads the closures); BOTH feeds — the trace and the engine — call it so they never
+    // diverge. The pass COUNT comes from the wizard's hints (which mirror its reposition() calls); single-pass ops have no
+    // hints → one start; the engine falls back to _stockOffset past the array. A dragged ② (userStarts) persists.
+    function computePassStarts(st) {
+        const hints = get('getStartHints');
+        const hintFor = (p) => Array.isArray(hints) ? (hints[p] || hints[0]) : null;
+        const count = Math.max(Array.isArray(hints) ? hints.length : 0, 1);
+        const next = [];
+        for (let p = 0; p < count; p++) {
+            const h = userStarts[p] || (p === 0 && st) || hintFor(p) || passStarts[p] || { x: 0, y: 0, z: 0 };
+            next.push({ x: +h.x || 0, y: +h.y || 0, z: +h.z || 0 });
+        }
+        return next;
+    }
+
     function setGcode(text) {
         const code = text != null ? text : (get('getGcode') || '');
         // Inferred operator start (wizard preview): probes test from the real tool position so an incremental
         // probe macro doesn't trace from the origin (on the stock face) and clamp its first probe to zero.
         const st = getStartPos();
-        // INC1/Part1: per-pass operator starts, computed BEFORE the trace so the probe COLLISION fires from each pass's
-        // start ② (not always pass-0's ① — else a boss-both 2nd-axis probe misses). Mode-independent so BOTH views render
-        // them. Pass 0 honours the user drag (st via getStartPos); p>0 falls back to the wizard's per-pass HINT, then the
-        // last position (a dragged ② persists). The pass COUNT comes from the wizard's hints (the middle's inferStarts
-        // mirror its reposition() calls); single-pass ops have no hints → one start; the engine falls back to _stockOffset.
-        {
-            const hints = get('getStartHints');
-            const hintFor = (p) => Array.isArray(hints) ? (hints[p] || hints[0]) : null;
-            const count = Math.max(Array.isArray(hints) ? hints.length : 0, 1);
-            const next = [];
-            for (let p = 0; p < count; p++) {
-                // a USER edit (userStarts) beats everything; then pass 0's getStartPos (st); then the wizard HINT; then the last value.
-                const h = userStarts[p] || (p === 0 && st) || hintFor(p) || passStarts[p] || { x: 0, y: 0, z: 0 };
-                next.push({ x: +h.x || 0, y: +h.y || 0, z: +h.z || 0 });
-            }
-            passStarts = next;
-        }
+        // inc2: per-pass starts from computePassStarts — THE one declared source, fed IDENTICALLY to BOTH consumers (the
+        // trace's passStarts param below + the engine's _passStarts), so they never diverge. Computed BEFORE the trace.
+        passStarts = computePassStarts(st);
+        // inc2 SINGLE-FEED coherence: while the sim RUNS, refresh the engine's copy from the SAME computation, so a live
+        // edit that changes the starts but NOT the macro (a STOCK change → new hints, same G-code) updates the engine too —
+        // scheduleLiveRestart only re-plays on a G-CODE change, so it would otherwise leave _passStarts stale. Gated to
+        // code===lastRunCode so a G-code-changing edit (handled by the re-play) never feeds the OLD running pass new starts.
+        if (engine && engine.running && code === lastRunCode) engine._passStarts = (passStarts && passStarts.length) ? passStarts : null;
         const stk = stockForViz(), mch = machineForViz(), wo = wcsForViz() || {};
         let parsed;
         try {

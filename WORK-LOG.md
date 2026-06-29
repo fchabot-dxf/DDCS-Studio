@@ -1558,3 +1558,29 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   suite 401 green** + the 1 known flake (project-drawer-smoke, passes isolated). **SCOPE = increment 1 only** (not
   passStarts-unify / jog-IR / drag-expiry — 2-4). **⚠ HUMAN-eyes:** multi-pass probe previews (boss-both, alignment, rotary
   fit) show the same ①②③④ markers as before.
+
+## 2026-06-28 — turn 78: SIM REFACTOR inc 2 — passStarts SINGLE-FEED (mostly a near-noop; closed the real residual)
+
+- **VERIFY-FIRST — HONEST finding (the advisor flagged it might be a near-noop, and it largely is):** passStarts is ALREADY
+  the single source — ONE computation block in setGcode (precedence `userStarts > pass-0 start > registry hint > prev`) fed
+  to the trace (`traceToolpath({passStarts})`) AND the engine (`eng._passStarts` at play). For a WIZARD-PARAM edit (which
+  changes the G-code), `scheduleLiveRestart` already STOPs + re-plays → re-feeds `_passStarts` fresh → the engine path does
+  NOT lag the trace path. So for the dispatched scenario ("edit a wizard param while playing"), it's effectively a NOOP.
+- **THE REAL RESIDUAL (where staleness actually bites):** a live edit that changes the STARTS but NOT the macro — a **STOCK
+  change** while running (the middle macro is stock-INDEPENDENT, it measures): the trace recomputes passStarts (new hints)
+  but `scheduleLiveRestart` SKIPS (it only re-plays on a G-code change, [createPreviewPanel.js:402](DDCS-Studio/web/viz/createPreviewPanel.js#L402)),
+  and `eng._passStarts` was set only at `play()` — so the engine kept the STALE starts. Traced + reproduced.
+- **FIX (minimal, behaviour-preserving):**
+  - Extracted the precedence into a named **`computePassStarts(st)`** — THE one declared source, an explicit reusable fn
+    (both feeds read it), serving the stated goal.
+  - In setGcode, after computing passStarts: **`if (engine.running && code === lastRunCode) engine._passStarts = passStarts`**
+    — the running engine is refreshed from the SAME computation. GATED to `code===lastRunCode` so a G-code-CHANGING edit
+    (handled by the re-play) never feeds the OLD running pass new starts (no transient mismatch). Closes the stock residual;
+    leaves the param-edit path (re-play) untouched.
+- **VERIFIED (new `passstarts-single-feed.spec.js`):** play a boss-both preview, then a live STOCK-Y edit → `engine._passStarts`
+  ②.y FOLLOWS the stock (coherent), where without the feed it would stay stale (scheduleLiveRestart skips the unchanged G-code).
+  **Full suite 403 green** + the 1 known flake (project-drawer-smoke, passes isolated). **SCOPE = inc 2 only.**
+- **▶ The REAL remaining gaps are inc 3 (render-time JOG-IR) + inc 4 (user-drag EXPIRY) — not touched here.** NOTE (forward):
+  the deferred `def.sim.starts` declarative path must be designed BLOCK-FRIENDLY — a sim-declaration block round-trips against
+  the DECLARATION, not the macro (no emitted line to reverse-sync). **⚠ HUMAN-eyes:** edit the stock while a probe preview
+  plays → the live tool's per-pass starts track the change.
