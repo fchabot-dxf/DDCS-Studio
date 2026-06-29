@@ -18,6 +18,7 @@
 import { registerUserBuilder, unregisterUserBuilder, registerOpLabel, removeOpLabel } from './opBuilders.js';
 import { registerUserSpec, unregisterUserSpec } from './opSchema.js';
 import { setUserSimIntent } from '../viz/opSimContext.js';
+import { setUserSimStarts, makeProvider } from '../viz/opSimStarts.js';
 
 const STORE_KEY = 'ddcs_user_ops';
 export const USER_OP_PREFIX = 'user_';
@@ -218,6 +219,9 @@ export function registerUserOp(def) {
     registerUserSpec(def.opType, schema);
     registerOpLabel(def.opType, def.label || def.opType);
     setUserSimIntent(def.opType, def.sim || null);   // DECLARED preview intent only (never inferred from motion)
+    // DECLARED per-pass sim-starts (def.sim.starts rows) → a provider in the SAME registry the built-ins/wizards use.
+    const starts = def.sim && def.sim.starts;
+    setUserSimStarts(def.opType, (Array.isArray(starts) && starts.length) ? makeProvider(starts) : null);
     return def;
 }
 
@@ -265,6 +269,7 @@ export function deleteUserOp(opType) {
     unregisterUserSpec(opType);
     removeOpLabel(opType);            // register touches 4 tables — delete must clear all 4 (was leaking OP_LABELS)
     setUserSimIntent(opType, null);   // clear the declared preview intent
+    setUserSimStarts(opType, null);   // clear the declared per-pass sim-starts provider
 }
 
 /** Re-register every persisted user op — call ONCE at app start. Returns the count registered. */

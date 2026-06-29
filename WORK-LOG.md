@@ -1781,3 +1781,35 @@ provider)` in userOps (beside `setUserSimIntent`). NO engine/trace change — op
 
 **GATE → human/advisor:** pick **A vs B** + the starting vocabulary (anchors + `@tokens` + the `when` shape) before I build
 `makeProvider` + (B3) the block. NOT building this turn.
+
+## 2026-06-29 — turn 92: B1 BUILD — `def.sim.starts` declarative path (Option A blessed)
+
+GATE RESOLVED: the human blessed Option A (structured anchor+offset rows) + the vocabulary as-is. Built the data layer
+(B1) ONLY — not B2 (drag-persist) or B3 (the Blockly block).
+
+- **`makeProvider(rows)`** in [opSimStarts.js](DDCS-Studio/web/viz/opSimStarts.js) — interprets an array of pass-ROWS into a
+  provider `(params, stock) ⇒ [{x,y,z}…]`. The blessed vocabulary: `anchor` ∈ centre | edge(axis,side,out) | frac(fx,fy) |
+  radial(axis,sign,r); `plane` ∈ top | probe | @flank(=-R) | `<number>`; `side`/`out`/`r` = a literal OR an `@token` from the
+  bound set { `@dir1 @dir2 @outset @R` }; optional `when:{param,is}` → the row only contributes when params match (the
+  conditional pass count). PURE — it derives the SAME scope the built-ins use (`sx/sy/sz`, `cx/cy`,
+  `outset=max(6,min(dist·0.6,15))`, `R=min(sy,sz)/2`); unknown picks degrade to the stock centre, never throws.
+  - `edge` matches the built-in `outside()` exactly (pos/min ⇒ the `-out` side, neg/max ⇒ the `dim+out` side) so a built-in's
+    pattern re-expresses faithfully.
+- **Wired in [userOps.js](DDCS-Studio/web/blocks/userOps.js)** beside `setUserSimIntent` (mirror): `registerUserOp` →
+  `setUserSimStarts(def.opType, makeProvider(def.sim.starts))` when `def.sim.starts` is a non-empty array; `deleteUserOp` →
+  `setUserSimStarts(opType, null)` (clears, like the intent). Data → provider → the EXISTING registry seam. NO engine/trace
+  change — `opSimStarts` already feeds the wizard AND (B0) the editor.
+- **BUILT-INS UNCHANGED** — middle/alignment/rotary keep their fns (the backlog allows it; the spec serves CUSTOM ops).
+- **VERIFIED (new `sim-starts-data.spec.js`, 3 tests):**
+  - **(a) PROOF-OF-SUFFICIENCY** — MIDDLE boss-both (auto) expressed as 2 edge rows + a `when` gate, and ALIGNMENT (fence-X)
+    as 2 frac rows, each run through `makeProvider` and asserted EQUAL to that built-in's own `opSimStarts` output (representative
+    params). Proves the vocabulary is sufficient + the interpreter correct for both the wall-edge and fraction patterns. (The
+    one pick NOT proof-backed is `radial`+`@flank` — rotary's flank uses `R+retract`, a compound the single-`@token` `r` can't
+    express; tested directly, NOT via rotary. A future `out` offset on `radial` would close that — out of scope, built-in keeps its fn.)
+  - **(b)** every anchor (centre/edge/frac/radial), plane (top/probe/@flank/number), @token (@dir1/@dir2/@outset/@R), and the
+    `when`-gate conditional count (twoAxis on→2 / off→1) interpret to the expected coordinates.
+  - **(c)** a DECLARED `def.sim.starts` flows end-to-end: the direct registry seam (setUserSimStarts(makeProvider(rows)) →
+    opSimStarts) AND the full userOps path (`createUserOp` carrying `sim:{starts}` → registered provider → opSimStarts; the
+    gated pass appears only when twoAxis is true; `deleteUserOp` clears → null).
+  - Regression: op-sim-starts-registry / custom-op-sim-intent / custom-op-panel / federated-registry / middle-aim all pass
+    isolated (this is a pure-module add — no DOM/render/engine change).

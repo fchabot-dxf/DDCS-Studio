@@ -94,6 +94,82 @@ export function setUserSimStarts(opType, provider) {
     if (typeof provider === 'function') USER_STARTS.set(opType, provider); else USER_STARTS.delete(opType);
 }
 
+// ── makeProvider: a DECLARED `def.sim.starts` ROWS spec → a (params, stock) ⇒ [{x,y,z}…] provider (Option A, blessed) ────
+// Each ROW = one pass. The human-blessed bounded vocabulary:
+//   anchor : 'centre' | 'edge'(axis,side,out) | 'frac'(fx,fy) | 'radial'(axis,sign,r)
+//   plane  : 'top' (above the top, +z) | 'probe' (below the top, into the stock) | '@flank' (= -R, the bar centreline) | <number>
+//   side/out/r : a literal OR an @token from the bound set { @dir1 @dir2 @outset @R }
+//   when   : { param, is } — optional; the row only contributes when params[param] matches (the conditional pass count)
+// PURE: it derives the SAME scope the built-ins use (sx/sy/sz, cx/cy, outset, R) so a built-in's pattern is expressible as
+// rows (proof-of-sufficiency). Unknown picks degrade to the stock centre — never throws (valid-by-construction).
+const TOK = (v, ctx) => {
+    if (typeof v !== 'string' || v[0] !== '@') return v;          // a literal passes through untouched
+    switch (v) {
+        case '@dir1': return ctx.params.dir1;
+        case '@dir2': return ctx.params.dir2;
+        case '@outset': return ctx.outset;
+        case '@R': return ctx.R;
+        default: return v;
+    }
+};
+
+const planeZ = (p, ctx) => {
+    if (typeof p === 'number') return p;
+    if (p === 'top') return Math.min(5, ctx.sz * 0.5);            // above the top, ready to probe down
+    if (p === 'probe') return -Math.min(5, ctx.sz * 0.5);         // just below the top, into the stock
+    if (p === '@flank') return -ctx.R;                            // the bar centreline (top-at-0 frame)
+    return 0;
+};
+
+const rowToStart = (row, ctx) => {
+    const z = planeZ(row.plane, ctx);
+    const { sx, sy, cx, cy } = ctx;
+    switch (row.anchor) {
+        case 'edge': {
+            const axis = row.axis === 'Y' ? 'Y' : 'X';
+            const side = TOK(row.side, ctx);                      // 'pos'/'min' → the -out side; 'neg'/'max' → the +out side
+            const minSide = side === 'pos' || side === 'min';     // matches the built-in outside(): pos ⇒ -out
+            const out = n(TOK(row.out, ctx), 0);
+            const coord = minSide ? -out : (axis === 'X' ? sx : sy) + out;
+            return axis === 'X' ? { x: coord, y: cy, z } : { x: cx, y: coord, z };
+        }
+        case 'frac':
+            return { x: sx * n(row.fx, 0.5), y: sy * n(row.fy, 0.5), z };
+        case 'radial': {
+            const axis = row.axis === 'X' ? 'X' : 'Y';
+            const r = n(TOK(row.r, ctx), 0) * (row.sign === '-' ? -1 : 1);
+            return axis === 'X' ? { x: cx + r, y: cy, z } : { x: cx, y: cy + r, z };
+        }
+        case 'centre':
+        default:
+            return { x: cx, y: cy, z };
+    }
+};
+
+const whenOk = (when, params) => {
+    if (!when) return true;
+    const v = (params || {})[when.param];
+    return typeof when.is === 'boolean' ? !!v === when.is : v === when.is;
+};
+
+/** A DECLARED `def.sim.starts` rows spec → a per-pass provider (params, stock) ⇒ [{x,y,z}…]. Register via setUserSimStarts. */
+export function makeProvider(rows) {
+    const spec = Array.isArray(rows) ? rows : [];
+    return (params, stock) => {
+        const sx = n(stock && stock.x, 100), sy = n(stock && stock.y, 80), sz = n(stock && stock.z, 20);
+        const dist = n(params && params.dist, 20);
+        const ctx = {
+            sx, sy, sz, cx: sx / 2, cy: sy / 2,
+            outset: Math.max(6, Math.min(dist * 0.6, 15)),        // the standard stand-off (matches built-in middle)
+            R: Math.min(sy, sz) / 2,                              // bar radius (matches built-in rotary)
+            params: params || {},
+        };
+        const out = [];
+        for (const row of spec) if (whenOk(row.when, params)) out.push(rowToStart(row, ctx));
+        return out;
+    };
+}
+
 /**
  * The per-pass preview-start markers for an op: a registered custom op uses its DECLARED provider; a built-in uses the
  * MOVED static inference; everything else returns null (the caller falls back to a single inferStart). The returned
