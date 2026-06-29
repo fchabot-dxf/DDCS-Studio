@@ -1882,3 +1882,30 @@ the advisor pre-authorized "GATE if it needs a real restructure"), the options:
 reversing the deliberate editor-clean contract, and keeps the self-describing path working via the existing fallback. A only
 wins if LIVE markers in the editor text are explicitly wanted — and since that changes what the user sees in their G-code,
 it's the HUMAN's call. **GATED — no build this turn.** Awaiting A vs B.
+
+## 2026-06-29 — turn 98: B0 BUILD — Option B (program-model-first hints; editor stays clean) [human + advisor blessed]
+
+Fix the editor-sim divergence (an inserted boss-both: the 2nd-axis must land on the per-pass start ②, matching the wizard,
+NOT the WCS edge) WITHOUT touching the editor-clean contract — chosen over Option A (no editor-text markers).
+
+- **VERIFY-FIRST (REAL insert, not synthetic):** probed `wizardManager.insert()` of a middle boss → the program record carries
+  the FULL params (`{featureType:'boss', findBoth:true, axis:'X', dir1:'pos', dir2:'pos', dist:'200', inAxis/transAxis, …}`),
+  and `opSimStarts('middle', rec.params, stock)` → **2 hints**, ②=`{50,-15,-5}` (the Y-wall, not the WCS edge). So the live
+  program model is sufficient for the registry.
+- **BUILD ([gcodePreviewTab.js](DDCS-Studio/web/ui/gcodePreviewTab.js) `gpStartHints`):** read the LIVE PROGRAM MODEL first —
+  `ddcsGetBlockProgram()` → for each op record `opSimStarts(opType, params, stock)` → concatenate the per-pass hints. KEEP
+  turn-88's editor-text `@DDCS` marker-parse as the FALLBACK (for a loaded .nc that already has export markers). So:
+  program-model PRIMARY, markers SECOND. **No projection change** — the editor text stays clean (Option A rejected). Lights up
+  CUSTOM ops too (the program record → opSimStarts → the def.sim.starts provider).
+- **VERIFIED — REAL-SYMPTOM (new `editor-sim-real-insert.spec.js`, through `wizardManager.insert()`, NOT a synthetic marker):**
+  (1) real-insert a boss-both → the editor preview's `getPassStarts()[1]` (②) MATCHES the wizard's `opSimStarts(…)[1]`, the
+  editor text has NO `@DDCS` (stays clean), 2 passes; (2) a SECOND real insert → two program ops, each independently resolving
+  its own 2 hints; AND a loaded .nc with an `@DDCS` marker (program emptied) still resolves via the FALLBACK (2 passes). The
+  turn-88 `editor-sim-hints.spec.js` now exercises that fallback path — still green. Regression: dro-position, op-sim-starts,
+  sim-starts-data, probe-anim, editor-click-seek pass isolated (14 total). Trusted isolated runs (server overloaded 3× this
+  session on full runs); recommend a fresh-server full re-run.
+- **NOTE (honest):** multi-op concatenation aligns the FIRST op's passes with the trace; for several STACKED multi-pass probes
+  the trace's running `_pass` can drift on later ops (each op contributes its hints, but per-pass alignment past the first is
+  the same deeper limitation flagged since turn 88 — B2/B4 territory). Also: if the editor is HAND-EDITED to diverge from the
+  program model, the program hints can be stale — acceptable per the one-source choice (the program is the truth right after an
+  insert, the human's actual flow). SCOPE = Option B only (NOT A / no editor markers; NOT B2 drag-persist; NOT B4).

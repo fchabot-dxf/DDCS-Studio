@@ -12,16 +12,31 @@ import { createPreviewPanel } from '../viz/createPreviewPanel.js';
 import { isMarker, parseMarker } from '../blocks/opSchema.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 
-// Per-pass sim-start HINTS for the editor's program — the SAME federated registry the wizards use (opSimStarts, inc 1).
-// Parse the program's @DDCS op markers (op type + params) and concatenate each op's DECLARED per-pass starts, so the editor
-// sims a multi-pass probe (a boss-both) with the 2nd-axis beginning at ② — IDENTICAL to the wizard's preview — instead of
-// gluing it to the literal incremental position (the stock edge / WCS). 'the block should apply' (human). No markers → null
-// → the single-pass default (unchanged). (Registry DEFAULT hints only; a dragged ②/userStarts saved as op data is Phase 2.)
+// Per-pass sim-start HINTS for the editor's program — the SAME federated registry the wizards use (opSimStarts). So the
+// editor sims a multi-pass probe (a boss-both) with the 2nd-axis beginning at ② — IDENTICAL to the wizard's preview —
+// instead of gluing it to the literal incremental position (the stock edge / WCS).
+//
+// Option B (one-source, editor-clean): read the LIVE PROGRAM MODEL first — its op records carry opType + params, so no
+// markers are needed in the editor text (the editor stays clean — see programModel.js "export only"). This is what fixes the
+// human's symptom: right after a wizard INSERT the op+params are in the program, so the hints resolve. It also lights up
+// CUSTOM ops (the program record → opSimStarts → the def.sim.starts provider). FALLBACK: a loaded .nc that already carries
+// export @DDCS markers (no live program) — parse them (the original marker path). Either yields registry DEFAULT hints; a
+// dragged ②/userStarts saved as op data is a later increment.
 function gpStartHints() {
+    const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
+    // PRIMARY — the live program model (each op record → its per-pass starts, concatenated in program order).
+    const prog = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+    const fromProg = [];
+    for (const b of prog) {
+        if (!b || b.type !== 'op' || !b.opType) continue;
+        const h = opSimStarts(b.opType, b.params || {}, stock);
+        if (Array.isArray(h) && h.length) fromProg.push(...h);
+    }
+    if (fromProg.length) return fromProg;
+    // FALLBACK — a loaded .nc with export @DDCS markers but no live program model.
     const editor = document.getElementById('editor');
     const txt = editor ? editor.value : '';
     if (!txt || txt.indexOf('@DDCS') < 0) return null;
-    const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const hints = [];
     for (const line of txt.split('\n')) {
         if (!isMarker(line)) continue;
