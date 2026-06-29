@@ -11,6 +11,7 @@ export class EditorManager {
         this.editor = el('editor');
         this.highlight = el('editor-highlight');
         this.activeLineIndex = null;
+        this._execTrail = [];          // ring of recent line indices, newest-first, max EXEC_TRAIL_CAP entries
         this.backTimer = null;
         this.backInterval = null;
 
@@ -216,19 +217,52 @@ export class EditorManager {
         this.editor.dispatchEvent(new Event('input'));
     }
 
+    // EXEC-LINE-VISIBILITY: max trail depth (age-1 is freshest, age-EXEC_TRAIL_CAP is oldest/dimmest)
+    static get EXEC_TRAIL_CAP() { return 5; }
+
     setActiveLine(lineIndex) {
         if (!this.highlight) return;
+
+        // --- clear previous active class ---
         const previous = this.highlight.querySelector('.g-line.active-line');
         if (previous) previous.classList.remove('active-line');
+
         if (lineIndex == null || lineIndex < 0) {
             this.activeLineIndex = null;
+            this._execTrail = [];
+            this._applyTrail();
             return;
         }
+
+        // --- push outgoing active into the trail ring ---
+        if (this.activeLineIndex != null && this.activeLineIndex !== lineIndex) {
+            this._execTrail.unshift(this.activeLineIndex);
+            if (this._execTrail.length > EditorManager.EXEC_TRAIL_CAP) {
+                this._execTrail.length = EditorManager.EXEC_TRAIL_CAP;
+            }
+        }
+
+        // --- apply trail depth tags ---
+        this._applyTrail();
+
+        // --- mark new active line ---
         const next = this.highlight.querySelector(`.g-line[data-line-index="${lineIndex}"]`);
         if (next) next.classList.add('active-line');
         this.activeLineIndex = lineIndex;
         // No _scrollToLine: the editor must not jump while playing (unified with the wizard CODE PREVIEW —
         // the pulsing highlight tracks the line in place instead of scrolling the text).
+    }
+
+    // Tag trail lines with data-exec-age="1..CAP" (1 = most-recently-left, CAP = oldest/dimmest).
+    // Strips stale exec-age from any lines that have aged out of the ring.
+    _applyTrail() {
+        if (!this.highlight) return;
+        // clear all existing trail tags first
+        this.highlight.querySelectorAll('.g-line[data-exec-age]').forEach(el => el.removeAttribute('data-exec-age'));
+        this._execTrail.forEach((idx, i) => {
+            const el = this.highlight.querySelector(`.g-line[data-line-index="${idx}"]`);
+            if (el) el.setAttribute('data-exec-age', i + 1);
+        });
     }
 
     clearActiveLine() {
@@ -254,6 +288,7 @@ export class EditorManager {
         if (this.activeLineIndex == null) return;
         const next = this.highlight.querySelector(`.g-line[data-line-index="${this.activeLineIndex}"]`);
         if (next) next.classList.add('active-line');
+        this._applyTrail();
     }
 
     _scrollToLine(index) {

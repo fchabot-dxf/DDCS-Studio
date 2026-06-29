@@ -3223,9 +3223,23 @@ body #editor.editor-layer {
 /* Executing-line highlight — UNIFIED across the Studio editor (#editor-highlight) and the wizard CODE PREVIEW
    (pre[id$=_code]): same blue, same pulse (each newly-executing line flashes then settles), and neither view
    scrolls while playing (the editor's setActiveLine no longer calls _scrollToLine). */
-@keyframes ddcs-exec-pulse { from { background: rgba(64, 130, 220, 0.65); } to { background: rgba(64, 110, 171, 0.30); } }
+@keyframes ddcs-exec-pulse { from { background: rgba(64, 130, 220, 0.65); } to { background: rgba(64, 110, 171, 0.42); } }
+/* EXEC-LINE-VISIBILITY: bolder active line — stronger fill + left accent bar */
 #editor-highlight .g-line.active-line,
-pre[id^="wiz_"][id$="_code"] .g-line.active-line { background: rgba(64, 110, 171, 0.30); border-radius: 2px; animation: ddcs-exec-pulse 0.4s ease; }
+pre[id^="wiz_"][id$="_code"] .g-line.active-line {
+    background: rgba(64, 110, 171, 0.42);
+    border-radius: 2px;
+    box-shadow: inset 3px 0 0 rgba(100, 160, 255, 0.85);
+    animation: ddcs-exec-pulse 0.45s ease;
+}
+/* EXEC-LINE-VISIBILITY: smooth fade on all g-lines so trail aging transitions instead of snapping */
+#editor-highlight .g-line { transition: background-color 0.45s ease; }
+/* EXEC-LINE-VISIBILITY: comet-tail trail — 5 depth levels, decreasing opacity */
+#editor-highlight .g-line[data-exec-age="1"] { background: rgba(64, 110, 171, 0.28); }
+#editor-highlight .g-line[data-exec-age="2"] { background: rgba(64, 110, 171, 0.20); }
+#editor-highlight .g-line[data-exec-age="3"] { background: rgba(64, 110, 171, 0.14); }
+#editor-highlight .g-line[data-exec-age="4"] { background: rgba(64, 110, 171, 0.09); }
+#editor-highlight .g-line[data-exec-age="5"] { background: rgba(64, 110, 171, 0.05); }
 
 /* SLICE 2 — WCS VISIBLE: a temporal FLASH on a WCS/start call line as the sim reaches it (paired with the 3D marker
    glow). flash-wcs = amber (WCS select/set), flash-start = warm red (spindle/program start); both fade out. */
