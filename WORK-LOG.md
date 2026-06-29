@@ -1909,3 +1909,25 @@ NOT the WCS edge) WITHOUT touching the editor-clean contract — chosen over Opt
   the same deeper limitation flagged since turn 88 — B2/B4 territory). Also: if the editor is HAND-EDITED to diverge from the
   program model, the program hints can be stale — acceptable per the one-source choice (the program is the truth right after an
   insert, the human's actual flow). SCOPE = Option B only (NOT A / no editor markers; NOT B2 drag-persist; NOT B4).
+
+## 2026-06-29 — turn 100: END-OF-PATH FIX — the boss/probe-both macro ENDS over the feature centre (not offset at the last wall)
+
+The human's 'push and fix': after the last probe the tool ended OFFSET at the last wall (the net incremental XY drift),
+Z-lifted but beside the feature — so the real tool AND the 3D spindle (which follows the engine) rested in an awkward spot.
+
+- **VERIFY-FIRST (traced [middleWizard.js](DDCS-Studio/web/wizards/middleWizard.js) `middleStack`):** after `seq(second,…)`
+  (the last Y probe) the tool sits at the last wall; `MV('Z','#17')` lifts Z but leaves XY there; the WCS offsets are written
+  (`#53`→primary, `#56`→secondary) and the macro ends — so it ends offset. `#53/#56` = the measured centres (seq's wall
+  MIDPOINT, machine frame); `MM` = a machine-frame (G53) move, mode-independent (the same re-centre the circular path uses at
+  line 158). The single-axis + pocket branches drift the same way (each ends at its last probed wall).
+- **FIX (clean end-retract, return-to-measured-centre — WCS-independent, beats `G90 X0 Y0` which only centres if the WRITTEN
+  WCS is the ACTIVE one):** after the WCS write, `MM(axis,'#53'); MM(second,'#56')` (2-axis) / `MM(axis,'#53')` (single-axis).
+  Z is already at safe (#17), so crossing back is clear. It's a final move with NO `REPOSITION:` → the pass count (and the
+  per-pass start hints) are unchanged.
+- **VERIFIED — REAL-SYMPTOM (new `middle-end-retract.spec.js`, the engine sim's FINAL position `e.pos` = where the tool
+  stops):** boss-both on a 60×60 boss → `e.pos` = the measured centre (`#53`≈30, `#56`) NOT the last wall (0/60); single-axis
+  boss → `e.pos.x` = `#53`; pocket-both (100×80) → `e.pos` = the cavity centre (`#53`≈50, `#56`). Since the 3D spindle FOLLOWS
+  the engine (established), it rests over the feature. Regression: middle-center-sim, per-pass-live-anchor, per-pass-starts-2d,
+  cam-slot-sim, op-sim-starts, middle-trans-traverse, editor-sim-real-insert all pass isolated (41 total). SCOPE = the end
+  retract only (NOT B2/B4). Other probe wizards (edge/corner) weren't in scope — possible similar end-offset, flagged for the
+  advisor. Trusted isolated runs (server overloaded 3× this session on full runs); recommend a fresh-server full re-run.
