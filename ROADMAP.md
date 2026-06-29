@@ -1,5 +1,9 @@
 # DDCS Studio — Roadmap
 
+## ⚠ ONGOING (turn 101 — FRESH-ADVISOR HANDOFF for fresh eyes)
+**Probe START uses the WCS origin, not the per-pass start ①** (single-axis boss preview). The hint is correct in `opSimStarts` (`viz/opSimStarts.js:42-47`); the engine/preview just doesn't anchor the single-pass probe at it. Part of a **test-green-but-render-broken** pattern (also B0 editor-sim + the spindle/end-retract) — the prior advisor reviewed property TESTS, not the REAL render. **Fresh advisor must verify the rendered preview, human as the check, not tests.** Full detail + state in NEXT-SESSION.md.
+
+
 > The single canonical backlog. **Code-verified 2026-06-25** by a 95-agent pass (extract every item from the old
 > planning docs → adversarially check each against the actual code → synthesize). Of 89 backlog items across the
 > former docs, **52 were genuinely outstanding and 37 were already shipped** — the staleness that motivated
