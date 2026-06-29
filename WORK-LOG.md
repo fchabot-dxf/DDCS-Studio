@@ -2271,3 +2271,74 @@ I implemented Part 2 as a `compedVars` TAINT — the sim re-scanned the macro TE
 need are pointing at the same generalisation — the **probe-surface block** as the one declared probe primitive. Recommend
 planning that next (it subsumes disc-on-surface, the per-axis comp, and likely the per-op datum semantics) rather than more
 per-wizard probe code. [[restructure-source-not-abstraction]] [[declare-or-handroll-before-dispatch]]
+
+---
+
+## 🔨 turn 123 — PROBE-SURFACE BLOCK: design + migration proposal (VERIFY-FIRST · PROPOSE · GATE — no build)
+
+Scope = ground the refactor in real code + propose; GATE before any migration (foundational + emitted-G-code-changing).
+Verified with 3 read-only sweeps (probe primitives · the 84f4efd comps + OD-top gap · the 1576fee snippet).
+
+### VERIFY-FIRST (real code)
+- **Common touch shape (all 4 wizards, identical):** setup(stop+limit) → **fast G31** → probecheck(goto err) → retract →
+  **slow G31** → probecheck → **READ** → retract. The block IS exactly this. The wizard-specific parts are the AGGREGATIONS
+  that CONSUME touches: middle bisect+diameter, rotary Yc-bisect+Zc, rotary `fit` = a 3-point CIRCLE SOLVER (reads machine
+  pos + solves — not a surface; its 3 touches use the block, the solver stays). Read atom varies: middle/edge/corner
+  `assign #N=#1925`; rotary `proberead`+`setworkoffset` (dialect) → the block parameterises the read/write, doesn't fork.
+- **The 84f4efd comps (exact, all #6):** edge `#50=[#1925±#6]`@70 · corner `#102/#101=[#1925/#1926±#6]`@75/78 + Z `[#1927-#6]`@129 ·
+  middle Z-first `[#57-#6]`@160 + diameter `ABS[#51-#52]∓[2*#6]`@189-192 (boss−/bore+) · rotary Zc `[#50-#6-#55]`@105 +
+  flank `[#55+#2+#6]`@81 (flank = APPROACH clearance, stays in the wizard). `#6` declared per-wizard (5 copies).
+- **Rotary OD-top GAP confirmed (rotaryCenterWizard.js:130):** `SWO('Z', datum==='top' ? '#50' : '#56')` — datum='top' writes
+  the RAW `#50` (OD-top + radius = a tip-radius HIGH); only datum='center' uses the comped `#56`. A real un-comped datum.
+- **The 1576fee snippet (web/data/learnerLibrary.js):** `probe-surface` + `probe-surface-2pass` ALREADY EXIST as DECLARED
+  atom-stack data (`{id,label,desc,stack:[{type,params}…]}`), emitted by the shared `emitMapped()`. `probe-surface-2pass` =
+  the wizards' exact touch (probe→check→retract→probe→check→retract→proberead #50). But it is **INERT** — wired only into the
+  Blocks toolbox + a validator test, **no wizard composes it.** The commit deferred *"a wizard-references-a-snippet mechanism
+  + a byte-identical gate (batch #6)."* THAT compose-mechanism is the migration's real first build (not the snippet itself).
+
+### PROPOSE (gated)
+**A · radius-comp ATOM** — a new atom `radiuscomp {raw, result, radius, dir, enable}` → emits `#result=[#raw <dir> #radius]`
+(enable OFF → `#result=#raw` passthrough). The ONE home for the comp; the 5 hand-rolled `[#raw±#6]` copies all become this.
+
+**B · probe-surface BLOCK** = a shared builder `probeSurfaceStack(params)` returning the atom stack (the extended snippet shape):
+```
+comment → probe(fast) → probecheck → retract → [probe(slow) → probecheck → retract]
+        → proberead(axis → #raw) → radiuscomp(#raw → #result, dir, enable=ON)   ⇒ #result = the TRUE surface
+        → ( @DDCS probe-surface {result:#result, axis, dir} )   ← self-describing marker [[format-parser-marker-system]]
+```
+params: axis · dir · maxDist · retract · feeds(fast/slow) · port · twoPass? · radius · compEnable · resultVar. The learner
+snippet becomes one baked instance of this builder (one source, two faces: teach = data in the toolbox, compose = the builder).
+
+**C · disc-on-surface + datum FALL OUT (no Part-2 taint, no OD-top gap, no per-axis flag):** the block emits a DECLARED marker
+naming its surface result var. The sim's probe-read reads the marker → the contact's surface = `#result` → disc sits on the
+wall, datum reads `#result`. Middle: two blocks/axis → centre = bisect of the two TRUE surfaces (discs on true walls, datum =
+centre, unchanged). Rotary OD-top: the top touch is a block (comp ON) → datum='top' writes the TRUE surface → the gap closes.
+The dropped Part-2 macro-scan AND the OD-top gap both disappear because the surface is DECLARED, not inferred.
+
+**D · migration MAP + ORDER (simplest first = the proof):**
+1. **edge** — `#50=[#1925±#6]` → one `probeSurfaceStack`. Expect BYTE-IDENTICAL. (the proof of the compose-mechanism.)
+2. **corner** — 3 blocks (X,Y,Z). Byte-identical per axis.
+3. **rotary** — top + 2 flank blocks (closes OD-top gap); Zc=top−R, Yc=bisect; `fit` touches use the block, solver stays.
+4. **middle** — two-wall blocks/axis + bisect; diameter recomputes from true walls. Last = hardest proof.
+
+**E · EQUIVALENCE approach (two-part proof, [[federated-registry-and-wizards-as-data-stage4]]):**
+- **Byte-identical** where legacy is already correct: edge, corner X/Y/Z, middle Z-first, rotary Zc/flank — the block emits the
+  SAME `G31→check→retract→read→#result=[#raw±#6]` lines. Prove per-wizard with an emit-equivalence test BEFORE swapping.
+- **Behaviour-preserved, DELIBERATE + NAMED output changes (real-machine G-code):**
+  - **middle diameter:** `ABS[#51-#52]∓[2*#6]` (aggregate comp on RAW walls) → `ABS[#s1-#s2]` (the ∓2#6 evaporates — same
+    value from TRUE walls, cleaner G-code). NAME it.
+  - **rotary OD-top (datum='top'):** today un-comped (the gap) → the block comps it → datum drops a radius to the TRUE
+    surface. This is a real G-code FIX/CHANGE — flag explicitly for the human (ship the fix, or keep byte-identical?).
+
+**F · the comps DELETE:** every per-wizard `[#raw±#6]` + the middle ∓2#6 + rotary Zc −#6 + the 5 `#6` declarations → the block's
+`radiuscomp` atom + one radius param. ~Net deletion across 4 wizards; the comp logic lives once.
+
+### GATE — bless before ANY migration (authoring contract + multi-wizard G-code refactor)
+1. **The block's home:** a shared `probeSurfaceStack` builder in opStacks (composed by the `<name>Stack` builders), with the
+   learnerLibrary snippet as a baked instance — vs a pure-data snippet referenced by id. (Recommend the builder: wizards need params.)
+2. **The compose-mechanism** (1576fee's deferred "batch #6") — the wizard→block seam + the byte-identical gate. This is the real build.
+3. **The 2 NAMED G-code changes** — middle diameter recompute (safe, same value) + **rotary OD-top fix** (real change): ship or hold?
+4. **The sim marker contract** — extend `( @DDCS )` with a probe-surface/result declaration the probe-read consumes (replaces the Part-2 taint).
+5. **Order = edge first** as the equivalence proof, one wizard per pass, GATE between.
+
+NO migration built this turn (per scope). Proposal only; gating back for the authoring-contract + G-code-change decisions.
