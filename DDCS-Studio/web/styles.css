@@ -4497,6 +4497,18 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
     }
     .editor-container .viz3d-handle.open { bottom: var(--viz3d-size, 50%) !important; right: auto !important; }
     .editor-container .viz3d-handle:active { transform: translateX(-50%) !important; }
+
+    /* Push the editor scroll area UP when the bottom-sheet drawer is open, so editor content
+       is visible above the drawer instead of hidden behind it. */
+    .editor-layer { transition: height 0.22s ease; }
+    .editor-container:has(.viz3d-drawer.open) .editor-layer {
+        height: calc(100% - var(--viz3d-size, 50%));
+    }
+    /* Ride the statusbar up with the shrunk editor so it stays above the drawer. */
+    .editor-container:has(.viz3d-drawer.open) .editor-statusbar {
+        bottom: var(--viz3d-size, 50%);
+        transition: bottom 0.22s ease;
+    }
 }
 
 /* ── Probe-config source dot (PROBE-CONFIG-SOURCE.md) ───────────────────────
