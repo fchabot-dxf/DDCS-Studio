@@ -2236,3 +2236,38 @@ the CENTRE, shown by the crosshair). Why this is a gate, not a hand-roll:
 - Tension: (A) = declare-the-intent (the dispatch's stated preference) vs (B) = one-source (don't duplicate the macro's comp). Need your call.
 
 Did NOT build part 2 (per "if part 2 needs a declared flag → STOP + gate, don't sniff op-types"). Parts 1/3/4 committed; awaiting the part-2 design.
+
+---
+
+## 🔨 turn 120 — DATUM VISUAL refinement: B (Z-first datum fix) + C (thin crosshair) + GLOW; Part 2 DROPPED (human, mid-turn)
+
+Dispatched 3 parts (B Z-first datum regression · C thin 2D crosshair · Part 2 disc-on-calculated-surface). Built B + C, added
+a glow (human ask), then the HUMAN stopped me on Part 2 — see the redirect below. Net: B + C + glow shipped, Part 2 dropped.
+
+- **B — Z-FIRST DATUM REGRESSION (fixed).** The comp (84f4efd) turned the Z-first WCS write into a BRACKETED expr
+  (`#[#73]=[#1927-#6]`) that the datum hook's single-var-RHS regex missed → datum Z fell back to the contact mean. ROOT cause
+  found in the engine: `onLineChange` fires BEFORE `_executeStep` (GcodeExecutionEngine.js:414-415), so the write hasn't run
+  yet — can't read the target inline. FIX: DEFER one line (like `pendingProbe`) — detect the assign to a WCS-offset target,
+  then on the NEXT line read the engine's OWN committed value `engine.vars.get(target)` (robust to ANY RHS expression, no
+  re-parsing). `onFinish` flushes a trailing write. New test (probe-wcs.spec.js) drives the bracketed Z-first write → datum Z = surface.
+- **C — CROSSHAIR thin + 2D.** Replaced the turn-118 BoxGeometry bars with a thin `LineSegments` `+` (a PEER of the stock-WCS
+  crosshair style; red vs amber), rotated into the probed plane (xy/xz/yz) in `_updateDatum`. probe-wcs reads `_probeCross`.
+- **GLOW (human ask, "harder brighter").** Additive-blended crosshair + a hot-core radial **halo sprite** behind it; a pulse
+  loop (`_pulseDatum`) breathes both opacity + halo size while the datum is visible (self-stops on hide). Human: "perfect glow."
+
+### ⛔ Part 2 DROPPED — human redirect: STOP hand-rolling, the probe-surface block owns this
+I implemented Part 2 as a `compedVars` TAINT — the sim re-scanned the macro TEXT for `#6` to infer which contacts are surfaces
+(to nudge the disc onto the wall). The HUMAN stopped it: *"a lot of the probe coding is useless — we're going to build the
+**probe surface block** and generalise it"* / *"I don't understand why we are still hand-rolling the code."* They're right:
+- The 5 wizards EACH hand-roll their own `[#1925 ± #6]` comp into flat G-code → the sim has nothing DECLARED to read, so it
+  reverse-engineers the comp from macro text. That taint IS the hand-roll.
+- The **probe-surface block** (the canonical probe primitive, 1576fee) generalises this: ONE declared "I am a surface probe (r)"
+  → disc-on-wall + datum-on-surface come for free, no scanning; wizards COMPOSE it instead of emitting G31+comp each.
+- So disc-on-surface should come FROM that block, NOT a macro scan now. **Reverted the entire Part-2 taint + disc-nudge**
+  (`compedVars`, the `comped` flag through markDatumWrite, `_axisDiscs`, the disc-return). B (deferral) + C + glow kept — those
+  are generic display, not per-op probe hand-rolling. Human: *"drop the macro scan, yes, pass the ball."*
+
+**FOR THE ADVISOR:** the per-op probe comp (turn-116 work, scattered across middle/corner/edge/rotary) + this disc-on-surface
+need are pointing at the same generalisation — the **probe-surface block** as the one declared probe primitive. Recommend
+planning that next (it subsumes disc-on-surface, the per-axis comp, and likely the per-op datum semantics) rather than more
+per-wizard probe code. [[restructure-source-not-abstraction]] [[declare-or-handroll-before-dispatch]]

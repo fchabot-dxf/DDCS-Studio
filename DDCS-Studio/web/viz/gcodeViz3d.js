@@ -174,16 +174,29 @@ export class GcodeViz3D {
         this._probeDiscFadeMs = 16000;                                  // disc lifetime at 1× (scaled by the live sim speed) — longer-lived (user request)
         this._probeBurstBasePx = 200; this._probeBurstRefFeed = 250;    // disc radius px = base × clamp(√(feed/ref), .6, 1.8) — FASTER → bigger (LARGER disc, user)
         this._probeLinePx = 200; this._probeLineRadPx = 0.8; this._simSpeed = 1;   // THIN axis line (length spans the scene — see _scaleMarkers)
-        // DATUM gizmo — a bold RED 2-axis CROSSHAIR: the `+` lies in the plane of the 2 displayed/probed axes; the 3rd axis
-        // is just DEPTH (the cross sits at that depth). Two thin bars in a Group, reoriented to the written-axes plane in
-        // _updateDatum (XY / XZ / YZ). Constant on-screen size via _scaleMarkers (peer of the stock-WCS crosshair).
+        // DATUM gizmo — a thin RED 2-axis CROSSHAIR, a PEER of the stock-WCS crosshair (same LineSegments style; red vs amber).
+        // The `+` lies in the plane of the 2 displayed/probed axes; the 3rd axis is just DEPTH (the cross sits at that depth).
+        // Built as a 2D `+` in XY and rotated into the probed plane (XY/XZ/YZ) in _updateDatum. Constant on-screen via _scaleMarkers.
         const pg = new THREE.Group();
-        const dmat = new THREE.MeshBasicMaterial({ color: this._datumColor, depthTest: false, depthWrite: false });
-        const mkBar = () => { const b = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.34, 0.34), dmat); b.renderOrder = 20; return b; };
-        const bar0 = mkBar(), bar1 = mkBar();
-        pg.add(bar0); pg.add(bar1);
+        const dmat = new THREE.LineBasicMaterial({ color: this._datumColor, transparent: true, opacity: 0.98, depthTest: false, blending: THREE.AdditiveBlending });   // additive → luminous red GLOW (pulsed in _pulseDatum)
+        const dgeo = new THREE.BufferGeometry();
+        dgeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, 0, 0, 1, 0, 0, 0, -1, 0, 0, 1, 0]), 3));   // a 2-axis `+` in XY, unit half-length
+        const dcross = new THREE.LineSegments(dgeo, dmat); dcross.renderOrder = 20;
+        pg.add(dcross);
+        // GLOW HALO — a soft additive radial sprite behind the `+` (hot core → red → transparent) so it reads as a bright,
+        // hard glow. Constant-screen (rides pg's scale). Pulsed brighter/larger in _pulseDatum.
+        if (typeof document !== 'undefined') {
+            const gc = document.createElement('canvas'); gc.width = gc.height = 64;
+            const gx = gc.getContext('2d');
+            const grd = gx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            grd.addColorStop(0, 'rgba(255,180,170,1)'); grd.addColorStop(0.3, 'rgba(255,60,55,0.85)'); grd.addColorStop(1, 'rgba(255,45,45,0)');
+            gx.fillStyle = grd; gx.fillRect(0, 0, 64, 64);
+            const gspr = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(gc), blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, transparent: true, opacity: 1 }));
+            gspr.scale.set(5.5, 5.5, 1); gspr.renderOrder = 19;   // behind the sharp lines (19 < 20)
+            pg.add(gspr); this._datumGlow = gspr;
+        }
         pg.renderOrder = 20; pg.visible = false;   // renders OVER the line (20 > 13)
-        this._probeGizmo = pg; this._probeBars = [bar0, bar1];   // the DATUM — RED crosshair (shown ≥2 axes), reoriented to the 2-axis plane
+        this._probeGizmo = pg; this._probeCross = dcross;   // the DATUM — thin RED 2-axis crosshair + glow halo (shown ≥2 axes), rotated to the probed plane
         this.partFrame.add(pg);
         this._probeLine = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 14), new THREE.MeshBasicMaterial({ color: this._lineColor, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false }));
         this._probeLine.renderOrder = 13; this._probeLine.visible = false; this.partFrame.add(this._probeLine);
@@ -1717,15 +1730,34 @@ export class GcodeViz3D {
         pt.visible = false;
         if (written.length >= 2) {
             pt.position.set(d.x, d.y, d.z);
-            // orient the `+` into the plane of the 2 PROBED axes (the 3rd is depth); all-3-written → XY plane, Z = depth.
-            const plane = written.length >= 3 ? ['x', 'y'] : written;
-            const bars = this._probeBars || [];
-            const rot = (a) => a === 'y' ? [0, 0, Math.PI / 2] : a === 'z' ? [0, Math.PI / 2, 0] : [0, 0, 0];   // box default lies along X
-            if (bars[0]) { const r = rot(plane[0]); bars[0].rotation.set(r[0], r[1], r[2]); }
-            if (bars[1]) { const r = rot(plane[1]); bars[1].rotation.set(r[0], r[1], r[2]); }
+            // rotate the XY `+` into the plane of the 2 PROBED axes (the 3rd is depth); all-3-written → XY plane, Z = depth.
+            const plane = (written.length >= 3 ? ['x', 'y'] : written).slice().sort().join('');   // 'xy' | 'xz' | 'yz'
+            pt.rotation.set(plane === 'xz' ? Math.PI / 2 : 0, plane === 'yz' ? Math.PI / 2 : 0, 0);
             pt.visible = true;
+            this._pulseDatum();   // start the GLOW pulse (self-stops when the datum hides)
         }   // shows ONCE the WCS is written → at the centre, as a 2-axis crosshair
         this.render();
+    }
+
+    // GLOW — pulse the datum crosshair's (additive) opacity while it's visible, so the red `+` breathes/glows. One rAF loop
+    // at a time (_datumPulseOn); it self-stops the moment the datum hides (resetProbe / next loop). Render-only.
+    _pulseDatum() {
+        if (this._datumPulseOn) return;
+        const mat = this._probeCross && this._probeCross.material;
+        if (!mat) return;
+        this._datumPulseOn = true;
+        const glow = this._datumGlow;
+        const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+        const t0 = now();
+        const tick = () => {
+            if (!this._probeGizmo || !this._probeGizmo.visible) { this._datumPulseOn = false; mat.opacity = 1; if (glow) { glow.material.opacity = 1; glow.scale.set(5.5, 5.5, 1); } this.render(); return; }
+            const u = 0.5 + 0.5 * Math.sin((now() - t0) / 1000 * 4.6);   // 0↔1 breath
+            mat.opacity = 0.8 + 0.2 * u;                                  // sharp `+` stays bright
+            if (glow) { glow.material.opacity = 0.55 + 0.45 * u; const s = 5.0 + 1.4 * u; glow.scale.set(s, s, 1); }   // halo breathes brighter + bigger = a hard glow
+            this.render();
+            requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
     }
 
     // Feed → disc radius in PX: SLOWER/fine probe (small feed) → SMALLER disc, FASTER/rough → bigger (clamped). User's request.

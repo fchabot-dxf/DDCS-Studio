@@ -25,7 +25,7 @@ async function runShape(page) {
   return page.evaluate(() => {
     const v = window.__gpPanel.viz;
     return {
-      datum: { vis: v._probeGizmo.visible, color: v._probeBars[0].material.color.getHex() },   // datum = a RED crosshair GROUP (bars carry the material)
+      datum: { vis: v._probeGizmo.visible, color: v._probeCross.material.color.getHex() },   // datum = a RED 2-axis crosshair (LineSegments _probeCross)
       line: { vis: v._probeLine.visible, color: v._probeLine.material.color.getHex() },
     };
   });
@@ -61,6 +61,23 @@ test('2-axis probe → the DATUM (red crosshair) shows; the axis line is REMOVED
   expect(s.datum.vis, 'the datum shows once two WCS axes are written').toBe(true);
   expect(s.datum.color).toBe(0xff2d2d);
   expect(s.line.vis, 'the axis line was removed — it never shows now').toBe(false);
+});
+
+test('Z-first datum: a COMPED (bracketed) WCS write lands the datum on the SURFACE, not the contact', async ({ page }) => {
+  // REGRESSION (turn 116 comp → turn 120 fix): the comp turned the Z-first WCS write into a BRACKETED expr
+  // `#[#73]=[#1927-#6]` that the old single-var-RHS regex missed → the Z write wasn't detected → the datum Z fell back to
+  // the contact MEAN (the wall-scan depth, a tip-radius too low). The hook now reads the engine's COMMITTED target value
+  // (robust to any expression) → the datum Z drops a stylus-radius (#6=2) onto the true surface.
+  await setup(page, 'G54\nM3 S12000\n#70=805\n#6=2\nG31 Z-50 F3000\n#73=[#70+2]\n#[#73]=[#1927-#6]\nG31 X-25 F3000\n#[#70+0]=[#1925-#6]\nM30');
+  await page.locator(RUN).click();
+  await expect(page.locator(STATUS)).toContainText('complete', { timeout: 15000 });
+  await page.waitForTimeout(400);
+  const r = await page.evaluate(() => {
+    const v = window.__gpPanel.viz;
+    return { datumZ: +v._probeGizmo.position.z.toFixed(3), contactZ: +v._probeVals.z.toFixed(3), vis: v._probeGizmo.visible };
+  });
+  expect(r.vis, 'the datum shows (Z + X written)').toBe(true);
+  expect(r.datumZ, 'datum Z = the comped surface = contact − stylus radius (2), NOT the raw contact').toBeCloseTo(r.contactZ - 2, 1);
 });
 
 test('3-axis probe → the DATUM point (no line — three planes cross at a point)', async ({ page }) => {

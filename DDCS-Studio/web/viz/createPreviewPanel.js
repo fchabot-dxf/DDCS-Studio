@@ -250,6 +250,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     let engine = null;
     let pendingProbe = null;   // SLICE 3: the axis of a G31 awaiting completion (resolved on the next onLineChange)
+    let pendingDatum = null;   // a WCS-offset write awaiting its COMMITTED value — onLineChange fires BEFORE the assign runs, so read the target var on the NEXT line (robust to ANY RHS expr, incl. the comp's bracketed [#1927-#6])
     function ensureEngine() {
         if (engine) return engine;
         engine = new GcodeExecutionEngine({
@@ -265,6 +266,14 @@ export function createPreviewPanel(container, opts = {}) {
                 // build that axis of the probe-WCS. Resolving on the NEXT line guarantees the tool is at the contact.
                 if (pendingProbe && viz && viz.probeAxisTouched) { viz.probeAxisTouched(pendingProbe, engine.feedVal); flashDro(); }   // probe re-references the DRO (feedVal = the just-finished probe's feed → disc size)
                 pendingProbe = null;
+                // DATUM = the WCS-WRITE event (DEFERRED read). onLineChange fires BEFORE the assign executes, so the write
+                // detected last line has now run → read the engine's OWN computed value at the target address (robust to ANY
+                // RHS expression, incl. the comp's bracketed `[#1927-#6]` that the old single-var regex missed → Z-first bug).
+                if (pendingDatum && engine.vars && viz && viz.markDatumWrite) {
+                    const val = engine.vars.get(pendingDatum.target);
+                    if (Number.isFinite(val)) viz.markDatumWrite(['x', 'y', 'z'][pendingDatum.off], val);
+                }
+                pendingDatum = null;
                 // WCS VISIBLE: a WCS/start call fires a temporal FLASH — the 3D marker glows + the code line glows/fades.
                 const kind = raw ? classifyCall(raw) : null;
                 if (kind) {
@@ -273,21 +282,15 @@ export function createPreviewPanel(container, opts = {}) {
                     if (kind === 'wcs') { setDroWcs(raw); flashDro(); }   // DRO: update the active-WCS label + flash the Work column (re-zero cue)
                 }
                 if (raw) { const pa = probeAxis(raw); if (pa) pendingProbe = pa; }   // a G31 → resolve on the next line
-                // DATUM = the WCS-WRITE event — ONE declared source for EVERY probe type (declare, never infer). Detect any
-                // assignment whose TARGET resolves into the controller's WCS-offset table #805..#834 (the canonical datum
-                // store); offset%5 → axis (0 X, 1 Y, 2 Z). Covers middle (`#[#70+N]=#53`), corner (`#[#70]=`, indirect
-                // `#[#73]=`), edge — uniformly. For a 1-probe/axis op the written value == that axis's contact, so edge/corner
-                // render unchanged; only middle's 2-probe bisect (#53/#56) re-pins to the CENTRE (the bug). SIM-ONLY, no macro
-                // write — the value is already computed (read from the engine vars). The probe-contact DISCS stay (separate).
-                if (engine.vars && viz && viz.markDatumWrite) {
-                    const asg = raw && /^\s*#\[([^\]]+)\]\s*=\s*(#\d+|-?\d+(?:\.\d+)?)/.exec(raw);
+                // Detect an assign to a WCS-offset target (#[…] resolving into the table at #70+0/1/2 = X/Y/Z) and DEFER the
+                // value read to the next line (above) — onLineChange fires before the assign executes, so read the committed value next.
+                if (engine.vars) {
+                    const asg = raw && /^\s*#\[([^\]]+)\]\s*=\s*(.+?)\s*$/.exec(raw);
                     const base = engine.vars.get(70);   // the active WCS base address (#70 — every wizard sets it before writing)
                     if (asg && Number.isFinite(base)) {
-                        const off = resolveVarExpr(asg[1], engine.vars) - base;   // target RELATIVE to #70 → 0 X, 1 Y, 2 Z (3/4 = A/B, ignored)
-                        if (off === 0 || off === 1 || off === 2) {                // robust to #578/#70's absolute value (only the offset matters)
-                            const val = asg[2][0] === '#' ? engine.vars.get(+asg[2].slice(1)) : +asg[2];
-                            if (Number.isFinite(val)) viz.markDatumWrite(['x', 'y', 'z'][off], val);
-                        }
+                        const target = resolveVarExpr(asg[1], engine.vars);   // the resolved WCS-offset ADDRESS (#[#73] → 807 …)
+                        const off = target - base;                            // RELATIVE to #70 → 0 X, 1 Y, 2 Z (3/4 = A/B, ignored)
+                        if (off === 0 || off === 1 || off === 2) pendingDatum = { off, target };   // robust to #578/#70's absolute value (only the offset matters)
                     }
                 }
             },
@@ -297,9 +300,14 @@ export function createPreviewPanel(container, opts = {}) {
             onFinish: () => {
                 if (pendingProbe && viz && viz.probeAxisTouched) viz.probeAxisTouched(pendingProbe, engine.feedVal);   // SLICE 3: a trailing G31 (last line)
                 pendingProbe = null;
+                if (pendingDatum && engine.vars && viz && viz.markDatumWrite) {   // a trailing WCS write (last line) → flush its committed value
+                    const val = engine.vars.get(pendingDatum.target);
+                    if (Number.isFinite(val)) viz.markDatumWrite(['x', 'y', 'z'][pendingDatum.off], val);
+                }
+                pendingDatum = null;
                 updateRunBtn();
                 if (typeof opts.onLine === 'function') opts.onLine(null);
-                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
+                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); pendingProbe = null; pendingDatum = null; engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
             },
         });
         return engine;
@@ -518,6 +526,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (mode === '3d') ensureViz();
         if (viz && viz.setSimSpeed) viz.setSimSpeed(simSpeed());   // probe discs fade in SIM time (track the speed button)
         if (viz && viz.resetProbe) viz.resetProbe();    // SLICE 3: fresh probe-WCS each run (superimposed on the stock-WCS)
+        pendingProbe = null; pendingDatum = null;   // fresh deferred-write state each run
         updateDro(getStartPos() || { x: 0, y: 0, z: 0 });   // DRO: reset to the start position for the fresh run
         if (droWcsEl) droWcsEl.textContent = activeWcsName();   // refresh the label to the active WCS (catches a settings switch)
         if (viz) viz.setAnimate(false);                 // engine drives the tool/trail, not the geometric sweep
