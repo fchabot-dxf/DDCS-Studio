@@ -93,10 +93,10 @@ export function middleStack(params = {}) {
         // comment so it belongs to the PRIOR (primary-axis) pass — the trace anchors the NEXT pass to ②, so a move
         // emitted AFTER the REPOSITION would draw FROM ② and push the 2nd probe away. Then REPOSITION marks the Y pass.
         // SAME directional pattern as the corner's diagonal (probeBlocks travelOwn/travelOpp): the PRIMARY leg travels
-        // IN the primary probe direction (back across to the centre), the SECONDARY leg travels the OTHER way (out to ②'s
-        // side, opposite its probe direction). #21 = the Diag-travel distance (a SANE fixed default, NOT scaled to max-probe
-        // which overshot far off-stock). Empirically these signs already head toward ② for all dir1/dir2 — only the
-        // magnitude was wrong; the human tunes #21 so the 2nd-axis probe lands at ②.
+        // IN the primary probe direction, the SECONDARY leg the OTHER way (out to ②'s side). #21 = the Diag-travel.
+        // ⚠ KNOWN-LIMITED: a single travel can't reliably land on ② — the tool's position after the primary probes
+        // depends on the boss size vs max-probe (the cross-over over/undershoots), so this drifts for off-size bosses.
+        // The clean fix is the GUI (drag ② → compute the move); a macro-only re-centre breaks manual-in-axis (see WORK-LOG).
         const pmove = travelOwn(dir1Plus, '#21', '[0-#21]');   // primary axis: toward the centre / the perpendicular walls
         const smove = travelOpp(dir2Plus, '#21', '[0-#21]');   // secondary axis: out toward ② (opposite its first probe dir)
         MV('Z', '#18');                                  // lift clear of the boss

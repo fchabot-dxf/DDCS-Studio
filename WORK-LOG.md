@@ -1415,3 +1415,44 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   max-probe-independent). Full suite: 396 passed + 2 parallel-load flakes (custom-op-chip, project-drawer-smoke — both pass
   isolated, unrelated to the probe/engine changes). Corner byte-identical, Part-1 collisions intact.
 - **HUMAN-eyes verify:** AUTO + MANUAL boss-both both COLLIDE with the walls (Part 1) + the diagonal now heads to ② (Part 2a).
+
+## 2026-06-28 — turn 67: phantom auto JOG (fix 2, BUILT) + the diagonal STILL drifts (fix 1, VERIFIED CIRCULAR → GATE)
+
+- **Correction taken:** the in-axis cross-over is FINE (human) — dropped. Two items: (1) the trans-axis diagonal still
+  heads OUTWARD in the user's real config; (2) a phantom dashed JOG in auto.
+- **FIX 2 (BUILT, `1c86e74`): the phantom auto jog.** VERIFY-FIRST (traced the source, didn't reason): the 3D
+  [gcodeViz3d.js setSegments](DDCS-Studio/web/viz/gcodeViz3d.js#L717) drew a dashed orange jog (`jogPos`, the `0xff9a0d`
+  dashed line at :774) from each pass's previous end → its start anchor ② **unconditionally** — even in AUTO, where the
+  auto-traverse diagonal IS the connecting move. So an auto boss-both showed a dashed "move to ②" that shouldn't exist
+  (the human's exact report — confirmed it's NOT an emitted G-code move; the macro has no move there). **Gate the jog on the
+  per-pass SOURCE** (`this._startSources[p]`): MANUAL draws its jog; AUTO renders continuous (no jog line). The 2D never
+  drew this connector (per-seg). New permanent test in `marker-colour-by-source.spec.js` (auto → no jog geometry; manual → jog).
+- **FIX 1 (VERIFIED CIRCULAR → GATE, no build): the diagonal drifts outward.** VERIFY-FIRST in the USER'S config (boss,
+  dir1=pos, dir2=pos, max-probe=100, diag=50) ACROSS stock sizes (don't reason — trace):
+  - The X-probe-END itself scales with **boss size vs max-probe**: 40×40 → tool ends at local `57` (RIGHT of centre `35`),
+    so `+#21` drives it FURTHER outward → endpoint `(107,-50)` vs ②`(35,-35)`, **74 mm off, OUTWARD**. 60×50 → 83 mm off.
+    100×80 → tool ends LEFT of centre → `+#21` heads toward ② → only 5 mm off. **My Part-2a test only hit the 100×80 case
+    where it happened to work — test config ≠ real (verify-REAL-symptom, again).**
+  - **⭐ LIVE-PREVIEW (the REAL symptom, driven through the wizard — the static traces above UNDER-represented it):** default
+    config (stock 100×80, boss, dir1=pos/dir2=pos, auto) → ②=`(50,-15)` but the diagonal runs local **`(117,0)→(167,0)`**: the
+    X-probe-END sits at local **117** (world 102, PAST the +X edge), and `+#21` drives it further **RIGHT to 167**, while ②'s
+    X is at local **65** (LEFT). So **the X goes the WRONG WAY** (human: "right y- but not the right x"). The Y is fine (down to ②).
+  - **The DEFAULT is DEGENERATE:** the default stock IS the boss (100 wide) with max-probe=100 → the cross-over `#19≈102`
+    can't clear the boss (tool ends AT/just past the +X wall, the 2nd X probe never re-clamps), so the tool ends far right
+    AND `#53` (the measured centre) is GARBAGE. A re-centre to `#53` therefore can't save the default preview either.
+  - **ROOT:** the correct diagonal depends on the tool's post-probe position, which depends on the boss size — which the
+    macro is MEASURING (doesn't know at emit time); for the degenerate default it can't even measure the centre. A fixed
+    `#21` can't be size-aware; a macro re-centre needs a VALID `#53` (probe must succeed) AND breaks manual-in-axis.
+    GENUINELY CIRCULAR (advisor predicted). **The preview KNOWS ② (inferStarts from the stock) — only the GUI can draw/compute
+    the diagonal to it.**
+  - **Tried a macro-side re-centre** (primary leg → the measured centre `#53`: incremental `[#53-#52-lastRetract]`).
+    VERIFIED: PERFECT for auto-in-axis at any size **when the probe succeeds** (xErr=0 for 40/60/100/150 with proper dist),
+    BUT **breaks manual-in-axis** (xErr=90 — the per-pass resets make `#52`/`#53` not map to the tool position) AND inherits
+    garbage `#53` when the probe itself fails (boss ≥ max-probe). So a macro-only re-centre is fragile → **REVERTED** (kept
+    the clean Part-2a; added a ⚠ KNOWN-LIMITED comment in `transTraverse`). Also: the Y-out distance fundamentally can't be
+    computed (it needs the boss half-height, which isn't probed until the NEXT pass).
+  - **▶ FLAG THE GUI ANSWER (the advisor's flagged clean path):** drag ② on the feature canvas → the diagonal is COMPUTED to
+    reach it (the preview KNOWS the boss size from the sim stock / the user's placement — no value to get right). The
+    feature-canvas-in-probe initiative. **GATE: pass to advisor to greenlight the GUI vs another approach — no macro hack.**
+- **⚠ HUMAN-eyes:** fix 2 — auto boss-both shows NO dashed jog (manual still does). fix 1 — still drifts for off-size bosses
+  (the circular residual; awaiting the GUI decision).
