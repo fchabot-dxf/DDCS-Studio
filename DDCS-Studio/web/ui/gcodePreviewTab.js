@@ -9,6 +9,29 @@
  * in the panel, so a tweak there changes every preview at once.
  */
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';
+import { isMarker, parseMarker } from '../blocks/opSchema.js';
+import { opSimStarts } from '../viz/opSimStarts.js';
+
+// Per-pass sim-start HINTS for the editor's program — the SAME federated registry the wizards use (opSimStarts, inc 1).
+// Parse the program's @DDCS op markers (op type + params) and concatenate each op's DECLARED per-pass starts, so the editor
+// sims a multi-pass probe (a boss-both) with the 2nd-axis beginning at ② — IDENTICAL to the wizard's preview — instead of
+// gluing it to the literal incremental position (the stock edge / WCS). 'the block should apply' (human). No markers → null
+// → the single-pass default (unchanged). (Registry DEFAULT hints only; a dragged ②/userStarts saved as op data is Phase 2.)
+function gpStartHints() {
+    const editor = document.getElementById('editor');
+    const txt = editor ? editor.value : '';
+    if (!txt || txt.indexOf('@DDCS') < 0) return null;
+    const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
+    const hints = [];
+    for (const line of txt.split('\n')) {
+        if (!isMarker(line)) continue;
+        const m = parseMarker(line);
+        if (!m) continue;
+        const h = opSimStarts(m.opType, m.params, stock);
+        if (Array.isArray(h) && h.length) hints.push(...h);
+    }
+    return hints.length ? hints : null;
+}
 
 // Seed controller parameter vars from Settings so "read from controller" macros (F#632 P#1078 L#1080 … —
 // PROBE-CONFIG-SOURCE.md) resolve as a controller whose parameter page matches the Settings panel.
@@ -51,8 +74,12 @@ function ensurePanel() {
         },
         // WCS VISIBLE (slice 2): a WCS/start call line flashes in the editor as the sim reaches it (the 3D marker glows too).
         onCallFlash: (i, kind) => { const em = window.editorManager; if (em && em.flashLine) em.flashLine(i, kind); },
-        // A wizard insert hands off the start it was previewing — consume it once.
-        getStart: () => { const ps = window.__pendingSpindleStart; window.__pendingSpindleStart = null; return ps; },
+        // A wizard insert hands off the start it was previewing — consume it once; else the op marker's pass-0 hint (①), so
+        // pass 0 begins at the inferred start too (matching the wizard), not the viz default {0,0,0} / the WCS origin.
+        getStart: () => { const ps = window.__pendingSpindleStart; window.__pendingSpindleStart = null; return ps || (gpStartHints() || [])[0] || null; },
+        // Per-pass start HINTS from the program's op markers (opSimStarts registry) → the editor sims a boss-both's 2nd-axis
+        // at ②, the SAME as the wizard. Consumed by the panel's computePassStarts (the trace + engine passStarts).
+        getStartHints: gpStartHints,
         createVarStore: gpSeededVarStore,
     });
     // Spindle / program-zero start hooks (read/write the panel's draggable 3D marker) — used by the wizard insert.

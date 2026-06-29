@@ -1688,3 +1688,28 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   vs the usual ~2 — from repeated suite runs, not a regression.)** **⚠ HUMAN-eyes:** if the 3D looked stale, hard-reload — the
   op→stock preselect + the 2D/3D both following are verified. **NOTE:** the advisor's turn-86 TRACK-STOCK (start-drag offset
   model) is still PENDING — this was the human's mid-turn redirect.
+
+## 2026-06-29 — turn 88: EDITOR SIM applies the declared start hints (extend opSimStarts from the wizard to the editor)
+
+- **Human (eyeball + the pasted macro):** on INSERT, the SAME op sims DIFFERENTLY — the editor's 2nd-axis move is glued to
+  the stock edge / WCS. The macro is IDENTICAL (`#21=50`, `G0 X[#53-#52-#10] Y[0-#21]`); only the SIM differs. "The wizard has
+  the gui canvas but the editor doesn't, BUT THE BLOCK SHOULD STILL APPLY."
+- **VERIFY-FIRST (traced):** the editor preview ([gcodePreviewTab.js](DDCS-Studio/web/ui/gcodePreviewTab.js)) is the SAME
+  shared `createPreviewPanel`, but its config has **no `getStartHints`** → `get('getStartHints')` is undefined → the panel's
+  `computePassStarts` falls to the single-pass default → the 2nd-axis anchors to the literal incremental position (the WCS).
+  The wizard feeds hints via `getStartHints` (host.__startHints = inferStarts). `opSchema.parseMarker`/`isMarker` already
+  parse the `@DDCS` op markers (op type + params); `opSimStarts` (inc 1) is the shared hint registry. **No restructure → build.**
+- **BUILD:** `gpStartHints()` — parse the program's `@DDCS` markers → `opSimStarts(opType, params, stock)` (the SAME registry
+  the wizard uses) → concatenate each op's per-pass starts → wired as the panel's `getStartHints`. Also `getStart` now falls
+  back to `hint[0]` (①) so pass 0 begins at the inferred start too (matching the wizard), not the viz default `{0,0,0}`. The
+  panel's `computePassStarts` → the trace/engine `passStarts` — the wizard's EXACT path. So the editor + wizard SHARE the
+  registry → identical sim for the same op.
+- **VERIFIED (real symptom, new `editor-sim-hints.spec.js`):** put an inserted boss-both (marker + macro) in the editor →
+  the editor's `passStarts` ①② MATCH `opSimStarts('middle', params, stock)` (the 2nd-axis ② begins at the registry hint, not
+  the WCS edge); the SAME macro WITHOUT the marker → the single-pass default (unchanged). The editor-preview + middle/preview
+  tests pass ISOLATED (25 of the overload-run "failures" re-run green). **SCOPE = registry DEFAULT hints only** (a dragged
+  ②/userStarts saved as op data is Phase 2). **NOTE — multi-op:** the concatenation aligns for a single op (the human's case)
+  + the first op of a multi-op program; later ops can drift (the trace's `_pass` is a running counter, not per-op) — Phase 2.
+- **⚠ The full suite couldn't run clean = DEV-SERVER OVERLOAD** (4.7 min vs ~2; 72 page.waitForFunction timeouts) from my
+  repeated suite runs — NOT a regression; every sampled "failure" passes isolated. **⚠ HUMAN-eyes:** editor sim of an inserted
+  boss-both matches the wizard (2nd-axis starts at ②).
