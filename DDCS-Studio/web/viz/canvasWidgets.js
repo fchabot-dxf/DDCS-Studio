@@ -78,6 +78,25 @@ export const CANVAS_GESTURES = {
         place: (d) => ({ x: d.cx + d.nx * d.off, y: d.cy + d.ny * d.off, kind: 'size', label: d.label, value: d.value }),
         drag: (d, w) => ({ [d.field]: clampMin(d.scale * Math.abs((w.x - d.cx) * d.nx + (w.y - d.cy) * d.ny), d.min) }),
     },
+    // PROBE-VECTOR about an anchor → an axis ENUM + a dir ENUM + a reach scalar (ONE drag = three controls). The handle is
+    // the arrow TIP: a probe is AXIS-ALIGNED, so the drag angle SNAPS to the nearest cardinal (|dx|≥|dy| → X else Y; the
+    // sign → pos/neg), and the length sets the reach (`d.field`). Anchor (cx,cy) = the probe start; the view draws the
+    // shaft. NOTE: axis/dir are STRINGS — the view's setFields must pass enums through (not round them like a number).
+    probeVector: {
+        place: (d) => {
+            const ux = d.axis === 'Y' ? 0 : (d.dir === 'neg' ? -1 : 1);
+            const uy = d.axis === 'Y' ? (d.dir === 'neg' ? -1 : 1) : 0;
+            return { x: d.cx + ux * d.dist, y: d.cy + uy * d.dist, kind: 'size', label: d.label, value: d.dist };
+        },
+        drag: (d, w) => {
+            const dx = w.x - d.cx, dy = w.y - d.cy, horiz = Math.abs(dx) >= Math.abs(dy);
+            return {
+                [d.fieldAxis]: horiz ? 'X' : 'Y',
+                [d.fieldDir]: (horiz ? dx : dy) >= 0 ? 'pos' : 'neg',
+                [d.field]: clampMin(Math.hypot(dx, dy), d.minR),
+            };
+        },
+    },
 };
 
 /** Declarations → { handles, onDrag, onEdit } for a FeatureCanvas spec. `setFields(map)` writes the op's form fields

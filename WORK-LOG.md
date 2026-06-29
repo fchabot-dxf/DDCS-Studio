@@ -1501,3 +1501,33 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
 - Updated `middle-crossover.spec.js` (default 80 not `[#1+#2]`; header; + the reverse-sync test). **Full suite 398 green + 3
   KNOWN parallel flakes** (custom-op-chip, middle-animator, project-drawer-smoke — 9 pass isolated). **⚠ HUMAN-eyes:** the
   CROSS-OVER form fields read as clean numbers + a probe-both run on a real boss reaches both in-axis walls.
+
+## 2026-06-28 — turn 74: FEATURE-CANVAS-IN-PROBE prototype #1 — the EDGE probe-vector (the canvas↔form SEAM)
+
+- **New thread (FEATURE-CANVAS-PROBE-SCOPE.md), EDGE first (human "do edge first").** ADDITIVE — the axis/dir/dist form
+  fields STAY; the canvas ADDS one two-way-synced draggable arrow. This establishes the canvas↔form SYNC SEAM for the whole
+  initiative, so the seam mattered most.
+- **VERIFY-FIRST (traced, didn't assume):** (1) [featureCanvas.js](DDCS-Studio/web/viz/featureCanvas.js) is GENERIC + already
+  shared (drill/pocket/slot/contour/surfacing/text use it): a `spec` of `{stock, items, paths, handles, onDrag, onEdit}`;
+  a handle drag hands back a world point → `onDrag(id, world)` → the view's `setFields` writes the field(s) → update()
+  redraws. (2) [edgeView.js](DDCS-Studio/web/wizards/views/edgeView.js) cleanly extends like [drillView](DDCS-Studio/web/wizards/views/drillView.js)
+  (instantiate a `FeatureCanvas`, add a container, render in update()) — **no featureCanvas generalization needed → NO design
+  fork → build, no gate.** (3) [canvasWidgets.js](DDCS-Studio/web/viz/canvasWidgets.js) `radial` maps a polar handle to a
+  NUMERIC angle field — doesn't fit a probe (axis-aligned, axis+dir are ENUMS). So a new gesture.
+- **BUILD:**
+  - **`probeVector` gesture** (canvasWidgets, one registry entry — the intended extension point): the handle is the arrow
+    TIP; the drag SNAPS to the nearest cardinal (`|dx|≥|dy|`→X else Y; sign→pos/neg) → `fieldAxis`+`fieldDir`, length →
+    `field` (reach). `place` puts the tip at anchor + dist·cardinal-unit.
+  - **`edgeLayoutCanvas`** container added to the edge panel ([index.html](DDCS-Studio/web/index.html), additive — the
+    existing SVG animator stays below it).
+  - **edgeView**: `setFields` is ENUM-SAFE (numbers rounded, axis/dir strings passed through — not `r3`'d to NaN);
+    `buildEdgeSpec` draws the arrow from the stock centre in the probe direction (shaft = a `line` item, tip = the handle);
+    `update()` renders the canvas every field change.
+- **THE SEAM (both directions, the field VALUES are the one source — form + Blockly round-trip intact):** form→canvas =
+  update() re-renders the arrow from the fields; canvas→form = `onDrag` → `setFields({p_axis,p_dir,p_dist})` → one `input`
+  event → update(). The canvas writes the SAME fields the form/Blockly use — it's just another view of them (the drill pattern).
+- **VERIFIED (real symptom, new spec `edge-probe-vector.spec.js`):** unit — the gesture place/drag (cardinal snap + enum
+  mapping + reach); integration — drove the real wizard: typing axis=Y/dir=neg/dist=40 makes the arrow vertical-down-longer
+  (form→canvas), and a pointer-DRAG of the handle above centre sets axis=Y/dir=pos (canvas→form). **Full suite 401 green, zero
+  failures.** **⚠ HUMAN-eyes:** open Edge → drag the arrow updates axis/dir/dist live; type a field → the arrow moves.
+  **The seam is proven; the rest of the initiative is handle declarations on top.** (Anchor = stock centre for now — refinable.)
