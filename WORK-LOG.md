@@ -1847,3 +1847,38 @@ restructure (the emit path is untouched; the block emits nothing and is read as 
   federated, custom-op-sim-intent, dev-mode, sim-starts-data, op-sim-starts + the toolbox screenshots (render/mobile/theme)
   all pass ISOLATED (16 + 2). SCOPE = B3 only (NOT B4 the two-mouth op block / NOT B5 shared stacks). Trusted isolated runs
   per the agreed approach (the dev server overloaded 3× this session on full runs); recommend a fresh-server full re-run.
+
+## 2026-06-29 — turn 96: B0 REDO — GATE (the marker-on-insert fix collides with a deliberate "editor stays clean" contract)
+
+VERIFY-FIRST (root, confirmed by code-trace AND a REAL-insert probe — the turn-88 lesson, no synthetic):
+- The wizard Insert path (`wizardManager.insert()` :399 → `ops.commitActiveOp()` / `commitDecodedCode()` →
+  `ddcsLoadBlockStack`) DOES go through the program model. The editor TEXT is then PROJECTED from the program:
+  **[programModel.js:150](DDCS-Studio/web/blocks/programModel.js) `proj = emitMapped(stack)` — CLEAN, no markers.**
+  `serializeWithMarkers` (markerLine per op, :94) exists but is **EXPORT-ONLY** (:189 — "export only; **editor stays
+  clean**"). So the editor is markerless BY A DELIBERATE DECISION, not a per-insert bypass.
+- **REAL-insert probe** (open middle → boss → `wm.insert()`): the editor starts `#1=200 ( Max probe distance )` with
+  **`@DDCS` ABSENT** (exactly the human's screenshot), AND `ddcsGetBlockProgram()` HOLDS the `middle` op with full params
+  (featureType/inAxis/transAxis/axis/…). So turn-88 `gpStartHints` is starved BY CONTRACT — and the live PROGRAM MODEL
+  already carries the op. **A marker prepended on insert would VANISH on the next reproject** (proj = emitMapped re-runs).
+
+**THE CONFLICT (why I'm gating, not building):** the dispatched fix — "make the INSERT emit the `@DDCS` marker [in the
+editor]" — reverses the deliberate **"editor stays clean / markers export-only"** decision (programModel:189). The robust
+form (route the projection through `serializeWithMarkers`) is a CONTRACT change: every op gets a `( @DDCS:1 {…} )` line the
+user sees in their G-code, and it would shift the editor-text + screenshot tests. The advisor's note diagnosed a per-insert
+"bypass"; the real root is a whole-editor design choice. Per the protocol (don't reverse a deliberate contract unilaterally;
+the advisor pre-authorized "GATE if it needs a real restructure"), the options:
+
+- **A — markers LIVE in the editor** (the dispatched mechanism, robust form): change the projection → `serializeWithMarkers`.
+  Self-describing editor + .nc (survives raw-.nc save/reload; the custom-op bonus). **COST:** reverses "editor stays clean"
+  (markers visible in every program), broad/risky (editor-text + screenshot tests), a real CONTRACT change.
+- **B — gpStartHints reads the LIVE PROGRAM MODEL (RECOMMENDED, no contract change):** `gpStartHints` reads
+  `ddcsGetBlockProgram()` (the op records → per-op `opSimStarts`) as the PRIMARY source, KEEPING turn-88's editor-text
+  `@DDCS` parse as the FALLBACK. Fixes the human's LIVE symptom (right after insert the op is in the program model → hints →
+  the 2nd-axis lands on ②), **lights up CUSTOM ops too** (the program record → opSimStarts → its B1/B3 provider), the editor
+  STAYS CLEAN, and a loaded .nc that HAS markers still works (the fallback). The only thing it can't do that A can: a RAW
+  clean .nc (no live program, no markers) reloaded — which carries no op identity anyway.
+
+**RECOMMENDATION: B** — it achieves the advisor's GOAL (editor sim matches the wizard + custom ops light up) WITHOUT
+reversing the deliberate editor-clean contract, and keeps the self-describing path working via the existing fallback. A only
+wins if LIVE markers in the editor text are explicitly wanted — and since that changes what the user sees in their G-code,
+it's the HUMAN's call. **GATED — no build this turn.** Awaiting A vs B.
