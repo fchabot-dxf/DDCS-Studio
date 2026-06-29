@@ -153,6 +153,46 @@ export function simIntentFromStack(children) {
     return (sim.showRotaryRig || sim.forceMachine || sim.showMagazine) ? sim : null;
 }
 
+// ── def.sim.starts ⇄ `simstart` blocks (B3) — the DECLARATION round-trip (NOT the macro: a sim-start emits no line) ──
+const ANCHORS = ['centre', 'edge', 'frac', 'radial'];
+const numOrTok = (v) => (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim())) ? Number(v) : v;   // "15"→15, "@outset"→"@outset"
+
+/** The `simstart` blocks in a stack → def.sim.starts ROWS (B1's makeProvider vocabulary). Each block declares one
+ *  pass; only the chosen anchor's fields are kept, so the rows stay tidy (and match a hand-written def.sim.starts). */
+export function simStartsFromStack(children) {
+    return flattenBlocks(children).filter((b) => b && b.type === 'simstart').map((b) => {
+        const p = b.params || {};
+        const a = ANCHORS.includes(p.anchor) ? p.anchor : 'centre';
+        const row = { anchor: a, plane: p.zplane || 'probe' };
+        if (a === 'edge') { row.axis = p.axis || 'X'; row.side = p.wall || '@dir1'; row.out = numOrTok(p.out); }
+        else if (a === 'frac') { row.fx = Number(p.fx) || 0; row.fy = Number(p.fy) || 0; }
+        else if (a === 'radial') { row.axis = p.axis || 'Y'; row.sign = p.sign === '-' ? '-' : '+'; row.r = numOrTok(p.rad); }
+        if (p.whenparam) row.when = { param: p.whenparam, is: p.whenis === 'true' ? true : p.whenis === 'false' ? false : p.whenis };
+        return row;
+    });
+}
+
+/** def.sim.starts ROWS → `simstart` block records (every field set, so recToJson's dropdowns stay valid). The reverse
+ *  of simStartsFromStack — renders a declared (incl. B1-programmatic) op's starts AS BLOCKS in the Blockly view. */
+export function simStartsToBlocks(rows) {
+    return (rows || []).map((row) => {
+        const a = ANCHORS.includes(row.anchor) ? row.anchor : 'centre';
+        return { type: 'simstart', params: {
+            anchor: a,
+            axis: row.axis || 'X',
+            wall: row.side || '@dir1',
+            out: String(row.out ?? '@outset'),
+            fx: Number.isFinite(+row.fx) ? +row.fx : 0.5,
+            fy: Number.isFinite(+row.fy) ? +row.fy : 0.5,
+            sign: row.sign === '-' ? '-' : '+',
+            rad: String(row.r ?? '@R'),
+            zplane: row.plane || 'probe',
+            whenparam: row.when ? row.when.param : '',
+            whenis: row.when ? String(row.when.is) : '',
+        } };
+    });
+}
+
 // Drop counter-based block ids so a stored template is stable (ids are reassigned on emit). (Same rule as opGlow.)
 function stripIds(v) {
     if (Array.isArray(v)) return v.map(stripIds);

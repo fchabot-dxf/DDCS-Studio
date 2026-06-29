@@ -18,7 +18,7 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack } from './userOps.js';
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack } from './userOps.js';
 import { createWizard } from './wizardLibrary.js';
 import { workspaceToStack } from './blockly/stackBridge.js';
 import { openRegionEditor } from '../ui/regionEditor.js';   // the "make your own datum" authoring editor
@@ -553,7 +553,10 @@ function saveAsCustomOp() {
         editing: editingDef ? { opType: _editingWizard, label: editingDef.label || _editingWizard } : null,
     }, (meta) => {
         const panel = blkPanel || meta.panel;
-        const sim = blkSim !== undefined ? blkSim : meta.sim;
+        let sim = blkSim !== undefined ? blkSim : meta.sim;
+        // `simstart` blocks in the stack DECLARE the per-pass sim-starts → def.sim.starts (B3, read like the sim block).
+        const blkStarts = simStartsFromStack(a.opRec.children);
+        if (blkStarts && blkStarts.length) sim = { ...(sim || {}), starts: blkStarts };
         // Non-destructive: only an EXPLICIT "Update" (mode 'update') overwrites the re-authored wizard. Anything else —
         // a fresh op, or "Save as new" while editing — creates a SEPARATE wizard, leaving the original untouched.
         const update = meta.mode === 'update' && _editingWizard;

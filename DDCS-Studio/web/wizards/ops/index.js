@@ -46,6 +46,7 @@ import { distModeBlock } from './distmode.js';
 import { commentBlock } from './comment.js';
 import { panelBlock } from './panel.js';
 import { simBlock } from './sim.js';
+import { simStartBlock } from './simStart.js';
 import { variableBlock } from './variable.js';
 import { paramBlock } from './param.js';
 import { regionPickBlock } from './regionpick.js';
@@ -78,7 +79,7 @@ export const PALETTE = [
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     mcodeBlock, rawBlock, outPinBlock, waitInputBlock,         // Signals (raw M-code/G-code escape + digital I/O M62-66)
-    paramBlock, regionPickBlock, coordListBlock, panelBlock, simBlock,   // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig declarations)
+    paramBlock, regionPickBlock, coordListBlock, panelBlock, simBlock, simStartBlock,   // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig + per-pass sim-start declarations)
     commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
 ];
 

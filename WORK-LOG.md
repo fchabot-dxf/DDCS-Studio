@@ -1813,3 +1813,37 @@ GATE RESOLVED: the human blessed Option A (structured anchor+offset rows) + the 
     gated pass appears only when twoAxis is true; `deleteUserOp` clears → null).
   - Regression: op-sim-starts-registry / custom-op-sim-intent / custom-op-panel / federated-registry / middle-aim all pass
     isolated (this is a pure-module add — no DOM/render/engine change).
+
+## 2026-06-29 — turn 94: B3 — the SIM-DECLARATION block (`def.sim.starts` as a Blockly block)
+
+VERIFY-FIRST → **CLEAN ADDITION** (built, not gated). The bridge already has the EXACT precedent: the `sim` block
+([wizards/ops/sim.js](DDCS-Studio/web/wizards/ops/sim.js)) is a PALETTE atom (category 'Wizard UI', `emit: () => []`,
+checkbox fields) that round-trips through the GENERIC field path (toRecord/recToJson key off `BLOCKS[type]` + `fieldsOf`),
+and `userOps.simIntentFromStack` reads it at SAVE → `def.sim`. A sim-START block is the same shape — no emit-reverse-sync
+restructure (the emit path is untouched; the block emits nothing and is read as a declaration).
+
+- **[simStart.js](DDCS-Studio/web/wizards/ops/simStart.js) (NEW)** — the `simstart` atom: ONE pass-start per block, fields =
+  B1's Option-A vocabulary (anchor centre|edge|frac|radial · axis/wall/out · fx/fy · sign/rad · zplane top|probe|@flank ·
+  whenparam/whenis). `dynamic: 'anchor'` (the ddcs_dynfields extension) shows only the chosen anchor's fields. `emit: () => []`.
+  Registered in [ops/index.js](DDCS-Studio/web/wizards/ops/index.js) PALETTE beside `simBlock` → auto-defined as a Blockly
+  block + a 'Wizard UI'-styled toolbox entry (reads as a distinct authoring/preview block, not an emit-atom).
+- **[bridge.js](DDCS-Studio/web/blocks/blockly/bridge.js)** — SELECTS `anchor`/`wall`/`sign`/`zplane` (the dropdowns) + their
+  tooltips. **Field-name care:** renamed the edge side field to `wall` because `side` ALREADY exists in SELECTS (contour
+  cutter side outside/inside/on) — reusing it would have mis-typed the dropdown; `zplane`/`rad` likewise avoid `plane` (arc
+  G17-19) and `r`'s misleading desc.
+- **[userOps.js](DDCS-Studio/web/blocks/userOps.js)** — `simStartsFromStack(children)` (the `simstart` blocks → def.sim.starts
+  ROWS, per-anchor-pruned so the data stays tidy + matches a hand-written spec; "15"→15, "@outset" kept) and
+  `simStartsToBlocks(rows)` (the reverse — every field set so recToJson's dropdowns stay valid; renders a declared, incl.
+  B1-programmatic, op's starts AS BLOCKS). Mirror `simIntentFromStack`. **The round-trip is against def.sim.starts (the
+  DECLARATION), never the macro** — there is no emitted line to reverse-sync.
+- **[devMode.js](DDCS-Studio/web/blocks/devMode.js)** — at save, `sim.starts = simStartsFromStack(children)` when present
+  (beside the existing `blkSim`), so authoring `simstart` blocks → `def.sim.starts` → (B1) `makeProvider`.
+- **VERIFIED — REAL-SYMPTOM, not synthetic** (new `sim-start-block.spec.js`, 2 tests): (1) registered + anchor/wall render as
+  dropdowns + `emit()===[]` (a move beside it still emits) + the PURE rows⇄blocks round-trip is identity + the round-tripped
+  rows still drive `makeProvider` (2 passes, the gate keeps the 2nd); (2) **through the LIVE Blockly workspace** — a custom
+  op's def.sim.starts rows `ddcsLoadBlockStack(simStartsToBlocks(rows))` render as 2 drawn `simstart` blocks; editing a block
+  field (`WALL` @dir1→@dir2) and reading the workspace back (`workspaceToStack` → `simStartsFromStack`) shows the edit flowed
+  into def.sim.starts (NOT a macro line); the `when` gate survives. Regression: gui-sim/panel/param, blocks-render/roundtrip,
+  federated, custom-op-sim-intent, dev-mode, sim-starts-data, op-sim-starts + the toolbox screenshots (render/mobile/theme)
+  all pass ISOLATED (16 + 2). SCOPE = B3 only (NOT B4 the two-mouth op block / NOT B5 shared stacks). Trusted isolated runs
+  per the agreed approach (the dev server overloaded 3× this session on full runs); recommend a fresh-server full re-run.

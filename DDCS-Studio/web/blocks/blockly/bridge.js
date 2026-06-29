@@ -54,6 +54,11 @@ const SELECTS = {
     direction: ['bothways', 'oneway', 'otherway'],   // fill / step-over scan direction
     order: ['outside-in', 'inside-out'],             // concentric-fill ring order
     strategy: ['parallel', 'concentric'],            // step-over pass strategy
+    // SIM-START (per-pass preview start, the simstart authoring block — B3). The Option-A vocabulary as dropdowns.
+    anchor: ['centre', 'edge', 'frac', 'radial'],    // where this pass begins relative to the stock
+    wall: ['@dir1', '@dir2', 'min', 'max'],          // edge anchor: which wall side (@token follows the op's dir param, or a fixed min/max)
+    sign: ['+', '-'],                                // radial anchor: which side of centre
+    zplane: ['probe', 'top', '@flank'],              // probe height: into the stock / above the top / the bar centreline (-R)
 };
 const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/[^a-z0-9]+/g, '');   // slug = alphanumerics only (so "Spindle & Feed" → spindlefeed, "Wizard UI" → wizardui)
 export const FN = (field) => field.toUpperCase();   // Blockly input/field name from an op field
@@ -122,7 +127,14 @@ const DESCRIPTIONS = {
     options: "Dropdown presets — a comma/newline list of Label=value (numeric), e.g. Rough=500, Finish=1500",
     rotary: "Preview shows the 4th-axis rotary rig (+ the A± jog row)",
     machine: "Preview pins to the machine frame (draws the envelope)",
-    magazine: "Preview shows the ATC magazine (pockets + tool stubs)"
+    magazine: "Preview shows the ATC magazine (pockets + tool stubs)",
+    anchor: "Where this preview pass begins: centre / edge (a wall) / frac (a fraction of the stock) / radial (offset from centre)",
+    wall: "Edge anchor: which wall side — @dir1/@dir2 follow the op's direction param, or a fixed min/max",
+    out: "Stand-off distance outside the wall (a number, or @outset = the op's standard approach)",
+    rad: "Radial offset from centre (a number, or @R = the bar radius)",
+    zplane: "Probe height: probe (into the stock) / top (above) / @flank (the bar centreline, -R)",
+    whenparam: "Optional gate: this pass only exists when this op param matches (the conditional pass count)",
+    whenis: "Gate value the param must equal (true / false / a string)"
 };
 const getDesc = (f) => DESCRIPTIONS[f.toLowerCase()] || `The ${f} parameter`;
 
