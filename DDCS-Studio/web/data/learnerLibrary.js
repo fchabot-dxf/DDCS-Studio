@@ -57,6 +57,29 @@ export const SNIPPETS = [
         entries: [
             { id: 'z-touch', label: 'Z touch-off', desc: 'Probe straight down (G31) until the probe triggers, then store the touch Z in #50.',
               stack: [cmt('Z touch-off — probe down, store the result in #50'), { type: 'probe', params: { axis: 'Z', to: -20, feed: 100, port: 3, level: 0 } }, { type: 'proberead', params: { axis: 'Z', var: '#50' } }] },
+            // The canonical probe primitive, decomposed into its atoms: probe IN → verify contact → retract → store.
+            // (The wizards build their measure cycles from this exact shape; the later consolidation composes from it.)
+            { id: 'probe-surface', label: 'Probe surface', desc: 'Probe in (G31) until the probe triggers, verify it contacted, retract clear, then store the touch position in #50.',
+              stack: [
+                  cmt('Probe surface — probe in (G31), verify contact, retract, store the touch position'),
+                  { type: 'probe', params: { axis: 'Z', to: -20, feed: 100, port: 3, level: 0 } },   // probe straight in (G31)
+                  { type: 'probecheck', params: { axis: 'Z', goto: 1 } },                              // verify it triggered (else jump to the fail handler)
+                  { type: 'move', params: { mode: 'rapid', z: 5, feed: 200 } },                        // retract clear of the surface
+                  { type: 'proberead', params: { axis: 'Z', var: '#50' } },                            // store the latched touch position
+              ] },
+            // Two-pass (fast find + slow re-probe) — the accurate version the WIZARDS actually use, so the later
+            // consolidation has the right shape to compose from: fast probe → check → retract → slow probe → check → retract → save.
+            { id: 'probe-surface-2pass', label: 'Probe surface — fast + slow', desc: 'Two-pass probe (the accurate version the wizards use): a fast approach to find the surface, retract, then a slow re-probe — and store the touch position in #50.',
+              stack: [
+                  cmt('Probe surface (fast + slow) — fast find, retract, slow re-probe for accuracy, store the result'),
+                  { type: 'probe', params: { axis: 'Z', to: -20, feed: 200, port: 3, level: 0 } },   // FAST approach
+                  { type: 'probecheck', params: { axis: 'Z', goto: 1 } },
+                  { type: 'move', params: { mode: 'rapid', z: 5, feed: 200 } },                        // retract
+                  { type: 'probe', params: { axis: 'Z', to: -20, feed: 50, port: 3, level: 0 } },     // SLOW re-probe (accurate)
+                  { type: 'probecheck', params: { axis: 'Z', goto: 1 } },
+                  { type: 'move', params: { mode: 'rapid', z: 5, feed: 200 } },                        // retract
+                  { type: 'proberead', params: { axis: 'Z', var: '#50' } },                            // store the latched touch position
+              ] },
         ],
     },
 ];

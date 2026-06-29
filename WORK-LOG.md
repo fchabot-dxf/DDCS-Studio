@@ -2046,3 +2046,32 @@ NOT B-END-OFFSET/B-TRANS-ANGLE). No G53/G90.
   AUTO/MANUAL per-transition travel GUI is batch item #2 (it'll subsume this Z→X transition + the existing inAxis/transAxis
   toggles). So an AUTO boss-both with probeZ currently asks the operator to jog from the Z spot to the first wall; that
   becomes hands-free in #2. (Resolves TWO-WCS-DATUM decision C: target datum = XYZ when ON, XY when OFF.)
+
+## 2026-06-29 — turn 108: PROBE-SURFACE SNIPPET — the canonical probe primitive in the learner library
+
+Make 'probe surface' a curated Snippet in the Probing category ([data/learnerLibrary.js] SNIPPETS), beside z-touch —
+DEFINE-ONLY (the wizard migration to compose from it is batch #6; wizards UNTOUCHED). Z-FIRST cb2518e reviewed PASS t107.
+
+- **VERIFY-FIRST (atom shapes, not assumed):** confirmed against the real atoms — `move{z:5}` emits **`G0 Z5`** (Z-ONLY;
+  move.js: "only the axes that are set are emitted", target absolute), `probecheck{axis:'Z',goto:1}` emits
+  `IF #1922!=2 GOTO1` (a valid line, does NOT throw on a dangling label — the validator only needs >0 emitted lines),
+  `proberead{axis:'Z',var:'#50'}` saves the latched trigger pos. `stackToFlyoutBlock` chains via Blockly `next.block`.
+- **BUILT — two entries under `Probing`:**
+  - `probe-surface` (single-pass, matches z-touch's shape + the human's "4 atoms"): `cmt → probe (G31 in) → probecheck
+    (verify/goto-fail) → move (retract Z5) → proberead (#50)`. Sensible defaults (axis Z, feed 100, port 3, level 0).
+  - `probe-surface-2pass` ("fast + slow" — the version the WIZARDS use, so #6 composes from the right shape):
+    `cmt → probe(fast F200) → check → retract → probe(slow F50) → check → retract → proberead`.
+  Both are plain `{type,params}` stacks (the same thing the app builds); the toolbox tree + drag-in are generic.
+- **VERIFIED (learner-library.spec.js — the validator gate + a new focused test, 2 green):**
+  - the existing validator (every curated composition emits >0 lines without throwing) now covers both new snippets;
+  - the new test asserts: both are curated under `Probing`, the `Probing` sub-category shows under 📚 Snippets, each
+    drags in as ONE connected stack (single = 5 blocks, two-pass = 8, counted down the `next.block` chain), and each
+    emits a real `G31` + stores a result. Focused blocks regression (blocks-render screenshot / roundtrip / blockly-port)
+    5/5 — adding flyout ENTRIES does not drift the static toolbox-tree screenshots. Full suite running.
+- **SCOPE:** define-only (canonical snippet + Blocks-tab drag-in). NOT the wizard migration (#6 — needs a
+  wizard-references-a-snippet mechanism + a byte-identical gate). No wizard files touched. Files: data/learnerLibrary.js
+  + tests/learner-library.spec.js.
+- **NOTE (honest):** the retracts are absolute `G0 Z5` (matching z-touch's absolute convention + the existing Probing
+  examples, no distmode side-effect) rather than the wizards' incremental lift — a teaching-clean default; #6 will map
+  params when it composes the wizard cycles from this shape. The probecheck `goto 1` is a nominal fail-handler ref (no
+  label in the bare snippet, like a primitive meant to slot into a framed program).

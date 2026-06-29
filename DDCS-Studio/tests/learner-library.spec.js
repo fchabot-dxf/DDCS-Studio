@@ -50,3 +50,41 @@ test('learner library: tree (Atoms · Snippets · Programs) with sub-categories;
   // a leaf of a Snippets sub-category is ONE draggable connected composition (head + next)
   expect(r.snipFirstLeafIsStack, 'a composition is one draggable connected stack').toBe(true);
 });
+
+test('Probing snippets: the canonical "probe surface" primitive (single + two-pass) drags in as one stack + emits G31', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => !!window.ddcsStudio);
+
+  const r = await page.evaluate(async () => {
+    const { SNIPPETS, learnerToolboxCategories } = await import('/data/learnerLibrary.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { stackToFlyoutBlock } = await import('/blocks/blockly/stackBridge.js');
+    const { buildToolbox } = await import('/blocks/blockly/bridge.js');
+
+    const probing = SNIPPETS.find((g) => g.category === 'Probing');
+    const byId = (id) => probing.entries.find((e) => e.id === id);
+    const surf = (id) => {
+      const e = byId(id);
+      const g = (emitMapped(e.stack).text || '').trim();
+      const fb = stackToFlyoutBlock(e.stack);
+      // count connected blocks down the Blockly next chain (next.block) — one draggable stack
+      let n = 0; for (let b = fb; b; b = b.next && b.next.block) n += 1;
+      return { present: !!e, g31: /G31 /.test(g), reads: /#1925|#1927|#50|#1500|#864/.test(g), stackLen: n, stackHead: !!(fb && fb.type) };
+    };
+    return { single: surf('probe-surface'), two: surf('probe-surface-2pass'),
+             probingNames: probing.entries.map((e) => e.id),
+             snipHasProbing: buildToolbox(learnerToolboxCategories())
+               .contents.find((c) => /Snippets/.test(c.name)).contents.some((c) => c.name === 'Probing') };
+  });
+
+  expect(r.probingNames, 'both probe-surface snippets are curated under Probing').toEqual(
+    expect.arrayContaining(['probe-surface', 'probe-surface-2pass']));
+  expect(r.snipHasProbing, 'Probing sub-category shows under 📚 Snippets').toBe(true);
+  // single-pass: a real G31 + a stored result, all in one connected stack (cmt+probe+check+move+read = 5)
+  expect(r.single.g31, 'probe-surface emits a G31 probe').toBe(true);
+  expect(r.single.reads, 'probe-surface stores the touch result').toBe(true);
+  expect(r.single.stackLen, 'probe-surface drags in as one connected 5-block stack').toBe(5);
+  // two-pass: TWO G31s (fast + slow) in one connected stack (cmt + 2×(probe,check,move) + read = 8)
+  expect((r.two.g31), 'probe-surface-2pass emits G31 probes').toBe(true);
+  expect(r.two.stackLen, 'probe-surface-2pass drags in as one connected 8-block stack').toBe(8);
+});
