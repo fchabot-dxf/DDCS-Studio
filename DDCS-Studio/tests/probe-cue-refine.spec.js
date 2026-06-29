@@ -24,23 +24,24 @@ async function run(page) {
   await page.waitForTimeout(400);
 }
 
-test('REAL DATUM: the un-probed axis rides the contact, not the WCS', async ({ page }) => {
-  // a corner-style probe at Z = -3: probe X then Y → the datum's un-probed Z must be the contact (-3), not 0 (the WCS)
-  await setup(page, 'G54\nM3 S12000\nG0 Z-3\nG31 X-10 F600\nG31 Y-8 F600\nM30');
+test('REAL DATUM: the un-written axis rides the contact, not the WCS', async ({ page }) => {
+  // DATUM follows the WCS-WRITE (turn 112). Probe X & Y at Z=-3 and WRITE the WCS X/Y (#[#70+0]/#[#70+1]) → the datum
+  // shows at the written X/Y; its UN-written Z rides the contact (-3), not 0 (the WCS). (Discs come from the probes.)
+  await setup(page, 'G54\nM3 S12000\n#70=805\nG0 Z-3\nG31 X-10 F600\n#[#70+0]=-5\nG31 Y-8 F600\n#[#70+1]=-5\nM30');
   await run(page);
   const d = await page.evaluate(() => {
     const v = window.__gpPanel.viz;
     return { datumVis: v._probeGizmo.visible, lineVis: v._probeLine.visible, z: v._probeGizmo.position.z, contactZ: v._probeContact && v._probeContact.z };
   });
-  expect(d.datumVis, 'datum shows for the 2-axis corner').toBe(true);
+  expect(d.datumVis, 'datum shows once the WCS X/Y are written').toBe(true);
   expect(d.lineVis, 'the axis line was removed (user) — never shows').toBe(false);
   expect(Math.abs(d.contactZ), 'the probe happened off the WCS Z (at Z-3)').toBeGreaterThan(1);
-  expect(d.z, 'datum Z = the contact Z, NOT the WCS 0').toBeCloseTo(d.contactZ, 2);
+  expect(d.z, 'datum Z = the contact Z (un-written), NOT the WCS 0').toBeCloseTo(d.contactZ, 2);
 });
 
 test('a re-probe REFINES the axis (fast→slow), it does NOT reset the accumulated axes', async ({ page }) => {
-  // Z (fast) → X (fast) → Z (slow, a fine refinement) — the cue must KEEP {z,x}, not reset to {z}
-  await setup(page, 'G54\nM3 S12000\nG31 Z-15 F3000\nG31 X-10 F3000\nG31 Z-16 F50\nM30');
+  // Z (fast) → X (fast) → Z (slow, a fine refinement); WRITE Z then X (the datum source) — the cue must KEEP {z,x}.
+  await setup(page, 'G54\nM3 S12000\n#70=805\nG31 Z-15 F3000\n#[#70+2]=-15\nG31 X-10 F3000\n#[#70+0]=-10\nG31 Z-16 F50\n#[#70+2]=-16\nM30');
   await run(page);
   const s = await page.evaluate(() => {
     const v = window.__gpPanel.viz;
@@ -48,7 +49,7 @@ test('a re-probe REFINES the axis (fast→slow), it does NOT reset the accumulat
   });
   expect(s.axes, 'the slow re-probe refined Z, keeping both axes').toEqual(['x', 'z']);
   expect(s.line, 'the axis line was removed (user) — never shows').toBe(false);
-  expect(s.datum, 'datum still shown (not reset)').toBe(true);
+  expect(s.datum, 'datum shown (Z + X written)').toBe(true);
 });
 
 test('FEED → SIZE: a SLOWER probe makes a SMALLER disc than a faster probe', async ({ page }) => {

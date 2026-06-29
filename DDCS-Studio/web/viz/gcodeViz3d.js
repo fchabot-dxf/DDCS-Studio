@@ -1659,7 +1659,18 @@ export class GcodeViz3D {
         this._probeAxes = {};
         this._probeContact = null;
         this._probeContacts = [];
+        this._datumWrite = {};   // the WCS-WRITE centre (#53/#56) per axis — cleared each run/loop (see markDatumWrite)
         this._updateDatum();   // hide the persistent line + datum
+    }
+
+    // DATUM follows the WCS-WRITE event, not the probe-contact walls. The engine runs the offset write #[#70+off]=#53/#56
+    // (the middle CALCULUS output — the bisected centre); the preview signals THAT value here so the datum gizmo positions
+    // OVER the feature centre, not at the last probed wall. SIM-ONLY overlay (the value is already computed — no macro write).
+    // #53/#56 are in the SAME part-local frame as the contacts (worker-verified: #53/#56 == the contacts' midpoint == centre).
+    markDatumWrite(axis, value) {
+        if ('xyz'.indexOf(axis) < 0 || !Number.isFinite(value)) return;
+        (this._datumWrite || (this._datumWrite = {}))[axis] = value;
+        this._updateDatum();
     }
 
     // TRANSIENT-DISC model. A G31 finished on `axis` at feed `feed`. Record the contact, rebuild the DATUM (which also
@@ -1675,7 +1686,8 @@ export class GcodeViz3D {
         (this._probeAxes || (this._probeAxes = {}))[axis] = true;
         this._probeContact = { x: tool.position.x, y: tool.position.y, z: tool.position.z };   // part-local (rides partFrame)
         (this._probeContacts || (this._probeContacts = [])).push({ ...this._probeContact });
-        this._updateDatum();                                   // (B) line + datum at the intersection
+        // The DATUM is NOT driven by probe contacts anymore — it follows the WCS-WRITE event only (markDatumWrite), so it
+        // appears AT THE CENTRE, never flickering through the walls. Here we just record the contact + drop its FIXED disc.
         this._probeDiscBurst(this._probeContact, axis, feed);   // (A) a FIXED disc at the contact — do NOT move it after
     }
 
@@ -1684,15 +1696,18 @@ export class GcodeViz3D {
     // axes at the MEAN of the contacts (so it sits AMONG the discs, not at one stale contact — the offset fix). Also
     // re-centers every live disc on this datum (each disc keeps its plane but slides to the crossing). Cleared next loop.
     _updateDatum() {
-        const THREE = this.THREE, ax = this._probeAxes || {}, v = this._probeVals || { x: 0, y: 0, z: 0 }, cs = this._probeContacts || [];
+        const THREE = this.THREE, cs = this._probeContacts || [], dw = this._datumWrite || {};
         const pt = this._probeGizmo, line = this._probeLine;
         if (!THREE || !pt) return;
-        const probed = ['x', 'y', 'z'].filter((a) => ax[a]);
         const mean = (a) => (cs.length ? cs.reduce((s, c) => s + (c[a] || 0), 0) / cs.length : 0);
-        const d = { x: ax.x ? v.x : mean('x'), y: ax.y ? v.y : mean('y'), z: ax.z ? v.z : mean('z') };
+        // The WCS DATUM is driven SOLELY by the WCS-WRITE event (the middle calculus centre #53/#56) — NEVER the probe-contact
+        // walls. A WRITTEN axis sits at its centre; an un-written axis (e.g. Z on an XY probe) at the contacts' mean (the probe
+        // plane). So the datum appears ONLY once the WCS is written (≥2 axes), AT the centre — no flicker through the walls.
+        const written = ['x', 'y', 'z'].filter((a) => dw[a] != null);
+        const d = { x: dw.x != null ? dw.x : mean('x'), y: dw.y != null ? dw.y : mean('y'), z: dw.z != null ? dw.z : mean('z') };
         if (line) line.visible = false;   // AXIS LINE REMOVED (user) — only the DATUM point + the discs remain; the line never shows
         pt.visible = false;
-        if (probed.length >= 2) { pt.position.set(d.x, d.y, d.z); pt.visible = true; }
+        if (written.length >= 2) { pt.position.set(d.x, d.y, d.z); pt.visible = true; }   // shows ONCE the WCS is written → at the centre
         this.render();
     }
 

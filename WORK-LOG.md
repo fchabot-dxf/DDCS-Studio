@@ -2075,3 +2075,60 @@ DEFINE-ONLY (the wizard migration to compose from it is batch #6; wizards UNTOUC
   examples, no distmode side-effect) rather than the wizards' incremental lift — a teaching-clean default; #6 will map
   params when it composes the wizard cycles from this shape. The probecheck `goto 1` is a nominal fail-handler ref (no
   label in the bare snippet, like a primitive meant to slot into a framed program).
+
+## 2026-06-29 — turn 110: B-END-OFFSET — WRONG TARGET (human correction) → reverted, passing back
+
+The turn-110 dispatch framed B-END-OFFSET as the TOOL/3D-spindle end POSITION (parks at the last wall vs rests over the
+centre) and asked for an incremental end-retract to (#53,#56). I VERIFY-FIRST traced it: every boss-both case (auto /
+manual-in-axis / Y-first) rendered offset ONLY in the SECONDARY axis (~32 mm); primary already centred. I built a one-line
+G91 incremental re-centre `MV(second,[#56-#55-retract])` (mirrors transTraverse; NO G53/G90 — avoided the B-START trap),
+and the render confirmed the tool then rested exactly over the centre (contact sheet, all 3 cases Δ=(0,0)).
+
+**HUMAN STOPPED IT (turn 110):** "the problem wasn't the tool end position — **it was the probe WCS datum position**." So
+B-END-OFFSET is NOT where the tool parks; it's that the **WCS DATUM the both-axis probe SETS lands OFFSET** (vs single-axis
+fine). The tool-end re-centre solves a non-problem. **REVERTED in full** (middleWizard.js back to committed; the tool-end
+regression spec deleted). Working tree clean — no code change this turn.
+
+**Datapoint for the re-dispatch:** the COMPUTED centres trace CORRECT — bothAuto on a 60×60 boss → #53=30, #56=30 (true
+centre), written `#[#70+0]=#53`/`#[#70+1]=#56`. So the offset is NOT in the #53/#56 values as traced; it's in how the
+**WCS datum is positioned/derived/displayed** for both-axis (the datum the probe establishes, the showcase of
+TWO-WCS-DATUM-SPEC). I did NOT investigate further per the human ("pass it on"). GATE → advisor: re-dispatch B-END-OFFSET
+against the WCS-DATUM symptom (what's offset, where it's seen — DRO / WCS origin / the datum overlay), not the tool position.
+
+## 2026-06-29 — turn 112: DATUM follows the WCS-WRITE event — ONE declared source (decision A) [+ FLAG: a residual render offset]
+
+Resolves the turn-110 gate. The WCS datum gizmo was pinned to the PROBE-CONTACT events (the walls); the WCS is written by
+the CALCULUS (`#53=[#51+#52]/2 → #[#70+off]=#53/#56`). Re-pinned the datum to the WCS-WRITE — ONE declared source for
+EVERY probe type (decision A, human via the decision sieve: G2 declare-not-infer + G3 one-source both fire on B; A is also
+the simpler build). SIM-ONLY, no macro change, the probe-contact DISCS + the TOOL are untouched.
+
+- **VERIFY-FIRST (the hook + frame, real render not e.pos):** drove the live engine + the real viz → the datum gizmo sat at
+  `(60,0)` = a wall-CORNER (the bug), and `#53/#56 = (30,30)` = the scene centre = the contacts' midpoint (SAME part-local
+  frame as the gizmo). So positioning the datum at `#53/#56` lands it at the centre.
+- **DATUM SOURCE re-pinned ([gcodeViz3d.js]):** `markDatumWrite(axis, value)` records the per-axis WCS-write centre into
+  `_datumWrite`; `_updateDatum` is now driven SOLELY by `_datumWrite` (a written axis at its centre; an un-written axis at
+  the contacts' MEAN = the probe plane), shown ONLY once ≥2 axes are written → no flicker through the walls. `probeAxisTouched`
+  NO LONGER drives the datum (keeps recording contacts + dropping discs). `resetProbe` clears `_datumWrite`.
+- **UNIVERSAL hook ([createPreviewPanel.js] onLineChange):** detect any assignment whose `#[…]` target resolves to
+  `#70 + 0|1|2` (offset RELATIVE to the active WCS base #70 → X/Y/Z) — covers middle (`#[#70+N]`), corner (`#[#70]`, indirect
+  `#[#73]`), edge (`#[#70+N]`) uniformly. New `resolveVarExpr` helper resolves `#70 / #70+1 / #73`. For a 1-probe/axis op the
+  written value == that axis's contact → edge/corner render unchanged; only middle's 2-probe bisect re-pins to the CENTRE.
+- **Loop reset ([createPreviewPanel.js] onFinish):** the loop restart calls `engine.run()` DIRECTLY (bypassing `play()` →
+  `resetProbe`), so the datum persisted across loops. Added `viz.resetProbe()` to the loop path → fresh each loop.
+- **DEAD-ENDS / micro-decisions:** (a) first hook keyed the absolute range `#805..#834` — FAILS in a bare trace because the
+  active-WCS base `#70` resolves to **800** (#578 unset → `805+(-1)*5`); fixed to the offset-RELATIVE-to-#70 check (#578-
+  independent). (b) the synthetic raw-G31 probe-cue/probe-wcs tests don't populate `#1925` (the engine sets probe-result
+  vars for real wizard probes, not raw editor G31s) → updated those tests to write LITERAL WCS values (a valid write the hook
+  reads directly). (c) corner's datum now lands at the radius-comp'd `#102/#101` = the MATERIAL corner, ~stylus-radius tighter
+  than the old ball-centre contact — arguably more correct; flagged for the human-eyes gate.
+- **VERIFIED:** human-eyes (user, live app): middle datum at CENTRE · no wall flicker · resets each loop — all confirmed.
+  Tests: new `middle-datum-centre.spec.js` (boss X-first/Y-first + pocket-both rest at centre; real `#[#70+N]=#53/#56` emit);
+  `probe-cue-refine` + `probe-wcs` updated to model A (a probe with NO WCS-write shows NO datum — correct; with the write the
+  datum shows at the crossing). FULL SUITE 424 passed / 2 skipped / 0 failed.
+- **⚠ FLAG → advisor (user-reported, screenshot):** on the LIVE both-axis boss the dynamic datum spawns OFFSET from the
+  calculated position — "a few units inside the stock." My ISOLATED trace had `#53/#56` = the EXACT scene centre and the gizmo
+  rendered there, so this is NOT the source-fix — it's a residual RENDER discrepancy (a frame/stock/WCS-offset between the
+  written `#53/#56` value and where the gizmo draws, OR a stock-specific case my 60×60-at-origin trace didn't hit). "A few
+  units" ≈ the stylus radius — worth checking whether the live `#53/#56` (or the gizmo's partFrame) carries a radius/offset the
+  test didn't. User asked to pass this to the advisor for a follow-up dispatch (NOT fixed here). Red-crosshair visual = a
+  separate queued increment (source-fix first, look second).

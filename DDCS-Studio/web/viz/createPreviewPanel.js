@@ -98,6 +98,17 @@ export function classifyCall(raw) {
     return null;
 }
 
+// Resolve a SIMPLE indirect-address expression — `#70`, `#70+1`, `#73` — to a number, using the engine var store. Used to
+// detect a WCS-offset write: an assignment whose `#[…]` target lands in the WCS table #805..#834 is the datum source.
+// Only handles `#N` / `#N±M` (every wizard's WCS-target form); anything else → NaN (ignored). Exported for unit tests.
+export function resolveVarExpr(expr, vars) {
+    if (!vars) return NaN;
+    const e = String(expr).replace(/#(\d+)/g, (_, n) => { const v = vars.get(+n); return Number.isFinite(v) ? String(v) : 'NaN'; });
+    const m = /^\s*(-?\d+(?:\.\d+)?)\s*(?:([+-])\s*(\d+(?:\.\d+)?))?\s*$/.exec(e);
+    if (!m) return NaN;
+    return m[2] ? (m[2] === '+' ? +m[1] + +m[3] : +m[1] - +m[3]) : +m[1];
+}
+
 // SLICE 3: the axis a G31 PROBE move targets (the first axis word carrying a value), or null if the line isn't a G31.
 // Exported for unit tests. The per-axis probe-WCS is built one G31 at a time, so we only need which axis each touches.
 export function probeAxis(raw) {
@@ -262,6 +273,23 @@ export function createPreviewPanel(container, opts = {}) {
                     if (kind === 'wcs') { setDroWcs(raw); flashDro(); }   // DRO: update the active-WCS label + flash the Work column (re-zero cue)
                 }
                 if (raw) { const pa = probeAxis(raw); if (pa) pendingProbe = pa; }   // a G31 → resolve on the next line
+                // DATUM = the WCS-WRITE event — ONE declared source for EVERY probe type (declare, never infer). Detect any
+                // assignment whose TARGET resolves into the controller's WCS-offset table #805..#834 (the canonical datum
+                // store); offset%5 → axis (0 X, 1 Y, 2 Z). Covers middle (`#[#70+N]=#53`), corner (`#[#70]=`, indirect
+                // `#[#73]=`), edge — uniformly. For a 1-probe/axis op the written value == that axis's contact, so edge/corner
+                // render unchanged; only middle's 2-probe bisect (#53/#56) re-pins to the CENTRE (the bug). SIM-ONLY, no macro
+                // write — the value is already computed (read from the engine vars). The probe-contact DISCS stay (separate).
+                if (engine.vars && viz && viz.markDatumWrite) {
+                    const asg = raw && /^\s*#\[([^\]]+)\]\s*=\s*(#\d+|-?\d+(?:\.\d+)?)/.exec(raw);
+                    const base = engine.vars.get(70);   // the active WCS base address (#70 — every wizard sets it before writing)
+                    if (asg && Number.isFinite(base)) {
+                        const off = resolveVarExpr(asg[1], engine.vars) - base;   // target RELATIVE to #70 → 0 X, 1 Y, 2 Z (3/4 = A/B, ignored)
+                        if (off === 0 || off === 1 || off === 2) {                // robust to #578/#70's absolute value (only the offset matters)
+                            const val = asg[2][0] === '#' ? engine.vars.get(+asg[2].slice(1)) : +asg[2];
+                            if (Number.isFinite(val)) viz.markDatumWrite(['x', 'y', 'z'][off], val);
+                        }
+                    }
+                }
             },
             onPositionChange: (pos) => { if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock)
             onStatus: ({ message }) => setStatus(message),
@@ -271,7 +299,7 @@ export function createPreviewPanel(container, opts = {}) {
                 pendingProbe = null;
                 updateRunBtn();
                 if (typeof opts.onLine === 'function') opts.onLine(null);
-                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; engine.run(lastRunCode); updateRunBtn(); }, 800); }
+                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); engine.run(lastRunCode); updateRunBtn(); }, 800); }   // fresh probe overlay each loop (datum re-derives from the WCS-write — doesn't persist from the prior pass)
             },
         });
         return engine;

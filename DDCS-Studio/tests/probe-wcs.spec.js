@@ -55,16 +55,17 @@ test('1-axis probe → no persistent datum/line yet (one plane, nothing crosses)
 });
 
 test('2-axis probe → the DATUM (gold) shows; the axis line is REMOVED (user)', async ({ page }) => {
-  await setup(page, 'G54\nM3 S12000\nG31 Z-15 F3000\nG31 X-25 F3000\nM30');
+  // DATUM follows the WCS-WRITE (turn 112): probe Z & X and WRITE the WCS Z/X (#[#70+2]/#[#70+0]) → the datum shows.
+  await setup(page, 'G54\nM3 S12000\n#70=805\nG31 Z-15 F3000\n#[#70+2]=-15\nG31 X-25 F3000\n#[#70+0]=-25\nM30');
   const s = await runShape(page);
-  expect(s.datum.vis, 'the datum shows where the planes cross').toBe(true);
+  expect(s.datum.vis, 'the datum shows once two WCS axes are written').toBe(true);
   expect(s.datum.color).toBe(0xffce3a);
   expect(s.line.vis, 'the axis line was removed — it never shows now').toBe(false);
 });
 
 test('3-axis probe → the DATUM point (no line — three planes cross at a point)', async ({ page }) => {
-  await setup(page, 'G54\nM3 S12000\nG31 Z-15 F3000\nG31 X-25 F3000\nG31 Y-20 F3000\nM30');
+  await setup(page, 'G54\nM3 S12000\n#70=805\nG31 Z-15 F3000\n#[#70+2]=-15\nG31 X-25 F3000\n#[#70+0]=-25\nG31 Y-20 F3000\n#[#70+1]=-20\nM30');
   const s = await runShape(page);
-  expect(s.datum.vis, 'three planes → a datum point').toBe(true);
+  expect(s.datum.vis, 'three written WCS axes → a datum point').toBe(true);
   expect(s.line.vis, 'no line at 3 axes (it collapsed to the point)').toBe(false);
 });
