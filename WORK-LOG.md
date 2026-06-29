@@ -1531,3 +1531,30 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   (form→canvas), and a pointer-DRAG of the handle above centre sets axis=Y/dir=pos (canvas→form). **Full suite 401 green, zero
   failures.** **⚠ HUMAN-eyes:** open Edge → drag the arrow updates axis/dir/dist live; type a field → the arrow moves.
   **The seam is proven; the rest of the initiative is handle declarations on top.** (Anchor = stock centre for now — refinable.)
+
+## 2026-06-28 — turn 76: SIM-SIDE DECLARE-NOT-INFER, increment 1 — shared inferStarts REGISTRY (opSimStarts)
+
+- **The one sim-side leak:** the viz + engine pass-tracking already read DECLARED values; the only ad-hoc inference was the
+  wizard→engine junction where each wizard's `inferStarts(params, stock)` computed per-pass start markers with no shared home.
+- **VERIFY-FIRST (traced):** multi-pass `inferStarts` lives in **middle / alignment / rotary_center** (the single-pass
+  wizards only have `inferStart` → not the leak). All three are SELF-CONTAINED pure fns (params + stock + `num` + math, no
+  instance state) → a CLEAN move. Consumed: views call `wizard.inferStarts` → `ctx.preview3D` → `host.__startHints`
+  ([wizardManager.js:489](DDCS-Studio/web/wizardManager.js#L489)) → `getStartHints` → createPreviewPanel's passStarts.
+  **`def.sim` declares preview INTENT (rotary rig / machine / magazine), NOT starts** — so the custom-op declared-starts
+  wiring is non-trivial → the dispatch's ELSE path (shape the seam, note the follow-up). NOT a gate (clean move).
+- **BUILD — [viz/opSimStarts.js](DDCS-Studio/web/viz/opSimStarts.js), mirroring opSimContext (federated registry):**
+  - **BUILT_IN layer** `{ middle, alignment, rotary_center }` — the three `inferStarts` MOVED VERBATIM (behaviour-preserving).
+  - **USER_* layer** `setUserSimStarts(opType, provider)` + a `USER_STARTS` Map — the wizard-maker seam: a custom op
+    DECLARES its per-pass starts (a `(params,stock)→[{x,y,z}]` provider), never inferred from motion (same as
+    setUserSimIntent). `opSimStarts(opType, params, stock)` = custom declared → built-in → null (caller falls back to one start).
+  - The 3 wizards' `inferStarts` now **delegate** (`return opSimStarts('middle', params, stock)`) — consumers unchanged.
+- **Custom-op def.sim wiring = FOLLOW-UP (noted):** `def.sim` carries the intent flags only; a declared sim-starts spec
+  (e.g. `def.sim.starts`) + the userOps `setUserSimStarts` call from it is increment-2-ish. The seam is shaped + testable
+  NOW (a custom op can register a provider fn); the spec→provider translation is the deferred leg.
+- **VERIFIED (new `op-sim-starts-registry.spec.js`):** equivalence — the registry === each wizard's `inferStarts` for 6
+  representative param sets + the pass COUNTS (boss-both auto 2 / manual 4 / pocket 1 / alignment 2 / rotary known 1 / fit 3)
+  + concrete values locked; the USER_* layer (register → drives starts, clear → null, built-ins unaffected). **Preview
+  markers byte-identical** (verbatim move; per-pass-starts-2d + per-pass-live-anchor + boss-probe-collision green). **Full
+  suite 401 green** + the 1 known flake (project-drawer-smoke, passes isolated). **SCOPE = increment 1 only** (not
+  passStarts-unify / jog-IR / drag-expiry — 2-4). **⚠ HUMAN-eyes:** multi-pass probe previews (boss-both, alignment, rotary
+  fit) show the same ①②③④ markers as before.

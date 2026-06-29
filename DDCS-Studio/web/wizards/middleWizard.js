@@ -12,6 +12,7 @@ import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { travelOwn, travelOpp } from './probeBlocks.js';
+import { opSimStarts } from '../viz/opSimStarts.js';
 
 const AX = {
     X: { stop: '#1905', limit: '#1915', status: '#1920', result: '#1925', off: 0 },
@@ -195,29 +196,9 @@ export class MiddleWizard {
      *   boss single-axis  → manual: 2 (wall1, wall2); auto: 1 (traverses over hands-free).
      *   boss two-axis     → manual: 4 (X w1/w2, Y w1/w2); auto: 2 (one per axis, with the between-axes reposition).
      */
-    inferStarts(params, stock) {
-        const n = (v, d) => num(v, d);
-        const sx = n(stock && stock.x, 100), sy = n(stock && stock.y, 80), sz = n(stock && stock.z, 20);
-        const cx = sx / 2, cy = sy / 2, probeZ = -Math.min(5, sz * 0.5);
-        const centre = { x: cx, y: cy, z: probeZ };
-        const boss = (params.featureType || 'pocket') === 'boss';
-        const twoAxis = !!params.twoAxis || !!params.findBoth;
-        const inAxisManual = (params.inAxis || params.approach) === 'manual';   // INC3: the IN-axis toggle drives the per-axis pass count (manual → each wall is its own pass)
-        const axis = (params.axis || 'X') === 'Y' ? 'Y' : 'X';
-        const second = axis === 'X' ? 'Y' : 'X';
-        const dir1Plus = (params.dir1 || 'pos') === 'pos';
-        const dir2Plus = (typeof params.dir2 === 'string' ? params.dir2 : (dir1Plus ? 'neg' : 'pos')) === 'pos';
-        const outset = Math.max(6, Math.min(n(params.dist, 20) * 0.6, 15));
-        const outside = (ax, plus) => ax === 'X'
-            ? { x: plus ? -outset : sx + outset, y: cy, z: probeZ }
-            : { x: cx, y: plus ? -outset : sy + outset, z: probeZ };
-
-        if (!boss) return [centre];                                  // pocket: always one pass, from the centre
-        const prim = inAxisManual ? [outside(axis, dir1Plus), outside(axis, !dir1Plus)] : [outside(axis, dir1Plus)];
-        if (!twoAxis) return prim;                                   // single-axis: in-axis manual → 2 walls, auto → 1
-        const sec = inAxisManual ? [outside(second, dir2Plus), outside(second, !dir2Plus)] : [outside(second, dir2Plus)];
-        return [...prim, ...sec];                                    // the trans pass (auto or manual) always adds the secondary marker(s)
-    }
+    // Per-pass preview starts → the shared sim-start registry (viz/opSimStarts.js, BUILT_IN.middle). Moved verbatim; one
+    // home for the per-pass inference + the wizard-maker seam (declare, never infer).
+    inferStarts(params, stock) { return opSimStarts('middle', params, stock); }
 
     /** Preview/sim start hint = the first pass's start. */
     inferStart(params, stock) {
