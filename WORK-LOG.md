@@ -1966,3 +1966,42 @@ HEAD = `cbdc44d`). No G53/G90 introduced (would re-break B-START — [[g53-move-
   `panel.getStartPos()` + `viz._stock`, `viz.setView('top')`, then step a fresh engine over the REAL viz. The
   before/after now matches the app (top-down: the probe circle visibly jumps off the boss to ① on the 4 FLASH
   frames, then rides ② clean once fixed). Human confirmed.
+
+## 2026-06-29 — turn 104: MID-PROBE-Z-FIRST — GATE (the Z→XY sim transition collides with the deferred centre-move)
+
+VERIFY-FIRST (precedent + target fully traced; the mechanical wiring is unambiguous, ONE design fork blocks a faithful build).
+
+**READY-TO-BUILD, no ambiguity** (mapped end-to-end against the corner):
+- EMIT: `params.probeZ`; a Z-surface two-pass block BEFORE `seq(axis,dir1Plus,51)` ([middleWizard.js:150]) — `PR('Z','#7','#3');
+  CK('Z',1); MV('Z','#10'); PR('Z','#7','#4'); CK('Z',1);` then write Z0 in middle's convention `A('#[#70+2]','#1927')`
+  (#1927 = the Z trigger result, off=2), retract. Confirm prompt branch OVER-vs-current ([:148]). Byte-identical when OFF.
+- FORM: `m_probe_z_first` checkbox (index.html, near m_circular) + middleView reader + inputIds + app.js viz-listener (:216) + checkboxIds (:308).
+- BLOCKLY round-trip: `middle_op` PROBEZ field (bridge.js block def :251 + message) + stackBridge toRecord (:46) + toNode (:163).
+- SCHEMA: `probeZ: Bool()` (opSchema middle :90) + field-map `probeZ:'m_probe_z_first'` (:153).
+
+**THE FORK (why I'm gating, not picking):** the live sim anchors EACH PASS to ONE per-pass start and then FOLLOWS the macro's
+INCREMENTAL moves within that pass (that's how the corner's Z-then-XY works — its macro escapes laterally + plunges, and the
+sim tool follows). For MIDDLE the Z-probe start and the first XY-probe start are PHYSICALLY INCOMPATIBLE in one pass:
+- **BOSS (the showcase):** Z datum needs the tool OVER the stock top (e.g. centre); the first XY probe needs it OUTSIDE the
+  boss wall, OFF the footprint. Z-down from the XY start MISSES (no material below); X-probe from the Z start is INSIDE solid
+  material (invalid). They can't share pass-0's start — so a clean Z-first sim needs the Z probe as its OWN pass with a
+  reposition to the first wall.
+- **That reposition geometry IS the "shared centre-move precursor"** the TWO-WCS spec (substrate §) + the batch list (item 4)
+  explicitly DEFER. So the dispatch ("copy the corner, Z block before seq, retract THEN XY") and the deferral are in tension:
+  a faithful Z-first *render* (VERIFY #3, the human-eyes gate) needs the very centre-move that's parked for later.
+
+**OPTIONS:**
+- **A — minimal "shared pass-0 start" (dispatch-literal):** Z block + Z0, opSimStarts sets starts[0] OVER the stock. EMIT is
+  correct + byte-identical-OFF, but the BOSS sim breaks (Z start ≠ XY start in one pass) → VERIFY #3 (render) FAILS. Rejected.
+- **B — pull a minimal Z→XY reposition into THIS task:** after the Z probe emit a hands-free `REPOSITION:` (lift + the existing
+  retract) so the Z probe is pass 0 (start OVER the stock) and the XY becomes pass 1+ (its existing correct starts). opSimStarts
+  PREPENDS a Z-over-stock start when probeZ; XY pass count +1. Sim shows a distinct Z pass (descend → datum) → reposition → XY.
+  Byte-identical-OFF preserved. COST: deviates from the corner's auto-move (adds a pass boundary; the PHYSICAL auto centre-move
+  stays deferred to item 4 — for now the reposition is a marker/operator-jog, like middle's manual idiom).
+- **C — resequence:** do the centre-move precursor (item 4's substrate) FIRST, then Z-first lands trivially on top. Honors the
+  spec's stated ordering but reorders the human-approved batch.
+
+**RECOMMENDATION: B** — it delivers a faithful Z-first render NOW (the human-eyes gate), keeps OFF byte-identical, and defers
+only the AUTO physical centre-move (item 4), matching the spec's "Z→X→Y convergence, datum as a sim overlay". Need the
+advisor's call on B (+ is an interim operator-jog between Z and XY acceptable, or must it be hands-free now → then C).
+NOT building until blessed (don't push past the gate). Everything in READY-TO-BUILD lands the moment B/C is chosen.
