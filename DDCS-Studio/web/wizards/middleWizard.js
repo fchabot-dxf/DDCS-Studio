@@ -162,15 +162,9 @@ export function middleStack(params = {}) {
         // #53 = centre of the PRIMARY axis, #56 = centre of the SECONDARY — write each to ITS axis's WCS offset
         // (not hardcoded X=0/Y=1, which swapped them when the primary axis was Y).
         A(`#[#70+${AX[axis].off}]`, '#53'); A(`#[#70+${AX[second].off}]`, '#56');
-        // CLEAN END RETRACT: park back OVER the feature centre. The probes leave the tool OFFSET at the last wall (the net
-        // incremental XY drift), so without this it ends Z-lifted but beside the feature — and the 3D spindle (which follows
-        // the engine) rests there too. Return to the MEASURED centre (#53/#56, machine frame — WCS-independent, the same
-        // re-centre the circular path uses); Z is already at safe (#17) above, so crossing back is clear.
-        MM(axis, '#53'); MM(second, '#56');
     } else {
         MV('Z', '#17');
         A(`#[#70+${AX[axis].off}]`, '#53');
-        MM(axis, '#53');   // single-axis: same end-offset fix — centre the PROBED axis back over the feature (Z already safe)
     }
     if (circular) {
         // Round feature: the opposite-touch span IS the diameter. #58 = primary-axis Ø; with 2-axis, #59 = the
