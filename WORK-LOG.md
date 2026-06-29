@@ -1614,3 +1614,26 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   offset-from-hint, not absolute XY) — genuinely inc-4 work. **Lean: ship ABSOLUTE; add TRACK-STOCK in inc 4 only if the
   human finds absolute-after-stock-change confusing.** Not baked in either way — the decision is yours. **⚠ HUMAN-eyes:**
   open Middle boss-both → drag ② on the feature canvas → that probe pass begins there + the 3D/2D markers follow.
+
+## 2026-06-28 — turn 82: TIE the trans-axial diagonal to the dragged ② (GUI drives the macro)
+
+- **The culmination of the boss-both thread.** The ②-aim handle (turn 80) drove the SIM (`userStarts[1]`). Now it ALSO
+  drives the G-code: drag ② → derive `#21`/`diagTravel` so the auto trans-axial diagonal ENDS on ②. **ONE handle, BOTH
+  outputs** — and the divergence is closed BY CONSTRUCTION (there's no free `#21` to drift from ②: `#21` = the distance to ②).
+- **VERIFY-FIRST (traced):** the auto trans-axial is `X[#53-#52-rv] Y#21` — re-centre the PRIMARY axis to the measured centre,
+  then go OUT by `#21` on the SECONDARY axis toward ②. So **`#21` IS the centre→② out-distance on the secondary axis**. ②
+  (the trans-axial target) = the first SECONDARY start (auto in-axis → passStarts[1]; manual in-axis → [2]). The inferred
+  preview centre = `(stockX/2, stockY/2)`. **Confirmed empirically:** `#21 = |②_secondary − centre_secondary|` → the diagonal's
+  secondary endpoint lands EXACTLY on ②'s secondary (dir2=neg 95→95, dir2=pos −15→−15; the `travelOpp` sign handles direction).
+- **BUILD ([middleView.js](DDCS-Studio/web/wizards/views/middleView.js) `tieDiagTravel`):** when the SECONDARY-axis start ②
+  is dragged (gated: boss + findBoth + transAxis auto + pass===the secondary start), compute `#21 = |dragged②_secondary −
+  centre_secondary|` and write the `m_diag_travel` field (dispatch `input` → re-generate the macro). Called in the canvas
+  onDrag right after `panel.onStartDrag` (the sim write). ② is the MASTER; the field FOLLOWS (drag-the-position-the-number-
+  follows). Form + Blockly round-trip intact (the field is still the one source — the drag just writes it, like a user typing).
+- **⚠ NOTED constraint:** the diagonal RE-CENTRES the primary axis (#53), so only the SECONDARY out-distance ties — if ② is
+  dragged OFF-CENTRE in the PRIMARY axis, that coord can't be honoured by the re-centred primary leg (the diagonal still ends
+  on ②'s secondary line, at the centre primary). Expected (FIX-1 re-centres regardless).
+- **VERIFIED (real symptom, new `middle-aim-tie.spec.js`):** real pointer-DRAG ② further out → `m_diag_travel` GROWS to the
+  derived `|②.y − centre.y|`, and a re-trace with the post-drag macro shows the trans-axial diagonal ENDS on ②.y (< 2 mm, not
+  near it). **Full suite 404 green** + 2 known parallel flakes (custom-op-chip, project-drawer-smoke — pass isolated).
+  **SCOPE = the ②→#21 tie only** (no track-stock, no other handles). **⚠ HUMAN-eyes:** drag ② → the diagonal aims where you dropped it.

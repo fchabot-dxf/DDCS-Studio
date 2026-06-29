@@ -8,9 +8,29 @@ const wizard = new MiddleWizard();
 const layout = new FeatureCanvas();
 const num = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
 
+/** TIE ② → the trans-axial diagonal: drag-the-position, the-number-follows. The auto trans-axial is `X[#53-#52-rv] Y#21`
+ *  (re-centre the primary to the measured centre, then go OUT by #21=diagTravel on the SECONDARY axis toward ②). So #21 IS
+ *  the centre→② out-distance. When the SECONDARY-axis start ② (the diagonal's target) is dragged, derive #21 from ②'s
+ *  out-distance from the inferred centre and write the diagTravel field — so the diagonal ENDS on ②, and #21 can no longer
+ *  drift from ② (② is the master). NOTE: the diagonal re-centres the PRIMARY axis, so only the SECONDARY out-distance ties —
+ *  if ② is dragged off-centre in the primary axis, that coord can't be honoured by the re-centred primary leg. */
+function tieDiagTravel(pass, world) {
+    if (el('m_type')?.value !== 'boss' || !el('m_both')?.checked || el('m_transaxis')?.value !== 'auto') return;   // diagonal not emitted
+    const secStart = (el('m_inaxis')?.value === 'manual') ? 2 : 1;   // the first secondary-axis start = the trans-axial target
+    if (pass !== secStart) return;
+    const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
+    const primaryX = (el('m_axis')?.value || 'X') !== 'Y';           // primary X → secondary Y (and vice-versa)
+    const centreSec = primaryX ? num(stock.y, 80) / 2 : num(stock.x, 100) / 2;
+    const draggedSec = primaryX ? world.y : world.x;
+    const d21 = Math.max(1, Math.round(Math.abs(draggedSec - centreSec)));
+    const f = el('m_diag_travel');
+    if (f && f.value !== String(d21)) { f.value = String(d21); f.dispatchEvent(new Event('input', { bubbles: true })); }   // the field follows ② → re-generate the macro
+}
+
 /** The ②-AIM feature-canvas spec: the per-pass start markers ①②③④ as DRAGGABLE POINT handles. Unlike Edge's vector (which
  *  wrote FORM fields), a drag here writes the SIM-ONLY DECLARED value via panel.onStartDrag → userStarts[p] → the same seam
- *  the 2D/3D markers use (computePassStarts → the trace AND the engine). So dragging ② makes that probe pass BEGIN there. */
+ *  the 2D/3D markers use (computePassStarts → the trace AND the engine). So dragging ② makes that probe pass BEGIN there.
+ *  PLUS ② also drives the macro's #21 (tieDiagTravel) so the auto trans-axial diagonal ends ON ② — ONE handle, BOTH outputs. */
 function renderStartCanvas(panel, stock) {
     const container = el('middleLayoutCanvas');
     if (!container || !panel || typeof panel.getPassStarts !== 'function') return;
@@ -25,7 +45,8 @@ function renderStartCanvas(panel, stock) {
         onDrag: (id, world) => {
             const p = parseInt(String(id).split(':')[1], 10) || 0;
             const z = (starts[p] && starts[p].z) || 0;
-            panel.onStartDrag({ x: world.x, y: world.y, z }, p);
+            panel.onStartDrag({ x: world.x, y: world.y, z }, p);   // ① SIM: userStarts[p] (the pass begins here)
+            tieDiagTravel(p, world);                                // ② G-CODE: ② also drives #21 → the diagonal ends ON ②
             renderStartCanvas(panel, (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {});
         },
     };
