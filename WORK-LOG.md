@@ -2132,3 +2132,36 @@ the simpler build). SIM-ONLY, no macro change, the probe-contact DISCS + the TOO
   units" ≈ the stylus radius — worth checking whether the live `#53/#56` (or the gizmo's partFrame) carries a radius/offset the
   test didn't. User asked to pass this to the advisor for a follow-up dispatch (NOT fixed here). Red-crosshair visual = a
   separate queued increment (source-fix first, look second).
+
+## 2026-06-29 — turn 114: PROBE TIP-COMP inc1 — CONFIRMED + fix works for corner/edge, but GATE (Z-surface + diameter macros don't comp)
+
+- **CONFIRMED the centre-collision (instrument):** the sim point-collides the tool-CENTRE ray vs the stock box — middle's
+  walls register at exactly `#51=0 / #52=60` (the faces, no tip geometry). So the tool centre stops ON the wall and the tip
+  ball buries a radius. ROOT of the t113 offset: the corner/edge macros radius-comp (`#50=[#1925±#6]`, "edge = trigger ±
+  stylus radius") assuming `#1925` = the tool centre a radius FROM the wall (real machine); but the sim's `#1925` = the wall
+  itself → the comp DOUBLE-shifts → datum a radius off. MIDDLE has NO comp (`#53` = bisect) → radius cancels → unchanged.
+- **BUILT + VERIFIED the fix (numerically):** `stockProbeStop(A,B,stock,rotaryAxis,tipR=0)` grows the outer box / shrinks the
+  pocket cavity / grows the cylinder OD by the tip radius → the tool CENTRE stops a radius short (the tip touches the surface).
+  Engine + viz `_rebuild` pass `settings.probes.radius` (the DECLARED tip radius, default 2.0). Result: EDGE `#50` went
+  `2` (a radius INSIDE the stock — exactly the human's symptom) → `0` (ON the wall, recovered by the macro comp); MIDDLE `#53`
+  stayed `30` (bisect cancels — regression guard holds). So the tip radius is correct and fixes the dispatch's symptom.
+- **⚠ GATE (the dispatch's "if a macro comp is needed, STOP" condition fires — for OTHER probes):** the tip radius is a
+  UNIFORM geometric change, so it also moves every UN-comp'd surface measurement. The point-collision was MASKING latent
+  radius-comp gaps (off on a real machine too, just hidden by the no-tip sim):
+  - **DIAMETER spans (no comp):** circular `#58/#59 = ABS[#51-#52]` → off by 2r (middle-circular-sim fails).
+  - **Z-SURFACE probes (no comp):** rotary `#56 = [#50−#55]` (Zc = top − R) → off by r; middle Z-first `#57` (Z0) and
+    edge/corner Z likewise (rotary-center-sim ×2 fail). Bisects are fine (middle centre, rotary Yc `#54`).
+  - **Legitimate (not a gate):** probe-cavity-collision (25→23, 10→8) — the tool centre correctly stops a radius short.
+  - 5 tests fail; the diameter is IRREDUCIBLE (the same XY tip radius that fixes corner/edge also shifts the XY span).
+- **REPORT (the dispatch's 1-liner):** Studio rolls its OWN G31 corner/edge sequences with the comp BAKED INTO the emitted
+  macro (`#50=#1925±#6`) — so corner/edge are correct on the real machine + now in the sim. The Z-surface + diameter macros
+  do NOT comp → they need it (macro change). So the comp gap is REAL (real-machine), not sim-only, for those.
+- **ACTION:** per the dispatch ("don't build the macro comp this turn, gate it back") I **REVERTED** the tip-radius edits
+  (probeGeometry.js / GcodeExecutionEngine.js / gcodeViz3d.js) → suite back to green. The fix is trivial to re-apply (the
+  `tipR` param + the box-grow/cavity-shrink/cylinder-grow + passing `probes.radius` from the engine & viz). GATE OPTIONS:
+  - **(A) RECOMMEND** — pair the tip radius with radius-comp in the un-comp'd surface macros: circular diameter `#58/#59
+    ∓ 2r` (bore vs boss sign), Z-surface `#57`/`#56`/etc. `∓ r`; then the tip radius lands clean across ALL probes and the
+    sim matches a correctly-compensated real machine. (Several wizard macros — circular, rotary, middle Z-first, edge/corner Z.)
+  - **(B)** ship the tip radius for corner/edge XY only — NOT geometrically clean (the uniform collision can't spare the XY
+    diameter span); rejected.
+  - Need your call on scope (A is the real fix but spans several macros = a bigger increment than inc1's "sim collision only").
