@@ -1663,3 +1663,28 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   → a circle (override). **Full suite 406 green** + 3 known parallel flakes (custom-op-chip, blocks-live-form, project-drawer-
   smoke — 9 pass isolated). **SCOPE = DRAW the feature only** (not the full shared-stock-block design — Phase 2). **⚠ HUMAN-eyes:**
   select pocket → a cavity; boss → a boss; circular → a circle; a stock-settings override beats the default.
+
+## 2026-06-29 — turn 84 FOLLOW-UP (human redirect, mid-turn-86): the OP PRESELECTS the stock (3D + 2D), panel OVERRIDES
+
+- **Human feedback on the turn-84 feature-draw:** "the shape is controlled by the op type, but if i override it in stock,
+  the 2d canvas should also be changed" + "isnt it BOTH? op preselects the stock, for BOTH 3d and 2d gui canvas; then the
+  stock panel can override." My turn-84 heuristic ('boss' = the settings default → does NOT override) was wrong — an explicit
+  `stock.shape='boss'` should change the 2D, and the 3D already reads `stock.shape` directly.
+- **FIX (the one coherent behaviour, not a choice):** the STOCK shape is the ONE source — the 2D reads it (the SAME value the
+  3D reads, so they always match), and the op-type PRESELECTS it.
+  - [middleView.js](DDCS-Studio/web/wizards/views/middleView.js) `buildFeatureItems` now reads `stock.shape` directly
+    (pocket→cavity, cylinder→circle, else boss-block) — no op-type heuristic.
+  - `syncStockShape(featureType, circular)` — on an op-type/circular CHANGE only (tracked `_lastShapeKey`, so a panel override
+    isn't clobbered), declare `stock.shape` (pocket op → 'pocket', boss → 'boss', circular → 'cylinder'). In-memory on the
+    SAME `_ddcsSettings` object the 3D/sim read, so the current `update()` shows it (the 2D reads it; preview3D re-setStocks
+    the 3D — `setStock` rebuilds unconditionally). Plus a DEFERRED `queueMicrotask(saveSettings)` to persist + broadcast
+    (reload + the open stock dialog stay in sync) WITHOUT re-entering update() (saveSettings → ddcs:settings-changed →
+    wizardManager.update is synchronous; the microtask runs it AFTER this render). The panel override flows through the
+    settings-panel's own saveSettings → re-render → buildFeatureItems reads `stock.shape`.
+- **VERIFIED:** drive the wizard, switch m_type pocket→boss (the real dropdown 'change' event, no explicit update) → BOTH
+  `settings.stock.shape` AND `viz._stock.shape` become 'boss' (the 3D follows); the override survives (no op-change →
+  not re-preselected); no loop from the deferred saveSettings. Updated `middle-feature-draw.spec.js` (op preselects + panel
+  overrides). The middle-opening tests pass isolated (16). **(A '36 failed' full-suite run was DEV-SERVER OVERLOAD — 4.4 min
+  vs the usual ~2 — from repeated suite runs, not a regression.)** **⚠ HUMAN-eyes:** if the 3D looked stale, hard-reload — the
+  op→stock preselect + the 2D/3D both following are verified. **NOTE:** the advisor's turn-86 TRACK-STOCK (start-drag offset
+  model) is still PENDING — this was the human's mid-turn redirect.

@@ -31,24 +31,34 @@ function tieDiagTravel(pass, world) {
  *  wrote FORM fields), a drag here writes the SIM-ONLY DECLARED value via panel.onStartDrag → userStarts[p] → the same seam
  *  the 2D/3D markers use (computePassStarts → the trace AND the engine). So dragging ② makes that probe pass BEGIN there.
  *  PLUS ② also drives the macro's #21 (tieDiagTravel) so the auto trans-axial diagonal ends ON ② — ONE handle, BOTH outputs. */
-/** The FEATURE shape to DRAW in the canvas (so it shows WHAT'S being probed, not just the stock rect). The op TYPE
- *  (m_type + circular) DECLARES the default — a pocket cavity, a boss block, a circle; a user-set stock.shape OVERRIDES it
- *  (declare-default + autonomy-override). Sizes reuse the 3D preview's model (pocket cavity inset 0.25·min(x,y)); the
- *  feature size is approximate pre-probe (it's being measured) — a sensible centred default, refinable later. */
+/** The FEATURE shape to DRAW in the canvas (so it shows WHAT'S being probed, not just the stock rect). The STOCK shape is
+ *  the ONE source — the SAME value the 3D reads — so the 2D and 3D always match. The op-type PRESELECTS it (see syncStockShape
+ *  in update(): picking a pocket op declares a pocket stock), and the stock panel OVERRIDES it (declare-default +
+ *  autonomy-override). Sizes reuse the 3D model (pocket cavity inset 0.25·min(x,y)); the size is approximate pre-probe. */
 function buildFeatureItems(sw, sh, stock) {
     if (!(sw > 0 && sh > 0)) return [];
-    const mType = el('m_type')?.value === 'boss' ? 'boss' : 'pocket';
-    const circular = !!el('m_circular')?.checked;
-    const stockShape = stock && stock.shape;
-    // user-set stock.shape (pocket/cylinder — a deliberate non-default; 'boss' is the settings default) beats the op default
-    const shape = stockShape === 'pocket' ? 'pocket'
-        : stockShape === 'cylinder' ? 'circle'
-        : circular ? 'circle'
-        : mType;
-    const cls = (shape === 'boss' || (shape === 'circle' && mType === 'boss')) ? 'fc-feature-boss' : 'fc-feature-pocket';
-    if (shape === 'circle') return [{ kind: 'circle', cx: sw / 2, cy: sh / 2, r: Math.min(sw, sh) * 0.4, cls }];   // round bore / boss
-    if (shape === 'pocket') { const w = Math.max(8, Math.min(sw, sh) * 0.25); return [{ kind: 'rect', x: w, y: w, w: sw - 2 * w, h: sh - 2 * w, cls }]; }   // inner CAVITY
-    return [{ kind: 'rect', x: 0, y: 0, w: sw, h: sh, cls }];   // BOSS = the stock block (the probe approaches it from outside)
+    const shape = stock && stock.shape;
+    if (shape === 'cylinder') return [{ kind: 'circle', cx: sw / 2, cy: sh / 2, r: Math.min(sw, sh) * 0.4, cls: 'fc-feature-boss' }];   // round bar / boss
+    if (shape === 'pocket') { const w = Math.max(8, Math.min(sw, sh) * 0.25); return [{ kind: 'rect', x: w, y: w, w: sw - 2 * w, h: sh - 2 * w, cls: 'fc-feature-pocket' }]; }   // inner CAVITY
+    return [{ kind: 'rect', x: 0, y: 0, w: sw, h: sh, cls: 'fc-feature-boss' }];   // BOSS block (the probe approaches it from outside)
+}
+
+// The op-type PRESELECTS the stock shape (so a pocket op shows a pocket in BOTH the 2D canvas AND the 3D, which both read
+// stock.shape). Only on an op-type/circular CHANGE — never on every update — so a stock-panel OVERRIDE isn't clobbered. The
+// in-memory mutation is on the SAME _ddcsSettings object the 3D/sim read, and gets persisted on the next saveSettings; we
+// do NOT call saveSettings here (it would re-enter update() via the ddcs:settings-changed listener).
+let _lastShapeKey = null;
+function syncStockShape(featureType, circular) {
+    const key = (circular ? 'cyl' : '') + featureType;
+    if (key === _lastShapeKey) return;
+    _lastShapeKey = key;
+    const want = circular ? 'cylinder' : (featureType === 'boss' ? 'boss' : 'pocket');
+    const stk = window.ddcsGetSettings && window.ddcsGetSettings().stock;
+    if (!stk || stk.shape === want) return;
+    stk.shape = want;   // declare the stock for BOTH views (the 2D reads it; preview3D re-setStocks the 3D this render)
+    // Persist + broadcast (so a reload + the open stock dialog stay in sync), but DEFERRED — saveSettings re-enters
+    // update() via the ddcs:settings-changed listener, so run it AFTER this render completes (queueMicrotask), not inside it.
+    if (window.ddcsSaveSettings) queueMicrotask(() => window.ddcsSaveSettings());
 }
 
 function renderStartCanvas(panel, stock) {
@@ -165,6 +175,8 @@ export const middleView = {
 
         const gcode = wizard.generate(params);
         el('wiz_middle_code').innerHTML = UIUtils.formatGCode(gcode);
+        // The op-type PRESELECTS the stock shape (BEFORE the preview, so the 3D + 2D read the declared shape this render).
+        syncStockShape(params.featureType, !!el('m_circular')?.checked);
         // Infer the spindle start (pocket → centre; boss → outside the first side) so the preview begins right.
         const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
         ctx.preview3D(gcode, 'middleVizContainer', wizard.inferStart(params, stock), wizard.inferStarts(params, stock));
