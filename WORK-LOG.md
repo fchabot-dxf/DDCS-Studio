@@ -1584,3 +1584,33 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   the deferred `def.sim.starts` declarative path must be designed BLOCK-FRIENDLY — a sim-declaration block round-trips against
   the DECLARATION, not the macro (no emitted line to reverse-sync). **⚠ HUMAN-eyes:** edit the stock while a probe preview
   plays → the live tool's per-pass starts track the change.
+
+## 2026-06-28 — turn 80: PHASE 3 GUI — the ②-AIM handle (the first SIM-ONLY canvas handle)
+
+- **The prize the declared seam was built for.** The MIDDLE wizard now has a feature canvas (reusing Edge's pattern) that
+  renders the per-pass start markers ①②③④ as DRAGGABLE POINT handles. **The critical difference from Edge:** Edge's drag
+  wrote FORM fields (a G-code driver); the ②-aim writes the **SIM-ONLY DECLARED value** — NOT a form field.
+- **VERIFY-FIRST:** the existing `onStartDrag(pos, pass)` (createPreviewPanel) is THE seam — it writes `userStarts[p]`
+  (the user override that BEATS the inferStarts hint + persists), mirrors to the 3D marker, then `setGcode` + `replayFromStart`
+  (→ computePassStarts → the trace AND the engine, inc 1+2). The view reaches the panel via `ctx._activePanel` (the view's
+  `ctx` IS the wizardManager; `_activePanel` is set by `preview3D`). So the feature-canvas drag must call that SAME handler —
+  one source, every view (2D toolpath, 3D, feature canvas) edits the same `userStarts`.
+- **BUILD:**
+  - [createPreviewPanel.js](DDCS-Studio/web/viz/createPreviewPanel.js): extracted the 2D drag callback into a named
+    `onStartDrag(pos, pass)` and **exposed it** on the panel return + `getPassStarts()`.
+  - [index.html](DDCS-Studio/web/index.html): added `middleLayoutCanvas` (additive — the 2D toolpath view STAYS below).
+  - [middleView.js](DDCS-Studio/web/wizards/views/middleView.js): `renderStartCanvas(panel, stock)` — the start markers as
+    POINT handles (`kind:'move'`, label ①②③④); a drag → `panel.onStartDrag({x,y,z}, p)` (the declared seam) → redraw. Called
+    after `ctx.preview3D` (so `_activePanel` exists). NO buildCanvasWidgets (that maps to form fields) — the handles + onDrag
+    are built directly so the drag writes the sim-only start, not a field.
+- **VERIFIED (real symptom, new `middle-aim-canvas.spec.js`):** open Middle boss-both, real pointer-DRAG ② right on the
+  feature canvas → `engine._passStarts[1].x` FOLLOWS (the probe pass BEGINS where dragged, not just the canvas redrawing);
+  and it PERSISTS across a re-render (userStarts[1] locks). **Full suite 403 green** + 2 known parallel flakes
+  (custom-op-chip, probe-wcs — 9 pass isolated). **SCOPE = the middle start handles only, ADDITIVE.**
+- **▶ GATE (advisor's call, inc 4) — ABSOLUTE vs TRACK-STOCK:** built with **ABSOLUTE** (the current `userStarts` seam — a
+  dragged ② locks to its XY and persists). After a drag, if the STOCK changes, ② stays put (absolute). **Recommendation:**
+  keep ABSOLUTE now — predictable, simplest, "the user placed ② HERE." TRACK-STOCK (re-derive ② relative to the wall so a
+  stock change keeps it OUTSIDE the wall) is more robust for the probe semantics BUT needs a relative-anchor model (store the
+  offset-from-hint, not absolute XY) — genuinely inc-4 work. **Lean: ship ABSOLUTE; add TRACK-STOCK in inc 4 only if the
+  human finds absolute-after-stock-change confusing.** Not baked in either way — the decision is yours. **⚠ HUMAN-eyes:**
+  open Middle boss-both → drag ② on the feature canvas → that probe pass begins there + the 3D/2D markers follow.

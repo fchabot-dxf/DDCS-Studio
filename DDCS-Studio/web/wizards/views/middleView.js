@@ -2,8 +2,35 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { MiddleWizard } from '../middleWizard.js';
 import { restoreBoxStock } from './rotaryCenterView.js';
+import { FeatureCanvas } from '../../viz/featureCanvas.js';
 
 const wizard = new MiddleWizard();
+const layout = new FeatureCanvas();
+const num = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
+
+/** The ②-AIM feature-canvas spec: the per-pass start markers ①②③④ as DRAGGABLE POINT handles. Unlike Edge's vector (which
+ *  wrote FORM fields), a drag here writes the SIM-ONLY DECLARED value via panel.onStartDrag → userStarts[p] → the same seam
+ *  the 2D/3D markers use (computePassStarts → the trace AND the engine). So dragging ② makes that probe pass BEGIN there. */
+function renderStartCanvas(panel, stock) {
+    const container = el('middleLayoutCanvas');
+    if (!container || !panel || typeof panel.getPassStarts !== 'function') return;
+    const starts = panel.getPassStarts() || [];
+    const sw = num(stock && stock.x, 100), sh = num(stock && stock.y, 80);
+    const handles = starts.map((s, p) => ({ id: 'start:' + p, x: +s.x || 0, y: +s.y || 0, kind: 'move', label: String(p + 1) }));   // ①②③④ as POINT handles
+    const spec = {
+        stock: (sw > 0 && sh > 0) ? { w: sw, h: sh, ox: 0, oy: 0 } : null,
+        placement: { x: 0, y: 0 }, items: [], handles,
+        // a handle drag hands back a WORLD point → write the per-pass start through the shared seam, then redraw THIS canvas
+        // (the 2D/3D + engine already followed inside onStartDrag → setGcode/replay; getPassStarts() now has the new value).
+        onDrag: (id, world) => {
+            const p = parseInt(String(id).split(':')[1], 10) || 0;
+            const z = (starts[p] && starts[p].z) || 0;
+            panel.onStartDrag({ x: world.x, y: world.y, z }, p);
+            renderStartCanvas(panel, (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {});
+        },
+    };
+    layout.render(container, spec);
+}
 
 export const middleView = {
     type: 'middle',
@@ -100,6 +127,8 @@ export const middleView = {
         // Infer the spindle start (pocket → centre; boss → outside the first side) so the preview begins right.
         const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
         ctx.preview3D(gcode, 'middleVizContainer', wizard.inferStart(params, stock), wizard.inferStarts(params, stock));
+        // ②-aim feature canvas: render the per-pass start markers as draggable handles (panel exists after preview3D).
+        renderStartCanvas(ctx._activePanel, stock);
 
         // Update middle status label
         const middleStatus = el('middleVizStatus');

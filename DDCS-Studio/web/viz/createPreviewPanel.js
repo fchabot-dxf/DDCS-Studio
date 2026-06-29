@@ -118,16 +118,18 @@ export function createPreviewPanel(container, opts = {}) {
     let curStart = null;   // operator start the user dragged (2D handle / 3D marker); getStartPos() reads it (pass 0)
     let passStarts = [];   // INC1: per-pass operator starts [{x,y,z}] — the shared source of truth for BOTH views' numbered markers
     let userStarts = [];   // INC2: per-pass USER overrides (a jog or a drag) — these BEAT the wizard's inferStarts HINT so an edited ② STICKS (the hint only positions an un-touched pass)
-    const t2 = createToolpath2d(cv2d, {
-        // 2D start-handle drag (any pass) → record it, mirror to the 3D marker, re-trace + replay from the new start.
-        onStartDrag: (pos, pass) => {
-            const p = pass | 0, np = { x: +pos.x || 0, y: +pos.y || 0, z: +pos.z || 0 };
-            passStarts[p] = np; userStarts[p] = np;          // shared source of truth + USER override (beats the hint, persists)
-            if (p === 0) curStart = np;                      // pass 0 = the operator start getStartPos() reads
-            if (viz && viz.starts) viz.starts[p] = np;       // mirror to the 3D marker
-            setGcode(); replayFromStart();                   // #18: re-run the sim from the new start
-        },
-    });
+    // A per-pass start drag from ANY view — the 2D toolpath handle, the 3D marker, or the feature-canvas ②-aim handle —
+    // records it as the USER override (a sim-only DECLARED value: it BEATS the inferStarts hint + persists), mirrors to the
+    // 3D marker, then re-traces + replays from the new start. ONE seam, so every view edits the SAME userStarts (the
+    // feature-canvas drag is just another writer of it — exposed on the panel return for the view-owned canvas).
+    function onStartDrag(pos, pass) {
+        const p = pass | 0, np = { x: +pos.x || 0, y: +pos.y || 0, z: +pos.z || 0 };
+        passStarts[p] = np; userStarts[p] = np;          // shared source of truth + USER override (beats the hint, persists)
+        if (p === 0) curStart = np;                      // pass 0 = the operator start getStartPos() reads
+        if (viz && viz.starts) viz.starts[p] = np;       // mirror to the 3D marker
+        setGcode(); replayFromStart();                   // #18: re-run the sim from the new start
+    }
+    const t2 = createToolpath2d(cv2d, { onStartDrag });
     t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.setWcs(wcsForViz());   // 2D mirrors the 3D scene
 
     let viz = null;            // GcodeViz3D (lazy — only when 3D is shown and WebGL is available)
@@ -633,5 +635,5 @@ export function createPreviewPanel(container, opts = {}) {
         buildDro();   // DRO gains/loses the A/B rows with the rotary rig
     }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, get viz() { return viz; }, get engine() { return engine; }, el: container };
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, onStartDrag, getPassStarts: () => passStarts, get viz() { return viz; }, get engine() { return engine; }, el: container };
 }
