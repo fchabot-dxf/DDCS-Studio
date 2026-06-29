@@ -2195,6 +2195,10 @@ button.primary:hover {
 .feature-canvas .fc-axis-y { stroke: #3b7a48; stroke-width: 1.5; }
 .feature-canvas .fc-stock { fill: rgba(80,110,150,0.08); stroke: #46566a; stroke-width: 1.5; }
 .feature-canvas .fc-guide { fill: none; stroke: #2e8b9a; stroke-width: 1; stroke-dasharray: 4 3; }
+/* The FEATURE being probed (op-type-declared, stock-overridable): a pocket cavity (blue) or a boss protrusion (green),
+   matching the 3D preview's fill colours, so the 2D canvas shows WHAT'S being probed — not just the stock rectangle. */
+.feature-canvas .fc-feature-pocket { fill: rgba(106,143,190,0.18); stroke: #86b6ff; stroke-width: 1.5; }
+.feature-canvas .fc-feature-boss { fill: rgba(143,174,106,0.18); stroke: #a6d77c; stroke-width: 1.5; }
 .feature-canvas .fc-path-ghost { fill: none; stroke: #43525f; stroke-width: 1.2; }   /* original path (before rotate) */
 .feature-canvas .fc-path { fill: none; stroke: #4ab3ff; stroke-width: 1.8; }          /* rotated result — cut moves */
 .feature-canvas .fc-path-rapid { fill: none; stroke: #4ab3ff; stroke-width: 1; stroke-dasharray: 4 3; opacity: .5; }

@@ -31,6 +31,26 @@ function tieDiagTravel(pass, world) {
  *  wrote FORM fields), a drag here writes the SIM-ONLY DECLARED value via panel.onStartDrag → userStarts[p] → the same seam
  *  the 2D/3D markers use (computePassStarts → the trace AND the engine). So dragging ② makes that probe pass BEGIN there.
  *  PLUS ② also drives the macro's #21 (tieDiagTravel) so the auto trans-axial diagonal ends ON ② — ONE handle, BOTH outputs. */
+/** The FEATURE shape to DRAW in the canvas (so it shows WHAT'S being probed, not just the stock rect). The op TYPE
+ *  (m_type + circular) DECLARES the default — a pocket cavity, a boss block, a circle; a user-set stock.shape OVERRIDES it
+ *  (declare-default + autonomy-override). Sizes reuse the 3D preview's model (pocket cavity inset 0.25·min(x,y)); the
+ *  feature size is approximate pre-probe (it's being measured) — a sensible centred default, refinable later. */
+function buildFeatureItems(sw, sh, stock) {
+    if (!(sw > 0 && sh > 0)) return [];
+    const mType = el('m_type')?.value === 'boss' ? 'boss' : 'pocket';
+    const circular = !!el('m_circular')?.checked;
+    const stockShape = stock && stock.shape;
+    // user-set stock.shape (pocket/cylinder — a deliberate non-default; 'boss' is the settings default) beats the op default
+    const shape = stockShape === 'pocket' ? 'pocket'
+        : stockShape === 'cylinder' ? 'circle'
+        : circular ? 'circle'
+        : mType;
+    const cls = (shape === 'boss' || (shape === 'circle' && mType === 'boss')) ? 'fc-feature-boss' : 'fc-feature-pocket';
+    if (shape === 'circle') return [{ kind: 'circle', cx: sw / 2, cy: sh / 2, r: Math.min(sw, sh) * 0.4, cls }];   // round bore / boss
+    if (shape === 'pocket') { const w = Math.max(8, Math.min(sw, sh) * 0.25); return [{ kind: 'rect', x: w, y: w, w: sw - 2 * w, h: sh - 2 * w, cls }]; }   // inner CAVITY
+    return [{ kind: 'rect', x: 0, y: 0, w: sw, h: sh, cls }];   // BOSS = the stock block (the probe approaches it from outside)
+}
+
 function renderStartCanvas(panel, stock) {
     const container = el('middleLayoutCanvas');
     if (!container || !panel || typeof panel.getPassStarts !== 'function') return;
@@ -39,7 +59,7 @@ function renderStartCanvas(panel, stock) {
     const handles = starts.map((s, p) => ({ id: 'start:' + p, x: +s.x || 0, y: +s.y || 0, kind: 'move', label: String(p + 1) }));   // ①②③④ as POINT handles
     const spec = {
         stock: (sw > 0 && sh > 0) ? { w: sw, h: sh, ox: 0, oy: 0 } : null,
-        placement: { x: 0, y: 0 }, items: [], handles,
+        placement: { x: 0, y: 0 }, items: buildFeatureItems(sw, sh, stock), handles,
         // a handle drag hands back a WORLD point → write the per-pass start through the shared seam, then redraw THIS canvas
         // (the 2D/3D + engine already followed inside onStartDrag → setGcode/replay; getPassStarts() now has the new value).
         onDrag: (id, world) => {

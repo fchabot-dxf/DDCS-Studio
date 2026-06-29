@@ -289,17 +289,19 @@ export class FeatureCanvas {
             items.appendChild(svgEl('path', { d, class: pth.cls || 'fc-guide', fill: 'none' }));
         });
 
-        // --- guides (rings / bounding rects / paths) ---------------------
+        // --- guides (rings / bounding rects / paths). A guide defaults to the dashed fc-guide; an item may set its own
+        //     `cls` (e.g. a FEATURE shape — a filled pocket cavity / boss) so the canvas shows WHAT'S being probed. -----
         (spec.items || []).forEach((it) => {
+            const cls = it.cls || 'fc-guide';
             if (it.kind === 'circle') {
                 const c = this._disp(it.cx, it.cy);
-                items.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: it.r * this._tf.scale, class: 'fc-guide' }));
+                items.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: it.r * this._tf.scale, class: cls }));
             } else if (it.kind === 'line') {
                 const a = this._disp(it.x1, it.y1), b = this._disp(it.x2, it.y2);
-                items.appendChild(svgEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'fc-guide' }));
+                items.appendChild(svgEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: cls }));
             } else if (it.kind === 'rect') {
                 const p = this._disp(it.x, it.y + it.h);
-                items.appendChild(svgEl('rect', { x: p.x, y: p.y, width: it.w * this._tf.scale, height: it.h * this._tf.scale, class: 'fc-guide' }));
+                items.appendChild(svgEl('rect', { x: p.x, y: p.y, width: it.w * this._tf.scale, height: it.h * this._tf.scale, class: cls }));
             }
         });
 

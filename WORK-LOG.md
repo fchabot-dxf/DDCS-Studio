@@ -1637,3 +1637,29 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   derived `|②.y − centre.y|`, and a re-trace with the post-drag macro shows the trans-axial diagonal ENDS on ②.y (< 2 mm, not
   near it). **Full suite 404 green** + 2 known parallel flakes (custom-op-chip, project-drawer-smoke — pass isolated).
   **SCOPE = the ②→#21 tie only** (no track-stock, no other handles). **⚠ HUMAN-eyes:** drag ② → the diagonal aims where you dropped it.
+
+## 2026-06-29 — turn 84: DRAW THE FEATURE in the middle canvas (op-type declares it; fixes 'pocket not drawn')
+
+- **The bug:** the middle feature-canvas spec had `items: []` — it drew the stock outline + the start handles but NO feature
+  shape, so a pocket showed nothing (the human's red-rect was their own sketch of where the cavity should be).
+- **VERIFY-FIRST (traced, reuse what exists):** the 3D ([gcodeViz3d.js setStock](DDCS-Studio/web/viz/gcodeViz3d.js#L994))
+  draws the feature from `stock.shape` — POCKET = an inset CAVITY (inset `w = max(8, 0.25·min(x,y))`), BOSS = the stock block,
+  CYLINDER = the round OD; `probeGeometry` collides against the SAME. `m_type` ↔ `stock.shape` are NOT synced (the view reads
+  `featureType` from `m_type`, never writes `stock.shape`) → **`m_type` is the op-type DEFAULT, `stock.shape` the OVERRIDE.**
+  featureCanvas items rendered as `fc-guide` (dashed outline) only.
+- **BUILD:**
+  - [featureCanvas.js](DDCS-Studio/web/viz/featureCanvas.js): items honour an optional `it.cls` (default `fc-guide`), so an
+    item can be a FILLED feature shape.
+  - [styles.css](DDCS-Studio/web/styles.css): `.fc-feature-pocket` (blue) / `.fc-feature-boss` (green), matching the 3D fill
+    colours.
+  - [middleView.js](DDCS-Studio/web/wizards/views/middleView.js) `buildFeatureItems(sw, sh, stock)`: the FEATURE shape —
+    **precedence** (declare-default + autonomy-override): a user-set `stock.shape==='pocket'` → cavity, `==='cylinder'` →
+    circle (a deliberate non-default beats the op default; `'boss'` is the settings default so it does NOT override) → else
+    `circular` → circle → else `m_type` (`pocket`→cavity / `boss`→block). Geometry reuses the 3D model: pocket = an inner rect
+    inset `0.25·min`; boss = the full stock rect (the probe approaches from outside); circle = centred, `r=0.4·min`
+    (approximate pre-probe — it's being measured — a sensible centred default, refinable). `items: []` → `buildFeatureItems(...)`.
+- **VERIFIED (new `middle-feature-draw.spec.js`):** pocket → a blue cavity rect INSET from the stock (the bug fix); boss →
+  a green block; circular → a circle; a user-set `stock.shape='pocket'` (over m_type=boss) → the cavity (override); `='cylinder'`
+  → a circle (override). **Full suite 406 green** + 3 known parallel flakes (custom-op-chip, blocks-live-form, project-drawer-
+  smoke — 9 pass isolated). **SCOPE = DRAW the feature only** (not the full shared-stock-block design — Phase 2). **⚠ HUMAN-eyes:**
+  select pocket → a cavity; boss → a boss; circular → a circle; a stock-settings override beats the default.
