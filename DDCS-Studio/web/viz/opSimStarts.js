@@ -42,11 +42,15 @@ const BUILT_IN = {
             ? { x: plus ? -outset : sx + outset, y: cy, z: probeZ }
             : { x: cx, y: plus ? -outset : sy + outset, z: probeZ };
 
-        if (!boss) return [centre];                                  // pocket: always one pass, from the centre
+        // probe-Z-first: DECLARE the Z-surface probe as its OWN leading pass — over the stock top (z ABOVE the surface,
+        // probing DOWN), so the sim renders Z-pass → reposition → XY-passes. Mirrors the macro's Z block + reposition().
+        const lead = params.probeZ ? [{ x: cx, y: cy, z: Math.min(5, sz * 0.5) }] : [];
+
+        if (!boss) return [...lead, centre];                         // pocket: [Z?] then one pass from the centre
         const prim = inAxisManual ? [outside(axis, dir1Plus), outside(axis, !dir1Plus)] : [outside(axis, dir1Plus)];
-        if (!twoAxis) return prim;                                   // single-axis: in-axis manual → 2 walls, auto → 1
+        if (!twoAxis) return [...lead, ...prim];                     // single-axis: in-axis manual → 2 walls, auto → 1 (+ Z?)
         const sec = inAxisManual ? [outside(second, dir2Plus), outside(second, !dir2Plus)] : [outside(second, dir2Plus)];
-        return [...prim, ...sec];                                    // the trans pass (auto or manual) always adds the secondary marker(s)
+        return [...lead, ...prim, ...sec];                           // [Z?] + primary + the trans pass (auto or manual) secondary
     },
 
     // ALIGNMENT — probe A, reposition (jog to B along the fence), probe B → 2 passes. Spread A/B along the checkAxis so

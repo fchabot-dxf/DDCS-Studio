@@ -90,7 +90,7 @@ export const middleView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'm_type', 'm_inaxis', 'm_transaxis', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_circular', 'm_sync_a', 'm_wcs', 'm_slave',
+        'm_type', 'm_inaxis', 'm_transaxis', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_circular', 'm_probe_z_first', 'm_sync_a', 'm_wcs', 'm_slave',
         'm_dist', 'm_retract', 'm_safe_z', 'm_clear', 'm_crossX', 'm_crossY', 'm_diag_travel',
         'm_feed_fast', 'm_feed_slow', 'm_port', 'm_level', 'm_q',
     ],
@@ -119,6 +119,7 @@ export const middleView = {
             dir2: dir2val,
             findBoth: el('m_both')?.checked || false,
             circular: el('m_circular')?.checked || false,
+            probeZ: el('m_probe_z_first')?.checked || false,   // probe-Z-first: Z datum before the XY work
             syncA: el('m_sync_a')?.checked || false,
             slave: el('m_slave')?.value || '3',
             wcs: el('m_wcs')?.value || 'active',

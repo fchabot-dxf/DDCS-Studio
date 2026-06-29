@@ -41,6 +41,7 @@ function toRecord(b) {
             params.twoAxis = b.getFieldValue('TWOAXIS') === 'TRUE';
             params.dir2 = b.getFieldValue('DIR2') || 'pos';
             params.wcs = b.getFieldValue('WCS') || 'active';
+            params.probeZ = b.getFieldValue('PROBEZ') === 'TRUE';
             params.syncA = b.getFieldValue('SYNCA') === 'TRUE';
             params.slave = b.getFieldValue('SLAVE') || '3';
             params.qStop = b.getFieldValue('QSTOP') === 'TRUE';
@@ -158,6 +159,7 @@ function recToJson(rec) {
             node.fields.TWOAXIS = rec.params.twoAxis ? 'TRUE' : 'FALSE';
             node.fields.DIR2 = rec.params.dir2 || 'pos';
             node.fields.WCS = rec.params.wcs || 'active';
+            node.fields.PROBEZ = rec.params.probeZ ? 'TRUE' : 'FALSE';
             node.fields.SYNCA = rec.params.syncA ? 'TRUE' : 'FALSE';
             node.fields.SLAVE = rec.params.slave || '3';
             node.fields.QSTOP = rec.params.qStop ? 'TRUE' : 'FALSE';

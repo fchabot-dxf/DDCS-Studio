@@ -248,13 +248,14 @@ export const OP_BLOCKS = [
         { type: 'field_dropdown', name: 'WCS', options: SELECTS.wcs.map(o => [o, o]) },
         { type: 'field_checkbox', name: 'QSTOP', checked: false }
     ]),
-    makeOpDef('middle_op', 'Middle Probe', 'Type %2 Axis %3 Dir %4 %5 2-Axis Dir2 %6 WCS %7 Sync %8 Slave %9 Stop %10', [
+    makeOpDef('middle_op', 'Middle Probe', 'Type %2 Axis %3 Dir %4 %5 2-Axis Dir2 %6 WCS %7 Z-First %8 Sync %9 Slave %10 Stop %11', [
         { type: 'field_dropdown', name: 'FEATURETYPE', options: SELECTS.featureType.map(o => [o, o]) },
         { type: 'field_dropdown', name: 'AXIS', options: SELECTS.axis.map(o => [o, o]) },
         { type: 'field_dropdown', name: 'DIR1', options: SELECTS.axisDir.map(o => [o, o]) },
         { type: 'field_checkbox', name: 'TWOAXIS', checked: false },
         { type: 'field_dropdown', name: 'DIR2', options: SELECTS.axisDir.map(o => [o, o]) },
         { type: 'field_dropdown', name: 'WCS', options: SELECTS.wcs.map(o => [o, o]) },
+        { type: 'field_checkbox', name: 'PROBEZ', checked: false },
         { type: 'field_checkbox', name: 'SYNCA', checked: false },
         { type: 'field_dropdown', name: 'SLAVE', options: SELECTS.slave },
         { type: 'field_checkbox', name: 'QSTOP', checked: false }

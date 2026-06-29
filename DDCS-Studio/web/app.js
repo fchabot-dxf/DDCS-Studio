@@ -213,7 +213,7 @@ class DDCSStudio {
         });
 
         // Middle wizard visualization listeners
-        ['m_type', 'm_axis', 'm_dir', 'm_dir2', 'm_both'].forEach(id => {
+        ['m_type', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_probe_z_first'].forEach(id => {
             const elem = el(id);
             if (elem) {
                 elem.addEventListener('change', () => {
@@ -305,7 +305,7 @@ class DDCSStudio {
         ];
         const checkboxIds = [
             'c_probe_z_first', 'c_sync_a',
-            'm_both', 'm_sync_a',
+            'm_both', 'm_probe_z_first', 'm_sync_a',
             'p_sync_a',
             'w_x', 'w_y', 'w_z', 'w_sync'
         ];

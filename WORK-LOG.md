@@ -2005,3 +2005,44 @@ sim tool follows). For MIDDLE the Z-probe start and the first XY-probe start are
 only the AUTO physical centre-move (item 4), matching the spec's "Z→X→Y convergence, datum as a sim overlay". Need the
 advisor's call on B (+ is an interim operator-jog between Z and XY acceptable, or must it be hands-free now → then C).
 NOT building until blessed (don't push past the gate). Everything in READY-TO-BUILD lands the moment B/C is chosen.
+
+## 2026-06-29 — turn 106: MID-PROBE-Z-FIRST — BUILT (declaration reusing middle's own twoPass + reposition)
+
+Advisor turn-106 dispatch RESOLVED my turn-104 gate = my Option B, reframed: add probe-Z-first as a DECLARATION reusing
+middle's OWN pieces (NOT a 3rd hand-rolled corner copy — human called that out). Z is its OWN declared sim pass → the
+faithful render. SCOPE = Z-first only (NOT the general travel GUI = batch #2, NOT the shared-brick consolidation = #5,
+NOT B-END-OFFSET/B-TRANS-ANGLE). No G53/G90.
+
+- **VERIFY-FIRST (Z probe vars):** confirmed Z = status #1922 / result #1927 / stop #1907 / limit #1917 against
+  [probeBlocks.js:13-23] (the documented +2-per-axis pattern), NOT assumed. Added `Z` to middle's `AX`.
+- **EMIT ([middleWizard.js]):** `params.probeZ`; BEFORE `seq(axis,dir1Plus,51)`, when probeZ: `twoPass('Z', false, '#57')`
+  (REUSE middle's own two-pass — emits the same stop/limit-reset → fast G31 Z↓ + check + retract → slow G31 Z↓ + check +
+  save#57 + retract as X/Y do, no new dup) → `A('#[#70+2]','#57')` (Z0 write, middle's `#[#70+off]` convention, Z off=2) →
+  `reposition('jog clear, to the first wall')` (REUSE the existing helper → the "REPOSITION:" comment makes the parser count
+  the XY as the NEXT pass). Confirm prompt branches OVER-the-stock when probeZ. The macro now sets Z FIRST, then X, then Y.
+- **DECLARE the Z pass ([opSimStarts.js] BUILT_IN.middle):** when `params.probeZ`, PREPEND a Z-pass start `{cx, cy, +min(5,sz/2)}`
+  (over the stock top, z>0, probing DOWN) → per-pass starts = **[Z, ①X-wall, (②Y-wall)]**. This is the resolution to the gate:
+  the Z probe gets its OWN start so the boss Z-start (over the top) and the XY-start (outside the wall) no longer collide in
+  one pass → the sim renders Z-pass → reposition → XY-passes. Pocket too: [Z, centre].
+- **WIRING (mechanical, mirrors the corner across 8 files):** form checkbox `m_probe_z_first` (index.html) + middleView reader
+  + inputIds; app.js viz-listener + checkboxIds; Blockly `middle_op` PROBEZ field (bridge.js block def + "Z-First %8" message,
+  shifted %9-11) + stackBridge toRecord/toNode; opSchema `probeZ: Bool()` + field-map `m_probe_z_first`.
+- **VERIFIED — 3 property gates + the RENDER (new `middle-probe-z-first.spec.js`, 3 tests, all green):**
+  - (1) EQUIVALENCE: `generate(probeZ omitted) === generate(probeZ:false)`, and the OFF macro has ZERO Z-first artifacts
+    (no `Z Surface`/`#1907`/`#[#70+2]`) → byte-identical.
+  - (2) ON ORDERING: a `G31 Z` probe + `#[#70+2]=#57` Z0 write + the `REPOSITION` all emit, and STRICTLY BEFORE the first
+    `G31 X` (Z datum → reposition → XY).
+  - (3) opSimStarts: probeZ adds exactly one LEADING pass, over the stock centre, z>0; the existing XY starts are unchanged
+    (just shifted after Z); pocket → [Z, centre].
+  - Blockly round-trip: a `{opType:'middle', params:{probeZ:true}}` record → `middle_op` block field PROBEZ='TRUE' → read
+    back via `workspaceToStack` → `params.probeZ===true` (and false round-trips false).
+  - **HUMAN-EYES RENDER (the gate, not a property test):** a step-driven TOP-DOWN capture of the REAL wizard (Boss·Find
+    Both·Auto·Probe-Z-First) shows **p0 Z** (tool over the stock centre, descending = the Z datum) → reposition → **p1 XY**
+    (X walls) → **p2 XY** (Y walls). 32 frames, opened in VS Code. Z is established FIRST, faithfully.
+  - Regression: focused 48/48 (middle-*, op-sim-starts, sim-starts-data, per-pass, cam-slot-sim, blocks-roundtrip,
+    blockly-port, blocks-render screenshot, probe-fixes) + full suite (running). The `middle_op` block message change did NOT
+    shift the blocks-render baseline.
+- **FLAG:** the Z→first-wall reposition uses `reposition()` (an operator-jog prompt) for NOW — per the dispatch, the uniform
+  AUTO/MANUAL per-transition travel GUI is batch item #2 (it'll subsume this Z→X transition + the existing inAxis/transAxis
+  toggles). So an AUTO boss-both with probeZ currently asks the operator to jog from the Z spot to the first wall; that
+  becomes hands-free in #2. (Resolves TWO-WCS-DATUM decision C: target datum = XYZ when ON, XY when OFF.)

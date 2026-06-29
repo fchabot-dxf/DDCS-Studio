@@ -17,6 +17,7 @@ import { opSimStarts } from '../viz/opSimStarts.js';
 const AX = {
     X: { stop: '#1905', limit: '#1915', status: '#1920', result: '#1925', off: 0 },
     Y: { stop: '#1906', limit: '#1916', status: '#1921', result: '#1926', off: 1 },
+    Z: { stop: '#1907', limit: '#1917', status: '#1922', result: '#1927', off: 2 },   // Z-surface (probe-Z-first) — reuses twoPass
 };
 const WCS_BASE = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
 const sgn = (plus) => (plus ? 'pos' : 'neg');
@@ -32,6 +33,7 @@ export function middleStack(params = {}) {
     const dir1Plus = (params.dir1 || 'pos') === 'pos';
     const twoAxis = !!params.twoAxis || !!params.findBoth;
     const circular = !!params.circular;   // round bore/boss: report the diameter (opposite-touch span) + re-centre between axes
+    const probeZ = !!params.probeZ;   // probe-Z-first: two-pass the TOP surface + set Z0 BEFORE the XY centre-finding (its own declared sim pass)
     const second = axis === 'X' ? 'Y' : 'X';
     const resolvedDir2 = (typeof params.dir2 === 'string') ? params.dir2 : (dir1Plus ? 'neg' : 'pos');
     const dir2Plus = resolvedDir2 === 'pos';
@@ -145,7 +147,17 @@ export function middleStack(params = {}) {
     }
     if (wcs === 'active') { A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'); A('#72', '[#71-1]', 'Zero-based index'); A('#70', '[805+[#72*5]]', 'Base WCS address'); }
     else A('#70', WCS_BASE[wcs]);
-    A('#1505', '1', 'Press Enter to probe - ESC=cancel'); IF('#1505', '==', '0', 2); DM('inc');
+    A('#1505', '1', probeZ ? 'Hover OVER the stock top (Z datum first). Press Enter - ESC=cancel' : 'Press Enter to probe - ESC=cancel'); IF('#1505', '==', '0', 2); DM('inc');
+
+    // PROBE-Z-FIRST (declaration): set the Z datum BEFORE the XY work, REUSING middle's own twoPass (no corner copy / no dup),
+    // then REUSE reposition() to move to the first wall. The Z probe is its OWN pass (the "REPOSITION:" reposition emits marks
+    // the XY as the next pass) → opSimStarts declares a leading Z-pass start so the sim renders Z-pass → reposition → XY faithfully.
+    if (probeZ) {
+        C('Z Surface - set Z datum first');
+        twoPass('Z', false, '#57');                          // two-pass down-probe the top surface → #57 (= Z trigger #1927)
+        A('#[#70+2]', '#57', `Save ${wcsLabel} Z offset`);   // Z0 write — middle's #[#70+off] convention (Z off=2)
+        reposition('jog clear, to the first wall');           // Z pass done → reposition to the XY start (existing helper)
+    }
 
     seq(axis, dir1Plus, 51);
     if (twoAxis) {
