@@ -1713,3 +1713,71 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
 - **⚠ The full suite couldn't run clean = DEV-SERVER OVERLOAD** (4.7 min vs ~2; 72 page.waitForFunction timeouts) from my
   repeated suite runs — NOT a regression; every sampled "failure" passes isolated. **⚠ HUMAN-eyes:** editor sim of an inserted
   boss-both matches the wizard (2nd-axis starts at ②).
+
+## 2026-06-29 — turn 90: B1 PROPOSAL — `def.sim.starts` spec (PROPOSE + GATE, NOT a build)
+
+Per SIM-BLOCK-STACK-BACKLOG.md B1: make a sim-start declarable as DATA, BLOCK-FRIENDLY, declaration round-trip
+(not the emit-atom model). This turn = verify-first + propose + GATE; the build is the next turn once the human blesses the spec.
+
+**VERIFY-FIRST (3 findings):**
+1. `def.sim` TODAY carries preview INTENT flags only — `{ showRotaryRig, forceMachine, showMagazine }`, registered by
+   `setUserSimIntent(def.opType, def.sim)` in [userOps.js](DDCS-Studio/web/blocks/userOps.js). NO starts (declared, never inferred).
+2. The USER_* layer ([opSimStarts.js](DDCS-Studio/web/viz/opSimStarts.js)): `setUserSimStarts(opType, providerFn)` + a
+   `USER_STARTS` Map; `opSimStarts(opType, params, stock)` = USER provider || `BUILT_IN[opType]` || null. **The provider seam
+   EXISTS** — the gap is only the `def.sim.starts` → provider wiring (its own comment says "the DECLARED-spec → provider
+   wiring (read def.sim) is the follow-up").
+3. The built-in math = the PATTERN to make declarable: each per-pass start is a POSITION = { an ANCHOR — centre |
+   wall-outside-by-`outset` | a fraction | centre±`R` — at a Z-PLANE (above-top | below-top `probeZ` | flank `-R`) }, and the
+   per-pass LIST is CONDITIONAL on params (count: middle 1/2/4 by featureType+twoAxis+inAxisManual; alignment 2; rotary 1/3 by
+   method). Vars in scope: `sx,sy,sz`, `cx=sx/2, cy=sy/2`, `outset=max(6,min(dist·0.6,15))`, `R=min(sy,sz)/2`, + the op's params.
+
+**The spec must handle:** (i) a per-pass POSITION relative to the stock; (ii) the per-pass LIST being param-conditional (count
+varies); (iii) block-friendly — a DECLARATION round-trip (no emitted line to reverse-sync).
+
+**OPTION A (RECOMMENDED) — structured anchor+offset rows:**
+```
+def.sim.starts = [
+  { anchor:'edge',   axis:'X', side:'@dir1', out:'@outset', plane:'probe' },                              // pass ①
+  { anchor:'edge',   axis:'Y', side:'@dir2', out:'@outset', plane:'probe', when:{ param:'twoAxis', is:true } }, // pass ② (only if 2-axis)
+  { anchor:'centre', plane:'probe', when:{ param:'featureType', is:'pocket' } },                            // pocket = 1 centre pass
+]
+```
+- Each ROW = one pass. `anchor` ∈ { `centre` | `edge`(axis,side,out) | `frac`(fx,fy) | `radial`(axis,sign,r) }; `plane` (Z) ∈
+  { `top` | `probe` | `<number>` | `@flank` }; `side`/`out`/`r` = a literal OR a `@token` from a SMALL bound set
+  (`@dir1 @dir2 @outset @R`); optional `when` = a single param-gate so the row only contributes when it matches (the
+  conditional count). A `makeProvider(def.sim.starts)` interprets the rows → `(params, stock) ⇒ [{x,y,z}…]`; userOps registers
+  it via the existing `setUserSimStarts`. Data → provider → the registry already in place.
+- BLOCK (B3): each row = a "pass" declaration block (anchor dropdown + axis/side/out fields + an optional when-gate); the
+  STACK of pass-blocks IS `def.sim.starts`, round-tripping against the DATA — no emitted line (the declaration model).
+```
+   SIM mouth ▸ [ pass ① · edge X @dir1 out @outset · probe ]
+              [ pass ② · edge Y @dir2 out @outset · probe ·· when twoAxis ]   ⇄  def.sim.starts (the DATA)
+              [ pass · centre · probe ·· when featureType=pocket ]
+```
+- PRO: block-friendly (dropdowns + numbers + a gate = the spatial-GUI / GUI-first principle); declarative + VALIDATABLE
+  (valid-by-construction); tracks the stock (anchors re-derive — aligns with track-stock B2); a small bounded vocabulary.
+- CON: vocabulary is fixed (edge/centre/frac/radial + a few `@tokens`) → an exotic position needs a new anchor/token; `when`
+  is a single param-eq (compound conditions would need more).
+
+**OPTION B — expression rows (general, less block-friendly):**
+```
+def.sim.starts = [ { x:'dir1=="pos" ? -outset : sx+outset', y:'cy', z:'probeZ', when:'featureType=="boss"' }, … ]
+```
+- Each coord = a STRING expression over a bound scope `{ sx,sy,sz,cx,cy,outset,R,probeZ,top, + params }`; `when` = a bool
+  expression; a small safe evaluator runs them (the engine has a G-code expr evaluator — different scope, same idea).
+- PRO: fully GENERAL — one shape covers EVERY built-in verbatim (fractions, R, conditionals) → trivial to migrate the built-ins.
+- CON: expression STRINGS not picks → a code-ish field, not the spatial-GUI; needs a safe evaluator (injection care); harder to
+  validate + to render as a clean declaration block; the value lives in a string, not structured fields.
+
+**RECOMMENDATION: Option A.** It matches the north-star (GUI-first, declare-not-infer, valid-by-construction, block-friendly)
+and the track-stock direction (anchors re-derive with the stock). The CUSTOM-op need is narrow (a probe with a few
+stock-relative passes) — A's bounded vocabulary covers it and the block is a clean stack of pass-rows. **Keep the BUILT-INS as
+their fns** (the backlog allows "keep fn or migrate") — they carry WE-authored conditional complexity (middle's 1/2/4) that
+needn't become data; the spec serves CUSTOM ops. The first time a custom op needs a position outside the vocabulary is the
+trigger to add a token/anchor — not to fall back to expressions.
+
+**Integration (NEXT turn, when blessed):** `makeProvider(def.sim.starts)` in opSimStarts.js + `setUserSimStarts(def.opType,
+provider)` in userOps (beside `setUserSimIntent`). NO engine/trace change — opSimStarts already feeds the wizard + (B0) the editor.
+
+**GATE → human/advisor:** pick **A vs B** + the starting vocabulary (anchors + `@tokens` + the `when` shape) before I build
+`makeProvider` + (B3) the block. NOT building this turn.
