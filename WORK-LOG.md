@@ -2198,3 +2198,41 @@ DECLARED `#6` (one source, like corner/edge — NEVER a literal). Ground-truthed
   BOSS through the wizard viz + datum hook): **Ø reads true 60**, centre 30/30 (unchanged) — opened in a VS Code tab for the human.
 - **Declare-or-handroll:** every comp reads the ONE declared `#6` (no literals); the diameter sign is the only *derived* term
   (no native diameter macro exists) — derived from the edge convention + confirmed by the expanded-box geometry, not guessed.
+
+---
+
+## 🔨 turn 118 — DATUM VISUAL (parts 1·3·4 built) + part 2 GATED (the declared-signal design)
+
+Dispatch = 4 SIM-ONLY display parts. Built the three unambiguous ones; part 2 hit its VERIFY-FIRST gate condition.
+
+- **Part 1 — DATUM → RED 2-AXIS CROSSHAIR.** Replaced the gold sphere `_probeGizmo` with a bold RED (`0xff2d2d`) crosshair:
+  a `THREE.Group` of two thin bars (`_probeBars`), reoriented in `_updateDatum` to the plane of the 2 PROBED/written axes
+  (XY / XZ / YZ; all-3-written → XY plane, Z = depth). Constant-screen via the existing `_scaleMarkers` (a Group has
+  `.position/.visible/.scale`, so the rest of the datum code is unchanged). Render capture: visible, `ff2d2d`, 2 bars, at the
+  written WCS (−25,−20) — opened in a VS Code tab.
+- **Parts 3 + 4 — 2-SECOND PRE-LOOP IDLE (both = the same root).** The datum "cleared too fast" because the loop restarted
+  fast. Two loop timers → 2000 ms: the ENGINE-sim loop (createPreviewPanel `onFinish`, was 800 ms) and the route-anim loop
+  (gcodeViz3d `_frame`, was 1000 ms). `resetProbe` only runs at the NEXT run's start, so the 2 s idle holds the final datum
+  visible before the loop wipes it — that IS part 3's "persists longer." "ALL sims" = both loops.
+- **Tests:** probe-wcs.spec.js updated — datum colour `0xffce3a`→`0xff2d2d`, and the colour read goes through `_probeBars[0]`
+  (the Group has no `.material`). 9 datum/probe tests green; full suite running.
+
+### ⚠ GATE — part 2 (CONTACT DISC → on the calculated surface): needs a DECLARED per-axis signal
+**VERIFY-FIRST finding.** The disc must know, **per AXIS**, whether a contact is a calculated SURFACE (edge/corner → shift the
+disc a stylus-radius toward the wall, onto `#50/#101/#102 = #1925±#6`) or RAW (middle → stays at the tool-centre; its result is
+the CENTRE, shown by the crosshair). Why this is a gate, not a hand-roll:
+- **It is PER-AXIS, not per-op:** middle-Z-first COMPS Z (`#[#70+2]=[#57−#6]`) but BISECTS XY — so a single per-op flag is wrong.
+- **The comp forms are HETEROGENEOUS:** the trigger var varies (`#1925/#1926/#1927`, and `#57` for middle-Z), and the comp is
+  sometimes inline (`[#1927−#6]`), sometimes via an intermediate (`#50=[#1925+#6]` then `#[#70]=#50`). No single line pattern.
+- **No existing op/sim FLAG** carries "this contact is a surface" — exactly the dispatch's "if it needs a new declared flag, gate" condition.
+
+**OPTIONS (advisor's call — value vs cost):**
+- **(A) NEW declared per-axis sim flag — RECOMMEND.** The op's sim declaration states, per probed axis, `surface` (shift by `#6`
+  toward the wall) vs `raw` (bisected). This IS the dispatch's "a flag the op/sim carries" + matches [[custom-op-sim-intent-infer-vs-declare]]
+  (declare sim intent, never infer). COST: a new declared field + wiring it from edge/corner/middle (incl. middle-Z-first's Z=surface, XY=raw).
+- **(B) Read the macro's `#6`-comp at runtime** (taint `#6` through the var chain → per-axis surface flag, reusing the datum-write
+  hook that already reads macro declarations). PRO: ONE source (the macro already declares the comp — no second declaration to
+  diverge). CON: custom taint logic + a post-hoc disc-move (today the disc is "FIXED, never moved") + a part-local-frame assumption.
+- Tension: (A) = declare-the-intent (the dispatch's stated preference) vs (B) = one-source (don't duplicate the macro's comp). Need your call.
+
+Did NOT build part 2 (per "if part 2 needs a declared flag → STOP + gate, don't sniff op-types"). Parts 1/3/4 committed; awaiting the part-2 design.

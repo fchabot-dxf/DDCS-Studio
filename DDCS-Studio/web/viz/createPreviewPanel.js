@@ -299,7 +299,7 @@ export function createPreviewPanel(container, opts = {}) {
                 pendingProbe = null;
                 updateRunBtn();
                 if (typeof opts.onLine === 'function') opts.onLine(null);
-                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); engine.run(lastRunCode); updateRunBtn(); }, 800); }   // fresh probe overlay each loop (datum re-derives from the WCS-write — doesn't persist from the prior pass)
+                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
             },
         });
         return engine;

@@ -170,13 +170,20 @@ export class GcodeViz3D {
         // PERSISTENT, no-fade layers, built at the REAL datum (un-probed axes ride the CONTACT, NOT the projected WCS):
         // the AXIS LINE (the 2-plane intersection, along the un-probed axis — CYAN) + the DATUM point (where the planes
         // cross — GOLD, a different colour). Both vanish when the next probe LOOP starts. Constant-screen in _scaleMarkers.
-        this._datumColor = 0xffce3a; this._lineColor = 0x00e5ff;
+        this._datumColor = 0xff2d2d; this._lineColor = 0x00e5ff;   // DATUM = RED 2-axis crosshair (was a gold sphere)
         this._probeDiscFadeMs = 16000;                                  // disc lifetime at 1× (scaled by the live sim speed) — longer-lived (user request)
         this._probeBurstBasePx = 200; this._probeBurstRefFeed = 250;    // disc radius px = base × clamp(√(feed/ref), .6, 1.8) — FASTER → bigger (LARGER disc, user)
         this._probeLinePx = 200; this._probeLineRadPx = 0.8; this._simSpeed = 1;   // THIN axis line (length spans the scene — see _scaleMarkers)
-        const pg = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 18), new THREE.MeshBasicMaterial({ color: this._datumColor, depthTest: false, depthWrite: false }));
+        // DATUM gizmo — a bold RED 2-axis CROSSHAIR: the `+` lies in the plane of the 2 displayed/probed axes; the 3rd axis
+        // is just DEPTH (the cross sits at that depth). Two thin bars in a Group, reoriented to the written-axes plane in
+        // _updateDatum (XY / XZ / YZ). Constant on-screen size via _scaleMarkers (peer of the stock-WCS crosshair).
+        const pg = new THREE.Group();
+        const dmat = new THREE.MeshBasicMaterial({ color: this._datumColor, depthTest: false, depthWrite: false });
+        const mkBar = () => { const b = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.34, 0.34), dmat); b.renderOrder = 20; return b; };
+        const bar0 = mkBar(), bar1 = mkBar();
+        pg.add(bar0); pg.add(bar1);
         pg.renderOrder = 20; pg.visible = false;   // renders OVER the line (20 > 13)
-        this._probeGizmo = pg;   // the DATUM — where the probed planes cross (shown ≥2 axes; GOLD, distinct from the line)
+        this._probeGizmo = pg; this._probeBars = [bar0, bar1];   // the DATUM — RED crosshair (shown ≥2 axes), reoriented to the 2-axis plane
         this.partFrame.add(pg);
         this._probeLine = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 14), new THREE.MeshBasicMaterial({ color: this._lineColor, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false }));
         this._probeLine.renderOrder = 13; this._probeLine.visible = false; this.partFrame.add(this._probeLine);
@@ -568,10 +575,10 @@ export class GcodeViz3D {
             const total = this._animMs || 1;
             if (!this._animPaused) {
                 this._animDist += dt * 1000 * (this._animSimSpeed || 1);
-                if (this._animDist >= total) {       // reached the end → hold 1s, then loop (no beep — it loops forever)
+                if (this._animDist >= total) {       // reached the end → hold 2s (final datum/result visible), then loop (no beep — it loops forever)
                     this._animDist = total;
                     this._animPaused = true;
-                    setTimeout(() => { this._animDist = 0; this._animPaused = false; this._animLast = 0; }, 1000);
+                    setTimeout(() => { this._animDist = 0; this._animPaused = false; this._animLast = 0; }, 2000);
                 }
             }
             let d = Math.min(this._animDist, total);
@@ -1708,7 +1715,16 @@ export class GcodeViz3D {
         const d = { x: dw.x != null ? dw.x : mean('x'), y: dw.y != null ? dw.y : mean('y'), z: dw.z != null ? dw.z : mean('z') };
         if (line) line.visible = false;   // AXIS LINE REMOVED (user) — only the DATUM point + the discs remain; the line never shows
         pt.visible = false;
-        if (written.length >= 2) { pt.position.set(d.x, d.y, d.z); pt.visible = true; }   // shows ONCE the WCS is written → at the centre
+        if (written.length >= 2) {
+            pt.position.set(d.x, d.y, d.z);
+            // orient the `+` into the plane of the 2 PROBED axes (the 3rd is depth); all-3-written → XY plane, Z = depth.
+            const plane = written.length >= 3 ? ['x', 'y'] : written;
+            const bars = this._probeBars || [];
+            const rot = (a) => a === 'y' ? [0, 0, Math.PI / 2] : a === 'z' ? [0, Math.PI / 2, 0] : [0, 0, 0];   // box default lies along X
+            if (bars[0]) { const r = rot(plane[0]); bars[0].rotation.set(r[0], r[1], r[2]); }
+            if (bars[1]) { const r = rot(plane[1]); bars[1].rotation.set(r[0], r[1], r[2]); }
+            pt.visible = true;
+        }   // shows ONCE the WCS is written → at the centre, as a 2-axis crosshair
         this.render();
     }
 

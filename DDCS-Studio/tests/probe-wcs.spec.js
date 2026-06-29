@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 /**
  * Probe-WCS cue — TRANSIENT-DISC model (advisor turn 30). Each probe drops a transient feed-sized soft disc at its
- * contact (self-fades; covered by probe-anim-pipeline/visible). The PERSISTENT layer is the DATUM point (GOLD, where
- * the probed planes cross — shown ≥2 axes). The axis line was REMOVED (user); _probeLine stays as a hidden object
+ * contact (self-fades; covered by probe-anim-pipeline/visible). The PERSISTENT layer is the DATUM (a RED 2-axis
+ * crosshair, where the probed planes cross — shown ≥2 axes). The axis line was REMOVED (user); _probeLine stays as a hidden object
  * (never shown) + _lineColor remains the disc colour. Drives the REAL Simulate.
  */
 const BASE = process.env.STUDIO_URL || 'http://localhost:3211';
@@ -25,7 +25,7 @@ async function runShape(page) {
   return page.evaluate(() => {
     const v = window.__gpPanel.viz;
     return {
-      datum: { vis: v._probeGizmo.visible, color: v._probeGizmo.material.color.getHex() },
+      datum: { vis: v._probeGizmo.visible, color: v._probeBars[0].material.color.getHex() },   // datum = a RED crosshair GROUP (bars carry the material)
       line: { vis: v._probeLine.visible, color: v._probeLine.material.color.getHex() },
     };
   });
@@ -42,7 +42,7 @@ test('probeAxis classifier + the DATUM is a distinct-colour peer of the stock-WC
     const v = window.__gpPanel.viz;
     return { datum: v._datumColor, line: v._lineColor, stock: v._originGizmo.children.find((c) => c.geometry && c.geometry.type === 'SphereGeometry')?.material.color.getHex() };
   });
-  expect(peers.datum, 'datum is GOLD').toBe(0xffce3a);
+  expect(peers.datum, 'datum is RED (crosshair)').toBe(0xff2d2d);
   expect(peers.line, 'axis line is CYAN, a different colour from the datum').toBe(0x00e5ff);
   expect(peers.datum, 'datum colour differs from the amber stock-WCS').not.toBe(peers.stock);
 });
@@ -54,12 +54,12 @@ test('1-axis probe → no persistent datum/line yet (one plane, nothing crosses)
   expect(s.line.vis, 'no line from a single plane').toBe(false);
 });
 
-test('2-axis probe → the DATUM (gold) shows; the axis line is REMOVED (user)', async ({ page }) => {
+test('2-axis probe → the DATUM (red crosshair) shows; the axis line is REMOVED (user)', async ({ page }) => {
   // DATUM follows the WCS-WRITE (turn 112): probe Z & X and WRITE the WCS Z/X (#[#70+2]/#[#70+0]) → the datum shows.
   await setup(page, 'G54\nM3 S12000\n#70=805\nG31 Z-15 F3000\n#[#70+2]=-15\nG31 X-25 F3000\n#[#70+0]=-25\nM30');
   const s = await runShape(page);
   expect(s.datum.vis, 'the datum shows once two WCS axes are written').toBe(true);
-  expect(s.datum.color).toBe(0xffce3a);
+  expect(s.datum.color).toBe(0xff2d2d);
   expect(s.line.vis, 'the axis line was removed — it never shows now').toBe(false);
 });
 
