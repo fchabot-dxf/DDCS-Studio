@@ -193,6 +193,9 @@ const RECONCILERS = {
             f.m_inaxis = cmts.some((t) => /opposite wall/i.test(t)) ? 'manual' : 'auto';
             if (twoAxis) f.m_transaxis = cmts.some((t) => /jog[^]*perpendicular/i.test(t)) ? 'manual' : 'auto';
             const d21 = asn('#21'); if (d21 && d21.params && d21.params.value != null) f.m_diag_travel = String(d21.params.value);
+            // the in-axis cross-over TRAVERSE distance round-trips from #19/#20 (declared, user-set — recover it like #21)
+            const c19 = asn('#19'); if (c19 && c19.params && c19.params.value != null) f.m_crossX = String(c19.params.value);
+            const c20 = asn('#20'); if (c20 && c20.params && c20.params.value != null) f.m_crossY = String(c20.params.value);
         }
         return f;
     },

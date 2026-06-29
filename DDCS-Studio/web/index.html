@@ -432,8 +432,8 @@
                         <div><span class="label">SAFE Z</span><input id="m_safe_z" value="10" title="Z retract height between probing moves (mm). Stored as #17. Used as G0 Z#17."/></div>
                     </div>
                     <div id="m_crossover_block" class="grid-2 hidden">
-                        <div><span class="label">X CROSS-OVER</span><input id="m_crossX" value="[#1+#2]" title="Boss probe-both (auto): raw probe-move distance from the X wall 1 across to wall 2. Default [#1+#2] = max probe + retract; for a feature WIDER than max probe set a number ≈ feature width + 2×approach + retract. Stored as #19."/></div>
-                        <div><span class="label">Y CROSS-OVER</span><input id="m_crossY" value="[#1+#2]" title="Boss probe-both (auto): raw probe-move distance from the Y wall 1 across to wall 2. Default [#1+#2] = max probe + retract; set a number for a non-square / wide boss. Stored as #20."/></div>
+                        <div><span class="label">X CROSS-OVER</span><input id="m_crossX" value="80" title="Boss probe-both (auto): the in-axis TRAVERSE distance — how far to move from the X wall 1 across to wall 2. This is the traverse, NOT the probe reach (Max Probe) — set it to span YOUR feature: ≈ feature width + 2×approach. Default 80 (a moderate feature). Stored as #19."/></div>
+                        <div><span class="label">Y CROSS-OVER</span><input id="m_crossY" value="80" title="Boss probe-both (auto): the in-axis TRAVERSE distance — how far to move from the Y wall 1 across to wall 2. Set it to span your feature (≈ feature width + 2×approach); separate from X for a non-square boss. Default 80. Stored as #20."/></div>
                     </div>
                 </div>
 

@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-// BOSS CROSS-OVER MOVE DISTANCE (per axis). The boss "probe both" wall1→wall2 cross-over used to be a hard-coded
-// [#1+#2] (max probe + retract), so the probe only reached the far wall if MAX PROBE happened to span the feature.
-// Now it's a per-axis distance — #19 (X cross-over) / #20 (Y cross-over) — that DEFAULTS to [#1+#2] (back-compat) and
-// is overridable with a raw number for a feature wider than MAX PROBE.
-test('boss probe-both cross-over is per-axis #19/#20, defaults to [#1+#2], overridable; pocket unaffected', async ({ page }) => {
+// BOSS CROSS-OVER TRAVERSE DISTANCE (per axis). The in-axis wall1→wall2 cross-over is the straight TRAVERSE that spans
+// the feature. It used to DEFAULT to [#1+#2] (max probe + retract) — conflating the probe REACH with the traverse
+// distance (they're different). Now DECOUPLED: a clean declared per-axis number — #19 (X) / #20 (Y) — that DEFAULTS to a
+// feature-independent 80 (a moderate feature; the user tunes it to span their feature ≈ width + 2×approach).
+test('boss probe-both cross-over is per-axis #19/#20, a clean declared 80 (decoupled from max-probe), overridable', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
@@ -19,10 +19,11 @@ test('boss probe-both cross-over is per-axis #19/#20, defaults to [#1+#2], overr
     };
   });
 
-  // default boss-auto: the cross-over vars prefill to [#1+#2] (byte-behaviour of the old hard-coded move)
-  expect(r.def, '#19 (X cross-over) defaults to [#1+#2]').toMatch(/#19\s*=\s*\[#1\+#2\]/);
-  expect(r.def, '#20 (Y cross-over) defaults to [#1+#2]').toMatch(/#20\s*=\s*\[#1\+#2\]/);
-  // ... and the lateral cross moves use the vars, not a hard-coded [#1+#2]
+  // default boss-auto: the cross-over vars prefill to a clean declared 80 (decoupled from max-probe — NOT [#1+#2])
+  expect(r.def, '#19 (X cross-over) defaults to a clean 80').toMatch(/#19\s*=\s*80\b/);
+  expect(r.def, '#20 (Y cross-over) defaults to 80').toMatch(/#20\s*=\s*80\b/);
+  expect(r.def, 'the default is no longer the max-probe expression [#1+#2]').not.toMatch(/#19\s*=\s*\[#1\+#2\]/);
+  // ... and the lateral cross moves use the vars, not a hard-coded distance
   expect(r.def, 'X cross uses #19').toMatch(/X#19|X\[0-#19\]/);
   expect(r.def, 'Y cross uses #20').toMatch(/Y#20|Y\[0-#20\]/);
   expect(r.def, 'no hard-coded [#1+#2] lateral move remains').not.toMatch(/[XY]\[#1\+#2\]/);
@@ -43,6 +44,22 @@ test('boss probe-both cross-over is per-axis #19/#20, defaults to [#1+#2], overr
   });
   expect(rt.crossX, 'crossX (number) round-trips').toBe('130');
   expect(rt.crossY, 'crossY (expression) round-trips intact').toBe('[#1+#2]');
+});
+
+// SURFACE (declare-not-infer): a block-edited cross-over distance reverse-syncs from #19/#20 back into the form fields,
+// like #21 → m_diag_travel. So the X/Y CROSS-OVER fields stay the single source of the declared traverse distance.
+test('the cross-over distance reverse-syncs from #19/#20 into m_crossX/m_crossY', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio);
+  const back = await page.evaluate(async () => {
+    const ops = await import('/blocks/opSession.js');
+    const rec = await import('/blocks/opRecord.js');
+    rec.recordOp('middle', { featureType: 'boss', findBoth: true, inAxis: 'auto', transAxis: 'auto', crossX: '120', crossY: '90', axis: 'X', dir1: 'pos', dir2: 'neg' });
+    window.ddcsLoadBlockStack(ops.buildActiveOpStack().blocks);
+    return ops.reconcileActiveOp();
+  });
+  expect(back.fields.m_crossX, 'X cross-over reverse-synced from #19').toBe('120');
+  expect(back.fields.m_crossY, 'Y cross-over reverse-synced from #20').toBe('90');
 });
 
 // The real symptom: a boss WIDER than MAX PROBE. With the old [#1+#2] cross-over the probe could never reach the far

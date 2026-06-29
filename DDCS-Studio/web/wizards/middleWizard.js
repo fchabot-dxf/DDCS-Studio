@@ -37,12 +37,14 @@ export function middleStack(params = {}) {
     const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
     const dist = num(params.dist, 20), retract = num(params.retract, 2), safeZ = num(params.safeZ, 10);
     const clearOver = num(params.clearOver, 15);   // boss AUTO: how high to lift before crossing over the part
-    // Boss-AUTO probe-both: the wall1→wall2 cross-over, a RAW probe-move distance, SEPARATE per axis (non-square boss).
-    // Default = [#1+#2] (max probe + retract) = the old hard-coded behaviour, so saved ops are unchanged; a feature
-    // WIDER than MAX PROBE needs an explicit number (≈ feature width + 2×approach + retract) — MAX PROBE no longer has
-    // to span the feature. Kept as a string so the [#1+#2] default (an expression) round-trips intact.
-    const crossX = (params.crossX === '' || params.crossX == null) ? '[#1+#2]' : String(params.crossX);
-    const crossY = (params.crossY === '' || params.crossY == null) ? '[#1+#2]' : String(params.crossY);
+    // Boss-AUTO probe-both: the in-axis wall1→wall2 cross-over — the straight TRAVERSE that spans the feature, SEPARATE
+    // per axis (non-square boss). DECOUPLED from MAX PROBE: max-probe (#1) is the probe REACH (how far G31 searches);
+    // the cross-over is the TRAVERSE DISTANCE (how far to move across) — different things. It can't be computed before
+    // the probe (wall 2 is unknown), so it's USER-SET: a clean declared number ≈ feature width + 2×approach. Default 80
+    // (a moderate feature ~50 + 2×15 approach); the user tunes it to span THEIR feature. (Was [#1+#2] — that conflated
+    // reach with traverse and overshot when max-probe >> the feature.) String type → a raw expression still round-trips.
+    const crossX = (params.crossX === '' || params.crossX == null) ? '80' : String(params.crossX);
+    const crossY = (params.crossY === '' || params.crossY == null) ? '80' : String(params.crossY);
     // INC3: the TRANS-axis (X→Y) auto-traverse distance — a raw diagonal probe-move to the perpendicular walls. Default
     // 50 (a SANE fixed value, like the corner's travelDist) — NOT [#19+#20]/2 (≈ max-probe), which scaled with the probe
     // distance and overshot FAR off-stock when max-probe >> the feature. EDITABLE (the human tunes it so the 2nd-axis
@@ -129,12 +131,13 @@ export function middleStack(params = {}) {
     A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
     A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract'); A('#17', safeZ, 'Safe Z retract');
     A('#18', clearOver, 'Traverse-over clearance (boss auto: lift this high to clear the part before crossing)');
-    // #19/#20 = the IN-axis cross-over (traverseOver); #21 = the TRANS-axis Diag travel (transTraverse). Assigned only
-    // when their auto-traverse is active, so pocket/manual macros stay unchanged. #21's default references #19/#20, so
-    // they're also assigned whenever the trans-axis is auto (even if the in-axis is manual).
-    if (featureType === 'boss' && (inAxis === 'auto' || (transAxis === 'auto' && twoAxis))) {
-        A('#19', crossX, 'X cross-over: probe-move from wall 1 to wall 2 (default [#1+#2] = max probe + retract)');
-        A('#20', crossY, 'Y cross-over: probe-move from wall 1 to wall 2 (default [#1+#2] = max probe + retract)');
+    // #19/#20 = the IN-axis cross-over (traverseOver — used ONLY when the in-axis is auto); #21 = the TRANS-axis Diag travel
+    // (transTraverse). Each assigned only when its own auto-traverse is active, so pocket/manual macros stay unchanged.
+    // (#21 no longer references #19/#20 — it's a fixed default — and the trans-axis re-centres to #53, so the cross-over no
+    // longer needs to be assigned for the trans-axis's sake.)
+    if (featureType === 'boss' && inAxis === 'auto') {
+        A('#19', crossX, 'X cross-over: in-axis traverse, wall 1 across to wall 2 (user-set to span the feature, default 80)');
+        A('#20', crossY, 'Y cross-over: in-axis traverse, wall 1 across to wall 2 (user-set to span the feature, default 80)');
     }
     if (featureType === 'boss' && transAxis === 'auto' && twoAxis) {
         A('#21', diagTravel, 'Diag travel: X→Y trans-axis auto-traverse distance (default 50; tune so the 2nd-axis probe reaches ②)');

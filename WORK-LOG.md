@@ -1478,3 +1478,26 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
   travels `#21` (5–15 mm residual the user tunes). New emitted move: `G0 X[#53-#52-#10] Y#21` (X-first). **Full suite 398 green.**
 - Updated `middle-trans-traverse.spec.js` (the move regex + a new test: the primary re-centres onto ② for BOTH orders).
   **This CLOSES the trans-axis diagonal (GUI stays a nice-to-have, not needed). ⚠ HUMAN-eyes: X-first now reaches ② like Y-first.**
+
+## 2026-06-28 — turn 72: DECOUPLE + SURFACE the in-axis cross-over (#19/#20) from max-probe
+
+- **The conflation (human):** the in-axis cross-over `#19`/`#20` defaulted to `[#1+#2]` (max-probe `#1` + retract) — but
+  max-probe is the probe REACH (how far G31 searches) and the cross-over is the TRAVERSE DISTANCE (how far to move wall1→
+  wall2 across the feature). DIFFERENT things; coupling them overshot whenever max-probe >> the feature.
+- **VERIFY-FIRST:** `#19`/`#20` are used ONLY by `traverseOver` (the in-axis cross-over, called only when `inAxis==='auto'`);
+  the form fields [m_crossX/m_crossY](DDCS-Studio/web/index.html) showed the raw `[#1+#2]` expression (max-probe defaults to
+  100 → `[#1+#2]`=102); the reconciler recovered `#21` (diag) but **NOT** `#19`/`#20` (a round-trip gap). Post-Fix-1 the
+  trans-axis re-centres to `#53`, so the cross-over no longer feeds the diagonal — it only needs to span the in-axis feature.
+- **(b) DECOUPLE** [middleWizard.js](DDCS-Studio/web/wizards/middleWizard.js): `crossX`/`crossY` default `[#1+#2]` → a clean
+  **`80`** (feature-INDEPENDENT). **⚠ PROPOSED VALUE — advisor to review:** 80 = a moderate feature (~50) + 2×15 approach;
+  TRACED → it spans features to wall 2 up to ~65 mm (reach = −outset + 80 = world 65); bigger features the user tunes (the
+  field is now visible). Trade-off: the old `[#1+#2]`=102 spanned ~85 mm — 80 is smaller, but it's a clean declared number
+  the user OWNS (not a hidden max-probe expression). Also: `#19`/`#20` are now assigned ONLY when `inAxis==='auto'` (was
+  also-when-trans-auto, which is obsolete now that `#21` is a fixed default and the trans-axis re-centres to `#53`).
+- **(c) SURFACE:** the X/Y CROSS-OVER fields read a clean **`80`** with a title that says TRAVERSE distance (≈ feature width
+  + 2×approach), explicitly "NOT the probe reach (Max Probe)". Added the **reverse-sync** ([opSession.js](DDCS-Studio/web/blocks/opSession.js)):
+  `#19`/`#20` → `m_crossX`/`m_crossY` (mirrors `#21`→`m_diag_travel`) — closes the round-trip gap so the field stays the one
+  declared source of the traverse distance. New test: a block-edited cross-over reverse-syncs into the form.
+- Updated `middle-crossover.spec.js` (default 80 not `[#1+#2]`; header; + the reverse-sync test). **Full suite 398 green + 3
+  KNOWN parallel flakes** (custom-op-chip, middle-animator, project-drawer-smoke — 9 pass isolated). **⚠ HUMAN-eyes:** the
+  CROSS-OVER form fields read as clean numbers + a probe-both run on a real boss reaches both in-axis walls.
