@@ -92,15 +92,18 @@ export function middleStack(params = {}) {
         // The lateral travel is the CONNECTING move (lift → diagonal → drop) and MUST come BEFORE the REPOSITION
         // comment so it belongs to the PRIOR (primary-axis) pass — the trace anchors the NEXT pass to ②, so a move
         // emitted AFTER the REPOSITION would draw FROM ② and push the 2nd probe away. Then REPOSITION marks the Y pass.
-        // SAME directional pattern as the corner's diagonal (probeBlocks travelOwn/travelOpp): the PRIMARY leg travels
-        // IN the primary probe direction, the SECONDARY leg the OTHER way (out to ②'s side). #21 = the Diag-travel.
-        // ⚠ KNOWN-LIMITED: a single travel can't reliably land on ② — the tool's position after the primary probes
-        // depends on the boss size vs max-probe (the cross-over over/undershoots), so this drifts for off-size bosses.
-        // The clean fix is the GUI (drag ② → compute the move); a macro-only re-centre breaks manual-in-axis (see WORK-LOG).
-        const pmove = travelOwn(dir1Plus, '#21', '[0-#21]');   // primary axis: toward the centre / the perpendicular walls
-        const smove = travelOpp(dir2Plus, '#21', '[0-#21]');   // secondary axis: out toward ② (opposite its first probe dir)
+        // PRIMARY axis: the AUTO in-axis cross-over (#19/#20) flings the tool FAR past centre (in +dir1), so a fixed travel
+        // can't come back — it's WHY the old `travelOwn` X leg went the WRONG WAY (further out) for X-first. Re-centre to the
+        // MEASURED centre #53 instead: the tool sits at wall-2 (#52) + the last retract (seq runs twoPass(!dir1Plus) last →
+        // its rv = #10 / #9), so the incremental step to centre = #53 − #52 − rv. This heads to ②'s primary coord regardless
+        // of axis ORDER (X-first or Y-first — #51-53 are always the PRIMARY axis's). MANUAL in-axis has no cross-over fling
+        // and a different per-pass frame, so keep its directional travel there. SECONDARY axis: travel OUT to ② by the
+        // Diag-travel #21 (the one distance the macro can't measure before it probes that axis — the user tunes it).
+        const lastRetract = dir1Plus ? '#10' : '#9';          // seq runs twoPass(!dir1Plus) last → its retract is #10 (+) / #9 (−)
+        const pmove = inAxis === 'auto' ? `[#53-#52-${lastRetract}]` : travelOwn(dir1Plus, '#21', '[0-#21]');
+        const smove = travelOpp(dir2Plus, '#21', '[0-#21]');  // secondary axis: out toward ② (opposite its first probe dir)
         MV('Z', '#18');                                  // lift clear of the boss
-        MOVE({ [axis.toLowerCase()]: pmove, [second.toLowerCase()]: smove });   // travel across to ② (Diag travel #21)
+        MOVE({ [axis.toLowerCase()]: pmove, [second.toLowerCase()]: smove });   // re-centre the primary + travel out to ②
         MV('Z', '[0-#18]');                              // back to probe height
         C('REPOSITION: auto-traverse to the perpendicular walls');   // mark the Y pass (anchored to ②); no operator wait
         DM('inc');

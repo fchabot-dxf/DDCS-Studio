@@ -18,11 +18,13 @@ test('macro: boss auto trans-axis emits the diagonal traverse (#21); manual jogs
     const stock = { x: 100, y: 80, z: 20 };
     return {
       autoHas21: /#21\s*=/.test(auto),
-      autoHasTransMove: /G0 X#21 Y#21/.test(auto),
+      // the PRIMARY (X here) leg re-centres to the measured centre #53 (heads to ② regardless of axis order); the
+      // SECONDARY (Y) leg travels out by the Diag-travel #21. (dir2=neg → +#21 = Y#21.)
+      autoHasTransMove: /G0 X\[#53-#52-#10\] Y#21/.test(auto),
       autoHasAutoTraverse: /auto-traverse to the perpendicular/.test(auto),
       // the diagonal move must come BEFORE the REPOSITION (the connecting travel of the PRIOR pass) — else the trace
       // anchors it to ② and pushes the 2nd probe AWAY (the bug the human caught). So the Y pass starts cleanly at ②.
-      moveBeforeReposition: auto.indexOf('G0 X#21 Y#21') < auto.indexOf('auto-traverse to the perpendicular'),
+      moveBeforeReposition: auto.indexOf('G0 X[#53-#52-#10] Y#21') < auto.indexOf('auto-traverse to the perpendicular'),
       manualHas21: /#21/.test(manual),
       manualHasJogPerp: /jog clear, around to the perpendicular/.test(manual),
       legacyAutoMatches: w.generate({ ...base, approach: 'auto' }) === auto,
@@ -32,7 +34,7 @@ test('macro: boss auto trans-axis emits the diagonal traverse (#21); manual jogs
     };
   });
   expect(r.autoHas21, 'auto trans-axis assigns the Diag travel #21').toBe(true);
-  expect(r.autoHasTransMove, 'auto trans-axis emits the diagonal G0 move (the fix — it used to just jog)').toBe(true);
+  expect(r.autoHasTransMove, 'auto trans-axis re-centres the primary (#53) + travels out by #21 (the fix)').toBe(true);
   expect(r.autoHasAutoTraverse, 'auto trans-axis is hands-free, not an operator jog').toBe(true);
   expect(r.moveBeforeReposition, 'the diagonal move is the connecting travel BEFORE the REPOSITION (so the Y pass anchors at ②)').toBe(true);
   expect(r.manualHas21, 'manual has no Diag travel').toBe(false);
@@ -43,32 +45,36 @@ test('macro: boss auto trans-axis emits the diagonal traverse (#21); manual jogs
   expect(r.manualStarts, 'manual → 4 per-pass starts').toBe(4);
 });
 
-// Part 2a: the trans-axis diagonal LANDS near ② — its distance #21 is a SANE fixed default (50, like the corner's
-// travelDist), NOT [#19+#20]/2 (≈ max-probe) which scaled with the probe distance and overshot FAR off-stock when
-// max-probe >> the feature. The DIRECTION (travelOwn primary / travelOpp secondary, shared with the corner via
-// probeBlocks) was already correct; only the magnitude was wrong. So the endpoint is now max-probe-INDEPENDENT.
-test('the diagonal lands near ② and is independent of max-probe (sane #21=50, not scaled to dist)', async ({ page }) => {
+// The real fix (was mis-diagnosed as "circular"): the trans-axis diagonal's PRIMARY leg re-centres to the MEASURED centre
+// #53, so it heads to ②'s primary coord REGARDLESS OF AXIS ORDER. The old hardcoded `travelOwn` primary sign sent X-first
+// the WRONG WAY: the in-axis cross-over flings the tool far past centre (in +dir1), so +#21 drove it FURTHER out, not back.
+// X-first now matches the (already-working) Y-first. The secondary leg still travels out by #21 (the user-tuned distance).
+test('the trans diagonal re-centres the PRIMARY axis to ② for BOTH axis orders (X-first == Y-first)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
     const { MiddleWizard } = await import('/wizards/middleWizard.js');
     const { traceToolpath } = await import('/engine/trace.js');
     const w = new MiddleWizard();
-    const stock = { x: 100, y: 80, z: 20, shape: 'boss' };
-    const endpointErr = (dist) => {
-      const p = { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', stockX: 100, stockY: 80, stockZ: 20, dist, inAxis: 'auto', transAxis: 'auto' };
+    const stock = { x: 40, y: 40, z: 20, shape: 'boss' };   // NORMAL boss (dist=100 clears it → the probes succeed)
+    // the diagonal endpoint's PRIMARY coord must land on ②'s primary (= the centre), for X-first AND Y-first
+    const primErr = (axis) => {
+      const p = { featureType: 'boss', twoAxis: true, axis, dir1: 'pos', dir2: 'pos', dist: 100, diagTravel: '50', inAxis: 'auto', transAxis: 'auto' };
       const code = w.generate(p), starts = w.inferStarts(p, stock);
       const segs = traceToolpath(code, { stock, start: starts[0], passStarts: starts }).segments || [];
       const diag = segs.filter((s) => (s.type === 'rapid' || s.rapid) && Math.abs(s.x2 - s.x1) > 1 && Math.abs(s.y2 - s.y1) > 1)[0];
-      const twoLocal = { x: starts[1].x - starts[0].x, y: starts[1].y - starts[0].y };
-      return Math.hypot(diag.x2 - twoLocal.x, diag.y2 - twoLocal.y);   // distance from the diagonal endpoint to ②
+      const prim = axis === 'X' ? 'x' : 'y';
+      const centreLocal = (axis === 'X' ? 20 : 20) - starts[0][prim];   // centre = (20,20) for a 40×40 boss
+      return Math.abs(diag[prim + '2'] - centreLocal);
     };
-    return { err60: endpointErr(60), err100: endpointErr(100), default21: /#21\s*=\s*50\b/.test(w.generate({ featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', stockX: 100, stockY: 80, stockZ: 20, inAxis: 'auto', transAxis: 'auto' })) };
+    return {
+      xFirst: primErr('X'), yFirst: primErr('Y'),
+      reCentreMove: /G0 X\[#53-#52-#10\] Y/.test(w.generate({ featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'pos', dist: 100, inAxis: 'auto', transAxis: 'auto' })),
+    };
   });
-  expect(r.default21, 'the Diag-travel default is a sane fixed 50, not [#19+#20]/2').toBe(true);
-  expect(r.err60, 'diagonal lands near ② at dist=60').toBeLessThan(12);
-  expect(r.err100, 'diagonal lands near ② at dist=100 (the old overshoot case)').toBeLessThan(12);
-  expect(Math.abs(r.err60 - r.err100), 'endpoint is max-probe-INDEPENDENT (decoupled from dist)').toBeLessThan(1);
+  expect(r.reCentreMove, 'the primary leg is the re-centre expression #53-#52-#10, not a fixed travel').toBe(true);
+  expect(r.xFirst, 'X-first: primary re-centres onto ② (was sent the wrong way)').toBeLessThan(2);
+  expect(r.yFirst, 'Y-first: primary re-centres onto ② (matches the working order)').toBeLessThan(2);
 });
 
 test('round-trip: the per-traverse toggles + Diag travel reverse-sync from the block stack', async ({ page }) => {

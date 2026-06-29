@@ -1456,3 +1456,25 @@ were clean, no forks. (Visual items #15/#18 have the standard human-eyes-pending
     feature-canvas-in-probe initiative. **GATE: pass to advisor to greenlight the GUI vs another approach — no macro hack.**
 - **⚠ HUMAN-eyes:** fix 2 — auto boss-both shows NO dashed jog (manual still does). fix 1 — still drifts for off-size bosses
   (the circular residual; awaiting the GUI decision).
+
+## 2026-06-28 — turn 70: FIX 1 was NOT circular — an axis-order PRIMARY-sign bug. FIXED (re-centre to #53)
+
+- **Own it — I mis-framed turn-67 as "circular."** The advisor (relaying the human) re-opened: the "circular" was the
+  DEGENERATE DEFAULT (boss=stock=100, dist=100 → #53 garbage). On a NORMAL boss (boss < stock so the cross-over clears),
+  **Y-first works at the SAME #21=50 — which PROVES the move reaches ②**, so it's not circular; it's a hardcoded sign.
+- **VERIFY-FIRST (traced BOTH orders + drove the LIVE preview, normal 40×40 boss):** symmetric — both orders put the tool at
+  primary local `57` (the in-axis cross-over `G0 X#19`/`G0 Y#20` flings it FAR past centre in +dir1), then the trans-move's
+  PRIMARY leg `+#21` drove it FURTHER out to `107` (②'s primary = the centre, local `35`). The SECONDARY leg already headed
+  to ②. **ROOT: the primary leg used `travelOwn(dir1)` (a fixed +dir1 sign) — right after a manual jog, WRONG after the
+  auto cross-over fling.** (My earlier static "5 mm" for 100×80 under-represented it; the LIVE preview is the truth — it
+  showed `(117,0)→(167,0)`, the human's exact symptom.)
+- **FIX ([middleWizard.js transTraverse](DDCS-Studio/web/wizards/middleWizard.js)):** the PRIMARY leg re-centres to the
+  MEASURED centre **#53** (the tool sits at wall-2 `#52` + the last retract → incremental step `[#53−#52−#10/#9]`). Heads to
+  ②'s primary coord **regardless of axis ORDER** (#51-53 are always the primary's). SECONDARY stays `travelOpp(dir2)` `#21`
+  (the out-distance the macro can't measure before it probes that axis — user-tuned). MANUAL in-axis kept (no cross-over
+  fling, different per-pass frame; verified it was already ~correct, primErr 2 mm).
+- **VERIFIED in the LIVE preview (the real symptom):** X-first `X 57→35` (=②X centre, EXACT) · Y-first `Y 57→35` (=②Y centre)
+  · even the default `X 117→65` (=②X=65). The X no longer flies outward; X-first now matches Y-first. The secondary still
+  travels `#21` (5–15 mm residual the user tunes). New emitted move: `G0 X[#53-#52-#10] Y#21` (X-first). **Full suite 398 green.**
+- Updated `middle-trans-traverse.spec.js` (the move regex + a new test: the primary re-centres onto ② for BOTH orders).
+  **This CLOSES the trans-axis diagonal (GUI stays a nice-to-have, not needed). ⚠ HUMAN-eyes: X-first now reaches ② like Y-first.**
