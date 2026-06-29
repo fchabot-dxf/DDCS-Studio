@@ -1909,3 +1909,60 @@ NOT the WCS edge) WITHOUT touching the editor-clean contract — chosen over Opt
   the same deeper limitation flagged since turn 88 — B2/B4 territory). Also: if the editor is HAND-EDITED to diverge from the
   program model, the program hints can be stale — acceptable per the one-source choice (the program is the truth right after an
   insert, the human's actual flow). SCOPE = Option B only (NOT A / no editor markers; NOT B2 drag-persist; NOT B4).
+
+## 2026-06-29 — turn 102: B-FLASH-2ND-AXIS — the 2nd-axis probe-retract render flash (render-side, one-line)
+
+Kill the 4× flash on an AUTO boss-both: during the 2nd-axis probe the rendered 3D spindle jumped to an offset
+position at each probe-retract, then snapped back. RENDER/animation-side only — the macro is UNCHANGED (post-revert
+HEAD = `cbdc44d`). No G53/G90 introduced (would re-break B-START — [[g53-move-breaks-preview-start-anchor]]).
+
+- **VERIFY-FIRST — empirical, render-level (NOT e.pos; the 4th render bug this thread, e.pos lied 3×).** Wrote a
+  throwaway diagnostic that drove the REAL live engine through an auto boss-both and fed every `onPositionChange`
+  into a REAL `GcodeViz3D.setToolPosition`, recording the RENDERED `_animTool.position` + `pos.pass` per frame.
+  Ground truth: ①=`{-15,30}`, ②=`{30,75}` (offset ②−①≈63 mm). PASS histogram `{0:10, 1:8, undefined:8}` — **8
+  pass-less frames**, all the short probe-RETRACTS. In the 1st axis the missing pass defaults to `starts[0]`=① =
+  the CORRECT anchor → no visible flash. In the 2nd axis (4 of them: f#15/17/22/24 = 2 walls × slow/fast) it
+  defaults to ① but should be ② → renders at `①+raw` (e.g. `{-15,17}`) instead of `②+raw` (`{30,62}`) → the
+  `{45,45}` jump, then the next emit (with pass) snaps back. EXACTLY the human's "4× at each contact".
+- **ROOT (code-anchored):** every per-frame emit sets `p.pass = this._pass` (the animated `_advanceMove` ~:481, the
+  landing `_finishMove` :494) — EXCEPT the sub-frame coordinate-move emit at [GcodeExecutionEngine.js:1050]
+  (`onPositionChange({x,y,z})`, no pass). A retract is a fast rapid over a few mm → `realMs/speed ≤ 50` → it skips
+  the in-flight `_move` and emits via that pass-less path. `setToolPosition` then defaults `pass→0` →
+  `starts[0]`=①. The advisor's hypothesis (pos.pass → null → defaults 0 → jump by starts[0]−starts[1]) confirmed.
+- **FIX (one line, render-reporting only):** add `pass: this._pass` to the :1050 emit, identical to its two
+  siblings. The retracts now report their pass → during the 2nd axis they carry `pass=1` → render on ②. pass-0 ops
+  unaffected (default was already 0). NOT a macro/G53/G90 change; the emitted G-code is byte-identical.
+- **WHY the flash only shows at real speed (and why the grab tool is the wrong instrument):** it's a ~1-tick
+  transient (the retract frame is on-canvas ~12 ms, then corrected). SLOWING the sim to capture it converts the
+  retract from a sub-frame jump into an animated `_move` → that path already carries pass (~:481) → the bug HIDES
+  itself. So fps sampling (and headless WebGL ~2 fps) misses it; the deterministic render-VALUE capture is the
+  reliable gate. (Human confirmed live: "flash is gone".)
+- **VERIFIED — REAL-SYMPTOM (new `middle-2nd-axis-flash.spec.js`):** drives the real live engine + a REAL viz, asserts
+  every frame AFTER the diagonal reposition renders on the ② anchor (boundary found STRUCTURALLY via the REPOSITION
+  onLineChange line, NOT the `pass` field this fix corrects). Reverted the one-liner → FAILS (2nd-axis frame renders
+  at `{-15,17}`=①); fixed → PASSES. Targeted sim/probe set 47/47 green; FULL suite 415 passed / 2 skipped / 1 failed,
+  the lone failure `knob-persist` (Blocks FORM-LIVE, unrelated domain) is a parallel-load flake — PASSES isolated.
+- **HUMAN-EYES artifact (animation-capture skill):** built the contact sheets by EXECUTION LINES (the human's idea) —
+  stepped the engine one emit at a time, one still per step, fps-independent so the 1-tick flash lands on its own
+  frame. BUGGY sheet: f015/f017/f022/f024 = `p- s0 FLASH` (pass null → ①), spindle visibly at the ① corner. FIXED
+  sheet: f014–f025 all `p1 s1`, riding ②, zero FLASH. (Sheets are in the session scratchpad, opened in VS Code.)
+- **SKILL UPGRADE (outside the repo — `~/.claude/skills/animation-capture/`, NOT in this commit):** added a general
+  step-driven mode to `web_capture.cjs` (`scenario.step → label|null`, one still per tick), documented it
+  generically in SKILL.md (any deterministic driver — execution timeline, token/word walk, state machine, scrubber,
+  action log; granularity is the scenario's choice), + a worked `examples/middle-probe-steps.scenario.cjs`.
+- **FLAGS for the advisor:**
+  - **Shared root with B-END-OFFSET / B-TRANS-ANGLE** — partly. B-FLASH was specifically the pass-less SUB-FRAME
+    emit; it is INDEPENDENT of the end-retract (B-END-OFFSET) and the static traverse angle (B-TRANS-ANGLE). All three
+    touch the 2nd-axis/per-pass anchor on the render, but this fix does NOT address B-END-OFFSET or B-TRANS-ANGLE
+    (still queued). SCOPE kept to the flash only, as dispatched.
+  - **Sibling pass-less emits** at :860 (native HOMING move) and :1095 (arc real-time play) still omit `pass`. They
+    are NOT on the boss-both 2nd-axis path (not reached by the middle probe), so out of scope this turn — but a
+    homing-then-probe or an arc-in-a-multipass op could show the same anchor glitch. Worth a look if it surfaces.
+
+- **CAPTURE made FAITHFUL (human feedback mid-turn):** the first step-capture hand-built a synthetic scene → the
+  human flagged "your captures aren't what I'm seeing / path going off stock / use top-down". Reworked the example
+  scenario to drive the REAL wizard: configure the actual Middle form (Boss·Find Both·Auto), let the panel build its
+  REAL scene (stock/path/①②/camera), lift the REAL generated code (`#wiz_middle_code`) + `panel.getPassStarts()` +
+  `panel.getStartPos()` + `viz._stock`, `viz.setView('top')`, then step a fresh engine over the REAL viz. The
+  before/after now matches the app (top-down: the probe circle visibly jumps off the boss to ① on the 4 FLASH
+  frames, then rides ② clean once fixed). Human confirmed.

@@ -1043,7 +1043,11 @@ export class GcodeExecutionEngine {
             }
             this.pos = target;
             if (typeof this.onPositionChange === 'function') {
-                this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
+                // Sub-frame move (no in-flight _move): report the current REPOSITION pass so the live tool anchors to
+                // starts[_pass] like the animated path (line ~481) + the landing (_finishMove). WITHOUT this, a short
+                // 2nd-axis retract emits pass-less → setToolPosition defaults to starts[0]=① → the tool FLASHES off ②
+                // at each probe contact (B-FLASH-2ND-AXIS). pass 0 ops are unaffected (default already 0).
+                this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z, pass: this._pass });
             }
         } else if (this._traceSink) {
             // Arc (G2/G3) in a trace: linearize into chord segments so the drawn route shows the curve.
