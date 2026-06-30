@@ -3026,3 +3026,69 @@ LENGTH calc (MachineZ − BlockHeight), NOT a radiuscomp/probe-surface comp. A f
 **Verified:** `probe-surface-block.spec` green (5 passed — radiuscomp/probeSurfaceStack/EDGE/CORNER/ROTARY); full suite **436
 passed** (1 failure, `project-drawer-smoke`, is a parallel-load flake — passes isolated, unrelated). The probe-surface chapter
 is closed (radiuscomp atom → 5 wizards migrated → disc-on-surface both sims → fit-comp → now one bracket style).
+
+---
+
+## 🔨 turn 165 — ITEM 4 SCOUT (design phase 1): the current travel/START model + the seams for start=source/travel=derived
+
+A map, NO build. Headline: **the model is INVERTED today** (START is DERIVED from TRAVEL), but the seam for the new model
+ALREADY EXISTS (a user-drag override + the inversion prototyped for ONE field). Item 4 = flip the dependency + generalise the
+prototype + retire the redundant fields. The human's vision is already DOCUMENTED in two backlog files (cited below).
+
+### A · Current model — per wizard (START ← derived ← TRAVEL, backwards)
+Every probe wizard computes the START from a TRAVEL field + the stock; nothing derives travel from the start.
+
+| wizard | START source | TRAVEL field(s) | relation |
+|---|---|---|---|
+| EDGE | `inferStart` → outset = min(dist*0.6, 15) off the edge | `dist` (#1; the canvas LABELS it "reach") | START ← dist |
+| CORNER | `inferStart` → inFront/nearEdge from travelDist+dist | `travelDist` (#15/#16, the between-walls move), dist | START ← travelDist |
+| ROTARY CENTER | `opSimStarts` → top + 2 flanks; flankOff = R+retract+tipR | retract, safeZ (no travel field — flankOff computed) | START ← R/retract |
+| ROTARY CLOCK | `inferStart` → y = sy/2 − span/2 | `span` (#6, the A→B distance) | START ← span |
+| ALIGNMENT | `opSimStarts` → A/B at 30%/70% of the stock | (none; macro reads the DRO) | START inferred per-pass |
+| **MIDDLE (crux)** | `opSimStarts` → 1–5 markers; outside() = f(dist) | dist, crossX/crossY (#19/#20), **diagTravel (#21)**, clearOver (#18) | START ← dist; travel user-set |
+
+`opSimStarts` is the central registry for the multi-pass wizards (middle/alignment/rotary); the single-pass ones
+(edge/corner/rotary-clock) define `inferStart` directly. The pass/marker count MUST mirror the macro's `reposition()` calls.
+
+### B · The MIDDLE crux — the marker count IS config-driven (1–5)
+`opSimStarts.middle`: `z(probeZ?1:0) + prim(inAxisManual?2:1) + sec(twoAxis ? (boss? (inAxisManual?2:1) : 1) : 0)`.
+Max = **5** when probeZ + boss + inAxisManual + twoAxis → `[Z, X-w1, X-w2, Y-w1, Y-w2]` — exactly the human's "4th + 5th
+marker." So the handles already enumerate from the real config (the spec's requirement is half-met).
+
+### C · The seam ALREADY EXISTS — the inversion is prototyped
+- **START-as-source infra is built:** `createPreviewPanel.userStarts` (a drag/jog BEATS the inferStarts hint + PERSISTS);
+  `onStartDrag(pos, pass)`; `toolpath2d.setStarts` draws the draggable ①②③④ handles. So drag → persist → macro re-runs from it.
+- **The inversion is prototyped for ONE field:** `tieDiagTravel` (middleView) — dragging ② DERIVES `#21` and writes the field
+  ("② is the master"). That's exactly start=source/travel=derived, for diagTravel only. Item 4 = generalise it to ALL travels.
+
+### D · The human's documented vision (ground truth — the spec is half-written)
+- **`MIDDLE-PROBE-BACKLOG.md` (turn 117, "THE CRUX"):** (1) START=source, TRAVEL=derived — drag the start, never type the
+  travel; the **diag-travel field is OBSOLETE** ("dependent on the next start pos, not a distance"); the **block STORES the
+  derived value** (spatial-GUI: drag the canvas, plain number on the block, no form field) → unification: **reach = travel =
+  start**, edge-reach→start folds in here. (2) markers config-driven (the 4th+5th). (3) the **"locked 24" BUG**: the diag handle/
+  field/value are DISCONNECTED (field shows 8, effective ~24, handle does nothing) → making START the source **fixes it by
+  construction**. Plus a **per-transition AUTO/MANUAL unification** (one uniform model replacing inAxis+transAxis+crossX/Y+diag;
+  "two meanings of pass" — the sim re-anchors per START always, auto/manual only = does the operator stop).
+- **`FEATURE-CANVAS-PROBE-SCOPE.md`:** the canvas views — EDGE probe-VECTOR (one drag = axis+dir+reach), MIDDLE start-markers
+  ①②③④ + the cross-over/diagonal as draggable vectors, the probe-reach RING. **Build order:** EDGE probe-vector first (smallest
+  surface, biggest "aha"), then MIDDLE start-markers (continues the toolpath2d ①②③④ work).
+- **EDGE (turn 117):** DROP the "reach" handle, ADD a START-POS handle.
+
+### E · Surprises / flags
+1. The dependency is **backwards** today (start←travel) but the flip is low-risk: the override infra + the tieDiagTravel
+   prototype already exist. Item 4 is "invert + generalise + delete the field," not "build from scratch."
+2. **"travel = derived" means derived from the START POSITIONS, not computed by the macro** — the macro genuinely can't know
+   wall-2 pre-probe; but the GUI knows where the user dropped ②, so the field is derivable GUI-side (that's all tieDiagTravel does).
+3. **B-TRANS-ANGLE is NOT in the code** — a backlog RENDER-side item (turn 102): the trans-axis traverse draws at a FIXED 45°
+   instead of the ACTUAL vector to the variable ②. It rides the SAME ② start data → folds into the same start-sync cluster.
+4. **EDGE "reach" is the `dist` field** mislabeled "reach" on the canvas — drop the reach handle, the dist derives from the
+   start outset (or a reach ring).
+5. The **marker count must stay in lockstep** with the macro's `reposition()` calls (the existing fragile seam) — the
+   config-driven enumeration (B) already does this; item 4 must preserve it.
+
+### Recommended seams for the increment plan (advisor's spec)
+1. **EDGE first** (the prototype, per the scope doc): drop reach → a START-POS handle; dist derives. Smallest, proves the pattern.
+2. **MIDDLE** (the crux): generalise `tieDiagTravel` → all travels derive from the dragged starts; **remove the diagTravel form
+   field** (the block stores it); fix the "locked" disconnect by construction; the per-transition auto/manual unification.
+3. **B-TRANS-ANGLE** (render): draw the actual trans-axis vector to ②, not a fixed 45° — falls out once ② is the source.
+4. Corner/rotary/alignment: adopt the same start-marker canvas (their opSimStarts already provide the per-pass starts).
