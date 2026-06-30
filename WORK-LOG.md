@@ -2777,3 +2777,46 @@ comps `[#51,#52,#54,#55]`; driving the editor's gcode through the REAL editor vi
 NOTE: the gpPanel's ANIMATED play wouldn't sustain `running` in-test (the single-engine guard, just after the wizard insert),
 so the disc is verified by driving the SAME program-model source + nudge through the real editor viz, not the animated engine —
 the render is the real editor-view symptom. RELEASE: batches with the flank-disc polish (378191f) → V10.42 (advisor ships).
+
+---
+
+## 🔨 turn 151 — SPATIAL MODEL inc 1 SCOUT + GATE: safe-Z frame primitive (no shared control exists; machine-move confirmed)
+
+Scout-first per the dispatch. The machine-move ground truth is CONFIRMED (no invention needed); the "shared safe-Z control"
+the dispatch wants to hang the toggle on does NOT exist (safe-Z is hand-rolled per wizard) → a cross-wizard refactor decision,
+plus a real machine-frame move subtlety. Gating with the plan; no code changed.
+
+### (c) MACHINE MOVE — CONFIRMED from ground truth (buildable, NOT invented)
+- `dialect.machineMove('Z', ref)` already exists: Expert `G53 Z#var` (dump `appcode/snippets.nc:4 → G53 Z#99` ✓), V4.1
+  `G0 G53 Z#var` (`probe-fix.nc → G0G53Z#102` ✓ — cited in the dialect).
+- A `machinemove` block atom (`web/wizards/ops/macro.js:12`) + reverse-sync (`gcodeToStack.js:63`); the engine honors G53
+  (`GcodeExecutionEngine` maps part = machine − wcsOffset). So machine-frame EMIT + SIM are buildable from existing primitives.
+
+### (a/b) SAFE-Z — per-wizard, NO shared control (a cross-wizard refactor to share)
+- SHARED today: only the param KEY `params.safeZ` + the `num()` coercion.
+- PER-WIZARD: the HTML field (`c_safe_z`/`m_safe_z`/`rc_safe_z`/`rcl_safe_z`/`al_safe_z`/`circ_safe_z`), the view read, the
+  opSchema FIELD_BIND, AND the emit — DIFFERENT vars (`#17` middle/rotary, `#19` corner/alignment/ATC), defaults (10 vs 15),
+  and SEMANTICS (corner `#17 = safeZ + scanDepth`, its safe-Z RETRACT is `#19`). No shared field/widget/helper.
+- ⇒ the dispatch's "SHARED safe-Z control so wizards INHERIT the toggle" doesn't exist — building one = a refactor across the
+  HTML + 5–6 views + the schema bindings. That's the cross-wizard refactor to gate before.
+
+### OPEN DECISIONS (advisor's call)
+1. **Shared-control fork.**
+   - **(A, REC)** inc-1 = a shared frame-aware EMIT helper + the block field + round-trip (these ARE reusable) wired through
+     ONE wizard, the UI toggle hand-added to that wizard's field; the shared UI control (all wizards inherit) = a follow-up
+     refactor. Minimal, no cross-wizard refactor now.
+   - **(B)** build the shared safe-Z field COMPONENT first (refactor the per-wizard fields into one control), then the toggle
+     lives there. The bigger cross-wizard refactor.
+2. **Machine-frame MOVE semantics — the real subtlety.** The relative move is a SYMMETRIC pair: lift `MV('Z','#17')` (+#17),
+   drop `MV('Z','[0-#17]')` (−#17 back to the work height). Under an ABSOLUTE machine lift (`G53 Z#17`), the `−#17` drop no
+   longer returns to work (it drops #17 below the machine plane). So machine-frame is NOT a 1-line swap of the lift — the
+   lift→drop pairing needs reworking (the drop-back needs the work Z). **Q:** for inc 1, scope machine-frame to (a) just the
+   FINAL retract / end park (clean — no drop-back, a true single-move slice), or (b) inter-move traverses too (needs the rework)?
+3. **Machine-Z VALUE.** Confirm `frame=machine` ⇒ `safeZ.value` IS the absolute machine Z (e.g. 480), emitted `G53 Z#<safeZvar>`
+   (user owns the number, per the spec). The height stays a value the user sets, not a profile push.
+
+### Recommendation
+(A) + scope inc-1 machine-frame to the **FINAL retract / park** (the clean, well-defined case) on the **middle or rotary**
+(cleanest `#17 = safeZ` seam): the `safeZ.frame` param (default relative) + relative byte-identical (stripAnnotations) + machine
+→ `dialect.machineMove('Z', '#17')` + the block round-trip + the sim honoring G53. The inter-move-traverse machine frame (the
+lift/drop rework) and the shared UI control across all wizards = follow-ups (inc 2+). No G-code invented.
