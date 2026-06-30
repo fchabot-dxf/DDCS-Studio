@@ -85,29 +85,57 @@ test("CORNER migration — functional G-code BYTE-IDENTICAL to the hand-rolled w
   for (let i = 0; i < CORNER_GOLDEN.length; i++) expect(out[i], JSON.stringify(CORNER_SWEEP[i])).toBe(CORNER_GOLDEN[i]);
 });
 
-// ROTARY migration (t129) — VALUE-IDENTICAL (the comp relocates from #56 to the touches) + the named OD-top FIX.
-test('ROTARY migration — known value-identical (Yc/Zc/R) + OD-top FIX (datum=top on the TRUE surface) + fit value-identical', async ({ page }) => {
+// ROTARY (t129 migration + t139 fit-comp ON) — known value-identical + OD-top FIX; the FIT now comps too (the declared
+// toggle, consistent with known). The fit SIM is degenerate (the operator-jog reposition isn't simulated → garbage points),
+// so the fit comp is verified by the DECLARATION (the touches emit the comp + readEnabledComps includes them) + a SYNTHETIC
+// solver test (the ACTUAL macro's circle-solve on real OD points), NOT the broken sim. (Fixing the fit sim = the next task.)
+test('ROTARY — known value-identical + OD-top FIX; fit comp ON verified by declaration + synthetic solver', async ({ page }) => {
   await boot(page);
   const r = await page.evaluate(async () => {
     const { GcodeExecutionEngine } = await import('/engine/index.js');
     const { RotaryCenterWizard } = await import('/wizards/rotaryCenterWizard.js');
+    const { builderOf } = await import('/blocks/opBuilders.js');
     const stock = { x: 150, y: 76.2, z: 76.2, shape: 'cylinder', show: true };
     const w = new RotaryCenterWizard();
     const run = (p) => { const eng = new GcodeExecutionEngine({ autoAnswer: true, stock, stockOffset: w.inferStart(p, stock) }); eng.trace(w.generate(p)); return { yc: eng.vars.get(54), zc: eng.vars.get(56), R: eng.vars.get(55), top: eng.vars.get(50) }; };
-    return {
-      known: run({ method: 'known', diameter: 76.2, dist: 30, safeZ: 15, approach: 'auto', datum: 'top' }),
-      fit: run({ method: 'fit', dist: 30, safeZ: 15, datum: 'center' }),
-    };
+    const known = run({ method: 'known', diameter: 76.2, dist: 30, safeZ: 15, approach: 'auto', datum: 'top' });
+
+    // FIT — comp ON, verified WITHOUT the degenerate operator-jog sim:
+    const fitParams = { method: 'fit', dist: 30, safeZ: 15, datum: 'center' };
+    const fitText = w.generate(fitParams);
+    // (1) the 3 fit touches EMIT the comp (the declared surface): top −#6, +Y flank +#6, −Y flank −#6
+    const fitEmit = { top: fitText.includes('#51=[#1927-#6]'), flankPlus: fitText.includes('#53=[#1926+#6]'), flankMinus: fitText.includes('#55=[#1926-#6]') };
+    // (2) readEnabledComps(fit) now includes the 3 result vars → the disc-on-surface nudges the fit's discs (RELATIVE ±r)
+    const TRIG = { '#1925': 'x', '#1926': 'y', '#1927': 'z' };
+    const fitComps = {};
+    for (const a of builderOf('rotary_center')(fitParams)) if (a && a.type === 'radiuscomp' && a.params && a.params.enable !== false) fitComps[String(a.params.result)] = { axis: TRIG[a.params.raw], sign: a.params.dir === '-' ? -1 : 1 };
+    // (3) SYNTHETIC: run the ACTUAL macro's circle-solve on a clean OD circle. Comped points sit ON the OD; raw tool-centre
+    // points sit at R+r. The solver must fit R_true (comped) vs R_true+r (raw), same centre — the geometry the sim can't show.
+    const lines = fitText.split('\n');
+    const i0 = lines.findIndex((l) => /Solve circle/.test(l)), i1 = lines.findIndex((l) => /Final retract/.test(l));
+    const solver = lines.slice(i0 + 1, i1).join('\n');
+    const Yc0 = 5, Zc0 = -10, Rt = 30, rad = 2;
+    const solve = (pts) => { const e = new GcodeExecutionEngine({ autoAnswer: true, stock }); e.trace(Object.entries(pts).map(([k, v]) => `${k}=${v}`).join('\n') + '\n' + solver + '\nM30'); return { yc: e.vars.get(54), zc: e.vars.get(56), R: e.vars.get(55) }; };
+    const comped = solve({ '#52': Yc0, '#51': Zc0 + Rt, '#53': Yc0 - Rt, '#54': Zc0, '#55': Yc0 + Rt, '#56': Zc0 });               // ON the true OD
+    const raw = solve({ '#52': Yc0, '#51': Zc0 + Rt + rad, '#53': Yc0 - Rt - rad, '#54': Zc0, '#55': Yc0 + Rt + rad, '#56': Zc0 }); // tool-centre (R+r)
+    return { known, fitEmit, fitComps, syn: { comped, raw, Yc0, Zc0, Rt, rad } };
   });
-  // KNOWN: Yc/Zc/R unchanged (the comp relocated from #56 to the top touch; the flank ∓#6 cancels in the bisect)
+  // KNOWN unchanged (valid sim)
   expect(r.known.yc, 'Yc value-identical').toBeCloseTo(38.1, 1);
   expect(r.known.zc, 'Zc value-identical').toBeCloseTo(-38.1, 1);
   expect(r.known.R, 'R value-identical').toBeCloseTo(38.1, 1);
-  // OD-TOP FIX (named change): datum=top now writes the TRUE OD top (= Zc + R = 0), not the raw tool-centre top (was +radius = 2)
-  expect(r.known.top, 'OD top = the TRUE surface (Zc + R) — the comp dropped the stylus radius').toBeCloseTo(r.known.zc + r.known.R, 1);
-  expect(r.known.top, 'the OD top is now 0 (was the raw 2, a stylus radius high)').toBeCloseTo(0, 1);
-  // FIT: value-identical (touches stay raw → the solver is unchanged)
-  expect(r.fit.yc, 'fit Yc value-identical').toBeCloseTo(38.1, 1);
-  expect(r.fit.zc, 'fit Zc value-identical').toBeCloseTo(159.3, 0);
-  expect(r.fit.R, 'fit R value-identical').toBeCloseTo(161.85, 0);
+  expect(r.known.top, 'OD top = the TRUE surface (Zc + R)').toBeCloseTo(r.known.zc + r.known.R, 1);
+  expect(r.known.top, 'the OD top is now 0 (was the raw 2)').toBeCloseTo(0, 1);
+  // FIT (1) the touches emit the comp
+  expect(r.fitEmit, 'the 3 fit touches emit the radius comp (the declared surface)').toEqual({ top: true, flankPlus: true, flankMinus: true });
+  // (2) readEnabledComps includes the fit comps → the disc-on-surface nudges the fit's discs
+  expect(r.fitComps, 'the fit comps are enabled-read for the disc-on-surface').toMatchObject({ '#51': { axis: 'z', sign: -1 }, '#53': { axis: 'y', sign: 1 }, '#55': { axis: 'y', sign: -1 } });
+  // (3) the ACTUAL solver: comped → R_true; raw tool-centre → R_true+r; same centre either way (concentric)
+  expect(r.syn.comped.R, 'comped points fit the TRUE OD radius').toBeCloseTo(r.syn.Rt, 3);
+  expect(r.syn.raw.R, 'raw tool-centre points fit R_true + the stylus radius').toBeCloseTo(r.syn.Rt + r.syn.rad, 3);
+  expect(r.syn.comped.R, 'the comp drops exactly the stylus radius').toBeCloseTo(r.syn.raw.R - r.syn.rad, 3);
+  expect(r.syn.comped.yc, 'centre Yc unchanged by the comp').toBeCloseTo(r.syn.Yc0, 3);
+  expect(r.syn.comped.zc, 'centre Zc unchanged by the comp').toBeCloseTo(r.syn.Zc0, 3);
+  expect(r.syn.raw.yc, 'raw centre = same Yc (concentric)').toBeCloseTo(r.syn.Yc0, 3);
+  expect(r.syn.raw.zc, 'raw centre = same Zc (concentric)').toBeCloseTo(r.syn.Zc0, 3);
 });

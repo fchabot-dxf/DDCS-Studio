@@ -78,10 +78,10 @@ export function rotaryCenterStack(params = {}) {
     CF('Press Enter to probe - ESC=cancel', 2);
     DM('inc');
 
+    A('#6', radius, 'Probe stylus radius — declared ONE source for the OD comp (both methods)');
     if (method === 'known') {
         C(`=== Known diameter: top + two flanks (${approach === 'auto' ? 'auto-centring' : 'operator-guided'}) ===`);
         A('#55', `${diameter}/2`, 'R = known diameter / 2');
-        A('#6', radius, 'Probe stylus radius');   // declared ONE source for the Z-surface comp
         A('#11', '[#55+#2+#6]', 'Flank approach = R + retract + stylus radius (the tool CENTRE must clear the OD by retract — the tip sticks out r)');
         // A solid bar can't be probed from its axis — approach each flank from OUTSIDE at the centreline.
         // Traverses run at a SAFE height clear above the bar (#17 over the top, so the rapid never skims the OD);
@@ -109,23 +109,26 @@ export function rotaryCenterStack(params = {}) {
         A('#56', '[#50-#55]', 'Zc = top - R (top already radius-compensated by the block; the inline −#6 relocated → value-identical)');
     } else {
         C('=== 3-point circle fit (no diameter) === ADVANCED: verify on machine');
-        C('Point 1: top (capture Z trigger + current Y)'); touch('Z', false, '#51', false);   // raw (the solver wants tool-centre points)
+        // comp ON (consistent with the known method — the declared toggle): each probed point shifts radially inward by the
+        // stylus radius → the solver fits the TRUE OD circle (R = true OD radius, was the tool-centre circle R+r; same centre).
+        // (The fit SIM can't show this — the operator-jog reposition isn't simulated; proven by the synthetic-solver test.)
+        C('Point 1: top (capture Z trigger + current Y)'); touch('Z', false, '#51', true);
         RM('Y', '#52');                      // P1 Y (machine)
         reposition('move clear to the +Y side of the cylinder');
-        C('Point 2: +Y flank (capture Y trigger + current Z)'); touch('Y', true, '#53', false);
+        C('Point 2: +Y flank (capture Y trigger + current Z)'); touch('Y', true, '#53', true);
         RM('Z', '#54');                      // P2 Z (machine)
         reposition('move clear to the -Y side of the cylinder');
-        C('Point 3: -Y flank (capture Y trigger + current Z)'); touch('Y', false, '#55', false);
+        C('Point 3: -Y flank (capture Y trigger + current Z)'); touch('Y', false, '#55', true);
         RM('Z', '#56');                      // P3 Z (machine)
-        C('Solve circle through P1(#52,#51) P2(#53,#54) P3(#55,#56) [a=Y b=Z]');
+        C('Solve circle through the comped surface points P1(#52,#51) P2(#53,#54) P3(#55,#56) [a=Y b=Z]');
         A('#60', '[#52*#52]+[#51*#51]', '|P1|^2');
         A('#61', '[#53*#53]+[#54*#54]', '|P2|^2');
         A('#62', '[#55*#55]+[#56*#56]', '|P3|^2');
         A('#63', '2*[[#52*[#54-#56]]+[#53*[#56-#51]]+[#55*[#51-#54]]]', 'd (twice signed area)');
         A('#54', '[[#60*[#54-#56]]+[#61*[#56-#51]]+[#62*[#51-#54]]]/#63', 'Yc');
         A('#56', '[[#60*[#55-#53]]+[#61*[#52-#55]]+[#62*[#53-#52]]]/#63', 'Zc');
-        A('#55', 'SQRT[[[#52-#54]*[#52-#54]]+[[#51-#56]*[#51-#56]]]', 'R');
-        A('#50', '[#56+#55]', 'OD top = Zc + R');
+        A('#55', 'SQRT[[[#52-#54]*[#52-#54]]+[[#51-#56]*[#51-#56]]]', 'R (the TRUE OD radius — the points are comped)');
+        A('#50', '[#56+#55]', 'OD top = Zc + R (the TRUE OD top — points comped, no stylus-radius gap)');
     }
 
     C('Final retract'); MV('Z', '#17');

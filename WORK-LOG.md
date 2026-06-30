@@ -2584,3 +2584,31 @@ This is purely a SIM artifact. On a real machine the 3 distinct OD tool-centre p
 1. Move `A('#6', radius, …)` from inside the `known` branch to just before `if (method === 'known')` (declare once, both methods).
 2. The 3 fit `touch(...)` calls: 4th arg `false` → `true` (comp ON) — top `#51`, +Y `#53`, −Y `#55`.
 3. Update the fit comments (raw → comped surface points).
+
+---
+
+## 🔨 turn 139 — rotary FIT comp ON (gate A): verified by DECLARATION + SYNTHETIC, not the degenerate sim
+
+Gate A blessed. Re-applied the comp ON (the #6 move to ONE shared declaration before the method branch + the 3 fit `touch(...)`
+→ `compEnable:true`). The fit's 3 probed points now return the TRUE OD surface (each shifts radially inward by the stylus
+radius), so the solver fits the true OD (R_true, was the tool-centre circle R+r; same centre) and datum/OD-top land on the
+real surface — consistent with the known method.
+
+**Verified WITHOUT the degenerate operator-jog sim** (the fit sim can't move the tool to distinct flank points → garbage):
+1. **Emit** — the 3 fit touches emit the declared comp: `#51=[#1927-#6]` (top), `#53=[#1926+#6]` (+Y flank), `#55=[#1926-#6]` (−Y flank).
+2. **readEnabledComps(fit)** — now includes `#51{z,−1} #53{y,+1} #55{y,−1}` → the disc-on-surface nudges the fit's discs too
+   (RELATIVE ±r, so it's safe even on the sim's garbage contacts; the disc rides a radius off the contact regardless).
+3. **SYNTHETIC solver** — ran the ACTUAL macro's circle-solve (sliced from the emit) on a clean OD circle (centre (5,−10),
+   R_true=30, stylus 2). Comped points (ON the OD) → **R=30, centre (5,−10)**; raw tool-centre points (R+r) → **R=32, same
+   centre**. So the comp drops exactly the stylus radius, centre unchanged (concentric). This proves the geometry the dispatch
+   intended, independent of the broken sim.
+4. **Replaced** the t129 "fit value-identical" assertions (they locked in the degenerate sim's R=161.85 / Zc=159.3 — green-but-wrong).
+
+The known assertions are untouched (its sim is valid). The `#6` move is value-identical for known (the test asserts values).
+
+**Full suite: 429 passed.** Two failures under `--workers=2` — `atc-roundtrip` + `knob-persist` — both PASS isolated (8 passed
+×2 re-runs); parallel-load flakes, unrelated to this rotary-only change (different domains). Cf. [[playwright-stale-cache-testuse-error]].
+
+**Next (queued, the advisor's plan):** declare the fit's per-touch sim-starts (the operator-jog OD positions) via
+`opSimStarts.rotary_center` fit case → the fit sim becomes real and verifies the comp naturally (a sim DECLARATION, not a
+hand-rolled sim fix). Then the disc-on-surface lands the fit's discs on a REAL OD, not a garbage contact.
