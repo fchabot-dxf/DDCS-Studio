@@ -69,7 +69,10 @@ const BUILT_IN = {
 
     // ROTARY_CENTER — KNOWN = 1 hands-free pass; FIT repositions twice → 3 passes, spread to DISTINCT points around the
     // bar (cylinder along X, cross-section in Y-Z; top-at-0 preview → centreline at Z = -R) so the circle solve isn't
-    // degenerate: pass 0 = over the TOP at centreline (probe down Z); pass 1/2 = the +Y / -Y flanks (probe in Y).
+    // degenerate: pass 0 = over the TOP at centreline (probe down Z); pass 1/2 = the flanks (probe in Y).
+    // The start SIDE must match the macro's probe DIRECTION so the touch moves INTO the bar (t141): macro P2 probes +Y
+    // → start the −Y side (probe toward the bar, hit the −Y OD); P3 probes −Y → start the +Y side. (Was swapped → the
+    // probe ran AWAY from the bar → a miss → degenerate fit. With the real DRO + correct sides → R≈R_true, centre right.)
     rotary_center(params, stock) {
         const sx = n(stock && stock.x, 150), sy = n(stock && stock.y, 76), sz = n(stock && stock.z, 76);
         const cx = sx / 2, cy = sy / 2;
@@ -81,8 +84,8 @@ const BUILT_IN = {
         const flankZ = -R;                              // centreline height in the top-at-0 preview frame
         return [
             top,
-            { x: cx, y: cy + R + retract, z: flankZ },  // +Y flank, beside the bar at centreline height
-            { x: cx, y: cy - R - retract, z: flankZ },  // -Y flank
+            { x: cx, y: cy - R - retract, z: flankZ },  // P2 — macro probes +Y → start the −Y side, probe toward the bar
+            { x: cx, y: cy + R + retract, z: flankZ },  // P3 — macro probes −Y → start the +Y side
         ];
     },
 };

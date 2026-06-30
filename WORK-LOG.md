@@ -2685,3 +2685,31 @@ general improvement (any RM macro now reads the true coord).
 
 **Next (step 2):** swap the opSimStarts fit-start P2/P3 sides to match the macro's probe directions → with the DRO now real, the
 fit sim becomes real (t141 prototype: R≈38.2 ≈ true 38.1), the disc lands on the real OD, the t139 comp verifies in-sim.
+
+---
+
+## 🔨 turn 145 — rotary FIT sim-start SIDE-SWAP: the real fit sim (step 2 — COMPLETES the t141 arc)
+
+Step 2, the declaration fix. Swapped the `opSimStarts.rotary_center` FIT-case P2/P3 start SIDES to match the macro's probe
+directions (the t141 finding): macro P2 = `touch('Y', true)` (probe +Y) → start the −Y side (probe TOWARD the bar); P3 =
+`touch('Y', false)` (probe −Y) → start the +Y side. Was swapped → the probe ran AWAY from the bar → a miss → R=120.9 (with the
+DRO) / collapsed (without). One declaration change (the two flank rows), SIM-only, NO emit change.
+
+**With the real DRO (t143, e7af3af) + the correct sides, the fit sim is REAL:**
+- starts now `[top, (−Y side), (+Y side)]` → the fit probes **3 DISTINCT points on the stock OD** (was collapsed at origin).
+- the circle-solve fits **R = 38.21 ≈ the true OD radius 38.1**, centre **Yc 38.1 / Zc −38.21** (the bar centreline) — sane.
+- all 3 disc clusters sit ON the OD (dist-from-centre 38.1–38.26 ≈ R, within 0.2 mm) → the disc-on-surface lands on the real OD.
+- the **t139 fit comp now verifies IN-sim** (R = the TRUE OD radius, OD-top = 0) — not just the synthetic solver.
+
+**Verified:** `tests/rotary-fit-sim.spec.js` — opSimStarts gives 3 starts with the swapped sides (P2 −Y, P3 +Y); the engine
+(with `_passStarts` + the now-real DRO) solves R≈38.1, centre on the centreline. Render captured + opened (3 distinct discs on
+the OD). **Full suite 433 passed (0 failed — the knob flake passed too).**
+
+**Minor polish (optional follow-up, NOT a correctness issue):** the flank discs land ~safeZ below the bar centreline
+(z≈−53 vs the equator −38.1) — the macro's reposition drop (`MV('Z','[0-#17]')`, −safeZ) applies AFTER the engine resets
+pos=0 at the REPOSITION comment, so the probe touches a lower point on the OD. Still genuinely ON the OD (the fit is exact), so
+the sim is correct; probing at the equator (lift the flank start z by safeZ) would be a cosmetic refinement.
+
+### Arc complete (t141 → t145): the rotary 3-point fit sim is now REAL
+t141 GATE (found the 2-part cause) → t143 engine DRO population (general read-machine gap) → t145 fit-start side-swap. The fit
+solves the true OD in-sim, the disc-on-surface lands on the real OD, and the probe-surface block's fit comp is verified in-sim.
