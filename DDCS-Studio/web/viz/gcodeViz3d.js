@@ -16,7 +16,7 @@ import { setupJogPendant } from './jogPendant.js';
 import { toolHalfProfile } from './toolProfile.js';
 import { PartFrame } from './sceneFrame.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
-import { stockProbeStop } from '../engine/probeGeometry.js';
+import { stockProbeStop, barRadius } from '../engine/probeGeometry.js';
 
 export class GcodeViz3D {
     constructor(container) {
@@ -1058,7 +1058,7 @@ export class GcodeViz3D {
                 const axis = Object.values(getRotaryAxes())[0] || 'x';
                 const dims = { x: stock.x, y: stock.y, z: stock.z };
                 const cross = axis === 'x' ? [dims.y, dims.z] : axis === 'y' ? [dims.x, dims.z] : [dims.x, dims.y];
-                const r = Math.min(cross[0], cross[1]) / 2;
+                const r = barRadius(stock, cross[0], cross[1]);   // SPATIAL-MODEL inc2: declared stock.diameter wins, else min(cross)/2
                 geo = new THREE.CylinderGeometry(r, r, dims[axis], 48); // three.js cylinders run along Y
                 if (axis === 'x') geo.rotateZ(Math.PI / 2);
                 else if (axis === 'z') geo.rotateX(Math.PI / 2);

@@ -2968,3 +2968,31 @@ GATE — don't build. Bar≠box requires `stock.diameter` (the collision's only 
 declaration infra. REC: (2A) the Ø is a stock-editor property the sim+collision both read (`stock.diameter ?? min-cross`),
 default unchanged; (3) keep the preview top-at-0. That's the minimal declared cylinder with no wizard-mutates-stock coupling.
 Bless the shape (esp. 2A vs 2B and the datum question) and it's mechanical.
+
+---
+
+## 🔨 turn 161 — SPATIAL MODEL inc2: the rotary sim READS the declared bar (stock.diameter), not min(cross)/2
+
+Gate resolved (2A blessed, top-at-0 kept). The rotary bar is now a DECLARED cylinder: `stock.diameter` (optional) is read by the
+collision, the 3D mesh, AND the sim-starts — declared-first, box-fallback. ONE source, set in the stock editor (no wizard-mutates-stock).
+
+**One source** — `barRadius(stock, crossA, crossB)` (`engine/probeGeometry.js`): `stock.diameter>0 ? d/2 : min(cross)/2`. Read by:
+- `cylinderOf` (the probe COLLISION) — was `min(cross)/2`.
+- `gcodeViz3d.setStock` (the 3D MESH) — was `min(cross)/2`.
+- `opSimStarts.rotary_center` (the sim-start R + the makeProvider ctx.R) — was `min(sy,sz)/2`.
+So the render + the collision can't drift: both read the same declared Ø.
+
+**Stock editor** — a "Bar Ø" input (`se_dia`, shown only for `shape:'cylinder'`) writes `stock.diameter` (blank/non-cylinder →
+undefined); round-trips through `applySettings` → the settings store. The KNOWN wizard auto-reads it (it pulls
+`2*cylinderOf(stock).r`, now barRadius-driven); the FIT renders the nominal (`stock.diameter ?? box`).
+
+**Verified** (`tests/rotary-bar-declared.spec.js`):
+- **DEFAULT (no diameter) UNCHANGED** — collision R = mesh R = **38.1** (= min(cross)/2), no regression.
+- **declared Ø50 in a 76×76 box → R=25 for BOTH collision + mesh** (they agree → no false through-stock); opSimStarts reads it too
+  (the flank moves from −4 to +9.1 — the thinner bar's flanks sit closer to centre).
+- `stock.diameter` round-trips through settings (50).
+- Render captured + opened: the Ø50 bar renders visibly thinner than the default Ø76 in the same 76×76 box.
+- **Full suite 435 passed** — 2 failures (`blocks-live-form`, `knob-persist`) are parallel-load FLAKES (7 passed isolated;
+  both in the FORM/knob domain, nothing to do with the probeGeometry/mesh/stock changes).
+
+SCOPE = stock.diameter + the sim/collision/mesh read. NOT the datum-relative frame (kept top-at-0, macro-only). Releasable (advisor's bump).

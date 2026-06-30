@@ -19,6 +19,7 @@
  */
 
 import { num } from '../wizards/ops/util.js';
+import { barRadius } from '../engine/probeGeometry.js';   // SPATIAL-MODEL inc2: the declared bar radius (stock.diameter ?? min(cross)/2)
 
 const n = (v, d) => num(v, d);
 
@@ -76,7 +77,7 @@ const BUILT_IN = {
     rotary_center(params, stock) {
         const sx = n(stock && stock.x, 150), sy = n(stock && stock.y, 76), sz = n(stock && stock.z, 76);
         const cx = sx / 2, cy = sy / 2;
-        const R = Math.min(sy, sz) / 2;                 // bar radius (cross-section = min of the two cross dims)
+        const R = barRadius(stock, sy, sz);             // SPATIAL-MODEL inc2: declared stock.diameter wins, else min(cross)/2 (the bar)
         const retract = n(params && params.retract, 2);
         const tipR = n(params && params.radius, 2);                // stylus tip radius (#6)
         const safeZ = Math.round(n(params && params.safeZ, 15));   // the macro's #17 = Math.round(safeZ)
@@ -176,7 +177,7 @@ export function makeProvider(rows) {
         const ctx = {
             sx, sy, sz, cx: sx / 2, cy: sy / 2,
             outset: Math.max(6, Math.min(dist * 0.6, 15)),        // the standard stand-off (matches built-in middle)
-            R: Math.min(sy, sz) / 2,                              // bar radius (matches built-in rotary)
+            R: barRadius(stock, sy, sz),                          // bar radius — declared stock.diameter ?? min(cross)/2 (matches built-in rotary)
             params: params || {},
         };
         const out = [];

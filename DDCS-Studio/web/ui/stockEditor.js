@@ -94,6 +94,9 @@ export function openStockEditor(anchor, opts) {
                 <option value="cylinder">Cylinder — rotary stock</option>
             </select>
         </label>
+        <label class="col" id="se_dia_row" style="margin-bottom:10px; display:none;">Bar Ø <span style="color:#9fb4cc;font-size:10px;">(optional — the cylinder OD; blank = fills the box, min Y/Z)</span>
+            <input id="se_dia" type="number" min="0" step="0.1" placeholder="min(Y, Z)">
+        </label>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
             <label class="col">Part-zero (datum)
                 <div id="se_datum_pick" class="se-datum-pick" title="Click the box point of the stock that is your part-zero / program origin"></div>
@@ -154,9 +157,13 @@ export function openStockEditor(anchor, opts) {
     q('se_y').value = s.y ?? '';
     q('se_z').value = s.z ?? '';
     q('se_shape').value = s.shape || 'boss';
+    q('se_dia').value = s.diameter ?? '';   // SPATIAL-MODEL inc2: the declared bar OD (blank = inferred from the box)
     setDatum(s.datum);
     q('se_pin').value = s.pin || 'origin';
     q('se_show').checked = s.show !== false;
+    // The Bar Ø field is meaningful only for a cylinder (rotary bar) — show it just then.
+    const syncDiaRow = () => { const row = q('se_dia_row'); if (row) row.style.display = q('se_shape').value === 'cylinder' ? '' : 'none'; };
+    syncDiaRow();
 
     const updateTplDel = () => {
         const sel = q('se_tpl');
@@ -179,17 +186,19 @@ export function openStockEditor(anchor, opts) {
 
     rebuildTplDropdown();
 
-    const commit = () => applySettings({ stock: {
+    const commit = () => { syncDiaRow(); applySettings({ stock: {
         x: parseFloat(q('se_x').value) || 0,
         y: parseFloat(q('se_y').value) || 0,
         z: parseFloat(q('se_z').value) || 0,
         shape: q('se_shape').value,
+        // SPATIAL-MODEL inc2: a cylinder's declared OD (sim + collision read it); blank / non-cylinder → undefined (inferred from the box)
+        diameter: (q('se_shape').value === 'cylinder' && parseFloat(q('se_dia').value) > 0) ? parseFloat(q('se_dia').value) : undefined,
         datum: getDatum(),
         pin: q('se_pin').value,
         show: q('se_show').checked,
-    } });
+    } }); };
 
-    ['se_x', 'se_y', 'se_z', 'se_shape', 'se_pin', 'se_show'].forEach((id) => {
+    ['se_x', 'se_y', 'se_z', 'se_shape', 'se_dia', 'se_pin', 'se_show'].forEach((id) => {
         q(id).addEventListener('input', commit);
         q(id).addEventListener('change', commit);
     });

@@ -33,14 +33,22 @@ export function rotaryAxisOf(motors) {
     return 'x';
 }
 
+/** The DECLARED bar radius (SPATIAL-MODEL inc2): the stock's declared cylinder OD wins (`stock.diameter`), else the radius is
+ *  INFERRED from the bounding box (min of the two cross dims). Declared-first, box-fallback → an unset diameter is the status
+ *  quo (bar = box), a set one renders a true bar ≠ box. ONE source read by the collision, the 3D mesh, AND opSimStarts. */
+export function barRadius(stock, crossA, crossB) {
+    const d = stock && stock.diameter;
+    return (Number.isFinite(d) && d > 0) ? d / 2 : Math.min(crossA, crossB) / 2;
+}
+
 /** A finite cylinder for `stock.shape==='cylinder'`, in stock-local space — identical to the mesh setStock
- *  draws: centred at (X/2, Y/2, −Z/2), radius = min(cross dims)/2, lying full-length along the rotary axis. */
+ *  draws: centred at (X/2, Y/2, −Z/2), radius = the DECLARED bar radius (stock.diameter, else min(cross)/2), along the rotary axis. */
 export function cylinderOf(stock, rotaryAxis) {
     const axis = (rotaryAxis === 'y' || rotaryAxis === 'z') ? rotaryAxis : 'x';
     const dims = { x: stock.x, y: stock.y, z: stock.z };
     const ctr = { x: dims.x / 2, y: dims.y / 2, z: -dims.z / 2 };
     const cross = axis === 'x' ? ['y', 'z'] : axis === 'y' ? ['x', 'z'] : ['x', 'y'];
-    const r = Math.min(dims[cross[0]], dims[cross[1]]) / 2;
+    const r = barRadius(stock, dims[cross[0]], dims[cross[1]]);
     const lo = axis === 'z' ? -dims.z : 0, hi = axis === 'z' ? 0 : dims[axis];   // axial extent in stock-local
     return { axis, u: cross[0], v: cross[1], cu: ctr[cross[0]], cv: ctr[cross[1]], r, lo, hi };
 }
