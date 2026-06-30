@@ -3269,3 +3269,41 @@ the **end-of-probe → ②** vector (the two real positions), never a fixed angl
   vector is wrong even as the end follows ②. The fix would draw the segment from the actual end-of-probe to ②.
 - HANDED TO ADVISOR to scope a proper investigation (fresh eyes on how toolpath2d / the trace compute the trans-axis rapid's
   START + END endpoints; the user's "end-of-probe → ②" is the target model). Do NOT trust my partial diagnosis — re-verify.
+
+---
+
+## 🔨 turn 175 — B-TRANS EVIDENCE-FIRST diagnosis (instrumented the REAL trace coords) → root confirmed, GATE
+
+Config: boss, X, probe-both, transAxis auto; ② dragged off-default; BOTH in-axis modes. Centre = (50, 40). The trans-axis
+diagonal = the 2-axis rapid seg; world = seg + ① anchor. **REAL NUMBERS (not a hypothesis):**
+
+| in-axis | ② (actual) | #21 | diagonal START→END (world) | secondary (Y) | primary (X) |
+|---|---|---|---|---|---|
+| AUTO | (73.8, 118.7) | 79 | (0, 40) → (**-2**, 119) | END.Y 119 ≈ ②.Y 118.7 ✓ | END.X **-2** ≠ ②.X 73.8 ≠ centre 50 — Δx=-2, DEGENERATE |
+| MANUAL | (83.4, 128.4) | 88 | (**-211**, 40) → (**-123**, 128) | END.Y 128 ≈ ②.Y 128.4 ✓ | START **-211** (off-stock!), Δx=+88=+#21 |
+
+**CONFIRMED (the advisor's read holds): the PRIMARY (X / pmove) component is the shared root; the SECONDARY (Y) already
+tracks ② via #21 in both.** But the mechanism is nuanced (two DIFFERENT root causes, not one):
+- **AUTO** — `pmove = [#53-#52-rv±#6]` resolves to ≈**-2** because **#53 (the measured centre) is DEGENERATE in the sim** (back-
+  solved ≈2, not 50 — the probe sim isn't producing a valid centre). So the X barely moves → the diagonal goes nearly straight
+  up, reaching neither ②.X (73.8) nor the centre (50). ALSO by design the re-centre IGNORES ②.X (so even a correct #53 lands
+  the diagonal at (centre, ②.Y), not ②'s full position).
+- **MANUAL** — `pmove = +#21` (the **wrong-direction sign**, exactly as flagged) AND the **START is off-stock at X=-211** (the
+  manual reposition/marker anchoring puts the tool miles left). The diagonal lives entirely in empty space (X -211→-123), far
+  from ② (83.4) and the stock (0-100).
+
+**EMIT vs RENDER:** the trace renders the macro MOVE faithfully (the seg IS the emit). So: **MANUAL's wrong sign is a real EMIT
+bug** (wrong on the real machine too). **AUTO is mixed** — partly EMIT *design* (re-centre ignores ②.X) + partly a **SIM
+resolution** issue (#53 degenerate because the sim can't measure the centre).
+
+**FIX SHAPE + the design tension (GATE — no fix until scoped):**
+- The advisor's shape — *derive the PRIMARY from ② (a #21-peer), so the diagonal runs END-OF-PROBE → ②'s FULL position* — makes
+  it computable in the sim and tracks ②. BUT it changes the macro semantics: today pmove re-centres to the **MEASURED** #53
+  (more accurate than the user's eyeballed ②.X). Deriving from ②.X uses the GUI guess → loses measured-centre accuracy. So
+  either (a) ② is **constrained to centre-X** (1-DOF Y-slide; the diagonal joins ② which sits at centre-X) — keeps the measured
+  re-centre, OR (b) **pmove derives from ②.X** (a #21-peer) — full GUI control, drops the measured re-centre.
+- The two modes need DIFFERENT fixes: MANUAL = fix the pmove **sign** (+#21 → re-centre/­toward-stock) + the off-stock start;
+  AUTO = either resolve #53 in the sim OR the (a)/(b) above. They share the "primary is broken" root but not one patch.
+
+GATE: pick (a constrained-② / measured re-centre) vs (b ②.X-derived pmove), and confirm the MANUAL sign+start is a separate
+emit fix. NO code until blessed.
