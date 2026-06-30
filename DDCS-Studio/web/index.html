@@ -376,9 +376,12 @@
                         <span class="label">TRAVERSE HEIGHT (mm)</span>
                         <input id="m_clear" value="15" title="Boss auto only: how high to lift before crossing over the part to the far wall. Set it to clear the top of your boss with margin. Stored as #18."/>
                     </div>
+                    <!-- TRAVEL-START inc2a: the DIAG TRAVEL field is REMOVED from the UI — #21 is DERIVED from the ② start
+                         marker (drag ② on the canvas; tieDiagTravel writes the value). m_diag_block stays permanently hidden;
+                         the input is a readonly value-store (the ② is the sole source) that persists the derived #21 + round-trips. -->
                     <div id="m_diag_block" class="hidden">
                         <span class="label">DIAG TRAVEL</span>
-                        <input id="m_diag_travel" value="50" title="Boss probe-both (auto trans-axis): the diagonal probe-move distance from the primary-axis walls across to the perpendicular walls. Default 50 (a sane fixed travel — NOT scaled to max-probe, which overshot far off-stock). Tune it so the 2nd-axis probe reaches its start ②. Stored as #21."/>
+                        <input id="m_diag_travel" value="50" readonly title="Diag travel (#21) — DERIVED from the ② start marker (drag ② on the canvas); NOT directly editable. Default 50. The boss probe-both auto-trans diagonal ends ON ②."/>
                     </div>
                 </div>
 

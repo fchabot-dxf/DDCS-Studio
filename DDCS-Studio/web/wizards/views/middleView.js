@@ -174,9 +174,8 @@ export const middleView = {
         const inAxisAuto = isBoss && params.inAxis === 'auto';
         const clearBlock = el('m_clear_block'); if (clearBlock) clearBlock.classList.toggle('hidden', !inAxisAuto);
         const crossBlock = el('m_crossover_block'); if (crossBlock) crossBlock.classList.toggle('hidden', !inAxisAuto);
-        // Diag travel applies to a BOSS probe-both with the TRANS-axis traverse on AUTO (transTraverse uses #21).
-        const diagBlock = el('m_diag_block');
-        if (diagBlock) diagBlock.classList.toggle('hidden', !(isBoss && params.findBoth && params.transAxis === 'auto'));
+        // TRAVEL-START inc2a: the DIAG TRAVEL field is GONE from the UI — #21 is DERIVED from the dragged ② (tieDiagTravel).
+        // m_diag_block stays permanently hidden (no show-toggle); the readonly input persists the derived value + round-trips.
 
         const gcode = wizard.generate(params);
         el('wiz_middle_code').innerHTML = UIUtils.formatGCode(gcode);

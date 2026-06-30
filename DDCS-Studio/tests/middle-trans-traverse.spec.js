@@ -93,7 +93,7 @@ test('round-trip: the per-traverse toggles + Diag travel reverse-sync from the b
   expect(back.fields.m_diag_travel, 'Diag travel reverse-synced from #21').toBe('25');
 });
 
-test('form: a boss probe-both shows both toggles + the Diag travel field; a pocket hides them', async ({ page }) => {
+test('form: a boss probe-both shows both toggles; the Diag travel field is REMOVED (derived from ②, always hidden); a pocket hides the toggles', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('middle'));
@@ -111,10 +111,10 @@ test('form: a boss probe-both shows both toggles + the Diag travel field; a pock
   const boss = await setAndRead('boss', true);
   expect(boss.inaxis, 'in-axis toggle shows for a boss').toBe(true);
   expect(boss.transaxis, 'trans-axis toggle shows for a boss probe-both').toBe(true);
-  expect(boss.diag, 'Diag travel shows for a boss probe-both auto trans-axis').toBe(true);
+  expect(boss.diag, 'Diag travel field is REMOVED from the UI (inc2a) — #21 now derives from the ② marker, always hidden').toBe(false);
 
   const pocket = await setAndRead('pocket', true);
   expect(pocket.inaxis, 'in-axis toggle hidden for a pocket').toBe(false);
   expect(pocket.transaxis, 'trans-axis toggle hidden for a pocket').toBe(false);
-  expect(pocket.diag, 'Diag travel hidden for a pocket').toBe(false);
+  expect(pocket.diag, 'Diag travel field stays removed for a pocket too').toBe(false);
 });

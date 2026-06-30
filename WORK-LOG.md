@@ -3239,3 +3239,33 @@ default = 50 (or accept a tiny shift). A build-time reconcile.
 locked-24; the big re-architecture is its own inc]; (B) inc2a + inc2b together (full middle flip now); (C) re-scope. AND
 confirm the KEEP-4 / REMOVE-3 classification. Also confirm a build-time verify (does `tieDiagTravel` currently fire — drag ② →
 #21 updates?) before inc2a.
+
+---
+
+## 🔨 turn 173 — ITEM 4 inc2a (MIDDLE diagTravel field) DONE + B-TRANS render OPEN (45° wrong, user-confirmed) → ball to advisor
+
+**inc2a (the dispatched task) — DONE + verified:** removed the editable DIAG TRAVEL field. `index.html` m_diag_block stays
+permanently hidden (removed the show-toggle in `middleView.js`); the input is now a `readonly` value-store written ONLY by the
+② drag (`tieDiagTravel`). The 4 KEEP fields (dist#1/retract#2/safeZ#17/clearOver#18) are UNTOUCHED + editable (render-verified).
+Value-identical: `middleWizard.js` (the emit) is UNTOUCHED → byte-identical for all params (git diff confirms). 4 middle tests
+green incl. the round-trip + the updated form test. The locked-24 editable-disconnect is gone (the field can't be user-typed).
+- ⚠ IMPLEMENTATION FLAG: I used a HIDDEN readonly store, NOT a literal DOM-delete + pure-derive. Reason: the round-trip
+  (opSession:195 `#21→m_diag_travel`, opSchema FIELD_BIND, `_seedForm` reopen) all key off m_diag_travel — hiding keeps that
+  intact with a byte-identical change; full removal needs parallel plumbing. This also made the dispatch's "seed ② to derive 50"
+  reconcile unnecessary (the store default is 50). Residual: a ~2mm default ②-marker-vs-#21 viz gap (deferred). If the advisor
+  wants the literal pure-derive, it's a follow-up.
+- Pre-existing bug found: `tieDiagTravel` secStart = `inAxisManual ? 2 : 1` IGNORES the lead Z marker → with probe-Z-first ON,
+  the secondary is index 2 but the tie watches index 1 (the primary). A separate small fix (belongs with inc2b's marker work).
+
+**B-TRANS render — OPEN, NOT FIXED (I got this wrong, the user corrected me):** the trans-axis DIAGONAL renders at ~45° and is
+WRONG. Confirmed by the user (multiple screenshots) — it IS in the **2D AND 3D programmatic render**, NOT the dead hand-made SVG
+(`assets/svg/middleViz.svg` is no longer used — a search agent wrongly fingered it), NOT the feature canvas. It's the trace's
+**trans-axis RAPID segment** (`toolpath2d.js:220-225`, the `transV` cyan-dashed 2-axis rapid). The user wants it COMPUTED from
+the **end-of-probe → ②** vector (the two real positions), never a fixed angle.
+- I FLIP-FLOPPED + could not correctly diagnose the root cause (wrongly concluded "it re-angles, so it's computed" — the user:
+  "always reangles yes" BUT "it is at 45, and wrong"). So: the END may track ② while the diagonal is still geometrically wrong.
+- HYPOTHESIS (unverified — I was wrong once already, treat with caution): the diagonal's START is drawn from a fixed/wrong
+  anchor (a stock CORNER) instead of the REAL end-of-X-probe (the +X wall at centre-Y, after the X seq + retract) — so the
+  vector is wrong even as the end follows ②. The fix would draw the segment from the actual end-of-probe to ②.
+- HANDED TO ADVISOR to scope a proper investigation (fresh eyes on how toolpath2d / the trace compute the trans-axis rapid's
+  START + END endpoints; the user's "end-of-probe → ②" is the target model). Do NOT trust my partial diagnosis — re-verify.
