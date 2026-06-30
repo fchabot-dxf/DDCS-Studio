@@ -3176,3 +3176,66 @@ wizard-library / placement / op-* / knob / animator.
 
 **Note for release:** this fixes a USER-FACING regression shipped in V10.46 (MAX PROBE was non-editable) — recommend a prompt
 version bump/release (left to the advisor's cadence call, not bumped unilaterally mid-handoff).
+
+---
+
+## 🔨 turn 171 — ITEM 4 inc 2 MIDDLE (the CRUX): SCOUT + classification — GATE before any field removal
+
+The edge lesson applied: classify EACH field derive-vs-needed BEFORE removing anything (I shipped a regression by conflating
+a NEEDED field). NO code — a classified plan to bless. Read the full `middleStack` macro + `opSimStarts.middle`.
+
+### (1) CLASSIFIED FIELD LIST — the 7 travel/clearance fields
+| field | macro use | role | VERDICT | reason |
+|---|---|---|---|---|
+| `dist` #1 (MAX PROBE) | `#7=[0-#1]`,`#8=#1` → G31 | probe REACH (search dist) | **KEEP** | the search distance (safety) — already DECOUPLED from cross-over in code (middleWizard:47-48); the EDGE lesson — identical to edge's MAX PROBE |
+| `retract` #2 | `#9/#10` back-off | probe param | **KEEP** | fast/slow retract; not a travel between two markers |
+| `safeZ` #17 | `MV('Z','#17')` inter-pass lift + park | Z-clearance | **KEEP** | a Z-clearance/safety lift; the 2D markers are XY → no XY marker derives a Z-lift (SPATIAL-MODEL 1c already gave it a frame toggle) |
+| `clearOver` #18 | `traverseOver`/`transTraverse` `MV('Z','#18')` | Z-clearance | **KEEP** | the boss-clear lift height (operator clears THEIR boss top; macro can't know boss height) — a Z-clearance, not an XY traverse |
+| `diagTravel` #21 | `transTraverse` `smove=travelOpp(...,#21)` | XY traverse to ② | **DERIVE→REMOVE** | already derived from ② via `tieDiagTravel`; the "locked 24" field; THE prototype |
+| `crossX` #19 / `crossY` #20 | `traverseOver` `MV(ax,#19/#20)` | XY traverse wall1→wall2 | **DERIVE→REMOVE (conditional)** | the in-axis traverse = the GAP between wall-1 and wall-2 markers → derivable like diagTravel, BUT needs a wall-2 marker surfaced in AUTO in-axis (today auto=1 marker) — the two-meanings-of-pass |
+
+**KEEP (needed, stay editable):** dist #1, retract #2, safeZ #17, clearOver #18 — all are probe-reach / Z-clearance / safety
+values the operator sets; none is an XY traverse spanning two markers. **DERIVE→REMOVE:** diagTravel #21 (ready), crossX/crossY
+#19/#20 (needs the marker work). The discrete picks (type/axis/dir/both/circular/probeZ/inaxis/transaxis) + probe-config
+(feed/port/level/q) are NOT travels → stay in the form (out of scope).
+
+### (2) tieDiagTravel = the prototype — CONFIRMED
+`tieDiagTravel` (middleView) derives `#21 = |draggedSec − centreSec|` from the dragged ② ("② is the master", drag-the-
+position-the-field-follows). It generalises to crossX/crossY: derive each from the wall-2 marker's gap. BUT crossX/crossY's
+wall-2 marker exists only in MANUAL in-axis today (auto in-axis = 1 marker) → generalising NEEDS the two-meanings-of-pass.
+
+### (3) MARKER config + LOCKSTEP — CONFIRMED
+`opSimStarts.middle` = `z(probeZ?1:0) + prim(inAxisManual?2:1) + sec(twoAxis ? (boss?(inAxisManual?2:1):1) : 0)` → max **5**
+= `[Z, X-w1, X-w2, Y-w1, Y-w2]` (boss+both+inAxisManual+probeZ) — the human's 4th+5th. Lockstep CONFIRMED: each marker = one
+parser pass = one `REPOSITION:` (or `transTraverse`'s REPOSITION). **KEY:** auto `traverseOver` (middleWizard:100) emits NO
+REPOSITION → no new pass → that's WHY auto in-axis shows only 1 marker (the wall-2 probe-START is invisible). This is the crux.
+
+### (4) THE TWO MEANINGS OF PASS — what it is
+Today "pass" CONFLATES two things, both served by `REPOSITION:`: (a) a SIM re-anchor (each probe-START = a marker) and (b) an
+operator-STOP (a manual jog pause). So in AUTO, `traverseOver` emits no REPOSITION → the wall-2 probe-START gets NO marker.
+The unification (backlog t117): SEPARATE them — the sim re-anchors per probe-START ALWAYS (auto in-axis → 2 markers), and
+auto/manual ONLY decides the operator-STOP (emit the REPOSITION pause or not), MIXABLE per-transition (Z→X, w1→w2, X→Y).
+```
+   TODAY:  REPOSITION = sim-marker AND operator-stop   → auto = 0 markers for wall-2 (can't derive crossX)
+   UNIFIED: marker = per probe-START (always)  ·  auto/manual = operator-stop only (orthogonal)
+            → auto in-axis surfaces wall-2 → crossX/crossY DERIVE from the gap (like #21 from ②)
+```
+This is the PREREQUISITE for deriving crossX/crossY, and it cleanly surfaces the 4th/5th markers.
+
+### (5) THE LOCKED 24 — CONFIRMED
+The "locked 24" = the diagTravel field/handle disconnect (field shows 8, effective ~24, handle does nothing — t117).
+`tieDiagTravel` is the existing BRIDGE (drag ② → #21). The RESIDUAL disconnect = the field staying EDITABLE (a 2nd source).
+Removing the field (the ② marker the SOLE source) fixes it BY CONSTRUCTION — nothing to disconnect. ⚠ FLAG: the default ②
+(inferStart) derives #21 ≈ 52, NOT the current field default 50 → for value-identical, seed inferStart's ② so the derived
+default = 50 (or accept a tiny shift). A build-time reconcile.
+
+### BUILD PLAN — proposed, GATED (no removal until blessed)
+- **inc2a (Tier 1 — READY, low-risk, mirrors EDGE):** remove the `diagTravel` field → derived from ② (a readout; ② is the
+  source). Fixes the "locked 24" by construction. Reconcile the default for value-identical. KEEP dist/retract/safeZ/clearOver.
+- **inc2b (Tier 2 — BIGGER, separate):** the two-meanings-of-pass unification (per-transition auto/manual + per-probe-START
+  markers) → surface the wall-2 markers in auto → derive crossX/crossY → remove those fields → surface the 4th/5th cleanly.
+
+**GATE — bless before I build:** (A) **inc2a now, defer inc2b** [RECOMMEND — edge-style incremental, value-identical, fixes
+locked-24; the big re-architecture is its own inc]; (B) inc2a + inc2b together (full middle flip now); (C) re-scope. AND
+confirm the KEEP-4 / REMOVE-3 classification. Also confirm a build-time verify (does `tieDiagTravel` currently fire — drag ② →
+#21 updates?) before inc2a.
