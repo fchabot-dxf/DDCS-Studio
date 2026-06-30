@@ -2478,3 +2478,39 @@ stack's radiuscomp result), NOT an editor-text marker — this is the concrete r
 edge (byte-identical) · corner (byte-identical) · rotary (value-identical + OD-top fix) · middle (value-identical). Full suite
 **429 passed**. QUEUED: **inc2** = the sim consumes the surface SIM-SIDE (disc-on-surface + datum + the OD-top payoff) — and
 the marker mechanism is now settled as sim-side (no editor text). Then the unify-pass (radiuscomp.spaced, fit bracket drift).
+
+---
+
+## 🔨 turn 133 — PROBE-SURFACE BLOCK inc2: VERIFY-FIRST done → GATE the disc↔result MATCHING mechanism (no build)
+
+inc2 = the sim reads the declared surface (disc-on-surface + datum + OD-top), SIM-SIDE. Verified the mechanism first; the
+MATCHING (a contact → its radiuscomp result) is a real design decision (+ "no macro-text taint" makes the choice matter), so gating.
+
+### VERIFY-FIRST findings
+- The sim runs the FLAT G-code (`engine.run(getGcode())`); the radiuscomp result lands in `engine.vars` when its line runs.
+- The program model (`ddcsGetBlockProgram`) holds the structured op stacks → the `radiuscomp` atoms carry `{result, axis, dir, enable}`.
+  The viz/sim does NOT currently import the model — reading it is a NEW dependency.
+- **The probe-surface blocks are NOT distinct instances in the stack** — `probeSurfaceStack` returns a FLAT atom sequence spliced
+  into the op, so there's no "block-instance" id to match a contact to (the dispatch's framing doesn't map to a real id).
+- **fast+slow = 2 discs per touch** (`probeAxisTouched` fires on every G31). So a touch ≠ a single contact.
+- PRECEDENT: the datum-write hook ALREADY reads the flat-text WCS-write (`#[#70+off]=val` → `markDatumWrite`), declared-driven
+  (the #70 table), not a #6-scan. The disc-on-surface is the analogous extension.
+- DATUM + OD-top likely ALREADY consistent: the datum follows the WCS-write, which for edge/corner is the comped surface
+  (`#50/#101/#102`), for middle the centre (`#53`), for rotary datum='top' the comped `#50` (the OD-top fix). So the main BUILD
+  is the DISC; the datum/OD-top just need a render VERIFY.
+
+### GATE — the disc↔radiuscomp MATCHING mechanism (advisor's call)
+- **(A) RECOMMEND — result-var-keyed deferred hook (the datum-hook pattern).** Read the radiuscomp atoms from the model →
+  `{resultVar → axis/dir/enable}`. Hook the flat-text comp line: when a line assigns a known radiuscomp result var (`#102=…`),
+  nudge the discs-since-the-last-comp (on that axis) onto the surface (= contact + radius·dir, or read the result value).
+  PRO: declared-driven (the result vars, NOT a #6-scan), identical to the existing datum hook, handles fast+slow + middle's
+  two-walls-per-axis naturally. CON: reads the flat-text comp line (but keyed by the DECLARED result var, not inferred).
+- **(B) order-match + nudge at the contact.** Match the Nth radiuscomp ↔ the Nth touch-group; nudge by radius·dir at
+  `probeAxisTouched`. PRO: no comp-line read. CON: the fast/slow touch-group counting (variable: twoPass on/off) is fragile.
+- **(C) projection-map.** Correlate a G31 line → its op via `proj.map`, find the following radiuscomp atom. CON: the projection
+  is editor-program-only (not the wizard PREVIEW's G-code); and it maps to op-level, not a probe-surface sub-block.
+
+### Open question for the gate
+**Model access in BOTH sim contexts:** the wizard PREVIEW (the active op via `opRecord`) vs the EDITOR sim (`ddcsGetBlockProgram`).
+The sim must read the radiuscomp result vars from whichever is live. Bless the source(s) + (A) and I build inc2 (disc nudge +
+the datum/OD-top render verify). NO build this turn (the matching is the flagged design decision).
