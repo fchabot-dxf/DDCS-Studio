@@ -2417,3 +2417,33 @@ the corner X/Y comp — functionally identical) to UNIFY the comp format and DEL
 migration byte-identical (no re-gate) this turn. (`trailingRetract` + `preComp` are legit structural params, they stay.)
 
 QUEUED (advisor): rotary (OD-top comped) → middle (dia recompute) → inc2 (marker sub-op fix + sim consumes the marker).
+
+---
+
+## 🔨 turn 129 — PROBE-SURFACE BLOCK inc1: ROTARY migrated (VALUE-IDENTICAL + the OD-top FIX). Edge+corner done.
+
+Migrated rotaryCenterWizard's 6 touches (known: top + 2 flanks; fit: 3 points) to a `touch()` helper that wraps
+`probeSurfaceStack`. The flank-approach (#11/#12), the Yc/Zc aggregation, and the 3-point SOLVER stay in the wizard.
+Deleted the `pp` helper + the orphaned PR/CK/RD.
+
+- **Known method — comp ON, the comp RELOCATES (value-identical):** the top + flank touches now return the TRUE surface
+  (`#50/#52/#53 = [trigger ± #6]`). So `#56` drops its inline `−#6`: `[#50-#6-#55] → [#50-#55]` (the −#6 moved into the top
+  touch — same Zc). Yc = bisect of the comped flanks (`∓#6` cancels → same centre). PROVEN value-identical by running the
+  macro in the engine: Yc 38.1 / Zc −38.1 / R 38.1 — UNCHANGED from the pre-migration golden (rotary-center-sim still green).
+- **NAMED CHANGE — the OD-top FIX:** datum='top' writes `#50`, which was the RAW top (the gap). With the comped top, `#50`
+  now = the TRUE OD top (= Zc + R). Sim: the OD top dropped from **2 → 0** (a stylus radius onto the true surface).
+  Correct-by-default + reversible by the radiuscomp `enable` flip (the human's 'declared' call).
+- **Fit method — comp OFF (value-identical):** the 3 fit touches use the block with `compEnable:false` (raw), so the solver
+  gets the same tool-centre points → Yc/Zc/R unchanged (sim: 38.1 / 159.3 / 161.85, identical to golden). The read text
+  changes cosmetically (`proberead [#1927]` → radiuscomp passthrough `#1927` — brackets are grouping, value-identical).
+- **VERIFIED** — `tests/probe-surface-block.spec.js` rotary case asserts known Yc/Zc/R value-identical + the OD-top = Zc+R
+  (0, the FIX) + fit Yc/Zc/R value-identical; rotary-center-sim (known auto+guided) still green. Full suite **429 passed**.
+
+### ⚠ FLAG for the gate (not blocking) — a LATENT fit OD-gap
+The fit solves the TOOL-CENTRE circle (raw points), so its OD top (`#50 = Zc + R`) is a stylus-radius too high — the same
+class of gap the known OD-top FIX just closed. NOT touched this turn (kept the fit value-identical per the dispatch). Worth a
+decision when the fit is next revisited (comp the 3 fit points → solve the TRUE circle; it would be a named change like the OD-top).
+
+### GATE back — rotary done (value-identical + the named OD-top fix landed)
+QUEUED (advisor): middle (dia `|s1-s2|` value-identical, the last wizard) → inc2 (marker sub-op fix + sim consumes the marker
+= disc-on-surface + datum + the OD-top payoff) → unify-pass (delete cosmetic warts: radiuscomp.spaced, the fit bracket drift).

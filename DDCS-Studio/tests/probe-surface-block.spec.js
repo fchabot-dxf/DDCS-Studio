@@ -87,3 +87,30 @@ test("CORNER migration — functional G-code BYTE-IDENTICAL to the hand-rolled w
   }, CORNER_SWEEP);
   for (let i = 0; i < CORNER_GOLDEN.length; i++) expect(out[i], JSON.stringify(CORNER_SWEEP[i])).toBe(CORNER_GOLDEN[i]);
 });
+
+// ROTARY migration (t129) — VALUE-IDENTICAL (the comp relocates from #56 to the touches) + the named OD-top FIX.
+test('ROTARY migration — known value-identical (Yc/Zc/R) + OD-top FIX (datum=top on the TRUE surface) + fit value-identical', async ({ page }) => {
+  await boot(page);
+  const r = await page.evaluate(async () => {
+    const { GcodeExecutionEngine } = await import('/engine/index.js');
+    const { RotaryCenterWizard } = await import('/wizards/rotaryCenterWizard.js');
+    const stock = { x: 150, y: 76.2, z: 76.2, shape: 'cylinder', show: true };
+    const w = new RotaryCenterWizard();
+    const run = (p) => { const eng = new GcodeExecutionEngine({ autoAnswer: true, stock, stockOffset: w.inferStart(p, stock) }); eng.trace(w.generate(p)); return { yc: eng.vars.get(54), zc: eng.vars.get(56), R: eng.vars.get(55), top: eng.vars.get(50) }; };
+    return {
+      known: run({ method: 'known', diameter: 76.2, dist: 30, safeZ: 15, approach: 'auto', datum: 'top' }),
+      fit: run({ method: 'fit', dist: 30, safeZ: 15, datum: 'center' }),
+    };
+  });
+  // KNOWN: Yc/Zc/R unchanged (the comp relocated from #56 to the top touch; the flank ∓#6 cancels in the bisect)
+  expect(r.known.yc, 'Yc value-identical').toBeCloseTo(38.1, 1);
+  expect(r.known.zc, 'Zc value-identical').toBeCloseTo(-38.1, 1);
+  expect(r.known.R, 'R value-identical').toBeCloseTo(38.1, 1);
+  // OD-TOP FIX (named change): datum=top now writes the TRUE OD top (= Zc + R = 0), not the raw tool-centre top (was +radius = 2)
+  expect(r.known.top, 'OD top = the TRUE surface (Zc + R) — the comp dropped the stylus radius').toBeCloseTo(r.known.zc + r.known.R, 1);
+  expect(r.known.top, 'the OD top is now 0 (was the raw 2, a stylus radius high)').toBeCloseTo(0, 1);
+  // FIT: value-identical (touches stay raw → the solver is unchanged)
+  expect(r.fit.yc, 'fit Yc value-identical').toBeCloseTo(38.1, 1);
+  expect(r.fit.zc, 'fit Zc value-identical').toBeCloseTo(159.3, 0);
+  expect(r.fit.R, 'fit R value-identical').toBeCloseTo(161.85, 0);
+});

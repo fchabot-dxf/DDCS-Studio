@@ -12,6 +12,7 @@
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
+import { probeSurfaceStack } from './ops/probeSurface.js';   // the shared probe primitive (rotary composes it — t129 inc1)
 import { srcVal, srcNote } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 
@@ -33,9 +34,6 @@ export function rotaryCenterStack(params = {}) {
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
     const CF = (msg, cancel) => { const b = newBlock('confirm'); b.params = { msg, cancel }; S.push(b); };
-    const PR = (axis, to, feed) => { const b = newBlock('probe'); b.params = { axis, to, feed, port: '#5', level }; S.push(b); };
-    const CK = (axis, goto) => { const b = newBlock('probecheck'); b.params = { axis, goto }; S.push(b); };
-    const RD = (axis, v) => { const b = newBlock('proberead'); b.params = { axis, var: v }; S.push(b); };
     const RM = (axis, v) => { const b = newBlock('readmachine'); b.params = { axis, var: v }; S.push(b); };
     const MM = (axis, to) => { const b = newBlock('machinemove'); b.params = { axis, to }; S.push(b); };
     const SWO = (axis, value) => { const b = newBlock('setworkoffset'); b.params = { wcs: wcsArg, axis, value }; S.push(b); };
@@ -43,10 +41,16 @@ export function rotaryCenterStack(params = {}) {
     const MSG = (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); };
     const END = () => S.push(newBlock('endprogram'));
 
-    const pp = (axis, plus, resultVar) => {
-        const pv = plus ? '#8' : '#7', rv = plus ? '#9' : '#10';
-        PR(axis, pv, '#3'); CK(axis, 1); MV(axis, rv);
-        PR(axis, pv, '#4'); CK(axis, 1); RD(axis, resultVar); MV(axis, rv);
+    // One probe touch via the shared PROBE-SURFACE BLOCK (t129). KNOWN: comp ON → the touch returns the TRUE surface
+    // (top/flanks), so Zc drops its inline −#6 (value-identical) and datum='top' lands on the true OD top (the OD-top FIX).
+    // FIT: comp OFF (raw) — the solver wants the tool-centre points unchanged (value-identical; the brackets are cosmetic).
+    const TRIG = { X: '#1925', Y: '#1926', Z: '#1927' };
+    const touch = (axis, plus, resultVar, comp) => {
+        S.push(...probeSurfaceStack({
+            axis, dir: plus ? '+' : '-', probeVar: plus ? '#8' : '#7', retractVar: plus ? '#9' : '#10',
+            feedFast: '#3', feedSlow: '#4', port: '#5', level, twoPass: true,
+            raw: TRIG[axis], result: resultVar, radius: '#6', compEnable: comp,
+        }));
     };
     const reposition = (msg) => {
         // Lift clear, operator jogs to the flank, then drop back the SAME amount — all INCREMENTAL (no G53).
@@ -86,32 +90,32 @@ export function rotaryCenterStack(params = {}) {
         // before each touch (operator verifies / fine-jogs); AUTO runs hands-free. Both simulate identically.
         const gate = (msg) => { if (approach === 'guided') CF(msg, 2); };
         A('#12', '[#17+#55]', 'Traverse height -> centreline drop = safeZ + R');
-        C('Probe top (Z down)'); pp('Z', false, '#50');
+        C('Probe top (Z down)'); touch('Z', false, '#50', true);   // comp ON → #50 = the TRUE OD top (was raw — the OD-top gap)
         MV('Z', '[#17-#2]');         // lift from the top (Ztop+retract) to the safe traverse height (Ztop+safeZ)
         C('+Y flank: cross clear to the +Y side, drop to the centreline, probe inward');
         MV('Y', '#11');              // over to the +Y side, beyond the OD (well above the top)
         MV('Z', '[0-#12]');          // drop to the centreline (Ztop - R), beside the bar
         gate('At the +Y side, centreline height - Enter to probe (jog to adjust), ESC=cancel');
-        pp('Y', false, '#52');       // probe -Y -> the +Y OD surface
+        touch('Y', false, '#52', true);   // probe -Y -> the +Y OD surface (comped; the ∓#6 cancels in the Yc bisect)
         C('-Y flank: raise clear, cross to the -Y side, drop, probe inward');
         MV('Z', '#12');              // raise back to the traverse height
         MV('Y', '[0-#11-#11]');      // cross to the -Y side, beyond the OD (well above the top)
         MV('Z', '[0-#12]');          // drop to the centreline
         gate('At the -Y side, centreline height - Enter to probe (jog to adjust), ESC=cancel');
-        pp('Y', true, '#53');        // probe +Y -> the -Y OD surface
+        touch('Y', true, '#53', true);    // probe +Y -> the -Y OD surface (comped; bisect cancels)
         MV('Z', '#12');              // raise clear of the bar before the final retract
         C('Centre + radius');
         A('#54', '[#52+#53]/2', 'Yc = midpoint of flanks');
-        A('#56', '[#50-#6-#55]', 'Zc = top - R (− stylus radius: the Z-down top contact is the tool centre a radius above the OD)');
+        A('#56', '[#50-#55]', 'Zc = top - R (top already radius-compensated by the block; the inline −#6 relocated → value-identical)');
     } else {
         C('=== 3-point circle fit (no diameter) === ADVANCED: verify on machine');
-        C('Point 1: top (capture Z trigger + current Y)'); pp('Z', false, '#51');
+        C('Point 1: top (capture Z trigger + current Y)'); touch('Z', false, '#51', false);   // raw (the solver wants tool-centre points)
         RM('Y', '#52');                      // P1 Y (machine)
         reposition('move clear to the +Y side of the cylinder');
-        C('Point 2: +Y flank (capture Y trigger + current Z)'); pp('Y', true, '#53');
+        C('Point 2: +Y flank (capture Y trigger + current Z)'); touch('Y', true, '#53', false);
         RM('Z', '#54');                      // P2 Z (machine)
         reposition('move clear to the -Y side of the cylinder');
-        C('Point 3: -Y flank (capture Y trigger + current Z)'); pp('Y', false, '#55');
+        C('Point 3: -Y flank (capture Y trigger + current Z)'); touch('Y', false, '#55', false);
         RM('Z', '#56');                      // P3 Z (machine)
         C('Solve circle through P1(#52,#51) P2(#53,#54) P3(#55,#56) [a=Y b=Z]');
         A('#60', '[#52*#52]+[#51*#51]', '|P1|^2');
