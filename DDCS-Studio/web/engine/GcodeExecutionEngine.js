@@ -15,6 +15,11 @@ import { loadProgram as loadProgramText, stripLine } from './core/program.js';
 import { arcPoints } from './core/arc.js';
 import { rayBox, rotaryAxisOf, stockProbeStop } from './probeGeometry.js';
 
+// Machine-DRO register bases per dialect (X=base, Y=+1, Z=+2, A=+3): Expert #880, V4.1 #1500, DM500 #864, rs274 #5420.
+// read-machine (RM) reads ITS dialect's base; the sim populates them ALL (cheap, dialect-agnostic) so RM returns the real
+// tool coord for any dialect instead of an unset 0. (A live PC-bridge store proxies the real DRO → guarded off there.)
+const DRO_BASES = [880, 1500, 864, 5420];
+
 export class GcodeExecutionEngine {
     constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
         this.stepDelay = Number.isFinite(stepDelay) ? stepDelay : 250;
@@ -27,6 +32,9 @@ export class GcodeExecutionEngine {
         // inject a store that proxies system variables (#880, #1920-1929, ...)
         // to a real controller while keeping user vars local.
         this.createVarStore = typeof createVarStore === 'function' ? createVarStore : () => new Map();
+        // Pure-sim (own Map) → we POPULATE the machine DRO each step so read-machine returns the real coord. An injected
+        // (live PC-bridge) store already PROXIES the controller's real DRO → don't overwrite it (it'd write a read-only reg).
+        this._populateDro = typeof createVarStore !== 'function';
         this.onLineChange = onLineChange;
         this.onStatus = onStatus;
         this.onFinish = onFinish;
@@ -485,6 +493,18 @@ export class GcodeExecutionEngine {
     }
 
     // Land the in-flight move: snap to the target, fire any deferred probe touch.
+    // Populate the machine DRO registers (all dialect bases) with the tool's CURRENT machine position so read-machine (RM)
+    // returns the real coord. Machine space = stock space = the current pass's operator start (O) + the local position —
+    // the SAME frame the probe trigger uses (#1925 = O + target). A=0 (no rotary axis tracked). Guarded to pure-sim.
+    _updateDro() {
+        if (!this._populateDro) return;
+        const O = (this._passStarts && this._passStarts[this._pass]) || this._stockOffset || { x: 0, y: 0, z: 0 };
+        const mx = (O.x || 0) + this.pos.x, my = (O.y || 0) + this.pos.y, mz = (O.z || 0) + this.pos.z;
+        for (const base of DRO_BASES) {
+            this.vars.set(base, mx); this.vars.set(base + 1, my); this.vars.set(base + 2, mz); this.vars.set(base + 3, 0);
+        }
+    }
+
     _finishMove() {
         const mv = this._move;
         if (!mv) return;
@@ -581,6 +601,8 @@ export class GcodeExecutionEngine {
             this._passSources[this._pass] = /auto-traverse/i.test(step.raw) ? 'auto' : 'manual';   // marker colour by source: auto-traverse vs operator jog
             this.pos = { x: 0, y: 0, z: 0 };
         }
+
+        this._updateDro();   // machine DRO reflects the last completed move → read-machine (RM) reads the real coord this step
 
         if (!line) {
             this.ip += 1;

@@ -2653,3 +2653,35 @@ OD, and turn-139's fit comp verifies IN the sim (not just the synthetic solver).
 
 **My read:** A (or B if you want the engine DRO landed + reviewed before the geometry swap). The DRO-population gap is a genuine
 general sim improvement worth doing regardless.
+
+---
+
+## 🔨 turn 143 — ENGINE: populate the machine DRO in sim (the general read-machine gap; step 1 of the real fit sim)
+
+Option B, step 1: the engine never populated the machine DRO registers in sim (plain Map), so `read-machine` (RM) returned 0
+for every dialect — the general gap that collapses the rotary fit's cross-axis capture (`#52=#881`). Fixed it on its own (it's
+GENERAL — any RM macro was reading 0); the opSimStarts fit side-swap (step 2) is next.
+
+**Verify-first:** RM emits `<var>=#<base+AX[axis]>` per dialect (Expert #880, V4.1 #1500, DM500 #864, rs274 #5420; AX =
+{X:0,Y:1,Z:2,A:3}); the engine's var store is a plain Map in sim → those regs are never set → RM = 0. `this.pos` is {x,y,z}
+(no rotary axis tracked).
+
+**Build (engine-only, no emit change):**
+- `DRO_BASES = [880, 1500, 864, 5420]` + `_updateDro()` — sets EVERY dialect base (X=base, Y=+1, Z=+2, A=+3) to the tool's
+  machine position = the current pass's operator start `O` + the local `this.pos` (the SAME frame the probe trigger uses,
+  `#1925 = O + target`). A=0 (no rotary axis). Populating all bases is dialect-agnostic + cheap (one macro reads its own base).
+- Called at the START of `_executeStep` — reflects the last completed move, and RM lines always follow moves, so the DRO is
+  current when RM reads it (matches the t141 read-proxy prototype exactly).
+- **Guarded to pure-sim** (`this._populateDro = no injected store`): a live PC-bridge store PROXIES the controller's real DRO,
+  so we must not overwrite it (it'd write a read-only register).
+
+**Verify:** `tests/engine-dro.spec.js` — after `G91 / G0 X10 Y5 Z-3`, read-machine returns the machine coord (10,5,-3); with a
+{50,20,0} operator start it's (60,25,-3); ALL dialect bases populated (Expert/V4.1/DM500/rs274 each read X=10). Was 0 before.
+
+**Blast radius: zero.** Full suite **431 passed**; the one failure is `knob-persist` — a recurring parallel-load flake (failed
+t139 too), PASSES isolated, knob/FORM domain, nothing to do with read-machine. No RM-garbage-locked test broke: the t129 rotary
+fit was already reworked (t139) to the synthetic solver, so nothing else asserted the RM=0 garbage. The DRO populate is a real
+general improvement (any RM macro now reads the true coord).
+
+**Next (step 2):** swap the opSimStarts fit-start P2/P3 sides to match the macro's probe directions → with the DRO now real, the
+fit sim becomes real (t141 prototype: R≈38.2 ≈ true 38.1), the disc lands on the real OD, the t139 comp verifies in-sim.
