@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-// TRAVEL-START inc1 — the EDGE flip: START ← TRAVEL becomes TRAVEL ← START. The unit test below still covers the GENERIC
-// probeVector widget (canvasWidgets.js — kept, may be adopted elsewhere). The integration test now covers the FLIP: the
-// edge canvas shows a draggable ① START marker (the SOURCE); dragging it DERIVES the reach (#1) — no typed reach field.
+// TRAVEL-START inc1 (EDGE) — DROP the "reach" ARROW (the GUI element), ADD a draggable ① START marker. The unit test below
+// still covers the GENERIC probeVector widget (canvasWidgets.js — kept). The integration test covers the DECOUPLED model:
+// the start marker (the "reach") moves the SIM start; MAX PROBE (#1) stays a SEPARATE editable safety field, untouched.
 test.use({ viewport: { width: 1280, height: 900 } });
 
 // ── Unit: the generic probeVector gesture (cardinal snap → axis+dir enums + reach) — the widget itself is unchanged ─────
@@ -31,40 +31,50 @@ test('probeVector gesture: place from axis/dir/dist; drag snaps to the nearest c
   expect(r.dragXneg).toMatchObject({ p_axis: 'X', p_dir: 'neg' });
 });
 
-// ── Integration: TRAVEL-START inc1 — the START marker is the SOURCE; dragging it DERIVES the reach (#1) ───────────────
-test('edge wizard: the ① start marker is the source — dragging it sticks + DERIVES the reach (read-only MAX PROBE)', async ({ page }) => {
+// ── Integration: TRAVEL-START inc1 — the ① START marker (the "reach") is DECOUPLED from MAX PROBE ────────────────────
+test('edge wizard: MAX PROBE is editable; dragging the ① start moves the start (sim) WITHOUT touching MAX PROBE; it persists', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('edge'));
   await page.waitForSelector('#wiz_edge', { state: 'visible' });
   await page.waitForFunction(() => document.querySelector('#edgeLayoutCanvas .fc-handle'));
 
-  // the reach is a READ-ONLY readout — the start is the source, you don't type the reach (the field is DROPPED as editable)
-  expect(await page.evaluate(() => document.getElementById('p_dist').hasAttribute('readonly')), 'MAX PROBE is a read-only readout').toBeTruthy();
+  // MAX PROBE is a NORMAL EDITABLE field (the V10.46 regression to undo: it must NOT be read-only)
+  expect(await page.evaluate(() => document.getElementById('p_dist').hasAttribute('readonly')), 'MAX PROBE is editable (not read-only)').toBeFalsy();
+  await page.fill('#p_dist', '37');   // fill would THROW on a read-only input → this also proves editability
+  await page.evaluate(() => document.getElementById('p_dist').dispatchEvent(new Event('input', { bubbles: true })));
+  await page.waitForFunction(() => document.querySelector('#edgeLayoutCanvas .fc-handle'));
 
-  // grab the ① START handle (a 'move' rect: centre = x + w/2, y + h/2) in client px
-  const grab = () => page.evaluate(() => {
+  // the ① START handle (a 'move' rect: centre = x + w/2) + the world start before the drag
+  const before = await page.evaluate(() => {
     const h = document.querySelector('#edgeLayoutCanvas .fc-handle');
     const svg = document.querySelector('#edgeLayoutCanvas svg').getBoundingClientRect();
-    const cx = h.hasAttribute('cx') ? +h.getAttribute('cx') : +h.getAttribute('x') + (+h.getAttribute('width') || 12) / 2;
-    const cy = h.hasAttribute('cy') ? +h.getAttribute('cy') : +h.getAttribute('y') + (+h.getAttribute('height') || 12) / 2;
-    return { cx, cy, svgL: svg.left, svgT: svg.top };
+    const cx = h.hasAttribute('cx') ? +h.getAttribute('cx') : +h.getAttribute('x') + 6;
+    const cy = h.hasAttribute('cy') ? +h.getAttribute('cy') : +h.getAttribute('y') + 6;
+    const s = window.ddcsStudio.wizardManager._activePanel.getPassStarts()[0];
+    return { cx, cy, svgL: svg.left, svgT: svg.top, startX: s.x, startY: s.y };
   });
 
-  const g = await grab();
-  // drag the start AWAY from the wall (X+ → wall at world x=0; screen-left = world −x = a larger outset = a longer reach)
-  await page.mouse.move(g.svgL + g.cx, g.svgT + g.cy);
+  // drag the ① start
+  await page.mouse.move(before.svgL + before.cx, before.svgT + before.cy);
   await page.mouse.down();
-  await page.mouse.move(g.svgL + g.cx - 60, g.svgT + g.cy, { steps: 6 });
+  await page.mouse.move(before.svgL + before.cx - 50, before.svgT + before.cy + 25, { steps: 6 });
   await page.mouse.up();
-  await page.waitForFunction(() => document.querySelector('#edgeLayoutCanvas .fc-handle'));   // canvas re-rendered
+  await page.waitForTimeout(150);
 
-  // the START is the SOURCE: it STUCK where dropped (userStarts beats the inferred hint), and the reach DERIVED from it.
-  const r = await page.evaluate(() => {
-    const start = window.ddcsStudio.wizardManager._activePanel.getPassStarts()[0];
-    return { startX: start.x, dist: +document.getElementById('p_dist').value };
+  const after = await page.evaluate(() => {
+    const s = window.ddcsStudio.wizardManager._activePanel.getPassStarts()[0];
+    return { startX: s.x, startY: s.y, dist: document.getElementById('p_dist').value };
   });
-  expect(r.startX, 'the start stuck OUTSIDE the probed wall (x<0 for X+)').toBeLessThan(0);
-  const expected = Math.max(1, Math.round(Math.abs(r.startX - 0) / 0.6));   // tieEdgeDist: reach = round(outset / 0.6)
-  expect(r.dist, 'the reach DERIVES from the dragged start — round(outset / 0.6)').toBe(expected);
+  // the start MOVED (the drag set the start position) …
+  expect(Math.abs(after.startX - before.startX) + Math.abs(after.startY - before.startY), 'the start moved on drag').toBeGreaterThan(1);
+  // … but MAX PROBE is UNCHANGED — DECOUPLED (the drag must NOT touch it)
+  expect(after.dist, 'MAX PROBE is untouched by the start drag (decoupled)').toBe('37');
+
+  // the start PERSISTS: editing MAX PROBE re-renders, but the dragged start STICKS (userStarts beats the inferred hint)
+  await page.fill('#p_dist', '52');
+  await page.evaluate(() => document.getElementById('p_dist').dispatchEvent(new Event('input', { bubbles: true })));
+  await page.waitForTimeout(150);
+  const persisted = await page.evaluate(() => window.ddcsStudio.wizardManager._activePanel.getPassStarts()[0]);
+  expect(Math.abs(persisted.x - after.startX) + Math.abs(persisted.y - after.startY), 'the dragged start persists across a MAX PROBE edit').toBeLessThan(0.5);
 });

@@ -3138,3 +3138,41 @@ outset.
    dragging the start in the 3D/2D SIM updates `userStarts` but not the reach. Same gap the middle has; acceptable for inc1.
 4. **the derived reach writes the SHARED `maxDist`** — the existing `p_dist↔maxDist` sync means dragging the edge start nudges
    the shared max-probe default other wizards seed from. Existing mechanism; the flip rides it.
+
+---
+
+## 🔨 turn 169 — ITEM 4 inc 1 (EDGE) FIX: revert MAX PROBE to editable + DECOUPLE the start from it
+
+Human correction (t168): "i didn't say to drop max probe we need it, i said drop reach" + "reach was in the gui." V10.46
+(90dc933) got it HALF right: RIGHT — dropped the "reach" ARROW (the GUI element) → a draggable start marker; WRONG — it
+ALSO made MAX PROBE (`p_dist`) read-only + COUPLED it (the drag derived `#1` via `tieEdgeDist`). MAX PROBE is a SEPARATE,
+needed, editable SAFETY field — never should have been touched. The conflation: I treated the start marker ("reach") and the
+max search distance (`#1`) as ONE thing; they're TWO.
+
+**Fixed:**
+- `edgeView.js`: DELETED `tieEdgeDist` + its call. The start-drag now writes ONLY the sim start (`panel.onStartDrag →
+  userStarts[0]`) — it does NOT touch `p_dist`. DECOUPLED.
+- `index.html`: `p_dist` (MAX PROBE) → reverted to a NORMAL EDITABLE field (removed `readonly` + the readout title). The
+  user's typed max search distance, emitted as `#1` exactly as before.
+- KEPT the draggable ① START marker (the "reach" — the dropped arrow's replacement) + `edgeWizard.inferStarts`.
+- `tests/edge-probe-vector.spec.js`: rewrote the integration test for the DECOUPLED model — MAX PROBE is editable (a `fill`
+  that would throw on read-only), the drag MOVES the start but leaves MAX PROBE unchanged, and the dragged start PERSISTS
+  across a MAX PROBE edit (userStarts beats the hint). Kept the generic-widget unit test.
+
+**PERSISTENCE (verify-first — the dispatch's gate question):** the start (reach) is a SIM-ONLY hint (the incremental probe
+macro doesn't encode it — no emit effect). It persists IN-SESSION via `userStarts` (never reset in the panel; `computePassStarts`
+reads `userStarts[p] || hint`, line 393) — EXACTLY the MIDDLE's pattern (its dragged start is also sim-only userStarts, no
+param for the position). So NO new param, NO design call → NO gate. The t167 bug was coupling them FOR persistence; decoupled,
+each persists on its own (MAX PROBE via the form/maxDist, the start via userStarts).
+
+**Verified:** edge decoupled-integration green; **byte-identical EDGE migration (probe-surface-block) green → emit = the
+ORIGINAL pre-edge** (`tieEdgeDist` gone, MAX PROBE typed as before); REAL RENDER (human-eyes, both PNGs): `p_dist readonly =
+false` (EDITABLE), MAX PROBE held 37→37 across a start-drag (DECOUPLED), the marker moved. FULL SUITE: 426 passed / 10 failed
+BUT in a **37-min DEGRADED run (2× the normal ~18 min — the machine was slammed)**; ALL 10 confirmed ENVIRONMENTAL FLAKES on
+re-run — 8/10 recovered on a serial re-run; `middle-animator` passes isolated (6 passed) and failed DIFFERENT sub-tests each
+run (:22 vs :196 = non-determinism); `knob-persist` (a known flake) passes on a clean re-run (1 passed); `per-pass-starts-2d`
+(the only edge-adjacent one) passes serially. No regression — an edge-only change has no mechanism to touch io-sim /
+wizard-library / placement / op-* / knob / animator.
+
+**Note for release:** this fixes a USER-FACING regression shipped in V10.46 (MAX PROBE was non-editable) — recommend a prompt
+version bump/release (left to the advisor's cadence call, not bumped unilaterally mid-handoff).
