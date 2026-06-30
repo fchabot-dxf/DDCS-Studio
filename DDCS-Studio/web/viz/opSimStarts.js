@@ -78,14 +78,22 @@ const BUILT_IN = {
         const cx = sx / 2, cy = sy / 2;
         const R = Math.min(sy, sz) / 2;                 // bar radius (cross-section = min of the two cross dims)
         const retract = n(params && params.retract, 2);
+        const tipR = n(params && params.radius, 2);                // stylus tip radius (#6)
+        const safeZ = Math.round(n(params && params.safeZ, 15));   // the macro's #17 = Math.round(safeZ)
         const top = { x: cx, y: cy, z: Math.min(5, sz * 0.5) };   // above the top, ready to probe down
         const method = (params && params.method) === 'fit' ? 'fit' : 'known';
         if (method !== 'fit') return [top];
-        const flankZ = -R;                              // centreline height in the top-at-0 preview frame
+        // Flank START = R + retract + tipR off the axis, matching the known macro's #11 ("the tool CENTRE clears the OD by
+        // retract — the tip sticks out r"). That keeps the start OUTSIDE the grown collision OD (R + tipR) by `retract`, so the
+        // probe approaches from outside → a normal near-wall touch even probing dead through the bar axis (no on-surface start
+        // = no collision edge case; the shared cylinder collision is untouched). Z is lifted safeZ above the centreline: the
+        // macro's reposition drops −#17 (safeZ) AFTER the engine resets pos=0, so the touch lands at the EQUATOR (−R, widest).
+        const flankOff = R + retract + tipR;
+        const flankZ = -R + safeZ;
         return [
             top,
-            { x: cx, y: cy - R - retract, z: flankZ },  // P2 — macro probes +Y → start the −Y side, probe toward the bar
-            { x: cx, y: cy + R + retract, z: flankZ },  // P3 — macro probes −Y → start the +Y side
+            { x: cx, y: cy - flankOff, z: flankZ },  // P2 — macro probes +Y → start the −Y side, clear of the OD, probe in
+            { x: cx, y: cy + flankOff, z: flankZ },  // P3 — macro probes −Y → start the +Y side
         ];
     },
 };

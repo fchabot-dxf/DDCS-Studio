@@ -2713,3 +2713,35 @@ the sim is correct; probing at the equator (lift the flank start z by safeZ) wou
 ### Arc complete (t141 → t145): the rotary 3-point fit sim is now REAL
 t141 GATE (found the 2-part cause) → t143 engine DRO population (general read-machine gap) → t145 fit-start side-swap. The fit
 solves the true OD in-sim, the disc-on-surface lands on the real OD, and the probe-surface block's fit comp is verified in-sim.
+
+---
+
+## 🔨 turn 147 — fit flank discs at the EQUATOR (cosmetic) — fixed the CLEAN way after the suite caught a shared-code regression
+
+Cosmetic: lift the fit's flank probe-discs to the equator (the bar's widest point) instead of sitting safeZ low. Two honest
+detours got to the right fix:
+
+**Detour 1 (reverted): the dispatch's "lift by safeZ" broke the fit.** Lifting the flank start by exactly safeZ lands the probe
+at z = −R — which IS the cylinder AXIS. A radial probe straight through the axis hit a collision edge case → R collapsed to 24.
+A sweep showed R is correct everywhere from z=−53 up to z=−40, but breaks at exactly the axis.
+
+**Detour 2 (reverted): a shared-collision guard regressed `rotary-collision`.** Root cause (verified): at the dead-axis the
+flank's tool CENTRE starts R+retract from the axis, the grown collision OD is R+tipR — and with retract==tipR (both 2) the
+start sits EXACTLY on the OD, so the t=0 entry was skipped as self-contact and the only other crossing (the far wall) was out
+of reach → a false miss. I added a "started already in contact → contact at t=0" guard in `stockProbeStop`. It fixed the fit
+**but the full suite caught a real regression**: `rotary-collision`'s "radial probe FROM the axis" probes from *inside* the
+cylinder and must stop at the EXIT OD — my guard made it stop at the start. (Exactly the shared-code risk I'd flagged.) Backed
+the collision change out entirely.
+
+**The clean fix (shipped): make the flank START clear the OD — no shared-collision change.** The fit's flank sim-start was
+`R + retract` (missing the tip term), which is what put the centre on the grown OD at the dead-axis. The KNOWN macro already
+offsets its flank approach by `R + retract + tip` (#11 — "the tool centre clears the OD by retract, the tip sticks out r"). So
+the fit sim-start now matches: `cy ± (R + retract + tipR)`, `z = −R + safeZ`. The probe approaches from OUTSIDE → a normal
+near-wall touch even probing dead through the axis. The shared cylinder collision is untouched.
+
+**Proven polyvalent** (the human pushed on this — all verified, not asserted): R = the exact true OD radius across
+- bar Ø 50–102, stand-off 1–5 (below / equal / above the tip radius), and start height safeZ 5–40 (flank start −33 to +2).
+Every combination solves the exact OD and lands the flanks at the equator (centre Zc = −R). Render: the 3 cardinal OD discs
+(top + both flanks at the widest point). `rotary-collision` restored. **Full suite 433 passed.**
+
+(Cosmetic — per the dispatch, NOT bumping the version for it alone; it batches with the next meaningful unit.)
