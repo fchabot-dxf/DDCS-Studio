@@ -95,6 +95,10 @@ function ensurePanel() {
         // Per-pass start HINTS from the program's op markers (opSimStarts registry) → the editor sims a boss-both's 2nd-axis
         // at ②, the SAME as the wizard. Consumed by the panel's computePassStarts (the trace + engine passStarts).
         getStartHints: gpStartHints,
+        // DISC-ON-SURFACE (multi-op, t149): the declared radius-comps the disc nudges to come from the WHOLE program model
+        // (every op's builderOf stack), so editor Simulate lands the probe disc on the TRUE surface for ANY probe op — the
+        // same declared-driven nudge as the wizard preview, read SIM-SIDE from the model (Option B, never an editor-text marker).
+        getOps: () => (window.ddcsGetBlockProgram ? (window.ddcsGetBlockProgram() || []) : []).filter((b) => b && b.type === 'op' && b.opType).map((b) => ({ type: b.opType, params: b.params || {} })),
         createVarStore: gpSeededVarStore,
     });
     // Spindle / program-zero start hooks (read/write the panel's draggable 3D marker) — used by the wizard insert.

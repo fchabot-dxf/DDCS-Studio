@@ -2745,3 +2745,35 @@ Every combination solves the exact OD and lands the flanks at the equator (centr
 (top + both flanks at the widest point). `rotary-collision` restored. **Full suite 433 passed.**
 
 (Cosmetic — per the dispatch, NOT bumping the version for it alone; it batches with the next meaningful unit.)
+
+---
+
+## 🔨 turn 149 — EDITOR-SIM disc-on-surface: declared radiuscomp from the program model (Option B) — the flagged t135 follow-up
+
+The disc-on-surface (probe disc nudged to the TRUE comped surface by the declared radiuscomp) worked in the WIZARD preview
+(readEnabledComps read the single active op via getLastOp). Extended the SAME declared-driven disc to the EDITOR sim, which
+previews a MULTI-op program.
+
+**Verify-first:** the editor sim IS the same `createPreviewPanel` (gcodePreviewTab mounts it); the ONLY difference is the comp
+SOURCE — the wizard feeds its single active op (getLastOp), the editor feeds the whole program model (ddcsGetBlockProgram).
+`ddcsGetBlockProgram()` returns op blocks `{type:'op', opType, params}` (gpStartHints already relies on that shape).
+
+**Build (declared-driven, Option B — read the MODEL, no @DDCS editor-text marker, NO macro-text scan):**
+- `readEnabledComps(ops)` now takes an OPS LIST (was hard-wired to getLastOp) → builds `{ resultVar → {axis, sign} }` across all
+  given ops via `builderOf(op.type)` → the radiuscomp atoms.
+- A `compOps()` source helper in the closure: `opts.getOps` if the host provides it (the editor), else `[getLastOp()]` (every
+  other host — wizard/Blocks). Both run-reset sites read `readEnabledComps(compOps())`.
+- `gcodePreviewTab` passes `getOps: () => ddcsGetBlockProgram() (op blocks) → [{type, params}]`. So editor Simulate's compMap is
+  the WHOLE program's declared comps → the disc nudges onto the TRUE surface for ANY probe op.
+- The nudge geometry is UNCHANGED (the proven frame-invariant ±radius). Multi-op safety: the maps merge; a comp-line init
+  (`#50=0`) is harmless (no discs pending yet); a same-var/different-axis collision degrades to a RAW disc (the earlier op's
+  nudge no-ops on an empty axis), never a WRONG nudge.
+
+**Verified:** `tests/editor-sim-disc.spec.js` — REAL insert (middle boss-both) → the live program model yields the enabled
+comps `[#51,#52,#54,#55]`; driving the editor's gcode through the REAL editor viz nudges every disc EXACTLY a stylus radius
+(maxOff=2) onto the walls (was left at the tool centre ≈0). Render captured + opened (8 discs on the 4 walls, editor view).
+**Full suite 434 passed.**
+
+NOTE: the gpPanel's ANIMATED play wouldn't sustain `running` in-test (the single-engine guard, just after the wizard insert),
+so the disc is verified by driving the SAME program-model source + nudge through the real editor viz, not the animated engine —
+the render is the real editor-view symptom. RELEASE: batches with the flank-disc polish (378191f) → V10.42 (advisor ships).

@@ -24,20 +24,24 @@ import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock mo
 import { getLastOp } from '../blocks/opRecord.js';          // the active op (wizard PREVIEW) → its declared radius-comp surfaces
 import { builderOf } from '../blocks/opBuilders.js';        // rebuild the op stack to read its radiuscomp atoms (disc-on-surface, inc2)
 
-// DISC-ON-SURFACE (inc2): read the ACTIVE op's DECLARED radiuscomp atoms → { resultVar → { axis, sign } } for ENABLED comps
-// ONLY. The flat <name>Stack carries the probeSurfaceStack atoms; a radiuscomp's `raw` (trigger #1925/6/7) gives the axis,
-// `dir` the sign. Declared, NOT a #6-scan. (Wizard PREVIEW source = getLastOp; the EDITOR-sim ddcsGetBlockProgram is the flagged follow-up.)
+// DISC-ON-SURFACE (inc2): read the DECLARED radiuscomp atoms of the ops being previewed → { resultVar → { axis, sign } } for
+// ENABLED comps ONLY. The flat <name>Stack carries the probeSurfaceStack atoms; a radiuscomp's `raw` (trigger #1925/6/7) gives
+// the axis, `dir` the sign. Declared, NOT a #6-scan. SOURCE per host: the wizard PREVIEW passes its single active op
+// (getLastOp); the EDITOR sim passes the whole program model (opts.getOps → ddcsGetBlockProgram). Multi-op → the maps merge;
+// a comp-line init (`#50=0`) is harmless (no discs pending yet), and a same-var/different-axis collision degrades to a RAW
+// disc (the earlier op's nudge no-ops on an empty axis), never a wrong nudge.
 const TRIG_AXIS = { '#1925': 'x', '#1926': 'y', '#1927': 'z' };
-function readEnabledComps() {
-    const op = getLastOp();
-    if (!op || !op.type) return {};
-    let stack = null;
-    try { const b = builderOf(op.type); stack = b ? b(op.params || {}) : null; } catch (_) { stack = null; }
+function readEnabledComps(ops) {
     const map = {};
-    for (const a of (stack || [])) {
-        if (!a || a.type !== 'radiuscomp' || !a.params) continue;
-        const p = a.params, on = p.enable !== false && p.enable !== 'false' && p.enable !== 0;
-        if (on && p.result && TRIG_AXIS[p.raw]) map[String(p.result)] = { axis: TRIG_AXIS[p.raw], sign: p.dir === '-' ? -1 : 1 };   // comp-OFF (fit) drops out → its discs stay raw
+    for (const op of (ops || [])) {
+        if (!op || !op.type) continue;
+        let stack = null;
+        try { const b = builderOf(op.type); stack = b ? b(op.params || {}) : null; } catch (_) { stack = null; }
+        for (const a of (stack || [])) {
+            if (!a || a.type !== 'radiuscomp' || !a.params) continue;
+            const p = a.params, on = p.enable !== false && p.enable !== 'false' && p.enable !== 0;
+            if (on && p.result && TRIG_AXIS[p.raw]) map[String(p.result)] = { axis: TRIG_AXIS[p.raw], sign: p.dir === '-' ? -1 : 1 };   // comp-OFF (fit) drops out → its discs stay raw
+        }
     }
     return map;
 }
@@ -271,7 +275,13 @@ export function createPreviewPanel(container, opts = {}) {
     let engine = null;
     let pendingProbe = null;   // SLICE 3: the axis of a G31 awaiting completion (resolved on the next onLineChange)
     let pendingDatum = null;   // a WCS-offset write awaiting its COMMITTED value — onLineChange fires BEFORE the assign runs, so read the target var on the NEXT line (robust to ANY RHS expr, incl. the comp's bracketed [#1927-#6])
-    let compMap = {};   // DISC-ON-SURFACE (inc2): the active op's enabled-comp { resultVar → { axis, sign } } map (read per run)
+    let compMap = {};   // DISC-ON-SURFACE (inc2): the previewed ops' enabled-comp { resultVar → { axis, sign } } map (read per run)
+    // The ops whose declared radius-comps drive the disc-on-surface: the EDITOR sim injects its whole program model
+    // (opts.getOps → ddcsGetBlockProgram); every other host (wizard/Blocks preview) uses the single active op (getLastOp).
+    const compOps = () => {
+        if (typeof opts.getOps === 'function') { try { return opts.getOps() || []; } catch (_) { return []; } }
+        const op = getLastOp(); return op ? [op] : [];
+    };
     function ensureEngine() {
         if (engine) return engine;
         engine = new GcodeExecutionEngine({
@@ -336,7 +346,7 @@ export function createPreviewPanel(container, opts = {}) {
                 pendingDatum = null;
                 updateRunBtn();
                 if (typeof opts.onLine === 'function') opts.onLine(null);
-                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); pendingProbe = null; pendingDatum = null; compMap = readEnabledComps(); engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
+                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); pendingProbe = null; pendingDatum = null; compMap = readEnabledComps(compOps()); engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
             },
         });
         return engine;
@@ -555,7 +565,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (mode === '3d') ensureViz();
         if (viz && viz.setSimSpeed) viz.setSimSpeed(simSpeed());   // probe discs fade in SIM time (track the speed button)
         if (viz && viz.resetProbe) viz.resetProbe();    // SLICE 3: fresh probe-WCS each run (superimposed on the stock-WCS)
-        pendingProbe = null; pendingDatum = null; compMap = readEnabledComps();   // fresh deferred state + the active op's declared surfaces, each run
+        pendingProbe = null; pendingDatum = null; compMap = readEnabledComps(compOps());   // fresh deferred state + the active op's declared surfaces, each run
         updateDro(getStartPos() || { x: 0, y: 0, z: 0 });   // DRO: reset to the start position for the fresh run
         if (droWcsEl) droWcsEl.textContent = activeWcsName();   // refresh the label to the active WCS (catches a settings switch)
         if (viz) viz.setAnimate(false);                 // engine drives the tool/trail, not the geometric sweep
