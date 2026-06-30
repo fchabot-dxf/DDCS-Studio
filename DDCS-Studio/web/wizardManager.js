@@ -14,6 +14,7 @@ import { listUserOps } from './blocks/userOps.js';
 const isUserOp = (t) => typeof t === 'string' && t.startsWith('user_');
 import { playClick, playClickReverse } from './ui/sound.js';  // audio helper for click sounds
 import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
+import { mountSafeZFrameToggles } from './ui/safeZFrameToggle.js';   // SPATIAL-MODEL 1c: the shared safe-Z frame toggle (rel|mach)
 import { createPreviewPanel } from './viz/createPreviewPanel.js';   // THE shared preview (identical to Blocks/Studio), fed the wizard's op code
 import { openTemplatesPopover, closeTemplatesPopover } from './ui/wizardTemplates.js';   // per-op save/load templates (local + cloud)
 import { frameWizardSections } from './ui/wizardSections.js';   // group each form's fields into framed categories
@@ -256,6 +257,7 @@ export class WizardManager {
             if (view && typeof view.applyVariant === 'function') view.applyVariant(variant);
             if (view && typeof view.onShow === 'function') view.onShow(this);
             decorateProbeSrc(view);   // controller/Studio source chips (before first generate)
+            mountSafeZFrameToggles(() => this.update());   // the shared rel|mach safe-Z frame toggle on adopting wizards' safe-Z fields (idempotent)
             this.applyProbeDefaults();   // seed probe fields from the global 3D-probe defaults
             // Ensure fields & preview reflect current defaults immediately
             this.update();

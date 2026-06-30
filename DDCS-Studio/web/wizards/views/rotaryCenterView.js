@@ -1,5 +1,6 @@
 /** views/rotaryCenterView.js — Rotary centreline (4th-axis setup) wizard view. */
 import { el, UIUtils } from '../../ui/uiUtils.js';
+import { safeZFrameValue } from '../../ui/safeZFrameToggle.js';   // SPATIAL-MODEL 1c: shared safe-Z frame read
 import { RotaryCenterWizard } from '../rotaryCenterWizard.js';
 import { cylinderOf, rotaryAxisOf } from '../../engine/probeGeometry.js';
 import { applySettings } from '../../ui/settingsPanel.js';
@@ -81,7 +82,7 @@ export const rotaryCenterView = {
             dist: el('rc_dist')?.value || '30',
             retract: el('rc_retract')?.value || '2',
             safeZ: el('rc_safe_z')?.value || '15',
-            safeZFrame: el('rc_safe_z_frame')?.value || 'relative',   // SPATIAL-MODEL inc1: final-park frame (relative | machine G53)
+            safeZFrame: safeZFrameValue('rc_safe_z'),   // SPATIAL-MODEL inc1: final-park frame (relative | machine G53)
             f_fast: el('rc_feed_fast')?.value || '200',
             f_slow: el('rc_feed_slow')?.value || '50',
             qStop: el('rc_q')?.value || '1',

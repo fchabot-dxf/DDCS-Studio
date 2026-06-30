@@ -2892,3 +2892,36 @@ GATE — don't build. The register NAME is real (Expert #69 = "Z-axis safe heigh
 ambiguous AND conflict with the project's deliberate Studio-side decision. Building now would contradict that decision, emit a
 non-ground-truth register usage (`G53/G90 Z#69` in no dump), and be wrong on DM500 (#69 = tool sensor). Reconcile the premise
 (which register, which frame per profile, vs the existing decision) — then the build is mechanical (the infra is all there).
+
+---
+
+## 🔨 turn 157 — SPATIAL MODEL 1c: roll the safe-Z FRAME out via a SHARED toggle widget (byte-identical each; corner/atc flagged)
+
+Built the shared UI control 1a deferred + rolled the frame (proven on rotary) out to every wizard with a CLEAN final-park safe-Z.
+
+**Shared widget** (`web/ui/safeZFrameToggle.js`): the `rel|mach` toggle is DECLARED ONCE + INJECTED next to each adopting
+safe-Z field by `mountSafeZFrameToggles()` (idempotent; mounted from `wizardManager` on wizard-open, the same hook the probe-
+source chips use). `safeZFrameValue(fieldId)` is the shared view-read. Wizards adopt by listing their field id. The 1a static
+rotary toggle was converted to this shared widget (removed from index.html).
+
+**Rolled out** (final park → `safeZParkBlock` + the `safeZFrame` param + view-read + opSchema param/bind):
+- **rotary_clock** (`#17`, the "Final retract" — an exact mirror of rotary_center).
+- **alignment** (`#19`, the final `MV('Z','#19')` before END).
+- **middle** (`#17`, BOTH branch final-parks — 2-axis + single-axis; the inter-move lifts + error retract STAY relative).
+
+**FLAGGED / deferred (don't force-fit, per the dispatch):**
+- **corner** — `#17 = safeZ + scanDepth` (the safe-Z is FOLDED into the plunge depth; its retract uses `#17`=plungeDepth, and
+  `#19`=safeZ isn't a clean final park). The safe-Z semantic differs from rotary's → NOT a clean mirror. Deferred.
+- **atc** (atcLength / atcToolCheck) — has NO safe-Z UI field (safeZ comes from defaults, no form input) → nowhere to host the
+  toggle. Deferred until it gets a field.
+
+**Verified:**
+- **relative BYTE-IDENTICAL** — git-stash diff (rotary_clock + alignment + middle relative-default vs pre-1c, stripAnnotations,
+  incl. middle boss-both + pocket) → **IDENTICAL ✓**. The rollout test also asserts each emits 0 × G53 on relative.
+- **machine** — each parks the FINAL retract via `G53 Z#<var>` (1×); the sim honors G53 (general, verified t153).
+- **round-trip** — `safeZFrame` survives the op marker for each wizard.
+- **shared widget renders uniformly** — opening a wizard mounts all 4 toggles (`relative|machine`).
+- **Full suite 435 passed** (the one failure, `align-rotate-gui`, is a timing FLAKE — passes isolated ×2; `ddcsAlignRotate`
+  doesn't import any changed file).
+
+SCOPE = the frame rollout via the shared widget. NOT inter-move, NOT the bar (inc2). Releasable increment (advisor's bump).

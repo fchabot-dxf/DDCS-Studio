@@ -19,6 +19,7 @@ import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
+import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
 
 /** Alignment params → its block stack. The one source of truth for both displays, native across posts. */
 export function alignmentStack(params = {}) {
@@ -27,6 +28,7 @@ export function alignmentStack(params = {}) {
     const dir = params.probeDir === 'neg' ? 'neg' : 'pos', plus = dir === 'pos';
     const dirLabel = plus ? 'pos' : 'neg';
     const safeZ = num(params.safeZ, 10), dist = num(params.dist, 20), retract = num(params.retract, 2);
+    const safeZFrame = safeZFrameOf(params.safeZFrame);   // SPATIAL-MODEL 1c: relative (default) | machine (G53 park)
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 20), port = num(params.port, 0);
     const tolerance = num(params.tolerance, 0);
     const src = params.sources || {};
@@ -102,7 +104,7 @@ export function alignmentStack(params = {}) {
     A('#53', 'ABS[#72]', `Absolute span along ${checkAxis}`);
     IF('#53', '==', '0', 1);                      // abort if A and B are at the same position (zero span)
     A('#54', 'ATAN[#52]/[#53]', 'Misalignment angle (deg) = atan2(delta, span) — two-operand atan[a]/[b] form');
-    MV('Z', '#19'); DM('abs');
+    S.push(safeZParkBlock(safeZFrame, '#19')); DM('abs');   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
 
     // ── Results ──
     C('===== RESULTS =====');

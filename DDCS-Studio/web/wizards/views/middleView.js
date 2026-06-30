@@ -1,5 +1,6 @@
 /** views/middleView.js — Middle (pocket/boss centre) wizard view. */
 import { el, UIUtils } from '../../ui/uiUtils.js';
+import { safeZFrameValue } from '../../ui/safeZFrameToggle.js';   // SPATIAL-MODEL 1c: shared safe-Z frame read
 import { MiddleWizard } from '../middleWizard.js';
 import { restoreBoxStock } from './rotaryCenterView.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
@@ -126,6 +127,7 @@ export const middleView = {
             dist: el('m_dist')?.value || '20',
             retract: el('m_retract')?.value || '2',
             safeZ: el('m_safe_z')?.value || '10',
+            safeZFrame: safeZFrameValue('m_safe_z'),   // SPATIAL-MODEL 1c: final-park frame (relative | machine G53)
             clearance: '2',
             f_fast: el('m_feed_fast')?.value || '200',
             f_slow: el('m_feed_slow')?.value || '50',

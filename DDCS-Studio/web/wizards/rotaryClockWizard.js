@@ -12,10 +12,12 @@ import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
+import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
 
 export function rotaryClockStack(params = {}) {
     const level = num(params.level, 0), span = num(params.span, 20), dist = num(params.dist, 30);
     const retract = num(params.retract, 2), safeZ = num(params.safeZ, 10), fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
+    const safeZFrame = safeZFrameOf(params.safeZFrame);   // relative (default, clearance lift) | machine (G53 park at the absolute Z)
     const src = params.sources || {};
     const action = ['set', 'report', 'rotate'].includes(params.action) ? params.action : 'set';
     const refAngle = params.reference === 'side' ? 90 : 0, refLabel = refAngle ? '+Y side (3 o clock)' : 'top (+Z)';
@@ -82,7 +84,7 @@ export function rotaryClockStack(params = {}) {
         SWO('A', `[#54-#53${refTerm}]`);
     }
 
-    C('Final retract'); MV('Z', '#17');
+    C('Final retract'); S.push(safeZParkBlock(safeZFrame, '#17'));   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
     DM('abs');
     MSG(action === 'report' ? 'Flat tilt #53 deg (measured)' : 'Flat tilt #53 deg - A datum set');
     GO(2);

@@ -12,6 +12,7 @@ import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { probeSurfaceStack } from './ops/probeSurface.js';   // the shared probe primitive (middle composes it — t131 inc1)
+import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
 import { travelOwn, travelOpp } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 
@@ -40,6 +41,7 @@ export function middleStack(params = {}) {
     const dir2Plus = resolvedDir2 === 'pos';
     const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
     const dist = num(params.dist, 20), retract = num(params.retract, 2), safeZ = num(params.safeZ, 10);
+    const safeZFrame = safeZFrameOf(params.safeZFrame);   // SPATIAL-MODEL 1c: relative (default) | machine (G53 final park)
     const clearOver = num(params.clearOver, 15);   // boss AUTO: how high to lift before crossing over the part
     // Boss-AUTO probe-both: the in-axis wall1→wall2 cross-over — the straight TRAVERSE that spans the feature, SEPARATE
     // per axis (non-square boss). DECOUPLED from MAX PROBE: max-probe (#1) is the probe REACH (how far G31 searches);
@@ -180,12 +182,12 @@ export function middleStack(params = {}) {
         if (circular) MM(axis, '#53');
         C(`2axis_${axis === 'X' ? 'XtoY' : 'YtoX'}_${resolvedDir2}`);
         seq(second, dir2Plus, 54);
-        MV('Z', '#17');
+        S.push(safeZParkBlock(safeZFrame, '#17'));   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
         // #53 = centre of the PRIMARY axis, #56 = centre of the SECONDARY — write each to ITS axis's WCS offset
         // (not hardcoded X=0/Y=1, which swapped them when the primary axis was Y).
         A(`#[#70+${AX[axis].off}]`, '#53'); A(`#[#70+${AX[second].off}]`, '#56');
     } else {
-        MV('Z', '#17');
+        S.push(safeZParkBlock(safeZFrame, '#17'));   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
         A(`#[#70+${AX[axis].off}]`, '#53');
     }
     if (circular) {
