@@ -2342,3 +2342,45 @@ The dropped Part-2 macro-scan AND the OD-top gap both disappear because the surf
 5. **Order = edge first** as the equivalence proof, one wizard per pass, GATE between.
 
 NO migration built this turn (per scope). Proposal only; gating back for the authoring-contract + G-code-change decisions.
+
+---
+
+## 🔨 turn 125 — PROBE-SURFACE BLOCK inc1: foundation + EDGE migrated (BYTE-IDENTICAL). Design blessed t124.
+
+Built the foundation + migrated EDGE as the byte-identical proof of the wizard→block compose mechanism. Scope = foundation + edge only.
+
+- **radius-comp ATOM** (`web/wizards/ops/radiuscomp.js`, registered in ops/index PALETTE) — a DECLARED, TOGGLEABLE property:
+  `enable` ON (default, correct-by-default) → `#result=[#raw <dir> #radius]` (the TRUE surface); OFF → `#result=#raw`
+  (raw passthrough, a config flip away — the human's "not a big deal to change later"). The ONE comp home.
+- **probe-surface BUILDER** (`web/wizards/ops/probeSurface.js`) — `probeSurfaceStack(params)` returns the touch atom stack:
+  [comment]→[stop/limit setup]→fast G31→check→retract→slow G31→check→**radiuscomp(raw→result)**→retract→`( @DDCS probe-surface )`.
+  Returns the TRUE surface in `result`. The 1576fee learner snippet is one baked instance of this shape.
+- **@DDCS marker** — `opSchema.SCHEMA['probe-surface'] = { result, axis, dir }`; the block emits the self-describing marker
+  (`( @DDCS:1 {"op":"probe-surface","result":"#50","axis":"X","dir":"+"} )`). Additive (a paren-free comment → stripAnnotations
+  removes it) so byte-identicalness holds. The sim consumes it NEXT increment (replaces the dropped Part-2 macro scan).
+- **EDGE migrated** — `edgeStack`'s hand-rolled touch → ONE `probeSurfaceStack` call (kept the WCS write). Removed the now-orphan
+  `PR`/`CK`/`MV` helpers. **Functional G-code BYTE-IDENTICAL** to the pre-migration emit, proven across a 4-set param sweep
+  (axis X/Y · dir ±  · active/G54/G55) by `tests/probe-surface-block.spec.js` (golden captured from the OLD code, compared via
+  stripAnnotations). Full suite **428 passed**.
+
+### Decisions / deviations from the literal spec (all to keep byte-identical — the gate's hard constraint)
+- **radiuscomp FUSES read+comp into ONE line** (not `proberead(→#raw)` then `radiuscomp(#raw→#result)` = 2 lines). The legacy
+  edge reads+comps in a single `assign #50=[#1925+#6]`; a 2-atom form would add a line → not byte-identical. The atom reads the
+  trigger var directly.
+- **Order = read-BEFORE-retract** (the wizards' order), not the snippet's retract-before-read — else the comp/retract lines swap
+  and the line-compare fails. #1925 is latched at the probe, so the value is identical either way (functional-identical).
+- **push REPLACES params** (not merge with the atom defaults) — a merged single-axis `move` leaks the move atom's `y:0/z:0`
+  defaults (`G0 X#9 Y0 Z0`); replacing (like the wizards' own helpers) keeps `G0 X#9`.
+
+### ⚠ FLAG for the gate — the marker is a SUB-op declaration, but `@DDCS` markers are OP BOUNDARIES
+`importMarkedNc`/`opFromMarker` (the .nc round-trip) treat every `( @DDCS:v {op:…} )` as a TOP-LEVEL op. The probe-surface
+marker sits INSIDE the edge op (a sub-op surface declaration), so a save→reopen of a program containing an edge probe would
+parse it as a phantom `probe-surface` op. NOT test-exercised (suite green) + out of THIS increment's scope (round-trip/sim =
+next), but the **marker contract needs a sub-op vs op-boundary distinction** (namespace it, or teach the round-trip to skip
+sub-op markers) BEFORE the sim/round-trip consume it next increment. Flagging, not hacking the round-trip out of scope.
+
+### GATE — mechanism PROVEN on edge; ready to roll out
+The wizard→block compose mechanism works + is byte-identical. Pending the advisor before the next increments:
+1. the **marker sub-op refinement** (above) — needed before the sim reads it.
+2. **corner next** (per-axis single walls, also byte-identical) then rotary (incl. the OD-top FIX) then middle (the diameter recompute).
+3. the **2 NAMED G-code changes** (middle diameter `|s1-s2|` · rotary OD-top comp) still need the human's ship/hold call (t123 gate).

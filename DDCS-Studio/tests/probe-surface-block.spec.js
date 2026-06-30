@@ -1,0 +1,73 @@
+import { test, expect } from '@playwright/test';
+
+/**
+ * PROBE-SURFACE BLOCK — foundation (turn 125 inc1). The radius-comp atom + the shared probeSurfaceStack builder +
+ * the @DDCS surface marker, proven by migrating EDGE with FUNCTIONAL (stripAnnotations) byte-identical G-code.
+ * GOLDEN = the hand-rolled edge emit captured BEFORE the migration (the swap must not change machine behaviour).
+ */
+const BASE = 'http://localhost:3211';
+async function boot(page) { await page.goto(BASE); await page.waitForFunction(() => window.ddcsStudio); }
+
+// EDGE param sweep + the frozen pre-migration golden (executable G-code only — comments/marker stripped).
+const SWEEP = [
+  { axis: 'X', dir: 'pos', wcs: 'active' },
+  { axis: 'X', dir: 'neg', wcs: 'G54' },
+  { axis: 'Y', dir: 'pos', wcs: 'active' },
+  { axis: 'Y', dir: 'neg', wcs: 'G55', dist: 25, retract: 3, radius: 1.5, f_fast: 300, f_slow: 40, port: 4 },
+];
+const GOLDEN = [
+  "#1=15\n#2=2\n#3=200\n#4=50\n#5=3\n#6=2\n#50=0\n#7=[0-#1]\n#8=#1\n#9=[0-#2]\n#10=#2\n#71=#578\n#72=[#71-1]\n#70=[805+[#72*5]]\n#1505=1\nIF #1505==0 GOTO2\nG91\n#1905=0\n#1915=2\nG31 X#8 F#3 P#5 L0 Q1\nIF #1920!=2 GOTO1\nG0 X#9\nG31 X#8 F#4 P#5 L0 Q1\nIF #1920!=2 GOTO1\n#50=[#1925+#6]\nG0 X#9\n#[#70+0]=#50\nG90\n#1505=-5000\nGOTO2\nN1\nG90\n#1505=1\nN2\nM30",
+  "#1=15\n#2=2\n#3=200\n#4=50\n#5=3\n#6=2\n#50=0\n#7=[0-#1]\n#8=#1\n#9=[0-#2]\n#10=#2\n#70=805\n#1505=1\nIF #1505==0 GOTO2\nG91\n#1905=0\n#1915=1\nG31 X#7 F#3 P#5 L0 Q1\nIF #1920!=2 GOTO1\nG0 X#10\nG31 X#7 F#4 P#5 L0 Q1\nIF #1920!=2 GOTO1\n#50=[#1925-#6]\nG0 X#10\n#[#70+0]=#50\nG90\n#1505=-5000\nGOTO2\nN1\nG90\n#1505=1\nN2\nM30",
+  "#1=15\n#2=2\n#3=200\n#4=50\n#5=3\n#6=2\n#50=0\n#7=[0-#1]\n#8=#1\n#9=[0-#2]\n#10=#2\n#71=#578\n#72=[#71-1]\n#70=[805+[#72*5]]\n#1505=1\nIF #1505==0 GOTO2\nG91\n#1906=0\n#1916=2\nG31 Y#8 F#3 P#5 L0 Q1\nIF #1921!=2 GOTO1\nG0 Y#9\nG31 Y#8 F#4 P#5 L0 Q1\nIF #1921!=2 GOTO1\n#50=[#1926+#6]\nG0 Y#9\n#[#70+1]=#50\nG90\n#1505=-5000\nGOTO2\nN1\nG90\n#1505=1\nN2\nM30",
+  "#1=25\n#2=3\n#3=300\n#4=40\n#5=4\n#6=1.5\n#50=0\n#7=[0-#1]\n#8=#1\n#9=[0-#2]\n#10=#2\n#70=810\n#1505=1\nIF #1505==0 GOTO2\nG91\n#1906=0\n#1916=1\nG31 Y#7 F#3 P#5 L0 Q1\nIF #1921!=2 GOTO1\nG0 Y#10\nG31 Y#7 F#4 P#5 L0 Q1\nIF #1921!=2 GOTO1\n#50=[#1926-#6]\nG0 Y#10\n#[#70+1]=#50\nG90\n#1505=-5000\nGOTO2\nN1\nG90\n#1505=1\nN2\nM30",
+];
+
+test('radiuscomp atom — enable ON comps toward the wall; OFF passes through raw', async ({ page }) => {
+  await boot(page);
+  const r = await page.evaluate(async () => {
+    const { newBlock, emitMapped } = await import('/blocks/blockEmitter.js');
+    const mk = (params) => { const b = newBlock('radiuscomp'); b.params = { ...b.params, ...params }; return emitMapped([b]).text.trim(); };
+    return {
+      on: mk({ raw: '#1925', result: '#50', radius: '#6', dir: '+', enable: true }),
+      off: mk({ raw: '#1925', result: '#50', radius: '#6', dir: '+', enable: false }),
+      neg: mk({ raw: '#1926', result: '#101', radius: '#6', dir: '-', enable: true }),
+    };
+  });
+  expect(r.on).toBe('#50=[#1925+#6]');     // the TRUE surface
+  expect(r.off).toBe('#50=#1925');         // passthrough = the un-compensated tool centre (a config flip away)
+  expect(r.neg).toBe('#101=[#1926-#6]');
+});
+
+test('probeSurfaceStack — composes the touch + emits the declared @DDCS surface marker', async ({ page }) => {
+  await boot(page);
+  const r = await page.evaluate(async () => {
+    const { probeSurfaceStack } = await import('/wizards/ops/probeSurface.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { isMarker, parseMarker } = await import('/blocks/opSchema.js');
+    const stack = probeSurfaceStack({ axis: 'X', dir: '+', stopVar: '#1905', limitVar: '#1915', limitVal: '2', probeVar: '#8', retractVar: '#9', feedFast: '#3', feedSlow: '#4', port: '#5', level: 0, raw: '#1925', result: '#50', radius: '#6', compEnable: true });
+    const lines = emitMapped(stack).text.split('\n');
+    const marker = lines.find(isMarker);
+    return {
+      twoG31: lines.filter((l) => /^G31 X/.test(l.trim())).length,
+      hasComp: lines.some((l) => l.trim().startsWith('#50=[#1925+#6]')),
+      retracts: lines.filter((l) => l.trim() === 'G0 X#9').length,
+      parsed: marker ? parseMarker(marker) : null,
+    };
+  });
+  expect(r.twoG31, 'fast + slow probe').toBe(2);
+  expect(r.hasComp, 'the read+comp emits the TRUE surface in one line').toBe(true);
+  expect(r.retracts, 'a retract after the fast probe + after the read').toBe(2);
+  expect(r.parsed?.opType).toBe('probe-surface');
+  expect(r.parsed?.params).toMatchObject({ result: '#50', axis: 'X', dir: '+' });
+});
+
+test('EDGE migration — functional G-code BYTE-IDENTICAL to the hand-rolled touch (stripAnnotations)', async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(async (sweep) => {
+    const { edgeStack } = await import('/wizards/edgeWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { stripAnnotations } = await import('/blocks/dataOps/equivalence.js');
+    return sweep.map((p) => stripAnnotations(emitMapped(edgeStack(p)).text));
+  }, SWEEP);
+  for (let i = 0; i < GOLDEN.length; i++) expect(out[i], `param set ${i} (${JSON.stringify(SWEEP[i])})`).toBe(GOLDEN[i]);
+});

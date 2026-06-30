@@ -63,6 +63,9 @@ export const SCHEMA = {
         f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), level: N(null, 'triggerLevel'),
         syncA: Bool(), slave: Enum(), qStop: N(),
     },
+    // the probe-surface BLOCK's declared surface: `result` holds the TRUE (radius-compensated) wall on `axis`/`dir`.
+    // The block emits this marker; the sim reads it to place the disc/datum ON the surface (replaces the Part-2 macro scan).
+    'probe-surface': { result: Str(), axis: Enum(), dir: Enum() },
     atc_change: {
         method: Enum(), x: N('X'), y: N('Y'), z: N('Z'), zClear: N('Z'), fixedT: N('T'), orient: Bool(),
         waitSpindle: Bool(), dustCover: Bool(), confirm: Bool(), magazine: Struct(),

@@ -12,6 +12,7 @@
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
+import { probeSurfaceStack } from './ops/probeSurface.js';   // the shared probe primitive (edge composes it — t125 inc1)
 
 const AX = {
     X: { status: '#1920', result: '#1925', stop: '#1905', limit: '#1915', off: 0 },
@@ -34,10 +35,7 @@ export function edgeStack(params = {}) {
     const C = (text) => { const b = newBlock('comment'); b.params = { text }; S.push(b); };
     const A = (v, value, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(value), note: note || '' }; S.push(b); };
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
-    const PR = (to, feed) => { const b = newBlock('probe'); b.params = { axis, to, feed, port: '#5', level }; S.push(b); };
-    const CK = (goto) => { const b = newBlock('probecheck'); b.params = { axis, goto }; S.push(b); };   // folds where there's no status var
     const IF = (lhs, op, rhs, goto) => { const b = newBlock('ifgoto'); b.params = { lhs, op, rhs, goto }; S.push(b); };
-    const MV = (v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [axis.toLowerCase()]: v }; S.push(b); };
     const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
     const END = () => { S.push(newBlock('endprogram')); };
@@ -62,12 +60,16 @@ export function edgeStack(params = {}) {
     A('#1505', 1, `Press Enter to probe ${axis} ${dir} - ESC=cancel`);
     IF('#1505', '==', '0', 2);
     DM('inc');
-    C(`Probe ${axis} ${dir}`);
-    A(av.stop, '0', 'Stop mode: decelerate');
-    A(av.limit, limitVal, `Limit protect: ${plus ? 'positive' : 'negative'}`);
-    PR(probeVar, '#3'); CK(1); MV(retractVar);
-    PR(probeVar, '#4'); CK(1);
-    A('#50', `[${av.result}${compOp}#6]`, 'Edge = trigger +/- stylus radius'); MV(retractVar);
+    // PROBE-SURFACE BLOCK (t125 inc1): compose the shared probe primitive instead of hand-rolling the G31 sequence.
+    // It bundles the stylus-radius comp (#50=[#1925±#6]) as a DECLARED toggleable property + emits the @DDCS surface
+    // marker. Functional G-code is BYTE-IDENTICAL to the old hand-rolled touch (the marker is an additive comment).
+    S.push(...probeSurfaceStack({
+        axis, dir: compOp, comment: `Probe ${axis} ${dir}`,
+        stopVar: av.stop, limitVar: av.limit, limitVal,
+        probeVar, retractVar, feedFast: '#3', feedSlow: '#4', port: '#5', level,
+        twoPass: true, raw: av.result, result: '#50', radius: '#6', compEnable: true,
+        compNote: 'Edge = trigger +/- stylus radius',
+    }));
     C('Write to WCS');
     A(`#[#70+${av.off}]`, '#50', `Set ${wcsLabel} ${axis} to edge`);
     DM('abs'); A('#1505', '-5000', 'Edge found'); GO(2);

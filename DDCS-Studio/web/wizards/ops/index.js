@@ -58,6 +58,7 @@ import { labelBlock, gotoBlock, ifGotoBlock } from './flow.js';
 import { probeReadBlock, probeCheckBlock, readMachineBlock, toolOffsetBlock } from './measure.js';
 import { setWorkOffsetBlock } from './setworkoffset.js';
 import { assignBlock } from './assign.js';
+import { radiuscompBlock } from './radiuscomp.js';
 import { pauseBlock, messageBlock, askNumberBlock, confirmBlock } from './hmi.js';
 import { cornerConfigBlock } from './corner_config.js';
 import { pathModeBlock, drillCycleBlock, cancelCycleBlock, outPinBlock, waitInputBlock } from './cnc.js';
@@ -74,7 +75,7 @@ export const PALETTE = [
     spindleBlock, feedBlock, feedModeBlock, dwellBlock, coolantBlock, toolBlock,   // Spindle & Feed (spindle/feed/coolant/tool/dwell + G94/95 feed mode)
     wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, toolOffsetBlock,   // Coordinates (WCS + dist-mode + G17-19 plane + work-offset/tool-table write)
     progStartBlock, progEndBlock, endProgramBlock,             // Program (framing + end)
-    probeReadBlock, readMachineBlock,                          // Probing (probe/DRO capture)
+    probeReadBlock, readMachineBlock, radiuscompBlock,         // Probing (probe/DRO capture + stylus-radius comp)
     countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock, cornerConfigBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input + corner-macro config)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
