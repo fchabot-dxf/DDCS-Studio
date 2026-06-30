@@ -2851,3 +2851,44 @@ now `S.push(safeZParkBlock(safeZFrame, '#17'))`. SCOPE = the success final park 
 
 **Follow-ups** (not this slice): inter-move-traverse machine frame (the lift/drop rework); rollout to the other wizards; the
 SHARED UI control (so wizards inherit the toggle, not hand-added); the `wcs` frame value. Releasable increment (advisor's bump).
+
+---
+
+## 🔨 turn 155 — SPATIAL MODEL 1b SCOUT + GATE: safe-Z SOURCE — infra buildable, but register mapping/frame AMBIGUOUS + conflicts an existing decision
+
+Scout-first per the dispatch. The source-from-register INFRA is fully present (mechanical to mirror), but the register
+MAPPING + FRAME is ambiguous and the premise CONFLICTS with a deliberate project decision → gating per the dispatch's own
+gate condition ("if the register mapping/frame is ambiguous, surface the plan, don't barrel"). No code changed.
+
+### Infra — BUILDABLE (the radius-comp #6-from-register pattern is the exact precedent)
+- `profile.probeVars` (controllerProfiles.js) maps a field → its controller register `{ctrl,pr,label}` per profile.
+- `srcVal(src, literal)` / `srcNote` (probeBlocks.js) — emit picks the register var over the literal + annotates the comment.
+- `probeSrc(field)` / `resolveProbeSources([...])` (settingsPanel.js) — resolves only when the user flipped `sources.<field>='ctrl'`.
+- `probeSrcGlyph.js` — the greying UI: a glyph button by the field; on `ctrl` the input goes `readOnly` + `.psrc-ctrl` (mirrors the radius-comp greying).
+- `gpSeededVarStore` (gcodePreviewTab.js) seeds the sim's var store from settings → the SIM reads the register VALUE.
+⇒ IF safe-Z had a profile register, this is mechanical (add to probeVars + the view's source list + srcVal in the emit + seed the var).
+
+### BUT — 4 conflicts (the gate)
+1. **safe-Z is DELIBERATELY Studio-side already.** controllerProfiles.js comment: "Fields with no native var (slow feed, scan
+   stroke, **safe Z**) are deliberately absent — they stay Studio-side." PROBE-CONFIG-SOURCE.md: safe-Z = user-convention `#1173`.
+   So "source from #69" CONTRADICTS an existing, deliberate decision.
+2. **#69 is profile-INCONSISTENT.** Expert cfg `#69 -s1"Z-axis safe height"` ✓ — but the DM500 profile already maps
+   `#69 = "Thickness of tool sensor"` (blockHeight). #69 means DIFFERENT things per controller; not a consistent safe-Z register.
+3. **The FRAME is NOT "machine → G53".** The Expert 3D-probe dump's "Move to safe height" is `G90 G00 Z[#113]` — WORK-absolute,
+   a LOCAL var #113, NOT G53/machine, and it does NOT reference #69. DM500 `#2049` is machine-coord but used in ARITHMETIC
+   (`#3=#574-#2049`) → a RELATIVE (G91) lift, not a G53. So the dispatch's `controller → G53 Z#<register>` is not the ground truth.
+4. **#69 is never macro-referenced (Expert).** The probe macros use a local clearance (#113), never #69 — so emitting
+   `G53/G90 Z#69` is a usage seen in NO dump (it'd invent the usage even though the register name is real).
+
+### Questions (advisor reconcile before any build)
+1. Does 1b OVERRIDE the deliberate "safe-Z is Studio-side" decision (cfg #69 as new ground truth vs PROBE-CONFIG-SOURCE.md's
+   #1173 convention + the probeVars deliberate-absence)?
+2. Per-profile register + EMIT: Expert #69 emits how (the dump's frame is G90 work-absolute, and #69 isn't macro-referenced)?
+   DM500 — a relative lift derived from #2049 (the dump's arithmetic), not G53? The "machine → G53" mapping doesn't hold.
+3. Intended source = the cfg `#69` OR the `#1173` user-convention (they differ)? On DM500 #69 is the tool sensor — handle that.
+
+### Recommendation
+GATE — don't build. The register NAME is real (Expert #69 = "Z-axis safe height"), but the SOURCE/FRAME/CONSISTENCY/USAGE are
+ambiguous AND conflict with the project's deliberate Studio-side decision. Building now would contradict that decision, emit a
+non-ground-truth register usage (`G53/G90 Z#69` in no dump), and be wrong on DM500 (#69 = tool sensor). Reconcile the premise
+(which register, which frame per profile, vs the existing decision) — then the build is mechanical (the infra is all there).
