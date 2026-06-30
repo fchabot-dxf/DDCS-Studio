@@ -71,3 +71,19 @@ test('EDGE migration — functional G-code BYTE-IDENTICAL to the hand-rolled tou
   }, SWEEP);
   for (let i = 0; i < GOLDEN.length; i++) expect(out[i], `param set ${i} (${JSON.stringify(SWEEP[i])})`).toBe(GOLDEN[i]);
 });
+
+
+// CORNER migration (t127) — 3 touches (X/Y/Z) compose probeSurfaceStack; golden captured pre-migration.
+const CORNER_SWEEP = [{"corner":"FL","probeZ":false,"probeSeq":"XY","wcs":"active"},{"corner":"BR","probeZ":true,"probeSeq":"XY","wcs":"G54"},{"corner":"FR","probeZ":true,"probeSeq":"YX","wcs":"active"},{"corner":"BL","probeZ":false,"probeSeq":"YX","wcs":"G55","dist":300,"retract":3,"radius":1.5,"f_fast":300,"f_slow":40,"port":4,"safeZ":8,"scanDepth":4,"travelDist":30}];
+const CORNER_GOLDEN = ["#1=500\n#2=5\n#3=200\n#4=50\n#5=3\n#6=2\n#7=[0-#1]\n#8=#1\n#9=[0-#2]\n#10=#2\n#15=50\n#16=[0-50]\n#17=15\n#18=[0-#17]\n#19=10\n#71=#578\n#72=[#71-1]\n#70=[805+[#72*5]]\n#1505=1\nG91\nG0 Z#18\nG31 X#8 F#3 P#5 L0 Q1\nIF #1920!=2 GOTO1\nG0 X#9\nG31 X#8 F#4 P#5 L0 Q1\nIF #1920!=2 GOTO1\n#102=[#1925 + #6]\n#[#70]=#102\nG0 X#9\nG0 Z#17\nG0 X#15 Y#16\nG0 Z#18\nG31 Y#8 F#3 P#5 L0 Q1\nIF #1921!=2 GOTO1\nG0 Y#9\nG31 Y#8 F#4 P#5 L0 Q1\nIF #1921!=2 GOTO1\n#101=[#1926 + #6]\n#73=[#70+1]\n#[#73]=#101\nG0 Y#9\nG0 Z#17\nG90\n#1505=-5000\nGOTO2\nN1\nG91\nG0 Z#17\nG90\n#1505=1\nN2\nM30","#1=500\n#2=5\n#3=200\n#4=50\n#5=3\n#6=2\n#7=[0-#1]\n#8=#1\n#9=[0-#2]\n#10=#2\n#15=50\n#16=[0-50]\n#17=15\n#18=[0-#17]\n#19=10\n#70=805\n#1505=1\nG91\nG31 Z#7 F#3 P#5 L0 Q1\nIF #1922!=2 GOTO1\nG0 Z#10\nG31 Z#7 F#4 P#5 L0 Q1\nIF #1922!=2 GOTO1\n#73=[#70+2]\n#[#73]=[#1927-#6]\nG0 Z#19\nG0 X#15\nG0 Z#18\nG31 X#7 F#3 P#5 L0 Q1\nIF #1920!=2 GOTO1\nG0 X#10\nG31 X#7 F#4 P#5 L0 Q1\nIF #1920!=2 GOTO1\n#102=[#1925 - #6]\n#[#70]=#102\nG0 X#10\nG0 Z#17\nG0 X#16 Y#15\nG0 Z#18\nG31 Y#7 F#3 P#5 L0 Q1\nIF #1921!=2 GOTO1\nG0 Y#10\nG31 Y#7 F#4 P#5 L0 Q1\nIF #1921!=2 GOTO1\n#101=[#1926 - #6]\n#73=[#70+1]\n#[#73]=#101\nG0 Y#10\nG0 Z#17\nG90\n#1505=-5000\nGOTO2\nN1\nG91\nG0 Z#17\nG90\n#1505=1\nN2\nM30","#1=500\n#2=5\n#3=200\n#4=50\n#5=3\n#6=2\n#7=[0-#1]\n#8=#1\n#9=[0-#2]\n#10=#2\n#15=50\n#16=[0-50]\n#17=15\n#18=[0-#17]\n#19=10\n#71=#578\n#72=[#71-1]\n#70=[805+[#72*5]]\n#1505=1\nG91\nG31 Z#7 F#3 P#5 L0 Q1\nIF #1922!=2 GOTO1\nG0 Z#10\nG31 Z#7 F#4 P#5 L0 Q1\nIF #1922!=2 GOTO1\n#73=[#70+2]\n#[#73]=[#1927-#6]\nG0 Z#19\nG0 Y#16\nG0 Z#18\nG31 Y#8 F#3 P#5 L0 Q1\nIF #1921!=2 GOTO1\nG0 Y#9\nG31 Y#8 F#4 P#5 L0 Q1\nIF #1921!=2 GOTO1\n#101=[#1926 + #6]\n#73=[#70+1]\n#[#73]=#101\nG0 Y#9\nG0 Z#17\nG0 X#15 Y#15\nG0 Z#18\nG31 X#7 F#3 P#5 L0 Q1\nIF #1920!=2 GOTO1\nG0 X#10\nG31 X#7 F#4 P#5 L0 Q1\nIF #1920!=2 GOTO1\n#102=[#1925 - #6]\n#[#70]=#102\nG0 X#10\nG0 Z#17\nG90\n#1505=-5000\nGOTO2\nN1\nG91\nG0 Z#17\nG90\n#1505=1\nN2\nM30","#1=300\n#2=3\n#3=300\n#4=40\n#5=4\n#6=1.5\n#7=[0-#1]\n#8=#1\n#9=[0-#2]\n#10=#2\n#15=30\n#16=[0-30]\n#17=12\n#18=[0-#17]\n#19=8\n#70=810\n#1505=1\nG91\nG0 Z#18\nG31 Y#7 F#3 P#5 L0 Q1\nIF #1921!=2 GOTO1\nG0 Y#10\nG31 Y#7 F#4 P#5 L0 Q1\nIF #1921!=2 GOTO1\n#101=[#1926 - #6]\n#73=[#70+1]\n#[#73]=#101\nG0 Y#10\nG0 Z#17\nG0 X#16 Y#16\nG0 Z#18\nG31 X#8 F#3 P#5 L0 Q1\nIF #1920!=2 GOTO1\nG0 X#9\nG31 X#8 F#4 P#5 L0 Q1\nIF #1920!=2 GOTO1\n#102=[#1925 + #6]\n#[#70]=#102\nG0 X#9\nG0 Z#17\nG90\n#1505=-5000\nGOTO2\nN1\nG91\nG0 Z#17\nG90\n#1505=1\nN2\nM30"];
+
+test("CORNER migration — functional G-code BYTE-IDENTICAL to the hand-rolled walls (stripAnnotations)", async ({ page }) => {
+  await boot(page);
+  const out = await page.evaluate(async (sweep) => {
+    const { cornerStack } = await import("/wizards/cornerWizard.js");
+    const { emitMapped } = await import("/blocks/blockEmitter.js");
+    const { stripAnnotations } = await import("/blocks/dataOps/equivalence.js");
+    return sweep.map((p) => stripAnnotations(emitMapped(cornerStack(p)).text));
+  }, CORNER_SWEEP);
+  for (let i = 0; i < CORNER_GOLDEN.length; i++) expect(out[i], JSON.stringify(CORNER_SWEEP[i])).toBe(CORNER_GOLDEN[i]);
+});

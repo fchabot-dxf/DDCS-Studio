@@ -16,6 +16,7 @@
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
+import { probeSurfaceStack } from './ops/probeSurface.js';   // the shared probe primitive (corner composes it — t127 inc1)
 import { toNum as toNumShared, srcVal, srcNote, travelOwn as travelOwnExpr, travelOpp as travelOppExpr } from './probeBlocks.js';
 
 const AX = {
@@ -53,8 +54,6 @@ export function cornerStack(params = {}) {
     const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
-    const PR = (ax, to, feed) => { const b = newBlock('probe'); b.params = { axis: ax, to, feed, port: '#5', level }; S.push(b); };
-    const CK = (ax, goto) => { const b = newBlock('probecheck'); b.params = { axis: ax, goto }; S.push(b); };   // folds where there's no status var
     const MOVE = (props) => { const b = newBlock('move'); b.params = { mode: 'rapid', ...props }; S.push(b); };
     const MV = (ax, v) => MOVE({ [ax.toLowerCase()]: v });
     const RAW = (text) => { const b = newBlock('raw'); b.params = { text }; S.push(b); };
@@ -64,18 +63,20 @@ export function cornerStack(params = {}) {
     const travelOwn = (d) => travelOwnExpr(d === '+', '#15', '#16');   // travel IN the probe direction
     const travelOpp = (d) => travelOppExpr(d === '+', '#15', '#16');   // travel the OTHER way (off the far side)
 
-    // Probe one wall: fast touch → check → retract → slow touch → check → radius-comp WCS write → retract + safe-Z.
+    // Probe one wall via the shared PROBE-SURFACE BLOCK (t127): touch+comp → the TRUE wall in a temp (#102/#101); the
+    // corner keeps its own WCS write + retract + safe-Z (trailingRetract:false). Byte-identical to the old hand-rolled wall.
+    // The legacy X/Y comp spaces the operator (`[#1925 + #6]`) → spaced:true preserves that (a cosmetic wart to unify later).
     const probeWall = (ax, dir) => {
         const av = AX[ax], probeVar = dir === '+' ? '#8' : '#7', retractVar = dir === '+' ? '#9' : '#10';
         const compOp = dir === '+' ? '+' : '-';   // boss: wall is at trigger ± stylus radius
-        PR(ax, probeVar, '#3'); CK(ax, 1); MV(ax, retractVar);
-        PR(ax, probeVar, '#4'); CK(ax, 1);
-        C(`Apply ${ax} WCS with Radius Comp`);
+        S.push(...probeSurfaceStack({
+            axis: ax, dir: compOp, probeVar, retractVar, feedFast: '#3', feedSlow: '#4', port: '#5', level,
+            twoPass: true, raw: av.result, result: ax === 'X' ? '#102' : '#101', radius: '#6', spaced: true,
+            compEnable: true, trailingRetract: false, compNote: `Trigger Pos ${compOp} Radius`,
+        }));
         if (ax === 'X') {
-            A('#102', `[${av.result} ${compOp} #6]`, `Trigger Pos ${compOp} Radius`);
             A('#[#70]', '#102', `Save to ${wcsLabel} X`);
         } else {
-            A('#101', `[${av.result} ${compOp} #6]`, `Trigger Pos ${compOp} Radius`);
             A('#73', '[#70+1]', 'WCS Y Address');
             A('#[#73]', '#101', `Save to ${wcsLabel} Y`);
         }
@@ -121,12 +122,15 @@ export function cornerStack(params = {}) {
     // ── Z surface (optional) ──
     if (probeZ) {
         const firstTravelVar = firstDir === '+' ? '#16' : '#15';   // escape OPPOSITE the first wall's probe dir
-        C('Step 1: Z Surface Probe');
-        PR('Z', '#7', '#3'); CK('Z', 1);
-        MV('Z', '#10');
-        PR('Z', '#7', '#4'); CK('Z', 1);
-        A('#73', '[#70+2]', 'WCS Z Address');
-        A('#[#73]', '[#1927-#6]', `Save ${wcsLabel} Z offset - machine coord (− stylus radius)`);   // Z-down contact is the tool centre a radius above the surface
+        // Z-surface touch via the shared block. The comp writes the WCS Z directly (#[#73]=[#1927-#6]); preComp sets the
+        // indirect address #73 right before the comp (kept in place → byte-identical). trailingRetract:false → the corner
+        // does its own safe-Z retract + the travel to the first wall.
+        S.push(...probeSurfaceStack({
+            axis: 'Z', dir: '-', probeVar: '#7', retractVar: '#10', feedFast: '#3', feedSlow: '#4', port: '#5', level,
+            twoPass: true, raw: '#1927', result: '#[#73]', radius: '#6', spaced: false, compEnable: true,
+            trailingRetract: false, preComp: [{ var: '#73', value: '[#70+2]', note: 'WCS Z Address' }],
+            compNote: `Save ${wcsLabel} Z offset - machine coord (− stylus radius)`,
+        }));
         MV('Z', '#19');
         MV(firstAx, firstTravelVar);
     }

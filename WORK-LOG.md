@@ -2384,3 +2384,36 @@ The wizard→block compose mechanism works + is byte-identical. Pending the advi
 1. the **marker sub-op refinement** (above) — needed before the sim reads it.
 2. **corner next** (per-axis single walls, also byte-identical) then rotary (incl. the OD-top FIX) then middle (the diameter recompute).
 3. the **2 NAMED G-code changes** (middle diameter `|s1-s2|` · rotary OD-top comp) still need the human's ship/hold call (t123 gate).
+
+---
+
+## 🔨 turn 127 — PROBE-SURFACE BLOCK inc1: CORNER migrated (BYTE-IDENTICAL). Edge proved it (38ff817).
+
+Migrated cornerWizard's 3 probe touches (X, Y, Z) → 3 `probeSurfaceStack` calls. The aggregation (the WCS writes, the
+travel/plunge, the error handler) stays in the wizard; only the per-axis touch+comp moved to the block. Orphaned PR/CK removed.
+
+- **VERIFIED byte-identical** — `tests/probe-surface-block.spec.js` corner case: a 4-set sweep (FL/BR/FR/BL · XY/YX · Z on/off ·
+  active/G54/G55), golden captured pre-migration, compared via stripAnnotations. 4/4 identical. Full suite **428 passed** (1
+  known-flaky middle-animator retried green).
+- **3 params added to probeSurfaceStack/radiuscomp** to absorb the corner's PRE-EXISTING quirks (the block stays the one
+  primitive; these are how a wizard's exact shape maps onto it):
+  - `radiuscomp.spaced` — the corner X/Y comp spaces the operator (`[#1925 + #6]`) where edge + corner-Z don't (`[#1927-#6]`).
+    A pure-COSMETIC inconsistency in the legacy code; `spaced:true` preserves it for byte-identicalness.
+  - `probeSurfaceStack.trailingRetract` (default ON) — edge retracts THEN writes; the corner writes THEN retracts (+ safe-Z).
+    `trailingRetract:false` lets the corner do its own retract after its WCS write. A real structural variation.
+  - `probeSurfaceStack.preComp` — the corner Z computes its indirect WCS address inline (`#73=[#70+2]`) right before the comp
+    (`#[#73]=[#1927-#6]`). `preComp` injects that assign in place. A real structural variation.
+
+### Per-axis mapping (each → one probeSurfaceStack call + the wizard's own write)
+- **X**: touch → `#102=[#1925 + #6]` (spaced, trailingRetract:false); wizard writes `#[#70]=#102` + retract + safe-Z.
+- **Y**: touch → `#101=[#1926 + #6]`; wizard writes `#73=[#70+1]` + `#[#73]=#101` + retract + safe-Z.
+- **Z**: touch → preComp `#73=[#70+2]` + comp `#[#73]=[#1927-#6]` (dir −, no spaces, result=the WCS address directly,
+  trailingRetract:false); wizard does safe-Z + travel to the first wall.
+
+### ⚠ FLAG (cosmetic cleanup, not a gate) — the `spaced` wart
+`spaced` exists ONLY to preserve a meaningless legacy inconsistency (corner X/Y space the operator; edge + corner-Z + the
+block's natural format don't). Recommend a future **cosmetic-normalize pass** (one named whitespace change: drop the spaces in
+the corner X/Y comp — functionally identical) to UNIFY the comp format and DELETE the `spaced` flag. Deferred — kept the
+migration byte-identical (no re-gate) this turn. (`trailingRetract` + `preComp` are legit structural params, they stay.)
+
+QUEUED (advisor): rotary (OD-top comped) → middle (dia recompute) → inc2 (marker sub-op fix + sim consumes the marker).
