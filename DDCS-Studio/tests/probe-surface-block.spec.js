@@ -38,27 +38,24 @@ test('radiuscomp atom — enable ON comps toward the wall; OFF passes through ra
   expect(r.neg).toBe('#101=[#1926-#6]');
 });
 
-test('probeSurfaceStack — composes the touch + emits the declared @DDCS surface marker', async ({ page }) => {
+test('probeSurfaceStack — composes the touch (fast+slow probe, check, retract, comp) and stays editor-CLEAN (no @DDCS)', async ({ page }) => {
   await boot(page);
   const r = await page.evaluate(async () => {
     const { probeSurfaceStack } = await import('/wizards/ops/probeSurface.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
-    const { isMarker, parseMarker } = await import('/blocks/opSchema.js');
     const stack = probeSurfaceStack({ axis: 'X', dir: '+', stopVar: '#1905', limitVar: '#1915', limitVal: '2', probeVar: '#8', retractVar: '#9', feedFast: '#3', feedSlow: '#4', port: '#5', level: 0, raw: '#1925', result: '#50', radius: '#6', compEnable: true });
-    const lines = emitMapped(stack).text.split('\n');
-    const marker = lines.find(isMarker);
+    const text = emitMapped(stack).text, lines = text.split('\n');
     return {
       twoG31: lines.filter((l) => /^G31 X/.test(l.trim())).length,
       hasComp: lines.some((l) => l.trim().startsWith('#50=[#1925+#6]')),
       retracts: lines.filter((l) => l.trim() === 'G0 X#9').length,
-      parsed: marker ? parseMarker(marker) : null,
+      hasMarker: text.indexOf('@DDCS') >= 0,
     };
   });
   expect(r.twoG31, 'fast + slow probe').toBe(2);
   expect(r.hasComp, 'the read+comp emits the TRUE surface in one line').toBe(true);
   expect(r.retracts, 'a retract after the fast probe + after the read').toBe(2);
-  expect(r.parsed?.opType).toBe('probe-surface');
-  expect(r.parsed?.params).toMatchObject({ result: '#50', axis: 'X', dir: '+' });
+  expect(r.hasMarker, 'no @DDCS in the emitted G-code (Option B — editor stays clean; the sim reads the surface sim-side, inc2)').toBe(false);
 });
 
 test('EDGE migration — functional G-code BYTE-IDENTICAL to the hand-rolled touch (stripAnnotations)', async ({ page }) => {

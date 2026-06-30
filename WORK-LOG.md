@@ -2447,3 +2447,34 @@ decision when the fit is next revisited (comp the 3 fit points → solve the TRU
 ### GATE back — rotary done (value-identical + the named OD-top fix landed)
 QUEUED (advisor): middle (dia `|s1-s2|` value-identical, the last wizard) → inc2 (marker sub-op fix + sim consumes the marker
 = disc-on-surface + datum + the OD-top payoff) → unify-pass (delete cosmetic warts: radiuscomp.spaced, the fit bracket drift).
+
+---
+
+## 🔨 turn 131 — PROBE-SURFACE BLOCK inc1: MIDDLE migrated (value-identical) — ALL 4 WIZARDS DONE. + a marker course-correct.
+
+Migrated middleWizard's two-wall touches to a `touch()` block wrapper (comp ON → the TRUE walls). Kept the reposition/
+traverse, the seq/centre bisect, the Z-first reposition. Deleted the hand-rolled `twoPass` + orphaned PR/CK. `#6` is now
+declared UNCONDITIONALLY (every wall touch comps, not just circular/Z).
+
+- **Value-identical (proven by the existing middle sim tests, all green post-migration):**
+  - centre `#53/#56` = bisect of the comped walls — the ∓#6 cancels (same centre; middle-center-sim, middle-circular-sim cx/cy).
+  - diameter `#58/#59 = ABS[#s1-#s2]` — the old ∓2#6 (boss −, pocket +) EVAPORATES; from the TRUE walls the span IS the
+    diameter (middle-circular-sim dx=60 dy=40, UNCHANGED). The featureType sign disappears entirely.
+  - Z-first Z0 `#[#70+2]=[#57-#6] → #[#70+2]=#57` — the −#6 relocated into the Z touch (middle-probe-z-first, regex updated).
+- **transTraverse re-centre — a real comp coupling, FIXED:** the AUTO trans-axis re-centre used `#52` (the wall-2 contact) as
+  the tool's POSITION (`[#53-#52-rv]`). Now `#52` is the COMPED wall, so the tool's raw position = `#52 + (dir1Plus?+#6:−#6)`.
+  Added that back → `[#53-#52-rv ∓#6]` so the re-centre stays EXACT (path value-identical, the tool lands on ② — middle-trans-
+  traverse xFirst/yFirst < 2, both axis orders). MANUAL uses the fixed Diag-travel #21 (unaffected).
+
+### ⚠ COURSE-CORRECT — the @DDCS surface marker REMOVED (it violated "Option B")
+The middle migration surfaced a real problem with the t125 marker: probeSurfaceStack emitted a `( @DDCS probe-surface … )`
+comment, which lands in the EDITOR TEXT — violating **Option B** (the editor stays CLEAN; op info comes from the program
+model, NOT editor markers — enforced by editor-sim-real-insert.spec). edge/corner/rotary had it too (just untested for them).
+**Removed the marker emit** (the equivalence proofs hold — stripAnnotations stripped it anyway; editor now clean). The
+opSchema `probe-surface` entry is KEPT for inc2. **The inc2 sim-consumes-the-surface mechanism MUST be SIM-SIDE** (read the op
+stack's radiuscomp result), NOT an editor-text marker — this is the concrete resolution of the t125/t127 "marker sub-op" flag.
+
+### GATE back — inc1 COMPLETE (all 4 wizards on the shared block)
+edge (byte-identical) · corner (byte-identical) · rotary (value-identical + OD-top fix) · middle (value-identical). Full suite
+**429 passed**. QUEUED: **inc2** = the sim consumes the surface SIM-SIDE (disc-on-surface + datum + the OD-top payoff) — and
+the marker mechanism is now settled as sim-side (no editor text). Then the unify-pass (radiuscomp.spaced, fit bracket drift).

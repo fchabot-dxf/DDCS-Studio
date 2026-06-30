@@ -11,6 +11,7 @@
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
+import { probeSurfaceStack } from './ops/probeSurface.js';   // the shared probe primitive (middle composes it — t131 inc1)
 import { travelOwn, travelOpp } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 
@@ -66,16 +67,20 @@ export function middleStack(params = {}) {
     const MV = (ax, v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [ax.toLowerCase()]: v }; S.push(b); };
     const MOVE = (props) => { const b = newBlock('move'); b.params = { mode: 'rapid', ...props }; S.push(b); };   // 2-axis rapid (trans-axis diagonal)
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
-    const PR = (ax, to, feed) => { const b = newBlock('probe'); b.params = { axis: ax, to, feed, port: '#5', level: 0 }; S.push(b); };
-    const CK = (ax, g) => { const b = newBlock('probecheck'); b.params = { axis: ax, goto: g }; S.push(b); };   // folds where there's no status var
     const MSG = (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); };
     const END = () => S.push(newBlock('endprogram'));
 
-    const twoPass = (ax, plus, resultVar) => {
-        const av = AX[ax], pv = plus ? '#8' : '#7', rv = plus ? '#9' : '#10', lim = plus ? '2' : '1';
-        A(av.stop, '0'); A(av.limit, lim);
-        PR(ax, pv, '#3'); CK(ax, 1); MV(ax, rv);
-        PR(ax, pv, '#4'); CK(ax, 1); A(resultVar, av.result); MV(ax, rv);
+    // One two-pass wall touch via the shared PROBE-SURFACE BLOCK (t131), comp ON → the TRUE wall (the read becomes
+    // `#result=[#trigger±#6]`). The centre bisect cancels the ∓#6 (same centre); the diameter ABS[s1-s2] is true (the old
+    // ∓2#6 EVAPORATES); the Z-first comp relocates here from its inline −#6. All VALUE-IDENTICAL. (Replaces the hand-rolled twoPass.)
+    const touch = (ax, plus, resultVar) => {
+        const av = AX[ax];
+        S.push(...probeSurfaceStack({
+            axis: ax, dir: plus ? '+' : '-', probeVar: plus ? '#8' : '#7', retractVar: plus ? '#9' : '#10',
+            stopVar: av.stop, limitVar: av.limit, limitVal: plus ? '2' : '1',
+            feedFast: '#3', feedSlow: '#4', port: '#5', level: 0, twoPass: true,
+            raw: av.result, result: resultVar, radius: '#6', compEnable: true,
+        }));
     };
     const reposition = (msg) => {
         // Lift clear, the operator jogs to the next wall, then drop back the SAME amount — all INCREMENTAL (no G53),
@@ -105,8 +110,11 @@ export function middleStack(params = {}) {
         // of axis ORDER (X-first or Y-first — #51-53 are always the PRIMARY axis's). MANUAL in-axis has no cross-over fling
         // and a different per-pass frame, so keep its directional travel there. SECONDARY axis: travel OUT to ② by the
         // Diag-travel #21 (the one distance the macro can't measure before it probes that axis — the user tunes it).
-        const lastRetract = dir1Plus ? '#10' : '#9';          // seq runs twoPass(!dir1Plus) last → its retract is #10 (+) / #9 (−)
-        const pmove = inAxis === 'auto' ? `[#53-#52-${lastRetract}]` : travelOwn(dir1Plus, '#21', '[0-#21]');
+        const lastRetract = dir1Plus ? '#10' : '#9';          // seq runs the last wall touch with !dir1Plus → its retract is #10 (+) / #9 (−)
+        // The tool sits at the wall-2 RAW contact + the last retract, but #52 is now the RADIUS-COMPED wall (the block comps it),
+        // so add the comp back to recover the tool's true position: raw = #52 + (dir1Plus ? +#6 : −#6). Keeps the re-centre EXACT
+        // (path value-identical) despite the comp moving into the walls.
+        const pmove = inAxis === 'auto' ? `[#53-#52-${lastRetract}${dir1Plus ? '-#6' : '+#6'}]` : travelOwn(dir1Plus, '#21', '[0-#21]');
         const smove = travelOpp(dir2Plus, '#21', '[0-#21]');  // secondary axis: out toward ② (opposite its first probe dir)
         MV('Z', '#18');                                  // lift clear of the boss
         MOVE({ [axis.toLowerCase()]: pmove, [second.toLowerCase()]: smove });   // re-centre the primary + travel out to ②
@@ -122,15 +130,15 @@ export function middleStack(params = {}) {
         if (inAxis === 'manual') reposition('jog clear, around to the opposite wall'); else traverseOver(ax, firstPlus);
     };
     const seq = (ax, firstPlus, base) => {
-        twoPass(ax, firstPlus, `#${base}`);
+        touch(ax, firstPlus, `#${base}`);
         between(ax, firstPlus);
-        twoPass(ax, !firstPlus, `#${base + 1}`);
-        A(`#${base + 2}`, `[#${base}+#${base + 1}]/2`);     // centre = midpoint of the two walls
+        touch(ax, !firstPlus, `#${base + 1}`);
+        A(`#${base + 2}`, `[#${base}+#${base + 1}]/2`);     // centre = midpoint of the two (now radius-comped) walls — ∓#6 cancels
     };
 
     A('#1', dist, 'Max probe distance'); A('#2', retract, 'Retract distance');
     A('#3', fFast, 'Fast feedrate'); A('#4', fSlow, 'Slow feedrate'); A('#5', port, 'Probe port');
-    if (circular || probeZ) A('#6', radius, 'Probe stylus radius');   // declared ONE source for the comp (only emitted where it's used)
+    A('#6', radius, 'Probe stylus radius');   // declared ONE source for the comp — now EVERY wall touch comps via the block (not just circular/Z)
     A('#51', 0, 'Wall 1 pos'); A('#52', 0, 'Wall 2 pos'); A('#53', 0, 'Center pos');
     A('#54', 0, 'Wall 3 pos'); A('#55', 0, 'Wall 4 pos'); A('#56', 0, 'Center pos 2');
     A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
@@ -156,8 +164,8 @@ export function middleStack(params = {}) {
     // the XY as the next pass) → opSimStarts declares a leading Z-pass start so the sim renders Z-pass → reposition → XY faithfully.
     if (probeZ) {
         C('Z Surface - set Z datum first');
-        twoPass('Z', false, '#57');                          // two-pass down-probe the top surface → #57 (= Z trigger #1927)
-        A('#[#70+2]', '[#57-#6]', `Save ${wcsLabel} Z offset (− stylus radius)`);   // Z0 write — STYLUS-RADIUS COMP: the Z-down contact is the tool CENTRE a radius ABOVE the top, so the true surface = trigger − r (matches Expert 3D-probe `G10 L20 P2 Z[#110]`)
+        touch('Z', false, '#57');                            // two-pass down-probe the top → #57 = the TRUE surface (the block comps it; −#6 relocated here)
+        A('#[#70+2]', '#57', `Save ${wcsLabel} Z offset`);   // Z0 write — #57 is already radius-compensated by the block (was [#57-#6] inline; value-identical)
         reposition('jog clear, to the first wall');           // Z pass done → reposition to the XY start (existing helper)
     }
 
@@ -183,13 +191,11 @@ export function middleStack(params = {}) {
     if (circular) {
         // Round feature: the opposite-touch span IS the diameter. #58 = primary-axis Ø; with 2-axis, #59 = the
         // perpendicular Ø and #60 the mean. ABS so the result is direction-agnostic (dir1 pos/neg ordering).
-        // STYLUS-RADIUS COMP: each opposite contact is the tool CENTRE a radius off its wall, so the centre-span is off by
-        // TWO balls — a BOSS (outside) reads 2r TOO BIG (subtract), a BORE/pocket (inside) reads 2r TOO SMALL (add). Derived
-        // from the native edge convention (#1925±#6 toward the probe dir) applied to two opposite walls; bisect (centre) cancels.
-        const dia = featureType === 'boss' ? '-[2*#6]' : '+[2*#6]';
-        A('#58', `ABS[#51-#52]${dia}`, 'Primary-axis diameter (∓ 2× stylus radius)');
+        // The walls are now the TRUE surfaces (each touch radius-comped by the block), so the opposite-touch span IS the
+        // diameter directly — the old ∓2#6 (boss −, pocket +) EVAPORATES (value-identical: the comp moved into the walls).
+        A('#58', `ABS[#51-#52]`, 'Primary-axis diameter (walls already radius-comped)');
         if (twoAxis) {
-            A('#59', `ABS[#54-#55]${dia}`, 'Secondary-axis diameter (∓ 2× stylus radius)'); A('#60', '[#58+#59]/2', 'Mean diameter');
+            A('#59', `ABS[#54-#55]`, 'Secondary-axis diameter (walls already radius-comped)'); A('#60', '[#58+#59]/2', 'Mean diameter');
             A('#61', '[#58-#59]', 'Out-of-round (primary dia - secondary dia)');   // roundness metric (same as the Circular wizard)
         }
         MSG(twoAxis ? 'Centre #53/#56 - mean dia #60 - round #61' : 'Centre #53 - dia #58');

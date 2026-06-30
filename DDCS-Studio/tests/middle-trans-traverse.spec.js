@@ -20,11 +20,11 @@ test('macro: boss auto trans-axis emits the diagonal traverse (#21); manual jogs
       autoHas21: /#21\s*=/.test(auto),
       // the PRIMARY (X here) leg re-centres to the measured centre #53 (heads to ② regardless of axis order); the
       // SECONDARY (Y) leg travels out by the Diag-travel #21. (dir2=neg → +#21 = Y#21.)
-      autoHasTransMove: /G0 X\[#53-#52-#10\] Y#21/.test(auto),
+      autoHasTransMove: /G0 X\[#53-#52-#10-#6\] Y#21/.test(auto),   // t131: −#6 recovers the tool's raw position (#52 now comped)
       autoHasAutoTraverse: /auto-traverse to the perpendicular/.test(auto),
       // the diagonal move must come BEFORE the REPOSITION (the connecting travel of the PRIOR pass) — else the trace
       // anchors it to ② and pushes the 2nd probe AWAY (the bug the human caught). So the Y pass starts cleanly at ②.
-      moveBeforeReposition: auto.indexOf('G0 X[#53-#52-#10] Y#21') < auto.indexOf('auto-traverse to the perpendicular'),
+      moveBeforeReposition: auto.indexOf('G0 X[#53-#52-#10-#6] Y#21') < auto.indexOf('auto-traverse to the perpendicular'),
       manualHas21: /#21/.test(manual),
       manualHasJogPerp: /jog clear, around to the perpendicular/.test(manual),
       legacyAutoMatches: w.generate({ ...base, approach: 'auto' }) === auto,
@@ -69,7 +69,7 @@ test('the trans diagonal re-centres the PRIMARY axis to ② for BOTH axis orders
     };
     return {
       xFirst: primErr('X'), yFirst: primErr('Y'),
-      reCentreMove: /G0 X\[#53-#52-#10\] Y/.test(w.generate({ featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'pos', dist: 100, inAxis: 'auto', transAxis: 'auto' })),
+      reCentreMove: /G0 X\[#53-#52-#10-#6\] Y/.test(w.generate({ featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'pos', dist: 100, inAxis: 'auto', transAxis: 'auto' })),
     };
   });
   expect(r.reCentreMove, 'the primary leg is the re-centre expression #53-#52-#10, not a fixed travel').toBe(true);

@@ -17,7 +17,6 @@
  *         raw · result · radius · compEnable(=true) · failGoto(=1) · comment · compNote · stopVar · limitVar · limitVal
  */
 import { newBlock } from '../../blocks/blockEmitter.js';
-import { markerLine } from '../../blocks/opSchema.js';
 
 export function probeSurfaceStack(p = {}) {
     const S = [];
@@ -47,8 +46,9 @@ export function probeSurfaceStack(p = {}) {
     // final retract (after the read) — default ON (edge); a wizard that retracts AFTER its OWN WCS write sets trailingRetract:false
     if (p.trailingRetract !== false) push('move', { mode: 'rapid', [lc]: p.retractVar });
 
-    // DECLARED surface marker (additive; stripAnnotations removes it → byte-identical; sim consumes it next increment)
-    const inner = markerLine('probe-surface', { result: p.result, axis, dir }).replace(/^\(\s*|\s*\)$/g, '');
-    push('comment', { text: inner });
+    // NOTE (t131): the surface DECLARATION for the sim must NOT live as a `( @DDCS … )` comment in the emitted G-code — that
+    // lands in the EDITOR text and violates "Option B" (the editor stays clean; op info comes from the program model, not
+    // editor markers — see editor-sim-real-insert.spec). So the inc2 sim-consumes-the-surface mechanism is SIM-SIDE (read the
+    // op stack's radiuscomp result), not an editor marker. Marker emit removed; opSchema's `probe-surface` entry kept for inc2.
     return S;
 }
