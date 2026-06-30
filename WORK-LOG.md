@@ -2996,3 +2996,33 @@ undefined); round-trips through `applySettings` → the settings store. The KNOW
   both in the FORM/knob domain, nothing to do with the probeGeometry/mesh/stock changes).
 
 SCOPE = stock.diameter + the sim/collision/mesh read. NOT the datum-relative frame (kept top-at-0, macro-only). Releasable (advisor's bump).
+
+---
+
+## 🔨 turn 163 — PROBE-SURFACE unify-pass: delete radiuscomp.spaced + normalize to the DDCS no-space bracket style
+
+Closes the probe-surface chapter. Normalization ONLY — ZERO logic change.
+
+**The wart:** `radiuscomp.spaced` (a cosmetic param) made the CORNER X/Y comps emit `[#1925 + #6]` (inner spaces) while every
+other comp (edge, corner-Z, middle, rotary known + fit) emitted `[#1925+#6]` (no spaces). The only `spaced:true` caller was the
+corner X/Y.
+
+**Done:**
+- DELETED `radiuscomp.spaced` (the param + the `sp` emit) → the radiuscomp emits ONE convention, **no inner spaces** always.
+- Removed the `spaced` arg from `probeSurfaceStack` + the corner's `spaced:true/false`.
+- The corner X/Y now emit `[#1925+#6]` / `[#1926+#6]` (was `[#1925 + #6]`) — consistent with the rest.
+- Updated `CORNER_GOLDEN` (the byte-identical assertion) to the normalized no-space form (8 spaced brackets → 0).
+- The rotary FIT comps + solver were ALREADY no-space (`#51=[#1927-#6]`, `[[#52-#54]*...]`) — consistent, no change needed.
+
+**DDCS-aligned:** the M350 dump uses no inner spaces (`G00 Z[#113-2]` in the SYSDISK 3D-probe capture). So no-space is the
+ground-truth style.
+
+**Verdict — COSMETIC, not a compliance fix → BATCH (not its own release).** The spacing is functionally a no-op (DDCS parses
+both `[#1925 + #6]` and `[#1925+#6]`); this is consistency + dump-alignment, not correctness.
+
+**Flagged (separate, OUT of this scope):** `atcLengthWizard.js:70` still emits `[#101 - #6]` (spaced) — but that's the ATC
+LENGTH calc (MachineZ − BlockHeight), NOT a radiuscomp/probe-surface comp. A future general spacing pass could unify it.
+
+**Verified:** `probe-surface-block.spec` green (5 passed — radiuscomp/probeSurfaceStack/EDGE/CORNER/ROTARY); full suite **436
+passed** (1 failure, `project-drawer-smoke`, is a parallel-load flake — passes isolated, unrelated). The probe-surface chapter
+is closed (radiuscomp atom → 5 wizards migrated → disc-on-surface both sims → fit-comp → now one bracket style).

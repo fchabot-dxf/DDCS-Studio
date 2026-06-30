@@ -13,13 +13,14 @@
  */
 export const radiuscompBlock = {
     type: 'radiuscomp', label: 'Radius comp', kind: 'leaf', category: 'Probing',
-    defaults: { raw: '#1925', result: '#50', radius: '#6', dir: '+', enable: true, spaced: false, note: '' },
-    fields: ['raw', 'result', 'radius', 'dir', 'enable', 'spaced', 'note'],
+    defaults: { raw: '#1925', result: '#50', radius: '#6', dir: '+', enable: true, note: '' },
+    fields: ['raw', 'result', 'radius', 'dir', 'enable', 'note'],
     emit: (p) => {
         const result = p.result || '#50', raw = p.raw || '#1925';
         const on = p.enable !== false && p.enable !== 'false' && p.enable !== 0;   // default ON (correct-by-default)
-        const sp = p.spaced ? ' ' : '';   // some legacy wizards space the operator (`[#1925 + #6]`) — match for byte-identicalness
-        const expr = on ? `[${raw}${sp}${p.dir === '-' ? '-' : '+'}${sp}${p.radius || '#6'}]` : raw;
+        // ONE bracket convention, no inner spaces — `[#1925+#6]` — matching the DDCS M350 dump style (`Z[#113-2]`). The
+        // spacing is functionally a no-op (DDCS parses both); this is consistency, not correctness. (Was the `spaced` param.)
+        const expr = on ? `[${raw}${p.dir === '-' ? '-' : '+'}${p.radius || '#6'}]` : raw;
         const n = String(p.note ?? '').replace(/[()]/g, '').trim();
         return [n ? `${result}=${expr} ( ${n} )` : `${result}=${expr}`];
     },

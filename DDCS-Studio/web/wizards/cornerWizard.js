@@ -65,13 +65,12 @@ export function cornerStack(params = {}) {
 
     // Probe one wall via the shared PROBE-SURFACE BLOCK (t127): touch+comp → the TRUE wall in a temp (#102/#101); the
     // corner keeps its own WCS write + retract + safe-Z (trailingRetract:false). Byte-identical to the old hand-rolled wall.
-    // The legacy X/Y comp spaces the operator (`[#1925 + #6]`) → spaced:true preserves that (a cosmetic wart to unify later).
     const probeWall = (ax, dir) => {
         const av = AX[ax], probeVar = dir === '+' ? '#8' : '#7', retractVar = dir === '+' ? '#9' : '#10';
         const compOp = dir === '+' ? '+' : '-';   // boss: wall is at trigger ± stylus radius
         S.push(...probeSurfaceStack({
             axis: ax, dir: compOp, probeVar, retractVar, feedFast: '#3', feedSlow: '#4', port: '#5', level,
-            twoPass: true, raw: av.result, result: ax === 'X' ? '#102' : '#101', radius: '#6', spaced: true,
+            twoPass: true, raw: av.result, result: ax === 'X' ? '#102' : '#101', radius: '#6',
             compEnable: true, trailingRetract: false, compNote: `Trigger Pos ${compOp} Radius`,
         }));
         if (ax === 'X') {
@@ -127,7 +126,7 @@ export function cornerStack(params = {}) {
         // does its own safe-Z retract + the travel to the first wall.
         S.push(...probeSurfaceStack({
             axis: 'Z', dir: '-', probeVar: '#7', retractVar: '#10', feedFast: '#3', feedSlow: '#4', port: '#5', level,
-            twoPass: true, raw: '#1927', result: '#[#73]', radius: '#6', spaced: false, compEnable: true,
+            twoPass: true, raw: '#1927', result: '#[#73]', radius: '#6', compEnable: true,
             trailingRetract: false, preComp: [{ var: '#73', value: '[#70+2]', note: 'WCS Z Address' }],
             compNote: `Save ${wcsLabel} Z offset - machine coord (− stylus radius)`,
         }));
