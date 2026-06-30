@@ -2925,3 +2925,46 @@ rotary toggle was converted to this shared widget (removed from index.html).
   doesn't import any changed file).
 
 SCOPE = the frame rollout via the shared widget. NOT inter-move, NOT the bar (inc2). Releasable increment (advisor's bump).
+
+---
+
+## 🔨 turn 159 — SPATIAL MODEL inc 2 SCOUT + GATE: rotary BAR — bar≠box needs a DECLARED Ø on the stock (new infra)
+
+Scout-first per the dispatch. Confirmed: a bar ≠ box can't be EXPRESSED today, and the collision can only read the stock — so
+the dispatch's "render correctly for Ø ≠ box (probe + cylinder agree)" needs new declaration infra. Gating with the plan.
+
+### Scout (confirmed)
+- **The collision is box-inferred, stock-only.** `cylinderOf(stock, rotaryAxis)` → `r = min(cross dims)/2`; `stockProbeStop(A,B,
+  stock,rotaryAxis,tipR)` takes ONLY the stock — NO params path. So for the collision to use a declared Ø, the Ø must live ON
+  the stock.
+- **The stock has NO diameter field.** `{ x,y,z,shape,datum,pin,show }`; the stock editor accepts only X/Y/Z (no Ø input even for
+  `shape:'cylinder'`). The cylinder = the box (Ø = min cross dims). ⇒ a bar ≠ box can't be declared at all.
+- **The known Ø is PULLED from the stock, read-only.** rotaryCenterView: for a cylinder stock `diameter = 2*cylinderOf(stock).r`
+  (read-only — "change it in the stock editor"); the wizard's `diameter` param NEVER flows back to the stock. No params→stock plumbing.
+- **opSimStarts re-infers R = min(sy,sz)/2** (doesn't read `params.diameter`); the collision agrees (both = min cross dims) — so
+  the DEFAULT (bar=box) has no mismatch. The datum is macro-only today (`SWO('Z', datum==='top'?#50:#56)`); the preview is always
+  top-at-0 (`flankZ = -R`).
+
+### Plan (the declared cylinder — new infra)
+1. **`stock.diameter`** (optional; meaningful for `shape:'cylinder'`; the cylinder's true OD, distinct from the box).
+2. **`cylinderOf` + `opSimStarts` read `stock.diameter ?? min(cross dims)/2`** — declared-first, fallback to the box. DEFAULT
+   (no `diameter`) is render/collision-IDENTICAL (no regression). bar≠box (diameter 50 in a 76×76 box) → R=25 for BOTH render +
+   collision → they agree (no false through-stock).
+3. **Stock editor: a Ø input for cylinders** — the user declares the bar Ø (one source).
+4. **Known wizard pulls `stock.diameter`** (read-only, as now). **FIT** renders the nominal `stock.diameter ?? box` (measures, consumes none).
+
+### Design calls (advisor)
+1. The Ø lives on `stock.diameter` (declared-first, fallback min-cross) — confirm.
+2. **Where the user declares it:** (A, REC) a Ø input in the STOCK EDITOR — the Ø is a stock property, the wizard READS it
+   (read-only, no wizard-mutates-stock); OR (B) the spec's literal "known method TYPES Ø; the stock carries it" — the wizard's
+   typed Ø PERSISTS to `stock.diameter` (the wizard mutates the shared workpiece stock — more plumbing + a coupling call).
+3. **Datum → render frame:** keep the preview top-at-0 (datum stays macro-only, REC) OR make the render axis-Z datum-relative
+   (center → axis at 0; top → −R)? The spec's "height-of-center derived from bar+datum" reads as a MACRO concern (already done);
+   the preview convention is separate.
+4. FIT nominal = `stock.diameter ?? box` — confirm.
+
+### Recommendation
+GATE — don't build. Bar≠box requires `stock.diameter` (the collision's only source) + the editor Ø input + the readers — new
+declaration infra. REC: (2A) the Ø is a stock-editor property the sim+collision both read (`stock.diameter ?? min-cross`),
+default unchanged; (3) keep the preview top-at-0. That's the minimal declared cylinder with no wizard-mutates-stock coupling.
+Bless the shape (esp. 2A vs 2B and the datum question) and it's mechanical.
