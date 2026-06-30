@@ -21,6 +21,26 @@ import { createToolpath2d } from './toolpath2d.js';
 import { traceToolpath } from '../engine/trace.js';
 import { GcodeExecutionEngine } from '../engine/index.js';
 import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
+import { getLastOp } from '../blocks/opRecord.js';          // the active op (wizard PREVIEW) → its declared radius-comp surfaces
+import { builderOf } from '../blocks/opBuilders.js';        // rebuild the op stack to read its radiuscomp atoms (disc-on-surface, inc2)
+
+// DISC-ON-SURFACE (inc2): read the ACTIVE op's DECLARED radiuscomp atoms → { resultVar → { axis, sign } } for ENABLED comps
+// ONLY. The flat <name>Stack carries the probeSurfaceStack atoms; a radiuscomp's `raw` (trigger #1925/6/7) gives the axis,
+// `dir` the sign. Declared, NOT a #6-scan. (Wizard PREVIEW source = getLastOp; the EDITOR-sim ddcsGetBlockProgram is the flagged follow-up.)
+const TRIG_AXIS = { '#1925': 'x', '#1926': 'y', '#1927': 'z' };
+function readEnabledComps() {
+    const op = getLastOp();
+    if (!op || !op.type) return {};
+    let stack = null;
+    try { const b = builderOf(op.type); stack = b ? b(op.params || {}) : null; } catch (_) { stack = null; }
+    const map = {};
+    for (const a of (stack || [])) {
+        if (!a || a.type !== 'radiuscomp' || !a.params) continue;
+        const p = a.params, on = p.enable !== false && p.enable !== 'false' && p.enable !== 0;
+        if (on && p.result && TRIG_AXIS[p.raw]) map[String(p.result)] = { axis: TRIG_AXIS[p.raw], sign: p.dir === '-' ? -1 : 1 };   // comp-OFF (fit) drops out → its discs stay raw
+    }
+    return map;
+}
 
 // Stock is a sim/preview property — configured via the Stock MODAL (ui/stockEditor.js), opened from the panel's
 // Stock button (you set the workpiece where you see it). The modal persists to the shared stock store and
@@ -251,6 +271,7 @@ export function createPreviewPanel(container, opts = {}) {
     let engine = null;
     let pendingProbe = null;   // SLICE 3: the axis of a G31 awaiting completion (resolved on the next onLineChange)
     let pendingDatum = null;   // a WCS-offset write awaiting its COMMITTED value — onLineChange fires BEFORE the assign runs, so read the target var on the NEXT line (robust to ANY RHS expr, incl. the comp's bracketed [#1927-#6])
+    let compMap = {};   // DISC-ON-SURFACE (inc2): the active op's enabled-comp { resultVar → { axis, sign } } map (read per run)
     function ensureEngine() {
         if (engine) return engine;
         engine = new GcodeExecutionEngine({
@@ -293,6 +314,14 @@ export function createPreviewPanel(container, opts = {}) {
                         if (off === 0 || off === 1 || off === 2) pendingDatum = { off, target };   // robust to #578/#70's absolute value (only the offset matters)
                     }
                 }
+                // DISC-ON-SURFACE (inc2): a radius-comp RESULT write (`#50=…` / the corner Z's `#[#73]=…`) whose target is a
+                // DECLARED enabled-comp result var → slide that touch's discs (dropped since the last comp on its axis) onto the
+                // wall by ±#6 toward the probe dir. RELATIVE (the result value is engine-frame; the disc rides the part frame).
+                if (raw && viz && viz.nudgeSurface) {
+                    const lhs = /^\s*(#\d+|#\[[^\]]+\])\s*=/.exec(raw);
+                    const c = lhs && compMap[lhs[1]];
+                    if (c) { const r = engine.vars.get(6); if (Number.isFinite(r)) viz.nudgeSurface(c.axis, r * c.sign); }
+                }
             },
             onPositionChange: (pos) => { if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock)
             onStatus: ({ message }) => setStatus(message),
@@ -307,7 +336,7 @@ export function createPreviewPanel(container, opts = {}) {
                 pendingDatum = null;
                 updateRunBtn();
                 if (typeof opts.onLine === 'function') opts.onLine(null);
-                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); pendingProbe = null; pendingDatum = null; engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
+                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); pendingProbe = null; pendingDatum = null; compMap = readEnabledComps(); engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
             },
         });
         return engine;
@@ -526,7 +555,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (mode === '3d') ensureViz();
         if (viz && viz.setSimSpeed) viz.setSimSpeed(simSpeed());   // probe discs fade in SIM time (track the speed button)
         if (viz && viz.resetProbe) viz.resetProbe();    // SLICE 3: fresh probe-WCS each run (superimposed on the stock-WCS)
-        pendingProbe = null; pendingDatum = null;   // fresh deferred-write state each run
+        pendingProbe = null; pendingDatum = null; compMap = readEnabledComps();   // fresh deferred state + the active op's declared surfaces, each run
         updateDro(getStartPos() || { x: 0, y: 0, z: 0 });   // DRO: reset to the start position for the fresh run
         if (droWcsEl) droWcsEl.textContent = activeWcsName();   // refresh the label to the active WCS (catches a settings switch)
         if (viz) viz.setAnimate(false);                 // engine drives the tool/trail, not the geometric sweep

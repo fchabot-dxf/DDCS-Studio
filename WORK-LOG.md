@@ -2514,3 +2514,31 @@ MATCHING (a contact → its radiuscomp result) is a real design decision (+ "no 
 **Model access in BOTH sim contexts:** the wizard PREVIEW (the active op via `opRecord`) vs the EDITOR sim (`ddcsGetBlockProgram`).
 The sim must read the radiuscomp result vars from whichever is live. Bless the source(s) + (A) and I build inc2 (disc nudge +
 the datum/OD-top render verify). NO build this turn (the matching is the flagged design decision).
+
+---
+
+## 🔨 turn 135 — PROBE-SURFACE BLOCK inc2 BUILD: DISC-ON-SURFACE (the payoff). SIM-side, declared-driven.
+
+Built option A (blessed): the contact disc sits on the COMPED surface (the wall), read SIM-SIDE from the declared radiuscomp
+atoms — NOT a macro-text #6-scan, NOT the dropped Part-2 taint. This is the disc-on-surface the human stopped me hand-rolling at t120, now landing properly from the consolidation.
+
+- **Model-read** (createPreviewPanel.readEnabledComps): the ACTIVE op (`getLastOp` — the wizard PREVIEW) → `builderOf(type)(params)`
+  → the flat stack → the `radiuscomp` atoms → `{ resultVar → { axis (from `raw`), sign (from `dir`) } }` for ENABLED comps only.
+- **The hook** (onLineChange, the datum-hook pattern): a line writing a DECLARED enabled-comp result var (`#102=…`, the corner
+  Z's `#[#73]=…`) → `viz.nudgeSurface(axis, ±#6)`. Keyed by the declared result var, exactly as the datum hook keys on the WCS target.
+- **viz.nudgeSurface + _pendingDiscs** (gcodeViz3d): every disc dropped SINCE THE LAST comp on that axis slides onto the wall.
+  Handles fast+slow (both discs), middle's two-walls-per-axis (cleared per comp), and the rotary fit (comp-OFF → never called → discs stay raw).
+- **THE FRAME FIX (the real subtlety):** the radiuscomp's committed RESULT is in the ENGINE frame, but the disc rides the PART
+  frame — they differ by the inferStart offset (harness: disc at x=22, `#102`=0 → an absolute nudge jumped it 22 mm). So the
+  nudge is **RELATIVE**: `disc.position[axis] += ±radius·dir` (frame-invariant — the surface IS the contact ± radius). Read `#6`
+  from the engine for the magnitude, the `dir` from the declared atom for the sign.
+- **DATUM + OD-top already consistent (verified):** they ride the WCS-write hook (now writing the comped surface) — unchanged,
+  green (probe-wcs, middle-datum-centre, rotary-center-sim). The disc was the only new build.
+- **VERIFIED:** `tests/disc-on-surface.spec.js` — corner X/Y discs nudge EXACTLY a tip radius (minOff=maxOff=2) onto the wall,
+  off the raw tool-centre; the comps are read from the declared atoms (axis+sign). Render captured + opened (discs on the walls).
+  Full suite **431 passed**.
+
+### Flagged follow-up (per the dispatch) — the EDITOR-sim source
+`readEnabledComps` uses `getLastOp` (the WIZARD PREVIEW, the surface the human eyeballs). The EDITOR-sim source
+(`ddcsGetBlockProgram` — the inserted program) is the heavier wiring deferred to a follow-up (it needs the per-op stack + the
+right active surface). The wizard preview — where the human verifies — is done.

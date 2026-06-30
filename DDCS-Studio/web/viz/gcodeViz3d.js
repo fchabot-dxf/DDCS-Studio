@@ -1680,6 +1680,7 @@ export class GcodeViz3D {
         this._probeAxes = {};
         this._probeContact = null;
         this._probeContacts = [];
+        this._pendingDiscs = { x: [], y: [], z: [] };   // discs dropped SINCE THE LAST comp (per axis) — nudgeSurface moves them onto the wall
         this._datumWrite = {};   // the WCS-WRITE centre (#53/#56) per axis — cleared each run/loop (see markDatumWrite)
         this._updateDatum();   // hide the persistent line + datum
     }
@@ -1692,6 +1693,19 @@ export class GcodeViz3D {
         if ('xyz'.indexOf(axis) < 0 || !Number.isFinite(value)) return;
         (this._datumWrite || (this._datumWrite = {}))[axis] = value;
         this._updateDatum();
+    }
+
+    // DISC-ON-SURFACE (inc2): a probe op's ENABLED radius-comp ran (createPreviewPanel keys off the declared radiuscomp result
+    // var + feeds the SIGNED radius). Slide every disc dropped SINCE THE LAST comp on this axis onto the wall by `delta` =
+    // ± the tip radius toward the probe direction. RELATIVE on purpose: the comp's committed result is in the engine's frame,
+    // but the disc rides the part frame — a relative ±radius nudge is frame-invariant (the surface IS the contact ± radius).
+    // fast + slow both. ENABLED comps only → the rotary fit's comp-OFF touches never call this → their discs stay raw.
+    nudgeSurface(axis, delta) {
+        if ('xyz'.indexOf(axis) < 0 || !Number.isFinite(delta)) return;
+        const pend = (this._pendingDiscs || (this._pendingDiscs = { x: [], y: [], z: [] }))[axis] || [];
+        for (const d of pend) d.position[axis] += delta;
+        this._pendingDiscs[axis] = [];   // consumed — the next touch accumulates fresh (handles middle's two walls per axis)
+        this.render();
     }
 
     // TRANSIENT-DISC model. A G31 finished on `axis` at feed `feed`. Record the contact, rebuild the DATUM (which also
@@ -1707,9 +1721,11 @@ export class GcodeViz3D {
         (this._probeAxes || (this._probeAxes = {}))[axis] = true;
         this._probeContact = { x: tool.position.x, y: tool.position.y, z: tool.position.z };   // part-local (rides partFrame)
         (this._probeContacts || (this._probeContacts = [])).push({ ...this._probeContact });
-        // The DATUM is NOT driven by probe contacts anymore — it follows the WCS-WRITE event only (markDatumWrite), so it
-        // appears AT THE CENTRE, never flickering through the walls. Here we just record the contact + drop its FIXED disc.
-        this._probeDiscBurst(this._probeContact, axis, feed);   // (A) a FIXED disc at the contact — do NOT move it after
+        // The DATUM is NOT driven by probe contacts — it follows the WCS-WRITE event only (markDatumWrite). Here we record the
+        // contact + drop its disc, and remember it in _pendingDiscs[axis] so a later ENABLED comp (nudgeSurface) slides it onto
+        // the wall. A comp-OFF touch (the rotary fit) never fires nudgeSurface → its disc stays at the raw contact.
+        const disc = this._probeDiscBurst(this._probeContact, axis, feed);
+        if (disc) (this._pendingDiscs || (this._pendingDiscs = { x: [], y: [], z: [] }))[axis].push(disc);
     }
 
     // (B) The persistent DATUM (where the probed planes cross — GOLD, ≥2 axes) + AXIS LINE (the 2-plane intersection along
@@ -1798,6 +1814,7 @@ export class GcodeViz3D {
             else { this.partFrame.group.remove(disc); disc.geometry.dispose(); mat.dispose(); }
         };
         requestAnimationFrame(tick);
+        return disc;   // so probeAxisTouched can track it for nudgeSurface (disc-on-surface, inc2)
     }
 
     // Hover tooltip for the STOCK-WCS marker (the yellow origin square = settings.stock's saved WCS). Projects the
