@@ -2612,3 +2612,44 @@ The known assertions are untouched (its sim is valid). The `#6` move is value-id
 **Next (queued, the advisor's plan):** declare the fit's per-touch sim-starts (the operator-jog OD positions) via
 `opSimStarts.rotary_center` fit case → the fit sim becomes real and verifies the comp naturally (a sim DECLARATION, not a
 hand-rolled sim fix). Then the disc-on-surface lands the fit's discs on a REAL OD, not a garbage contact.
+
+---
+
+## 🔨 turn 141 — GATE: the real fit sim is a TWO-PART sim fix (engine DRO + opSimStarts sides), not a missing declaration
+
+Dispatched: declare the fit's per-touch sim-starts → real fit sim. VERIFY-FIRST found the sim-starts ARE already declared
+(`opSimStarts.rotary_center` returns 3 for fit: top + 2 flanks) AND the engine consumes them for the probe TRIGGER
+(`#1925-1927 = passStarts[pass] + target`, line 959). So the dispatch's "missing declaration" framing is incomplete — making
+the fit sim real needs **two coordinated SIM fixes**, prototyped below. **No source changed this turn (diagnostics only); suite green.**
+
+### Why the fit is degenerate (two independent causes)
+1. **The engine never populates the machine DRO (#880-883).** The fit captures its cross-axis via `RM` (read machine), which
+   emits `#52=#881` (the Expert DRO Y register). The engine's var store is a plain Map in sim — #880-883 are NEVER set → every
+   RM read returns 0 → the 3 points collapse (P1=P3=(0,0)). The known method doesn't use RM (it derives Yc/Zc from the triggers
+   + the known diameter), so it's unaffected. **Fixing this is an ENGINE change** (sim-only, but profile-aware: DRO base is
+   Expert #880 / V41 #1500 / DM500 #864 / rs274 #5420) — beyond the dispatch's "opSimStarts declaration" scope.
+2. **The opSimStarts fit-start SIDES (P2/P3) are mismatched to the macro's probe directions.** Macro P2 = `touch('Y', true)`
+   (probe +Y) but the declared start is on the +Y side (cy+R+retract) → the probe moves AWAY from the bar → a miss (#53 = full
+   travel = 138.2). The sides must match the macro: P2 (probes +Y) starts on the −Y side; P3 (probes −Y) starts on the +Y side.
+   **This is a true opSimStarts DECLARATION fix** (in scope).
+
+### Prototype (proxied the DRO via a custom var store; swapped the sides in the starts array — no source edits)
+```
+no fix:        pts collapse (0,0)(138,0)(0,0)        R degenerate (~0)
++DRO only:     pts DISTINCT but off the OD           R = 120.9   (sides still wrong)
++DRO +swap:    on the true OD                        R = 38.2  Yc 38.1  Zc -38.2   ✓ (true OD R=38.1, centre (38.1,-38.1))
+```
+Both fixes are SIM-only, NO emit change. Together they make the fit sim REAL → R≈R_true, the disc-on-surface lands on the real
+OD, and turn-139's fit comp verifies IN the sim (not just the synthetic solver).
+
+### Options
+- **(A) RECOMMENDED — do both:** the engine DRO population (general — benefits ANY RM-using macro) + swap the opSimStarts P2/P3
+  fit-start sides. Prototype-confirmed real. Two coordinated sim changes. Sub-decision: populate the ACTIVE profile's DRO base
+  (engine reads `ddcsGetSettings`) **or** all known bases (dialect-agnostic, cheap) — I lean all-known-bases.
+- **(B) incremental:** engine DRO population FIRST (the general gap + the prerequisite, a real standalone improvement), then the
+  opSimStarts side-swap as a follow-up. De-risks; two small passes.
+- **(C) defer the in-sim fit** — it's "ADVANCED: verify on machine" + already proven by the synthetic solver (t139). Skip the
+  2-part sim fix for now. Weakest given the human explicitly wants the real fit sim.
+
+**My read:** A (or B if you want the engine DRO landed + reviewed before the geometry swap). The DRO-population gap is a genuine
+general sim improvement worth doing regardless.
