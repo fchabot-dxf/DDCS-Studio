@@ -13,6 +13,7 @@ import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { probeSurfaceStack } from './ops/probeSurface.js';   // the shared probe primitive (rotary composes it — t129 inc1)
+import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // the shared safe-Z FRAME primitive (SPATIAL-MODEL inc1)
 import { srcVal, srcNote } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 
@@ -23,6 +24,7 @@ export function rotaryCenterStack(params = {}) {
     const level = num(params.level, 0), diameter = num(params.diameter, 76.2), dist = num(params.dist, 30);
     const retract = num(params.retract, 2), safeZ = num(params.safeZ, 15), fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
     const radius = num(params.radius, 2);   // stylus tip radius (#6) — the Z-down top probe lands a radius high, so Zc subtracts it (Yc bisect cancels)
+    const safeZFrame = safeZFrameOf(params.safeZFrame);   // SPATIAL-MODEL inc1: relative (default, clearance lift) | machine (G53 park at the absolute Z)
     const src = params.sources || {};
     const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
     const wcsArg = wcs === 'active' ? '#578' : String(parseInt(String(wcs).replace('G', ''), 10) - 53);
@@ -131,7 +133,9 @@ export function rotaryCenterStack(params = {}) {
         A('#50', '[#56+#55]', 'OD top = Zc + R (the TRUE OD top — points comped, no stylus-radius gap)');
     }
 
-    C('Final retract'); MV('Z', '#17');
+    // FINAL retract/park via the DECLARED safe-Z frame: relative → MV('Z','#17') BYTE-IDENTICAL; machine → G53 Z#17 (park at
+    // the absolute machine Z). #17 = the user's safe-Z value, interpreted per the frame (a clearance, or the absolute Z).
+    C('Final retract'); S.push(safeZParkBlock(safeZFrame, '#17'));
     C(`Write work origin (Z0 at ${datum === 'top' ? 'OD top' : 'centreline'})`);
     SWO('Y', '#54');                         // Y0 to centreline
     SWO('Z', datum === 'top' ? '#50' : '#56');

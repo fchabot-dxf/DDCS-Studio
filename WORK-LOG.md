@@ -2820,3 +2820,34 @@ plus a real machine-frame move subtlety. Gating with the plan; no code changed.
 (cleanest `#17 = safeZ` seam): the `safeZ.frame` param (default relative) + relative byte-identical (stripAnnotations) + machine
 → `dialect.machineMove('Z', '#17')` + the block round-trip + the sim honoring G53. The inter-move-traverse machine frame (the
 lift/drop rework) and the shared UI control across all wizards = follow-ups (inc 2+). No G-code invented.
+
+---
+
+## 🔨 turn 153 — SPATIAL MODEL inc1: the safe-Z FRAME primitive (relative byte-identical, machine=G53), ONE wizard
+
+Gate resolved (advisor t152, my rec). Built the DECLARED safe-Z frame primitive + wired it through the rotary's FINAL retract/
+park as the proof. It's an EMIT declaration → relative stays byte-identical, machine emits the ground-truth G53 (never invented).
+
+**Shared mechanism** (`web/wizards/ops/safeZframe.js`):
+- `safeZFrameOf(v)` — normalise (default `relative`; unknown → relative, so an absent field is the status quo).
+- `safeZParkBlock(frame, varRef)` — the frame-aware park block: `relative` → the rapid `move` atom (G0 Z#var; IDENTICAL to a
+  plain `MV('Z',var)`); `machine` → the `machinemove` atom → the dialect's G53 machine-coord move (Expert `G53 Z#var`,
+  V4.1 `G0 G53 Z#var`). Reuses the existing atoms, so it round-trips through gcodeToStack as-is.
+
+**Wired the rotary** (one vertical slice): a `safeZFrame` param (default relative); the FINAL retract `C('Final retract')`
+now `S.push(safeZParkBlock(safeZFrame, '#17'))`. SCOPE = the success final park only — the error-path retract STAYS relative
+(an absolute machine lift there would break the symmetric drop-back; deferred). UI: a compact `rel|mach` toggle on `rc_safe_z`
+(hand-added; the shared UI control = a follow-up). View reads it + `inputIds`; opSchema gets `safeZFrame: Enum()` + the FIELD_BIND.
+
+**machine semantic:** `frame=machine` ⇒ the safe-Z VALUE *is* the absolute machine Z → `G53 Z#17` (the user owns the number).
+
+**Verified** (`tests/safez-frame.spec.js` + checks):
+- **relative BYTE-IDENTICAL to today** — git-stash diff (the relative-default emit vs the pre-change emit, stripAnnotations,
+  3-combo sweep) → **IDENTICAL ✓**. The test also asserts relative emits 0 × G53 + 2 × `G0 Z#17`.
+- **machine** — the final park emits `G53 Z#17` (1×); the error retract stays `G0 Z#17` (scope). The SIM honors it: tracing
+  `G53 Z#17` (#17=480) parks at part-Z 480 (wcsOffset 0) / 380 (wcsOffset 100) — the engine's machine→part map.
+- **round-trip** — `markerLine('rotary_center', {…,safeZFrame:'machine'})` → `parseMarker` preserves `safeZFrame='machine'`.
+- **Full suite 435 passed.**
+
+**Follow-ups** (not this slice): inter-move-traverse machine frame (the lift/drop rework); rollout to the other wizards; the
+SHARED UI control (so wizards inherit the toggle, not hand-added); the `wcs` frame value. Releasable increment (advisor's bump).

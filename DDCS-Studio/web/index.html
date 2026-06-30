@@ -552,7 +552,7 @@
                     <div class="grid-3">
                         <div><span class="label">MAX PROBE</span><input id="rc_dist" value="100" title="Max probe travel per touch (mm). #1."/></div>
                         <div><span class="label">RETRACT</span><input id="rc_retract" value="2" title="Retract between passes (mm). #2."/></div>
-                        <div><span class="label">SAFE Z</span><input id="rc_safe_z" value="15" title="Z retract height (mm). #17."/></div>
+                        <div><span class="label">SAFE Z</span><input id="rc_safe_z" value="15" title="Z retract height (mm). #17."/><select id="rc_safe_z_frame" class="frame-toggle" title="Safe-Z frame for the final park&#10;rel: a clearance ABOVE the surface (the value is a height; incremental lift — the default)&#10;mach: an ABSOLUTE machine Z (G53 park clear of clamps/tall fixtures — the value IS the machine Z)"><option value="relative">rel</option><option value="machine">mach</option></select></div>
                     </div>
                 </div>
 

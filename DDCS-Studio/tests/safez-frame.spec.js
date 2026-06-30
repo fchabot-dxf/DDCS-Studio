@@ -1,0 +1,40 @@
+import { test, expect } from '@playwright/test';
+
+// SPATIAL MODEL inc1 — the declared safe-Z FRAME on the rotary FINAL retract/park (SPATIAL-MODEL-SPEC.md §A). A shared
+// primitive (safeZ.frame param + the frame-aware safeZParkBlock helper): relative (DEFAULT) is byte-identical to today; machine
+// parks via the DDCS-correct G53 (dialect.machineMove — ground-truth-confirmed). Scope = the final park only; the error-path
+// retract stays relative. The frame round-trips through the op marker.
+test('safe-Z frame on the rotary final park: relative byte-identical, machine = G53, frame round-trips', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio);
+  const r = await page.evaluate(async () => {
+    const { RotaryCenterWizard } = await import('/wizards/rotaryCenterWizard.js');
+    const { markerLine, parseMarker } = await import('/blocks/opSchema.js');
+    const { stripAnnotations } = await import('/blocks/dataOps/equivalence.js');
+    const w = new RotaryCenterWizard();
+    const base = { method: 'known', diameter: 76.2, datum: 'top', safeZ: '15' };
+    const def = stripAnnotations(w.generate({ ...base }));                          // default → relative
+    const rel = stripAnnotations(w.generate({ ...base, safeZFrame: 'relative' }));
+    const mac = stripAnnotations(w.generate({ ...base, safeZFrame: 'machine' }));
+    const count = (t, re) => (t.match(re) || []).length;
+    const marker = markerLine('rotary_center', { ...base, safeZFrame: 'machine' });   // round-trip via the op marker
+    const parsed = parseMarker(marker);
+    return {
+      defEqRel: def === rel,
+      rel_g53: count(rel, /G53 Z#17/g), rel_g0: count(rel, /G0 Z#17/g),
+      mac_g53: count(mac, /G53 Z#17/g), mac_g0: count(mac, /G0 Z#17/g),
+      hasMarkerFrame: /@DDCS/.test(marker) && marker.includes('machine'),
+      parsedFrame: parsed && parsed.params && parsed.params.safeZFrame,
+    };
+  });
+  console.log('SAFEZFRAME ' + JSON.stringify(r));
+  // relative = today: the frame defaults to relative; only the rapid lift G0 Z#17, no machine move
+  expect(r.defEqRel, 'the frame defaults to relative (default emit === explicit relative)').toBe(true);
+  expect(r.rel_g53, 'relative emits NO G53 (byte-identical to today)').toBe(0);
+  expect(r.rel_g0, 'relative keeps both retracts as the rapid lift G0 Z#17').toBe(2);
+  // machine = the new path: the FINAL park swaps to G53; the error retract stays relative (scope = final park only)
+  expect(r.mac_g53, 'machine parks the final retract via G53 Z#17').toBe(1);
+  expect(r.mac_g0, 'the error-path retract stays relative (final-park scope only)').toBe(1);
+  // round-trip: the frame survives the op marker
+  expect(r.parsedFrame, 'safeZFrame round-trips through the op marker').toBe('machine');
+});

@@ -44,7 +44,7 @@ export const rotaryCenterView = {
     twoPane: true,
     inputIds: [
         'rc_method', 'rc_approach', 'rc_datum', 'rc_diameter', 'rc_wcs',
-        'rc_dist', 'rc_retract', 'rc_safe_z', 'rc_feed_fast', 'rc_feed_slow', 'rc_q',
+        'rc_dist', 'rc_retract', 'rc_safe_z', 'rc_safe_z_frame', 'rc_feed_fast', 'rc_feed_slow', 'rc_q',
     ],
     // Controller-source chips (PROBE-CONFIG-SOURCE.md)
     probeSrcFields: { rc_feed_fast: 'fastFeed', rc_retract: 'retract' },
@@ -81,6 +81,7 @@ export const rotaryCenterView = {
             dist: el('rc_dist')?.value || '30',
             retract: el('rc_retract')?.value || '2',
             safeZ: el('rc_safe_z')?.value || '15',
+            safeZFrame: el('rc_safe_z_frame')?.value || 'relative',   // SPATIAL-MODEL inc1: final-park frame (relative | machine G53)
             f_fast: el('rc_feed_fast')?.value || '200',
             f_slow: el('rc_feed_slow')?.value || '50',
             qStop: el('rc_q')?.value || '1',
