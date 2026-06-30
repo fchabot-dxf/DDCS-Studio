@@ -2542,3 +2542,45 @@ atoms — NOT a macro-text #6-scan, NOT the dropped Part-2 taint. This is the di
 `readEnabledComps` uses `getLastOp` (the WIZARD PREVIEW, the surface the human eyeballs). The EDITOR-sim source
 (`ddcsGetBlockProgram` — the inserted program) is the heavier wiring deferred to a follow-up (it needs the per-op stack + the
 right active surface). The wizard preview — where the human verifies — is done.
+
+---
+
+## 🔨 turn 137 — GATE: rotary FIT comp ON is correct-for-machine but UNVERIFIABLE in the sim (the fit sim is degenerate)
+
+Dispatched: flip the 3-point fit's comp ON (consistency with the known method; "declared = correct-by-default + reversible")
+and VERIFY "the fit's R + OD-top now comped (new = old − radius); centre unchanged." I made the change, and verifying it
+surfaced that the dispatch's premise — a meaningful sim fit — is FALSE. **Reverted to keep the suite green; passing the finding.**
+
+### The finding (with data)
+The rotary 3-point FIT **sim is degenerate**: the operator-guided `reposition()` (the jog between flanks) is NOT simulated, so
+the tool's machine position never changes across the 3 probes — `#52=#54=#56=0`. The "points" the solver fits are therefore
+garbage: **P1(0,2) P2(66.71,0) P3(2,0)** — not on any real OD. That's why the raw fit yields **R=161.85** for a Ø76.2 bar whose
+true OD radius is **38.1** (~4× off), and the t129 "fit value-identical" test was simply locking in that garbage number.
+
+Flipping the fit comp ON shifts the probed-axis results `#51` (2→0, top) and `#55` (2→0, −Y flank) by the radius → **P1 and P3
+collapse onto (0,0)** (coincident) → determinant `#63=0` → **R / Yc / Zc all → 0**. So in the sim "new = old − radius" is
+impossible: I measured new = **0**, not 159.85.
+
+This is purely a SIM artifact. On a real machine the 3 distinct OD tool-centre points each shift radially inward by r →
+**R = R_true, same centre** — the dispatch's geometry is right. The sim just can't show it.
+
+### Options (the change is staged-then-reverted; the exact edit is below, trivial to re-apply)
+- **(A) RECOMMENDED — keep comp ON; verify by the DECLARATION + math, not the degenerate operator-jog sim.** (i) assert the 3
+  fit touches now emit the comp (`#51=[#1927-#6]`, `#53=[#1926+#6]`, `#55=[#1926-#6]`); (ii) `readEnabledComps(rotary_center,fit)`
+  now includes the 3 comps → the disc-on-surface nudges the fit's discs ±r onto the surface (works regardless of the sim's
+  garbage contact — the nudge is RELATIVE); (iii) a synthetic-points solver check: feed real OD tool-centre points (R_true+r)
+  through the circle-solve, comp inward, assert R=R_true + centre unchanged. REPLACE the t129 sim-fit R/Yc/Zc assertions (they
+  assert garbage) with these. The fit's operator-jog stays "verify on machine" by nature. In scope; honest; proves correctness.
+- **(B) keep comp ON + FIX the fit SIM** — make `reposition()` move the tool to distinct OD points so the sim fit yields the true
+  R (38.1), the comp then gives R−r naturally, and the disc lands on a real OD. Bigger scope (a sim-geometry change), but makes
+  the fit sim meaningful (and retires the garbage value-identical lock-in). Could be a follow-up to A.
+- **(C) revert the fit comp (leave OFF)** — the fit is "ADVANCED: verify on machine"; don't ship an in-sim-unverifiable change.
+  Loses the consistency the human explicitly asked for → weakest option.
+
+**My read:** A now (correct + reversible + honestly verified), B as a later follow-up (the degenerate fit sim PRE-DATES this task
+— the t129 "value-identical 161.85" was already garbage). The disc-on-surface for the fit is fine under A.
+
+### The exact edit to re-apply if A/B (was reverted)
+1. Move `A('#6', radius, …)` from inside the `known` branch to just before `if (method === 'known')` (declare once, both methods).
+2. The 3 fit `touch(...)` calls: 4th arg `false` → `true` (comp ON) — top `#51`, +Y `#53`, −Y `#55`.
+3. Update the fit comments (raw → comped surface points).
