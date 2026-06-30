@@ -3092,3 +3092,49 @@ marker." So the handles already enumerate from the real config (the spec's requi
    field** (the block stores it); fix the "locked" disconnect by construction; the per-transition auto/manual unification.
 3. **B-TRANS-ANGLE** (render): draw the actual trans-axis vector to ②, not a fixed 45° — falls out once ② is the source.
 4. Corner/rotary/alignment: adopt the same start-marker canvas (their opSimStarts already provide the per-pass starts).
+
+---
+
+## 🔨 turn 167 — ITEM 4 inc 1 (EDGE): flip START←TRAVEL to TRAVEL←START — the prototype
+
+The dependency-flip on the simplest wizard, to prove the pattern. The EMIT is UNTOUCHED — the change is purely the
+INTERACTION (drag the start → derive the reach), the viz, and the field becoming a readout. So it's BYTE-identical (not
+merely value-identical) for ALL params, not just the default.
+
+**Built (mirrors middle's proven `renderStartCanvas` + `tieDiagTravel`):**
+- `edgeView.js`: replaced the probe-VECTOR/"reach" arrow with a draggable ① **START-POS** marker on the feature canvas. A
+  drag → `panel.onStartDrag → userStarts[0]` (the SIM source — the marker STICKS where dropped, beating the inferred hint)
+  **AND** `tieEdgeDist(world)` derives the reach: `outset = |start − wall|`, `dist = round(outset / 0.6)` (the exact inverse
+  of inferStart's `outset = clamp(dist*0.6, 6, 15)`) → writes `p_dist`. ONE handle, BOTH outputs.
+- `edgeWizard.js`: added `inferStarts(params, stock) = [inferStart]` (1 pass → 1 marker; markers↔macro `reposition()` in
+  trivial lockstep) — fed to `preview3D` as the per-pass hint so the panel seeds the ① marker.
+- `index.html`: `p_dist` (MAX PROBE) → `readonly` readout (the start is the source; you don't type the reach).
+- removed the now-orphaned `buildCanvasWidgets` import + `setFields`/`r3` (my change orphaned them). The generic
+  `probeVector` widget + its UNIT test stay (out of scope; may be adopted elsewhere).
+- `tests/edge-probe-vector.spec.js`: rewrote the INTEGRATION test (it asserted the OLD arrow→axis/dir/dist model) → the new
+  flip (the ① start is the source: it sticks `x<0` outside the wall, and the reach DERIVES `round(outset/0.6)`; MAX PROBE is
+  read-only). Kept the generic-widget unit test.
+
+**Verified:** rewritten edge test green; **EDGE byte-identical migration (probe-surface-block) STILL green** → emit unchanged;
+`wizard-templates` green (readonly doesn't break the round-trip — a loaded template still seeds dist=33 via JS); FULL SUITE
+**436 passed** (1 failure `align-rotate-gui` = the known parallel-load flake, passes isolated). REAL RENDER (human-eyes,
+opened both PNGs): dragging the ① start away from the wall re-derived the reach 200→77 and the marker stuck at the dropped
+outset.
+
+**Persistence (round-trip):** `p_dist` ↔ a shared `maxDist` sticky-override (wizardManager:33 / `ddcs_probe_field_overrides`)
++ the op's `params.dist` (recordOp). The drag dispatches `input` → the existing sticky-save persists it; the restore sets
+`.value` via JS — readonly blocks only typing, not JS, so both survive. `#1` ← `params.dist` round-trips unchanged.
+
+**FLAGS for the advisor:**
+1. **readout vs full removal** (the dispatch-flagged sub-decision): I kept a **read-only readout**, NOT full field removal.
+   Two reasons it's clearly better: (a) MAX PROBE is a SAFETY-relevant distance (how far the probe travels) the operator
+   should SEE; (b) the value MUST persist in the DOM (`userStarts` is sim-only, lost on op save/reopen) — full removal would
+   need a hidden store anyway, so a visible readout dominates. If you want it fully hidden, it's a 1-line change.
+2. **default sits outside the linear region** — the default reach (the shared `maxDist`, 200 here) maps to `outset = 60`, but
+   inferStart CAPS the start at `outset 15`, so AT REST the marker doesn't reflect the full reach (a benign pre-existing cap,
+   not new). On the first drag it syncs cleanly to `round(outset/0.6)`. A future tweak could lower the default / uncap so the
+   marker and reach agree at rest (touches value-identical → your call).
+3. **3D/2D sim-marker drag doesn't derive** — `tieEdgeDist` rides the FEATURE-CANVAS onDrag (like middle's `tieDiagTravel`);
+   dragging the start in the 3D/2D SIM updates `userStarts` but not the reach. Same gap the middle has; acceptable for inc1.
+4. **the derived reach writes the SHARED `maxDist`** — the existing `p_dist↔maxDist` sync means dragging the edge start nudges
+   the shared max-probe default other wizards seed from. Existing mechanism; the flip rides it.

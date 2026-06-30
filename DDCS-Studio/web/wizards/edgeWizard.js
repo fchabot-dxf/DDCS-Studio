@@ -97,4 +97,9 @@ export class EdgeWizard {
             ? { x: pos ? -outset : sx + outset, y: cy, z: probeZ }
             : { x: cx, y: pos ? -outset : sy + outset, z: probeZ };
     }
+
+    /** Per-pass start hints (the panel seeds the draggable ① marker from these). Edge is ONE pass → one start, so the
+     *  marker count stays in lockstep with the macro (a single probe-surface touch). TRAVEL-START inc1: the start IS the
+     *  source — dragging the marker derives the reach (#1) GUI-side (see edgeView.tieEdgeDist). */
+    inferStarts(params, stock) { return [this.inferStart(params, stock)]; }
 }

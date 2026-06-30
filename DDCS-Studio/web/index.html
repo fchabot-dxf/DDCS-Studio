@@ -727,7 +727,7 @@
                 <div>
                     <span class="section-label">GEOMETRY</span>
                     <div class="grid-2">
-                        <div><span class="label">MAX PROBE</span><input id="p_dist" value="100" title="Max probe travel distance (mm). Stored as #1. #7=[0-#1] (neg), #8=#1 (pos)."/></div>
+                        <div><span class="label">MAX PROBE</span><input id="p_dist" value="100" readonly title="Max probe reach (mm), stored as #1 — DERIVED from the start (TRAVEL-START inc1): drag the ① start marker on the canvas to set it (closer to the wall = shorter reach). Read-only — the start is the source. #7=[0-#1] (neg), #8=#1 (pos)."/></div>
                         <div><span class="label">RETRACT</span><input id="p_retract" value="2" title="Retract between fast and slow passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)."/></div>
                         <div><span class="label">STYLUS RADIUS</span><input id="p_radius" value="2" title="Probe ball radius (mm). Stored as #6. WCS = trigger ± radius so the datum lands on the edge, not the ball centre."/></div>
                     </div>
