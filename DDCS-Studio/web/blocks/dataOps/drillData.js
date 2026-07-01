@@ -56,7 +56,7 @@ export const DRILL_DEFAULTS = {
 // (clearance is deliberately NOT bound — frontier #3; method is NOT bound — frontier #1. The placeonstock bbox
 //  snapshot on block 2 is NO LONGER a frontier — the place fold recomputes it LIVE from the array's params, so
 //  placement is fully bindable now; only the 4 bbox-snapshot keys (bminX..) stay vestigial/ignored.)
-export const DRILL_BINDINGS = [
+const DRILL_EXEC_BINDINGS = [
     { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: DRILL_DEFAULTS.wcs },
     // placement scalars (block 2, placeonstock) — now correct because the bbox tracks the pattern live (array.extent)
     { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: DRILL_DEFAULTS.stockAttach },
@@ -92,10 +92,28 @@ export const DRILL_BINDINGS = [
     { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', default: DRILL_DEFAULTS.feed },
 ];
 
+const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
+export const DRILL_BINDINGS = DRILL_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
+
 export const DRILL_DATA_OPTYPE = 'user_drill_data';
 
 /** Build the drill-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. The template
  *  is drillStack(defaults) with ids stripped (userOpFromStack does both) — the canonical valid-by-construction stack. */
 export function drillDataDef() {
-    return userOpFromStack('drill_data', 'Drill (data)', drillStack(DRILL_DEFAULTS), DRILL_BINDINGS, 'form3d');
+    const exec = drillStack(DRILL_DEFAULTS);
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [
+            { type: 'panel', params: { panel: 'form3d' } },
+            { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
+            {
+                type: 'param_group',
+                params: { group: 'Drill' },
+                children: [],
+            },
+        ],
+        children: exec,
+    }];
+    return userOpFromStack('drill_data', 'Drill (data)', stack, DRILL_BINDINGS, 'form3d', null, 'mill_datawiz');
 }

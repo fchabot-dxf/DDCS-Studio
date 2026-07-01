@@ -32,17 +32,64 @@ export const SLOT_DEFAULTS = {
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
 };
 
+const WCS_OPTIONS = [
+    ['Active', 'active'],
+    ['G54', 'G54'],
+    ['G55', 'G55'],
+    ['G56', 'G56'],
+    ['G57', 'G57'],
+    ['G58', 'G58'],
+    ['G59', 'G59'],
+];
+
+const XY_DATUM_OPTIONS = [
+    ['Follow stock datum', ''],
+    ['Front Left', 'nn'],
+    ['Front Center', 'cn'],
+    ['Front Right', 'pn'],
+    ['Center Left', 'nc'],
+    ['Center', 'cc'],
+    ['Center Right', 'pc'],
+    ['Back Left', 'np'],
+    ['Back Center', 'cp'],
+    ['Back Right', 'pp'],
+];
+
+const STOCK_DATUM_OPTIONS = [
+    ['Front Left / Top', 'nnp'],
+    ['Front Center / Top', 'cnp'],
+    ['Front Right / Top', 'pnp'],
+    ['Center Left / Top', 'ncp'],
+    ['Center / Top', 'ccp'],
+    ['Center Right / Top', 'pcp'],
+    ['Back Left / Top', 'npp'],
+    ['Back Center / Top', 'cpp'],
+    ['Back Right / Top', 'ppp'],
+];
+
 // Pre-order flatten of the bare-leaf single-slot template [progstart, wcs, placeonstock{ slot }, progend]:
 //   0 progstart · 1 wcs · 2 placeonstock · 3 slot · 4 progend
 // (No intermediate container — the slot leaf does its own depth passes internally — so it sits at index 3, not 4.)
-export const SLOT_BINDINGS = [
-    { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: SLOT_DEFAULTS.wcs },
+const SLOT_EXEC_BINDINGS = [
+    {
+        param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: SLOT_DEFAULTS.wcs,
+        widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS },
+    },
     // placement scalars (block 2, placeonstock) — opt-in: originX/originY are the raw offset; stock-attach uses the live extent
     { param: 'originX', blockIndex: 2, key: 'offX', type: 'number', default: SLOT_DEFAULTS.originX },
     { param: 'originY', blockIndex: 2, key: 'offY', type: 'number', default: SLOT_DEFAULTS.originY },
-    { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: SLOT_DEFAULTS.stockAttach },
-    { param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: SLOT_DEFAULTS.pathDatum },
-    { param: 'stockDatum', blockIndex: 2, key: 'stockDatum', type: 'enum', default: SLOT_DEFAULTS.stockDatum },
+    {
+        param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: SLOT_DEFAULTS.stockAttach,
+        widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS },
+    },
+    {
+        param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: SLOT_DEFAULTS.pathDatum,
+        widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS },
+    },
+    {
+        param: 'stockDatum', blockIndex: 2, key: 'stockDatum', type: 'enum', default: SLOT_DEFAULTS.stockDatum,
+        widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS },
+    },
     { param: 'stockW', blockIndex: 2, key: 'stockW', type: 'number', default: SLOT_DEFAULTS.stockW },
     { param: 'stockH', blockIndex: 2, key: 'stockH', type: 'number', default: SLOT_DEFAULTS.stockH },
     { param: 'stockZ', blockIndex: 2, key: 'stockZ', type: 'number', default: SLOT_DEFAULTS.stockZ },
@@ -61,9 +108,28 @@ export const SLOT_BINDINGS = [
     { param: 'plunge', blockIndex: 3, key: 'plunge', type: 'number', default: SLOT_DEFAULTS.plunge },
 ];
 
+// Wrapped-template indexes (user_root + param_group precede execution children).
+const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
+export const SLOT_BINDINGS = SLOT_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
+
 export const SLOT_DATA_OPTYPE = 'user_slot_data';
 
 /** Build the slot-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. */
 export function slotDataDef() {
-    return userOpFromStack('slot_data', 'Slot (data)', slotStack(SLOT_DEFAULTS), SLOT_BINDINGS, 'form2d');
+    const exec = slotStack(SLOT_DEFAULTS);
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [
+            { type: 'panel', params: { panel: 'form2d' } },
+            { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
+            {
+                type: 'param_group',
+                params: { group: 'Slot' },
+                children: [],
+            },
+        ],
+        children: exec,
+    }];
+    return userOpFromStack('slot_data', 'Slot (data)', stack, SLOT_BINDINGS, 'form2d', null, 'mill_datawiz');
 }

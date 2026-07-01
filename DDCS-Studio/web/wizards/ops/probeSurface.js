@@ -52,3 +52,48 @@ export function probeSurfaceStack(p = {}) {
     // op stack's radiuscomp result), not an editor marker. Marker emit removed; opSchema's `probe-surface` entry kept for inc2.
     return S;
 }
+
+/**
+ * safeTraverseStack — a shared traverse block for moving between probe passes (in-axis or trans-axis).
+ * Handles the standard sequence: [optional lift] → move → [optional drop]
+ *
+ * @param p.mode - 'in-axis' (1D jump), 'center' (2D dynamic re-center), or 'seq' (2D fixed dog-leg/diagonal)
+ * @param p.axis, p.second - primary and secondary axes ('X' or 'Y')
+ * @param p.lift, p.drop - variables/expressions for Z lift and drop (e.g. '#18', '[0-#18]')
+ * @param p.comment - comment to emit before the traverse
+ *
+ * Mode 'in-axis' params: p.move (e.g. '#19')
+ * Mode 'center' params: p.dir1Plus, p.dir2Plus, p.diagPrimary ('#22'), p.diagTravel ('#21'), p.wall2Var ('#52'), p.radiusVar ('#6'), p.lastRetract
+ * Mode 'seq' params: p.crossX, p.crossY (e.g. '#23', '#24')
+ */
+export function safeTraverseStack(p = {}) {
+    const S = [];
+    const push = (type, params) => { const b = newBlock(type); b.params = { ...params }; S.push(b); };
+    const axis = p.axis || 'X';
+    const second = p.second || 'Y';
+    const alc = axis.toLowerCase(), slc = second.toLowerCase();
+
+    if (p.mode === 'center') {
+        const lastRetract = p.lastRetract || (p.dir1Plus ? '#10' : '#9');
+        push('assign', { var: '#22', value: String(p.diagPrimary), note: `Diag primary: the diagonal ${axis} target — #53 (re-centre, measured NOW) at rest, or ②.${axis} when the ② marker is placed` });
+        const pmove = `[#22-${p.wall2Var}-${lastRetract}${p.dir1Plus ? '-'+p.radiusVar : '+'+p.radiusVar}]`;
+        const smove = p.dir2Plus ? `[0-${p.diagTravel}]` : String(p.diagTravel); // travelOpp logic
+        if (p.lift) push('move', { mode: 'rapid', z: p.lift });
+        push('move', { mode: 'rapid', [alc]: pmove, [slc]: smove });
+        if (p.drop) push('move', { mode: 'rapid', z: p.drop });
+        if (p.comment) push('comment', { text: p.comment });
+        push('distmode', { dist: 'inc' });
+    } else if (p.mode === 'seq') {
+        if (p.comment) push('comment', { text: p.comment });
+        if (p.lift) push('move', { mode: 'rapid', z: p.lift });
+        push('move', { mode: 'rapid', x: String(p.crossX), y: String(p.crossY) });
+        if (p.drop) push('move', { mode: 'rapid', z: p.drop });
+    } else if (p.mode === 'in-axis') {
+        if (p.lift) push('move', { mode: 'rapid', z: p.lift });
+        push('move', { mode: 'rapid', [alc]: String(p.move) });
+        if (p.drop) push('move', { mode: 'rapid', z: p.drop });
+        if (p.comment) push('comment', { text: p.comment });
+        push('distmode', { dist: 'inc' });
+    }
+    return S;
+}

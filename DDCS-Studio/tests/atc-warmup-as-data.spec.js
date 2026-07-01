@@ -52,9 +52,17 @@ test('atc-warmup-as-data: BYTE-IDENTICAL to atcWarmupStack across a param sweep 
 
     // BINDING WIRING — every binding routes its param to the SAME socket atcWarmupStack uses (structural, no emit).
     const wiringFails = [];
+    const REF_BINDINGS = [
+      { param: 'rpm1', blockIndex: 8, key: 'rpm' },
+      { param: 'time1', blockIndex: 9, key: 'sec' },
+      { param: 'rpm2', blockIndex: 12, key: 'rpm' },
+      { param: 'time2', blockIndex: 13, key: 'sec' },
+    ];
+    const refOf = (param) => REF_BINDINGS.find((x) => x.param === param);
     for (const b of ATC_WARMUP_BINDINGS) {
+      const r = refOf(b.param);
       const dataSock = (flattenBlocks(dataBuilder(S({ [b.param]: 4242 })))[b.blockIndex] || {}).params || {};
-      const refSock = (flattenBlocks(atcWarmupStack(S({ [b.param]: 4242 })))[b.blockIndex] || {}).params || {};
+      const refSock = (flattenBlocks(atcWarmupStack(S({ [b.param]: 4242 })))[(r ? r.blockIndex : b.blockIndex)] || {}).params || {};
       if (dataSock[b.key] !== 4242 || refSock[b.key] !== 4242) wiringFails.push({ param: b.param, blockIndex: b.blockIndex, key: b.key, data: dataSock[b.key], ref: refSock[b.key] });
     }
 

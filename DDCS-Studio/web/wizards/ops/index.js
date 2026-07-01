@@ -28,6 +28,7 @@ import { stepdownBlock } from './stepdown.js';
 import { placeOnStockBlock } from './placeOnStock.js';
 import { rotateBlock } from './rotate.js';
 import { probeBlock } from './probe.js';
+import { userRootBlock, paramGroupBlock } from './userRoot.js';
 import { arrayBlock, patternPoints } from './array.js';
 import { helixBlock, helixPoints } from './helix.js';
 import { countBlock } from './count.js';
@@ -45,6 +46,7 @@ import { wcsBlock } from './wcs.js';
 import { distModeBlock } from './distmode.js';
 import { commentBlock } from './comment.js';
 import { panelBlock } from './panel.js';
+import { layoutBlock } from './layout.js';
 import { simBlock } from './sim.js';
 import { simStartBlock } from './simStart.js';
 import { variableBlock } from './variable.js';
@@ -80,7 +82,7 @@ export const PALETTE = [
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     mcodeBlock, rawBlock, outPinBlock, waitInputBlock,         // Signals (raw M-code/G-code escape + digital I/O M62-66)
-    paramBlock, regionPickBlock, coordListBlock, panelBlock, simBlock, simStartBlock,   // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig + per-pass sim-start declarations)
+    paramBlock, regionPickBlock, coordListBlock, panelBlock, layoutBlock, simBlock, simStartBlock, userRootBlock, paramGroupBlock, // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig + per-pass sim-start declarations)
     commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
 ];
 

@@ -63,11 +63,12 @@ test('surfacing-as-data: byte-identical G-code to surfacingStack across a param 
     // emit). The `strategy` socket MAPS its input ('concentric'→concentric, else→parallel), so its sentinel must be a
     // VALID alternate value ('concentric' ≠ the 'parallel' default); pass-through enums/numbers use the generic sentinels.
     const sentinelFor = (b) => (b.type === 'number' ? 4242 : (b.param === 'strategy' ? 'concentric' : '__SENTINEL__'));
+    const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
     const wiringFails = [];
     for (const b of SURFACING_BINDINGS) {
       const sent = sentinelFor(b);
       const dataSock = (flattenBlocks(dataBuilder(S({ [b.param]: sent })))[b.blockIndex] || {}).params || {};
-      const refSock = (flattenBlocks(surfacingStack(S({ [b.param]: sent })))[b.blockIndex] || {}).params || {};
+      const refSock = (flattenBlocks(surfacingStack(S({ [b.param]: sent })))[b.blockIndex - WRAP_PREFIX_COUNT] || {}).params || {};
       const dataOk = dataSock[b.key] === sent;   // the binding wrote the sentinel where it claims
       const refOk = refSock[b.key] === sent;     // surfacingStack ALSO routes b.param to that exact socket
       if (!dataOk || !refOk) wiringFails.push({ param: b.param, blockIndex: b.blockIndex, key: b.key, dataOk, refOk });

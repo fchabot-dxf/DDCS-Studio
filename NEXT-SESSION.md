@@ -44,7 +44,14 @@ declare-never-infer · valid-by-construction. `WIZARD-PORTING-MAP.md` is the ref
 
 ---
 
-## 📌 QUEUED — CORNER-PORT inc B: the corner port itself (fires after inc A lands + is reviewed)
+## ⚡ AUTONOMOUS (human t178) — automate the FULL corner port, all THREE dimensions
+Run **inc A → inc B → a final VERIFY** as a finite autonomous loop — NO per-increment human check-in. The FULL port must deliver:
+**EMIT** (the `cornerData` op emits correct G-code) · **SIM** (`opSimStarts.corner()` markers render, no NaN, multi-handle starts) ·
+**LAYOUT** (the FeatureCanvas layout panel + the form panel render via `registerUserOp → def.panel/def.layout → userOpView`). The
+advisor fresh-eyes-reviews each increment (fan verifiers, the audit's rigor) and dispatches the next. SURFACE to the human ONLY for:
+a genuine design fork · a regression the advisor can't verify · a worker stall. Otherwise run to a working, verified corner port.
+
+## 📌 CORNER-PORT inc B: the corner port itself — EMIT + SIM + LAYOUT (fires after inc A lands + is reviewed)
 - LIFT the audit-SOUND corner UI: `cornerWizard.js` cornerStack refactor (#21–#24 cross-traverse via shared `safeTraverseStack`,
   enum-normalizing param maps, `inferStarts`) · `cornerView.js` FeatureCanvas port (drag handles, `tieCornerTravel`, `getPassStarts`) ·
   `index.html` corner panel · the schema/FIELD_BIND rename (`travelDist`→`startX/startY/cross1_x/cross1_y`, internally consistent).
@@ -57,6 +64,15 @@ declare-never-infer · valid-by-construction. `WIZARD-PORTING-MAP.md` is the ref
 - ⭐ **ADD an EMIT-CORRECTNESS test** — `corner-data-layout.spec` only checks a field-rewrite, NEVER that the emitted G-code is
   correct (that is WHY the break shipped). Assert the corner data-port emits the SAME G-code as the built-in `cornerWizard`
   (byte/value-identical via `stripAnnotations`) → verify-real-symptom. DISCARD `_diag-endoffset.spec.js` (asserts nothing).
+
+## 📌 CORNER-PORT inc C: VERIFY the full port (all 3 dimensions) — the autonomous close-out
+- **EMIT:** `registerUserOp(cornerData())` does NOT throw; the corner data-op emits **byte/value-identical** G-code to the built-in
+  `cornerWizard` across a param sweep (incl. the `probeZFirst` toggle that broke the hand-counted bindings) — `stripAnnotations`.
+- **SIM:** a placed corner op renders its start markers (NO NaN coords) — `opSimStarts.corner()` via the real preview; multi-handle
+  drag + Wall-2 travel-tie populate (defect #3 gone).
+- **LAYOUT:** the corner op renders its **FeatureCanvas layout** + **form panel** through the generic `userOpView`
+  (`registerUserOp → def.panel/def.layout → renderDeclaredLayout`), matching the built-in corner wizard's panel.
+- Full suite green. This closes the FIRST full wizard-as-data port (emit + sim + layout) end-to-end. Release when verified. Commit + WORK-LOG + pass.
 
 ---
 

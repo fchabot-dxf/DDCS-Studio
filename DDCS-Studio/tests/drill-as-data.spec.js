@@ -75,11 +75,12 @@ test('drill-as-data: the data def emits byte-identical G-code to drillStack acro
     // assert BOTH the data def's instantiate AND drillStack land that sentinel in the binding's (blockIndex,key)
     // socket. A mis-keyed binding fails refOk (drillStack routes the param elsewhere) or dataOk (the binding wrote elsewhere).
     const sentinelFor = (t) => (t === 'number' ? 4242 : '__SENTINEL__');   // never a drill default
+    const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
     const wiringFails = [];
     for (const b of DRILL_BINDINGS) {
       const sent = sentinelFor(b.type);
       const dataSock = (flattenBlocks(dataBuilder(S({ [b.param]: sent })))[b.blockIndex] || {}).params || {};
-      const refSock = (flattenBlocks(drillStack(S({ [b.param]: sent })))[b.blockIndex] || {}).params || {};
+      const refSock = (flattenBlocks(drillStack(S({ [b.param]: sent })))[b.blockIndex - WRAP_PREFIX_COUNT] || {}).params || {};
       const dataOk = dataSock[b.key] === sent;   // the binding wrote the sentinel where it claims
       const refOk = refSock[b.key] === sent;     // drillStack ALSO routes b.param to that exact socket
       if (!dataOk || !refOk) wiringFails.push({ param: b.param, blockIndex: b.blockIndex, key: b.key, dataOk, refOk });
