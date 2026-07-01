@@ -56,6 +56,11 @@ export function middleStack(params = {}) {
     // distance and overshot FAR off-stock when max-probe >> the feature. EDITABLE (the human tunes it so the 2nd-axis
     // probe reaches ②); the direction is verified-correct for all dir1/dir2 — only this magnitude was wrong. #21.
     const diagTravel = (params.diagTravel === '' || params.diagTravel == null) ? '50' : String(params.diagTravel);
+    // B-TRANS fix (b): the diagonal's PRIMARY target — a #21-PEER for the primary axis. Default '#53' = re-centre to the
+    // MEASURED centre (value-identical at rest); when the ② marker is placed it becomes ②'s primary coord (drag-derived,
+    // like #21 derives the secondary) so the diagonal runs END-OF-X-PROBE → ②'s FULL position. Avoids the (separate-bug)
+    // degenerate sim #53 on drag because #52 cancels: pmove = [#22-#52-rv±#6], tool at #52+rv+#6 → lands at #22.
+    const diagPrimary = (params.diagPrimary === '' || params.diagPrimary == null) ? '#53' : String(params.diagPrimary);
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
     const radius = num(params.radius, 2);   // stylus tip radius (#6) — for the DIAMETER (∓2r) + Z-surface (−r) comp; the CENTRE (bisect) needs none
 
@@ -116,7 +121,11 @@ export function middleStack(params = {}) {
         // The tool sits at the wall-2 RAW contact + the last retract, but #52 is now the RADIUS-COMPED wall (the block comps it),
         // so add the comp back to recover the tool's true position: raw = #52 + (dir1Plus ? +#6 : −#6). Keeps the re-centre EXACT
         // (path value-identical) despite the comp moving into the walls.
-        const pmove = inAxis === 'auto' ? `[#53-#52-${lastRetract}${dir1Plus ? '-#6' : '+#6'}]` : travelOwn(dir1Plus, '#21', '[0-#21]');
+        // B-TRANS fix (b): UNIFORM primary move (auto + manual) → the diagonal targets ②'s primary coord (#22). Replaces
+        // auto's [#53-…] re-centre (now #22, which DEFAULTS to #53 so at-rest is value-identical) AND manual's wrong-sign
+        // ±#21 (the "runs away" bug). #52 cancels: tool sits at #52+rv+#6, move [#22-#52-rv±#6] lands at #22 = ②.X.
+        A('#22', diagPrimary, 'Diag primary: the diagonal X target — #53 (re-centre, measured NOW) at rest, or ②.X when the ② marker is placed');
+        const pmove = `[#22-#52-${lastRetract}${dir1Plus ? '-#6' : '+#6'}]`;
         const smove = travelOpp(dir2Plus, '#21', '[0-#21]');  // secondary axis: out toward ② (opposite its first probe dir)
         MV('Z', '#18');                                  // lift clear of the boss
         MOVE({ [axis.toLowerCase()]: pmove, [second.toLowerCase()]: smove });   // re-centre the primary + travel out to ②
@@ -157,6 +166,8 @@ export function middleStack(params = {}) {
     if (featureType === 'boss' && transAxis === 'auto' && twoAxis) {
         A('#21', diagTravel, 'Diag travel: X→Y trans-axis auto-traverse distance (default 50; tune so the 2nd-axis probe reaches ②)');
     }
+    // NOTE: #22 (the diagonal's X target) is assigned INSIDE transTraverse — AFTER the primary seq measures #53 — because at
+    // rest diagPrimary='#53' and #53 is only known post-probe (assigning it here would capture #53's initial 0).
     if (wcs === 'active') { A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'); A('#72', '[#71-1]', 'Zero-based index'); A('#70', '[805+[#72*5]]', 'Base WCS address'); }
     else A('#70', WCS_BASE[wcs]);
     A('#1505', '1', probeZ ? 'Hover OVER the stock top (Z datum first). Press Enter - ESC=cancel' : 'Press Enter to probe - ESC=cancel'); IF('#1505', '==', '0', 2); DM('inc');

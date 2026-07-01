@@ -382,6 +382,8 @@
                     <div id="m_diag_block" class="hidden">
                         <span class="label">DIAG TRAVEL</span>
                         <input id="m_diag_travel" value="50" readonly title="Diag travel (#21) — DERIVED from the ② start marker (drag ② on the canvas); NOT directly editable. Default 50. The boss probe-both auto-trans diagonal ends ON ②."/>
+                        <!-- B-TRANS fix (b): the diagonal's PRIMARY (X) target #22 — '#53' (re-centre) at rest, ②.X when the ② marker is placed (tieDiagTravel writes it). A readonly store like #21. -->
+                        <input id="m_diag_primary" value="#53" readonly style="display:none" title="Diag primary (#22) — the diagonal's X target: #53 (re-centre) at rest, ②.X when the ② marker is placed. Drag-derived, not editable."/>
                     </div>
                 </div>
 

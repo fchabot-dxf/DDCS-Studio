@@ -23,9 +23,14 @@ function tieDiagTravel(pass, world) {
     const primaryX = (el('m_axis')?.value || 'X') !== 'Y';           // primary X → secondary Y (and vice-versa)
     const centreSec = primaryX ? num(stock.y, 80) / 2 : num(stock.x, 100) / 2;
     const draggedSec = primaryX ? world.y : world.x;
-    const d21 = Math.max(1, Math.round(Math.abs(draggedSec - centreSec)));
-    const f = el('m_diag_travel');
-    if (f && f.value !== String(d21)) { f.value = String(d21); f.dispatchEvent(new Event('input', { bubbles: true })); }   // the field follows ② → re-generate the macro
+    const draggedPrim = primaryX ? world.x : world.y;                 // ②'s PRIMARY-axis coord = the diagonal's X target (#22)
+    const d21 = Math.max(1, Math.round(Math.abs(draggedSec - centreSec)));   // #21 = the secondary out-distance (Y)
+    const d22 = Math.round(draggedPrim);                              // B-TRANS (b): #22 = ②'s primary coord (the diagonal targets ②'s FULL position)
+    const f = el('m_diag_travel'), fp = el('m_diag_primary');
+    let changed = false;
+    if (f && f.value !== String(d21)) { f.value = String(d21); changed = true; }
+    if (fp && fp.value !== String(d22)) { fp.value = String(d22); changed = true; }   // ② drives BOTH #21 (Y) and #22 (X) — the diagonal joins ②
+    if (changed && f) f.dispatchEvent(new Event('input', { bubbles: true }));   // ONE re-generate (update() reads both fields)
 }
 
 /** The ②-AIM feature-canvas spec: the per-pass start markers ①②③④ as DRAGGABLE POINT handles. Unlike Edge's vector (which
@@ -115,6 +120,7 @@ export const middleView = {
             crossX: el('m_crossX')?.value,   // boss-auto per-axis cross-over (string: a number or the [#1+#2] expression default)
             crossY: el('m_crossY')?.value,
             diagTravel: el('m_diag_travel')?.value,   // boss probe-both auto trans-axis: the diagonal traverse distance (#21)
+            diagPrimary: el('m_diag_primary')?.value,   // B-TRANS (b): the diagonal's X target (#22) — '#53' at rest, ②.X when placed
             axis: el('m_axis')?.value || 'X',
             dir1: dir1val,
             dir2: dir2val,

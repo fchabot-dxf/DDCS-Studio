@@ -18,13 +18,13 @@ test('macro: boss auto trans-axis emits the diagonal traverse (#21); manual jogs
     const stock = { x: 100, y: 80, z: 20 };
     return {
       autoHas21: /#21\s*=/.test(auto),
-      // the PRIMARY (X here) leg re-centres to the measured centre #53 (heads to ② regardless of axis order); the
+      // B-TRANS (b): the PRIMARY (X) leg targets ②'s primary coord via #22 (= #53 re-centre at rest, ②.X when placed); the
       // SECONDARY (Y) leg travels out by the Diag-travel #21. (dir2=neg → +#21 = Y#21.)
-      autoHasTransMove: /G0 X\[#53-#52-#10-#6\] Y#21/.test(auto),   // t131: −#6 recovers the tool's raw position (#52 now comped)
+      autoHasTransMove: /G0 X\[#22-#52-#10-#6\] Y#21/.test(auto),   // #22 = the diagonal X target; −#6 recovers the tool's raw position (#52 comped)
       autoHasAutoTraverse: /auto-traverse to the perpendicular/.test(auto),
       // the diagonal move must come BEFORE the REPOSITION (the connecting travel of the PRIOR pass) — else the trace
       // anchors it to ② and pushes the 2nd probe AWAY (the bug the human caught). So the Y pass starts cleanly at ②.
-      moveBeforeReposition: auto.indexOf('G0 X[#53-#52-#10-#6] Y#21') < auto.indexOf('auto-traverse to the perpendicular'),
+      moveBeforeReposition: auto.indexOf('G0 X[#22-#52-#10-#6] Y#21') < auto.indexOf('auto-traverse to the perpendicular'),
       manualHas21: /#21/.test(manual),
       manualHasJogPerp: /jog clear, around to the perpendicular/.test(manual),
       legacyAutoMatches: w.generate({ ...base, approach: 'auto' }) === auto,
@@ -34,7 +34,7 @@ test('macro: boss auto trans-axis emits the diagonal traverse (#21); manual jogs
     };
   });
   expect(r.autoHas21, 'auto trans-axis assigns the Diag travel #21').toBe(true);
-  expect(r.autoHasTransMove, 'auto trans-axis re-centres the primary (#53) + travels out by #21 (the fix)').toBe(true);
+  expect(r.autoHasTransMove, 'auto trans-axis targets ②’s primary via #22 (=#53 at rest) + travels out by #21 (B-TRANS fix b)').toBe(true);
   expect(r.autoHasAutoTraverse, 'auto trans-axis is hands-free, not an operator jog').toBe(true);
   expect(r.moveBeforeReposition, 'the diagonal move is the connecting travel BEFORE the REPOSITION (so the Y pass anchors at ②)').toBe(true);
   expect(r.manualHas21, 'manual has no Diag travel').toBe(false);
@@ -69,10 +69,10 @@ test('the trans diagonal re-centres the PRIMARY axis to ② for BOTH axis orders
     };
     return {
       xFirst: primErr('X'), yFirst: primErr('Y'),
-      reCentreMove: /G0 X\[#53-#52-#10-#6\] Y/.test(w.generate({ featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'pos', dist: 100, inAxis: 'auto', transAxis: 'auto' })),
+      reCentreMove: /G0 X\[#22-#52-#10-#6\] Y/.test(w.generate({ featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'pos', dist: 100, inAxis: 'auto', transAxis: 'auto' })),
     };
   });
-  expect(r.reCentreMove, 'the primary leg is the re-centre expression #53-#52-#10, not a fixed travel').toBe(true);
+  expect(r.reCentreMove, 'the primary leg targets #22 (=#53 re-centre at rest, ②.X when placed), not a fixed travel').toBe(true);
   expect(r.xFirst, 'X-first: primary re-centres onto ② (was sent the wrong way)').toBeLessThan(2);
   expect(r.yFirst, 'Y-first: primary re-centres onto ② (matches the working order)').toBeLessThan(2);
 });

@@ -3307,3 +3307,31 @@ resolution** issue (#53 degenerate because the sim can't measure the centre).
 
 GATE: pick (a constrained-② / measured re-centre) vs (b ②.X-derived pmove), and confirm the MANUAL sign+start is a separate
 emit fix. NO code until blessed.
+
+---
+
+## 🔨 turn 177 — B-TRANS FIX (b): the diagonal's PRIMARY derives from the marker (#22) — AUTO fixed, manual sign fixed
+
+Human picked (b) + wanted manual's sign in this batch. Built the #21-PEER for the primary: **#22** = the diagonal's X target.
+- **middleWizard.js:** UNIFORM `pmove = [#22-#52-${lastRetract}±#6]` (replaces auto's `[#53-#52…]` re-centre AND manual's
+  wrong-sign `±#21` — the "runs away" bug). #22 defaults to `'#53'` (re-centre) and becomes ②.X when the marker is placed.
+  The **#52 cancels** (tool sits at #52+rv+#6, moves [#22-#52-rv±#6] → lands at #22) so it AVOIDS the degenerate sim #53. The
+  #22 assign lives INSIDE `transTraverse` (after the primary seq measures #53) — a bug I caught: assigning it earlier captured
+  #53's pre-probe 0.
+- **middleView.js:** `tieDiagTravel` now writes BOTH #21 (②.Y offset) and #22 (②.X) from the drag; `update()` reads both.
+- **round-trip:** `diagPrimary` added to opSchema (schema + FIELD_BIND) + opSession reverse-sync (#22 → m_diag_primary); a
+  hidden readonly `m_diag_primary` store (like inc2a's #21).
+
+**VERIFIED (instrumented + human-eyes):** AUTO drag ② → the diagonal END = **(74, 119) ≈ ② (73.8, 118.7)** — it JOINS ②, both
+axes (was ~45°, degenerate X). At rest (#22=#53 measured) the re-centre is restored → `middle-aim-tie` GREEN. The 2 trans-
+traverse tests updated for the new emit text (`#53-#52` → `#22-#52`); DDCS-valid (`#22=#53`, bracket expr).
+
+**⚠ MANUAL — sign fixed, off-stock NOT fixed (out of scope):** the uniform pmove makes the manual diagonal TARGET ②.X (the
+wrong-sign "runs away" is gone). BUT the render shows the manual secondary probe still starting **off-stock (X≈-120)** — that's
+the manual PROBES NOT STOPPING in the sim (accumulating off-stock), i.e. the **probe-calc degeneracy**, the SAME class as the
+#53 sim bug the dispatch DEFERRED as the next fix. So the manual off-stock is DOWNSTREAM of that separate bug, not the diagonal.
+The dispatch called it "the -211 anchoring" (in scope) but the render (correct anchoring) shows it's the probe-calc — FLAG for
+the advisor: the manual off-stock needs the probe-calc/#53 fix, not more diagonal work.
+
+**Full suite:** launched but the box is EXTREMELY loaded (a single spec > 3 min; ~30+ min for the suite) — committing on the
+verified middle area (the changes are middle-scoped + the round-trip); RE-RUN the full suite to confirm no broad regression.
