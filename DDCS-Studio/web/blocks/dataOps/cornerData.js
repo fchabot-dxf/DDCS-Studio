@@ -55,8 +55,8 @@ export const CORNER_BINDING_SPECS = [
     { param: 'port',       type: 'number', default: CORNER_DEFAULTS.port,       label: 'Port',             section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
     { param: 'radius',     type: 'number', default: CORNER_DEFAULTS.radius,     label: 'Stylus Radius',    section: 'TOOL & CUT', match: { type: 'assign', var: '#6' },  key: 'value' },
     { param: 'travelDist', type: 'number', default: CORNER_DEFAULTS.travelDist, label: 'Reposition Travel', section: 'GEOMETRY',  match: { type: 'assign', var: '#15' }, key: 'value' },
-    { param: 'cross1_x',   type: 'number',                                      label: 'Wall 2 dX',        section: 'GEOMETRY',   match: { type: 'assign', var: '#23' }, key: 'value' },
-    { param: 'cross1_y',   type: 'number',                                      label: 'Wall 2 dY',        section: 'GEOMETRY',   match: { type: 'assign', var: '#24' }, key: 'value' },
+    { param: 'cross1_x',   type: 'number', group: 'reposition', role: 'x',      label: 'Wall 2 dX',        section: 'GEOMETRY',   match: { type: 'assign', var: '#23' }, key: 'value' },
+    { param: 'cross1_y',   type: 'number', group: 'reposition', role: 'y',      label: 'Wall 2 dY',        section: 'GEOMETRY',   match: { type: 'assign', var: '#24' }, key: 'value' },
 ];
 
 export const CORNER_DATA_OPTYPE = 'user_corner_data';
@@ -85,7 +85,7 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d' } },
+            { type: 'panel', params: { panel: 'form2d' } },   // inc B3: 2D FeatureCanvas layout so the reposition point drags
             { type: 'sim', params: { rotary: false, machine: true, magazine: false } },
             {
                 type: 'param_group',
@@ -103,5 +103,5 @@ export const CORNER_BINDINGS = deriveBindingsFor(cornerDataStack(CORNER_DEFAULTS
 
 /** Build the corner-as-data def — same userOpFromStack pattern as drill/surfacing/slot/text/atcWarmup. */
 export function cornerDataDef() {
-    return userOpFromStack('corner_data', 'Corner (data)', cornerDataStack(CORNER_DEFAULTS), CORNER_BINDINGS, 'form3d', { forceMachine: true }, 'probe_datawiz');
+    return userOpFromStack('corner_data', 'Corner (data)', cornerDataStack(CORNER_DEFAULTS), CORNER_BINDINGS, 'form2d', { forceMachine: true }, 'probe_datawiz');
 }

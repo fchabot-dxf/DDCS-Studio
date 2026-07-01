@@ -60,6 +60,8 @@ export function deriveBindings(flatStack, specs) {
         const out = { param: s.param, type: s.type, default: dflt, key: s.key, blockIndex };
         if (s.label) out.label = s.label;
         if (s.section) out.section = s.section;
+        if (s.group) out.group = s.group;   // canvas-layout grouping (layoutSpecFromOp reads b.group)
+        if (s.role) out.role = s.role;      // canvas-layout role (x/y/w/h/… — the draggable handle it drives)
         return out;
     });
 }

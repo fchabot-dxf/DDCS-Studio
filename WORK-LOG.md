@@ -3655,3 +3655,48 @@ stock; + editor real-render = 2 markers, no NaN); **corner-data-emit 2/2** (emit
 pre-existing.) A clean run, no flakes. inc B2b = COMPLETE + VERIFIED: the corner preview markers now index 1:1 with the engine's
 probe passes (2 for the baked no-Z default), the reposition-waypoint marker is gone, and no start marker sits inside the stock —
 proven by a pass-alignment test that runs the real engine (the check my B2 test lacked).
+
+---
+
+## 🔨 turn 13 (cycle 1) — CORNER-PORT inc B3: LAYOUT + DRAG (advisor turn 12, human "b3")
+
+Dispatched to render "Corner (data)"'s 2D FeatureCanvas layout via the generic `userOpView` path and wire the reposition DRAG
+(a drag writes a datum-relative literal into the reposition socket, overriding the default expression). Ran a 3-agent scout.
+
+**Scout verdict = PURE GENERIC, NO GATE (both decisive).**
+- **cornerView port:** do NOT lift `cornerView.js` and do NOT add an index.html corner panel. The render/drag/writeback chain is
+  ALREADY generic + wired: `userOpView.update()` → `renderLayout2D` → `layoutSpecFromOp` (binding ROLES → canvas decls) →
+  `buildCanvasWidgets` → `_writeParam` (writes the `data-param` field + a bubbling `input`) → the delegated `#wiz_user_form` `input`
+  listener → `mgr.update()` → re-emit; `instantiate` makes a param literal WIN over the socket's expression default. The premise
+  "like the 5 siblings" was misleading — NO sibling declares layout roles (slot/text `form2d` render an EMPTY stock rect). So B3 is
+  genuinely new but TINY: the reposition is a generic `point` role (`cross1_x`/`cross1_y`); `cornerView`'s
+  `getPassStarts`/`tieCornerTravel`/absolute-handle machinery only matters once the datum is a reachable `#var` (follow-up).
+- **datum GATE: NONE.** A plain literal offset is sufficient. The datum `#var` is only needed for the `[<datum>+<off>]`
+  datum-relative FORM (the B1b follow-up) — the drag never READS or ADDS to the datum, it writes a wholesale literal into an
+  expression-holding socket. INTERIM = drag relative to the default geometry, exactly as the dispatch sanctions.
+
+**Built (LAYOUT+DRAG; no emit-structure change):**
+- **`cornerData.js`:** flipped the panel `form3d → form2d` (the `panel` uiChild + the `userOpFromStack` arg) so `userOpView` renders
+  the 2D layout; tagged the two cross bindings `cross1_x → {group:'reposition', role:'x'}`, `cross1_y → {…, role:'y'}` → a generic
+  `point` handle. A drag writes LITERALS into `#23/#24`, overriding the `#15/#16` expression via `instantiate` — the LOCKED-MODEL
+  "expression-holding socket, overridable by a bound literal" payoff.
+- **`deriveBindings.js`:** the derive helper now carries `group`/`role` through to the binding (it previously dropped extra spec
+  fields), so the derived corner bindings reach `layoutSpecFromOp`.
+- **`tests/corner-data-drag.spec.js` (NEW):** verify-real-symptom — opens the REAL Corner (data) in the real `#wiz_user` form2d
+  panel via `openWiz`, confirms `cross1_x/cross1_y` render as writable fields, asserts the PRE-drag emit holds the `#15/#16`
+  expression, does a REAL `page.mouse` drag on the `.fc-handle-move`, then asserts the EMITTED reposition `#23` flipped to a numeric
+  literal and the `#15/#16` expression is GONE. Mirrors `custom-op-form2d-drag.spec` but asserts the real EMIT, not just a field.
+
+**Caveat (cosmetic, recorded — not a gate):** with the cross params unset, the point handle renders at world `(0,0)` (the layout
+reads `num(params.cross1_x)` and `num('#16')=0`), not at the true wall-2 location; cured the instant the user drags. Drawing the
+handle at the absolute wall position needs the datum `#var` (the stock-datum follow-up).
+
+**VERIFIED:** `node --check` clean. **corner-data-drag PASS** (a REAL drag → the emitted reposition takes a literal, the expression
+is gone); **corner-data-emit 2/2** + **corner-data-sim-starts 2/2** (the panel flip did not regress emit or the sim markers).
+SCOPE: LAYOUT+DRAG only — NOT auto/manual, NOT probeZFirst (B4).
+
+**Full suite: GREEN — 452 passed, 3 skipped, 0 failed, 0 flaky (1.4m).** (455 total = the prior 454 + the new corner-data-drag
+spec; 3 skips = the probeZFirst `fixme` + 2 pre-existing.) A clean run. inc B3 = COMPLETE + VERIFIED: "Corner (data)" renders its
+2D FeatureCanvas layout via the generic `userOpView` path and a REAL canvas drag overrides the reposition socket with a literal —
+the payoff of the expression-holding socket. EMIT (B1/B1b) + SIM (B2/B2b) + LAYOUT+DRAG (B3) all done; remaining: B4 (probeZFirst),
+auto/manual travel, inc C (verify+release), the stock-datum follow-up.
