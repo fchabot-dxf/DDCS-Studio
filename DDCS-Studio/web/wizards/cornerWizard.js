@@ -98,8 +98,8 @@ export function cornerStack(params = {}) {
 
     // ── Calculated motions ──
     C('=== CALCULATED MOTIONS ===');
-    A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
-        A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract');
+        A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
+    A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract');
     if (td > 0) { A('#15', td, 'Positive travel'); A('#16', `[0-${td}]`, 'Negative travel'); }
     else { A('#15', 0, 'Travel not used'); A('#16', 0, 'Travel not used'); }
     A('#17', plungeDepth, 'Plunge depth = safeZ + scanDepth');
