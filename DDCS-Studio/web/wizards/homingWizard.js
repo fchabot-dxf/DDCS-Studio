@@ -30,6 +30,7 @@ import { recordOp } from '../blocks/opRecord.js';
 import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { num } from './ops/util.js';
+import { axisSpan } from '../engine/limitSwitches.js';
 
 const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
@@ -75,7 +76,11 @@ export function homingStack(params = {}) {
     const homeAxis = (ax) => {
         const c = cfg[ax] || {};
         const N = AX_IDX[ax], L = AX_LABEL[ax];
-        const method = c.method || 'native';
+        const rotary = ax === 'a' || ax === 'b';
+        // The wizard is a free-form function, so it always emits the transparent G31 (seek) for linear axes,
+        // or setzero for rotaries configured that way. The 'native' method from settings is ignored for macro generation.
+        let method = 'seek';
+        if (rotary && (c.rotary || 'setzero') === 'setzero') method = 'setzero';
 
         // Homed-flag + machine-coord are written at their RESOLVED literal address (e.g. Z=#1517, #882) to match
         // Homed-flag / machine-coord at their RESOLVED literal address (e.g. Z=#1517, #882). The native path does
@@ -95,14 +100,7 @@ export function homingStack(params = {}) {
             A(`#${1515 + s}`, '1', 'slave homed flag');
         };
 
-        if (method === 'native') {
-            // Controller built-in home — uses ITS configured switch/dir/speed AND sets the homed flag itself. The
-            // safest method (fndzero.nc). No manual #[1515+N] write here (see above).
-            C(`Home ${L} — native (controller config)`);
-            RAW(`M98P501X${N}     ( home ${L} - axis ${N} )`);
-            syncSlave();
-            return;
-        }
+
 
         if (method === 'setzero') {
             // Set the CURRENT position as machine home — no motion. (#[880+N]=0 then mark homed.)
@@ -132,8 +130,10 @@ export function homingStack(params = {}) {
             //    back to the controller's own #612 register (20000*#612-10000 → ±10000). Signs the seek distance.
             const backoff = num(c.backoff, 5);                       // back-off / release-clear distance (mm)
             const seekDist = 10000;                                  // O501: ±10000 signed seek distance
-            const tSign = Math.sign(num((params.machine || {})[ax], 0)); // signed-travel sign (0 if unknown)
-            const dir = c.dir === '+' ? 1 : c.dir === '-' ? -1 : (tSign || 0); // 0 ⇒ defer to controller #612
+            const travel = num((params.machine || {})[ax], 0);
+            const { homeSide } = axisSpan(travel);
+            const envDir = homeSide === 'min' ? -1 : 1;
+            const dir = c.dir === '+' ? 1 : c.dir === '-' ? -1 : (travel === 0 ? 0 : envDir);
             const passes = Math.max(1, Math.round(num(c.seekPasses, 2)));     // O501 multi-pass (#606); default 2
 
             C(`Home ${L} — G31 GRANULAR SEEK (transparent re-derivation of O501)`);
@@ -243,13 +243,17 @@ export function homingSimProxy(params = {}) {
     const L = [];
     L.push('( SIMULATION PROXY — homing motion model, not the emitted macro )');
     L.push('G90');
-    const homeEnd = (ax) => {
+    const homeEnd = (ax, returnSeekSign = false) => {
         const c = cfg[ax] || {};
         const t = travel[ax] || 0;
-        // Home end follows the SIGNED travel (its sign = home direction). An explicit c.dir — set by a Homing block,
-        // never the settings form — overrides; otherwise derive from the travel sign. offset shifts the landing point.
-        const end = c.dir === '+' ? Math.abs(t) : c.dir === '-' ? -Math.abs(t) : t;
-        return Math.round((end + num(c.offset, 0)) * 1000) / 1000;
+        const { homeSide, lo, hi } = axisSpan(t);
+        // Home end follows the SIGNED travel (home is at machine-0). An explicit c.dir overrides.
+        let endPos = homeSide === 'min' ? lo : hi;
+        if (c.dir === '+') endPos = hi;
+        else if (c.dir === '-') endPos = lo;
+        const seekSign = endPos === hi ? 1 : -1;
+        if (returnSeekSign) return seekSign;
+        return Math.round((endPos + num(c.offset, 0)) * 1000) / 1000;
     };
     axes.forEach((ax) => {
         const c = cfg[ax] || {};
@@ -258,7 +262,8 @@ export function homingSimProxy(params = {}) {
         const end = homeEnd(ax);
         L.push(`G53 G0 ${A}${end}     ( seek ${A} home )`);
         // back-off a touch toward centre so the homed state isn't sitting on the switch
-        const back = Math.round((end - Math.sign(end || 1) * num(c.backoff, 5)) * 1000) / 1000;
+        const seekSign = homeEnd(ax, true);
+        const back = Math.round((end - seekSign * num(c.backoff, 5)) * 1000) / 1000;
         L.push(`G53 G1 ${A}${back} F${Math.round(num(c.slowFeed, 100))}     ( back off )`);
         const s = parseInt(c.slaveFollows, 10);
         if (Number.isInteger(s)) L.push(`( slave idx ${s} follows ${A} )`);

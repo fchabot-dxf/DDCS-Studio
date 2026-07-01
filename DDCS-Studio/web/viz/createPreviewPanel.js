@@ -290,6 +290,9 @@ export function createPreviewPanel(container, opts = {}) {
             wcsOffset: wcsForViz(),
             simSpeed: simSpeed(),
             createVarStore: opts.createVarStore || null,
+            onWait: (wait) => {
+                if (viz && viz.updateIoState) viz.updateIoState(wait ? [wait.pinName] : []);
+            },
             onLineChange: ({ lineIndex, raw }) => {
                 if (typeof opts.onLine === 'function') opts.onLine(lineIndex);
                 if (raw) setStatus(`Executing line ${lineIndex + 1}: ${raw.trim()}`);

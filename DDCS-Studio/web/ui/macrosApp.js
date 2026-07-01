@@ -859,7 +859,7 @@ function renderHomingGui() {
                 <button type="button" class="hm-down" title="Home later" style="cursor:pointer; background:none; border:none; color:var(--text-main);">▼</button>
                 <label style="font-weight:600;"><input type="checkbox" class="hm-enable" ${c.enable !== false ? 'checked' : ''}/> ${HOMING_AX_LABEL[ax]}</label>
                 <input type="hidden" class="hm-order" value="${pos + 1}">
-                <label style="font-size:12px;">Method <select class="hm-method">${methodOpts(c.method || 'native')}</select></label>
+                <label style="font-size:12px;">Method <select class="hm-method">${methodOpts(c.method || 'seek')}</select></label>
                 <label style="font-size:12px;" title="Home direction. Auto derives it from the signed machine travel (envelope) — one source. + / − force it. Signs the switch-seek (G31) move and the sim animation; for native (M98 P501) the controller uses its OWN config, so the override is sim/informational only.">Home dir <select class="hm-dir">${dirOpts(c.dir || '')}</select></label>
             </div>
             <div class="hm-motion" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">

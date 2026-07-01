@@ -37,3 +37,6 @@ client_secret_*.json
 
 # advisor/worker handoff — local per-session marker state
 .handoff/
+
+# animation-capture skill output (clickable from chat, never committed)
+.anim-captures/

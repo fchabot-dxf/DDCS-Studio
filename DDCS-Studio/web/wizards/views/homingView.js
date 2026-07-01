@@ -1,6 +1,7 @@
 /** views/homingView.js — Homing wizard view. A lean run-form: pick which axes to home this run; order +
  *  per-axis method come from the saved Homing Setup config (settings.homing). Opens the setup modal too. */
 import { el, UIUtils } from '../../ui/uiUtils.js';
+import { renderFormWidget } from '../../ui/formWidgets.js';
 import { HomingWizard } from '../homingWizard.js';
 import { openHomingSetup } from '../../ui/settingsPanel.js';
 
@@ -46,21 +47,36 @@ export const homingView = {
     buildAxes() {
         const host = el('homing_axes');
         if (!host) return;
+        
         const homing = getHoming(), cfg = homing.axes || {};
         const list = configuredAxes();
-        const prevState = {};
-        host.querySelectorAll('.homing-run-ax').forEach((cb) => { prevState[cb.getAttribute('data-axis')] = cb.checked; });
-        host.innerHTML = list.map((ax) => {
-            const c = cfg[ax] || {};
-            const on = (ax in prevState) ? prevState[ax] : (c.enable !== false);
-            return `<label style="display:flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--border,#3a4150); border-radius:6px;">
-                <input type="checkbox" class="homing-run-ax" data-axis="${ax}" ${on ? 'checked' : ''}/>
-                <b>${AX_LABEL[ax]}</b> <span style="opacity:.65; font-size:11px;">${METHOD_LABEL[c.method || 'native'] || c.method}</span>
-            </label>`;
-        }).join('');
-        host.querySelectorAll('.homing-run-ax').forEach((cb) => {
-            cb.addEventListener('change', () => { if (window.updateWiz) window.updateWiz(); });
+        const listStr = list.join(',');
+        
+        // Preserve state if the list of available axes hasn't changed
+        if (this._lastListStr === listStr) return;
+        this._lastListStr = listStr;
+
+        let defaultAxes = [];
+        if (this.widgetReader) {
+            // Preserve the user's current sequence if we are just rebuilding
+            defaultAxes = this.widgetReader().axes.filter((ax) => list.includes(ax));
+        } else {
+            // Initial seed from hardware settings
+            defaultAxes = list.filter((ax) => (cfg[ax] || {}).enable !== false);
+            defaultAxes = orderAxes(defaultAxes, homing);
+        }
+
+        host.innerHTML = '';
+        const readerObj = renderFormWidget(host, { 
+            param: 'axes', 
+            type: 'sequence', 
+            default: defaultAxes, 
+            widgetConfig: { axes: list } 
         });
+        this.widgetReader = readerObj.read;
+        
+        host.addEventListener('input', () => { if (window.updateWiz) window.updateWiz(); });
+
         const btn = el('homing_open_setup');
         if (btn && !btn._homingBound) { btn._homingBound = true; btn.addEventListener('click', (e) => { e.preventDefault(); openHomingSetup(); }); }
     },
@@ -70,12 +86,8 @@ export const homingView = {
     update(ctx) {
         const settings = window.ddcsGetSettings ? window.ddcsGetSettings() : {};
         const homing = settings.homing || { axes: {} };
-        // Build the axis rows every update (buildAxes preserves current ticks) so the list always reflects the
-        // configured axes/methods and timing can't leave it empty.
         this.buildAxes();
-        const host = el('homing_axes');
-        const selected = host ? [...host.querySelectorAll('.homing-run-ax')].filter((c) => c.checked).map((c) => c.getAttribute('data-axis')) : [];
-        const axes = orderAxes(selected, homing);
+        const axes = this.widgetReader ? this.widgetReader().axes : [];
 
         const params = { axes, config: homing.axes || {}, softLimits: (settings.machine || {}).softLimits !== false, machine: settings.machine || {} };   // re-enable #655 iff the machine uses soft limits
         const gcode = wizard.generate(params);

@@ -107,6 +107,19 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         return out;
     }
 
+    // Custom-op authoring containers are transparent at emit time: they only group metadata and execution blocks.
+    if (block.type === 'user_root') {
+        const out = [];
+        (block.uiChildren || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
+        (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
+        return out;
+    }
+    if (block.type === 'param_group') {
+        const out = [];
+        (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
+        return out;
+    }
+
     if (!def) return [tag(`( unknown block ${block.type} )`, own)];
 
     if (def.kind === 'var') {                  // SET: bind a variable in the current scope

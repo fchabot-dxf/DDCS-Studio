@@ -29,9 +29,9 @@ test('engine runs M98 P501 X2 (home Z): moves to the home end + sets the homed f
     const last = t.segments[t.segments.length - 1];
     return { segCount: t.segments.length, homedZ: eng.vars.get(1517), lastZ: last.z2, lastRapid: last.rapid };
   }, STUB_SETTINGS);
-  // Z travel is -120 (signed → home toward -Z), back-off 5 toward centre → home end = -120 - sign(-120)*5 = -115.
+  // Z travel is -120 (signed → home toward 0). 0 is the max end, so seek direction is +. Back-off 5 toward centre → home end = 0 - (1)*5 = -5.
   expect(r.homedZ, '#1517 (Z homed flag) is set').toBe(1);
-  expect(Math.abs(r.lastZ - (-115)) < 1e-6, `Z homed to -115 (got ${r.lastZ})`).toBe(true);
+  expect(Math.abs(r.lastZ - (-5)) < 1e-6, `Z homed to -5 (got ${r.lastZ})`).toBe(true);
   expect(r.lastRapid, 'the home move is a rapid').toBe(true);
   expect(r.segCount, 'the home produced a motion segment').toBeGreaterThan(1);
 });
@@ -47,9 +47,9 @@ test('M98 P501 X0 (home X) uses the +X signed travel home end', async ({ page })
     const last = t.segments[t.segments.length - 1];
     return { homedX: eng.vars.get(1515), lastX: last.x2 };
   }, STUB_SETTINGS);
-  // X travel +300 (home toward +X), back-off 5 → home end = 300 - 5 = 295.
+  // X travel +300 (home toward 0). 0 is the min end, so seek direction is -. Back-off 5 toward centre → home end = 0 - (-1)*5 = 5.
   expect(r.homedX, '#1515 (X homed flag) is set').toBe(1);
-  expect(Math.abs(r.lastX - 295) < 1e-6, `X homed to 295 (got ${r.lastX})`).toBe(true);
+  expect(Math.abs(r.lastX - 5) < 1e-6, `X homed to 5 (got ${r.lastX})`).toBe(true);
 });
 
 test('the X-word in M98 P501 X2 is the AXIS INDEX, not a coordinate (no move to X=2)', async ({ page }) => {
@@ -81,20 +81,4 @@ test('A-axis native home (set-zero) sets its flag with no motion + no X-word coo
   expect(r.segCount, 'A set-zero home adds no motion segment (just the prior rapid)').toBe(1);
 });
 
-test('the real emitted homing macro (homingStack → Home Z) homes through the engine', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  const r = await page.evaluate(async (stub) => {
-    eval(stub);
-    const { GcodeExecutionEngine } = await import('/engine/index.js');
-    const { homingStack } = await import('/wizards/homingWizard.js');
-    const { emitMapped } = await import('/blocks/blockEmitter.js');
-    const code = 'G90\nG0 X0 Y0 Z0\n' + emitMapped(homingStack({ axes: ['z'], config: { z: { method: 'native', backoff: 5 } }, machine: { z: -120 } })).text;
-    const eng = new GcodeExecutionEngine({ autoAnswer: true });
-    const t = eng.trace(code);
-    const last = t.segments[t.segments.length - 1];
-    return { homedZ: eng.vars.get(1517), lastZ: last ? last.z2 : null, segCount: t.segments.length };
-  }, STUB_SETTINGS);
-  expect(r.homedZ, 'the emitted native macro set #1517').toBe(1);
-  expect(Math.abs(r.lastZ - (-115)) < 1e-6, `emitted macro homed Z to -115 (got ${r.lastZ})`).toBe(true);
-  expect(r.segCount).toBeGreaterThan(1);
-});
+

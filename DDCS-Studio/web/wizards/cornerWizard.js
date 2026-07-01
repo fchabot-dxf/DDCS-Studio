@@ -15,8 +15,8 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
+import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';
 import { num } from './ops/util.js';
-import { probeSurfaceStack } from './ops/probeSurface.js';   // the shared probe primitive (corner composes it — t127 inc1)
 import { toNum as toNumShared, srcVal, srcNote, travelOwn as travelOwnExpr, travelOpp as travelOppExpr } from './probeBlocks.js';
 
 const AX = {
@@ -28,10 +28,10 @@ const WCS_BASE = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
 
 /** Corner params → its outside-corner probe-macro block stack. The one source of truth for both displays. */
 export function cornerStack(params = {}) {
-    const corner = params.corner || 'FL';
-    const probeZ = !!params.probeZ;
-    const probeSeq = params.probeSeq === 'YX' ? 'YX' : 'XY';
-    const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
+    const corner = ({ 1: 'FL', 2: 'FR', 3: 'BL', 4: 'BR', FL: 'FL', FR: 'FR', BL: 'BL', BR: 'BR' }[params.corner]) || 'FL';
+    const probeZ = !!(params.probeZ || params.probeZFirst);
+    const probeSeq = ({ 0: 'YX', 1: 'XY', YX: 'YX', XY: 'XY' }[params.probeSeq]) || 'YX';
+    const wcs = ({ 0: 'active', 1: 'G54', 2: 'G55', 3: 'G56', 4: 'G57', 5: 'G58', 6: 'G59', active: 'active', G54: 'G54', G55: 'G55', G56: 'G56', G57: 'G57', G58: 'G58', G59: 'G59' }[params.wcs]) || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
 
     const dist = num(params.dist, 500), retract = num(params.retract, 5);
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
@@ -100,10 +100,14 @@ export function cornerStack(params = {}) {
     C('=== CALCULATED MOTIONS ===');
     A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
     A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract');
-    if (td > 0) { A('#15', td, 'Positive travel'); A('#16', `[0-${td}]`, 'Negative travel'); }
-    else { A('#15', 0, 'Travel not used'); A('#16', 0, 'Travel not used'); }
     A('#17', plungeDepth, 'Plunge depth = safeZ + scanDepth');
     A('#18', '[0-#17]', 'Negative plunge'); A('#19', safeZ, 'Safe Z retract distance');
+    if (probeZ) {
+        A('#21', params.startX || '0', 'Z to Wall 1 traverse (X)');
+        A('#22', params.startY || '0', 'Z to Wall 1 traverse (Y)');
+    }
+    A('#23', params.cross1_x || '0', 'Wall 1 to Wall 2 traverse (X)');
+    A('#24', params.cross1_y || '0', 'Wall 1 to Wall 2 traverse (Y)');
 
     // ── WCS base address ──
     if (wcs === 'active') {
@@ -120,7 +124,6 @@ export function cornerStack(params = {}) {
 
     // ── Z surface (optional) ──
     if (probeZ) {
-        const firstTravelVar = firstDir === '+' ? '#16' : '#15';   // escape OPPOSITE the first wall's probe dir
         // Z-surface touch via the shared block. The comp writes the WCS Z directly (#[#73]=[#1927-#6]); preComp sets the
         // indirect address #73 right before the comp (kept in place → byte-identical). trailingRetract:false → the corner
         // does its own safe-Z retract + the travel to the first wall.
@@ -130,8 +133,10 @@ export function cornerStack(params = {}) {
             trailingRetract: false, preComp: [{ var: '#73', value: '[#70+2]', note: 'WCS Z Address' }],
             compNote: `Save ${wcsLabel} Z offset - machine coord (− stylus radius)`,
         }));
-        MV('Z', '#19');
-        MV(firstAx, firstTravelVar);
+        S.push(...safeTraverseStack({
+            mode: 'seq', crossX: '#21', crossY: '#22', lift: '#19',
+            comment: 'Traverse to first wall'
+        }));
     }
 
     // ── Two walls, in the chosen order ──
@@ -140,9 +145,10 @@ export function cornerStack(params = {}) {
     MV('Z', '#18');                          // plunge to scan depth
     probeWall(firstAx, firstDir);
 
-    C(`Step ${step++}: Travel past corner and set up for ${secondAx}`);
-    MOVE({ [firstAx.toLowerCase()]: travelOwn(firstDir), [secondAx.toLowerCase()]: travelOpp(secondDir) });
-    MV('Z', '#18');                          // plunge to scan depth
+    S.push(...safeTraverseStack({
+        mode: 'seq', crossX: '#23', crossY: '#24', drop: '#18',
+        comment: `Step ${step++}: REPOSITION: Traverse past corner and set up for ${secondAx}`
+    }));
 
     C(`Step ${step++}: ${secondAx} Probe`);
     probeWall(secondAx, secondDir);
@@ -191,9 +197,9 @@ export class CornerWizard {
     inferStart(params, stock) {
         const n = (v, d) => this.toNum(v, d);
         const sx = n(stock && stock.x, 100), sy = n(stock && stock.y, 80);
-        const corner = params.corner || 'FL';
+        const corner = ({ 1: 'FL', 2: 'FR', 3: 'BL', 4: 'BR', FL: 'FL', FR: 'FR', BL: 'BL', BR: 'BR' }[params.corner]) || 'FL';
         const zFirst = !!(params.probeZ || params.probeZFirst);
-        const seq = params.probeSeq || 'YX';
+        const seq = ({ 0: 'YX', 1: 'XY', YX: 'YX', XY: 'XY' }[params.probeSeq]) || 'YX';
         const safeZ = n(params.safeZ, 10), radius = n(params.radius, 2);
         const travel = n(params.travelDist, 50), dist = n(params.dist, 500);
         // corner XY in the stock frame + the probe direction (matches FL=X+Y+ … BR=X−Y−)
@@ -208,5 +214,16 @@ export class CornerWizard {
         const firstIsX = (seq !== 'YX');                                   // YX → Y first, else X first
         const kFor = (isX) => zFirst ? overMat : ((isX === firstIsX) ? -inFront : nearEdge);
         return { x: cornerXY[0] + dir[0] * kFor(true), y: cornerXY[1] + dir[1] * kFor(false), z: safeZ };
+    }
+
+    /**
+     * Per-pass preview starts — ONE per parser pass.
+     * Delegates to the shared sim-start registry.
+     */
+    inferStarts(params, stock) {
+        if (window.app && window.app.opSimStarts) {
+            return window.app.opSimStarts('corner', params, stock);
+        }
+        return [this.inferStart(params, stock)];
     }
 }

@@ -29,8 +29,16 @@ export const BINDING_TYPES = new Set(['number', 'int', 'enum', 'bool', 'string',
 
 // Deterministic pre-order walk of a block stack (block, then its children) → a flat array of block REFS.
 // Exported so devMode shares ONE definition (binding.blockIndex must mean the same block in both modules).
-export function flattenBlocks(blocks, out = []) {
-    for (const b of (blocks || [])) { if (!b) continue; out.push(b); if (b.children) flattenBlocks(b.children, out); }
+export function flattenBlocks(blocks, out = [], currentGroup = null) {
+    for (const b of (blocks || [])) { 
+        if (!b) continue; 
+        let g = currentGroup;
+        if (b.type === 'param_group' && b.params && b.params.group) g = String(b.params.group).trim();
+        b._group = g;
+        out.push(b); 
+        if (b.uiChildren) flattenBlocks(b.uiChildren, out, g);
+        if (b.children) flattenBlocks(b.children, out, g); 
+    }
     return out;
 }
 
@@ -57,11 +65,11 @@ export function parseParamOptions(str) {
 // (point / nrect / ncircle) render as PLAIN number fields but still carry the role, so the Form+2D preview derives a
 // drag handle over them (the spatial-GUI decision: continuous positions = drag the preview, plain numbers on the block).
 // decodeCanvasWidget → { widget, role } (role null = a plain, role-less widget).
-const CANVAS_DECODE = { 'xy-x': ['xy-pad', 'x'], 'xy-y': ['xy-pad', 'y'], 'rect-x': ['rect', 'x'], 'rect-y': ['rect', 'y'], 'rect-w': ['rect', 'w'], 'rect-h': ['rect', 'h'], 'point-x': ['point', 'x'], 'point-y': ['point', 'y'], 'nrect-x': ['nrect', 'x'], 'nrect-y': ['nrect', 'y'], 'nrect-w': ['nrect', 'w'], 'nrect-h': ['nrect', 'h'], 'ncirc-x': ['ncircle', 'x'], 'ncirc-y': ['ncircle', 'y'], 'ncirc-d': ['ncircle', 'dia'], 'nlen-x': ['nlength', 'x'], 'nlen-y': ['nlength', 'y'], 'nlen-l': ['nlength', 'len'] };
+const CANVAS_DECODE = { 'xy-x': ['xy-pad', 'x'], 'xy-y': ['xy-pad', 'y'], 'rect-x': ['rect', 'x'], 'rect-y': ['rect', 'y'], 'rect-w': ['rect', 'w'], 'rect-h': ['rect', 'h'], 'point-x': ['point', 'x'], 'point-y': ['point', 'y'], 'nrect-x': ['nrect', 'x'], 'nrect-y': ['nrect', 'y'], 'nrect-w': ['nrect', 'w'], 'nrect-h': ['nrect', 'h'], 'ncirc-x': ['ncircle', 'x'], 'ncirc-y': ['ncircle', 'y'], 'ncirc-d': ['ncircle', 'dia'], 'nlen-x': ['nlength', 'x'], 'nlen-y': ['nlength', 'y'], 'nlen-l': ['nlength', 'len'], 'nscale-x': ['nscaleX', 'x'], 'nscale-y': ['nscaleX', 'y'], 'nscale-w': ['nscaleX', 'w'], 'nscale-s': ['nscaleX', 'scale'], 'nshear-x': ['nshear', 'x'], 'nshear-y': ['nshear', 'y'], 'nshear-w': ['nshear', 'w'], 'nshear-h': ['nshear', 'h'], 'nshear-s': ['nshear', 'slant'], 'nproj-ax': ['nprojLength', 'ax'], 'nproj-ay': ['nprojLength', 'ay'], 'nproj-bx': ['nprojLength', 'bx'], 'nproj-by': ['nprojLength', 'by'], 'nproj-w': ['nprojLength', 'width'] };
 /** The role-encoded widget choices ([label, value]) — shared by the param-block dropdown (bridge) and the dev-mode
  *  inline-expose dropdown so all three (author / decode / form) agree on the encoding. "XY pad / Rect" = a form
  *  mini-canvas; "2D point / 2D rect / 2D circle" = plain number fields that the Form+2D preview makes drag-to-edit. */
-export const CANVAS_ROLE_WIDGETS = [['XY pad · X', 'xy-x'], ['XY pad · Y', 'xy-y'], ['Rect · X', 'rect-x'], ['Rect · Y', 'rect-y'], ['Rect · W', 'rect-w'], ['Rect · H', 'rect-h'], ['2D point · X', 'point-x'], ['2D point · Y', 'point-y'], ['2D rect · X', 'nrect-x'], ['2D rect · Y', 'nrect-y'], ['2D rect · W', 'nrect-w'], ['2D rect · H', 'nrect-h'], ['2D circle · X', 'ncirc-x'], ['2D circle · Y', 'ncirc-y'], ['2D circle · Ø', 'ncirc-d'], ['2D length · X', 'nlen-x'], ['2D length · Y', 'nlen-y'], ['2D length · L', 'nlen-l']];
+export const CANVAS_ROLE_WIDGETS = [['XY pad · X', 'xy-x'], ['XY pad · Y', 'xy-y'], ['Rect · X', 'rect-x'], ['Rect · Y', 'rect-y'], ['Rect · W', 'rect-w'], ['Rect · H', 'rect-h'], ['2D point · X', 'point-x'], ['2D point · Y', 'point-y'], ['2D rect · X', 'nrect-x'], ['2D rect · Y', 'nrect-y'], ['2D rect · W', 'nrect-w'], ['2D rect · H', 'nrect-h'], ['2D circle · X', 'ncirc-x'], ['2D circle · Y', 'ncirc-y'], ['2D circle · Ø', 'ncirc-d'], ['2D length · X', 'nlen-x'], ['2D length · Y', 'nlen-y'], ['2D length · L', 'nlen-l'], ['2D scale · X', 'nscale-x'], ['2D scale · Y', 'nscale-y'], ['2D scale · W', 'nscale-w'], ['2D scale · S', 'nscale-s'], ['2D shear · X', 'nshear-x'], ['2D shear · Y', 'nshear-y'], ['2D shear · W', 'nshear-w'], ['2D shear · H', 'nshear-h'], ['2D shear · S', 'nshear-s'], ['2D projLen · Ax', 'nproj-ax'], ['2D projLen · Ay', 'nproj-ay'], ['2D projLen · Bx', 'nproj-bx'], ['2D projLen · By', 'nproj-by'], ['2D projLen · W', 'nproj-w']];
 /** Decode a (possibly role-encoded) widget value → { widget, role }. role is null for plain widgets. */
 export function decodeCanvasWidget(w) { const d = CANVAS_DECODE[w]; return d ? { widget: d[0], role: d[1] } : { widget: w, role: null }; }
 
@@ -69,7 +77,7 @@ export function decodeCanvasWidget(w) { const d = CANVAS_DECODE[w]; return d ? {
 // shares its canvas twin's shape (a point = an xy-pad's x/y; an nrect = a rect's x/y/w/h; an ncircle = a centre + Ø).
 // nlength = an anchor (x,y) + a 1D extent (len); the length handle drags `len` along a FIXED axis (Y, like text
 // height) — the rule-of-three 4th shape after point/nrect/ncircle. X/Y-selectable axis is a future gesture variant.
-const CANVAS_ROLES = { 'xy-pad': ['x', 'y'], rect: ['x', 'y', 'w', 'h'], point: ['x', 'y'], nrect: ['x', 'y', 'w', 'h'], ncircle: ['x', 'y', 'dia'], nlength: ['x', 'y', 'len'] };
+const CANVAS_ROLES = { 'xy-pad': ['x', 'y'], rect: ['x', 'y', 'w', 'h'], point: ['x', 'y'], nrect: ['x', 'y', 'w', 'h'], ncircle: ['x', 'y', 'dia'], nlength: ['x', 'y', 'len'], nscaleX: ['x', 'y', 'w', 'scale'], nshear: ['x', 'y', 'w', 'h', 'slant'], nprojLength: ['ax', 'ay', 'bx', 'by', 'width'] };
 const cleanBinding = (b) => ({ param: b.param, blockIndex: b.blockIndex, key: b.key, type: b.type, default: b.default, label: b.label });
 
 /** Assemble canvas bindings (each carrying `_widget` + a DECLARED `role`) into form groups: consecutive same-widget
@@ -129,6 +137,7 @@ export function extractParamBlocks(template, seen = new Set(), keepPills = true)
             // toggle to type:'bool': a bool in a numeric socket resolves to 0, so a toggled-ON knob would emit OFF
             // (audit #6-A — a false alarm; this comment exists so it isn't re-flagged).
             const base = { param: name, blockIndex: i, key, type: 'number', default: dflt, label: pp.name || name };
+            if (blk._group) base.group = blk._group;
             const dec = decodeCanvasWidget(pp.widget);
             if (dec.role) canvas.push({ ...base, _widget: dec.widget, role: dec.role });   // DECLARED role (folded into the widget)
             else if (pp.widget === 'slider' || pp.widget === 'toggle') bindings.push({ ...base, widget: pp.widget });
@@ -193,6 +202,50 @@ export function simStartsToBlocks(rows) {
     });
 }
 
+// Template-declared sim metadata is the canonical source for custom ops.
+// Compatibility fallback: if a legacy template has no sim/simstart blocks, use def.sim.
+function resolveSimMeta(def) {
+    const template = def && Array.isArray(def.template) ? def.template : [];
+
+    // sim intent: undefined = no sim block in template (fallback allowed), null = explicit "none" declaration.
+    const stackIntent = simIntentFromStack(template);
+    const intent = (stackIntent !== undefined) ? stackIntent : ((def && def.sim) || null);
+
+    // sim starts: only fall back when there are NO simstart blocks in template.
+    const hasStartBlocks = flattenBlocks(template).some((b) => b && b.type === 'simstart');
+    const stackStarts = hasStartBlocks ? simStartsFromStack(template) : null;
+    const legacyStarts = def && def.sim && Array.isArray(def.sim.starts) ? def.sim.starts : null;
+    const starts = hasStartBlocks ? stackStarts : legacyStarts;
+
+    return { intent, starts };
+}
+
+/** The `panel` block in a stack → its panel layout parameter. */
+export function panelFromStack(children) {
+    const blk = flattenBlocks(children).find((b) => b && b.type === 'panel');
+    if (!blk || !blk.params) return undefined;
+    return typeof blk.params.panel === 'string' ? blk.params.panel : null;
+}
+
+function resolvePanelMeta(def) {
+    const template = def && Array.isArray(def.template) ? def.template : [];
+    const stackPanel = panelFromStack(template);
+    return stackPanel !== undefined ? stackPanel : ((def && def.panel) || 'form3d');
+}
+
+/** The `layout` block in a stack → its layout kind parameter. */
+export function layoutFromStack(children) {
+    const blk = flattenBlocks(children).find((b) => b && b.type === 'layout');
+    if (!blk || !blk.params) return undefined;
+    return typeof blk.params.kind === 'string' ? { kind: blk.params.kind } : null;
+}
+
+function resolveLayoutMeta(def) {
+    const template = def && Array.isArray(def.template) ? def.template : [];
+    const stackLayout = layoutFromStack(template);
+    return stackLayout !== undefined ? stackLayout : ((def && def.layout) || null);
+}
+
 // Drop counter-based block ids so a stored template is stable (ids are reassigned on emit). (Same rule as opGlow.)
 function stripIds(v) {
     if (Array.isArray(v)) return v.map(stripIds);
@@ -252,15 +305,23 @@ export function validateUserOp(def) {
 export function registerUserOp(def) {
     const errs = validateUserOp(def);
     if (errs.length) throw new Error('invalid user op: ' + errs.join('; '));
-    registerUserBuilder(def.opType, (params) => instantiate(def, params || defaultParams(def)));
+    const builder = (params) => {
+        const resolved = params || defaultParams(def);
+        if (typeof def.build === 'function') return def.build(resolved);
+        return instantiate(def, resolved);
+    };
+    registerUserBuilder(def.opType, builder);
     const schema = {};
     // canon omitted: the param name is already a clean marker key (canonOf falls back to the key). field drives the form.
     for (const b of def.bindings) schema[b.param] = { type: b.type, addr: null, field: `uop_${def.opType}_${b.param}` };
     registerUserSpec(def.opType, schema);
     registerOpLabel(def.opType, def.label || def.opType);
-    setUserSimIntent(def.opType, def.sim || null);   // DECLARED preview intent only (never inferred from motion)
-    // DECLARED per-pass sim-starts (def.sim.starts rows) → a provider in the SAME registry the built-ins/wizards use.
-    const starts = def.sim && def.sim.starts;
+    def.panel = resolvePanelMeta(def);
+    def.layout = resolveLayoutMeta(def);
+    const sim = resolveSimMeta(def);
+    setUserSimIntent(def.opType, sim.intent);   // DECLARED preview intent only (never inferred from motion)
+    // DECLARED per-pass sim-starts (template `simstart` rows first, legacy def.sim.starts fallback).
+    const starts = sim.starts;
     setUserSimStarts(def.opType, (Array.isArray(starts) && starts.length) ? makeProvider(starts) : null);
     return def;
 }
@@ -274,7 +335,9 @@ function writeStore(defs) {
 }
 
 /** Every saved user-op def. */
-export function listUserOps() { return readStore(); }
+export function listUserOps() {
+    return readStore();
+}
 
 /** Validate → register → persist a new user op. Throws if invalid or the opType already exists. */
 export function createUserOp(def) {
@@ -315,7 +378,7 @@ export function deleteUserOp(opType) {
 /** Re-register every persisted user op — call ONCE at app start. Returns the count registered. */
 export function loadUserOps() {
     let n = 0;
-    for (const def of readStore()) { try { registerUserOp(def); n++; } catch (_) { /* skip a corrupt def */ } }
+    for (const def of listUserOps()) { try { registerUserOp(def); n++; } catch (_) { /* skip a corrupt def */ } }
     return n;
 }
 
@@ -323,9 +386,10 @@ export function loadUserOps() {
  *  `panel` is the wizard's panel-layout id (form / form3d / form2d) — view-only metadata, persisted with the def.
  *  `sim` is the DECLARED preview intent ({ showRotaryRig?, forceMachine?, showMagazine? }) — never inferred from
  *  the stack's motion; omitted = the default local-frame preview. Both are view-only metadata. */
-export function userOpFromStack(opType, label, stack, bindings, panel, sim) {
+export function userOpFromStack(opType, label, stack, bindings, panel, sim, group) {
     const t = opType.startsWith(USER_OP_PREFIX) ? opType : USER_OP_PREFIX + opType;
     const def = { opType: t, label: label || t, template: stripIds(stack), bindings: bindings || [], panel: panel || 'form3d' };
     if (sim && typeof sim === 'object') def.sim = sim;   // declared preview intent (rotary rig / machine / magazine)
+    if (typeof group === 'string' && group.trim()) def.group = group.trim();
     return def;
 }

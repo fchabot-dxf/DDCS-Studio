@@ -1243,6 +1243,8 @@ export class GcodeViz3D {
         this.partFrame.update(this._partShift());   // op + stock ride the STOCK's WCS (machine view); else part-zero at scene 0
         if (this.machineBox) { this.scene.remove(this.machineBox); this.machineBox.geometry.dispose(); this.machineBox.material.dispose(); this.machineBox = null; }
         if (this.machineAxes) { this.scene.remove(this.machineAxes); if (this.machineAxes.geometry) this.machineAxes.geometry.dispose(); if (this.machineAxes.material) this.machineAxes.material.dispose(); this.machineAxes = null; }
+        if (this.limitSwitches) { this.scene.remove(this.limitSwitches); this.limitSwitches = null; }
+
         const sx = machine ? machine.x : 0, sy = machine ? machine.y : 0, sz = machine ? machine.z : 0;
         if (machine && machine.show && sx && sy && sz) {
             const src = new THREE.BoxGeometry(Math.abs(sx), Math.abs(sy), Math.abs(sz));   // |travel| — the sign is just the home direction
@@ -1264,9 +1266,51 @@ export class GcodeViz3D {
                 ax.renderOrder = 5;
                 this.machineAxes = ax; this.scene.add(ax);
             }
+            
+            // Limit switches at the home position (scene 0)
+            const lsGrp = new THREE.Group();
+            this.limitSwitches = lsGrp;
+            this.scene.add(lsGrp);
+
+            const lsMat = new THREE.MeshBasicMaterial({ color: 0x444444 });
+            const sBox = 8; // 8mm limit switch
+            const lsGeo = new THREE.BoxGeometry(sBox, sBox, sBox);
+            
+            this.lsMeshes = {};
+            const axCols = { x: 0x444444, y: 0x444444, z: 0x444444 };
+            ['x', 'y', 'z'].forEach(ax => {
+                const ls = new THREE.Mesh(lsGeo, lsMat.clone());
+                // Place roughly at the ends of the axes, near home (0) but slightly visible
+                // For X home switch: at X=0, halfway down Y, Z
+                if (ax === 'x') ls.position.set(0, sy / 2, sz / 2);
+                else if (ax === 'y') ls.position.set(sx / 2, 0, sz / 2);
+                else ls.position.set(sx / 2, sy / 2, 0);
+                lsGrp.add(ls);
+                this.lsMeshes[ax] = ls;
+            });
         }
+
         if (this._magazine) this.setMagazine(this._magazine);   // re-place pockets when the envelope/WCS changes
         if (this._stock && this._stock.pin && this._stock.pin !== 'origin') this.setStock(this._stock);   // re-pin the stock to its WCS
+    }
+
+    /** Update limit switch illumination based on active IO pins */
+    updateIoState(activePins) {
+        if (!this.lsMeshes) return;
+        const pins = activePins || [];
+        // Trip if pinName mentions the axis limit or home switch
+        const isTripped = (ax) => pins.some(p => {
+            const low = p.toLowerCase();
+            return low.includes(ax + '-limit') || low.includes(ax + ' home') || low === ax; // simple check
+        });
+        
+        for (const ax of ['x', 'y', 'z']) {
+            if (this.lsMeshes[ax]) {
+                const tripped = isTripped(ax);
+                this.lsMeshes[ax].material.color.setHex(tripped ? 0xff0000 : 0x444444);
+            }
+        }
+        this.render();
     }
 
     /**

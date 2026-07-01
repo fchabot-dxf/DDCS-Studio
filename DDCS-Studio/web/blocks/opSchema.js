@@ -35,6 +35,7 @@ const Enum = (canon = null) => ({ type: 'enum', addr: null, ...(canon && { canon
 const Str = (canon = null) => ({ type: 'string', addr: null, ...(canon && { canon }) });
 const Bool = (canon = null) => ({ type: 'bool', addr: null, ...(canon && { canon }) });
 const Struct = (canon = null) => ({ type: 'structured', addr: null, ...(canon && { canon }) });
+const Seq = (canon = null) => ({ type: 'sequence', addr: null, ...(canon && { canon }) });
 // Placement params (ride the PlaceOnStock wrapper) — shared by the geometric ops.
 const PLACE = { stockAttach: Enum(), pathDatum: Enum(), offX: N(), offY: N(), offZ: N() };
 
@@ -70,7 +71,7 @@ export const SCHEMA = {
         method: Enum(), x: N('X'), y: N('Y'), z: N('Z'), zClear: N('Z'), fixedT: N('T'), orient: Bool(),
         waitSpindle: Bool(), dustCover: Bool(), confirm: Bool(), magazine: Struct(),
     },
-    homing: { axes: Struct(), config: Struct(), machine: Struct(), softLimits: Bool() },
+    homing: { axes: Seq(), config: Struct(), machine: Struct(), softLimits: Bool() },
     pocket: {
         shape: Enum(), originX: N('X'), originY: N('Y'), dia: N(), sides: N(), w: N(), h: N(),
         toolDia: N(), stepoverPct: N(), wallOffset: N(), strategy: Enum(), depth: N('Z'), stepdown: N(),
@@ -92,12 +93,12 @@ export const SCHEMA = {
     middle: {
         featureType: Enum(), approach: Enum(), inAxis: Enum(), transAxis: Enum(), axis: Enum(), dir1: Enum(), dir2: Enum(), twoAxis: Bool(),
         findBoth: Bool(), circular: Bool(), probeZ: Bool(), wcs: Enum(), dist: N(null, 'maxDist'), retract: N(), safeZ: N(), safeZFrame: Enum(),
-        clearOver: N(), crossX: Str(), crossY: Str(), diagTravel: Str(), diagPrimary: Str(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), syncA: Bool(), slave: Enum(), qStop: N(),
+        clearOver: N(), cross1_x: Str(), cross1_y: Str(), cross2_x: Str(), cross2_y: Str(), diagTravel: Str(), diagPrimary: Str(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), syncA: Bool(), slave: Enum(), qStop: N(),
     },
     corner: {
         corner: Enum(), probeSeq: Enum(), probeZ: Bool(), probeZFirst: Bool(), wcs: Enum(), dist: N(null, 'maxDist'),
         retract: N(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), level: N(null, 'triggerLevel'),
-        safeZ: N(), travelDist: N(), scanDepth: N(), radius: N(), sources: Struct(), syncA: Bool(), slave: Enum(), qStop: N(),
+        safeZ: N(), scanDepth: N(), radius: N(), startX: N(), startY: N(), cross1_x: N(), cross1_y: N(), sources: Struct(), syncA: Bool(), slave: Enum(), qStop: N(),
     },
     alignment: {
         checkAxis: Enum(), probeDir: Enum(), safeZ: N(), safeZFrame: Enum(), dist: N(null, 'maxDist'), retract: N(),
@@ -151,11 +152,11 @@ const FIELD_BIND = {
     contour: { shape: 'ct_shape', side: 'ct_side', originX: 'ct_originX', originY: 'ct_originY', offZ: 'ct_offZ', pathDatum: 'ct_pathDatum', stockAttach: 'ct_stockAttach', w: 'ct_w', h: 'ct_h', dia: 'ct_dia', sides: 'ct_sides', wcs: 'ct_wcs', toolDia: 'ct_toolDia', depth: 'ct_depth', stepdown: 'ct_stepdown', clearance: 'ct_clearance', feed: 'ct_feed', plunge: 'ct_plunge', rpm: 'ct_rpm' },
     slot: { ax: 'sl_ax', ay: 'sl_ay', bx: 'sl_bx', by: 'sl_by', width: 'sl_width', originX: 'sl_offX', originY: 'sl_offY', offZ: 'sl_offZ', pathDatum: 'sl_pathDatum', stockAttach: 'sl_stockAttach', toolDia: 'sl_toolDia', stepoverPct: 'sl_stepoverPct', depth: 'sl_depth', stepdown: 'sl_stepdown', clearance: 'sl_clearance', feed: 'sl_feed', plunge: 'sl_plunge', rpm: 'sl_rpm' },
     text: { text: 'tx_text', x: 'tx_x', y: 'tx_y', originX: 'tx_offX', originY: 'tx_offY', offZ: 'tx_offZ', pathDatum: 'tx_pathDatum', stockAttach: 'tx_stockAttach', height: 'tx_height', width: 'tx_width', slant: 'tx_slant', spacing: 'tx_spacing', align: 'tx_align', strokeWidth: 'tx_strokeWidth', toolDia: 'tx_toolDia', stepoverPct: 'tx_stepoverPct', depth: 'tx_depth', stepdown: 'tx_stepdown', clearance: 'tx_clearance', feed: 'tx_feed', plunge: 'tx_plunge', rpm: 'tx_rpm' },
-    corner: { corner: 'c_corner', probeZ: 'c_probe_z_first', syncA: 'c_sync_a', slave: 'c_slave', probeSeq: 'c_probe_seq', wcs: 'c_wcs', dist: 'c_dist', retract: 'c_retract', f_fast: 'c_feed_fast', f_slow: 'c_feed_slow', qStop: 'c_q', safeZ: 'c_safe_z', travelDist: 'c_travel_dist', scanDepth: 'c_scan_depth', radius: 'c_radius' },
+    middle: { featureType: 'm_type', approach: 'm_approach', inAxis: 'm_inaxis', transAxis: 'm_transaxis', axis: 'm_axis', dir1: 'm_dir1', dir2: 'm_dir2', twoAxis: 'm_two_axis', findBoth: 'm_both', circular: 'm_circular', probeZ: 'm_probe_z_first', wcs: 'm_wcs', dist: 'm_dist', retract: 'm_retract', safeZ: 'm_safe_z', safeZFrame: 'm_safe_z_frame', clearOver: 'm_clear_over', cross1_x: 'm_cross1_x', cross1_y: 'm_cross1_y', cross2_x: 'm_cross2_x', cross2_y: 'm_cross2_y', diagTravel: 'm_start_x', diagPrimary: 'm_start_y', f_fast: 'm_feed_fast', f_slow: 'm_feed_slow', port: 'm_port', syncA: 'm_sync_a', slave: 'm_slave', qStop: 'm_q' },
+    corner: { corner: 'c_corner', probeSeq: 'c_probe_seq', probeZ: 'c_probe_z_first', probeZFirst: 'c_probe_z_first', wcs: 'c_wcs', dist: 'c_dist', retract: 'c_retract', f_fast: 'c_feed_fast', f_slow: 'c_feed_slow', port: 'c_port', level: 'c_level', safeZ: 'c_safe_z', scanDepth: 'c_scan_depth', radius: 'c_radius', startX: 'c_start_x', startY: 'c_start_y', cross1_x: 'c_cross1_x', cross1_y: 'c_cross1_y', syncA: 'c_sync_a', slave: 'c_slave', qStop: 'c_q' },
     edge: { axis: 'p_axis', dir: 'p_dir', wcs: 'p_wcs', dist: 'p_dist', retract: 'p_retract', syncA: 'p_sync_a', slave: 'p_slave', f_fast: 'p_feed_fast', f_slow: 'p_feed_slow', qStop: 'p_q' },
-    middle: { featureType: 'm_type', inAxis: 'm_inaxis', transAxis: 'm_transaxis', clearOver: 'm_clear', crossX: 'm_crossX', crossY: 'm_crossY', diagTravel: 'm_diag_travel', diagPrimary: 'm_diag_primary', axis: 'm_axis', findBoth: 'm_both', circular: 'm_circular', probeZ: 'm_probe_z_first', syncA: 'm_sync_a', slave: 'm_slave', wcs: 'm_wcs', dist: 'm_dist', retract: 'm_retract', safeZ: 'm_safe_z', safeZFrame: 'm_safe_z_frame', f_fast: 'm_feed_fast', f_slow: 'm_feed_slow', qStop: 'm_q', dir1: 'm_dir', dir2: 'm_dir2' },
     wcs: { sys: 'w_sys', axisX: 'w_x', axisY: 'w_y', axisZ: 'w_z', sync: 'w_sync', slave: 'w_slave' },
-    alignment: { checkAxis: 'al_check_axis', probeDir: 'al_probe_dir', tolerance: 'al_tolerance', dist: 'al_dist', retract: 'al_retract', safeZ: 'al_safe_z', safeZFrame: 'al_safe_z_frame', f_fast: 'al_feed_fast', f_slow: 'al_feed_slow', qStop: 'al_q' },
+    alignment: { checkAxis: 'al_axis', probeDir: 'al_dir', safeZ: 'al_safe_z', safeZFrame: 'al_safe_z_frame', dist: 'al_dist', retract: 'al_retract', f_fast: 'al_feed_fast', f_slow: 'al_feed_slow', port: 'al_port', level: 'al_level', tolerance: 'al_tolerance', qStop: 'al_q' },
     circular: { featureType: 'circ_type', wcs: 'circ_wcs', dist: 'circ_dist', retract: 'circ_retract', safeZ: 'circ_safe_z', f_fast: 'circ_feed_fast', f_slow: 'circ_feed_slow', qStop: 'circ_q' },
     rotary_clock: { action: 'rcl_action', reference: 'rcl_reference', span: 'rcl_span', wcs: 'rcl_wcs', dist: 'rcl_dist', retract: 'rcl_retract', safeZ: 'rcl_safe_z', safeZFrame: 'rcl_safe_z_frame', f_fast: 'rcl_feed_fast', f_slow: 'rcl_feed_slow', qStop: 'rcl_q' },
     rotary_center: { method: 'rc_method', approach: 'rc_approach', datum: 'rc_datum', diameter: 'rc_diameter', wcs: 'rc_wcs', dist: 'rc_dist', retract: 'rc_retract', safeZ: 'rc_safe_z', safeZFrame: 'rc_safe_z_frame', f_fast: 'rc_feed_fast', f_slow: 'rc_feed_slow', qStop: 'rc_q' },

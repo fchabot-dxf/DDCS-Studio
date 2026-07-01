@@ -195,9 +195,11 @@ const RECONCILERS = {
             const d21 = asn('#21'); if (d21 && d21.params && d21.params.value != null) f.m_diag_travel = String(d21.params.value);
             const d22 = asn('#22'); if (d22 && d22.params && d22.params.value != null) f.m_diag_primary = String(d22.params.value);   // B-TRANS (b): the diagonal's X target round-trips like #21
 
-            // the in-axis cross-over TRAVERSE distance round-trips from #19/#20 (declared, user-set — recover it like #21)
-            const c19 = asn('#19'); if (c19 && c19.params && c19.params.value != null) f.m_crossX = String(c19.params.value);
-            const c20 = asn('#20'); if (c20 && c20.params && c20.params.value != null) f.m_crossY = String(c20.params.value);
+            // the in-axis cross-over TRAVERSE distance round-trips from #19/#20 and #23/#24 (declared, user-set — recover it like #21)
+            const c19 = asn('#19'); if (c19 && c19.params && c19.params.value != null) f.m_cross1_x = String(c19.params.value);
+            const c20 = asn('#20'); if (c20 && c20.params && c20.params.value != null) f.m_cross1_y = String(c20.params.value);
+            const c23 = asn('#23'); if (c23 && c23.params && c23.params.value != null) f.m_cross2_x = String(c23.params.value);
+            const c24 = asn('#24'); if (c24 && c24.params && c24.params.value != null) f.m_cross2_y = String(c24.params.value);
         }
         return f;
     },

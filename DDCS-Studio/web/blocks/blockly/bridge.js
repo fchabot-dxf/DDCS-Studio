@@ -19,6 +19,7 @@ import { PALETTE, CATEGORIES } from '../../wizards/ops/index.js';
 import { installCornerGridField } from './cornerGridField.js';
 import { installRegionPickField } from './regionPickField.js';
 import { installCoordListField } from './coordListField.js';
+import { installHomingOrderField } from './homingOrderField.js';
 import { CANVAS_ROLE_WIDGETS } from '../userOps.js';   // the ONE role-encoded widget list (shared with dev-mode; consumed lazily below → cycle-safe)
 
 // Fields that render as the inline 3×3 corner-grid picker (field_cornergrid), tinted per datum so PlaceOnStock's
@@ -152,6 +153,7 @@ const optionsFor = (def, field) => {
     // surfaces can't drift. (The import closes a benign cycle — this list is read lazily here, never at module-eval.)
     if (field === 'widget' && def.type === 'param') return ['number', 'slider', 'dropdown', 'toggle', ...CANVAS_ROLE_WIDGETS];
     if (field === 'panel' && def.type === 'panel') return ['form3d', 'form2d', 'form'];   // the GUI panel-type declaration
+    if (field === 'kind' && def.type === 'layout') return ['none', 'corner'];
     return SELECTS[field] || null;
 };
 
@@ -199,7 +201,19 @@ function jsonDef(def) {
         else if (k === 'boolean') args.push({ type: 'input_value', name: FN(f), check: 'Boolean', tooltip: desc });
         else args.push({ type: 'input_value', name: FN(f), check: 'Number', tooltip: desc });
     }
-    if (isWrap(def)) { message += ` %${++n}`; args.push({ type: 'input_statement', name: 'DO' }); }
+    if (def.kind === 'user_root') {
+        message += ` %${++n}`;
+        args.push({ type: 'input_dummy' });
+        message += ` Presentation (UI & Sim) %${++n}`;
+        args.push({ type: 'input_statement', name: 'PRESENTATION' });
+        message += ` Execution (G-code) %${++n}`;
+        args.push({ type: 'input_statement', name: 'EXECUTION' });
+    } else if (def.kind === 'param_group') {
+        message += ` %${++n}`;
+        args.push({ type: 'input_statement', name: 'DO' });
+    } else if (isWrap(def)) { 
+        message += ` %${++n}`; args.push({ type: 'input_statement', name: 'DO' }); 
+    }
     const block = {
         type: def.type, message0: message, args0: args, inputsInline: true,
         style: catSlug(def.category) + '_style', tooltip: `${def.label} (${def.category})`,
@@ -217,8 +231,10 @@ const makeOpDef = (type, label, msgAdd = '', argsAdd = []) => ({
         { type: 'field_label_serializable', name: 'LABEL', text: label, tooltip: getDesc(type) },
         ...argsAdd.map(a => ({ ...a, tooltip: getDesc(a.name) }))
     ],
-    message1: '%1',
-    args1: [ { type: 'input_statement', name: 'DO' } ],
+    message1: 'GCODE %1',
+    args1: [ { type: 'input_statement', name: 'GCODE' } ],
+    message2: 'SIM %1',
+    args2: [ { type: 'input_statement', name: 'SIM' } ],
     previousStatement: null, nextStatement: null,
     colour: 210,
     tooltip: 'Recorded op — edit via its wizard.',
@@ -334,6 +350,7 @@ export function installBlockly(Blockly) {
     installCornerGridField(Blockly);   // register field_cornergrid BEFORE the blocks that reference it
     installRegionPickField(Blockly);   // register field_regionpick (the region-pick control's block adapter)
     installCoordListField(Blockly);    // register field_coordlist (the coordinate-list positions preview)
+    installHomingOrderField(Blockly);  // register field_homingorder
     registerDynExtension(Blockly);
     Blockly.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), ...OP_BLOCKS]);
 }

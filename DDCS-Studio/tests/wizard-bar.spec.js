@@ -83,7 +83,7 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   expect(custom).toBeTruthy();
   expect(custom.items).toHaveLength(1);
   expect(custom.items[0].text).toContain('Bar Test');
-  expect(custom.items[0].onclick).toBe("ddcsInsertUserOp && ddcsInsertUserOp('user_bar_test')");
+  expect(custom.items[0].onclick).toBe("(openWiz ? openWiz('user_bar_test') : (ddcsInsertUserOp && ddcsInsertUserOp('user_bar_test')))");
 
   // ── a hidden built-in drops out of the bar (override + refresh) ──
   await page.evaluate(async () => {

@@ -42,7 +42,7 @@ test('a length param is declarable (nlen roles decode + complete group) and drag
   expect(fieldParams, 'the form rendered the length params as writable number fields').toEqual(['ll', 'lx', 'ly']);
 
   // the LENGTH handle is a size handle (a circle, like the ncircle ring) — distinct from the point move-square.
-  const handle = page.locator('#userVizContainer circle.fc-handle').first();
+  const handle = page.locator('#userVizContainer2D circle.fc-handle').first();
   await handle.waitFor({ state: 'visible' });
 
   const before = await page.evaluate(() => ({

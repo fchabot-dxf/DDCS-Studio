@@ -1,5 +1,152 @@
 # NEXT SESSION — handoff
 
+## ⚡ Custom-wizard seam update (2026-07-01)
+
+### ✅ DONE tonight (uncommitted, local)
+1. **Corner port migrated to the new custom root block shape** — `user_corner_port` now has `template: [ { type:'user_root', uiChildren:[], children:[ ...existing atoms... ] } ]` in `web/data/cornerPort.js`.
+2. **Bindings preserved** — all corner-port `bindings[].blockIndex` values were shifted by +1 so param writeback still targets the same assign atoms after the root wrapper insertion.
+3. **Custom-op declaration ownership seam landed** — save/runtime now treat stack-declared `sim` / `simstart` as canonical; legacy `def.sim` is fallback-only when stack declarations are absent (`web/blocks/devMode.js`, `web/blocks/userOps.js`).
+4. **Regression locks added and passing** — canonical-vs-fallback precedence is now test-locked for both `sim` and `simstart` (`tests/custom-op-sim-intent.spec.js`, `tests/custom-op-sim-starts-precedence.spec.js`).
+5. **Pilot 2 completed** — `atc_warmup_data` is now ported to `user_root` shape with wrapped bindings, and stays byte-identical across the sweep (`web/blocks/dataOps/atcWarmupData.js`, `tests/atc-warmup-as-data.spec.js`).
+6. **Runtime emit seam fixed** — `user_root` / `param_group` are explicit transparent containers in the emitter, so custom-op wrapped templates execute exactly their children (`web/blocks/blockEmitter.js`).
+7. **Regression lock added** — `tests/user-root-transparent-emit.spec.js` now guards wrapper transparency directly (wrapped vs plain execution stack, byte-identical emit).
+8. **Pilot 3 completed** — `slot_data` is now ported to `user_root` shape with wrapped bindings, and stays byte-identical across its sweep + wiring checks (`web/blocks/dataOps/slotData.js`, `tests/slot-as-data.spec.js`).
+9. **Pilot 4 completed** — `text_data` is now ported to `user_root` shape with wrapped bindings, and stays byte-identical across its sweep + wiring checks (`web/blocks/dataOps/textData.js`, `tests/text-as-data.spec.js`).
+10. **Ports are surfaced in the bar now** — startup seeds these pilot defs into the USER layer (`createUserOp` only when missing), so they show under **Custom** without changing built-ins (`web/app.js`).
+11. **Custom-op form controls upgraded** — seeded `slot_data` / `text_data` enum bindings now provide explicit dropdown options (WCS, path/stock datums, align, font), eliminating weak generic inputs in the param-group form (`web/blocks/dataOps/slotData.js`, `web/blocks/dataOps/textData.js`).
+12. **Port set completion + startup seeding expanded** — startup now seeds all current ported data ops (`atc_warmup_data`, `drill_data`, `slot_data`, `surfacing_data`, `text_data`) in the USER layer; built-ins remain unchanged (`web/app.js`, `web/blocks/dataOps/*.js`).
+13. **Probe/ATC/Mill separation landed for user ports** — user-op defs now support a `group` field and library rendering respects it; ported defs are assigned to `atc`/`mill`, and `user_corner_port` is tagged `probe` (`web/blocks/userOps.js`, `web/blocks/wizardLibrary.js`, `web/data/cornerPort.js`).
+14. **Preview/UI declaration blocks matched for full port set** — wrapped data-op defs now include explicit `panel` + `sim` + `param_group` blocks under `user_root.uiChildren`, with wrapped binding indexes aligned and tests updated (`web/blocks/dataOps/*.js`, `tests/drill-as-data.spec.js`, `tests/surfacing-as-data.spec.js`).
+15. **Declaration-first rule clarified for layout work** — corner layout must be completed at the authored-block layer, not via a runtime-only view hook; the shared panel path is the place to consume that declaration (`web/data/cornerPort.js`, `web/wizards/ops/panelTypes.js`).
+
+### ⏭️ NEXT (small but important)
+1. **Complete the corner declaration** — finish the authored block shape so the layout/UI intent lives in the declared stack itself, then keep the shared panel renderer as the consumer.
+2. **Keep one canonical sim declaration source** — retain stack `sim` / `simstart` as source-of-truth for user ops; keep grey-shell compatibility as read-only fallback path.
+3. **Maintain focused wrapper safety coverage** — keep direct transparency checks where they catch structural regressions (no speculative test sprawl).
+
+## ⚡ TRAVEL-GUI progress (2026-06-30) — Z→XY traverse WORKING; cross-over markers NEXT
+
+### ✅ SHIPPED tonight (uncommitted, local)
+1. **Z→XY auto-traverse VISIBLE in preview** — the traverse from the Z-probe marker ① to the XY-probe marker ② now renders as a visible rapid line. Three bugs fixed:
+   - **`tieDiagTravel` origin bug**: was anchored to `starts[0]` (Z-probe start) instead of `starts[secStart-1]` (where the primary axis finished) — dragging Z-probe shifted the trans-axial diagonal by the same amount. Fixed: origin = `starts[originIdx]` where `originIdx = secStart - 1`.
+   - **`middleView.update()` missing params**: `startX`, `startY`, `scanDepth` were never passed from the view's `params` object to the wizard's `generate()` — the wizard always fell back to `'0'`/`'0'`/`'5'` defaults, producing invisible `G0 X0 Y0` zero-length moves. Fixed: added all three to the params constructor.
+   - **`tieStart1` over-restricted**: was gated on `featureType === 'boss' && inAxis === 'auto'`, blocking pockets and manual mode from computing the Z→XY vector. Fixed: gate only on `probeZ` checkbox.
+2. **SCAN DEPTH field added to UI** — `m_scan_depth` in the Geometry section, wired into `opSchema.js` (FIELD_BIND), `middleView.js` (inputIds), and the params object.
+3. **Z→XY traverse enabled for pockets** — was boss-only; now fires for any `inAxis === 'auto'` when Z-first is checked (the move is just a horizontal traverse + Z plunge — low risk, same as In-Axis).
+4. **Decision: Z→XY traverse mode = In-Axis toggle** (human) — no new dropdown; the Z→XY move is the same risk category as in-axis (horizontal + Z drop), so lumping it under `IN-AXIS TRAVERSE` (auto/manual) is correct.
+5. **Cross-over markers (inc2b) SHIPPED** — the in-axis cross-overs (`#19`/`#20` and now `#23`/`#24` for the secondary axis) are full 2D coordinate pairs derived from draggable wall-2 start positions! 
+   - `opSimStarts.js` places the secondary wall markers at the exact offsets typed into the UI, unless the user drags them. 
+   - The UI fields are VISIBLE (not hidden), and a custom input hook in `middleView.js` perfectly un-hooks past drag operations so typing new values immediately updates the visual markers.
+   - `middleWizard.js` emits full 2D `MOVE({x, y})` transversals to the wall-2 target, anchoring the pass accurately to the marker location in the simulator (emits `REPOSITION:`).
+- `middleView.js` — new `tieCrossOver` callback to derive X+Y distances between adjacent markers on drag
+- `index.html` — hidden inputs for per-axis cross-over X/Y components (replace or augment the existing `m_crossX`/`m_crossY`)
+- `opSchema.js` — register any new hidden input fields
+
+**Marker layout for full boss + both + auto + probeZ:**
+```
+①  Z-probe start
+②  Primary axis, wall 1 start
+③  Primary axis, wall 2 start    ← NEW
+④  Secondary axis, wall 1 start  (trans-axial target)
+⑤  Secondary axis, wall 2 start  ← NEW
+```
+Cross-over = ③−② (both X+Y), trans-axial = ④−③ (already done), secondary cross-over = ⑤−④.
+
+
+## ✅ DONE (advisor-reviewed PASS): B-FLASH (`b790caa`, t103) · EXEC-LINE (`ba84705`) · MOBILE-3D-PUSH (`b82eb78`) · MID-PROBE-Z-FIRST (`cb2518e`, t107 — render verified on the contact sheet) · DATUM-FOLLOWS-WCS-WRITE (`f91a0aa`, t113 — decision A, ONE declared source; middle datum at centre, human-confirmed) · STYLUS-RADIUS-COMP (`84f4efd`, t117 — sim tip-radius + diameter/Z-surface comp via `#6`; signs advisor-verified; CORNER datum human-confirmed; the point-collision was masking real-machine bugs) · DATUM-VISUAL B+C (`528c74a`, t122 — Z-first datum regression fixed by reading the engine's COMMITTED target value not parsing the RHS; thin 2D LineSegments crosshair + human-blessed glow; Part 2 disc-on-surface correctly PULLED to the probe-surface block). See MIDDLE-PROBE-BACKLOG.
+
+## 🗂 APPROVED BATCH — ONE dispatch per turn, REVIEWED between (human, turn 103 + reseq turn 105 "yes #2")
+1. ✅ **MID-PROBE-Z-FIRST** — DONE (`cb2518e`, reviewed PASS t107)
+2. ✅ **PROBE-SURFACE SNIPPET** — DONE (`1576fee`, reviewed PASS t109) — define-only; wizard migration is #6
+2b. *(optional cluster)* **drop z-touch · touch-off snippet/program · rename ATC→"Tools"** — probing follow-ons (human, turn 107)
+3. ✅ **DATUM-FOLLOWS-WCS-WRITE** — DONE (`f91a0aa`, reviewed PASS t113) — decision A: ONE declared source = the WCS-write event, universal across probe types; middle datum now at centre (human-confirmed). ⚠ left a residual datum OFFSET → 3b. *(B-END-OFFSET tool-return = NOT a bug; an optional end-move is a future declared feature.)*
+3b. ✅ **PROBE STYLUS-RADIUS COMPENSATION** — DONE (`84f4efd`, reviewed PASS t117). Inc1 (t114) confirmed the sim point-collides the tool CENTRE; the full fix added sim tip-radius + diameter (∓2r) & Z-surface (∓r) comp via `#6` (center left alone — cancels), signs ground-truthed vs M350, +the rotary flank graze it exposed. Advisor-verified signs; CORNER datum human-confirmed. *(inc2 comp-GUI = DROPPED.)*
+3c. ✅ **DATUM VISUAL** — DONE (`0672c26` 1/3/4 + `528c74a` B/C/glow, t122): red crosshair → thin 2D LineSegments + glow · 2 s pre-loop idle · Z-first datum regression fixed (read the engine's committed target value). Part 2 disc-on-surface PULLED → the probe-surface block.
+3d. **PROBE-SURFACE BLOCK — inc1+inc2 DONE, SHIPPED** (inc1: all 4 wizards on the one declared block, comps in one `radiuscomp` atom, 12 equivalence tests passed, marker removed=Option-B; inc2 `d87db5d`: disc-on-surface declared-driven, frame-invariant nudge, wizard-preview done — **V10.38 shipped**). fit-comp ON DONE (`89938e7`, V10.39 — fits the TRUE OD, verified by the synthetic solver; the degenerate-fit-sim was found to be a MISSING DECLARATION). REAL FIT SIM COMPLETE (3-step arc, all shipped): comp ON (`89938e7`, V10.39, synthetic-verified) → engine DRO population (`e7af3af`, V10.40, the general `read-machine`=0 gap) → side-swap (`3a205b6`, V10.41 — 3 distinct OD points, R≈38.1, comp verifies in-sim). disc-on-surface ARC COMPLETE (both sims): flank-disc polish (`378191f`) + editor-sim disc (`fb35323`, Option B program-model) → V10.42. NEW THREAD — **declared spatial model** (`SPATIAL-MODEL-SPEC.md`, human-locked): safe-Z FRAME thread: 1a (V10.43 rotary) + 1c (V10.44 — shared toggle widget on rotary/rotary_clock/alignment/middle, byte-identical each). 1b DROPPED (no usable controller register; SPATIAL-MODEL-SPEC §A.2). DEFERRED follow-ups: corner (safe-Z folded into scanDepth — needs untangling), ATC (no safe-Z field). SPATIAL MODEL §A+§B COMPLETE: §A safe-Z frame (V10.43 + V10.44, 4 wizards) + §B rotary bar (`1e6d3e5`, V10.45 — declared stock.diameter, ONE barRadius source → render+collision can't drift → through-stock structurally fixed). 1b dropped. probe-surface chapter CLOSED (unify-pass `6395e50`, batched — no-space brackets, DDCS-aligned, zero logic). ITEM 4 (the unified travel/START model) OPENED: scout done (`f45d57c` — model is inverted start←travel; the seam EXISTS, item4 = FLIP + generalise, not build-from-scratch) → spec drafted (`TRAVEL-START-SPEC.md`). inc1 EDGE (`90dc933`, V10.46) HALF-WRONG: correctly dropped the reach ARROW → draggable start marker, BUT wrongly made MAX PROBE a read-only readout (human t168: "i didn't say drop max probe we need it, i said drop reach; reach was in the gui"). EDGE inc1 DONE + CORRECTED (`7c1aeef`, V10.47 — fixed the V10.46 MAX-PROBE regression: reach arrow → draggable start marker, MAX PROBE separate+editable+decoupled). EDGE lesson burned in [[confirm-the-referent-before-dropping]]. MIDDLE scout DONE (`feece57`) + classification BLESSED (human t172): KEEP dist#1/retract#2/safeZ#17/clearOver#18 (needed, editable); REMOVE diagTravel#21 (derived from ②); crossX#19/crossY#20 need the two-meanings-of-pass (inc2b). inc2a DONE (`deea0a4`, V10.48 — diag-travel field removed, value-identical, locked-24 fixed). Human jumped to B-TRANS (the live diagonal bug, demonstrated 2 symptoms: auto=stuck-45°-not-joining-②, manual=reverses-away-from-stock; "probably linked"). Worker BOTCHED the first diagnosis by guessing; EVIDENCE-FIRST scout (`9d6561e`) then CONFIRMED with real numbers: PRIMARY (X/pmove) is the root (secondary tracks ②). Human picked (b) full-marker-control (advisor's "drops accuracy" framing CORRECTED — no accuracy cost; #53 degeneracy is a separate BUG). B-TRANS FIX (b) DONE (`9f23993`, V10.49 — #22 primary-peer: auto diagonal JOINS the marker [END≈②], value-identical at rest [#22 defaults to #53]; manual sign fixed; opSchema/opSession additive+middle-isolated). Worker correction: the manual OFF-STOCK (-211) is DOWNSTREAM of the probe-calc/#53 sim bug (probes don't STOP in sim → accumulate), NOT the diagonal.
+⏸️ **PAUSED (human, turn 178).** RESUME order: **(1) #53/probe-calc sim fix** — the sim's probe doesn't stop/accumulates → degenerate #53 (auto measured-centre wrong) + manual off-stock; ONE fix, BOTH symptoms · (2) inc2b (two-meanings-of-pass: wall-2 markers → derive+remove crossX/crossY → 4th/5th) · (3) B-TRANS canvas adoption to corner/rotary/alignment. ALSO: RE-RUN the full suite (box was too loaded to finish) to confirm V10.49 no-broad-regression (low risk — middle-isolated). DEFERRED: rotary active-WCS bug · corner/ATC frame · atcLength spacing. [[verify-real-symptom-not-just-test]] [[probe-surface-block-generalises-probing]]
+4. **TRAVEL-GUI = the unified TRAVEL/START model** (the crux = middle). START POS = source / TRAVEL derived (diag-travel field REMOVED); config-driven start markers (Z-first/both-axis → 4th+5th); auto+manual × in-axis+trans-axis. **ABSORBS** the edge reach→start AND B-TRANS-ANGLE. See MIDDLE-PROBE-BACKLOG.
+5. **TWO-WCS-DATUM gate** — design pass (+ corner/centreline migration to the Snippet) — last, bigger
+
+## 🔁 B-END-OFFSET (tool-return) — NOT a bug (human, turn 109+). The tool correctly ends at the LAST RETRACT (post-revert); the CENTRE belongs to the DATUM, not the tool. RECONSIDERED (turn 111): an optional "go to found centre" END-MOVE *is* useful (visual confirm + next-op positioning) → a FUTURE **declared, reusable end-of-program move** that consumes the centre value, NOT a hand-rolled middle return. Queued, not needed now. [[declare-or-handroll-before-dispatch]]
+
+## 🚦 ACTIVE DISPATCH — TURN 178 (advisor → worker): **#53/probe-calc sim fix** 
+
+The sim's probe doesn't stop/accumulates → degenerate #53 (auto measured-centre wrong) + manual off-stock; ONE fix, BOTH symptoms.
+
+**FIX shape:** Fix the engine's `G31` probe calculation to properly stop the tool at the contact point and prevent accumulation. 
+
+---
+*(record — turn-175 evidence scout, COMPLETED; instrumented coords below):*
+
+## 🚦 (DONE) TURN 175 — B-TRANS EVIDENCE-FIRST diagnosis [the scout that confirmed the primary-component root; no longer active]
+
+inc2a DONE (`deea0a4`, V10.48 — diag-travel field removed). NOW **B-TRANS**, the live bug the human demonstrated (2 screenshots).
+⚠ **The prior attempt FAILED by GUESSING** (worker flip-flopped: SVG misfinger, then a hypothesis). **EVIDENCE-FIRST this time — no
+hypothesis until the numbers are in.** [[verify-real-symptom-not-just-test]]
+
+**THE BUG (2 faces, human says "probably linked" — advisor agrees):**
+- **auto in-axis:** the trans-axis diagonal renders ~45°, does NOT join ② (drag ② right → diagonal doesn't retarget).
+- **manual in-axis:** the diagonal REVERSES — runs AWAY from the stock.
+
+**ADVISOR's grounded read (CONFIRM, don't assume):** `transTraverse` (middleWizard.js:104-124) emits a 2-axis move = (pmove, smove).
+`smove = ±#21` (DERIVED from ② → already tracks ②). `pmove` is the suspect: **auto** = `[#53-#52-retract±#6]` (a fixed recovered
+position, NOT ②); **manual** = `±#21` with the `dir1` sign (wrong-way → reverses). So the **PRIMARY component** looks like the shared root.
+
+**INSTRUMENT (human's exact config: boss, X, probe-both; run BOTH auto + manual in-axis; ② dragged off-default):**
+- the ACTUAL transV segment START `(x1,y1)` + END `(x2,y2)` — real numbers — vs ②'s actual position + the END-OF-X-PROBE position.
+- confirm/refute: is it the **PRIMARY** component (pmove) in both cases? auto = fixed-recovered-not-②? manual = wrong sign?
+- is it the EMIT (the move coords) or the RENDER (the segment anchor)? (advisor read = emit, since the trace draws segs faithfully — CONFIRM.)
+- **the FIX shape:** the diagonal must run END-OF-PROBE → ②'s FULL position — derive the PRIMARY from ② (a #21-like primary value) like
+  the secondary already is. Scope it. ⚠ NOTE: the macro can't know ② (sim-only) — but #21 is GUI-derived from ², so a primary peer is too.
+
+**⚠ NO FIX until the numbers confirm the root.** Report: the instrumented coords, the confirmed root, the proposed fix + scope. GATE. WORK-LOG + pass.
+
+**⊕ HUMAN CLARIFICATION (t174, FOLD INTO THE FIX):** the auto/manual in-axis modes serve DIFFERENT consumers — **AUTO = the EMIT**
+(the macro auto-traverses → the dragged ② must drive the EMITTED move, both axes) · **MANUAL = the SIM** (the operator jogs, macro
+pauses → ② is the sim jog target). The **GUI jog dragger (the draggable ②) must be live in BOTH modes — today only MANUAL honors it.**
+So the fix = ONE dragged ② drives BOTH consumers (auto-emit + manual-sim), and ② is draggable in auto too. This is the same root as the
+primary-component bug (auto ignores ②'s primary → 45°; manual reads ② but wrong sign → reverse).
+
+**QUEUED (firing in order, release each):** safe-Z primitive ROLLOUT to the remaining wizards (byte-identical each) · inc 2 rotary
+bar (sim reads the declared cylinder → kills `min(sy,sz)/2` + `−R`) · unify-pass (delete `radiuscomp.spaced` + the fit brackets) ·
+pre-existing rotary active-WCS bug · then **item 4 proper** (the unified travel/START model — `SPATIAL-MODEL-SPEC.md` §C).
+
+**QUEUED AFTER:** **4 · TRAVEL-GUI = the unified travel/START model** (START POS = source, TRAVEL derived; diag-travel field
+REMOVED; config-driven start markers incl. Z-first/both-axis 4th+5th; absorbs the edge reach→start + B-TRANS-ANGLE; middle is
+the crux — see MIDDLE-PROBE-BACKLOG).
+
+### 📌 Increment 2 — ❌ DROPPED (human, t113: "really it's not worth it"). No comp GUI.
+inc1 (the sim consuming the op's radius `#6`) is the whole thing — the radius field already exists ("just put 2"). The ONLY
+conceivable add is letting PROBE RADIUS accept a `#`-reference so you can type real G-code `#110` → `#6=#110` (resolved from
+the profile) — **no GUI either way.** A dedicated compensation GUI is NOT worth it; **if ever revisited it belongs in
+SETTINGS, not the wizard.** Variables kept for reference only (advisor, t113):
+```
+ controller-var source — the native probe-comp variable, per profile:
+   V4.1    #110 = probe tip DIAMETER  → radius = #110/2   (native probe-vertex.nc: G92 X#118+[#110/2+#111])
+           #111 / #112 = extra X / Y edge offset (added on top of the radius)
+   Expert  #110 = ball RADIUS (Z)  ·  #111 = ball RADIUS (XY)   (3D-probe macro uservars, operator-entered via #2070)
+ GOTCHAS the reader must handle: V4.1 stores DIAMETER (÷2), Expert stores RADIUS as-is; Expert splits Z vs XY.
+ choice: controller-var (default = machine truth) | custom mm (override).
+ ⚠ SOURCE RESOLUTION (human, t113): the controller-var value resolves **CUSTOM > LIVE PULL > DDCS FACTORY DEFAULT**.
+   **Nothing is greyed/disabled** — controller-var ALWAYS shows a number: no pull → the factory default; even that unset
+   → 0. The only UI job is **PROVENANCE** — label which one it is (custom / from-controller / factory-default) so the user
+   knows. (V4.1 `#110` is a real setting with a genuine factory default; Expert ball-R `#110/#111` is an operator-entered
+   `#2070` uservar → may read 0 until pulled/entered — still a value, still not greyed.)
+ FIELD = REAL G-CODE (human, t113 — "like a real gcode"): the PROBE RADIUS field just holds a G-code value and emits it
+   verbatim — type `#110` → `#6=#110` (the macro reads the controller's value at runtime; the sim resolves `#110` from the
+   profile, machine-truth, live, nothing baked) — or type `2` → `#6=2` (literal). ⇒ **NO source-picker GUI / mode toggle**:
+   "controller-var vs custom" is just *whether you typed `#110` or `2`*. This is a **G-code-DRIVER field** (field→macro→sim
+   runs it) — coherent by construction, EXEMPT from the declare-the-seam concern [[declared-seam-before-declaring-gui]].
+   Real work shrinks to: (a) let PROBE RADIUS accept a `#`-reference (not number-only); (b) ensure `#110` is populated in the
+   sim from the profile; (c) optional per-profile HINT ("`#110` = your tip Ø", V4.1 `#110`/Expert `#110`/`#111`).
+```
+
+**QUEUED AFTER:** 3c RED-CROSSHAIR datum visual · 4 TRAVEL-GUI (all transitions).
+
+Full batch + bug state → [`MIDDLE-PROBE-BACKLOG.md`](MIDDLE-PROBE-BACKLOG.md) + [`TWO-WCS-DATUM-SPEC.md`](TWO-WCS-DATUM-SPEC.md).
+
+---
+
 ## ⭐ Current state (2026-06-27) — READ THIS FIRST
 **LATEST — the CANVAS-WIDGET consolidation advanced through Stage 2 (COMPLETE) into Stage 3 (started).** 9 commits,
 **local / NOT pushed** (no `.ver` bump → pushing triggers no release), full suite **329 green** (lone flake = known
@@ -796,3 +943,4 @@ this session.
 - **RECENT (suspect for the render regressions)**: B0 (`1e6a909`), B1 (`4403833`), B3 (`c03b80a`), end-retract (`af9e574`).
 - **PARKED**: track-stock · B2/B4/B5 ([SIM-BLOCK-STACK-BACKLOG.md](SIM-BLOCK-STACK-BACKLOG.md)) · MG1/MG2 ([FEATURE-CANVAS-PROBE-SCOPE.md](FEATURE-CANVAS-PROBE-SCOPE.md)) · edge/corner end-offset · inc-3 jog-IR · the radial+@flank vocab pick · the multi-op `_pass` concat drift.
 
+**✅ TURN-101 (advisor, code-fix per human 'fix it yourself'): the start-at-WCS regression is REVERTED.** ROOT (git-confirmed, the human's instinct): `af9e574` (end-retract) added `MM(#53)/#56` = **G53** moves; `GcodeExecutionEngine.js:227/925` — a G53 (or G90) move makes the path START-INDEPENDENT → `stats.absolute=true` → `createPreviewPanel:355` `_anchorToStart=false` → `gcodeViz3d:514` anchors at `{0,0,0}` (WCS), NOT the per-pass start ①. REVERTED in `cbdc44d` (+ docs committed `adbdb3a`). **PENDING human render-verify** (single-axis boss → probe starts at ①). Trade-offs: the offset-END is back (re-do the retract with an INCREMENTAL G91 return, NOT G53); **circular** middle (`middleWizard.js:158`) has a PRE-EXISTING `MM(#53)` G53 → same flip for circular (parked). [[g53-move-breaks-preview-start-anchor]]

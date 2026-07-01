@@ -7,13 +7,14 @@
  * handshake simulation and probe collision detection.
  */
 
-import { resetVirtualIO, setVirtualOutput, getVirtualInput, injectVirtualInput, triggerProbeCollision, resolveVirtualPin, ioState } from './virtualIO.js';
+import { resetVirtualIO, setVirtualOutput, getVirtualInput, injectVirtualInput, triggerProbeCollision, resolveVirtualPin, ioState, setLimitSwitches } from './virtualIO.js';
 import { tokenizeWords } from './core/tokenizer.js';
 import { evalExpr, validateExpression } from './core/expression.js';
 import { evaluateCondition, validateCondition } from './core/condition.js';
 import { loadProgram as loadProgramText, stripLine } from './core/program.js';
 import { arcPoints } from './core/arc.js';
 import { rayBox, rotaryAxisOf, stockProbeStop } from './probeGeometry.js';
+import { limitSwitchTrips, axisSpan } from './limitSwitches.js';
 
 // Machine-DRO register bases per dialect (X=base, Y=+1, Z=+2, A=+3): Expert #880, V4.1 #1500, DM500 #864, rs274 #5420.
 // read-machine (RM) reads ITS dialect's base; the sim populates them ALL (cheap, dialect-agnostic) so RM returns the real
@@ -496,6 +497,16 @@ export class GcodeExecutionEngine {
     // Populate the machine DRO registers (all dialect bases) with the tool's CURRENT machine position so read-machine (RM)
     // returns the real coord. Machine space = stock space = the current pass's operator start (O) + the local position —
     // the SAME frame the probe trigger uses (#1925 = O + target). A=0 (no rotary axis tracked). Guarded to pure-sim.
+    _updateLimits() {
+        const mPos = {
+            x: this.pos.x + (this._wcsOffset.x || 0),
+            y: this.pos.y + (this._wcsOffset.y || 0),
+            z: this.pos.z + (this._wcsOffset.z || 0)
+        };
+        const S = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings() : {};
+        setLimitSwitches(limitSwitchTrips(mPos, S.machine, S.limits));
+    }
+
     _updateDro() {
         if (!this._populateDro) return;
         const O = (this._passStarts && this._passStarts[this._pass]) || this._stockOffset || { x: 0, y: 0, z: 0 };
@@ -510,6 +521,7 @@ export class GcodeExecutionEngine {
         if (!mv) return;
         this._move = null;
         this.pos = { ...mv.to };
+        this._updateLimits();
         if (typeof this.onPositionChange === 'function') {
             this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z, pass: this._pass });   // INC4: per-pass anchor
         }
@@ -828,10 +840,15 @@ export class GcodeExecutionEngine {
                     const machine = s.machine || {};
                     const cfg = ((s.homing || {}).axes || {})[AX] || {};
                     const travel = AX === 'z' ? num(machine.z, -120) : num(machine[AX], 300);
-                    // Home end follows the SIGNED travel (its sign = home direction); an explicit cfg.dir overrides.
-                    const end = (cfg.dir === '+' ? Math.abs(travel) : cfg.dir === '-' ? -Math.abs(travel) : travel) + num(cfg.offset, 0);
-                    // Final homed spot = home end backed off toward centre, so it isn't sitting on the switch (proxy parity).
-                    const homePos = end - Math.sign(end || 1) * num(cfg.backoff, 5);
+                    const { homeSide, lo, hi } = axisSpan(travel);
+                    // Home end follows the SIGNED travel (home is at machine-0). An explicit cfg.dir overrides.
+                    let endPos = homeSide === 'min' ? lo : hi;
+                    if (cfg.dir === '+') endPos = hi;
+                    else if (cfg.dir === '-') endPos = lo;
+                    const end = endPos + num(cfg.offset, 0);
+                    // Final homed spot = home end backed off toward centre, so it isn't sitting on the switch
+                    const seekSign = endPos === hi ? 1 : -1;
+                    const homePos = end - seekSign * num(cfg.backoff, 5);
                     homedMove = { axis: AX, machine: Math.round(homePos * 1000) / 1000 };
                 }
                 this.vars.set(1515 + N, 1);   // homed flag #[1515+N] — the controller sets it on real hardware
@@ -879,6 +896,7 @@ export class GcodeExecutionEngine {
                 return false;   // ticks now advance the move; next line runs when it lands
             }
             this.pos = target;
+            this._updateLimits();
             if (typeof this.onPositionChange === 'function') this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
             this.ip += 1;
             return false;
@@ -1017,11 +1035,7 @@ export class GcodeExecutionEngine {
                     this.vars.set(1925, O.x + target.x);
                     this.vars.set(1926, O.y + target.y);
                     this.vars.set(1927, O.z + target.z);
-                }
-                if (this._traceSink) {
-                    // Trace/preview: a virtual probe always "detects" at its landing point, so macros take
-                    // their success branch and probe loops (IF #1920+ax!=2 GOTO …) terminate instead of
-                    // running to the step cap. Same hands-free contract as autoAnswer for M31/M33 waits.
+                } else if (this._traceSink) {
                     for (const a of scannedAxes) this.vars.set(PROBE_STATUS_VAR[a], 2);
                     this.vars.set(1925, O.x + target.x);
                     this.vars.set(1926, O.y + target.y);
@@ -1042,6 +1056,7 @@ export class GcodeExecutionEngine {
                     line: step.lineIndex,   // source line → lets the preview seek the tool to a clicked code line
                 });
                 this.pos = target;
+                this._updateLimits();
                 this.ip += 1;
                 return false;
             }
@@ -1065,6 +1080,7 @@ export class GcodeExecutionEngine {
                 if (touchName) this._touchPulse(touchName);
             }
             this.pos = target;
+            this._updateLimits();
             if (typeof this.onPositionChange === 'function') {
                 // Sub-frame move (no in-flight _move): report the current REPOSITION pass so the live tool anchors to
                 // starts[_pass] like the animated path (line ~481) + the landing (_finishMove). WITHOUT this, a short
@@ -1092,6 +1108,7 @@ export class GcodeExecutionEngine {
                     prev = pts[i];
                 }
                 this.pos = target;
+                this._updateLimits();
             }
         } else {
             // Arc (G2/G3) in real-time play: walk the linearized arc so the curve actually animates. Direction

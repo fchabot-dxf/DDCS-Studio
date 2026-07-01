@@ -41,7 +41,7 @@ export const SURFACING_DEFAULTS = {
 //   0 progstart · 1 wcs · 2 placeonstock · 3 stepdown · 4 surfacefill · 5 progend
 // (clearance is deliberately NOT bound — frontier #3 fan-out to progstart + the surfacefill leaf. surfacefill's
 //  shape/x/y/z/direction stay at their constants: shape='rect', x=y=0 [local], z='z', direction='bothways'.)
-export const SURFACING_BINDINGS = [
+const SURFACING_EXEC_BINDINGS = [
     { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: SURFACING_DEFAULTS.wcs },
     // placement scalars (block 2, placeonstock) — origin owned by the placement now (region is local-0-based)
     { param: 'originX', blockIndex: 2, key: 'offX', type: 'number', default: SURFACING_DEFAULTS.originX },
@@ -65,10 +65,28 @@ export const SURFACING_BINDINGS = [
     { param: 'plunge', blockIndex: 4, key: 'plunge', type: 'number', default: SURFACING_DEFAULTS.plunge },
 ];
 
+const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
+export const SURFACING_BINDINGS = SURFACING_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
+
 export const SURFACING_DATA_OPTYPE = 'user_surfacing_data';
 
 /** Build the surfacing-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. The template
  *  is surfacingStack(defaults) with ids stripped (userOpFromStack does both) — the canonical valid-by-construction stack. */
 export function surfacingDataDef() {
-    return userOpFromStack('surfacing_data', 'Surfacing (data)', surfacingStack(SURFACING_DEFAULTS), SURFACING_BINDINGS, 'form3d');
+    const exec = surfacingStack(SURFACING_DEFAULTS);
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [
+            { type: 'panel', params: { panel: 'form3d' } },
+            { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
+            {
+                type: 'param_group',
+                params: { group: 'Surfacing' },
+                children: [],
+            },
+        ],
+        children: exec,
+    }];
+    return userOpFromStack('surfacing_data', 'Surfacing (data)', stack, SURFACING_BINDINGS, 'form3d', null, 'mill_datawiz');
 }

@@ -64,3 +64,42 @@ test('declared custom-op sim intent persists + re-registers via loadUserOps', as
   expect(r.beforeReload, 'cleared registry → no intent').toBe(false);
   expect(r.afterReload, 'loadUserOps re-registers the DECLARED intent from storage').toBe(true);
 });
+
+test('template sim block is canonical; legacy def.sim remains fallback', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio);
+
+  const r = await page.evaluate(async () => {
+    localStorage.removeItem('ddcs_user_ops');
+    const U = await import('/blocks/userOps.js');
+    const sim = await import('/viz/opSimContext.js');
+
+    // Canonical path: stack declares a sim block (all false => explicit null intent),
+    // so a conflicting legacy def.sim must be ignored.
+    U.createUserOp({
+      opType: 'user_stack_canon',
+      label: 'Stack Canon',
+      template: [
+        { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
+        { type: 'move', params: { mode: 'rapid', x: 1 } },
+      ],
+      bindings: [],
+      panel: 'form3d',
+      sim: { showRotaryRig: true },
+    });
+    const stackCanon = sim.opSimContext('user_stack_canon');
+
+    // Compatibility fallback: no sim block in template => def.sim still applies.
+    U.createUserOp(U.userOpFromStack('legacy_fallback', 'Legacy Fallback',
+      [{ type: 'move', params: { mode: 'rapid', x: 2 } }], [], 'form3d', { showRotaryRig: true }));
+    const legacyFallback = sim.opSimContext('user_legacy_fallback');
+
+    U.deleteUserOp('user_stack_canon');
+    U.deleteUserOp('user_legacy_fallback');
+    localStorage.removeItem('ddcs_user_ops');
+    return { stackCanon, legacyFallback };
+  });
+
+  expect(r.stackCanon.showRotaryRig, 'stack sim block (all false) explicitly clears intent; legacy def.sim is ignored').toBe(false);
+  expect(r.legacyFallback.showRotaryRig, 'without a stack sim block, legacy def.sim still applies').toBe(true);
+});

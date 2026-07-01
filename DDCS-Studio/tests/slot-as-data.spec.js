@@ -56,10 +56,35 @@ test('slot-as-data: byte-identical G-code to slotStack across a param sweep + bi
     // generic sentinels suffice; the placement datum codes are stored RAW in the socket and only parsed at emit).
     const sentinelFor = (b) => (b.type === 'number' ? 4242 : '__SENTINEL__');
     const wiringFails = [];
+    const REF_BINDINGS = [
+      { param: 'wcs', blockIndex: 1, key: 'wcs' },
+      { param: 'originX', blockIndex: 2, key: 'offX' },
+      { param: 'originY', blockIndex: 2, key: 'offY' },
+      { param: 'stockAttach', blockIndex: 2, key: 'stockAttach' },
+      { param: 'pathDatum', blockIndex: 2, key: 'pathDatum' },
+      { param: 'stockDatum', blockIndex: 2, key: 'stockDatum' },
+      { param: 'stockW', blockIndex: 2, key: 'stockW' },
+      { param: 'stockH', blockIndex: 2, key: 'stockH' },
+      { param: 'stockZ', blockIndex: 2, key: 'stockZ' },
+      { param: 'offZ', blockIndex: 2, key: 'offZ' },
+      { param: 'ax', blockIndex: 3, key: 'x0' },
+      { param: 'ay', blockIndex: 3, key: 'y0' },
+      { param: 'bx', blockIndex: 3, key: 'x1' },
+      { param: 'by', blockIndex: 3, key: 'y1' },
+      { param: 'width', blockIndex: 3, key: 'width' },
+      { param: 'toolDia', blockIndex: 3, key: 'tool' },
+      { param: 'stepoverPct', blockIndex: 3, key: 'stepoverPct' },
+      { param: 'depth', blockIndex: 3, key: 'depth' },
+      { param: 'stepdown', blockIndex: 3, key: 'stepdown' },
+      { param: 'feed', blockIndex: 3, key: 'feed' },
+      { param: 'plunge', blockIndex: 3, key: 'plunge' },
+    ];
+    const refOf = (param) => REF_BINDINGS.find((x) => x.param === param);
     for (const b of SLOT_BINDINGS) {
       const sent = sentinelFor(b);
+      const r = refOf(b.param);
       const dataSock = (flattenBlocks(dataBuilder(S({ [b.param]: sent })))[b.blockIndex] || {}).params || {};
-      const refSock = (flattenBlocks(slotStack(S({ [b.param]: sent })))[b.blockIndex] || {}).params || {};
+      const refSock = (flattenBlocks(slotStack(S({ [b.param]: sent })))[(r ? r.blockIndex : b.blockIndex)] || {}).params || {};
       const dataOk = dataSock[b.key] === sent, refOk = refSock[b.key] === sent;
       if (!dataOk || !refOk) wiringFails.push({ param: b.param, blockIndex: b.blockIndex, key: b.key, dataOk, refOk });
     }

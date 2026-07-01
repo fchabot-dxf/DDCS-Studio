@@ -14,7 +14,8 @@ import { recordOp } from '../../blocks/opRecord.js';
 import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
 import { flattenBlocks } from '../../blocks/userOps.js';   // group: index the stored children for the live preview
-import { panelType, renderLayout2D } from '../ops/panelTypes.js';
+import { panelType, renderLayout2D, renderDeclaredLayout } from '../ops/panelTypes.js';
+import { opSimContext } from '../../viz/opSimContext.js';    // DECLARED preview intent (registerUserOp → setUserSimIntent)
 
 // Apply the form values to a COPY of a group's stored children (via the bindings' blockIndex/key) → the records emit
 // walks for the live code preview. A group has no builder; its children ARE the program. The real writeback to the
@@ -35,9 +36,35 @@ let _seed = null;         // params to seed the widgets with (edit), or null (de
 let _readers = [];        // [() → { param: value }] one per rendered widget unit
 let _mgr = null;
 
-/** The manager sets the def before opening (resolved from the type). Also picks the panel layout. */
+const isDataPortOp = (def) => {
+    if (!def || typeof def !== 'object') return false;
+    if (typeof def.opType === 'string' && def.opType.endsWith('_data')) return true;
+    return typeof def.group === 'string' && def.group.endsWith('_datawiz');
+};
+
+function withBuiltInLikeSections(def, bindings) {
+    if (!isDataPortOp(def)) return bindings;
+    const hasAnySection = (bindings || []).some((b) => b && typeof b.section === 'string' && b.section.trim());
+    if (hasAnySection) return bindings;
+    const sectionFor = (param) => {
+        const p = String(param || '').toLowerCase();
+        if (/^(wcs)$/.test(p)) return 'SETUP';
+        if (/^(stockattach|pathdatum|stockdatum|stockw|stockh|stockz|originx|originy|offz|offx|offy)$/.test(p)) return 'PLACEMENT';
+        if (/^(tool|tooldia|rpm|feed|plunge|stepover|stepoverpct|stepdown|depth|peck|clearance|strategy|method|side)$/.test(p)) return 'TOOL & CUT';
+        if (/^(shape|x0|y0|w|h|dia|sides|pattern|cols|rows|dx|dy|count|spacing|angle|startangle|nx|ny|skip|text|font|align|slant|size)$/.test(p)) return 'GEOMETRY';
+        return 'PARAMETERS';
+    };
+    return (bindings || []).map((b) => ({ ...b, section: sectionFor(b && b.param) }));
+}
+
+/** The manager sets the def before opening (resolved from the type). */
+// registerUserOp already resolves panel/layout/sim from the template blocks at
+// save/register time (userOps.resolvePanelMeta / resolveLayoutMeta / resolveSimMeta),
+// writing def.panel and def.layout, and calling setUserSimIntent/setUserSimStarts.
+// setUserOpDef just reads the pre-resolved values — no template-scanning needed.
 export function setUserOpDef(def) {
-    _def = def || null; _seed = null;
+    _def = def && typeof def === 'object' ? def : null;
+    _seed = null;
     userOpView.twoPane = panelType(_def && _def.panel).viz;   // form-only → single pane (open() reads view.twoPane)
 }
 
@@ -52,7 +79,7 @@ function render() {
     if (!host || !_def) return;
     host.innerHTML = '';
     // seed: override each binding's default with the op's param when editing (so the widgets show its values)
-    const binds = (_def.bindings || []).map((b) => (_seed && (b.param in _seed)) ? { ...b, default: _seed[b.param] } : b);
+    const binds = withBuiltInLikeSections(_def, (_def.bindings || []).map((b) => (_seed && (b.param in _seed)) ? { ...b, default: _seed[b.param] } : b));
     _readers = _def.bindings && _def.bindings.length
         ? renderOpForm(host, binds)
         : (host.appendChild(Object.assign(document.createElement('div'), { textContent: 'No parameters — inserts as-is.', style: 'opacity:.6;margin:8px 0;' })), []);
@@ -64,7 +91,7 @@ function render() {
         host.addEventListener('change', u);
     }
     const usage = el('wiz_user_usage');
-    if (usage) usage.textContent = (_def.label || 'Custom op') + ' — your custom wizard.';
+    if (usage) usage.textContent = (_def.label || 'Wizard') + ' wizard.';
 }
 
 export const userOpView = {
@@ -77,6 +104,33 @@ export const userOpView = {
     probeSrcFields: {},         // keep the shared probe-source decorator a no-op
 
     onShow(mgr) { _mgr = mgr; applyPanel(); render(); },
+
+    // Render the 3D preview and apply any DECLARED sim context (rotary rig,
+    // machine frame, ATC magazine). Mirrors what built-in views do manually
+    // (previewMachine / previewRotaryFixture / previewMagazine), but driven
+    // by the declared `sim` block from the op's template — no per-view code.
+    _show3dPreview(mgr, gcode) {
+        mgr.preview3D(gcode, 'userVizContainer');
+
+        const ctx = opSimContext(_def.opType);          // from registerUserOp → setUserSimIntent
+        const sim = _def.sim || ctx;                    // legacy def.sim fallback (pre-save)
+
+        if (sim) {
+            // forceMachine: pin to the machine envelope (ATC, homing — G53 frame).
+            if (sim.forceMachine && mgr.previewMachine) {
+                mgr.previewMachine('userVizContainer', true);
+            }
+            // showRotaryRig: show the 4th-axis chuck + tailstock.
+            if (sim.showRotaryRig && mgr.previewRotaryFixture) {
+                mgr.previewRotaryFixture('userVizContainer', true);
+            }
+            // showMagazine: read magazine config from settings, render pockets.
+            if (sim.showMagazine && mgr.previewMagazine) {
+                const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+                mgr.previewMagazine('userVizContainer', s.atc ? (s.atc.pockets || []) : []);
+            }
+        }
+    },
 
     update(mgr) {
         _mgr = mgr;
@@ -97,10 +151,45 @@ export const userOpView = {
         }
         const codeEl = el('wiz_user_code');
         if (codeEl) codeEl.innerHTML = UIUtils.formatGCode(gcode);
-        // preview per panel type: 3D toolpath, a 2D stock layout, or nothing (form-only)
-        const pt = panelType(_def.panel), viz3d = document.querySelector('#wiz_user .wiz-viz3d');
-        if (pt.mode === '3d') { if (viz3d) viz3d.style.display = ''; mgr.preview3D(gcode, 'userVizContainer'); }
-        else if (pt.mode === '2d') { if (viz3d) viz3d.style.display = 'none'; const c = el('userVizContainer'); if (c) c.style.display = ''; renderLayout2D(c, _def, params); }
+
+        // ── Unified preview dispatch ──────────────────────────────────────
+        // renderDeclaredLayout reads both _def.panel AND _def.layout (both
+        // pre-resolved by registerUserOp) and returns true when it renders a
+        // declared layout (corner, drill-pattern, etc.). When it renders, the
+        // layout owns the preview space exclusively — no 3D/2D-generic overlap.
+        // When it returns false, the panel mode (form3d/form2d/form) drives the
+        // generic 3D preview or 2D binding-layout or nothing.
+        const viz3d = document.querySelector('#wiz_user .wiz-viz3d-host');
+        const c2d = el('userVizContainer');
+        const layout = el('userVizContainer2D');
+        const pt = panelType(_def.panel);
+
+        const hasLayout = renderDeclaredLayout(layout, _def, params);
+
+        if (hasLayout) {
+            // Declared layout owns the preview space — hides 3D + generic 2D.
+            if (viz3d) viz3d.style.display = 'none';
+            if (c2d) c2d.style.display = 'none';
+            if (layout) layout.style.display = '';
+        } else if (pt.mode === '3d' && mgr) {
+            // 3D preview: apply any declared sim context automatically
+            // (rotary rig, machine frame, ATC magazine — as declared by `sim` block).
+            if (viz3d) viz3d.style.display = '';
+            if (c2d) c2d.style.display = 'none';
+            if (layout) layout.style.display = 'none';
+            userOpView._show3dPreview(mgr, gcode);
+        } else if (pt.mode === '2d') {
+            // Generic 2D binding layout (form2d): inferred from param roles.
+            if (viz3d) viz3d.style.display = 'none';
+            if (c2d) c2d.style.display = '';
+            if (layout) layout.style.display = 'none';
+            renderLayout2D(c2d, _def, params);
+        } else {
+            // form-only: hide all previews.
+            if (viz3d) viz3d.style.display = 'none';
+            if (c2d) c2d.style.display = 'none';
+            if (layout) layout.style.display = 'none';
+        }
         const status = el('userVizStatus');
         if (status) status.textContent = (_def.label || 'custom') + ' · ' + (gcode.split('\n').length) + ' lines';
     },

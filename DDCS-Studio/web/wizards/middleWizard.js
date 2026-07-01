@@ -11,7 +11,7 @@
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
-import { probeSurfaceStack } from './ops/probeSurface.js';   // the shared probe primitive (middle composes it — t131 inc1)
+import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';   // the shared probe primitive (middle composes it — t131 inc1)
 import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
 import { travelOwn, travelOpp } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
@@ -44,13 +44,25 @@ export function middleStack(params = {}) {
     const safeZFrame = safeZFrameOf(params.safeZFrame);   // SPATIAL-MODEL 1c: relative (default) | machine (G53 final park)
     const clearOver = num(params.clearOver, 15);   // boss AUTO: how high to lift before crossing over the part
     // Boss-AUTO probe-both: the in-axis wall1→wall2 cross-over — the straight TRAVERSE that spans the feature, SEPARATE
-    // per axis (non-square boss). DECOUPLED from MAX PROBE: max-probe (#1) is the probe REACH (how far G31 searches);
-    // the cross-over is the TRAVERSE DISTANCE (how far to move across) — different things. It can't be computed before
-    // the probe (wall 2 is unknown), so it's USER-SET: a clean declared number ≈ feature width + 2×approach. Default 80
-    // (a moderate feature ~50 + 2×15 approach); the user tunes it to span THEIR feature. (Was [#1+#2] — that conflated
-    // reach with traverse and overshot when max-probe >> the feature.) String type → a raw expression still round-trips.
-    const crossX = (params.crossX === '' || params.crossX == null) ? '80' : String(params.crossX);
-    const crossY = (params.crossY === '' || params.crossY == null) ? '80' : String(params.crossY);
+    const isYFirst = (params.axis || 'X') === 'Y';
+    const sgn1 = dir1Plus ? 1 : -1;
+    const sgn2 = dir2Plus ? 1 : -1;
+    const defaultCross1X = isYFirst ? '0' : String(80 * sgn1);
+    const defaultCross1Y = isYFirst ? String(80 * sgn1) : '0';
+    const defaultCross2X = isYFirst ? String(80 * sgn2) : '0';
+    const defaultCross2Y = isYFirst ? '0' : String(80 * sgn2);
+
+    const cross1_x = (params.cross1_x !== undefined && params.cross1_x !== null && params.cross1_x !== '') ? String(params.cross1_x) :
+                     (!isYFirst && params.crossX !== undefined && params.crossX !== null && params.crossX !== '') ? String(params.crossX) : defaultCross1X;
+
+    const cross1_y = (params.cross1_y !== undefined && params.cross1_y !== null && params.cross1_y !== '') ? String(params.cross1_y) :
+                     (isYFirst && params.crossY !== undefined && params.crossY !== null && params.crossY !== '') ? String(params.crossY) : defaultCross1Y;
+
+    const cross2_x = (params.cross2_x !== undefined && params.cross2_x !== null && params.cross2_x !== '') ? String(params.cross2_x) :
+                     (isYFirst && params.crossX !== undefined && params.crossX !== null && params.crossX !== '') ? String(params.crossX) : defaultCross2X;
+
+    const cross2_y = (params.cross2_y !== undefined && params.cross2_y !== null && params.cross2_y !== '') ? String(params.cross2_y) :
+                     (!isYFirst && params.crossY !== undefined && params.crossY !== null && params.crossY !== '') ? String(params.crossY) : defaultCross2Y;
     // INC3: the TRANS-axis (X→Y) auto-traverse distance — a raw diagonal probe-move to the perpendicular walls. Default
     // 50 (a SANE fixed value, like the corner's travelDist) — NOT [#19+#20]/2 (≈ max-probe), which scaled with the probe
     // distance and overshot FAR off-stock when max-probe >> the feature. EDITABLE (the human tunes it so the 2nd-axis
@@ -99,10 +111,18 @@ export function middleStack(params = {}) {
         A('#1505', '1', 'Press Enter when repositioned'); IF('#1505', '==', '0', 2);
         MV('Z', '[0-#17]'); DM('inc');
     };
-    // Boss, AUTO: clear over the feature to the far side, hands-free. Uses the max probe distance #1 as the
-    // over-estimate of the feature width (the operator already sets it >= the feature for the probes to reach),
-    // so traversing #1+retract past the first face lands beyond the second; then drop back to probe height.
-    const traverseOver = (ax, firstPlus) => { const cv = ax === 'X' ? '#19' : '#20'; MV('Z', '#18'); MV(ax, firstPlus ? cv : `[0-${cv}]`); MV('Z', '[0-#18]'); };
+    // Boss, AUTO: clear over the feature to the far side, hands-free. Uses the 2D cross-over distances derived
+    // from the GUI markers (wall-1 to wall-2).
+    const traverseOver = (ax, firstPlus) => {
+        const isPrimary = ax === axis;
+        const cx = isPrimary ? '#19' : '#23';
+        const cy = isPrimary ? '#20' : '#24';
+        S.push(...safeTraverseStack({
+            mode: 'seq', crossX: cx, crossY: cy, lift: '#18', drop: '[0-#18]',
+            comment: 'auto-traverse to the opposite wall'
+        }));
+        DM('inc');
+    };
     // INC3: BOSS trans-axis AUTO traverse — hands-free move from the primary-axis walls across to the perpendicular
     // (secondary-axis) walls: lift, a 2-axis diagonal step of #21 (Diag travel) toward the secondary first wall, drop.
     // Emits "REPOSITION:" so the parser counts a NEW pass (the 2nd start ②). Signs follow dir1/dir2; the human tunes #21.
@@ -118,20 +138,12 @@ export function middleStack(params = {}) {
         // and a different per-pass frame, so keep its directional travel there. SECONDARY axis: travel OUT to ② by the
         // Diag-travel #21 (the one distance the macro can't measure before it probes that axis — the user tunes it).
         const lastRetract = dir1Plus ? '#10' : '#9';          // seq runs the last wall touch with !dir1Plus → its retract is #10 (+) / #9 (−)
-        // The tool sits at the wall-2 RAW contact + the last retract, but #52 is now the RADIUS-COMPED wall (the block comps it),
-        // so add the comp back to recover the tool's true position: raw = #52 + (dir1Plus ? +#6 : −#6). Keeps the re-centre EXACT
-        // (path value-identical) despite the comp moving into the walls.
-        // B-TRANS fix (b): UNIFORM primary move (auto + manual) → the diagonal targets ②'s primary coord (#22). Replaces
-        // auto's [#53-…] re-centre (now #22, which DEFAULTS to #53 so at-rest is value-identical) AND manual's wrong-sign
-        // ±#21 (the "runs away" bug). #52 cancels: tool sits at #52+rv+#6, move [#22-#52-rv±#6] lands at #22 = ②.X.
-        A('#22', diagPrimary, 'Diag primary: the diagonal X target — #53 (re-centre, measured NOW) at rest, or ②.X when the ② marker is placed');
-        const pmove = `[#22-#52-${lastRetract}${dir1Plus ? '-#6' : '+#6'}]`;
-        const smove = travelOpp(dir2Plus, '#21', '[0-#21]');  // secondary axis: out toward ② (opposite its first probe dir)
-        MV('Z', '#18');                                  // lift clear of the boss
-        MOVE({ [axis.toLowerCase()]: pmove, [second.toLowerCase()]: smove });   // re-centre the primary + travel out to ②
-        MV('Z', '[0-#18]');                              // back to probe height
-        C('REPOSITION: auto-traverse to the perpendicular walls');   // mark the Y pass (anchored to ②); no operator wait
-        DM('inc');
+        S.push(...safeTraverseStack({
+            mode: 'center', axis, second, dir1Plus, dir2Plus,
+            diagPrimary, diagTravel: '#21', wall2Var: '#52', radiusVar: '#6', lastRetract,
+            lift: '#18', drop: '[0-#18]',
+            comment: 'REPOSITION: auto-traverse to the perpendicular walls'
+        }));
     };
     const between = (ax, firstPlus) => {
         // The two opposite walls. POCKET probes both from the centre (no move - manual is N/A, never reposition).
@@ -160,12 +172,21 @@ export function middleStack(params = {}) {
     // (#21 no longer references #19/#20 — it's a fixed default — and the trans-axis re-centres to #53, so the cross-over no
     // longer needs to be assigned for the trans-axis's sake.)
     if (featureType === 'boss' && inAxis === 'auto') {
-        A('#19', crossX, 'X cross-over: in-axis traverse, wall 1 across to wall 2 (user-set to span the feature, default 80)');
-        A('#20', crossY, 'Y cross-over: in-axis traverse, wall 1 across to wall 2 (user-set to span the feature, default 80)');
+        A('#19', cross1_x, 'Primary axis cross-over (X-component, derived from GUI markers)');
+        A('#20', cross1_y, 'Primary axis cross-over (Y-component, derived from GUI markers)');
+        if (twoAxis) {
+            A('#23', cross2_x, 'Secondary axis cross-over (X-component, derived from GUI markers)');
+            A('#24', cross2_y, 'Secondary axis cross-over (Y-component, derived from GUI markers)');
+        }
     }
     if (featureType === 'boss' && transAxis === 'auto' && twoAxis) {
         A('#21', diagTravel, 'Diag travel: X→Y trans-axis auto-traverse distance (default 50; tune so the 2nd-axis probe reaches ②)');
     }
+    // Z-probe auto-traverse vector (TRAVEL-START)
+    const startX = (params.startX === '' || params.startX == null) ? '0' : String(params.startX);
+    const startY = (params.startY === '' || params.startY == null) ? '0' : String(params.startY);
+    const scanDepth = (params.scanDepth === '' || params.scanDepth == null) ? '5' : String(params.scanDepth);
+
     // NOTE: #22 (the diagonal's X target) is assigned INSIDE transTraverse — AFTER the primary seq measures #53 — because at
     // rest diagPrimary='#53' and #53 is only known post-probe (assigning it here would capture #53's initial 0).
     if (wcs === 'active') { A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'); A('#72', '[#71-1]', 'Zero-based index'); A('#70', '[805+[#72*5]]', 'Base WCS address'); }
@@ -179,7 +200,15 @@ export function middleStack(params = {}) {
         C('Z Surface - set Z datum first');
         touch('Z', false, '#57');                            // two-pass down-probe the top → #57 = the TRUE surface (the block comps it; −#6 relocated here)
         A('#[#70+2]', '#57', `Save ${wcsLabel} Z offset`);   // Z0 write — #57 is already radius-compensated by the block (was [#57-#6] inline; value-identical)
-        reposition('jog clear, to the first wall');           // Z pass done → reposition to the XY start (existing helper)
+        if (inAxis === 'auto') {
+            MV('Z', '#17');
+            MOVE({ x: startX, y: startY });
+            MV('Z', '[0-#17-' + scanDepth + ']');
+            C('REPOSITION: auto-traverse to the first wall');
+            DM('inc');
+        } else {
+            reposition('jog clear, to the first wall');
+        }
     }
 
     seq(axis, dir1Plus, 51);

@@ -29,6 +29,9 @@ const GROUPS = [
     { id: 'probe', label: 'Probe', section: 'center' },
     { id: 'atc', label: 'ATC', section: 'center' },
     { id: 'mill', label: 'Mill', section: 'center' },
+    { id: 'probe_datawiz', label: 'Probe Data Wiz', section: 'right' },
+    { id: 'atc_datawiz', label: 'ATC Data Wiz', section: 'right' },
+    { id: 'mill_datawiz', label: 'Mill Data Wiz', section: 'right' },
     { id: 'custom', label: 'Custom', section: 'center' },   // user ops land here by default (re-groupable)
 ];
 const BUILTINS = [
@@ -105,7 +108,15 @@ export function deleteGroup(id) {
 
 // ── the merged library (what the bar + Settings render from) ─────────────────────────────────────────────────
 function userEntries() {
-    return listUserOps().map((d) => ({ id: d.opType, type: d.opType, label: d.label || d.opType, icon: '✦', group: 'custom', kind: 'user', def: d }));
+    return listUserOps().map((d) => ({
+        id: d.opType,
+        type: d.opType,
+        label: d.label || d.opType,
+        icon: '✦',
+        group: d.group || 'custom',
+        kind: 'user',
+        def: d,
+    }));
 }
 
 /** Every entry (built-in + user), overrides applied, in a flat order-resolved list. */

@@ -193,21 +193,16 @@
               <div class="wiz-2pane">
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
-                <!-- Visualization container -->
-                <div class="viz-container">
-                    <div id="cornerVizStatus" class="viz-status"></div>
-                    <div id="cornerVizContainer" class="viz-canvas"></div>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="cornerVizStatus2D" class="viz-status">LAYOUT</div>
+                        <div id="cornerLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="cornerVizStatus" class="viz-status"></div>
+                        <div id="cornerVizContainer" class="viz-canvas"></div>
+                    </div>
                 </div>
-                
-                <!-- Viz Legend -->
-                <div class="viz-legend">
-                    <div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>
-                    <div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>
-                    <div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>
-                    <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
-                </div>
-
-
                 </div><!-- /.wiz-visual -->
                 <div class="wiz-controls">
                 <div class="wiz-usage">Use for <b>outside corners</b> (boss). Park probe in the open space near the corner at scan depth — clear of both walls. Macro probes each wall and sets WCS X and Y (and optionally Z) to the corner.</div>
@@ -252,8 +247,28 @@
                         <div><span class="label">RETRACT</span><input type="number" id="c_retract" value="5" title="Retract distance after fast probe, before slow pass (mm). Stored as #2. Used as #9=[0-#2] (neg) or #10=#2 (pos)."/></div>
                         <div><span class="label">PROBE RADIUS</span><input type="number" id="c_radius" value="2.0" step="0.001" title="Radius of the probe stylus ruby tip. Used for coordinate compensation."/></div>
                         <div><span class="label">SAFE Z</span><input type="number" id="c_safe_z" value="10" title="Z lift distance for moves between walls (mm). Stored as #19. Also used in plunge: #17=safeZ+scanDepth."/></div>
-                        <div><span class="label">DIAG TRAVEL</span><input type="number" id="c_travel_dist" value="50" title="Diagonal trans-axis reposition: distance to travel from the first wall across to set up the second-wall probe (mm) — the same diagonal-step idea as the middle's Diag travel. Stored as #15 (pos) / #16=[0-travel] (neg)."/></div>
                         <div><span class="label">SCAN DEPTH</span><input type="number" id="c_scan_depth" value="5" title="Extra Z plunge below safeZ before probing a wall (mm). #17=safeZ+scanDepth. #18=[0-#17]."/></div>
+                    </div>
+                </div>
+                
+                <!-- Cross Over Inputs -->
+                <div>
+                    <span class="section-label">MARKERS / TRAVEL</span>
+                    <div class="grid-2">
+                        <div>
+                            <span class="label">Z → XY TRAVERSE</span>
+                            <div class="coord-inputs">
+                                <label>X: <input type="number" id="c_start_x" title="Distance from Z-hover to Wall 1 (X)"/></label>
+                                <label>Y: <input type="number" id="c_start_y" title="Distance from Z-hover to Wall 1 (Y)"/></label>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="label">WALL 1 → WALL 2 TRAVERSE</span>
+                            <div class="coord-inputs">
+                                <label>X: <input type="number" id="c_cross1_x" title="Distance from Wall 1 to Wall 2 (X)"/></label>
+                                <label>Y: <input type="number" id="c_cross1_y" title="Distance from Wall 1 to Wall 2 (Y)"/></label>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
@@ -384,6 +399,9 @@
                         <input id="m_diag_travel" value="50" readonly title="Diag travel (#21) — DERIVED from the ② start marker (drag ② on the canvas); NOT directly editable. Default 50. The boss probe-both auto-trans diagonal ends ON ②."/>
                         <!-- B-TRANS fix (b): the diagonal's PRIMARY (X) target #22 — '#53' (re-centre) at rest, ②.X when the ② marker is placed (tieDiagTravel writes it). A readonly store like #21. -->
                         <input id="m_diag_primary" value="#53" readonly style="display:none" title="Diag primary (#22) — the diagonal's X target: #53 (re-centre) at rest, ②.X when the ② marker is placed. Drag-derived, not editable."/>
+                        <!-- Z-PROBE TRAVERSE (TRAVEL-START): the Z-probe start ① to XY-probe start ② vector -->
+                        <input id="m_start_x" value="0" readonly style="display:none" title="Derived X distance from Z-probe to first wall."/>
+                        <input id="m_start_y" value="0" readonly style="display:none" title="Derived Y distance from Z-probe to first wall."/>
                     </div>
                 </div>
 
@@ -442,9 +460,22 @@
                         <div><span class="label">RETRACT</span><input id="m_retract" value="2" title="Retract between fast and slow probe passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)."/></div>
                         <div><span class="label">SAFE Z</span><input id="m_safe_z" value="10" title="Z retract height between probing moves (mm). Stored as #17. Used as G0 Z#17."/></div>
                     </div>
-                    <div id="m_crossover_block" class="grid-2 hidden">
-                        <div><span class="label">X CROSS-OVER</span><input id="m_crossX" value="80" title="Boss probe-both (auto): the in-axis TRAVERSE distance — how far to move from the X wall 1 across to wall 2. This is the traverse, NOT the probe reach (Max Probe) — set it to span YOUR feature: ≈ feature width + 2×approach. Default 80 (a moderate feature). Stored as #19."/></div>
-                        <div><span class="label">Y CROSS-OVER</span><input id="m_crossY" value="80" title="Boss probe-both (auto): the in-axis TRAVERSE distance — how far to move from the Y wall 1 across to wall 2. Set it to span your feature (≈ feature width + 2×approach); separate from X for a non-square boss. Default 80. Stored as #20."/></div>
+                    <div class="grid-3" style="margin-top: 8px;">
+                        <div><span class="label">SCAN DEPTH</span><input type="number" id="m_scan_depth" value="5" title="Extra Z plunge below the Z-surface before probing the first wall (mm). Used when PROBE Z FIRST is checked."/></div>
+                    </div>
+                    <div id="m_crossover_block" class="hidden">
+                        <span class="label" style="margin-top: 8px;">CROSS-OVER 1 (WALL 1 → WALL 2)</span>
+                        <div class="grid-2">
+                            <div><span class="label">X TRAVERSE</span><input id="m_cross1_x" value="80" title="Primary axis traverse (X component). Derived from markers or typed."/></div>
+                            <div><span class="label">Y TRAVERSE</span><input id="m_cross1_y" value="0" title="Primary axis traverse (Y component). Derived from markers or typed."/></div>
+                        </div>
+                        <div id="m_crossover2_block" class="hidden">
+                            <span class="label" style="margin-top: 8px;">CROSS-OVER 2 (WALL 3 → WALL 4)</span>
+                            <div class="grid-2">
+                                <div><span class="label">X TRAVERSE</span><input id="m_cross2_x" value="0" title="Secondary axis traverse (X component). Derived from markers or typed."/></div>
+                                <div><span class="label">Y TRAVERSE</span><input id="m_cross2_y" value="80" title="Secondary axis traverse (Y component). Derived from markers or typed."/></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -500,11 +531,16 @@
               <div class="wiz-2pane">
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
-                <div class="viz-container">
-                    <div id="rotaryCenterVizStatus" class="viz-status"></div>
-                    <div id="rotaryCenterVizContainer" class="viz-canvas"></div>
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="rotaryCenterVizStatus2D" class="viz-status">LAYOUT</div>
+                        <div id="rotaryCenterLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="rotaryCenterVizStatus" class="viz-status"></div>
+                        <div id="rotaryCenterVizContainer" class="viz-canvas"></div>
+                    </div>
                 </div>
-
                 </div><!-- /.wiz-visual -->
                 <div class="wiz-controls">
                 <div id="rc_desc" class="wiz-usage"></div>
@@ -592,10 +628,8 @@
               <div class="wiz-2pane">
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
-                <div class="viz-container">
-                    <div id="rotaryClockVizStatus" class="viz-status"></div>
-                    <div id="rotaryClockVizContainer" class="viz-canvas"></div>
-                </div>
+                <div id="rotaryClockLayoutCanvas" class="wiz-layout-canvas"></div>
+                <div id="rotaryClockVizStatus" class="viz-status"></div>
 
                 </div><!-- /.wiz-visual -->
                 <div class="wiz-controls">
@@ -898,7 +932,11 @@
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-split">
-                    <div class="viz-container">
+                    <div class="viz-container wiz-viz2d">
+                        <div id="userVizStatus2D" class="viz-status">LAYOUT</div>
+                        <div id="userVizContainer2D" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container wiz-viz3d-host">
                         <div id="userVizStatus" class="viz-status"></div>
                         <div id="userVizContainer" class="viz-canvas"></div>
                     </div>
@@ -908,7 +946,7 @@
                 <div class="wiz-usage" id="wiz_user_usage">Custom op.</div>
                 <div id="wiz_user_form"></div>
                 <div class="preview-block">
-                    <span class="label">CODE PREVIEW</span>
+                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
                     <pre id="wiz_user_code"></pre>
                 </div>
                 </div><!-- /.wiz-controls -->
@@ -1317,26 +1355,17 @@
             <div id="wiz_alignment" class="wiz-body" style="display:none">
               <div class="wiz-2pane">
                 <div class="wiz-visual">
-
                 <span class="section-label">VISUALIZATION</span>
-
-                <!-- Viz placeholder -->
-                <div class="viz-container">
-                    <div id="alignmentVizStatus" class="viz-status"></div>
-                    <div id="alignmentVizContainer" class="viz-canvas">
-                        <!-- Alignment viz — SVG to be added in a future pass -->
+                <div class="viz-split">
+                    <div class="viz-container">
+                        <div id="alignmentVizStatus2D" class="viz-status">LAYOUT</div>
+                        <div id="alignmentLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container">
+                        <div id="alignmentVizStatus" class="viz-status"></div>
+                        <div id="alignmentVizContainer" class="viz-canvas"></div>
                     </div>
                 </div>
-
-                <!-- Viz Legend -->
-                <div class="viz-legend">
-                    <div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>
-                    <div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>
-                    <div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>
-                    <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
-                </div>
-
-
                 </div><!-- /.wiz-visual -->
                 <div class="wiz-controls">
                 <div class="wiz-usage">Jog probe to <b>point A</b> along the fence at probe height → Enter. Macro probes fence, lifts Z, pauses. Jog to <b>point B</b> along same fence → Enter. Macro probes again and reports drift, span and angle.</div>

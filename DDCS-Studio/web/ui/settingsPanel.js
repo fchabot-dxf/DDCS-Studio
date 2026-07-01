@@ -164,9 +164,9 @@ export const SETTINGS_DEFAULTS = {
     homing: {
         philosophy: 'sequential',
         axes: {
-            x: { enable: true,  order: 2, method: 'native', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
-            y: { enable: true,  order: 3, method: 'native', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
-            z: { enable: true,  order: 1, method: 'native', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
+            x: { enable: true,  order: 2, method: 'seek', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
+            y: { enable: true,  order: 3, method: 'seek', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
+            z: { enable: true,  order: 1, method: 'seek', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
             a: { enable: false, order: 4, method: 'setzero', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'setzero', continuous: true },
             b: { enable: false, order: 5, method: 'setzero', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'setzero', continuous: true }
         }
@@ -227,7 +227,7 @@ function mergeHoming(p) {
         const merged = { ...da, ...pa };
         delete merged.dual;                                        // drop the removed auto-squaring sub-config
         if (merged.method === 'dual') {                            // legacy dual → native master; keep its slave sync
-            merged.method = 'native';
+            merged.method = 'seek';
             if (!merged.slaveFollows && pa.dual && pa.dual.slaveIdx != null) merged.slaveFollows = String(pa.dual.slaveIdx);
         }
         out.axes[ax] = merged;

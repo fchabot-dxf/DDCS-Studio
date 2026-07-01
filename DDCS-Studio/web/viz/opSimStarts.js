@@ -48,10 +48,53 @@ const BUILT_IN = {
         const lead = params.probeZ ? [{ x: cx, y: cy, z: Math.min(5, sz * 0.5) }] : [];
 
         if (!boss) return [...lead, centre];                         // pocket: [Z?] then one pass from the centre
-        const prim = inAxisManual ? [outside(axis, dir1Plus), outside(axis, !dir1Plus)] : [outside(axis, dir1Plus)];
-        if (!twoAxis) return [...lead, ...prim];                     // single-axis: in-axis manual → 2 walls, auto → 1 (+ Z?)
-        const sec = inAxisManual ? [outside(second, dir2Plus), outside(second, !dir2Plus)] : [outside(second, dir2Plus)];
-        return [...lead, ...prim, ...sec];                           // [Z?] + primary + the trans pass (auto or manual) secondary
+        const p1 = outside(axis, dir1Plus);
+        const p2x = n(params.cross1_x), p2y = n(params.cross1_y);
+        const p2 = (!inAxisManual && Number.isFinite(p2x) && Number.isFinite(p2y)) ? { x: p1.x + p2x, y: p1.y + p2y, z: probeZ } : outside(axis, !dir1Plus);
+        const prim = inAxisManual ? [p1, p2] : [p1];
+        if (!twoAxis) return [...lead, ...prim];                     // single-axis: in-axis manual/auto → 2 walls (+ Z?)
+        const s1 = outside(second, dir2Plus);
+        const s2x = n(params.cross2_x), s2y = n(params.cross2_y);
+        const s2 = (!inAxisManual && Number.isFinite(s2x) && Number.isFinite(s2y)) ? { x: s1.x + s2x, y: s1.y + s2y, z: probeZ } : outside(second, !dir2Plus);
+        const sec = inAxisManual ? [s1, s2] : [s1];
+        return [...lead, ...prim, ...sec];                           // [Z?] + primary + the trans pass secondary
+    },
+
+    // CORNER — outside corner probing. Wall 1 is the first probed wall, Wall 2 is the second.
+    // Travel move spans from Wall 1 to Wall 2. The pass count matches reposition() calls.
+    corner(params, stock) {
+        const sx = n(stock && stock.x, 100), sy = n(stock && stock.y, 80), sz = n(stock && stock.z, 20);
+        const corner = params.corner || 'FL';
+        const zFirst = !!(params.probeZ || params.probeZFirst);
+        const seq = params.probeSeq || 'YX';
+        const safeZ = n(params.safeZ, 10), radius = n(params.radius, 2);
+        const dist = n(params.dist, 20), travel = n(params.travelDist, 20);
+        const cornerXY = { FL: [0, 0], FR: [sx, 0], BL: [0, sy], BR: [sx, sy] }[corner] || [0, 0];
+        const dir = { FL: [1, 1], FR: [-1, 1], BL: [1, -1], BR: [-1, -1] }[corner] || [1, 1];
+        const inFront = Math.max(8, Math.min(travel, dist * 0.3));
+        const nearEdge = Math.min(20, travel * 0.8);
+        const firstIsX = (seq !== 'YX');
+        
+        // Z hover marker
+        const lead = zFirst ? [{ x: cornerXY[0] + dir[0] * (radius + 5), y: cornerXY[1] + dir[1] * (radius + 5), z: safeZ }] : [];
+        
+        // Wall 1 marker: if Z first is true, we can travel to Wall 1 using explicitly typed start offsets.
+        const stx = n(params.startX), sty = n(params.startY);
+        const w1 = (zFirst && stx !== null && sty !== null) ? { x: lead[0].x + stx, y: lead[0].y + sty, z: safeZ } : {
+            x: cornerXY[0] + dir[0] * (firstIsX ? -inFront : nearEdge),
+            y: cornerXY[1] + dir[1] * (firstIsX ? nearEdge : -inFront),
+            z: safeZ
+        };
+        
+        // Wall 2 marker: read explicit cross-over inputs if present, else fallback to default corner travel calculation
+        const cx2 = n(params.cross1_x ?? params.cross1_dx), cy2 = n(params.cross1_y ?? params.cross1_dy);
+        const w2 = (cx2 !== null && cy2 !== null) ? { x: w1.x + cx2, y: w1.y + cy2, z: safeZ } : {
+            x: cornerXY[0] + dir[0] * (firstIsX ? nearEdge : -inFront),
+            y: cornerXY[1] + dir[1] * (firstIsX ? -inFront : nearEdge),
+            z: safeZ
+        };
+        
+        return [...lead, w1, w2];
     },
 
     // ALIGNMENT — probe A, reposition (jog to B along the fence), probe B → 2 passes. Spread A/B along the checkAxis so
@@ -97,6 +140,8 @@ const BUILT_IN = {
             { x: cx, y: cy + flankOff, z: flankZ },  // P3 — macro probes −Y → start the +Y side
         ];
     },
+
+    user_corner_port: (params, stock) => BUILT_IN.corner(params, stock),
 };
 
 // ── USER_* layer: a custom op DECLARES its per-pass sim-starts and registers a provider here (the wizard-maker seam) ───

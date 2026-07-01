@@ -59,10 +59,39 @@ test('text-as-data: byte-identical G-code to textStack across a param sweep + bi
     // EMIT, not the stack) so its socket stores the raw value — but pass a VALID 'center' to also prove the map routes.
     const sentinelFor = (b) => (b.type === 'number' ? 4242 : (b.param === 'align' ? 'center' : '__SENTINEL__'));
     const wiringFails = [];
+    const REF_BINDINGS = [
+      { param: 'originX', blockIndex: 3, key: 'offX' },
+      { param: 'originY', blockIndex: 3, key: 'offY' },
+      { param: 'offZ', blockIndex: 3, key: 'offZ' },
+      { param: 'stockAttach', blockIndex: 3, key: 'stockAttach' },
+      { param: 'pathDatum', blockIndex: 3, key: 'pathDatum' },
+      { param: 'stockDatum', blockIndex: 3, key: 'stockDatum' },
+      { param: 'stockW', blockIndex: 3, key: 'stockW' },
+      { param: 'stockH', blockIndex: 3, key: 'stockH' },
+      { param: 'stockZ', blockIndex: 3, key: 'stockZ' },
+      { param: 'depth', blockIndex: 4, key: 'to' },
+      { param: 'stepdown', blockIndex: 4, key: 'by' },
+      { param: 'text', blockIndex: 5, key: 'text' },
+      { param: 'font', blockIndex: 5, key: 'font' },
+      { param: 'height', blockIndex: 5, key: 'height' },
+      { param: 'width', blockIndex: 5, key: 'width' },
+      { param: 'slant', blockIndex: 5, key: 'slant' },
+      { param: 'spacing', blockIndex: 5, key: 'spacing' },
+      { param: 'align', blockIndex: 5, key: 'align' },
+      { param: 'x', blockIndex: 5, key: 'x' },
+      { param: 'y', blockIndex: 5, key: 'y' },
+      { param: 'strokeWidth', blockIndex: 5, key: 'strokeWidth' },
+      { param: 'toolDia', blockIndex: 5, key: 'toolDia' },
+      { param: 'stepoverPct', blockIndex: 5, key: 'stepoverPct' },
+      { param: 'feed', blockIndex: 5, key: 'feed' },
+      { param: 'plunge', blockIndex: 5, key: 'plunge' },
+    ];
+    const refOf = (param) => REF_BINDINGS.find((x) => x.param === param);
     for (const b of TEXT_BINDINGS) {
       const sent = sentinelFor(b);
+      const r = refOf(b.param);
       const dataSock = (flattenBlocks(dataBuilder(S({ [b.param]: sent })))[b.blockIndex] || {}).params || {};
-      const refSock = (flattenBlocks(textStack(S({ [b.param]: sent })))[b.blockIndex] || {}).params || {};
+      const refSock = (flattenBlocks(textStack(S({ [b.param]: sent })))[(r ? r.blockIndex : b.blockIndex)] || {}).params || {};
       const dataOk = dataSock[b.key] === sent, refOk = refSock[b.key] === sent;
       if (!dataOk || !refOk) wiringFails.push({ param: b.param, blockIndex: b.blockIndex, key: b.key, dataOk, refOk });
     }

@@ -12,6 +12,7 @@
  */
 import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
 import { buildRegions, paintRegions, regionValueFromEvent, regionLabel } from './regionPickSvg.js';
+import { HO, buildHomingSequence, paintHomingSequence, axisFromEvent } from './homingOrderSvg.js';
 import { FeatureCanvas } from '../viz/featureCanvas.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -72,6 +73,7 @@ function dropdownWidget(host, b) {
     host.style.cssText = ROW_CSS;
     const sel = document.createElement('select');
     sel.style.cssText = CTRL_CSS + ' min-width:120px;';
+    sel.dataset.param = b.param;
     for (const o of ((b.widgetConfig && b.widgetConfig.options) || [])) {
         const val = Array.isArray(o) ? o[1] : o, lab = Array.isArray(o) ? o[0] : o;
         const op = document.createElement('option');
@@ -92,6 +94,7 @@ function toggleWidget(host, b) {
     lab.innerHTML = '<input type="checkbox"><span class="ddcs-slider"></span>';
     const cb = lab.querySelector('input');
     cb.checked = !!b.default;
+    cb.dataset.param = b.param;
     host.append(labelSpan(b), lab);
     // a bool binding commits true/false; a numeric param-block toggle commits 1/0 (it lands in a numeric socket).
     const numeric = b.type === 'number' || b.type === 'int';
@@ -160,6 +163,37 @@ function regionPickWidget(host, b) {
     return { read: () => ({ [b.param]: numOr(cur, b.default ?? 0) }) };
 }
 
+// the HOMING ORDER control — a visual sequence picker for the homing wizard.
+function homingOrderWidget(host, b) {
+    const cfg = b.widgetConfig || {};
+    const configuredAxes = cfg.axes || ['x', 'y', 'z', 'a', 'b'];
+    host.style.cssText = 'display:flex; flex-direction:column; gap:6px; margin:10px 0;';
+    host.appendChild(labelSpan(b));
+    let cur = Array.isArray(b.default) ? [...b.default] : [];
+    
+    const svg = document.createElementNS(SVGNS, 'svg');
+    svg.setAttribute('width', HO.SPAN_X); svg.setAttribute('height', HO.SPAN_Y);
+    svg.setAttribute('viewBox', `0 0 ${HO.SPAN_X} ${HO.SPAN_Y}`);
+    svg.style.cssText = 'border:1px solid var(--border,#2a3340); border-radius:8px; background:var(--bg,#0b0f14); margin:4px 0;';
+    
+    const ui = buildHomingSequence(svg, configuredAxes);
+    const repaint = () => paintHomingSequence(ui, cur, '#00e5ff');
+    
+    svg.addEventListener('click', (e) => {
+        const ax = axisFromEvent(ui, e);
+        if (ax != null) {
+            const idx = cur.indexOf(ax);
+            if (idx >= 0) cur.splice(idx, 1);
+            else cur.push(ax);
+            repaint();
+            host.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    });
+    repaint();
+    host.appendChild(svg);
+    return { read: () => ({ [b.param]: cur }) };
+}
+
 // ── canvas pickers (multi-param) ─────────────────────────────────────────────────────────────────────────────
 // FORM-ONLY widgets built on FeatureCanvas (the same engine the built-in wizards' 2D layout uses): a draggable
 // handle drives several params at once. A canvas inside a Blockly block is deliberately NOT attempted — the block
@@ -223,27 +257,56 @@ export function buildCoordEditor(host, initial, onChange, cfg = {}) {
     });
     requestAnimationFrame(draw);
 
-    const row = document.createElement('div'); row.style.cssText = 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;';
+    let mode = 'rel'; // 'abs' | 'rel'
+    const row = document.createElement('div'); row.style.cssText = 'display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:4px;';
     const addBtn = document.createElement('button'); addBtn.type = 'button'; addBtn.className = 'cl-add'; addBtn.textContent = '＋ Point';
     addBtn.style.cssText = CTRL_CSS + ' cursor:pointer;';
     addBtn.addEventListener('click', () => { points.push({ x: r3(bd.ox + bd.w / 2), y: r3(bd.oy + bd.h / 2) }); renderList(); draw(); fire(); });
+    
+    const modeSel = document.createElement('select'); modeSel.style.cssText = CTRL_CSS + ' font-size:10px; padding:2px;';
+    modeSel.innerHTML = '<option value="rel">Relative</option><option value="abs">Absolute</option>';
+    modeSel.value = mode;
+    modeSel.addEventListener('change', () => { mode = modeSel.value; renderList(); });
+
     const zWrap = document.createElement('label'); zWrap.style.cssText = 'display:flex; align-items:center; gap:4px; font-size:11px;';
-    const zInp = document.createElement('input'); zInp.type = 'number'; zInp.step = 'any'; zInp.className = 'cl-z'; zInp.value = z; zInp.style.cssText = CTRL_CSS + ' width:80px;';
+    const zInp = document.createElement('input'); zInp.type = 'number'; zInp.step = 'any'; zInp.className = 'cl-z'; zInp.value = z; zInp.style.cssText = CTRL_CSS + ' width:60px;';
     zInp.addEventListener('input', () => { z = numOr(zInp.value, 0); fire(); });
-    zWrap.append(document.createTextNode('Z (shared)'), zInp);
-    row.append(addBtn, zWrap);
+    zWrap.append(document.createTextNode('Z'), zInp);
+    row.append(addBtn, modeSel, zWrap);
     host.appendChild(row);
 
-    const list = document.createElement('div'); list.className = 'cl-list'; list.style.cssText = 'font-size:11px; max-height:90px; overflow:auto;';
+    const list = document.createElement('div'); list.className = 'cl-list'; list.style.cssText = 'font-size:11px; max-height:120px; overflow:auto; margin-top:6px;';
     function renderList() {
         list.innerHTML = '';
         points.forEach((p, i) => {
-            const r = document.createElement('div'); r.style.cssText = 'display:flex; gap:6px; align-items:center; padding:2px 0;';
-            r.append(document.createTextNode(`${i + 1}: ${r3(p.x)}, ${r3(p.y)}`));
+            const isRel = mode === 'rel' && i > 0;
+            const prev = isRel ? points[i - 1] : { x: 0, y: 0 };
+            const vx = r3(p.x - prev.x), vy = r3(p.y - prev.y);
+
+            const r = document.createElement('div'); r.style.cssText = 'display:flex; gap:4px; align-items:center; padding:2px 0;';
+            const num = document.createElement('div'); num.style.cssText = 'width:16px; font-weight:bold;'; num.textContent = `${i + 1}:`;
+            
+            const xWrap = document.createElement('div'); xWrap.style.cssText = 'display:flex; align-items:center; gap:2px;';
+            const xInp = document.createElement('input'); xInp.type = 'number'; xInp.step = 'any'; xInp.value = vx; xInp.style.cssText = CTRL_CSS + ' width:48px;';
+            xWrap.append(document.createTextNode(isRel ? 'dx' : 'x'), xInp);
+
+            const yWrap = document.createElement('div'); yWrap.style.cssText = 'display:flex; align-items:center; gap:2px;';
+            const yInp = document.createElement('input'); yInp.type = 'number'; yInp.step = 'any'; yInp.value = vy; yInp.style.cssText = CTRL_CSS + ' width:48px;';
+            yWrap.append(document.createTextNode(isRel ? 'dy' : 'y'), yInp);
+
+            const update = () => {
+                const nx = numOr(xInp.value, vx), ny = numOr(yInp.value, vy);
+                points[i] = isRel ? { x: prev.x + nx, y: prev.y + ny } : { x: nx, y: ny };
+                renderList(); draw(); fire();
+            };
+            xInp.addEventListener('change', update); yInp.addEventListener('change', update);
+
             const del = document.createElement('button'); del.type = 'button'; del.className = 'cl-del'; del.textContent = '✕';
-            del.style.cssText = 'cursor:pointer; background:transparent; border:none; color:inherit; opacity:.6;';
+            del.style.cssText = 'cursor:pointer; background:transparent; border:none; color:inherit; opacity:.6; margin-left:auto; padding:0 4px;';
             del.addEventListener('click', () => { points.splice(i, 1); renderList(); draw(); fire(); });
-            r.appendChild(del); list.appendChild(r);
+
+            r.append(num, xWrap, yWrap, del);
+            list.appendChild(r);
         });
     }
     renderList();
@@ -325,6 +388,7 @@ export const FORM_WIDGETS = {
     text: textWidget,
     'corner-grid': cornerGridWidget,
     'region-pick': regionPickWidget,
+    'homing-order': homingOrderWidget,
     'coord-list': coordListWidget,
     'xy-pad': xyPadWidget,
     rect: rectPadWidget,
@@ -333,7 +397,7 @@ export const FORM_WIDGETS = {
 // widgets that bind a GROUP of params (the form renders ONE widget for the whole group, not one per binding).
 export const MULTI_WIDGETS = new Set(['xy-pad', 'rect']);
 
-const DEFAULT_BY_TYPE = { number: 'number', int: 'number', enum: 'dropdown', bool: 'toggle', string: 'text' };
+const DEFAULT_BY_TYPE = { number: 'number', int: 'number', enum: 'dropdown', bool: 'toggle', string: 'text', sequence: 'homing-order' };
 
 /** Pick the form widget for a binding: its declared `widget`, else a sensible default for its `type`. */
 export function resolveFormWidget(b) {
@@ -362,7 +426,20 @@ export function renderOpForm(host, bindings) {
         catch (e) { console.warn('widget render failed for', label, e); }
         host.appendChild(row);
     };
+    const sectionOf = (unit) => {
+        const first = Array.isArray(unit) ? unit[0] : unit;
+        return (first && typeof first.section === 'string') ? first.section.trim() : '';
+    };
+    let lastSection = null;
     for (const unit of units) {
+        const sec = sectionOf(unit);
+        if (sec && sec !== lastSection) {
+            const hdr = document.createElement('span');
+            hdr.className = 'section-label';
+            hdr.textContent = sec;
+            host.appendChild(hdr);
+            lastSection = sec;
+        }
         // A canvas multi-widget (xy-pad / rect) renders the whole group as ONE widget that owns its value. A
         // number-role group (2D point / rect declared as plain numbers) instead renders each member as its OWN
         // number field — each carries data-param so the Form+2D preview's role-derived handle can drag-write it,

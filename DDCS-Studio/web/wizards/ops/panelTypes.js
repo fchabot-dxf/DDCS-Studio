@@ -7,6 +7,7 @@
  */
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
+import { opSimStarts } from '../../viz/opSimStarts.js';
 
 export const PANEL_TYPES = {
     form:   { id: 'form',   label: 'Form only', viz: false, mode: null },   // single column, no preview
@@ -15,9 +16,28 @@ export const PANEL_TYPES = {
 };
 export const DEFAULT_PANEL = 'form3d';
 export const panelType = (id) => PANEL_TYPES[id] || PANEL_TYPES[DEFAULT_PANEL];
+export const LAYOUT_TYPES = {
+    none:         { id: 'none',         label: 'No layout' },
+    corner:       { id: 'corner',       label: 'Corner start layout' },
+    drill:        { id: 'drill',        label: 'Drill pattern' },
+    slot:         { id: 'slot',         label: 'Slot geometry' },
+    surfacing:    { id: 'surfacing',    label: 'Surfacing region' },
+    text:         { id: 'text',         label: 'Text outline' },
+    pocket:       { id: 'pocket',       label: 'Pocket region' },
+    contour:      { id: 'contour',      label: 'Contour profile' },
+    edge:         { id: 'edge',         label: 'Edge probe starts' },
+    middle:       { id: 'middle',       label: 'Middle probe starts' },
+    alignment:    { id: 'alignment',    label: 'Alignment probe starts' },
+    rotary_clock: { id: 'rotary_clock', label: 'Rotary clock probe' },
+    rotary_center:{ id: 'rotary_center',label: 'Rotary center probe' },
+};
+export const DEFAULT_LAYOUT = 'none';
+export const layoutType = (id) => LAYOUT_TYPES[id] || LAYOUT_TYPES[DEFAULT_LAYOUT];
 
 const num = (v, d = 0) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 const r3 = (n) => Math.round(n * 1000) / 1000;
+const cornerLayout = new FeatureCanvas();
+const cornerState = new WeakMap();
 
 // A param is WRITABLE from the 2D canvas only if the form rendered it as a settable field (data-param). Number/slider
 // fields are; multi-param canvas widgets (xy-pad) own their value internally, so we DON'T put a (dead) preview handle
@@ -25,6 +45,85 @@ const r3 = (n) => Math.round(n * 1000) / 1000;
 const _field = (name) => (typeof document !== 'undefined') ? document.querySelector('#wiz_user_form [data-param="' + (window.CSS ? CSS.escape(name) : name) + '"]') : null;
 const _writable = (name) => !!_field(name);
 function _writeParam(name, val) { const f = _field(name); if (f) { f.value = r3(val); f.dispatchEvent(new Event('input', { bubbles: true })); } }
+
+function cornerParamsFromForm() {
+    return {
+        corner: _field('corner')?.value || 'FL',
+        probeSeq: _field('probeSeq')?.value || 'YX',
+        probeZFirst: _field('probeZFirst')?.checked || false,
+        wcs: _field('wcs')?.value || 'active',
+        dist: _field('dist')?.value || 500,
+        retract: _field('retract')?.value || 5,
+        f_fast: _field('f_fast')?.value || 200,
+        f_slow: _field('f_slow')?.value || 50,
+        port: _field('port')?.value || 3,
+        level: _field('level')?.value || 0,
+        safeZ: _field('safeZ')?.value || 10,
+        scanDepth: _field('scanDepth')?.value || 5,
+        radius: _field('radius')?.value || 2,
+        startX: _field('startX')?.value || 0,
+        startY: _field('startY')?.value || 0,
+        cross1_x: _field('cross1_x')?.value || 0,
+        cross1_y: _field('cross1_y')?.value || 0,
+        syncA: _field('syncA')?.checked || false,
+        slave: _field('slave')?.value || '3',
+    };
+}
+
+function renderCornerLayout(container, params) {
+    if (!container) return false;
+    const stockSrc = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
+    const stock = stockSrc && stockSrc.x > 0 && stockSrc.y > 0 ? stockSrc : { x: 100, y: 80 };
+    const state = cornerState.get(container) || {};
+    const inferred = opSimStarts('user_corner_port', params, stock) || [];
+    const starts = inferred.map((p, i) => (state.userStarts && state.userStarts[i]) ? state.userStarts[i] : p);
+
+    const hasZ = !!params.probeZFirst;
+    const pZ = hasZ ? 0 : -1;
+    const pW1 = hasZ ? 1 : 0;
+    const pW2 = hasZ ? 2 : 1;
+
+    if (!state.userStarts) state.userStarts = [];
+
+    const syncTravel = () => {
+        let changed = false;
+        if (hasZ && starts[pZ] && starts[pW1]) {
+            const dx = Math.round(starts[pW1].x - starts[pZ].x), dy = Math.round(starts[pW1].y - starts[pZ].y);
+            if (_field('startX') && String(_field('startX').value) !== String(dx)) { _field('startX').value = String(dx); changed = true; }
+            if (_field('startY') && String(_field('startY').value) !== String(dy)) { _field('startY').value = String(dy); changed = true; }
+            if (changed && _field('startX')) _field('startX').dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        changed = false;
+        if (starts[pW1] && starts[pW2]) {
+            const dx = Math.round(starts[pW2].x - starts[pW1].x), dy = Math.round(starts[pW2].y - starts[pW1].y);
+            if (_field('cross1_x') && String(_field('cross1_x').value) !== String(dx)) { _field('cross1_x').value = String(dx); changed = true; }
+            if (_field('cross1_y') && String(_field('cross1_y').value) !== String(dy)) { _field('cross1_y').value = String(dy); changed = true; }
+            if (changed && _field('cross1_x')) _field('cross1_x').dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    };
+
+    syncTravel();
+
+    const sw = num(stock && stock.x, 100), sh = num(stock && stock.y, 80);
+    const items = [{ kind: 'rect', x: 0, y: 0, w: sw, h: sh, cls: 'fc-feature-boss' }];
+    const handles = starts.map((s, p) => ({ id: 'start:' + p, x: +s.x || 0, y: +s.y || 0, kind: 'move', label: String(p + 1) }));
+
+    cornerLayout.render(container, {
+        stock: (sw > 0 && sh > 0) ? { w: sw, h: sh, ox: 0, oy: 0 } : null,
+        placement: { x: 0, y: 0 },
+        items,
+        handles,
+        onDrag: (id, world) => {
+            const p = parseInt(String(id).split(':')[1], 10) || 0;
+            const z = (starts[p] && starts[p].z) || 0;
+            state.userStarts[p] = world ? { x: world.x, y: world.y, z } : null;
+            cornerState.set(container, state);
+            renderCornerLayout(container, params);
+        },
+    });
+    cornerState.set(container, state);
+    return true;
+}
 
 // Derive a 2D FeatureCanvas spec from the op's xy / rect / circle-bound params — a top-down summary that mirrors what
 // the canvas pickers set (xy group → a point; rect group → a rectangle; circle group → a disc), drawn on the configured
@@ -45,7 +144,18 @@ export function layoutSpecFromOp(def, params) {
         const wr = (r) => byRole[r] && _writable(byRole[r].param);   // a role whose param is a settable form field
         // pos handle = a `point` gesture over the x/y params (built only when both are writable — never a dead handle).
         const pos = () => { if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: p('x'), y: p('y'), label: 'pos' }); };
-        if (byRole.x && byRole.y && byRole.w && byRole.h) {
+        if (byRole.x && byRole.y && byRole.w && byRole.h && byRole.slant) {
+            const x = p('x'), y = p('y'), w = p('w'), h = p('h'), slant = p('slant');
+            const dx = Math.tan(slant / 180 * Math.PI) * h;
+            items.push(
+                { kind: 'line', x1: x, y1: y, x2: x + w, y2: y },
+                { kind: 'line', x1: x + w, y1: y, x2: x + w + dx, y2: y + h },
+                { kind: 'line', x1: x + w + dx, y1: y + h, x2: x + dx, y2: y + h },
+                { kind: 'line', x1: x + dx, y1: y + h, x2: x, y2: y }
+            );
+            pos();
+            if (wr('slant')) decls.push({ type: 'shear', id: gid + '_shear', field: byRole.slant.param, ax: x + w, ay: y, h: h, value: slant, label: 'slant°' });
+        } else if (byRole.x && byRole.y && byRole.w && byRole.h) {
             const x = p('x'), y = p('y'), w = p('w'), h = p('h');
             items.push({ kind: 'rect', x, y, w, h });
             pos();
@@ -55,6 +165,26 @@ export function layoutSpecFromOp(def, params) {
             items.push({ kind: 'circle', cx: x, cy: y, r: R });
             pos();
             if (wr('dia')) decls.push({ type: 'radial', id: gid + '_size', field: byRole.dia.param, cx: x, cy: y, r: R, a: 0, rScale: 2, minR: 1, label: 'Ø', value: dia });
+        } else if (byRole.x && byRole.y && byRole.w && byRole.scale) {
+            const x = p('x'), y = p('y'), w = p('w'), scale = p('scale');
+            const currentW = w * scale;
+            items.push({ kind: 'line', x1: x, y1: y, x2: x + currentW, y2: y });
+            pos();
+            if (wr('scale')) decls.push({ type: 'scaleX', id: gid + '_scale', field: byRole.scale.param, ax: x, edgeX: x + currentW, ay: y, value: scale, min: 0.1, label: 'scale' });
+        } else if (byRole.ax && byRole.ay && byRole.bx && byRole.by && byRole.width) {
+            const ax = p('ax'), ay = p('ay'), bx = p('bx'), by = p('by'), W = p('width');
+            const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+            const nx = -dy / len, ny = dx / len;
+            const mx = (ax + bx) / 2, my = (ay + by) / 2;
+            const hw = W / 2;
+            items.push(
+                { kind: 'line', x1: ax, y1: ay, x2: bx, y2: by },
+                { kind: 'line', x1: ax + nx * hw, y1: ay + ny * hw, x2: bx + nx * hw, y2: by + ny * hw },
+                { kind: 'line', x1: ax - nx * hw, y1: ay - ny * hw, x2: bx - nx * hw, y2: by - ny * hw }
+            );
+            if (wr('ax') && wr('ay')) decls.push({ type: 'point', id: gid + '_a', fx: byRole.ax.param, fy: byRole.ay.param, x: ax, y: ay, label: 'A' });
+            if (wr('bx') && wr('by')) decls.push({ type: 'point', id: gid + '_b', fx: byRole.bx.param, fy: byRole.by.param, x: bx, y: by, label: 'B' });
+            if (wr('width')) decls.push({ type: 'projLength', id: gid + '_width', field: byRole.width.param, cx: mx, cy: my, nx, ny, off: hw, scale: 2, min: 1, label: 'width' });
         } else if (byRole.x && byRole.y && byRole.len) {
             const x = p('x'), y = p('y'), len = p('len');
             items.push({ kind: 'hole', x, y, n: 1, r: Math.max(1, stock.w * 0.012) });   // anchor marker
@@ -80,4 +210,15 @@ export function renderLayout2D(container, def, params) {
     if (!container) return;
     if (!_layout) _layout = new FeatureCanvas();
     _layout.render(container, layoutSpecFromOp(def, params));
+}
+
+export function renderDeclaredLayout(container, def, params) {
+    if (!container || !def) return false;
+    const kind = def.layout && typeof def.layout.kind === 'string' ? def.layout.kind : '';
+    if (kind === 'corner') return renderCornerLayout(container, params || {});
+    if (panelType(def.panel).mode === '2d') {
+        renderLayout2D(container, def, params);
+        return true;
+    }
+    return false;
 }

@@ -149,3 +149,113 @@ test('Stage 3: the 2D-circle role family is declarable end-to-end (decode + comp
   expect(r.headWidget, 'group head carries the ncircle widget (resolveFormWidget reads it)').toBe('ncircle');
   expect(r.incompleteGrouped, 'an incomplete circle degrades to plain knobs (no group)').toBe(false);
 });
+
+test('Stage 3: a writable scaleX group → a position + a scaleX handle; drag writes scale factor', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => !!window.ddcsStudio);
+
+  const r = await page.evaluate(async () => {
+    const PT = await import('/wizards/ops/panelTypes.js');
+    const def = { bindings: [
+      { param: 'sx', group: 'scale_grp', role: 'x' },
+      { param: 'sy', group: 'scale_grp', role: 'y' },
+      { param: 'sw', group: 'scale_grp', role: 'w' },
+      { param: 'sscale', group: 'scale_grp', role: 'scale' }
+    ] };
+    const form = document.createElement('div'); form.id = 'wiz_user_form';
+    const fields = {};
+    for (const [role, param, val] of [['x', 'sx', 10], ['y', 'sy', 20], ['w', 'sw', 30], ['scale', 'sscale', 1.5]]) {
+      const f = document.createElement('input'); f.dataset.param = param; f.value = val; form.append(f); fields[role] = f;
+    }
+    document.body.appendChild(form);
+
+    const spec = PT.layoutSpecFromOp(def, { sx: 10, sy: 20, sw: 30, sscale: 1.5 });
+    const scaleH = spec.handles.find((h) => /_scale$/.test(h.id));
+    spec.onDrag(scaleH.id, { x: 100, y: 20 });
+    const out = {
+      handles: spec.handles.length,
+      scaleAt: [scaleH.x, scaleH.y],
+      newScale: Number(fields.scale.value),
+    };
+    form.remove();
+    return out;
+  });
+
+  expect(r.handles).toBe(2);
+  expect(r.scaleAt).toEqual([55, 20]);
+  expect(r.newScale).toBe(3);
+});
+
+test('Stage 3: a writable shear group → a position + a shear handle; drag writes slant angle', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => !!window.ddcsStudio);
+
+  const r = await page.evaluate(async () => {
+    const PT = await import('/wizards/ops/panelTypes.js');
+    const def = { bindings: [
+      { param: 'sh_x', group: 'sh_grp', role: 'x' },
+      { param: 'sh_y', group: 'sh_grp', role: 'y' },
+      { param: 'sh_w', group: 'sh_grp', role: 'w' },
+      { param: 'sh_h', group: 'sh_grp', role: 'h' },
+      { param: 'sh_s', group: 'sh_grp', role: 'slant' }
+    ] };
+    const form = document.createElement('div'); form.id = 'wiz_user_form';
+    const fields = {};
+    for (const [role, param, val] of [['x', 'sh_x', 10], ['y', 'sh_y', 20], ['w', 'sh_w', 30], ['h', 'sh_h', 40], ['slant', 'sh_s', 0]]) {
+      const f = document.createElement('input'); f.dataset.param = param; f.value = val; form.append(f); fields[role] = f;
+    }
+    document.body.appendChild(form);
+
+    const spec = PT.layoutSpecFromOp(def, { sh_x: 10, sh_y: 20, sh_w: 30, sh_h: 40, sh_s: 0 });
+    const shearH = spec.handles.find((h) => /_shear$/.test(h.id));
+    spec.onDrag(shearH.id, { x: 80, y: 60 });
+    const out = {
+      handles: spec.handles.length,
+      shearAt: [shearH.x, shearH.y],
+      newSlant: Number(fields.slant.value),
+    };
+    form.remove();
+    return out;
+  });
+
+  expect(r.handles).toBe(2);
+  expect(r.shearAt).toEqual([40, 60]);
+  expect(r.newSlant).toBeCloseTo(45, 1);
+});
+
+test('Stage 3: a writable projLength group → a position A + position B + width handle; drag writes width', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => !!window.ddcsStudio);
+
+  const r = await page.evaluate(async () => {
+    const PT = await import('/wizards/ops/panelTypes.js');
+    const def = { bindings: [
+      { param: 'p_ax', group: 'pj_grp', role: 'ax' },
+      { param: 'p_ay', group: 'pj_grp', role: 'ay' },
+      { param: 'p_bx', group: 'pj_grp', role: 'bx' },
+      { param: 'p_by', group: 'pj_grp', role: 'by' },
+      { param: 'p_w', group: 'pj_grp', role: 'width' }
+    ] };
+    const form = document.createElement('div'); form.id = 'wiz_user_form';
+    const fields = {};
+    for (const [role, param, val] of [['ax', 'p_ax', 0], ['ay', 'p_ay', 0], ['bx', 'p_bx', 60], ['by', 'p_by', 0], ['width', 'p_w', 20]]) {
+      const f = document.createElement('input'); f.dataset.param = param; f.value = val; form.append(f); fields[role] = f;
+    }
+    document.body.appendChild(form);
+
+    const spec = PT.layoutSpecFromOp(def, { p_ax: 0, p_ay: 0, p_bx: 60, p_by: 0, p_w: 20 });
+    const widthH = spec.handles.find((h) => /_width$/.test(h.id));
+    spec.onDrag(widthH.id, { x: 30, y: 25 });
+    const out = {
+      handles: spec.handles.length,
+      widthAt: [widthH.x, widthH.y],
+      newWidth: Number(fields.width.value),
+    };
+    form.remove();
+    return out;
+  });
+
+  expect(r.handles).toBe(3);
+  expect(r.widthAt).toEqual([30, 10]);
+  expect(r.newWidth).toBe(50);
+});

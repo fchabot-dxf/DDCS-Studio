@@ -77,10 +77,15 @@ function toRecord(b) {
             }
         }
 
-        const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
+        const gcodeInput = b.getInput('GCODE'), doInput = b.getInput('DO');
+        const firstGcode = (gcodeInput && gcodeInput.connection && gcodeInput.connection.targetBlock()) || 
+                           (doInput && doInput.connection && doInput.connection.targetBlock());
+        const simInput = b.getInput('SIM');
+        const firstSim = simInput && simInput.connection && simInput.connection.targetBlock();
         return {
             id: b.id, type: 'op', opType: meta.opType, label: b.getFieldValue('LABEL') || meta.label,
-            requires: meta.requires || [], params: params, children: first ? chain(first) : [],
+            requires: meta.requires || [], params: params, children: firstGcode ? chain(firstGcode) : [],
+            simChildren: firstSim ? chain(firstSim) : [],
             collapsed: b.isCollapsed() || undefined,
         };
     }
@@ -100,9 +105,17 @@ function toRecord(b) {
     // Non-field params (snapshots like PlaceOnStock's stock dims + bbox) ride in `data` — restore them WITHOUT
     // clobbering live field values, so editing the block keeps the context emit needs.
     if (b.data) { try { const d = JSON.parse(b.data); if (d._expose) r._expose = d._expose; for (const k in d) if (k !== '_expose' && !(k in r.params)) r.params[k] = d[k]; } catch (_) { /* keep fields */ } }
-    if (isWrap(def)) {
+    if (def.kind === 'user_root') {
+        const pInp = b.getInput('PRESENTATION'), pBlk = pInp && pInp.connection && pInp.connection.targetBlock();
+        const eInp = b.getInput('EXECUTION'), eBlk = eInp && eInp.connection && eInp.connection.targetBlock();
+        r.uiChildren = pBlk ? chain(pBlk) : [];
+        r.children = eBlk ? chain(eBlk) : [];
+    } else if (def.kind === 'param_group') {
         const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
-        r.children = first ? chain(first) : [];
+        if (first) r.children = chain(first);
+    } else if (isWrap(def)) {
+        const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
+        if (first) r.children = chain(first);
     }
     if (b.isCollapsed && b.isCollapsed()) r.collapsed = true;
     return r;
@@ -192,7 +205,10 @@ function recToJson(rec) {
             node.fields.COLOR = rec.params.statusColor || -1;
         }
 
-        if (rec.children && rec.children.length) node.inputs = { DO: { block: chainToJson(rec.children) } };
+        const inputs = {};
+        if (rec.children && rec.children.length) inputs.GCODE = { block: chainToJson(rec.children) };
+        if (rec.simChildren && rec.simChildren.length) inputs.SIM = { block: chainToJson(rec.simChildren) };
+        if (Object.keys(inputs).length) node.inputs = inputs;
         if (rec.collapsed) node.collapsed = true;
         return node;
     }
@@ -221,7 +237,12 @@ function recToJson(rec) {
     // ticked knob survives a round-trip → the live form persists across a reprojection (#13). devMode reads it in augment.
     if (rec._expose) extra._expose = rec._expose;
     if (Object.keys(extra).length) node.data = JSON.stringify(extra);
-    if (isWrap(def) && rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
+    if (def.kind === 'user_root') {
+        if (rec.uiChildren && rec.uiChildren.length) inputs.PRESENTATION = { block: chainToJson(rec.uiChildren) };
+        if (rec.children && rec.children.length) inputs.EXECUTION = { block: chainToJson(rec.children) };
+    } else if (def.kind === 'param_group') {
+        if (rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
+    } else if (isWrap(def) && rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
     if (Object.keys(fields).length) node.fields = fields;
     if (Object.keys(inputs).length) node.inputs = inputs;
     if (rec.collapsed) node.collapsed = true;

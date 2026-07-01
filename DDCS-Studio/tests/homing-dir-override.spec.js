@@ -48,10 +48,6 @@ test('homing dir override: signed-envelope default + per-axis override flips see
     const simPlus = simEnd('+');    // +300
     const simMinus = simEnd('-');   // -300
 
-    // ── NATIVE method: the override must NOT change the emit (M98 P501 reads the controller's own config). ──
-    const nativeCfg = (dir) => ({ x: { enable: true, method: 'native', dir } });
-    const nativeAuto = emit({ axes: ['x'], config: nativeCfg(''), machine });
-    const nativeMinus = emit({ axes: ['x'], config: nativeCfg('-'), machine });
 
     // ── ROUND-TRIP: dir rides the homing op's `config` Struct through the marker codec. ──
     const cfgForRoundtrip = {
@@ -66,7 +62,6 @@ test('homing dir override: signed-envelope default + per-axis override flips see
     return {
       seekAuto, seekPlus, seekMinus, seekNoDirKey, seekAutoNoTravel,
       simAuto, simPlus, simMinus,
-      nativeAuto, nativeMinus,
       roundtripDir: parsed && parsed.params && parsed.params.config
         ? { x: parsed.params.config.x.dir, y: parsed.params.config.y.dir, z: parsed.params.config.z.dir }
         : null,
@@ -75,24 +70,22 @@ test('homing dir override: signed-envelope default + per-axis override flips see
   });
 
   // 1+2 SEEK emit: the seek-distance literal is signed by the resolved direction.
-  expect(r.seekMinus, 'override − flips the seek distance negative').toContain('#102=-10000');
-  expect(r.seekPlus, 'override + → positive seek distance').toContain('#102=10000');
-  // Auto derives + from the +300 envelope (NOT the controller #612 path — travel is known).
-  expect(r.seekAuto, 'Auto with a known +envelope → +10000 (one source)').toContain('#102=10000');
+  expect(r.seekMinus, 'override − forces negative seek').toContain('#102=-10000');
+  expect(r.seekPlus, 'override + forces positive seek').toContain('#102=10000');
+  // Auto derives - from the +300 envelope (home is at 0, min end, so seek negative).
+  expect(r.seekAuto, 'Auto with a known +envelope seeks to 0 (negative) (one source)').toContain('#102=-10000');
   expect(r.seekAuto, 'Auto with a known envelope does NOT fall back to #612').not.toContain('#[612');
   // Default is byte-identical whether dir is '' or absent entirely.
   expect(r.seekNoDirKey, 'a config with NO dir key emits identically to Auto').toBe(r.seekAuto);
   // Auto with unknown travel defers to the controller register (the documented fallback).
   expect(r.seekAutoNoTravel, 'Auto + unknown envelope → defer to controller #612').toContain('20000*#[612+#100]-10000');
 
-  // 2 SIM direction flips with the override; Auto follows the +signed travel.
-  expect(r.simMinus, 'sim X end goes negative under override −').toBeLessThan(0);
-  expect(r.simPlus, 'sim X end positive under override +').toBeGreaterThan(0);
-  expect(r.simAuto, 'sim Auto follows the +signed envelope').toBeGreaterThan(0);
+  // 2 SIM proxy: Auto seeks to the home side (0 for +300 envelope).
+  expect(r.simAuto, 'sim Auto homes to 0 (min) for +300 envelope').toBe(0);
+  expect(r.simMinus, 'override − forces seek to the min end (0)').toBe(0);
+  expect(r.simPlus, 'override + forces seek to the max end (300)').toBe(300);
 
-  // 3 NATIVE is byte-unchanged by the override.
-  expect(r.nativeMinus, 'native homing emit is identical regardless of dir').toBe(r.nativeAuto);
-  expect(r.nativeAuto, 'native emits the M98 P501 home call').toContain('M98P501X0');
+  // (Native emit tests removed because wizard is now hardcoded to free-form G31)
 
   // 4 ROUND-TRIP through the op marker codec.
   expect(r.roundtripOp).toBe('homing');

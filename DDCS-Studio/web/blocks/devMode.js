@@ -68,7 +68,7 @@ function authoringBody(ws) {
     const opRec = stack.find((b) => b && b.type === 'op');
     if (opRec && (opRec.children || []).length) {
         const opBlk = ws.getAllBlocks().find((b) => b.type === 'op' || b.type.endsWith('_op'));
-        const doIn = opBlk && opBlk.getInput('DO');
+        const doIn = opBlk && (opBlk.getInput('GCODE') || opBlk.getInput('DO'));
         return { opRec, children: opRec.children, first: (doIn && doIn.connection && doIn.connection.targetBlock()) || null };
     }
     const children = stack.filter((b) => b && b.type !== 'op' && !String(b.type || '').endsWith('_op') && b.type !== 'progstart' && b.type !== 'progend');
@@ -543,7 +543,7 @@ function saveAsCustomOp() {
     // A 2D-point / 2D-rect knob is ONLY drag-to-edit on the Form+2D preview — so default a freshly-authored op that
     // has one to form2d, else the feature is silently hidden behind the form3d default. Still a DECLARATION: a `panel`
     // block, a re-authored wizard's own panel, and the dialog dropdown all override (group[0] carries the widget).
-    const hasNumberRole = bindings.some((b) => b.widget === 'point' || b.widget === 'nrect');
+    const hasNumberRole = bindings.some((b) => ['point', 'nrect', 'ncircle', 'nlength', 'nscaleX', 'nshear', 'nprojLength'].includes(b.widget));
 
     openSaveDialog({
         name: editingDef ? (editingDef.label || '') : '',
@@ -553,10 +553,11 @@ function saveAsCustomOp() {
         editing: editingDef ? { opType: _editingWizard, label: editingDef.label || _editingWizard } : null,
     }, (meta) => {
         const panel = blkPanel || meta.panel;
-        let sim = blkSim !== undefined ? blkSim : meta.sim;
-        // `simstart` blocks in the stack DECLARE the per-pass sim-starts → def.sim.starts (B3, read like the sim block).
-        const blkStarts = simStartsFromStack(a.opRec.children);
-        if (blkStarts && blkStarts.length) sim = { ...(sim || {}), starts: blkStarts };
+        // Canonical write path: when stack blocks declare sim/sim-starts, store those declarations in the template
+        // only (no duplicate legacy def.sim payload). Keep legacy def.sim writes only when the stack declares neither.
+        const blkStarts = simStartsFromStack(a.opRec.children || []);
+        const hasStackSimDecl = (blkSim !== undefined) || (Array.isArray(blkStarts) && blkStarts.length > 0);
+        const sim = hasStackSimDecl ? null : meta.sim;
         // Non-destructive: only an EXPLICIT "Update" (mode 'update') overwrites the re-authored wizard. Anything else —
         // a fresh op, or "Save as new" while editing — creates a SEPARATE wizard, leaving the original untouched.
         const update = meta.mode === 'update' && _editingWizard;

@@ -1,33 +1,76 @@
-/** views/cornerView.js — Corner probing wizard view (DOM glue + SVG animator). */
+/** views/cornerView.js — Corner probing wizard view (DOM glue + FeatureCanvas). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { CornerWizard } from '../cornerWizard.js';
 import { restoreBoxStock } from './rotaryCenterView.js';
+import { FeatureCanvas } from '../../viz/featureCanvas.js';
 
 const wizard = new CornerWizard();
+const layout = new FeatureCanvas();
+const num = (val, d) => (val === '' || val == null || isNaN(Number(val))) ? d : Number(val);
 
-export function startCornerAnim() {
-    const animate = el('c_animate')?.checked !== false;
-    const corner  = el('c_corner')?.value || 'FL';
-    const seq     = el('c_probe_seq')?.value || 'YX';
-    const zfirst  = el('c_probe_z_first')?.checked || false;
+function tieCornerTravel(starts) {
+    const hasZ = el('c_probe_z_first')?.checked;
+    const pZ = hasZ ? 0 : -1;
+    const pW1 = hasZ ? 1 : 0;
+    const pW2 = hasZ ? 2 : 1;
 
-    // Stop any running animation
-    if (window.__cornerAnimator) { try { window.__cornerAnimator.stop(); } catch (e) {} }
-    // Clear any pending start timer
-    if (window.__cornerAnimStartTimer) { clearTimeout(window.__cornerAnimStartTimer); window.__cornerAnimStartTimer = null; }
-
-    if (!animate) return;
-
-    // Create instance once, reuse it — play() handles stopping old loops via token
-    if (!window.__cornerAnimator && window.CornerVizAnimator) {
-        window.__cornerAnimator = new window.CornerVizAnimator();
+    let changed = false;
+    // Z -> Wall 1
+    if (hasZ && starts[pZ] && starts[pW1]) {
+        const dx = Math.round(starts[pW1].x - starts[pZ].x), dy = Math.round(starts[pW1].y - starts[pZ].y);
+        const fx = el('c_start_x'), fy = el('c_start_y');
+        if (fx && fx.value !== String(dx)) { fx.value = String(dx); changed = true; }
+        if (fy && fy.value !== String(dy)) { fy.value = String(dy); changed = true; }
+        if (changed && fx) fx.dispatchEvent(new Event('input', { bubbles: true }));
     }
-    if (window.__cornerAnimator) {
-        window.__cornerAnimStartTimer = setTimeout(() => {
-            window.__cornerAnimStartTimer = null;
-            window.__cornerAnimator.play(corner, seq, zfirst);
-        }, 80);
+    // Wall 1 -> Wall 2
+    changed = false;
+    if (starts[pW1] && starts[pW2]) {
+        const dx = Math.round(starts[pW2].x - starts[pW1].x), dy = Math.round(starts[pW2].y - starts[pW1].y);
+        const fx = el('c_cross1_x'), fy = el('c_cross1_y');
+        if (fx && fx.value !== String(dx)) { fx.value = String(dx); changed = true; }
+        if (fy && fy.value !== String(dy)) { fy.value = String(dy); changed = true; }
+        if (changed && fx) fx.dispatchEvent(new Event('input', { bubbles: true }));
     }
+}
+
+function renderCornerStartCanvas(panel, params, stock) {
+    const container = el('cornerLayoutCanvas');
+    if (!container || !panel || typeof panel.getPassStarts !== 'function') return;
+    const starts = panel.getPassStarts() || [];
+
+    tieCornerTravel(starts);
+
+    const hookInput = (id, passIndex) => {
+        const input = el(id);
+        if (input && !input._coHooked) {
+            input._coHooked = true;
+            input.addEventListener('input', (e) => {
+                if (e.isTrusted && typeof panel.onStartDrag === 'function') panel.onStartDrag(null, passIndex);
+            });
+        }
+    };
+    const hasZ = el('c_probe_z_first')?.checked;
+    hookInput('c_start_x', hasZ ? 1 : -1);
+    hookInput('c_start_y', hasZ ? 1 : -1);
+    hookInput('c_cross1_x', hasZ ? 2 : 1);
+    hookInput('c_cross1_y', hasZ ? 2 : 1);
+
+    const sw = num(stock && stock.x, 100), sh = num(stock && stock.y, 80);
+    const items = [{ kind: 'rect', x: 0, y: 0, w: sw, h: sh, cls: 'fc-feature-boss' }];
+    const handles = starts.map((s, p) => ({ id: 'start:' + p, x: +s.x || 0, y: +s.y || 0, kind: 'move', label: String(p + 1) }));
+    
+    const spec = {
+        stock: (sw > 0 && sh > 0) ? { w: sw, h: sh, ox: 0, oy: 0 } : null,
+        placement: { x: 0, y: 0 }, items, handles,
+        onDrag: (id, world) => {
+            const p = parseInt(String(id).split(':')[1], 10) || 0;
+            const z = (starts[p] && starts[p].z) || 0;
+            panel.onStartDrag({ x: world.x, y: world.y, z }, p);
+            renderCornerStartCanvas(panel, params, (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {});
+        }
+    };
+    layout.render(container, spec);
 }
 
 export const cornerView = {
@@ -38,22 +81,34 @@ export const cornerView = {
     twoPane: true,
     inputIds: [
         'c_corner', 'c_probe_seq', 'c_probe_z_first', 'c_sync_a', 'c_wcs',
-        'c_travel_dist', 'c_safe_z', 'c_scan_depth', 'c_radius', 'c_feed_fast', 'c_feed_slow',
+        'c_start_x', 'c_start_y', 'c_cross1_x', 'c_cross1_y', 'c_safe_z', 'c_scan_depth', 'c_radius', 'c_feed_fast', 'c_feed_slow',
         'c_dist', 'c_retract', 'c_port', 'c_level', 'c_q', 'c_slave',
     ],
-    // Controller-source chips (PROBE-CONFIG-SOURCE.md)
     probeSrcFields: { c_port: 'port', c_level: 'level', c_feed_fast: 'fastFeed', c_retract: 'retract' },
-    startAnim: startCornerAnim,
-
-    onOpen() {
-        restoreBoxStock();   // not a rotary op → revert a forced cylinder back to the box (no-op if already a box)
-        setTimeout(async () => {
-            startCornerAnim();
-        }, 50);
+    
+    onStartDrag(world, passIndex) {
+        if (!this.userStarts) this.userStarts = [];
+        this.userStarts[passIndex] = world ? { x: world.x, y: world.y, z: world.z } : null;
     },
-    // (params → form for editing comes from the schema's field binding — SCHEMA.corner param .field — no per-view setForm.)
+    
+    getPassStarts() {
+        const params = this._lastParams || {};
+        const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
+        const inferred = wizard.inferStarts(params, stock) || [];
+        const starts = [];
+        for (let i = 0; i < inferred.length; i++) {
+            starts[i] = (this.userStarts && this.userStarts[i]) ? this.userStarts[i] : inferred[i];
+        }
+        return starts;
+    },
+
+    onOpen(ctx) {
+        restoreBoxStock();
+        setTimeout(() => { ctx.update(); }, 50);
+    },
 
     update(ctx) {
+        ctx._activePanel = this;
         const params = {
             corner: el('c_corner').value,
             probeZ: el('c_probe_z_first')?.checked || false,
@@ -70,24 +125,27 @@ export const cornerView = {
             port: window.ddcsGetSettings().probes.probePin,
             level: window.ddcsGetSettings().probes.probeLevel,
             safeZ: el('c_safe_z').value,
-            travelDist: el('c_travel_dist').value,
             scanDepth: el('c_scan_depth')?.value || '5',
             radius: el('c_radius')?.value || '2.0',
+            startX: el('c_start_x')?.value,
+            startY: el('c_start_y')?.value,
+            cross1_x: el('c_cross1_x')?.value,
+            cross1_y: el('c_cross1_y')?.value,
             sources: window.ddcsResolveProbeSources(['port', 'level', 'fastFeed', 'retract']),
         };
+        this._lastParams = params;
 
         const gcode = wizard.generate(params);
         el('wiz_corner_code').innerHTML = UIUtils.formatGCode(gcode);
-        // Infer the spindle start for this corner/config so the preview begins in the right spot.
+        
         const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
-        ctx.preview3D(gcode, 'cornerVizContainer', wizard.inferStart(params, stock));
+        const inferredStarts = wizard.inferStarts(params, stock);
+        ctx.preview3D(gcode, 'cornerVizContainer', inferredStarts[0], inferredStarts);
+        
+        renderCornerStartCanvas(this, params, stock);
 
-        // Update corner status label 📌
         const dirMap = { FL: 'X pos, Y pos', FR: 'X neg, Y pos', BL: 'X pos, Y neg', BR: 'X neg, Y neg' };
         const cornerStatus = el('cornerVizStatus');
         if (cornerStatus) cornerStatus.textContent = `Corner: ${params.corner} (${dirMap[params.corner]}) - ${params.probeSeq}` + (params.probeZ ? ' + Z' : '');
-
-        // Restart animator
-        startCornerAnim();
     },
 };

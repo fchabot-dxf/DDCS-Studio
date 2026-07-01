@@ -15,22 +15,77 @@ const num = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v
  *  out-distance from the inferred centre and write the diagTravel field — so the diagonal ENDS on ②, and #21 can no longer
  *  drift from ② (② is the master). NOTE: the diagonal re-centres the PRIMARY axis, so only the SECONDARY out-distance ties —
  *  if ② is dragged off-centre in the primary axis, that coord can't be honoured by the re-centred primary leg. */
-function tieDiagTravel(pass, world) {
+function tieDiagTravel(pass, world, starts) {
     if (el('m_type')?.value !== 'boss' || !el('m_both')?.checked || el('m_transaxis')?.value !== 'auto') return;   // diagonal not emitted
-    const secStart = (el('m_inaxis')?.value === 'manual') ? 2 : 1;   // the first secondary-axis start = the trans-axial target
-    if (pass !== secStart) return;
-    const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
+    const hasZ = el('m_probe_z_first')?.checked ? 1 : 0;
+    const secStart = ((el('m_inaxis')?.value === 'manual') ? 2 : 1) + hasZ;   // the first secondary-axis start = the trans-axial target
+    const originIdx = secStart - 1; // The origin is where the primary axis sequence finished
+
+    if (pass !== secStart && pass !== originIdx) return; // Update if the target OR the origin moves
+    if (!starts) return;
+    
+    // The origin of the secondary axis is wherever the primary sequence finished
+    const origin = starts[originIdx]; 
+    const target = starts[secStart];
+    if (!origin || !target) return;
+
     const primaryX = (el('m_axis')?.value || 'X') !== 'Y';           // primary X → secondary Y (and vice-versa)
-    const centreSec = primaryX ? num(stock.y, 80) / 2 : num(stock.x, 100) / 2;
-    const draggedSec = primaryX ? world.y : world.x;
-    const draggedPrim = primaryX ? world.x : world.y;                 // ②'s PRIMARY-axis coord = the diagonal's X target (#22)
-    const d21 = Math.max(1, Math.round(Math.abs(draggedSec - centreSec)));   // #21 = the secondary out-distance (Y)
-    const d22 = Math.round(draggedPrim);                              // B-TRANS (b): #22 = ②'s primary coord (the diagonal targets ②'s FULL position)
+    const draggedSec = primaryX ? target.y : target.x;
+    const originSec = primaryX ? origin.y : origin.x;
+    const draggedPrim = primaryX ? target.x : target.y;                 // ②'s PRIMARY-axis coord = the diagonal's X target (#22)
+    
+    const d21 = Math.max(1, Math.round(Math.abs(draggedSec - originSec)));   // #21 = the secondary out-distance from the origin
+    const d22 = Math.round(draggedPrim);                              // B-TRANS (b): #22 = ②'s primary coord
     const f = el('m_diag_travel'), fp = el('m_diag_primary');
     let changed = false;
     if (f && f.value !== String(d21)) { f.value = String(d21); changed = true; }
     if (fp && fp.value !== String(d22)) { fp.value = String(d22); changed = true; }   // ② drives BOTH #21 (Y) and #22 (X) — the diagonal joins ②
     if (changed && f) f.dispatchEvent(new Event('input', { bubbles: true }));   // ONE re-generate (update() reads both fields)
+}
+
+function tieStart1(pass, world, starts) {
+    if (!el('m_probe_z_first')?.checked) return;
+    if (pass !== 1 && pass !== 0) return; // Update if Z-probe (0) or XY-probe (1) moves
+    if (!starts || starts.length < 2) return;
+    
+    const zStart = starts[0];
+    const xyStart = starts[1];
+    if (!zStart || !xyStart) return;
+    
+    const dx = Math.round(xyStart.x - zStart.x);
+    const dy = Math.round(xyStart.y - zStart.y);
+    const sx = el('m_start_x'), sy = el('m_start_y');
+    let changed = false;
+    if (sx && sx.value !== String(dx)) { sx.value = String(dx); changed = true; }
+    if (sy && sy.value !== String(dy)) { sy.value = String(dy); changed = true; }
+    if (changed && sx) sx.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function tieCrossOver(pass, world, starts) {
+    if (el('m_type')?.value !== 'boss' || el('m_inaxis')?.value !== 'auto') return;
+    const hasZ = el('m_probe_z_first')?.checked ? 1 : 0;
+    const p1 = hasZ, p2 = hasZ + 1;
+    const s1 = hasZ + 2, s2 = hasZ + 3;
+    const hasSec = el('m_both')?.checked;
+
+    if (pass !== p1 && pass !== p2 && pass !== s1 && pass !== s2) return;
+    if (!starts) return;
+
+    let changed = false;
+    if (starts[p1] && starts[p2]) {
+        const dx = Math.round(starts[p2].x - starts[p1].x), dy = Math.round(starts[p2].y - starts[p1].y);
+        const fx = el('m_cross1_x'), fy = el('m_cross1_y');
+        if (fx && fx.value !== String(dx)) { fx.value = String(dx); changed = true; }
+        if (fy && fy.value !== String(dy)) { fy.value = String(dy); changed = true; }
+        if (changed && fx) fx.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    if (hasSec && starts[s1] && starts[s2]) {
+        const dx = Math.round(starts[s2].x - starts[s1].x), dy = Math.round(starts[s2].y - starts[s1].y);
+        const fx = el('m_cross2_x'), fy = el('m_cross2_y');
+        if (fx && fx.value !== String(dx)) { fx.value = String(dx); changed = true; }
+        if (fy && fy.value !== String(dy)) { fy.value = String(dy); changed = true; }
+        if (changed && fx) fx.dispatchEvent(new Event('input', { bubbles: true }));
+    }
 }
 
 /** The ②-AIM feature-canvas spec: the per-pass start markers ①②③④ as DRAGGABLE POINT handles. Unlike Edge's vector (which
@@ -71,6 +126,34 @@ function renderStartCanvas(panel, stock) {
     const container = el('middleLayoutCanvas');
     if (!container || !panel || typeof panel.getPassStarts !== 'function') return;
     const starts = panel.getPassStarts() || [];
+
+    // Sync markers to fields to populate defaults if the user hasn't dragged them yet.
+    // This runs on every render, but tieDiagTravel/tieStart1 only dispatch if the value ACTUALLY changes.
+    for (let p = 0; p < starts.length; p++) {
+        if (starts[p]) {
+            tieDiagTravel(p, starts[p], starts);
+            tieStart1(p, starts[p], starts);
+            tieCrossOver(p, starts[p], starts);
+        }
+    }
+
+    const hasZ = el('m_probe_z_first')?.checked ? 1 : 0;
+    const hookCrossOver = (id, passIndex) => {
+        const input = el(id);
+        if (input && !input._coHooked) {
+            input._coHooked = true;
+            input.addEventListener('input', (e) => {
+                if (e.isTrusted && typeof panel.onStartDrag === 'function') {
+                    panel.onStartDrag(null, passIndex); // Clear the dragged position so the typed value generates the marker
+                }
+            });
+        }
+    };
+    hookCrossOver('m_cross1_x', hasZ + 1);
+    hookCrossOver('m_cross1_y', hasZ + 1);
+    hookCrossOver('m_cross2_x', hasZ + 3);
+    hookCrossOver('m_cross2_y', hasZ + 3);
+
     const sw = num(stock && stock.x, 100), sh = num(stock && stock.y, 80);
     const handles = starts.map((s, p) => ({ id: 'start:' + p, x: +s.x || 0, y: +s.y || 0, kind: 'move', label: String(p + 1) }));   // ①②③④ as POINT handles
     const spec = {
@@ -82,7 +165,14 @@ function renderStartCanvas(panel, stock) {
             const p = parseInt(String(id).split(':')[1], 10) || 0;
             const z = (starts[p] && starts[p].z) || 0;
             panel.onStartDrag({ x: world.x, y: world.y, z }, p);   // ① SIM: userStarts[p] (the pass begins here)
-            tieDiagTravel(p, world);                                // ② G-CODE: ② also drives #21 → the diagonal ends ON ②
+            
+            // Re-fetch the updated starts so the tie functions can compute distances between them
+            const newStarts = panel.getPassStarts() || [];
+            tieDiagTravel(p, world, newStarts);                                // ② G-CODE: ② also drives #21 → the diagonal ends ON ②
+            tieStart1(p, world, newStarts);
+            
+            // Trigger a full wizard update to regenerate G-code
+            if (window.app && window.app.wizardManager) window.app.wizardManager.update();
             renderStartCanvas(panel, (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {});
         },
     };
@@ -97,7 +187,8 @@ export const middleView = {
     twoPane: true,
     inputIds: [
         'm_type', 'm_inaxis', 'm_transaxis', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_circular', 'm_probe_z_first', 'm_sync_a', 'm_wcs', 'm_slave',
-        'm_dist', 'm_retract', 'm_safe_z', 'm_clear', 'm_crossX', 'm_crossY', 'm_diag_travel',
+        'm_dist', 'm_retract', 'm_safe_z', 'm_scan_depth', 'm_clear', 'm_cross1_x', 'm_cross1_y', 'm_cross2_x', 'm_cross2_y', 'm_diag_travel',
+        'm_diag_primary', 'm_start_x', 'm_start_y',
         'm_feed_fast', 'm_feed_slow', 'm_port', 'm_level', 'm_q',
     ],
     // Controller-source chips (PROBE-CONFIG-SOURCE.md)
@@ -117,10 +208,15 @@ export const middleView = {
             inAxis: el('m_inaxis')?.value || 'auto',        // INC3: per-traverse toggles (replace the single approach)
             transAxis: el('m_transaxis')?.value || 'auto',
             clearOver: el('m_clear')?.value || '15',
-            crossX: el('m_crossX')?.value,   // boss-auto per-axis cross-over (string: a number or the [#1+#2] expression default)
-            crossY: el('m_crossY')?.value,
+            cross1_x: el('m_cross1_x')?.value,
+            cross1_y: el('m_cross1_y')?.value,
+            cross2_x: el('m_cross2_x')?.value,
+            cross2_y: el('m_cross2_y')?.value,
             diagTravel: el('m_diag_travel')?.value,   // boss probe-both auto trans-axis: the diagonal traverse distance (#21)
             diagPrimary: el('m_diag_primary')?.value,   // B-TRANS (b): the diagonal's X target (#22) — '#53' at rest, ②.X when placed
+            startX: el('m_start_x')?.value,   // Z→XY auto-traverse: X distance from Z-probe start to XY-probe start (derived by tieStart1)
+            startY: el('m_start_y')?.value,   // Z→XY auto-traverse: Y distance (derived by tieStart1)
+            scanDepth: el('m_scan_depth')?.value || '5',   // Z→XY auto-traverse: plunge below Z surface before probing first wall
             axis: el('m_axis')?.value || 'X',
             dir1: dir1val,
             dir2: dir2val,
@@ -180,6 +276,7 @@ export const middleView = {
         const inAxisAuto = isBoss && params.inAxis === 'auto';
         const clearBlock = el('m_clear_block'); if (clearBlock) clearBlock.classList.toggle('hidden', !inAxisAuto);
         const crossBlock = el('m_crossover_block'); if (crossBlock) crossBlock.classList.toggle('hidden', !inAxisAuto);
+        const cross2Block = el('m_crossover2_block'); if (cross2Block) cross2Block.classList.toggle('hidden', !params.findBoth);
         // TRAVEL-START inc2a: the DIAG TRAVEL field is GONE from the UI — #21 is DERIVED from the dragged ② (tieDiagTravel).
         // m_diag_block stays permanently hidden (no show-toggle); the readonly input persists the derived value + round-trips.
 

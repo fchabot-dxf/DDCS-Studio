@@ -68,7 +68,9 @@ function wizItemIcon(e) {
     return entryIconHtml(e);   // iconOverride (emoji or ic:<id>) wins → built-in line-art (by id) → emoji default
 }
 function wizItemOnclick(e) {
-    if (e.kind === 'user') return `ddcsInsertUserOp && ddcsInsertUserOp('${_escArg(e.type)}')`;
+    // User ops should open through WizardManager so they get the full #wiz_user shell (panel/sim/preview/sections),
+    // matching edit-in-place. Fall back to the legacy insert form only if openWiz is unavailable.
+    if (e.kind === 'user') return `(openWiz ? openWiz('${_escArg(e.type)}') : (ddcsInsertUserOp && ddcsInsertUserOp('${_escArg(e.type)}')))`;
     const special = WIZ_SPECIAL_OPENER[e.id];
     if (special) return `${special} && ${special}()`;
     if (e.variant) return `openWiz && openWiz('${_escArg(e.type)}','${_escArg(e.variant)}')`;

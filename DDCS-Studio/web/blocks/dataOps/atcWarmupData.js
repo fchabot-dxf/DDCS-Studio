@@ -29,20 +29,39 @@ import { userOpFromStack } from '../userOps.js';
 /** Author defaults — match atcWarmupStack's own num() fallbacks so the seeded template == the true default stack. */
 export const ATC_WARMUP_DEFAULTS = { rpm1: 6000, time1: 30, rpm2: 12000, time2: 30 };
 
-// Hand-authored binding map → the flattened default template (atcWarmupStack pushes a flat stack, no nesting):
+// Hand-authored binding map → execution-stack indexes (atcWarmupStack pushes a flat stack, no nesting):
 //   0 comment · 1 comment · 2 comment · 3 confirm · 4 spindle(off) · 5 coolant(off) · 6 comment · 7 message ·
 //   8 spindle(stage1) · 9 dwell(stage1) · 10 comment · 11 message · 12 spindle(stage2) · 13 dwell(stage2) ·
 //   14 spindle(off) · 15 message · 16 label · 17 endprogram
-export const ATC_WARMUP_BINDINGS = [
+const ATC_WARMUP_EXEC_BINDINGS = [
     { param: 'rpm1', blockIndex: 8, key: 'rpm', type: 'number', default: ATC_WARMUP_DEFAULTS.rpm1 },
     { param: 'time1', blockIndex: 9, key: 'sec', type: 'number', default: ATC_WARMUP_DEFAULTS.time1 },
     { param: 'rpm2', blockIndex: 12, key: 'rpm', type: 'number', default: ATC_WARMUP_DEFAULTS.rpm2 },
     { param: 'time2', blockIndex: 13, key: 'sec', type: 'number', default: ATC_WARMUP_DEFAULTS.time2 },
 ];
 
+// Wrapped-template indexes (user_root + param_group precede execution children).
+const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
+export const ATC_WARMUP_BINDINGS = ATC_WARMUP_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
+
 export const ATC_WARMUP_DATA_OPTYPE = 'user_atc_warmup_data';
 
 /** Build the spindle-warmup-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. */
 export function atcWarmupDataDef() {
-    return userOpFromStack('atc_warmup_data', 'Spindle Warmup (data)', atcWarmupStack(ATC_WARMUP_DEFAULTS), ATC_WARMUP_BINDINGS, 'form');
+    const exec = atcWarmupStack(ATC_WARMUP_DEFAULTS);
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [
+            { type: 'panel', params: { panel: 'form' } },
+            { type: 'sim', params: { rotary: false, machine: true, magazine: true } },
+            {
+                type: 'param_group',
+                params: { group: 'Spindle Warmup' },
+                children: [],
+            },
+        ],
+        children: exec,
+    }];
+    return userOpFromStack('atc_warmup_data', 'Spindle Warmup (data)', stack, ATC_WARMUP_BINDINGS, 'form', { forceMachine: true, showMagazine: true }, 'atc_datawiz');
 }
