@@ -26,9 +26,11 @@ const clampMin = (v, m) => (m == null ? v : Math.max(m, v));
  *  square and anything else as a circle (with a click-to-edit value label when `value` + spec.onEdit are present). */
 export const CANVAS_GESTURES = {
     // POSITION → two fields. Square 'move' handle (FeatureCanvas snaps it to stock anchors).
+    // Optional anchor ax/ay makes it RELATIVE: the fields hold world − anchor (a delta, e.g. a G91 incremental
+    // reposition offset from the previous pass's start). Absent anchor → absolute (back-compat: ax/ay default 0).
     point: {
-        place: (d) => ({ x: d.x, y: d.y, kind: 'move', label: d.label }),
-        drag: (d, w) => ({ [d.fx]: w.x, [d.fy]: w.y }),
+        place: (d) => ({ x: (d.ax || 0) + d.x, y: (d.ay || 0) + d.y, kind: 'move', label: d.label }),
+        drag: (d, w) => ({ [d.fx]: w.x - (d.ax || 0), [d.fy]: w.y - (d.ay || 0) }),
     },
     // 1D LENGTH from an anchor along an axis (e.g. height). Handle at anchor + value·axis; drag → the axis distance.
     length: {

@@ -55,8 +55,8 @@ export const CORNER_BINDING_SPECS = [
     { param: 'port',       type: 'number', default: CORNER_DEFAULTS.port,       label: 'Port',             section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
     { param: 'radius',     type: 'number', default: CORNER_DEFAULTS.radius,     label: 'Stylus Radius',    section: 'TOOL & CUT', match: { type: 'assign', var: '#6' },  key: 'value' },
     { param: 'travelDist', type: 'number', default: CORNER_DEFAULTS.travelDist, label: 'Reposition Travel', section: 'GEOMETRY',  match: { type: 'assign', var: '#15' }, key: 'value' },
-    { param: 'cross1_x',   type: 'number', group: 'reposition', role: 'x',      label: 'Wall 2 dX',        section: 'GEOMETRY',   match: { type: 'assign', var: '#23' }, key: 'value' },
-    { param: 'cross1_y',   type: 'number', group: 'reposition', role: 'y',      label: 'Wall 2 dY',        section: 'GEOMETRY',   match: { type: 'assign', var: '#24' }, key: 'value' },
+    { param: 'cross1_x',   type: 'number', group: 'reposition', role: 'x', relTo: 0, label: 'Wall 2 dX',   section: 'GEOMETRY',   match: { type: 'assign', var: '#23' }, key: 'value' },
+    { param: 'cross1_y',   type: 'number', group: 'reposition', role: 'y', relTo: 0, label: 'Wall 2 dY',   section: 'GEOMETRY',   match: { type: 'assign', var: '#24' }, key: 'value' },
 ];
 
 export const CORNER_DATA_OPTYPE = 'user_corner_data';

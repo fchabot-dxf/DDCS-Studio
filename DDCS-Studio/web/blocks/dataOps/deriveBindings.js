@@ -62,6 +62,7 @@ export function deriveBindings(flatStack, specs) {
         if (s.section) out.section = s.section;
         if (s.group) out.group = s.group;   // canvas-layout grouping (layoutSpecFromOp reads b.group)
         if (s.role) out.role = s.role;      // canvas-layout role (x/y/w/h/… — the draggable handle it drives)
+        if (s.relTo != null) out.relTo = s.relTo;   // incremental socket: anchor the point to the op's Nth sim-start (drag writes a delta)
         return out;
     });
 }

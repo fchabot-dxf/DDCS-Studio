@@ -1,20 +1,19 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * CORNER-PORT inc B3 LAYOUT+DRAG — verify-real-symptom: a REAL "Corner (data)" opened in the real #wiz_user form2d panel
- * renders its FeatureCanvas layout with a draggable REPOSITION point handle (cross1_x/cross1_y = a generic x/y point role),
- * and a REAL pointer drag writes a LITERAL into those sockets → the EMITTED reposition #23/#24 flips from the signed-travelDist
- * EXPRESSION (#15/#16) to a numeric literal. This is the "expression-holding socket, overridable by a bound literal" payoff of
- * the LOCKED MODEL. The drag is relative to the default geometry (INTERIM — the datum-relative form lands with the stock-datum
- * follow-up; no datum #var is needed to write a plain literal offset). Mirrors custom-op-form2d-drag.spec.
+ * CORNER-PORT inc B3/B3b LAYOUT+DRAG — verify-real-symptom: a REAL "Corner (data)" opened in the real #wiz_user form2d panel
+ * renders its FeatureCanvas layout with a draggable REPOSITION point handle, and a REAL pointer drag writes the CORRECT
+ * INCREMENTAL DELTA (world − wall-1, the G91 wall-1→wall-2 reposition) into cross1_x/cross1_y → the EMITTED reposition #23/#24
+ * flips from the signed-travelDist EXPRESSION (#15/#16) to that literal delta. B3b: the point is anchored to the op's first
+ * sim-start (wall-1) so the drag writes a DELTA, not the absolute world coord (the B3 bug). Asserts the VALUE, with DISTINCT
+ * x/y so an axis swap is caught, and rejects the buggy absolute-world write.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-test('Corner (data): dragging the reposition handle writes a literal into the emitted reposition (#23/#24)', async ({ page }) => {
+test('Corner (data): dragging the reposition handle writes the CORRECT incremental delta (world − wall-1) into #23/#24', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
 
-  // register the REAL shipped def (panel form2d + grouped cross1_x/y point roles after B3)
   await page.evaluate(async () => {
     const U = await import('/blocks/userOps.js');
     const CD = await import('/blocks/dataOps/cornerData.js');
@@ -25,39 +24,58 @@ test('Corner (data): dragging the reposition handle writes a literal into the em
   await page.evaluate(() => window.openWiz('user_corner_data'));
   await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
 
-  // the point role needs BOTH cross params rendered as writable fields
   const hasFields = await page.$$eval('#wiz_user_form [data-param]', (ns) => {
     const s = new Set(ns.map((n) => n.dataset.param));
     return s.has('cross1_x') && s.has('cross1_y');
   });
   expect(hasFields, 'cross1_x + cross1_y render as writable form fields (the point role)').toBe(true);
 
-  // PRE-DRAG (negative control): the unset reposition socket emits the signed-travelDist EXPRESSION (#15/#16), not a literal.
+  // the KNOWN wall-1 anchor (pass 0) from the DECLARED sim-starts — computed at runtime, never hard-coded
+  const { wall1, stock } = await page.evaluate(async () => {
+    const CD = await import('/blocks/dataOps/cornerData.js');
+    const { opSimStarts } = await import('/viz/opSimStarts.js');
+    const s = window.ddcsGetSettings().stock;
+    return { wall1: opSimStarts(CD.CORNER_DATA_OPTYPE, CD.CORNER_DEFAULTS, s)[0], stock: s };
+  });
+
+  // PRE-DRAG (negative control): the unset reposition socket emits the #15/#16 expression, not a literal.
   const before = await page.evaluate(() => ({
     cx: document.querySelector('#wiz_user_form [data-param="cross1_x"]').value,
     code: (document.getElementById('wiz_user_code') || {}).textContent || '',
   }));
   expect(before.code, 'the default reposition socket holds the #15/#16 expression').toMatch(/#23\s*=\s*#1[56]\b/);
 
-  // the reposition point drag handle on the 2D preview
+  // drag the reposition handle to the STOCK CENTRE — a KNOWN world point W = (stock.x/2, stock.y/2). The move handle snaps
+  // to stock anchors, so the centre lands the handle at exactly the world centre; the expected DELTA = W − wall1.
+  const stockBox = await page.locator('#userVizContainer .fc-stock').first().boundingBox();
+  const W = { x: stock.x / 2, y: stock.y / 2 };
+  const expectDx = +(W.x - wall1.x).toFixed(2);
+  const expectDy = +(W.y - wall1.y).toFixed(2);
+  expect(Math.abs(expectDx - expectDy), 'expected deltas distinct → an x/y swap is detectable').toBeGreaterThan(1);
+
   const handle = page.locator('#userVizContainer .fc-handle-move').first();
   await handle.waitFor({ state: 'visible' });
-  const box = await handle.boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  const hb = await handle.boundingBox();
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
   await page.mouse.down();
-  await page.mouse.move(box.x + box.width / 2 + 110, box.y + box.height / 2 + 70, { steps: 8 });
+  await page.mouse.move(stockBox.x + stockBox.width / 2, stockBox.y + stockBox.height / 2, { steps: 10 });
   await page.mouse.up();
 
-  // the writeback loop is wired: the field changed
   await expect.poll(async () => page.evaluate(() =>
-    document.querySelector('#wiz_user_form [data-param="cross1_x"]').value
-  )).not.toBe(before.cx);
+    document.querySelector('#wiz_user_form [data-param="cross1_x"]').value)).not.toBe(before.cx);
 
   const after = await page.evaluate(() => (document.getElementById('wiz_user_code') || {}).textContent || '');
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 
-  // THE LOAD-BEARING ASSERTIONS (verify-real-symptom): the EMITTED reposition took a numeric literal; the expression is GONE.
-  expect(after, 'the reposition re-emitted after the drag').not.toBe(before.code);
-  expect(/#23\s*=\s*-?\d+(\.\d+)?\b/.test(after), 'reposition #23 is now a numeric literal').toBe(true);
+  // LOAD-BEARING (verify-real-symptom): the emitted increments equal the WALL-RELATIVE delta, not the absolute world.
+  const g23 = Number((after.match(/#23\s*=\s*(-?\d+(?:\.\d+)?)/) || [])[1]);
+  const g24 = Number((after.match(/#24\s*=\s*(-?\d+(?:\.\d+)?)/) || [])[1]);
+  expect(Number.isFinite(g23) && Number.isFinite(g24), '#23/#24 emitted as literals').toBe(true);
   expect(after, 'the #15/#16 expression default is gone from the reposition socket').not.toMatch(/#23\s*=\s*#1[56]\b/);
+  const TOL = 2;   // world-unit slack for snapping / sub-pixel
+  expect(Math.abs(g23 - expectDx), `#23 == W.x − wall1.x (incremental delta ${expectDx}, not the absolute world ${W.x}); got ${g23}`).toBeLessThan(TOL);
+  expect(Math.abs(g24 - expectDy), `#24 == W.y − wall1.y (incremental delta ${expectDy}); got ${g24}`).toBeLessThan(TOL);
+  // reject the buggy ABSOLUTE-world write (which would give #23 ≈ W.x, #24 ≈ W.y): wall1 ≠ 0, so the delta ≠ the absolute.
+  expect(Math.abs(g23 - W.x), 'reject the absolute-world write on X (#23 must be the delta, not the world coord)').toBeGreaterThan(Math.abs(wall1.x) / 2);
+  expect(Math.abs(g23 - expectDy), 'the X socket is not the Y delta (no axis swap)').toBeGreaterThan(1);
 });

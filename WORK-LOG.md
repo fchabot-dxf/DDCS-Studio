@@ -3700,3 +3700,44 @@ spec; 3 skips = the probeZFirst `fixme` + 2 pre-existing.) A clean run. inc B3 =
 2D FeatureCanvas layout via the generic `userOpView` path and a REAL canvas drag overrides the reposition socket with a literal —
 the payoff of the expression-holding socket. EMIT (B1/B1b) + SIM (B2/B2b) + LAYOUT+DRAG (B3) all done; remaining: B4 (probeZFirst),
 auto/manual travel, inc C (verify+release), the stock-datum follow-up.
+
+---
+
+## 🔨 turn 15 (cycle 1) — CORNER-PORT inc B3b: the reposition drag writes the CORRECT INCREMENTAL DELTA (advisor turn 14)
+
+Advisor caught a real bug in my B3 (the recurring verify-real-symptom trap): the generic `point` handle wrote the ABSOLUTE
+world coord into `cross1_x/cross1_y`, but `#23/#24` are G91 INCREMENTAL deltas (the wall-1→wall-2 reposition, consumed in
+`G91 G0 X#23 Y#24`). So a drag to world W emitted `#23 = W.x` when the geometrically-correct value is `#23 = W.x − wall1.x`
+(the delta FROM the previous pass's start). My B3 test only asserted "`#23` became SOME literal" → it passed on the wrong value.
+This is the same class as the B2 marker bug: a test that checks CHANGED/FINITE instead of the correct VALUE.
+
+**Fix — anchor the point to the op's first sim-start (a DECLARED datum, not a hand-rolled offset):**
+- **`canvasWidgets.js` (`point` gesture):** optional `ax/ay` anchor. `place` renders the handle at `anchor + delta` (the TRUE
+  wall position on the canvas); `drag` writes `world − anchor` (the delta) back to the fields. Absent anchor → `(d.ax||0)=0` →
+  absolute, byte-identical to before (back-compat; custom-op-form2d-drag still green). ONE registry entry, every point op gets it.
+- **`panelTypes.js`:** a binding `role:'x'` carrying `relTo:N` now resolves the anchor from `opSimStarts(def.opType, params, stock)[N]`
+  — i.e. the SAME declared sim-start rows the preview uses (`CORNER_SIM_STARTS[0]` = wall-1). `pos(ax,ay)` threads the anchor into
+  the `point` decl. No `relTo` → absolute (the other point roles: slot A/B, drill pos — unchanged). `s` = the live stock.
+- **`deriveBindings.js`:** carry `relTo` through to the derived binding (it already carries `group`/`role`).
+- **`cornerData.js`:** tag both cross bindings `relTo: 0` (anchor to sim-start 0 = wall-1) + tightened labels (`Wall 2 dX/dY`).
+
+**Why declare, not hand-roll:** the anchor is READ from the op's existing `def.sim.starts` (the wall-1 marker the preview already
+declares), NOT a new per-corner offset constant. `relTo` is a tiny reusable binding attribute — any future incremental socket
+(another wizard's G91 reposition) gets datum-relative drag for free. Kept the data-def DUMB: no corner-specific drag code, no
+`cornerView` lift; the gesture math stays in the shared registry.
+
+**Test HARDENED (`corner-data-drag.spec.js`) — assert the VALUE, per the advisor's B3b requirement:** compute `wall1 =
+opSimStarts(CORNER_DATA_OPTYPE, CORNER_DEFAULTS, stock)[0]` at RUNTIME (never hard-coded); drag the `.fc-handle-move` to the STOCK
+CENTRE — a KNOWN world point `W = (stock.x/2, stock.y/2)` the move handle snaps to; then assert `#23 == W.x − wall1.x` AND
+`#24 == W.y − wall1.y` (a 2-unit tolerance for snap/sub-pixel), with the two expected deltas DISTINCT (catches an x/y swap), and a
+`|#23 − W.x| > |wall1.x|/2` guard that REJECTS the old absolute-world write. For stock {100,80}, wall1 = {20,−50} → expected
+{`#23`=30, `#24`=90} (distinct); the buggy absolute would have been {50,40} → now fails. The test now fails on the B3 bug and
+passes only on the delta.
+
+**VERIFIED:** `node --check` clean on all 4 changed source files + the spec. **corner-data-drag PASS** (the hardened value
+assertion). Regression triangle green: **corner-data-emit 2/2** + **corner-data-sim-starts 2/2** + **custom-op-form2d-drag 2/2**
+(the `point` back-compat — absent anchor is identical). **Full suite: GREEN — 452 passed (1.3m), 0 failed, 0 flaky.**
+
+inc B3b = COMPLETE + VERIFIED. The drag is now geometrically correct (incremental, datum-relative). EMIT (B1/B1b) + SIM (B2/B2b)
++ LAYOUT+DRAG (B3/B3b) all done + value-verified; remaining: B4 (probeZFirst), auto/manual travel, inc C (verify+release), the
+stock-datum `#var` follow-up (draw the handle at the absolute wall via a reachable datum register).

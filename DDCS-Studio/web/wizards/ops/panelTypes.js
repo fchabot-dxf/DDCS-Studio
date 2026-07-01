@@ -7,6 +7,7 @@
  */
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
+import { opSimStarts } from '../../viz/opSimStarts.js';   // a `relTo` point anchors to the op's declared sim-start (incremental socket)
 
 export const PANEL_TYPES = {
     form:   { id: 'form',   label: 'Form only', viz: false, mode: null },   // single column, no preview
@@ -61,7 +62,7 @@ export function layoutSpecFromOp(def, params) {
         const p = (r) => byRole[r] ? num(params[byRole[r].param]) : undefined;
         const wr = (r) => byRole[r] && _writable(byRole[r].param);   // a role whose param is a settable form field
         // pos handle = a `point` gesture over the x/y params (built only when both are writable — never a dead handle).
-        const pos = () => { if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: p('x'), y: p('y'), label: 'pos' }); };
+        const pos = (ax = 0, ay = 0) => { if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: p('x'), y: p('y'), ax, ay, label: 'pos' }); };
         if (byRole.x && byRole.y && byRole.w && byRole.h && byRole.slant) {
             const x = p('x'), y = p('y'), w = p('w'), h = p('h'), slant = p('slant');
             const dx = Math.tan(slant / 180 * Math.PI) * h;
@@ -110,9 +111,18 @@ export function layoutSpecFromOp(def, params) {
             // 1D extent: drag `len` along Y from the anchor (like text height) — axis FIXED Y (one gesture; X variant later).
             if (wr('len')) decls.push({ type: 'length', id: gid + '_len', field: byRole.len.param, ax: x, ay: y, axis: 'y', value: len, min: 1, label: 'len' });
         } else if (byRole.x && byRole.y) {
-            const x = p('x'), y = p('y');
+            // A `relTo` role marks an INCREMENTAL socket (a delta from a previous pass's start — e.g. corner's #23/#24
+            // wall-1→wall-2 reposition, consumed in G91): anchor the point to the op's Nth DECLARED sim-start, so the
+            // handle renders at anchor+delta (the true wall position) and a drag writes world − anchor (the delta), not
+            // the absolute world coord. Absent relTo → an absolute point (unchanged).
+            let ax = 0, ay = 0;
+            if (byRole.x.relTo != null && typeof opSimStarts === 'function') {
+                const a = (opSimStarts(def.opType, params, s) || [])[byRole.x.relTo];
+                if (a) { ax = num(a.x, 0); ay = num(a.y, 0); }
+            }
+            const x = ax + p('x'), y = ay + p('y');
             items.push({ kind: 'hole', x, y, n: 1, r: Math.max(1, stock.w * 0.012) });
-            pos();
+            pos(ax, ay);
         }
     }
     // Drag a handle → write the bound param FIELDS (their 'input' bubbles → userOpView.update() redraws). The gesture
