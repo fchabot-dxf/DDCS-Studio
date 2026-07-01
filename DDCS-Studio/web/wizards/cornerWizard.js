@@ -99,11 +99,23 @@ export function cornerStack(params = {}) {
     // ── Calculated motions ──
     C('=== CALCULATED MOTIONS ===');
     A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
-    A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract');
+        A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract');
     if (td > 0) { A('#15', td, 'Positive travel'); A('#16', `[0-${td}]`, 'Negative travel'); }
     else { A('#15', 0, 'Travel not used'); A('#16', 0, 'Travel not used'); }
     A('#17', plungeDepth, 'Plunge depth = safeZ + scanDepth');
     A('#18', '[0-#17]', 'Negative plunge'); A('#19', safeZ, 'Safe Z retract distance');
+
+    // ── Notepad — data-port-socket values (harmless #var writes that give every param
+    //     a unique (blockIndex, key:'value') socket for the data-port binding table). ──
+    A('#_corner', corner, `Corner: ${corner}`);
+    A('#_probe_seq', probeSeq, `Probe order: ${probeSeq}`);
+    A('#_probe_z', probeZ ? 1 : 0, 'Probe Z surface');
+    A('#_wcs', wcs === 'active' ? 0 : WCS_BASE[wcs], `WCS: ${wcs}`);
+    A('#_level', level, 'Probe level');
+    A('#_scan_depth', scanDepth, 'Scan depth');
+    A('#_travel_dist', travelDist, 'Travel distance');
+    A('#_sync_a', params.syncA ? 1 : 0, 'Sync A axis');
+    A('#_slave', params.slave || '3', 'Slave offset');
 
     // ── WCS base address ──
     if (wcs === 'active') {
