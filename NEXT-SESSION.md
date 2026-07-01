@@ -10,86 +10,67 @@ and the corner wizard/view port is clean; the break is 3 small corner-specific d
 into one "wip" label. So: **DON'T build on that branch — LIFT the clean pieces here, worker-driven, and REDO the one broken file.**
 
 **The 3 corner defects (runtime-proven):**
-1. `data/cornerPort.js` `CORNER_EXEC_BINDINGS` — **hand-counted block-index map is off-by-one** (skips the `=== CONFIGURATION ===`
-   comment at flat index 3) → all 9 bindings shift → `registerUserOp` THROWS (swallowed by an app.js try/catch → silently mis-binds).
-2. `viz/opSimStarts.js` `corner()` — guard `stx !== null` but `n()` returns **`undefined`** → NaN preview-marker coords when the
-   cross-over fields are blank (the default). `middle()` uses the correct `Number.isFinite()`.
-3. `wizards/cornerWizard.js:224` — `inferStarts()` calls `window.app.opSimStarts(...)`, a global **assigned nowhere** → corner falls
-   back to a single start (multi-handle drag / Wall-2 travel-tie never populate). Siblings `import { opSimStarts }` directly.
+1. `data/cornerPort.js` `CORNER_EXEC_BINDINGS` — hand-counted block-index map off-by-one → `registerUserOp` THROWS. **FIXED inc B1**
+   (deriveBindings.js — reviewer-confirmed clean).
+2. `viz/opSimStarts.js` `corner()` — guard `stx !== null` but `n()` returns **`undefined`** → NaN preview-marker coords. **inc B2 (SIM).**
+3. `wizards/cornerWizard.js` `inferStarts()` calls `window.app.opSimStarts(...)`, a global assigned nowhere. **inc B2 (SIM).**
 
 ---
 
 ## ✅ inc A DONE + VERIFIED (advisor turn 2) — the wizards-as-data MECHANISM is lifted
-- Worker lifted the mechanism (commits `fb3f439` [+13 swept] + `118a6f2` [+4 surgical] + `d06e770` [worklog]); 26-file footprint,
-  mechanism-only — no corner-UI, no other-agent WIP, no junk leaked.
-- **ADVISOR REVIEW** (4-lens fan-out + adversarial verify, 9 agents): **2 dims CLEAN** — *emit-identity* (all 5 as-data specs PROVE
-  byte-identical emit via `instantiate()` over the full wrapped `user_root`, NOT a field-rewrite) · *mechanism-soundness* (resolver/
-  round-trip core clean, verified statically + Node harness). **5 raw findings → 4 refuted, 1 nit.** 7 named specs re-run GREEN (10.9s).
-- **FLAG1 (`fb3f439` commit-split):** advisor call = **LEAVE** (cosmetic; all code present + verified; the branch squash-merges clean).
-- **FLAG2 (stale advisor marker):** **FIXED** (`.handoff/advisor.last` 178 → 2; the waiter fires again).
-- **2 NITS carried forward (not blockers):**
-  1. **Tree-hygiene:** 6 `_*.png` visual baselines + `HANDOFF.md` are uncommitted stray churn (concurrent UI-agent regen, NOT inc A).
-     → **STAGE SURGICALLY on every commit** (`git add <files>`, **NEVER** `git add -A`/`commit -a`); do not sweep them.
-  2. **`WRAP_PREFIX_COUNT=4`** is a hand-counted magic offset duplicated across the 5 dataOps (proven-correct + validator-guarded
-     today → a nit) — but it is the SAME CLASS as corner defect #1. → inc B1 **DERIVES** corner's bindings (below); the derivation
-     helper is the one-source the 5 siblings can later adopt.
+- Mechanism lifted (fb3f439/118a6f2/d06e770); 4-lens review: emit-identity + mechanism-soundness CLEAN, 4/5 refuted, 1 nit; 7 specs green.
+- FLAG1 commit-split = LEAVE (cosmetic). FLAG2 stale advisor marker = FIXED (178→2).
 
----
+## ✅ inc B1 DONE + REVIEWED (advisor turn 6) — corner EMIT via derived-binding data twin; the "regression" dissolved by human "REPLACE"
+- Worker built B1 (73b4293): cornerStack EMIT lift + `deriveBindings.js` (reusable) + `cornerData.js` + emit/frontier specs; suite 448/3-skip/0-fail.
+- **ADVISOR REVIEW** (4-lens + adversarial verify, 11 agents): **derive-helper CLEAN** · **FLAG1 safeZ-bake CORRECT** (real fan-out
+  `#17`+`#19`; baking is valid-by-construction + sibling-consistent → KEEP) · probeSeq XY→YX default = not a regression (canonical).
+- The review flagged a built-in regression: the schema rename → `cross1_x/cross1_y` default `0` → the reposition collapses to
+  `G0 X0 Y0`, on the SHARED `cornerStack`. **Human ruling (turn 6): "REPLACE"** — "Corner (data)" REPLACES the built-in, so its
+  transitional emit is IRRELEVANT (drop the byte-identical-to-old invariant). The REAL residue = the data op's OWN default must be correct.
 
-## ⚡ AUTONOMOUS (human t178) — automate the FULL corner port, all THREE dimensions
-Run to a working, verified corner port with NO per-increment HUMAN check-in. The advisor splits the port by DIMENSION so each gets a
-fresh-eyes review, dispatches the next after review, and SURFACES to the human ONLY for: a genuine design fork · a regression the
-advisor can't verify · a worker stall. The FULL port delivers **EMIT** (B1) · **SIM** (B2) · **LAYOUT** (B3), closed by **inc C**.
+### 🔒 THE LOCKED MODEL (human turn 6) — reposition positions are EXPRESSIONS of the stock-datum coord
+Each reposition socket (`#21`/`#22` start, `#23`/`#24` cross) holds a **`datum + offset` EXPRESSION** (declare-never-infer, not a magic number):
+- **DEFAULT** offset = stock-geometry-derived → correct-by-construction (kills the degenerate default). Datum referenced via the WCS /
+  "sits at WCS" stock placement (same wiring the sim/placement use → human: "probably wired" — VERIFY).
+- **DRAG** (B3 canvas) = a **datum-RELATIVE literal offset** → tracks the stock (drill frontier-#2 lesson: never bake an absolute snapshot
+  of derivable geometry). ABSOLUTE = the degenerate case (bare literal, no datum term) → a fallback, never the default.
+- **REPLACE** mode (built-in retires). **Probe-Z-First** = the one structural frontier (its own planned increment; red gate holds).
 
-## 🚦 ACTIVE DISPATCH — CORNER-PORT inc B1: EMIT (the crown-jewel dimension) [autonomous; advisor turn 2]
-The corner port's EMIT path — the exact dimension the shipped break lived in. Get corner's G-code byte-identical to the built-in
-wizard, with DERIVED (not hand-counted) bindings, PROVEN by a real emit test. **Reference:** `git show wizard-porting-work -- <file>`.
+## 🚦 ACTIVE DISPATCH — CORNER-PORT inc B1b: reposition correct-by-default via datum EXPRESSIONS [advisor turn 6; human "replace" + "expressions of the stock-datum coord"]
+Make "Corner (data)" emit a CORRECT wall-to-wall reposition BY DEFAULT (it REPLACES the built-in — correctness is the bar, not
+byte-identity to the old emit). Work to THE LOCKED MODEL above.
+- **DEFAULT `#21`/`#22`/`#23`/`#24` to EXPRESSIONS, not literal `0`.** TARGET: datum-relative geometry expressions of the stock-datum
+  coord (via the WCS / PlaceOnStock "sits at WCS"). **FIRST verify** the stock-datum coord is reachable from the corner op (it currently
+  uses a relative `travelDist`, NOT stock geometry — so the target may need the corner op connected to the stock model):
+  - **IF wired** → default to the datum-relative geometry expressions.
+  - **IF NOT** (a bigger stock-model integration) → use **signed-`travelDist` expressions** (reproduce the base `travelOwn`/`travelOpp`
+    ±travelDist reposition) as the CORRECT non-degenerate **INTERIM** — still an expression, fixes the default NOW — and **GATE** the
+    stock-datum wiring as a follow-up increment (report it). Either way the degenerate `G0 X0 Y0` default dies in this increment.
+- Keep `travelDist` as a bound scalar the interim expressions reference; keep the sockets **expression-holding** (so a datum default OR a
+  B3 drag literal drops in later WITHOUT a schema change).
+- **TEST:** `corner-data-emit` must pin the emit against a KNOWN-GOOD golden — the CORRECT non-zero reposition — NOT "agreement with
+  `cornerStack`" alone (agreement passed while BOTH were degenerate — the verify-real-symptom trap that hid this).
+- KEEP: `deriveBindings.js`, safeZ baked (FLAG1), the `corner-data-probeZFirst-frontier` gate, the additive seed.
 
-**DO:**
-- LIFT `wizards/cornerWizard.js` **cornerStack** (EMIT only): the #21–#24 cross-traverse via the shared `safeTraverseStack` (already
-  lifted in inc A), the enum-normalizing param maps, and the FINAL field schema (`travelDist` → `startX/startY/cross1_x/cross1_y`,
-  internally consistent) so the bindings are stable. Do NOT wire the sim/view yet.
-- ⭐ **REDO `data/cornerPort.js` → `blocks/dataOps/cornerData.js`** (one-source: match the 5 siblings' shape). **DERIVE the binding
-  blockIndexes PROGRAMMATICALLY from the flattened stack** — walk the flattened `user_root` and match each binding to its target
-  block by role/key, **NOT hand-counted**. This is defect #1's real fix AND kills the `WRAP_PREFIX_COUNT` class for corner. Make the
-  derivation a small **REUSABLE helper** (valid-by-construction; the 5 siblings can adopt it later — but do NOT migrate them now).
-  The helper must re-find the sockets correctly EVEN under `probeZFirst`'s structural shift (see the FRONTIER below).
-- ⭐ **`probeZFirst` = a DECLARED FRONTIER (baked off), NOT a bound param.** Ticking it INSERTS a Z-surface step + traverse (changes the
-  stack SHAPE, shifts #23/#24); `instantiate()` substitutes VALUES in a fixed shape — it cannot add/remove blocks. Same class as drill's
-  baked `method` (peck-not-bore). So `cornerData` bakes `probeZFirst=off` (the default shape). **This is ADDITIVE:** `cornerData` is a
-  NEW "Corner (data)" op seeded ALONGSIDE the UNTOUCHED built-in Corner wizard (`wizardLibrary` id:`corner`, which keeps `probeZFirst`
-  fully working) — nothing the operator uses is disabled. Don't surface a working probeZFirst control in the twin (a B3 concern).
-- ⭐ **ADD an EMIT-CORRECTNESS test** `corner-data-emit.spec.js`: assert `cornerData` emits **byte/value-identical** G-code to the
-  built-in `cornerStack` across a sweep of the BOUND scalars (all quadrants, WCS, offsets, cross-traverse) at the baked
-  `probeZFirst=off`, via `stripAnnotations` (mirror the 5 as-data specs) — PLUS a **DERIVE-ROBUSTNESS** assertion: the derive helper
-  re-finds the shifted `#23/#24` sockets when built against a `probeZFirst=on` stack. That guards defect #1's ROOT (bindings under a
-  structural shift) BETTER than the impossible "emit the variant" test my first dispatch wrongly demanded. **DISCARD
-  `_diag-endoffset.spec.js`** (asserts nothing).
-- ⭐ **ADD a can't-forget FRONTIER GATE** (`corner-data-probeZFirst-frontier.spec.js`): a LOUD, named `test.fixme`/skip documenting that
-  the data model can't yet do the add-a-step toggle, PLUS an assertion that the built-in Corner (`wizardLibrary` id:`corner`) stays
-  registered — so any future attempt to RETIRE the built-in while the twin is limited turns the suite RED. A red/skipped marker can't be
-  forgotten like a backlog note (this is the anti-"risky-to-forget" guard, human t178).
-- DROP the corner emit-path orphans your changes make dead (`travelOwn`/`travelOpp` + imports, unused `td`, stale `Travel:` header) —
-  only the ones YOUR changes orphan.
-- **SCOPE: EMIT ONLY.** Do NOT lift `cornerView.js` / the `index.html` panel (= inc B3 LAYOUT). Do NOT touch `opSimStarts` /
-  `inferStarts` (= inc B2 SIM). Do NOT migrate the 5 existing dataOps to the derive helper (follow-up).
-
-**VERIFY:** `node --check` clean on every touched file; `registerUserOp(cornerData())` does NOT throw; `corner-data-emit` +
-`corner-data-probeZFirst-frontier` + the 7 inc-A specs GREEN. **STAGE SURGICALLY** (the tree has stray PNG/HANDOFF churn — never
+**VERIFY:** a placed "Corner (data)" with DEFAULTS emits a real reposition (NOT `G0 X0 Y0`); `corner-data-emit` pins the correct motion +
+GREEN; frontier-gate + the 7 inc-A + `probe-surface-block` GREEN; full suite green. **STAGE SURGICALLY** (stray PNG/HANDOFF churn — never
 `git add -A`). Commit + WORK-LOG + pass.
 
-**NORTH STAR:** valid-by-construction (DERIVE, never hand-count) · one-source (cornerData matches the 5 siblings; the derive helper is
-the single binding-index authority) · verify-real-symptom (the emit test asserts real G-code, not a field rewrite) · declare-never-infer.
+**NORTH STAR:** declare-never-infer (position = DERIVED geometry, not a magic number) · valid-by-construction (datum-relative → tracks the
+stock) · verify-real-symptom (the golden pins the REAL motion) · GUI-first (B3 drag overrides the same socket).
 
 ## 📌 QUEUED (advisor dispatches each after review — no human check-in):
-- **inc B2 — SIM:** FIX defect #2 (`opSimStarts.corner()` `!== null` → `Number.isFinite()`, like `middle()`) + defect #3
-  (`cornerWizard.js` `window.app.opSimStarts` → `import { opSimStarts }`) + `inferStarts`. VERIFY: a placed corner op renders its start
-  markers (**NO NaN**); multi-handle drag + Wall-2 travel-tie populate (defect #3 gone).
-- **inc B3 — LAYOUT:** LIFT `cornerView.js` FeatureCanvas port (drag handles, `tieCornerTravel`, `getPassStarts`) + the `index.html`
-  corner panel; render through the generic `registerUserOp → def.panel/def.layout → userOpView`. VERIFY: the FeatureCanvas layout +
-  form panel render, matching the built-in corner wizard's panel.
-- **inc C — VERIFY + RELEASE:** all 3 dims end-to-end (EMIT byte-identical incl. `probeZFirst` · SIM no-NaN + multi-handle · LAYOUT
-  renders via `userOpView`) + full suite green. Release when verified. Closes the FIRST full wizard-as-data port (emit + sim + layout).
+- **inc B2 — SIM:** FIX defect #2 (`opSimStarts.corner()` `!== null` → `Number.isFinite()`) + defect #3 (`cornerWizard.js`
+  `window.app.opSimStarts` → `import { opSimStarts }`) + `inferStarts`. VERIFY: a placed "Corner (data)" renders start markers (**NO NaN**).
+- **inc B3 — LAYOUT + DRAG:** LIFT `cornerView.js` FeatureCanvas port + the `index.html` corner panel, rendered via
+  `registerUserOp → def.panel/def.layout → userOpView`. ⭐ **The DRAG writes a datum-RELATIVE literal offset into the reposition socket**
+  (overriding the default expression; tracks the stock). VERIFY: layout + form render; dragging a handle updates the emitted position.
+- **inc B4 — PROBE-Z-FIRST (REQUIRED for replacement):** since "Corner (data)" REPLACES the built-in, it must do Probe-Z-First (an
+  add-a-step, not an expression). Likely: ALWAYS emit the Z-surface step + traverse, GUARDED by a `probeZ` flag (conditional goto), so it
+  becomes a BOUND VALUE in a fixed shape (registers stop shifting). Its own increment; the red frontier-gate holds until it lands.
+- **inc C — VERIFY + RELEASE:** all dims end-to-end (EMIT correct reposition · SIM no-NaN · LAYOUT+DRAG · Probe-Z-First) + full suite
+  green. Release when verified. Closes the FIRST full wizard-as-data port that REPLACES its built-in.
 
 ---
 
