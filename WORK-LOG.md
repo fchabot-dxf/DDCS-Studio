@@ -3403,3 +3403,56 @@ template `simstart` blocks are canonical with `def.sim.starts` as fallback (regi
 (448 tests across parallel workers) — **passes clean in isolation (2.2s)**. It's a cloud/OAuth-UI test, untouched by the mechanism;
 NOT a regression. The 445 app-loading specs (all `blocks-*`, `custom-op-*`, `wizard-*`) pass, which proves the `app.js` seeding +
 the bridge `DO→GCODE/SIM` round-trip + devMode read-leg did not break app init. inc-A mechanism lift = COMPLETE + VERIFIED.
+
+---
+
+## 🔨 turn 3 (cycle 1) — CORNER-PORT inc B1 EMIT — SCOUT DONE, ⛔ GATING on a design fork before authoring
+
+Dispatched (HANDOFF turn 3, autonomous) to port the corner EMIT path: lift `cornerWizard` cornerStack, REDO `cornerPort.js` →
+`blocks/dataOps/cornerData.js` with DERIVED binding indices (defect #1 fix, reusable helper), add a byte-identical
+`corner-data-emit.spec` incl `probeZFirst`. Ran a 5-agent read-only understanding workflow, then verified every load-bearing
+fact against the real source. **No code written yet — I'm gating on a genuine design fork the scout surfaced.**
+
+**Verified facts (settled two conflicting agent reports against `git show`):**
+- The dump's `cornerStack` (the emit source of truth) reads the FINAL schema: `#21/#22 ← startX/startY` (only when `probeZ`),
+  `#23/#24 ← cross1_x/cross1_y`, driven via the shared `safeTraverseStack({mode:'seq', crossX/crossY,…})` (lifted in inc A).
+  `travelDist`/`td`/`travelOwn`/`travelOpp`(+imports)/the `Travel:` header are **orphans** the refactor left dead — drop-list confirmed.
+- `probeZFirst` is **STRUCTURAL**: `const probeZ = !!(params.probeZ || params.probeZFirst)` → it inserts the whole Z-surface
+  `probeSurfaceStack`, shifting `#23/#24` downstream. So do `wcs` (active=4 vs fixed=2 blocks), `syncA`, `probeSeq` (Y-wall writes 2
+  WCS assigns vs X-wall's 1). The corner exec stack has **no fixed index** for many sockets.
+- `instantiate(def, params)` (userOps.js) clones a **STATIC** `def.template` (seeded from `CORNER_DEFAULTS`, probeZFirst=0) and only
+  overwrites each binding's `(blockIndex, key)` socket — it **cannot** perform a shape swap. The 5 sibling data-ops are all
+  static-template; their shape-changing params are asserted as FRONTIER tripwires that DIVERGE (e.g. slot's pattern/clearance).
+- `registerUserOp` DOES honor `def.build` (userOps.js:310 `if (typeof def.build === 'function') return def.build(resolved)`), but
+  NO sibling uses it.
+- The DERIVE helper design is solid (walk the wrapped+flattened stack, match each binding by `block.type==='assign' && params.var===`
+  the macro var — re-finds the shifted index, absorbs the +4 wrap offset, throws loudly on zero/ambiguous/keyless — kills defect #1
+  AND the `WRAP_PREFIX_COUNT` hand-count class). That part is NOT in question.
+
+**⛔ THE FORK (a tension between the dispatch's OWN mandates for a structurally-dynamic op):**
+- **Mandate 1:** "DERIVE the binding blockIndexes (defect #1's real fix, central) · match the 5 siblings' shape." → a STATIC template
+  whose bound sockets the derived indices drive. Honors defect #1 + one-source-with-siblings.
+- **Mandate 2:** "emit byte/value-identical to `cornerStack` across a sweep INCLUDING the `probeZFirst` toggle."
+- These COLLIDE: a static template baked at `probeZFirst=0` emits the no-Z shape for ALL params (probeZFirst isn't a bindable
+  socket) → it CANNOT be byte-identical to `cornerStack(probeZFirst=true)`. The literal acceptance test FAILS on a static template.
+  Making it pass requires `def.build = (p) => wrap(cornerStack(p))` (delegate to the real builder) — but then emit comes from
+  `build`, the bound sockets are bypassed, and the "DERIVE bindings = defect #1 fix" becomes **vestigial for emit** (bindings serve
+  only the form). So we satisfy Mandate 1 XOR Mandate 2, not both, with the sibling architecture.
+
+**OPTIONS (for the advisor):**
+- **(A) — RECOMMENDED — static template + derived bindings (matches siblings, centers the derive helper).** cornerData bakes the
+  structural params (corner/probeSeq/probeZ/probeZFirst/wcs/syncA) like the dump did (and like drill's clearance/method). Emit test:
+  byte-identical (via `stripAnnotations`) over the 9 BOUND scalars at the seed shape, PLUS a direct derive-robustness check —
+  build the template at `probeZFirst=1` and assert `deriveBindings` re-finds `#23/#24` at the shifted indices (proves
+  valid-by-construction; THIS is the real "probeZFirst" guard). Structural flips asserted as frontiers (diverge), sibling-style.
+  Reading: "incl probeZFirst" = the TEST must exercise probeZFirst to prove the derive re-finds — not that the baked op reproduces
+  Z-first emit. Cheapest, on-pattern, defect-#1-centered. COST: the corner data-op is a LIMITED port (baked corner/Z/wcs — user
+  can't pick them), same limitation the 5 siblings accept.
+- **(B) — `def.build` dynamic (full byte-identity, fully-functional corner op).** `def.build=(p)=>wrap(cornerStack(p))` → byte-identical
+  across ALL params incl probeZFirst, user can drive every field. Departs from the static-sibling shape (but registerUserOp supports
+  it), and the derive helper becomes form-only (defect #1 fix still built + used for the form/round-trip, not for emit).
+
+**Why I gate (not guess):** the crown-jewel file shipped broken precisely from an emit/binding mismatch; the two mandates genuinely
+conflict for a structurally-dynamic op; the choice changes cornerData.js, the spec, and whether the derive helper is emit-central or
+form-only. Per the autonomous plan ("surface ONLY for a genuine design fork") this qualifies. **No code written; tree clean (only the
+stray `_*.png`/HANDOFF churn). Awaiting the advisor's synthesis (expect "do A" or "do B, plus …"), then I author inc B1 in one pass.**
