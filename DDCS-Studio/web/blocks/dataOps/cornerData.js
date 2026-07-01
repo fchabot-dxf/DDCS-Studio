@@ -61,17 +61,20 @@ export const CORNER_BINDING_SPECS = [
 
 export const CORNER_DATA_OPTYPE = 'user_corner_data';
 
-/** inc B2 — the per-pass PREVIEW start markers, DECLARED as `def.sim.starts` rows (the makeProvider vocabulary), authored
- *  as canonical template `simstart` blocks below. Sim-side ONLY (emit unchanged: simstart emits nothing). Positions follow the
- *  LOCKED-MODEL default geometry (FL corner, YX seq) via the `frac` anchor — the ONLY anchor that reaches a corner (`edge`
- *  centres the perpendicular axis). All fractions are LITERAL, so they resolve to the default geometry and NEVER read the
- *  reposition EXPRESSION sockets (#23/#24 = '#15'/'#16') → finite by construction, no NaN (the dispatch's NaN discipline).
- *  The Z-plunge row is `when`-gated on probeZFirst (a baked frontier = off in the twin → 3 markers by default; 4 with Z). */
+/** inc B2/B2b — the per-PROBE-PASS PREVIEW start markers, DECLARED as `def.sim.starts` rows, authored as canonical template
+ *  `simstart` blocks below. ONE marker per PROBE PASS (wall-1, wall-2, + Z-surface when probeZFirst) — NOT per waypoint. The
+ *  engine indexes markers by `_pass`, which increments at each `REPOSITION:` traverse (a DELIMITER, not a pass — GcodeExecution
+ *  Engine.js:598). The corner's single wall-1→wall-2 REPOSITION → 2 passes → 2 markers for the baked no-Z default; the
+ *  reposition itself gets NO marker (a 3rd/waypoint marker would displace wall-2 to the reposition point INSIDE the stock and
+ *  orphan the true wall-2 — the B2 bug this fixes). Sim-side ONLY (emit unchanged: simstart emits nothing). Positions follow the
+ *  LOCKED-MODEL FL/YX default via the `frac` anchor — the only one that reaches a corner (`edge` centres the perp axis). All
+ *  fractions are LITERAL → resolve to the default geometry, NEVER read the reposition EXPRESSION sockets (#23/#24) → finite by
+ *  construction (NaN discipline). The Z-surface row is `when`-gated on probeZFirst (a baked frontier = off in the twin;
+ *  probeZFirst's own pass-alignment — the Z→wall-1 traverse is not a REPOSITION: delimiter — is a B4 concern). */
 export const CORNER_SIM_STARTS = [
-    { anchor: 'frac', fx: 0.07, fy: 0.0875, plane: 'top',   when: { param: 'probeZFirst', is: true } },   // Z-plunge (over the corner; only when probeZ)
-    { anchor: 'frac', fx: 0.20, fy: -0.625, plane: 'probe' },   // Wall-1 (Y, first) — in front of the −Y wall, X just inside
-    { anchor: 'frac', fx: 0.50, fy: 0.25,   plane: 'probe' },   // Reposition waypoint (past the corner) — LITERAL, never reads #23/#24
-    { anchor: 'frac', fx: -0.50, fy: 0.25,  plane: 'probe' },   // Wall-2 (X, second)
+    { anchor: 'frac', fx: 0.07, fy: 0.0875, plane: 'top',   when: { param: 'probeZFirst', is: true } },   // Z-surface probe (only when probeZ)
+    { anchor: 'frac', fx: 0.20, fy: -0.625, plane: 'probe' },   // Wall-1 (Y, first) — _pass 0 in the no-Z default
+    { anchor: 'frac', fx: -0.50, fy: 0.25,  plane: 'probe' },   // Wall-2 (X, second) — _pass 1 (after the wall-1→wall-2 REPOSITION traverse)
 ];
 
 /** The wrapped `user_root` template for a given param set. Structural params bake the stack SHAPE; the 9 bound scalars

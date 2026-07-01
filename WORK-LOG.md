@@ -3619,3 +3619,39 @@ The run showed 1 failed + 1 flaky, BOTH the known load-induced flakes, unrelated
 in isolation (re-ran project-drawer-smoke + the 2 corner sim-starts → 3 passed). inc B2 = COMPLETE + VERIFIED: "Corner (data)"
 DECLARES its per-pass preview markers and they RENDER in the editor's real 3D preview (no NaN), via the twin's own provider — the
 built-in `opSimStarts.corner` untouched.
+
+---
+
+## 🔨 turn 11 (cycle 1) — CORNER-PORT inc B2b: align sim-starts to PROBE PASSES (a bug fix in my B2)
+
+Advisor review of B2 caught a real bug in my markers: I declared a separate REPOSITION (waypoint) marker → **3 markers for a
+2-pass macro**. The engine indexes markers by `_pass`, so it mapped `_pass=1` (wall-2) to marker[1] (the reposition point,
+INSIDE the stock) and ORPHANED the true wall-2 marker. My B2 test only asserted finite/distinct — never PASS-ALIGNMENT — so the bug
+shipped green (the verify-real-symptom trap: a green test asserting the wrong property).
+
+**SCOUT (empirical, verify-real-symptom).** `GcodeExecutionEngine._pass` increments at each `REPOSITION:` raw comment
+(GcodeExecutionEngine.js:598) — a DELIMITER, not a pass. Ran both corner variants through the real engine: the **no-Z corner macro
+= 2 passes** (1 `REPOSITION:` comment, the wall-1→wall-2 traverse; the Z→wall-1 traverse is 'Traverse to first wall', not a
+delimiter). probeZFirst is anomalous/dormant (baked off → B4). Sibling contract confirmed: middle boss-both (2 probes / 1
+reposition) = exactly 2 markers, no reposition marker.
+
+**FIX (SIM decl only — emit UNCHANGED):**
+- **`cornerData.js`:** REMOVED the reposition-waypoint row. `CORNER_SIM_STARTS` = `[Z-surface (when probeZFirst) · wall-1 · wall-2]`
+  → the baked no-Z default renders **2 markers** `[wall-1(_pass 0), wall-2(_pass 1)]`, 1:1 with the engine's 2 passes; the
+  reposition gets NO marker.
+- **`corner-data-sim-starts.spec.js`:** rewrote the assertions to the checks whose ABSENCE let the bug ship —
+  **PASS-ALIGNMENT** (run the no-Z macro through the real engine, `enginePassCount === marker count === 2`) + **no marker inside
+  the stock material** (`0<x<sx && 0<y<sy && z<0` → 0; the reposition was inside) + finite/distinct + NaN-safe. The editor
+  real-render spec now asserts **2** rendered markers (one per probe pass).
+
+**⚠ FLAG (B4):** probeZFirst's OWN pass-alignment is deferred. The Z→wall-1 traverse is not a `REPOSITION:` delimiter, so the engine
+doesn't split Z-surface from wall-1 into separate passes — a 3-marker probeZFirst (Z · wall-1 · wall-2) would need that emit change
++ the probeZFirst un-baking, both B4. Dormant now (baked off); the Z-surface row is declared (gated) and inert in the twin.
+
+**VERIFIED:** `node --check` clean. **corner-data-sim-starts 2/2** (pass-alignment: 2 markers === 2 engine passes, none inside the
+stock; + editor real-render = 2 markers, no NaN); **corner-data-emit 2/2** (emit unchanged).
+
+**Full suite: GREEN — 451 passed, 3 skipped, 0 failed, 0 flaky (1.4m).** (454 total; 3 skips = the probeZFirst `fixme` + 2
+pre-existing.) A clean run, no flakes. inc B2b = COMPLETE + VERIFIED: the corner preview markers now index 1:1 with the engine's
+probe passes (2 for the baked no-Z default), the reposition-waypoint marker is gone, and no start marker sits inside the stock —
+proven by a pass-alignment test that runs the real engine (the check my B2 test lacked).
