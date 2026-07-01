@@ -14,8 +14,13 @@ import { el } from './ui/uiUtils.js';
 import { setupGlobalFunctions } from './ui/globalFunctions.js';
 import { setupNumericInputGuards as setupNumericInputGuardsImpl } from './ui/numericInputGuards.js';
 import { playClick } from './ui/sound.js';  // click feedback sound
-import { loadUserOps } from './blocks/userOps.js';   // wizard-maker: register persisted user-defined ops at startup
+import { loadUserOps, listUserOps, createUserOp, updateUserOp } from './blocks/userOps.js';   // wizard-maker: register + seed/upgrade user-defined ops
 import { insertUserOp } from './ui/userOpForm.js';   // wizard-maker: generic param form (→ window.ddcsInsertUserOp)
+import { atcWarmupDataDef } from './blocks/dataOps/atcWarmupData.js';
+import { drillDataDef } from './blocks/dataOps/drillData.js';
+import { slotDataDef } from './blocks/dataOps/slotData.js';
+import { surfacingDataDef } from './blocks/dataOps/surfacingData.js';
+import { textDataDef } from './blocks/dataOps/textData.js';
 // Edge viz animator (registers `window.EdgeVizAnimator`)
 import './viz/edgeVizAnimator.js';
 // Alignment viz animator (registers `window.AlignVizAnimator`)
@@ -73,10 +78,14 @@ class DDCSStudio {
         initProgramModel();
         initSaveStates();
         loadUserOps();                              // register every persisted user-defined op (wizard-maker)
+        this.seedDefaultPortedUserOps();            // surface shipped data-op ports in the user layer / bar Custom dropdown
         window.ddcsInsertUserOp = insertUserOp;     // open the generic param form for a user op (menu / dev panel)
         // Re-author a saved wizard (load its template into Blocks). Exposed early — the Settings manager triggers it
         // from Studio, before the Blocks app (which would otherwise set it) has mounted.
         import('./blocks/devMode.js').then((m) => { window.ddcsEditWizardDef = (opType) => m.editWizardDef(opType); }).catch(() => {});
+
+        // Ensure the wizard bar reflects any newly seeded user ops on first load.
+        if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
 
         // Setup global window functions for backwards compatibility
         this.setupGlobalFunctions();
@@ -123,6 +132,27 @@ class DDCSStudio {
 
         // Log layout snapshot for debugging: sizes and visibility
         this.logLayoutSnapshot();
+    }
+
+    // Seed/upgrade selected data-op ports as default USER ops.
+    // Built-ins remain untouched; these are user-layer entries and can be hidden/deleted/overridden like any other custom op.
+    // IMPORTANT: existing saved seeded defs are upgraded in place so new UI metadata (dropdown options, panel/sim blocks,
+    // domain grouping) appears for users who already had earlier versions in localStorage.
+    seedDefaultPortedUserOps() {
+        const have = new Set(listUserOps().map((d) => d.opType));
+        const seeds = [
+            atcWarmupDataDef(),
+            drillDataDef(),
+            slotDataDef(),
+            surfacingDataDef(),
+            textDataDef(),
+        ];
+        for (const def of seeds) {
+            try {
+                if (have.has(def.opType)) updateUserOp(def);
+                else createUserOp(def);
+            } catch (_) { /* ignore duplicate/corrupt edge cases */ }
+        }
     }
 
     logLayoutSnapshot() {

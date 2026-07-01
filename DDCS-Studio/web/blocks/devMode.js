@@ -68,7 +68,7 @@ function authoringBody(ws) {
     const opRec = stack.find((b) => b && b.type === 'op');
     if (opRec && (opRec.children || []).length) {
         const opBlk = ws.getAllBlocks().find((b) => b.type === 'op' || b.type.endsWith('_op'));
-        const doIn = opBlk && opBlk.getInput('DO');
+        const doIn = opBlk && (opBlk.getInput('GCODE') || opBlk.getInput('DO'));
         return { opRec, children: opRec.children, first: (doIn && doIn.connection && doIn.connection.targetBlock()) || null };
     }
     const children = stack.filter((b) => b && b.type !== 'op' && !String(b.type || '').endsWith('_op') && b.type !== 'progstart' && b.type !== 'progend');
