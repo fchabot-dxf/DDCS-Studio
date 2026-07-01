@@ -3456,3 +3456,68 @@ fact against the real source. **No code written yet — I'm gating on a genuine 
 conflict for a structurally-dynamic op; the choice changes cornerData.js, the spec, and whether the derive helper is emit-central or
 form-only. Per the autonomous plan ("surface ONLY for a genuine design fork") this qualifies. **No code written; tree clean (only the
 stray `_*.png`/HANDOFF churn). Awaiting the advisor's synthesis (expect "do A" or "do B, plus …"), then I author inc B1 in one pass.**
+
+---
+
+## 🔨 turn 5 (cycle 1) — CORNER-PORT inc B1 EMIT — BUILT (Option A pure-data, advisor turn 4)
+
+Advisor resolved the fork → **Option A** (my recommendation) with refinements: `probeZFirst` = a DECLARED FRONTIER baked off;
+`cornerData` is an ADDITIVE "Corner (data)" twin (built-in Corner UNTOUCHED); emit test = byte-identical over the bound scalars
+@probeZFirst=off PLUS a derive-robustness assertion (NOT "emit the variant"); + a loud can't-forget FRONTIER GATE.
+
+**Built (EMIT only; sim=B2, layout=B3 untouched):**
+- **`cornerWizard.js` cornerStack — lifted EMIT hunks only.** Applied the 5 emit hunks (enum-normalizing param maps; the final
+  schema `#21/#22 ← startX/startY` (probeZ) + `#23/#24 ← cross1_x/cross1_y`; the two `safeTraverseStack({mode:'seq'…})`
+  cross-traverses replacing the old `#15/#16` travelOwn/travelOpp `MOVE`). **SKIPPED the 2 B2 sim hunks** (the `inferStart`
+  enum-normalize + the new `inferStarts()`→`window.app.opSimStarts` = defect #3). **DROPPED only my-change orphans:**
+  `travelOwn`/`travelOpp` (+ their `travelOwnExpr`/`travelOppExpr` imports), unused `td`, now-dead `travelDist` (in cornerStack),
+  the stale `Travel:` header, `firstTravelVar`. **Verified faithful:** a full-file diff vs the dump shows the ONLY differences are
+  exactly those orphan drops + the 2 deliberately-skipped B2 hunks — the probe/WCS/motion emit body is byte-identical to the dump.
+- **`blocks/dataOps/deriveBindings.js` (NEW, the reusable defect-#1 fix).** `deriveBindings(flatStack, specs)` /
+  `deriveBindingsFor(stack, specs)`: each binding is DECLARED by identity (`{type:'assign', var:'#23'}`), and the helper RE-FINDS
+  the flat index by scanning the wrapped+flattened stack — immune to a comment insertion, absorbs the `user_root` +4 prefix (no
+  `WRAP_PREFIX_COUNT`), and re-finds `#23/#24` under probeZFirst's +2 shift. Throws LOUDLY on a zero/ambiguous/keyless match
+  (a real authoring error) instead of an off-by-one's silent mis-bind. Reusable by the 5 siblings later (NOT migrated now).
+- **`blocks/dataOps/cornerData.js` (NEW, REDOES the broken `data/cornerPort.js`).** Same sibling shape (user_root wrap +
+  `userOpFromStack('corner_data','Corner (data)',…,'form3d',{forceMachine:true},'probe_datawiz')`); bindings are DERIVED, not
+  hand-counted. `CORNER_DATA_OPTYPE='user_corner_data'`. Structural params (corner/probeSeq/probeZFirst/wcs/syncA) baked =
+  frontiers.
+- **⚠ DEVIATION (flagged): `safeZ` is a FAN-OUT frontier → 8 clean bindings, NOT the dump's 9.** `safeZ` feeds its own socket
+  `#19` AND the COMPUTED `#17 = safeZ + scanDepth` (plunge depth). A single binding drives ONE socket, so binding safeZ→#19 would
+  leave #17 stale = inconsistent plunge (the dump's 9th binding was unsound even before its off-by-one — its hand-count landed
+  safeZ on #17 anyway). Per valid-by-construction I BAKED safeZ (like slot's `clearance` fan-out) rather than ship a wrong
+  binding. The 8 bound are the clean single-socket scalars: dist/retract/f_fast/f_slow/port/radius/cross1_x/cross1_y. The built-in
+  Corner still drives safeZ fully. (If the advisor wants a fan-out binding mechanism, that's a follow-up — out of B1 scope.)
+- **`app.js`:** re-added `cornerDataDef()` to the seed array (the additive twin, seeded alongside the untouched built-in).
+- **`tests/corner-data-emit.spec.js` (NEW):** byte-identical (via `stripAnnotations`) over a 14-entry bound-scalar sweep;
+  FRONTIER divergences (probeZFirst / safeZ / corner MUST diverge); a DERIVE-ROBUSTNESS block (build the template at
+  probeZFirst=on → assert `deriveBindings` re-finds `#23/#24` shifted **+2** while the pre-Z scalar `#1` is unmoved); and a
+  String-normalized binding-wiring check (every derived binding routes to the same `assign var` cornerStack writes).
+- **`tests/corner-data-probeZFirst-frontier.spec.js` (NEW):** (1) a LOUD `test.fixme` documenting the unimplemented probeZFirst
+  shape (visible in every run; un-fixme when the twin gains it), and (2) a REAL gate asserting the built-in Corner
+  (`wizardLibrary` `id:'corner'`, `kind:'builtin'`) stays registered — retiring it while the twin is limited turns the suite RED.
+- **`tests/probe-surface-block.spec.js`:** lifted the dump's regenerated CORNER golden (its single-line diff) — my cornerStack
+  change orphaned the old `G0 X#15 Y#16` golden; the new one asserts `#23/#24` (+ `#21/#22` under probeZ). My cornerStack ==
+  the dump's, so the dump's golden is the correct expected value.
+- **`_diag-endoffset.spec.js`:** dispatch said DISCARD — it was never lifted onto this branch (new-on-dump), so a no-op.
+
+**VERIFIED:** `node --check` clean on every touched file. `registerUserOp(cornerData())` does NOT throw (proven by the emit spec
+building the def). **corner-data-emit PASS** (byte-identical + derive-robustness +2 shift + frontiers diverge + wiring clean);
+**corner-data-probeZFirst-frontier**: gate PASS + 1 fixme (the frontier marker); **7 inc-A specs GREEN**; **probe-surface-block
+5/5 GREEN**.
+
+**Full-suite regression → 1 real failure found + FIXED (`disc-on-surface.spec`), + a DESIGN FLAG.** First full run: 446 passed,
+3 skipped, 1 flaky, 1 FAILED. The failure was `disc-on-surface` (a SIM test that drives the corner probe) — GREEN in inc A, so my
+change caused it. ROOT: the final schema replaced `travelDist` (default 50 → the walls traversed apart) with `cross1_x/cross1_y`
+(default **0** → NO traverse), so the DEFAULT corner probe is degenerate (both walls probed at the same spot) → the discs collapse
+onto overlapping contacts → `minOff=0`. FIX: the test used bare defaults; I set `cross1_x:50, cross1_y:-50` in its param (a
+my-change orphan / test-data update, NOT sim code — mirrors the old travelDist reposition) → now `minOff=maxOff=2` (each disc
+nudged exactly the tip radius), PASS. ⚠ **DESIGN FLAG for the advisor:** the new corner schema defaults `cross1_x/cross1_y=0`, so
+a corner op with UNSET cross-traverse has no reposition between walls (was auto-50). That's fine for EMIT (the values are the
+user's/canvas's to set) and the B3 FeatureCanvas drag handles will supply them — but the built-in corner FORM's defaults / the B3
+canvas should provide a sensible non-zero cross-traverse so the default probe isn't degenerate. Tracking for B3.
+
+**Full suite (re-run after the disc-on-surface fix): GREEN — 448 passed, 3 skipped, 0 failed, 0 flaky (1.3m).** (451 total = the
+prior 448 + the 3 new corner tests; the 3 skips = the 1 probeZFirst-frontier `fixme` + 2 pre-existing.) inc B1 EMIT =
+COMPLETE + VERIFIED: corner G-code byte-identical via a DERIVED (never hand-counted) binding, defect #1 killed by construction,
+the built-in Corner intact, the probeZFirst frontier gated RED-if-retired.

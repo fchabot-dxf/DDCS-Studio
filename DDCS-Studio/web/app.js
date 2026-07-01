@@ -21,6 +21,7 @@ import { drillDataDef } from './blocks/dataOps/drillData.js';
 import { slotDataDef } from './blocks/dataOps/slotData.js';
 import { surfacingDataDef } from './blocks/dataOps/surfacingData.js';
 import { textDataDef } from './blocks/dataOps/textData.js';
+import { cornerDataDef } from './blocks/dataOps/cornerData.js';   // corner port (inc B1): additive "Corner (data)" twin
 // Edge viz animator (registers `window.EdgeVizAnimator`)
 import './viz/edgeVizAnimator.js';
 // Alignment viz animator (registers `window.AlignVizAnimator`)
@@ -146,6 +147,7 @@ class DDCSStudio {
             slotDataDef(),
             surfacingDataDef(),
             textDataDef(),
+            cornerDataDef(),
         ];
         for (const def of seeds) {
             try {
