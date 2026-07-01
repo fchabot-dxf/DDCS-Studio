@@ -24,7 +24,7 @@
  * tests/corner-data-emit.spec.js. SCOPE (inc B1) = EMIT only — no view/panel (B3), no sim-starts/inferStarts (B2).
  */
 import { cornerStack } from '../../wizards/cornerWizard.js';
-import { userOpFromStack } from '../userOps.js';
+import { userOpFromStack, simStartsToBlocks } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 
 /** Author defaults — match cornerStack's fallbacks + the built-in Corner field defaults. Structural params (corner/
@@ -61,9 +61,22 @@ export const CORNER_BINDING_SPECS = [
 
 export const CORNER_DATA_OPTYPE = 'user_corner_data';
 
+/** inc B2 — the per-pass PREVIEW start markers, DECLARED as `def.sim.starts` rows (the makeProvider vocabulary), authored
+ *  as canonical template `simstart` blocks below. Sim-side ONLY (emit unchanged: simstart emits nothing). Positions follow the
+ *  LOCKED-MODEL default geometry (FL corner, YX seq) via the `frac` anchor — the ONLY anchor that reaches a corner (`edge`
+ *  centres the perpendicular axis). All fractions are LITERAL, so they resolve to the default geometry and NEVER read the
+ *  reposition EXPRESSION sockets (#23/#24 = '#15'/'#16') → finite by construction, no NaN (the dispatch's NaN discipline).
+ *  The Z-plunge row is `when`-gated on probeZFirst (a baked frontier = off in the twin → 3 markers by default; 4 with Z). */
+export const CORNER_SIM_STARTS = [
+    { anchor: 'frac', fx: 0.07, fy: 0.0875, plane: 'top',   when: { param: 'probeZFirst', is: true } },   // Z-plunge (over the corner; only when probeZ)
+    { anchor: 'frac', fx: 0.20, fy: -0.625, plane: 'probe' },   // Wall-1 (Y, first) — in front of the −Y wall, X just inside
+    { anchor: 'frac', fx: 0.50, fy: 0.25,   plane: 'probe' },   // Reposition waypoint (past the corner) — LITERAL, never reads #23/#24
+    { anchor: 'frac', fx: -0.50, fy: 0.25,  plane: 'probe' },   // Wall-2 (X, second)
+];
+
 /** The wrapped `user_root` template for a given param set. Structural params bake the stack SHAPE; the 9 bound scalars
- *  are the value-sockets the bindings drive. Exported so the emit spec can build a probeZFirst=on variant to prove the
- *  derive helper re-finds the shifted `#23`/`#24`. */
+ *  are the value-sockets the bindings drive. The `simstart` rows declare the per-pass preview markers (canonical over
+ *  def.sim.starts). Exported so the emit spec can build a probeZFirst=on variant to prove the derive helper re-finds #23/#24. */
 export function cornerDataStack(params = CORNER_DEFAULTS) {
     return [{
         type: 'user_root',
@@ -76,6 +89,7 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
                 params: { group: 'Corner' },
                 children: [],
             },
+            ...simStartsToBlocks(CORNER_SIM_STARTS),   // per-pass preview start markers (canonical; SIM only, emit nothing)
         ],
         children: cornerStack(params),
     }];

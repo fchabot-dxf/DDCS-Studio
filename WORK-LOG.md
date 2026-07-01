@@ -3579,3 +3579,43 @@ GOLDEN test; 3 skips = the probeZFirst `fixme` + 2 pre-existing.) The 1 flaky = 
 animation-timing test, unrelated to corner) — passed on retry #1. inc B1b = COMPLETE + VERIFIED: the corner "Corner (data)" twin
 now emits a CORRECT non-degenerate reposition BY DEFAULT, proven by a known-good golden (not agreement-only); the sockets stay
 expression-holding for the datum default (GATED follow-up) / B3 drag to drop in.
+
+---
+
+## 🔨 turn 9 (cycle 1) — CORNER-PORT inc B2: SIM — DECLARE the per-pass preview start-markers (advisor turn 8)
+
+Advisor reviewed B1b (clean 3/3) and dispatched B2: `cornerData` must DECLARE its OWN per-pass preview START markers via
+canonical template `simstart` rows (routed `simStartsFromStack` → `setUserSimStarts` → `makeProvider` → `opSimStarts`), NOT the
+built-in `opSimStarts.corner` — and NOT fix defects #2/#3 in the retiring built-in. Ran a 3-agent scout.
+
+**Scout verdict = IN SCOPE, NO GATE (verified).** A `simstart` row is a DECLARATION (anchor `centre|edge|frac|radial` + offsets
++ zplane), resolved by `makeProvider` to `{x,y,z}` **against the STOCK** (`stock.x/stock.y`). The SIM side HAS the stock (every
+consumer passes `window.ddcsGetSettings().stock`); only the EMIT side lacked the datum (the B1b gate). So the marker positions do
+NOT need the deferred datum → declare the rows. Also confirmed: there is NO `corner` in `opSimStarts.BUILT_IN` (the premise holds —
+the twin resolves via its own `USER_STARTS` provider, never a built-in).
+
+**Built (SIM only — emit UNCHANGED, `simstart` emits nothing):**
+- **`cornerData.js`:** `CORNER_SIM_STARTS` = 4 declarative rows (all `frac` — the only anchor that reaches a corner; `edge`
+  centres the perpendicular axis), authored as canonical template `simstart` blocks via `simStartsToBlocks(...)` into the
+  `user_root` `uiChildren`: **Z-plunge** (`when:{probeZFirst:true}`-gated), **wall-1** (Y), **reposition** (waypoint), **wall-2**
+  (X). Positions follow the LOCKED-MODEL FL/YX default geometry (derived from the built-in `inferStart`). **NaN discipline:** every
+  fraction is a LITERAL, so `makeProvider`'s `frac` path (`sx*n(fx)`) resolves to the default geometry and NEVER reads the `#23/#24`
+  reposition EXPRESSION sockets (`Number('#16')=NaN`) → finite by construction, no NaN. The Z gate → **3 markers for the baked no-Z
+  default**, 4 with probeZFirst (a B4 concern). The 4 simstart blocks shift the flat indices, but **deriveBindings re-found the
+  sockets** (corner-data-emit stayed 2/2 — a real confirmation of the B1 derive-robustness).
+- **`tests/corner-data-sim-starts.spec.js` (NEW):** (1) a PROVIDER spec — register `cornerDataDef()`, assert the starts are
+  canonical template blocks (`hasStartBlocks`, 4 rows), the provider yields 3 finite DISTINCT markers at the default (4 with
+  probeZFirst), and an expression-holding `cross1_x:'#16'` still yields finite markers (NaN-safe); (2) a REAL-SYMPTOM editor spec —
+  a PLACED `user_corner_data` op (its @DDCS marker + macro in the editor) drives the editor's real 3D preview
+  (`__gpPanel.refresh()` → `computePassStarts` → `opSimStarts`) and `getPassStarts()` returns 3 finite markers (mirrors
+  `editor-sim-hints.spec`). This is the WIRED real render surface for B2; the wizard-pane wiring (`userOpView → startHints`) is B3.
+
+**VERIFIED:** `node --check` clean. **corner-data-sim-starts 2/2** (provider + editor REAL-render, no NaN); **corner-data-emit 2/2**
+(emit unchanged — simstart is metadata; bindings re-found under the uiChildren shift).
+
+**Full suite: GREEN — 449 passed, 3 skipped, 0 real failures (1.3m).** (454 total = the prior 452 + the 2 new sim-starts tests.)
+The run showed 1 failed + 1 flaky, BOTH the known load-induced flakes, unrelated to corner: `project-drawer-smoke` (the Cloud-tab
+`waitForSelector` timeout that also flaked in inc A) and `middle-animator` (the stroke-dashoffset animation-timing flake). Both PASS
+in isolation (re-ran project-drawer-smoke + the 2 corner sim-starts → 3 passed). inc B2 = COMPLETE + VERIFIED: "Corner (data)"
+DECLARES its per-pass preview markers and they RENDER in the editor's real 3D preview (no NaN), via the twin's own provider — the
+built-in `opSimStarts.corner` untouched.
