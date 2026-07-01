@@ -20,25 +20,31 @@ Each reposition socket (`#21`/`#22` start, `#23`/`#24` cross) holds a **`datum +
 - **Dropdown dup (human turn 8):** a stale `user_corner_port` (the OLD hand-counted port) was a leftover localStorage save — NOT in this
   branch's code. Human deleted it; nothing re-seeds it. The kept op (`user_corner_data`) renders with real blocks = live-verified.
 
-## 🚦 ACTIVE DISPATCH — CORNER-PORT inc B2: SIM (declare the preview start-markers) [advisor turn 8]
-Make "Corner (data)"'s 3D preview render its per-pass START MARKERS. **PREMISE (advisor-verified turn 8):** a DATA op's sim starts come
-from its OWN DECLARED `simstart` rows (template `simstart` canonical, `def.sim.starts` fallback — the custom-op-sim-starts-precedence
-spec), routed via `setUserSimStarts`/`makeProvider`, NOT the built-in's `opSimStarts.corner()`. `cornerData` currently declares NONE →
-its preview shows no per-pass markers. And we're REPLACING the built-in. So B2 = **DECLARE the corner sim-starts on `cornerData`** — do
-NOT fix the retiring built-in's `opSimStarts.corner`/`inferStarts` (defects #2/#3) unless the data op genuinely routes through them.
-- **SCOUT FIRST:** confirm the user-op marker path (`setUserSimStarts` ← template `simstart` rows via `makeProvider`; `opSimContext`).
-  Confirm HOW a `simstart` row expresses a position (static coord vs a binding/expression). Report the mechanism; **GATE** if declaring the
-  rows is bigger than expected (e.g. positions need the datum the B1b gate deferred).
-- **DECLARE** a `simstart` row per pass on `cornerData` (Z-plunge start · wall-1 start · reposition · wall-2 start) so the preview renders
-  them, positions following the LOCKED MODEL (resolve to the DEFAULT geometry for the marker). **NO NaN** when a socket holds an expression
-  string — tolerate it (`Number.isFinite()` discipline), render no marker rather than NaN.
-- SCOPE: SIM only. No emit change (B1b done); no view/canvas (B3).
+## ✅ inc B2 (SIM declared) — done, 1 concern → inc B2b
+Worker declared `cornerData`'s OWN sim-starts (4 canonical `simstart` rows, NaN-safe by construction, real-symptom editor spec; premise
+held — the built-in `opSimStarts.corner` doesn't exist). Review (2-lens): scope/emit CLEAN (emit untouched, bindings re-found under the
+uiChildren shift). ONE concern: the markers align to WAYPOINTS, not PROBE PASSES → the reposition marker displaces wall-2 → probe-2 renders
+INSIDE the stock + the true wall-2 marker is orphaned. Sim-preview only (concern, not blocker) → fixed in B2b.
 
-**VERIFY:** a placed "Corner (data)" renders its start markers in the REAL preview with NO NaN coords (incl. expression-holding reposition
-sockets); a declared sim-starts spec + full suite GREEN. **STAGE SURGICALLY** (stray PNG/HANDOFF churn — never `git add -A`). Commit + WORK-LOG + pass.
+## 🚦 ACTIVE DISPATCH — CORNER-PORT inc B2b: align sim-starts to PROBE PASSES [advisor turn 10]
+The engine indexes preview markers by `_pass` (incremented at each reposition/traverse delimiter); markers must be ONE-PER-PROBE-PASS, not
+one-per-waypoint. Currently `CORNER_SIM_STARTS` declares a SEPARATE reposition marker → 3 markers for a 2-pass macro → wall-2's marker is
+the reposition point (INSIDE the stock) + the true wall-2 marker orphaned. Sibling contract: `opSimStarts` middle boss-both (2 probes /
+1 reposition) = EXACTLY 2 markers, NO reposition marker.
+- **FIX:** declare ONE marker per PROBE PASS — wall-1 start · wall-2 start (+ the Z-surface start when probeZFirst) — and REMOVE the
+  reposition-waypoint marker. Markers index 1:1 with the engine's `_pass`.
+- **SCOUT** the exact `_pass`-increment triggers (which comments bump `_pass` in `GcodeExecutionEngine`) so the count + order are right for
+  BOTH the no-Z default (2 passes) AND probeZFirst (its pass count); mirror the `opSimStarts` middle/edge providers.
+- ⭐ **FIX THE TEST** (the gap that shipped this green): `corner-data-sim-starts` asserted markers finite/DISTINCT — NOT that each maps to
+  the correct PROBE PASS. Assert PASS-ALIGNMENT: N markers == N probe passes, each at the pass's real start, and NONE inside the stock
+  footprint (the real symptom). verify-real-symptom — assert the RIGHT property.
+- SCOPE: the sim-start DECLARATION (`cornerData` `CORNER_SIM_STARTS`) + its test. No emit change; no B3 view wiring.
 
-**NORTH STAR:** declare-never-infer (sim intent DECLARED on the op, never inferred from motion — the custom-op rule) · verify-real-symptom
-(markers render in the REAL preview, not just a spec) · one-source (the same declared provider path the 5 siblings use).
+**VERIFY:** the placed "Corner (data)" preview shows one marker per probe pass, each at the correct start, NONE inside the stock; the
+corrected sim-starts spec + `corner-data-emit` + full suite GREEN. **STAGE SURGICALLY** (never `git add -A`). Commit + WORK-LOG + pass.
+
+**NORTH STAR:** verify-real-symptom (assert marker POSITION per pass, not just finiteness) · one-source (align to the `opSimStarts` per-pass
+contract the siblings use) · declare-never-infer.
 
 ## 📌 QUEUED (advisor dispatches each after review — no human check-in):
 - **inc B3 — LAYOUT + DRAG:** LIFT `cornerView.js` FeatureCanvas + the `index.html` corner panel via `registerUserOp →
