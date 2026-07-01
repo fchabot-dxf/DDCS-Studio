@@ -33,7 +33,8 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
     const base = CORNER_DEFAULTS;
     const S = (o) => ({ ...base, ...o });   // structural params stay at their baked defaults; only bound scalars vary
 
-    // Sweep the 8 CLEAN bound scalars (single-socket) — the ports where the shipped hand-count mis-bound.
+    // Sweep the 9 bound scalars. Default rows (no cross override) exercise the signed-travelDist reposition; travelDist scales
+    // it (#15); cross1_x/cross1_y OVERRIDE the reposition socket with a literal (both sides identically → agreement holds).
     const sweep = [
       S({}),
       S({ dist: 300 }),
@@ -44,11 +45,13 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
       S({ port: 5 }),
       S({ radius: 3 }),
       S({ radius: 2.5 }),
+      S({ travelDist: 30 }),
+      S({ travelDist: 80 }),
       S({ cross1_x: 15 }),
       S({ cross1_y: 20 }),
       S({ cross1_x: -12, cross1_y: 8 }),
       S({ cross1_x: 40, cross1_y: -30 }),
-      S({ dist: 250, retract: 6, f_fast: 220, f_slow: 45, port: 4, radius: 2.5, cross1_x: 18, cross1_y: 22 }),
+      S({ dist: 250, retract: 6, f_fast: 220, f_slow: 45, port: 4, radius: 2.5, travelDist: 60, cross1_x: 18, cross1_y: 22 }),
     ];
 
     // FUNCTIONAL byte-identity (corner header comments interpolate params → normalize with stripAnnotations).
@@ -103,7 +106,7 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
   expect(r.resolves, 'corner-data-emit resolves via builderOf').toBe(true);
   expect(r.independentPath, 'data builder is NOT cornerStack (independent code path)').toBe(true);
   expect(r.pristine, 'lives in the user layer; built-in BUILDERS/SCHEMA untouched').toBe(true);
-  expect(r.bindingCount, 'the 8 clean single-socket scalars are bound (safeZ is a fan-out frontier)').toBe(8);
+  expect(r.bindingCount, 'the 9 bound scalars: 6 clean + travelDist(#15) + cross1_x/cross1_y (safeZ is a fan-out frontier)').toBe(9);
   expect(r.wiringFails, 'every DERIVED binding routes to the same assign var cornerStack writes (defect #1 guard)').toEqual([]);
   if (!r.main.pass) console.log('FIRST DIFF @', JSON.stringify(r.main.firstDiff && r.main.firstDiff.params) + '\n--- cornerStack ---\n' + (r.main.firstDiff && r.main.firstDiff.a) + '\n--- data def ---\n' + (r.main.firstDiff && r.main.firstDiff.b));
   expect(r.main.count, 'the sweep is substantial').toBeGreaterThan(12);
@@ -112,11 +115,41 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
   expect(r.robustness.crossXShift, 'deriveBindings re-finds #23 (cross1_x) shifted +2 under probeZFirst').toBe(2);
   expect(r.robustness.crossYShift, 'deriveBindings re-finds #24 (cross1_y) shifted +2 under probeZFirst').toBe(2);
   expect(r.robustness.distStable, 'a pre-Z scalar (dist/#1) is unmoved — the derive is not a blanket offset').toBe(0);
-  expect(r.robustness.onCount, 'all 8 bindings still resolve under the probeZFirst shape').toBe(8);
+  expect(r.robustness.onCount, 'all 9 bindings still resolve under the probeZFirst shape').toBe(9);
   // FRONTIERS — must diverge (the twin bakes these).
   expect(r.probeZFirstPass, 'frontier: probeZFirst inserts a Z-surface step (structure swap the static template cannot do)').toBe(false);
   expect(r.safeZPass, 'frontier: safeZ fans out to #19 + the computed #17 (plunge depth) — a single binding cannot drive both').toBe(false);
   expect(r.cornerPass, 'frontier: the corner quadrant is structural (direction signs + comments) — baked in the twin').toBe(false);
   expect(r.sampleHasProbe, 'emits a real probe move (G31)').toBe(true);
   expect(r.sampleLen, 'emits substantial G-code').toBeGreaterThan(200);
+});
+
+/**
+ * KNOWN-GOOD GOLDEN (inc B1b) — the agreement sweep above proves "twin == cornerStack", but agreement ALONE hid the shipped
+ * degenerate default (both emitted `G0 X0 Y0`). This pins the CONTENT: a DEFAULT "Corner (data)" (no user input) must emit a
+ * NON-DEGENERATE signed-travelDist reposition. Targeted line-anchored checks (not a brittle full-string golden). The twin bakes
+ * FL / YX / travelDist=50 → reposition X socket #23 = #16 (−td), Y socket #24 = #15 (+td); #15=50, #16=[0-#15].
+ */
+test('corner-data-emit GOLDEN: a DEFAULT Corner (data) emits a NON-DEGENERATE reposition (kills G0 X0 Y0)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const emit = await page.evaluate(async () => {
+    const { cornerDataDef, CORNER_DATA_OPTYPE } = await import('/blocks/dataOps/cornerData.js');
+    const { stripAnnotations } = await import('/blocks/dataOps/equivalence.js');
+    const { registerUserOp } = await import('/blocks/userOps.js');
+    const { builderOf } = await import('/blocks/opBuilders.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    registerUserOp(cornerDataDef());
+    const dataBuilder = builderOf(CORNER_DATA_OPTYPE);
+    return stripAnnotations(emitMapped(dataBuilder({})).text);   // {} → all binding defaults = the shipped operator default
+  });
+  // POSITIVE — the travel vars + the reposition sockets carry signed-travelDist expressions, and the move references them:
+  expect(emit, '#15 = +travelDist (the bound scalar)').toMatch(/^#15=50$/m);
+  expect(emit, '#16 = -#15 (derives from travelDist → no fan-out)').toMatch(/^#16=\[0-#15\]$/m);
+  expect(emit, '#23 (X cross) holds the signed-travel expression, not 0').toMatch(/^#23=#16$/m);
+  expect(emit, '#24 (Y cross) holds the signed-travel expression, not 0').toMatch(/^#24=#15$/m);
+  expect(emit, 'the reposition MOVE references the sockets').toMatch(/^G0 X#23 Y#24$/m);
+  // NEGATIVE — the degenerate default is GONE (both failure modes: an inlined zero move, and #23/#24 resolving to 0):
+  expect(emit, 'no inlined zero reposition').not.toMatch(/^G0 X0 Y0$/m);
+  expect(/^#23=0$/m.test(emit) || /^#24=0$/m.test(emit), 'no zero reposition socket').toBe(false);
 });

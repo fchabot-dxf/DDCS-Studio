@@ -15,12 +15,15 @@
  * Reusable across every data-op port (drill/surfacing/slot/text/atcWarmup can adopt it later); for
  * now only corner uses it (do NOT migrate the siblings here). Depends on nothing but flattenBlocks.
  *
- * A spec row: { param, type, default, key, match, label?, section? }
+ * A spec row: { param, type, key, match, default?, label?, section? }
  *   match — how to identify the target block among the flattened stack:
  *     { type, var: '#23' }        an `assign` block whose params.var === '#23'   (the natural corner key)
  *     { type, params: {k:v,…} }   a block of `type` whose params match every (k,v)   (general form)
  *     { type }                    the SOLE block of that type in the stack
  *   key — the socket key on that block the binding drives (assign → 'value').
+ *   default — OPTIONAL. If omitted, the binding default is READ from the matched socket's baked value — so a socket that
+ *     holds an EXPRESSION default (e.g. corner's reposition #23 = '#15') keeps that expression when the param is unset,
+ *     instead of an instantiate() overwrite reintroducing a wrong literal. (declare-never-infer: the template IS the default.)
  */
 import { flattenBlocks } from '../userOps.js';
 
@@ -53,7 +56,8 @@ export function deriveBindings(flatStack, specs) {
         const blockIndex = hits[0];
         if (!(s.key in (flatStack[blockIndex].params || {})))
             throw new Error(`deriveBindings: spec "${s.param}" → block ${blockIndex} has no socket key "${s.key}"`);
-        const out = { param: s.param, type: s.type, default: s.default, key: s.key, blockIndex };
+        const dflt = (s.default !== undefined) ? s.default : (flatStack[blockIndex].params || {})[s.key];
+        const out = { param: s.param, type: s.type, default: dflt, key: s.key, blockIndex };
         if (s.label) out.label = s.label;
         if (s.section) out.section = s.section;
         return out;

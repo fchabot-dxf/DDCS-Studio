@@ -32,24 +32,31 @@ import { deriveBindingsFor } from './deriveBindings.js';
 export const CORNER_DEFAULTS = {
     corner: 1, probeSeq: 0, probeZFirst: 0, wcs: 0,
     dist: 500, retract: 5, f_fast: 200, f_slow: 50, port: 3,
-    level: 0, safeZ: 10, scanDepth: 5, radius: 2,
-    startX: 0, startY: 0, cross1_x: 0, cross1_y: 0,
+    level: 0, safeZ: 10, scanDepth: 5, radius: 2, travelDist: 50,
+    // NOTE: startX/startY/cross1_x/cross1_y are deliberately ABSENT — the reposition sockets default to their signed-travelDist
+    // EXPRESSION (via the binding's socket-default), so a seed with no cross override stays non-degenerate. Listing them here as
+    // literal 0 would make `'cross1_x' in params` true → instantiate() overwrites the expression with 0 (the degenerate default).
     syncA: 0, slave: '3',
 };
 
-/** The 8 CLEAN single-socket bindable scalars → the `assign` macro var each one writes. DECLARED by identity (var), NOT by
- *  position: deriveBindings re-finds the flat index, so the `=== CONFIGURATION ===` comment can never desync them again, and
- *  `#23`/`#24` are re-found even under probeZFirst's +2 shift. (safeZ is deliberately NOT here — it is a fan-out frontier;
- *  see the header note.) */
+/** The 9 bindable scalars → the `assign` macro var each writes. DECLARED by identity (var), NOT by position: deriveBindings
+ *  re-finds the flat index, so the `=== CONFIGURATION ===` comment can never desync them again, and `#23`/`#24` are re-found
+ *  even under probeZFirst's +2 shift. (safeZ is NOT here — a fan-out frontier; see the header note.)
+ *  - `travelDist` → `#15` (=+travelDist; `#16=[0-#15]` derives, so binding #15 alone stays consistent — NOT a fan-out). It
+ *    SCALES the default reposition, since #23/#24 reference #15/#16.
+ *  - `cross1_x`/`cross1_y` → `#23`/`#24` with NO `default`: deriveBindings reads the socket's baked value (the signed-travelDist
+ *    reposition EXPRESSION), so an UNSET cross stays non-degenerate (kills the old `G0 X0 Y0`); a bound literal (a B3 drag) still
+ *    overrides the socket wholesale. This is the "expression-holding socket" of the LOCKED MODEL. */
 export const CORNER_BINDING_SPECS = [
-    { param: 'dist',     type: 'number', default: CORNER_DEFAULTS.dist,     label: 'Max Probe Dist', section: 'TOOL & CUT', match: { type: 'assign', var: '#1' },  key: 'value' },
-    { param: 'retract',  type: 'number', default: CORNER_DEFAULTS.retract,  label: 'Retract',        section: 'TOOL & CUT', match: { type: 'assign', var: '#2' },  key: 'value' },
-    { param: 'f_fast',   type: 'number', default: CORNER_DEFAULTS.f_fast,   label: 'Fast Feed',      section: 'TOOL & CUT', match: { type: 'assign', var: '#3' },  key: 'value' },
-    { param: 'f_slow',   type: 'number', default: CORNER_DEFAULTS.f_slow,   label: 'Slow Feed',      section: 'TOOL & CUT', match: { type: 'assign', var: '#4' },  key: 'value' },
-    { param: 'port',     type: 'number', default: CORNER_DEFAULTS.port,     label: 'Port',           section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
-    { param: 'radius',   type: 'number', default: CORNER_DEFAULTS.radius,   label: 'Stylus Radius',  section: 'TOOL & CUT', match: { type: 'assign', var: '#6' },  key: 'value' },
-    { param: 'cross1_x', type: 'number', default: CORNER_DEFAULTS.cross1_x, label: 'Wall 2 dX',      section: 'GEOMETRY',   match: { type: 'assign', var: '#23' }, key: 'value' },
-    { param: 'cross1_y', type: 'number', default: CORNER_DEFAULTS.cross1_y, label: 'Wall 2 dY',      section: 'GEOMETRY',   match: { type: 'assign', var: '#24' }, key: 'value' },
+    { param: 'dist',       type: 'number', default: CORNER_DEFAULTS.dist,       label: 'Max Probe Dist',   section: 'TOOL & CUT', match: { type: 'assign', var: '#1' },  key: 'value' },
+    { param: 'retract',    type: 'number', default: CORNER_DEFAULTS.retract,    label: 'Retract',          section: 'TOOL & CUT', match: { type: 'assign', var: '#2' },  key: 'value' },
+    { param: 'f_fast',     type: 'number', default: CORNER_DEFAULTS.f_fast,     label: 'Fast Feed',        section: 'TOOL & CUT', match: { type: 'assign', var: '#3' },  key: 'value' },
+    { param: 'f_slow',     type: 'number', default: CORNER_DEFAULTS.f_slow,     label: 'Slow Feed',        section: 'TOOL & CUT', match: { type: 'assign', var: '#4' },  key: 'value' },
+    { param: 'port',       type: 'number', default: CORNER_DEFAULTS.port,       label: 'Port',             section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
+    { param: 'radius',     type: 'number', default: CORNER_DEFAULTS.radius,     label: 'Stylus Radius',    section: 'TOOL & CUT', match: { type: 'assign', var: '#6' },  key: 'value' },
+    { param: 'travelDist', type: 'number', default: CORNER_DEFAULTS.travelDist, label: 'Reposition Travel', section: 'GEOMETRY',  match: { type: 'assign', var: '#15' }, key: 'value' },
+    { param: 'cross1_x',   type: 'number',                                      label: 'Wall 2 dX',        section: 'GEOMETRY',   match: { type: 'assign', var: '#23' }, key: 'value' },
+    { param: 'cross1_y',   type: 'number',                                      label: 'Wall 2 dY',        section: 'GEOMETRY',   match: { type: 'assign', var: '#24' }, key: 'value' },
 ];
 
 export const CORNER_DATA_OPTYPE = 'user_corner_data';

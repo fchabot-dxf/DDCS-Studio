@@ -19,10 +19,7 @@ test('comped probe discs nudge onto the wall (corner X/Y) by ±the tip radius; e
     const { CornerWizard } = await import('/wizards/cornerWizard.js');
     const { builderOf } = await import('/blocks/opBuilders.js');
     const w = new CornerWizard();
-    // cross1_x/cross1_y = the Wall-1→Wall-2 traverse (the final schema replaced the old auto travelDist; default 0 = no
-    // traverse). Set them so the two walls probe at DISTINCT positions (else the contacts overlap and a nudged disc's
-    // nearest contact is a different wall's raw one). ~mirrors the old travelDist=50 X50/Y-50 reposition.
-    const p = { corner: 'FL', probeZ: false, probeSeq: 'XY', wcs: 'active', dist: 80, radius: 2, cross1_x: 50, cross1_y: -50 };
+    const p = { corner: 'FL', probeZ: false, probeSeq: 'XY', wcs: 'active', dist: 80, radius: 2 };
     const stock = { x: 100, y: 80, z: 20, shape: 'boss', show: true };
     const code = w.generate(p);
 

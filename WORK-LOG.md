@@ -3521,3 +3521,61 @@ canvas should provide a sensible non-zero cross-traverse so the default probe is
 prior 448 + the 3 new corner tests; the 3 skips = the 1 probeZFirst-frontier `fixme` + 2 pre-existing.) inc B1 EMIT =
 COMPLETE + VERIFIED: corner G-code byte-identical via a DERIVED (never hand-counted) binding, defect #1 killed by construction,
 the built-in Corner intact, the probeZFirst frontier gated RED-if-retired.
+
+---
+
+## 🔨 turn 7 (cycle 1) — CORNER-PORT inc B1b: reposition CORRECT-BY-DEFAULT via signed-travelDist expressions (advisor turn 6)
+
+Advisor accepted B1 (derive-helper clean, safeZ-bake correct) and dispatched B1b to kill my degenerate-default flag: the schema
+rename made `cross1_x/cross1_y` default `0` → `G0 X0 Y0`. **REPLACE mode** (correctness is the bar, not byte-identity): default the
+reposition sockets to EXPRESSIONS. Ran a 3-agent scout (stock-datum reachability + exact travelOwn/travelOpp reconstruction +
+golden design).
+
+**Scout verdict = INTERIM + GATE (verified).** The stock-datum coord is NOT reachable from the corner op as a controller `#var`:
+`cornerStack(params)` gets flat scalars only (the emit path never sees `stock`; only `inferStart` does, sim-only), and the whole
+"sits-at-WCS / stock-datum" model is HOST-side JS (folded into literal coords by `translateProgram`), never plumbed into the macro.
+So the TARGET (datum-relative reposition expr) needs a stock-model→macro integration that doesn't exist → **GATE it** (below); use the
+signed-travelDist INTERIM now.
+
+**Built (EMIT; sim=B2, layout=B3, probeZFirst=B4 all untouched):**
+- **`cornerWizard.js` cornerStack:** re-added `travelDist` + `#15=+travelDist` / `#16=[0-#15]` (a REFERENCE, not a baked literal —
+  so `#16` tracks `#15`, making travelDist a CLEAN single-socket binding, NOT a fan-out). Added `own(d)`/`opp(d)` helpers
+  (`travelOwn`/`travelOpp` = `#15`/`#16` by direction). **Defaulted `#21/#22/#23/#24` to the signed-travelDist expressions** that
+  reproduce the OLD `travelOwn/travelOpp` reposition per quadrant×seq (`#23 = firstAx==='X' ? own(xDir) : opp(xDir)`, etc.) — so a
+  DEFAULT corner emits a real wall-to-wall traverse (`G0 X#23 Y#24` with `#23/#24 = ±travelDist`), NOT `G0 X0 Y0`. `params.cross1_x ||`
+  keeps the socket overridable.
+- **`deriveBindings.js`:** a spec may now OMIT `default` → the binding default is READ from the matched socket's baked value. So
+  `cross1_x/cross1_y` default to the reposition EXPRESSION (`#16`/`#15`), not a literal — an unset cross stays non-degenerate, a bound
+  literal (B3 drag) still overrides. (declare-never-infer: the template IS the default.)
+- **`cornerData.js`:** bound `travelDist`→`#15` (scales the reposition) → **9 bindings** (6 clean + travelDist + cross1_x/cross1_y);
+  safeZ still a baked fan-out frontier. **⚠ subtle bug I hit + fixed:** `CORNER_DEFAULTS` listing `cross1_x:0` made
+  `'cross1_x' in params` true → `instantiate()` overwrote the socket EXPRESSION with `0` (degenerate again, the agreement sweep
+  caught it). Fix: REMOVE `startX/startY/cross1_x/cross1_y` from `CORNER_DEFAULTS` so they fall through to the socket-default expr.
+- **`corner-data-emit.spec.js`:** added `travelDist` sweep rows, bumped `bindingCount` 8→9, and ADDED a **KNOWN-GOOD GOLDEN** test —
+  a default `dataBuilder({})` must emit `#15=50`, `#16=[0-#15]`, `#23=#16`, `#24=#15`, `G0 X#23 Y#24`, and must NOT contain
+  `G0 X0 Y0` / `#23=0` / `#24=0`. (Agreement-only hid the degenerate default — this pins the real motion.)
+- **`probe-surface-block.spec.js`:** REGENERATED the CORNER golden (my cornerStack change re-added `#15/#16` and made `#23/#24` the
+  signed-travel exprs) — verified non-degenerate (no `#23=0`/`#24=0` in any of the 4 sweep entries).
+- **`disc-on-surface.spec.js`:** REVERTED my B1 workaround (`cross1_x/cross1_y=50/-50`) — the DEFAULT reposition is correct now
+  (FL/XY → X+50 Y-50), so bare defaults pass.
+
+**⚠ GATE (report, per dispatch) — the stock-datum wiring for the TARGET.** A datum-relative reposition needs the stock corner as a
+controller `#var`, which requires (a) threading `stock`/placement into `cornerStack`'s emit path (corner is not in the placement
+family; it can't reuse the `place`-fold `translateProgram` since the reposition is incremental `G91` keyed off `#var`s), and (b)
+exposing the stock corner as a macro register (a stock-geometry variable the operator/Studio pins). That's the machine-frame /
+stock-model integration (machine-frame-sim-spec) — a FOLLOW-UP increment, not B1b. The INTERIM is correct-by-default today; the
+sockets are expression-holding, so the datum default (post-integration) or a B3 drag literal drops in with no schema change.
+
+**⚠ FLAG (B3):** `cross1_x/cross1_y` binding defaults are now expression strings (`#16`/`#15`), so their FORM fields show an
+expression, not a number. Harmless for EMIT (registerUserOp fine, the golden proves the motion) — but B3's FeatureCanvas drag
+(which writes a datum-relative literal into the socket) is the intended UX for these; the raw form field is a stopgap.
+
+**VERIFIED:** `node --check` clean on all touched files. **corner-data-emit: 2/2 PASS** (agreement sweep + KNOWN-GOOD golden — the
+default reposition is non-degenerate); **corner-data-probeZFirst-frontier**: gate PASS + fixme; **disc-on-surface PASS** (bare
+defaults); **probe-surface-block 5/5 GREEN** (regenerated golden).
+
+**Full suite: GREEN — 448 passed, 3 skipped, 1 flaky, 0 hard failures (1.3m).** (452 total = the prior 451 + the new corner-data-emit
+GOLDEN test; 3 skips = the probeZFirst `fixme` + 2 pre-existing.) The 1 flaky = `middle-animator` (a stroke-dashoffset
+animation-timing test, unrelated to corner) — passed on retry #1. inc B1b = COMPLETE + VERIFIED: the corner "Corner (data)" twin
+now emits a CORRECT non-degenerate reposition BY DEFAULT, proven by a known-good golden (not agreement-only); the sockets stay
+expression-holding for the datum default (GATED follow-up) / B3 drag to drop in.

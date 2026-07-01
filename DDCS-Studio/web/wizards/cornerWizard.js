@@ -36,17 +36,23 @@ export function cornerStack(params = {}) {
     const dist = num(params.dist, 500), retract = num(params.retract, 5);
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
     const level = num(params.level, 0), safeZ = num(params.safeZ, 10);
-    const scanDepth = num(params.scanDepth, 5), radius = num(params.radius, 2.0);
+    const travelDist = num(params.travelDist, 50), scanDepth = num(params.scanDepth, 5), radius = num(params.radius, 2.0);
     const src = params.sources || {};   // controller-resident probe fields (PROBE-CONFIG-SOURCE.md)
 
     // corner → probe directions (FL=X+Y+  FR=X−Y+  BL=X+Y−  BR=X−Y−)
     const [xDir, yDir] = { FL: ['+', '+'], FR: ['-', '+'], BL: ['+', '-'], BR: ['-', '-'] }[corner] || ['+', '+'];
     const dirLabel = (d) => (d === '+' ? 'pos' : 'neg');
-    const plungeDepth = safeZ + scanDepth;
+    const plungeDepth = safeZ + scanDepth, td = travelDist || 0;
 
     // The two walls in the chosen probe order, each with its direction.
     const firstAx = probeSeq === 'YX' ? 'Y' : 'X', firstDir = probeSeq === 'YX' ? yDir : xDir;
     const secondAx = probeSeq === 'YX' ? 'X' : 'Y', secondDir = probeSeq === 'YX' ? xDir : yDir;
+
+    // Signed-travelDist reposition (INTERIM — until a stock-datum default is wired; inc B1b GATE): #15=+travelDist, #16=−travelDist.
+    // own(dir) = signed by dir (#15/#16); opp(dir) = the opposite. The reposition sockets #21-#24 default to these so the wall-to-wall
+    // traverse is NON-DEGENERATE by default; a bound cross1_*/start* (or a B3 drag literal) still overrides the socket wholesale.
+    const own = (d) => (d === '+' ? '#15' : '#16');
+    const opp = (d) => (d === '+' ? '#16' : '#15');
 
     const S = [];
     const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
@@ -96,14 +102,17 @@ export function cornerStack(params = {}) {
     C('=== CALCULATED MOTIONS ===');
     A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
     A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract');
+    A('#15', td, 'Positive travel = travelDist'); A('#16', '[0-#15]', 'Negative travel');
     A('#17', plungeDepth, 'Plunge depth = safeZ + scanDepth');
     A('#18', '[0-#17]', 'Negative plunge'); A('#19', safeZ, 'Safe Z retract distance');
     if (probeZ) {
-        A('#21', params.startX || '0', 'Z to Wall 1 traverse (X)');
-        A('#22', params.startY || '0', 'Z to Wall 1 traverse (Y)');
+        // Z→Wall1: only the first wall's axis repositions (opp of its probe dir); the perpendicular axis holds.
+        A('#21', params.startX || (firstAx === 'X' ? opp(firstDir) : '0'), 'Z to Wall 1 traverse (X)');
+        A('#22', params.startY || (firstAx === 'Y' ? opp(firstDir) : '0'), 'Z to Wall 1 traverse (Y)');
     }
-    A('#23', params.cross1_x || '0', 'Wall 1 to Wall 2 traverse (X)');
-    A('#24', params.cross1_y || '0', 'Wall 1 to Wall 2 traverse (Y)');
+    // Wall1→Wall2: X moves own(xDir) when X is probed first (else opp); Y likewise. Default = signed travelDist (non-degenerate).
+    A('#23', params.cross1_x || (firstAx === 'X' ? own(xDir) : opp(xDir)), 'Wall 1 to Wall 2 traverse (X)');
+    A('#24', params.cross1_y || (firstAx === 'Y' ? own(yDir) : opp(yDir)), 'Wall 1 to Wall 2 traverse (Y)');
 
     // ── WCS base address ──
     if (wcs === 'active') {
