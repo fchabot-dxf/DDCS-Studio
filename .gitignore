@@ -37,3 +37,8 @@ client_secret_*.json
 
 # advisor/worker handoff — local per-session marker state
 .handoff/
+
+# handoff + session artifacts (never commit)
+.proc/
+.claude/
+.anim-captures/
