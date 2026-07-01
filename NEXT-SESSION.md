@@ -19,60 +19,65 @@ into one "wip" label. So: **DON'T build on that branch — LIFT the clean pieces
 
 ---
 
-## 🚦 ACTIVE DISPATCH — CORNER-PORT inc A (advisor → worker): LIFT the PORT MECHANISM onto `port/corner-clean`, verify it loads + tests pass [audit-driven; human "please do, don't forget the north star"]
-
-Lift the audit-SOUND wizards-as-data **mechanism** (the crown jewel) from `wizard-porting-work` onto this fresh branch — the FOUNDATION
-the corner port sits on. **Reference:** `git show wizard-porting-work -- <file>` / `git checkout wizard-porting-work -- <file>`.
-
-**Mechanism files (audit-confirmed SOUND — lift these ONLY):**
-- `blocks/blockEmitter.js` (user_root / param_group transparency) · `wizards/ops/userRoot.js` + `wizards/ops/layout.js` (block defs +
-  PALETTE) · `blocks/userOps.js` (resolveSim/Panel/LayoutMeta, panelFromStack/layoutFromStack, flattenBlocks group-propagation) ·
-  `wizards/ops/probeSurface.js` (`safeTraverseStack`) · the 5 `blocks/dataOps/*.js` `user_root` wraps (WRAP_PREFIX_COUNT=4, verified) ·
-  `web/app.js` seeding (`seedDefaultPortedUserOps`) · `blocks/blockly/{bridge,stackBridge}.js` (user_root DO→GCODE/SIM round-trip) ·
-  `blocks/wizardLibrary.js` (`*_datawiz` groups) · `wizards/ops/index.js`, `wizards/ops/panelTypes.js` as needed for the above to resolve.
-
-⚠ **LIFT ONLY THE MECHANISM.** Do NOT sweep in the other agents' swept-in WIP (homing / middle-B-TRANS-followon / spatial-GUI
-number-roles / H2 virtual-I/O — each lands via ITS OWN branch, two carry their own regressions) NOR the junk (`.proc`, worktree
-pointers, `_*.png`, `.vscode`). This is the EDGE-lesson discipline: lift only what's audited-clean; don't own the dump.
-
-**VERIFY:** `node --check` clean on every lifted file; `registerUserOp` + the DO→GCODE/SIM round-trip work; the mechanism tests pass
-(`{slot,drill,text,surfacing,atc-warmup}-as-data.spec`, `user-root-transparent-emit.spec`, `custom-op-sim-starts-precedence.spec`).
-Full suite green. SCOPE = the mechanism only (NOT the corner port = inc B). Commit + WORK-LOG + pass.
-
-**NORTH STAR:** wizards-as-data (the whole point) · one-source (the mechanism is the SINGLE generic consumer pipeline) ·
-declare-never-infer · valid-by-construction. `WIZARD-PORTING-MAP.md` is the reference architecture.
+## ✅ inc A DONE + VERIFIED (advisor turn 2) — the wizards-as-data MECHANISM is lifted
+- Worker lifted the mechanism (commits `fb3f439` [+13 swept] + `118a6f2` [+4 surgical] + `d06e770` [worklog]); 26-file footprint,
+  mechanism-only — no corner-UI, no other-agent WIP, no junk leaked.
+- **ADVISOR REVIEW** (4-lens fan-out + adversarial verify, 9 agents): **2 dims CLEAN** — *emit-identity* (all 5 as-data specs PROVE
+  byte-identical emit via `instantiate()` over the full wrapped `user_root`, NOT a field-rewrite) · *mechanism-soundness* (resolver/
+  round-trip core clean, verified statically + Node harness). **5 raw findings → 4 refuted, 1 nit.** 7 named specs re-run GREEN (10.9s).
+- **FLAG1 (`fb3f439` commit-split):** advisor call = **LEAVE** (cosmetic; all code present + verified; the branch squash-merges clean).
+- **FLAG2 (stale advisor marker):** **FIXED** (`.handoff/advisor.last` 178 → 2; the waiter fires again).
+- **2 NITS carried forward (not blockers):**
+  1. **Tree-hygiene:** 6 `_*.png` visual baselines + `HANDOFF.md` are uncommitted stray churn (concurrent UI-agent regen, NOT inc A).
+     → **STAGE SURGICALLY on every commit** (`git add <files>`, **NEVER** `git add -A`/`commit -a`); do not sweep them.
+  2. **`WRAP_PREFIX_COUNT=4`** is a hand-counted magic offset duplicated across the 5 dataOps (proven-correct + validator-guarded
+     today → a nit) — but it is the SAME CLASS as corner defect #1. → inc B1 **DERIVES** corner's bindings (below); the derivation
+     helper is the one-source the 5 siblings can later adopt.
 
 ---
 
 ## ⚡ AUTONOMOUS (human t178) — automate the FULL corner port, all THREE dimensions
-Run **inc A → inc B → a final VERIFY** as a finite autonomous loop — NO per-increment human check-in. The FULL port must deliver:
-**EMIT** (the `cornerData` op emits correct G-code) · **SIM** (`opSimStarts.corner()` markers render, no NaN, multi-handle starts) ·
-**LAYOUT** (the FeatureCanvas layout panel + the form panel render via `registerUserOp → def.panel/def.layout → userOpView`). The
-advisor fresh-eyes-reviews each increment (fan verifiers, the audit's rigor) and dispatches the next. SURFACE to the human ONLY for:
-a genuine design fork · a regression the advisor can't verify · a worker stall. Otherwise run to a working, verified corner port.
+Run to a working, verified corner port with NO per-increment HUMAN check-in. The advisor splits the port by DIMENSION so each gets a
+fresh-eyes review, dispatches the next after review, and SURFACES to the human ONLY for: a genuine design fork · a regression the
+advisor can't verify · a worker stall. The FULL port delivers **EMIT** (B1) · **SIM** (B2) · **LAYOUT** (B3), closed by **inc C**.
 
-## 📌 CORNER-PORT inc B: the corner port itself — EMIT + SIM + LAYOUT (fires after inc A lands + is reviewed)
-- LIFT the audit-SOUND corner UI: `cornerWizard.js` cornerStack refactor (#21–#24 cross-traverse via shared `safeTraverseStack`,
-  enum-normalizing param maps, `inferStarts`) · `cornerView.js` FeatureCanvas port (drag handles, `tieCornerTravel`, `getPassStarts`) ·
-  `index.html` corner panel · the schema/FIELD_BIND rename (`travelDist`→`startX/startY/cross1_x/cross1_y`, internally consistent).
-- ⭐ **REDO `cornerPort.js` → refile as `blocks/dataOps/cornerData.js`** (one-source: match the 5 siblings). **DERIVE the binding
-  indices PROGRAMMATICALLY from the flattened stack — NOT hand-counted** → declare-never-infer / valid-by-construction (kills the
-  off-by-one AND makes it robust to the `probeZFirst` toggle). This is defect #1's real fix.
-- FIX defect #2: `opSimStarts.corner()` `!== null` → `Number.isFinite()` (like `middle()`). FIX defect #3: `cornerWizard.js`
-  `window.app.opSimStarts` → `import { opSimStarts }`.
-- DROP the corner orphans (dead `travelOwn`/`travelOpp` + imports, unused `td`, stale `Travel:` header).
-- ⭐ **ADD an EMIT-CORRECTNESS test** — `corner-data-layout.spec` only checks a field-rewrite, NEVER that the emitted G-code is
-  correct (that is WHY the break shipped). Assert the corner data-port emits the SAME G-code as the built-in `cornerWizard`
-  (byte/value-identical via `stripAnnotations`) → verify-real-symptom. DISCARD `_diag-endoffset.spec.js` (asserts nothing).
+## 🚦 ACTIVE DISPATCH — CORNER-PORT inc B1: EMIT (the crown-jewel dimension) [autonomous; advisor turn 2]
+The corner port's EMIT path — the exact dimension the shipped break lived in. Get corner's G-code byte-identical to the built-in
+wizard, with DERIVED (not hand-counted) bindings, PROVEN by a real emit test. **Reference:** `git show wizard-porting-work -- <file>`.
 
-## 📌 CORNER-PORT inc C: VERIFY the full port (all 3 dimensions) — the autonomous close-out
-- **EMIT:** `registerUserOp(cornerData())` does NOT throw; the corner data-op emits **byte/value-identical** G-code to the built-in
-  `cornerWizard` across a param sweep (incl. the `probeZFirst` toggle that broke the hand-counted bindings) — `stripAnnotations`.
-- **SIM:** a placed corner op renders its start markers (NO NaN coords) — `opSimStarts.corner()` via the real preview; multi-handle
-  drag + Wall-2 travel-tie populate (defect #3 gone).
-- **LAYOUT:** the corner op renders its **FeatureCanvas layout** + **form panel** through the generic `userOpView`
-  (`registerUserOp → def.panel/def.layout → renderDeclaredLayout`), matching the built-in corner wizard's panel.
-- Full suite green. This closes the FIRST full wizard-as-data port (emit + sim + layout) end-to-end. Release when verified. Commit + WORK-LOG + pass.
+**DO:**
+- LIFT `wizards/cornerWizard.js` **cornerStack** (EMIT only): the #21–#24 cross-traverse via the shared `safeTraverseStack` (already
+  lifted in inc A), the enum-normalizing param maps, and the FINAL field schema (`travelDist` → `startX/startY/cross1_x/cross1_y`,
+  internally consistent) so the bindings are stable. Do NOT wire the sim/view yet.
+- ⭐ **REDO `data/cornerPort.js` → `blocks/dataOps/cornerData.js`** (one-source: match the 5 siblings' shape). **DERIVE the binding
+  blockIndexes PROGRAMMATICALLY from the flattened stack** — walk the flattened `user_root` and match each binding to its target
+  block by role/key, **NOT hand-counted**. This is defect #1's real fix AND kills the `WRAP_PREFIX_COUNT` class for corner. Make the
+  derivation a small **REUSABLE helper** (valid-by-construction; the 5 siblings can adopt it later — but do NOT migrate them now).
+  Robust to the `probeZFirst` toggle.
+- ⭐ **ADD an EMIT-CORRECTNESS test** `corner-data-emit.spec.js`: assert `cornerData`'s emitted G-code is **byte/value-identical** to
+  the built-in `cornerWizard` cornerStack across a param sweep **including the `probeZFirst` toggle** (the exact param that broke the
+  hand-counted bindings), via `stripAnnotations`. Mirror the 5 as-data specs. This is the test whose ABSENCE let the break ship
+  (`corner-data-layout.spec` only checked a field-rewrite). **DISCARD `_diag-endoffset.spec.js`** (asserts nothing).
+- DROP the corner emit-path orphans your changes make dead (`travelOwn`/`travelOpp` + imports, unused `td`, stale `Travel:` header) —
+  only the ones YOUR changes orphan.
+- **SCOPE: EMIT ONLY.** Do NOT lift `cornerView.js` / the `index.html` panel (= inc B3 LAYOUT). Do NOT touch `opSimStarts` /
+  `inferStarts` (= inc B2 SIM). Do NOT migrate the 5 existing dataOps to the derive helper (follow-up).
+
+**VERIFY:** `node --check` clean on every touched file; `registerUserOp(cornerData())` does NOT throw; the new `corner-data-emit`
+spec + the 7 inc-A specs GREEN. **STAGE SURGICALLY** (the tree has stray PNG/HANDOFF churn — never `git add -A`). Commit + WORK-LOG + pass.
+
+**NORTH STAR:** valid-by-construction (DERIVE, never hand-count) · one-source (cornerData matches the 5 siblings; the derive helper is
+the single binding-index authority) · verify-real-symptom (the emit test asserts real G-code, not a field rewrite) · declare-never-infer.
+
+## 📌 QUEUED (advisor dispatches each after review — no human check-in):
+- **inc B2 — SIM:** FIX defect #2 (`opSimStarts.corner()` `!== null` → `Number.isFinite()`, like `middle()`) + defect #3
+  (`cornerWizard.js` `window.app.opSimStarts` → `import { opSimStarts }`) + `inferStarts`. VERIFY: a placed corner op renders its start
+  markers (**NO NaN**); multi-handle drag + Wall-2 travel-tie populate (defect #3 gone).
+- **inc B3 — LAYOUT:** LIFT `cornerView.js` FeatureCanvas port (drag handles, `tieCornerTravel`, `getPassStarts`) + the `index.html`
+  corner panel; render through the generic `registerUserOp → def.panel/def.layout → userOpView`. VERIFY: the FeatureCanvas layout +
+  form panel render, matching the built-in corner wizard's panel.
+- **inc C — VERIFY + RELEASE:** all 3 dims end-to-end (EMIT byte-identical incl. `probeZFirst` · SIM no-NaN + multi-handle · LAYOUT
+  renders via `userOpView`) + full suite green. Release when verified. Closes the FIRST full wizard-as-data port (emit + sim + layout).
 
 ---
 
