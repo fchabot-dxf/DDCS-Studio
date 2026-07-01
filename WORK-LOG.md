@@ -3335,3 +3335,71 @@ the advisor: the manual off-stock needs the probe-calc/#53 fix, not more diagona
 
 **Full suite:** launched but the box is EXTREMELY loaded (a single spec > 3 min; ~30+ min for the suite) — committing on the
 verified middle area (the changes are middle-scoped + the round-trip); RE-RUN the full suite to confirm no broad regression.
+
+---
+
+## 🔨 turn 1 (cycle 1) — CORNER-PORT inc A: LIFT the wizards-as-data MECHANISM onto `port/corner-clean`
+
+Dispatched (HANDOFF turn 1) to lift ONLY the audit-sound wizards-as-data port mechanism (the "crown jewel") from
+`wizard-porting-work` onto this fresh branch — NOT the corner port (inc B), NOT other agents' WIP, NOT junk.
+
+**Method — classify before touching the tree.** 43 files differ (`port/corner-clean → wizard-porting-work`); only ~16 are the
+mechanism. Ran a 22-agent classification workflow (per-file branch-diff verdict + test-import-closure + dep-scan). Verified findings:
+- **Only 2 files genuinely ABSENT on target** and required: `wizards/ops/{userRoot,layout}.js` (both named, zero-import leaves).
+  The named roster is COMPLETE vs the 7 specs' static import closure (112 modules; 110 already on the clean branch).
+- **13 wholesale-safe**, **3 surgical**, plus **1 unnamed-but-required** (devMode, see below).
+- `blocks/{opSchema,opSession}.js` → **LEFT as-is**: their mechanism symbols (specOf/registerUserSpec/USER_SCHEMA; flattenBlocks)
+  are byte-identical on both branches; the diffs are 100% excluded WIP (homing Seq / middle B-TRANS #23-#24 / corner startX-startY /
+  alignment FIELD_BIND). Lifting them would drag WIP in for zero mechanism gain.
+- **Views are fan-out artifacts, not deps** — no named mechanism file imports any view; `wizardManager`/`views/index` are clean on
+  target, so the mechanism resolves/runs without `userOpView` et al. Not lifted.
+
+**Lift executed:**
+- **Wholesale (`git checkout wizard-porting-work -- …`, 13):** `blockEmitter, userOps, wizardLibrary, blockly/stackBridge,
+  dataOps/{atcWarmup,drill,slot,surfacing,text}Data, ops/{userRoot,layout,probeSurface,index}`. + **7 mechanism specs** (the
+  acceptance set: 5 `-as-data` updated + `user-root-transparent-emit` & `custom-op-sim-starts-precedence` new-on-dump — source and
+  its tests move together).
+- **Surgical (checkout dump → trim the excluded lines):**
+  - `app.js` — kept `seedDefaultPortedUserOps()` + the 5 dataOps imports + init wiring; **DROPPED** `import cornerPortDef` + the
+    `cornerPortDef()` seed entry (→ inc B; `data/cornerPort.js` doesn't exist here).
+  - `blocks/blockly/bridge.js` — kept user_root PRESENTATION/EXECUTION + param_group DO shapes + op GCODE/SIM split + layout `kind`
+    dropdown; **DROPPED** `import installHomingOrderField` + its `installBlockly()` call (→ HOMING WIP; module absent here).
+  - `wizards/ops/panelTypes.js` — kept `LAYOUT_TYPES`/`renderDeclaredLayout` + the generic slant/scale/alignment `layoutSpecFromOp`
+    branches; **DROPPED** `renderCornerLayout`/`cornerParamsFromForm`/`cornerLayout`/`cornerState` + the `opSimStarts` import + the
+    `kind==='corner'` branch. **Also removed the `const kind` line** the dropped branch orphaned (my-change orphan cleanup).
+- **devMode.js (NOT in the named roster — lifted hunk-1 ONLY, under "as needed to resolve"):** `authoringBody` now reads
+  `getInput('GCODE') || getInput('DO')`. **WHY:** `bridge.makeOpDef` renames the recorded-op statement input `DO→GCODE` (+ new
+  `SIM`); `stackBridge`/`devMode` are the readers. Lifting bridge's rename while leaving devMode reading `'DO'` ships a
+  **known-broken** authoring round-trip (`blocks-authoring-*` exercise it) — that violates valid-by-construction, so hunk-1 is a
+  required leg of the *named* round-trip, not scope creep. **Deliberately NOT lifted:** devMode hunk-2 (adds spatial number-role
+  widgets `nscaleX/nshear/nprojLength` = spatial-GUI WIP, absent here) and hunk-3 (the `saveAsCustomOp` sim-write rewrite — an
+  authoring-save path, not required by the mechanism or any lifted spec; revisit ONLY if the full suite regresses there).
+
+**⚠ FLAG 1 — shared-index collision (advisor commit `fb3f439`).** While my lift was staged, the advisor's concurrent session ran
+`git commit` ("docs(port): full corner-port autonomous plan …") and, because we share ONE working tree + index, it **swept my
+staged 13 mechanism files + 7 specs into its own commit** (verified: `fb3f439` = those 20 files + `NEXT-SESSION.md`; **no WIP/junk
+leaked**, and it did NOT grab app/bridge/panelTypes, so no broken import landed in history). I then committed the completing 4
+surgical files as **`118a6f2`**. Net: inc-A is CORRECT at the tip but **split across `fb3f439` + `118a6f2` with messy attribution**
+(most of my mechanism sits under a "docs" message). History is the advisor's to own — flagging for a possible reword/squash. Root
+cause worth noting for the protocol: worker+advisor sharing one git index means staging is NOT isolated; a concurrent `commit -a`
+can grab in-progress staged work. `fb3f439` also happened AFTER the advisor passed the ball (it did work post-pass).
+
+**⚠ FLAG 2 — marker sync at wake.** `.handoff/worker.last` was orphaned at 177 from the prior batch while the new cycle is turn 1,
+so my waiter could not fire (1 > 177 false). Re-baselined `worker.last → 0` ("sync", per human). **The advisor side is still stale:**
+`advisor.last=178`; my `pass` creates turn 2, and `2 > 178` is false → the advisor's waiter won't wake unless its own `.last` is
+re-baselined to ≤1. One-way rule → I did not touch it; advisor must sync its side.
+
+**Note — autonomous framing.** `NEXT-SESSION.md` (committed in `fb3f439`) now dispatches inc A → inc B → inc C VERIFY as a FINITE
+autonomous loop (no per-increment human check-in; advisor fresh-eyes-reviews each and dispatches the next; surface to the human only
+for a design fork / unverifiable regression / worker stall).
+
+**VERIFIED:** `node --check` clean on all lifted files; residual diffs of the 4 surgical files scanned for excluded tokens
+(cornerPort/homingOrder/renderCornerLayout/nscaleX…) = clean. **The 7 named mechanism specs PASS (7/7, 6.6s)** —
+slot/drill/text/surfacing/atc-warmup emit byte-identical G-code to their stacks; `user_root` is emit-transparent;
+template `simstart` blocks are canonical with `def.sim.starts` as fallback (registerUserOp + DO→GCODE/SIM round-trip proven).
+
+**Full suite: GREEN** — `446/448 pass, 2 skipped, 0 real failures` (1.5m). The single "failure" was a **flake**:
+`project-drawer-smoke.spec` (Cloud-tab / project-Open-drawer) hit a 15s `waitForSelector` timeout under the heavily-loaded box
+(448 tests across parallel workers) — **passes clean in isolation (2.2s)**. It's a cloud/OAuth-UI test, untouched by the mechanism;
+NOT a regression. The 445 app-loading specs (all `blocks-*`, `custom-op-*`, `wizard-*`) pass, which proves the `app.js` seeding +
+the bridge `DO→GCODE/SIM` round-trip + devMode read-leg did not break app init. inc-A mechanism lift = COMPLETE + VERIFIED.
