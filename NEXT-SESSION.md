@@ -53,18 +53,30 @@ wizard, with DERIVED (not hand-counted) bindings, PROVEN by a real emit test. **
   blockIndexes PROGRAMMATICALLY from the flattened stack** — walk the flattened `user_root` and match each binding to its target
   block by role/key, **NOT hand-counted**. This is defect #1's real fix AND kills the `WRAP_PREFIX_COUNT` class for corner. Make the
   derivation a small **REUSABLE helper** (valid-by-construction; the 5 siblings can adopt it later — but do NOT migrate them now).
-  Robust to the `probeZFirst` toggle.
-- ⭐ **ADD an EMIT-CORRECTNESS test** `corner-data-emit.spec.js`: assert `cornerData`'s emitted G-code is **byte/value-identical** to
-  the built-in `cornerWizard` cornerStack across a param sweep **including the `probeZFirst` toggle** (the exact param that broke the
-  hand-counted bindings), via `stripAnnotations`. Mirror the 5 as-data specs. This is the test whose ABSENCE let the break ship
-  (`corner-data-layout.spec` only checked a field-rewrite). **DISCARD `_diag-endoffset.spec.js`** (asserts nothing).
+  The helper must re-find the sockets correctly EVEN under `probeZFirst`'s structural shift (see the FRONTIER below).
+- ⭐ **`probeZFirst` = a DECLARED FRONTIER (baked off), NOT a bound param.** Ticking it INSERTS a Z-surface step + traverse (changes the
+  stack SHAPE, shifts #23/#24); `instantiate()` substitutes VALUES in a fixed shape — it cannot add/remove blocks. Same class as drill's
+  baked `method` (peck-not-bore). So `cornerData` bakes `probeZFirst=off` (the default shape). **This is ADDITIVE:** `cornerData` is a
+  NEW "Corner (data)" op seeded ALONGSIDE the UNTOUCHED built-in Corner wizard (`wizardLibrary` id:`corner`, which keeps `probeZFirst`
+  fully working) — nothing the operator uses is disabled. Don't surface a working probeZFirst control in the twin (a B3 concern).
+- ⭐ **ADD an EMIT-CORRECTNESS test** `corner-data-emit.spec.js`: assert `cornerData` emits **byte/value-identical** G-code to the
+  built-in `cornerStack` across a sweep of the BOUND scalars (all quadrants, WCS, offsets, cross-traverse) at the baked
+  `probeZFirst=off`, via `stripAnnotations` (mirror the 5 as-data specs) — PLUS a **DERIVE-ROBUSTNESS** assertion: the derive helper
+  re-finds the shifted `#23/#24` sockets when built against a `probeZFirst=on` stack. That guards defect #1's ROOT (bindings under a
+  structural shift) BETTER than the impossible "emit the variant" test my first dispatch wrongly demanded. **DISCARD
+  `_diag-endoffset.spec.js`** (asserts nothing).
+- ⭐ **ADD a can't-forget FRONTIER GATE** (`corner-data-probeZFirst-frontier.spec.js`): a LOUD, named `test.fixme`/skip documenting that
+  the data model can't yet do the add-a-step toggle, PLUS an assertion that the built-in Corner (`wizardLibrary` id:`corner`) stays
+  registered — so any future attempt to RETIRE the built-in while the twin is limited turns the suite RED. A red/skipped marker can't be
+  forgotten like a backlog note (this is the anti-"risky-to-forget" guard, human t178).
 - DROP the corner emit-path orphans your changes make dead (`travelOwn`/`travelOpp` + imports, unused `td`, stale `Travel:` header) —
   only the ones YOUR changes orphan.
 - **SCOPE: EMIT ONLY.** Do NOT lift `cornerView.js` / the `index.html` panel (= inc B3 LAYOUT). Do NOT touch `opSimStarts` /
   `inferStarts` (= inc B2 SIM). Do NOT migrate the 5 existing dataOps to the derive helper (follow-up).
 
-**VERIFY:** `node --check` clean on every touched file; `registerUserOp(cornerData())` does NOT throw; the new `corner-data-emit`
-spec + the 7 inc-A specs GREEN. **STAGE SURGICALLY** (the tree has stray PNG/HANDOFF churn — never `git add -A`). Commit + WORK-LOG + pass.
+**VERIFY:** `node --check` clean on every touched file; `registerUserOp(cornerData())` does NOT throw; `corner-data-emit` +
+`corner-data-probeZFirst-frontier` + the 7 inc-A specs GREEN. **STAGE SURGICALLY** (the tree has stray PNG/HANDOFF churn — never
+`git add -A`). Commit + WORK-LOG + pass.
 
 **NORTH STAR:** valid-by-construction (DERIVE, never hand-count) · one-source (cornerData matches the 5 siblings; the derive helper is
 the single binding-index authority) · verify-real-symptom (the emit test asserts real G-code, not a field rewrite) · declare-never-infer.
