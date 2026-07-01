@@ -17,24 +17,33 @@ Each reposition socket (`#21`/`#22` start, `#23`/`#24` cross) holds a **`datum +
 - **Human calls:** REPLACE the built-in (turn 6) · positions = datum expressions (turn 6) · dropdown-dup was a stale localStorage op
   (turn 8) · **ADD auto/manual travel** (turn 12, queued below) · **proceed to B3** (turn 12).
 
-## 🚦 ACTIVE DISPATCH — CORNER-PORT inc B3: LAYOUT + DRAG [advisor turn 12; human "b3"]
-LIFT the corner's 2D layout + wire the drag — the PAYOFF of the LOCKED MODEL (dragging OVERRIDES the reposition socket expression).
-- LIFT `cornerView.js` FeatureCanvas port (drag handles, `tieCornerTravel`, `getPassStarts`) + the `index.html` corner panel; render
-  "Corner (data)" through the generic `registerUserOp → def.panel/def.layout → userOpView` (like the 5 sibling data ops).
-- ⭐ **The DRAG writes a datum-RELATIVE literal offset into the reposition socket** (`cross1_x/cross1_y` → a bound literal that OVERRIDES
-  the default expression via `instantiate`; tracks the stock). **INTERIM:** the stock-datum coord isn't a reachable `#var` yet (the B1b
-  gate), so the drag is relative to the DEFAULT geometry / `travelDist` for now; the true datum-relative form lands with the stock-datum
-  follow-up. Keep the socket EXPRESSION-HOLDING so both drop in without a schema change.
-- **SCOUT FIRST:** the `cornerView` canvas port + the drag→socket-override wiring (how a user-op's canvas handle writes a binding literal
-  back through `userOpView`). Report the mechanism; **GATE** if the datum-relative drag needs the deferred datum.
-- SCOPE: LAYOUT + DRAG. No emit-structure change; NOT auto/manual (its own increment); NOT probeZFirst (B4).
+## ✅ inc B3 (LAYOUT+DRAG) — done, 1 concern → inc B3b
+Worker wired the drag via the EXISTING generic canvas-widget system (role-tagged `cross1_x/cross1_y` → a point handle; no per-wizard
+cornerView lift — MORE wizards-as-data-aligned than the dispatch asked). Review (2-lens): drag-test clean bar a nit (only #23 asserted).
+ONE concern: the point handle writes an ABSOLUTE world coord into `#23/#24`, but those are consumed as an INCREMENTAL (G91) delta
+(`cornerWizard.js:128 DM('inc')`) → a drag emits a geometrically WRONG reposition + CORRUPTS the correct signed-travelDist expression.
+The built-in `cornerView.tieCornerTravel` wrote the DELTA (`wall2start − wall1start`); the generic port dropped it. (Additive twin; concern.)
 
-**VERIFY:** "Corner (data)" renders its FeatureCanvas layout + form panel via `userOpView` (matching the built-in corner); dragging a
-handle updates the emitted reposition (the socket takes the literal); relevant specs + full suite GREEN. **STAGE SURGICALLY** (never
-`git add -A`). Commit + WORK-LOG + pass.
+## 🚦 ACTIVE DISPATCH — CORNER-PORT inc B3b: the drag writes a DELTA, not an absolute coord [advisor turn 14]
+Honor the LOCKED MODEL's **relative** ruling (human "relative good"): the drag must write an INCREMENTAL DELTA into `#23/#24`, matching the
+G91 socket semantics AND the datum-relative offset model — NOT the raw absolute world point.
+- **FIX:** the drag writes `world − reference` (the Wall-1→Wall-2 delta, reproducing the built-in `tieCornerTravel`
+  `cross1 = wall2start − wall1start`), so the emitted incremental reposition is CORRECT. The undragged default is already correct
+  (signed-travelDist expression) — leave it; the defect is strictly on-drag.
+- **SCOUT** the cleanest ONE-SOURCE path: a GENERIC "relative/offset" handle capability in the canvas-widget system (a role/mode writing
+  `world − reference` instead of absolute `world`) vs corner-specific delta math. **Prefer the generic** (every incremental-socket drag will
+  need it). GATE if it's a bigger canvas-widget change than a targeted fix.
+- ⭐ **FIX THE TEST** (the recurring gap): `corner-data-drag` asserts only that `#23` became "SOME literal" + the expression is gone — NOT
+  that the value is CORRECT. Assert the drag writes the RIGHT DELTA (drag to a KNOWN world point → `#23/#24` == the expected wall-relative
+  delta), with DISTINCT x/y deltas so an x/y swap is caught too (the refuted nit). verify-real-symptom: assert the VALUE, not just that it changed.
+- SCOPE: the drag writeback (handle → socket) + its test. No emit-structure change; leave the correct undragged default.
 
-**NORTH STAR:** GUI-first (drag the canvas, not a field) · valid-by-construction (datum-relative tracks the stock) · one-source (the same
-`userOpView` path the siblings use) · verify-real-symptom (a REAL pointer drag updates the REAL emit).
+**VERIFY:** a REAL drag to a known point writes the CORRECT incremental delta into `#23/#24` (reproducing the built-in `tieCornerTravel`);
+`corner-data-drag` (hardened) + `corner-data-emit` + `corner-data-sim-starts` + full suite GREEN. **STAGE SURGICALLY** (never `git add -A`).
+Commit + WORK-LOG + pass.
+
+**NORTH STAR:** valid-by-construction (a relative DELTA is right-by-the-G91-socket + tracks geometry) · verify-real-symptom (assert the
+CORRECT value, not just that it changed) · one-source (a generic relative-handle every incremental drag reuses).
 
 ## 📌 QUEUED (advisor dispatches each after review — no human check-in):
 - **AUTO/MANUAL TRAVEL — generalize into `safeTraverseStack` (human t12).** Middle ALREADY has per-traverse auto/manual
