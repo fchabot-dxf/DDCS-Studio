@@ -68,7 +68,16 @@ function wizItemIcon(e) {
     return entryIconHtml(e);   // iconOverride (emoji or ic:<id>) wins → built-in line-art (by id) → emoji default
 }
 function wizItemOnclick(e) {
-    if (e.kind === 'user') return `ddcsInsertUserOp && ddcsInsertUserOp('${_escArg(e.type)}')`;
+    if (e.kind === 'user') {
+        // A user op that DECLARES the 2D canvas panel opens the CANVAS/wizard path so its FeatureCanvas + drag handles
+        // render (openWiz → wizardManager.open → userOpView → renderLayout2D). The wizard's shared Insert still commits
+        // the op (userOpView.update recordOp → wizardManager.insert → commitActiveOp — the SAME accumulate path the quick
+        // form uses), so it both RENDERS and INSERTS. Everything else stays on the fast quick-insert form (no regression).
+        // Scoped to 'form2d' (the explicit canvas panel Corner (data) declares); NOT 'form3d' — that is the DEFAULT panel,
+        // so routing it would move EVERY panel-less user op off the quick form. Widen to form3d only if that is intended.
+        if (e.def && e.def.panel === 'form2d') return `openWiz && openWiz('${_escArg(e.type)}')`;
+        return `ddcsInsertUserOp && ddcsInsertUserOp('${_escArg(e.type)}')`;
+    }
     const special = WIZ_SPECIAL_OPENER[e.id];
     if (special) return `${special} && ${special}()`;
     if (e.variant) return `openWiz && openWiz('${_escArg(e.type)}','${_escArg(e.variant)}')`;

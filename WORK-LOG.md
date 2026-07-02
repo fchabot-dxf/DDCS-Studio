@@ -3910,3 +3910,49 @@ future wizard inherit auto/manual for free.
 
 SCOPE respected: EMIT plumbing only. NOT the live data-op manual toggle / GUI control / Blockly round-trip (② / B4 — a control
 now would be a dead option since the twin bakes auto). Ready for advisor review + the ② dispatch.
+
+---
+
+## 🔨 turn 21 (cycle 11) — B3c WIZ-BAR ROUTING — BUILT + VERIFIED (advisor turn 20; user-blocked)
+
+(Context: a transient `claude-opus-4-8[1m]` classifier outage blocked Bash during the turn-19 handoff, so an autonomous
+fallback tick re-armed the loop; on recovery the advisor had already reviewed ① (VERIFIED) + dispatched B3c. Picked it up.)
+
+**The gap (user-found t18):** clicking "Corner (data)" in the wizard bar opened the plain quick-insert FORM (fields only),
+never the FeatureCanvas + drag the user built (B3/B3b). Trace: `commandDeck.wizItemOnclick` routed EVERY `kind:'user'`
+entry to `ddcsInsertUserOp` (→ userOpForm, no viz); the canvas renders ONLY via the wizard path (`openWiz` →
+`wizardManager.open` → `userOpView.update` → `renderLayout2D`). The B3 test used `openWiz` (passed) while the real bar door
+stayed broken.
+
+**SCOUT — the INSERT flow (the one flagged subtlety): NOT a gate.** The wizard path DOES insert, via the SAME accumulate
+path as the quick form: `userOpView.update()` does `recordOp()` (makes it the active op), and the wizard's shared
+`wizardManager.insert()` (footer button) commits via `commitActiveOp()` (wizardManager.js:439) — identical to
+`userOpForm`'s Insert (`recordOp` + `commitActiveOp`, userOpForm.js:64-65). So routing to `openWiz` RENDERS the canvas AND
+still inserts. No seam to wire → a pure routing switch, no gate. Also verified `e.def.panel` is available on the bar entry
+(`wizardLibrary.userEntries` sets `def:d` → survives `listEntries` `...e` → `getLibrary` items).
+
+**THE FIX (commandDeck.js `wizItemOnclick`):** a `kind:'user'` entry whose `e.def.panel === 'form2d'` routes to
+`openWiz(type)` (the canvas/wizard path); everything else stays on `ddcsInsertUserOp` (the fast quick form). One surgical
+branch.
+
+**⚠️ SCOPE DECISION — shipped form2d-ONLY, NOT the dispatched "form2d/form3d". Flagging for your call.** New info the
+dispatch's literal spec didn't account for: `userOpFromStack` DEFAULTS `panel` to **`'form3d'`** (userOps.js:391;
+`resolvePanelMeta` falls back to `'form3d'`), so `'form3d'` is not a rare explicit opt-in — it's what virtually EVERY
+panel-less user op resolves to (e.g. `Bar Test` in wizard-bar.spec:86). Routing `form3d` → `openWiz` would therefore move
+ALL default user ops off the quick form to the wizard AND break the existing wizard-bar.spec:86 assertion (`Bar Test` →
+`ddcsInsertUserOp`). That is a UX + test change well beyond the user's stated problem. Corner (data) declares an EXPLICIT
+`'form2d'` (its `panel` block + the userOpFromStack arg), so **form2d-only fully fixes the user's exact gap** while staying
+maximally surgical (zero existing-test churn, no surprise UX shift for the whole user-op class). Extending to `form3d` is a
+one-word change (`|| e.def.panel === 'form3d'`) + a wizard-bar.spec:86 update — **say the word if you want the broad,
+every-visual-op version** (there's a real product call here: is the wizard the richer DEFAULT door for all user ops, or
+does the quick form stay the fast default and only explicit-canvas ops get the wizard?).
+
+**VERIFY (verify-real-symptom — the USER's path, NOT `openWiz`).** New `wiz-bar-canvas-route.spec.js` registers Corner
+(data), refreshes the bar, finds the RENDERED bar button, asserts it routes to `openWiz` (not `ddcsInsertUserOp`) + that the
+op declares `form2d`, then CLICKS the actual button and asserts `#userVizContainer .fc-handle-move` + `.fc-stock` RENDER.
+**FAILED pre-fix** (routing was `ddcsInsertUserOp && ddcsInsertUserOp('user_corner_data')` → no canvas) → **PASSES
+post-fix**. wizard-bar.spec stays GREEN (Bar Test = form3d → quick form, unchanged — proves form2d-only is surgical).
+**Full suite: 457 passed, 0 failed (1.3m).**
+
+SCOPE respected: routing only; the emit/canvas/insert mechanisms were already built. NOT ②'s toggles. Ready for review +
+the form3d call.
