@@ -4598,3 +4598,90 @@ STRUCTURAL-TOGGLE BATCH (4a-4d) is COMPLETE: probeZFirst / travelApproach / wcs 
 cornerStack, each with a hardened live-spec (binding-driven + value-pinned where value-carrying), each frontier retired in
 lockstep. REMAINING for corner parity: corner/probeSeq value-bindings (sign/order, not prune) · ③ stock-datum drag handles · ④
 VERIFY + release (retire the built-in; decide level's baked-final). Ready for whichever the advisor dispatches next.
+
+---
+
+## 🔨 turn 49 (cycle 11) — ③ STOCK-DATUM DRAG HANDLES: SCOUT + GATE (plan only, NO build). ⏸ PASS BACK THE PLAN.
+
+Prune-shaped toggle batch (4a-4d) DONE + verified. Dispatched ③ as a SCOUT+GATE (first meatier non-clone increment): map the
+current reposition-default + drag state vs the LOCKED MODEL, surface the build plan, ⏸ pass back for the advisor to bless before
+building. Scouted via 2 parallel Explore agents (docs/history + existing datum infra) + direct code reading. NO code written.
+
+### 0) CURRENT STATE (mapped precisely — 4a already did a lot of this)
+- **The declared datum ALREADY EXISTS.** `CORNER_SIM_STARTS` (cornerData.js) = per-PASS stock-derived START markers, declared
+  as `frac` rows with stable `id`s (zsurf/wall1/wall2) + `when` gates. These ARE the "stock-geometry-derived" datum the LOCKED
+  MODEL wants — one source, sim+preview read them, `makeProvider(rows)` → `(params,stock)⇒[{x,y,z}…]`.
+- **#23/#24 (wall1→wall2 reposition) is ALREADY datum-wired (4a).** Binding `cross1_x/_y`, group `reposition`, role x/y,
+  `relTo:{row:'wall1'}`. The handle renders at `wall1 + #23/#24` (via canvasWidgets `point.place`); a drag writes `world − wall1`
+  (`point.drag`) — a DATUM-RELATIVE literal. Default (unset) = the signed-travelDist EXPRESSION `#15/#16` (non-degenerate). So
+  for wall1→wall2 the LOCKED MODEL is ~satisfied EXCEPT the DEFAULT offset is travelDist-scaled, not stock-geometry-derived.
+- **#21/#22 (startX/startY, the Z→wall1 traverse) is BAKED — NOT a binding, NO handle.** Only emitted under probeZFirst
+  (`zOnly`); defaults `opp(dir)`/`'0'`. This is the "missing #21/#22 handle" ③ adds.
+- **Current draggable handle count = 1** (the `reposition` point-group; layoutSpecFromOp groups bindings by `b.group`). Markers
+  (opSimStarts) = 2 off / 3 on but DISPLAY-ONLY except the one #23/#24 handle.
+- **The B3 (0,0) bug is CURED for #23/#24** (relTo anchors it to wall1, not origin); it is NOT yet cured for #21/#22 (no handle
+  yet — a new #21/#22 handle must anchor to its datum, not 0,0).
+
+### 0b) THE ARCHITECTURAL TRUTH (TRAVEL-START-SPEC.md:26-27) — travel/derivation is GUI-SIDE
+The MACRO is INCREMENTAL (G91) + the controller has NO stock var → it CANNOT know wall-2's position pre-probe. So "stock-
+geometry-derived" CANNOT mean a macro expression referencing stock.x; it means the datum resolves GUI-SIDE (from the declared
+sim-start rows) for the PREVIEW/HANDLE, and the socket stores a value the drag derives. The model = START=source, TRAVEL=derived.
+
+### (a) BUILD PLAN (proposed)
+1. **Add #21/#22 as `startX`/`startY` bindings** (cornerData `CORNER_BINDING_SPECS`): group `start`, role x/y,
+   `relTo:{row:'zsurf'}` (the pass BEFORE wall1 under probeZFirst is the Z-surface), match `{assign,var:'#21'/'#22'}`, NO
+   `default` (read the socket's expression default → non-degenerate, kills 0,0). → layoutSpecFromOp renders a 2nd point-group
+   handle anchored at the zsurf marker; a drag writes `world − zsurf` into #21/#22.
+2. **⚠ MECHANISM GAP — prune-gated bindings.** #21/#22 exist ONLY under probeZFirst (pruned away when off). But `deriveBindings`
+   (the bindingSpecs path) REQUIRES exactly 1 match → it THROWS on 0 matches → build({probeZFirst:0}) would crash. FIX: an
+   `optional:true` spec flag → deriveBindings treats 0 matches as "absent in this state → skip the binding" (still errors on >1).
+   Small, general, declared. (This is the real new capability ③ needs; everything else composes.)
+3. **Form-gate the start fields** (post-field-gating pattern): grey/hide startX/startY when probeZFirst off (their socket is
+   absent) so the form doesn't show a dead field. The handle auto-absents (its group's params aren't writable/socketed).
+4. **Reposition DEFAULT → stock-geometry-derived (the core LOCKED-MODEL change).** Two candidate shapes — GATE decision:
+   - (A) KEEP the emitted default = the signed-travelDist EXPRESSION (#15/#16); "stock-derived" is satisfied by the relTo
+     anchor (handle/preview sit at the stock-derived sim-start, cure 0,0). Minimal, byte-identical-on-default, preserves the
+     editable travelDist. This is what 4a already does for #23/#24 — extend it to #21/#22. RECOMMENDED for ③'s scope.
+   - (B) DERIVE the default GUI-side from the sim-start deltas (marker[i+1]−marker[i]) + store a stock-scaled literal; retire
+     the travelDist field (the full TRAVEL-START "flip"). Bigger — this is really Item-4 (TRAVEL-START-SPEC increment 4), a
+     separate committed feature, NOT ③. Recommend DEFERRING (B) and doing (A) for ③.
+5. **Files:** cornerData.js (2 specs + relTo), deriveBindings.js (optional-spec), cornerWizard.js (only if the #21/#22 default
+   needs restructuring — likely NOT under option A), the form-gate (formWidgets/userOpView), + the spec.
+
+### (b) COMPOSE WITH THE NOW-LIVE TOGGLES
+- **probeZFirst** — the #21/#22 handle is prune-gated ON it (present on, absent off): 1 handle off (reposition/#23/#24) → 2 on
+  (+start/#21/#22). The reposition #23/#24 already tracks wall1 via relTo in BOTH states (4a). The `optional` spec (a2) is what
+  makes deriveBindings survive the off state.
+- **travelApproach/wcs/syncA** — orthogonal (they don't touch #21-#24); the datum handles compose cleanly (the reposition MOVE
+  emits under auto; manual jogs — the handle still sets the socket value the auto move reads).
+- **⚠ OPEN — the "2 off / 3 on" count.** I currently reach 1 off / 2 on (reposition + prune-gated start). The advisor's "2/3"
+  implies a THIRD handle: the wall-1 pass's OWN start (where the FIRST probe begins). Off-probeZFirst that start is the
+  operator's jog (no XY socket) — so making it a handle means EITHER (i) a preview-only handle that re-derives inferStart
+  (display), OR (ii) a NEW emitted start-XY move for pass-1. NEEDS A DECISION (surfaced below).
+
+### (c) DECLARE-OR-HANDROLL → DECLARE (reuse the existing declared datum)
+The datum is a DECLARED reference: the `CORNER_SIM_STARTS` rows (stock-frac anchors + ids). ③ expresses the positions AGAINST
+them via `relTo:{row:…}` (already the pattern for #23/#24). Do NOT invent a new datum concept, and do NOT reuse the cornerGrid
+[X][Y] stock-corner picker (that's a SINGLE stock corner; the corner needs a PER-PASS datum, which the sim-start rows already
+are). So ③ = add `relTo` anchors + the `start` binding group, reading the ONE declared source. Default-DECLARE, satisfied.
+
+### (d) HARDENED-SPEC PLAN (the adopted assert-the-value pattern)
+- READ the new startX/startY bindings' OWN wiring from def.bindings (group `start`, role x/y, relTo:{row:'zsurf'}) — a mis-wire
+  fails.
+- **INDEPENDENT-TRUTH position value** (NOT twin-vs-self): assert the datum-relative EMIT — e.g. with startX bound, #21 = the
+  written literal; and the UNSET default emits the non-degenerate expression (#21 = opp(dir), NOT 0). Pin the actual #21/#22 +
+  #23/#24 default expressions vs a hardcoded expected (like the WCS-base pins), so a wrong datum/default fails.
+- **DRAG writes the datum-relative DELTA** (real-symptom, both probeZ states): extend corner-data-drag to drag the START handle
+  under probeZFirst → assert #21/#22 = world − zsurf (the delta), anchored to zsurf (idx 0 when Z on), NOT the absolute world,
+  NOT (0,0). Mirror the 4a wall1 drag but for the start handle. + MUTATION-CHECK a wrong relTo row / wrong default → RED, revert.
+
+### ⏸ GATE — decisions I need the advisor (± human) to bless before building:
+1. **Handle count "2 off / 3 on"** — confirm the mapping. My plan gives 1 off / 2 on (reposition + prune-gated start). Is the
+   3rd the wall-1 pass START, and if so is it (i) preview-only (re-derive inferStart) or (ii) a new emitted pass-1 start move?
+2. **Reposition default (a4)** — option A (keep the travelDist expression, anchor via relTo — minimal, ③-scoped) vs option B
+   (GUI-derive from markers + retire travelDist — the full TRAVEL-START flip, a separate feature). I recommend A for ③.
+3. **The `optional` bindingSpec (a2)** — bless the small deriveBindings addition (0-match → skip) for prune-gated sockets.
+4. **Scope fence:** ③ = the corner's start-handle + datum-anchor wiring (option A). The full START=source/TRAVEL=derived flip
+   (retire travelDist, generalize tieDiagTravel) is Item-4/TRAVEL-START — a SEPARATE feature, not this increment.
+
+Passing back the PLAN — NOT building. Expect a synthesis ("do A + this from B") + the handle-count decision, then dispatch the build.
