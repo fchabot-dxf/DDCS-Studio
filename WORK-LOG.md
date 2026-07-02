@@ -3997,3 +3997,123 @@ SCOPE respected: the generic 3D+2D combo + corner's panel declaration. NOT ②'s
 advisor amended NEXT-SESSION.md in place for B without re-passing to avoid a colliding turn; I staged ONLY my files, left
 NEXT-SESSION.md untouched.) Ready for review — "Corner (data)" from the bar now shows the 3D probe sim + per-pass markers +
 the 2D reposition drag handle together.
+
+---
+
+## 🔨 turn 25 (cycle 11) — ② B4 SCOUT + GATE: the plan (advisor turn 24; human "yes dispatch"). ⛔ REPORTING, no code.
+
+Scouted with an 8-agent workflow (6 area designers @high-effort + 2 adversarial verifiers) over the 4 mechanism areas +
+GUI/round-trip + parity table. This is the PILOT pattern — the mechanism chosen here is inherited by every future port, so I
+report + the advisor reviews WITH THE HUMAN before any build. No source touched this turn.
+
+### 🎯 DECISION 1 (the architectural crux — sets the pattern for ALL ports): the structural-toggle mechanism
+`instantiate()` (userOps.js:268-278) substitutes VALUES into a fixed template — it CANNOT add/remove blocks. Three mechanisms
+for making a structural toggle (probeZFirst/travelApproach/wcs/syncA/corner/probeSeq) live:
+- **M1 — runtime goto-guard (the dispatch's literal words "always-emit-guarded-by-a-flag"): REFUTED.** Emitting BOTH branches +
+  an `IF..GOTO` produces a THIRD shape matching NEITHER the built-in OFF (extra skipped blocks) NOR ON (dead scaffolding), and
+  it's impossible for prompt-vs-move / wcs-active-vs-fixed (can't emit both). Fails byte-identical-off AND built-in parity. ✗
+- **M3 — `def.build` delegates to the SOURCE `cornerStack(params)` [RECOMMENDED, 3/4 agents converged].** `registerUserOp`
+  ALREADY honors `def.build` (userOps.js:310, unused today). `def.build = (params) => wrap(cornerStack({...CORNER_DEFAULTS,
+  ...params}))`. Byte-identical-off BY CONSTRUCTION (`build({})` === `cornerStack(CORNER_DEFAULTS)` === today's instantiate
+  output → the emit golden stays green) and EXACT parity-on BY CONSTRUCTION (`build({probeZFirst:1})` === `cornerStack(...on)`
+  === the built-in — the twin literally IS the source). GENERIC for free — middle's probeZFirst inherits the identical one-line
+  delegation (build-once, like safeTraverseStack). Matches the dispatch north-star ("restructure the SOURCE, don't grow
+  machinery; a def CAN carry a build function"). It also DISSOLVES the fan-out (c) and most of (a) with zero extra code.
+- **M2 — declared `when`-guards + a generic `pruneGuards` pass in instantiate [the pure-data alternative].** The template becomes
+  the SUPERSET (all forks on, each forked region wrapped in a `when:{param,is}` group — reusing the sim side's proven `whenOk`
+  vocabulary); instantiate prunes the falsified groups. Keeps corner as pure re-authorable DATA (the wizards-as-data ideal:
+  the template IS the wizard). COST: builds new machinery (pruneGuards + re-derive bindings BY IDENTITY after prune — the one
+  load-bearing hazard), AND the template is a SNAPSHOT of cornerStack + hand-added guards → the branch logic lives in BOTH
+  places (cornerStack ifs + template guards) → duplication/drift (LESS one-source than M3).
+
+**My recommendation: M3.** It's correct-by-construction, minimal, keeps ONE source of the shape, and the dispatch explicitly
+leans there. TRADE-OFF to weigh (the human's call): under M3 the STRUCTURE is param-driven via the source FUNCTION, not
+free-block-re-authorable pure data — but the operator-facing surface (all value + enum + toggle PARAMS) still round-trips as
+data via the marker, and the Blocks tab still shows build(params). The clean layering: operators PARAMETERIZE (data); wizard
+AUTHORS edit the source. Choose M2 only if free-block re-authoring of the probe STRUCTURE is a required goal (at the machinery
++ duplication cost). This is DECISION 1 for you + the human.
+
+### 🎯 DECISION 2 (a real bug the verifier caught): the multi-handle relTo / _pass anchor fix — the proposed fix BREAKS
+Adversarial verify verdict = **BREAKS.** Root: under probeZFirst the Z→wall1 traverse is NOT a `REPOSITION:` delimiter
+(cornerWizard.js:147 comment "Traverse to first wall"; the engine bumps `_pass` only on `REPOSITION:`, GcodeExecutionEngine.js:598),
+so corner has **3 physical starts (Z-surf, wall1, wall2) but only 2 engine passes** (Z-surf + wall1 share _pass 0). The 3-row
+`CORNER_SIM_STARTS` then orphans wall-2 onto a nonexistent _pass 2, and a single static `relTo:0` cannot serve BOTH handles:
+#21/#22 (Z→wall1) must anchor TO the Z-surf row; #23/#24 (wall1→wall2) must anchor PAST it to wall-1. No uniform resolver over
+one shared integer gets both right. **RESOLUTION (my proposal):** (i) make the Z→wall1 traverse a `REPOSITION:` delimiter in
+`cornerStack` → 3 passes = 3 markers 1:1 under probeZFirst (byte-identical OFF — the traverse only exists when Z on; lockstep
+parity ON — both built-in + twin share the source; comments are stripped in the functional compare anyway). (ii) make `relTo`
+a SEMANTIC anchor (names its sim-start row: Z-surf vs wall1) resolved to the surviving `when`-filtered index — so #21/#22→Z-surf,
+#23/#24→wall1, correct in BOTH states. NOTE: middle already emits `REPOSITION:` for its Z reposition (middleWizard.js:184) — so
+(i) makes corner CONSISTENT with middle (the asymmetry was corner's bug). Confirm this fix direction.
+
+### How each area lands UNDER M3 (the recommended mechanism)
+- **(a) structural toggles:** all six (probeZFirst, travelApproach, wcs, syncA, corner, probeSeq, slave) become build-params
+  flowing to cornerStack → live + parity, ZERO per-toggle machinery. Bindings become FORM/2D-layout metadata (drive the widgets),
+  not instantiate sockets. RETIRE the two frontier tripwire specs; FLIP the 4 emit-spec divergence rows to PARITY (`pass:true`)
+  + add probeSeq/wcs/syncA/slave/scanDepth parity rows.
+- **(b) enum fields:** ~90% already wired — `BINDING_TYPES` has `enum`/`bool`; `dropdownWidget`/`toggleWidget` render by type;
+  the JSON marker codec + `Enum()`/`Bool()` schema round-trip strings/bools already. NEW work is small: append enum/bool spec
+  rows (corner/probeSeq/slave/travelApproach/wcs/syncA/probeZFirst) as NON-derived bindings (no blockIndex — they drive
+  build-params, not sockets) with `type:'enum'|'bool'` + `widgetConfig.options`. corner widget = plain dropdown for B4 (the 3×3
+  corner-grid picker needs a code↔FL/FR adapter → defer as polish).
+- **(c) fan-out — DISSOLVED under M3.** No #17-expression rewrite needed: cornerStack already computes `#17 = safeZ + scanDepth`
+  from its JS params, so safeZ + scanDepth just become plain build-param number bindings (editable fields) — the fan-out limit
+  was purely an instantiate-single-socket artifact that M3 removes. (Under M2 instead, (c) WOULD need `#17 → [#19+#20]`
+  value-identical expression + a #20 scanDepth socket — flagged in case M2 is chosen.) `level` stays baked (a literal-in-G31
+  multi-socket fan-out, no macro var — needs a separate multi-socket-binding capability; out of scope). DRILL clearance does
+  NOT transfer (drill has NO macro-var layer — its clearance is an inlined literal; needs the same separate multi-socket
+  capability, NOT the corner pattern) → a genuine separate fork, recommend DEFER out of B4.
+- **(d) multi-handle:** add startX/startY (#21/#22) bindings (group:'ztravel', role x/y, NO default → expression-holding, no
+  degenerate G0 X0 Y0) → a 2nd/3rd drag handle via the existing generic incremental-point machinery (the drag→socket TIE is
+  DATA, not code — the middle tieDiagTravel pattern generalized). Gate the handle on probeZFirst (grey the fields when off).
+  + the anchor fix (DECISION 2).
+
+### PARITY TABLE (built-in Corner vs "Corner (data)" twin, after B4 under M3)
+23 params: **20 MATCHED** (corner/probeSeq/probeZFirst/wcs/dist/retract/f_fast/f_slow/port/safeZ/scanDepth/radius/travelDist/
+travelApproach/startX/startY/syncA/slave via build-params; + cross1_x/cross1_y) · **2 EXCEED** the built-in (cross1_x/y — 2D
+drag handles the built-in lacks) · residue: **`level`** baked (multi-socket, non-operator-facing, leave) · **`sources`** GAP
+(decision 3) · **`qStop`** dead in BOTH (decision 4).
+
+### 🎯 DECISION 3 — CONTROLLER-SOURCE CHIPS (`sources`): RECOMMEND WIRE (correctness).
+The built-in sources port/level/fastFeed/retract from controller vars via `srcVal`/`srcNote`/`ddcsResolveProbeSources`
+(cornerWizard.js:95-102); the twin binds plain literals → `sources` UNWIRED → a user who flipped a chip gets a WRONG program
+(literal instead of the ctrl var), not just a missing nicety. Under M3 it's near-free: `sources` rides the build-param seam
+(`build` passes it straight to cornerStack → `srcVal` already fires; absent/{} → literals → byte-identical). `opSchema` already
+declares `sources: Struct()`. Sub-fork: land CORRECTNESS (passthrough + Struct user-spec) in B4; the chip GUI (flip-to-ctrl
+toggles) as a follow-on. Recommend WIRE-correctness in B4.
+
+### 🎯 DECISION 4 — DEAD Q (`qStop`): RECOMMEND LEAVE.
+Read but UNUSED in BOTH built-in and twin (the shared probe atom hardcodes Q1) — a pre-existing dead field across all 7 probe
+wizards, NOT a corner-data regression. Fixing it = a cross-cutting shared-atom change with real DDCS Q0/Q1 deceleration
+semantics → a separate M350-verified task. Leave; record as backlog.
+
+### ROLLOUT DECOMPOSITION (ordered, each independently verifiable; assumes M3 + the DECISION-2 fix)
+1. **B4-1 def.build seam:** `cornerDataDef().build = (p) => wrap(cornerStack({...CORNER_DEFAULTS, ...bindingScalars(p), ...p}))`.
+   Assert `build(CORNER_DEFAULTS)` byte-identical to today's instantiate output (golden + a build-fn scalar sweep proving the 9
+   bindings still route through build, not instantiate). Pure code-path move, no behaviour change.
+2. **B4-2 enum/bool + safeZ/scanDepth bindings:** append the NON-derived toggle/enum rows (correct enum/bool types) + safeZ/
+   scanDepth number bindings; form renders toggle/dropdown/number by type. Verify registerUserOp validates + the form renders.
+3. **B4-3 make the clean toggles live + retire their gates:** corner/probeSeq/wcs/syncA/slave/safeZ/scanDepth → flip the emit-spec
+   divergence rows to PARITY; verify each flipped state == cornerStack(flipped).
+4. **B4-4 probeZFirst + travelApproach live + the DECISION-2 anchor fix:** REPOSITION-delimiter on the Z→wall1 traverse; semantic
+   relTo; CORNER_SIM_STARTS = 3 pass-markers aligned to 3 engine passes under Z; retire the two frontier tripwire specs; add
+   startX/startY handles. Verify the 3D preview anchors each pass + the drag ties correctly (real-symptom, human eyes).
+5. **B4-5 sources (DECISION 3, if WIRE):** Struct user-spec + build passthrough (correctness); chip GUI optional follow-on.
+6. **B4-6 marker/Blockly round-trip verification:** table-driven per-field round-trip (markerLine→parseMarker preserves value+type;
+   emit(build(back.params)) == cornerStack(p) per flipped field). GUI controls + round-trip = the "wire round-trip" requirement.
+7. **B4-7 generalize to middle (proof the capability is build-once):** middle's probeZ inherits the identical def.build pattern
+   (or document it follows separately). DRILL clearance multi-socket = a SEPARATE deferred capability, NOT B4.
+(Built-in Corner RETIREMENT stays a separate human-approved step AFTER the twin is app-verified — B4 only removes the blocking gate.)
+
+### Verify results + residual risks
+- **anchor-fix: BREAKS → resolved by DECISION 2** (REPOSITION delimiter + semantic relTo). Load-bearing; must be built + human-eye-verified.
+- **byte-identity: the verifier returned a DEGENERATE result** (placeholder "test"/"a"/"b" — a failed structured output), so it's
+  inconclusive from the agent. The 4 design agents' byte-identity analyses are consistent (M3 default = byte-identical; M2 (c) =
+  value-identical). ⚠ EMPIRICAL GATE: run the corner-data-emit golden + sweep immediately after B4-1 (def.build) and assert
+  `build(CORNER_DEFAULTS)` deep-equals the pre-change instantiate output before touching anything else.
+- Risks: (r1) the build-fn MUST feed BINDING values into the params or the 9 scalars silently revert to defaults (test with a
+  build sweep). (r2) new bindings must be `type:'enum'|'bool'` (NOT number) for the marker codec — the one place the
+  "keep type:number" pill rule does NOT apply (call it out so it isn't "re-fixed"). (r3) retire the frontier gates in LOCKSTEP
+  with flipping the divergence rows or the suite goes red. (r4) `sources` needs Struct user-spec treatment (not a scalar).
+
+**GATE: passing to advisor for review WITH THE HUMAN. Awaiting the mechanism decision (M3 vs M2) + the 3 other decisions before any build.**
