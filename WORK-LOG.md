@@ -5412,3 +5412,71 @@ Byte-parity untouched (declared source is preview-only — no emit path). Surgic
 
 **⏸ PASS BACK for your live re-verify with the SAME toggle-and-recheck** (query getPassSources before/after a real toggle — it
 now tracks travelApproach; arc + colour follow live). COMMITTED, NOT pushed. Source-chips wiring still HELD for its register scout.
+
+---
+
+## 🔨 turn 85 (cycle 11) — SCOUT (verify only, NO code): source-chips wiring — are port/level/fastFeed/retract genuinely macro-referenced? + the wiring plan. ⏸ PASS BACK findings for the advisor's review before building.
+
+Corner's visual-language polish BLESSED (advisor re-ran 10/10 + toggle-and-recheck: getPassSources ['auto','auto'] default →
+['auto','manual'] on toggle; arc pixel-verified). Corner backlog FULLY CLOSED except source-chips. Dispatched the source-chips
+SCOUT. Findings (register-name-is-not-macro-usage discipline applied):
+
+**(1) MACRO-USAGE — VERIFIED (all 4 Expert registers are GENUINELY macro-referenced, not eng-list names):**
+The M350's OWN macro library `bridge/controllers/expert-m350/…/SYSDISK/slib-g.nc` (the DDCS-compliant ground truth, captured
+2026-06-10) references all four DIRECTLY:
+  • port #1078   — `IF #1078!=0 GOTO36` (:341, a real conditional branch) + `#26 = #1078` (:428, read into the probe macro)
+  • level #1080  — `#28 = #1080` (:429)
+  • fastFeed #632 — `#22 = #632` (:422)
+  • retract #640 — `G91G0Z#640` (:510, the retract MOVE)
+RED-HERRING ruled out: cfg/eng `#632 = "Dust cover signal"` is the CONFIG-PARAM namespace (Pr632); the RUNTIME macro var #632 =
+Pr132+500 mirror = probing speed (what slib-g.nc reads). The profile's own comment ("#1078/#1080/#632 production-proven via
+community macro_cam13; retract from the ENG list") was CONSERVATIVE — the slib-g.nc dump confirms #640 (retract) is real too.
+⇒ the register-name-is-not-macro-usage bar is PASSED for Expert.
+
+**(2) CORNER SOURCES ONLY 3 OF THE 4 — `level` is BAKED (do NOT relitigate):**
+cornerStack srcVal's EXACTLY: retract (#2, :186), fastFeed (#3, :187), port (#5, :189). It does NOT srcVal `level` — level is a
+baked literal `L(level)=0` (the campaign's LOCKED level-baked-final decision; #4 slowFeed, #1 dist, #6 radius are also literals —
+"fields with no native var are deliberately absent"). So even though #1080 (level) IS macro-referenced, corner deliberately
+doesn't use it. ⇒ WIRE port/fastFeed/retract (3 fields); level STAYS baked.
+
+**(3) PROFILE-SPECIFIC — only Expert is hardware-confirmed (controllerProfiles.js):**
+  • Expert M350 : all 4 (verified above). CONFIRMED.
+  • V4.1        : probeVars {} EMPTY — "macro-address offset not confirmed → stays Studio-side."
+  • V3/DM500    : level/fastFeed/retract with DIFFERENT ctrl (#70/#2011/#75), NO port (single probe input); "verify #NNNN
+                  macro-readable before trusting; user has no DM500 → reference/sim only." UNVERIFIED.
+  • Generic     : probeVars {} EMPTY.
+⇒ sources activate ONLY on Expert; other profiles → literals (unchanged). Registers are per-profile, not a shared set.
+
+**(4) OPT-IN (default = studio/literal → byte-identical to today):**
+probeSrc(field) (settingsPanel:311) returns the src ONLY IF (a) the profile has probeVars[field] AND (b) the user flipped it to
+'ctrl' (ddcsSetProbeSrc). Default = studio → the literal. So sources are per-field OPT-IN; the untouched default emit is
+byte-identical. `sources` is a GLOBAL setting (profile + user choice), re-resolved at emit from settings — NOT a stored per-op
+value (consistent with machine-facts-vs-macro: pull controller values from the profile, don't bake them per-op).
+
+**(5) THE DATA-OP GAP + WIRING PLAN + THE BINDING-vs-SOURCE CONFLICT (the real design work — surfaced, NOT built):**
+  • GAP: the RETIRED built-in cornerView passed `sources: ddcsResolveProbeSources(['port','level','fastFeed','retract'])` to
+    cornerStack. The data-op uses the generic userOpView + M2 instantiate → it does NOT thread `params.sources` (src={} →
+    cornerStack emits literals). That's why the data-op sources are UNWIRED.
+  • CONFLICT: the data-op HAS number bindings retract→#2 / f_fast→#3 / port→#5 (CORNER_BINDING_SPECS:74/75/77) that SUBSTITUTE the
+    form literal into #2/#3/#5. If I thread `sources`, cornerStack's SEED emits #5=`#1078` (sourced) — but the port BINDING then
+    OVERWRITES it with the form literal. So threading `sources` alone is NOT enough; the binding + the source collide.
+  • WIRING PLAN (the pieces + the ONE fork for you):
+    a. THREAD `sources`: inject `sources = ddcsResolveProbeSources(['port','fastFeed','retract'])` read from the LIVE settings at
+       emit time (like the stock via window.ddcsGetSettings — a global profile setting, NOT a stored binding). WHERE: the
+       data-op's builder / a param-resolution step before instantiate.
+    b. RESOLVE the binding-vs-source conflict — THE FORK:
+       (A) [RECOMMEND] when a field is 'ctrl'-sourced, GATE its binding (skip the substitution) so the SEED's srcVal output
+           (#5=#1078) survives + GREY the form field (tooltip "controller Pr578") — the post-field-gating pattern; matches the
+           built-in's behaviour exactly. Cleanest.
+       (B) when sourced, set the bound param value to the controller-var STRING ('#1078') so the binding substitutes it — but the
+           binding is type:number, so a string value is awkward (formatting / round-trip). Rejected unless A is infeasible.
+    c. `sources` SHAPE (for reference): `{ port:{ctrl:'#1078',pr:'Pr578',label}, fastFeed:{ctrl:'#632',pr:'Pr132',…},
+       retract:{ctrl:'#640',pr:'Pr140',…} }` — only the fields the user opted 'ctrl' on the active profile; cornerStack reads
+       src.<f>.ctrl (the value) + src.<f>.pr (the comment note).
+  • SCOPE: additive + opt-in. Only Expert + user-'ctrl' changes the emit; default (studio) / V4.1 / Generic → literals →
+    byte-identical. level excluded (baked). The data-op's port/fastFeed/retract FIELDS get greyed when sourced.
+
+**⏸ PASS BACK the scout findings.** Bottom line: the 4 fields ARE real macro usage (Expert-verified in slib-g.nc); corner
+wires 3 (port/fastFeed/retract, level baked); Expert-only + opt-in; the one design decision is the binding-vs-source conflict
+(RECOMMEND A: gate+grey the field when sourced). Awaiting your review + a build dispatch (which fork, and confirm level-excluded).
+NO code changed this turn.
