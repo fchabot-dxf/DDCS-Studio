@@ -5311,3 +5311,32 @@ NOT retry or work around it.
 **STATE:** everything is staged for a one-command release. The HUMAN must authorize the push (run `git push origin main` outside
 auto mode, approve it, or add a Bash permission rule for it). Nothing is pushed; local `main` @ `9b9250a` is fully reversible.
 Once the human pushes, origin/main deploys the exe + web for the whole campaign. ⏸ Awaiting HUMAN authorization for the push.
+
+---
+
+## 🔨 turn 79 (cycle 11) — ④ move 2b RELEASE CONFIRMED LIVE 🎉 — the ENTIRE corner port campaign is on main + deployed. Corner (the gated pilot) is DONE.
+
+The human EXPLICITLY authorized the push (AskUserQuestion "Push now") and the ADVISOR ran `git push origin main` (683896b..9b9250a,
+main -> main) — the human-gated production door, cleared by direct human authorization (exactly the safety gate I held for at t77).
+
+**POST-PUSH VERIFICATION (my normal confirmation):**
+- **origin/main @ 9b9250a** = V10.50 = the whole corner campaign + the bump (verified via git ls-remote; local == remote). Tags
+  v10.49 + v10.50 pushed.
+- **EXE ✅** — "Desktop build (+ rolling release)" SUCCESS (1m27s) + "Desktop release" SUCCESS (1m28s); GitHub release
+  **"DDCS Studio v10.50 (desktop)" = Latest** published. + a "Latest build (main)" pre-release.
+- **WEB (Cloudflare pages.dev) ✅** — https://ddcs-studio.pages.dev is LIVE serving **V10.50** (verified: page title + the .ver
+  chip both read V10.50). This is THE primary web deploy (the web-deploy-cloudflare memory).
+- **WEB (GitHub Pages mirror) ⚠️** — the `pages-build-deployment` GitHub-Pages job FAILED: build OK (29s) but the DEPLOY step hit a
+  10-min TIMEOUT ("Timeout reached, aborting!"). TRANSIENT GitHub-side flake, NOT a code/release issue — every prior release
+  succeeded in <1min (V10.49 = 45s). This is a SECONDARY github.io mirror, NOT the primary web (Cloudflare pages.dev is live at
+  V10.50). Optional follow-up: `gh run rerun 28608178552` if github.io is actually used. Does NOT block the release.
+
+**🎉 CORNER (THE GATED PILOT) IS DONE + SHIPPED.** The whole campaign end to end: EMIT/SIM/LAYOUT+DRAG foundations → the M2
+guard/prune mechanism (probeZFirst/travelApproach/wcs-7way/syncA, each hardened + fan-out-clean) → corner×probeSeq 8-way (+ the
+wall-order hardening) → the full drag-handle model (marker anchoring across combos, shape distinction, Layout unification, the
+anchor-offset fix — all live-verified with real screenshots) → final verify + built-in retirement → V10.50 release. It is now the
+proven, hardened template for porting the remaining wizards.
+
+**QUEUED (advisor, near-term, NON-blocking follow-up):** the visual-language polish — circle shapes for sim-only / manual-jog
+markers, rainbow-arc manual-jog travel lines, Layout-canvas colors matching the top panel's cyan/amber. Post-release; the
+human + advisor decide which wizard ports next.
