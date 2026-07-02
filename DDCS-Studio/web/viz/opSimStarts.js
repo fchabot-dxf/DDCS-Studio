@@ -197,7 +197,16 @@ export function makeProvider(rows) {
             params: params || {},
         };
         const out = [];
-        for (const row of spec) if (whenOk(row.when, params)) out.push(rowToStart(row, ctx));
+        // sim-marker-distinguish (t69): tag each surviving pass with `emits` — does dragging its marker WRITE to the emitted
+        // program (a reposition destination, e.g. corner #21-#24) → the SOLID marker shape, vs a sim-only jog preview → HOLLOW.
+        // The FIRST surviving pass is ALWAYS the operator's manual start (never program-written), so `emits` only takes effect
+        // from pass 2 on. SIM-ONLY by default (a row with no `emits`; the built-in providers above return no emits → unchanged).
+        let pass = -1;
+        for (const row of spec) {
+            if (!whenOk(row.when, params)) continue;
+            pass++;
+            out.push({ ...rowToStart(row, ctx), emits: pass > 0 && !!row.emits });
+        }
         return out;
     };
 }

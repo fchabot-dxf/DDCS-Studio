@@ -53,6 +53,7 @@ export function createToolpath2d(canvas, opts = {}) {
     let cursor = null;               // program coords under the pointer → readout chip
     let starts = [];                 // per-pass operator starts [{x,y,z}] → numbered DRAGGABLE handles (onStartDrag(pos, pass) on release)
     let startSources = [];           // per-pass reposition source ['auto'|'manual',…] → marker colour (auto=cyan, manual=amber)
+    let startEmits = [];             // per-pass emitting flag [bool,…] → marker SHAPE (emitting=filled ◆, sim-only=hollow ◇) — orthogonal to the colour
     let toolPos = null;              // LIVE tool/probe position from the sim (engine onPositionChange) → the moving head marker
     let drag = null, dragStart = null;   // dragStart = the per-pass start INDEX being dragged (null = none)
     const anim = { playing: false, k: 0, raf: null };
@@ -158,7 +159,7 @@ export function createToolpath2d(canvas, opts = {}) {
         drawPath(ctx, anim.playing ? Math.floor(anim.k) : null);
         drawLabels(ctx, foot, step, w, h);
         if (starts.length) drawStartHandles(ctx);
-        canvas.__t2starts = starts.map((s, i) => ({ i, sx: sptx(s.x), sy: spty(s.y), x: s.x, y: s.y, source: startSources[i] || 'auto' }));   // debug + tests: the drawn per-pass start handles + colour source
+        canvas.__t2starts = starts.map((s, i) => ({ i, sx: sptx(s.x), sy: spty(s.y), x: s.x, y: s.y, source: startSources[i] || 'auto', emits: !!startEmits[i] }));   // debug + tests: the drawn per-pass start handles + colour source + SHAPE (emits)
         canvas.__t2cursor = cursor;   // debug + tests
         if (cursor) { if (cursor.snapped) drawSnap(ctx, cursor); drawReadout(ctx, cursor, w, h); }
     }
@@ -174,9 +175,11 @@ export function createToolpath2d(canvas, opts = {}) {
             const manual = startSources[i] === 'manual';                            // colour by reposition source
             const col = manual ? '#ffb300' : '#22d3ee';                              // amber = manual jog, cyan = auto traverse
             const ringCol = manual ? 'rgba(255,179,0,0.45)' : 'rgba(34,211,238,0.45)';
+            const emits = !!startEmits[i];                                          // SHAPE (orthogonal to the colour): emitting = a drag writes a macro var into the PROGRAM
             ctx.save();
-            ctx.strokeStyle = col; ctx.lineWidth = 2.8; ctx.lineJoin = 'round';      // hollow diamond — a static reference, NOT red (probe) or orange (tool)
-            ctx.beginPath(); ctx.moveTo(hx, hy - 6.5); ctx.lineTo(hx + 6.5, hy); ctx.lineTo(hx, hy + 6.5); ctx.lineTo(hx - 6.5, hy); ctx.closePath(); ctx.stroke();
+            ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.8; ctx.lineJoin = 'round';   // diamond — a static reference, NOT red (probe) or orange (tool)
+            ctx.beginPath(); ctx.moveTo(hx, hy - 6.5); ctx.lineTo(hx + 6.5, hy); ctx.lineTo(hx, hy + 6.5); ctx.lineTo(hx - 6.5, hy); ctx.closePath();
+            if (emits) ctx.fill(); else ctx.stroke();                               // EMITTING = FILLED ◆ (a drag edits the program); SIM-ONLY = HOLLOW ◇ (jog preview, never emitted → edge/middle unchanged)
             ctx.lineWidth = 1.4; ctx.strokeStyle = ringCol; ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI * 2); ctx.stroke();   // grab-ring (nearHandle's 12px hit-test)
             const bx = hx + 11, by = hy - 9;   // numbered badge (1-based), like the 3D number sprite
             ctx.fillStyle = 'rgba(13,17,23,0.85)'; ctx.beginPath(); ctx.arc(bx, by, 7, 0, Math.PI * 2); ctx.fill();
@@ -291,6 +294,7 @@ export function createToolpath2d(canvas, opts = {}) {
     function setStarts(arr) { starts = Array.isArray(arr) ? arr.filter(Boolean).map((p) => ({ x: +p.x || 0, y: +p.y || 0, z: +p.z || 0 })) : []; if (view) paint(); }   // per-pass operator starts (①②…)
     function setStart(p) { setStarts(p ? [p] : []); }   // back-compat: a single operator start = pass 0
     function setStartSources(arr) { startSources = Array.isArray(arr) ? arr.slice() : []; if (view) paint(); }   // per-pass marker colour (auto=cyan, manual=amber)
+    function setStartEmits(arr) { startEmits = Array.isArray(arr) ? arr.slice() : []; if (view) paint(); }   // per-pass marker SHAPE: emitting (a drag edits the program) = filled ◆, sim-only = hollow ◇
     function setAnchor(v) { anchorToStart = !!v; if (view) paint(); }   // mirror the 3D's _anchorToStart: anchored → path emanates from the start, not the stock pin
     function setToolPosition(p) { toolPos = p ? { x: +p.x || 0, y: +p.y || 0, pass: p.pass } : null; if (view && anim.playing) paint(); }   // live sim head (in sync with the 3D); pass → per-pass anchor (INC4)
     function setGcode(text) { setSegments(traceToolpath(text).segments); }
@@ -340,7 +344,7 @@ export function createToolpath2d(canvas, opts = {}) {
     canvas.addEventListener('mouseleave', () => { cursor = null; if (!anim.playing) paint(); });
 
     return {
-        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setStarts, setStartSources, setAnchor, setToolPosition, redraw, fit, play, stop, toggle, seek,
+        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setStarts, setStartSources, setStartEmits, setAnchor, setToolPosition, redraw, fit, play, stop, toggle, seek,
         get playing() { return anim.playing; },
         get count() { return segs.length; },
     };

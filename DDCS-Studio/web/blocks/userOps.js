@@ -180,6 +180,7 @@ export function simStartsFromStack(children) {
         else if (a === 'radial') { row.axis = p.axis || 'Y'; row.sign = p.sign === '-' ? '-' : '+'; row.r = numOrTok(p.rad); }
         if (p.whenparam) row.when = { param: p.whenparam, is: p.whenis === 'true' ? true : p.whenis === 'false' ? false : p.whenis };
         if (p.id) row.id = p.id;   // stable pass id (② B4 step 4a) — the anchor a semantic relTo names; only present when declared
+        if (p.emits === 'true' || p.emits === true) row.emits = true;   // sim-marker-distinguish (t69): a reposition-destination pass → SOLID marker (a drag edits the program)
         return row;
     });
 }
@@ -202,6 +203,7 @@ export function simStartsToBlocks(rows) {
             whenparam: row.when ? row.when.param : '',
             whenis: row.when ? String(row.when.is) : '',
             ...(row.id ? { id: row.id } : {}),   // carry a declared pass id ONLY when set → id-less rows round-trip byte-identical
+            ...(row.emits ? { emits: 'true' } : {}),   // sim-marker-distinguish (t69): carry the emitting flag ONLY when set → sim-only rows round-trip byte-identical
         } };
     });
 }

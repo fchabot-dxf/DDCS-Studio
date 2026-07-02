@@ -391,7 +391,8 @@ export function createPreviewPanel(container, opts = {}) {
         const next = [];
         for (let p = 0; p < count; p++) {
             const h = userStarts[p] || (p === 0 && st) || hintFor(p) || passStarts[p] || { x: 0, y: 0, z: 0 };
-            next.push({ x: +h.x || 0, y: +h.y || 0, z: +h.z || 0 });
+            const hint = hintFor(p);   // sim-marker-distinguish (t69): `emits` is a DECLARED property of the pass HINT (opSimStarts), not of a drag/operator override — so it survives a userStarts drag
+            next.push({ x: +h.x || 0, y: +h.y || 0, z: +h.z || 0, emits: !!(hint && hint.emits) });
         }
         return next;
     }
@@ -432,6 +433,7 @@ export function createPreviewPanel(container, opts = {}) {
         t2.setStarts(passStarts);   // the draggable 2D start handles — ALL per-pass starts, numbered (①②…)
         const passSources = (parsed.stats && parsed.stats.passSources) || [];   // per-pass reposition source → marker colour (auto=cyan, manual=amber)
         if (t2.setStartSources) t2.setStartSources(passSources);
+        if (t2.setStartEmits) t2.setStartEmits(passStarts.map((s) => !!s.emits));   // sim-marker-distinguish (t69): the SHAPE axis (emitting=solid vs sim-only=hollow), orthogonal to the auto/manual COLOUR
         t2.setAnchor(curAnchor);                              // 2D mirrors the 3D anchor: anchored → path emanates from the start, not the stock pin
         t2.setMachine(curAnchor ? null : machineForViz());   // anchored (probe) → LOCAL scene (no envelope), like the 3D's setMachine(null)
         if (mode === '3d') {
@@ -463,6 +465,7 @@ export function createPreviewPanel(container, opts = {}) {
                     for (let p = 0; p < passStarts.length; p++) v.starts[p] = { x: passStarts[p].x, y: passStarts[p].y, z: passStarts[p].z };
                 }
                 if (v.setStartSources) v.setStartSources(passSources);   // colour each start marker by its reposition source (auto=cyan, manual=amber)
+                if (v.setStartEmits) v.setStartEmits(passStarts.map((s) => !!s.emits));   // sim-marker-distinguish (t69): SHAPE each marker (emitting=solid vs sim-only=hollow), orthogonal to the colour
                 v.setSegments(parsed, !fitted); fitted = true;
                 if (v.setSimTool) v.setSimTool(simTool(code, parsed));   // per-op tool from the tool table (see simTool)
                 if (v.setSimMode) v.setSimMode(((parsed.stats && parsed.stats.probe) > 0) ? 'probe' : 'mill');   // probe = translucent stock, mill = solid

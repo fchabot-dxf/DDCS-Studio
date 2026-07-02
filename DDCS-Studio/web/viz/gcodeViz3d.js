@@ -243,16 +243,26 @@ export class GcodeViz3D {
         return grp;
     }
 
-    // The start glyph: a camera-facing (billboard) hollow CYAN diamond drawn on a sprite, so it always shows as a clean
-    // lozenge ◇ — the 3D twin of the 2D start handle. depthTest:false → always visible against the scene.
-    _makeStartGlyph() {
-        const THREE = this.THREE;
+    // The start-glyph textures (WHITE so material.color tints them per-pass — cyan=auto / amber=manual — hi-res keeps them
+    // crisp), cached per shape. sim-marker-distinguish (t69): HOLLOW diamond = a SIM-ONLY jog preview (never emitted); FILLED
+    // diamond = an EMITTING pass whose drag writes a macro var into the program (corner #21-#24). SHAPE axis, orthogonal to colour.
+    _startGlyphTex(emits) {
+        const key = emits ? '_emitStartTex' : '_simStartTex';
+        if (this[key]) return this[key];
         const c = document.createElement('canvas');
         c.width = c.height = 128;
         const ctx = c.getContext('2d');
-        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 18; ctx.lineJoin = 'round';   // WHITE so material.color tints it per-pass (cyan=auto / amber=manual); hi-res keeps it crisp
-        ctx.beginPath(); ctx.moveTo(64, 14); ctx.lineTo(114, 64); ctx.lineTo(64, 114); ctx.lineTo(14, 64); ctx.closePath(); ctx.stroke();   // hollow diamond outline (inset for the thick line)
-        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), color: 0x22d3ee, depthTest: false, transparent: true }));   // cyan default (auto)
+        ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ffffff'; ctx.lineWidth = 18; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(64, 14); ctx.lineTo(114, 64); ctx.lineTo(64, 114); ctx.lineTo(14, 64); ctx.closePath();
+        if (emits) ctx.fill(); else ctx.stroke();   // filled = emitting; hollow outline = sim-only (inset for the thick line)
+        return (this[key] = new this.THREE.CanvasTexture(c));
+    }
+
+    // The start glyph: a camera-facing (billboard) CYAN diamond drawn on a sprite, so it always shows as a clean lozenge
+    // ◇ — the 3D twin of the 2D start handle. depthTest:false → always visible. Shape (hollow/filled) is set live per pass.
+    _makeStartGlyph() {
+        const THREE = this.THREE;
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._startGlyphTex(false), color: 0x22d3ee, depthTest: false, transparent: true }));   // cyan (auto) + hollow (sim-only) defaults
         sp.scale.set(9, 9, 1);   // ~9 mm
         sp.renderOrder = 11;
         return sp;
@@ -324,10 +334,14 @@ export class GcodeViz3D {
             glyph.material.opacity = sel ? 1 : 0.45;
             const src = (this._startSources && this._startSources[p]) || 'auto';
             glyph.material.color.setHex(src === 'manual' ? 0xffb300 : 0x22d3ee);   // amber = manual jog, cyan = auto traverse
+            const tex = this._startGlyphTex(!!(this._startEmits && this._startEmits[p]));   // sim-marker-distinguish (t69): SHAPE — emitting=filled ◆ / sim-only=hollow ◇ (re-applied here so it survives marker recreation)
+            if (glyph.material.map !== tex) { glyph.material.map = tex; glyph.material.needsUpdate = true; }
         }
     }
     // Per-pass reposition sources (['auto'|'manual',…]) → start-marker colour. Re-applies via the highlight pass.
     setStartSources(sources) { this._startSources = Array.isArray(sources) ? sources : []; this._highlightSelectedStart(); this.render(); }
+    // Per-pass emitting flags ([bool,…]) → start-marker SHAPE (emitting=filled ◆, sim-only=hollow ◇). Re-applies via highlight.
+    setStartEmits(emits) { this._startEmits = Array.isArray(emits) ? emits : []; this._highlightSelectedStart(); this.render(); }
 
     // Ray-pick a start marker (ruby + numbered badge) under the pointer; returns pass index or -1.
     _pickMarker(e) {

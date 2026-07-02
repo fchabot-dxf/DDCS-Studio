@@ -105,10 +105,16 @@ export const CORNER_DATA_OPTYPE = 'user_corner_data';
  *  construction (NaN discipline). The Z-surface row is `when`-gated on probeZFirst — now a LIVE toggle (② B4 step 4a): its
  *  pass-alignment is resolved (step 3 made Z→wall-1 a REPOSITION: delimiter → 3 passes == 3 markers under Z). Each row carries a
  *  stable `id` so a binding's SEMANTIC relTo ({row:'wall1'}) anchors to the right pass regardless of the zsurf row's presence. */
+// `emits` (sim-marker-distinguish, t69) marks a pass whose start is a PROGRAM-WRITTEN reposition destination — dragging
+// its handle edits a macro var in the emitted G-code (corner #21-#24) → the marker gets the SOLID (emitting) shape vs the
+// HOLLOW (sim-only jog preview) shape. Purely a SHAPE hint for the preview (never emitted); the FIRST surviving pass is
+// always the operator's manual start (sim-only) so `emits` only takes effect from pass 2 on — see makeProvider. So: zsurf
+// (no emits) is always sim-only (the Z-first lead); wall1 emits (its start is #21/#22) but reads sim-only when it IS the
+// lead pass (probeZ off, index 0); wall2 always emits (#23/#24, never the lead).
 export const CORNER_SIM_STARTS = [
-    { id: 'zsurf', anchor: 'frac', fx: 0.07, fy: 0.0875, plane: 'top',   when: { param: 'probeZFirst', is: true } },   // Z-surface probe (only when probeZ) — filtered-index 0 when on
-    { id: 'wall1', anchor: 'frac', fx: 0.20, fy: -0.625, plane: 'probe' },   // Wall-1 (Y, first) — _pass 0 no-Z / _pass 1 under Z
-    { id: 'wall2', anchor: 'frac', fx: -0.50, fy: 0.25,  plane: 'probe' },   // Wall-2 (X, second) — after the wall-1→wall-2 REPOSITION traverse
+    { id: 'zsurf', anchor: 'frac', fx: 0.07, fy: 0.0875, plane: 'top',   when: { param: 'probeZFirst', is: true } },   // Z-surface probe (only when probeZ) — filtered-index 0 when on; operator-jogged (sim-only)
+    { id: 'wall1', anchor: 'frac', fx: 0.20, fy: -0.625, plane: 'probe', emits: true },   // Wall-1 (Y, first) — _pass 0 no-Z (sim-only lead) / _pass 1 under Z (EMITS #21/#22)
+    { id: 'wall2', anchor: 'frac', fx: -0.50, fy: 0.25,  plane: 'probe', emits: true },   // Wall-2 (X, second) — always a reposition destination (EMITS #23/#24)
 ];
 
 /** The wrapped `user_root` template for a given param set. Structural params bake the stack SHAPE; the 9 bound scalars

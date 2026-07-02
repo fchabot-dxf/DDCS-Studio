@@ -5089,3 +5089,60 @@ own, decide "land the entire unmerged campaign on main to ship it now" (a new co
 **⏸ NOTHING done to git** (no bump, no commit, no push) — the bump belongs as the TIP of whatever actually gets pushed,
 so I held it until you pick the target. Working tree clean except the untouched `_*.png` / `HANDOFF.md` /
 `NEXT-SESSION.md`. Awaiting your call: A (ship via main) or B (push branch for review)?
+
+---
+
+## 🔨 turn 69 (cycle 11) — sim-marker-distinguish (BEFORE release): a per-pass `emits` flag → EMITTING markers get a distinct SHAPE from SIM-ONLY jog-preview markers, in BOTH the 2D toolpath view and the 3D sprite. COMMITTED (not pushed). ⏸ PASS BACK for live screenshot verify.
+
+Release stays HELD (t68 gate) — the advisor acknowledged it + leans A, but found a REAL UX/safety gap in ③ first: the sim-only
+first-start marker (NEVER emitted) and the EMITTING reposition markers (write #21-#24) rendered with the IDENTICAL shape; the
+only marker visual was `travelApproach` COLOUR (auto=cyan/manual=amber) — ORTHOGONAL to "does dragging this change my program".
+
+**THE FIX — a declared per-pass `emits` flag on a NEW SHAPE axis (orthogonal to the colour), 6 surgical files + 1 spec:**
+- `blocks/dataOps/cornerData.js` — CORNER_SIM_STARTS: wall1 + wall2 get `emits: true` (zsurf none). `emits` = "this pass's
+  start is a PROGRAM-WRITTEN reposition destination (a drag edits #21-#24)".
+- `viz/opSimStarts.js` — makeProvider tags each SURVIVING pass: `emits: pass > 0 && !!row.emits`. The FIRST surviving pass is
+  ALWAYS the operator's manual jog start (never program-written) → sim-only; `emits` bites from pass 2 on. This is the SAME
+  invariant the ③ handle model already declared ("first-start = SIM-ONLY"). Built-in providers (middle/alignment/rotary) return
+  bare {x,y,z} (no emits) → default sim-only → edge/middle UNCHANGED.
+- `blocks/userOps.js` — simStartsFromStack + simStartsToBlocks carry `emits` through the simstart-block round-trip (exactly like
+  `id`: only when set → emits-less rows round-trip byte-identical). Corner's sim.starts round-trips template→rows→makeProvider.
+- `viz/createPreviewPanel.js` — computePassStarts attaches `emits` from the DECLARED hint (`hintFor(p)`, NOT userStarts/operator
+  override) → SURVIVES a sim-only drag; setGcode extracts `passStarts.map(s=>!!s.emits)` → `t2.setStartEmits` + `v.setStartEmits`
+  (parallel array, symmetric with the existing setStartSources colour axis).
+- `viz/toolpath2d.js` — parallel `startEmits` array + `setStartEmits()` (API) + drawStartHandles branches `ctx.fill()` (emitting =
+  FILLED ◆) vs `ctx.stroke()` (sim-only = HOLLOW ◇), colour untouched; `__t2starts` records emits (test hook).
+- `viz/gcodeViz3d.js` — `_startGlyphTex(emits)` caches a hollow + a filled diamond texture; `_highlightSelectedStart` swaps the
+  glyph.material.map by `_startEmits[p]` (re-applied there → survives marker recreation); `setStartEmits()` mirrors setStartSources.
+
+**WHY declare + this shape:** declare-never-infer (the row DECLARES emits; one `whenOk`-shared filter; no per-op inference).
+The SIM-ONLY marker keeps the CURRENT hollow diamond so edge/middle (all sim-only) render byte-identical; only EMITTING gets the
+new FILLED shape. Emit path NEVER sees the flag (SIM and EMIT are fully isolated — passStarts is sim-only) → byte-parity is FREE
+by construction. The exact glyph (filled diamond) is a cheap viz knob — happy to swap to a square/other on your live review.
+
+**EMITS SEMANTICS (independent truth, matches the dispatch):** OFF → 2 passes [wall1 sim-only (operator jog), wall2 EMITS
+#23/#24]. ON → 3 passes [zsurf sim-only (operator jog), wall1 EMITS #21/#22, wall2 EMITS #23/#24]. Combo-independent: corner ×
+probeSeq (③b 8-way) does NOT reorder the sim rows or change which repositions are written, and appears in no row.when/emits.
+
+**NOTE — the map fan-out's 2 agents were WRONG; I verified against source + the dispatch, didn't trust them:** (1) the
+emits-semantics agent INVERTED the mapping (said zsurf=emit / wall2=sim-only) by reasoning from the binding's relTo ANCHOR
+instead of the reposition DESTINATION; the dispatch text + first-principles (drag-handle destination) give zsurf=sim / wall2=emit.
+(2) the pipeline agent proposed `emits ?? true` (default TRUE) which would flip edge/middle to emitting — the default MUST be
+false. Corrected both.
+
+**VERIFY.** New hardened spec `corner-data-sim-marker-emits.spec.js` (5 tests, all green): (A) emits per pass vs an INDEPENDENT
+truth table, BOTH probeZFirst states, index-aligned; (B) end-to-end in the LIVE wizard — the flag reaches getPassStarts + the 3D
+`viz._startEmits`; (C) the REAL 2D visual symptom — a real (sized) canvas, sampled at the marker's own drawn coords: emitting
+paints a FILLED centre (alpha ≫ hollow+120) in cyan (colour unchanged), sim-only is HOLLOW; (D) backward-compat — middle/alignment
+all sim-only; (E) emit byte-parity — twin emit == cornerStack (both states) + no `emits` leak in the G-code. **MUTATION-PROVEN:**
+(M1) drop the `pass>0` rule → (A)+(B) RED (first pass wrongly emits) → reverted; (M2) force always-hollow → (C) RED → reverted.
+**Full suite: 472 passed, 2 skipped, 0 failed** (467 prior + 5 new). Adversarial fan-out (wg3bvu8yw, 3 skeptics: consumer sweep /
+emit isolation / semantics): **3/3 CLEAN, 0 findings** — consumer sweep (engine `_passStarts` reads only x/y/z; no
+JSON.stringify / Object.keys / strict-eq on start objects; setStartEmits guarded on both renderers); emit isolation
+(deriveBindings matches by type+matcher `var:'#N'`, NOT field values → the extra `emits` simstart-param can't shift binding
+indices; simstart.emit = () => []; simstart blocks are fixed-position in uiChildren → byte-parity by CONSTRUCTION); semantics
+(re-derived OFF/ON independently + confirmed corner/probeSeq appear in NO row when-gate + middle/alignment backward-compat).
+
+**⏸ PASS BACK for your LIVE screenshot verify** (the drag-handle shape distinction is a VISUAL symptom — your eyes are the real
+check). COMMITTED this branch, NOT pushed. Once you bless it, the release gate (A vs B) is the last step. Surgical: only the 6
+source files + the new spec staged (the `_*.png` captures + HANDOFF/NEXT-SESSION left untouched).
