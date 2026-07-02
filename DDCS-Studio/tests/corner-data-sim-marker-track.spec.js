@@ -99,10 +99,10 @@ test('(3) Layout canvas: the sim-only start handle appears as a HOLLOW diamond (
   expect(info.stroke, 'cyan — matches the top-panel sim-only marker').toBe('#22d3ee');
 });
 
-// (4) PART 2 — the sim marker is VISUAL on the Layout: it coincides with a reposition anchor (pass-0 is always a reposition
-//     origin), so the EMITTING reposition handle still owns the drag there (the sim marker never steals the hit) — "emitting
-//     handles stay as today". The sim start itself is dragged on the top panel (covered by corner-data-start-live).
-test('(4) Layout sim marker is visual — the coincident emitting reposition handle still owns the drag (writes cross1_x)', async ({ page }) => {
+// (4) PART 2 — the sim ◇ is VISUAL on the Layout (excluded from the hit-test): dragging the EMITTING reposition handle writes
+//     cross1_x — the ◇ never steals the hit ("emitting handles stay as today"). The sim start itself is dragged on the top
+//     panel (covered by corner-data-start-live). (Post-t75 fix, the emitting handle sits at its destination, clear of the ◇.)
+test('(4) Layout sim ◇ is visual — the emitting reposition handle owns its drag (writes cross1_x)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
   await page.evaluate(async () => {
@@ -117,8 +117,7 @@ test('(4) Layout sim marker is visual — the coincident emitting reposition han
 
   const cx = () => page.evaluate(() => document.querySelector('#wiz_user_form [data-param="cross1_x"]').value);
   const before = await cx();
-  // the reposition handle (#23/#24) coincides with the sim marker (pass-0 = the wall-1 anchor under Z-off). Dragging there
-  // must grab the EMITTING handle (the sim marker is excluded from the hit-test) → cross1_x gets written.
+  // dragging the EMITTING reposition handle writes cross1_x; the visual ◇ (excluded from the hit-test) never steals it.
   const handle = page.locator('#userVizContainer .fc-handle-move').first();
   const hb = await handle.boundingBox();
   await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);

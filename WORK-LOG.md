@@ -5248,3 +5248,44 @@ corner-data-drag (the overlap). **Full suite: 475 passed, 1 flaky (the known mid
 **⏸ PASS BACK for your LIVE screenshot verify** (marker-to-anchor proximity FL/YX + a combo; the Layout hollow ◇) + to bless
 the 2 refinements (wall1 state-invariant, Layout marker visual-only) or redirect. COMMITTED, NOT pushed. Surgical: 6 source
 files + 1 new spec + 1 lockstep spec update. Byte-parity untouched.
+
+---
+
+## 🔨 turn 75 (cycle 11) — FIX: the Layout EMITTING reposition handle rendered at its ANCHOR, not anchor+offset (the num()→0 fallback). One-source fix + Part-2 confirmed. Suite green. COMMITTED (not pushed). ⏸ PASS BACK for live-verify.
+
+Advisor BLESSED Part 1 + both refinements (re-ran 476 green, live-verified FL/YX + BR/XY chains). Found a NEW real display bug
+(root-caused precisely) + asked me to confirm Part 2.
+
+**THE BUG (advisor's root cause, confirmed):** panelTypes' `p('x') = num(params.cross1_x)` → when the reposition socket is
+UNSET (it relies on the G-code expression default, no JS literal) → `num(undefined)` = 0 → the +offset vanished → the Layout
+EMITTING reposition handle sat at its ANCHOR (wall-1, (7,-43)) instead of anchor+offset (wall-2, (-43,7)). SAME class as the
+sim-marker bug cornerReposOffsets already fixed — but layoutSpecFromOp's point computation was a SEPARATE stale raw-param path.
+
+**THE ONE-SOURCE FIX (`panelTypes.js` only — 1 source file):** the reposition ARRIVES at the NEXT pass marker, so the handle
+renders at `starts[ri+1]` (the destination sim marker) — which already chains via cornerReposOffsets AND reflects a bound
+socket (via useN). So the handle sits EXACTLY on the wall-2 sim marker (the most one-source: the handle IS the destination
+marker). Anchor (for the drag delta = world−anchor) unchanged. Non-relTo → the raw param (absolute point, unchanged).
+- **⚠ WHY NOT a `def.reposDefault` fn (my first cut):** I first added `def.reposDefault = cornerReposOffsets-wrapper` and read
+  it in layoutSpecFromOp — test-1 (fresh cornerDataDef) passed, but the LIVE render (test-2) FAILED: the live `_def` is
+  DESERIALIZED, so a def-carried FUNCTION is dropped (same persistence trap as simStartsProvider, but reposDefault is read off
+  the def at render time, not via a registry). Switched to `starts[ri+1]` — persistence-safe (opSimStarts uses the registered
+  provider) + more one-source. Removed def.reposDefault (cornerData.js net-unchanged this turn).
+
+**PART 2 CONFIRMED (your 2-arg probe was the issue):** the hollow ◇ DOES render — your `layoutSpecFromOp(def,params)` probe
+passed 2 args, but the real render is `renderLayout2D → layoutSpecFromOp(def,params,simStart)` (3 args, from userOpView reading
+host.__panel). corner-data-repos-handle.spec test-2 asserts the ◇ (.fc-handle-sim) renders in the LIVE wizard. **BONUS: your
+"no ◇" screenshot was likely the ◇ MASKED by the buggy emitting handle** — both sat at wall-1 (pass-0). This fix moves the
+emitting handle to wall-2, so the ◇ at pass-0 is now ALONE + visible (test-2 asserts they're >20px apart on screen).
+- **NOTE — the turn-73 OVERLAP that forced the ◇ visual-only is NOW RESOLVED:** the emitting handles render at their
+  DESTINATIONS (not anchors), and pass-0 (the ◇) is an ORIGIN — so they no longer coincide in EITHER probeZ state. I KEPT the
+  blessed visual-only ◇ (you blessed it t74), but if you now WANT it draggable on the Layout, it's clean (no overlap) — YOUR CALL.
+
+**VERIFY.** New `corner-data-repos-handle.spec.js` (2, green): (1) the unset-default reposition handle position = anchor+offset =
+the wall-2 destination, INDEPENDENT truth (hand-derived FL/YX (-43,7) + BR/XY (7,57)) + coincides with the wall-2 sim marker
+(one-source) + a regression guard (NOT stuck at its wall-1 anchor); (2) the ◇ renders + is >20px from the (now correctly-placed)
+emitting handle. **MUTATION-PROVEN M4:** disable the destination offset → both RED → reverted. **Full suite: 477 passed, 1 flaky
+(known middle-animator, retried green), 0 failed** (480 total; my new specs stable 18/18 across 3 repeats). Byte-parity untouched
+(preview/UI only). Surgical: 1 source file + 1 new spec + 1 comment update.
+
+**⏸ PASS BACK for your live screenshot re-verify** (the reposition handle now at wall-2 = anchor+offset; the ◇ visible + distinct)
++ FYI the overlap is resolved if you want a draggable Layout ◇. COMMITTED, NOT pushed.

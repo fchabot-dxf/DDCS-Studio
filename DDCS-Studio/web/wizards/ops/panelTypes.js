@@ -121,17 +121,26 @@ export function layoutSpecFromOp(def, params, simStart) {
             // wall-1→wall-2 reposition, consumed in G91): anchor the point to the op's Nth DECLARED sim-start, so the
             // handle renders at anchor+delta (the true wall position) and a drag writes world − anchor (the delta), not
             // the absolute world coord. Absent relTo → an absolute point (unchanged).
-            let ax = 0, ay = 0;
+            let ax = 0, ay = 0, destX = null, destY = null;
             if (byRole.x.relTo != null && typeof opSimStarts === 'function') {
                 // SEMANTIC relTo ({row:'wall1'}) → the pass index among the SURVIVING when-filtered starts (correct in
                 // BOTH probeZ states); a numeric relTo passes straight through. null = the named pass isn't present here.
                 const ri = resolveRelToIndex(def.opType, params, byRole.x.relTo);
-                const a = (ri != null) ? (opSimStarts(def.opType, params, s) || [])[ri] : null;
+                const starts = (ri != null) ? (opSimStarts(def.opType, params, s) || []) : [];
+                const a = starts[ri];
                 if (a) { ax = num(a.x, 0); ay = num(a.y, 0); }
+                // The reposition ARRIVES at the NEXT pass marker (starts[ri+1] — chained via the SAME cornerReposOffsets the
+                // emit uses, and persistence-safe as the registered sim provider): the handle renders THERE (anchor+offset =
+                // the true destination), whether the socket is set (marker reflects the literal) or UNSET. Fixes the num()→0
+                // fallback that stuck the handle AT its anchor (masking the sim ◇). No 2nd hand-rolled path — ONE source.
+                const dest = starts[ri + 1];
+                if (dest) { destX = num(dest.x, 0); destY = num(dest.y, 0); }
             }
-            const x = ax + p('x'), y = ay + p('y');
+            const offX = (destX != null) ? destX - ax : p('x');
+            const offY = (destY != null) ? destY - ay : p('y');
+            const x = ax + offX, y = ay + offY;
             items.push({ kind: 'hole', x, y, n: 1, r: Math.max(1, stock.w * 0.012) });
-            pos(ax, ay);
+            if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: offX, y: offY, ax, ay, label: 'pos' });
         }
     }
     // Drag a handle → write the bound param FIELDS (their 'input' bubbles → userOpView.update() redraws). The gesture
