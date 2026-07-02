@@ -17,24 +17,31 @@ Each reposition socket (`#21`/`#22` start, `#23`/`#24` cross) holds a **`datum +
 - **Recurring lesson:** the worker's tests keep asserting a change HAPPENED, not that the RESULT is CORRECT (B1 golden / B2 finite / B3 literal) —
   every test-bearing dispatch now MANDATES asserting the correct value vs an INDEPENDENT truth; the advisor re-runs + fan-out-reviews.
 
-## 🚦 ACTIVE DISPATCH — ① AUTO/MANUAL TRAVEL: generalize into `safeTraverseStack` (SCOUT + GATE) [advisor turn 16; human t12]
-Generalize middle's EXISTING per-traverse auto/manual into the ONE shared travel primitive, so corner (+ every wizard) inherits it — NOT a
-per-wizard hand-roll. This is a shared-primitive CONTRACT change + a refactor of SHIPPED middle code → **SCOUT + GATE first** (report the plan; I review before you build).
-- **Ground truth to build on:** middle has auto/manual per-traverse (`middleWizard.js:30-33` `approach`/`inAxis`/`transAxis`): AUTO = the
-  machine's G0 traverse; MANUAL = a `#1505` "jog to the next wall + Press Enter" prompt (no move) — HAND-ROLLED at `middleWizard.js:93-99`.
-  The shared `safeTraverseStack` (`ops/probeSurface.js`) is AUTO-only (center/seq/in-axis all emit G0).
-- **Propose (in the scout):**
-  1. Add `approach: 'auto'|'manual'` to `safeTraverseStack` — manual → the `#1505` jog-prompt; auto → the current G0 (default, back-compat).
-  2. REFACTOR middle's hand-rolled manual (`:93-99`) onto the shared block — **must be VALUE-IDENTICAL** (middle is shipped; prove it with a sweep).
-  3. CORNER adopts it for ALL its travels: `#21/#22` (Z-first→wall-1) AND `#23/#24` (wall-1→wall-2) — a per-travel toggle.
-  4. DATA op ("Corner (data)"): manual vs auto = DIFFERENT blocks (prompt vs move) → a STRUCTURAL toggle `instantiate` can't do → same class
-     as probeZFirst; BAKE auto in the twin for now, the LIVE toggle lands with ② (the structural-toggle capability). Say how you'll bake+gate it.
-- **GATE:** report the plan (the `safeTraverseStack` API · the middle value-identity proof approach · the corner adoption · the twin handling)
-  BEFORE building. I review, then dispatch the build.
-- SCOPE (build, after gate): the shared primitive + middle refactor (value-identical) + corner emit adoption. NOT the live data-op toggle (②).
+## 🚦 ACTIVE DISPATCH — ① AUTO/MANUAL TRAVEL: BUILD (scout plan BLESSED) [advisor turn 18]
+The scout plan (WORK-LOG turn-17) is SOUND + adversarially self-verified (middle value-identity + corner back-compat both HOLD; the "drop
+crux" elegantly resolved — corner-manual reuses each travel's OWN auto `lift #19`/`drop #18`, no new `manualLift/Drop`). BUILD per the plan
+§1–§4 (early-return manual branch in `safeTraverseStack`; middle `reposition()`→ the shared block; corner `travelApproach`→ both seq calls;
+twin bakes auto). **Fork decisions:**
+1. **SINGLE `travelApproach`** (governs both corner travels) — CONFIRMED (matches the human's "for all travel within"; per-travel is a cheap
+   additive refinement later via middle's `oneMode` precedent if a real case appears).
+2. **Value-identity proof:** the targeted UNIT EQUIVALENCE is the PRIMARY proof; KEEP the full-macro before/after sweep as the backstop but
+   **INLINE the golden — NO `UPDATE_GOLDEN` fixture machinery** (a ONE-SHOT refactor proof, not a maintained golden; rule-of-three: don't build
+   a golden framework for one use) + the existing middle suite + `corner-data-emit` stay green.
+3. **Twin frontier gate — BOTH:** the divergence row in `corner-data-emit.spec` (load-bearing) AND the loud `test.fixme` frontier spec —
+   mirror the probeZFirst frontier EXACTLY (one-source: same pattern; both gate the built-in's retirement).
+4. **DEFER the `travelApproach` GUI control + Blockly round-trip to ② (B4).** ① is EMIT plumbing; the twin BAKES auto (frontier) → a control
+   there would be a NON-WORKING option (the bridge.js "don't surface dead options" lesson). The LIVE toggle + its control + round-trip land
+   with ② when the structural capability makes it real. (This is the "① plumbing, ② the visible toggle" split I told the human.)
+- HONOR the residual risks: DOCUMENT the `approach:'manual'` = seq/in-axis-ONLY constraint (never center/transTraverse — re-centre math) on
+  the param; do NOT auto-prefix `REPOSITION:` inside the branch (the CALLER owns it — the sim pass-counter keys on it); the XY-only-jog-during-
+  the-pause is a USER responsibility (as middle already ships).
+
+**VERIFY:** middle emit BYTE/VALUE-IDENTICAL (unit-equivalence + full-macro sweep + middle suite green); corner emits the manual jog-prompt vs
+the auto move per `travelApproach`, auto byte-identical to today; twin bakes auto + the frontier gate trips; full suite GREEN. Stage surgically.
+Commit + WORK-LOG + pass.
 
 **NORTH STAR:** one-source (the ONE declared travel primitive owns auto/manual; kill the per-wizard hand-roll — the probe-surface-block
-generalises-probing pattern) · valid-by-construction · verify-real-symptom (middle's emit proven byte/value-identical post-refactor).
+generalises-probing pattern) · valid-by-construction · verify-real-symptom (middle proven byte/value-identical post-refactor).
 
 ## 📌 QUEUED (advisor dispatches each after review — no human check-in):
 - **② B4 — PROBE-Z-FIRST + the structural-toggle capability (REQUIRED for replacement).** probeZFirst (add the Z step) AND auto/manual travel
