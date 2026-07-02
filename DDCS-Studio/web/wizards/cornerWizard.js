@@ -26,8 +26,11 @@ const AX = {
 };
 const WCS_BASE = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
 
-/** Corner params → its outside-corner probe-macro block stack. The one source of truth for both displays. */
-export function cornerStack(params = {}) {
+/** Corner params → its outside-corner probe-macro block stack. The one source of truth for both displays.
+ *  `opts.superset` (② B4 step 4a) seeds the TWIN as an all-arms-present template: every probeZFirst-dependent piece
+ *  emits BOTH arms wrapped in a `guard` block so instantiate() can prune to either concrete shape. Superset OFF
+ *  (the built-in + every existing caller/test) is byte-identical to today. */
+export function cornerStack(params = {}, opts = {}) {
     const corner = ({ 1: 'FL', 2: 'FR', 3: 'BL', 4: 'BR', FL: 'FL', FR: 'FR', BL: 'BL', BR: 'BR' }[params.corner]) || 'FL';
     const probeZ = !!(params.probeZ || params.probeZFirst);
     const probeSeq = ({ 0: 'YX', 1: 'XY', YX: 'YX', XY: 'XY' }[params.probeSeq]) || 'YX';
@@ -69,6 +72,20 @@ export function cornerStack(params = {}) {
     const RAW = (text) => { const b = newBlock('raw'); b.params = { text }; S.push(b); };
     const END = () => S.push(newBlock('endprogram'));
 
+    // ② B4 step 4a — SUPERSET MODE. The twin SEED (opts.superset) carries EVERY probeZFirst arm, each wrapped in a
+    // `guard`, so instantiate() prunes it to either concrete shape. Off (the built-in + all existing callers) is byte-
+    // identical to today. The KIND-B interpolated text (header "+ Z Surface", the #1505 Hover OVER/OUTSIDE prompt, the
+    // Step-number labels) forks WITH the block-adds — a block-only superset would emit the ON shape with the OFF text.
+    const superset = !!opts.superset;
+    const GUARD = (when, kids) => { const b = newBlock('guard'); b.params = { when }; b.children = kids; return b; };
+    const WHEN_Z = { param: 'probeZFirst', is: true }, WHEN_NZ = { param: 'probeZFirst', is: false };
+    const mkC = (t) => { const b = newBlock('comment'); b.params = { text: t }; return b; };
+    const mkA = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; return b; };
+    // zPair: a Z-varying fork with BOTH arms — superset guards each; concrete pushes the matching arm inline (today's shape).
+    const zPair = (onKids, offKids) => { if (superset) S.push(GUARD(WHEN_Z, onKids), GUARD(WHEN_NZ, offKids)); else S.push(...(probeZ ? onKids : offKids)); };
+    // zOnly: a Z-ONLY block-add (no off-arm) — superset guards it on; concrete emits it only when probeZ.
+    const zOnly = (kids) => { if (superset) S.push(GUARD(WHEN_Z, kids)); else if (probeZ) S.push(...kids); };
+
     // Probe one wall via the shared PROBE-SURFACE BLOCK (t127): touch+comp → the TRUE wall in a temp (#102/#101); the
     // corner keeps its own WCS write + retract + safe-Z (trailingRetract:false). Byte-identical to the old hand-rolled wall.
     const probeWall = (ax, dir) => {
@@ -89,7 +106,8 @@ export function cornerStack(params = {}) {
     };
 
     // ── Header ──
-    C(`Corner | ${corner} OUTSIDE | X ${dirLabel(xDir)} Y ${dirLabel(yDir)}${probeZ ? ' + Z Surface' : ''} | ${wcsLabel}`);
+    const hdr1 = (z) => `Corner | ${corner} OUTSIDE | X ${dirLabel(xDir)} Y ${dirLabel(yDir)}${z ? ' + Z Surface' : ''} | ${wcsLabel}`;
+    zPair([mkC(hdr1(true))], [mkC(hdr1(false))]);   // KIND-B: the "+ Z Surface" suffix forks with probeZFirst
     C(`Probe dist: ${dist}mm | Retract: ${retract}mm`);
     C(`Fast: ${fFast} | Slow: ${fSlow} | SafeZ: ${safeZ}mm | ScanDepth: ${scanDepth}mm`);
 
@@ -110,11 +128,11 @@ export function cornerStack(params = {}) {
     // #19 (safeZ) + #20 (scanDepth) precede #17 so the controller has them when it evaluates #17=[#19+#20] (top-down eval).
     A('#19', safeZ, 'Safe Z retract distance'); A('#20', scanDepth, 'Scan depth');
     A('#17', '[#19+#20]', 'Plunge depth = safeZ + scanDepth'); A('#18', '[0-#17]', 'Negative plunge');
-    if (probeZ) {
-        // Z→Wall1: only the first wall's axis repositions (opp of its probe dir); the perpendicular axis holds.
-        A('#21', params.startX || (firstAx === 'X' ? opp(firstDir) : '0'), 'Z to Wall 1 traverse (X)');
-        A('#22', params.startY || (firstAx === 'Y' ? opp(firstDir) : '0'), 'Z to Wall 1 traverse (Y)');
-    }
+    // Z→Wall1: only the first wall's axis repositions (opp of its probe dir); the perpendicular axis holds. probeZFirst-only.
+    zOnly([
+        mkA('#21', params.startX || (firstAx === 'X' ? opp(firstDir) : '0'), 'Z to Wall 1 traverse (X)'),
+        mkA('#22', params.startY || (firstAx === 'Y' ? opp(firstDir) : '0'), 'Z to Wall 1 traverse (Y)'),
+    ]);
     // Wall1→Wall2: X moves own(xDir) when X is probed first (else opp); Y likewise. Default = signed travelDist (non-degenerate).
     A('#23', params.cross1_x || (firstAx === 'X' ? own(xDir) : opp(xDir)), 'Wall 1 to Wall 2 traverse (X)');
     A('#24', params.cross1_y || (firstAx === 'Y' ? own(yDir) : opp(yDir)), 'Wall 1 to Wall 2 traverse (Y)');
@@ -129,44 +147,48 @@ export function cornerStack(params = {}) {
 
     // ── Confirm + incremental ──
     C('Confirm Start');
-    A('#1505', '1', `${probeZ ? 'Hover OVER the' : 'Hover OUTSIDE the'} ${corner} corner material. Press Enter`);
+    const startPrompt = (z) => `${z ? 'Hover OVER the' : 'Hover OUTSIDE the'} ${corner} corner material. Press Enter`;
+    zPair([mkA('#1505', '1', startPrompt(true))], [mkA('#1505', '1', startPrompt(false))]);   // KIND-B: OVER vs OUTSIDE
     DM('inc');
 
-    // ── Z surface (optional) ──
-    if (probeZ) {
+    // ── Z surface (optional) ── probeZFirst-only block-add: the Z-surface touch + the Z→wall1 reposition.
+    zOnly([
         // Z-surface touch via the shared block. The comp writes the WCS Z directly (#[#73]=[#1927-#6]); preComp sets the
         // indirect address #73 right before the comp (kept in place → byte-identical). trailingRetract:false → the corner
         // does its own safe-Z retract + the travel to the first wall.
-        S.push(...probeSurfaceStack({
+        ...probeSurfaceStack({
             axis: 'Z', dir: '-', probeVar: '#7', retractVar: '#10', feedFast: '#3', feedSlow: '#4', port: '#5', level,
             twoPass: true, raw: '#1927', result: '#[#73]', radius: '#6', compEnable: true,
             trailingRetract: false, preComp: [{ var: '#73', value: '[#70+2]', note: 'WCS Z Address' }],
             compNote: `Save ${wcsLabel} Z offset - machine coord (− stylus radius)`,
-        }));
-        S.push(...safeTraverseStack({
+        }),
+        ...safeTraverseStack({
             mode: 'seq', crossX: '#21', crossY: '#22', lift: '#19',
             // ② B4 step 3 (anchor): 'REPOSITION:' makes the engine count Z→wall1 as its own pass (GcodeExecutionEngine
             // bumps _pass only on a REPOSITION: comment), so under probeZFirst there are 3 passes = 3 sim-start markers
             // 1:1 (was 2 passes / 3 markers → wall-2 orphaned). CONSISTENT with middle (its Z reposition is a delimiter).
-            // OFF: this block isn't emitted (inside `if (probeZ)`) → byte-identical. Byte-visible ON (both built-in + twin).
+            // OFF: this block isn't emitted (guarded on probeZFirst) → byte-identical. Byte-visible ON (both built-in + twin).
             comment: 'REPOSITION: Traverse to first wall',
             approach: travelApproach, promptNote: 'Jog clear, over to the first wall. Press Enter',   // manual: lift #19, jog, no drop (:150 plunges) — mirrors auto's Z
-        }));
-    }
+        }),
+    ]);
 
     // ── Two walls, in the chosen order ──
-    let step = probeZ ? 2 : 1;
-    C(`Step ${step++}: ${firstAx} Probe`);
+    // Z-first shifts EVERY step number +1 (Z-surface takes Step 1) — a KIND-B fork, so each Step label is a guarded comment
+    // PAIR in the superset. The wall1→wall2 reposition's moves are Z-identical (only its Step-number comment differs), so the
+    // WHOLE safeTraverseStack rides the pair — one arm survives prune → byte-identical to the concrete emit either way.
+    const firstLbl = (z) => `Step ${z ? 2 : 1}: ${firstAx} Probe`;
+    const repoLbl = (z) => `Step ${z ? 3 : 2}: REPOSITION: Traverse past corner and set up for ${secondAx}`;
+    const secondLbl = (z) => `Step ${z ? 4 : 3}: ${secondAx} Probe`;
+    const repoTraverse = (comment) => safeTraverseStack({
+        mode: 'seq', crossX: '#23', crossY: '#24', drop: '#18', comment,
+        approach: travelApproach, promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, drop #18 to scan depth (mirrors auto) — no lift (already at #17)
+    });
+    zPair([mkC(firstLbl(true))], [mkC(firstLbl(false))]);
     MV('Z', '#18');                          // plunge to scan depth
     probeWall(firstAx, firstDir);
-
-    S.push(...safeTraverseStack({
-        mode: 'seq', crossX: '#23', crossY: '#24', drop: '#18',
-        comment: `Step ${step++}: REPOSITION: Traverse past corner and set up for ${secondAx}`,
-        approach: travelApproach, promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, drop #18 to scan depth (mirrors auto) — no lift (already at #17)
-    }));
-
-    C(`Step ${step++}: ${secondAx} Probe`);
+    zPair(repoTraverse(repoLbl(true)), repoTraverse(repoLbl(false)));
+    zPair([mkC(secondLbl(true))], [mkC(secondLbl(false))]);
     probeWall(secondAx, secondDir);
 
     // ── Dual-gantry sync (optional) ──

@@ -56,3 +56,16 @@ test('FRONTIER GATE: the Corner (data) twin emits AUTO travel (G0 move on #23/#2
   expect(hasAutoMove, `the twin bakes travelApproach='auto' → its wall-to-wall traverse MUST be a hands-free G0 move on #23/#24. Missing it means the auto bake broke or the default was flipped. Emitted:\n${gcode}`).toBe(true);
   expect(hasManualPrompt, `the twin must NOT emit a manual #1505 jog prompt — that shape is ②/B4 structural-toggle work the static template cannot instantiate. If this is true, someone flipped travelApproach to 'manual' without wiring the block swap.`).toBe(false);
 });
+
+// (3) DON'T-RETIRE-THE-BUILT-IN gate (MOVED here when the probeZFirst frontier was retired — probeZFirst is now live via
+//     guard/prune, but travelApproach/wcs/syncA stay baked, so the twin is STILL a limited port). Retiring the built-in
+//     Corner now would drop those still-baked capabilities operators rely on. This assertion makes that RED, on purpose.
+test('FRONTIER GATE: the built-in Corner wizard stays registered while ANY structural frontier (travelApproach/wcs/syncA) is baked', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const builtinCorner = await page.evaluate(async () => {
+    const { listEntries } = await import('/blocks/wizardLibrary.js');
+    return listEntries().some((e) => e.id === 'corner' && e.type === 'corner' && e.kind === 'builtin');
+  });
+  expect(builtinCorner, 'built-in Corner (wizardLibrary id:corner) MUST stay registered until the twin reaches FULL parity — travelApproach/wcs/syncA are still baked, so retiring it would drop those. Do NOT retire it until 4b/4c/4d land (this test guards it).').toBe(true);
+});

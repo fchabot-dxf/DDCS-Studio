@@ -22,7 +22,7 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
     const { cornerDataDef, CORNER_DEFAULTS, CORNER_DATA_OPTYPE, CORNER_BINDINGS, CORNER_BINDING_SPECS, cornerDataStack } = await import('/blocks/dataOps/cornerData.js');
     const { emitEquivalence, stripAnnotations } = await import('/blocks/dataOps/equivalence.js');
     const { deriveBindingsFor } = await import('/blocks/dataOps/deriveBindings.js');
-    const { registerUserOp, flattenBlocks } = await import('/blocks/userOps.js');
+    const { registerUserOp } = await import('/blocks/userOps.js');
     const { builderOf, BUILDERS } = await import('/blocks/opBuilders.js');
     const { SCHEMA } = await import('/blocks/opSchema.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
@@ -57,8 +57,13 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
     // FUNCTIONAL byte-identity (corner header comments interpolate params → normalize with stripAnnotations).
     const main = emitEquivalence(cornerStack, dataBuilder, sweep, {}, stripAnnotations);
 
-    // FRONTIERS — MUST diverge (the twin bakes these; the built-in keeps them working):
-    const probeZFirstDiv = emitEquivalence(cornerStack, dataBuilder, [S({ probeZFirst: 1 })], {}, stripAnnotations);   // structural: inserts a Z step (still baked → diverges)
+    // ② B4 step 4a — probeZFirst is now LIVE (superset guard/prune). It CONVERGES with cornerStack byte-for-byte in BOTH
+    // states — FULL byte (no stripAnnotations), because the KIND-B comment variants (OVER/OUTSIDE, "+ Z Surface", Step
+    // numbers) prune to the same text. (The dedicated probeZFirst-live spec asserts the specific Z-surface lines appear/vanish.)
+    const probeZOffByte = emitEquivalence(cornerStack, dataBuilder, [S({})], {});                  // full-byte OFF
+    const probeZOnByte  = emitEquivalence(cornerStack, dataBuilder, [S({ probeZFirst: 1 })], {});  // full-byte ON
+
+    // FRONTIERS — STILL baked (the twin bakes these; the built-in keeps them working) → MUST diverge:
     const cornerDiv      = emitEquivalence(cornerStack, dataBuilder, [S({ corner: 2 })], {}, stripAnnotations);       // structural: FR direction signs (still baked → diverges)
     const travelDiv      = emitEquivalence(cornerStack, dataBuilder, [S({ travelApproach: 'manual' })], {}, stripAnnotations);   // structural: manual jog-prompt (still baked → diverges)
     // ② B4(c) — fan-out DISSOLVED: safeZ + scanDepth are now LIVE single-socket bindings (#17=[#19+#20] recomputes on the
@@ -66,28 +71,30 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
     const safeZConv      = emitEquivalence(cornerStack, dataBuilder, [S({ safeZ: 25 })], {}, stripAnnotations);
     const scanDepthConv  = emitEquivalence(cornerStack, dataBuilder, [S({ scanDepth: 8 })], {}, stripAnnotations);
 
-    // DERIVE-ROBUSTNESS — the defect #1 ROOT guard: build the template under probeZFirst=on (which inserts #21/#22) and
-    // confirm deriveBindings RE-FINDS the shifted #23/#24 (+2), while the pre-Z scalars are unmoved. A hand-count can't.
-    const bindOn = deriveBindingsFor(cornerDataStack({ ...base, probeZFirst: 1 }), CORNER_BINDING_SPECS);
+    // DERIVE-ROBUSTNESS — the defect #1 ROOT guard, now over the PRUNED shapes: prune the SUPERSET to probeZFirst on/off and
+    // confirm deriveBindings RE-FINDS the shifted #23/#24 (+2 when Z inserts #21/#22), while the pre-Z scalars are unmoved.
+    const { pruneGuards } = await import('/blocks/whenGuard.js');
+    const prune = (p) => { const c = JSON.parse(JSON.stringify(cornerDataStack(base))); pruneGuards(c, p); return c; };
+    const bindOn  = deriveBindingsFor(prune({ ...base, probeZFirst: 1 }), CORNER_BINDING_SPECS);
+    const bindOff = deriveBindingsFor(prune({ ...base, probeZFirst: 0 }), CORNER_BINDING_SPECS);
     const idx = (arr, p) => (arr.find((b) => b.param === p) || {}).blockIndex;
     const robustness = {
-      crossXShift: idx(bindOn, 'cross1_x') - idx(CORNER_BINDINGS, 'cross1_x'),
-      crossYShift: idx(bindOn, 'cross1_y') - idx(CORNER_BINDINGS, 'cross1_y'),
-      distStable:  idx(bindOn, 'dist') - idx(CORNER_BINDINGS, 'dist'),
+      crossXShift: idx(bindOn, 'cross1_x') - idx(bindOff, 'cross1_x'),
+      crossYShift: idx(bindOn, 'cross1_y') - idx(bindOff, 'cross1_y'),
+      distStable:  idx(bindOn, 'dist') - idx(bindOff, 'dist'),
       onCount: bindOn.length,
     };
 
-    // BINDING WIRING — every binding routes its param to the SAME assign var cornerStack writes (String-normalized because
-    // cornerStack stores assign values via String(val); instantiate writes the raw number → both emit identically).
+    // BINDING WIRING — every value spec routes its param to the SAME assign var cornerStack writes, asserted via the EMIT
+    // (bindingSpecs re-derives the flat index at build, so a blockIndex probe would be stale). Inject a sentinel, expect
+    // `#N=SENT` in BOTH the data-def emit and cornerStack's.
     const SENT = 4242;
+    const varRe = (v) => new RegExp('(^|\\n)' + String(v).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=' + SENT + '\\b');
     const wiringFails = [];
-    for (const b of CORNER_BINDINGS) {
-      const spec = CORNER_BINDING_SPECS.find((s) => s.param === b.param);
-      const dataSock = (flattenBlocks(dataBuilder(S({ [b.param]: SENT })))[b.blockIndex] || {}).params || {};
-      const refBlk = flattenBlocks(cornerStack(S({ [b.param]: SENT }))).find((blk) => blk && blk.type === 'assign' && blk.params && String(blk.params.var) === String(spec.match.var));
-      const dataOk = String(dataSock[b.key]) === String(SENT);
-      const refOk = !!refBlk && String(refBlk.params.value) === String(SENT);
-      if (!dataOk || !refOk) wiringFails.push({ param: b.param, blockIndex: b.blockIndex, var: spec.match.var, dataOk, refOk });
+    for (const spec of CORNER_BINDING_SPECS) {
+      const dataOk = varRe(spec.match.var).test(emitMapped(dataBuilder(S({ [spec.param]: SENT }))).text);
+      const refOk  = varRe(spec.match.var).test(emitMapped(cornerStack(S({ [spec.param]: SENT }))).text);
+      if (!dataOk || !refOk) wiringFails.push({ param: spec.param, var: spec.match.var, dataOk, refOk });
     }
 
     const sample = stripAnnotations(emitMapped(dataBuilder(S({}))).text);
@@ -98,7 +105,8 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
       bindingCount: CORNER_BINDINGS.length,
       wiringFails,
       main: { pass: main.pass, count: main.count, firstDiff: main.firstDiff && { params: main.firstDiff.params, a: main.firstDiff.a.slice(0, 700), b: main.firstDiff.b.slice(0, 700) } },
-      probeZFirstPass: probeZFirstDiv.pass,
+      probeZOffByte: { pass: probeZOffByte.pass, firstDiff: probeZOffByte.firstDiff && { a: probeZOffByte.firstDiff.a.slice(0, 700), b: probeZOffByte.firstDiff.b.slice(0, 700) } },
+      probeZOnByte: { pass: probeZOnByte.pass, firstDiff: probeZOnByte.firstDiff && { a: probeZOnByte.firstDiff.a.slice(0, 700), b: probeZOnByte.firstDiff.b.slice(0, 700) } },
       cornerPass: cornerDiv.pass,
       travelPass: travelDiv.pass,
       safeZConvPass: safeZConv.pass,
@@ -122,8 +130,11 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
   expect(r.robustness.crossYShift, 'deriveBindings re-finds #24 (cross1_y) shifted +2 under probeZFirst').toBe(2);
   expect(r.robustness.distStable, 'a pre-Z scalar (dist/#1) is unmoved — the derive is not a blanket offset').toBe(0);
   expect(r.robustness.onCount, 'all 11 bindings still resolve under the probeZFirst shape').toBe(11);
+  // ② B4 step 4a — probeZFirst is LIVE: FULL-byte parity with cornerStack in BOTH states (KIND-B comments included).
+  if (!r.probeZOnByte.pass) console.log('PROBEZ-ON DIFF\n--- cornerStack ---\n' + (r.probeZOnByte.firstDiff && r.probeZOnByte.firstDiff.a) + '\n--- data def ---\n' + (r.probeZOnByte.firstDiff && r.probeZOnByte.firstDiff.b));
+  expect(r.probeZOffByte.pass, 'probeZFirst OFF: the twin emit is byte-identical to cornerStack (default shape unchanged)').toBe(true);
+  expect(r.probeZOnByte.pass, 'probeZFirst ON: the twin reproduces cornerStack({probeZ:true}) BYTE-FOR-BYTE (Z-surface step + KIND-B text)').toBe(true);
   // FRONTIERS — STILL baked (structural), must diverge until B4 makes them live.
-  expect(r.probeZFirstPass, 'frontier: probeZFirst inserts a Z-surface step (structure swap the static template cannot do)').toBe(false);
   expect(r.cornerPass, 'frontier: the corner quadrant is structural (direction signs + comments) — baked in the twin').toBe(false);
   // ② B4(c): safeZ + scanDepth are NO LONGER frontiers — the #17=[#19+#20] fan-out fix made them live single-socket bindings.
   expect(r.safeZConvPass, 'safeZ is now a LIVE binding (→#19; #17=[#19+#20] recomputes) → CONVERGES with cornerStack').toBe(true);

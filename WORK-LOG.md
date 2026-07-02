@@ -4355,3 +4355,51 @@ pattern, each retiring/flipping its frontier row.
 **Passing back with step-3 landed + this re-scope, so you can dispatch 4a (probeZFirst-live) as the next focused increment
 to the human-eyes gate** — rather than a single rushed 4-fork superset. If you'd prefer I push straight through 4a-4d in
 fewer turns, say so; I flagged the coupling so the sequencing is your call.
+
+---
+
+## 🔨 turn 37 (cycle 11) — ② B4 M2 step 4a: probeZFirst LIVE (superset guard/prune + KIND-B variants + semantic relTo + bool binding + bindingSpecs). ⏸ HUMAN-EYES GATE.
+
+Advisor turn-36 RE-DISPATCH (the prev pass hit a split-brain HANDOFF.md in DDCS-Studio/ from a stray cwd — corrected; step 3
+reviewed clean). STEP-4 RE-SCOPE ACCEPTED → dispatch **4a probeZFirst-LIVE ONLY**, ⏸ pass back at the human-eyes gate (do NOT
+push to 4b/4c/4d). This is the first structural toggle made LIVE on the step-2 guard/prune capability.
+
+**The mechanism (one-source, each piece proven ONCE on corner):**
+- **cornerStack SUPERSET mode (`opts.superset`).** The built-in stays CONCRETE (1-arg call — byte-identical to today, untouched);
+  the twin SEEDs `cornerStack(params, {superset:true})`, which emits BOTH arms of the probeZFirst fork, each wrapped in a
+  `guard` block, via 5 tiny local helpers (`GUARD`/`mkC`/`mkA` + `zPair`(both arms)/`zOnly`(Z-only add)). `instantiate()`
+  (step 2) prunes the guarded superset to either concrete shape. The KIND-B interpolated text forks WITH the block-adds (a
+  block-only superset would emit the ON shape with the OFF text → ON-parity byte-fails): the header "+ Z Surface" suffix, the
+  `#1505` Hover OVER/OUTSIDE prompt, and the 3 Step-number labels (Z-first shifts every step +1) are each a guarded comment PAIR.
+  The wall1→wall2 reposition rides the pair whole (its moves are Z-identical — only the Step number in its comment differs).
+- **Semantic relTo (the drag-anchor's other half).** Tagged the CORNER_SIM_STARTS rows with stable `id`s (zsurf/wall1/wall2);
+  `cross1_x/_y` bind `relTo:{row:'wall1'}` instead of the fragile numeric `0`. NEW `resolveRelToIndex(opType, params, relTo)`
+  (opSimStarts.js) maps the semantic id → the row's position among the SURVIVING when-filtered rows (the SAME whenOk filter
+  opSimStarts + the engine `_pass` use), so the handle anchors to wall-1 in BOTH states (off: filtered-index 0; on: the zsurf
+  row shifts it to 1). A numeric relTo still passes straight through (back-compat). Wired at the panelTypes call site. The `id`
+  round-trips via `simStartsTo/FromBlocks` (params.id, ONLY when set → id-less rows stay byte-identical; survives stripIds) —
+  NOT through the Blockly field bridge (an internal anchor key, not operator-facing; Blockly re-authoring of the id = follow-on).
+- **bindingSpecs switch + the structural bool binding.** `cornerDataDef` now sets `def.bindingSpecs = CORNER_BINDING_SPECS`
+  (instantiate re-derives the 11 value sockets BY IDENTITY over the PRUNED stack — so #23/#24 land under the +2 shift) + adds a
+  `probeZFirst` BOOL binding to `def.bindings` (drives the form TOGGLE + the guard prune; NO value socket → no blockIndex/match).
+  `validateUserOp` now SKIPS the block-resolution check for a structural (blockIndex-less) binding — the M2 structural-binding
+  contract. `setUserSimStarts` gains a 3rd `rows` arg (the declared rows travel alongside the provider for resolveRelToIndex).
+- **Frontier retired in LOCKSTEP.** Deleted corner-data-probeZFirst-frontier.spec.js (the "probeZFirst is baked" tripwire is now
+  false). Its don't-retire-the-built-in GATE MOVED into corner-data-travelApproach-frontier.spec.js (part 3), re-anchored to the
+  frontiers STILL baked (travelApproach/wcs/syncA) — so the built-in stays guarded until 4b/4c/4d land.
+
+**VERIFY — ASSERT THE VALUE (not "a change happened"):** NEW corner-data-probeZFirst-live.spec asserts (1) OFF twin emit ==
+`cornerStack({probeZ:false})` AND ON twin emit == `cornerStack({probeZ:true})` **FULL BYTE-FOR-BYTE** (no stripAnnotations — the
+KIND-B comments must match too); (2) the real toggle symptom — ON adds "+ Z Surface" + Hover-OVER + the Z→wall1 REPOSITION +
+"Step 2: Y Probe", OFF keeps Hover-OUTSIDE + "Step 1"; (3) preview 2 markers off / 3 on, and the semantic relTo anchors to the
+SAME wall-1 point in BOTH states (idx 0 off, idx 1 on). corner-data-emit reworked: probeZFirst row FLIPPED div→**full-byte
+CONVERGE** (both states); derive-robustness re-proved over the PRUNED shapes (#23/#24 still +2 under Z); wiring re-proved via the
+EMIT (bindingSpecs makes a blockIndex probe stale). corner-data-drag (off anchor), probe-surface-block GOLDEN (concrete
+cornerStack byte-identical), sim-starts, guard-prune, sim-start round-trip all green. **Full suite: 460 passed, 0 failed, 3
+skipped (1.4m) — clean (no flakes on the confirming run).**
+
+**⏸ PASS BACK — HUMAN-EYES GATE.** probeZFirst is a real live toggle: open "Corner (data)", flip **Probe Z First** → the emit
+grows the Z-surface step + Z→wall1 reposition (3 aligned pass-markers), the prompt flips OVER↔OUTSIDE, and the reposition drag
+still writes the wall-relative DELTA (now anchored to wall-1 in either state). Human should eyeball: the Z step appears, the 3
+markers, and the drag tie. Then dispatch **4b travelApproach-live** (same guard/prune, its frontier retires next), 4c wcs (7-way),
+4d syncA. NOT pushing past the gate. (Note: this turn's pass avoids backticks in the --note per the turn-33 shell-substitution fix.)

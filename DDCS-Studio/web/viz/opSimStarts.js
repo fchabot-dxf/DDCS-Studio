@@ -104,11 +104,30 @@ const BUILT_IN = {
 // A provider is `(params, stock) => [{x,y,z}, …]`. The DECLARED-spec → provider wiring (read def.sim) is the follow-up;
 // for now userOps can register a provider directly. Mirrors opSimContext's USER_INTENT / setUserSimIntent.
 const USER_STARTS = new Map();
+// The DECLARED rows behind each provider (with stable `id`s + `when` gates) — kept so resolveRelToIndex can map a
+// binding's SEMANTIC relTo ({row:'wall1'}) to the pass's index among the SURVIVING when-filtered rows (② B4 step 4a).
+const USER_START_ROWS = new Map();
 
-/** Register (or clear with provider=null) a custom op's per-pass sim-start provider. Called by userOps on
- *  register/delete so a user_* op gets per-pass markers from its DECLARED intent, never inferred from its motion. */
-export function setUserSimStarts(opType, provider) {
-    if (typeof provider === 'function') USER_STARTS.set(opType, provider); else USER_STARTS.delete(opType);
+/** Register (or clear with provider=null) a custom op's per-pass sim-start provider + its declared rows. Called by
+ *  userOps on register/delete so a user_* op gets per-pass markers from its DECLARED intent, never inferred from motion. */
+export function setUserSimStarts(opType, provider, rows) {
+    if (typeof provider === 'function') { USER_STARTS.set(opType, provider); USER_START_ROWS.set(opType, Array.isArray(rows) ? rows : []); }
+    else { USER_STARTS.delete(opType); USER_START_ROWS.delete(opType); }
+}
+
+/** Resolve a binding's `relTo` to an index into the WHEN-FILTERED sim-starts for this op + params (② B4 step 4a — the
+ *  semantic anchor). A NUMBER passes through (back-compat: it already meant a filtered index). A SEMANTIC {row:'wall1'}
+ *  resolves to the row's position among the SURVIVING rows — the SAME whenOk filter opSimStarts + the engine `_pass`
+ *  use — so the drag handle anchors to the right pass in EITHER probeZFirst state (off: wall1=0; on: zsurf=0, wall1=1).
+ *  Returns null when the named row is absent in this state (the caller then leaves the anchor at the origin). */
+export function resolveRelToIndex(opType, params, relTo) {
+    if (relTo == null) return null;
+    if (typeof relTo === 'number') return relTo;
+    const rows = USER_START_ROWS.get(opType);
+    if (!rows || !relTo.row) return null;
+    let idx = -1;
+    for (const row of rows) if (whenOk(row.when, params || {})) { idx++; if (row.id === relTo.row) return idx; }
+    return null;
 }
 
 // ── makeProvider: a DECLARED `def.sim.starts` ROWS spec → a (params, stock) ⇒ [{x,y,z}…] provider (Option A, blessed) ────

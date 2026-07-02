@@ -7,7 +7,7 @@
  */
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
-import { opSimStarts } from '../../viz/opSimStarts.js';   // a `relTo` point anchors to the op's declared sim-start (incremental socket)
+import { opSimStarts, resolveRelToIndex } from '../../viz/opSimStarts.js';   // a `relTo` point anchors to the op's declared sim-start (incremental socket); resolveRelToIndex maps a SEMANTIC {row} → the surviving pass
 
 export const PANEL_TYPES = {
     form:        { id: 'form',        label: 'Form only',      viz: false, mode: null },   // single column, no preview
@@ -118,7 +118,10 @@ export function layoutSpecFromOp(def, params) {
             // the absolute world coord. Absent relTo → an absolute point (unchanged).
             let ax = 0, ay = 0;
             if (byRole.x.relTo != null && typeof opSimStarts === 'function') {
-                const a = (opSimStarts(def.opType, params, s) || [])[byRole.x.relTo];
+                // SEMANTIC relTo ({row:'wall1'}) → the pass index among the SURVIVING when-filtered starts (correct in
+                // BOTH probeZ states); a numeric relTo passes straight through. null = the named pass isn't present here.
+                const ri = resolveRelToIndex(def.opType, params, byRole.x.relTo);
+                const a = (ri != null) ? (opSimStarts(def.opType, params, s) || [])[ri] : null;
                 if (a) { ax = num(a.x, 0); ay = num(a.y, 0); }
             }
             const x = ax + p('x'), y = ay + p('y');

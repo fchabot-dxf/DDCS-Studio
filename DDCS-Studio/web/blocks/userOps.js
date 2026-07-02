@@ -179,6 +179,7 @@ export function simStartsFromStack(children) {
         else if (a === 'frac') { row.fx = Number(p.fx) || 0; row.fy = Number(p.fy) || 0; }
         else if (a === 'radial') { row.axis = p.axis || 'Y'; row.sign = p.sign === '-' ? '-' : '+'; row.r = numOrTok(p.rad); }
         if (p.whenparam) row.when = { param: p.whenparam, is: p.whenis === 'true' ? true : p.whenis === 'false' ? false : p.whenis };
+        if (p.id) row.id = p.id;   // stable pass id (② B4 step 4a) — the anchor a semantic relTo names; only present when declared
         return row;
     });
 }
@@ -200,6 +201,7 @@ export function simStartsToBlocks(rows) {
             zplane: row.plane || 'probe',
             whenparam: row.when ? row.when.param : '',
             whenis: row.when ? String(row.when.is) : '',
+            ...(row.id ? { id: row.id } : {}),   // carry a declared pass id ONLY when set → id-less rows round-trip byte-identical
         } };
     });
 }
@@ -306,6 +308,10 @@ export function validateUserOp(def) {
         seen.add(b.param);
         if (!b.type) errs.push(`param "${b.param}": missing type — declare one of ${[...BINDING_TYPES].join(' / ')} (type is declared, never assumed — audit #6)`);
         else if (!BINDING_TYPES.has(b.type)) errs.push(`param "${b.param}": unsupported type "${b.type}" (use ${[...BINDING_TYPES].join(' / ')})`);
+        // ② B4 step 4a — a STRUCTURAL binding (no blockIndex) drives GUARDS via the prune params (e.g. corner's probeZFirst),
+        // not a value SOCKET, so there is no template block to resolve. It's substituted by pruneGuards, never by instantiate's
+        // socket loop (which the bindingSpecs path skips anyway). Only value-socket bindings get the block-resolution check.
+        if (b.blockIndex == null) continue;
         const blk = flat[b.blockIndex];
         if (!blk || !blk.params || !(b.key in blk.params)) errs.push(`param "${b.param}": binding (block ${b.blockIndex}.${b.key}) does not resolve in the template`);
     }
@@ -331,9 +337,10 @@ export function registerUserOp(def) {
     def.layout = resolveLayoutMeta(def);
     const sim = resolveSimMeta(def);
     setUserSimIntent(def.opType, sim.intent);   // DECLARED preview intent only (never inferred from motion)
-    // DECLARED per-pass sim-starts (template `simstart` rows first, legacy def.sim.starts fallback).
+    // DECLARED per-pass sim-starts (template `simstart` rows first, legacy def.sim.starts fallback). The rows travel
+    // ALONGSIDE the provider so resolveRelToIndex can map a binding's semantic relTo ({row:'wall1'}) → the surviving pass.
     const starts = sim.starts;
-    setUserSimStarts(def.opType, (Array.isArray(starts) && starts.length) ? makeProvider(starts) : null);
+    setUserSimStarts(def.opType, (Array.isArray(starts) && starts.length) ? makeProvider(starts) : null, starts);
     return def;
 }
 
