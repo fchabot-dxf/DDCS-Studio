@@ -4943,3 +4943,68 @@ specs + byte-parity green (the validateUserOp change only ADDS a rejection for a
 **⏸ PASS BACK (advisor verifies).** Both fan-out findings closed (test/guard-only, no prod change). After this: truly ONLY
 ④ VERIFY + RELEASE remains — corner is otherwise COMPLETE (all operator structural params live, each byte-exact + hardened;
 level baked-final).
+
+---
+
+## 🔨 turn 63 (cycle 11) — ④ VERIFY + PLAN (gated move 1 of 2 — NO irreversible action). ⏸ PASS BACK for FINAL campaign review.
+
+Corner structural port COMPLETE (advisor confirmed). ④ gated as verify+plan (this turn) → retire+release (next, after sign-off).
+
+### (1) VERIFICATION — full suite + LIVE-APP SMOKE
+- **Full suite: 467 passed, 0 failed, 2 skipped** (the 1 middle-animator flake retried GREEN this run).
+- **Live-app smoke (a throwaway Playwright driver against the real localhost:3211 app; deleted after reading):** opened Corner
+  (data), exercised EVERY toggle via the real form + both drag surfaces:
+  - corner→FR · probeSeq→XY · wcs→G55 · travelApproach→manual · probeZFirst→on · syncA→on — **each UPDATES the code preview**
+    (changed: all true). probeZFirst→on put `+ Z Surface` in the code; syncA→on put `Dual Gantry Sync` in the code.
+  - **EMITTING handles (FeatureCanvas):** 2 present under probeZFirst (start + reposition) — the 2-off/3-on model.
+  - **SIM-ONLY first-start (createPreviewPanel userStarts):** wired; getPassStarts()[0] moved from the zsurf marker (7,7,5) to
+    the dragged (31,42,-2) — the sim-only override works, never emits.
+  - **NO JS/page errors** (pageerror handler caught nothing). The ONLY console line is a benign `/api/descriptor` 404 that fires
+    on ANY bare page load (the optional gateway isn't running in the dev server) — unrelated to the corner op. Verified on a bare
+    load. CLEAN.
+
+### (2) FRONTIER AUDIT — every frontier resolved except `level`
+Only `corner-data-baked-frontier.spec.js` remains as a *-frontier spec (all per-toggle frontier specs retired in lockstep). The
+ONLY divergence tripwire left is `level` (its `level stays baked-final` test). All other `.toBe(false)` in the corner specs are
+SHAPE assertions (e.g. "OFF has no + Z Surface"), not baked-frontier rows. No forgotten divergence row. (Minor: corner-data-emit's
+FILE-HEADER doc comment still lists the inc-B1 frontiers incl probeZFirst — stale prose, harmless; left untouched, out of scope.)
+
+### (3) `level` DOCUMENTED (cornerData.js frontier comment) — the t40-era decision carried forward, NOT relitigated
+Updated the header: `level` = the G31 probe LEVEL, a literal into the probe atom (no dedicated macro var), NON-OPERATOR-FACING (a
+machine/probe-config constant, not a per-op operator choice — human t40-era call) → INTENTIONALLY not a binding, baked level=0,
+the FINAL state (not a "live later" follow-on). Documented tripwire = corner-data-baked-frontier `level stays baked-final`.
+
+### (4) BUILT-IN-RETIREMENT PLAN (SURFACED — do NOT execute yet; ④ move 2)
+**PRECEDENT found — the Circular wizard retirement** (commit bb7fd28, 2026-06-23): removed the view import + WIZARD_VIEWS entry,
+removed the bar button, removed from PROBE_WIZARDS, deleted the view file, KEPT a backward-compat builder shim (circularStack →
+middleStack) so saved ops still render. Same pattern applies to Corner.
+
+**SHARED — MUST STAY** (the twin + saved ops depend on them): `cornerStack()` (the superset SEED + the byte-parity reference) ·
+`BUILDERS.corner` (opBuilders.js) · `SCHEMA.corner` + `FIELD_BIND.corner` (opSchema.js). Do NOT touch these.
+
+**BUILT-IN-ONLY — the retirement diff** (remove the operator-facing entry, keep cornerStack):
+1. `wizardLibrary.js:42` — remove the `{ id:'corner', type:'corner', label:'Corner', icon:'📐', group:'probe' }` BUILTINS entry
+   (OR `setEntryOverride('corner', {visible:false})` for a REVERSIBLE hide — see the fork below).
+2. `wizards/views/index.js` — remove the `cornerView` import + its WIZARD_VIEWS entry (add a "retired — replaced by
+   user_corner_data" comment, like Circular).
+3. `ui/commandDeck.js:54` — remove `corner:'openCornerWiz'` from WIZ_SPECIAL_OPENER.
+4. `ui/wizardPrereq.js:18` — remove `'corner'` from PROBE_WIZARDS.
+5. `index.html` — delete the `#wiz_corner` panel (+ any `cornerViz` svg); `ui/globalFunctions.js` — remove `openCornerWiz`;
+   `wizardManager.js` openCorner/updateCornerWizard/_startCornerAnim become dead (remove or leave).
+6. Optionally delete `wizards/views/cornerView.js` (the built-in form/SVG view).
+
+**TESTS to update at retirement:** DELETE the built-in gate `corner-data-baked-frontier.spec.js` built-in test (it exists to
+BLOCK this until now); `wizard-bar.spec.js` (asserts openCornerWiz wired → assert 'corner' is NOT in the bar); any
+`openWiz('corner')` / built-in-corner tests → switch to `user_corner_data` (e.g. probe-field-sticky).
+
+**⚠ FORK for the FINAL call (the ONLY open decision):** **(A) HIDE** (`setEntryOverride visible:false`) — reversible, the built-in
+still opens for editing legacy 'corner' ops, lowest risk; vs **(B) fully REMOVE** the entry + view (the Circular pattern) —
+cleaner, but legacy saved 'corner' ops can no longer be EDITED in a UI (they still RENDER via BUILDERS.corner=cornerStack). RECO:
+given corner is the GATED PILOT + the twin is proven byte-exact, either is safe; I lean (B) full-remove for a clean release (the
+Circular precedent + `cornerStack` stays as the shim, so saved ops render), but (A) hide-first is the conservative path if you
+want a reversible release-1 with removal in a follow-up. **Then the release: version bump (`npm run bump-version`) + push.**
+
+### ⏸ PASS BACK — verification GREEN + the retirement plan, for your FINAL full-campaign review before the irreversible step.
+Only ONE decision to bless: retirement mechanism **(A) hide vs (B) full-remove** (I lean B; the Circular precedent + cornerStack
+shim make it safe) + confirm the release (version bump + push) is yours to trigger or mine on your word. NOT executing anything
+irreversible this turn — committed only the `level` doc + this log.

@@ -25,15 +25,17 @@
  * swap is derived + the reorder is of differently-shaped blocks). The bound reposition sockets duplicate 8× in the superset →
  * CORNER_BINDINGS derives over a CANONICAL-pruned stack. ALL operator-facing structural params are now LIVE.
  *
- * FRONTIERS STILL held BAKED (asserted as divergence tripwires, like drill's `method` / slot's `pattern`+`clearance`):
- *   • `level` = a literal-in-G31 multi-socket value (no macro var, non-operator-facing) — a DELIBERATE baked-FINAL (it does
- *     NOT get a live toggle; the ④ release carries that forward).
- *   • `safeZ` + `scanDepth` — WERE a fan-out (safeZ fed #19 AND the COMPUTED literal `#17 = safeZ + scanDepth`, so one
- *     binding couldn't drive both). ② B4(c) DISSOLVED it: cornerStack now DECLARES `#17 = [#19 + #20]` (safeZ→#19,
- *     scanDepth→#20; the controller sums it at runtime, like `#18=[0-#17]`), so safeZ + scanDepth are now CLEAN single-socket
- *     bindings — no longer baked. (`level` stays baked: a literal-in-G31 multi-socket fan-out, no macro var, non-operator-facing.)
- * The built-in Corner keeps ALL of these working; see corner-data-baked-frontier.spec.js (the loud can't-forget gate that blocks
- * retiring the built-in while corner/probeSeq/level remain baked — the ④ release owns the retirement decision).
+ * THE ONLY REMAINING BAKED FRONTIER — `level` (DELIBERATE, FINAL; ④-verify decision, carried forward — do NOT relitigate):
+ *   • `level` = the G31 probe LEVEL, a literal passed straight into the probe atom (no dedicated macro var; a multi-socket
+ *     literal). It is NON-OPERATOR-FACING (a machine/probe-config constant, not a per-op operator choice — human t40-era call),
+ *     so it does NOT get a live toggle: baked at level=0 by design, INTENTIONALLY not a binding. This is the FINAL state (not a
+ *     "live later" follow-on like the toggles were) — carried forward into ④ verify+release unchanged. Documented tripwire:
+ *     corner-data-baked-frontier.spec `level stays baked-final` (the twin diverges when level changes — the deliberate bake).
+ *   • `safeZ` + `scanDepth` — WERE a fan-out (safeZ fed #19 AND the COMPUTED literal `#17 = safeZ + scanDepth`, so one binding
+ *     couldn't drive both). ② B4(c) DISSOLVED it: cornerStack DECLARES `#17 = [#19 + #20]` (safeZ→#19, scanDepth→#20; the
+ *     controller sums it at runtime, like `#18=[0-#17]`), so safeZ + scanDepth are now CLEAN single-socket bindings — live.
+ * The built-in Corner stays REGISTERED until the ④ release retires it (end-to-end verify + version bump); see corner-data-baked-
+ * frontier.spec's built-in gate. All operator-facing structural params are LIVE on the twin; only `level` (deliberate) remains.
  *
  * Template SEEDED from cornerStack(CORNER_DEFAULTS); the BINDINGS are derived + proven byte-identical by
  * tests/corner-data-emit.spec.js. SCOPE (inc B1) = EMIT only — no view/panel (B3), no sim-starts/inferStarts (B2).
