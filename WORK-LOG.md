@@ -4278,3 +4278,38 @@ comment-freshness, step 6 sources=WIRE + round-trip. corner/probeSeq baked (D2);
 
 **Passing back at the step-1 checkpoint** (a clean value-identical foundation) so the advisor sees it before the core-engine
 guard/prune rewrite; continuing the rollout next.
+
+---
+
+## 🔨 turn 33 (cycle 11) — ② B4 M2 step 2/7: the GUARD/PRUNE capability (core instantiate rewrite, built ONCE). ⏸ PASS BACK.
+
+Advisor affirmed the cadence: ISOLATE step 2 (the core `instantiate` change used by EVERY user op) as its own increment
+with the full regression + fresh eyes, then batch steps 3+4. This turn = the GENERIC capability only — NO corner changes.
+
+**Built (corner-agnostic, one-source):**
+- **`blocks/whenGuard.js` (NEW):** `whenOk(when, params)` (MOVED here from viz/opSimStarts — the ONE guard evaluator now
+  shared by emit + sim; viz→blocks is the natural direction, no blocks→viz edge) + `pruneGuards(blocks, params)` — a
+  clone-walk that DROPS a `guard` subtree whose `when` is false and UNWRAPS a survivor (splices children in place),
+  recursing children + uiChildren, handling NESTED guards. After prune NO guard remains → the tree is the concrete shape.
+- **`viz/opSimStarts.js`:** imports `whenOk` from whenGuard (removed the local copy) — emit + sim read the identical predicate.
+- **`wizards/ops/guard.js` (NEW) + index.js:** the `guard` block (transparent container, kind:'guard', Control category);
+  registered in PALETTE + the newBlock children-kind list. blockEmitter transparent-emits a guard alongside param_group
+  (a SAFETY NET — prune normally removes every guard pre-emit; a stray survivor emits its children, never `( unknown )`).
+- **`blocks/userOps.js` — the CORE `instantiate` rewrite:** `clone → pruneGuards(clone, params) → flatten → (def.bindingSpecs
+  ? deriveBindings(flat, specs) : def.bindings) → substitute`. A def may now carry `bindingSpecs` (identity matchers)
+  INSTEAD of frozen `bindings` — because a guarded superset shifts flat indices per prune state, so indices are RE-DERIVED
+  BY IDENTITY over the PRUNED stack every build. **Back-compat is exact:** a legacy def (no guards, no bindingSpecs) →
+  pruneGuards is a no-op → frozen `bindings` used as before → byte-identical for drill/slot/text/corner-current/every op.
+  (userOps↔deriveBindings is a runtime-safe ESM cycle: flattenBlocks is a hoisted `export function`, only called at runtime.)
+
+**VERIFY.** `node --check` clean (7 files). NEW `guard-prune.spec` proves: whenOk (bool coerce / enum strict); pruneGuards
+drop/unwrap/NESTED leaving zero guards; and instantiate RE-DERIVE-BY-IDENTITY — a synthetic guarded def whose guard inserts
+#Z1/#Z2 before #TARGET (a +2 flat shift when zOn) still writes `#TARGET=42` in BOTH states (the load-bearing hazard, proven).
+Regression: corner-data-emit / corner-data-drag / user-ops / sim-starts-data all green. **Full suite: 458 passed, 0 failed
+(1.4m)** — the core-engine change is transparent (no op has guards or bindingSpecs yet, so every existing op is unchanged).
+
+**⏸ PASS BACK (step-2 gate — a core-engine change earns fresh eyes + the full regression).** The capability is live +
+proven, NO behaviour change to any op. Next (on your pass-back), batch steps 3+4: step 3 anchor (Z→wall1 REPOSITION
+delimiter + semantic relTo), step 4 seed corner's superset (guard probeZFirst/travelApproach/wcs/syncA + enum/bool bindings
++ switch corner to `bindingSpecs`) → the toggles go LIVE + retire the 2 frontier tripwires in lockstep → ⏸ TOGGLES-LIVE
+human-eyes gate.

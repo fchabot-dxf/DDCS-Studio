@@ -19,6 +19,8 @@ import { registerUserBuilder, unregisterUserBuilder, registerOpLabel, removeOpLa
 import { registerUserSpec, unregisterUserSpec } from './opSchema.js';
 import { setUserSimIntent } from '../viz/opSimContext.js';
 import { setUserSimStarts, makeProvider } from '../viz/opSimStarts.js';
+import { pruneGuards } from './whenGuard.js';   // ② B4 M2: collapse guarded structural forks at build (the template carries every arm)
+import { deriveBindings } from './dataOps/deriveBindings.js';   // re-derive binding indices BY IDENTITY after prune (guarded templates shift per state)
 
 const STORE_KEY = 'ddcs_user_ops';
 export const USER_OP_PREFIX = 'user_';
@@ -264,11 +266,20 @@ export function defaultParams(def) {
     return p;
 }
 
-// The builder: clone the template, substitute each binding's value at its (blockIndex, key); unbound values stay baked.
+// The builder: clone the template, COLLAPSE guarded structural forks for this param state (pruneGuards), then substitute
+// each binding's value at its (blockIndex, key); unbound values stay baked.
+//
+// ② B4 M2: a def may carry `bindingSpecs` (identity matchers) INSTEAD of frozen `bindings` — because a guarded template
+// (the all-forks-present superset) shifts flat indices per prune state, so the indices MUST be RE-DERIVED BY IDENTITY over
+// the PRUNED stack every build. A legacy def (no guards, frozen `bindings`) is UNCHANGED: pruneGuards is a no-op with no
+// guard blocks, and without bindingSpecs the frozen `bindings` are used exactly as before → byte-identical for every
+// existing user op (drill/slot/text/…), verified by their emit specs + the guard-prune regression.
 function instantiate(def, params) {
     const clone = JSON.parse(JSON.stringify(def.template || []));
+    pruneGuards(clone, params);
     const flat = flattenBlocks(clone);
-    for (const b of (def.bindings || [])) {
+    const bindings = def.bindingSpecs ? deriveBindings(flat, def.bindingSpecs) : (def.bindings || []);
+    for (const b of bindings) {
         const blk = flat[b.blockIndex];
         if (blk && blk.params && (b.key in blk.params)) {
             blk.params[b.key] = (params && b.param in params) ? params[b.param] : b.default;

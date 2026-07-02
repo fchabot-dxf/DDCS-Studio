@@ -65,6 +65,7 @@ import { pauseBlock, messageBlock, askNumberBlock, confirmBlock } from './hmi.js
 import { cornerConfigBlock } from './corner_config.js';
 import { pathModeBlock, drillCycleBlock, cancelCycleBlock, outPinBlock, waitInputBlock } from './cnc.js';
 import { stopBlock, planeBlock, feedModeBlock, homeBlock, callBlock, returnBlock } from './more.js';
+import { guardBlock } from './guard.js';   // ② B4 M2: transparent when-guard container (pruneGuards collapses forks at build)
 import { evalExpr } from './expr.js';
 
 /** Palette: granular atoms + feature presets + modifiers + control/data/signals/authoring. Grouped by the block's
@@ -78,7 +79,7 @@ export const PALETTE = [
     wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, toolOffsetBlock,   // Coordinates (WCS + dist-mode + G17-19 plane + work-offset/tool-table write)
     progStartBlock, progEndBlock, endProgramBlock,             // Program (framing + end)
     probeReadBlock, readMachineBlock, radiuscompBlock,         // Probing (probe/DRO capture + stylus-radius comp)
-    countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock, cornerConfigBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input + corner-macro config)
+    countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock, cornerConfigBlock, guardBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input + corner-macro config + when-guard fork container)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     mcodeBlock, rawBlock, outPinBlock, waitInputBlock,         // Signals (raw M-code/G-code escape + digital I/O M62-66)

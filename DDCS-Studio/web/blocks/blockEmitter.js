@@ -32,7 +32,7 @@ export function newBlock(type) {
     const def = BLOCKS[type];
     if (!def) throw new Error(`unknown block type: ${type}`);
     const b = { id: `${type}${++_seq}`, type, params: { ...def.defaults } };
-    if (['container', 'path', 'loop', 'cond', 'depth', 'fill', 'place', 'rotate'].includes(def.kind)) b.children = [];
+    if (['container', 'path', 'loop', 'cond', 'depth', 'fill', 'place', 'rotate', 'guard'].includes(def.kind)) b.children = [];
     return b;
 }
 
@@ -114,7 +114,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
         return out;
     }
-    if (block.type === 'param_group') {
+    if (block.type === 'param_group' || block.type === 'guard') {   // guard is normally pruned pre-emit; transparent-emit is a safety net
         const out = [];
         (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
         return out;

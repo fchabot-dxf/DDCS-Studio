@@ -20,6 +20,7 @@
 
 import { num } from '../wizards/ops/util.js';
 import { barRadius } from '../engine/probeGeometry.js';   // SPATIAL-MODEL inc2: the declared bar radius (stock.diameter ?? min(cross)/2)
+import { whenOk } from '../blocks/whenGuard.js';   // the ONE guard evaluator (shared with the emit-side prune) — declare-never-infer
 
 const n = (v, d) => num(v, d);
 
@@ -162,11 +163,7 @@ const rowToStart = (row, ctx) => {
     }
 };
 
-const whenOk = (when, params) => {
-    if (!when) return true;
-    const v = (params || {})[when.param];
-    return typeof when.is === 'boolean' ? !!v === when.is : v === when.is;
-};
+// whenOk moved to blocks/whenGuard.js — the ONE guard evaluator shared by the sim (here) + the emit (instantiate prune).
 
 /** A DECLARED `def.sim.starts` rows spec → a per-pass provider (params, stock) ⇒ [{x,y,z}…]. Register via setUserSimStarts. */
 export function makeProvider(rows) {
