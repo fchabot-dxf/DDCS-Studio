@@ -95,6 +95,7 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
     const varRe = (v) => new RegExp('(^|\\n)' + String(v).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=' + SENT + '\\b');
     const wiringFails = [];
     for (const spec of CORNER_BINDING_SPECS) {
+      if (spec.when) continue;   // ③ — a `when`-gated socket (start #21/#22) emits only under probeZFirst; S({}) is off → wired in corner-data-start-live
       const dataOk = varRe(spec.match.var).test(emitMapped(dataBuilder(S({ [spec.param]: SENT }))).text);
       const refOk  = varRe(spec.match.var).test(emitMapped(cornerStack(S({ [spec.param]: SENT }))).text);
       if (!dataOk || !refOk) wiringFails.push({ param: spec.param, var: spec.match.var, dataOk, refOk });
@@ -123,7 +124,7 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
   expect(r.resolves, 'corner-data-emit resolves via builderOf').toBe(true);
   expect(r.independentPath, 'data builder is NOT cornerStack (independent code path)').toBe(true);
   expect(r.pristine, 'lives in the user layer; built-in BUILDERS/SCHEMA untouched').toBe(true);
-  expect(r.bindingCount, 'the 11 bound scalars: 6 clean + travelDist(#15) + safeZ(#19) + scanDepth(#20) + cross1_x/cross1_y (safeZ/scanDepth un-baked by the #17 fan-out fix)').toBe(11);
+  expect(r.bindingCount, 'the 13 bound scalars: 11 (6 clean + travelDist#15 + safeZ#19 + scanDepth#20 + cross1_x/_y#23/#24) + ③ startX/startY (#21/#22, the Z-first start handle, present in the superset)').toBe(13);
   expect(r.wiringFails, 'every DERIVED binding routes to the same assign var cornerStack writes (defect #1 guard)').toEqual([]);
   if (!r.main.pass) console.log('FIRST DIFF @', JSON.stringify(r.main.firstDiff && r.main.firstDiff.params) + '\n--- cornerStack ---\n' + (r.main.firstDiff && r.main.firstDiff.a) + '\n--- data def ---\n' + (r.main.firstDiff && r.main.firstDiff.b));
   expect(r.main.count, 'the sweep is substantial').toBeGreaterThan(12);
@@ -132,7 +133,7 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
   expect(r.robustness.crossXShift, 'deriveBindings re-finds #23 (cross1_x) shifted +2 under probeZFirst').toBe(2);
   expect(r.robustness.crossYShift, 'deriveBindings re-finds #24 (cross1_y) shifted +2 under probeZFirst').toBe(2);
   expect(r.robustness.distStable, 'a pre-Z scalar (dist/#1) is unmoved — the derive is not a blanket offset').toBe(0);
-  expect(r.robustness.onCount, 'all 11 bindings still resolve under the probeZFirst shape').toBe(11);
+  expect(r.robustness.onCount, 'all 13 bindings resolve under probeZFirst=on (the 11 + startX/startY, present when Z-first)').toBe(13);
   // ② B4 step 4a — probeZFirst is LIVE: FULL-byte parity with cornerStack in BOTH states (KIND-B comments included).
   if (!r.probeZOnByte.pass) console.log('PROBEZ-ON DIFF\n--- cornerStack ---\n' + (r.probeZOnByte.firstDiff && r.probeZOnByte.firstDiff.a) + '\n--- data def ---\n' + (r.probeZOnByte.firstDiff && r.probeZOnByte.firstDiff.b));
   expect(r.probeZOffByte.pass, 'probeZFirst OFF: the twin emit is byte-identical to cornerStack (default shape unchanged)').toBe(true);

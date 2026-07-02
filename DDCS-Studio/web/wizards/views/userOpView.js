@@ -16,6 +16,7 @@ import { emitMapped } from '../../blocks/blockEmitter.js';
 import { flattenBlocks } from '../../blocks/userOps.js';   // group: index the stored children for the live preview
 import { panelType, renderLayout2D } from '../ops/panelTypes.js';
 import { opSimStarts } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers feed the 3D preview
+import { whenOk } from '../../blocks/whenGuard.js';   // ③ — gate `when`-conditioned form rows (e.g. corner's start #21/#22) from the live params
 
 // Apply the form values to a COPY of a group's stored children (via the bindings' blockIndex/key) → the records emit
 // walks for the live code preview. A group has no builder; its children ARE the program. The real writeback to the
@@ -86,6 +87,13 @@ export const userOpView = {
         if (!isGroup && !builderOf(_def.opType)) return;
         const params = {};
         for (const read of _readers) { try { Object.assign(params, read()); } catch (_) { /* skip a broken widget */ } }
+        // ③ — gate `when`-conditioned form rows from the LIVE params (corner's start #21/#22 → visible only under probeZFirst),
+        // so the fields follow the toggle dynamically (the row still reads; it's hidden when off, and its canvas handle absents).
+        const fhost = el('wiz_user_form');
+        if (fhost) fhost.querySelectorAll('[data-when-param]').forEach((row) => {
+            const is = row.dataset.whenIs === 'true' ? true : row.dataset.whenIs === 'false' ? false : row.dataset.whenIs;
+            row.style.display = whenOk({ param: row.dataset.whenParam, is }, params) ? '' : 'none';
+        });
         let gcode = '';
         if (isGroup) {
             // group: no builder — emit the stored children with the form values applied (a pure view, no recordOp).

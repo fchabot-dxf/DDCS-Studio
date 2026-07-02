@@ -8,6 +8,7 @@
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { opSimStarts, resolveRelToIndex } from '../../viz/opSimStarts.js';   // a `relTo` point anchors to the op's declared sim-start (incremental socket); resolveRelToIndex maps a SEMANTIC {row} → the surviving pass
+import { whenOk } from '../../blocks/whenGuard.js';   // a `when`-gated binding-group's handle shows only when its guard passes (③ — the prune-gated start handle)
 
 export const PANEL_TYPES = {
     form:        { id: 'form',        label: 'Form only',      viz: false, mode: null },   // single column, no preview
@@ -58,6 +59,10 @@ export function layoutSpecFromOp(def, params) {
     for (const b of (def.bindings || [])) { if (b.group) (groups[b.group] = groups[b.group] || []).push(b); }
     const items = [], decls = [];
     for (const gid in groups) {
+        // ③ — a `when`-gated group (e.g. corner's `start` #21/#22, gated on probeZFirst) renders its handle ONLY when the
+        // guard passes: its socket is pruned away in the other state, so a handle there would be dead / write a stale param.
+        const gWhen = groups[gid].find((b) => b.when);
+        if (gWhen && !whenOk(gWhen.when, params)) continue;
         const byRole = {};
         for (const b of groups[gid]) byRole[b.role] = b;
         const p = (r) => byRole[r] ? num(params[byRole[r].param]) : undefined;

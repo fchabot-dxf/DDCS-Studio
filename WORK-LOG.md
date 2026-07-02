@@ -4735,3 +4735,47 @@ CHANGES-PREVIEW-but-EMIT-BYTE-IDENTICAL). Parts (1)/(2) collapse to "verify + sp
 
 NOT building this turn — the seam is the forked FOUNDATION the dispatch said to decide first; passing back for the A/B call, then
 I build part 3 + the specs (small under A).
+
+---
+
+## 🔨 turn 53 (cycle 11) — ③ BUILD (option A): the EMITTING Z-first start handle + the sim-only-drag-never-emits invariant. ⏸ PASS BACK.
+
+Advisor BLESSED option A (reuse the existing createPreviewPanel.userStarts seam; my read-by-opSimStarts worry was over-specified
+— the requirement, sim-only + drives preview + never emits, is satisfied compositionally via computePassStarts). Under A parts
+1/2 were ~already wired, so this turn = PART 3 (the emitting #21/#22 handle) + the two hardened specs.
+
+**Built:**
+- **`deriveBindings.js` — the `optional` flag (+ carry `when`).** A spec with `optional:true` and 0 matches → SKIP the binding
+  (the socket is pruned away in this param state); a non-optional spec still requires exactly 1. This is the mechanism that lets
+  a PRUNE-GATED socket (#21/#22, present only under probeZFirst) be a binding without crashing build({probeZFirst:0}). `when`
+  is carried through to the derived binding (for the UI gate).
+- **`cornerData.js` — startX/startY (#21/#22) specs.** group `start`, role x/y, `relTo:{row:'zsurf'}` (the incremental datum
+  for the Z→wall1 traverse), `optional:true` (emit-side prune tolerance), `when:{param:'probeZFirst',is:true}` (UI gate), NO
+  `default` → the socket's baked expression holds (perp axis '0', probe axis signed) → NON-DEGENERATE (kills the B3 0,0 for this
+  handle). CORNER_BINDINGS 11→13 (the superset has #21/#22 in the probeZFirst guard). The emitting #21-#24 stay on the
+  FeatureCanvas; the SIM-ONLY first-start stays on the createPreviewPanel markers (option A).
+- **`panelTypes.js` (layoutSpecFromOp) — the HANDLE-gate.** A `when`-gated binding-group renders its canvas handle ONLY when
+  whenOk(when, params) passes (its socket is pruned in the other state → a handle there would be dead/stale). → 1 emitting
+  handle off (reposition), 2 on (+ start).
+- **`formWidgets.js` + `userOpView.js` — the FORM-gate.** renderOpForm tags a `when`-gated row (data-when-*); userOpView.update()
+  toggles those rows' visibility from the LIVE params, so the start fields follow the probeZFirst toggle dynamically.
+
+**VERIFY — the two hardened specs (corner-data-start-live):**
+- **(4a) EMITTING:** reads startX/startY OWN wiring (group start, role x/y, relTo:{row:zsurf}, when:probeZFirst); pins the
+  INDEPENDENT-TRUTH non-degenerate defaults (#21=0 · #22=#16 · #23=#16 · #24=#15 — the 0,0 cure), a bound startX=5/startY=7 →
+  #21=5/#22=7 + byte-parity vs cornerStack, and the anchor resolves to the zsurf pass at its independent frac position (7,7).
+  Handle-gate: 1 emitting handle off / 2 on. MUTATION-CHECK: startX.relTo zsurf→wall1 → the anchor assert RED; reverted byte-exact.
+- **(4b) THE CRITICAL (Option-B / verify-real-symptom):** dragging the SIM-ONLY first-start via the userStarts seam
+  (panel.onStartDrag(pos,0)) MOVES the preview marker (getPassStarts()[0] tracks it) but leaves the EMIT (wiz_user_code)
+  BYTE-IDENTICAL — the sim-only override never touches params/emit. PROVEN.
+
+corner-data-emit reworked (bindingCount + robustness onCount 11→13; the wiring loop skips `when`-gated specs — they emit only
+under probeZFirst, tested in the start spec). probeZFirst/travelApproach/wcs/syncA live specs + the 5 sibling ports + drag +
+sim-starts + golden all green (deriveBindings/formWidgets are shared — no regression). **Full suite: 465 passed, 0 failed, 2
+skipped (1.4m) — clean.**
+
+**⏸ PASS BACK (advisor verifies + likely fan-out on the byte-identical-emit invariant).** ③ is complete: the emitting Z-first
+start handle (#21/#22, gated + datum-anchored to zsurf, non-degenerate default) + the sim-only first-start (reused userStarts,
+never emits) + the wall-2 reposition (4a). The B3 (0,0) handle is cured for both reposition handles (each datum-anchored).
+Handle model realized: 2 off (sim-only first-start + wall-2 reposition) / 3 on (+ wall-1 start). REMAINING for corner parity:
+corner/probeSeq value-bindings (sign/order, not prune) → ④ VERIFY + release (retire the built-in; level's baked-final).

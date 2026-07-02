@@ -46,9 +46,14 @@ function matches(blk, match) {
  * @throws  if a spec matches != 1 block, or the matched block lacks the socket key.
  */
 export function deriveBindings(flatStack, specs) {
-    return specs.map((s) => {
+    const out = [];
+    for (const s of specs) {
         const hits = [];
         for (let i = 0; i < flatStack.length; i++) if (matches(flatStack[i], s.match)) hits.push(i);
+        // ② B4 ③ — an OPTIONAL spec targets a PRUNE-GATED socket (present only in some param states, e.g. corner's #21/#22
+        // which exist only under probeZFirst): 0 matches → the socket is absent in THIS state → SKIP the binding (do not
+        // substitute a socket that isn't there). A non-optional spec still requires exactly 1 (a real authoring error else).
+        if (hits.length === 0 && s.optional) continue;
         if (hits.length !== 1) {
             const how = ('var' in s.match) ? `${s.match.type} ${s.match.var}` : (s.match.type || '?');
             throw new Error(`deriveBindings: spec "${s.param}" matched ${hits.length} blocks (${how}); need exactly 1`);
@@ -57,14 +62,16 @@ export function deriveBindings(flatStack, specs) {
         if (!(s.key in (flatStack[blockIndex].params || {})))
             throw new Error(`deriveBindings: spec "${s.param}" → block ${blockIndex} has no socket key "${s.key}"`);
         const dflt = (s.default !== undefined) ? s.default : (flatStack[blockIndex].params || {})[s.key];
-        const out = { param: s.param, type: s.type, default: dflt, key: s.key, blockIndex };
-        if (s.label) out.label = s.label;
-        if (s.section) out.section = s.section;
-        if (s.group) out.group = s.group;   // canvas-layout grouping (layoutSpecFromOp reads b.group)
-        if (s.role) out.role = s.role;      // canvas-layout role (x/y/w/h/… — the draggable handle it drives)
-        if (s.relTo != null) out.relTo = s.relTo;   // incremental socket: anchor the point to the op's Nth sim-start (drag writes a delta)
-        return out;
-    });
+        const b = { param: s.param, type: s.type, default: dflt, key: s.key, blockIndex };
+        if (s.label) b.label = s.label;
+        if (s.section) b.section = s.section;
+        if (s.group) b.group = s.group;   // canvas-layout grouping (layoutSpecFromOp reads b.group)
+        if (s.role) b.role = s.role;      // canvas-layout role (x/y/w/h/… — the draggable handle it drives)
+        if (s.relTo != null) b.relTo = s.relTo;   // incremental socket: anchor the point to the op's Nth sim-start (drag writes a delta)
+        if (s.when) b.when = s.when;   // gated binding — the form field + the canvas handle show it only when whenOk(when, params)
+        out.push(b);
+    }
+    return out;
 }
 
 /** Convenience: flatten the wrapped stack, then derive. */

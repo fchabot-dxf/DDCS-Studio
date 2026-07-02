@@ -76,6 +76,12 @@ export const CORNER_BINDING_SPECS = [
     // in BOTH probeZ states (off: wall1 is filtered-index 0; on: the zsurf row shifts it to 1). Declare-never-infer.
     { param: 'cross1_x',   type: 'number', group: 'reposition', role: 'x', relTo: { row: 'wall1' }, label: 'Wall 2 dX', section: 'GEOMETRY', match: { type: 'assign', var: '#23' }, key: 'value' },
     { param: 'cross1_y',   type: 'number', group: 'reposition', role: 'y', relTo: { row: 'wall1' }, label: 'Wall 2 dY', section: 'GEOMETRY', match: { type: 'assign', var: '#24' }, key: 'value' },
+    // ③ — the Z-first START handle (#21/#22, the zsurf→wall1 traverse): PRUNE-GATED on probeZFirst (only emitted when Z-first),
+    // so `optional` (deriveBindings skips it when the socket is pruned away, off) + `when` (the form field + the canvas handle
+    // show only under probeZFirst). relTo:{row:'zsurf'} anchors the drag to the Z-surface pass (the incremental datum); NO
+    // `default` → the socket's baked expression holds (perp axis = '0', probe axis = signed travel) → NON-DEGENERATE (kills B3 0,0).
+    { param: 'startX', type: 'number', group: 'start', role: 'x', relTo: { row: 'zsurf' }, optional: true, when: { param: 'probeZFirst', is: true }, label: 'Z→Wall1 dX', section: 'GEOMETRY', match: { type: 'assign', var: '#21' }, key: 'value' },
+    { param: 'startY', type: 'number', group: 'start', role: 'y', relTo: { row: 'zsurf' }, optional: true, when: { param: 'probeZFirst', is: true }, label: 'Z→Wall1 dY', section: 'GEOMETRY', match: { type: 'assign', var: '#22' }, key: 'value' },
 ];
 
 export const CORNER_DATA_OPTYPE = 'user_corner_data';

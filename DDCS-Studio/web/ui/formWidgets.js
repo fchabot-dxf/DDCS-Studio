@@ -358,6 +358,10 @@ export function renderOpForm(host, bindings) {
     }
     const addRow = (spec, label) => {
         const row = document.createElement('div');
+        // ③ — a `when`-gated binding tags its row so the view can show/hide it from the live params (e.g. corner's start
+        // #21/#22, visible only under probeZFirst). Purely a marker; the widget still renders + reads (dead when hidden).
+        const w = Array.isArray(spec) ? spec[0] : spec;
+        if (w && w.when && w.when.param) { row.dataset.whenParam = w.when.param; row.dataset.whenIs = String(w.when.is); }
         try { readers.push(renderFormWidget(row, spec).read); }
         catch (e) { console.warn('widget render failed for', label, e); }
         host.appendChild(row);
