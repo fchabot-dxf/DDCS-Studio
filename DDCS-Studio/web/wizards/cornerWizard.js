@@ -46,7 +46,7 @@ export function cornerStack(params = {}) {
     // corner → probe directions (FL=X+Y+  FR=X−Y+  BL=X+Y−  BR=X−Y−)
     const [xDir, yDir] = { FL: ['+', '+'], FR: ['-', '+'], BL: ['+', '-'], BR: ['-', '-'] }[corner] || ['+', '+'];
     const dirLabel = (d) => (d === '+' ? 'pos' : 'neg');
-    const plungeDepth = safeZ + scanDepth, td = travelDist || 0;
+    const td = travelDist || 0;   // ② B4(c): #17 plunge is now DECLARED as [#19+#20] (safeZ+scanDepth) — the controller sums it, so both are single editable sockets (fan-out dissolved), no baked plungeDepth
 
     // The two walls in the chosen probe order, each with its direction.
     const firstAx = probeSeq === 'YX' ? 'Y' : 'X', firstDir = probeSeq === 'YX' ? yDir : xDir;
@@ -107,8 +107,9 @@ export function cornerStack(params = {}) {
     A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
     A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract');
     A('#15', td, 'Positive travel = travelDist'); A('#16', '[0-#15]', 'Negative travel');
-    A('#17', plungeDepth, 'Plunge depth = safeZ + scanDepth');
-    A('#18', '[0-#17]', 'Negative plunge'); A('#19', safeZ, 'Safe Z retract distance');
+    // #19 (safeZ) + #20 (scanDepth) precede #17 so the controller has them when it evaluates #17=[#19+#20] (top-down eval).
+    A('#19', safeZ, 'Safe Z retract distance'); A('#20', scanDepth, 'Scan depth');
+    A('#17', '[#19+#20]', 'Plunge depth = safeZ + scanDepth'); A('#18', '[0-#17]', 'Negative plunge');
     if (probeZ) {
         // Z→Wall1: only the first wall's axis repositions (opp of its probe dir); the perpendicular axis holds.
         A('#21', params.startX || (firstAx === 'X' ? opp(firstDir) : '0'), 'Z to Wall 1 traverse (X)');

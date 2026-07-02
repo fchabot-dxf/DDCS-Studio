@@ -17,10 +17,10 @@
  *     `G0 X#23 Y#24`). MANUAL travel is a DIFFERENT block — a `#1505` "jog + Press Enter" operator prompt (middle's
  *     reposition() shape), not a move — so auto→manual is a prompt-vs-move STRUCTURE swap `instantiate()` cannot do. Baked
  *     auto (the twin's default); the LIVE toggle lands with the structural-toggle capability (② / B4). Same class as probeZFirst.
- *   • `safeZ` — a FAN-OUT: it feeds its own socket `#19` AND the COMPUTED `#17 = safeZ + scanDepth` (plunge depth). A single
- *     binding drives ONE socket, so binding safeZ→#19 would leave #17 stale (inconsistent plunge). Held baked (correct-by-
- *     construction) rather than shipped as a wrong binding — this is why the dump's 9th binding was unsound even before its
- *     off-by-one. scanDepth / level are baked for the same reason (computed into #17 / passed into probeSurfaceStack).
+ *   • `safeZ` + `scanDepth` — WERE a fan-out (safeZ fed #19 AND the COMPUTED literal `#17 = safeZ + scanDepth`, so one
+ *     binding couldn't drive both). ② B4(c) DISSOLVED it: cornerStack now DECLARES `#17 = [#19 + #20]` (safeZ→#19,
+ *     scanDepth→#20; the controller sums it at runtime, like `#18=[0-#17]`), so safeZ + scanDepth are now CLEAN single-socket
+ *     bindings — no longer baked. (`level` stays baked: a literal-in-G31 multi-socket fan-out, no macro var, non-operator-facing.)
  * The built-in Corner keeps ALL of these working; see corner-data-probeZFirst-frontier.spec.js and
  * corner-data-travelApproach-frontier.spec.js (the loud can't-forget gates that block retiring the built-in and block
  * flipping a baked default before the structural-toggle capability is wired).
@@ -60,6 +60,9 @@ export const CORNER_BINDING_SPECS = [
     { param: 'port',       type: 'number', default: CORNER_DEFAULTS.port,       label: 'Port',             section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
     { param: 'radius',     type: 'number', default: CORNER_DEFAULTS.radius,     label: 'Stylus Radius',    section: 'TOOL & CUT', match: { type: 'assign', var: '#6' },  key: 'value' },
     { param: 'travelDist', type: 'number', default: CORNER_DEFAULTS.travelDist, label: 'Reposition Travel', section: 'GEOMETRY',  match: { type: 'assign', var: '#15' }, key: 'value' },
+    // ② B4(c) — fan-out DISSOLVED: #17 plunge now EMITS as [#19+#20], so safeZ→#19 + scanDepth→#20 are clean single-socket bindings (were baked frontiers).
+    { param: 'safeZ',      type: 'number', default: CORNER_DEFAULTS.safeZ,      label: 'Safe Z',           section: 'GEOMETRY',   match: { type: 'assign', var: '#19' }, key: 'value' },
+    { param: 'scanDepth',  type: 'number', default: CORNER_DEFAULTS.scanDepth,  label: 'Scan Depth',       section: 'GEOMETRY',   match: { type: 'assign', var: '#20' }, key: 'value' },
     { param: 'cross1_x',   type: 'number', group: 'reposition', role: 'x', relTo: 0, label: 'Wall 2 dX',   section: 'GEOMETRY',   match: { type: 'assign', var: '#23' }, key: 'value' },
     { param: 'cross1_y',   type: 'number', group: 'reposition', role: 'y', relTo: 0, label: 'Wall 2 dY',   section: 'GEOMETRY',   match: { type: 'assign', var: '#24' }, key: 'value' },
 ];

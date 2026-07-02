@@ -58,10 +58,13 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
     const main = emitEquivalence(cornerStack, dataBuilder, sweep, {}, stripAnnotations);
 
     // FRONTIERS — MUST diverge (the twin bakes these; the built-in keeps them working):
-    const probeZFirstDiv = emitEquivalence(cornerStack, dataBuilder, [S({ probeZFirst: 1 })], {}, stripAnnotations);   // structural: inserts a Z step
-    const safeZDiv       = emitEquivalence(cornerStack, dataBuilder, [S({ safeZ: 25 })], {}, stripAnnotations);        // fan-out: #19 + computed #17
-    const cornerDiv      = emitEquivalence(cornerStack, dataBuilder, [S({ corner: 2 })], {}, stripAnnotations);       // structural: FR direction signs
-    const travelDiv      = emitEquivalence(cornerStack, dataBuilder, [S({ travelApproach: 'manual' })], {}, stripAnnotations);   // structural: manual jog-prompt vs the baked auto G0 move
+    const probeZFirstDiv = emitEquivalence(cornerStack, dataBuilder, [S({ probeZFirst: 1 })], {}, stripAnnotations);   // structural: inserts a Z step (still baked → diverges)
+    const cornerDiv      = emitEquivalence(cornerStack, dataBuilder, [S({ corner: 2 })], {}, stripAnnotations);       // structural: FR direction signs (still baked → diverges)
+    const travelDiv      = emitEquivalence(cornerStack, dataBuilder, [S({ travelApproach: 'manual' })], {}, stripAnnotations);   // structural: manual jog-prompt (still baked → diverges)
+    // ② B4(c) — fan-out DISSOLVED: safeZ + scanDepth are now LIVE single-socket bindings (#17=[#19+#20] recomputes on the
+    // controller), so a bound safeZ/scanDepth now CONVERGES with cornerStack (was a baked frontier that diverged).
+    const safeZConv      = emitEquivalence(cornerStack, dataBuilder, [S({ safeZ: 25 })], {}, stripAnnotations);
+    const scanDepthConv  = emitEquivalence(cornerStack, dataBuilder, [S({ scanDepth: 8 })], {}, stripAnnotations);
 
     // DERIVE-ROBUSTNESS — the defect #1 ROOT guard: build the template under probeZFirst=on (which inserts #21/#22) and
     // confirm deriveBindings RE-FINDS the shifted #23/#24 (+2), while the pre-Z scalars are unmoved. A hand-count can't.
@@ -96,9 +99,10 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
       wiringFails,
       main: { pass: main.pass, count: main.count, firstDiff: main.firstDiff && { params: main.firstDiff.params, a: main.firstDiff.a.slice(0, 700), b: main.firstDiff.b.slice(0, 700) } },
       probeZFirstPass: probeZFirstDiv.pass,
-      safeZPass: safeZDiv.pass,
       cornerPass: cornerDiv.pass,
       travelPass: travelDiv.pass,
+      safeZConvPass: safeZConv.pass,
+      scanDepthConvPass: scanDepthConv.pass,
       robustness,
       sampleHasProbe: /G31/.test(sample),
       sampleLen: sample.length,
@@ -108,7 +112,7 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
   expect(r.resolves, 'corner-data-emit resolves via builderOf').toBe(true);
   expect(r.independentPath, 'data builder is NOT cornerStack (independent code path)').toBe(true);
   expect(r.pristine, 'lives in the user layer; built-in BUILDERS/SCHEMA untouched').toBe(true);
-  expect(r.bindingCount, 'the 9 bound scalars: 6 clean + travelDist(#15) + cross1_x/cross1_y (safeZ is a fan-out frontier)').toBe(9);
+  expect(r.bindingCount, 'the 11 bound scalars: 6 clean + travelDist(#15) + safeZ(#19) + scanDepth(#20) + cross1_x/cross1_y (safeZ/scanDepth un-baked by the #17 fan-out fix)').toBe(11);
   expect(r.wiringFails, 'every DERIVED binding routes to the same assign var cornerStack writes (defect #1 guard)').toEqual([]);
   if (!r.main.pass) console.log('FIRST DIFF @', JSON.stringify(r.main.firstDiff && r.main.firstDiff.params) + '\n--- cornerStack ---\n' + (r.main.firstDiff && r.main.firstDiff.a) + '\n--- data def ---\n' + (r.main.firstDiff && r.main.firstDiff.b));
   expect(r.main.count, 'the sweep is substantial').toBeGreaterThan(12);
@@ -117,11 +121,13 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
   expect(r.robustness.crossXShift, 'deriveBindings re-finds #23 (cross1_x) shifted +2 under probeZFirst').toBe(2);
   expect(r.robustness.crossYShift, 'deriveBindings re-finds #24 (cross1_y) shifted +2 under probeZFirst').toBe(2);
   expect(r.robustness.distStable, 'a pre-Z scalar (dist/#1) is unmoved — the derive is not a blanket offset').toBe(0);
-  expect(r.robustness.onCount, 'all 9 bindings still resolve under the probeZFirst shape').toBe(9);
-  // FRONTIERS — must diverge (the twin bakes these).
+  expect(r.robustness.onCount, 'all 11 bindings still resolve under the probeZFirst shape').toBe(11);
+  // FRONTIERS — STILL baked (structural), must diverge until B4 makes them live.
   expect(r.probeZFirstPass, 'frontier: probeZFirst inserts a Z-surface step (structure swap the static template cannot do)').toBe(false);
-  expect(r.safeZPass, 'frontier: safeZ fans out to #19 + the computed #17 (plunge depth) — a single binding cannot drive both').toBe(false);
   expect(r.cornerPass, 'frontier: the corner quadrant is structural (direction signs + comments) — baked in the twin').toBe(false);
+  // ② B4(c): safeZ + scanDepth are NO LONGER frontiers — the #17=[#19+#20] fan-out fix made them live single-socket bindings.
+  expect(r.safeZConvPass, 'safeZ is now a LIVE binding (→#19; #17=[#19+#20] recomputes) → CONVERGES with cornerStack').toBe(true);
+  expect(r.scanDepthConvPass, 'scanDepth is now a LIVE binding (→#20) → CONVERGES with cornerStack').toBe(true);
   expect(r.travelPass, 'frontier: travelApproach=manual swaps the auto G0 move for a #1505 jog prompt (structure swap the static template cannot do) — twin bakes auto').toBe(false);
   expect(r.sampleHasProbe, 'emits a real probe move (G31)').toBe(true);
   expect(r.sampleLen, 'emits substantial G-code').toBeGreaterThan(200);

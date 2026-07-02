@@ -4241,3 +4241,40 @@ reads "300mm") — the assert-the-value discipline.
 **GATE: passing to advisor for review WITH THE HUMAN. Key calls: (1) grid-of-corners = new primitive + WCS-target semantic
 [headline — the "array of probes" isn't free]; (2) corner/probeSeq baked in M2; (3) #17-expression sign-off on the shared
 cornerStack; (4) KIND-B comment freshness co-delivers with the toggles. Sub-decisions hold.**
+
+---
+
+## 🔨 turn 31 (cycle 11) — ② B4 M2 BUILD — step 1/7: FAN-OUT dissolved (#17=[#19+#20]) (advisor turn 30; human-approved M2).
+
+M2 build approved (scout reviewed + human-approved). The rollout is 7 steps; the advisor asked to run to the TOGGLES-LIVE
+gate autonomously. **I'm sequencing it as verified increments** — step 1 (the self-contained, value-identical fan-out fix)
+landed + globally green this turn; steps 2-4 (the guard/prune CAPABILITY = a core `instantiate` rewrite used by EVERY user
+op, then anchor, then toggles-live) are the heavy, verification-critical core and get their own focused increments so the
+core-engine change is proven, not batched. (verify-real-symptom over speed; the toggles-live human-eyes gate wants a solid
+foundation under it.)
+
+**Step 1 — FAN-OUT via DECLARATION (D3, approved).** Restructured the SHARED cornerStack so the plunge `#17` EMITS as the
+EXPRESSION `[#19+#20]` instead of the baked literal `safeZ+scanDepth`:
+- `cornerWizard.js`: dropped the `plungeDepth` JS local; reordered so `#19`(safeZ) + a NEW `#20`(scanDepth) precede `#17`
+  (top-down eval); `A('#17','[#19+#20]')` + `A('#18','[0-#17]')`. Value-identical (controller sums to the same plunge; same
+  idiom as the shipped `#18=[0-#17]`/`#16=[0-#15]`). BYTE-visible on the `#17`/`#19`/`#20` lines (approved D3).
+- `cornerData.js`: safeZ→`#19` + scanDepth→`#20` are now CLEAN single-socket bindings (were the baked fan-out frontier) →
+  CORNER_BINDING_SPECS 9→11; updated the FRONTIER header note (safeZ/scanDepth un-baked; `level` stays baked).
+- Regenerated the SHARED `probe-surface-block.spec` CORNER_GOLDEN (4 full-macro strings) — captured from the new cornerStack,
+  verified `#19=10 · #20=5 · #17=[#19+#20] · #18=[0-#17]` (value-identical, 15).
+- `corner-data-emit.spec`: bindingCount + onCount 9→11; FLIPPED the safeZ frontier row from "must diverge" to a `safeZConv`
+  PARITY row (safeZ is live now) + added a `scanDepthConv` parity row. The probeZFirst/corner/travelApproach frontiers STAY
+  (still baked — they land in steps 3-4).
+
+**VERIFY.** `node --check` clean. corner-data-emit + probe-surface-block(golden) + corner-data-drag + corner-data-sim-starts
+10/10. **Full suite: 457 passed, 0 failed (1.4m).** The fan-out is value-identical (the emit golden's asserted lines + the
+stripAnnotations sweep stay green; the byte-visible `#17` change rode into the regenerated shared golden).
+
+**Remaining rollout to the ⏸ toggles-live gate:** step 2 = the generic guard block + `pruneGuards` + `instantiate` re-derive
+BY IDENTITY after prune + shared `whenOk` (built ONCE, corner-agnostic, with a drill/slot UNCHANGED regression) → step 3 =
+anchor (Z→wall1 REPOSITION delimiter + semantic relTo) → step 4 = seed the superset + enum/bool bindings → probeZFirst/
+travelApproach/wcs/syncA LIVE + retire the two frontier tripwires in lockstep → **PASS BACK (human eyes).** Then step 5
+comment-freshness, step 6 sources=WIRE + round-trip. corner/probeSeq baked (D2); grid = follow-on (D1).
+
+**Passing back at the step-1 checkpoint** (a clean value-identical foundation) so the advisor sees it before the core-engine
+guard/prune rewrite; continuing the rollout next.
