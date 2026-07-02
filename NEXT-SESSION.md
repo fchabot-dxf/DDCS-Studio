@@ -1,64 +1,55 @@
 # NEXT-SESSION — advisor → worker dispatch
 
-**Branch:** `port/corner-clean` (off `main` @9bc0a7c). NOT on main / not deployed. Served locally via VSCode Live Server. **Backups:** `wizard-porting-work` · `corner-notepad-enrich`.
+**Branch:** `port/corner-clean` (off `main` @9bc0a7c). NOT on main / not deployed; local via VSCode Live Server. **Backups:** `wizard-porting-work` · `corner-notepad-enrich`.
+**STRATEGY (human t24):** corner is the GATED PILOT — NO other wizard is ported until corner is PERFECT + human-eye-confirmed. Each mechanism piece proven ONCE on corner; the rest inherit it.
 
-## 🔒 THE LOCKED MODEL (human turn 6) — "Corner (data)" REPLACES the built-in; reposition = EXPRESSIONS of the stock-datum coord
-Socket = `datum + offset` EXPRESSION. DEFAULT = stock-geometry-derived; DRAG = datum-RELATIVE literal; ABS = fallback. REPLACE mode.
+## 🔒 THE LOCKED MODEL (human t6) — "Corner (data)" REPLACES the built-in; reposition = EXPRESSIONS of the stock-datum coord
+Socket = `datum + offset` EXPRESSION. DEFAULT = stock-geometry-derived; DRAG = datum-RELATIVE literal; ABS = fallback.
 
-## ✅ DONE + VERIFIED (advisor reviews = fan-out + adversarial verify + independent re-run)
-- **EMIT** — A · B1 · B1b (reposition correct-by-default via signed-travelDist expressions).
-- **SIM MARKERS** — B2 → B2b (per-PROBE-PASS start markers, pass-aligned vs the REAL engine). ⚠ these markers only render INSIDE a 3D preview
-  pane → currently ORPHANED (see the 3D-SIM GAP below).
-- **LAYOUT+DRAG** — B3 (2D canvas, flipped panel to `form2d`) → B3b (drag writes the correct incremental delta via a generic point-anchor).
-- **① AUTO/MANUAL TRAVEL** — generalized into `safeTraverseStack` (`approach:'auto'|'manual'`); middle refactored onto it, proven BYTE-IDENTICAL
-  (review CLEAN 2/2, re-run green vs a frozen golden). Corner adopts one `travelApproach`; twin bakes auto + frontier gate.
-- **B3c WIZ-BAR ROUTING** — the bar now routes `form2d` data-ops to the canvas/wizard path (was: all user ops → the plain quick-insert form).
-  User-CONFIRMED the 2D canvas now shows; test drives the real bar click (FAIL→PASS). Kept `form2d`-only (form3d is the default panel).
+## ✅ DONE + VERIFIED (fan-out review + adversarial verify + independent re-run + human eyes)
+EMIT (A·B1·B1b) · SIM markers (B2·B2b) · LAYOUT+DRAG (B3·B3b) · ① AUTO/MANUAL travel (shared `safeTraverseStack`, middle byte-identical) ·
+B3c wiz-bar routing (bar opens the wizard view) · B3d 3D-sim+2D-layout combo (`form3d+2d`, human-confirmed).
+**Decisions:** axis `+h` = CORRECT, do NOT remove (regresses drill/slot/pocket) · 2D-sim-view removal = BACKLOG (own decision, not corner) ·
+the data-op already matches the built-in on the 9 value fields + EXCEEDS it on drag handles (built-in has NONE).
 
-## 🐞 THE 3D-SIM GAP (user-found t22, trace-CONFIRMED) — the generic data-op view is EITHER/OR; probes need BOTH
-"Corner (data)" is MISSING the 3D sim preview (+ its per-pass markers). ROOT CAUSE: the generic `userOpView` treats the panel as EITHER/OR —
-`form3d` (3D preview) XOR `form2d` (2D canvas). B3 flipped corner to `form2d` for the drag handle; `userOpView.js:100-103` then does
-`mode==='2d' → viz3d.style.display='none'` + `renderLayout2D()`, so the 3D pane is HIDDEN and the declared `CORNER_SIM_STARTS` markers ORPHAN
-(no 3D pane to render into). The built-in probes (cornerView/edgeView/middleView) ALWAYS call `preview3D()` (3D base) AND layer a 2D canvas ON
-TOP (`renderStartCanvas`) — never either/or. The generic view must do the same.
+## 🚦 ACTIVE DISPATCH — ② B4: STRUCTURAL-TOGGLE + ENUM-FIELD CAPABILITY + MULTI-HANDLE (SCOUT + GATE) [human "yes dispatch" t24]
+The last big mechanism piece — makes the baked corner frontiers LIVE. GENERIC (every future port inherits it). **SCOUT + GATE first:**
+propose the mechanism + the rollout decomposition; the advisor reviews WITH THE HUMAN before any build (it sets the pattern for all ports).
+**Parity-confirmed baked frontiers to make live** (`cornerData` CORNER_DEFAULTS):
+- **(a) STRUCTURAL toggles — build the capability GENERICALLY** (Z-First is in BOTH corner AND middle `m_probe_z_first`; build ONCE, both
+  inherit — like auto/manual → `safeTraverseStack`) (reshape blocks → `instantiate` can't → needs "always-emit the block GUARDED by a flag"
+  so a structural choice becomes a BOUND VALUE): `probeZFirst` (adds Z-surface step + #21/#22 traverse) · `travelApproach` auto|manual
+  (prompt-vs-move) · `wcs` active|G54–G59 (active reads #578/computes #70 vs fixed literal — BOTH branches guarded) · `syncA` (dual-gantry) · `slave` A|B.
+- **(b) ENUM/non-numeric field kind** (a dropdown/text param, NOT a numeric socket — the ROADMAP capability: Blockly field adapter + `enum`
+  bindings + marker round-trip; SHARED across future ports): `corner` FL/FR/BL/BR · `probeSeq` YX/XY · `slave` A/B.
+- **(c) FAN-OUT via DECLARATION** (safeZ + scanDepth are REAL — human t24 "declare", NOT baked): restructure `cornerStack` so `#17` (plunge)
+  EMITS as the EXPRESSION `[#19 + #scanDepth-socket]` (not a baked literal) → bind `safeZ`→#19 + `scanDepth`→its own socket as single editable
+  bindings; `#17` recomputes at emit (`#18=[0-#17]` already an expression). Same expression-socket / declare-never-infer pattern as the
+  reposition — restructure the SOURCE, keep the data-def DUMB (`level` similarly if computed-in). SHARED with middle (same plunge=safeZ+scanDepth)
+  + apply the SAME fix to the DRILL port's `clearance` fan-out (was held baked).
+- **MULTI-HANDLE editor (2 XY / 3 Z-first) in the LAYOUT CANVAS** (sim stays display-only): ADD the missing `#21/#22` bindings
+  (`startX/startY`, Z→wall1 — preserve the expression default when unset, NO degenerate `G0 X0 Y0`) as a 2nd reposition handle, gated by
+  probeZFirst → 3rd handle. FIX the `relTo:0`/`_pass` anchor: under probeZFirst the passes shift +2 (Z→wall1 is not a `REPOSITION:` delimiter),
+  so the marker alignment + the drag anchor are wrong when Z is on.
+- **GUI control + Blockly round-trip** for every new toggle/enum/binding. **RETIRE** the frontier tripwire specs
+  (`corner-data-probeZFirst-frontier`, `corner-data-travelApproach-frontier`) once the toggles are live.
+- ⚠ Emit BYTE-IDENTICAL when a toggle is untouched; the multi-handle drag writes the socket via a corner tie (the middle `tieDiagTravel`
+  pattern) so emit follows; SIM-declaration-clean (no `( @DDCS )` in editor text).
+- **GATE:** report the capability mechanism (structural-guard + enum-field) + the rollout decomposition (which sub-increments) BEFORE building.
 
-## ✅ B3d DONE + VERIFIED (advisor turn 24) — Option B: the data-op view shows BOTH the 3D sim AND the 2D canvas
-Built as OPTION B (human + advisor, declare-never-infer): a NEW explicit `form3d+2d` panel type (`mode '3d2d'`); `userOpView.update` renders
-`preview3D(...startHints)` (3D sim + declared markers) AND `renderLayout2D()` (2D drag) together via a dedicated `#userViz3dBox` (2D stays in
-`#userVizContainer` → zero selector churn; form2d/form3d byte-untouched). commandDeck routes form2d|form3d+2d → openWiz. Re-run GREEN (bar
-opens BOTH panes; drag + markers no regression). ⏳ HUMAN to reload + eyeball the 3D render (headless can't confirm 3D visibility).
-**(historical dispatch record below — the plan that produced it)**
-Teach the GENERIC `userOpView` to render the 3D sim preview AND the 2D drag canvas TOGETHER — the built-in probe pattern (3D base + 2D
-overlay), so "Corner (data)" shows the 3D probe sim + its per-pass markers + the draggable 2D reposition handle, all at once.
-- **FIX (the built-in pattern, generalized — one-source):** enhance `userOpView.update()` (the either/or at `:100-103`) so a visual data-op
-  renders BOTH `preview3D(gcode, ..., startHints)` (the 3D sim + the declared sim-starts) AND `renderLayout2D()` (the 2D drag overlay) —
-  matching how `edgeView`/`middleView` layer the 2D over the 3D (never suppressing the 3D pane).
-- ⭐ **SEAM = OPTION B (human t22): a NEW explicit `form3d+2d` panel type.** The op DECLARES `panel:'form3d+2d'` → renders BOTH panes.
-  DECLARE-NEVER-INFER (the op explicitly declares it wants both; NOT inferred from role-presence — that was option A, which the human rejected).
-  Corner declares `panel:'form3d+2d'`; ADD the type to `PANEL_TYPES` (panelTypes.js) + wire `userOpView.update` (`:100-103`) to render
-  `preview3D(...startHints)` AND the 2D `renderLayout2D()` overlay for it. Must NOT break the existing form2d-only / form3d-only ops.
-  GATE if it's a bigger view refactor than adding the type + the render branch.
-- ⭐ **TEST (verify-real-symptom — the USER's bar path):** open "Corner (data)" via the bar → assert BOTH the 3D preview pane (`.wiz-viz3d`
-  visible + the sim/markers) AND the `.fc-handle-move` 2D handle render TOGETHER. (The current test only checks the 2D handle.)
-- SCOPE: the generic `userOpView` 3D+2D combo + corner's panel declaration. Benefits EVERY visual data-op.
+**NORTH STAR:** declare-never-infer · valid-by-construction · keep the data-def DUMB (restructure source, don't grow machinery) · one-source (the capability serves every port) · verify-real-symptom (human eyes on each live toggle).
 
-**VERIFY:** "Corner (data)" from the bar shows the 3D sim + per-pass markers + the 2D drag handle together (matching the built-in corner's
-preview); the combo test + the existing corner specs + full suite GREEN. **STAGE SURGICALLY**. Commit + WORK-LOG + pass.
-
-**NORTH STAR:** one-source (the GENERIC view gains 3D+2D like the built-in probes — not a corner hack) · verify-real-symptom (assert BOTH panes
-render via the user's path) · valid-by-construction.
-
-## 📌 QUEUED (advisor dispatches each after review — no human check-in):
-- **② B4 — PROBE-Z-FIRST + auto/manual LIVE toggle + the structural-toggle capability + GUI/round-trip.** Both are structural toggles the twin
-  bakes; likely ALWAYS emit the block GUARDED by a flag (conditional goto) → a BOUND VALUE → both go LIVE + get their GUI control + round-trip.
-  Also fix the latent `relTo` anchor shift under probeZFirst.
-- **③ FOLLOW-UP — stock-datum integration (B1b GATE):** wire the stock-datum coord so the reposition DEFAULT + the B3 drag become datum-relative
-  (interim = travelDist/wall-1-relative today). Cures the B3 (0,0) handle caveat.
-- **④ inc C — VERIFY + RELEASE:** all dims end-to-end + full suite green → merge to main + version bump → pages.dev + exe. Closes the FIRST full
-  wizard-as-data port that REPLACES its built-in.
+## 📌 QUEUED:
+- **③ stock-datum wire (B1b GATE):** reposition DEFAULT + drag → datum-relative (`socket = datum + offset`); cures the B3 (0,0) handle.
+- **④ inc C — VERIFY + RELEASE:** all dims end-to-end + full suite → merge to main + version bump → pages.dev + exe; retire the built-in.
+- **✅ FAN-OUT — RESOLVED (human t24: "declare, don't bake"; safeZ + scanDepth are REAL):** moved INTO ② B4 (c) — `#17` becomes the declared
+  expression `[#19 + #scanDepth]`, so safeZ + scanDepth are editable bindings. Apply the same declared-expression fix to DRILL's `clearance`.
+- **⚠ 2 PARITY GAPS — pending the human's "perfect"-bar decision (surfaced t24):**
+  2. **CONTROLLER-SOURCE CHIPS (port/level/fastFeed/retract):** the built-in sources these from controller-resident values (`srcVal`/`srcNote`/
+     `ddcsResolveProbeSources`); the data-op binds plain literals — `sources` is UNWIRED. Advisor rec = include (real parity), late sub-task. HUMAN CALL.
+  3. **DEAD Q field (`qStop`):** read but UNUSED in BOTH (probe atom hardcodes Q1) — a pre-existing bug, not a data-op regression. Advisor rec = leave. HUMAN CALL.
+- **Likely-acceptable-drop (confirm):** the built-in's `CornerVizAnimator` SVG walkthrough (the data-op has 3D sim + per-pass markers instead) · the corner-specific status label (generic `label · N lines` today).
 
 ---
-
-## ⏸️ PAUSED — B-TRANS / middle (all SHIPPED work on MAIN up to V10.49): `#53`/probe-calc SIM fix · auto →③ diagonal hard-coded · inc2b · canvas rollout · full-suite re-run.
-
+## ⏸️ PAUSED — B-TRANS / middle (SHIPPED on MAIN ≤ V10.49): `#53`/probe-calc SIM fix · auto →③ diagonal hard-coded · inc2b · canvas rollout · full-suite re-run.
 **REFS:** `WIZARD-PORTING-MAP.md` · `SPATIAL-MODEL-SPEC.md` · `TRAVEL-START-SPEC.md` · `MIDDLE-PROBE-BACKLOG.md`.
