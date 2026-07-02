@@ -5050,3 +5050,42 @@ corner entry; **a legacy saved 'corner' op still RENDERS real probe G-code (G31 
 **⏸ PASS BACK the retirement diff for your FINAL fresh-eyes review (the one true one-way door).** COMMITTED (this branch) but NOT
 pushed + NOT version-bumped — reversible via git until you bless it. Once you bless the diff, dispatch move 2b: version bump
 (`npm run bump-version`) + release (web deploy + exe) per the standing release-version-often authorization.
+
+---
+
+## 🔨 turn 67 (cycle 11) — ④ move 2b (THE RELEASE) — ⏸ GATE: dispatch says "push", but the release fires ONLY on `main`, and we're on a never-pushed branch 53 commits ahead. Passing back the target-branch decision. NOTHING done to git.
+
+Advisor BLESSED the retirement diff (cbe08b0) — independently re-ran the suite (467/2-skip/0-fail), confirmed the shim
+byte-untouched, read the sentinel re-anchor. Dispatched move 2b: `npm run bump-version` → commit ONLY the 2 version
+files as the tip → push → "closes the campaign end to end (web deploy + exe)".
+
+**Before touching the one-way production door I checked the release topology — and it does NOT match a bare "push":**
+- `desktop-release.yml` (cuts the exe release, reads the `.ver` chip) and `desktop-build-check.yml` are BOTH
+  `on: push → branches:[main]`. Cloudflare Pages serves `DDCS-Studio/web` on `main`. **⇒ the release (web + exe)
+  fires ONLY on a push to `main`.**
+- We are on `port/corner-clean`: **53 commits ahead of `main`, 0 behind**, `main` IS an ancestor of HEAD
+  (clean FAST-FORWARD, no merge commit), and the branch has **no upstream / has never been pushed** (not in
+  `git branch -r`). Local `main` is 1 ahead of `origin/main` (a pre-existing unpushed commit, already in HEAD's
+  ancestry — rides along on any ff).
+- `bump-version.cjs` only edits the chip + `package.json` (no git tag) — the release IS the push-to-main event.
+
+**So the dispatch under-specifies the consequential part.** Pushing `port/corner-clean` deploys NOTHING (workflows
+are main-only; Pages would give at most a non-production preview) — I'd be falsely reporting a release. The advisor's
+stated intent (web + exe, "end to end") is ONLY achievable by **landing all 53 campaign commits on `main` and shipping
+to production** — materially bigger than "commit 2 files and push", and the one true one-way door of the whole campaign.
+This is a GATE (irreversible + outward-facing); per the protocol I STOP and pass back the target-branch call rather
+than guess. The release-version-often standing authorization covers the routine milestone bump — it does not, on its
+own, decide "land the entire unmerged campaign on main to ship it now" (a new context).
+
+**The two legitimate paths (RECOMMEND A — it matches your stated intent + is clean via fast-forward):**
+- **A) SHIP NOW via main.** On `port/corner-clean`: `npm run bump-version` → commit ONLY the 2 version files as the
+  tip → fast-forward `main` to that tip (`git branch -f main HEAD`, since main is an ancestor) → `git push origin main`.
+  The bump lands as the literal tip of `main`; push triggers the exe release + web deploy. Ships the whole corner
+  campaign to production users. **Recommended** if the intent is truly to ship-to-prod now.
+- **B) PUSH THE BRANCH FOR REVIEW.** Bump as the branch tip, `git push -u origin port/corner-clean` — NO deploy;
+  a human/you merges to `main` later to actually release. Matches the "then we discuss with the human what ports next"
+  note if you'd rather land corner on main under human eyes before it ships.
+
+**⏸ NOTHING done to git** (no bump, no commit, no push) — the bump belongs as the TIP of whatever actually gets pushed,
+so I held it until you pick the target. Working tree clean except the untouched `_*.png` / `HANDOFF.md` /
+`NEXT-SESSION.md`. Awaiting your call: A (ship via main) or B (push branch for review)?
