@@ -5340,3 +5340,41 @@ proven, hardened template for porting the remaining wizards.
 **QUEUED (advisor, near-term, NON-blocking follow-up):** the visual-language polish — circle shapes for sim-only / manual-jog
 markers, rainbow-arc manual-jog travel lines, Layout-canvas colors matching the top panel's cyan/amber. Post-release; the
 human + advisor decide which wizard ports next.
+
+---
+
+## 🔨 turn 81 (cycle 11) — visual-language polish (3 parts): circle sim-only marker · manual-jog rainbow arc · Layout cyan/amber handles. Pure rendering (byte-parity untouched). Suite green. COMMITTED (not pushed). ⏸ PASS BACK for live-verify.
+
+Release DOUBLE-VERIFIED (advisor curl'd pages.dev = V10.50 live). Corner DONE. Advisor dispatched the queued visual polish (no
+scout — fully specified). Source-chips wiring HELD for a later register-verification scout (do NOT start).
+
+**PART 1 — the SIM-ONLY / manual-jog marker is a hollow CIRCLE ○ (was a hollow diamond); EMITTING stays a filled diamond ◆:**
+- `viz/toolpath2d.js` drawStartHandles — `!emits` → `ctx.arc(...)` (circle) instead of the diamond path.
+- `viz/gcodeViz3d.js` _startGlyphTex — `!emits` → a hollow-circle sprite texture.
+- `viz/featureCanvas.js` — the `simOnly` handle draws a `<circle>` (was a `<path>` diamond).
+
+**PART 2 — a MANUAL jog TRAVEL line arcs UP ('rainbow'); AUTO stays straight:**
+- `viz/toolpath2d.js` strokeSegs — a transV rapid with `startSources[pass]==='manual'` draws a `quadraticCurveTo` through a
+  control point above the chord midpoint (screen-up); auto/other = `lineTo` (straight, unchanged). Pure canvas draw.
+
+**PART 3 — the Layout FeatureCanvas handles adopt the top panel's CYAN=auto / AMBER=manual (was a plain gold square, NO coding):**
+- `viz/createPreviewPanel.js` — expose the per-pass sources (`getPassSources` + a `lastPassSources` closure) — the SAME
+  passSources the top panel colours by, so the Layout matches EXACTLY (not re-derived from travelApproach, which wouldn't match
+  — corner's auto travel isn't tagged 'auto-traverse', so even auto reads amber).
+- `wizards/views/userOpView.js` — read `panel.getPassSources()` → pass to `renderLayout2D`.
+- `wizards/ops/panelTypes.js` — `layoutSpecFromOp(def,params,simStart,sources)` colours each handle by its pass's source
+  (`srcCol`): the reposition handle by its DESTINATION pass (ri+1), the sim-only ◇ by pass 0. `renderLayout2D` threads sources.
+- `viz/canvasWidgets.js` — a decl may carry a `color` → onto the handle.
+- `viz/featureCanvas.js` — the emitting square's fill + the ◇'s stroke use `h.color` (else the CSS default).
+
+**VERIFY.** New `corner-viz-polish.spec.js` (3, green): (1) the 2D sim-only marker is a CIRCLE (a 16-point r=6.5 RING is ~fully
+painted — a diamond paints only ~4 vertices [mutation-proven: diamond → 11/16 < 13 → RED]; a shrunk circle → ~0) + emitting is
+filled; (2) a manual travel arcs UP (topmost painted pixel reaches far above the chord vs auto straight; mutation-proven: force
+straight → RED); (3) the Layout reposition handle + sim ◇ are AMBER(manual)/CYAN(auto) in layoutSpecFromOp AND rendered by the
+FeatureCanvas (mutation-proven: break srcCol → RED). corner-data-sim-marker-track test-3 updated in lockstep (◇ is now a
+`<circle>`). **Full suite: 480 passed, 1 flaky (known middle-animator stroke-dashoffset — confirmed transient: 6/6 in isolation,
+retried green), 0 failed** (483 total; new specs stable 9/9 across 3 repeats). Byte-parity untouched (pure viz — no emit path).
+Surgical: 7 viz/render source files + 1 new spec + 1 lockstep update.
+
+**⏸ PASS BACK for your live screenshot verify** (circle markers top+Layout; the rainbow manual-jog travel; Layout cyan/amber
+handles). COMMITTED, NOT pushed. Source-chips wiring is next (needs the register-verification scout first).

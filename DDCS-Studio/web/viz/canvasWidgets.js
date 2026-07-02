@@ -111,7 +111,7 @@ export function buildCanvasWidgets(widgets, setFields) {
         if (!g) return;
         const id = d.id || (d.type + ':' + (d.field || d.fx || i));
         byId[id] = d;
-        handles.push({ id, ...g.place(d) });
+        handles.push({ id, color: d.color, ...g.place(d) });   // t81 — a decl may carry a SOURCE colour (auto/manual) for the FeatureCanvas
     });
     const onDrag = (id, world) => {
         const d = byId[id]; if (!d) return;

@@ -74,8 +74,8 @@ test('(2) emit byte-parity: marker chaining + geometry hoist never touch the G-c
   expect(passes.every(Boolean), 'twin emit == cornerStack across all combos (hoist is byte-safe; marker math is preview-only)').toBe(true);
 });
 
-// (3) PART 2 — the sim-only start handle renders on the Layout FeatureCanvas as a HOLLOW ◇ (distinct from filled emitting handles).
-test('(3) Layout canvas: the sim-only start handle appears as a HOLLOW diamond (second renderer of the userStarts seam)', async ({ page }) => {
+// (3) PART 2 — the sim-only start handle renders on the Layout FeatureCanvas as a HOLLOW circle ○ (t81; distinct from the filled emitting handles).
+test('(3) Layout canvas: the sim-only start handle appears as a HOLLOW circle (second renderer of the userStarts seam)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
   await page.evaluate(async () => {
@@ -94,9 +94,9 @@ test('(3) Layout canvas: the sim-only start handle appears as a HOLLOW diamond (
   });
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
   expect(info.present, 'a sim-only handle renders on the Layout canvas').toBe(true);
-  expect(info.tag, 'drawn as a diamond path (not the filled rect/circle of emitting handles)').toBe('path');
+  expect(info.tag, 'drawn as a CIRCLE (t81 — the sim-only/manual-jog shape, distinct from the emitting square)').toBe('circle');
   expect(info.fill, 'HOLLOW — fill:none (the sim-only shape)').toBe('none');
-  expect(info.stroke, 'cyan — matches the top-panel sim-only marker').toBe('#22d3ee');
+  expect(info.stroke, 'cyan (auto, default) — matches the top-panel sim-only marker colour').toBe('#22d3ee');
 });
 
 // (4) PART 2 — the sim ◇ is VISUAL on the Layout (excluded from the hit-test): dragging the EMITTING reposition handle writes

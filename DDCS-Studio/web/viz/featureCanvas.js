@@ -329,13 +329,16 @@ export class FeatureCanvas {
         // --- handles (top layer, always above holes) ---------------------
         (spec.handles || []).forEach((h) => {
             const c = this._disp(h.x, h.y);
+            const col = h.color || null;   // t81 — reposition SOURCE colour (auto=cyan / manual=amber), matching the top panel; null → the CSS default
             if (h.simOnly) {
-                // t73 — the SIM-ONLY (never-emitted) start handle: a HOLLOW cyan diamond ◇, the 2D-canvas twin of the top
-                // panel's sim-only marker (sim-marker-distinguish). Distinct from the FILLED emitting handles (rect/circle).
-                const d = `M ${c.x} ${c.y - 7} L ${c.x + 7} ${c.y} L ${c.x} ${c.y + 7} L ${c.x - 7} ${c.y} Z`;
-                handles.appendChild(svgEl('path', { d, class: 'fc-handle fc-handle-sim', fill: 'none', stroke: '#22d3ee', 'stroke-width': 2 }));
+                // t73/t81 — the SIM-ONLY / manual-jog start marker: a HOLLOW CIRCLE ○ (was a diamond), the 2D-canvas twin of the
+                // top panel's sim-only marker. Coloured by reposition source (cyan=auto / amber=manual), matching the top panel.
+                handles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 7, class: 'fc-handle fc-handle-sim', fill: 'none', stroke: col || '#22d3ee', 'stroke-width': 2 }));
             } else if (h.kind === 'move') {
-                handles.appendChild(svgEl('rect', { x: c.x - 6, y: c.y - 6, width: 12, height: 12, class: 'fc-handle fc-handle-move', rx: 2 }));
+                // t81 — colour the emitting reposition handle by its travel SOURCE (cyan=auto / amber=manual), matching the top
+                // panel; without a source it keeps the CSS fc-handle-move default (gold).
+                const paint = col ? { fill: col, stroke: col } : {};
+                handles.appendChild(svgEl('rect', { x: c.x - 6, y: c.y - 6, width: 12, height: 12, class: 'fc-handle fc-handle-move', rx: 2, ...paint }));
             } else {
                 handles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 6, class: 'fc-handle' }));
             }

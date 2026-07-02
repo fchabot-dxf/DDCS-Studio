@@ -244,8 +244,8 @@ export class GcodeViz3D {
     }
 
     // The start-glyph textures (WHITE so material.color tints them per-pass — cyan=auto / amber=manual — hi-res keeps them
-    // crisp), cached per shape. sim-marker-distinguish (t69): HOLLOW diamond = a SIM-ONLY jog preview (never emitted); FILLED
-    // diamond = an EMITTING pass whose drag writes a macro var into the program (corner #21-#24). SHAPE axis, orthogonal to colour.
+    // crisp), cached per shape. SHAPE axis (orthogonal to colour): SIM-ONLY / manual-jog = a hollow CIRCLE ○ (jog preview, never
+    // emitted); EMITTING = a FILLED diamond ◆ (a drag writes a macro var into the program, corner #21-#24).
     _startGlyphTex(emits) {
         const key = emits ? '_emitStartTex' : '_simStartTex';
         if (this[key]) return this[key];
@@ -253,8 +253,9 @@ export class GcodeViz3D {
         c.width = c.height = 128;
         const ctx = c.getContext('2d');
         ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ffffff'; ctx.lineWidth = 18; ctx.lineJoin = 'round';
-        ctx.beginPath(); ctx.moveTo(64, 14); ctx.lineTo(114, 64); ctx.lineTo(64, 114); ctx.lineTo(14, 64); ctx.closePath();
-        if (emits) ctx.fill(); else ctx.stroke();   // filled = emitting; hollow outline = sim-only (inset for the thick line)
+        ctx.beginPath();
+        if (emits) { ctx.moveTo(64, 14); ctx.lineTo(114, 64); ctx.lineTo(64, 114); ctx.lineTo(14, 64); ctx.closePath(); ctx.fill(); }   // EMITTING = filled diamond
+        else { ctx.arc(64, 64, 46, 0, Math.PI * 2); ctx.stroke(); }   // SIM-ONLY / manual-jog = hollow circle (inset for the thick line)
         return (this[key] = new this.THREE.CanvasTexture(c));
     }
 

@@ -52,9 +52,12 @@ function _writeParam(name, val) { const f = _field(name); if (f) { f.value = r3(
 // canvas drag-to-edit with no per-op code. The handles are DECLARED from the param-block roles and built by the SAME
 // reusable gesture registry the built-in views use (viz/canvasWidgets — point / rect / radial), not a parallel onDrag.
 // See ROADMAP "CANVAS-WIDGET consolidation" Stage 3 + the spatial-gui-form-vs-canvas memory.
-export function layoutSpecFromOp(def, params, simStart) {
+export function layoutSpecFromOp(def, params, simStart, sources) {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y, ox: 0, oy: 0 } : { w: 200, h: 150, ox: 0, oy: 0 };
+    // t81 — colour a handle by its pass's reposition SOURCE (auto=cyan / manual=amber), MATCHING the top panel. `sources` is the
+    // per-pass array the panel exposes (getPassSources); absent → null → the FeatureCanvas keeps its CSS default (gold).
+    const srcCol = (pass) => (!Array.isArray(sources)) ? null : (sources[pass] === 'manual' ? '#ffb300' : '#22d3ee');
     const groups = {};
     for (const b of (def.bindings || [])) { if (b.group) (groups[b.group] = groups[b.group] || []).push(b); }
     const items = [], decls = [];
@@ -121,7 +124,7 @@ export function layoutSpecFromOp(def, params, simStart) {
             // wall-1→wall-2 reposition, consumed in G91): anchor the point to the op's Nth DECLARED sim-start, so the
             // handle renders at anchor+delta (the true wall position) and a drag writes world − anchor (the delta), not
             // the absolute world coord. Absent relTo → an absolute point (unchanged).
-            let ax = 0, ay = 0, destX = null, destY = null;
+            let ax = 0, ay = 0, destX = null, destY = null, destPass = null;
             if (byRole.x.relTo != null && typeof opSimStarts === 'function') {
                 // SEMANTIC relTo ({row:'wall1'}) → the pass index among the SURVIVING when-filtered starts (correct in
                 // BOTH probeZ states); a numeric relTo passes straight through. null = the named pass isn't present here.
@@ -129,6 +132,7 @@ export function layoutSpecFromOp(def, params, simStart) {
                 const starts = (ri != null) ? (opSimStarts(def.opType, params, s) || []) : [];
                 const a = starts[ri];
                 if (a) { ax = num(a.x, 0); ay = num(a.y, 0); }
+                if (ri != null) destPass = ri + 1;   // the handle sits on the destination marker (pass ri+1) → colour by that pass's source (t81)
                 // The reposition ARRIVES at the NEXT pass marker (starts[ri+1] — chained via the SAME cornerReposOffsets the
                 // emit uses, and persistence-safe as the registered sim provider): the handle renders THERE (anchor+offset =
                 // the true destination), whether the socket is set (marker reflects the literal) or UNSET. Fixes the num()→0
@@ -140,7 +144,7 @@ export function layoutSpecFromOp(def, params, simStart) {
             const offY = (destY != null) ? destY - ay : p('y');
             const x = ax + offX, y = ay + offY;
             items.push({ kind: 'hole', x, y, n: 1, r: Math.max(1, stock.w * 0.012) });
-            if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: offX, y: offY, ax, ay, label: 'pos' });
+            if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: offX, y: offY, ax, ay, label: 'pos', color: srcCol(destPass) });
         }
     }
     // Drag a handle → write the bound param FIELDS (their 'input' bubbles → userOpView.update() redraws). The gesture
@@ -152,7 +156,7 @@ export function layoutSpecFromOp(def, params, simStart) {
     // VISUAL here (excluded from the hit-test) because pass-0 always coincides with a reposition ANCHOR whose emitting handle
     // owns that point — the sim start is DRAGGED on the top panel (its natural sim surface). Host passes the pass-0 position.
     if (simStart && simStart.pos && Number.isFinite(+simStart.pos.x) && Number.isFinite(+simStart.pos.y)) {
-        const allHandles = [...handles, { id: '__simstart0', x: +simStart.pos.x, y: +simStart.pos.y, kind: 'move', simOnly: true, label: '' }];
+        const allHandles = [...handles, { id: '__simstart0', x: +simStart.pos.x, y: +simStart.pos.y, kind: 'move', simOnly: true, label: '', color: srcCol(0) }];
         return { stock, items, handles: allHandles, onDrag };
     }
     return { stock, items, handles, onDrag };
@@ -160,10 +164,10 @@ export function layoutSpecFromOp(def, params, simStart) {
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).
 let _layout = null;
-export function renderLayout2D(container, def, params, simStart) {
+export function renderLayout2D(container, def, params, simStart, sources) {
     if (!container) return;
     if (!_layout) _layout = new FeatureCanvas();
-    _layout.render(container, layoutSpecFromOp(def, params, simStart));
+    _layout.render(container, layoutSpecFromOp(def, params, simStart, sources));
 }
 
 export function renderDeclaredLayout(container, def, params) {

@@ -132,7 +132,8 @@ export const userOpView = {
                 const panel = host && host.__panel;
                 const ps = (panel && typeof panel.getPassStarts === 'function') ? (panel.getPassStarts() || []) : [];
                 const pos0 = ps[0] || (Array.isArray(starts) && starts[0]) || null;   // dragged start, else the declared pass-0 hint
-                renderLayout2D(c, _def, params, pos0 ? { pos: pos0 } : null);
+                const sources = (panel && typeof panel.getPassSources === 'function') ? panel.getPassSources() : null;   // t81 — per-pass auto/manual, so the Layout matches the top panel
+                renderLayout2D(c, _def, params, pos0 ? { pos: pos0 } : null, sources);
             }
         } else if (pt.mode === '3d') {
             if (viz3dBox) viz3dBox.style.display = 'none';

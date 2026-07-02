@@ -153,6 +153,7 @@ export function createPreviewPanel(container, opts = {}) {
     let curStart = null;   // operator start the user dragged (2D handle / 3D marker); getStartPos() reads it (pass 0)
     let passStarts = [];   // INC1: per-pass operator starts [{x,y,z}] — the shared source of truth for BOTH views' numbered markers
     let userStarts = [];   // INC2: per-pass USER overrides (a jog or a drag) — these BEAT the wizard's inferStarts HINT so an edited ② STICKS (the hint only positions an un-touched pass)
+    let lastPassSources = [];   // t81 — the latest per-pass reposition sources (auto/manual), exposed (getPassSources) so the Layout canvas colours its handles to MATCH the top panel
     // A per-pass start drag from ANY view — the 2D toolpath handle, the 3D marker, or the feature-canvas ②-aim handle —
     // records it as the USER override (a sim-only DECLARED value: it BEATS the inferStarts hint + persists), mirrors to the
     // 3D marker, then re-traces + replays from the new start. ONE seam, so every view edits the SAME userStarts (the
@@ -432,6 +433,7 @@ export function createPreviewPanel(container, opts = {}) {
         t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
         t2.setStarts(passStarts);   // the draggable 2D start handles — ALL per-pass starts, numbered (①②…)
         const passSources = (parsed.stats && parsed.stats.passSources) || [];   // per-pass reposition source → marker colour (auto=cyan, manual=amber)
+        lastPassSources = passSources;   // t81 — expose to the Layout canvas so its handles match the top panel's colours
         if (t2.setStartSources) t2.setStartSources(passSources);
         if (t2.setStartEmits) t2.setStartEmits(passStarts.map((s) => !!s.emits));   // sim-marker-distinguish (t69): the SHAPE axis (emitting=solid vs sim-only=hollow), orthogonal to the auto/manual COLOUR
         t2.setAnchor(curAnchor);                              // 2D mirrors the 3D anchor: anchored → path emanates from the start, not the stock pin
@@ -714,5 +716,5 @@ export function createPreviewPanel(container, opts = {}) {
         buildDro();   // DRO gains/loses the A/B rows with the rotary rig
     }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, onStartDrag, getPassStarts: () => passStarts, get viz() { return viz; }, get engine() { return engine; }, el: container };
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, get viz() { return viz; }, get engine() { return engine; }, el: container };
 }

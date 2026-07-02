@@ -167,8 +167,9 @@ export function createToolpath2d(canvas, opts = {}) {
         const hx = tx(c.x), hy = ty(c.y);
         ctx.save(); ctx.strokeStyle = '#33d6ff'; ctx.lineWidth = 1.6; ctx.strokeRect(hx - 5, hy - 5, 10, 10); ctx.restore();
     }
-    // Each per-pass operator start = a hollow CYAN diamond ◇ + grab-ring + a NUMBERED badge (①②…), parity with the 3D
-    // markers. All draggable (distinct from the RED moving head). A multi-pass probe (boss/middle probe-both) shows one per pass.
+    // Each per-pass operator start + a grab-ring + a NUMBERED badge (①②…), parity with the 3D markers. Coloured by reposition
+    // SOURCE (auto=cyan, manual=amber). SHAPE by emits (orthogonal): SIM-ONLY / manual-jog = a hollow CIRCLE ○; EMITTING (a drag
+    // writes a macro var) = a FILLED diamond ◆. All draggable (distinct from the RED moving head). Multi-pass → one per pass.
     function drawStartHandles(ctx) {
         for (let i = 0; i < starts.length; i++) {
             const s = starts[i], hx = sptx(s.x), hy = spty(s.y);
@@ -177,9 +178,10 @@ export function createToolpath2d(canvas, opts = {}) {
             const ringCol = manual ? 'rgba(255,179,0,0.45)' : 'rgba(34,211,238,0.45)';
             const emits = !!startEmits[i];                                          // SHAPE (orthogonal to the colour): emitting = a drag writes a macro var into the PROGRAM
             ctx.save();
-            ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.8; ctx.lineJoin = 'round';   // diamond — a static reference, NOT red (probe) or orange (tool)
-            ctx.beginPath(); ctx.moveTo(hx, hy - 6.5); ctx.lineTo(hx + 6.5, hy); ctx.lineTo(hx, hy + 6.5); ctx.lineTo(hx - 6.5, hy); ctx.closePath();
-            if (emits) ctx.fill(); else ctx.stroke();                               // EMITTING = FILLED ◆ (a drag edits the program); SIM-ONLY = HOLLOW ◇ (jog preview, never emitted → edge/middle unchanged)
+            ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.8; ctx.lineJoin = 'round';   // a static reference, NOT red (probe) or orange (tool)
+            ctx.beginPath();
+            if (emits) { ctx.moveTo(hx, hy - 6.5); ctx.lineTo(hx + 6.5, hy); ctx.lineTo(hx, hy + 6.5); ctx.lineTo(hx - 6.5, hy); ctx.closePath(); ctx.fill(); }   // EMITTING = FILLED diamond ◆ (a drag edits the program)
+            else { ctx.arc(hx, hy, 6.5, 0, Math.PI * 2); ctx.stroke(); }            // SIM-ONLY / manual-jog = a hollow CIRCLE ○ (jog preview, never emitted → edge/middle unchanged)
             ctx.lineWidth = 1.4; ctx.strokeStyle = ringCol; ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI * 2); ctx.stroke();   // grab-ring (nearHandle's 12px hit-test)
             const bx = hx + 11, by = hy - 9;   // numbered badge (1-based), like the 3D number sprite
             ctx.fillStyle = 'rgba(13,17,23,0.85)'; ctx.beginPath(); ctx.arc(bx, by, 7, 0, Math.PI * 2); ctx.fill();
@@ -223,10 +225,17 @@ export function createToolpath2d(canvas, opts = {}) {
             // manual=amber), MATCHING its start chip. Single-axis rapids (in-axis cross-over, lift/drop, retract) +
             // probe/feed keep their TYPE colours.
             const transV = t === 'rapid' && Math.abs((s.x2 || 0) - (s.x1 || 0)) > 0.05 && Math.abs((s.y2 || 0) - (s.y1 || 0)) > 0.05;
+            const manualTrav = transV && startSources[s.pass] === 'manual';   // a MANUAL jog travel arcs UP ('rainbow'); AUTO stays straight
             ctx.strokeStyle = transV ? (startSources[s.pass] === 'manual' ? '#ffb300' : '#22d3ee') : segColor(s, zMin, zRange, maxPF);
             ctx.lineWidth = t === 'rapid' ? width * 0.6 : width;
             ctx.setLineDash(t === 'probe' ? [2, 3] : (t === 'rapid' ? [5, 4] : []));   // probe dotted, rapid dashed (match 3D)
-            ctx.beginPath(); ctx.moveTo(ptx(s.x1, s.pass), pty(s.y1, s.pass)); ctx.lineTo(ptx(s.x2, s.pass), pty(s.y2, s.pass)); ctx.stroke();   // each pass rides its own start (INC4)
+            const ax = ptx(s.x1, s.pass), ay = pty(s.y1, s.pass), bx = ptx(s.x2, s.pass), by = pty(s.y2, s.pass);   // each pass rides its own start (INC4)
+            ctx.beginPath(); ctx.moveTo(ax, ay);
+            if (manualTrav) {   // a pronounced UPWARD 'rainbow' arc — a quadratic through a control point above the midpoint (screen-up = smaller y)
+                const mx = (ax + bx) / 2, my = (ay + by) / 2, arc = Math.max(14, Math.hypot(bx - ax, by - ay) * 0.45);
+                ctx.quadraticCurveTo(mx, my - arc, bx, by);
+            } else { ctx.lineTo(bx, by); }
+            ctx.stroke();
         }
         ctx.globalAlpha = 1; ctx.setLineDash([]);
     }
