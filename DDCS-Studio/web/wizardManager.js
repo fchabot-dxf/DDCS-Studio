@@ -352,8 +352,7 @@ export class WizardManager {
         this._formSnapshot = this._captureForm();
     }
 
-    // Back-compat entry points (older callers and window.* glue)
-    openCorner() { this.open('corner'); }
+    // Back-compat entry points (older callers and window.* glue). (openCorner retired ④ — Corner (data) opens via open('user_corner_data').)
     openMiddle() { this.open('middle'); }
     openEdge() { this.open('edge'); }
     openAlignment() { this.open('alignment'); }
@@ -384,8 +383,7 @@ export class WizardManager {
         if (view) return view.update(this);
     }
 
-    // Back-compat named update/anim entry points used by app.js listeners
-    updateCornerWizard() { return viewByType.get('corner').update(this); }
+    // Back-compat named update/anim entry points used by app.js listeners (updateCornerWizard retired ④)
     updateMiddleWizard() { return viewByType.get('middle').update(this); }
     updateEdgeWizard() { return viewByType.get('edge').update(this); }
     updateAlignmentWizard() { return viewByType.get('alignment').update(this); }
@@ -394,7 +392,6 @@ export class WizardManager {
     updateAtcLengthWizard() { return viewByType.get('atc_length').update(this); }
     updateAtcWarmupWizard() { return viewByType.get('atc_warmup').update(this); }
     updateAtcChangeWizard() { return viewByType.get('atc_change').update(this); }
-    _startCornerAnim() { viewByType.get('corner').startAnim(); }
     _startEdgeAnim() { viewByType.get('edge').startAnim(); }
     _startAlignmentAnim() { viewByType.get('alignment').startAnim(); }
 

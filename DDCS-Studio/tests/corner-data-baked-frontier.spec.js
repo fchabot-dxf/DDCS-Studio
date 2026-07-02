@@ -7,8 +7,8 @@ import { test, expect } from '@playwright/test';
  *   • `level` — the G31 probe LEVEL (a literal-in-G31 multi-socket value, no macro var, non-operator-facing): a DELIBERATE
  *     baked-FINAL (it does NOT get a live toggle; the ④ release carries that decision forward — do not relitigate).
  *
- * This holds the DON'T-RETIRE-THE-BUILT-IN gate: the twin is the release replacement, but retiring the built-in Corner is the
- * ④ RELEASE's call (end-to-end verify + version bump), not unblocked here.
+ * The built-in Corner is now RETIRED (④ move 2a) — the twin is its replacement. Test (2) asserts the retirement landed +
+ * guards re-registration; the SHIM (cornerStack / BUILDERS.corner / SCHEMA.corner) stays so legacy saved 'corner' ops render.
  */
 
 // (1) `level` is the last baked frontier — DELIBERATELY baked-final (non-operator-facing). The twin diverges from cornerStack
@@ -30,14 +30,15 @@ test('BAKED FRONTIER: `level` stays baked-final (non-operator-facing) — the tw
   expect(levelDiverges, 'level is baked-final (the twin bakes level=0); a non-zero level diverges — DELIBERATE (non-operator-facing), not a follow-on').toBe(true);
 });
 
-// (2) DON'T-RETIRE-THE-BUILT-IN gate. The twin is the release replacement, but retiring the built-in Corner is the ④ RELEASE's
-//     decision (end-to-end verify + version bump + retire the wizardLibrary entry). This assertion guards it until then.
-test('BAKED FRONTIER GATE: the built-in Corner wizard stays registered until the ④ release retires it', async ({ page }) => {
+// (2) The built-in Corner is now RETIRED (④ move 2a) — replaced by the "Corner (data)" twin. This asserts the retirement
+//     LANDED (no built-in 'corner' entry in wizardLibrary) + guards against an accidental re-registration. The SHIM stays:
+//     cornerStack / BUILDERS.corner / SCHEMA.corner keep legacy saved 'corner' ops rendering.
+test('RETIRED: the built-in Corner wizard is no longer registered (replaced by the Corner (data) twin)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
   const builtinCorner = await page.evaluate(async () => {
     const { listEntries } = await import('/blocks/wizardLibrary.js');
     return listEntries().some((e) => e.id === 'corner' && e.type === 'corner' && e.kind === 'builtin');
   });
-  expect(builtinCorner, 'built-in Corner (wizardLibrary id:corner) MUST stay registered until the ④ release retires it (end-to-end verify + version bump). All operator params are live now, but the release owns the retirement; this test guards it until then.').toBe(true);
+  expect(builtinCorner, 'the built-in Corner (wizardLibrary id:corner) is RETIRED ④ — replaced by user_corner_data; do NOT re-register it').toBe(false);
 });

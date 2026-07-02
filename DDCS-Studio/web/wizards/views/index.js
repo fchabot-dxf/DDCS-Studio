@@ -17,7 +17,7 @@
  */
 import { commView } from './commView.js';
 import { wcsView } from './wcsView.js';
-import { cornerView } from './cornerView.js';
+// Corner wizard retired 2026-07-02 (④) — REPLACED by the "Corner (data)" twin (user_corner_data, the generic user-op view).
 import { middleView } from './middleView.js';
 // Circular wizard retired 2026-06-23 — superseded by Middle (circular + probe-both-axes).
 import { rotaryCenterView } from './rotaryCenterView.js';
@@ -37,7 +37,6 @@ export const WIZARD_VIEWS = [
     commView,
     wcsView,
     homingView,
-    cornerView,
     middleView,
     rotaryCenterView,
     rotaryClockView,

@@ -15,7 +15,7 @@ import { getSettings } from './settingsPanel.js';
 
 // Which wizards require which hardware. Anything not listed (warm-up / comm / wcs / homing / mill cutting) is
 // ungated — it opens straight through.
-const PROBE_WIZARDS = ['corner', 'edge', 'middle', 'alignment', 'rotary_center', 'rotary_clock'];
+const PROBE_WIZARDS = ['edge', 'middle', 'alignment', 'rotary_center', 'rotary_clock'];   // corner (built-in) retired (④)
 const ATC_WIZARDS = ['atc_length', 'atc_check', 'atc_change', 'atc_table', 'atc_test'];
 
 // "Is it configured" — reuse the same logic the setup checklist uses.

@@ -5008,3 +5008,45 @@ want a reversible release-1 with removal in a follow-up. **Then the release: ver
 Only ONE decision to bless: retirement mechanism **(A) hide vs (B) full-remove** (I lean B; the Circular precedent + cornerStack
 shim make it safe) + confirm the release (version bump + push) is yours to trigger or mine on your word. NOT executing anything
 irreversible this turn — committed only the `level` doc + this log.
+
+---
+
+## 🔨 turn 65 (cycle 11) — ④ move 2a: RETIRE the built-in Corner (full-remove, the Circular pattern). COMMITTED, NOT pushed/bumped. ⏸ PASS BACK the diff for FINAL review.
+
+Advisor blessed OPTION B (full-remove — executes the human-t6 locked model "Corner (data) REPLACES the built-in"; hidden-but-
+present would leave the gated pilot unfinished + set the wrong precedent for the ~10 waiting wizards). Executed the retirement
+ONLY (no push, no version-bump). THE SHIM (cornerStack / BUILDERS.corner / SCHEMA.corner / FIELD_BIND.corner) is UNTOUCHED —
+`git diff --stat` on those is EMPTY — so legacy saved 'corner' ops still render.
+
+**THE RETIREMENT DIFF (13 files — the built-in-ONLY entry points, per the surfaced plan + the Circular precedent bb7fd28):**
+- `blocks/wizardLibrary.js` — removed the `{ id:'corner', … }` BUILTINS entry (the bar entry).
+- `wizards/views/index.js` — removed the cornerView import + its WIZARD_VIEWS entry (the view).
+- `wizards/views/cornerView.js` — DELETED (git rm; was only imported by views/index).
+- `ui/commandDeck.js` — removed `corner:'openCornerWiz'` from WIZ_SPECIAL_OPENER.
+- `ui/wizardPrereq.js` — removed 'corner' from PROBE_WIZARDS.
+- `ui/globalFunctions.js` — removed `window.openCornerWiz`.
+- `wizardManager.js` — removed the dead openCorner / updateCornerWizard / _startCornerAnim.
+- `app.js` — removed the dead c_corner viz-listener block + the dead openCorner().
+- `index.html` — removed the `#wiz_corner` DOM panel (119 lines, CRLF/no-BOM preserved via a scripted range delete) + the
+  fallback openCornerWiz + 'wiz_corner' from the fallback hide-list; RE-ANCHORED the fallback's early-return sentinel from the
+  removed openCornerWiz to a surviving opener (openMiddleWiz) so the "skip if the module already loaded" logic stays correct.
+- LEFT (dead-but-HARMLESS, guarded, out of the surfaced scope): `index.html` window.drawCornerViz (guarded `if(!container)return`,
+  now uncalled) + `viz/cornerVizAnimator.js` + globalFunctions' CornerVizAnimator assign — noted; a later cleanup, not needed.
+
+**TESTS updated (4):**
+- `corner-data-baked-frontier.spec` — the built-in-gate test FLIPPED from "stays registered" → "is RETIRED (not registered)"
+  (asserts the retirement landed + guards re-registration); the `level` baked-final test KEPT.
+- `probe-field-sticky.spec` — the "a DIFFERENT un-edited wizard follows the global" check switched from corner/#c_dist →
+  edge/#p_dist (edge is another built-in probe wizard with a MAX PROBE field).
+- `ui-presence.spec` — `#wiz_corner` toHaveCount(1) → toHaveCount(0) (panel retired).
+- `wizard-bar.spec` — the openCornerWiz assertion → asserts NO 'Corner' item + NO openCornerWiz opener in the probe group.
+
+**VERIFY.** **Full suite: 467 passed, 0 failed, 2 skipped** (app boots clean — the retirement broke nothing). RETIREMENT SMOKE
+(throwaway, deleted): built-in Corner GONE from the library (builtinCorner:false); `#wiz_corner` panel gone; `openCornerWiz`
+removed; the surviving openers (openMiddleWiz) still work (sentinel fix verified); Corner (data) (user_corner_data) is the ONLY
+corner entry; **a legacy saved 'corner' op still RENDERS real probe G-code (G31 … M30, 1713 chars) via the shim** (BUILDERS.corner
+= cornerStack); NO JS/page errors (only the benign /api/descriptor gateway 404, filtered).
+
+**⏸ PASS BACK the retirement diff for your FINAL fresh-eyes review (the one true one-way door).** COMMITTED (this branch) but NOT
+pushed + NOT version-bumped — reversible via git until you bless it. Once you bless the diff, dispatch move 2b: version bump
+(`npm run bump-version`) + release (web deploy + exe) per the standing release-version-often authorization.

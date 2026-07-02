@@ -189,125 +189,7 @@
             </div>
 
             <!-- WIZARD BODIES: One per wizard type, only one visible at a time -->
-            <div id="wiz_corner" class="wiz-body" style="display:none">
-              <div class="wiz-2pane">
-                <div class="wiz-visual">
-                <span class="section-label">VISUALIZATION</span>
-                <!-- Visualization container -->
-                <div class="viz-container">
-                    <div id="cornerVizStatus" class="viz-status"></div>
-                    <div id="cornerVizContainer" class="viz-canvas"></div>
-                </div>
-                
-                <!-- Viz Legend -->
-                <div class="viz-legend">
-                    <div class="viz-legend-item"><div class="viz-legend-line probe"></div>Probe</div>
-                    <div class="viz-legend-item"><div class="viz-legend-line retract"></div>Retract</div>
-                    <div class="viz-legend-item"><div class="viz-legend-line jog"></div>Jog</div>
-                    <div class="viz-legend-item"><div class="viz-legend-line travel"></div>Travel</div>
-                </div>
-
-
-                </div><!-- /.wiz-visual -->
-                <div class="wiz-controls">
-                <div class="wiz-usage">Use for <b>outside corners</b> (boss). Park probe in the open space near the corner at scan depth — clear of both walls. Macro probes each wall and sets WCS X and Y (and optionally Z) to the corner.</div>
-
-                <!-- Form controls in grid layouts -->
-                <span class="section-label">FEATURE CONTEXT</span>
-                <div class="grid-3">
-                    <div>
-                        <span class="label">CORNER LOCATION</span>
-                        <select id="c_corner" title="Corner to probe. Sets X/Y probe directions.&#10;FL: X+, Y+  FR: X-, Y+  BL: X+, Y-  BR: X-, Y-" value="FL"><option>FL</option><option>FR</option><option>BL</option><option>BR</option></select>
-                    </div>
-                    <div>
-                        <span class="label">PROBE SEQUENCE</span>
-                        <select id="c_probe_seq" title="Probe order. YX: probe Y wall first, travel to X wall. XY: probe X wall first, travel to Y wall." value="YX"><option>YX</option><option>XY</option></select>
-                    </div>
-                    <div>
-                        <span class="label">PROBE Z FIRST</span>
-                        <label style="font-size:12px;" title="Probe Z surface before XY walls. Contact pos saved to #1927, written to #[#70+2] (WCS Z offset)."><input type="checkbox" id="c_probe_z_first"/> Probe Z First</label>
-                    </div>
-                </div>
-
-                <!-- WCS Target -->
-                <div>
-                    <span class="section-label">WCS</span>
-                    <span class="label">WCS TARGET</span>
-                    <select id="c_wcs" title="Target WCS for probe results. Active: reads #578 to get index, computes base address as #70=[805+([#578]-1)*5]. Fixed: #70=805..830 directly." value="active">
-                        <option value="active">Active WCS</option>
-                        <option value="G54">G54</option>
-                        <option value="G55">G55</option>
-                        <option value="G56">G56</option>
-                        <option value="G57">G57</option>
-                        <option value="G58">G58</option>
-                        <option value="G59">G59</option>
-                    </select>
-                </div>
-                
-                <!-- Section groups with headers -->
-                <div>
-                    <span class="section-label">GEOMETRY</span>
-                    <div class="grid-3">
-                        <div><span class="label">MAX PROBE</span><input type="number" id="c_dist" value="100" title="Max probe travel distance (mm). Stored as #1. Used in G31 as #7=[0-#1] (neg) or #8=#1 (pos)."/></div>
-                        <div><span class="label">RETRACT</span><input type="number" id="c_retract" value="5" title="Retract distance after fast probe, before slow pass (mm). Stored as #2. Used as #9=[0-#2] (neg) or #10=#2 (pos)."/></div>
-                        <div><span class="label">PROBE RADIUS</span><input type="number" id="c_radius" value="2.0" step="0.001" title="Radius of the probe stylus ruby tip. Used for coordinate compensation."/></div>
-                        <div><span class="label">SAFE Z</span><input type="number" id="c_safe_z" value="10" title="Z lift distance for moves between walls (mm). Stored as #19. Also used in plunge: #17=safeZ+scanDepth."/></div>
-                        <div><span class="label">DIAG TRAVEL</span><input type="number" id="c_travel_dist" value="50" title="Diagonal trans-axis reposition: distance to travel from the first wall across to set up the second-wall probe (mm) — the same diagonal-step idea as the middle's Diag travel. Stored as #15 (pos) / #16=[0-travel] (neg)."/></div>
-                        <div><span class="label">SCAN DEPTH</span><input type="number" id="c_scan_depth" value="5" title="Extra Z plunge below safeZ before probing a wall (mm). #17=safeZ+scanDepth. #18=[0-#17]."/></div>
-                    </div>
-                </div>
-                
-                <!-- Feed Rates -->
-                <div>
-                    <span class="section-label">FEED RATES</span>
-                    <div class="grid-2">
-                        <div><span class="label">FAST FEED</span><input type="number" id="c_feed_fast" value="200" title="Fast probe feedrate (mm/min). Stored as #3. Used in first G31 pass."/></div>
-                        <div><span class="label">SLOW FEED</span><input type="number" id="c_feed_slow" value="50" title="Slow probe feedrate (mm/min). Stored as #4. Used in second G31 pass after retract."/></div>
-                    </div>
-                </div>
-
-                <!-- Probe Settings -->
-                <div>
-                    <span class="section-label">ADVANCED</span>
-                    <div class="grid-3">
-                        <div><span class="label">INPUT PORT (P)</span><input type="number" id="c_port" value="3" title="Probe input port number. Stored as #5. Used as P parameter in G31 (e.g. G31 X#7 F#3 P#5)."/></div>
-                        <div><span class="label">LEVEL (L)</span>
-                            <select id="c_level" title="Probe trigger signal level. L0=active low (NPN/normally-open). L1=active high (PNP/normally-closed). Used as L parameter in G31." value="0">
-                                <option value="0">Low (0)</option>
-                                <option value="1">High (1)</option>
-                            </select>
-                        </div>
-                        <div><span class="label">STOP (Q)</span>
-                            <select id="c_q" title="Probe stop mode. Q1=immediate stop on trigger. Q0=decelerate to stop. Used as Q parameter in G31." value="1">
-                                <option value="1">Immediate (Q1)</option>
-                                <option value="0">Decel (Q0)</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Options -->
-                <div>
-                    <span class="section-label">OPTIONS</span>
-                    <div class="grid-3">
-                        <div>
-                            <label style="font-size:12px;" title="Dual gantry only — writes A machine position to WCS slave offset. Disable if A is a rotary axis."><input type="checkbox" id="c_sync_a" checked/> Sync A Axis (Dual Gantry)</label>
-                        </div>
-                        <div>
-                            <span class="label">SLAVE</span>
-                            <select id="c_slave" title="WCS offset index for the slave axis. A=offset 3 (#[#70+3]), B=offset 4 (#[#70+4])."><option value="3">A</option><option value="4">B</option></select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Preview block -->
-                <div class="preview-block">
-                    <span class="label">CODE PREVIEW <span class="compliant-tag">(DDCS M350 COMPLIANT)</span></span>
-                    <pre id="wiz_corner_code"></pre>
-                </div>
-                </div><!-- /.wiz-controls -->
-              </div><!-- /.wiz-2pane -->
-            </div>
+            <!-- #wiz_corner panel RETIRED (4) - replaced by the "Corner (data)" twin (user_corner_data). -->
 
             <!-- Middle Wizard -->
             <div id="wiz_middle" class="wiz-body" style="display:none">
@@ -2669,7 +2551,7 @@
     <!-- Fallback: expose simple wizard controls if module failed to initialize -->
     <script>
     (function(){
-        if (typeof window.openCornerWiz !== 'undefined') return;
+        if (typeof window.openMiddleWiz !== 'undefined') return;   // (was openCornerWiz — retired ④; re-anchored to a surviving opener)
 
         function showWizardPanel(type){
             const w = document.getElementById('wizard');
@@ -2677,7 +2559,7 @@
             const box = w.querySelector('.wiz-box');
             w.style.display = 'flex';
             w.classList.add('active');
-            ['wiz_comm','wiz_wcs','wiz_corner','wiz_middle','wiz_edge','wiz_alignment'].forEach(id=>{
+            ['wiz_comm','wiz_wcs','wiz_middle','wiz_edge','wiz_alignment'].forEach(id=>{
                 const el = document.getElementById(id);
                 if (el) el.style.display = 'none';
             });
@@ -2686,25 +2568,7 @@
         }
 
         window.openWiz = (type) => showWizardPanel(type);
-        window.openCornerWiz = () => {
-            showWizardPanel('corner');
-            const startAnim = async () => {
-                try {
-                    if (window.drawCornerViz) await window.drawCornerViz();
-                    const corner   = document.getElementById('c_corner')?.value || 'FL';
-                    const seq      = document.getElementById('c_probe_seq')?.value || 'YX';
-                    const zfirst   = document.getElementById('c_probe_z_first')?.checked || false;
-                    if (window.__cornerAnimator) { try { window.__cornerAnimator.stop(); } catch(e){} }
-                    if (!window.__cornerAnimator && window.CornerVizAnimator) {
-                        window.__cornerAnimator = new window.CornerVizAnimator();
-                    }
-                    if (window.__cornerAnimator) {
-                        setTimeout(() => window.__cornerAnimator.play(corner, seq, zfirst), 60);
-                    }
-                } catch(err) { console.warn('openCornerWiz anim failed', err); }
-            };
-            startAnim();
-        };
+        // openCornerWiz fallback RETIRED (④) — the built-in Corner is replaced by the "Corner (data)" twin (user_corner_data).
         // Enhanced fallback: show the middle panel and attempt autoplay if animator exists
         window.openMiddleWiz = () => {
             showWizardPanel('middle');

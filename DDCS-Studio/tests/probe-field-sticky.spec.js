@@ -53,6 +53,7 @@ test('a wizard MAX PROBE edit sticks per-wizard, overrides only its own field, a
   await expect(page.locator('#m_dist')).toHaveValue('77');
 
   // Overrides ONLY its own field: a DIFFERENT, un-edited wizard's MAX PROBE still follows the global (33).
-  await openWiz(page, 'corner');
-  await expect(page.locator('#c_dist')).toHaveValue('33');
+  // (Was 'corner'; the built-in Corner is retired ④ → use edge, another built-in probe wizard with a MAX PROBE field.)
+  await openWiz(page, 'edge');
+  await expect(page.locator('#p_dist')).toHaveValue('33');
 });

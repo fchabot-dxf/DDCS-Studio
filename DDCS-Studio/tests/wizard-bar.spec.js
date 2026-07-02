@@ -50,7 +50,9 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   // the "Rotary" sub-label divider survives.
   const probeBy = Object.fromEntries(probe.items.map((i) => [i.text.replace(/\s+/g, ' '), i.onclick]));
   expect(probe.items[0].onclick).toBe("openWiz && openWiz('wcs')");
-  expect(probe.items.find((i) => /Corner/.test(i.text)).onclick).toContain('openCornerWiz');
+  // Built-in Corner RETIRED ④ — no 'Corner' item + no openCornerWiz opener in the probe group (the "Corner (data)" twin lives in its own data-wizard group).
+  expect(probe.items.some((i) => /Corner/.test(i.text)), 'no built-in Corner in the probe bar').toBe(false);
+  expect(probe.items.some((i) => /openCornerWiz/.test(i.onclick || '')), 'no openCornerWiz opener').toBe(false);
   expect(probe.items.find((i) => /Middle/.test(i.text)).onclick).toContain('openMiddleWiz');
   expect(probe.items.find((i) => /Edge/.test(i.text)).onclick).toContain('openEdgeWiz');
   expect(probe.items.find((i) => /Align/.test(i.text)).onclick).toContain('openAlignmentWiz');

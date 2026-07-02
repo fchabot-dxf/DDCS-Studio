@@ -230,19 +230,7 @@ class DDCSStudio {
     }
 
     setupVisualizationListeners() {
-        // Corner wizard visualization listeners
-        ['c_corner', 'c_probe_seq', 'c_probe_z_first'].forEach(id => {
-            const elem = el(id);
-            if (elem) {
-                elem.addEventListener('change', () => {
-                    if (el('wiz_corner').style.display !== 'none') {
-                        if (window.drawCornerViz) {
-                            window.drawCornerViz();
-                        }
-                    }
-                });
-            }
-        });
+        // (Corner wizard viz listeners retired ④ — the built-in Corner is replaced by the "Corner (data)" twin.)
 
         // Middle wizard visualization listeners
         ['m_type', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_probe_z_first'].forEach(id => {
@@ -293,13 +281,7 @@ class DDCSStudio {
         });
     }
 
-    openCorner() {
-        this.open('corner');
-        setTimeout(() => {
-            if (window.drawCornerViz) window.drawCornerViz();
-            this.updateCornerWizard();
-        }, 10);
-    }
+    // openCorner() retired ④ — the built-in Corner is replaced by the "Corner (data)" twin (user_corner_data).
 
     openMiddle() {
         this.open('middle');

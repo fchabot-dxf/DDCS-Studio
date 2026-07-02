@@ -51,7 +51,7 @@ const WIZ_GROUP_ICON = { setup: HEADER_ICONS.comm, probe: HEADER_ICONS.probe, at
 const WIZ_SUBLABEL = { rotary_center: 'Rotary' };
 
 // Wizards with a dedicated 3D-animated opener instead of the generic openWiz(type).
-const WIZ_SPECIAL_OPENER = { corner: 'openCornerWiz', middle: 'openMiddleWiz', edge: 'openEdgeWiz', alignment: 'openAlignmentWiz' };
+const WIZ_SPECIAL_OPENER = { middle: 'openMiddleWiz', edge: 'openEdgeWiz', alignment: 'openAlignmentWiz' };   // corner retired (④) — Corner (data) opens via the generic user-op path
 
 // The I/O quick-actions — a bar-special section appended to the Setup dropdown (not library entries).
 const WIZ_IO_SECTION = `

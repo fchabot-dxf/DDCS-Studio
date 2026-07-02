@@ -39,7 +39,8 @@ const BUILTINS = [
     { id: 'atc_warmup', type: 'atc_warmup', label: 'Warm-up', icon: '🔥', group: 'setup' },
     { id: 'wcs', type: 'wcs', label: 'WCS / work offsets', icon: '⊕', group: 'probe' },
     { id: 'homing', type: 'homing', label: 'Homing', icon: '⌖', group: 'probe' },
-    { id: 'corner', type: 'corner', label: 'Corner', icon: '📐', group: 'probe' },
+    // Corner (built-in) RETIRED (④ 2026-07-02) — REPLACED by the "Corner (data)" twin (user_corner_data). cornerStack /
+    // BUILDERS.corner / SCHEMA.corner stay as the shim so legacy saved 'corner' ops still render.
     { id: 'middle', type: 'middle', label: 'Middle / Bore / Boss', icon: '🎯', group: 'probe' },
     { id: 'edge', type: 'edge', label: 'Edge', icon: '📏', group: 'probe' },
     { id: 'alignment', type: 'alignment', label: 'Align', icon: '🧭', group: 'probe' },

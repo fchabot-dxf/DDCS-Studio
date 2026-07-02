@@ -26,7 +26,7 @@ export function setupGlobalFunctions(app) {
 
         // Wizard functions
         window.openWiz = (type, variant, bypassPrereq) => { window.ddcsTrack?.('feature', 'wizard:' + type); return app.wizardManager.open(type, variant, bypassPrereq); };
-        window.openCornerWiz = () => { window.ddcsTrack?.('feature', 'wizard:corner'); return app.wizardManager.openCorner(); };
+        // openCornerWiz retired (④) — the built-in Corner is replaced by the "Corner (data)" twin (opens via openWiz('user_corner_data')).
         window.openMiddleWiz = () => { window.ddcsTrack?.('feature', 'wizard:middle'); return app.wizardManager.openMiddle(); };
         window.CornerVizAnimator = CornerVizAnimator;
         window.openEdgeWiz = () => { window.ddcsTrack?.('feature', 'wizard:edge'); return app.wizardManager.openEdge(); };

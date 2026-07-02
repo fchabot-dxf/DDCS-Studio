@@ -9,7 +9,7 @@ test('UI basics: header, generators, chips and import control are present', asyn
   await expect(page.locator('header .ver')).toContainText(/V\d+/);
 
   // Generator wizard sections exist in the DOM
-  await expect(page.locator('#wiz_corner')).toHaveCount(1);
+  await expect(page.locator('#wiz_corner'), 'built-in Corner panel RETIRED ④ — replaced by the "Corner (data)" twin').toHaveCount(0);
   await expect(page.locator('#wiz_middle')).toHaveCount(1);
   await expect(page.locator('#wiz_edge')).toHaveCount(1);
 
