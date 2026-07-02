@@ -4685,3 +4685,53 @@ are). So ③ = add `relTo` anchors + the `start` binding group, reading the ONE 
    (retire travelDist, generalize tieDiagTravel) is Item-4/TRAVEL-START — a SEPARATE feature, not this increment.
 
 Passing back the PLAN — NOT building. Expect a synthesis ("do A + this from B") + the handle-count decision, then dispatch the build.
+
+---
+
+## 🔨 turn 51 (cycle 11) — ③ BUILD start: the SIM-SIDE SEAM has a REAL FORK — SURFACING it (advisor said do NOT guess). ⏸ PASS BACK.
+
+③ BUILD dispatched (option A, handle model 2 off / 3 on: sim-only first-start + emitting #21/#22 + emitting #23/#24). Part (1)
+= "DECLARE the sim-side start-override seam FIRST … read by opSimStarts … NEVER emitted." Investigated it (2 Explore agents +
+direct code trace) BEFORE touching code, per the advisor's "if the seam has a real design fork, SURFACE it, do NOT guess."
+
+### FINDING — the sim-only-override seam ALREADY EXISTS + the corner data-op is ALREADY WIRED to it
+- **`createPreviewPanel.userStarts` (viz/createPreviewPanel.js:155-166)** is the declared sim-only per-pass start-override seam:
+  `onStartDrag(pos, pass)` → `userStarts[p]` (BEATS the inferStarts hint, persists in-session), mirrors the 3D marker, re-traces.
+  `computePassStarts` (:387) precedence = **userStarts > pass-0 > getStartHints(=opSimStarts) > passStarts**. It is SIM-ONLY —
+  NEVER touches params/emit (edge/middle already use it: edgeView.js:34 / middleView.js:37 "SIM ONLY … does NOT touch the emit").
+- **The corner data-op's per-pass markers are ALREADY DRAGGABLE via it, in BOTH surfaces:** the 3D marker (gcodeViz3d.js:1436-40,
+  a ruby+gizmo per pass) AND the 2D toolpath handle (toolpath2d.js:316-335) both call `onStartDrag` → userStarts. userOpView
+  feeds `opSimStarts(...)` as the hints (userOpView.js:113-114 → mgr.preview3D → createPreviewPanel getStartHints). So dragging
+  the corner's first-start marker TODAY writes userStarts (sim-only, persists, no emit). Parts (1)/(2) are ~ALREADY WIRED.
+
+### THE FORK — where does the sim-only first-start override live?
+The advisor's spec says "read by **opSimStarts**." The existing seam is read by **computePassStarts** (downstream of the
+opSimStarts hints), NOT opSimStarts itself. So:
+- **(A) REUSE the existing `userStarts` seam** (edge/middle's pattern; the corner is already wired). Never emits; persists
+  in-session; "read by opSimStarts" is satisfied COMPOSITIONALLY (opSimStarts gives the HINTS; userStarts overrides via the ONE
+  declared `computePassStarts` precedence). **Build under A = tiny:** verify the corner's pass-0 first-start drag persists + is
+  sim-only, + the hardened spec (4b). No new seam, consistent with edge/middle.
+- **(B) NEW declared opSimStarts-level override** (`setSimStartOverride(opType, pass, pos)` registry, opSimStarts returns it →
+  "read by opSimStarts" LITERALLY). More "declared", and a future NON-panel consumer would see it. **Cost:** a new seam that
+  DUPLICATES userStarts (both override the first start); the corner's drag must be RE-ROUTED off onStartDrag to it; edge/middle
+  stay on userStarts → an inconsistency unless generalized (a bigger cross-cutting change). Per-opType keying (opSimStarts has no
+  instance id) is coarser than the panel's per-instance userStarts.
+
+### RECOMMENDATION → **A** (reuse userStarts)
+It IS a declared seam (the one edge/middle + the whole preview use), it is verifiably SIM-ONLY (no emit), the corner is already
+wired to it, and it keeps ONE precedence source. B duplicates a working seam for a wording-nicety. If the advisor specifically
+needs opSimStarts to LITERALLY RETURN the override (for a headless/non-preview consumer), that's a separate GENERALIZATION —
+fold userStarts INTO the opSimStarts registry for ALL wizards — which is its own increment, not ③. **Scope note:** under A, the
+real remaining ③ build is PART 3 (the EMITTING #21/#22 startX/startY handle + the `optional` deriveBindings flag + form/handle-
+gating) + the two hardened specs (4a emitting datum-relative-delta·independent-truth·mutation; 4b the CRITICAL sim-only-drag
+CHANGES-PREVIEW-but-EMIT-BYTE-IDENTICAL). Parts (1)/(2) collapse to "verify + spec" — the seam is done.
+
+### ⏸ GATE — bless the seam choice before I build:
+1. **A vs B** (I rec A — reuse the existing sim-only userStarts seam; the corner is already wired + it never emits). If A, the
+   ③ build is mainly part 3 (the emitting handle) + the hardened specs (4a/4b). If B, I add the opSimStarts override registry +
+   re-route the corner drag (bigger, + the edge/middle-consistency question).
+2. Confirm the sim-only first-start drag SURFACE = the existing createPreviewPanel per-pass markers (3D + 2D toolpath), NOT a new
+   handle on the FeatureCanvas layout (the emitting #21-#24 handles stay on the FeatureCanvas). Both already exist under A.
+
+NOT building this turn — the seam is the forked FOUNDATION the dispatch said to decide first; passing back for the A/B call, then
+I build part 3 + the specs (small under A).
