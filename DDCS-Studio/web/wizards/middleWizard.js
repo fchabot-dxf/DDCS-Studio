@@ -11,7 +11,7 @@
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
-import { probeSurfaceStack } from './ops/probeSurface.js';   // the shared probe primitive (middle composes it — t131 inc1)
+import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';   // the shared probe + travel primitives (middle composes them — t131 inc1, ① auto/manual travel)
 import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
 import { travelOwn, travelOpp } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
@@ -92,12 +92,14 @@ export function middleStack(params = {}) {
     const reposition = (msg) => {
         // Lift clear, the operator jogs to the next wall, then drop back the SAME amount — all INCREMENTAL (no G53),
         // so the preview stays start-anchored and fans each pass out to its own marker. The "REPOSITION:" comment is
-        // what the parser counts as a new pass (gcodeParser.js). (Was: #57 machine-Z save + G53 restore — that marked
-        // the trace absolute and collapsed every pass onto the same marker, so only marker 1 ever appeared.)
-        MV('Z', '#17');
-        C(`REPOSITION: ${msg || 'jog the probe to the next wall'}`);
-        A('#1505', '1', 'Press Enter when repositioned'); IF('#1505', '==', '0', 2);
-        MV('Z', '[0-#17]'); DM('inc');
+        // what the parser counts as a new pass (gcodeParser.js). Delegated to the ONE shared travel primitive
+        // (safeTraverseStack, approach:'manual') — the manual jog-and-wait (no XY move; operator jogs). VALUE-IDENTICAL to
+        // the old inline lift→comment→#1505→ifgoto→drop→G91 (proven byte-for-byte: middle-reposition-refactor.spec). The
+        // caller owns the 'REPOSITION:' prefix; lift/drop stay #17/[0-#17] so the Z-state is unchanged.
+        S.push(...safeTraverseStack({
+            approach: 'manual', lift: '#17', drop: '[0-#17]',
+            comment: `REPOSITION: ${msg || 'jog the probe to the next wall'}`,
+        }));
     };
     // Boss, AUTO: clear over the feature to the far side, hands-free. Uses the max probe distance #1 as the
     // over-estimate of the feature width (the operator already sets it >= the feature for the probes to reach),

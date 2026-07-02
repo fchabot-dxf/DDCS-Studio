@@ -61,6 +61,7 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
     const probeZFirstDiv = emitEquivalence(cornerStack, dataBuilder, [S({ probeZFirst: 1 })], {}, stripAnnotations);   // structural: inserts a Z step
     const safeZDiv       = emitEquivalence(cornerStack, dataBuilder, [S({ safeZ: 25 })], {}, stripAnnotations);        // fan-out: #19 + computed #17
     const cornerDiv      = emitEquivalence(cornerStack, dataBuilder, [S({ corner: 2 })], {}, stripAnnotations);       // structural: FR direction signs
+    const travelDiv      = emitEquivalence(cornerStack, dataBuilder, [S({ travelApproach: 'manual' })], {}, stripAnnotations);   // structural: manual jog-prompt vs the baked auto G0 move
 
     // DERIVE-ROBUSTNESS — the defect #1 ROOT guard: build the template under probeZFirst=on (which inserts #21/#22) and
     // confirm deriveBindings RE-FINDS the shifted #23/#24 (+2), while the pre-Z scalars are unmoved. A hand-count can't.
@@ -97,6 +98,7 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
       probeZFirstPass: probeZFirstDiv.pass,
       safeZPass: safeZDiv.pass,
       cornerPass: cornerDiv.pass,
+      travelPass: travelDiv.pass,
       robustness,
       sampleHasProbe: /G31/.test(sample),
       sampleLen: sample.length,
@@ -120,6 +122,7 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
   expect(r.probeZFirstPass, 'frontier: probeZFirst inserts a Z-surface step (structure swap the static template cannot do)').toBe(false);
   expect(r.safeZPass, 'frontier: safeZ fans out to #19 + the computed #17 (plunge depth) — a single binding cannot drive both').toBe(false);
   expect(r.cornerPass, 'frontier: the corner quadrant is structural (direction signs + comments) — baked in the twin').toBe(false);
+  expect(r.travelPass, 'frontier: travelApproach=manual swaps the auto G0 move for a #1505 jog prompt (structure swap the static template cannot do) — twin bakes auto').toBe(false);
   expect(r.sampleHasProbe, 'emits a real probe move (G31)').toBe(true);
   expect(r.sampleLen, 'emits substantial G-code').toBeGreaterThan(200);
 });

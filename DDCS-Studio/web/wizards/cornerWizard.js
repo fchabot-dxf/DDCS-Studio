@@ -38,6 +38,10 @@ export function cornerStack(params = {}) {
     const level = num(params.level, 0), safeZ = num(params.safeZ, 10);
     const travelDist = num(params.travelDist, 50), scanDepth = num(params.scanDepth, 5), radius = num(params.radius, 2.0);
     const src = params.sources || {};   // controller-resident probe fields (PROBE-CONFIG-SOURCE.md)
+    // ① AUTO/MANUAL TRAVEL — ONE toggle governs BOTH travels (Z→wall1 + wall1→wall2). 'auto' (default) = the hands-free G0
+    // seq move; 'manual' = an operator jog-and-wait via the shared safeTraverseStack (approach:'manual'), reusing each
+    // travel's OWN lift/drop so the Z-state mirrors auto. Default 'auto' → BYTE-IDENTICAL to today.
+    const travelApproach = params.travelApproach === 'manual' ? 'manual' : 'auto';
 
     // corner → probe directions (FL=X+Y+  FR=X−Y+  BL=X+Y−  BR=X−Y−)
     const [xDir, yDir] = { FL: ['+', '+'], FR: ['-', '+'], BL: ['+', '-'], BR: ['-', '-'] }[corner] || ['+', '+'];
@@ -140,7 +144,8 @@ export function cornerStack(params = {}) {
         }));
         S.push(...safeTraverseStack({
             mode: 'seq', crossX: '#21', crossY: '#22', lift: '#19',
-            comment: 'Traverse to first wall'
+            comment: 'Traverse to first wall',
+            approach: travelApproach, promptNote: 'Jog clear, over to the first wall. Press Enter',   // manual: lift #19, jog, no drop (:150 plunges) — mirrors auto's Z
         }));
     }
 
@@ -152,7 +157,8 @@ export function cornerStack(params = {}) {
 
     S.push(...safeTraverseStack({
         mode: 'seq', crossX: '#23', crossY: '#24', drop: '#18',
-        comment: `Step ${step++}: REPOSITION: Traverse past corner and set up for ${secondAx}`
+        comment: `Step ${step++}: REPOSITION: Traverse past corner and set up for ${secondAx}`,
+        approach: travelApproach, promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, drop #18 to scan depth (mirrors auto) — no lift (already at #17)
     }));
 
     C(`Step ${step++}: ${secondAx} Probe`);

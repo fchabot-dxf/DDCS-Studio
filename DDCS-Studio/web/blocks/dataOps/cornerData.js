@@ -13,12 +13,17 @@
  *   • `probeZFirst` — ticking it INSERTS a Z-surface probe step + traverse (a CONDITIONAL STRUCTURE swap — adds #21/#22 +
  *     a probeSurfaceStack); `instantiate()` substitutes VALUES into a FIXED shape, it cannot add/remove blocks. corner /
  *     probeSeq / wcs / syncA are the same structural class (they change comment text + control-flow), all baked.
+ *   • `travelApproach` — baked at 'auto': each wall-to-wall traverse is a hands-free G0 seq move (safeTraverseStack seq →
+ *     `G0 X#23 Y#24`). MANUAL travel is a DIFFERENT block — a `#1505` "jog + Press Enter" operator prompt (middle's
+ *     reposition() shape), not a move — so auto→manual is a prompt-vs-move STRUCTURE swap `instantiate()` cannot do. Baked
+ *     auto (the twin's default); the LIVE toggle lands with the structural-toggle capability (② / B4). Same class as probeZFirst.
  *   • `safeZ` — a FAN-OUT: it feeds its own socket `#19` AND the COMPUTED `#17 = safeZ + scanDepth` (plunge depth). A single
  *     binding drives ONE socket, so binding safeZ→#19 would leave #17 stale (inconsistent plunge). Held baked (correct-by-
  *     construction) rather than shipped as a wrong binding — this is why the dump's 9th binding was unsound even before its
  *     off-by-one. scanDepth / level are baked for the same reason (computed into #17 / passed into probeSurfaceStack).
- * The built-in Corner keeps ALL of these working; see corner-data-probeZFirst-frontier.spec.js (the loud can't-forget gate
- * that blocks retiring the built-in).
+ * The built-in Corner keeps ALL of these working; see corner-data-probeZFirst-frontier.spec.js and
+ * corner-data-travelApproach-frontier.spec.js (the loud can't-forget gates that block retiring the built-in and block
+ * flipping a baked default before the structural-toggle capability is wired).
  *
  * Template SEEDED from cornerStack(CORNER_DEFAULTS); the BINDINGS are derived + proven byte-identical by
  * tests/corner-data-emit.spec.js. SCOPE (inc B1) = EMIT only — no view/panel (B3), no sim-starts/inferStarts (B2).
@@ -30,7 +35,7 @@ import { deriveBindingsFor } from './deriveBindings.js';
 /** Author defaults — match cornerStack's fallbacks + the built-in Corner field defaults. Structural params (corner/
  *  probeSeq/probeZFirst/wcs/syncA) are baked at their defaults: the twin is the FL / YX / no-Z / active-WCS shape. */
 export const CORNER_DEFAULTS = {
-    corner: 1, probeSeq: 0, probeZFirst: 0, wcs: 0,
+    corner: 1, probeSeq: 0, probeZFirst: 0, travelApproach: 'auto', wcs: 0,
     dist: 500, retract: 5, f_fast: 200, f_slow: 50, port: 3,
     level: 0, safeZ: 10, scanDepth: 5, radius: 2, travelDist: 50,
     // NOTE: startX/startY/cross1_x/cross1_y are deliberately ABSENT — the reposition sockets default to their signed-travelDist

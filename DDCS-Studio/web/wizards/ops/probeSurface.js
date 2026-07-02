@@ -62,6 +62,15 @@ export function probeSurfaceStack(p = {}) {
  * @param p.lift, p.drop - variables/expressions for Z lift and drop (e.g. '#18', '[0-#18]')
  * @param p.comment - comment to emit before the traverse
  *
+ * @param p.approach - 'auto' (default) | 'manual'. AUTO emits the hands-free G0 XY move (the mode dispatch below).
+ *   MANUAL emits an operator JOG-and-wait instead (NO XY move — the operator jogs): [lift] → [comment] → #1505 prompt →
+ *   IF #1505==0 GOTO <failGoto> → [drop] → G91. It reuses this call's OWN lift/drop/comment, so the Z-state mirrors the
+ *   auto travel it replaces. ONLY valid for the seq/in-axis JOG repositions — NOT 'center'/transTraverse, whose re-centre
+ *   math the jog would silently discard. The CALLER owns the comment INCLUDING any 'REPOSITION:' prefix (the sim
+ *   pass-counter keys on it — do NOT auto-prefix here). XY-only jogging during the pause is the operator's responsibility.
+ * @param p.promptVar/p.promptVal/p.promptNote/p.failGoto - manual prompt knobs (defaults '#1505' / '1' /
+ *   'Press Enter when repositioned' / 2 — middle's reposition() literals).
+ *
  * Mode 'in-axis' params: p.move (e.g. '#19')
  * Mode 'center' params: p.dir1Plus, p.dir2Plus, p.diagPrimary ('#22'), p.diagTravel ('#21'), p.wall2Var ('#52'), p.radiusVar ('#6'), p.lastRetract
  * Mode 'seq' params: p.crossX, p.crossY (e.g. '#23', '#24')
@@ -72,6 +81,23 @@ export function safeTraverseStack(p = {}) {
     const axis = p.axis || 'X';
     const second = p.second || 'Y';
     const alc = axis.toLowerCase(), slc = second.toLowerCase();
+
+    // MANUAL approach — SHORT-CIRCUIT the mode dispatch (the mode only shapes the auto XY move, which manual omits).
+    // Emits middle's proven reposition() shape verbatim; leaves the three auto arms below byte-identical for every
+    // existing caller. See the @param p.approach note for the seq/in-axis-ONLY constraint + who owns the REPOSITION: prefix.
+    if (p.approach === 'manual') {
+        const promptVar = p.promptVar || '#1505';
+        const promptVal = p.promptVal ?? '1';
+        const promptNote = p.promptNote ?? 'Press Enter when repositioned';
+        const failGoto = p.failGoto ?? 2;
+        if (p.lift) push('move', { mode: 'rapid', z: p.lift });
+        if (p.comment) push('comment', { text: p.comment });
+        push('assign', { var: promptVar, value: String(promptVal), note: promptNote });
+        push('ifgoto', { lhs: promptVar, op: '==', rhs: '0', goto: failGoto });
+        if (p.drop) push('move', { mode: 'rapid', z: p.drop });
+        push('distmode', { dist: 'inc' });
+        return S;
+    }
 
     if (p.mode === 'center') {
         const lastRetract = p.lastRetract || (p.dir1Plus ? '#10' : '#9');

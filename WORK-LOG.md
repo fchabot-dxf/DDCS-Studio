@@ -3853,3 +3853,60 @@ probeZFirst. The existing golden already pins `^G0 X#23 Y#24$` (auto move presen
 ### SCOPE of the build (after gate): the shared primitive (§1) + middle refactor value-identical (§2) + corner emit adoption (§3) + twin bake+gate (§4). NOT the live data-op manual toggle (② / B4 structural-toggle capability). Also flagged for the build: the corner `travelApproach` GUI control + Blockly round-trip (ship together — "wire round-trip in new features").
 
 **GATE: passing to advisor for review. Awaiting the synthesis before any code.**
+
+---
+
+## 🔨 turn 19 (cycle 1) — ① AUTO/MANUAL TRAVEL — BUILT + VERIFIED (advisor turn 18 blessed the plan)
+
+Built §1–§4 of the turn-17 plan under the advisor's fork decisions (single `travelApproach`; unit-equivalence primary +
+inline one-shot full-macro sweep; both frontier gates; GUI/round-trip deferred to ②). Honored all three residual-risk
+directives. Full suite **456 passed, 0 failed**.
+
+**§1 — `safeTraverseStack` gains `approach:'auto'|'manual'`** (ops/probeSurface.js). A guarded EARLY RETURN on
+`p.approach==='manual'` BEFORE the mode dispatch → the three auto arms (center/seq/in-axis) are textually UNTOUCHED
+(strongest back-compat). Manual emits `[lift] → [comment] → #1505 prompt → IF #1505==0 GOTO <failGoto> → [drop] → G91`,
+reusing the caller's OWN lift/drop/comment. New knobs default to middle's literals (`#1505`/`'1'`/`'Press Enter when
+repositioned'`/`2`; `??` so an explicit `''`/`0` passes). Documented on `@param p.approach`: **seq/in-axis-ONLY** (never
+center/transTraverse — the jog would discard the re-centre math); the **CALLER owns the `REPOSITION:` prefix** (no
+auto-prefix — the sim pass-counter keys on it); XY-only jogging during the pause is a USER responsibility.
+
+**§2 — middle `reposition()` → the shared primitive** (middleWizard.js), added `safeTraverseStack` to the existing import.
+The 10-line inline helper is now a 4-arg call `safeTraverseStack({approach:'manual', lift:'#17', drop:'[0-#17]',
+comment:'REPOSITION: '+…})`. **Proven BYTE/VALUE-IDENTICAL** (middle is shipped) two ways in `middle-reposition-refactor.spec.js`:
+(a) PRIMARY unit equivalence — the manual-branch emit == the OLD inline reposition shape hand-encoded as the independent
+truth, across all 3 call-site msgs + the default fallback, with non-vacuous guards (real `#1505` prompt present; no XY move);
+(b) BACKSTOP full-macro sweep — the whole `middleStack` emit across a 6-row matrix (all 3 reposition sites + the untouched
+AUTO traverseOver/transTraverse controls + circular + X/Y + dir±) == a FROZEN inline golden captured on the pre-refactor tip
+(one-shot; no UPDATE_GOLDEN machinery, per the fork decision). Both green. The temp capture spec was deleted after inlining.
+
+**§3 — corner adopts the toggle** (cornerWizard.js). One read `const travelApproach = params.travelApproach==='manual' ?
+'manual' : 'auto'` + `approach: travelApproach` on BOTH existing seq calls — **reusing each travel's OWN lift/drop** (Call A
+Z→wall1: lift `#19`, no drop → stays lifted, :150 plunges; Call B wall1→wall2: no lift, drop `#18` → ends at scan depth),
+so manual's Z-state MIRRORS auto and probe-2 lands correctly (the plan's "drop crux", resolved by construction — NO new
+`manualLift/manualDrop` params). `corner-travel-approach.spec.js` asserts the VALUES: auto = `G0 X#23 Y#24`; manual = the
+`#1505` jog prompt + `IF #1505==0 GOTO2` with the move GONE, `#18` drop kept, `#23/#24` assigns still emitting (inert dead
+assigns, un-gated); auto explicit == default (byte-identical); + the Z-first Call A path. Auto back-compat is DOUBLY guarded
+(this test + the corner-data-emit golden that pins `^G0 X#23 Y#24$`).
+
+**§4 — the data twin bakes auto** (cornerData.js + 2 specs). `CORNER_DEFAULTS.travelApproach = 'auto'` — baked as a
+STRUCTURAL frontier (prompt-block vs move-block = a swap `instantiate()` can't do; NO binding — nothing to bind, it selects
+WHICH blocks exist). Header FRONTIERS note added next to probeZFirst. TWO gates, mirroring probeZFirst exactly: (a) a
+divergence row in `corner-data-emit.spec.js` — `emitEquivalence(cornerStack, dataBuilder, [S({travelApproach:'manual'})]).pass
+=== false` (twin bakes auto → can't reproduce the manual swap); (b) `corner-data-travelApproach-frontier.spec.js` — a loud
+`test.fixme` documenting the unbuilt manual shape + a REAL gate asserting the twin's default emit HAS the auto `G0 X#23 Y#24`
+and NOT a `#1505` jog prompt (RED if someone flips the default before ② wires the structural toggle).
+
+**VERIFY.** `node --check` clean on all changed source + specs. middle-reposition-refactor 2/2; corner-travel-approach 1/1;
+corner-data-emit (+ the new travel divergence row) 2/2; both frontier specs (probeZFirst + travelApproach) 4/4 (2 fixme
+documenting the frontiers). **Full suite: 456 passed, 0 failed (1.3m).** One non-deterministic flake surfaced on the FIRST
+full run — `middle-animator.spec.js:145` (`stroke-dashoffset` CSS-animation timing under parallel load); it passed 6/6 in
+isolation twice AND the full-suite RE-RUN was clean 456/0. NOT caused by this change (byte-identical middle; no viz/animation
+touched; the middle block stack is unchanged). Flagged as pre-existing parallel-load flake (no retries configured in
+playwright.config).
+
+**NORTH-STAR payoff:** the ONE declared travel primitive now owns BOTH auto and manual — middle's per-wizard hand-rolled
+`reposition()` is retired onto it (the probe-surface-block generalises-probing pattern, applied to travel). corner + every
+future wizard inherit auto/manual for free.
+
+SCOPE respected: EMIT plumbing only. NOT the live data-op manual toggle / GUI control / Blockly round-trip (② / B4 — a control
+now would be a dead option since the twin bakes auto). Ready for advisor review + the ② dispatch.
