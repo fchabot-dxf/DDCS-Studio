@@ -26,7 +26,9 @@ qStop=LEAVE / safe-Z-frame add) STILL HOLD.
 - **D1 — GRID = FOLLOW-ON (NOT this build; human-approved deferral):** M2 delivers the RE-AUTHORING (editable blocks). But "wrap corner in an
   `array` → grid of probes" BREAKS on the existing array (can't stamp #var/incremental coords; duplicate labels; repeated M30; N corners on ONE
   WCS is meaningless). A real grid needs a NEW macro-aware REPEAT primitive (renumber labels, single M30) + a WCS-per-probe semantic (distinct
-  G54..G59) — a SEPARATE GENERIC capability (every probe benefits). M2 makes it POSSIBLE. → **QUEUED as the next big capability after B4.**
+  G54..G59). **Human t30 clarified: the grid was an ILLUSTRATION of re-authoring, NOT a literal ask** — the VALUE M2 delivers is the
+  re-authoring ITSELF (edit corner's structure in Blocks → emit follows). The grid is a POSSIBILITY re-authoring opens; build a repeat
+  primitive ONLY if a real need appears. NOT a committed deliverable.
 - **D2 — corner/probeSeq = SIGN-SWAPS (not prune-shaped):** keep baked in the guard work; live via VALUE-bindings alongside the enum field.
 - **D3 — #17 fan-out fix APPROVED (human t30):** declare `#17 = [#19 + #20]` (scanDepth socket) in the SHARED cornerStack → built-in + twin `#17`
   go literal→expression, VALUE-IDENTICAL (byte-visible in the text; human signed off — touches the built-in).
