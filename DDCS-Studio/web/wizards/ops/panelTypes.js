@@ -10,9 +10,10 @@ import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { opSimStarts } from '../../viz/opSimStarts.js';   // a `relTo` point anchors to the op's declared sim-start (incremental socket)
 
 export const PANEL_TYPES = {
-    form:   { id: 'form',   label: 'Form only', viz: false, mode: null },   // single column, no preview
-    form3d: { id: 'form3d', label: 'Form + 3D', viz: true,  mode: '3d' },   // form + the shared 3D preview (default)
-    form2d: { id: 'form2d', label: 'Form + 2D', viz: true,  mode: '2d' },   // form + a 2D stock layout of the op's xy/rect params
+    form:        { id: 'form',        label: 'Form only',      viz: false, mode: null },   // single column, no preview
+    form3d:      { id: 'form3d',      label: 'Form + 3D',      viz: true,  mode: '3d' },   // form + the shared 3D preview (default)
+    form2d:      { id: 'form2d',      label: 'Form + 2D',      viz: true,  mode: '2d' },   // form + a 2D stock layout of the op's xy/rect params
+    'form3d+2d': { id: 'form3d+2d',   label: 'Form + 3D + 2D', viz: true,  mode: '3d2d' }, // BOTH: the 3D sim (+ declared per-pass markers) AND the 2D drag canvas (the built-in probe pattern, generalized — a visual data-op like Corner (data))
 };
 export const DEFAULT_PANEL = 'form3d';
 export const panelType = (id) => PANEL_TYPES[id] || PANEL_TYPES[DEFAULT_PANEL];

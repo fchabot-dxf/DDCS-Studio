@@ -3956,3 +3956,44 @@ post-fix**. wizard-bar.spec stays GREEN (Bar Test = form3d → quick form, uncha
 
 SCOPE respected: routing only; the emit/canvas/insert mechanisms were already built. NOT ②'s toggles. Ready for review +
 the form3d call.
+
+---
+
+## 🔨 turn 23 (cycle 11) — B3d: the data-op view shows BOTH the 3D sim AND the 2D canvas (advisor turn 22; user-found t22)
+
+**Gap (my B3c exposed it):** `userOpView` was EITHER/OR — B3's `form2d` flip HID the 3D pane (`userOpView.js:100-103`
+`mode==='2d' → viz3d.display='none'`), so "Corner (data)" showed the 2D drag canvas but LOST the 3D probe sim + its
+declared `CORNER_SIM_STARTS` per-pass markers (orphaned — no 3D pane to render into). Built-in probes
+(cornerView/edgeView/middleView) ALWAYS `preview3D()` (3D base) + layer a 2D canvas — never either/or.
+
+**Fork A vs B — DECIDED = B by human ("do b instead") + advisor (locked in NEXT-SESSION.md, "declare-never-infer wins").**
+Option A (infer the overlay from role-presence) REJECTED; Option B = a NEW explicit `form3d+2d` panel type the op DECLARES.
+I did NOT gate (the only fork B3d framed — A vs B — was already answered; the rest is impl within "add the type + the render
+branch"). Confirmed no-break first: `renderDeclaredLayout` is dead (0 callers), `opSimStarts` is exported.
+
+**Built B (one-source — the GENERIC view gains 3D+2D like the built-in probes, not a corner hack):**
+- **`panelTypes.js`:** added `'form3d+2d'` to `PANEL_TYPES` (`viz:true, mode:'3d2d'`).
+- **`index.html` (`#wiz_user`):** added a dedicated 3D box `#userViz3dBox`/`#userViz3dContainer` (a 2nd `viz-container` in
+  the `viz-split`, `display:none` default) — the pocket/edge two-container pattern. The CSS `.viz-split > .viz-container
+  {flex:1 1 0; min-height:160px}` sizes both cleanly. **Chose this over moving the 2D**, so the 2D canvas STAYS in
+  `#userVizContainer` → corner-data-drag + custom-op-form2d-drag + the B3c bar test keep finding `.fc-handle-move` there
+  (zero selector churn); only form3d+2d is new. form2d/form3d paths are byte-untouched.
+- **`userOpView.update`:** new `mode==='3d2d'` branch — `preview3D(gcode, 'userViz3dContainer', starts[0], starts)` (3D sim +
+  the DECLARED `opSimStarts` per-pass markers) AND `renderLayout2D('userVizContainer')` (the 2D drag overlay), together.
+  `.wiz-viz3d` visibility is now box-SCOPED (`viz3dIn(id)` via the container's parent), not a bare `#wiz_user .wiz-viz3d`
+  first-match — robust to the 2 boxes + the shared `#wiz_user` panel lingering a stale pane from a prior op's panel.
+- **`cornerData.js`:** panel block + `userOpFromStack` arg `form2d → form3d+2d`.
+- **`commandDeck.js`:** the B3c routing now catches `form2d` OR `form3d+2d` → `openWiz` (corner's panel changed; keep plain
+  `form3d` on the quick form — still the default-panel guard). This also folds in the form3d-fork I flagged in B3c: the
+  discriminator stays the EXPLICIT canvas panels, not the default.
+
+**VERIFY (verify-real-symptom — the USER's bar path).** Extended `wiz-bar-canvas-route.spec` (the bar-click test): after
+clicking the rendered Corner (data) bar button, assert BOTH `#userVizContainer .fc-handle-move` (2D) AND
+`#userViz3dBox .wiz-viz3d` visible (3D) render TOGETHER, plus `opSimStarts(corner)` feeds ≥2 markers (wall-1 + wall-2) to
+the 3D preview, plus panel==='form3d+2d'. **Full suite: 457 passed, 0 failed (1.4m)** — corner-data-drag / custom-op-form2d-drag
+/ wizard-bar / corner-data-emit all green (form2d/form3d byte-untouched; corner's 2D stayed in #userVizContainer).
+
+SCOPE respected: the generic 3D+2D combo + corner's panel declaration. NOT ②'s live toggles. (Coordination note: the
+advisor amended NEXT-SESSION.md in place for B without re-passing to avoid a colliding turn; I staged ONLY my files, left
+NEXT-SESSION.md untouched.) Ready for review — "Corner (data)" from the bar now shows the 3D probe sim + per-pass markers +
+the 2D reposition drag handle together.

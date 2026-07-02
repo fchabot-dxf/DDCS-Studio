@@ -15,6 +15,7 @@ import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
 import { flattenBlocks } from '../../blocks/userOps.js';   // group: index the stored children for the live preview
 import { panelType, renderLayout2D } from '../ops/panelTypes.js';
+import { opSimStarts } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers feed the 3D preview
 
 // Apply the form values to a COPY of a group's stored children (via the bindings' blockIndex/key) → the records emit
 // walks for the live code preview. A group has no builder; its children ARE the program. The real writeback to the
@@ -97,10 +98,28 @@ export const userOpView = {
         }
         const codeEl = el('wiz_user_code');
         if (codeEl) codeEl.innerHTML = UIUtils.formatGCode(gcode);
-        // preview per panel type: 3D toolpath, a 2D stock layout, or nothing (form-only)
-        const pt = panelType(_def.panel), viz3d = document.querySelector('#wiz_user .wiz-viz3d');
-        if (pt.mode === '3d') { if (viz3d) viz3d.style.display = ''; mgr.preview3D(gcode, 'userVizContainer'); }
-        else if (pt.mode === '2d') { if (viz3d) viz3d.style.display = 'none'; const c = el('userVizContainer'); if (c) c.style.display = ''; renderLayout2D(c, _def, params); }
+        // preview per panel type: 3D toolpath, a 2D stock layout, BOTH (form3d+2d), or nothing (form-only).
+        // The .wiz-viz3d pane is created by preview3D as a sibling INSIDE the target container's .viz-container, so
+        // toggle it box-scoped (not a bare `#wiz_user .wiz-viz3d` first-match — two boxes exist for form3d+2d, and
+        // #wiz_user is shared across ops so a stale pane can linger from a prior op's panel).
+        const pt = panelType(_def.panel);
+        const viz3dBox = el('userViz3dBox');
+        const viz3dIn = (id) => { const c = el(id); return (c && c.parentElement) ? c.parentElement.querySelector('.wiz-viz3d') : null; };
+        if (pt.mode === '3d2d') {
+            // form3d+2d — the built-in probe pattern generalized (edge/middle: 3D base + 2D overlay, never either/or):
+            // the 3D sim + the DECLARED per-pass markers in the dedicated 3D box, AND the 2D drag canvas in #userVizContainer.
+            if (viz3dBox) viz3dBox.style.display = '';
+            let starts = null;
+            try { const stk = window.ddcsGetSettings && window.ddcsGetSettings().stock; starts = opSimStarts(_def.opType, params, stk); } catch (_) { /* op declares no sim-starts */ }
+            mgr.preview3D(gcode, 'userViz3dContainer', (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null);
+            const c = el('userVizContainer'); if (c) { c.style.display = ''; const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; renderLayout2D(c, _def, params); }
+        } else if (pt.mode === '3d') {
+            if (viz3dBox) viz3dBox.style.display = 'none';
+            const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(gcode, 'userVizContainer');
+        } else if (pt.mode === '2d') {
+            if (viz3dBox) viz3dBox.style.display = 'none';
+            const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = el('userVizContainer'); if (c) c.style.display = ''; renderLayout2D(c, _def, params);
+        }
         const status = el('userVizStatus');
         if (status) status.textContent = (_def.label || 'custom') + ' · ' + (gcode.split('\n').length) + ' lines';
     },

@@ -90,7 +90,7 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form2d' } },   // inc B3: 2D FeatureCanvas layout so the reposition point drags
+            { type: 'panel', params: { panel: 'form3d+2d' } },   // B3d: BOTH the 3D probe sim (+ per-pass markers) AND the 2D reposition drag canvas (built-in probe pattern)
             { type: 'sim', params: { rotary: false, machine: true, magazine: false } },
             {
                 type: 'param_group',
@@ -108,5 +108,5 @@ export const CORNER_BINDINGS = deriveBindingsFor(cornerDataStack(CORNER_DEFAULTS
 
 /** Build the corner-as-data def — same userOpFromStack pattern as drill/surfacing/slot/text/atcWarmup. */
 export function cornerDataDef() {
-    return userOpFromStack('corner_data', 'Corner (data)', cornerDataStack(CORNER_DEFAULTS), CORNER_BINDINGS, 'form2d', { forceMachine: true }, 'probe_datawiz');
+    return userOpFromStack('corner_data', 'Corner (data)', cornerDataStack(CORNER_DEFAULTS), CORNER_BINDINGS, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
 }
