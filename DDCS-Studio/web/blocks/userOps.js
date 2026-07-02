@@ -265,9 +265,7 @@ export function defaultParams(def) {
 }
 
 // The builder: clone the template, substitute each binding's value at its (blockIndex, key); unbound values stay baked.
-// Exported so the M3 build-parity gate (corner-data-build-parity.spec) can assert a def.build twin emits byte-identically
-// to the frozen-template instantiate path before the build seam is widened.
-export function instantiate(def, params) {
+function instantiate(def, params) {
     const clone = JSON.parse(JSON.stringify(def.template || []));
     const flat = flattenBlocks(clone);
     for (const b of (def.bindings || [])) {

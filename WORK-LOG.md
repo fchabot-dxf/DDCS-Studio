@@ -4154,3 +4154,90 @@ stays baked (the frontier divergence rows still see the twin bake → still dive
 
 **⏸ GATE (1): the M3 seam is proven sound (byte-identical default, functionally-identical + comment-improved otherwise, no
 behaviour change). Passing to advisor for review before widening the bound set (B4-2: enum/toggle bindings → structural live).**
+
+---
+
+## 🔨 turn 29 (cycle 11) — ② B4 MECHANISM REVERSED M3→M2: REVERT + M2 SCOUT+GATE (advisor turn 28; human t26). ⛔ REPORTING.
+
+Human reversed M3→M2 (t26): re-authoring/COMPOSITION is THE POINT ("open a wizard, go into Blocks, add an array of probes");
+M3's def.build locks structure in JS → defeats it. This is exactly the trade-off I flagged in the turn-25 gate — the human
+chose the pure-data path for composability. Two parts this turn: (1) REVERTED the M3 seam, (2) SCOUTED M2 (6-agent workflow).
+
+### (1) REVERT — done
+Restored userOps.js + cornerData.js to pre-03698c1 (git diff vs 03698c1^ = EMPTY → clean); deleted the M3 corner-data-build-parity
+spec; KEPT the turn-27 WORK-LOG entry (append-only). def.build gone; instantiate is the builder again (M2 emits FROM the template).
+
+### (2) M2 SCOUT — the plan. Mechanism SOUND; but TWO findings the human must weigh (composition + fan-out sign-off).
+
+**§ M2 MECHANISM (sound, well-designed).** A generic `guard` block (transparent container carrying `when:{param,is}`, reusing
+the sim side's EXISTING `whenOk` — one evaluator for emit + sim) + a `pruneGuards(clone, params)` pre-pass in instantiate that
+DROPS falsified guarded subtrees + UNWRAPS survivors, THEN **re-derives bindings BY IDENTITY** (deriveBindings over the pruned
+stack — the def carries binding SPECS, not frozen indices; this is the load-bearing hazard, solved by the existing identity
+matcher). Template = the SUPERSET (all forks present, each guarded); cornerStack = the SEED for now (self-host/delete later).
+BYTE-IDENTICAL-OFF proven: the default prunes every guard → the surviving tree IS cornerStack(defaults) → the emit golden stays
+green. Flipped → the guarded branch survives → parity with cornerStack(flipped). Makes probeZFirst/travelApproach/wcs/syncA
+LIVE as pure re-authorable data.
+
+**⚠️ DECISION 1 (the headline — the human's use case doesn't work as imagined): "array of probes → grid" BREAKS on the
+existing array block.** Adversarial verify = BREAKS, confirmed in code. M2 DOES deliver the ENABLER — the corner op IS the
+editable template block stack in the Blocks tab (no def.build black box), so you CAN wrap the probe blocks. BUT the existing
+`array`/multiplier stamp CANNOT turn that into a grid of corner probes: its `(dx,dy)` offset only reaches LITERAL coords
+(util.js:18 passes `#var`/`[expr]` through, ignoring the offset), and the corner is entirely `#var`-driven + INCREMENTAL (G91)
+— so wrapping it emits N BYTE-IDENTICAL passes at the SAME spot, with DUPLICATE N1/N2 labels + repeated M30 = a BROKEN program,
+not a grid. A real "grid of corners" needs a NEW **macro-aware repeat** primitive (an incremental `G91 X<pitch>` step between
+passes + the config/error-handler/M30 HOISTED out of the loop so they stay singular) AND a **WCS-TARGET semantic decision**: N
+corners all writing the SAME active WCS is meaningless — each needs a distinct G54..G59 slot or a table index. **So: M2 is worth
+building for editability + live toggles, but the specific "add an array of probes" is a SEPARATE follow-on primitive + a
+semantic the human must decide. It is NOT free with M2.** (The array multiplier stays correct for its real job — absolute-XY
+toolpath leaves like drill/bore.)
+
+**§ SCOPE finding: corner quadrant + probeSeq are NOT prune-shaped.** They permute direction SIGNS + axis ORDER inside atoms
+(not add/remove blocks), so the guard/prune mechanism doesn't fit — they'd need value-bindings (bind `own(dir)`/`opp(dir)` /
+axis-letter). **Recommend: keep corner + probeSeq BAKED in M2** (as today); bring them live later via value-bindings.
+So M2's live structural toggles = **probeZFirst · travelApproach · wcs · syncA** (+ syncA's `slave` value). [DECISION 2]
+
+**§ ANCHOR fix under M2 (from the turn-25 BREAKS finding, now concretely resolved).** (i) make the Z→wall1 traverse a
+`REPOSITION:` delimiter in cornerStack → 3 passes = 3 markers 1:1 under probeZFirst (byte-identical OFF — that line only exists
+when Z on; consistent with middle). (ii) SEMANTIC relTo: tag the CORNER_SIM_STARTS rows with stable `id`s ('zsurf'/'wall1'/
+'wall2'); a binding's `relTo:{row:'wall1'}` resolves via `resolveRelToIndex(rows, params, relTo)` to the surviving `when`-filtered
+index (the same filter opSimStarts + the engine `_pass` use) → #23/#24 anchor to wall-1, #21/#22 to zsurf, correct in BOTH Z
+states. (Numeric relTo still honored for back-compat.)
+
+**§ FAN-OUT under M2 (required — instantiate can't compute).** Restructure cornerStack so `#17` (plunge) EMITS the EXPRESSION
+`[#19+#20]` (add a `#20=scanDepth` socket) instead of the baked literal — value-identical, exactly the shipped `#18=[0-#17]` /
+`#16=[0-#15]` idiom. Then safeZ→#19 + scanDepth→#20 are CLEAN single bindings (fan-out dissolved; count 9→11). **DECISION 3:
+this edits the SHARED cornerStack, so the BUILT-IN's `#17` line also changes from `#17=15` to `#17=[#19+#20]` (value-identical,
+byte-VISIBLE — stripAnnotations doesn't hide `#`-lines) — needs sign-off + a re-run of every cornerStack test, and pick #20
+against the M350 free-var list.** `level` stays baked (multi-socket); drill clearance is a separate deferred fork.
+
+**§ STALE-SNAPSHOT (PARTIAL fix — adversarial verify = PARTIAL, honestly).** M2's template is a snapshot → interpolated text
+freezes at the seed defaults. Three kinds: **KIND C** (`#17`, a real value) → fixed by the expression above (byte-gated).
+**KIND A** (bound-value comments like "Probe dist: {dist}mm") → an `interp` binding kind fills `{param}` placeholders at
+instantiate from the SAME resolved values (must be BUILT — not free). **KIND B** (structural-derived text: dir labels, "+Z
+Surface", corner name, "Hover OVER/OUTSIDE", "Target: G5x", step labels, the 2 compNotes) → rides the guard/prune as GUARDED
+comment VARIANTS, **co-delivered WITH the structural toggles** (frozen until then — acceptable ONLY because the twin's
+structural params are baked at exactly those defaults, so the frozen text is CORRECT for the only shape the twin emits; goes
+wrong the instant a toggle is live without its variant → so they ship together). [DECISION 4: confirm KIND B co-delivery.]
+Note: `stripAnnotations` HIDES KIND A/B from the byte-gate, so each needs a DEDICATED value-asserting test (dist=300 ⇒ comment
+reads "300mm") — the assert-the-value discipline.
+
+### ROLLOUT (ordered; each independently verifiable). Assumes M2 + the 4 sub-decisions (anchor / sources=WIRE / qStop=LEAVE / safe-Z frame) HOLD.
+1. **M2-fanout** (self-contained, value-identical, no guard machinery): cornerStack `#17=[#19+#20]` + `#20=scanDepth`; bind
+   safeZ→#19, scanDepth→#20 (9→11); update the golden (#17 expression + #19/#20 lines) + flip the safeZ frontier row to converge.
+2. **M2-guards** (the capability, built ONCE): `guard` block + `pruneGuards` + `resolveRelToIndex`, sharing `whenOk` (extract to
+   a neutral module to avoid a blocks→viz edge); instantiate = prune → re-derive-by-identity → substitute. Unit-test prune
+   (default byte-identical / flipped other-branch / nested / uiChildren) + a non-guarded op (drill) UNCHANGED regression.
+3. **M2-anchor**: Z→wall1 REPOSITION delimiter + sim-start row `id`s + semantic relTo wiring. Assert pass-count == filtered-row-count
+   across the probeZFirst on/off matrix; #23/#24 anchor to wall-1 both states.
+4. **M2-toggles-live**: seed the superset (guard probeZFirst/travelApproach/wcs/syncA regions) + enum/bool bindings
+   (type:'enum'|'bool' + widgetConfig.options — NOT the number-pill rule); flip the 4 frontier divergence rows to PARITY; RETIRE
+   the two frontier tripwire specs in lockstep. **⏸ HUMAN-EYES gate here** (3D preview anchors each pass + the drag ties + toggles work).
+5. **M2-freshness**: KIND A interp-comment binding (dist/retract/fast/slow + safeZ/scanDepth after step 1) + KIND B guarded
+   comment variants (ride step 2's guards) + value-asserting tests.
+6. **sources = WIRE** (Struct user-spec + build passthrough — correctness); **GUI + marker/Blockly round-trip** per new field.
+7. **SEPARATE / GATED (grid-of-corners)**: the macro-aware repeat primitive + the WCS-target decision (DECISION 1). NOT part of
+   core M2; scope after the human decides the semantic. corner+probeSeq value-bindings + self-host (delete cornerStack) also later.
+
+**GATE: passing to advisor for review WITH THE HUMAN. Key calls: (1) grid-of-corners = new primitive + WCS-target semantic
+[headline — the "array of probes" isn't free]; (2) corner/probeSeq baked in M2; (3) #17-expression sign-off on the shared
+cornerStack; (4) KIND-B comment freshness co-delivers with the toggles. Sub-decisions hold.**
