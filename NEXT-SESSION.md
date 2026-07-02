@@ -12,7 +12,25 @@ B3c wiz-bar routing (bar opens the wizard view) · B3d 3D-sim+2D-layout combo (`
 **Decisions:** axis `+h` = CORRECT, do NOT remove (regresses drill/slot/pocket) · 2D-sim-view removal = BACKLOG (own decision, not corner) ·
 the data-op already matches the built-in on the 9 value fields + EXCEEDS it on drag handles (built-in has NONE).
 
-## 🚦 ACTIVE DISPATCH — ② B4: BUILD on M3 (scout reviewed, 4 decisions resolved) [human "automate as much as possible" t26]
+## ⚠️ MECHANISM REVERSED → M2 (human turn 26) — the M3 dispatch below is SUPERSEDED
+**Human ruling:** re-authoring/COMPOSITION is THE POINT — "open a wizard, go into Blocks, add an array of probes." M3 (`def.build`→
+cornerStack) locks the block STRUCTURE in JS → editing Blocks would be decorative → defeats the vision. So **M2** (pure-data template + guards;
+the TEMPLATE is the emit source, re-authorable). Cost accepted (guard/prune machinery + re-derive bindings BY IDENTITY after prune = the
+load-bearing hazard, but `deriveBindings` handles it). Scope: **M2 now** (template = cornerStack blocks + guards, cornerStack stays as the SEED)
+→ self-host (author the template directly, DELETE cornerStack) as the natural NEXT step. The 4 sub-decisions (anchor fix / sources=WIRE /
+qStop=LEAVE / safe-Z-frame add) STILL HOLD.
+
+**🚦 ACTIVE — M2 SCOUT + GATE (advisor turn 28):**
+1. **REVERT the M3 B4-1 seam `03698c1`** (`def.build` is M3-specific; M2 emits FROM the template). Keep the `corner-data-build-parity` test only if it adapts to M2.
+2. **SCOUT the M2 mechanism:** the all-blocks-GUARDED template (a `when`-guard per structural block) · `pruneGuards` at build · **RE-DERIVE the
+   bindings BY IDENTITY after prune** (the load-bearing hazard — `deriveBindings`) · emit-FROM-the-template (the template IS the source, cornerStack = the SEED for now).
+3. ⭐ **Show HOW re-authoring COMPOSES** — the M2 proof + the human's exact use case: "open Corner in Blocks → wrap it in an `array` → a grid of
+   corner probes" must ACTUALLY change the emit. If it doesn't, M2 isn't delivering the point.
+4. ⚠ **STALE-SNAPSHOT FLAG:** the M3 gate caught `instantiate` freezing a stale header (`Probe dist: 500mm` vs the live value) — M2's template is
+   ALSO a snapshot, so the scout MUST say how comments/derived text stay FRESH (regenerate at build, or guard). Don't ship the stale-comment bug.
+5. **GATE:** report the plan (mechanism + the array-of-probes composition + the stale-snapshot answer + the anchor/enum/fan-out rollout under M2) BEFORE build; advisor reviews WITH THE HUMAN.
+
+## 🚦 ~~ACTIVE DISPATCH — ② B4: BUILD on M3~~ (SUPERSEDED by M2 above — kept for the decision record) [human "automate as much as possible" t26]
 **MECHANISM = M3** (`def.build = (p)=>wrap(cornerStack({...defaults, ...bindingScalars(p), ...p}))`): cornerStack IS the emit engine →
 all structural toggles become BUILD-PARAMS → live + EXACT parity + byte-identical-off BY CONSTRUCTION, ZERO per-toggle machinery, one-source,
 DISSOLVES the fan-out (cornerStack computes `#17=safeZ+scanDepth` → both become plain number bindings). Bindings become FORM/2D-layout METADATA
