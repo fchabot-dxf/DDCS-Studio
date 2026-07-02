@@ -12,9 +12,32 @@ B3c wiz-bar routing (bar opens the wizard view) · B3d 3D-sim+2D-layout combo (`
 **Decisions:** axis `+h` = CORRECT, do NOT remove (regresses drill/slot/pocket) · 2D-sim-view removal = BACKLOG (own decision, not corner) ·
 the data-op already matches the built-in on the 9 value fields + EXCEEDS it on drag handles (built-in has NONE).
 
-## 🚦 ACTIVE DISPATCH — ② B4: STRUCTURAL-TOGGLE + ENUM-FIELD CAPABILITY + MULTI-HANDLE (SCOUT + GATE) [human "yes dispatch" t24]
-The last big mechanism piece — makes the baked corner frontiers LIVE. GENERIC (every future port inherits it). **SCOUT + GATE first:**
-propose the mechanism + the rollout decomposition; the advisor reviews WITH THE HUMAN before any build (it sets the pattern for all ports).
+## 🚦 ACTIVE DISPATCH — ② B4: BUILD on M3 (scout reviewed, 4 decisions resolved) [human "automate as much as possible" t26]
+**MECHANISM = M3** (`def.build = (p)=>wrap(cornerStack({...defaults, ...bindingScalars(p), ...p}))`): cornerStack IS the emit engine →
+all structural toggles become BUILD-PARAMS → live + EXACT parity + byte-identical-off BY CONSTRUCTION, ZERO per-toggle machinery, one-source,
+DISSOLVES the fan-out (cornerStack computes `#17=safeZ+scanDepth` → both become plain number bindings). Bindings become FORM/2D-layout METADATA
+(drive widgets), NOT instantiate sockets. Aligned w/ the 2026 reframe (keep the data-def DUMB, source does the work). Trade-off (human-accepted,
+veto→M2 before B4-1): structure is param-driven via the source fn, not free-block-re-authorable — but all params round-trip. (M1 refuted; M2 =
+pure-data when-guards at machinery+duplication cost — only if free-block STRUCTURE re-authoring is required.)
+**ANCHOR FIX (verifier caught the proposed fix BREAKING — Z→wall1 isn't a REPOSITION delimiter → 3 starts/2 passes):** (i) make Z→wall1 a
+`REPOSITION:` delimiter in cornerStack → 3 passes = 3 markers 1:1 (byte-identical OFF; CONSISTENT with middle); (ii) a SEMANTIC `relTo` (names
+its sim-start row) → #21/#22→Z-surf, #23/#24→wall1. **sources = WIRE** (correctness; near-free under M3 + Struct user-spec). **qStop = LEAVE** (backlog).
+**PILOT ADD: safe-Z FRAME toggle (rel|mach)** — corner alone hand-rolls its Z retract; add `safeZParkBlock(frame)` + a `frame` build-param to
+cornerStack (byte-identical when frame=relative) → proves the G53/machinemove atom in a data-op (edge/middle late-discovery risk). [add #3
+"bless deriveBindings" = established BY the M3 rollout + B4-7; #4 probeVector deferred post-enum.]
+
+**BUILD — the 7-step rollout (execute AUTONOMOUSLY; pass back only at the 2 marked checkpoints):**
+1. **B4-1 def.build seam + ⚠ EMPIRICAL GOLDEN GATE** — assert `build(CORNER_DEFAULTS)` deep-equals today's instantiate output (golden + a
+   9-binding build-fn sweep) BEFORE anything else; if it FAILS → STOP. **⏸ PASS BACK after B4-1** (advisor confirms M3 empirically).
+2. B4-2 append NON-derived enum/bool + safeZ/scanDepth + `frame` bindings (`type:'enum'|'bool'|'number'` — NOT the number-pill rule; call it out).
+3. B4-3 make the clean toggles live (corner/probeSeq/wcs/syncA/slave/safeZ/scanDepth/frame) + flip their emit-spec divergence rows to PARITY.
+4. **B4-4 probeZFirst + travelApproach live + the ANCHOR FIX + startX/startY (#21/#22) handles** → **⏸ PASS BACK (human eyes: 3D preview anchors each pass + the drag ties).**
+5. B4-5 sources (Struct user-spec + build passthrough — correctness; chip GUI = follow-on).
+6. B4-6 marker/Blockly round-trip verification (per-field: markerLine→parse preserves value+type; emit(build(back)) == cornerStack(p)) + GUI controls.
+7. B4-7 generalize the M3 pattern to middle (proof build-once). DRILL `clearance` multi-socket = a SEPARATE deferred fork (drill has no macro-var layer). `level` stays baked (multi-socket, non-operator-facing).
+RETIRE the two frontier tripwire specs in LOCKSTEP with flipping the divergence rows. Emit byte-identical when a toggle is untouched.
+Risks: (r1) build MUST feed binding values into params or the 9 scalars silently revert; (r2) new bindings enum/bool NOT number; (r3) gates retire in lockstep; (r4) sources = Struct not scalar.
+**(scout+gate: the mechanism plan + these decisions came from the turn-25 scout, WORK-LOG.)**
 **Parity-confirmed baked frontiers to make live** (`cornerData` CORNER_DEFAULTS):
 - **(a) STRUCTURAL toggles — build the capability GENERICALLY** (Z-First is in BOTH corner AND middle `m_probe_z_first`; build ONCE, both
   inherit — like auto/manual → `safeTraverseStack`) (reshape blocks → `instantiate` can't → needs "always-emit the block GUARDED by a flag"
