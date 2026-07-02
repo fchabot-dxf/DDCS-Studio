@@ -335,15 +335,22 @@ export class FeatureCanvas {
         (spec.handles || []).forEach((h) => {
             const c = this._disp(h.x, h.y);
             const col = h.color || null;   // t81 — reposition SOURCE colour (auto=cyan / manual=amber), matching the top panel; null → the CSS default
+            // t89 — set the source colour via INLINE STYLE, not a presentation ATTRIBUTE. A class-based stylesheet rule
+            // (.fc-handle{fill:#ffce54} gold) OUTRANKS an SVG presentation attribute, so an attribute-set fill/stroke was
+            // SILENTLY overridden to gold (getComputedStyle showed rgb(255,206,84) despite the attribute reading #22d3ee).
+            // Inline style beats the class rule → the computed colour is actually the cyan/amber source colour.
             if (h.simOnly) {
                 // t73/t81 — the SIM-ONLY / manual-jog start marker: a HOLLOW CIRCLE ○ (was a diamond), the 2D-canvas twin of the
                 // top panel's sim-only marker. Coloured by reposition source (cyan=auto / amber=manual), matching the top panel.
-                handles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 7, class: 'fc-handle fc-handle-sim', fill: 'none', stroke: col || '#22d3ee', 'stroke-width': 2 }));
+                const el = svgEl('circle', { cx: c.x, cy: c.y, r: 7, class: 'fc-handle fc-handle-sim', 'stroke-width': 2 });
+                el.style.fill = 'none'; el.style.stroke = col || '#22d3ee';   // hollow, source-coloured stroke — beats .fc-handle
+                handles.appendChild(el);
             } else if (h.kind === 'move') {
                 // t81 — colour the emitting reposition handle by its travel SOURCE (cyan=auto / amber=manual), matching the top
                 // panel; without a source it keeps the CSS fc-handle-move default (gold).
-                const paint = col ? { fill: col, stroke: col } : {};
-                handles.appendChild(svgEl('rect', { x: c.x - 6, y: c.y - 6, width: 12, height: 12, class: 'fc-handle fc-handle-move', rx: 2, ...paint }));
+                const el = svgEl('rect', { x: c.x - 6, y: c.y - 6, width: 12, height: 12, class: 'fc-handle fc-handle-move', rx: 2 });
+                if (col) { el.style.fill = col; el.style.stroke = col; }   // inline beats .fc-handle-move (gold); no source → CSS default
+                handles.appendChild(el);
             } else {
                 handles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 6, class: 'fc-handle' }));
             }

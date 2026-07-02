@@ -236,6 +236,11 @@ export function cornerStack(params = {}, opts = {}) {
     // ② B4 step 3 (anchor): the 'REPOSITION:' comment makes the engine count Z→wall1 as its own pass (3 passes = 3 markers
     // under probeZFirst). ② B4 step 4b: it forks on travelApproach (auto seq move vs #1505 jog prompt) → taPair NESTED inside
     // the probeZFirst guard. manual: lift #19, jog, no drop (the wall-1 step plunges) — mirrors auto's Z.
+    // Z→wall1 stays a single simultaneous XY move (NO firstAxis): this traverse runs at safe-Z (lift #19, no drop — the
+    // wall-1 step plunges) so it's ABOVE the stock and a diagonal can't collide; and by default only the first wall's axis
+    // moves (the other is 0), so a dog-leg would only add a no-op leg. The SAFE dog-leg is the wall1→wall2 traverse below,
+    // which runs at scan depth (crosses material). (It also isn't forked per-combo here, so a geometry-aware order would
+    // desync the twin's superset from the built-in — another reason to keep it the un-split diagonal. Byte-identical.)
     const zWall1 = (approach) => safeTraverseStack({
         mode: 'seq', crossX: '#21', crossY: '#22', lift: '#19',
         comment: 'REPOSITION: Traverse to first wall',
@@ -253,11 +258,15 @@ export function cornerStack(params = {}, opts = {}) {
     const firstLbl = (z, fA) => `Step ${z ? 2 : 1}: ${fA} Probe`;
     const repoLbl = (z, sA) => `Step ${z ? 3 : 2}: REPOSITION: Traverse past corner and set up for ${sA}`;
     const secondLbl = (z, sA) => `Step ${z ? 4 : 3}: ${sA} Probe`;
-    const repoTraverse = (comment, approach) => safeTraverseStack({
-        mode: 'seq', crossX: '#23', crossY: '#24', drop: '#18', comment, approach,
+    // SAFE DOG-LEG: this wall1→wall2 traverse runs at SCAN DEPTH (drop #18) → it crosses the material plane, so a diagonal
+    // could clip the corner. firstAxis = the SECOND wall's axis (ax.sA) routes it AROUND the outside corner (see the
+    // safeTraverseStack SAFE DOG-LEG note). Geometry-aware per corner×probeSeq (sA from axesOf), forked in csFork so the
+    // twin's superset + the built-in pick the same order per combo → byte-parity holds. (manual ignores firstAxis.)
+    const repoTraverse = (comment, approach, firstAxis) => safeTraverseStack({
+        mode: 'seq', crossX: '#23', crossY: '#24', drop: '#18', comment, approach, firstAxis,
         promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, drop #18 to scan depth (mirrors auto) — no lift (already at #17)
     });
-    const repoArmR = (z, sA) => taPair(() => repoTraverse(repoLbl(z, sA), 'auto'), () => repoTraverse(repoLbl(z, sA), 'manual'));
+    const repoArmR = (z, sA) => taPair(() => repoTraverse(repoLbl(z, sA), 'auto', sA), () => repoTraverse(repoLbl(z, sA), 'manual', sA));
     S.push(...csFork((c, s, ax) => [
         ...zPairR([mkC(firstLbl(true, ax.fA))], [mkC(firstLbl(false, ax.fA))]),
         mkMV('Z', '#18'),                          // plunge to scan depth

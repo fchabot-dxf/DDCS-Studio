@@ -753,8 +753,26 @@ export class GcodeViz3D {
             // A MANUAL reposition draws a dashed jog from the previous pass's end to this pass's start (the operator
             // physically moves there). An AUTO traverse does NOT — its auto-traverse move (the diagonal) IS the connecting
             // travel, so a jog line here is a PHANTOM (the dashed line that "shouldn't be there" in auto). Gate by source.
+            // The manual jog BOWS UP in +Z — a pronounced 'rainbow' arc (the operator lifts, arcs over the stock, drops):
+            // the 3D twin of the 2D canvas's upward-bow (toolpath2d). Sampled as a quadratic (control point lifted in +Z)
+            // and pushed as a polyline — consecutive segment PAIRS — so BOTH the dashed route AND the animated trail arc.
             const jogSrc = (this._startSources && this._startSources[p]) || 'auto';
-            if (prevEnd && jogSrc === 'manual') { jogPos.push(prevEnd.x, prevEnd.y, prevEnd.z, off.x, off.y, off.z); grow(prevEnd.x, prevEnd.y, prevEnd.z); grow(off.x, off.y, off.z); pushSeg(prevEnd.x, prevEnd.y, prevEnd.z, off.x, off.y, off.z, 6000, 0, 0, 0, 0, 0xff9a0d); }
+            if (prevEnd && jogSrc === 'manual') {
+                const A = prevEnd, B = off;
+                const chord = Math.hypot(B.x - A.x, B.y - A.y, B.z - A.z);
+                const bow = Math.max(4, chord * 0.45);   // apex height in +Z, matching the 2D bow factor (len*0.45, min floor)
+                const cz = (A.z + B.z) / 2 + bow;        // quadratic control point lifted above the chord midpoint
+                const cxm = (A.x + B.x) / 2, cym = (A.y + B.y) / 2;
+                const N = 16;
+                let pa = A;
+                for (let k = 1; k <= N; k++) {
+                    const t = k / N, u = 1 - t, uu = u * u, ut2 = 2 * u * t, tt = t * t;
+                    const pb = { x: uu * A.x + ut2 * cxm + tt * B.x, y: uu * A.y + ut2 * cym + tt * B.y, z: uu * A.z + ut2 * cz + tt * B.z };
+                    jogPos.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z); grow(pa.x, pa.y, pa.z); grow(pb.x, pb.y, pb.z);
+                    pushSeg(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z, 6000, 0, 0, 0, 0, 0xff9a0d);
+                    pa = pb;
+                }
+            }
             let cur = { x: 0, y: 0, z: 0 }; // pass-local, relative to the marker
             for (const s of segs) {
                 const dx = s.x2 - s.x1, dy = s.y2 - s.y1, dz = s.z2 - s.z1;

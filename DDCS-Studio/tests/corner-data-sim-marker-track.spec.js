@@ -90,13 +90,16 @@ test('(3) Layout canvas: the sim-only start handle appears as a HOLLOW circle (s
   const info = await page.evaluate(() => {
     const h = document.querySelector('#userVizContainer .fc-handle-sim');
     const move = document.querySelector('#userVizContainer .fc-handle-move');   // an emitting handle (filled)
-    return { present: !!h, tag: h && h.tagName.toLowerCase(), fill: h && h.getAttribute('fill'), stroke: h && h.getAttribute('stroke'), hasEmitting: !!move };
+    // t89 — read the COMPUTED colour (fill/stroke are now set via INLINE STYLE so they beat the .fc-handle class rule; the
+    // old getAttribute check saw the right value while the class silently overrode the paint). Computed cyan #22d3ee = rgb(34, 211, 238).
+    const cs = h && getComputedStyle(h);
+    return { present: !!h, tag: h && h.tagName.toLowerCase(), fill: cs && cs.fill, stroke: cs && cs.stroke, hasEmitting: !!move };
   });
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
   expect(info.present, 'a sim-only handle renders on the Layout canvas').toBe(true);
   expect(info.tag, 'drawn as a CIRCLE (t81 — the sim-only/manual-jog shape, distinct from the emitting square)').toBe('circle');
-  expect(info.fill, 'HOLLOW — fill:none (the sim-only shape)').toBe('none');
-  expect(info.stroke, 'cyan (auto, default) — matches the top-panel sim-only marker colour').toBe('#22d3ee');
+  expect(info.fill, 'HOLLOW — fill:none COMPUTES (not the gold .fc-handle fill) — the sim-only shape').toBe('none');
+  expect(info.stroke, 'cyan (auto, default) COMPUTES — matches the top-panel sim-only marker colour').toBe('rgb(34, 211, 238)');
 });
 
 // (4) PART 2 — the EMITTING reposition handle owns its OWN drag (writes cross1_x): it sits at its destination (wall-2), clear

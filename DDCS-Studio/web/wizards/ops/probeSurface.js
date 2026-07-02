@@ -73,7 +73,7 @@ export function probeSurfaceStack(p = {}) {
  *
  * Mode 'in-axis' params: p.move (e.g. '#19')
  * Mode 'center' params: p.dir1Plus, p.dir2Plus, p.diagPrimary ('#22'), p.diagTravel ('#21'), p.wall2Var ('#52'), p.radiusVar ('#6'), p.lastRetract
- * Mode 'seq' params: p.crossX, p.crossY (e.g. '#23', '#24')
+ * Mode 'seq' params: p.crossX, p.crossY (e.g. '#23', '#24'); p.firstAxis ('X'|'Y', optional) — see the SAFE DOG-LEG note below.
  */
 export function safeTraverseStack(p = {}) {
     const S = [];
@@ -112,7 +112,21 @@ export function safeTraverseStack(p = {}) {
     } else if (p.mode === 'seq') {
         if (p.comment) push('comment', { text: p.comment });
         if (p.lift) push('move', { mode: 'rapid', z: p.lift });
-        push('move', { mode: 'rapid', x: String(p.crossX), y: String(p.crossY) });
+        // SAFE DOG-LEG (safety): when the caller DECLARES a firstAxis, split the 2D reposition into two SEQUENTIAL single-axis
+        // rapids so the tool routes AROUND the outside corner instead of diagonally THROUGH the stock. The order is caller-
+        // declared + geometry-aware: pass the SECOND wall's axis (sA). After probing wall-1 the tool sits OUTSIDE the stock
+        // along wall-1's axis (fA) but INSIDE its span along wall-2's (sA); moving sA FIRST clears past the corner (fA-out ·
+        // sA-out) before fA brings it in — moving fA first would land fA-in · sA-in = INSIDE the stock. Topological → holds
+        // for all 8 corner×probeSeq combos (only the signs flip). NO firstAxis → the original single simultaneous XY move
+        // (byte-identical) — for callers that DON'T cross material at this Z, e.g. corner's Z→wall1 runs at safe-Z ABOVE the
+        // stock so a diagonal there can't collide (and one of its axes is 0 by default → splitting would add a no-op leg).
+        if (p.firstAxis === 'X' || p.firstAxis === 'Y') {
+            const fLc = p.firstAxis.toLowerCase(), sLc = fLc === 'x' ? 'y' : 'x';
+            push('move', { mode: 'rapid', [fLc]: String(fLc === 'x' ? p.crossX : p.crossY) });
+            push('move', { mode: 'rapid', [sLc]: String(sLc === 'x' ? p.crossX : p.crossY) });
+        } else {
+            push('move', { mode: 'rapid', x: String(p.crossX), y: String(p.crossY) });
+        }
         if (p.drop) push('move', { mode: 'rapid', z: p.drop });
     } else if (p.mode === 'in-axis') {
         if (p.lift) push('move', { mode: 'rapid', z: p.lift });

@@ -51,9 +51,9 @@ test('travelApproach LIVE: enum binding drives auto/manual == cornerStack byte-f
       parity,
       manualHasJogToWall1: /Jog clear, over to the first wall/.test(manual),
       manualHasJogToNext:  /Jog clear, around to the next wall/.test(manual),
-      manualHasSeqMove:    /G0 X#21 Y#22/.test(manual) || /G0 X#23 Y#24/.test(manual),
-      autoHasSeqZWall1:    /G0 X#21 Y#22/.test(auto),
-      autoHasSeqRepo:      /G0 X#23 Y#24/.test(auto),
+      manualHasSeqMove:    /G0 X#21 Y#22/.test(manual) || /G0 X#23/.test(manual) || /G0 X#23 Y#24/.test(manual),
+      autoHasSeqZWall1:    /G0 X#21 Y#22/.test(auto),   // Z→wall1 stays a single diagonal (above the stock — t89)
+      autoHasSeqRepo:      /G0 X#23/.test(auto) && /G0 Y#24/.test(auto),   // wall1→wall2 is now a 2-leg dog-leg (t89)
       autoHasJog:          /Jog clear/.test(auto),
     };
   });

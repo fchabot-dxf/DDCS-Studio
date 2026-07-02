@@ -5519,3 +5519,58 @@ default byte-identical; piece 2 preview-only). Surgical: 6 source files + 2 new 
 **⏸ PASS BACK for your live-verify** — source-chips on the Expert profile (flip a probe field to 'ctrl' in Settings ▸ Probes →
 the emit uses #1078 &c. + the form field greys) + drag the Layout sim-only ○ directly. NOTE the piece-1 fixed-template adaptation
 (post-emit srcVal, same result as gate-the-binding). COMMITTED, NOT pushed.
+
+## 🔨 turn 89 (cycle 11) — CONSOLIDATED PUNCH-LIST (3 items): (1) SAFE X-then-Y DOG-LEG for auto wall1→wall2 · (2) 3D manual-jog RAINBOW ARC · (3) FeatureCanvas CSS-specificity colour fix. Safety-relevant (real machine motion). Suite green (487 passed, 0 failed, 490 total). COMMITTED (not pushed). ⏸ PASS BACK for live-verify.
+
+**ITEM 1 — SAFE DOG-LEG (auto traverses).** The wall1→wall2 auto reposition was ONE simultaneous diagonal `G0 X#23 Y#24` — at SCAN DEPTH it can clip the corner. Replaced with a TRUE two-move dog-leg that routes AROUND the outside corner.
+- `wizards/ops/probeSurface.js` — `safeTraverseStack` seq mode: NEW opt-in `p.firstAxis` ('X'|'Y'). When set → TWO sequential
+  single-axis rapids in that order; ABSENT → the original single simultaneous XY move (byte-identical fallback). Doc + inline note.
+- `wizards/cornerWizard.js` — wall1→wall2 (`repoTraverse`) now passes `firstAxis: ax.sA` (the SECOND wall's axis), threaded
+  through `repoArmR`. GEOMETRY-AWARE (from `axesOf`, forked in csFork → per corner×probeSeq in BOTH the twin superset + the
+  built-in → byte-parity holds). Derivation: after probing wall-1 the tool is OUTSIDE the stock along wall-1's axis (fA) but
+  INSIDE its span along wall-2's (sA); moving sA FIRST clears past the corner (fA-out·sA-out) before fA brings it in — moving fA
+  first lands fA-in·sA-in = INSIDE the stock. Topological → holds for ALL 8 combos (only signs flip). Verified: XY→Y-first,
+  YX→X-first, per-quadrant-independent, against an INDEPENDENT hand-derivation (not just "two moves exist").
+- **⚠ DECISION I MUST FLAG (Z→wall1 deviates from "both"):** the dispatch listed BOTH Z→wall1 (:239) AND wall1→wall2 (:256) to
+  split. I split ONLY wall1→wall2 and left Z→wall1 a single diagonal (byte-IDENTICAL), on three grounds: (a) SAFETY — Z→wall1
+  runs at safe-Z (lift #19, no drop; the wall-1 step plunges later) so it's ABOVE the stock and a diagonal there CANNOT collide;
+  the collision risk is ONLY the scan-depth wall1→wall2. (b) NO-OP — by default one of #21/#22 is 0, so splitting Z→wall1 would
+  emit a no-op `G0 X0`/`G0 Y0` into production probe code (unverifiable on hardware while away — Live-CNC-read-only). (c)
+  BYTE-PARITY — Z→wall1 is NOT forked per-combo (it references #21/#22 as vars, emitted once), so a geometry-aware order there
+  would desync the twin's superset from the built-in for non-default seq; a diagonal keeps them identical. The architecture and
+  the safety need ALIGN: the traverse that NEEDS the dog-leg (wall1→wall2) is exactly the one that's cleanly forkable. If you'd
+  rather split Z→wall1 too for uniformity, say the word — but it adds a no-op leg for zero safety gain.
+- **MARKER-MOMENT (folded in, no code needed):** the sim marker is DECLARED at the post-sequence net endpoint via
+  `cornerReposOffsets` (net delta), fed identically to the trace + engine `_passStarts`. move-A+move-B = the SAME net delta as
+  the old diagonal → the marker is INVARIANT under the split (it already sits at the point right before G31, NOT an intermediate
+  dog-leg corner). The declare-not-infer architecture makes this free. Confirmed: corner-data-sim-marker-track tests (1)+(2)
+  (independent-truth chaining + emit byte-parity) stay GREEN unchanged.
+
+**ITEM 2 — 3D RAINBOW ARC (manual jog).** `viz/gcodeViz3d.js` — the manual inter-pass jog (drawn prevEnd→pass-start, gated on
+source==='manual') was a STRAIGHT segment. Now BOWS UP in +Z: a sampled quadratic (control point lifted `max(4, chord*0.45)`
+above the chord midpoint, matching the 2D bow factor) pushed as a 16-segment polyline → BOTH the dashed route AND the animated
+trail arc. AUTO passes draw no jog (unchanged). The 3D twin of toolpath2d's existing 2D bow.
+
+**ITEM 3 — CSS-SPECIFICITY COLOUR FIX.** `viz/featureCanvas.js` — the source-coloured handles set fill/stroke via a presentation
+ATTRIBUTE (svgEl), which the class rule `.fc-handle{fill:#ffce54}` (gold) OUTRANKS → getComputedStyle showed gold despite the
+attribute reading the right cyan/amber. Now set via INLINE STYLE (`el.style.fill/stroke`), which beats the class. Applied to BOTH
+the emitting-move handle (the advisor's confirmed case) AND the sim-only handle (same root cause — its fill:none + source stroke
+were ALSO overridden). Preview-only; no emit.
+
+**VERIFY (all green, all mutation-proven):**
+- Item 1: `corner-travel-approach` NEW test "dog-leg moves the SECOND wall axis FIRST — all 8 combos" (asserts the geometry-aware
+  ORDER, the CORRECTNESS property; Mut hardcode-X-first → RED for XY combos). corner-data-emit GOLDEN + corner-data-travelApproach-
+  live + the probe-surface-block CORNER_GOLDEN (4 full-emit snapshots) REGENERATED to the dog-leg — old↔new diff proved SURGICAL
+  (each combo's ONLY change = the single diagonal → the 2-move safe order; Z→wall1 + all else byte-identical).
+- Item 2: `marker-colour-by-source` NEW test "3D manual jog BOWS UP in +Z" (polyline apex >5mm above the flat chord; Mut bow=0 → RED).
+- Item 3: `corner-viz-polish` (3) + `corner-data-sim-marker-track` (3) HARDENED to assert getComputedStyle().fill/.stroke (the
+  ACTUAL painted colour) — the bar that would have caught the bug (the old getAttribute check passed WHILE it rendered gold).
+  Mut back-to-attribute → getComputedStyle reports gold rgb(255,206,84) → RED.
+- **Full suite: 487 passed, 0 failed, 1 flaky (known middle-animator stroke-dashoffset, retries green), 2 skipped = 490 total**
+  (reconciled: 488 prior + 2 new tests). project-drawer-smoke flaked once under full-suite parallelism, passes in isolation +
+  on re-run (unrelated to my files — nothing I touched is imported by the project drawer). Byte-parity: twin ≡ built-in preserved
+  (both go through cornerStack; the dog-leg applies identically) — corner-data-travelApproach-live's 2×2 byte-for-byte parity green.
+
+**⏸ PASS BACK for your live-verify** — the dog-leg (geometric pixel-checks across multiple corner/probeSeq combos: XY→Y-first,
+YX→X-first, at scan depth) + the 3D rainbow arc + the computed-style colour fix. FLAGGING the Z→wall1 decision (split only
+wall1→wall2; Z→wall1 kept a byte-identical diagonal — above stock, no-op-avoidance, byte-parity — reasons above). COMMITTED, NOT pushed.

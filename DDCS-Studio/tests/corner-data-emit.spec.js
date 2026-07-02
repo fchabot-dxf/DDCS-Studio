@@ -181,7 +181,9 @@ test('corner-data-emit GOLDEN: a DEFAULT Corner (data) emits a NON-DEGENERATE re
   expect(emit, '#16 = -#15 (derives from travelDist → no fan-out)').toMatch(/^#16=\[0-#15\]$/m);
   expect(emit, '#23 (X cross) holds the signed-travel expression, not 0').toMatch(/^#23=#16$/m);
   expect(emit, '#24 (Y cross) holds the signed-travel expression, not 0').toMatch(/^#24=#15$/m);
-  expect(emit, 'the reposition MOVE references the sockets').toMatch(/^G0 X#23 Y#24$/m);
+  // SAFE DOG-LEG (t89): the reposition MOVE is now TWO sequential single-axis rapids referencing the sockets (routes AROUND
+  // the corner, not diagonally through the stock). Default FL/YX → 2nd wall = X → X-first (G0 X#23 then G0 Y#24).
+  expect(emit, 'the reposition dog-leg references the sockets (X#23 leg then Y#24 leg — safe order)').toMatch(/^G0 X#23\nG0 Y#24$/m);
   // NEGATIVE — the degenerate default is GONE (both failure modes: an inlined zero move, and #23/#24 resolving to 0):
   expect(emit, 'no inlined zero reposition').not.toMatch(/^G0 X0 Y0$/m);
   expect(/^#23=0$/m.test(emit) || /^#24=0$/m.test(emit), 'no zero reposition socket').toBe(false);

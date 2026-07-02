@@ -106,9 +106,13 @@ test('(3) Layout handles adopt the top panel cyan=auto / amber=manual colour cod
     const fc = new FeatureCanvas();
     fc.render(cont, layoutSpecFromOp(def, p, { pos: { x: 12, y: 12 } }, ['manual', 'manual', 'manual']));
     const sq = cont.querySelector('.fc-handle-move'), sim = cont.querySelector('.fc-handle-sim');
+    // HARDENED (t89): read the COMPUTED (actually-painted) colour — the bar that catches the CSS-specificity bug. The
+    // .fc-handle-move class rule (gold) outranks a fill/stroke ATTRIBUTE, so an attribute-only check reported the right
+    // colour while the handle rendered GOLD. Inline style (the fix) beats the class → getComputedStyle reports the real colour.
+    const csSq = getComputedStyle(sq), csSim = getComputedStyle(sim);
     const out = { manualRepos: manualRepos && manualRepos.color, autoRepos: autoRepos && autoRepos.color,
       manualSim: manualSim && manualSim.color, autoSim: autoSim && autoSim.color,
-      renderedSquareFill: sq && sq.getAttribute('fill'), renderedSimStroke: sim && sim.getAttribute('stroke') };
+      computedSquareFill: csSq.fill, computedSimStroke: csSim.stroke, computedSimFill: csSim.fill };
     cont.remove(); return out;
   });
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
@@ -117,7 +121,11 @@ test('(3) Layout handles adopt the top panel cyan=auto / amber=manual colour cod
   expect(r.autoRepos, 'an auto reposition handle is CYAN').toBe(AUTO);
   expect(r.manualSim, 'the sim-only ◇ is AMBER when its pass is manual').toBe(MANUAL);
   expect(r.autoSim, 'the sim-only ◇ is CYAN when its pass is auto').toBe(AUTO);
-  // the FeatureCanvas actually paints the colour (not the CSS gold default).
-  expect(r.renderedSquareFill, 'the emitting square is painted AMBER (manual), not the CSS gold').toBe(MANUAL);
-  expect(r.renderedSimStroke, 'the sim ◇ stroke is AMBER (manual)').toBe(MANUAL);
+  // HARDENED — the FeatureCanvas COMPUTES the amber colour (inline style beats the .fc-handle-move class), NOT the CSS gold
+  // rgb(255,206,84). getComputedStyle returns rgb() form: amber #ffb300 = rgb(255, 179, 0).
+  const MANUAL_RGB = 'rgb(255, 179, 0)', GOLD_RGB = 'rgb(255, 206, 84)';
+  expect(r.computedSquareFill, 'the emitting square COMPUTES amber (inline beats the class), not the CSS gold').toBe(MANUAL_RGB);
+  expect(r.computedSquareFill, 'and specifically NOT the gold .fc-handle default (the bug it would have shown)').not.toBe(GOLD_RGB);
+  expect(r.computedSimStroke, 'the sim ◇ stroke COMPUTES amber (not the dark .fc-handle stroke)').toBe(MANUAL_RGB);
+  expect(r.computedSimFill, 'the sim ◇ is genuinely HOLLOW (fill:none computes as rgb(0,0,0,0)/none, not the gold .fc-handle fill)').toMatch(/none|rgba\(0, 0, 0, 0\)/);
 });

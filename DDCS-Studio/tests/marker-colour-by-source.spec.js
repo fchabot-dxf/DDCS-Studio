@@ -69,6 +69,36 @@ test('3D inter-pass jog: AUTO traverse draws NO jog line; MANUAL keeps its jog',
   expect(r.manualJog, 'MANUAL reposition → keeps its jog line').toBe(true);
 });
 
+// The MANUAL jog is a pronounced UPWARD 'rainbow' arc in the 3D view (the operator lifts, arcs over the stock, drops) —
+// the 3D twin of the 2D canvas's upward-bow (t89). It's a sampled polyline (not a single straight segment) whose apex
+// rises in +Z well above the two endpoints (which sit at the same low/scan Z here). AUTO stays straight (no jog at all).
+test('3D manual jog BOWS UP in +Z (rainbow arc), not a straight line', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
+  await page.waitForSelector('#wiz_drill', { state: 'visible' });
+  await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.viz; });
+  const r = await page.evaluate(() => {
+    const viz = window.ddcsStudio.wizardManager._activePanel.viz;
+    viz._anchorToStart = true;
+    viz.starts = [{ x: 0, y: 0, z: 0 }, { x: 50, y: -50, z: 0 }];   // both pass ends/starts at z=0 → any +Z is the bow
+    const parsed = { stats: { passes: 2 }, segments: [
+      { x1: 0, y1: 0, z1: 0, x2: 10, y2: 0, z2: 0, type: 'rapid', pass: 0 },   // prevEnd = (10,0,0)
+      { x1: 0, y1: 0, z1: 0, x2: 0, y2: 10, z2: 0, type: 'rapid', pass: 1 },   // pass-1 start anchor = (50,-50,0)
+    ] };
+    viz.setStartSources(['auto', 'manual']); viz.setSegments(parsed, false);
+    const pos = viz.lineGroups.jog && viz.lineGroups.jog.geometry.attributes.position.array;
+    if (!pos) return { hasJog: false };
+    let maxZ = -Infinity, minZ = Infinity;
+    for (let i = 2; i < pos.length; i += 3) { if (pos[i] > maxZ) maxZ = pos[i]; if (pos[i] < minZ) minZ = pos[i]; }
+    return { hasJog: true, verts: pos.length / 3, maxZ, minZ };
+  });
+  expect(r.hasJog, 'manual → a jog line exists').toBe(true);
+  expect(r.verts, 'the jog is a sampled polyline (many vertices), not a single 2-point segment').toBeGreaterThan(4);
+  expect(r.minZ, 'the jog endpoints sit at the low/scan Z (≈0)').toBeLessThan(0.001);
+  expect(r.maxZ, 'the jog APEX rises well above the flat chord (a pronounced +Z rainbow bow)').toBeGreaterThan(5);
+});
+
 test('2D path colours the trans-axis TRAVERSE vector (2-axis rapid) by source; in-axis rapid keeps its type colour', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
