@@ -4527,3 +4527,37 @@ suite: 462 passed, 0 failed, 3 skipped (1.3m) — clean, no flakes.**
 **⏸ PASS BACK (advisor verifies + fan-out).** wcs is live via the same guard/prune (7-way); frontier moved to syncA. Ready for
 4d syncA-live (the LAST toggle — a bool block-ADD like probeZFirst; retires the syncA tripwire, then the ④ release retires the
 built-in). Note the wcsLabel-bleed finding above — if a template-size cleanup is wanted later, the KIND-A interp is the lever.
+
+---
+
+## 🔨 turn 45 (cycle 11) — ② B4 M2 step 4c-HARDEN: independent value pins (kill the twin-vs-self tautology). ⏸ PASS BACK (advisor verifies).
+
+4c wcs-live reviewed: values CONFIRMED CORRECT (WCS_BASE + the active formula are both step-5 → consistent; the *20 was a stale
+screenshot, no prod bug). Fan-out found ONE test-integrity gap (CONFIRMED): my 14-combo parity is twin-vs-SELF — `build` just
+PRUNES cornerStack's superset, so BOTH paths share WCS_BASE + wcsLabelOf. Parity proves PRUNE correctness but NOT the VALUES;
+only G54=805/G59=830 were independently pinned (in the toggle-symptom checks). So a WCS_BASE typo for G55/G56/G57/G58, or a wrong
+Y-save/Z-compNote label, ESCAPES GREEN. HIGH-CONSEQUENCE (a wrong #70 = the probed corner written to the WRONG WCS register on a
+real machine) + wcs is now user-selectable + the human-eyes gate is dropped. GOOD CATCH.
+
+**Hardened corner-data-wcs-live (test-only — NO prod code touched):**
+- **(1) INDEPENDENT LITERAL PINS for ALL 6 fixed WCS bases.** Extract the literal `#70=<n>` each fixed arm writes (`#[#70]`
+  indirect refs don't match the regex) and assert it against a HARDCODED truth table `{G54:805,G55:810,G56:815,G57:820,G58:825,
+  G59:830}` — NOT read from WCS_BASE (that would re-introduce the tautology). CROSS-CHECKED: each truth value === 805 + idx*5 (the
+  active formula), a second independent derivation.
+- **(2) LABEL PINS for a fixed WCS.** Pinned the Y-save note ('Save to G54 Y' at wcs=G54) + the Z-surface compNote ('Save G54 Z
+  offset' at wcs=G54 probeZFirst=1 — the Z-compNote arm isn't emitted at probeZFirst=0, so it needs the Z-on state). Only the
+  X-note@G54 was pinned before.
+- **(3) MUTATION-CHECK (proven, reverted BYTE-EXACT):** typo WCS_BASE.G56 := 814 → the G56 pin went RED (Expected 815, Received
+  814) while the twin-vs-self PARITY stayed GREEN — precisely demonstrating the gap the pin closes. Reverted; `git diff` on
+  cornerWizard.js is EMPTY (only the test file changed).
+
+**ADOPTED into the LIVE-SPEC PATTERN:** for VALUE-CARRYING enum/toggle arms (an arm emitting a numeric/address VALUE), pin each
+arm's value vs an INDEPENDENT truth (a hardcoded table), NOT just twin-vs-self parity — parity is blind to a value both sides
+share. This APPLIES TO 4d syncA: pin its slave-offset value (#74=[#70+slave], #[#74]=#883) against an independent expected string.
+
+**VERIFY.** corner-data-wcs-live green; mutation RED on the value typo (parity green — the tautology, demonstrated); **full suite
+462 passed, 0 failed, 3 skipped (1.3m) — clean.** Prod code untouched (cornerWizard.js diff vs HEAD empty).
+
+**⏸ PASS BACK (advisor verifies — no human gate).** Only the wcs-live spec hardened; production 4c is as reviewed. Ready for 4d
+syncA-live (the LAST toggle — a bool block-ADD like probeZFirst, but VALUE-CARRYING via the slave offset, so its spec pins that
+value independently per the adopted pattern). 4d retires the syncA tripwire; then the ④ release retires the built-in.

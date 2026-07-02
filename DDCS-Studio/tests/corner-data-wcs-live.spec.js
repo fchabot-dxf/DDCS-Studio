@@ -47,6 +47,16 @@ test('wcs LIVE: 7-way enum binding drives all arms == cornerStack byte-for-byte 
     const g54    = emit(build, S({ wcs: 'G54' }));
     const g59    = emit(build, S({ wcs: 'G59' }));
 
+    // (4) INDEPENDENT VALUE PINS — the parity above is twin-vs-SELF (both prune the SAME cornerStack superset, sharing
+    //     WCS_BASE + wcsLabelOf), so a wrong base VALUE for a middle arm can't be caught by parity. Extract the literal #70
+    //     each fixed WCS writes (`#70=<n>`; `#[#70]` indirect refs don't match) so the assertions can pin it vs an
+    //     INDEPENDENT truth table. Also pin the Y-save + Z-compNote LABELS for a fixed WCS (only the X-note@G54 was pinned).
+    const fixedBases = {};
+    for (const w of ['G54', 'G55', 'G56', 'G57', 'G58', 'G59']) {
+      fixedBases[w] = Number((emit(build, S({ wcs: w })).match(/#70=(\d+)/) || [])[1]);
+    }
+    const g54Z = emit(build, S({ wcs: 'G54', probeZFirst: 1 }));
+
     return {
       wcsType: wcsBind && wcsBind.type, wcsDefault: wcsBind && wcsBind.default, opts,
       parity,
@@ -55,6 +65,9 @@ test('wcs LIVE: 7-way enum binding drives all arms == cornerStack byte-for-byte 
       g54HasLiteral:  /#70=805\b/.test(g54) && /Target: G54/.test(g54) && /Save to G54 X/.test(g54),
       g54NoActiveRead: !/#71=#578/.test(g54),
       g59HasLiteral:  /#70=830\b/.test(g59) && /Target: G59/.test(g59),
+      fixedBases,
+      g54YNote: /Save to G54 Y/.test(g54),          // the Y save note carries the fixed label
+      g54ZNote: /Save G54 Z offset/.test(g54Z),      // the Z-surface compNote (only emitted at probeZFirst:1)
     };
   });
 
@@ -71,4 +84,14 @@ test('wcs LIVE: 7-way enum binding drives all arms == cornerStack byte-for-byte 
   expect(r.g54HasLiteral, 'G54: writes the literal base #70=805 + "Target: G54" + "Save to G54 X"').toBe(true);
   expect(r.g54NoActiveRead, 'G54: the #578 active read is GONE (fixed target)').toBe(true);
   expect(r.g59HasLiteral, 'G59: writes the literal base #70=830 + "Target: G59"').toBe(true);
+  // (4) INDEPENDENT LITERAL PINS — assert every fixed WCS writes the CORRECT #70 base against a HARDCODED truth table (NOT
+  //     read from WCS_BASE), cross-checked vs the active formula 805+idx*5. A wrong base = the corner written to the WRONG
+  //     WCS register on a real machine; twin-vs-self parity can't catch it (both sides share WCS_BASE). ASSERT THE VALUE.
+  const WCS_TRUTH = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
+  Object.keys(WCS_TRUTH).forEach((w, i) => {
+    expect(WCS_TRUTH[w], `truth table self-consistent: ${w} == 805 + idx*5 (idx=${i})`).toBe(805 + i * 5);
+    expect(r.fixedBases[w], `${w} writes the base address #70=${WCS_TRUTH[w]} (independent literal pin — a WCS_BASE typo here fails, unlike twin-vs-self parity)`).toBe(WCS_TRUTH[w]);
+  });
+  expect(r.g54YNote, 'the Y save note carries the fixed label "Save to G54 Y" at wcs=G54').toBe(true);
+  expect(r.g54ZNote, 'the Z-surface compNote carries the fixed label "Save G54 Z offset" at wcs=G54 probeZFirst=1').toBe(true);
 });
