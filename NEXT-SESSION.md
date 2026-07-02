@@ -20,15 +20,20 @@ load-bearing hazard, but `deriveBindings` handles it). Scope: **M2 now** (templa
 → self-host (author the template directly, DELETE cornerStack) as the natural NEXT step. The 4 sub-decisions (anchor fix / sources=WIRE /
 qStop=LEAVE / safe-Z-frame add) STILL HOLD.
 
-**🚦 ACTIVE — M2 SCOUT + GATE (advisor turn 28):**
-1. **REVERT the M3 B4-1 seam `03698c1`** (`def.build` is M3-specific; M2 emits FROM the template). Keep the `corner-data-build-parity` test only if it adapts to M2.
-2. **SCOUT the M2 mechanism:** the all-blocks-GUARDED template (a `when`-guard per structural block) · `pruneGuards` at build · **RE-DERIVE the
-   bindings BY IDENTITY after prune** (the load-bearing hazard — `deriveBindings`) · emit-FROM-the-template (the template IS the source, cornerStack = the SEED for now).
-3. ⭐ **Show HOW re-authoring COMPOSES** — the M2 proof + the human's exact use case: "open Corner in Blocks → wrap it in an `array` → a grid of
-   corner probes" must ACTUALLY change the emit. If it doesn't, M2 isn't delivering the point.
-4. ⚠ **STALE-SNAPSHOT FLAG:** the M3 gate caught `instantiate` freezing a stale header (`Probe dist: 500mm` vs the live value) — M2's template is
-   ALSO a snapshot, so the scout MUST say how comments/derived text stay FRESH (regenerate at build, or guard). Don't ship the stale-comment bug.
-5. **GATE:** report the plan (mechanism + the array-of-probes composition + the stale-snapshot answer + the anchor/enum/fan-out rollout under M2) BEFORE build; advisor reviews WITH THE HUMAN.
+**🚦 ACTIVE — M2 BUILD (scout reviewed + human-approved t30):** M3 seam reverted (suite green). Build the M2 7-step rollout (WORK-LOG t29).
+- **MECHANISM = M2** (guard block + `pruneGuards` at build + **RE-DERIVE bindings BY IDENTITY after prune** = the load-bearing hazard + shared
+  `whenOk`): the TEMPLATE is the emit source, re-authorable; byte-identical-OFF proven; probeZFirst/travelApproach/wcs/syncA go LIVE as re-authorable data.
+- **D1 — GRID = FOLLOW-ON (NOT this build; human-approved deferral):** M2 delivers the RE-AUTHORING (editable blocks). But "wrap corner in an
+  `array` → grid of probes" BREAKS on the existing array (can't stamp #var/incremental coords; duplicate labels; repeated M30; N corners on ONE
+  WCS is meaningless). A real grid needs a NEW macro-aware REPEAT primitive (renumber labels, single M30) + a WCS-per-probe semantic (distinct
+  G54..G59) — a SEPARATE GENERIC capability (every probe benefits). M2 makes it POSSIBLE. → **QUEUED as the next big capability after B4.**
+- **D2 — corner/probeSeq = SIGN-SWAPS (not prune-shaped):** keep baked in the guard work; live via VALUE-bindings alongside the enum field.
+- **D3 — #17 fan-out fix APPROVED (human t30):** declare `#17 = [#19 + #20]` (scanDepth socket) in the SHARED cornerStack → built-in + twin `#17`
+  go literal→expression, VALUE-IDENTICAL (byte-visible in the text; human signed off — touches the built-in).
+- **D4 — comment freshness co-delivers WITH the toggles** (frozen-but-correct until then). Anchor fix (Z→wall1 REPOSITION + semantic relTo) resolved.
+- Sub-decisions hold: sources=WIRE · qStop=LEAVE · safe-Z frame add.
+- **BUILD AUTONOMOUSLY; ⏸ PASS BACK at the TOGGLES-LIVE gate (human eyes: probeZFirst etc. actually flip the emit + preview) + on completion.**
+  Emit byte-identical when a toggle untouched; retire the frontier tripwires in LOCKSTEP; re-derive bindings by identity after EVERY prune.
 
 ## 🚦 ~~ACTIVE DISPATCH — ② B4: BUILD on M3~~ (SUPERSEDED by M2 above — kept for the decision record) [human "automate as much as possible" t26]
 **MECHANISM = M3** (`def.build = (p)=>wrap(cornerStack({...defaults, ...bindingScalars(p), ...p}))`): cornerStack IS the emit engine →
