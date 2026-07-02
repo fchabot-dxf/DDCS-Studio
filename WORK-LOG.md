@@ -5146,3 +5146,50 @@ indices; simstart.emit = () => []; simstart blocks are fixed-position in uiChild
 **⏸ PASS BACK for your LIVE screenshot verify** (the drag-handle shape distinction is a VISUAL symptom — your eyes are the real
 check). COMMITTED this branch, NOT pushed. Once you bless it, the release gate (A vs B) is the last step. Surgical: only the 6
 source files + the new spec staged (the `_*.png` captures + HANDOFF/NEXT-SESSION left untouched).
+
+---
+
+## 🔨 turn 71 (cycle 11) — sim-marker positions + Layout-canvas sim-handle. ⏸ SCOUT+GATE: mapped both parts + CONFIRMED the root cause, but the advisor's premise needs refining + part 1 has a genuine mechanism fork on the pilot. NO code changed. Passing the mechanism call back.
+
+sim-marker-distinguish BLESSED (advisor live-verified). Dispatched (1) fix the wall-1 start hint to compute zsurf-anchor + the
+#21/#22 default evaluated in JS (mirror the "already-correct wall-2 reposition hint"), (2) unify the sim-only handle onto the
+Layout FeatureCanvas. I mapped both against source; part 2 is clear, but part 1's premise + mechanism need your call FIRST.
+
+**PREMISE REFINED (verify-real-symptom — the "correct wall-2 hint to mirror" does NOT exist for the MARKER):** I confirmed
+empirically that BOTH wall markers are static stock-FRACTIONS, each ~15u off their true anchor+reposition position — wall-2 is
+disconnected the SAME way wall-1 is:
+```
+  MARKER (static frac, today)     TRUE anchor + reposition (FL/YX, td=50)
+  zsurf  (7,  7)   ← operator jog lead; frac is FINE                       (unchanged)
+  wall1  (20, -50)  →  should be  zsurf + (#21,#22)=(0,-50)  = (7, -43)     ~15u off
+  wall2  (-50, 20)  →  should be  wall1 + (#23,#24)=(-50,+50) = (-43, 7)    ~15u off
+```
+The thing that IS correct is the FeatureCanvas HANDLE (panelTypes:119-135): it anchors to opSimStarts[relTo] + the bound value,
+and a drag writes world−anchor (the delta) — THAT is what corner-data-drag.spec verifies (the HANDLE, not the marker). So the
+"pattern to mirror" is the relTo-ANCHOR idea, but there is no existing MARKER that computes anchor + JS-evaluated-default — the
+top-panel markers are ALL fracs. The fix = make the reposition-DESTINATION markers compute as [their anchor pass] + [the #21-#24
+default evaluated in JS], combo-correct via cornerStack's axesOf/opp/travelDist geometry (I have the full formula pinned).
+
+**SCOPE Q:** you flagged wall-1, but wall-2's marker is disconnected identically. Fix BOTH (a coherent path zsurf→wall1→wall2)
+or wall-1 only? (I'd do both — a half-tracked preview looks worse.)
+
+**PART-1 MECHANISM FORK (the geometry is corner-specific → it CANNOT be generic-declarative; needs corner-authored JS. Per
+"restructure-source, don't grow machinery / keep the data-def DUMB" I'm asking before building the hook):**
+- **(A) [RECOMMEND] corner-authored sim-start provider** — corner computes its 3 markers, chaining wall1←zsurf and wall2←wall1
+  through a shared geometry helper `cornerReposOffsets(params)` EXPORTED from cornerWizard (ONE source: emit uses the #-ref form,
+  sim the numeric form — both from the same axesOf/opp/td). The simstart blocks stay (ids/emits/when + a frac fallback for the
+  Z-off lead). No NEW generic machinery; rule-of-three (only corner reposition-chains today). Smallest, most reversible.
+- **(B) a GENERAL reposition-chaining hook** — rows declare `startFrom:'zsurf'`; makeProvider chains position = prior + a
+  per-op offset fn the def supplies. More declarative + reusable (middle/alignment reposition too, could adopt later) — but new
+  generic machinery on the pilot, before a 2nd caller exists.
+
+**PART 2 — CLEAR + ALREADY ANTICIPATED (ready to build as you specified):** createPreviewPanel.js:155-167 already exposes
+`onStartDrag` + `getPassStarts` on the panel return, with the comment "the feature-canvas drag is just another writer of it —
+exposed on the panel return for the view-owned canvas." So: userOpView (owns both the top panel via preview3D AND the FeatureCanvas
+via renderLayout2D; reaches the panel via host.__panel) passes the panel's onStartDrag/getPassStarts into layoutSpecFromOp → the
+FeatureCanvas renders the sim-only ① as a HOLLOW handle at getPassStarts()[0] and a drag calls onStartDrag(pos,0). Same userStarts
+seam, second renderer, never-emitted. No new mechanism.
+
+**⏸ GATE: nod the part-1 mechanism (A or B) + scope (both walls vs wall-1 only) and I BUILD BOTH immediately** (part 2 as above),
+hardened-spec each (the marker position TRACKS its anchor within the JS-evaluated reposition; the Layout ① appears + drags via the
+same userStarts seam), byte-parity untouched throughout. NO code changed this turn (the mechanism belongs to you on the pilot).
