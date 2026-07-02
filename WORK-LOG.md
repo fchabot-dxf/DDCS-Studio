@@ -3741,3 +3741,115 @@ assertion). Regression triangle green: **corner-data-emit 2/2** + **corner-data-
 inc B3b = COMPLETE + VERIFIED. The drag is now geometrically correct (incremental, datum-relative). EMIT (B1/B1b) + SIM (B2/B2b)
 + LAYOUT+DRAG (B3/B3b) all done + value-verified; remaining: B4 (probeZFirst), auto/manual travel, inc C (verify+release), the
 stock-datum `#var` follow-up (draw the handle at the absolute wall via a reachable datum register).
+
+---
+
+## 🔨 turn 17 (cycle 1) — ① AUTO/MANUAL TRAVEL — SCOUT + GATE: the plan (advisor turn 16; human t12). ⛔ REPORTING, no code.
+
+Scouted with a 6-agent workflow (4 section designers + 2 adversarial verifiers) over the 3 subsystems I first ground-read.
+Both adversarial verdicts came back **HOLDS** (see §5). Synthesis below is TIGHTER than the raw agent output: I eliminated one
+over-engineered param set (corner's `manualLift/manualDrop`) and resolved the corner agent's flagged "drop crux". GATE per the
+dispatch — I report the plan; the advisor reviews + dispatches the build. **No source touched this turn.**
+
+### Ground truth confirmed
+- `safeTraverseStack` (ops/probeSurface.js:69-99) = modes center/seq/in-axis, ALL auto (G0). **Corner is the ONLY caller** (2 seq
+  calls: :141 Z→wall1 `#21/#22` lift `#19`; :153 wall1→wall2 `#23/#24` drop `#18`). Middle does NOT use it — it hand-rolls
+  `reposition()` inline (middleWizard.js:92-101).
+- Middle `reposition()` (the proven MANUAL shape) emits 6 blocks: `MV(Z,#17)` → `C(REPOSITION: <msg>)` → `A(#1505,1,'Press Enter
+  when repositioned')` → `IF(#1505=='0' goto 2)` → `MV(Z,[0-#17])` → `DM(inc)`. **No XY move** (operator jogs). Called at 3 sites
+  (:141 in-axis, :182 probeZ, :190 trans). Corner already uses `#1505`/`goto 2`/`LB(2)` as its end label → the prompt shape is native.
+
+### THE UNIFIED DESIGN (one manual branch serves BOTH middle byte-identity AND corner)
+
+```
+ONE-SOURCE TRAVEL PRIMITIVE — safeTraverseStack(p)          NORTH STAR: one declared primitive owns auto+manual
+
+              p.approach === 'manual' ?
+                   |
+        +----------+-----------+
+     MANUAL                   AUTO   (approach absent/'auto' -> mode arms UNTOUCHED = byte-identical)
+   (EARLY RETURN,               |
+    mode ignored)          mode dispatch  (center / seq / in-axis)  <- ZERO textual edits
+   operator jogs, NO XY         +---- G0 XY move ----+
+        |
+   [lift?]      <- p.lift    reads the SAME lift/comment/drop the caller already passes for auto
+   [comment]    <- p.comment
+   #1505 = 1                <- p.promptVal / p.promptNote  (default '1' / 'Press Enter when repositioned')
+   IF #1505==0 GOTO 2       <- p.promptVar / p.failGoto    (default #1505 / 2)
+   [drop?]      <- p.drop
+   G91  (DM inc)
+```
+
+**§1 API — add `approach:'auto'|'manual'` to safeTraverseStack (EARLY-RETURN before the mode dispatch).**
+- New params: `approach` (default 'auto'; only the exact string 'manual' diverts), `promptVar`='#1505', `promptVal`='1',
+  `promptNote`='Press Enter when repositioned', `failGoto`=2. REUSES existing `p.lift`/`p.drop`/`p.comment`.
+- Manual = guarded early `return S` on `p.approach==='manual'`; the three auto arms are **textually unedited** → adversary confirms
+  every current caller byte-identical (§5b). `promptVal`/`promptNote` use `??` (honour explicit ''/0); `failGoto` default **2** (middle's
+  end label — NOT probeSurface's own `?? 1`).
+- **Chosen over** the middle-agent's `const mode = approach==='manual'?'manual':p.mode` alias: equivalent behaviour, but the alias
+  renames the mode-test var in all 3 arms; the early-return leaves them provably untouched (stronger back-compat).
+
+**§2 MIDDLE refactor — value-identical, verdict HOLDS.** `reposition(msg)` becomes a 4-arg call:
+`safeTraverseStack({approach:'manual', lift:'#17', drop:'[0-#17]', comment:'REPOSITION: '+(msg||'jog the probe to the next wall')})`
+(middle adds `safeTraverseStack` to its existing probeSurface import). Adversary traced all 3 sites (:141/:182/:190) block-for-block
+→ **byte-identical** (§5a). PROOF (two layers): (a) a targeted unit equivalence — `safeTraverseStack({approach:'manual',lift:'#17',
+drop:'[0-#17]',comment:...})` deep-equals the hand-built 6-block sequence for each of the 3 msgs; (b) a FULL-MACRO golden sweep of
+`emitMapped(middleStack(row)).text` (FULL text, not stripAnnotations — pins the `( Press Enter… )` + `( REPOSITION: … )` comments)
+captured on the BEFORE tip, asserted byte-identical AFTER. Matrix = 12 rows hitting all 3 sites + auto controls (traverseOver/
+transTraverse must ALSO stay identical): pocket/boss × single/2-axis × inAxis auto/manual × transAxis auto/manual × probeZ on/off ×
+X/Y × dir± × circular × wcs. Regression backstop: full middle suite + `corner-data-emit.spec.js` (exercises the seq path) stay green.
+
+**§3 CORNER adoption — reuse each travel's OWN auto lift/drop (resolves the drop crux).** Add one read
+`const travelApproach = params.travelApproach === 'manual' ? 'manual' : 'auto';` and pass `approach: travelApproach` to BOTH existing
+seq calls — nothing else. Corner-manual mirrors auto's Z-state exactly:
+
+```
+Call A  Z->wall1 : auto = comment -> lift #19 -> G0 X#21 Y#22
+                   man  = lift #19 -> comment -> #1505 prompt            (NO drop -> stays lifted; :150 plunges #18)  OK
+Call B  w1->w2   : auto = comment -> G0 X#23 Y#24 -> drop #18
+                   man  = comment -> #1505 prompt -> drop #18            (ends at SCAN DEPTH, ready for probe 2)      OK
+   -> corner passes the SAME lift(#19)/drop(#18) it ALREADY passes for auto. NO new manualLift/manualDrop params
+      (the corner agent's draft added them + then flagged the drop was wrong; reusing the auto lift/drop is correct-by-construction).
+```
+Back-compat: `travelApproach` default 'auto' → both calls hit the unchanged mode-dispatch → byte-identical (adversary §5b). The
+`#21/#22`+`#23/#24` assigns stay UNCONDITIONAL (inert dead assigns under manual — an assign nobody reads is a no-op on DDCS; gating
+them would be speculative machinery). Corner prompt text via `promptNote` (new code, no byte constraint). Cosmetic: manual reorders
+Call A's comment after the lift — non-executable, no sim impact (Call A's comment isn't a `REPOSITION:` pass delimiter).
+
+**§4 DATA TWIN — bake auto (structural frontier, same class as probeZFirst).** manual vs auto = prompt-block vs move-block = a
+STRUCTURE swap `instantiate()` (value-into-fixed-shape) cannot do. So: add `travelApproach:'auto'` to `CORNER_DEFAULTS` (baked;
+NO binding — there's no value-socket to bind, it selects WHICH blocks exist). `cornerStack` reads it (§3) → the bake is a real code
+path, and it's USED not unused (corner adoption is in-scope), so no lint/unused-const issue. Gate (mirrors the probeZFirst frontier
+exactly, using the ESTABLISHED divergence pattern — no new emit symbol needed): (a) add one frontier-divergence row to
+`corner-data-emit.spec.js`: `emitEquivalence(cornerStack, dataBuilder, [S({travelApproach:'manual'})]).pass === false` (twin bakes
+auto → can't reproduce the manual swap); (b) a loud `corner-data-travelApproach-frontier.spec.js` (a `test.fixme` documenting the
+unbuilt manual shape) so the live toggle (②/B4) is impossible to forget. Header note added to cornerData.js's FRONTIERS list next to
+probeZFirst. The existing golden already pins `^G0 X#23 Y#24$` (auto move present), so auto is doubly-guarded.
+
+**§5 ADVERSARIAL VERIFY — both HOLDS (independent skeptics, told to REFUTE).**
+- (a) **middle value-identity: HOLDS, 0 divergences.** Traced all 3 sites → same 6 atoms, same order, same params (incl. the
+  `( Press Enter when repositioned )` note, `goto 2` numeric, only-Z moves with no X0/Y0 leak — `push` REPLACES params, no merge).
+- (b) **corner auto back-compat: HOLDS, 0 divergences.** Early-return guard false when approach absent → falls through to the verbatim
+  seq arm; new params never spread into an emitted block (per-atom literal params, not `...p`). Data twin bakes auto → emit sweep green.
+
+### GENUINE FORKS for the advisor (recommendations first; the rest I resolved above)
+1. **Corner toggle granularity — SINGLE `travelApproach` (both travels) [recommend] vs per-travel `startApproach`/`crossApproach`.**
+   The dispatch said "a per-travel toggle"; I read that as "manual applies to each travel," which a single toggle satisfies. Corner's
+   two travels are the same physical intent (get the probe to the next wall) — auto-first/manual-second is not a legit operator fork.
+   Middle's `oneMode()` precedent makes per-travel a cheap ADDITIVE refinement later if a real case appears. Confirm single.
+2. **Middle proof format — golden FIXTURE FILE + UPDATE_GOLDEN gate [recommend] vs inline-array golden.** Fixture is more diff-legible;
+   inline is one fewer file. (Both layered with the targeted unit equivalence regardless.)
+3. **Twin frontier gate — the divergence row in corner-data-emit.spec.js [recommend, established pattern] +/- the loud fixme spec.**
+   Divergence row is the load-bearing gate; the fixme spec is documentation/can't-forget (probeZFirst has both).
+
+### Residual risks to carry into the build (verify-real-symptom)
+- Corner manual drop lands probe-2 at scan depth ONLY if the operator jogs XY-only during the `#1505` pause (a Z jog breaks the
+  incremental drop). Same assumption middle already ships — a USER-responsibility, not a system gap. Verify with a real sim/emit check.
+- `approach:'manual'` short-circuits mode → it's ONLY valid for the seq/in-axis jog cases (never center/transTraverse, which carry
+  re-centre math). Middle + corner only ever call it in seq/in-axis contexts. Document the constraint on the param.
+- `REPOSITION:` prefix stays in the CALLER's `p.comment` (middle builds `'REPOSITION: '+msg`) — the sim pass-counter keys on it; don't
+  auto-prefix inside the branch (would break middle byte-identity).
+
+### SCOPE of the build (after gate): the shared primitive (§1) + middle refactor value-identical (§2) + corner emit adoption (§3) + twin bake+gate (§4). NOT the live data-op manual toggle (② / B4 structural-toggle capability). Also flagged for the build: the corner `travelApproach` GUI control + Blockly round-trip (ship together — "wire round-trip in new features").
+
+**GATE: passing to advisor for review. Awaiting the synthesis before any code.**
