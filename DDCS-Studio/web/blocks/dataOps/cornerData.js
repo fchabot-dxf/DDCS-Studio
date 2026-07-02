@@ -142,7 +142,16 @@ function cornerSimStartsProvider(params, stock) {
     // which is unreliable — corner's auto travel isn't tagged, so it read 'manual' even at the auto default + didn't track the
     // toggle). Pass 0 = the operator jog LEAD (auto/default); every reposition-destination pass = travelApproach. Preview-only.
     const src = (p.travelApproach === 'manual') ? 'manual' : 'auto';
-    return real.map((m, i) => { const c = xy[ids[i]]; const source = i === 0 ? 'auto' : src; return c ? { ...m, x: c.x, y: c.y, source } : { ...m, source }; });   // override XY, add DECLARED source, keep emits/z
+    // t94 — DECLARE the ROUTE draw-anchor decouple: an AUTO reposition pass (i>=1, source==='auto') draws its dog-leg
+    // from the PREVIOUS pass's start (the re-park), NOT its own net-endpoint marker — else the incremental dog-leg
+    // double-counts +cross and the route (+ the sim's probe collision origin) fires +cross beyond ②. drawAnchorFor reads
+    // this flag; the marker {x,y} stays the net endpoint. MANUAL (no dog-leg — operator jogs) + pass 0 keep anchor=self.
+    return real.map((m, i) => {
+        const c = xy[ids[i]];
+        const source = i === 0 ? 'auto' : src;
+        const anchorsAtPrev = i >= 1 && source === 'auto';   // auto reposition destinations only
+        return c ? { ...m, x: c.x, y: c.y, source, anchorsAtPrev } : { ...m, source, anchorsAtPrev };   // override XY, add DECLARED source + anchor flag, keep emits/z
+    });
 }
 
 /** The wrapped `user_root` template for a given param set. Structural params bake the stack SHAPE; the 9 bound scalars

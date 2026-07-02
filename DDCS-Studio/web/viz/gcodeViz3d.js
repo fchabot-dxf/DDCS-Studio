@@ -17,6 +17,7 @@ import { toolHalfProfile } from './toolProfile.js';
 import { PartFrame } from './sceneFrame.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
 import { stockProbeStop, barRadius } from '../engine/probeGeometry.js';
+import { drawAnchorFor } from '../engine/passAnchor.js';   // t94 — an AUTO reposition pass's ROUTE (+ its probe-collision Aw/Bw) draws from the PREVIOUS start (re-park), not its own net-endpoint marker
 
 export class GcodeViz3D {
     constructor(container) {
@@ -546,7 +547,10 @@ export class GcodeViz3D {
         // not back to starts[0]=① — else a boss-manual probes the Y walls from ① and looks like a pocket). Single-pass /
         // no pass → starts[0]. ONLY when anchored (probe/incremental); absolute/mill sits at its own coords (no offset).
         const pass = (pos.pass != null && pos.pass >= 0 && pos.pass < this.starts.length) ? pos.pass : 0;
-        const o = this._anchorToStart ? (this.starts[pass] || { x: 0, y: 0, z: 0 }) : { x: 0, y: 0, z: 0 };
+        // t94 — the LIVE engine-driven tool head must ride the SAME re-park draw-anchor as its route (line ~757) + the
+        // engine collision/DRO, else on a corner AUTO reposition pass the head floats +cross off the drawn dog-leg it
+        // traces. drawAnchorFor → previous start for a flagged pass, else self (non-corner / manual / pass 0 unchanged).
+        const o = this._anchorToStart ? (drawAnchorFor(this.starts, pass) || this.starts[pass] || { x: 0, y: 0, z: 0 }) : { x: 0, y: 0, z: 0 };
         this._animTool.position.set((pos.x || 0) + o.x, (pos.y || 0) + o.y, (pos.z || 0) + o.z);
         // Engine-driven trail: bold the executed route up to the tool head (option B — what you see is the path
         // the engine actually ran). Enable trail mode lazily; setAnimate(false)/ddcsStopPreview restores it.
@@ -749,7 +753,11 @@ export class GcodeViz3D {
             const mk = this.starts[p] || { x: 0, y: 0, z: 0 };
             // Route anchor: probe ops draw from the start MARKER (the incremental macro emanates from the real tool
             // position); mill/absolute programs draw at their own coords so moving the start does NOT drag the path.
-            const off = this._anchorToStart ? mk : { x: 0, y: 0, z: 0 };
+            // t94 — an AUTO reposition pass (anchorsAtPrev) draws its dog-leg from the PREVIOUS start (re-park), NOT its
+            // own net-endpoint marker (else the incremental dog-leg double-counts +cross → route + probe-collision Aw/Bw
+            // + prevEnd + the manual-jog B all shift +cross beyond ②). drawAnchorFor resolves it LIVE (drag-consistent);
+            // MANUAL / pass-0 / non-corner fall back to self (mk). The marker SPRITE (_positionMarkers) still uses starts[p].
+            const off = this._anchorToStart ? (drawAnchorFor(this.starts, p) || mk) : { x: 0, y: 0, z: 0 };
             // A MANUAL reposition draws a dashed jog from the previous pass's end to this pass's start (the operator
             // physically moves there). An AUTO traverse does NOT — its auto-traverse move (the diagonal) IS the connecting
             // travel, so a jog line here is a PHANTOM (the dashed line that "shouldn't be there" in auto). Gate by source.

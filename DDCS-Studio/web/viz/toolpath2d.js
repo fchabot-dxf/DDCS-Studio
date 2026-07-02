@@ -13,6 +13,7 @@
  * persist after that — we do NOT auto-recenter on every redraw, so live wizard edits don't yank the view.
  */
 import { traceToolpath } from '../engine/trace.js';
+import { drawAnchorFor } from '../engine/passAnchor.js';   // t94 — an AUTO reposition pass's ROUTE draws from the PREVIOUS start (re-park), not its own net-endpoint marker
 
 // Colours MATCH THE 3D LEGEND: rapid = yellow (dashed), retract = green, probe = blue (slow = light blue, dotted),
 // feed = a blue→teal gradient by DEPTH (Z) across the path — which also surfaces the Z you can't see top-down.
@@ -77,7 +78,8 @@ export function createToolpath2d(canvas, opts = {}) {
     // no pass → pass 0, so existing single-pass behaviour is unchanged.
     const passOff = (pass) => {
         const i = (pass != null && pass >= 0 && pass < starts.length) ? pass : 0;
-        return (anchorToStart && starts[i]) ? { x: starts[i].x, y: starts[i].y } : stockPin();
+        const a = drawAnchorFor(starts, i);   // t94 — auto reposition passes anchor at the previous start (else self); marker sprite (sptx/spty) keeps starts[i].x/y
+        return (anchorToStart && a) ? { x: a.x, y: a.y } : stockPin();
     };
     const pathOff = () => passOff(0);   // pass-0 default (where no per-segment pass applies)
     const ptx = (x, pass) => tx(x + passOff(pass).x);
@@ -300,7 +302,7 @@ export function createToolpath2d(canvas, opts = {}) {
     function setStock(s) { stock = s || null; if (view) paint(); }
     function setWcs(w) { wcs = w || null; }
     function setGridStep(s) { gridStep = Number(s) || 0; if (view) paint(); }
-    function setStarts(arr) { starts = Array.isArray(arr) ? arr.filter(Boolean).map((p) => ({ x: +p.x || 0, y: +p.y || 0, z: +p.z || 0 })) : []; if (view) paint(); }   // per-pass operator starts (①②…)
+    function setStarts(arr) { starts = Array.isArray(arr) ? arr.filter(Boolean).map((p) => ({ x: +p.x || 0, y: +p.y || 0, z: +p.z || 0, anchorsAtPrev: !!p.anchorsAtPrev })) : []; if (view) paint(); }   // per-pass operator starts (①②…); t94 keep anchorsAtPrev so passOff resolves the route draw-anchor
     function setStart(p) { setStarts(p ? [p] : []); }   // back-compat: a single operator start = pass 0
     function setStartSources(arr) { startSources = Array.isArray(arr) ? arr.slice() : []; if (view) paint(); }   // per-pass marker colour (auto=cyan, manual=amber)
     function setStartEmits(arr) { startEmits = Array.isArray(arr) ? arr.slice() : []; if (view) paint(); }   // per-pass marker SHAPE: emitting (a drag edits the program) = filled ◆, sim-only = hollow ◇
@@ -337,7 +339,7 @@ export function createToolpath2d(canvas, opts = {}) {
     canvas.addEventListener('pointermove', (e) => {
         if (!view) return;
         const r = canvas.getBoundingClientRect();
-        if (dragStart != null) { const p = stockPin(), cur = starts[dragStart]; starts[dragStart] = { x: (e.clientX - r.left - view.ox) / view.scale - p.x, y: (view.oy - (e.clientY - r.top)) / view.scale - p.y, z: cur ? cur.z : 0 }; paint(); return; }   // un-pin: handle drawn at +pin → program start = drawn − pin
+        if (dragStart != null) { const p = stockPin(), cur = starts[dragStart]; starts[dragStart] = { x: (e.clientX - r.left - view.ox) / view.scale - p.x, y: (view.oy - (e.clientY - r.top)) / view.scale - p.y, z: cur ? cur.z : 0, anchorsAtPrev: cur ? cur.anchorsAtPrev : false }; paint(); return; }   // un-pin: handle drawn at +pin → program start = drawn − pin; t94 keep anchorsAtPrev so the mid-drag route stays on the re-park frame (no flicker)
         if (drag) { view.ox = drag.ox + (e.clientX - drag.x); view.oy = drag.oy + (e.clientY - drag.y); paint(); return; }
         const px = e.clientX - r.left, py = e.clientY - r.top, snap = snapPoint(px, py);
         cursor = snap ? { x: snap.x, y: snap.y, snapped: true } : { x: (px - view.ox) / view.scale, y: (view.oy - py) / view.scale, snapped: false };

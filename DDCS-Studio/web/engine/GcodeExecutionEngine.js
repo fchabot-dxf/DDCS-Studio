@@ -14,6 +14,7 @@ import { evaluateCondition, validateCondition } from './core/condition.js';
 import { loadProgram as loadProgramText, stripLine } from './core/program.js';
 import { arcPoints } from './core/arc.js';
 import { rayBox, rotaryAxisOf, stockProbeStop } from './probeGeometry.js';
+import { drawAnchorFor } from './passAnchor.js';   // t94 — the probe-collision + DRO origin O is a pass's re-park draw-anchor (auto reposition), not its net-endpoint marker
 
 // Machine-DRO register bases per dialect (X=base, Y=+1, Z=+2, A=+3): Expert #880, V4.1 #1500, DM500 #864, rs274 #5420.
 // read-machine (RM) reads ITS dialect's base; the sim populates them ALL (cheap, dialect-agnostic) so RM returns the real
@@ -498,7 +499,7 @@ export class GcodeExecutionEngine {
     // the SAME frame the probe trigger uses (#1925 = O + target). A=0 (no rotary axis tracked). Guarded to pure-sim.
     _updateDro() {
         if (!this._populateDro) return;
-        const O = (this._passStarts && this._passStarts[this._pass]) || this._stockOffset || { x: 0, y: 0, z: 0 };
+        const O = drawAnchorFor(this._passStarts, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };   // t94 — same re-park anchor the collision uses, so the DRO frame matches #1925-1927
         const mx = (O.x || 0) + this.pos.x, my = (O.y || 0) + this.pos.y, mz = (O.z || 0) + this.pos.z;
         for (const base of DRO_BASES) {
             this.vars.set(base, mx); this.vars.set(base + 1, my); this.vars.set(base + 2, mz); this.vars.set(base + 3, 0);
@@ -978,7 +979,10 @@ export class GcodeExecutionEngine {
                 // (_stockOffset) + the local pos. The recorded route stays origin-relative (the viz offsets it
                 // by the start marker), so dir is the same in both frames — only the start point shifts.
                 // Part 1: the probe fires from its CURRENT pass's start (②③④ after a reposition), not always pass-0's ①.
-                const O = (this._passStarts && this._passStarts[this._pass]) || this._stockOffset || { x: 0, y: 0, z: 0 };
+                // t94 — for an AUTO reposition pass, O is the RE-PARK draw-anchor (previous start), NOT its net-endpoint
+                // marker: the dog-leg is incremental (in local pos), so O(re-park) + local(dog-leg incl. +cross) lands the
+                // probe fire + #1925-1927 exactly on ② the marker. Net-endpoint O double-counts +cross (fires off-face).
+                const O = drawAnchorFor(this._passStarts, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };
                 const aStart = { x: O.x + this.pos.x, y: O.y + this.pos.y, z: O.z + this.pos.z };
                 const bEnd = { x: O.x + target.x, y: O.y + target.y, z: O.z + target.z };
                 const dir = { x: target.x - this.pos.x, y: target.y - this.pos.y, z: target.z - this.pos.z };

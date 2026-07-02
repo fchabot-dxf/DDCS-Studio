@@ -392,8 +392,8 @@ export function createPreviewPanel(container, opts = {}) {
         const next = [];
         for (let p = 0; p < count; p++) {
             const h = userStarts[p] || (p === 0 && st) || hintFor(p) || passStarts[p] || { x: 0, y: 0, z: 0 };
-            const hint = hintFor(p);   // sim-marker-distinguish (t69): `emits` (+ t83 `source`) is a DECLARED property of the pass HINT (opSimStarts), not of a drag/operator override — so it survives a userStarts drag
-            next.push({ x: +h.x || 0, y: +h.y || 0, z: +h.z || 0, emits: !!(hint && hint.emits), source: hint && hint.source });
+            const hint = hintFor(p);   // sim-marker-distinguish (t69): `emits` (+ t83 `source`, t94 `anchorsAtPrev`) is a DECLARED property of the pass HINT (opSimStarts), not of a drag/operator override — so it survives a userStarts drag
+            next.push({ x: +h.x || 0, y: +h.y || 0, z: +h.z || 0, emits: !!(hint && hint.emits), source: hint && hint.source, anchorsAtPrev: !!(hint && hint.anchorsAtPrev) });
         }
         return next;
     }
@@ -469,7 +469,7 @@ export function createPreviewPanel(container, opts = {}) {
                 // (else all passes default to the same start and the circle solve is degenerate). Pass 0 also honours a
                 // user drag (curStart, via st). setSegments has already grown viz.starts to passCount.
                 if (v.starts) {   // sync the 3D markers from the shared per-pass starts (computed above for both views)
-                    for (let p = 0; p < passStarts.length; p++) v.starts[p] = { x: passStarts[p].x, y: passStarts[p].y, z: passStarts[p].z };
+                    for (let p = 0; p < passStarts.length; p++) v.starts[p] = { x: passStarts[p].x, y: passStarts[p].y, z: passStarts[p].z, anchorsAtPrev: !!passStarts[p].anchorsAtPrev };   // t94 — carry the draw-anchor flag so the route resolves it (marker sprite still uses x/y/z)
                 }
                 if (v.setStartSources) v.setStartSources(passSources);   // colour each start marker by its reposition source (auto=cyan, manual=amber)
                 if (v.setStartEmits) v.setStartEmits(passStarts.map((s) => !!s.emits));   // sim-marker-distinguish (t69): SHAPE each marker (emitting=solid vs sim-only=hollow), orthogonal to the colour
