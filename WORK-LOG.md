@@ -5378,3 +5378,37 @@ Surgical: 7 viz/render source files + 1 new spec + 1 lockstep update.
 
 **⏸ PASS BACK for your live screenshot verify** (circle markers top+Layout; the rainbow manual-jog travel; Layout cyan/amber
 handles). COMMITTED, NOT pushed. Source-chips wiring is next (needs the register-verification scout first).
+
+---
+
+## 🔨 turn 83 (cycle 11) — FIX (declare-not-infer): the per-pass reposition SOURCE (auto/manual → colour + arc) is now DECLARED from the live param travelApproach, NOT inferred from parsed G-code text. Fixes Parts 2+3's static/wrong signal. Suite green. COMMITTED (not pushed). ⏸ PASS BACK for live-verify.
+
+Advisor regressed 17/17 + LIVE-verified Part 1 (circle) CORRECT, but found a real regression-class bug in Parts 2+3 via a
+precise TOGGLE-and-recheck (not screenshot-guessing): toggled travelApproach auto→manual via the real form (DOM value genuinely
+changed), queried getPassSources() before/after → IDENTICAL (['auto','manual']) — the reposition pass read 'manual' even at the
+TRUE default (auto) + didn't track the toggle.
+
+**ROOT CAUSE (advisor traced precisely):** getPassSources returned lastPassSources = parsed.stats.passSources = the G-code-PARSING
+ENGINE's INFERENCE of auto/manual from the EMITTED TEXT STRUCTURE (an `auto-traverse`-comment test), NOT a read of the live
+params.travelApproach. corner's auto travel isn't tagged 'auto-traverse', so it read 'manual' at the auto default + was static.
+My t81 Part-3 getPassSources only EXPOSED that same broken engine-inferred signal to the Layout — it did NOT fix the inference,
+so BOTH panels shared the identical wrong source. Exactly the declare-don't-infer anti-pattern this campaign eliminates.
+
+**THE FIX (declare from the live param — same pattern as the emits flag, 2 files):**
+- `blocks/dataOps/cornerData.js` — `cornerSimStartsProvider` now adds a DECLARED `source` per pass alongside `emits`, sourced
+  DIRECTLY from `params.travelApproach` (pass 0 = the operator jog LEAD = 'auto'; every reposition-destination pass =
+  travelApproach). NOT re-derived from parsed G-code.
+- `viz/createPreviewPanel.js` — computePassStarts carries the hint's `source`; setGcode builds passSources = `s.source ||
+  parsedSrc[p] || 'auto'` → PREFERS the declared source (corner), falls back to the engine inference only for ops that don't
+  declare one (middle/edge). That ONE declared passSources feeds BOTH consumers: t2.setStartSources (2D colour + the manual arc)
+  + v.setStartSources (3D sprite) + lastPassSources → getPassSources (the Layout). One declared truth, both panels.
+
+**VERIFY.** New `corner-source-declared.spec.js` (the ASSERT-THE-VALUE bar): opens the wizard, reads getPassSources at the auto
+default (every pass 'auto'), toggles travelApproach→manual via the REAL form dropdown, polls until getPassSources reflects it, and
+asserts it ACTUALLY CHANGED (a reposition pass → 'manual'; pass 0 stays 'auto'), AND the Layout reposition handle colour follows
+the SAME declared source (cyan→amber). **MUTATION-PROVEN (Msource):** drop the declared source → falls back to the engine
+inference → the default reads [auto,manual] (the exact bug) → RED → reverted. **Full suite: 482 passed, 0 failed** (484 total).
+Byte-parity untouched (declared source is preview-only — no emit path). Surgical: 2 source files + 1 new spec.
+
+**⏸ PASS BACK for your live re-verify with the SAME toggle-and-recheck** (query getPassSources before/after a real toggle — it
+now tracks travelApproach; arc + colour follow live). COMMITTED, NOT pushed. Source-chips wiring still HELD for its register scout.

@@ -392,8 +392,8 @@ export function createPreviewPanel(container, opts = {}) {
         const next = [];
         for (let p = 0; p < count; p++) {
             const h = userStarts[p] || (p === 0 && st) || hintFor(p) || passStarts[p] || { x: 0, y: 0, z: 0 };
-            const hint = hintFor(p);   // sim-marker-distinguish (t69): `emits` is a DECLARED property of the pass HINT (opSimStarts), not of a drag/operator override — so it survives a userStarts drag
-            next.push({ x: +h.x || 0, y: +h.y || 0, z: +h.z || 0, emits: !!(hint && hint.emits) });
+            const hint = hintFor(p);   // sim-marker-distinguish (t69): `emits` (+ t83 `source`) is a DECLARED property of the pass HINT (opSimStarts), not of a drag/operator override — so it survives a userStarts drag
+            next.push({ x: +h.x || 0, y: +h.y || 0, z: +h.z || 0, emits: !!(hint && hint.emits), source: hint && hint.source });
         }
         return next;
     }
@@ -432,7 +432,12 @@ export function createPreviewPanel(container, opts = {}) {
         curAnchor = !forceMachine && !(parsed.stats && parsed.stats.absolute);
         t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
         t2.setStarts(passStarts);   // the draggable 2D start handles — ALL per-pass starts, numbered (①②…)
-        const passSources = (parsed.stats && parsed.stats.passSources) || [];   // per-pass reposition source → marker colour (auto=cyan, manual=amber)
+        // t83 — per-pass reposition source (auto=cyan/straight, manual=amber/arc). PREFER the DECLARED source (the op's sim
+        // provider — e.g. corner reads it from the LIVE param travelApproach), over the engine's G-code-TEXT inference
+        // (parsed.stats.passSources, unreliable + static — it read 'manual' even at corner's auto default). Fall back to the
+        // inference only for ops that DON'T declare a source (middle/edge). ONE declared truth feeds BOTH panels (top + Layout).
+        const parsedSrc = (parsed.stats && parsed.stats.passSources) || [];
+        const passSources = passStarts.map((s, p) => s.source || parsedSrc[p] || 'auto');
         lastPassSources = passSources;   // t81 — expose to the Layout canvas so its handles match the top panel's colours
         if (t2.setStartSources) t2.setStartSources(passSources);
         if (t2.setStartEmits) t2.setStartEmits(passStarts.map((s) => !!s.emits));   // sim-marker-distinguish (t69): the SHAPE axis (emitting=solid vs sim-only=hollow), orthogonal to the auto/manual COLOUR

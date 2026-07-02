@@ -136,7 +136,12 @@ function cornerSimStartsProvider(params, stock) {
     xy.wall1 = { x: xy.zsurf.x + off.wall1.dx, y: xy.zsurf.y + off.wall1.dy };
     xy.wall2 = { x: xy.wall1.x + off.wall2.dx, y: xy.wall1.y + off.wall2.dy };
     const ids = CORNER_SIM_STARTS.filter((r) => whenOk(r.when, p)).map((r) => r.id);
-    return real.map((m, i) => { const c = xy[ids[i]]; return c ? { ...m, x: c.x, y: c.y } : m; });   // override XY, keep emits/z
+    // t83 — DECLARE the per-pass reposition SOURCE (auto/manual → marker colour + the arc-vs-straight travel line) DIRECTLY from
+    // the LIVE param travelApproach, NOT re-derived from the parsed G-code text (the engine's `auto-traverse`-comment inference,
+    // which is unreliable — corner's auto travel isn't tagged, so it read 'manual' even at the auto default + didn't track the
+    // toggle). Pass 0 = the operator jog LEAD (auto/default); every reposition-destination pass = travelApproach. Preview-only.
+    const src = (p.travelApproach === 'manual') ? 'manual' : 'auto';
+    return real.map((m, i) => { const c = xy[ids[i]]; const source = i === 0 ? 'auto' : src; return c ? { ...m, x: c.x, y: c.y, source } : { ...m, source }; });   // override XY, add DECLARED source, keep emits/z
 }
 
 /** The wrapped `user_root` template for a given param set. Structural params bake the stack SHAPE; the 9 bound scalars
