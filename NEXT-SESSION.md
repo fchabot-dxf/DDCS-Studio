@@ -22,15 +22,22 @@ Socket = `datum + offset` EXPRESSION. DEFAULT = stock-geometry-derived; DRAG = d
 (no 3D pane to render into). The built-in probes (cornerView/edgeView/middleView) ALWAYS call `preview3D()` (3D base) AND layer a 2D canvas ON
 TOP (`renderStartCanvas`) — never either/or. The generic view must do the same.
 
-## 🚦 ACTIVE DISPATCH — B3d: the data-op view shows BOTH the 3D sim AND the 2D canvas [advisor turn 22; user-found]
+## ✅ B3d DONE + VERIFIED (advisor turn 24) — Option B: the data-op view shows BOTH the 3D sim AND the 2D canvas
+Built as OPTION B (human + advisor, declare-never-infer): a NEW explicit `form3d+2d` panel type (`mode '3d2d'`); `userOpView.update` renders
+`preview3D(...startHints)` (3D sim + declared markers) AND `renderLayout2D()` (2D drag) together via a dedicated `#userViz3dBox` (2D stays in
+`#userVizContainer` → zero selector churn; form2d/form3d byte-untouched). commandDeck routes form2d|form3d+2d → openWiz. Re-run GREEN (bar
+opens BOTH panes; drag + markers no regression). ⏳ HUMAN to reload + eyeball the 3D render (headless can't confirm 3D visibility).
+**(historical dispatch record below — the plan that produced it)**
 Teach the GENERIC `userOpView` to render the 3D sim preview AND the 2D drag canvas TOGETHER — the built-in probe pattern (3D base + 2D
 overlay), so "Corner (data)" shows the 3D probe sim + its per-pass markers + the draggable 2D reposition handle, all at once.
 - **FIX (the built-in pattern, generalized — one-source):** enhance `userOpView.update()` (the either/or at `:100-103`) so a visual data-op
   renders BOTH `preview3D(gcode, ..., startHints)` (the 3D sim + the declared sim-starts) AND `renderLayout2D()` (the 2D drag overlay) —
   matching how `edgeView`/`middleView` layer the 2D over the 3D (never suppressing the 3D pane).
-- **SCOUT the cleanest seam (prefer AUTOMATIC, not a corner special-case):** e.g. a `form3d` op that ALSO DECLARES layout roles (corner's
-  `cross1_x/y {role}`) gets the 2D overlay automatically — so revert corner's panel to `form3d` and let the layout-roles trigger the 2D
-  overlay. (vs a new `form3d+2d` panel type.) Must NOT break the existing form2d-only / form3d-only ops. GATE if it's a bigger view refactor.
+- ⭐ **SEAM = OPTION B (human t22): a NEW explicit `form3d+2d` panel type.** The op DECLARES `panel:'form3d+2d'` → renders BOTH panes.
+  DECLARE-NEVER-INFER (the op explicitly declares it wants both; NOT inferred from role-presence — that was option A, which the human rejected).
+  Corner declares `panel:'form3d+2d'`; ADD the type to `PANEL_TYPES` (panelTypes.js) + wire `userOpView.update` (`:100-103`) to render
+  `preview3D(...startHints)` AND the 2D `renderLayout2D()` overlay for it. Must NOT break the existing form2d-only / form3d-only ops.
+  GATE if it's a bigger view refactor than adding the type + the render branch.
 - ⭐ **TEST (verify-real-symptom — the USER's bar path):** open "Corner (data)" via the bar → assert BOTH the 3D preview pane (`.wiz-viz3d`
   visible + the sim/markers) AND the `.fc-handle-move` 2D handle render TOGETHER. (The current test only checks the 2D handle.)
 - SCOPE: the generic `userOpView` 3D+2D combo + corner's panel declaration. Benefits EVERY visual data-op.
