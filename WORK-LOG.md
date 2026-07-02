@@ -4561,3 +4561,40 @@ share. This APPLIES TO 4d syncA: pin its slave-offset value (#74=[#70+slave], #[
 **⏸ PASS BACK (advisor verifies — no human gate).** Only the wcs-live spec hardened; production 4c is as reviewed. Ready for 4d
 syncA-live (the LAST toggle — a bool block-ADD like probeZFirst, but VALUE-CARRYING via the slave offset, so its spec pins that
 value independently per the adopted pattern). 4d retires the syncA tripwire; then the ④ release retires the built-in.
+
+---
+
+## 🔨 turn 47 (cycle 11) — ② B4 M2 step 4d: syncA LIVE (bool block-ADD, value-carrying). ⏸ PASS BACK. **The prune-shaped toggle BATCH is DONE (all 4 live).**
+
+4c-harden reviewed CLEAN + verified (G56 pin RED while parity GREEN = the gap demonstrated; accepted). DISPATCH 4d syncA-LIVE —
+the LAST prune-shaped toggle. A bool block-ADD like probeZFirst's Z step, but VALUE-CARRYING (the slave offset). ⏸ pass back.
+
+**The mechanism (bool block-add + independent value-pin):**
+- **syncA guard.** The dual-gantry sync (comment "Dual Gantry Sync" + G1 A0 + #74=[#70+slave] + #[#74]=#883) is now wrapped in
+  a `when(syncA)` guard in the superset (via GUARD + 2 new mk helpers mkDM/mkRAW so the blocks RETURN, not push); concrete emits
+  it only when params.syncA (byte-identical to today). withGuardDefaults fills syncA=false for build({}) — VERIFIED (golden green).
+  slave stays BAKED at its default '3' (a value-binding follow-on, like corner/probeSeq).
+- **syncA = a bool structural binding** in CORNER_STRUCT_BINDINGS (default false → the form toggle). All 4 prune-shaped
+  structural toggles (probeZFirst bool · travelApproach enum · wcs 7-way enum · syncA bool) are now LIVE via one guard/prune
+  mechanism, each re-authorable as a bound param. deriveBindings UNAFFECTED (the sync assigns #74/#[#74], not spec vars).
+
+**Frontier moved in LOCKSTEP → the FINAL baked-frontier.** Retired corner-data-syncA-frontier (syncA now live). Since
+corner/probeSeq/level REMAIN baked, its don't-retire-the-built-in gate MOVED into a NEW corner-data-baked-frontier.spec,
+re-anchored to those: (1) a tripwire that corner-quadrant + probeSeq STILL diverge from cornerStack (sign/order swaps, NOT
+prune-shaped → live later via VALUE-bindings), + (2) the built-in-registered gate. Did NOT unblock the built-in retirement — the
+④ release owns that (handling level's deliberate baked-final status).
+
+**VERIFY (hardened live-spec WITH THE VALUE-PIN — the 4c-harden pattern applied).** NEW corner-data-syncA-live READS the bool
+binding (type bool, default false) + asserts ON/OFF emit == cornerStack byte-for-byte + the toggle symptom (sync block appears
+ON, absent OFF) + PINS THE SLAVE-OFFSET VALUE INDEPENDENTLY: #74=[#70+3] (slave default 3) + #[#74]=#883, HARDCODED, not
+twin-vs-self. MUTATION-CHECK: #883 → #999 (a hardcoded source value both paths share) → the value-pin went RED while the
+byte-parity stayed GREEN (the tautology, demonstrated); reverted byte-exact. (First tried mutating the slave `|| '3'` FALLBACK —
+it's dead: CORNER_DEFAULTS.slave='3' is always passed, so the seed is unaffected; switched to the #883 source value.)
+probe-surface GOLDEN (concrete cornerStack byte-identical) + corner-data-emit + the 3 prior *-live specs all green. **Full suite:
+463 passed, 0 failed, 2 skipped (1.3m) — clean, no flakes.**
+
+**⏸ PASS BACK (advisor verifies + likely fan-out — syncA is value-carrying + touches the A/slave axis).** The prune-shaped
+STRUCTURAL-TOGGLE BATCH (4a-4d) is COMPLETE: probeZFirst / travelApproach / wcs / syncA are all live, each byte-for-byte ==
+cornerStack, each with a hardened live-spec (binding-driven + value-pinned where value-carrying), each frontier retired in
+lockstep. REMAINING for corner parity: corner/probeSeq value-bindings (sign/order, not prune) · ③ stock-datum drag handles · ④
+VERIFY + release (retire the built-in; decide level's baked-final). Ready for whichever the advisor dispatches next.

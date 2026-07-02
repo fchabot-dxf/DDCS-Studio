@@ -15,21 +15,21 @@
  * cornerStack({probeZ:true}). Value sockets re-derive BY IDENTITY over the pruned stack (def.bindingSpecs), so #23/#24 land
  * correctly under the +2 shift. See corner-data-probeZFirst-live.spec.js.
  *
- * travelApproach (② B4 step 4b) + wcs (② B4 step 4c) are now LIVE too: the superset taPair/wcsFork emit ALL arms guarded by
- * value-equality when(travelApproach=='auto'|'manual') / when(wcs=='active'|'G54'…'G59'); prune selects one → byte-for-byte ==
- * cornerStack. wcs is 7-way — its 'active' arm reads #578, each G54..G59 uses the literal base #70 — and its derived label
- * (which bleeds into the header + the X/Y/Z save notes) forks WITH the block via wcsFork. See the corresponding *-live specs.
+ * travelApproach (4b) + wcs (4c) + syncA (4d) are now LIVE too: the superset taPair/wcsFork/syncA-guard emit ALL arms guarded
+ * by value-equality when(travelApproach=='auto'|'manual') / when(wcs=='active'|'G54'…'G59') / when(syncA); prune selects one →
+ * byte-for-byte == cornerStack. wcs is 7-way — its 'active' arm reads #578, each G54..G59 uses the literal base #70; syncA is a
+ * bool block-ADD (G1 A0 + the slave-offset write #74=[#70+slave]). ALL FOUR prune-shaped structural toggles are now LIVE.
  *
  * FRONTIERS STILL held BAKED (asserted as divergence tripwires, like drill's `method` / slot's `pattern`+`clearance`):
- *   • `syncA` (dual-gantry) — baked OFF: a sync appends a G1 A0 + a slave-offset write; the LIVE toggle lands last (② B4
- *     step 4d) via the same guard/prune. (`corner` quadrant + `probeSeq` = sign/order swaps, not prune-shaped — kept baked,
- *     live later via value-bindings; `level` = a literal-in-G31 multi-socket fan-out, non-operator-facing, stays baked.)
+ *   • `corner` quadrant + `probeSeq` — SIGN/ORDER swaps (they permute direction signs + axis order inside atoms), NOT
+ *     prune-shaped → they can't ride guard/prune; live later via VALUE-bindings. `level` = a literal-in-G31 multi-socket
+ *     fan-out (no macro var, non-operator-facing) — a DELIBERATE baked-final (the ④ release owns that decision).
  *   • `safeZ` + `scanDepth` — WERE a fan-out (safeZ fed #19 AND the COMPUTED literal `#17 = safeZ + scanDepth`, so one
  *     binding couldn't drive both). ② B4(c) DISSOLVED it: cornerStack now DECLARES `#17 = [#19 + #20]` (safeZ→#19,
  *     scanDepth→#20; the controller sums it at runtime, like `#18=[0-#17]`), so safeZ + scanDepth are now CLEAN single-socket
  *     bindings — no longer baked. (`level` stays baked: a literal-in-G31 multi-socket fan-out, no macro var, non-operator-facing.)
- * The built-in Corner keeps ALL of these working; see corner-data-syncA-frontier.spec.js (the loud can't-forget gate that blocks
- * flipping the baked syncA default before its toggle is wired, and blocks retiring the built-in while ANY frontier is baked).
+ * The built-in Corner keeps ALL of these working; see corner-data-baked-frontier.spec.js (the loud can't-forget gate that blocks
+ * retiring the built-in while corner/probeSeq/level remain baked — the ④ release owns the retirement decision).
  *
  * Template SEEDED from cornerStack(CORNER_DEFAULTS); the BINDINGS are derived + proven byte-identical by
  * tests/corner-data-emit.spec.js. SCOPE (inc B1) = EMIT only — no view/panel (B3), no sim-starts/inferStarts (B2).
@@ -132,6 +132,8 @@ export const CORNER_STRUCT_BINDINGS = [
     { param: 'travelApproach', type: 'enum', default: CORNER_DEFAULTS.travelApproach, label: 'Travel', section: 'GEOMETRY', widgetConfig: { options: [['Auto', 'auto'], ['Manual', 'manual']] } },
     // ② B4 step 4c — the 7-way WCS target: 'active' reads the controller's #578, or write a fixed G54..G59 slot directly.
     { param: 'wcs', type: 'enum', default: CORNER_DEFAULTS.wcs, label: 'WCS', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
+    // ② B4 step 4d — dual-gantry sync: a bool block-ADD (appends G1 A0 + the slave-offset write #74=[#70+slave], #[#74]=#883).
+    { param: 'syncA', type: 'bool', default: !!CORNER_DEFAULTS.syncA, label: 'Dual-Gantry Sync A', section: 'GEOMETRY' },
 ];
 
 /** Build the corner-as-data def — same userOpFromStack pattern as drill/surfacing/slot/text/atcWarmup, PLUS `bindingSpecs`
