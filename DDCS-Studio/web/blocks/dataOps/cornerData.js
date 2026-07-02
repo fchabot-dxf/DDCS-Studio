@@ -20,10 +20,14 @@
  * byte-for-byte == cornerStack. wcs is 7-way — its 'active' arm reads #578, each G54..G59 uses the literal base #70; syncA is a
  * bool block-ADD (G1 A0 + the slave-offset write #74=[#70+slave]). ALL FOUR prune-shaped structural toggles are now LIVE.
  *
+ * corner + probeSeq are now LIVE too (③b): they're VALUE/ORDER swaps (corner flips the probe directions + reposition signs;
+ * probeSeq swaps the wall order) that INTERACT → an 8-WAY corner×probeSeq guard (nested, like wcs — NOT a value-binding; the
+ * swap is derived + the reorder is of differently-shaped blocks). The bound reposition sockets duplicate 8× in the superset →
+ * CORNER_BINDINGS derives over a CANONICAL-pruned stack. ALL operator-facing structural params are now LIVE.
+ *
  * FRONTIERS STILL held BAKED (asserted as divergence tripwires, like drill's `method` / slot's `pattern`+`clearance`):
- *   • `corner` quadrant + `probeSeq` — SIGN/ORDER swaps (they permute direction signs + axis order inside atoms), NOT
- *     prune-shaped → they can't ride guard/prune; live later via VALUE-bindings. `level` = a literal-in-G31 multi-socket
- *     fan-out (no macro var, non-operator-facing) — a DELIBERATE baked-final (the ④ release owns that decision).
+ *   • `level` = a literal-in-G31 multi-socket value (no macro var, non-operator-facing) — a DELIBERATE baked-FINAL (it does
+ *     NOT get a live toggle; the ④ release carries that forward).
  *   • `safeZ` + `scanDepth` — WERE a fan-out (safeZ fed #19 AND the COMPUTED literal `#17 = safeZ + scanDepth`, so one
  *     binding couldn't drive both). ② B4(c) DISSOLVED it: cornerStack now DECLARES `#17 = [#19 + #20]` (safeZ→#19,
  *     scanDepth→#20; the controller sums it at runtime, like `#18=[0-#17]`), so safeZ + scanDepth are now CLEAN single-socket
@@ -37,13 +41,15 @@
 import { cornerStack } from '../../wizards/cornerWizard.js';
 import { userOpFromStack, simStartsToBlocks } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
+import { pruneGuards } from '../whenGuard.js';   // ③b — derive CORNER_BINDINGS over a CANONICAL-pruned stack (the 8-way corner×probeSeq guard duplicates the bound sockets in the raw superset)
 
 /** Author defaults — match cornerStack's fallbacks + the built-in Corner field defaults. Structural params (corner/
  *  probeSeq/probeZFirst/wcs/syncA) are baked at their defaults: the twin is the FL / YX / no-Z / active-WCS shape. */
 export const CORNER_DEFAULTS = {
-    // wcs is the STRING form ('active') — the 7-way wcs guards match by value-equality (when(wcs=='active'|'G54'…)); a numeric
-    // 0 would match no arm and drop the WCS block. (cornerStack still accepts 0..6 for the built-in via its own normalization.)
-    corner: 1, probeSeq: 0, probeZFirst: 0, travelApproach: 'auto', wcs: 'active',
+    // corner/probeSeq/wcs are the STRING forms — the guards match by value-equality (when(corner=='FL'…) / when(probeSeq=='YX'…)
+    // / when(wcs=='active'…)); a numeric 1/0 would match no arm and drop the block. (cornerStack still accepts the numeric forms
+    // for the built-in via its own normalization.)
+    corner: 'FL', probeSeq: 'YX', probeZFirst: 0, travelApproach: 'auto', wcs: 'active',
     dist: 500, retract: 5, f_fast: 200, f_slow: 50, port: 3,
     level: 0, safeZ: 10, scanDepth: 5, radius: 2, travelDist: 50,
     // NOTE: startX/startY/cross1_x/cross1_y are deliberately ABSENT — the reposition sockets default to their signed-travelDist
@@ -126,9 +132,13 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
     }];
 }
 
-/** Bindings for the value sockets — DERIVED (not hand-counted) over the superset (every spec's assign is unconditional →
- *  a unique match). instantiate re-derives the flat index BY IDENTITY over the PRUNED stack each build (via bindingSpecs). */
-export const CORNER_BINDINGS = deriveBindingsFor(cornerDataStack(CORNER_DEFAULTS), CORNER_BINDING_SPECS);
+/** Bindings for the value sockets — DERIVED (not hand-counted). The corner×probeSeq 8-way guard DUPLICATES the bound reposition
+ *  sockets (#21-#24) 8× in the raw superset, so we derive over a CANONICAL-PRUNED stack (probeZFirst:1 · FL · YX → exactly 1×
+ *  each socket, all 13 present incl the Z-first #21/#22). The frozen blockIndex is over this canonical stack (validateUserOp
+ *  skips it for bindingSpecs defs); EMIT re-derives BY IDENTITY over the actual PRUNED stack each build (via bindingSpecs). */
+const CANONICAL_BIND = { ...CORNER_DEFAULTS, probeZFirst: 1, corner: 'FL', probeSeq: 'YX' };
+function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(cornerDataStack(CORNER_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
+export const CORNER_BINDINGS = deriveBindingsFor(canonicalPrunedStack(), CORNER_BINDING_SPECS);
 
 /** The STRUCTURAL toggle bindings — params that drive the guard prune (NO value socket → no blockIndex/match). Each flips
  *  the emit AND the preview between shapes: `probeZFirst` (bool, ② B4 step 4a) no-Z↔Z-first; `travelApproach` (enum, step 4b)
@@ -140,6 +150,9 @@ export const CORNER_STRUCT_BINDINGS = [
     { param: 'wcs', type: 'enum', default: CORNER_DEFAULTS.wcs, label: 'WCS', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
     // ② B4 step 4d — dual-gantry sync: a bool block-ADD (appends G1 A0 + the slave-offset write #74=[#70+slave], #[#74]=#883).
     { param: 'syncA', type: 'bool', default: !!CORNER_DEFAULTS.syncA, label: 'Dual-Gantry Sync A', section: 'GEOMETRY' },
+    // ③b — corner quadrant + probe order: value/order swaps driven by the 8-way corner×probeSeq guard (NOT prune-add/remove).
+    { param: 'corner', type: 'enum', default: CORNER_DEFAULTS.corner, label: 'Corner', section: 'GEOMETRY', widgetConfig: { options: [['Front-Left', 'FL'], ['Front-Right', 'FR'], ['Back-Left', 'BL'], ['Back-Right', 'BR']] } },
+    { param: 'probeSeq', type: 'enum', default: CORNER_DEFAULTS.probeSeq, label: 'Probe Order', section: 'GEOMETRY', widgetConfig: { options: [['Y then X', 'YX'], ['X then Y', 'XY']] } },
 ];
 
 /** Build the corner-as-data def — same userOpFromStack pattern as drill/surfacing/slot/text/atcWarmup, PLUS `bindingSpecs`

@@ -46,14 +46,15 @@ export function cornerStack(params = {}, opts = {}) {
     // travel's OWN lift/drop so the Z-state mirrors auto. Default 'auto' → BYTE-IDENTICAL to today.
     const travelApproach = params.travelApproach === 'manual' ? 'manual' : 'auto';
 
-    // corner → probe directions (FL=X+Y+  FR=X−Y+  BL=X+Y−  BR=X−Y−)
-    const [xDir, yDir] = { FL: ['+', '+'], FR: ['-', '+'], BL: ['+', '-'], BR: ['-', '-'] }[corner] || ['+', '+'];
+    // corner → probe directions (FL=X+Y+  FR=X−Y+  BL=X+Y−  BR=X−Y−). ONE source (dirsOf) — the concrete xDir/yDir AND the
+    // ③b superset forks (cornerFork/csFork/axesOf) all read it, so a quadrant edit can't desync the two paths.
+    const dirsOf = (c) => ({ FL: ['+', '+'], FR: ['-', '+'], BL: ['+', '-'], BR: ['-', '-'] }[c] || ['+', '+']);
+    const [xDir, yDir] = dirsOf(corner);
     const dirLabel = (d) => (d === '+' ? 'pos' : 'neg');
     const td = travelDist || 0;   // ② B4(c): #17 plunge is now DECLARED as [#19+#20] (safeZ+scanDepth) — the controller sums it, so both are single editable sockets (fan-out dissolved), no baked plungeDepth
 
-    // The two walls in the chosen probe order, each with its direction.
-    const firstAx = probeSeq === 'YX' ? 'Y' : 'X', firstDir = probeSeq === 'YX' ? yDir : xDir;
-    const secondAx = probeSeq === 'YX' ? 'X' : 'Y', secondDir = probeSeq === 'YX' ? xDir : yDir;
+    // The two walls in the chosen probe order (per corner×probeSeq) are now derived PER COMBO inside csFork (axesOf) so the
+    // superset can emit all 8 — see the ③b fork helpers below; concrete uses axesOf(corner, probeSeq).
 
     // Signed-travelDist reposition (INTERIM — until a stock-datum default is wired; inc B1b GATE): #15=+travelDist, #16=−travelDist.
     // own(dir) = signed by dir (#15/#16); opp(dir) = the opposite. The reposition sockets #21-#24 default to these so the wall-to-wall
@@ -104,29 +105,48 @@ export function cornerStack(params = {}, opts = {}) {
     const wcsFork = (fn) => superset
         ? WCS_VALUES.map((w) => GUARD({ param: 'wcs', is: w }, fn(w, wcsLabelOf(w))))
         : fn(wcs, wcsLabel);
+    // ③b — corner + probeSeq are VALUE/ORDER swaps (not prune-add/remove): corner flips the probe DIRECTIONS (#7/#8, #9/#10,
+    // radiuscomp dir) + reposition signs + text; probeSeq swaps the wall ORDER + text. They INTERACT (probeWall content =
+    // f(corner, probeSeq)), so an 8-WAY guard (nested corner × probeSeq, reusing whenOk) like wcs — NOT a value-binding (the
+    // swap is derived from the quadrant; the reorder is of differently-shaped blocks). Combinatorial-but-inert (pruned/build).
+    const CORNERS = ['FL', 'FR', 'BL', 'BR'], SEQS = ['YX', 'XY'];
+    const axesOf = (c, seq) => { const [xd, yd] = dirsOf(c); return seq === 'YX' ? { xd, yd, fA: 'Y', fD: yd, sA: 'X', sD: xd } : { xd, yd, fA: 'X', fD: xd, sA: 'Y', sD: yd }; };
+    // cornerFork: 4-way (corner ONLY — header/prompt/footer text). RETURNS the arm blocks (composes inside the other forks).
+    const cornerFork = (fn) => superset ? CORNERS.map((c) => { const [xd, yd] = dirsOf(c); return GUARD({ param: 'corner', is: c }, fn(c, xd, yd)); }) : fn(corner, xDir, yDir);
+    // csFork: 8-way (corner × probeSeq, nested). RETURNS. fn(c, seq, axes) recomputes the combo's derived directions/axes.
+    const csFork = (fn) => superset
+        ? CORNERS.map((c) => GUARD({ param: 'corner', is: c }, SEQS.map((s) => GUARD({ param: 'probeSeq', is: s }, fn(c, s, axesOf(c, s))))))
+        : fn(corner, probeSeq, axesOf(corner, probeSeq));
+    // Returning variants of the push-forks (so a corner/cs fork can NEST them): same semantics as zPair/zOnly, but RETURN.
+    const zPairR = (onKids, offKids) => superset ? [GUARD(WHEN_Z, onKids), GUARD(WHEN_NZ, offKids)] : (probeZ ? onKids : offKids);
+    const zOnlyR = (kids) => superset ? [GUARD(WHEN_Z, kids)] : (probeZ ? kids : []);
+    const mkMV = (ax, v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [ax.toLowerCase()]: v }; return b; };
 
     // Probe one wall via the shared PROBE-SURFACE BLOCK (t127): touch+comp → the TRUE wall in a temp (#102/#101); the
     // corner keeps its own WCS write + retract + safe-Z (trailingRetract:false). Byte-identical to the old hand-rolled wall.
-    const probeWall = (ax, dir) => {
+    // RETURNS one wall's probe blocks (composed inside the corner×probeSeq csFork so directions/order fork per combo).
+    const probeWallR = (ax, dir) => {
         const av = AX[ax], probeVar = dir === '+' ? '#8' : '#7', retractVar = dir === '+' ? '#9' : '#10';
         const compOp = dir === '+' ? '+' : '-';   // boss: wall is at trigger ± stylus radius
-        S.push(...probeSurfaceStack({
+        const out = [...probeSurfaceStack({
             axis: ax, dir: compOp, probeVar, retractVar, feedFast: '#3', feedSlow: '#4', port: '#5', level,
             twoPass: true, raw: av.result, result: ax === 'X' ? '#102' : '#101', radius: '#6',
             compEnable: true, trailingRetract: false, compNote: `Trigger Pos ${compOp} Radius`,
-        }));
+        })];
         if (ax === 'X') {
-            S.push(...wcsFork((w, label) => [mkA('#[#70]', '#102', `Save to ${label} X`)]));   // note forks on wcs (value/target constant)
+            out.push(...wcsFork((w, label) => [mkA('#[#70]', '#102', `Save to ${label} X`)]));   // note forks on wcs (value/target constant)
         } else {
-            A('#73', '[#70+1]', 'WCS Y Address');
-            S.push(...wcsFork((w, label) => [mkA('#[#73]', '#101', `Save to ${label} Y`)]));
+            out.push(mkA('#73', '[#70+1]', 'WCS Y Address'));
+            out.push(...wcsFork((w, label) => [mkA('#[#73]', '#101', `Save to ${label} Y`)]));
         }
-        MV(ax, retractVar); MV('Z', '#17');
+        out.push(mkMV(ax, retractVar), mkMV('Z', '#17'));
+        return out;
     };
 
-    // ── Header ── KIND-B: "+ Z Surface" forks on probeZFirst, the WCS label on wcs → the two nest (zPair over wcsFork).
-    const hdr1 = (z, label) => `Corner | ${corner} OUTSIDE | X ${dirLabel(xDir)} Y ${dirLabel(yDir)}${z ? ' + Z Surface' : ''} | ${label}`;
-    zPair(wcsFork((w, label) => [mkC(hdr1(true, label))]), wcsFork((w, label) => [mkC(hdr1(false, label))]));
+    // ── Header ── KIND-B, 3-way: the corner NAME + dir labels fork on corner; "+ Z Surface" on probeZFirst; the WCS label on
+    // wcs → cornerFork(zPairR(wcsFork)) (4×2×7 in the superset, inert; one leaf survives prune → byte-identical concrete).
+    const hdr1 = (z, label, c, xd, yd) => `Corner | ${c} OUTSIDE | X ${dirLabel(xd)} Y ${dirLabel(yd)}${z ? ' + Z Surface' : ''} | ${label}`;
+    S.push(...cornerFork((c, xd, yd) => zPairR(wcsFork((w, label) => [mkC(hdr1(true, label, c, xd, yd))]), wcsFork((w, label) => [mkC(hdr1(false, label, c, xd, yd))]))));
     C(`Probe dist: ${dist}mm | Retract: ${retract}mm`);
     C(`Fast: ${fFast} | Slow: ${fSlow} | SafeZ: ${safeZ}mm | ScanDepth: ${scanDepth}mm`);
 
@@ -147,14 +167,18 @@ export function cornerStack(params = {}, opts = {}) {
     // #19 (safeZ) + #20 (scanDepth) precede #17 so the controller has them when it evaluates #17=[#19+#20] (top-down eval).
     A('#19', safeZ, 'Safe Z retract distance'); A('#20', scanDepth, 'Scan depth');
     A('#17', '[#19+#20]', 'Plunge depth = safeZ + scanDepth'); A('#18', '[0-#17]', 'Negative plunge');
-    // Z→Wall1: only the first wall's axis repositions (opp of its probe dir); the perpendicular axis holds. probeZFirst-only.
-    zOnly([
-        mkA('#21', params.startX || (firstAx === 'X' ? opp(firstDir) : '0'), 'Z to Wall 1 traverse (X)'),
-        mkA('#22', params.startY || (firstAx === 'Y' ? opp(firstDir) : '0'), 'Z to Wall 1 traverse (Y)'),
-    ]);
-    // Wall1→Wall2: X moves own(xDir) when X is probed first (else opp); Y likewise. Default = signed travelDist (non-degenerate).
-    A('#23', params.cross1_x || (firstAx === 'X' ? own(xDir) : opp(xDir)), 'Wall 1 to Wall 2 traverse (X)');
-    A('#24', params.cross1_y || (firstAx === 'Y' ? own(yDir) : opp(yDir)), 'Wall 1 to Wall 2 traverse (Y)');
+    // Z→Wall1: only the first wall's axis repositions (opp of its probe dir); the perpendicular axis holds. probeZFirst-only,
+    // AND the sign/axis fork on corner×probeSeq → csFork NESTED inside the zOnly (probeZ). (Bound socket → CORNER_BINDINGS is
+    // derived over a canonical-pruned stack, so the 8× superset copies don't ambiguate; instantiate re-derives over the pruned.)
+    S.push(...zOnlyR(csFork((c, s, ax) => [
+        mkA('#21', params.startX || (ax.fA === 'X' ? opp(ax.fD) : '0'), 'Z to Wall 1 traverse (X)'),
+        mkA('#22', params.startY || (ax.fA === 'Y' ? opp(ax.fD) : '0'), 'Z to Wall 1 traverse (Y)'),
+    ])));
+    // Wall1→Wall2: X moves own(xDir) when X is probed first (else opp); Y likewise. Sign forks on corner×probeSeq (csFork).
+    S.push(...csFork((c, s, ax) => [
+        mkA('#23', params.cross1_x || (ax.fA === 'X' ? own(ax.xd) : opp(ax.xd)), 'Wall 1 to Wall 2 traverse (X)'),
+        mkA('#24', params.cross1_y || (ax.fA === 'Y' ? own(ax.yd) : opp(ax.yd)), 'Wall 1 to Wall 2 traverse (Y)'),
+    ]));
 
     // ── WCS base address ── 7-way wcs fork: 'active' reads #578 → computes #70; a fixed G54..G59 uses the literal base.
     const wcsBaseBlocks = (w) => w === 'active'
@@ -162,10 +186,10 @@ export function cornerStack(params = {}, opts = {}) {
         : [mkC(`Target: ${w}`), mkA('#70', WCS_BASE[w], 'Base WCS address')];
     S.push(...wcsFork((w) => wcsBaseBlocks(w)));
 
-    // ── Confirm + incremental ──
+    // ── Confirm + incremental ── KIND-B, 2-way: OVER/OUTSIDE forks on probeZFirst, the corner NAME on corner → cornerFork(zPairR).
     C('Confirm Start');
-    const startPrompt = (z) => `${z ? 'Hover OVER the' : 'Hover OUTSIDE the'} ${corner} corner material. Press Enter`;
-    zPair([mkA('#1505', '1', startPrompt(true))], [mkA('#1505', '1', startPrompt(false))]);   // KIND-B: OVER vs OUTSIDE
+    const startPrompt = (z, c) => `${z ? 'Hover OVER the' : 'Hover OUTSIDE the'} ${c} corner material. Press Enter`;
+    S.push(...cornerFork((c) => zPairR([mkA('#1505', '1', startPrompt(true, c))], [mkA('#1505', '1', startPrompt(false, c))])));
     DM('inc');
 
     // ── Z surface (optional) ── probeZFirst-only block-add: the Z-surface touch + the Z→wall1 reposition.
@@ -194,20 +218,24 @@ export function cornerStack(params = {}, opts = {}) {
     // PAIR in the superset. The wall1→wall2 reposition forks on BOTH probeZFirst (the step number in its comment) AND
     // travelApproach (auto move vs #1505 jog prompt) → the taPair (travelApproach) NESTS inside the zPair (probeZFirst). One
     // leaf survives prune → byte-identical to the concrete emit for any (probeZFirst × travelApproach) combination.
-    const firstLbl = (z) => `Step ${z ? 2 : 1}: ${firstAx} Probe`;
-    const repoLbl = (z) => `Step ${z ? 3 : 2}: REPOSITION: Traverse past corner and set up for ${secondAx}`;
-    const secondLbl = (z) => `Step ${z ? 4 : 3}: ${secondAx} Probe`;
+    // The two-wall sequence forks on corner×probeSeq (directions + ORDER + step-axis text) → csFork wraps the WHOLE region;
+    // inside, probeZ (step number) / travelApproach (reposition shape) / wcs (save note) nest via the returning variants.
+    const firstLbl = (z, fA) => `Step ${z ? 2 : 1}: ${fA} Probe`;
+    const repoLbl = (z, sA) => `Step ${z ? 3 : 2}: REPOSITION: Traverse past corner and set up for ${sA}`;
+    const secondLbl = (z, sA) => `Step ${z ? 4 : 3}: ${sA} Probe`;
     const repoTraverse = (comment, approach) => safeTraverseStack({
         mode: 'seq', crossX: '#23', crossY: '#24', drop: '#18', comment, approach,
         promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, drop #18 to scan depth (mirrors auto) — no lift (already at #17)
     });
-    const repoArm = (z) => taPair(() => repoTraverse(repoLbl(z), 'auto'), () => repoTraverse(repoLbl(z), 'manual'));
-    zPair([mkC(firstLbl(true))], [mkC(firstLbl(false))]);
-    MV('Z', '#18');                          // plunge to scan depth
-    probeWall(firstAx, firstDir);
-    zPair(repoArm(true), repoArm(false));
-    zPair([mkC(secondLbl(true))], [mkC(secondLbl(false))]);
-    probeWall(secondAx, secondDir);
+    const repoArmR = (z, sA) => taPair(() => repoTraverse(repoLbl(z, sA), 'auto'), () => repoTraverse(repoLbl(z, sA), 'manual'));
+    S.push(...csFork((c, s, ax) => [
+        ...zPairR([mkC(firstLbl(true, ax.fA))], [mkC(firstLbl(false, ax.fA))]),
+        mkMV('Z', '#18'),                          // plunge to scan depth
+        ...probeWallR(ax.fA, ax.fD),
+        ...zPairR(repoArmR(true, ax.sA), repoArmR(false, ax.sA)),
+        ...zPairR([mkC(secondLbl(true, ax.sA))], [mkC(secondLbl(false, ax.sA))]),
+        ...probeWallR(ax.sA, ax.sD),
+    ]));
 
     // ── Dual-gantry sync (optional) ── ② B4 step 4d: a bool block-ADD guarded on syncA (the same shape as probeZFirst's
     // Z step, but VALUE-CARRYING — the slave offset #74=[#70+slave]). superset → the blocks wrapped in when(syncA); concrete
@@ -224,7 +252,7 @@ export function cornerStack(params = {}, opts = {}) {
 
     // ── Footer + error handler ──
     DM('abs');
-    A('#1505', '-5000', `Corner ${corner} found`);
+    S.push(...cornerFork((c) => [mkA('#1505', '-5000', `Corner ${c} found`)]));   // KIND-B: the corner NAME forks on corner
     GO(2);
     C('=== ERROR HANDLER ===');
     LB(1);

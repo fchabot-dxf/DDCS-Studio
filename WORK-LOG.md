@@ -4873,3 +4873,44 @@ combinatorial, smaller template — but that IS a new mechanism (the thing you s
 2. (If pure guard) the canonical-prune + validateUserOp tolerance are internal binding-derivation tweaks — bless / any concern?
 
 Ready to build the moment you confirm. (Signed 57; premise-verification-before-build, as you've valued.)
+
+---
+
+## 🔨 turn 59 (cycle 11) — ③b corner + probeSeq LIVE (8-way corner×probeSeq guard). ALL operator structural params now LIVE. ⏸ PASS BACK.
+
+Advisor confirmed the PURE 8-way guard (no interp) + blessed the 2 internal fixes (canonical-prune + validateUserOp tolerance),
+with the CONDITION: scope the tolerance strictly to bindingSpecs defs + regress the 5 siblings. Built it.
+
+**The 8-way guard (same style as wcs, but corner×probeSeq INTERACT).**
+- **cornerWizard — the fork helpers:** `cornerFork` (4-way, corner-only text: header/prompt/footer) + `csFork` (8-way,
+  corner×probeSeq nested: #21/#22, #23/#24, the two-wall probe region — directions + ORDER + step-axis text). Both RETURN arm
+  blocks so they NEST the existing forks; added RETURNING variants `zPairR`/`zOnlyR` + `mkMV` + a returning `probeWallR`. The
+  derived directions/axes recompute PER COMBO via `axesOf(c, seq)`. Concrete (built-in) byte-identical — proven by probe-surface
+  CORNER migration + corner-data-emit + the 8-combo byte-parity. Combinatorial-but-inert (the header is now corner×probeZ×wcs;
+  the probe region 8-way × the nested wcs/ta — pruned to one leaf per build).
+- **ONE direction source (a smell the mutation-check surfaced):** unified `dirsOf` — the concrete `xDir/yDir` AND the superset
+  forks all read it, so a quadrant edit can't desync the concrete vs superset paths (before: two maps).
+- **cornerData — the bound-socket fix + bindings:** CORNER_DEFAULTS corner/probeSeq → STRINGS 'FL'/'YX' (the guards match by
+  value-equality); corner/probeSeq = enum structural bindings (form dropdowns). CORNER_BINDINGS now derives over a CANONICAL-
+  pruned stack (probeZFirst:1/FL/YX → exactly 1× each bound socket; the 8-way guard duplicates #21-#24 8× in the raw superset).
+- **userOps — validateUserOp tolerance, SCOPED:** skips the frozen-blockIndex check ONLY for a `bindingSpecs` def (its bindings
+  re-derive+VALIDATE at build over the pruned stack; the frozen index is over the canonical stack, not the guarded superset).
+  The 5 legacy siblings (no bindingSpecs) keep the full check — VERIFIED (drill/slot/text/surfacing/atc + user-ops all green).
+
+**Frontier retired in LOCKSTEP.** corner/probeSeq's divergence tripwires removed (they CONVERGE full-byte now); corner-data-
+baked-frontier re-anchored to `level` (the DELIBERATE baked-final, non-operator-facing — untouched) + the don't-retire-the-
+built-in gate (the ④ release owns retirement).
+
+**VERIFY — the HARDENED 8-combo spec (assert-the-value from the START, per the wcs-harden lesson).** corner-data-cornerseq-live:
+reads the corner/probeSeq enum binding wiring + asserts ALL 8 (corner×probeSeq) combos == cornerStack BYTE-FOR-BYTE (prune
+correctness) AND pins each combo's DERIVED values (first/second-wall probe var #7/#8, header dir labels, footer name, reposition
+default sign) against an INDEPENDENT hardcoded truth table — NOT twin-vs-self. MUTATION-CHECK (with the unified dirsOf): flip
+dirsOf FR → the SECOND-wall probe-var pin went RED while byte-parity stayed GREEN (the independent-truth catch the wcs-harden
+taught — a value error both paths share), reverted byte-exact. corner-data-emit reworked (cornerDiv→FR/XY full-byte CONVERGE).
+probe-surface GOLDEN + probeZFirst/travelApproach/wcs/syncA/start live + the 5 siblings all green. **Full suite: 466 passed, 0
+failed, 2 skipped (1.4m) — clean.**
+
+**⏸ PASS BACK (advisor verifies + likely fan-out on the footprint, given the wider surface).** >>> MILESTONE: ALL
+operator-facing structural params on the corner twin are now LIVE — probeZFirst · travelApproach · wcs(7) · syncA · corner(4) ·
+probeSeq(2) — each via guard/prune, each byte-for-byte == cornerStack, each hardened (binding-driven + value-pinned). Only
+`level` stays (deliberate baked-final). REMAINING for corner parity = ONLY ④ VERIFY + RELEASE (end-to-end + retire the built-in).

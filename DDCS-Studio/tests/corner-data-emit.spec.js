@@ -67,8 +67,11 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
     // (the #1505 jog-prompt KIND-B text prunes to the same bytes). (The dedicated travelApproach-live spec asserts the shape.)
     const travelManualByte = emitEquivalence(cornerStack, dataBuilder, [S({ travelApproach: 'manual' })], {});   // full-byte MANUAL
 
-    // FRONTIERS — STILL baked (the twin bakes these; the built-in keeps them working) → MUST diverge:
-    const cornerDiv      = emitEquivalence(cornerStack, dataBuilder, [S({ corner: 2 })], {}, stripAnnotations);       // structural: FR direction signs (still baked → diverges)
+    // ③b — corner + probeSeq are now LIVE (8-way corner×probeSeq guard/prune). Non-default combos CONVERGE with cornerStack
+    // FULL byte (the derived directions/order + the KIND-B text prune to the same bytes). (The dedicated cornerseq-live spec
+    // pins each of the 8 combos' derived values vs an independent truth table.)
+    const cornerByte     = emitEquivalence(cornerStack, dataBuilder, [S({ corner: 'FR' })], {});   // full-byte FR
+    const probeSeqByte   = emitEquivalence(cornerStack, dataBuilder, [S({ probeSeq: 'XY' })], {}); // full-byte XY
     // ② B4(c) — fan-out DISSOLVED: safeZ + scanDepth are now LIVE single-socket bindings (#17=[#19+#20] recomputes on the
     // controller), so a bound safeZ/scanDepth now CONVERGES with cornerStack (was a baked frontier that diverged).
     const safeZConv      = emitEquivalence(cornerStack, dataBuilder, [S({ safeZ: 25 })], {}, stripAnnotations);
@@ -111,7 +114,8 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
       main: { pass: main.pass, count: main.count, firstDiff: main.firstDiff && { params: main.firstDiff.params, a: main.firstDiff.a.slice(0, 700), b: main.firstDiff.b.slice(0, 700) } },
       probeZOffByte: { pass: probeZOffByte.pass, firstDiff: probeZOffByte.firstDiff && { a: probeZOffByte.firstDiff.a.slice(0, 700), b: probeZOffByte.firstDiff.b.slice(0, 700) } },
       probeZOnByte: { pass: probeZOnByte.pass, firstDiff: probeZOnByte.firstDiff && { a: probeZOnByte.firstDiff.a.slice(0, 700), b: probeZOnByte.firstDiff.b.slice(0, 700) } },
-      cornerPass: cornerDiv.pass,
+      cornerByte: { pass: cornerByte.pass, firstDiff: cornerByte.firstDiff && { a: cornerByte.firstDiff.a.slice(0, 700), b: cornerByte.firstDiff.b.slice(0, 700) } },
+      probeSeqByte: { pass: probeSeqByte.pass, firstDiff: probeSeqByte.firstDiff && { a: probeSeqByte.firstDiff.a.slice(0, 700), b: probeSeqByte.firstDiff.b.slice(0, 700) } },
       travelManualByte: { pass: travelManualByte.pass, firstDiff: travelManualByte.firstDiff && { a: travelManualByte.firstDiff.a.slice(0, 700), b: travelManualByte.firstDiff.b.slice(0, 700) } },
       safeZConvPass: safeZConv.pass,
       scanDepthConvPass: scanDepthConv.pass,
@@ -138,8 +142,11 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
   if (!r.probeZOnByte.pass) console.log('PROBEZ-ON DIFF\n--- cornerStack ---\n' + (r.probeZOnByte.firstDiff && r.probeZOnByte.firstDiff.a) + '\n--- data def ---\n' + (r.probeZOnByte.firstDiff && r.probeZOnByte.firstDiff.b));
   expect(r.probeZOffByte.pass, 'probeZFirst OFF: the twin emit is byte-identical to cornerStack (default shape unchanged)').toBe(true);
   expect(r.probeZOnByte.pass, 'probeZFirst ON: the twin reproduces cornerStack({probeZ:true}) BYTE-FOR-BYTE (Z-surface step + KIND-B text)').toBe(true);
-  // FRONTIERS — STILL baked (structural), must diverge until B4 makes them live.
-  expect(r.cornerPass, 'frontier: the corner quadrant is structural (direction signs + comments) — baked in the twin').toBe(false);
+  // ③b — corner + probeSeq are LIVE: FULL-byte parity with cornerStack at a non-default combo (the dedicated cornerseq-live
+  // spec pins all 8 combos' derived values vs an independent truth table).
+  if (!r.cornerByte.pass) console.log('CORNER-FR DIFF\n--- cornerStack ---\n' + (r.cornerByte.firstDiff && r.cornerByte.firstDiff.a) + '\n--- data ---\n' + (r.cornerByte.firstDiff && r.cornerByte.firstDiff.b));
+  expect(r.cornerByte.pass, 'corner=FR: the twin emit == cornerStack byte-for-byte (direction signs + text)').toBe(true);
+  expect(r.probeSeqByte.pass, 'probeSeq=XY: the twin emit == cornerStack byte-for-byte (wall order + text)').toBe(true);
   // ② B4(c): safeZ + scanDepth are NO LONGER frontiers — the #17=[#19+#20] fan-out fix made them live single-socket bindings.
   expect(r.safeZConvPass, 'safeZ is now a LIVE binding (→#19; #17=[#19+#20] recomputes) → CONVERGES with cornerStack').toBe(true);
   expect(r.scanDepthConvPass, 'scanDepth is now a LIVE binding (→#20) → CONVERGES with cornerStack').toBe(true);

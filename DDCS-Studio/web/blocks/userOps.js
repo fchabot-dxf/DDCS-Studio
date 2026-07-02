@@ -327,6 +327,12 @@ export function validateUserOp(def) {
         // not a value SOCKET, so there is no template block to resolve. It's substituted by pruneGuards, never by instantiate's
         // socket loop (which the bindingSpecs path skips anyway). Only value-socket bindings get the block-resolution check.
         if (b.blockIndex == null) continue;
+        // ③b — a `bindingSpecs` def re-derives + VALIDATES its value bindings AT BUILD (deriveBindings over the PRUNED stack
+        // throws there on a bad spec). Its frozen def.bindings blockIndex is computed over a CANONICAL-pruned stack (not
+        // def.template, the guarded superset — where a corner×probeSeq-guarded socket appears 8×), so the superset-flatten
+        // check below would spuriously fail. SCOPED STRICTLY to bindingSpecs defs → the 5 legacy siblings (no bindingSpecs) are
+        // UNCHANGED (they keep the full block-resolution check). See corner-data-cornerseq-live.spec + the sibling regression.
+        if (def.bindingSpecs) continue;
         const blk = flat[b.blockIndex];
         if (!blk || !blk.params || !(b.key in blk.params)) errs.push(`param "${b.param}": binding (block ${b.blockIndex}.${b.key}) does not resolve in the template`);
     }
