@@ -145,7 +145,11 @@ export function cornerStack(params = {}) {
         }));
         S.push(...safeTraverseStack({
             mode: 'seq', crossX: '#21', crossY: '#22', lift: '#19',
-            comment: 'Traverse to first wall',
+            // ② B4 step 3 (anchor): 'REPOSITION:' makes the engine count Z→wall1 as its own pass (GcodeExecutionEngine
+            // bumps _pass only on a REPOSITION: comment), so under probeZFirst there are 3 passes = 3 sim-start markers
+            // 1:1 (was 2 passes / 3 markers → wall-2 orphaned). CONSISTENT with middle (its Z reposition is a delimiter).
+            // OFF: this block isn't emitted (inside `if (probeZ)`) → byte-identical. Byte-visible ON (both built-in + twin).
+            comment: 'REPOSITION: Traverse to first wall',
             approach: travelApproach, promptNote: 'Jog clear, over to the first wall. Press Enter',   // manual: lift #19, jog, no drop (:150 plunges) — mirrors auto's Z
         }));
     }

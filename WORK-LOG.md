@@ -4313,3 +4313,45 @@ proven, NO behaviour change to any op. Next (on your pass-back), batch steps 3+4
 delimiter + semantic relTo), step 4 seed corner's superset (guard probeZFirst/travelApproach/wcs/syncA + enum/bool bindings
 + switch corner to `bindingSpecs`) → the toggles go LIVE + retire the 2 frontier tripwires in lockstep → ⏸ TOGGLES-LIVE
 human-eyes gate.
+
+---
+
+## 🔨 turn 35 (cycle 11) — ② B4 M2 step 3 (anchor pass-alignment) + a RE-SCOPE of step 4 (advisor turn 34 greenlit 3+4).
+
+Step 2 accepted (advisor's independent regression: all 5 sibling ports byte-identical). Greenlit the batched step 3 + step 4
+→ toggles-live gate. In building it I MAPPED that step 4 is materially larger + more coupled than the batch assumed, so I
+landed the cleanly-bounded, correct piece (the anchor pass-alignment) + re-scope step 4 fork-by-fork below (the discipline
+the advisor has praised: prove each piece, don't rush a 4-fork superset in one turn).
+
+**Built + verified — step 3 pass-alignment (the anchor's engine-side half):** cornerStack's Z→wall1 traverse comment gains
+`REPOSITION:` → the engine (bumps `_pass` only on a REPOSITION: comment) now counts it as its OWN pass, so under probeZFirst
+there are **3 passes == the 3 declared CORNER_SIM_STARTS markers, 1:1** (was 2 passes / 3 markers → wall-2 orphaned).
+CONSISTENT with the middle wizard (its Z reposition is already a delimiter). BYTE-IDENTICAL OFF (the Z→wall1 line only
+exists under probeZ) + the prefix is stripAnnotations-invisible → the functional emit/golden specs are unaffected. NEW
+`corner-pass-align.spec` asserts the real symptom: 2 REPOSITION delimiters under probeZ, 1 without. **Full suite 459 green.**
+
+**⚠️ STEP-4 RE-SCOPE — the toggles-live work is a MULTI-INCREMENT job (mapped precisely):**
+- **Each fork's block-adds AND its KIND-B interpolated text must be guarded TOGETHER for ON-parity.** probeZFirst isn't
+  one contiguous block: it's #21/#22 (config) + the Z-surface probe + the Z→wall1 traverse (blocks), PLUS the `#1505`
+  prompt "Hover OVER vs OUTSIDE", the "Step 1/2 vs 2/3" labels, and the "+ Z Surface" header (KIND-B text). A superset that
+  guards only the blocks would emit the ON shape with the OFF text → `instantiate(probeZFirst:1) ≠ cornerStack(probeZ:1)`
+  (byte-fails on parity). So the KIND-B guarded comment variants (D4) are NOT deferrable per-toggle — they co-deliver with
+  each fork's block guards. (stripAnnotations hides them from the gate, so each needs a value-asserting test too.)
+- **cornerStack needs a `superset` mode** (emit BOTH arms of each fork, each wrapped in a `guard`) for the twin SEED, while
+  the built-in still calls it concrete. prune(superset, defaults) must be BYTE-identical to cornerStack(defaults).
+- **wcs is a 7-WAY guard** (active + G54..G59 literal arms — the fixed #70 value is enum-derived, so it's guarded arms, not
+  a value binding). travelApproach = 2 guarded pairs (×2 travels). syncA = 1 bool guard.
+- **The semantic relTo (anchor's drag-side half)** needs the declared sim-start rows accessible at the panelTypes call site
+  (row `id`s + a `resolveRelToIndex` over the when-filtered rows) — best delivered WITH probeZFirst-live (where the #23/#24
+  drag under probeZ actually exercises it).
+
+**PROPOSED fork-by-fork sequencing to the ⏸ human-eyes gate** (each a focused, verifiable increment on the step-2 guard/prune
+capability): **(4a) probeZFirst-LIVE** = the superset guards for #21/#22 + Z-surface + Z→wall1 + the KIND-B variants (prompt/
+steps/+Z) + the semantic relTo resolver + a `probeZFirst` bool binding + switch corner to `bindingSpecs` + retire the
+probeZFirst frontier in lockstep → **PASS BACK human-eyes** (the headline toggle: flip probeZFirst, see the Z step + 3
+aligned markers + the drag). **(4b) travelApproach-live**, **(4c) wcs-live (7-way)**, **(4d) syncA-live** — same guarded-arm
+pattern, each retiring/flipping its frontier row.
+
+**Passing back with step-3 landed + this re-scope, so you can dispatch 4a (probeZFirst-live) as the next focused increment
+to the human-eyes gate** — rather than a single rushed 4-fork superset. If you'd prefer I push straight through 4a-4d in
+fewer turns, say so; I flagged the coupling so the sequencing is your call.
