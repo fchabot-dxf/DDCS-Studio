@@ -4403,3 +4403,34 @@ grows the Z-surface step + Z→wall1 reposition (3 aligned pass-markers), the pr
 still writes the wall-relative DELTA (now anchored to wall-1 in either state). Human should eyeball: the Z step appears, the 3
 markers, and the drag tie. Then dispatch **4b travelApproach-live** (same guard/prune, its frontier retires next), 4c wcs (7-way),
 4d syncA. NOT pushing past the gate. (Note: this turn's pass avoids backticks in the --note per the turn-33 shell-substitution fix.)
+
+---
+
+## 🔨 turn 39 (cycle 11) — ② B4 M2 step 4a-HARDEN: close the test-integrity gap (binding-driven relTo + ON-state coverage + mutation-proven). ⏸ PASS BACK (advisor verifies).
+
+Advisor reviewed 4a: production SOLID (re-run 10/10, 5 siblings byte-identical; fan-out review 4/5 lenses clean). ONE test-
+integrity finding (NO prod bug — relTo IS correctly wired at cornerData.js:71-72): my corner-data-probeZFirst-live spec drove
+resolveRelToIndex with a HARDCODED {row:'wall1'} and never asserted the cross1_x/cross1_y BINDINGS actually declare that relTo
+→ a stale numeric relTo:0 (or a wrong row) would PASS GREEN in the ON state (no ON-state drag/anchor test; corner-data-drag is
+OFF-only). Matters because 4b-4d CLONE this pattern and the human-eyes gate is dropped (the test is the net). GOOD CATCH.
+
+**Hardened corner-data-probeZFirst-live (test-only change — no prod code touched):**
+- **(1) READ + ASSERT the declared wiring:** read `cross1_x`/`cross1_y` from `def.bindings` and assert each `relTo` deep-equals
+  `{row:'wall1'}`. A binding mis-declaration now fails directly.
+- **(2) DRIVE the resolver FROM the binding:** `resolveRelToIndex(..., cxBind.relTo)` — NOT a literal. So the anchor path is now
+  sensitive to the binding: a stale `relTo:0` → `resolveRelToIndex` returns 0 in BOTH states → onAnchorIdx 0≠1 + off/on anchor
+  points differ → RED. Mirrors the panelTypes call site exactly (`resolveRelToIndex(def.opType, params, byRole.x.relTo)`).
+- **(3) ON-STATE coverage (corner-data-drag is OFF-only):** binding-driven `onAnchorIdx===1` + `onAnchorIsWall1` (the resolved ON
+  anchor lands on the wall-1 marker, not zsurf/wall-2) + `anchorSamePoint` (same wall-1 point in both states).
+- **(4) MUTATION-CHECK (proven, then reverted BYTE-EXACT):** set `cross1_x.relTo := 0` → RED; set `:= {row:'wall2'}` → RED;
+  revert → GREEN. `git diff` on cornerData.js is EMPTY (mutation fully reverted; only the test file changed).
+
+**LIVE-SPEC PATTERN for 4b/4c/4d (adopted):** each toggle's spec READS its OWN binding wiring from `def.bindings`, DRIVES the
+resolver/emit from it (never a hardcoded literal), and tests BOTH toggle states — so a mis-wire fails the net, not the (now
+dropped) human eyes.
+
+**VERIFY.** corner-data-probeZFirst-live green; mutation-check RED on both mis-wires; **full suite 460 passed, 0 failed, 3
+skipped (1.3m) — clean.** All byte-parity specs stay green (prod code untouched this turn).
+
+**⏸ PASS BACK (advisor verifies — no human gate).** Only the test hardened; production 4a is as reviewed. Ready for the 4b
+travelApproach-live dispatch (same guard/prune mechanism, its frontier retires next, spec follows this live-spec pattern).
