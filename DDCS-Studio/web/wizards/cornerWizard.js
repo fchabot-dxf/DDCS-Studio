@@ -93,6 +93,15 @@ export function cornerStack(params = {}, opts = {}) {
     const taPair = (autoFn, manualFn) => superset
         ? [GUARD(WHEN_TA('auto'), autoFn()), GUARD(WHEN_TA('manual'), manualFn())]
         : (travelApproach === 'manual' ? manualFn() : autoFn());
+    // ② B4 step 4c — wcs is a 7-WAY enum structural fork: the WCS-base block (active reads #578 → computes #70; a fixed
+    // G54..G59 uses the literal base) PLUS the derived `wcsLabel`, which bleeds into 4 comments (header + the X/Y/Z save
+    // notes). wcsFork RETURNS one wcs value's arm blocks (composed inside the z-forks so it nests): superset → all 7 arms
+    // guarded by when(wcs==value), each built with ITS resolved label; concrete → the selected arm. Inert DATA pruned per build.
+    const WCS_VALUES = ['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59'];
+    const wcsLabelOf = (w) => (w === 'active' ? 'Active WCS' : w);
+    const wcsFork = (fn) => superset
+        ? WCS_VALUES.map((w) => GUARD({ param: 'wcs', is: w }, fn(w, wcsLabelOf(w))))
+        : fn(wcs, wcsLabel);
 
     // Probe one wall via the shared PROBE-SURFACE BLOCK (t127): touch+comp → the TRUE wall in a temp (#102/#101); the
     // corner keeps its own WCS write + retract + safe-Z (trailingRetract:false). Byte-identical to the old hand-rolled wall.
@@ -105,17 +114,17 @@ export function cornerStack(params = {}, opts = {}) {
             compEnable: true, trailingRetract: false, compNote: `Trigger Pos ${compOp} Radius`,
         }));
         if (ax === 'X') {
-            A('#[#70]', '#102', `Save to ${wcsLabel} X`);
+            S.push(...wcsFork((w, label) => [mkA('#[#70]', '#102', `Save to ${label} X`)]));   // note forks on wcs (value/target constant)
         } else {
             A('#73', '[#70+1]', 'WCS Y Address');
-            A('#[#73]', '#101', `Save to ${wcsLabel} Y`);
+            S.push(...wcsFork((w, label) => [mkA('#[#73]', '#101', `Save to ${label} Y`)]));
         }
         MV(ax, retractVar); MV('Z', '#17');
     };
 
-    // ── Header ──
-    const hdr1 = (z) => `Corner | ${corner} OUTSIDE | X ${dirLabel(xDir)} Y ${dirLabel(yDir)}${z ? ' + Z Surface' : ''} | ${wcsLabel}`;
-    zPair([mkC(hdr1(true))], [mkC(hdr1(false))]);   // KIND-B: the "+ Z Surface" suffix forks with probeZFirst
+    // ── Header ── KIND-B: "+ Z Surface" forks on probeZFirst, the WCS label on wcs → the two nest (zPair over wcsFork).
+    const hdr1 = (z, label) => `Corner | ${corner} OUTSIDE | X ${dirLabel(xDir)} Y ${dirLabel(yDir)}${z ? ' + Z Surface' : ''} | ${label}`;
+    zPair(wcsFork((w, label) => [mkC(hdr1(true, label))]), wcsFork((w, label) => [mkC(hdr1(false, label))]));
     C(`Probe dist: ${dist}mm | Retract: ${retract}mm`);
     C(`Fast: ${fFast} | Slow: ${fSlow} | SafeZ: ${safeZ}mm | ScanDepth: ${scanDepth}mm`);
 
@@ -145,13 +154,11 @@ export function cornerStack(params = {}, opts = {}) {
     A('#23', params.cross1_x || (firstAx === 'X' ? own(xDir) : opp(xDir)), 'Wall 1 to Wall 2 traverse (X)');
     A('#24', params.cross1_y || (firstAx === 'Y' ? own(yDir) : opp(yDir)), 'Wall 1 to Wall 2 traverse (Y)');
 
-    // ── WCS base address ──
-    if (wcs === 'active') {
-        C('Read Active WCS');
-        A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc');
-        A('#72', '[#71-1]', 'Zero-based index');
-        A('#70', '[805+[#72*5]]', 'Base WCS address');
-    } else { C(`Target: ${wcs}`); A('#70', WCS_BASE[wcs], 'Base WCS address'); }
+    // ── WCS base address ── 7-way wcs fork: 'active' reads #578 → computes #70; a fixed G54..G59 uses the literal base.
+    const wcsBaseBlocks = (w) => w === 'active'
+        ? [mkC('Read Active WCS'), mkA('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'), mkA('#72', '[#71-1]', 'Zero-based index'), mkA('#70', '[805+[#72*5]]', 'Base WCS address')]
+        : [mkC(`Target: ${w}`), mkA('#70', WCS_BASE[w], 'Base WCS address')];
+    S.push(...wcsFork((w) => wcsBaseBlocks(w)));
 
     // ── Confirm + incremental ──
     C('Confirm Start');
@@ -163,11 +170,12 @@ export function cornerStack(params = {}, opts = {}) {
     // Z-surface touch via the shared block. The comp writes the WCS Z directly (#[#73]=[#1927-#6]); preComp sets the indirect
     // address #73 right before the comp (kept in place → byte-identical). trailingRetract:false → the corner does its own
     // safe-Z retract + the travel to the first wall.
-    const zSurfaceProbe = probeSurfaceStack({
+    // The compNote carries the derived wcsLabel → forks on wcs (via wcsFork in the zOnly below); everything else is constant.
+    const zSurfaceProbe = (label) => probeSurfaceStack({
         axis: 'Z', dir: '-', probeVar: '#7', retractVar: '#10', feedFast: '#3', feedSlow: '#4', port: '#5', level,
         twoPass: true, raw: '#1927', result: '#[#73]', radius: '#6', compEnable: true,
         trailingRetract: false, preComp: [{ var: '#73', value: '[#70+2]', note: 'WCS Z Address' }],
-        compNote: `Save ${wcsLabel} Z offset - machine coord (− stylus radius)`,
+        compNote: `Save ${label} Z offset - machine coord (− stylus radius)`,
     });
     // ② B4 step 3 (anchor): the 'REPOSITION:' comment makes the engine count Z→wall1 as its own pass (3 passes = 3 markers
     // under probeZFirst). ② B4 step 4b: it forks on travelApproach (auto seq move vs #1505 jog prompt) → taPair NESTED inside
@@ -177,7 +185,7 @@ export function cornerStack(params = {}, opts = {}) {
         comment: 'REPOSITION: Traverse to first wall',
         approach, promptNote: 'Jog clear, over to the first wall. Press Enter',
     });
-    zOnly([...zSurfaceProbe, ...taPair(() => zWall1('auto'), () => zWall1('manual'))]);
+    zOnly([...wcsFork((w, label) => zSurfaceProbe(label)), ...taPair(() => zWall1('auto'), () => zWall1('manual'))]);
 
     // ── Two walls, in the chosen order ──
     // Z-first shifts EVERY step number +1 (Z-surface takes Step 1) — a KIND-B fork, so each Step label is a guarded comment

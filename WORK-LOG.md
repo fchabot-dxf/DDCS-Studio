@@ -4479,3 +4479,51 @@ full-byte MANUAL CONVERGE). corner-data-probeZFirst-live + guard-prune + golden 
 **⏸ PASS BACK (advisor verifies — no human gate).** travelApproach is live via the same guard/prune; frontier moved to wcs.
 Ready for 4c wcs-live (the 7-way enum: active + G54..G59 literal arms — same taPair-style pattern, but 7 arms; its spec follows
 this hardened pattern and retires the wcs tripwire in lockstep, moving the built-in gate to syncA). Then 4d syncA.
+
+---
+
+## 🔨 turn 43 (cycle 11) — ② B4 M2 step 4c: wcs LIVE (7-way enum guard/prune, batch fork 2/3, highest risk). ⏸ PASS BACK (advisor verifies + fan-out).
+
+4b travelApproach-live reviewed CLEAN + verified (withGuardDefaults sound, 12/12, mutation accepted). DISPATCH 4c wcs-LIVE —
+the 7-way enum (active|G54..G59), flagged as the highest-risk fork (advisor will fan-out review). ⏸ pass back.
+
+**The complication I mapped first (before coding): the derived `wcsLabel` BLEEDS into 5 locations**, not just the WCS-base block:
+(1) the WCS-base block itself (STRUCTURAL: active reads #578→computes #70 [4 blocks] vs a fixed G54..G59 literal #70 [2 blocks]);
+(2) the header `| ${wcsLabel}`; (3) the probeWall X save note `Save to {label} X`; (4) the probeWall Y save note; (5) the
+Z-surface compNote `Save {label} Z offset…` (inside the probeSurfaceStack). So 1 structural + 4 KIND-B derived-label comments,
+two of them inside SHARED spots (the probeWall helper, the Z probe).
+
+**Resolution — a `wcsFork(fn)` helper, consistent with M2 (not the KIND-A interp).** wcsFork RETURNS one wcs value's arm blocks
+(so it composes/NESTS inside the z-forks): superset → all 7 arms guarded by when(wcs==value), each built with ITS resolved
+label; concrete → the selected arm. Applied to all 5 spots — the WCS-base block, the header (nested inside the probeZFirst
+zPair → 2×7), the X/Y save notes (via S.push inside probeWall), and the Z compNote (the zSurfaceProbe is now label-parameterised
++ wcsForked, nested inside the probeZFirst guard). One leaf survives prune → byte-for-byte == cornerStack for EVERY combination.
+The CODE stays clean (5 helper calls); the extra template arms are inert DATA pruned per build — the same declare-the-superset
+pattern M2 rests on, just at 7-way. (A KIND-A interp for the 4 cosmetic labels would shrink the template, but it's a separate
+shared mechanism + not needed for correctness; noted as a possible later optimization, NOT built.)
+
+**Wiring details:**
+- CORNER_DEFAULTS.wcs 0 → 'active' (STRING): the guards match wcs by value-equality (when(wcs=='active'|'G54'…)), so a numeric 0
+  would match no arm and drop the whole WCS block. cornerStack still accepts 0..6 for the built-in via its own normalization
+  (unchanged). withGuardDefaults (4b) fills the 'active' default for build({}).
+- wcs = a 7-option ENUM structural binding in CORNER_STRUCT_BINDINGS (default 'active', options active/G54..G59 → the form
+  dropdown). whenOk enum === already proven (4b) — VERIFIED, no whenGuard change.
+- deriveBindings UNAFFECTED: the 7× WCS arms assign #70/#71/#72 (NOT spec vars), and every spec (#1-6,#15,#19,#20,#23,#24) is
+  unconditional (config/calc-motions, outside all guards) → still a unique match. The wcs base block sits AFTER #23/#24, so the
+  #21/#22-driven +2 shift under probeZFirst is unchanged.
+
+**Frontier moved in LOCKSTEP.** Retired corner-data-wcs-frontier (wcs now live). Its don't-retire-the-built-in gate MOVED into a
+NEW corner-data-syncA-frontier (re-anchored to syncA — the LAST baked structural frontier; 4d retires it, then the ④ release
+retires the built-in), which also tripwires syncA (the twin bakes it OFF: no Dual Gantry Sync / G1 A0 / #74 write).
+
+**VERIFY (hardened live-spec pattern).** NEW corner-data-wcs-live READS the 7-option enum binding's OWN wiring (type enum,
+default active, the 7 options) + DRIVES the emit from the declared option values; asserts FULL byte-for-byte parity across ALL 7
+arms × BOTH probeZFirst states (14 combos — exercises the Z-compNote wcs fork) + the toggle symptom (active reads #578; G54
+writes #70=805 + "Target: G54" + "Save to G54 X", no active read; G59 #70=830). MUTATION-CHECK: dropped the 'G55' arm from
+WCS_VALUES → the wcs=G55 parity went RED (prune → empty WCS block); reverted byte-exact. probe-surface-block GOLDEN (concrete
+cornerStack byte-identical for edge/corner/rotary) + corner-data-emit + probeZFirst-live + travelApproach-live all green. **Full
+suite: 462 passed, 0 failed, 3 skipped (1.3m) — clean, no flakes.**
+
+**⏸ PASS BACK (advisor verifies + fan-out).** wcs is live via the same guard/prune (7-way); frontier moved to syncA. Ready for
+4d syncA-live (the LAST toggle — a bool block-ADD like probeZFirst; retires the syncA tripwire, then the ④ release retires the
+built-in). Note the wcsLabel-bleed finding above — if a template-size cleanup is wanted later, the KIND-A interp is the lever.
