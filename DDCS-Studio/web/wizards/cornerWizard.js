@@ -26,6 +26,37 @@ const AX = {
 };
 const WCS_BASE = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
 
+// corner → probe directions (FL=X+Y+ FR=X−Y+ BL=X+Y− BR=X−Y−). ONE source read by cornerStack's concrete xDir/yDir, the
+// ③b superset forks (cornerFork/csFork/axesOf), AND the sim-marker reposition helper (cornerReposOffsets) — so a quadrant
+// edit can't desync the emit and the preview. (Hoisted to module scope so the sim helper shares the SAME geometry.)
+const dirsOf = (c) => ({ FL: ['+', '+'], FR: ['-', '+'], BL: ['+', '-'], BR: ['-', '-'] }[c] || ['+', '+']);
+// The two walls in the chosen probe order (per corner×probeSeq): fA/fD = first-wall axis+dir, sA/sD = second-wall axis+dir.
+const axesOf = (c, seq) => { const [xd, yd] = dirsOf(c); return seq === 'YX' ? { xd, yd, fA: 'Y', fD: yd, sA: 'X', sD: xd } : { xd, yd, fA: 'X', fD: xd, sA: 'Y', sD: yd }; };
+
+/** The numeric reposition-DEFAULT deltas for the SIM preview marker positions — the SAME #21/#22 (Z→wall1) and #23/#24
+ *  (wall1→wall2) defaults the emit uses (own/opp = ±travelDist), evaluated to NUMBERS via the SAME axesOf axis-order
+ *  geometry. So the preview markers chain from their anchors exactly where the tool actually arrives, and a quadrant /
+ *  probe-order / travelDist edit moves both together. Mirrors the emit's `params.<sock> || formula` (a set socket wins;
+ *  an unset/0 socket falls to the formula). PREVIEW-ONLY — never emitted (byte-parity untouched). */
+export function cornerReposOffsets(params = {}) {
+    const corner = ({ 1: 'FL', 2: 'FR', 3: 'BL', 4: 'BR', FL: 'FL', FR: 'FR', BL: 'BL', BR: 'BR' }[params.corner]) || 'FL';
+    const seq = ({ 0: 'YX', 1: 'XY', YX: 'YX', XY: 'XY' }[params.probeSeq]) || 'YX';
+    const td = num(params.travelDist, 50) || 0;
+    const ax = axesOf(corner, seq);
+    const ownN = (d) => (d === '+' ? td : -td);   // #15 / #16 as numbers (own = signed by dir)
+    const oppN = (d) => (d === '+' ? -td : td);   // opp = the opposite
+    // mirror the emit's `params.<sock> || formula`: a SET NUMERIC socket wins; unset/0/EXPRESSION → the formula. An expression
+    // string ('#16', '[0-#15]') can't be evaluated in JS → falls to the formula → the preview stays FINITE (never NaN).
+    const useN = (raw, formula) => { const v = parseFloat(raw); return (raw && Number.isFinite(v)) ? v : formula; };
+    // #21/#22 (Z→wall1): move along the FIRST wall axis in opp(fD); the perpendicular holds at 0.
+    const w1x = useN(params.startX, ax.fA === 'X' ? oppN(ax.fD) : 0);
+    const w1y = useN(params.startY, ax.fA === 'Y' ? oppN(ax.fD) : 0);
+    // #23/#24 (wall1→wall2): #23 = fA==='X' ? own(xd) : opp(xd); #24 = fA==='Y' ? own(yd) : opp(yd).
+    const w2x = useN(params.cross1_x, ax.fA === 'X' ? ownN(ax.xd) : oppN(ax.xd));
+    const w2y = useN(params.cross1_y, ax.fA === 'Y' ? ownN(ax.yd) : oppN(ax.yd));
+    return { wall1: { dx: w1x, dy: w1y }, wall2: { dx: w2x, dy: w2y } };
+}
+
 /** Corner params → its outside-corner probe-macro block stack. The one source of truth for both displays.
  *  `opts.superset` (② B4 step 4a) seeds the TWIN as an all-arms-present template: every probeZFirst-dependent piece
  *  emits BOTH arms wrapped in a `guard` block so instantiate() can prune to either concrete shape. Superset OFF
@@ -46,9 +77,8 @@ export function cornerStack(params = {}, opts = {}) {
     // travel's OWN lift/drop so the Z-state mirrors auto. Default 'auto' → BYTE-IDENTICAL to today.
     const travelApproach = params.travelApproach === 'manual' ? 'manual' : 'auto';
 
-    // corner → probe directions (FL=X+Y+  FR=X−Y+  BL=X+Y−  BR=X−Y−). ONE source (dirsOf) — the concrete xDir/yDir AND the
-    // ③b superset forks (cornerFork/csFork/axesOf) all read it, so a quadrant edit can't desync the two paths.
-    const dirsOf = (c) => ({ FL: ['+', '+'], FR: ['-', '+'], BL: ['+', '-'], BR: ['-', '-'] }[c] || ['+', '+']);
+    // corner → probe directions via the module-level dirsOf (shared with the sim helper — see the header). The concrete
+    // xDir/yDir AND the ③b superset forks (cornerFork/csFork/axesOf) all read it, so a quadrant edit can't desync the paths.
     const [xDir, yDir] = dirsOf(corner);
     const dirLabel = (d) => (d === '+' ? 'pos' : 'neg');
     const td = travelDist || 0;   // ② B4(c): #17 plunge is now DECLARED as [#19+#20] (safeZ+scanDepth) — the controller sums it, so both are single editable sockets (fan-out dissolved), no baked plungeDepth
@@ -110,7 +140,7 @@ export function cornerStack(params = {}, opts = {}) {
     // f(corner, probeSeq)), so an 8-WAY guard (nested corner × probeSeq, reusing whenOk) like wcs — NOT a value-binding (the
     // swap is derived from the quadrant; the reorder is of differently-shaped blocks). Combinatorial-but-inert (pruned/build).
     const CORNERS = ['FL', 'FR', 'BL', 'BR'], SEQS = ['YX', 'XY'];
-    const axesOf = (c, seq) => { const [xd, yd] = dirsOf(c); return seq === 'YX' ? { xd, yd, fA: 'Y', fD: yd, sA: 'X', sD: xd } : { xd, yd, fA: 'X', fD: xd, sA: 'Y', sD: yd }; };
+    // axesOf hoisted to module scope (shared with cornerReposOffsets — the sim helper — so emit + preview read one geometry).
     // cornerFork: 4-way (corner ONLY — header/prompt/footer text). RETURNS the arm blocks (composes inside the other forks).
     const cornerFork = (fn) => superset ? CORNERS.map((c) => { const [xd, yd] = dirsOf(c); return GUARD({ param: 'corner', is: c }, fn(c, xd, yd)); }) : fn(corner, xDir, yDir);
     // csFork: 8-way (corner × probeSeq, nested). RETURNS. fn(c, seq, axes) recomputes the combo's derived directions/axes.

@@ -120,7 +120,20 @@ export const userOpView = {
             let starts = null;
             try { const stk = window.ddcsGetSettings && window.ddcsGetSettings().stock; starts = opSimStarts(_def.opType, params, stk); } catch (_) { /* op declares no sim-starts */ }
             mgr.preview3D(gcode, 'userViz3dContainer', (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null);
-            const c = el('userVizContainer'); if (c) { c.style.display = ''; const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; renderLayout2D(c, _def, params); }
+            const c = el('userVizContainer');
+            if (c) {
+                c.style.display = ''; const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none';
+                // t73 — the SIM-ONLY first-start marker ALSO shows on the Layout canvas (a 2nd renderer of the panel's
+                // userStarts pass-0): reach the panel (host.__panel of the 3D box), read its pass-0 start, and render a hollow
+                // ◇ for spatial reference. VISUAL here (the sim start is dragged on the top panel — pass-0 coincides with a
+                // reposition anchor, whose emitting handle owns the Layout hit).
+                const box = el('userViz3dContainer');
+                const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
+                const panel = host && host.__panel;
+                const ps = (panel && typeof panel.getPassStarts === 'function') ? (panel.getPassStarts() || []) : [];
+                const pos0 = ps[0] || (Array.isArray(starts) && starts[0]) || null;   // dragged start, else the declared pass-0 hint
+                renderLayout2D(c, _def, params, pos0 ? { pos: pos0 } : null);
+            }
         } else if (pt.mode === '3d') {
             if (viz3dBox) viz3dBox.style.display = 'none';
             const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(gcode, 'userVizContainer');

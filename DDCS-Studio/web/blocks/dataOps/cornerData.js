@@ -40,10 +40,11 @@
  * Template SEEDED from cornerStack(CORNER_DEFAULTS); the BINDINGS are derived + proven byte-identical by
  * tests/corner-data-emit.spec.js. SCOPE (inc B1) = EMIT only — no view/panel (B3), no sim-starts/inferStarts (B2).
  */
-import { cornerStack } from '../../wizards/cornerWizard.js';
+import { cornerStack, cornerReposOffsets } from '../../wizards/cornerWizard.js';
 import { userOpFromStack, simStartsToBlocks } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
-import { pruneGuards } from '../whenGuard.js';   // ③b — derive CORNER_BINDINGS over a CANONICAL-pruned stack (the 8-way corner×probeSeq guard duplicates the bound sockets in the raw superset)
+import { pruneGuards, whenOk } from '../whenGuard.js';   // ③b — derive CORNER_BINDINGS over a CANONICAL-pruned stack (the 8-way corner×probeSeq guard duplicates the bound sockets in the raw superset)
+import { makeProvider } from '../../viz/opSimStarts.js';   // sim-marker positions: reuse the base frac provider, then CHAIN the reposition-destination passes off their anchor
 
 /** Author defaults — match cornerStack's fallbacks + the built-in Corner field defaults. Structural params (corner/
  *  probeSeq/probeZFirst/wcs/syncA) are baked at their defaults: the twin is the FL / YX / no-Z / active-WCS shape. */
@@ -117,6 +118,27 @@ export const CORNER_SIM_STARTS = [
     { id: 'wall2', anchor: 'frac', fx: -0.50, fy: 0.25,  plane: 'probe', emits: true },   // Wall-2 (X, second) — always a reposition destination (EMITS #23/#24)
 ];
 
+/** SIM-MARKER positions (t73) — the reposition-DESTINATION passes sit where the tool ARRIVES, chained by the SAME #21-#24
+ *  reposition defaults the emit uses (cornerReposOffsets — ONE geometry source, combo-correct via axesOf). The zsurf FRAC is
+ *  the fixed chain ANCHOR, computed even when its marker is gated off (Z-off) — so `wall1 = zsurf + Z→wall1 reposition` is the
+ *  SAME physical point in BOTH probeZ states (the #23/#24 relTo:wall1 anchor invariant, 4a — the reposition drag must anchor
+ *  to one wall-1 regardless of Z-first). `wall2 = wall1 + wall1→wall2 reposition`. Chained math is PREVIEW-ONLY, never
+ *  emitted → byte-parity untouched. (Registered as def.simStartsProvider so registerUserOp uses it over makeProvider.)
+ *    off : [wall1 = zsurf+start, wall2 = wall1+cross]           (zsurf marker gated off, but still the chain anchor)
+ *    on  : [zsurf(frac), wall1 = zsurf+start, wall2 = wall1+cross] */
+function cornerSimStartsProvider(params, stock) {
+    const p = params || {};
+    const prov = makeProvider(CORNER_SIM_STARTS);
+    const real = prov(p, stock);                              // the whenOk-filtered SET — correct emits + z + count
+    const zsurf = prov({ ...p, probeZFirst: 1 }, stock)[0];   // the zsurf FRAC (force it present) = the chain anchor, both states
+    const off = cornerReposOffsets(p);
+    const xy = { zsurf: { x: zsurf.x, y: zsurf.y } };
+    xy.wall1 = { x: xy.zsurf.x + off.wall1.dx, y: xy.zsurf.y + off.wall1.dy };
+    xy.wall2 = { x: xy.wall1.x + off.wall2.dx, y: xy.wall1.y + off.wall2.dy };
+    const ids = CORNER_SIM_STARTS.filter((r) => whenOk(r.when, p)).map((r) => r.id);
+    return real.map((m, i) => { const c = xy[ids[i]]; return c ? { ...m, x: c.x, y: c.y } : m; });   // override XY, keep emits/z
+}
+
 /** The wrapped `user_root` template for a given param set. Structural params bake the stack SHAPE; the 9 bound scalars
  *  are the value-sockets the bindings drive. The `simstart` rows declare the per-pass preview markers (canonical over
  *  def.sim.starts). Exported so the emit spec can build a probeZFirst=on variant to prove the derive helper re-finds #23/#24. */
@@ -169,5 +191,6 @@ export function cornerDataDef() {
     const def = userOpFromStack('corner_data', 'Corner (data)', cornerDataStack(CORNER_DEFAULTS),
         [...CORNER_BINDINGS, ...CORNER_STRUCT_BINDINGS], 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
     def.bindingSpecs = CORNER_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
+    def.simStartsProvider = cornerSimStartsProvider;   // t73 — sim markers CHAIN off their anchor via the emit's reposition geometry (preview-only)
     return def;
 }

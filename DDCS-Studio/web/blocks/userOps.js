@@ -368,7 +368,12 @@ export function registerUserOp(def) {
     // DECLARED per-pass sim-starts (template `simstart` rows first, legacy def.sim.starts fallback). The rows travel
     // ALONGSIDE the provider so resolveRelToIndex can map a binding's semantic relTo ({row:'wall1'}) → the surviving pass.
     const starts = sim.starts;
-    setUserSimStarts(def.opType, (Array.isArray(starts) && starts.length) ? makeProvider(starts) : null, starts);
+    // A def may supply its OWN sim-start provider (t73 — corner CHAINS reposition-destination markers off their anchor via
+    // the emit's reposition geometry, which can't be generic-declarative rows). It's a LIVE fn (never persisted; re-attached
+    // from code each boot by the seed). Else the generic makeProvider(rows). The rows still travel alongside (resolveRelToIndex).
+    const provider = (typeof def.simStartsProvider === 'function') ? def.simStartsProvider
+        : ((Array.isArray(starts) && starts.length) ? makeProvider(starts) : null);
+    setUserSimStarts(def.opType, provider, starts);
     return def;
 }
 

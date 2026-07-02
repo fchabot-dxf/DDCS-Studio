@@ -5193,3 +5193,58 @@ seam, second renderer, never-emitted. No new mechanism.
 **⏸ GATE: nod the part-1 mechanism (A or B) + scope (both walls vs wall-1 only) and I BUILD BOTH immediately** (part 2 as above),
 hardened-spec each (the marker position TRACKS its anchor within the JS-evaluated reposition; the Layout ① appears + drags via the
 same userStarts seam), byte-parity untouched throughout. NO code changed this turn (the mechanism belongs to you on the pilot).
+
+---
+
+## 🔨 turn 73 (cycle 11) — sim-marker-track (BOTH parts, option A) — DONE, but the build surfaced 2 real design refinements (an anchor invariant + a pass-0/reposition-anchor overlap). Suite green. COMMITTED (not pushed). ⏸ PASS BACK for live-verify + to bless the part-2 call.
+
+Advisor DECIDED: Option A (corner-scoped `cornerReposOffsets` shared with the emit; B = speculative machinery, rule-of-three)
++ BOTH walls + build both parts. Built both; two things the DISPATCH did not foresee came out of the actual code — surfaced
+below (I resolved both soundly + green, but they change the shape enough that you should eyeball them on the live-verify).
+
+**PART 1 — markers sit where the tool ARRIVES (chained by the emit's reposition geometry):**
+- `cornerWizard.js` — HOISTED `dirsOf`+`axesOf` to module scope (byte-safe) + `export cornerReposOffsets(params)` = the numeric
+  #21/#22 + #23/#24 defaults, mirroring the emit's formulas + its `||` semantics, NaN-safe (an EXPRESSION-holding socket like
+  '#16' can't be JS-evaluated → falls to the formula → the preview stays finite; the frac approach never read the sockets).
+- `cornerData.js` — `cornerSimStartsProvider`: the zsurf FRAC is the fixed chain ANCHOR (computed even when its marker is
+  gated off), `wall1 = zsurf + start`, `wall2 = wall1 + cross`. Set `def.simStartsProvider`.
+- `userOps.js` — `registerUserOp` uses `def.simStartsProvider` (live fn, re-seeded from code each boot; dropped on persistence
+  → falls back to makeProvider, never the emit) else `makeProvider`.
+- **⚠ REFINEMENT 1 (the ANCHOR INVARIANT, 4a):** my first cut kept wall1 = its frac LEAD under Z-off + chained only under Z-on
+  → that made wall1 DIFFER between states → BROKE corner-data-probeZFirst-live's `anchorSamePoint` (the #23/#24 relTo:wall1
+  drag MUST anchor to ONE wall-1 regardless of Z-first — physically wall-1 is one wall). FIX: wall1 = zsurf-frac + reposition
+  in BOTH states (zsurf as the fixed reference), so wall1 is state-invariant AND = zsurf+reposition (your ask). CONSEQUENCE:
+  the Z-off wall1 marker moved too (frac (20,-50) → the chained (7,-43)) — a NECESSARY consequence of (your Z-on ask) + (the
+  invariant). Updated probeZFirst-live's hardcoded wall1 expectation in LOCKSTEP (the invariant CHECK stays; only the expected
+  point changed). Alternative if you'd rather keep wall1 at (20,-50): place zsurf at wall1−reposition instead (moves zsurf, not
+  wall1) — same connected chain, different fixed anchor. I chose "zsurf fixed, wall1 computed" because that's your literal ask.
+
+**PART 2 — the sim-only start marker also shows on the Layout FeatureCanvas:**
+- `featureCanvas.js` — a `simOnly` handle draws a HOLLOW cyan ◇; it's EXCLUDED from the hit-test.
+- `panelTypes.js` / `userOpView.js` — `layoutSpecFromOp(def,params,simStart)` adds the ◇ at the panel's pass-0
+  (getPassStarts()[0]); userOpView reads host.__panel.
+- **⚠ REFINEMENT 2 (pass-0 ALWAYS coincides with a reposition anchor):** pass-0 (the sim-only start) is ALWAYS the ORIGIN of
+  the first reposition — Z-off it's wall-1 (the #23/#24 anchor), Z-on it's zsurf (the #21/#22 anchor) — so a DRAGGABLE sim
+  handle on the Layout ALWAYS overlaps an EMITTING handle (this broke corner-data-drag: the sim handle stole the reposition
+  handle's hit). RESOLUTION: the Layout sim marker is VISUAL (excluded from the hit-test) — it APPEARS (your primary ask:
+  "sim-only ① appears on BOTH surfaces") for spatial reference alongside the emitting handles, and the sim START is dragged on
+  the TOP panel (its natural sim surface, already wired). So "emitting handles stay as today" holds. If you want it DRAGGABLE on
+  the Layout too, the options are: give it a small visual OFFSET, or emitting-wins-on-overlap (sim draggable only when moved
+  clear) — both are more mechanism for a marginal gain, so I built the clean visual version. YOUR CALL on the live-verify.
+
+**WHY / byte-parity:** the geometry is one-source (cornerReposOffsets reuses the emit's axesOf/opp); both fixes are
+preview-only → emit byte-parity untouched (proven across combos + probeZ).
+
+**VERIFY.** New spec `corner-data-sim-marker-track.spec.js` (4, green): (1) markers chain off the anchor — both probeZ states,
+FL/YX + BR/XY, INDEPENDENT truth (hand-derived deltas) + a proximity check (wall1 exactly 50=travelDist from zsurf); (2) emit
+byte-parity across 4 combos; (3) the Layout renders the HOLLOW ◇; (4) the coincident EMITTING reposition handle still owns the
+drag (the visual marker never steals the hit). **MUTATION-PROVEN:** M1 disable chaining → (1) RED; M2 fill the ◇ → (3) RED; M3
+let the sim marker take the hit → corner-data-drag + (4) RED — all reverted. **3 REGRESSIONS CAUGHT + FIXED** (via a full-suite
+COUNT reconciliation — an early `tail` hid them; the adversarial fan-out ALSO reported 3/3 "clean" and MISSED all three, so the
+SUITE is the ground truth, not the agents): corner-data-sim-starts (the NaN), probeZFirst-live (the anchor invariant),
+corner-data-drag (the overlap). **Full suite: 475 passed, 1 flaky (the known middle-animator stroke-dashoffset — retried green),
+0 failed** (478 total). Specs updated in lockstep: probeZFirst-live (wall1 point), the new track spec.
+
+**⏸ PASS BACK for your LIVE screenshot verify** (marker-to-anchor proximity FL/YX + a combo; the Layout hollow ◇) + to bless
+the 2 refinements (wall1 state-invariant, Layout marker visual-only) or redirect. COMMITTED, NOT pushed. Surgical: 6 source
+files + 1 new spec + 1 lockstep spec update. Byte-parity untouched.

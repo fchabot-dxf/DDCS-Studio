@@ -52,7 +52,7 @@ function _writeParam(name, val) { const f = _field(name); if (f) { f.value = r3(
 // canvas drag-to-edit with no per-op code. The handles are DECLARED from the param-block roles and built by the SAME
 // reusable gesture registry the built-in views use (viz/canvasWidgets — point / rect / radial), not a parallel onDrag.
 // See ROADMAP "CANVAS-WIDGET consolidation" Stage 3 + the spatial-gui-form-vs-canvas memory.
-export function layoutSpecFromOp(def, params) {
+export function layoutSpecFromOp(def, params, simStart) {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y, ox: 0, oy: 0 } : { w: 200, h: 150, ox: 0, oy: 0 };
     const groups = {};
@@ -138,15 +138,23 @@ export function layoutSpecFromOp(def, params) {
     // math (corner/radius) lives in the registry; here `setFields` just routes each {param: value} to its form field.
     const setFields = (m) => { for (const k in m) _writeParam(k, m[k]); };
     const { handles, onDrag } = buildCanvasWidgets(decls, setFields);
+    // t73 — the SIM-ONLY first-start marker also shows on the Layout canvas (a SECOND renderer of createPreviewPanel's
+    // userStarts pass-0, never emitted): a hollow ◇ for spatial reference alongside the emitting reposition handles. It is
+    // VISUAL here (excluded from the hit-test) because pass-0 always coincides with a reposition ANCHOR whose emitting handle
+    // owns that point — the sim start is DRAGGED on the top panel (its natural sim surface). Host passes the pass-0 position.
+    if (simStart && simStart.pos && Number.isFinite(+simStart.pos.x) && Number.isFinite(+simStart.pos.y)) {
+        const allHandles = [...handles, { id: '__simstart0', x: +simStart.pos.x, y: +simStart.pos.y, kind: 'move', simOnly: true, label: '' }];
+        return { stock, items, handles: allHandles, onDrag };
+    }
     return { stock, items, handles, onDrag };
 }
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).
 let _layout = null;
-export function renderLayout2D(container, def, params) {
+export function renderLayout2D(container, def, params, simStart) {
     if (!container) return;
     if (!_layout) _layout = new FeatureCanvas();
-    _layout.render(container, layoutSpecFromOp(def, params));
+    _layout.render(container, layoutSpecFromOp(def, params, simStart));
 }
 
 export function renderDeclaredLayout(container, def, params) {

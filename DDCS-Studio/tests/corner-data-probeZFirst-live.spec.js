@@ -48,9 +48,12 @@ test('probeZFirst LIVE: OFF/ON emit == cornerStack byte-for-byte; toggle adds th
     const offAnchor = offStarts[offAnchorIdx];
     const onAnchor  = onStarts[onAnchorIdx];
     // ON-STATE anchor point (verify-real-symptom, ON side — corner-data-drag covers the OFF pointer drag): the resolved ON
-    // anchor is a finite point that equals the declared wall-1 marker (frac 0.20·sx, -0.625·sy in this stock).
-    const wall1Frac = { x: 0.20 * stock.x, y: -0.625 * stock.y };
-    const onAnchorIsWall1 = !!onAnchor && Math.abs(onAnchor.x - wall1Frac.x) < 1e-6 && Math.abs(onAnchor.y - wall1Frac.y) < 1e-6;
+    // anchor is a finite point that equals the wall-1 marker. t73 — wall-1 now CHAINS off the zsurf frac by the Z→wall1
+    // reposition (#21=0, #22=-travelDist for the FL/YX default), so it sits where the tool arrives + is the SAME point in
+    // both probeZ states (see anchorSamePoint below). Independent truth: zsurf frac (0.07·sx, 0.0875·sy) + (0, -travelDist).
+    const td = Number(CD.CORNER_DEFAULTS.travelDist) || 50;
+    const wall1Pt = { x: 0.07 * stock.x + 0, y: 0.0875 * stock.y - td };
+    const onAnchorIsWall1 = !!onAnchor && Math.abs(onAnchor.x - wall1Pt.x) < 1e-6 && Math.abs(onAnchor.y - wall1Pt.y) < 1e-6;
 
     // (4) the structural bool binding
     const zBind = (def.bindings || []).find((b) => b.param === 'probeZFirst');

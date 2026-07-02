@@ -233,6 +233,9 @@ export class FeatureCanvas {
         const wx = w.x - (p.x || 0), wy = w.y - (p.y || 0);
         let best = null, bd = tol;
         (this.spec.handles || []).forEach((h) => {
+            if (h.simOnly) return;   // t73 — the sim-only ◇ is a VISUAL reference on the Layout (it coincides with a reposition
+            //                          anchor, whose EMITTING handle owns the hit); the sim start is dragged on the top panel.
+            //                          anchor, whose EMITTING handle owns the hit); the sim start is dragged on the top panel.
             const d = Math.hypot(h.x - wx, h.y - wy);
             if (d <= bd) { bd = d; best = h; }
         });
@@ -326,7 +329,12 @@ export class FeatureCanvas {
         // --- handles (top layer, always above holes) ---------------------
         (spec.handles || []).forEach((h) => {
             const c = this._disp(h.x, h.y);
-            if (h.kind === 'move') {
+            if (h.simOnly) {
+                // t73 — the SIM-ONLY (never-emitted) start handle: a HOLLOW cyan diamond ◇, the 2D-canvas twin of the top
+                // panel's sim-only marker (sim-marker-distinguish). Distinct from the FILLED emitting handles (rect/circle).
+                const d = `M ${c.x} ${c.y - 7} L ${c.x + 7} ${c.y} L ${c.x} ${c.y + 7} L ${c.x - 7} ${c.y} Z`;
+                handles.appendChild(svgEl('path', { d, class: 'fc-handle fc-handle-sim', fill: 'none', stroke: '#22d3ee', 'stroke-width': 2 }));
+            } else if (h.kind === 'move') {
                 handles.appendChild(svgEl('rect', { x: c.x - 6, y: c.y - 6, width: 12, height: 12, class: 'fc-handle fc-handle-move', rx: 2 }));
             } else {
                 handles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 6, class: 'fc-handle' }));
