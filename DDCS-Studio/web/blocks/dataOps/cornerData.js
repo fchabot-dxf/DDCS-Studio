@@ -106,7 +106,25 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
 /** Bindings for the shipped (probeZFirst=off) template — DERIVED, not hand-counted. */
 export const CORNER_BINDINGS = deriveBindingsFor(cornerDataStack(CORNER_DEFAULTS), CORNER_BINDING_SPECS);
 
-/** Build the corner-as-data def — same userOpFromStack pattern as drill/surfacing/slot/text/atcWarmup. */
+/** Build the corner-as-data def — same userOpFromStack pattern as drill/surfacing/slot/text/atcWarmup.
+ *
+ * ② B4-1 — THE M3 SEAM (advisor turn 26; human "automate as much as possible"). The twin's emit engine becomes the SOURCE:
+ * `def.build(params)` replays `cornerDataStack` (which wraps `cornerStack`) so a STRUCTURAL choice is a build-PARAM, not an
+ * `instantiate` socket — this is what will let probeZFirst / travelApproach / wcs / syncA / corner / probeSeq go LIVE with
+ * byte-identical-off + built-in-parity-on by construction (`build({flip}) === cornerStack({flip})`), the fan-out dissolved.
+ *
+ * B4-1 is the PURE SEAM (no behaviour change, GATED for advisor review): `build` forwards ONLY the currently-BOUND params
+ * (the 9 numeric today) into the source, so every STRUCTURAL param stays at its CORNER_DEFAULTS bake — exactly what
+ * `instantiate` did. Proven byte-identical by corner-data-build-parity.spec (build === instantiate on the default + a scalar
+ * sweep). Later sub-increments WIDEN the bound set (add enum/toggle bindings) → each structural toggle goes live, and its
+ * frontier tripwire is retired in lockstep. */
 export function cornerDataDef() {
-    return userOpFromStack('corner_data', 'Corner (data)', cornerDataStack(CORNER_DEFAULTS), CORNER_BINDINGS, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
+    const def = userOpFromStack('corner_data', 'Corner (data)', cornerDataStack(CORNER_DEFAULTS), CORNER_BINDINGS, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
+    const bound = new Set((def.bindings || []).map((b) => b.param));   // widens as bindings are added → structural goes live incrementally
+    def.build = (params) => {
+        const merged = { ...CORNER_DEFAULTS };
+        for (const k in (params || {})) if (bound.has(k)) merged[k] = params[k];   // forward only BOUND params; structural stays baked (B4-1)
+        return cornerDataStack(merged);
+    };
+    return def;
 }

@@ -4117,3 +4117,40 @@ semantics → a separate M350-verified task. Leave; record as backlog.
   with flipping the divergence rows or the suite goes red. (r4) `sources` needs Struct user-spec treatment (not a scalar).
 
 **GATE: passing to advisor for review WITH THE HUMAN. Awaiting the mechanism decision (M3 vs M2) + the 3 other decisions before any build.**
+
+---
+
+## 🔨 turn 27 (cycle 11) — ② B4-1: the M3 def.build SEAM (advisor turn 26; human "automate as much as possible"). ⏸ GATE (1) pass-back.
+
+Executing the blessed B4 rollout on M3. B4-1 = the PURE SEAM only; the advisor's dispatch pauses here for review before I
+widen it (gate 1: "assert build(CORNER_DEFAULTS) deep-equals today's instantiate output; FAIL→STOP").
+
+**Built (3 files):**
+- **`userOps.js`:** `export`ed `instantiate` (was module-private) so the gate can compare the two builder paths directly.
+- **`cornerData.js` `cornerDataDef()`:** added `def.build` — the twin's emit engine is now the SOURCE. `build(params) =>
+  cornerDataStack({ ...CORNER_DEFAULTS, ...<only the BOUND params> })`. `registerUserOp` already routes to `def.build` when
+  present (userOps.js:310), so the builder path flips from frozen-template instantiate → source replay. **B4-1 forwards ONLY
+  the currently-bound params** (the 9 numeric today; `bound = new Set(def.bindings.map(b=>b.param))`), so every STRUCTURAL
+  param stays at its CORNER_DEFAULTS bake — no behaviour change. The `bound` set widens as later sub-increments add
+  enum/toggle bindings → each structural toggle goes live incrementally (+ its frontier tripwire retired in lockstep).
+- **`corner-data-build-parity.spec.js` (NEW — the gate):** asserts `build(defaults)` BYTE-IDENTICAL to `instantiate(defaults)`
+  (the advisor's explicit gate), `build == instantiate` FUNCTIONALLY across a 13-row bound-scalar sweep, `build == the source
+  cornerStack` functionally, and structural stays baked (probeZFirst override does NOT change the emit yet).
+
+**The gate CAUGHT a real divergence — and it turned out to be an IMPROVEMENT, not a regression.** First run FAILED at
+`{dist:300}`: the ONLY differing line was the header COMMENT — `build` regenerates `( Probe dist: 300mm … )` (correct,
+reflects the actual value) while `instantiate` had FROZEN `( Probe dist: 500mm … )` (stale — instantiate substitutes only the
+#1 socket, never the interpolated comment). So `build` is byte-identical for the DEFAULT (dist=500 → both say 500mm — the
+advisor's gate holds) and, for overrides, byte-fresher-and-MORE-CORRECT: build's comment now MATCHES the built-in cornerStack,
+whereas instantiate DIVERGED from it. The gate spec now compares the sweep FUNCTIONALLY (stripAnnotations, as corner-data-emit
+already does because the corner header interpolates params) + explicitly asserts the comment-freshness improvement (build says
+300mm like the built-in; instantiate said 500mm). Net: M3 build is CLOSER to built-in parity than instantiate was.
+
+**VERIFY.** `node --check` clean. **corner-data-build-parity 1/1** (byte-identical default + functional sweep + comment
+improvement + structural-still-baked). **Full suite: 457 passed + 1 FLAKY (middle-animator `stroke-dashoffset` CSS-timing
+under parallel load — `.not.toBe`, passed on retry; unrelated — B4-1 touches no viz/animation).** The existing corner specs
+(emit golden, drag, sim-starts, both frontier tripwires, wiz-bar) all stay GREEN — the seam is transparent because structural
+stays baked (the frontier divergence rows still see the twin bake → still diverge → still pass:false).
+
+**⏸ GATE (1): the M3 seam is proven sound (byte-identical default, functionally-identical + comment-improved otherwise, no
+behaviour change). Passing to advisor for review before widening the bound set (B4-2: enum/toggle bindings → structural live).**
