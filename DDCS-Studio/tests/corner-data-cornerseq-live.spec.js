@@ -61,8 +61,18 @@ test('③b corner×probeSeq LIVE: enum bindings drive all 8 combos == cornerStac
     const [xd, yd] = DIRS[c.corner];
     const [fA, fD] = c.seq === 'YX' ? ['Y', yd] : ['X', xd];
     const [sA, sD] = c.seq === 'YX' ? ['X', xd] : ['Y', yd];
-    expect(c.emit, `${c.corner}/${c.seq}: FIRST wall probes ${fA}#${pv(fD)}`).toMatch(new RegExp(`G31 ${fA}#${pv(fD)} `));
-    expect(c.emit, `${c.corner}/${c.seq}: SECOND wall probes ${sA}#${pv(sD)}`).toMatch(new RegExp(`G31 ${sA}#${pv(sD)} `));
+    // ADJACENCY (not just presence): each "Step N: <axis> Probe" comment must be followed by the MATCHING G31 <axis> line —
+    // catches a wall-1/wall-2 ORDER swap (which unordered presence checks miss: a swap keeps both G31s present but pairs each
+    // Step label with the WRONG probe axis → a real wall-probe-order bug on a physical machine). Index-based, on the raw emit.
+    const lines = c.emit.split('\n');
+    const stepIdx = (ax) => lines.findIndex((l) => new RegExp(`Step \\d+: ${ax} Probe`).test(l));
+    const nextG31 = (from) => { for (let i = from + 1; i < lines.length; i++) if (/^G31 /.test(lines[i])) return lines[i]; return null; };
+    const fStep = stepIdx(fA), sStep = stepIdx(sA);
+    expect(fStep, `${c.corner}/${c.seq}: a "Step: ${fA} Probe" comment exists`).toBeGreaterThanOrEqual(0);
+    expect(sStep, `${c.corner}/${c.seq}: a "Step: ${sA} Probe" comment exists`).toBeGreaterThanOrEqual(0);
+    expect(fStep < sStep, `${c.corner}/${c.seq}: the FIRST wall (${fA}) step precedes the SECOND (${sA})`).toBe(true);
+    expect(nextG31(fStep), `${c.corner}/${c.seq}: the ${fA}-Probe step is FOLLOWED by G31 ${fA}#${pv(fD)} (not the other wall)`).toMatch(new RegExp(`^G31 ${fA}#${pv(fD)} `));
+    expect(nextG31(sStep), `${c.corner}/${c.seq}: the ${sA}-Probe step is FOLLOWED by G31 ${sA}#${pv(sD)}`).toMatch(new RegExp(`^G31 ${sA}#${pv(sD)} `));
     expect(c.emit, `${c.corner}: header dir labels X ${lab(xd)} Y ${lab(yd)}`).toContain(`Corner | ${c.corner} OUTSIDE | X ${lab(xd)} Y ${lab(yd)}`);
     expect(c.emit, `${c.corner}: footer name`).toContain(`Corner ${c.corner} found`);
     // reposition default (unset) = the signed-travel own/opp per the combo (independent)

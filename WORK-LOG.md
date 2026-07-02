@@ -4914,3 +4914,32 @@ failed, 2 skipped (1.4m) — clean.**
 operator-facing structural params on the corner twin are now LIVE — probeZFirst · travelApproach · wcs(7) · syncA · corner(4) ·
 probeSeq(2) — each via guard/prune, each byte-for-byte == cornerStack, each hardened (binding-driven + value-pinned). Only
 `level` stays (deliberate baked-final). REMAINING for corner parity = ONLY ④ VERIFY + RELEASE (end-to-end + retire the built-in).
+
+---
+
+## 🔨 turn 61 (cycle 11) — cornerseq-HARDEN: adjacency (order) assertions + the bindingSpecs+build footgun guard (test/guard-only). ⏸ PASS BACK.
+
+corner×probeSeq reviewed CLEAN + fan-out (4 lenses, 16/16 regress) — 2 CONFIRMED findings, both fixed this turn (NO prod behaviour
+change; corner emit is byte-identical to before — cornerWizard.js diff vs HEAD is EMPTY after the mutation-check revert):
+
+**MAJOR (test-only, my spec's gap).** corner-data-cornerseq-live pinned the probe vars with UNORDERED `toMatch` (presence-only) —
+the reviewer empirically swapped the wall-1/wall-2 `probeWallR` order and the spec PASSED GREEN while emitting `( Step 1: Y Probe )`
+→ `G31 X#8` (a real wall-probe-ORDER mismatch on a machine; only masked from shipping by unrelated pre-existing goldens). FIX:
+replaced the presence checks with INDEX-BASED ADJACENCY across ALL 8 combos — each `Step N: <axis> Probe` comment's NEXT `G31`
+line must match that axis (`nextG31(stepIdx(axis))` → `^G31 <axis>#<var>`), + the first-wall step precedes the second. MUTATION-
+CHECK: reproduced the reviewer's exact wall-order swap → the adjacency went RED ("Step Y Probe FOLLOWED by G31 X#8") while
+byte-parity stayed GREEN (both paths swap → parity blind; the adjacency catches it). Reverted byte-exact.
+
+**MINOR (latent footgun).** validateUserOp's bindingSpecs-skip (③b) assumes instantiate() always runs (so deriveBindings
+re-derives + validates). A def combining `bindingSpecs` + a function `def.build` (which BYPASSES instantiate — corner itself
+tried+reverted exactly this one commit before the M2 rewrite) would silently skip BOTH the socket re-derivation AND the block
+check. FIX: validateUserOp now throws a clear error if a def sets BOTH `bindingSpecs` and a function `build`. NEW user-ops unit
+test asserts the combination errors, while bindingSpecs-alone (corner) + build-alone (legacy def.build ops) stay valid.
+
+**VERIFY.** corner-data-cornerseq-live (hardened, adjacency all 8) + the footgun guard test green; mutation-check RED-then-
+reverted; **full suite 466 passed, 0 failed, 2 skipped (1 known middle-animator flake retried GREEN).** 5 siblings + all live
+specs + byte-parity green (the validateUserOp change only ADDS a rejection for an impossible-today combo; siblings unaffected).
+
+**⏸ PASS BACK (advisor verifies).** Both fan-out findings closed (test/guard-only, no prod change). After this: truly ONLY
+④ VERIFY + RELEASE remains — corner is otherwise COMPLETE (all operator structural params live, each byte-exact + hardened;
+level baked-final).

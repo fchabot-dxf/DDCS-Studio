@@ -144,3 +144,25 @@ test('userOps: the generic param form inserts a user op into the program (depth 
   expect(r.label, 'friendly label on the op container').toBe('Form Test');
   expect(r.z, 'depth param substituted at insert time').toBe(-8);
 });
+
+// ③b-harden — the mutual-exclusivity FOOTGUN guard: a def combining `bindingSpecs` (re-derived + validated inside
+// instantiate) with a function `build` (which BYPASSES instantiate) would silently skip both the socket re-derivation and the
+// bindingSpecs-scoped validate check. validateUserOp must reject the combination (no def does this today; corner reverted it).
+test('userOps: a def cannot set BOTH bindingSpecs and a function build (footgun guard)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio);
+  const r = await page.evaluate(async () => {
+    const { validateUserOp } = await import('/blocks/userOps.js');
+    const base = { opType: 'user_footgun', label: 'FG', template: [{ type: 'move', params: { mode: 'rapid', x: 1 } }], bindings: [] };
+    const spec = [{ param: 'a', type: 'number', match: { type: 'move' }, key: 'x' }];
+    const hit = (errs) => errs.some((e) => /bindingSpecs/i.test(e) && /build/i.test(e));
+    return {
+      both:      hit(validateUserOp({ ...base, bindingSpecs: spec, build: () => [] })),
+      specsOnly: hit(validateUserOp({ ...base, bindingSpecs: spec })),
+      buildOnly: hit(validateUserOp({ ...base, build: () => [] })),
+    };
+  });
+  expect(r.both, 'bindingSpecs + a function build → a clear error').toBe(true);
+  expect(r.specsOnly, 'bindingSpecs ALONE is fine (corner)').toBe(false);
+  expect(r.buildOnly, 'a function build ALONE is fine (legacy def.build ops)').toBe(false);
+});

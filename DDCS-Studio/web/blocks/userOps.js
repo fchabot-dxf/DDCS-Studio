@@ -316,6 +316,11 @@ export function validateUserOp(def) {
     const errs = [];
     if (!def || typeof def.opType !== 'string' || !def.opType.startsWith(USER_OP_PREFIX)) errs.push('opType must be a string starting with "user_"');
     if (!Array.isArray(def.template) || !def.template.length) errs.push('template must be a non-empty block array');
+    // ③b-harden — a def that sets BOTH `bindingSpecs` AND a function `build` is a FOOTGUN: bindingSpecs re-derives + VALIDATES
+    // the value bindings inside instantiate(), but def.build BYPASSES instantiate → both the socket re-derivation AND the
+    // bindingSpecs-scoped block-check skip (below) would be silently skipped. Forbid the combination (no def does this today;
+    // corner reverted exactly this def.build attempt one commit before the M2 rewrite). Cheap to guard while it's fresh.
+    if (def && def.bindingSpecs && typeof def.build === 'function') errs.push('a def cannot set BOTH `bindingSpecs` and a function `build` — def.build bypasses the bindingSpecs re-derivation + validation (both would be silently skipped)');
     const flat = flattenBlocks(def.template || []), seen = new Set();
     for (const b of (def.bindings || [])) {
         if (!b || !b.param) { errs.push('a binding has no param name'); continue; }
