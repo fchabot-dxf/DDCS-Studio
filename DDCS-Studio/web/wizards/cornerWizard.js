@@ -85,6 +85,14 @@ export function cornerStack(params = {}, opts = {}) {
     const zPair = (onKids, offKids) => { if (superset) S.push(GUARD(WHEN_Z, onKids), GUARD(WHEN_NZ, offKids)); else S.push(...(probeZ ? onKids : offKids)); };
     // zOnly: a Z-ONLY block-add (no off-arm) — superset guards it on; concrete emits it only when probeZ.
     const zOnly = (kids) => { if (superset) S.push(GUARD(WHEN_Z, kids)); else if (probeZ) S.push(...kids); };
+    // ② B4 step 4b — travelApproach (auto|manual) is an ENUM structural fork: safeTraverseStack emits a DIFFERENT block shape
+    // per arm (auto = the G0 seq move; manual = the #1505 jog prompt). taPair RETURNS the arm blocks (composed INSIDE a z-fork,
+    // so it can nest): superset → BOTH arms guarded by value-equality when(travelApproach=='auto'|'manual'); concrete → only
+    // the selected arm (LAZY thunks, so the unused shape is never built). whenOk matches enums by strict === (guard-prune.spec).
+    const WHEN_TA = (v) => ({ param: 'travelApproach', is: v });
+    const taPair = (autoFn, manualFn) => superset
+        ? [GUARD(WHEN_TA('auto'), autoFn()), GUARD(WHEN_TA('manual'), manualFn())]
+        : (travelApproach === 'manual' ? manualFn() : autoFn());
 
     // Probe one wall via the shared PROBE-SURFACE BLOCK (t127): touch+comp → the TRUE wall in a temp (#102/#101); the
     // corner keeps its own WCS write + retract + safe-Z (trailingRetract:false). Byte-identical to the old hand-rolled wall.
@@ -152,42 +160,42 @@ export function cornerStack(params = {}, opts = {}) {
     DM('inc');
 
     // ── Z surface (optional) ── probeZFirst-only block-add: the Z-surface touch + the Z→wall1 reposition.
-    zOnly([
-        // Z-surface touch via the shared block. The comp writes the WCS Z directly (#[#73]=[#1927-#6]); preComp sets the
-        // indirect address #73 right before the comp (kept in place → byte-identical). trailingRetract:false → the corner
-        // does its own safe-Z retract + the travel to the first wall.
-        ...probeSurfaceStack({
-            axis: 'Z', dir: '-', probeVar: '#7', retractVar: '#10', feedFast: '#3', feedSlow: '#4', port: '#5', level,
-            twoPass: true, raw: '#1927', result: '#[#73]', radius: '#6', compEnable: true,
-            trailingRetract: false, preComp: [{ var: '#73', value: '[#70+2]', note: 'WCS Z Address' }],
-            compNote: `Save ${wcsLabel} Z offset - machine coord (− stylus radius)`,
-        }),
-        ...safeTraverseStack({
-            mode: 'seq', crossX: '#21', crossY: '#22', lift: '#19',
-            // ② B4 step 3 (anchor): 'REPOSITION:' makes the engine count Z→wall1 as its own pass (GcodeExecutionEngine
-            // bumps _pass only on a REPOSITION: comment), so under probeZFirst there are 3 passes = 3 sim-start markers
-            // 1:1 (was 2 passes / 3 markers → wall-2 orphaned). CONSISTENT with middle (its Z reposition is a delimiter).
-            // OFF: this block isn't emitted (guarded on probeZFirst) → byte-identical. Byte-visible ON (both built-in + twin).
-            comment: 'REPOSITION: Traverse to first wall',
-            approach: travelApproach, promptNote: 'Jog clear, over to the first wall. Press Enter',   // manual: lift #19, jog, no drop (:150 plunges) — mirrors auto's Z
-        }),
-    ]);
+    // Z-surface touch via the shared block. The comp writes the WCS Z directly (#[#73]=[#1927-#6]); preComp sets the indirect
+    // address #73 right before the comp (kept in place → byte-identical). trailingRetract:false → the corner does its own
+    // safe-Z retract + the travel to the first wall.
+    const zSurfaceProbe = probeSurfaceStack({
+        axis: 'Z', dir: '-', probeVar: '#7', retractVar: '#10', feedFast: '#3', feedSlow: '#4', port: '#5', level,
+        twoPass: true, raw: '#1927', result: '#[#73]', radius: '#6', compEnable: true,
+        trailingRetract: false, preComp: [{ var: '#73', value: '[#70+2]', note: 'WCS Z Address' }],
+        compNote: `Save ${wcsLabel} Z offset - machine coord (− stylus radius)`,
+    });
+    // ② B4 step 3 (anchor): the 'REPOSITION:' comment makes the engine count Z→wall1 as its own pass (3 passes = 3 markers
+    // under probeZFirst). ② B4 step 4b: it forks on travelApproach (auto seq move vs #1505 jog prompt) → taPair NESTED inside
+    // the probeZFirst guard. manual: lift #19, jog, no drop (the wall-1 step plunges) — mirrors auto's Z.
+    const zWall1 = (approach) => safeTraverseStack({
+        mode: 'seq', crossX: '#21', crossY: '#22', lift: '#19',
+        comment: 'REPOSITION: Traverse to first wall',
+        approach, promptNote: 'Jog clear, over to the first wall. Press Enter',
+    });
+    zOnly([...zSurfaceProbe, ...taPair(() => zWall1('auto'), () => zWall1('manual'))]);
 
     // ── Two walls, in the chosen order ──
     // Z-first shifts EVERY step number +1 (Z-surface takes Step 1) — a KIND-B fork, so each Step label is a guarded comment
-    // PAIR in the superset. The wall1→wall2 reposition's moves are Z-identical (only its Step-number comment differs), so the
-    // WHOLE safeTraverseStack rides the pair — one arm survives prune → byte-identical to the concrete emit either way.
+    // PAIR in the superset. The wall1→wall2 reposition forks on BOTH probeZFirst (the step number in its comment) AND
+    // travelApproach (auto move vs #1505 jog prompt) → the taPair (travelApproach) NESTS inside the zPair (probeZFirst). One
+    // leaf survives prune → byte-identical to the concrete emit for any (probeZFirst × travelApproach) combination.
     const firstLbl = (z) => `Step ${z ? 2 : 1}: ${firstAx} Probe`;
     const repoLbl = (z) => `Step ${z ? 3 : 2}: REPOSITION: Traverse past corner and set up for ${secondAx}`;
     const secondLbl = (z) => `Step ${z ? 4 : 3}: ${secondAx} Probe`;
-    const repoTraverse = (comment) => safeTraverseStack({
-        mode: 'seq', crossX: '#23', crossY: '#24', drop: '#18', comment,
-        approach: travelApproach, promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, drop #18 to scan depth (mirrors auto) — no lift (already at #17)
+    const repoTraverse = (comment, approach) => safeTraverseStack({
+        mode: 'seq', crossX: '#23', crossY: '#24', drop: '#18', comment, approach,
+        promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, drop #18 to scan depth (mirrors auto) — no lift (already at #17)
     });
+    const repoArm = (z) => taPair(() => repoTraverse(repoLbl(z), 'auto'), () => repoTraverse(repoLbl(z), 'manual'));
     zPair([mkC(firstLbl(true))], [mkC(firstLbl(false))]);
     MV('Z', '#18');                          // plunge to scan depth
     probeWall(firstAx, firstDir);
-    zPair(repoTraverse(repoLbl(true)), repoTraverse(repoLbl(false)));
+    zPair(repoArm(true), repoArm(false));
     zPair([mkC(secondLbl(true))], [mkC(secondLbl(false))]);
     probeWall(secondAx, secondDir);
 

@@ -277,17 +277,32 @@ export function defaultParams(def) {
 // guard blocks, and without bindingSpecs the frozen `bindings` are used exactly as before → byte-identical for every
 // existing user op (drill/slot/text/…), verified by their emit specs + the guard-prune regression.
 function instantiate(def, params) {
+    // ② B4 step 4b — fill STRUCTURAL binding defaults (guard-driving params with no block socket: bool probeZFirst, enum
+    // travelApproach) for any absent param BEFORE prune. A bool guard tolerates undefined (whenOk coerces !!undefined=false),
+    // but an ENUM guard needs the value (undefined === 'auto' is false → the arm would drop). Value bindings are untouched
+    // (their absence is handled per-binding below). A legacy def (no structural bindings) → this is a no-op → byte-identical.
+    const p = withGuardDefaults(def, params);
     const clone = JSON.parse(JSON.stringify(def.template || []));
-    pruneGuards(clone, params);
+    pruneGuards(clone, p);
     const flat = flattenBlocks(clone);
     const bindings = def.bindingSpecs ? deriveBindings(flat, def.bindingSpecs) : (def.bindings || []);
     for (const b of bindings) {
         const blk = flat[b.blockIndex];
         if (blk && blk.params && (b.key in blk.params)) {
-            blk.params[b.key] = (params && b.param in params) ? params[b.param] : b.default;
+            blk.params[b.key] = (p && b.param in p) ? p[b.param] : b.default;
         }
     }
     return clone;
+}
+
+// A STRUCTURAL binding (no blockIndex — drives guards via the prune params, not a value socket) supplies its default when
+// its param is absent, so an enum/bool guard prunes to the seeded shape even from a partial/empty params object (build({})).
+function withGuardDefaults(def, params) {
+    const p = { ...(params || {}) };
+    for (const b of (def.bindings || [])) {
+        if (b && b.param != null && b.blockIndex == null && !(b.param in p)) p[b.param] = b.default;
+    }
+    return p;
 }
 
 // NO INFERENCE for custom ops: a user_* op's preview intent (rotary rig / forceMachine / magazine) is whatever the

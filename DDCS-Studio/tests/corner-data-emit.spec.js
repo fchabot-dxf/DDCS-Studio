@@ -63,9 +63,12 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
     const probeZOffByte = emitEquivalence(cornerStack, dataBuilder, [S({})], {});                  // full-byte OFF
     const probeZOnByte  = emitEquivalence(cornerStack, dataBuilder, [S({ probeZFirst: 1 })], {});  // full-byte ON
 
+    // ② B4 step 4b — travelApproach is now LIVE (superset taPair guard/prune). Manual CONVERGES with cornerStack FULL byte
+    // (the #1505 jog-prompt KIND-B text prunes to the same bytes). (The dedicated travelApproach-live spec asserts the shape.)
+    const travelManualByte = emitEquivalence(cornerStack, dataBuilder, [S({ travelApproach: 'manual' })], {});   // full-byte MANUAL
+
     // FRONTIERS — STILL baked (the twin bakes these; the built-in keeps them working) → MUST diverge:
     const cornerDiv      = emitEquivalence(cornerStack, dataBuilder, [S({ corner: 2 })], {}, stripAnnotations);       // structural: FR direction signs (still baked → diverges)
-    const travelDiv      = emitEquivalence(cornerStack, dataBuilder, [S({ travelApproach: 'manual' })], {}, stripAnnotations);   // structural: manual jog-prompt (still baked → diverges)
     // ② B4(c) — fan-out DISSOLVED: safeZ + scanDepth are now LIVE single-socket bindings (#17=[#19+#20] recomputes on the
     // controller), so a bound safeZ/scanDepth now CONVERGES with cornerStack (was a baked frontier that diverged).
     const safeZConv      = emitEquivalence(cornerStack, dataBuilder, [S({ safeZ: 25 })], {}, stripAnnotations);
@@ -108,7 +111,7 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
       probeZOffByte: { pass: probeZOffByte.pass, firstDiff: probeZOffByte.firstDiff && { a: probeZOffByte.firstDiff.a.slice(0, 700), b: probeZOffByte.firstDiff.b.slice(0, 700) } },
       probeZOnByte: { pass: probeZOnByte.pass, firstDiff: probeZOnByte.firstDiff && { a: probeZOnByte.firstDiff.a.slice(0, 700), b: probeZOnByte.firstDiff.b.slice(0, 700) } },
       cornerPass: cornerDiv.pass,
-      travelPass: travelDiv.pass,
+      travelManualByte: { pass: travelManualByte.pass, firstDiff: travelManualByte.firstDiff && { a: travelManualByte.firstDiff.a.slice(0, 700), b: travelManualByte.firstDiff.b.slice(0, 700) } },
       safeZConvPass: safeZConv.pass,
       scanDepthConvPass: scanDepthConv.pass,
       robustness,
@@ -139,7 +142,9 @@ test('corner-data-emit: functional G-code == cornerStack across a bound-scalar s
   // ② B4(c): safeZ + scanDepth are NO LONGER frontiers — the #17=[#19+#20] fan-out fix made them live single-socket bindings.
   expect(r.safeZConvPass, 'safeZ is now a LIVE binding (→#19; #17=[#19+#20] recomputes) → CONVERGES with cornerStack').toBe(true);
   expect(r.scanDepthConvPass, 'scanDepth is now a LIVE binding (→#20) → CONVERGES with cornerStack').toBe(true);
-  expect(r.travelPass, 'frontier: travelApproach=manual swaps the auto G0 move for a #1505 jog prompt (structure swap the static template cannot do) — twin bakes auto').toBe(false);
+  // ② B4 step 4b — travelApproach LIVE: MANUAL emit == cornerStack({travelApproach:manual}) FULL byte-for-byte (jog-prompt KIND-B incl).
+  if (!r.travelManualByte.pass) console.log('TRAVEL-MANUAL DIFF\n--- cornerStack ---\n' + (r.travelManualByte.firstDiff && r.travelManualByte.firstDiff.a) + '\n--- data def ---\n' + (r.travelManualByte.firstDiff && r.travelManualByte.firstDiff.b));
+  expect(r.travelManualByte.pass, 'travelApproach=manual: the twin reproduces cornerStack byte-for-byte (the #1505 jog prompt shape)').toBe(true);
   expect(r.sampleHasProbe, 'emits a real probe move (G31)').toBe(true);
   expect(r.sampleLen, 'emits substantial G-code').toBeGreaterThan(200);
 });

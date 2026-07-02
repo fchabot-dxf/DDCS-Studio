@@ -15,17 +15,20 @@
  * cornerStack({probeZ:true}). Value sockets re-derive BY IDENTITY over the pruned stack (def.bindingSpecs), so #23/#24 land
  * correctly under the +2 shift. See corner-data-probeZFirst-live.spec.js.
  *
+ * travelApproach is now LIVE too (② B4 step 4b): the superset taPair emits BOTH the auto G0 seq move AND the #1505 jog prompt
+ * per traverse, each guarded by when(travelApproach=='auto'|'manual'); prune selects one → byte-for-byte == cornerStack. The
+ * enum guard is nested inside the probeZFirst guard on the Z→wall1 traverse. See corner-data-travelApproach-live.spec.js.
+ *
  * FRONTIERS STILL held BAKED (asserted as divergence tripwires, like drill's `method` / slot's `pattern`+`clearance`):
- *   • `travelApproach` — baked at 'auto': each wall-to-wall traverse is a hands-free G0 seq move (safeTraverseStack seq →
- *     `G0 X#23 Y#24`). MANUAL travel is a DIFFERENT block — a `#1505` "jog + Press Enter" operator prompt (middle's
- *     reposition() shape), not a move — so auto→manual is a prompt-vs-move STRUCTURE swap `instantiate()` cannot do. Baked
- *     auto (the twin's default); the LIVE toggle lands next (② B4 step 4b) via the SAME guard/prune mechanism probeZFirst now uses.
+ *   • `wcs` — baked at 'active' (reads #578 → computes #70); a fixed G54..G59 target emits a literal `#70=805` instead. The
+ *     LIVE 7-way toggle lands next (② B4 step 4c) via the same guard/prune. (`corner` quadrant + `probeSeq` = sign/order
+ *     swaps, not prune-shaped — kept baked, live later via value-bindings.) `syncA` (dual-gantry) also still baked (4d).
  *   • `safeZ` + `scanDepth` — WERE a fan-out (safeZ fed #19 AND the COMPUTED literal `#17 = safeZ + scanDepth`, so one
  *     binding couldn't drive both). ② B4(c) DISSOLVED it: cornerStack now DECLARES `#17 = [#19 + #20]` (safeZ→#19,
  *     scanDepth→#20; the controller sums it at runtime, like `#18=[0-#17]`), so safeZ + scanDepth are now CLEAN single-socket
  *     bindings — no longer baked. (`level` stays baked: a literal-in-G31 multi-socket fan-out, no macro var, non-operator-facing.)
- * The built-in Corner keeps ALL of these working; see corner-data-travelApproach-frontier.spec.js (the loud can't-forget gate
- * that blocks flipping a baked default before its toggle is wired, and blocks retiring the built-in while ANY frontier is baked).
+ * The built-in Corner keeps ALL of these working; see corner-data-wcs-frontier.spec.js (the loud can't-forget gate that blocks
+ * flipping the baked wcs default before its toggle is wired, and blocks retiring the built-in while ANY frontier is baked).
  *
  * Template SEEDED from cornerStack(CORNER_DEFAULTS); the BINDINGS are derived + proven byte-identical by
  * tests/corner-data-emit.spec.js. SCOPE (inc B1) = EMIT only — no view/panel (B3), no sim-starts/inferStarts (B2).
@@ -118,10 +121,12 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
  *  a unique match). instantiate re-derives the flat index BY IDENTITY over the PRUNED stack each build (via bindingSpecs). */
 export const CORNER_BINDINGS = deriveBindingsFor(cornerDataStack(CORNER_DEFAULTS), CORNER_BINDING_SPECS);
 
-/** The STRUCTURAL toggle bindings — a BOOL `probeZFirst` that drives the guard prune (NO value socket → no blockIndex/
- *  match). Ticking it flips the emit AND the preview between the no-Z and Z-first shapes (② B4 step 4a — the toggle goes LIVE). */
+/** The STRUCTURAL toggle bindings — params that drive the guard prune (NO value socket → no blockIndex/match). Each flips
+ *  the emit AND the preview between shapes: `probeZFirst` (bool, ② B4 step 4a) no-Z↔Z-first; `travelApproach` (enum, step 4b)
+ *  auto↔manual — the hands-free G0 seq move vs the #1505 jog-and-wait prompt, on BOTH the Z→wall1 and wall1→wall2 traverses. */
 export const CORNER_STRUCT_BINDINGS = [
     { param: 'probeZFirst', type: 'bool', default: !!CORNER_DEFAULTS.probeZFirst, label: 'Probe Z First', section: 'GEOMETRY' },
+    { param: 'travelApproach', type: 'enum', default: CORNER_DEFAULTS.travelApproach, label: 'Travel', section: 'GEOMETRY', widgetConfig: { options: [['Auto', 'auto'], ['Manual', 'manual']] } },
 ];
 
 /** Build the corner-as-data def — same userOpFromStack pattern as drill/surfacing/slot/text/atcWarmup, PLUS `bindingSpecs`

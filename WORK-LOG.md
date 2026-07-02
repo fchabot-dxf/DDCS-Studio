@@ -4434,3 +4434,48 @@ skipped (1.3m) — clean.** All byte-parity specs stay green (prod code untouche
 
 **⏸ PASS BACK (advisor verifies — no human gate).** Only the test hardened; production 4a is as reviewed. Ready for the 4b
 travelApproach-live dispatch (same guard/prune mechanism, its frontier retires next, spec follows this live-spec pattern).
+
+---
+
+## 🔨 turn 41 (cycle 11) — ② B4 M2 step 4b: travelApproach LIVE (enum guard/prune, batch fork 1/3). ⏸ PASS BACK (advisor verifies).
+
+4a-harden reviewed CLEAN + verified (gap closed, net bites). DISPATCH 4b travelApproach-LIVE — the FIRST ENUM structural
+toggle (4a was a bool), same guard/prune mechanism. ⏸ pass back (no human gate — advisor verifies). Then advisor dispatches
+4c wcs(7-way).
+
+**The mechanism (enum extends the 4a pattern):**
+- **`taPair` (travelApproach fork).** travelApproach forks TWO traverses (safeTraverseStack emits a DIFFERENT shape per arm:
+  auto = the G0 seq move; manual = the #1505 jog-and-wait prompt). New `taPair(autoFn, manualFn)` RETURNS the arm blocks
+  (composed INSIDE a z-fork so it can NEST): superset → BOTH arms guarded by `when(travelApproach=='auto'|'manual')`;
+  concrete → the selected arm via LAZY thunks (unused shape never built). Applied to (a) the Z→wall1 traverse — NESTED inside
+  the probeZFirst guard, and (b) the wall1→wall2 reposition — the taPair (travelApproach) NESTS inside the zPair (probeZFirst
+  step-number fork), a full 2×2. One leaf survives prune → byte-for-byte == cornerStack for every combination.
+- **whenOk handles enum out of the box** (`v === when.is`, strict string equality — guard-prune.spec already covers
+  enumMatch/enumMiss; pruneGuards is value-agnostic). NO whenGuard change needed — VERIFIED.
+- **HAZARD FIXED — enum needs its default before prune.** A bool guard tolerates an absent param (whenOk coerces
+  !!undefined=false → the OFF arm), but an ENUM guard does not (undefined === 'auto' is false → BOTH arms drop → the
+  reposition VANISHES). `build({})` (the golden + frontier gates) passes `{}`, so travelApproach would be undefined. FIX:
+  `instantiate` now fills STRUCTURAL binding defaults (guard params, blockIndex==null) for any ABSENT param BEFORE prune
+  (`withGuardDefaults`). Value bindings untouched (absence handled per-binding); a legacy def (no structural bindings) → no-op
+  → byte-identical. This also hardens probeZFirst (was relying on !!undefined).
+- **travelApproach = an ENUM structural binding** in CORNER_STRUCT_BINDINGS (type:'enum', default 'auto', widgetConfig options
+  auto/manual → the form dropdown; dropdownWidget commits the raw string for non-numeric types). Like probeZFirst it has NO
+  value socket (drives the guards via params), so it lives in def.bindings, NOT bindingSpecs (which requires a block match).
+
+**Frontier moved in LOCKSTEP.** Retired corner-data-travelApproach-frontier (travelApproach now live). Its don't-retire-the-
+built-in gate MOVED AGAIN into a NEW corner-data-wcs-frontier.spec (re-anchored to wcs/syncA — the STILL-baked frontiers), which
+also tripwires wcs (the twin BAKES the active-WCS read #71=#578 + ignores a fixed wcs param → RED when 4c wires the 7-way guard).
+
+**VERIFY — the HARDENED live-spec pattern (adopted for 4b/4c/4d).** NEW corner-data-travelApproach-live READS the enum
+binding's OWN wiring from def.bindings (asserts type enum, default auto, options {auto,manual}) and DRIVES the emit from the
+declared option VALUES (never a hardcoded literal) — so a mis-wire fails. Asserts FULL byte-for-byte parity across the WHOLE
+2×2 (probeZFirst × the binding's options) + the real toggle symptom on BOTH traverses (manual → the two "Jog clear" #1505
+prompts + no G0 seq move; auto → the two G0 seq moves + no jog). MUTATION-CHECK: set the binding option 'manual'→'jog' → the
+declared-options assert AND the binding-driven parity go RED; reverted byte-exact. corner-data-emit reworked (travelDiv →
+full-byte MANUAL CONVERGE). corner-data-probeZFirst-live + guard-prune + golden all green. **Full suite: 460 passed, 0 failed,
+3 skipped; 1 known flake (middle-animator stroke-dashoffset — retried GREEN by Playwright + passes 6/7 in isolation, unrelated
+— touches none of my files).**
+
+**⏸ PASS BACK (advisor verifies — no human gate).** travelApproach is live via the same guard/prune; frontier moved to wcs.
+Ready for 4c wcs-live (the 7-way enum: active + G54..G59 literal arms — same taPair-style pattern, but 7 arms; its spec follows
+this hardened pattern and retires the wcs tripwire in lockstep, moving the built-in gate to syncA). Then 4d syncA.
