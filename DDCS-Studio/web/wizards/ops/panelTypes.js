@@ -156,8 +156,15 @@ export function layoutSpecFromOp(def, params, simStart, sources) {
     // VISUAL here (excluded from the hit-test) because pass-0 always coincides with a reposition ANCHOR whose emitting handle
     // owns that point — the sim start is DRAGGED on the top panel (its natural sim surface). Host passes the pass-0 position.
     if (simStart && simStart.pos && Number.isFinite(+simStart.pos.x) && Number.isFinite(+simStart.pos.y)) {
-        const allHandles = [...handles, { id: '__simstart0', x: +simStart.pos.x, y: +simStart.pos.y, kind: 'move', simOnly: true, label: '', color: srcCol(0) }];
-        return { stock, items, handles: allHandles, onDrag };
+        const SIM_ID = '__simstart0';
+        const allHandles = [...handles, { id: SIM_ID, x: +simStart.pos.x, y: +simStart.pos.y, kind: 'move', simOnly: true, label: '', color: srcCol(0) }];
+        // t87 — the sim-only marker is DRAGGABLE: route its drag to the panel's onStartDrag (writes userStarts, NEVER emitted —
+        // reuses the top panel's seam, no new mechanism); every other handle keeps its param-writing onDrag. (placement is {0,0}
+        // for a probe op → the canvas world-delta IS the absolute start world point onStartDrag expects.)
+        const wrappedOnDrag = (typeof simStart.onDrag === 'function')
+            ? (id, world) => { if (id === SIM_ID) simStart.onDrag({ x: world.x, y: world.y }); else if (onDrag) onDrag(id, world); }
+            : onDrag;
+        return { stock, items, handles: allHandles, onDrag: wrappedOnDrag };
     }
     return { stock, items, handles, onDrag };
 }

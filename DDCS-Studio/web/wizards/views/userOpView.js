@@ -123,17 +123,23 @@ export const userOpView = {
             const c = el('userVizContainer');
             if (c) {
                 c.style.display = ''; const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none';
-                // t73 — the SIM-ONLY first-start marker ALSO shows on the Layout canvas (a 2nd renderer of the panel's
-                // userStarts pass-0): reach the panel (host.__panel of the 3D box), read its pass-0 start, and render a hollow
-                // ◇ for spatial reference. VISUAL here (the sim start is dragged on the top panel — pass-0 coincides with a
-                // reposition anchor, whose emitting handle owns the Layout hit).
-                const box = el('userViz3dContainer');
-                const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
-                const panel = host && host.__panel;
-                const ps = (panel && typeof panel.getPassStarts === 'function') ? (panel.getPassStarts() || []) : [];
-                const pos0 = ps[0] || (Array.isArray(starts) && starts[0]) || null;   // dragged start, else the declared pass-0 hint
-                const sources = (panel && typeof panel.getPassSources === 'function') ? panel.getPassSources() : null;   // t81 — per-pass auto/manual, so the Layout matches the top panel
-                renderLayout2D(c, _def, params, pos0 ? { pos: pos0 } : null, sources);
+                // t73/t87 — the SIM-ONLY first-start marker ALSO shows on the Layout canvas (a 2nd renderer of the panel's
+                // userStarts pass-0) AND is DRAGGABLE there: reach the panel (host.__panel), read its pass-0 start, render a
+                // hollow ○, and route a drag to the SAME onStartDrag(pos,0) → both surfaces edit one userStarts (never emitted).
+                // Re-render on drag so the marker tracks. (t87: draggable — the human confirmed the sim start should be movable.)
+                const renderLayoutWithSim = () => {
+                    const box = el('userViz3dContainer');
+                    const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
+                    const panel = host && host.__panel;
+                    const ps = (panel && typeof panel.getPassStarts === 'function') ? (panel.getPassStarts() || []) : [];
+                    const pos0 = ps[0] || (Array.isArray(starts) && starts[0]) || null;   // dragged start, else the declared pass-0 hint
+                    const sources = (panel && typeof panel.getPassSources === 'function') ? panel.getPassSources() : null;   // t81 — per-pass auto/manual, so the Layout matches the top panel
+                    const simStart = (panel && pos0 && typeof panel.onStartDrag === 'function')
+                        ? { pos: pos0, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } }
+                        : (pos0 ? { pos: pos0 } : null);
+                    renderLayout2D(c, _def, params, simStart, sources);
+                };
+                renderLayoutWithSim();
             }
         } else if (pt.mode === '3d') {
             if (viz3dBox) viz3dBox.style.display = 'none';

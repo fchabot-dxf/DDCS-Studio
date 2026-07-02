@@ -5480,3 +5480,42 @@ value (consistent with machine-facts-vs-macro: pull controller values from the p
 wires 3 (port/fastFeed/retract, level baked); Expert-only + opt-in; the one design decision is the binding-vs-source conflict
 (RECOMMEND A: gate+grey the field when sourced). Awaiting your review + a build dispatch (which fork, and confirm level-excluded).
 NO code changed this turn.
+
+---
+
+## 🔨 turn 87 (cycle 11) — TWO builds: (1) source-chips (Option A) + (2) Layout sim-only marker DRAG. Suite green (486 passed, 0 failed). COMMITTED (not pushed). ⏸ PASS BACK for live-verify.
+
+Scout blessed → advisor decided Option A + dispatched BOTH pieces (independent code areas).
+
+**PIECE 1 — SOURCE-CHIPS (Option A, with a fixed-template ADAPTATION):**
+- `blocks/dataOps/cornerData.js` — `applyProbeSources(stack)` rewrites the #5(port)/#3(fastFeed)/#2(retract) assign value+note via
+  the SAME srcVal/srcNote the built-in uses, reading LIVE from `window.ddcsResolveProbeSources` (a global profile+user setting —
+  machine-facts-vs-macro — not a stored per-op binding). Wired via a new `def.postInstantiate` hook. `level` EXCLUDED (baked).
+  Also tags the 3 bindings with `sourceField` so the form greys them.
+- `blocks/userOps.js` — the builder calls `def.postInstantiate(stack)` after instantiate (a live fn, re-attached from the seed).
+- `ui/formWidgets.js` — `numberWidget` GREYS the input (disabled + Pr tooltip) when `b.sourceField` is 'ctrl'-sourced
+  (window.ddcsProbeSrc) — the post-field-gating pattern; the value comes from the controller.
+- **⚠ ADAPTATION (surfaced):** the advisor's A said "gate the binding so the SEED's srcVal output survives" — but the M2 template
+  is FIXED at def-creation (built from CORNER_DEFAULTS, NO sources), so there is no sourced srcVal output in the template to
+  survive. Instead I apply srcVal/srcNote POST-emit (same functions, same result: #5=#1078 + "controller Pr578"). Achieves exact
+  parity with the built-in; STUDIO (the default) / non-Expert profile → resolve returns {} → BYTE-IDENTICAL (corner-data-emit green).
+
+**PIECE 2 — LAYOUT SIM-ONLY MARKER DRAG (the human: "sim only means it doesn't emit, but we still drag it to simulate a start"):**
+- `viz/featureCanvas.js` — `_hit`: replaced the blanket `if (h.simOnly) return` (from when the marker + emitting handle were
+  COINCIDENT, pre-t76) with a coincidence DISTANCE check: the sim marker IS hit-testable (draggable), and only YIELDS to an
+  EMITTING handle when they degenerately coincide (<6px). Normally (post-t76 offset fix) they're separated → the sim grabs cleanly.
+- `wizards/ops/panelTypes.js` — the sim handle's drag routes to `simStart.onDrag` (→ the panel's onStartDrag → userStarts, never
+  emitted); the other handles keep their param-writing onDrag. Reuses the top-panel seam — no new mechanism.
+- `wizards/views/userOpView.js` — `renderLayoutWithSim` supplies `onDrag:(p)=>{panel.onStartDrag(p,0); re-render}` so the marker
+  tracks the drag. (This restores the t73 draggable wiring I had removed when the overlap forced visual-only — now resolved.)
+
+**VERIFY.** New specs (all green, mutation-proven): `corner-source-chips` (Expert+ctrl → #5=#1078/#3=#632/#2=#640 + Pr note;
+studio/Generic → literal, byte-identical; the field greys when sourced — Msrc mutation → ctrl reads the literal → RED);
+`corner-layout-sim-drag` ((1) a real mouse drag of the ○ moves getPassStarts()[0] + emit byte-identical — Mdrag-a blanket-exclude →
+RED; (2) synthetic coincident handles → the emitting handle wins the hit, no crash — Mdrag-b drop-coincidence → RED). track test-4
+updated in lockstep (the ◇ is now draggable). **Full suite: 486 passed, 0 failed** (488 total). Byte-parity untouched (piece 1
+default byte-identical; piece 2 preview-only). Surgical: 6 source files + 2 new specs + 1 lockstep update.
+
+**⏸ PASS BACK for your live-verify** — source-chips on the Expert profile (flip a probe field to 'ctrl' in Settings ▸ Probes →
+the emit uses #1078 &c. + the form field greys) + drag the Layout sim-only ○ directly. NOTE the piece-1 fixed-template adaptation
+(post-emit srcVal, same result as gate-the-binding). COMMITTED, NOT pushed.

@@ -45,6 +45,10 @@ function numberWidget(host, b) {
     inp.value = b.default ?? 0;
     inp.style.cssText = CTRL_CSS + ' width:120px;';
     inp.dataset.param = b.param;   // so a 2D-preview handle can write this field back (drag-to-edit derives from roles)
+    // t87 — source-chips: a probe field the user opted 'ctrl' (on a profile with a native register) is provided by the
+    // CONTROLLER — GREY the input + tooltip the Pr (the emit uses the register, not this literal). post-field-gating pattern.
+    const src = (b.sourceField && typeof window !== 'undefined' && window.ddcsProbeSrc) ? window.ddcsProbeSrc(b.sourceField) : null;
+    if (src) { inp.disabled = true; inp.style.opacity = '.5'; inp.title = `From the controller (${src.pr || src.label || 'register'}) — change in Settings ▸ Probes`; }
     host.append(labelSpan(b), inp);
     return { read: () => ({ [b.param]: numOr(inp.value, b.default ?? 0) }) };
 }

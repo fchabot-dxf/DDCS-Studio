@@ -233,12 +233,17 @@ export class FeatureCanvas {
         const wx = w.x - (p.x || 0), wy = w.y - (p.y || 0);
         let best = null, bd = tol;
         (this.spec.handles || []).forEach((h) => {
-            if (h.simOnly) return;   // t73 — the sim-only ◇ is a VISUAL reference on the Layout (it coincides with a reposition
-            //                          anchor, whose EMITTING handle owns the hit); the sim start is dragged on the top panel.
-            //                          anchor, whose EMITTING handle owns the hit); the sim start is dragged on the top panel.
             const d = Math.hypot(h.x - wx, h.y - wy);
             if (d <= bd) { bd = d; best = h; }
         });
+        // t87 — the SIM-ONLY marker IS draggable (writes userStarts, sim-only — "sim only means it doesn't emit, but we still
+        // drag it to simulate a user start"). It only YIELDS the hit to an EMITTING handle when they DEGENERATELY COINCIDE
+        // (e.g. an explicit 0 offset); normally (post-t76 anchor-offset fix) they're separated, so the sim marker grabs cleanly.
+        if (best && best.simOnly) {
+            const coincTol = 6 / this._tf.scale;
+            const em = (this.spec.handles || []).find((h) => !h.simOnly && Math.hypot(h.x - best.x, h.y - best.y) < coincTol);
+            if (em) return em;
+        }
         return best;
     }
 

@@ -99,10 +99,10 @@ test('(3) Layout canvas: the sim-only start handle appears as a HOLLOW circle (s
   expect(info.stroke, 'cyan (auto, default) — matches the top-panel sim-only marker colour').toBe('#22d3ee');
 });
 
-// (4) PART 2 — the sim ◇ is VISUAL on the Layout (excluded from the hit-test): dragging the EMITTING reposition handle writes
-//     cross1_x — the ◇ never steals the hit ("emitting handles stay as today"). The sim start itself is dragged on the top
-//     panel (covered by corner-data-start-live). (Post-t75 fix, the emitting handle sits at its destination, clear of the ◇.)
-test('(4) Layout sim ◇ is visual — the emitting reposition handle owns its drag (writes cross1_x)', async ({ page }) => {
+// (4) PART 2 — the EMITTING reposition handle owns its OWN drag (writes cross1_x): it sits at its destination (wall-2), clear
+//     of the now-draggable sim ◇ (at pass-0), so dragging it grabs the emitting handle — the ◇ doesn't steal a separated hit.
+//     (t87: the sim ◇ is itself draggable now — covered by corner-layout-sim-drag; here we just guard the emitting handle.)
+test('(4) the emitting reposition handle owns its own drag (writes cross1_x); the separated sim ◇ does not steal it', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
   await page.evaluate(async () => {

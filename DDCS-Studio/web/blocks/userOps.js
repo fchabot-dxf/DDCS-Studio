@@ -353,7 +353,10 @@ export function registerUserOp(def) {
     const builder = (params) => {
         const resolved = params || defaultParams(def);
         if (typeof def.build === 'function') return def.build(resolved);
-        return instantiate(def, resolved);
+        const stack = instantiate(def, resolved);
+        // t87 — an optional LIVE post-emit hook (e.g. corner source-chips: rewrite probe-config values to controller registers
+        // when the user opts 'ctrl'). A fn on the code def (dropped on persistence, re-attached from the seed, like simStartsProvider).
+        return (typeof def.postInstantiate === 'function') ? def.postInstantiate(stack, resolved) : stack;
     };
     registerUserBuilder(def.opType, builder);
     const schema = {};

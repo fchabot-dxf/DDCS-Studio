@@ -41,10 +41,11 @@
  * tests/corner-data-emit.spec.js. SCOPE (inc B1) = EMIT only — no view/panel (B3), no sim-starts/inferStarts (B2).
  */
 import { cornerStack, cornerReposOffsets } from '../../wizards/cornerWizard.js';
-import { userOpFromStack, simStartsToBlocks } from '../userOps.js';
+import { userOpFromStack, simStartsToBlocks, flattenBlocks } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards, whenOk } from '../whenGuard.js';   // ③b — derive CORNER_BINDINGS over a CANONICAL-pruned stack (the 8-way corner×probeSeq guard duplicates the bound sockets in the raw superset)
 import { makeProvider } from '../../viz/opSimStarts.js';   // sim-marker positions: reuse the base frac provider, then CHAIN the reposition-destination passes off their anchor
+import { srcVal, srcNote } from '../../wizards/probeBlocks.js';   // t87 — the SAME source functions the built-in uses: srcVal picks src.ctrl over the literal; srcNote appends "- controller PrNNN"
 
 /** Author defaults — match cornerStack's fallbacks + the built-in Corner field defaults. Structural params (corner/
  *  probeSeq/probeZFirst/wcs/syncA) are baked at their defaults: the twin is the FL / YX / no-Z / active-WCS shape. */
@@ -190,12 +191,39 @@ export const CORNER_STRUCT_BINDINGS = [
     { param: 'probeSeq', type: 'enum', default: CORNER_DEFAULTS.probeSeq, label: 'Probe Order', section: 'GEOMETRY', widgetConfig: { options: [['Y then X', 'YX'], ['X then Y', 'XY']] } },
 ];
 
+// t87 — SOURCE-CHIPS: when the user opts a probe field to 'ctrl' (on a profile that has a native register, e.g. Expert), emit the
+// CONTROLLER register (#5=#1078 &c.) instead of the literal — EXACT parity with the built-in's srcVal/srcNote. Applied POST-emit
+// because the M2 template is FIXED at def-creation (no sources): rewrite the #5/#3/#2 assign value+note via the SAME srcVal/srcNote,
+// reading LIVE from settings (a global profile+user setting — machine-facts-vs-macro — not a stored per-op binding). `level`
+// stays baked (excluded). STUDIO-sourced (the default) or a profile with no native var → resolve returns {} → byte-IDENTICAL.
+const PROBE_SRC_VARS = { port: '#5', fastFeed: '#3', retract: '#2' };
+function applyProbeSources(stack) {
+    const resolve = (typeof window !== 'undefined' && window.ddcsResolveProbeSources) ? window.ddcsResolveProbeSources : null;
+    const sources = resolve ? resolve(['port', 'fastFeed', 'retract']) : {};
+    if (!sources || !Object.keys(sources).length) return stack;   // studio / non-Expert profile → unchanged (byte-identical)
+    for (const b of flattenBlocks(stack)) {
+        if (!b || b.type !== 'assign' || !b.params) continue;
+        for (const field in PROBE_SRC_VARS) {
+            if (b.params.var === PROBE_SRC_VARS[field] && sources[field]) {
+                b.params.value = String(srcVal(sources[field], b.params.value));   // src.ctrl (the controller register) over the literal
+                b.params.note = srcNote(sources[field], b.params.note);            // "<note> - controller PrNNN"
+            }
+        }
+    }
+    return stack;
+}
+
 /** Build the corner-as-data def — same userOpFromStack pattern as drill/surfacing/slot/text/atcWarmup, PLUS `bindingSpecs`
  *  (instantiate re-derives the value sockets by identity over the pruned superset) + the structural probeZFirst toggle. */
 export function cornerDataDef() {
+    // t87 — tag the probe-config bindings so the form GREYS them when 'ctrl'-sourced (the value then comes from the controller
+    // register, not the literal — see applyProbeSources). Matches PROBE_SRC_VARS: port(#5)/f_fast(#3)/retract(#2). level is baked.
+    const SRC_BY_PARAM = { port: 'port', f_fast: 'fastFeed', retract: 'retract' };
+    const bindings = [...CORNER_BINDINGS, ...CORNER_STRUCT_BINDINGS].map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
     const def = userOpFromStack('corner_data', 'Corner (data)', cornerDataStack(CORNER_DEFAULTS),
-        [...CORNER_BINDINGS, ...CORNER_STRUCT_BINDINGS], 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
+        bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
     def.bindingSpecs = CORNER_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     def.simStartsProvider = cornerSimStartsProvider;   // t73 — sim markers CHAIN off their anchor via the emit's reposition geometry (preview-only)
+    def.postInstantiate = (stack) => applyProbeSources(stack);   // t87 — source-chips: emit the controller register for 'ctrl'-sourced probe fields (parity with the built-in)
     return def;
 }
