@@ -1,62 +1,59 @@
 # NEXT-SESSION — advisor → worker dispatch
 
-**Branch:** `port/corner-clean` (off `main` @9bc0a7c = shipped V10.49 + concurrent H2). **Backups:** `wizard-porting-work` · `corner-notepad-enrich`.
-**NOT on main / not deployed** — 18 commits ahead of `origin/main` (which has no `cornerData`); the branch is served locally via VSCode Live Server.
+**Branch:** `port/corner-clean` (off `main` @9bc0a7c). NOT on main / not deployed. Served locally via VSCode Live Server. **Backups:** `wizard-porting-work` · `corner-notepad-enrich`.
 
-## 🔒 THE LOCKED MODEL (human turn 6) — "Corner (data)" REPLACES the built-in; positions are EXPRESSIONS of the stock-datum coord
-Each reposition socket (`#21`/`#22` start, `#23`/`#24` cross) holds a **`datum + offset` EXPRESSION**:
-- **DEFAULT** offset = stock-geometry-derived → correct-by-construction. **DRAG** = a datum-RELATIVE literal offset → tracks the stock (ABS = fallback).
-- **REPLACE** mode (built-in retires). **Probe-Z-First** = a structural frontier (B4).
+## 🔒 THE LOCKED MODEL (human turn 6) — "Corner (data)" REPLACES the built-in; reposition positions are EXPRESSIONS of the stock-datum coord
+Socket = `datum + offset` EXPRESSION. DEFAULT = stock-geometry-derived; DRAG = datum-RELATIVE literal (tracks stock); ABS = fallback. REPLACE mode.
 
-## ✅ DONE + VERIFIED (advisor reviews = fan-out + adversarial verify + independent re-run) — EMIT + SIM + LAYOUT+DRAG complete
-- **EMIT** — inc A (mechanism) · B1 (corner twin) · B1b (reposition correct-by-default via signed-travelDist expressions; degenerate `G0 X0 Y0` dead).
+## ✅ DONE + VERIFIED (advisor reviews = fan-out + adversarial verify + independent re-run)
+- **EMIT** — A (mechanism) · B1 (twin) · B1b (reposition correct-by-default via signed-travelDist expressions).
 - **SIM** — B2 → B2b (per-PROBE-PASS markers, pass-aligned vs the REAL engine, none inside the stock).
-- **LAYOUT+DRAG** — B3 (generic canvas-widget wiring, no per-wizard view) → B3b (drag writes the CORRECT INCREMENTAL DELTA `world−wall1`,
-  via a GENERIC point-anchor `relTo:0` from `opSimStarts`; test asserts the VALUE + rejects absolute). 452/0-fail.
-- **Human calls:** REPLACE (t6) · positions = datum expressions (t6) · dropdown dup = stale localStorage op (t8) · ADD auto/manual travel (t12) · B3 (t12).
-- **Recurring lesson:** the worker's tests keep asserting a change HAPPENED, not that the RESULT is CORRECT (B1 golden / B2 finite / B3 literal) —
-  every test-bearing dispatch now MANDATES asserting the correct value vs an INDEPENDENT truth; the advisor re-runs + fan-out-reviews.
+- **LAYOUT+DRAG** — B3 (generic canvas-widget wiring) → B3b (drag writes the CORRECT incremental delta `world−wall1` via a generic
+  point-anchor `relTo:0`; test asserts the value + rejects absolute).
+- **① AUTO/MANUAL TRAVEL** (human t12) — generalized into the shared `safeTraverseStack` (`approach:'auto'|'manual'`, manual = a `#1505`
+  jog-prompt via a guarded early-return; auto arms untouched). Middle's hand-rolled manual refactored onto it, proven **BYTE-IDENTICAL**
+  (unit equivalence + a FROZEN before-tip full-macro golden — review CLEAN 2/2, re-run green). Corner adopts one `travelApproach` on both
+  travels (reuses each travel's own lift/drop). Twin bakes auto + divergence row + loud fixme frontier gate.
+- **Recurring lesson:** every test-bearing dispatch MANDATES asserting the correct VALUE vs an INDEPENDENT truth (not just "it changed"); advisor re-runs + fan-out-reviews.
 
-## 🚦 ACTIVE DISPATCH — ① AUTO/MANUAL TRAVEL: BUILD (scout plan BLESSED) [advisor turn 18]
-The scout plan (WORK-LOG turn-17) is SOUND + adversarially self-verified (middle value-identity + corner back-compat both HOLD; the "drop
-crux" elegantly resolved — corner-manual reuses each travel's OWN auto `lift #19`/`drop #18`, no new `manualLift/Drop`). BUILD per the plan
-§1–§4 (early-return manual branch in `safeTraverseStack`; middle `reposition()`→ the shared block; corner `travelApproach`→ both seq calls;
-twin bakes auto). **Fork decisions:**
-1. **SINGLE `travelApproach`** (governs both corner travels) — CONFIRMED (matches the human's "for all travel within"; per-travel is a cheap
-   additive refinement later via middle's `oneMode` precedent if a real case appears).
-2. **Value-identity proof:** the targeted UNIT EQUIVALENCE is the PRIMARY proof; KEEP the full-macro before/after sweep as the backstop but
-   **INLINE the golden — NO `UPDATE_GOLDEN` fixture machinery** (a ONE-SHOT refactor proof, not a maintained golden; rule-of-three: don't build
-   a golden framework for one use) + the existing middle suite + `corner-data-emit` stay green.
-3. **Twin frontier gate — BOTH:** the divergence row in `corner-data-emit.spec` (load-bearing) AND the loud `test.fixme` frontier spec —
-   mirror the probeZFirst frontier EXACTLY (one-source: same pattern; both gate the built-in's retirement).
-4. **DEFER the `travelApproach` GUI control + Blockly round-trip to ② (B4).** ① is EMIT plumbing; the twin BAKES auto (frontier) → a control
-   there would be a NON-WORKING option (the bridge.js "don't surface dead options" lesson). The LIVE toggle + its control + round-trip land
-   with ② when the structural capability makes it real. (This is the "① plumbing, ② the visible toggle" split I told the human.)
-- HONOR the residual risks: DOCUMENT the `approach:'manual'` = seq/in-axis-ONLY constraint (never center/transTraverse — re-centre math) on
-  the param; do NOT auto-prefix `REPOSITION:` inside the branch (the CALLER owns it — the sim pass-counter keys on it); the XY-only-jog-during-
-  the-pause is a USER responsibility (as middle already ships).
+## 🐞 THE WIZ-BAR GAP (user-found t18, trace-CONFIRMED) — the canvas is built but the BAR opens the wrong surface
+Clicking "Corner (data)" in the Probe-Data-Wiz dropdown routes to the plain quick-insert FORM (`commandDeck.js:70-75` → `ddcsInsertUserOp`
+→ `userOpForm.openUserOpForm` = fields only). The FeatureCanvas + drag render ONLY via the WIZARD path (`openWiz` → `wizardManager.open` →
+`userOpView.update` → `renderLayout2D`). The B3 test used `openWiz` (passed); the user clicks the bar (form-only). Same op, two doors —
+NOT stale cache. → **B3c** below. (The parallel isolated build of this 529'd before committing; the worker builds it fresh.)
 
-**VERIFY:** middle emit BYTE/VALUE-IDENTICAL (unit-equivalence + full-macro sweep + middle suite green); corner emits the manual jog-prompt vs
-the auto move per `travelApproach`, auto byte-identical to today; twin bakes auto + the frontier gate trips; full suite GREEN. Stage surgically.
-Commit + WORK-LOG + pass.
+## 🚦 ACTIVE DISPATCH — B3c: WIZ-BAR ROUTING — open the canvas, not the plain form [advisor turn 20; user-blocked]
+Route panel-declaring data-ops from the bar to the canvas/wizard path so "Corner (data)" opens its 2D layout + drag handle (the thing the
+human has been trying to see), not the bare form.
+- **FIX:** in `commandDeck.js wizItemOnclick(e)`, route a `kind:'user'` entry whose `e.def.panel` is `'form2d'`/`'form3d'` to the CANVAS/
+  wizard path (the `openWiz`/`wizardManager.open` seam) instead of `ddcsInsertUserOp`. Keep form-only user ops on the quick form (no regression).
+  The full def is on the entry (`wizardLibrary.userEntries` sets `def:d`), so `e.def.panel` is available.
+- **SCOUT the ONE subtlety — the INSERT flow:** does the wizard/`userOpView` path actually INSERT the op into the program (the quick-form's
+  job), or only preview/edit? It MUST still insert. If the wizard path can't insert, wire the right seam so a form2d op both RENDERS its
+  canvas AND inserts. GATE if this is a bigger seam than a routing switch.
+- ⭐ **TEST (verify-real-symptom — the USER's path, NOT `openWiz`):** open "Corner (data)" via the DROPDOWN/commandDeck click entrypoint and
+  assert the FeatureCanvas + a `.fc-handle-move` RENDER (the exact gap). Must FAIL pre-fix, PASS post-fix.
+- SCOPE: the routing (`commandDeck`) + whatever the insert flow needs. NOT the emit (done); NOT ②'s toggles.
 
-**NORTH STAR:** one-source (the ONE declared travel primitive owns auto/manual; kill the per-wizard hand-roll — the probe-surface-block
-generalises-probing pattern) · valid-by-construction · verify-real-symptom (middle proven byte/value-identical post-refactor).
+**VERIFY:** clicking "Corner (data)" in the bar opens the 2D canvas + drag handle (and it STILL inserts); the new dropdown-path test + the
+existing commandDeck/user-op specs + full suite GREEN. **STAGE SURGICALLY** (never `git add -A`). Commit + WORK-LOG + pass.
+
+**NORTH STAR:** verify-real-symptom (test the path the USER takes) · GUI-first (the canvas IS the point) · one-source (route by the declared
+`panel` — generic to every visual data-op, not corner-special).
 
 ## 📌 QUEUED (advisor dispatches each after review — no human check-in):
-- **② B4 — PROBE-Z-FIRST + the structural-toggle capability (REQUIRED for replacement).** probeZFirst (add the Z step) AND auto/manual travel
-  (prompt vs move) are BOTH structural toggles the data model can't yet do. Likely: ALWAYS emit the block, GUARDED by a flag (conditional
-  goto) → a BOUND VALUE in a fixed shape. Makes both toggles LIVE in "Corner (data)". Red frontier-gate holds until it lands.
-  (Also fixes the latent `relTo` anchor shift: with probeZFirst on, sim-start[0] = Z-surface not wall-1, so the drag anchor index must adjust.)
+- **② B4 — PROBE-Z-FIRST + auto/manual LIVE toggle + the structural-toggle capability + GUI/round-trip (REQUIRED for replacement).**
+  probeZFirst (add the Z step) AND auto/manual travel (prompt vs move) are BOTH structural toggles the twin can't yet do (baked). Likely:
+  ALWAYS emit the block GUARDED by a flag (conditional goto) → a BOUND VALUE in a fixed shape → both go LIVE in "Corner (data)". Ship the
+  `travelApproach` (+ probeZFirst) GUI control + Blockly round-trip HERE (once live). Also fix the latent `relTo` anchor shift under probeZFirst.
 - **③ FOLLOW-UP — stock-datum integration (B1b GATE):** wire the stock-datum coord (PlaceOnStock / "sits at WCS") to the corner op so the
-  reposition DEFAULT + the B3 drag become datum-relative (the LOCKED-MODEL TARGET; interim = signed-travelDist / wall-1-relative today).
-  Also cures the B3 caveat (handle renders at world 0,0 when unset → renders at the true wall once the datum resolves).
-- **④ inc C — VERIFY + RELEASE:** all dims end-to-end (EMIT · SIM · LAYOUT+DRAG · Probe-Z-First · auto/manual travel) + full suite green.
-  Release when verified (merge to main + version bump → pages.dev + exe). Closes the FIRST full wizard-as-data port that REPLACES its built-in.
+  reposition DEFAULT + the B3 drag become datum-relative (interim = signed-travelDist / wall-1-relative today). Cures the B3 (0,0) handle caveat.
+- **④ inc C — VERIFY + RELEASE:** all dims end-to-end + full suite green → merge to main + version bump → pages.dev + exe. Closes the FIRST
+  full wizard-as-data port that REPLACES its built-in.
 
 ---
 
 ## ⏸️ PAUSED — B-TRANS / middle (all SHIPPED work is on MAIN up to V10.49; resume later)
-- the **`#53` / probe-calc SIM fix** · the **AUTO second-transition (→③) diagonal still hard-coded** · inc2b · B-TRANS canvas rollout · full-suite re-run to confirm V10.49.
+- `#53`/probe-calc SIM fix · AUTO second-transition (→③) diagonal still hard-coded · inc2b · B-TRANS canvas rollout · full-suite re-run to confirm V10.49.
 
 **REFS:** `WIZARD-PORTING-MAP.md` · `SPATIAL-MODEL-SPEC.md` · `TRAVEL-START-SPEC.md` · `MIDDLE-PROBE-BACKLOG.md`.
