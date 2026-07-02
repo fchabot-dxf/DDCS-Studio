@@ -4779,3 +4779,56 @@ start handle (#21/#22, gated + datum-anchored to zsurf, non-degenerate default) 
 never emits) + the wall-2 reposition (4a). The B3 (0,0) handle is cured for both reposition handles (each datum-anchored).
 Handle model realized: 2 off (sim-only first-start + wall-2 reposition) / 3 on (+ wall-1 start). REMAINING for corner parity:
 corner/probeSeq value-bindings (sign/order, not prune) → ④ VERIFY + release (retire the built-in; level's baked-final).
+
+---
+
+## 🔨 turn 55 (cycle 11) — corner/probeSeq: the "plain value-binding" premise DOESN'T HOLD (empirically) — SURFACING a mechanism gate. ⏸ PASS BACK.
+
+③ reviewed CLEAN (milestone). Dispatched corner/probeSeq as "plain value-bindings, NOT guards." Before building I EMPIRICALLY
+diffed cornerStack across the params (throwaway spec, deleted) — and the premise breaks. Surfacing rather than guessing.
+
+### EMPIRICAL FINDINGS (the actual emit diffs)
+- **corner (FL→FR)** is a set of SOCKET-VALUE swaps + text — NO reshape (no line add/remove/reorder): probe var `#8↔#7`,
+  retract `#9↔#10`, radiuscomp dir `+↔−` (`#102=[#1925±#6]`), reposition `#23=#16↔#15` + the header/prompt/footer TEXT. So
+  corner IS "value-swap-shaped" — BUT the swaps are DERIVED from the quadrant (xDir/yDir → which var/sign), not a raw
+  param→socket copy.
+- **probeSeq (YX→XY)** is a REORDER of the two probe-wall blocks, which are INHERENTLY DIFFERENT shapes: the X-wall saves to the
+  WCS base (`#[#70]=#102`), the Y-wall saves to base+1 via an EXTRA `#73=[#70+1]` + `#[#73]=#101`. So swapping the order
+  REORDERS differently-sized blocks (+ the `#23/#24` reposition sign swap + step-label text). NOT a value swap.
+- **They INTERACT:** corner sets xDir/yDir; probeSeq sets which axis is first; `probeWall(firstAx, firstDir)` content is a
+  function of BOTH → 4 corners × 2 sequences = 8 distinct arrangements (not two independent 1-D bindings).
+
+### WHY "plain value-binding" doesn't fit
+`instantiate` substitutes the RAW param into a socket (`blk.params[key] = p[b.param]`) — there is NO derive step and NO reorder.
+So: (a) corner's DERIVED swaps can't come from a raw copy (the user picks the QUADRANT, not the signs); (b) probeSeq's REORDER
+of inherently-different blocks isn't a socket value at all. Neither is a plain value-binding. (This matches the turn-30 scout,
+which deferred corner/probeSeq as "value-bindings LATER" — they're the hard ones.)
+
+### OPTIONS (mechanism fork — none is a "plain value-binding")
+- **(A) GUARD (the proven wcs 7-way pattern), combined corner×probeSeq (8-way) on the probe region.** Byte-EXACT, no built-in
+  change, no new mechanism — the established M2 superset (inert data pruned per build). Cost: a bigger superset (~8× the probe
+  region) + it CONTRADICTS your "not a guard." But given probeSeq genuinely reshapes (reorder) + the interaction, a guard is the
+  natural fit that handles the swaps + reorder + text uniformly.
+- **(B) RESTRUCTURE cornerStack → clean value-bindings (the north-star: keep the data-def DUMB, restructure the source).** (i)
+  make the two probe-wall blocks SYMMETRIC — X saves via `#73=[#70+0]` + `#[#73]=#102` like Y's `#73=[#70+1]` — so probeSeq
+  becomes a VALUE swap (swap the axis/var/offset), not a reorder; (ii) express the probe DIRECTIONS as socket values a
+  corner-driven binding sets (needs a small COMPUTED-binding mechanism: `spec.derive(params)→value`, since the sign is derived
+  from the quadrant). Result = corner/probeSeq ARE clean value-bindings (your intent). Cost: a BYTE-VISIBLE shared-cornerStack
+  change (the X-save gains a `#73` line) → HUMAN SIGN-OFF (like the accepted #17 fan-out) + re-run every cornerStack spec + the
+  new `derive` mechanism.
+- **(C) HYBRID:** corner via a `derive` computed-binding (its swaps ARE socketable) + probeSeq via a 2-way guard (its reorder
+  isn't). Mixes the two mechanisms; smaller than (A); still one guard + one new mechanism.
+
+### RECOMMENDATION → **(B) restructure** — it delivers your stated INTENT (clean value-bindings, not more guards), follows the
+north-star (dumb data-def, restructure source), and the byte-visible cost is the same class as the blessed #17 fan-out. The
+`derive` mechanism is small + reusable (any future computed socket). If you'd rather stay byte-exact + touch NOTHING in the
+built-in, (A) the 8-way guard is the pragmatic proven fallback. (C) is the middle path.
+
+### ⏸ GATE — pick the mechanism before I build (+ the byte-visible sign-off if B):
+1. (A) 8-way guard [byte-exact, no sign-off, bigger superset, = "a guard"] · (B) restructure→value-bindings [north-star,
+   byte-VISIBLE → human sign-off, + a small `derive` mechanism] · (C) hybrid [corner derive + probeSeq guard].
+2. If (B)/(C): confirm the byte-visible cornerStack restructure (symmetric X-save) is OK to touch the SHARED built-in (human
+   sign-off), + bless the `spec.derive(params)` computed-binding mechanism.
+
+NOT building — the "plain value-binding" doesn't fit (empirically); passing back the corrected premise + the fork. Then ④ VERIFY
++ release (level stays baked-final — carried forward, not relitigated).
