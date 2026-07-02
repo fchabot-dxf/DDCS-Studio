@@ -4832,3 +4832,44 @@ built-in, (A) the 8-way guard is the pragmatic proven fallback. (C) is the middl
 
 NOT building — the "plain value-binding" doesn't fit (empirically); passing back the corrected premise + the fork. Then ④ VERIFY
 + release (level stays baked-final — carried forward, not relitigated).
+
+---
+
+## 🔨 turn 57 (cycle 11) — A (8-way guard) ACCEPTED + executing; but designing it revealed A's TRUE scope (release-risk relevant). Concise heads-up + build plan. ⏸ PASS BACK.
+
+A is the right call (reuse the proven guard/prune, zero built-in risk) — no argument. Executing it, I mapped exactly what the
+corner×probeSeq guard touches against cornerStack's EXISTING guards (probeZ/ta/wcs) + the bound sockets. Two scope facts that
+weren't in the "clean 8-way, no new mechanism" picture — surfacing because you weighed A/B specifically on MINIMAL pre-release
+regression surface, and these change that estimate. NOT re-litigating A; confirming HOW to land it.
+
+**Fact 1 — the bound reposition sockets need an internal binding-derivation fix.** #21/#22/#23/#24 (startX/startY/cross1_x/_y)
+have combo-DEPENDENT defaults (own/opp = #15/#16 per corner×probeSeq), so the 8-way guard DUPLICATES them 8× in the superset →
+`deriveBindingsFor(superset)` throws (>1 match) at CORNER_BINDINGS load. FIX (small, internal, opt-in): compute CORNER_BINDINGS
+over a CANONICAL PRUNED stack (probeZFirst:1 · FL · YX → 1× each socket) instead of the raw superset, + a validateUserOp
+tolerance (skip the frozen-blockIndex check for a `bindingSpecs` def — the specs re-derive + validate at build). Emit is
+unaffected (instantiate already re-derives over the PRUNED stack). This is the same class as `optional`/`withGuardDefaults` — I'll
+just do it; noting it because A was pitched as "no new mechanism" and this is a (tiny) binding-machinery change.
+
+**Fact 2 — the TEXT guard is COMBINATORIAL (inert, but large).** corner/probeSeq interpolate into comments that ALSO depend on
+probeZ/wcs. The header is ALREADY guarded probeZ×wcs = 14 blocks (4a/4c); adding corner (name + dir labels) → **corner×probeZ×wcs
+= 56** header comment variants. Prompt → corner×probeZ = 8; footer → 4; step-axis → probeSeq×probeZ. Plus the probe region 8-way
+(directions/order) with the wcs save-note (7) nested → redundant multiplication. Net: a MUCH larger inert template (est. several
+hundred lines, pruned to ~70/build). It WORKS byte-exact + is CONSISTENT with the wcs precedent (inert data pruned per build) —
+just bigger. No new mechanism.
+
+**MY PLAN (recommended — pure guard, release-safe):** build the 8-way corner×probeSeq guard (nested corner-guard × probeSeq-guard,
+reusing whenOk; CORNER_DEFAULTS corner/probeSeq → string 'FL'/'YX' like wcs; corner/probeSeq as enum structural bindings) across
+the functional blocks + the (combinatorial) text; resolve Fact 1 with the canonical-prune + validateUserOp tolerance; retire
+corner/probeSeq from the baked-frontier (level untouched); HARDENED 8-combo spec pinning each combo's derived values (probe var
+7/8, retract 9/10, radiuscomp dir, reposition target, text) vs an INDEPENDENT truth table + mutation. No new user-facing mechanism.
+
+**ALTERNATIVE (only if the large inert text template bothers you):** guard the FUNCTIONAL parts 8-way + fill the corner-derived
+TEXT via the planned KIND-A interp (a small declared `{corner}/{xdir}/{axis}` placeholder fill at instantiate) → NO text
+combinatorial, smaller template — but that IS a new mechanism (the thing you steered away from with B), + regression surface.
+
+### ⏸ CONFIRM (quick — then I build immediately):
+1. Proceed with the **pure guard** (my plan: accept the large inert combinatorial text template + the internal canonical-prune/
+   validateUserOp fix for the bound sockets, no new mechanism) — RECOMMENDED for release-safety? Or the interp alternative?
+2. (If pure guard) the canonical-prune + validateUserOp tolerance are internal binding-derivation tweaks — bless / any concern?
+
+Ready to build the moment you confirm. (Signed 57; premise-verification-before-build, as you've valued.)
