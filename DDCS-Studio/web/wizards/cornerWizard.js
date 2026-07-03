@@ -27,9 +27,10 @@ const AX = {
 const WCS_BASE = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
 
 // corner → probe directions (FL=X+Y+ FR=X−Y+ BL=X+Y− BR=X−Y−). ONE source read by cornerStack's concrete xDir/yDir, the
-// ③b superset forks (cornerFork/csFork/axesOf), AND the sim-marker reposition helper (cornerReposOffsets) — so a quadrant
-// edit can't desync the emit and the preview. (Hoisted to module scope so the sim helper shares the SAME geometry.)
-const dirsOf = (c) => ({ FL: ['+', '+'], FR: ['-', '+'], BL: ['+', '-'], BR: ['-', '-'] }[c] || ['+', '+']);
+// ③b superset forks (cornerFork/csFork/axesOf), the sim-marker reposition helper (cornerReposOffsets), AND the sim-marker
+// per-corner BASE flip (cornerData's provider, t109 prefill) — so a quadrant edit can't desync the emit and the preview.
+// EXPORTED so the sim provider mirrors the frac anchor to the RIGHT corner using the SAME sign source. (Hoisted to module scope.)
+export const dirsOf = (c) => ({ FL: ['+', '+'], FR: ['-', '+'], BL: ['+', '-'], BR: ['-', '-'] }[c] || ['+', '+']);
 // The two walls in the chosen probe order (per corner×probeSeq): fA/fD = first-wall axis+dir, sA/sD = second-wall axis+dir.
 const axesOf = (c, seq) => { const [xd, yd] = dirsOf(c); return seq === 'YX' ? { xd, yd, fA: 'Y', fD: yd, sA: 'X', sD: xd } : { xd, yd, fA: 'X', fD: xd, sA: 'Y', sD: yd }; };
 

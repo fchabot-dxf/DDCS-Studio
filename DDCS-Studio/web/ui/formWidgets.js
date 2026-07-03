@@ -50,7 +50,13 @@ function numberWidget(host, b) {
     const src = (b.sourceField && typeof window !== 'undefined' && window.ddcsProbeSrc) ? window.ddcsProbeSrc(b.sourceField) : null;
     if (src) { inp.disabled = true; inp.style.opacity = '.5'; inp.title = `From the controller (${src.pr || src.label || 'register'}) — change in Settings ▸ Probes`; }
     host.append(labelSpan(b), inp);
-    return { read: () => ({ [b.param]: numOr(inp.value, b.default ?? 0) }) };
+    // t109 — an EXPRESSION-HOLDING socket (b.default is a #var/expression STRING, not a number — e.g. corner's reposition
+    // #21-#24, which default to a PER-CORNER signed-travelDist expression) must NOT inject a value when the user hasn't
+    // typed one: returning the FL-canonical default STRING would override the per-corner pruned socket (the dog-leg would
+    // stay FL for every corner). So an untouched field whose default is non-numeric is OMITTED → `param in params` is false
+    // → instantiate keeps the socket's own per-corner expression (matches CORNER_DEFAULTS deliberately omitting these). A
+    // typed number (or a drag literal) is a real override and passes through. Numeric-default fields are unchanged.
+    return { read: () => { const v = numOr(inp.value, b.default ?? 0); return Number.isFinite(v) ? { [b.param]: v } : {}; } };
 }
 
 function sliderWidget(host, b) {

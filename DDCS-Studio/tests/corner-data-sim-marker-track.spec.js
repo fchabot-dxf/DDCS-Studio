@@ -43,11 +43,14 @@ test('(1) sim markers chain off their anchor by the reposition — both probeZ s
   at(r.onFL[0], 7, 7, 'Z-on zsurf frac lead');
   at(r.onFL[1], 7, -43, 'Z-on wall1 = zsurf + (0,-50) — TRACKS zsurf (X aligned), not the old disconnected (20,-50)');
   at(r.onFL[2], -43, 7, 'Z-on wall2 = wall1 + (-50,+50)');
-  // Z-ON BR/XY (combo — advisor: not just FL/YX): dirsOf(BR)=[-,-]; XY → fA=X,fD=- → start(+50,0); #23=own(-)=-50,#24=opp(-)=+50.
-  // zsurf=(7,7); wall1 = zsurf + (+50,0) = (57,7); wall2 = wall1 + (-50,+50) = (7,57).
+  // Z-ON BR/XY (combo — advisor: not just FL/YX). PREFILL FIX (t109): the zsurf frac anchor now FLIPS to the BR corner
+  // (dirsOf(BR)=[-,-] → base = (sx-7, sy-7) = (93,73)), so the whole chain sits at the RIGHT corner (was canonical-FL (7,7)
+  // → the sim probe fired into empty space). XY → fA=X,fD=- → start(+50,0); #23=own(-)=-50,#24=opp(-)=+50 → cross(-50,+50).
+  // zsurf=(93,73); wall1 = zsurf + (+50,0) = (143,73) (outside the x=100 wall); wall2 = wall1 + (-50,+50) = (93,123) (outside y=80).
   expect(r.onBRXY.length).toBe(3);
-  at(r.onBRXY[1], 57, 7, 'BR/XY wall1 = zsurf + (+50,0)');
-  at(r.onBRXY[2], 7, 57, 'BR/XY wall2 = wall1 + (-50,+50)');
+  at(r.onBRXY[0], 93, 73, 'BR/XY zsurf FLIPS to the BR corner (base sx-7,sy-7), NOT canonical-FL (7,7)');
+  at(r.onBRXY[1], 143, 73, 'BR/XY wall1 = zsurf + (+50,0) — outside the x=100 wall');
+  at(r.onBRXY[2], 93, 123, 'BR/XY wall2 = wall1 + (-50,+50) — outside the y=80 wall');
 
   // marker-to-anchor PROXIMITY (the advisor's live check): under Z-first, wall1 sits exactly travelDist(50) from zsurf via
   // the reposition — NOT the old ~58u disconnected jump.

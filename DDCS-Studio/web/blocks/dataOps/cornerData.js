@@ -40,7 +40,7 @@
  * Template SEEDED from cornerStack(CORNER_DEFAULTS); the BINDINGS are derived + proven byte-identical by
  * tests/corner-data-emit.spec.js. SCOPE (inc B1) = EMIT only — no view/panel (B3), no sim-starts/inferStarts (B2).
  */
-import { cornerStack, cornerReposOffsets } from '../../wizards/cornerWizard.js';
+import { cornerStack, cornerReposOffsets, dirsOf } from '../../wizards/cornerWizard.js';
 import { userOpFromStack, simStartsToBlocks, flattenBlocks } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards, whenOk } from '../whenGuard.js';   // ③b — derive CORNER_BINDINGS over a CANONICAL-pruned stack (the 8-way corner×probeSeq guard duplicates the bound sockets in the raw superset)
@@ -133,7 +133,15 @@ function cornerSimStartsProvider(params, stock) {
     const real = prov(p, stock);                              // the whenOk-filtered SET — correct emits + z + count
     const zsurf = prov({ ...p, probeZFirst: 1 }, stock)[0];   // the zsurf FRAC (force it present) = the chain anchor, both states
     const off = cornerReposOffsets(p);
-    const xy = { zsurf: { x: zsurf.x, y: zsurf.y } };
+    // PREFILL FIX (t109) — the frac anchor is CANONICAL-FL (fx/fy measured from the origin = the FL corner); for a non-FL
+    // corner it must FLIP to the RIGHT corner or the whole chain (+ the machine-faithful passEnds relocation that rides it)
+    // sits at FL → the sim probe fires into EMPTY SPACE. Mirror the inset to the corner's side using dirsOf — the SAME
+    // per-corner sign source the emit uses (cornerReposOffsets/axesOf) → one geometry, can't desync. FL (xd/yd '+') → no flip
+    // → BYTE-IDENTICAL. Far-X corner (FR/BR, xd '−') mirrors to sx − inset; far-Y (BL/BR, yd '−') to sy − inset. Preview-only.
+    const cornerId = ({ 1: 'FL', 2: 'FR', 3: 'BL', 4: 'BR', FL: 'FL', FR: 'FR', BL: 'BL', BR: 'BR' }[p.corner]) || 'FL';
+    const [xd, yd] = dirsOf(cornerId);
+    const sx = Number(stock && stock.x) || 100, sy = Number(stock && stock.y) || 80;
+    const xy = { zsurf: { x: xd === '-' ? sx - zsurf.x : zsurf.x, y: yd === '-' ? sy - zsurf.y : zsurf.y } };
     xy.wall1 = { x: xy.zsurf.x + off.wall1.dx, y: xy.zsurf.y + off.wall1.dy };
     xy.wall2 = { x: xy.wall1.x + off.wall2.dx, y: xy.wall1.y + off.wall2.dy };
     const ids = CORNER_SIM_STARTS.filter((r) => whenOk(r.when, p)).map((r) => r.id);

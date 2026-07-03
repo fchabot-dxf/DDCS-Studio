@@ -42,8 +42,8 @@ test('reposition handle renders at anchor+evaluated-offset (the destination), un
 
   // INDEPENDENT TRUTH (hand-derived, td=50): FL/YX → anchor wall1(7,-43) + cross(#23=-50,#24=+50) = wall2 (-43, 7).
   expect(near(r.fl.h.x, -43) && near(r.fl.h.y, 7), `FL/YX handle at wall2 (-43,7), got (${r.fl.h.x},${r.fl.h.y})`).toBe(true);
-  // BR/XY → anchor wall1(57,7) + cross(-50,+50) = wall2 (7, 57).
-  expect(near(r.br.h.x, 7) && near(r.br.h.y, 57), `BR/XY handle at wall2 (7,57), got (${r.br.h.x},${r.br.h.y})`).toBe(true);
+  // BR/XY (prefill t109 — base FLIPS to the BR corner) → anchor wall1(143,73) + cross(-50,+50) = wall2 (93, 123).
+  expect(near(r.br.h.x, 93) && near(r.br.h.y, 123), `BR/XY handle at wall2 (93,123), got (${r.br.h.x},${r.br.h.y})`).toBe(true);
 
   // ONE-SOURCE cross-check: the handle sits EXACTLY on the wall-2 sim marker (both chain via cornerReposOffsets).
   expect(near(r.fl.h.x, r.fl.wall2.x) && near(r.fl.h.y, r.fl.wall2.y), 'FL/YX handle coincides with the wall-2 sim marker').toBe(true);
