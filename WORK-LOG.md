@@ -5850,3 +5850,24 @@ Surgical: 2 files deleted + 3 edited (globalFunctions, index.html, app.js). COMM
 **NO-COUPLING = a DRAG-STORAGE-MODEL change (design, gate-worthy):** to make each marker independent, either (A) store each marker as a WORLD (or its-own-corner-datum-relative) position + DERIVE the incremental #21-#24 at emit (each marker = a fixed stock spot; coherent + PRESERVES t107 since marker2 still displays at passEnds[wall1] + the derived cross; AND this naturally satisfies the dispatch's bug-1 "datum-relative → re-anchor on corner change"), or (B) cascade-recompute the downstream offsets on an upstream drag. Both are emit-affecting on the drag path (the dispatch anticipated this) + interact with t107 (machine-faithful) + bug-1 (re-anchor). This unifies the dispatch's bug-1 (re-anchor) + the human's no-coupling into ONE model: per-marker datum-relative position, derived incremental emit.
 
 **PASSED BACK for the advisor to reconcile the plan (human authority: all-independent, not marker2-rides) + dispatch the coherent per-marker-independent build.** No code this turn (correctly did not unilaterally re-architect the drag/emit model against the standing plan).
+
+## 🔨 turn 118 (cycle 11) — CORNER-MARKER INDEPENDENCE (Option A) CONCRETE DESIGN + a ONE-SOURCE refinement question (no code — highest-risk re-arch, byte-parity HARD GATE; passing back for a quick design bless before the large diff). Suite untouched.
+
+**CONSOLIDATED CURRENT MODEL (from t107/t109/t114):**
+- Sim-only first-start (pass-0): `userStarts[0]` = ABSOLUTE world (createPreviewPanel; onStartDrag writes it).
+- Emitting handles #21/#22 (wall-1 start, relTo:'zsurf') + #23/#24 (wall-2 reposition, relTo:'wall1'): stored as INCREMENTAL G91 deltas. The Layout drag (panelTypes point-widget) writes `cross1_x = world − anchor` where anchor = the trace's `passEnds[wall1]` (t107). UNDRAGGED → socketHeld (t114) → the field is empty → the per-combo SOCKET EXPRESSION holds → byte-identical.
+- The coupling: #23/#24 is a FIXED increment, so when M1 (wall1) moves, `passEnds[wall1]` moves → M2 = passEnds[wall1] + fixed-cross RIDES M1.
+
+**CONCRETE OPTION A (declare spots / derive deltas) — sound + byte-parity-safe:**
+- **Spot store** (per-op, per-marker): each corner-datum marker (sim-only-first-start · #21/#22 · #23/#24) stores a DATUM-RELATIVE spot = `{dx,dy}` off the CORNER datum (cornerXY), or UNSET. World = cornerXY + {dx,dy} → re-anchors on a corner change for free (SUBSUMES the t143 re-anchor).
+- **Drag** → set the dragged marker's spot = W − cornerXY; CAPTURE all other currently-UNSET corner-datum markers' spots (freeze them at their current world) → after any drag the whole set is independent.
+- **Derive** (per render): a marker WITH a spot → its increment = (cornerXY + spot) − its planned anchor [#21/#22: − zsurf; #23/#24: − passEnds[wall1]] → write the form field. UNSET → leave empty → the socket expression.
+- **Byte-parity GATE:** undragged (all unset) → all fields empty → the socket expressions → BYTE-IDENTICAL. ✓ (only a drag writes a literal).
+- **Independence:** drag M1 → M1_spot changes + M2_spot frozen → M2's cross1_x re-derives = (cornerXY+M2_spot) − new_passEnds[wall1] → M2 STAYS at its world. Drag M2 → M1_spot frozen → M1 stays. ✓ both directions.
+- **t107 preserved:** M2 still renders at passEnds[wall1] + derived-cross = M2_spot's world. ✓.
+
+**⚠ ONE-SOURCE REFINEMENT (the design question):** the dispatch says "derive the increments AT EMIT (in the builder)." But `passEnds[wall1]` (the planned END) needs the probe+retract+lift COLLISION geometry — which the TRACE already computes (getPassEnds, t107). Deriving IN THE BUILDER would DUPLICATE the collision as a 2nd path (a one-source violation — the exact anti-pattern this campaign fights). RECOMMEND: derive in the PANEL/render layer using the TRACE'S passEnds (ONE source), and WRITE the resulting increment to the form field → the EMIT is UNCHANGED (byte-parity trivial; the .nc still emits the derived G91 increment — the OUTPUT the dispatch wants). Same result, no duplicated geometry. Confirm: panel-derive-using-trace-passEnds (one-source) vs literal in-builder derive?
+
+**SCOPE (large, highest-risk):** createPreviewPanel (userStarts → datum-relative spot store + the sim-only first-start), panelTypes (Layout drag → store spot + capture-others + derive), userOpView (wire the store), the datum-relative re-anchor, probeZ-ON (zsurf→wall1→wall2 chain) AND probeZ-off (sim-only wall1→wall2). Emit UNCHANGED (via panel-derive).
+
+**PASSED BACK for a quick design bless (panel-derive one-source refinement + the capture-on-drag semantic) before committing the large diff you'll fan-out review anyway. Ready to build on confirm. NO code this turn (did not commit a large highest-risk diff on an unresolved one-source fork).**
