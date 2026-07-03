@@ -36,11 +36,12 @@ test('corner travelApproach: AUTO = G0 move, MANUAL = #1505 jog prompt — both 
   expect(r.auto, 'auto: NO manual reposition prompt').not.toMatch(/repositioned|Jog clear/i);
   expect(r.autoExplicit, 'explicit travelApproach:auto is byte-identical to the default').toBe(r.auto);
 
-  // MANUAL — the move is GONE, replaced by the #1505 jog prompt + ESC guard; the drop #18 (→scan depth) REMAINS.
+  // MANUAL (probeZ-off) — the move is GONE, replaced by the #1505 jog prompt + ESC guard. Z-TRUST (t102): NO auto-drop after
+  // the jog (the operator RE-JOGS Z — never auto-adjust after a human jog), AND no wall-1 pre-plunge → NO `G0 Z#18` at all.
   expect(r.manual, 'manual: the auto reposition move is GONE (operator jogs) — no X#23 leg, no diagonal').not.toMatch(/^G0 X#23( Y#24)?$/m);
   expect(r.manual, 'manual: the #1505 jog-and-wait prompt appears with the corner instruction').toMatch(/#1505=1 \( Jog clear, around to the next wall\. Press Enter \)/);
   expect(r.manual, 'manual: the ESC/cancel guard jumps to corner end label 2').toMatch(/IF #1505==0 GOTO2/);
-  expect(r.manual, 'manual: still drops #18 back to scan depth for probe-2 (Z-state mirrors auto)').toMatch(/^G0 Z#18$/m);
+  expect(r.manual, 'manual (probeZ-off): Z-TRUST — NO G0 Z#18 (no wall-1 pre-plunge + no auto-drop after the jog; operator sets Z)').not.toMatch(/^G0 Z#18$/m);
   expect(r.manual, 'manual: the #23 cross assign still emits (inert dead assign, not gated)').toMatch(/^#23=/m);
   expect(r.manual, 'manual: the #24 cross assign still emits').toMatch(/^#24=/m);
   expect(r.manual, 'manual differs from auto (the toggle actually swaps the block shape)').not.toBe(r.auto);

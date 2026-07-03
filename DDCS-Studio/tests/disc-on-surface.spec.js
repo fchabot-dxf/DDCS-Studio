@@ -32,8 +32,11 @@ test('comped probe discs nudge onto the wall (corner X/Y) by ±the tip radius; e
     viz._anchorToStart = true; viz.resetProbe && viz.resetProbe();
     const probeAxis = (raw) => { const m = /G31\s+([XYZ])/i.exec(raw || ''); return m ? m[1].toLowerCase() : null; };
     let pendingProbe = null;
+    // Z-TRUST (t102): probeZ-off no longer pre-plunges, so the wall probe fires AT the operator's start Z. The operator jogs
+    // to a real probe height WITHIN the stock (the old code reached z=-5 via the plunge from safeZ); drive the sim from that
+    // jogged probe height so the horizontal probe crosses the wall (inferStart's z=safeZ is the old hover-above-and-plunge Z).
     const e = new GcodeExecutionEngine({
-      autoAnswer: true, stock, stockOffset: w.inferStart(p, stock),
+      autoAnswer: true, stock, stockOffset: { ...w.inferStart(p, stock), z: -5 },
       onLineChange: ({ raw }) => {
         if (pendingProbe && viz.probeAxisTouched) viz.probeAxisTouched(pendingProbe, e.feedVal); pendingProbe = null;
         if (raw) { const pa = probeAxis(raw); if (pa) pendingProbe = pa; }

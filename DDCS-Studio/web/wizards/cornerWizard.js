@@ -262,14 +262,25 @@ export function cornerStack(params = {}, opts = {}) {
     // could clip the corner. firstAxis = the SECOND wall's axis (ax.sA) routes it AROUND the outside corner (see the
     // safeTraverseStack SAFE DOG-LEG note). Geometry-aware per corner×probeSeq (sA from axesOf), forked in csFork so the
     // twin's superset + the built-in pick the same order per combo → byte-parity holds. (manual ignores firstAxis.)
-    const repoTraverse = (comment, approach, firstAxis) => safeTraverseStack({
-        mode: 'seq', crossX: '#23', crossY: '#24', drop: '#18', comment, approach, firstAxis,
-        promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, drop #18 to scan depth (mirrors auto) — no lift (already at #17)
+    const repoTraverse = (comment, approach, firstAxis, drop) => safeTraverseStack({
+        mode: 'seq', crossX: '#23', crossY: '#24', drop, comment, approach, firstAxis,
+        promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, then drop (only when a drop is passed — see repoArmR)
     });
-    const repoArmR = (z, sA) => taPair(() => repoTraverse(repoLbl(z, sA), 'auto', sA), () => repoTraverse(repoLbl(z, sA), 'manual', sA));
+    // Z-TRUST (③ wall-1 Z frame, human-approved): the reposition drop #18 returns the tool to the probing depth. AUTO always
+    // drops (round-trips to the wall-1 jogged depth). MANUAL drops only when probeZFirst is ON (a real measured Z reference);
+    // when probeZ is OFF the operator RE-JOGS Z at the prompt, so we NEVER auto-adjust after a human jog → no drop. Per-arm
+    // scoping rides the existing zPairR fork below (repoArmR is called once per probeZ state → z is known here).
+    const repoArmR = (z, sA) => taPair(
+        () => repoTraverse(repoLbl(z, sA), 'auto', sA, '#18'),
+        () => repoTraverse(repoLbl(z, sA), 'manual', sA, z ? '#18' : undefined),
+    );
     S.push(...csFork((c, s, ax) => [
         ...zPairR([mkC(firstLbl(true, ax.fA))], [mkC(firstLbl(false, ax.fA))]),
-        mkMV('Z', '#18'),                          // plunge to scan depth
+        // Z-TRUST: the wall-1 pre-probe plunge is emitted ONLY when probeZFirst is ON (the tool is lifted to safe-Z after the
+        // Z→wall1 traverse, so it must plunge to reach the wall). When probeZ is OFF the operator jogged straight to the probe
+        // height → NO plunge, go STRAIGHT to G31 (trust the jog). Gated via zOnlyR so the twin's superset prunes it away on the
+        // OFF leaf too (a bare `if(probeZ)` would leave the superset emitting it → twin≠built-in for OFF).
+        ...zOnlyR([mkMV('Z', '#18')]),             // plunge to scan depth (probeZ ON only)
         ...probeWallR(ax.fA, ax.fD),
         ...zPairR(repoArmR(true, ax.sA), repoArmR(false, ax.sA)),
         ...zPairR([mkC(secondLbl(true, ax.sA))], [mkC(secondLbl(false, ax.sA))]),

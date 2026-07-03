@@ -5726,3 +5726,23 @@ Surgical: 2 files deleted + 3 edited (globalFunctions, index.html, app.js). COMM
 **WORKFLOW VERIFICATION (2 adversarial verifiers on the design):** emit-motion SURVIVES_WITH_CAVEAT (both walls at jogged_Z + safer dog-leg + probeZ-ON byte-identical CONFIRMED; 3 constraints folded in: zOnlyR gating, per-arm manual scoping, Fork→A). sim-frame-tension REFUTED my naive prevEnd-swap → corrected to the bridge line (kept the START anchor for the probe; the swap would have re-introduced the +cross-beyond-② disconnect). Both verdicts + the exact offset math are in the design above.
 
 **GATE:** NO code this turn (real machine motion — designed only). PASS BACK for advisor + human review of the design (esp. the Fork→A recommendation + the manual-OFF re-jog note + the bridge-line sim fix) BEFORE building.
+
+## 🔨 turn 102 (cycle 11) — Z-TRUST EMIT INCREMENT (Option A, human-confirmed). REAL MACHINE MOTION, byte-parity-AFFECTING. Suite green (496 passed, 0 failed, 498 total; new corner-z-trust spec mutation-proven). COMMITTED (not pushed). ⏸ PASS BACK with the byte-DIFF for advisor+human review BEFORE final.
+
+**THE CHANGE (cornerWizard.js — 2 gates, probeZ OFF only; probeZ ON UNCHANGED):**
+- **(1) wall-1 plunge gated on probeZFirst via `zOnlyR`:** `mkMV('Z','#18')` (:272, was unconditional) → `...zOnlyR([mkMV('Z','#18')])`. probeZ-off → NO plunge → wall-1 goes STRAIGHT to G31 at the jogged height. **zOnlyR (NOT a bare if)** so the twin's SUPERSET prunes it on the OFF leaf too → twin==built-in.
+- **(2) reposition drop threaded per-arm (via the existing zPairR):** `repoTraverse` now takes `drop`; `repoArmR` passes AUTO→`'#18'` always; MANUAL→`z ? '#18' : undefined`. So probeZ-ON manual KEEPS its drop (ON's wall-2 descends only via it), AUTO-OFF KEEPS its drop (round-trips to jogged_Z), and only probeZ-OFF MANUAL drops the drop (the operator re-jogs Z).
+
+**BYTE-DIFF (the emitted .nc — for human review):**
+- **probeZ-OFF AUTO:** −1 line — the wall-1 `G0 Z#18` plunge before its first G31 is GONE (straight to G31). The reposition drop `G0 Z#18` REMAINS.
+- **probeZ-OFF MANUAL:** −2 lines — the wall-1 plunge AND the post-jog reposition drop (`G0 Z#18`) are GONE.
+- **probeZ-ON (auto + manual):** BYTE-IDENTICAL (0 change — the plunge + both drops stay; the tool is lifted after the Z-surface, so it must plunge).
+- **probe-surface-block CORNER_GOLDEN (regen):** combos 0 (FL/XY/noZ) + 3 (BL/YX/noZ) each −1 line (`G0 Z#18`); combos 1,2 (probeZ:true) BYTE-IDENTICAL. Old↔new diff proven = ONLY the wall-1 plunge removal on the noZ combos.
+
+**NET MACHINE MOTION (probeZ-off):** the tool no longer plunges safeZ+scanDepth below the jog before probing — it probes AT the operator's jogged height (BOTH walls, AUTO). The auto dog-leg travels at jogged_Z+#17 = the HIGHEST point in the cycle (STRICTLY SAFER than today's OFF dog-leg, which ran at scan depth THROUGH material). MANUAL-off: the operator re-jogs Z at each wall (no auto-adjust after a human jog). Error handler over-lifts +#17 on a fail (higher=safer, benign, un-gated).
+
+**VERIFY (assert-the-value + mutation-proven):** new `corner-z-trust.spec.js` pins (1) probeZ-off wall-1 G31 has NO preceding Z move [Mut M1 un-gate plunge → 'G0 Z#18' precedes it → RED]; (2) probeZ-ON wall-1 G31 IS preceded by `G0 Z#18` (unchanged); (3) twin==built-in byte-for-byte across the probeZ×travelApproach 2×2; (4) probeZ-off MANUAL has NO `G0 Z#18` at all [Mut M2 off-manual always-drop → RED] + AUTO-OFF drop REMAINS. Lockstep golden updates: probe-surface-block CORNER_GOLDEN (regen) + corner-travel-approach (manual-off no-drop). **Full suite 496 passed, 0 failed** (497 prior + 1 new).
+
+**⚠ SIM CONSEQUENCE FLAGGED (for the machine-faithful sim increment, NOT this one):** the corner's SIM `inferStart` returns `z: safeZ` (:354 — the OLD hover-above-and-plunge model). Under Z-trust the sim's wall probe now fires AT that Z, which is ABOVE the wall for probeZ-off (the old plunge reached z=-5, within the stock). So the LIVE preview would show the probeZ-off wall probe firing above the wall. I fixed the `disc-on-surface` test TEST-ONLY (drive from a within-stock jogged probe height z=-5 → discs land on the wall, 4 discs ~2mm off, mechanism intact) — but the PROD sim inferStart-z is a real Z-trust sim consequence: the operator-start Z should reflect the jogged probe height (probeZ-off), a co-item for the machine-faithful sim increment (alongside the dog-leg-from-END / marker2-at-END+delta / END-relative-drag).
+
+**Surgical:** 1 emit source (cornerWizard.js) + 1 new spec + 3 lockstep test updates (golden regen, manual-off assertion, disc-on-surface driver-Z). COMMITTED, NOT pushed. ⏸ PASS BACK the byte-diff for advisor+human confirm BEFORE final. Then: the machine-faithful sim.
