@@ -184,41 +184,41 @@ export function inlineFields(def) {
 
 /** One Blockly JSON block def from an op def. */
 function jsonDef(def) {
-    const args = [];
-    let message = def.label, n = 0;
+    const isSection = def.kind === 'section';
+    const args0 = [];
+    // t146 — HEADER ROW (message0): the block's label + its inline fields. Statement-input MOUTHS go on their OWN rows
+    // BELOW (message1/message2 via addMouth) so the label never sits beside the mouth (which shoved nested blocks right
+    // + widened the block) → the block collapses to CONTENT WIDTH, nested content starts hard-left. The item-b separator-
+    // header pattern, GENERALIZED in the shared builder to EVERY C-mouth kind. Authoring layout only — emit is untouched.
+    // The `section` block shows JUST its title (no "Section title" prefix): drop the label + the field-name for it.
+    let message0 = isSection ? '' : def.label, n = 0;
     for (const f of fieldsOf(def)) {
         const k = fieldKind(def, f);
-        message += ` ${f} %${++n}`;
+        message0 += isSection ? ` %${++n}` : ` ${f} %${++n}`;
         const desc = getDesc(f);
-        if (k === 'cornergrid') args.push({ type: 'field_cornergrid', name: FN(f), value: String(def.defaults[f] ?? ''), colour: CORNER_COLOUR[f], tooltip: desc });
-        else if (k === 'regionpick') args.push({ type: 'field_regionpick', name: FN(f), value: String(def.defaults[f] ?? 0), tooltip: desc });
-        else if (k === 'coordlist') args.push({ type: 'field_coordlist', name: FN(f), value: String(def.defaults[f] ?? '{"points":[],"z":0}'), tooltip: desc });
-        else if (k === 'dropdown') args.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });
-        else if (k === 'checkbox') args.push({ type: 'field_checkbox', name: FN(f), checked: def.defaults[f] !== false, tooltip: desc });
-        else if (k === 'text') args.push({ type: 'field_input', name: FN(f), text: String(def.defaults[f] ?? ''), tooltip: desc });
-        else if (k === 'region') args.push({ type: 'input_value', name: FN(f), check: 'Region', tooltip: desc });
-        else if (k === 'boolean') args.push({ type: 'input_value', name: FN(f), check: 'Boolean', tooltip: desc });
-        else args.push({ type: 'input_value', name: FN(f), check: 'Number', tooltip: desc });
-    }
-    if (def.kind === 'user_root') {
-        message += ` %${++n}`;
-        args.push({ type: 'input_dummy' });
-        message += ` Presentation (UI & Sim) %${++n}`;
-        args.push({ type: 'input_statement', name: 'PRESENTATION' });
-        message += ` Execution (G-code) %${++n}`;
-        args.push({ type: 'input_statement', name: 'EXECUTION' });
-    } else if (def.kind === 'param_group' || def.kind === 'section') {   // t130 — section = the titled transparent container (same DO mouth)
-        message += ` %${++n}`;
-        args.push({ type: 'input_statement', name: 'DO' });
-    } else if (isWrap(def)) {
-        message += ` %${++n}`; args.push({ type: 'input_statement', name: 'DO' }); 
+        if (k === 'cornergrid') args0.push({ type: 'field_cornergrid', name: FN(f), value: String(def.defaults[f] ?? ''), colour: CORNER_COLOUR[f], tooltip: desc });
+        else if (k === 'regionpick') args0.push({ type: 'field_regionpick', name: FN(f), value: String(def.defaults[f] ?? 0), tooltip: desc });
+        else if (k === 'coordlist') args0.push({ type: 'field_coordlist', name: FN(f), value: String(def.defaults[f] ?? '{"points":[],"z":0}'), tooltip: desc });
+        else if (k === 'dropdown') args0.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });
+        else if (k === 'checkbox') args0.push({ type: 'field_checkbox', name: FN(f), checked: def.defaults[f] !== false, tooltip: desc });
+        else if (k === 'text') args0.push({ type: 'field_input', name: FN(f), text: String(def.defaults[f] ?? ''), tooltip: desc });
+        else if (k === 'region') args0.push({ type: 'input_value', name: FN(f), check: 'Region', tooltip: desc });
+        else if (k === 'boolean') args0.push({ type: 'input_value', name: FN(f), check: 'Boolean', tooltip: desc });
+        else args0.push({ type: 'input_value', name: FN(f), check: 'Number', tooltip: desc });
     }
     const block = {
-        type: def.type, message0: message, args0: args, inputsInline: true,
+        type: def.type, message0: message0.trim() || def.label, args0, inputsInline: true,
         style: catSlug(def.category) + '_style', tooltip: `${def.label} (${def.category})`,
     };
+    // t146 — each statement-input MOUTH on its OWN row below the header (message1, message2, …), with an optional
+    // sub-label. Generalized: user_root's 2 mouths, param_group + section's DO, and every isWrap kind's DO.
+    let row = 1;
+    const addMouth = (name, sub) => { block['message' + row] = (sub ? sub + ' ' : '') + '%1'; block['args' + row] = [{ type: 'input_statement', name }]; row++; };
+    if (def.kind === 'user_root') { addMouth('PRESENTATION', 'Presentation (UI & Sim)'); addMouth('EXECUTION', 'Execution (G-code)'); }
+    else if (def.kind === 'param_group' || isSection) addMouth('DO');
+    else if (isWrap(def)) addMouth('DO');
     if (def.dynamic) block.extensions = ['ddcs_dynfields'];   // toggle pattern-specific inputs per the `dynamic` field
-    if (def.kind === 'section') block.extensions = [...(block.extensions || []), 'ddcs_seccolor'];   // t132 — per-instance concern colour from data.color (authoring-only, never emitted)
+    if (isSection) block.extensions = [...(block.extensions || []), 'ddcs_seccolor'];   // t132 — per-instance concern colour from data.color (authoring-only, never emitted)
     if (def.kind === 'reporter') block.output = outputCheck(def);   // value block
     else { block.previousStatement = null; block.nextStatement = null; }   // statement block
     return block;
