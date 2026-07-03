@@ -6014,3 +6014,15 @@ The `user_root` rendering is SHARED by **6 seeded ops** (corner/drill/slot/surfa
 ### RECOMMENDATION: **(c)** if we fix it now — small, clean, reuses the existing postInstantiate + applyProbeSources pattern, one-sources the format, twin==built-in stays byte-identical, no operator regression. If deprioritized, **(d)** is acceptable (cosmetic). **FLAG (b)** as byte-affecting the built-in's operator output → human sign-off required. **Defer (a)**'s new binding engine until a 3rd composed-comment case forces it (rule-of-three).
 
 **PASSED BACK the finding + recommendation BEFORE building (SCOUT ONLY). Mechanical follow-ups after this = real per-view RIG blocks (LAYOUT-2D/PROJECTED-GCODE) then the STRUCTURAL knobs (item d). Corner RELEASED V10.51, disjoint.**
+
+## 🔨 turn 138 (cycle 12) — HEADER-COMMENT FIX (Option C). Suite 521 pass / 0 fail. twin==built-in byte-identical for ALL scalars (not just defaults); built-in .nc unchanged; mutation-verified. 3 files.
+
+**(1) SHARED HELPER (cornerWizard.js):** extracted `export function cornerHeaderComments(params)` → the 2 header summary lines (`Probe dist: Xmm | Retract: Ymm` + `Fast: | Slow: | SafeZ: | ScanDepth:`), composed with the SAME `num`+defaults as cornerStack → reproduces the old inline text BYTE-FOR-BYTE. The format now lives ONCE.
+**(2) cornerStack uses it** (`const [hdrDist, hdrFeed] = cornerHeaderComments(params); C(hdrDist); C(hdrFeed);`) — a pure refactor; the built-in .nc is byte-identical (verified default + all combos).
+**(3) TWIN RECOMPOSE (cornerData.js):** `applyHeaderComments(stack, resolved)` — matches the 2 comments by their DEFAULT-composed text (exact = what the static template froze) and replaces with the RESOLVED-composed text; wired into `postInstantiate` alongside applyProbeSources (the existing live-rewrite precedent, which already receives `(stack, resolved)`). Early-out when scalars are at defaults (byte-identical).
+
+**RESULT:** the twin's header comment tracks the live scalars → twin==built-in byte-identical for ALL scalars (the previously-missed cosmetic divergence is closed); NO operator-facing change (still shows the values, now correct per params). VERIFIED: non-default set (dist=321, retract=7, f_fast=333, f_slow=44, safeZ=15, scanDepth=8) → twin==built-in true, emitted header shows `( Probe dist: 321mm | Retract: 7mm )`; default set → byte-identical; corner-redivide 32-combo structural parity + all corner goldens unchanged.
+
+**MUTATION-VERIFIED:** skipping applyHeaderComments in postInstantiate turns the NEW corner-scalar-parity.spec RED (the frozen 500mm comment ≠ the built-in's live value). NEW corner-scalar-parity.spec: varies each of the 6 scalars (+ scalar×structural crosses) asserting twin==built-in byte-for-byte + the header shows the live dist/safeZ. Did NOT do option (b) (rejected — byte-affecting).
+
+**PASSED BACK for advisor review. Next mechanical follow-up = the per-view RIG blocks (LAYOUT-2D/PROJECTED-GCODE). Corner RELEASED V10.51, disjoint.**

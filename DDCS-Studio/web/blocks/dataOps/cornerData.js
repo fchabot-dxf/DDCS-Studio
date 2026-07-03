@@ -40,7 +40,7 @@
  * Template SEEDED from cornerStack(CORNER_DEFAULTS); the BINDINGS are derived + proven byte-identical by
  * tests/corner-data-emit.spec.js. SCOPE (inc B1) = EMIT only — no view/panel (B3), no sim-starts/inferStarts (B2).
  */
-import { cornerStack, cornerReposOffsets, dirsOf } from '../../wizards/cornerWizard.js';
+import { cornerStack, cornerReposOffsets, dirsOf, cornerHeaderComments } from '../../wizards/cornerWizard.js';
 import { userOpFromStack, simStartsToBlocks, flattenBlocks } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards, whenOk } from '../whenGuard.js';   // ③b — derive CORNER_BINDINGS over a CANONICAL-pruned stack (the 8-way corner×probeSeq guard duplicates the bound sockets in the raw superset)
@@ -256,6 +256,22 @@ function applyProbeSources(stack) {
     return stack;
 }
 
+// t138 — the static template froze the 2 header SUMMARY comments at CORNER_DEFAULTS (bindingSpecs only touch the #N assign
+// VALUES, not composed comment text). Recompose them from the RESOLVED params via the SAME cornerHeaderComments format
+// cornerStack uses → twin==built-in byte-identical for ALL scalars, not just defaults; no operator-facing change (still the
+// values, now correct). Match the 2 target comments by their DEFAULT-composed text (exact — that IS what the template froze).
+function applyHeaderComments(stack, resolved) {
+    const [d1, d2] = cornerHeaderComments(CORNER_DEFAULTS);
+    const [r1, r2] = cornerHeaderComments(resolved || {});
+    if (d1 === r1 && d2 === r2) return stack;   // scalars at defaults → nothing to rewrite (byte-identical)
+    for (const b of flattenBlocks(stack)) {
+        if (!b || b.type !== 'comment' || !b.params) continue;
+        if (b.params.text === d1) b.params.text = r1;
+        else if (b.params.text === d2) b.params.text = r2;
+    }
+    return stack;
+}
+
 /** Build the corner-as-data def — same userOpFromStack pattern as drill/surfacing/slot/text/atcWarmup, PLUS `bindingSpecs`
  *  (instantiate re-derives the value sockets by identity over the pruned superset) + the structural probeZFirst toggle. */
 export function cornerDataDef() {
@@ -267,6 +283,6 @@ export function cornerDataDef() {
         bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
     def.bindingSpecs = CORNER_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     def.simStartsProvider = cornerSimStartsProvider;   // t73 — sim markers CHAIN off their anchor via the emit's reposition geometry (preview-only)
-    def.postInstantiate = (stack) => applyProbeSources(stack);   // t87 — source-chips: emit the controller register for 'ctrl'-sourced probe fields (parity with the built-in)
+    def.postInstantiate = (stack, resolved) => applyHeaderComments(applyProbeSources(stack), resolved);   // t87 source-chips + t138 header-comment recompose (both rewrite from live/resolved state)
     return def;
 }

@@ -58,6 +58,21 @@ export function cornerReposOffsets(params = {}) {
     return { wall1: { dx: w1x, dy: w1y }, wall2: { dx: w2x, dy: w2y } };
 }
 
+/** The 2 human-readable HEADER SUMMARY comments (a scalar recap above the macro). Extracted (t138) so BOTH cornerStack
+ *  AND the data-twin compose them from the SAME format — the format lives ONCE. The twin's static template froze these at
+ *  CORNER_DEFAULTS; its postInstantiate hook RECOMPOSES them from the live/resolved params via this helper (declare-never-
+ *  infer), so twin==built-in stays byte-identical for ALL scalars, not just defaults. Must reproduce the old inline text
+ *  byte-for-byte (same `num` + defaults as cornerStack). */
+export function cornerHeaderComments(params = {}) {
+    const dist = num(params.dist, 500), retract = num(params.retract, 5);
+    const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50);
+    const safeZ = num(params.safeZ, 10), scanDepth = num(params.scanDepth, 5);
+    return [
+        `Probe dist: ${dist}mm | Retract: ${retract}mm`,
+        `Fast: ${fFast} | Slow: ${fSlow} | SafeZ: ${safeZ}mm | ScanDepth: ${scanDepth}mm`,
+    ];
+}
+
 /** Corner params → its outside-corner probe-macro block stack. The one source of truth for both displays.
  *  `opts.superset` (② B4 step 4a) seeds the TWIN as an all-arms-present template: every probeZFirst-dependent piece
  *  emits BOTH arms wrapped in a `guard` block so instantiate() can prune to either concrete shape. Superset OFF
@@ -179,8 +194,8 @@ export function cornerStack(params = {}, opts = {}) {
     // wcs → cornerFork(zPairR(wcsFork)) (4×2×7 in the superset, inert; one leaf survives prune → byte-identical concrete).
     const hdr1 = (z, label, c, xd, yd) => `Corner | ${c} OUTSIDE | X ${dirLabel(xd)} Y ${dirLabel(yd)}${z ? ' + Z Surface' : ''} | ${label}`;
     S.push(...cornerFork((c, xd, yd) => zPairR(wcsFork((w, label) => [mkC(hdr1(true, label, c, xd, yd))]), wcsFork((w, label) => [mkC(hdr1(false, label, c, xd, yd))]))));
-    C(`Probe dist: ${dist}mm | Retract: ${retract}mm`);
-    C(`Fast: ${fFast} | Slow: ${fSlow} | SafeZ: ${safeZ}mm | ScanDepth: ${scanDepth}mm`);
+    const [hdrDist, hdrFeed] = cornerHeaderComments(params);   // t138 — the ONE format (shared with the twin's recompose)
+    C(hdrDist); C(hdrFeed);
 
     // ── Configuration ──
     C('=== CONFIGURATION ===');
