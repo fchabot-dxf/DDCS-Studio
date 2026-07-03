@@ -42,7 +42,10 @@ function numberWidget(host, b) {
     const min = cfg.min ?? b.min, max = cfg.max ?? b.max;
     if (min != null) inp.min = min;
     if (max != null) inp.max = max;
-    inp.value = b.default ?? 0;
+    // t114 — a SOCKET-HELD field (no spec default → its `default` is the CANONICAL socket value, which varies per
+    // structural combo) renders EMPTY with an "auto" placeholder: untouched = the template's per-combo socket expression
+    // holds (see the read below). Others show their real default.
+    if (b.socketHeld) { inp.value = ''; inp.placeholder = 'auto'; } else { inp.value = b.default ?? 0; }
     inp.style.cssText = CTRL_CSS + ' width:120px;';
     inp.dataset.param = b.param;   // so a 2D-preview handle can write this field back (drag-to-edit derives from roles)
     // t87 — source-chips: a probe field the user opted 'ctrl' (on a profile with a native register) is provided by the
@@ -50,13 +53,19 @@ function numberWidget(host, b) {
     const src = (b.sourceField && typeof window !== 'undefined' && window.ddcsProbeSrc) ? window.ddcsProbeSrc(b.sourceField) : null;
     if (src) { inp.disabled = true; inp.style.opacity = '.5'; inp.title = `From the controller (${src.pr || src.label || 'register'}) — change in Settings ▸ Probes`; }
     host.append(labelSpan(b), inp);
-    // t109 — an EXPRESSION-HOLDING socket (b.default is a #var/expression STRING, not a number — e.g. corner's reposition
-    // #21-#24, which default to a PER-CORNER signed-travelDist expression) must NOT inject a value when the user hasn't
-    // typed one: returning the FL-canonical default STRING would override the per-corner pruned socket (the dog-leg would
-    // stay FL for every corner). So an untouched field whose default is non-numeric is OMITTED → `param in params` is false
-    // → instantiate keeps the socket's own per-corner expression (matches CORNER_DEFAULTS deliberately omitting these). A
-    // typed number (or a drag literal) is a real override and passes through. Numeric-default fields are unchanged.
-    return { read: () => { const v = numOr(inp.value, b.default ?? 0); return Number.isFinite(v) ? { [b.param]: v } : {}; } };
+    // An UNTOUCHED field must not inject a value that overwrites the template's own (per-structural-combo) socket:
+    //   • t114 SOCKET-HELD (no spec default → the socket holds a per-combo expression, e.g. corner #21-#24 which change with
+    //     corner×probeSeq): OMIT unless the user TYPED a finite number → instantiate keeps the pruned per-combo socket. This
+    //     covers even a FINITE canonical default (#21='0' on YX, which is WRONG for XY) that the t109 numeric check missed.
+    //   • t109 EXPRESSION default (a #var STRING, non-numeric): also omit when empty.
+    // A typed number / drag literal is a real override and passes through; plain numeric-default fields are unchanged.
+    return { read: () => {
+        const n = parseFloat(inp.value);
+        if (Number.isFinite(n)) return { [b.param]: n };   // the user typed a value → override
+        if (b.socketHeld) return {};                        // untouched socket-held → the per-combo socket holds
+        const v = numOr(inp.value, b.default ?? 0);         // else fall to the default; omit a non-numeric (expression) default
+        return Number.isFinite(v) ? { [b.param]: v } : {};
+    } };
 }
 
 function sliderWidget(host, b) {

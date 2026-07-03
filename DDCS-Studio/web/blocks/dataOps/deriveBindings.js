@@ -63,6 +63,12 @@ export function deriveBindings(flatStack, specs) {
             throw new Error(`deriveBindings: spec "${s.param}" → block ${blockIndex} has no socket key "${s.key}"`);
         const dflt = (s.default !== undefined) ? s.default : (flatStack[blockIndex].params || {})[s.key];
         const b = { param: s.param, type: s.type, default: dflt, key: s.key, blockIndex };
+        // t114 — a spec with NO explicit default reads the socket's PER-STRUCTURAL-COMBO baked value (its `dflt` above is
+        // the value over the CANONICAL stack — e.g. corner's #21/#22/#23/#24, which change with corner×probeSeq). That
+        // canonical default must NOT be injected when the field is untouched (it would overwrite the pruned per-combo
+        // socket — the t109 bug, but even for a FINITE canonical like #21='0' on YX which is WRONG for XY). Mark it so the
+        // form OMITS an untouched socket-held field → the template's per-combo socket expression holds. A typed value overrides.
+        if (s.default === undefined) b.socketHeld = true;
         if (s.label) b.label = s.label;
         if (s.section) b.section = s.section;
         if (s.group) b.group = s.group;   // canvas-layout grouping (layoutSpecFromOp reads b.group)
