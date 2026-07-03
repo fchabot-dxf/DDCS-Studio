@@ -40,9 +40,10 @@ let _mgr = null;
 // the corner) here, keyed by its binding GROUP (e.g. 'reposition' #23/#24, 'start' #21/#22). A drag sets the dragged
 // group's spot + CAPTURES the others (freeze) → after any drag all handles are independent (dragging one leaves the rest
 // put, its emitted G91 increment re-derived off the moved planned anchor). UNSET → the socket expression holds (byte-
-// identical default). Datum-relative → re-anchors on a corner change. Persists across renders; reset when the op changes.
-let _layoutSpots = {};    // { [groupId]: { dx, dy } } datum-relative, per the active op
-let _layoutSpotsOp = null;
+// identical default). Datum-relative → re-anchors on a corner change. Persists across a render pass within ONE editing
+// session; t122 — CLEARED per wizard OPEN (onShow), NOT per opType (every corner instance shares the opType, so a per-type
+// reset leaked one instance's drags into the next → a baked, NON-byte-identical emit for a freshly-opened corner).
+let _layoutSpots = {};    // { [groupId]: { dx, dy } } datum-relative; cleared per wizard OPEN (onShow)
 
 /** The manager sets the def before opening (resolved from the type). Also picks the panel layout. */
 export function setUserOpDef(def) {
@@ -85,7 +86,7 @@ export const userOpView = {
     inputIds: [],               // dynamic — the form wires its own delegated listener in render()
     probeSrcFields: {},         // keep the shared probe-source decorator a no-op
 
-    onShow(mgr) { _mgr = mgr; applyPanel(); render(); },
+    onShow(mgr) { _mgr = mgr; _layoutSpots = {}; applyPanel(); render(); },   // t122 — clear marker spots per OPEN (fresh session = undragged = byte-identical)
 
     update(mgr) {
         _mgr = mgr;
@@ -142,9 +143,9 @@ export const userOpView = {
                     const pos0 = ps[0] || (Array.isArray(starts) && starts[0]) || null;   // dragged start, else the declared pass-0 hint
                     const sources = (panel && typeof panel.getPassSources === 'function') ? panel.getPassSources() : null;   // t81 — per-pass auto/manual, so the Layout matches the top panel
                     const passEnds = (panel && typeof panel.getPassEnds === 'function') ? panel.getPassEnds() : null;   // t107 — per-pass runtime ENDs, so the Layout ② relocates to the machine-faithful spot + the drag writes END-relative #23/#24
-                    // t120 — the datum-relative marker-spot store (Option A independence). Reset when the op changes (a fresh op
-                    // starts undragged → the socket expressions → byte-identical). setSpots re-renders so a drag's capture/derive shows.
-                    if (_layoutSpotsOp !== _def.opType) { _layoutSpots = {}; _layoutSpotsOp = _def.opType; }
+                    // t120/t122 — the datum-relative marker-spot store (Option A independence). CLEARED per wizard OPEN (onShow),
+                    // NOT here per opType (every corner instance shares the opType → a per-type reset leaked drags across instances).
+                    // setSpots re-renders so a drag's capture/derive shows.
                     const setSpots = (next) => { _layoutSpots = next || {}; };
                     const simStart = (panel && pos0 && typeof panel.onStartDrag === 'function')
                         ? { pos: pos0, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } }

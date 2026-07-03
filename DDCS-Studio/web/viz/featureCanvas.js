@@ -342,20 +342,24 @@ export class FeatureCanvas {
             // (.fc-handle{fill:#ffce54} gold) OUTRANKS an SVG presentation attribute, so an attribute-set fill/stroke was
             // SILENTLY overridden to gold (getComputedStyle showed rgb(255,206,84) despite the attribute reading #22d3ee).
             // Inline style beats the class rule → the computed colour is actually the cyan/amber source colour.
+            // t122 — expose the handle's STABLE decl id (e.g. 'start_pos' / 'reposition_pos' / '__simstart0') as data-hid so a
+            // handle is identifiable by its BOUND source, not by sort-by-screen-position (which misattributes when a drag crosses
+            // the other handle). Additive attribute — the drag hit-test still uses the internal geometry.
+            const hid = h.id != null ? { 'data-hid': String(h.id) } : null;
             if (h.simOnly) {
                 // t73/t81 — the SIM-ONLY / manual-jog start marker: a HOLLOW CIRCLE ○ (was a diamond), the 2D-canvas twin of the
                 // top panel's sim-only marker. Coloured by reposition source (cyan=auto / amber=manual), matching the top panel.
-                const el = svgEl('circle', { cx: c.x, cy: c.y, r: 7, class: 'fc-handle fc-handle-sim', 'stroke-width': 2 });
+                const el = svgEl('circle', { cx: c.x, cy: c.y, r: 7, class: 'fc-handle fc-handle-sim', 'stroke-width': 2, ...hid });
                 el.style.fill = 'none'; el.style.stroke = col || '#22d3ee';   // hollow, source-coloured stroke — beats .fc-handle
                 handles.appendChild(el);
             } else if (h.kind === 'move') {
                 // t81 — colour the emitting reposition handle by its travel SOURCE (cyan=auto / amber=manual), matching the top
                 // panel; without a source it keeps the CSS fc-handle-move default (gold).
-                const el = svgEl('rect', { x: c.x - 6, y: c.y - 6, width: 12, height: 12, class: 'fc-handle fc-handle-move', rx: 2 });
+                const el = svgEl('rect', { x: c.x - 6, y: c.y - 6, width: 12, height: 12, class: 'fc-handle fc-handle-move', rx: 2, ...hid });
                 if (col) { el.style.fill = col; el.style.stroke = col; }   // inline beats .fc-handle-move (gold); no source → CSS default
                 handles.appendChild(el);
             } else {
-                handles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 6, class: 'fc-handle' }));
+                handles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 6, class: 'fc-handle', ...hid }));
             }
             // Raw axis-delta readouts (the grid "dx"/"dy" labels) are unhelpful clutter — the handle stays
             // draggable (it still drives its field), we just drop its on-canvas text. Useful named dimensions
