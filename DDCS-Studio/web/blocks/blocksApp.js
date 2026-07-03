@@ -150,7 +150,10 @@ async function buildWorkspace() {
         return WIZARDS[op.type].inferStart(op.params, stock);
       }
       return null;
-    }
+    },
+    // Route the sim's EXECUTING line to the projected G-code view: glow the emitting line (+ a fading comet-tail),
+    // mirroring the read-only editor panel — so watching a run in the Blocks tab lights the very code the blocks emit.
+    onLine: (i) => setExecLine(i),
   });
   if (blkPanelHost) blkPanelHost.__panel = panel;   // expose for inspection/tests (mirrors wizardManager's host.__panel)
 
@@ -398,7 +401,21 @@ async function buildWorkspace() {
   onChange(({ proj, origin }) => { if (origin !== 'blockly') renderFromModel(proj); });
 
   // ---- code view + linked selection (click a code line ⇄ its Blockly block) ----
+  // EXECUTION GLOW: the sim's active line lights on the projected G-code with a fading comet-tail — the SAME read-out
+  // as the read-only editor panel (`#blk-gcode .gl.active-line` + `[data-exec-age]` in styles.css). `onLine(i)` from the
+  // shared preview panel drives setExecLine; i indexes getProjection().text lines == the `.gl` spans (one per line).
+  let execTrail = [];   // recent .gl elements, newest first (index 0 = the current line)
+  function clearExec() { execTrail.forEach((sp) => { sp.classList.remove('active-line'); sp.removeAttribute('data-exec-age'); }); execTrail = []; }
+  function setExecLine(i) {
+    const el = (i >= 0 && i < out.children.length) ? out.children[i] : null;
+    if (!el || execTrail[0] === el) return;
+    execTrail.unshift(el);
+    execTrail.splice(6).forEach((sp) => { sp.classList.remove('active-line'); sp.removeAttribute('data-exec-age'); });   // age off the tail
+    execTrail.forEach((sp, age) => { sp.classList.toggle('active-line', age === 0); if (age === 0) sp.removeAttribute('data-exec-age'); else sp.dataset.execAge = String(Math.min(age, 5)); });
+    el.scrollIntoView({ block: 'nearest' });
+  }
   function renderCode(lines, map) {
+    clearExec();   // the .gl spans are about to be replaced — drop the stale exec trail so it can't point at dead nodes
     const frag = document.createDocumentFragment();
     lines.forEach((ln, i) => {
       const span = document.createElement('span');
