@@ -50,7 +50,12 @@ function getInlineFields(block) {
     return inlineFields(def);
 }
 function isAtom(blk) {
-    return blk && !blk.isShadow() && blk.type !== 'op' && !blk.type.endsWith('_op') && blk.type !== 'progstart' && blk.type !== 'progend';
+    if (!(blk && !blk.isShadow() && blk.type !== 'op' && !blk.type.endsWith('_op') && blk.type !== 'progstart' && blk.type !== 'progend')) return false;
+    // t148 — a `section`'s title is AUTHORING METADATA (the section's name), NOT an exposable wizard value, so it must not
+    // get the "expose as knob" kit (it read as "? knob false title" noise on the concern headers). Value-bearing atoms
+    // (assign / param / move / …) are untouched → the value-knob expose path (deriveAuthoredDef / EXPOSE_) still works.
+    const def = BLOCKS[blk.type];
+    return !(def && def.kind === 'section');
 }
 
 // the widget a numeric exposure renders as in the form (the form-widget registry keys; numeric-compatible only).
