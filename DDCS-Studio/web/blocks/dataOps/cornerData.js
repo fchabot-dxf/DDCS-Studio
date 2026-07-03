@@ -170,7 +170,10 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
     // `section` containers — emit their children in order, so this is byte-transparent). user_root keeps its 2 mouths (the
     // 5 OTHER user ops are untouched); the sections nest inside. PRESENTATION mouth = FORM + one peer per VIEW; EXECUTION
     // mouth = STRUCTURAL / VARIABLES / G-CODE.
-    const sec = (title, children) => ({ type: 'section', params: { title }, children });
+    // t132 — CONCERN COLOUR (item h): each section declares its Blockly block colour (authoring-only — rides in `data`, never
+    // a field, never emitted). VIEW family = a blue set (LAYOUT-2D / 3D-SIM / PROJECTED-GCODE read as related views);
+    // STRUCTURAL / VARIABLES / FORM / G-CODE each a distinct hue. Palette is easily tweaked (the human can adjust).
+    const sec = (title, color, children) => ({ type: 'section', params: { title, color }, children });
     const panel = { type: 'panel', params: { panel: 'form3d+2d' } };   // B3d: the 3D probe sim + per-pass markers AND the 2D reposition drag canvas
     const sim = { type: 'sim', params: { rotary: false, machine: true, magazine: false } };
     const paramGroup = { type: 'param_group', params: { group: 'Corner' }, children: [] };
@@ -181,10 +184,10 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
     // re-declared per view; the one-source guard); they ride 3D-SIM. LAYOUT-2D + PROJECTED-GCODE are LABELED PLACEHOLDERS
     // this pass — their views are driven by the ONE trace + the form3d+2d panel; per-view rig blocks are a later follow-up.
     const uiChildren = [
-        sec('FORM', [panel, paramGroup]),
-        sec('LAYOUT-2D', []),
-        sec('3D-SIM', [sim, ...simstarts]),
-        sec('PROJECTED-GCODE', []),
+        sec('FORM', '#d946ef', [panel, paramGroup]),           // form input — magenta
+        sec('LAYOUT-2D', '#3b82f6', []),                       // view family — blue
+        sec('3D-SIM', '#6366f1', [sim, ...simstarts]),         // view family — indigo
+        sec('PROJECTED-GCODE', '#0ea5e9', []),                 // view family — sky
     ];
 
     // EXECUTION mouth. ② B4 step 4a — cornerStack emits the SUPERSET (both probeZFirst arms wrapped in `guard`s; instantiate()
@@ -200,9 +203,9 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
         else if (seenAssign && b && (b.type === 'guard' || b.type === 'distmode' || b.type === 'probe' || b.type === 'move')) { seam = i; break; }
     }
     const children = [
-        sec('STRUCTURAL', []),
-        sec('VARIABLES', exec.slice(0, seam)),
-        sec('G-CODE', exec.slice(seam)),
+        sec('STRUCTURAL', '#f59e0b', []),                      // structural drivers — amber
+        sec('VARIABLES', '#06b6d4', exec.slice(0, seam)),      // #var defs — cyan
+        sec('G-CODE', '#22c55e', exec.slice(seam)),            // the emit — green
     ];
 
     return [{ type: 'user_root', params: {}, uiChildren, children }];

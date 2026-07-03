@@ -218,6 +218,7 @@ function jsonDef(def) {
         style: catSlug(def.category) + '_style', tooltip: `${def.label} (${def.category})`,
     };
     if (def.dynamic) block.extensions = ['ddcs_dynfields'];   // toggle pattern-specific inputs per the `dynamic` field
+    if (def.kind === 'section') block.extensions = [...(block.extensions || []), 'ddcs_seccolor'];   // t132 — per-instance concern colour from data.color (authoring-only, never emitted)
     if (def.kind === 'reporter') block.output = outputCheck(def);   // value block
     else { block.previousStatement = null; block.nextStatement = null; }   // statement block
     return block;
@@ -344,12 +345,29 @@ function registerDynExtension(Blockly) {
     } catch (e) { /* already registered */ }
 }
 
+// t132 — CONCERN COLOUR: a `section` block carries an OPTIONAL declared colour (params.color → rides in the block's `data`,
+// never a rendered field, never emitted). This extension applies it as the Blockly block colour so the concern-sections read
+// apart at a glance. Deserialization sets `data` AFTER init, so re-apply on the next tick + as a setOnChange fallback. A
+// section with no declared colour keeps its category style (so the 5 other user ops, which declare none, render unchanged).
+function registerSecColorExtension(Blockly) {
+    try {
+        Blockly.Extensions.register('ddcs_seccolor', function () {
+            const self = this;
+            const apply = () => { try { const c = self.data ? JSON.parse(self.data).color : null; if (c) { self.setColour(c); self._ddcsSecColored = true; } } catch (_) { /* keep style */ } };
+            apply();                        // paste / programmatic create (data already set)
+            setTimeout(apply, 0);           // JSON load sets `data` after init → colour on the next tick
+            self.setOnChange(function () { if (!self._ddcsSecColored) apply(); });   // fallback until it lands
+        });
+    } catch (e) { /* already registered */ }
+}
+
 export function installBlockly(Blockly) {
     _Blockly = Blockly;
     installCornerGridField(Blockly);   // register field_cornergrid BEFORE the blocks that reference it
     installRegionPickField(Blockly);   // register field_regionpick (the region-pick control's block adapter)
     installCoordListField(Blockly);    // register field_coordlist (the coordinate-list positions preview)
     registerDynExtension(Blockly);
+    registerSecColorExtension(Blockly);
     Blockly.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), ...OP_BLOCKS]);
 }
 

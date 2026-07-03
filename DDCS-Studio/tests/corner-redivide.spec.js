@@ -77,3 +77,33 @@ test('(3) the 7 concern sections render in the right mouths (PRESENTATION peers 
   expect(byMouth('PRESENTATION').sort(), 'the 4 view peers nest in PRESENTATION').toEqual(['3D-SIM', 'FORM', 'LAYOUT-2D', 'PROJECTED-GCODE']);
   expect(byMouth('EXECUTION').sort(), 'the 3 execution sections nest in EXECUTION').toEqual(['G-CODE', 'STRUCTURAL', 'VARIABLES']);
 });
+
+// (4) CONCERN COLOUR (t132) — VALUE: each section renders in its DECLARED concern colour (authoring-only), and the colour
+//     SURVIVES a workspace serialize→load round-trip (rides in the block's `data`, never emitted). The emit stays byte-exact.
+const EXPECT_COLOUR = { STRUCTURAL: '#f59e0b', VARIABLES: '#06b6d4', FORM: '#d946ef', 'LAYOUT-2D': '#3b82f6', '3D-SIM': '#6366f1', 'PROJECTED-GCODE': '#0ea5e9', 'G-CODE': '#22c55e' };
+test('(4) each concern section renders in its declared colour, and it survives a round-trip', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+  await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_corner_data'));
+  await page.waitForSelector('#wiz_user_form', { state: 'visible' });
+  await page.evaluate(() => window.ddcsStudio.wizardManager.update());
+  await page.evaluate(() => { const b = document.getElementById('wiz_user_insert') || document.querySelector('#wiz_user [data-act="insert"]'); if (b) b.click(); });
+  await page.waitForTimeout(300);
+  await page.evaluate(() => window.showApp('blocks'));
+  await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0, { timeout: 8000 });
+  await page.waitForTimeout(600);
+  const colours = () => page.evaluate(() => Object.fromEntries(window.__blkws.getAllBlocks().filter((b) => b.type === 'section').map((b) => [b.getFieldValue('TITLE'), b.getColour()])));
+  const before = await colours();
+  for (const [title, hex] of Object.entries(EXPECT_COLOUR)) expect(before[title], `${title} renders in its declared colour`).toBe(hex);
+  // round-trip: serialize the workspace to JSON and reload it → the colours must persist (they ride in the block `data`)
+  await page.evaluate(async () => {
+    const B = window.Blockly || (await import('/blocks/blockly/bridge.js')).getBlockly();
+    const ws = window.__blkws; const state = B.serialization.workspaces.save(ws);
+    ws.clear(); B.serialization.workspaces.load(state, ws);
+  });
+  await page.waitForTimeout(600);
+  const after = await colours();
+  for (const [title, hex] of Object.entries(EXPECT_COLOUR)) expect(after[title], `${title} colour survives the round-trip`).toBe(hex);
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+});
