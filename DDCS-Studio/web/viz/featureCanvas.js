@@ -90,6 +90,9 @@ export class FeatureCanvas {
                 // picker). The PATH anchor lives only in the form pickers — so the canvas never superposes two sets.
                 const att = this._hitAttach(w);
                 if (att) { if (this.spec.onStockAttach) this.spec.onStockAttach(att.code); e.preventDefault(); return; }
+                // t112 — a click on a stock CORNER target sets the `corner` param (the GUI corner-selector).
+                const cn = this._hitCorner(w);
+                if (cn) { if (this.spec.onCornerPick) this.spec.onCornerPick(cn.code); e.preventDefault(); return; }
             }
             try { svg.setPointerCapture(e.pointerId); } catch (_) {}
             // Grab a handle. For a POSITION handle, precompute the snap "from" points (the handle itself + the path's
@@ -376,6 +379,7 @@ export class FeatureCanvas {
         });
 
         this._drawStockAttach(spec);
+        this._drawCornerPick(spec);
 
         // Snap feedback: a green lock-ring + centre dot on the stock anchor (or part-zero) the dragged position handle
         // is locked onto — so it's obvious when the magnet caught (and which anchor).
@@ -412,6 +416,37 @@ export class FeatureCanvas {
         const tol = 11 / this._tf.scale;
         let best = null, bd = tol;
         this._attachPts.forEach((p) => { const d = Math.hypot(p.x - w.x, p.y - w.y); if (d <= bd) { bd = d; best = p; } });
+        return best;
+    }
+
+    /** Corner-selector (t112) — click a stock CORNER to set the `corner` param (GUI-first, augments the Corner dropdown).
+     *  4 ring targets on the stock corners FL/FR/BL/BR (FL=min-XY … BR=max-XY — matches cornerXY/the emit); the CURRENT
+     *  corner is filled, hover-highlights via CSS. Clicking → spec.onCornerPick(code) sets the corner → the emit + the
+     *  now-per-corner markers/sim all follow (prefill done). Opt-in: only ops whose spec carries onCornerPick + `corner`. */
+    _drawCornerPick(spec) {
+        this._cornerPts = null;
+        if (!spec || !spec.onCornerPick || !spec.stock || !(spec.stock.w > 0) || !(spec.stock.h > 0)) return;
+        const w = spec.stock.w, h = spec.stock.h, ox = spec.stock.ox || 0, oy = spec.stock.oy || 0;
+        const cur = String(spec.corner || 'FL');
+        const corners = [
+            { code: 'FL', x: ox, y: oy }, { code: 'FR', x: ox + w, y: oy },
+            { code: 'BL', x: ox, y: oy + h }, { code: 'BR', x: ox + w, y: oy + h },
+        ];
+        const pts = [];
+        for (const cn of corners) {
+            const c = this._S(cn.x, cn.y);
+            this.gHandles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 7, 'data-corner': cn.code, class: 'fc-corner-pick' + (cn.code === cur ? ' fc-corner-pick-cur' : ''), style: 'cursor:pointer' }));
+            pts.push({ x: cn.x, y: cn.y, code: cn.code });
+        }
+        this._cornerPts = pts;
+    }
+
+    /** Hit-test the corner-pick targets in world units → the nearest corner or null. */
+    _hitCorner(w) {
+        if (!this._cornerPts || !w) return null;
+        const tol = 12 / this._tf.scale;
+        let best = null, bd = tol;
+        this._cornerPts.forEach((p) => { const d = Math.hypot(p.x - w.x, p.y - w.y); if (d <= bd) { bd = d; best = p; } });
         return best;
     }
 

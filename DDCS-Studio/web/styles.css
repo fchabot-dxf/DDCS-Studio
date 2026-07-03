@@ -2208,6 +2208,11 @@ button.primary:hover {
 .feature-canvas .fc-handle { fill: #ffce54; stroke: #1a1a1a; stroke-width: 1.5; cursor: grab; }
 .feature-canvas .fc-handle-move { fill: #ffce54; stroke: #1a1a1a; stroke-width: 1.5; }
 .feature-canvas .fc-handle-label { fill: #ffce54; font: 10px var(--mono, monospace); }
+/* t112 — GUI corner-selector: clickable ring on each stock corner (FL/FR/BL/BR). Hollow = pickable, filled = the current
+   corner; hover brightens. Distinct from the gold drag-handles + blue stock-attach markers. */
+.feature-canvas .fc-corner-pick { fill: rgba(255,90,90,0.10); stroke: #ff6b6b; stroke-width: 1.5; transition: fill .1s ease, stroke .1s ease; }
+.feature-canvas .fc-corner-pick:hover { fill: rgba(255,90,90,0.32); stroke: #ff9a9a; stroke-width: 2; }
+.feature-canvas .fc-corner-pick-cur { fill: #ff6b6b; stroke: #ffdada; stroke-width: 2; }
 
 /* Preview Block */
 .preview-block { margin-top: 15px; }

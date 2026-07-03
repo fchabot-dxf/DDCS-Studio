@@ -82,6 +82,7 @@ function dropdownWidget(host, b) {
     host.style.cssText = ROW_CSS;
     const sel = document.createElement('select');
     sel.style.cssText = CTRL_CSS + ' min-width:120px;';
+    sel.dataset.param = b.param;   // t112 — targetable by [data-param] (parity with numeric fields) so a canvas picker (corner-selector) can set it + dispatch change
     for (const o of ((b.widgetConfig && b.widgetConfig.options) || [])) {
         const val = Array.isArray(o) ? o[1] : o, lab = Array.isArray(o) ? o[0] : o;
         const op = document.createElement('option');

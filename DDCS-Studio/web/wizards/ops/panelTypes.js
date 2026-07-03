@@ -166,6 +166,19 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds) {
     // math (corner/radius) lives in the registry; here `setFields` just routes each {param: value} to its form field.
     const setFields = (m) => { for (const k in m) _writeParam(k, m[k]); };
     const { handles, onDrag } = buildCanvasWidgets(decls, setFields);
+    // t112 — GUI CORNER-SELECTOR: an op that declares a `corner` enum binding gets clickable stock-corner targets on the
+    // canvas (FeatureCanvas._drawCornerPick). Clicking one SETS the corner <select> + dispatches change → update() re-emits
+    // (already correct per corner) + re-derives the per-corner markers/sim (prefill t109) — reusing the dropdown's OWN change
+    // seam, no new param path. Opt-in (only corner-bearing ops); the corner targets sit on the stock corners, distinct from
+    // the reposition handles (no hit-test overlap). Absent → the canvas draws no corner targets (unchanged for other ops).
+    const cornerBind = (def.bindings || []).find((b) => b && b.param === 'corner' && b.type === 'enum');
+    const cornerPick = cornerBind ? {
+        corner: params.corner,
+        onCornerPick: (code) => {
+            const sel = (typeof document !== 'undefined') && document.querySelector('#wiz_user_form [data-param="corner"]');
+            if (sel && sel.value !== code) { sel.value = code; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+        },
+    } : {};
     // t73 — the SIM-ONLY first-start marker also shows on the Layout canvas (a SECOND renderer of createPreviewPanel's
     // userStarts pass-0, never emitted): a hollow ◇ for spatial reference alongside the emitting reposition handles. It is
     // VISUAL here (excluded from the hit-test) because pass-0 always coincides with a reposition ANCHOR whose emitting handle
@@ -179,9 +192,9 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds) {
         const wrappedOnDrag = (typeof simStart.onDrag === 'function')
             ? (id, world) => { if (id === SIM_ID) simStart.onDrag({ x: world.x, y: world.y }); else if (onDrag) onDrag(id, world); }
             : onDrag;
-        return { stock, items, handles: allHandles, onDrag: wrappedOnDrag };
+        return { stock, items, handles: allHandles, onDrag: wrappedOnDrag, ...cornerPick };
     }
-    return { stock, items, handles, onDrag };
+    return { stock, items, handles, onDrag, ...cornerPick };
 }
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).
