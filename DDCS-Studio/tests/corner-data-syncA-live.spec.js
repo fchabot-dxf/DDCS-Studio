@@ -2,8 +2,9 @@ import { test, expect } from '@playwright/test';
 
 /**
  * ② B4 step 4d — syncA goes LIVE on the "Corner (data)" twin (batch fork 3/3 — the LAST prune-shaped toggle). A BOOL
- * block-ADD (like probeZFirst's Z step) but VALUE-CARRYING: the dual-gantry sync appends G1 A0 + the slave-offset write
- * (#74=[#70+slave], #[#74]=#883). The superset wraps the sync blocks in when(syncA); instantiate() keeps/drops them.
+ * block-ADD (like probeZFirst's Z step) but VALUE-CARRYING: the dual-gantry sync appends ONLY the slave-offset WCS write
+ * (#74=[#70+slave], #[#74]=#883) — t124 REMOVED the unsafe `G1 A0` motion (driving the slave/A axis alone to 0 racks a
+ * dual gantry). The superset wraps the sync blocks in when(syncA); instantiate() keeps/drops them.
  *
  * HARDENED live-spec pattern WITH THE VALUE-PIN (from 4c-harden): reads the bool binding's OWN wiring + asserts ON/OFF ==
  * cornerStack byte-for-byte + the toggle symptom, AND pins the slave-offset VALUE against an INDEPENDENT hardcoded truth
@@ -40,7 +41,7 @@ test('syncA LIVE: bool binding toggles the dual-gantry sync == cornerStack byte-
       syncType: syncBind && syncBind.type, syncDefault: syncBind && syncBind.default,
       offEqual, onEqual,
       onHasSyncHeader: /Dual Gantry Sync/.test(on),
-      onHasA0: /G1 A0 F#3/.test(on),
+      onHasA0move: /G1\s+A0/.test(on),   // t124 — must now be ABSENT (the racking A-axis motion was removed)
       offHasSync: /Dual Gantry Sync/.test(off) || /G1 A0/.test(off) || /#74=/.test(off),
       // INDEPENDENT PINS — hardcoded expected, not read from cornerStack's source (slave default '3' → offset 3):
       onSlaveOffset: /#74=\[#70\+3\]/.test(on),
@@ -54,8 +55,9 @@ test('syncA LIVE: bool binding toggles the dual-gantry sync == cornerStack byte-
   // (2) byte-for-byte parity both states
   expect(r.offEqual, 'syncA OFF: twin emit == cornerStack byte-for-byte (default shape unchanged)').toBe(true);
   expect(r.onEqual, 'syncA ON: twin reproduces cornerStack({syncA:1}) byte-for-byte (the dual-gantry sync block)').toBe(true);
-  // (3) the toggle actually adds/removes the sync block
-  expect(r.onHasSyncHeader && r.onHasA0, 'ON: emits the "Dual Gantry Sync" block + G1 A0').toBe(true);
+  // (3) the toggle adds/removes the sync block — t124: ON emits the comment + the WCS-write lines but NO A-axis MOTION
+  expect(r.onHasSyncHeader, 'ON: emits the "Dual Gantry Sync" comment block').toBe(true);
+  expect(r.onHasA0move, 'ON: NO "G1 A0" A-axis motion (removed — driving the slave axis alone to 0 racks a dual gantry)').toBe(false);
   expect(r.offHasSync, 'OFF: NO sync block at all (byte-identical to today)').toBe(false);
   // (4) INDEPENDENT VALUE PIN — the slave offset + the sync-offset write, vs a HARDCODED expected (a wrong value = the slave
   //     axis synced to the WRONG offset on a real dual-gantry machine; twin-vs-self parity can't catch it). ASSERT THE VALUE.

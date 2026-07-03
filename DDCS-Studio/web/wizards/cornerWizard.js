@@ -113,8 +113,6 @@ export function cornerStack(params = {}, opts = {}) {
     const WHEN_Z = { param: 'probeZFirst', is: true }, WHEN_NZ = { param: 'probeZFirst', is: false };
     const mkC = (t) => { const b = newBlock('comment'); b.params = { text: t }; return b; };
     const mkA = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; return b; };
-    const mkDM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; return b; };
-    const mkRAW = (text) => { const b = newBlock('raw'); b.params = { text }; return b; };
     // zPair: a Z-varying fork with BOTH arms — superset guards each; concrete pushes the matching arm inline (today's shape).
     const zPair = (onKids, offKids) => { if (superset) S.push(GUARD(WHEN_Z, onKids), GUARD(WHEN_NZ, offKids)); else S.push(...(probeZ ? onKids : offKids)); };
     // zOnly: a Z-ONLY block-add (no off-arm) — superset guards it on; concrete emits it only when probeZ.
@@ -296,9 +294,10 @@ export function cornerStack(params = {}, opts = {}) {
     // Z step, but VALUE-CARRYING — the slave offset #74=[#70+slave]). superset → the blocks wrapped in when(syncA); concrete
     // → emitted only when params.syncA (byte-identical to today). slave stays baked at its default (a value-binding follow-on).
     const slave = params.slave || '3';
+    // t124 safety (human t115) — REMOVED the unsafe A-axis MOTION (G90; G1 A0 F#3; G91): driving the slave/A axis alone to 0
+    // RACKS a dual gantry (the two rails skew). Keep ONLY the benign dual-axis WCS-OFFSET sync (no motion — updates the A DRO).
     const syncBlocks = [
         mkC('Dual Gantry Sync'),
-        mkDM('abs'), mkRAW('G1 A0 F#3'), mkDM('inc'),
         mkA('#74', `[#70+${slave}]`, 'Base WCS + Slave Offset'),
         mkA('#[#74]', '#883', 'Sync A offset with Y'),
     ];

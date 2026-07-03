@@ -5899,3 +5899,13 @@ Surgical: 2 files deleted + 3 edited (globalFunctions, index.html, app.js). COMM
 **NOTE acknowledged (no change): capture bakes undragged siblings to literals (loses #15/#16 portability) — inherent to world-fixed independence, human-accepted; the over-capture (reposition-drag freezes the start unnecessarily) is a possible LATER refinement.**
 
 **PASSED BACK for advisor re-review + human live-verify. syncA move-removal still queued after.**
+
+## 🔨 turn 124 (cycle 11) — SYNCA MOVE-REMOVAL (corner-only safety fix, human t115). Suite 512 pass / 0 fail. syncA-OFF byte-identical; syncA-ON = comment + 2 WCS-writes, NO A-axis motion. 2 files.
+
+**cornerWizard.js:** the Dual-Gantry syncBlocks emitted `( Dual Gantry Sync )` then `G90; G1 A0 F#3; G91` (the unsafe A-axis MOTION) then `#74=[#70+slave]; #[#74]=#883` (the WCS-offset write). REMOVED ONLY the 3 motion blocks `mkDM('abs'), mkRAW('G1 A0 F#3'), mkDM('inc')` — driving the slave/A axis alone to 0 RACKS a dual gantry (the rails skew). KEPT the comment + the 2 `mkA` WCS-writes (no motion, benign, updates the A DRO). The `G90; G1; G91` was a self-contained local round-trip (abs for the A0 move, back to inc), so removing it leaves the distance-mode coherent (the footer's own G90 follows, common to ON+OFF). Cleaned the now-orphaned `mkDM`/`mkRAW` helpers (my change made them unused; used nowhere else in the file). SCOPE = corner ONLY (did NOT touch middle/wcs/homing — homing correctly keeps its own G1 A0; middle/wcs are a later separate decision).
+
+**REAL-SYMPTOM VERIFIED (read the emitted .nc):** syncA-ON region now = `( Dual Gantry Sync )` · `#74=[#70+3] ( Base WCS + Slave Offset )` · `#[#74]=#883 ( Sync A offset with Y )` — NO `G1 A0`, and a repo-wide scan of the whole syncA-ON emit for any A-axis word found NONE (ANY_A_MOTION []). syncA-OFF path unchanged (doesn't push syncBlocks) → byte-identical.
+
+**corner-data-syncA-live.spec.js:** flipped the assertion — was `onHasSyncHeader && onHasA0 == true`; now asserts the header PRESENT + `G1 A0` ABSENT (`onHasA0move == false`) + keeps both independent WCS-write value pins (#74=[#70+3], #[#74]=#883). offEqual/onEqual twin==cornerStack byte-for-byte both hold (both emit from cornerStack). Updated the doc comment.
+
+**PASSED BACK. Corner release-ready pending the human's Option A live-verify. Blockly reorg is next (did NOT start it).**
