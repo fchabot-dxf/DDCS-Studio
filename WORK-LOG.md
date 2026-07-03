@@ -6026,3 +6026,29 @@ The `user_root` rendering is SHARED by **6 seeded ops** (corner/drill/slot/surfa
 **MUTATION-VERIFIED:** skipping applyHeaderComments in postInstantiate turns the NEW corner-scalar-parity.spec RED (the frozen 500mm comment ≠ the built-in's live value). NEW corner-scalar-parity.spec: varies each of the 6 scalars (+ scalar×structural crosses) asserting twin==built-in byte-for-byte + the header shows the live dist/safeZ. Did NOT do option (b) (rejected — byte-affecting).
 
 **PASSED BACK for advisor review. Next mechanical follow-up = the per-view RIG blocks (LAYOUT-2D/PROJECTED-GCODE). Corner RELEASED V10.51, disjoint.**
+
+## 🔨 turn 140 (cycle 12) — PER-VIEW-RIG SCOUT (NO code, design + scope). Finding + proposal for advisor+human. Suite untouched.
+
+### (1) The EXISTING panel + sim blocks ALREADY ARE view rigs (emit nothing, declare view config):
+- `panel` (panel.js) — declares the panel MODE (`form3d+2d` = which views show: form + 2D + 3D). A MASTER "which-views" switch, not per-view. Read at save → def.panel. Currently in the FORM section; it governs ALL views, so it arguably belongs at the PRESENTATION top (minor).
+- `sim` (sim.js, label "preview rig") — IS the 3D-SIM rig: rotary/machine/magazine. Emits nothing. Already in the 3D-SIM section. ✓ (could grow camera/legend fields later.)
+- `simstart` — the SHARED anchor source (feeds BOTH 2D + 3D via cornerSimStartsProvider — ONE source).
+
+### What each view NEEDS / HAS today:
+- **FORM** — panel(mode) + param_group. Real content. ✓
+- **3D-SIM** — the `sim` block = a real rig. ✓ (camera/legend are defaults.)
+- **LAYOUT-2D** — the 2D featureCanvas (panelTypes.layoutSpecFromOp) DERIVES everything: handles from the op's role-bindings, stock from settings, corner-picker from a `corner` binding, pan/zoom interactive. **NO per-op 2D config exists today** → a LAYOUT-2D rig would be a THIN display-toggle block ({showCornerPicker, showStock, initialZoom}) OVERRIDING auto-behavior.
+- **PROJECTED-GCODE** — the .nc text view is a FIXED Blocks-tab panel (`#blk-gcode`, shared across ops), already LIVE with block-hover + selection glow. A rig here = thin display config ({showGlow, lineNumbers}).
+
+### (2) GLOW state — unmerged, text-view already live:
+The execution-line GLOW is on the unmerged local branch **`glow-gcode` (5d72c76** — blocksApp.js + styles.css, +29; NOT on port/corner-clean per `git branch --contains`). It adds the sim's ACTIVE line + a fading comet-tail to the projected G-code (`onLine(i)→setExecLine`, `.gl.active-line` CSS), REUSING infra ALREADY on this branch (the `.gl` spans + the shared panel's `onLine` hook). Low-risk additive merge; NOT live-verified. The PROJECTED-GCODE text view ITSELF is already wired (fixed panel + hover/selection glow) — so the section does NOT need the glow to exist; the glow is just the main concrete feature a gcode rig would toggle.
+
+### (3) ONE-SOURCE + (4) BYTE-PARITY: a rig block declares DISPLAY config ONLY (toggles / camera / glow-on) — it CONFIGURES how the view renders the ONE trace, NEVER re-declares geometry/anchors (the shared trace + simStart stay one source). Rigs emit NOTHING (like panel/sim) → .nc byte-identical.
+
+### (5) PROPOSED SHAPE + EFFORT + FORK:
+- **Shape: PER-VIEW metadata blocks** (NOT a generic `viewrig` union) — the established pattern (`sim` IS already a per-view rig). Reuse `sim` for 3D; add thin `layout2d` + `gcode` rigs IF/when built.
+- **Reality check:** the 2D + gcode rigs have LITTLE concrete config today (2D fully derives from bindings; gcode is a fixed panel + the unmerged glow). Building them now = mostly-empty scaffolding + MODERATE wiring (each toggle must thread into userOpView/panelTypes/blocksApp render). Rule-of-three / YAGNI concern.
+- **DESIGN FORK for the human:** (A) VISION-FORWARD — add the thin `layout2d` + `gcode` rig blocks now so each view peer is self-contained (per the t119 "one peer c-block per view" vision), accepting some near-empty config; vs (B) YAGNI — keep LAYOUT-2D + PROJECTED-GCODE as labeled placeholders, add a rig block only when a concrete per-view toggle is wanted (`sim` already shows the pattern).
+- **RECOMMENDATION: B + do the concrete high-value step = MERGE + live-verify the sitting glow (5d72c76)** (a real, low-risk feature reusing existing infra) — that unblocks the PROJECTED-GCODE view's one meaningful feature. DEFER the 2D/gcode rig scaffolding until a concrete toggle is needed. Optionally move `panel` FORM→presentation-top (it's the which-views master). **Effort:** glow merge+verify = SMALL; per-view rig blocks = SMALL each but low-value-now (MODERATE with the view-render wiring); 3D-SIM rig = ZERO (exists).
+
+**PASSED BACK the finding + proposal BEFORE building (SCOUT ONLY). After this the LAST queued follow-up = the STRUCTURAL knobs (item d, value-vs-structural). Corner RELEASED V10.51, disjoint.**
