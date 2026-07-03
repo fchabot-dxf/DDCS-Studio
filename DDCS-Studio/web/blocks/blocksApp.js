@@ -174,6 +174,25 @@ async function buildWorkspace() {
   const fit = () => { try { B.svgResize(ws); } catch (_) { /* pre-render */ } };
   new ResizeObserver(fit).observe(host);
 
+  // t134 — MIDDLE mouse button ALWAYS pans (Blocks-tab item f). Blockly v13 decides drag-vs-pan by WHAT is under the pointer
+  // (a movable block → drag), not by which button — so a middle-drag STARTING over a block would try to grab it instead of
+  // panning. Intercept button 1 in the CAPTURE phase on the injection host (fires before Blockly's per-block gesture claims
+  // the pointerdown → stopPropagation keeps the block still) and drive ws.scroll directly. LMB (button 0 = block drag) and
+  // RMB (button 2 = context menu) are untouched — the guard returns immediately for any non-middle button.
+  (function middlePan() {
+    let sx = 0, sy = 0, ox = 0, oy = 0, active = false;
+    const onMove = (ev) => { if (!active) return; try { ws.scroll(ox + (ev.clientX - sx), oy + (ev.clientY - sy)); } catch (_) { /* pre-render */ } };
+    const onUp = () => { active = false; window.removeEventListener('pointermove', onMove, true); window.removeEventListener('pointerup', onUp, true); };
+    host.addEventListener('pointerdown', (e) => {
+      if (e.button !== 1) return;                          // ONLY the middle button; LMB/RMB fall through to Blockly
+      e.preventDefault(); e.stopPropagation();             // preempt Blockly's gesture + the browser's autoscroll puck
+      sx = e.clientX; sy = e.clientY; active = true;
+      try { ox = ws.scrollX; oy = ws.scrollY; } catch (_) { ox = 0; oy = 0; }
+      window.addEventListener('pointermove', onMove, true);
+      window.addEventListener('pointerup', onUp, true);
+    }, true);                                              // CAPTURE — beat Blockly's block-level pointerdown
+  })();
+
   // Authoring is always on (no normal/dev toggle): mountDevMode grows each atom's "expose as knob" affordances + the
   // persistent "Save wizard…" button, and re-augments after every model-driven rebuild (renderFromModel) via onModelRender.
   const _dev = mountDevMode(ws, B, host);
