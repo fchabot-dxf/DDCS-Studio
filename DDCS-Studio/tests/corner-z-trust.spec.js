@@ -29,11 +29,18 @@ test('Z-trust: probeZ-off wall-1 straight to G31 (no pre-plunge) · probeZ-ON ke
       const p = { probeZFirst: pz, travelApproach: ta };
       parity.push({ pz, ta, equal: twin(p) === emit({ ...CD.CORNER_DEFAULTS, ...p }) });
     }
+    const offAuto = emit({}), onAuto = emit({ probeZFirst: 1 });
     return {
-      offAutoBefore: beforeFirstWallG31(emit({})),                          // probeZ-off auto: what precedes wall-1's G31?
-      onAutoBefore: beforeFirstWallG31(emit({ probeZFirst: 1 })),           // probeZ-on auto: ...
+      offAutoBefore: beforeFirstWallG31(offAuto),                           // probeZ-off auto: what precedes wall-1's G31?
+      onAutoBefore: beforeFirstWallG31(onAuto),                             // probeZ-on auto: ...
       offManualHasZ18: /^G0 Z#18$/m.test(emit({ travelApproach: 'manual' })),  // probeZ-off manual: ANY G0 Z#18? (no plunge + no drop → false)
-      offAutoHasZ18: /^G0 Z#18$/m.test(emit({})),                            // probeZ-off auto: the reposition drop REMAINS → true
+      // Option B (t105): probeZ-OFF travel lifts to the DECLARED safe Z (#19) + drops -safeZ ([0-#19]) — scanDepth (#20) unused
+      // off-path. So the off travel has NO #17/#18 (those are the safeZ+scanDepth pair, probeZ-ON only). (Footer #17 excluded.)
+      offAutoLift19: /^G0 Z#19$/m.test(offAuto),                            // safeZ lift after each wall probe → true
+      offAutoDropNeg19: /^G0 Z\[0-#19\]$/m.test(offAuto),                   // -safeZ reposition drop → true
+      offAutoDrop18: /^G0 Z#18$/m.test(offAuto),                            // no #18 on the off path (drop is now [0-#19]) → false
+      onAutoLift17: /^G0 Z#17$/m.test(onAuto),                             // probeZ-ON lifts #17 (safeZ+scanDepth) → true
+      onAutoDrop18: /^G0 Z#18$/m.test(onAuto),                             // probeZ-ON drops #18 → true (unchanged)
       parity,
     };
   });
@@ -45,6 +52,10 @@ test('Z-trust: probeZ-off wall-1 straight to G31 (no pre-plunge) · probeZ-ON ke
   for (const c of r.parity) expect(c.equal, `twin==built-in at probeZ=${c.pz} ${c.ta}`).toBe(true);
   // (4) MANUAL-OFF has NO drop: probeZ-off manual emits NO `G0 Z#18` at all (no wall-1 plunge + no post-jog drop — operator sets Z).
   expect(r.offManualHasZ18, 'probeZ-off MANUAL: no G0 Z#18 (no pre-plunge, no auto-drop after the jog)').toBe(false);
-  // ...but the AUTO-OFF reposition drop REMAINS (it round-trips the tool back to the jogged depth for wall-2).
-  expect(r.offAutoHasZ18, 'probeZ-off AUTO: the reposition drop G0 Z#18 REMAINS (round-trip to jogged depth)').toBe(true);
+  // (5) OPTION B — probeZ-OFF travel lifts to the DECLARED safe Z (#19) + drops -safeZ ([0-#19]); scanDepth (#20) unused off-path.
+  expect(r.offAutoLift19, 'probeZ-off AUTO: the per-wall lift is #19 (safeZ), NOT #17 (safeZ+scanDepth)').toBe(true);
+  expect(r.offAutoDropNeg19, 'probeZ-off AUTO: the reposition drop is [0-#19] (=-safeZ), round-trips to jogged depth').toBe(true);
+  expect(r.offAutoDrop18, 'probeZ-off AUTO: NO G0 Z#18 on the off travel path (scanDepth unused)').toBe(false);
+  // ...and probeZ-ON travel is UNCHANGED — the #17 lift + #18 drop (safeZ+scanDepth, anchored to the measured Z-surface) stay.
+  expect(r.onAutoLift17 && r.onAutoDrop18, 'probeZ-ON: the #17 lift + #18 drop are unchanged (byte-identical)').toBe(true);
 });

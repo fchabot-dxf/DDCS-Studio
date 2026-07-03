@@ -169,7 +169,10 @@ export function cornerStack(params = {}, opts = {}) {
             out.push(mkA('#73', '[#70+1]', 'WCS Y Address'));
             out.push(...wcsFork((w, label) => [mkA('#[#73]', '#101', `Save to ${label} Y`)]));
         }
-        out.push(mkMV(ax, retractVar), mkMV('Z', '#17'));
+        // Z-TRUST (Option B): the per-wall lift-to-safe-Z is #17 (=safeZ+scanDepth) when probeZ ON (unchanged), but #19 (=safeZ
+        // ONLY) when probeZ OFF — scanDepth is meaningless without a measured surface, so the off-path travels at the DECLARED
+        // safe Z. Forked via zPairR so the twin's superset carries both arms (byte-identical ON). Pairs with the reposition drop.
+        out.push(mkMV(ax, retractVar), ...zPairR([mkMV('Z', '#17')], [mkMV('Z', '#19')]));
         return out;
     };
 
@@ -266,12 +269,13 @@ export function cornerStack(params = {}, opts = {}) {
         mode: 'seq', crossX: '#23', crossY: '#24', drop, comment, approach, firstAxis,
         promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, then drop (only when a drop is passed — see repoArmR)
     });
-    // Z-TRUST (③ wall-1 Z frame, human-approved): the reposition drop #18 returns the tool to the probing depth. AUTO always
-    // drops (round-trips to the wall-1 jogged depth). MANUAL drops only when probeZFirst is ON (a real measured Z reference);
-    // when probeZ is OFF the operator RE-JOGS Z at the prompt, so we NEVER auto-adjust after a human jog → no drop. Per-arm
+    // Z-TRUST (③ wall-1 Z frame, human-approved): the reposition drop returns the tool to the probing depth = the NEGATIVE of
+    // the per-wall lift (round-trip nets zero). AUTO always drops: probeZ-ON → #18 (=-#17), probeZ-OFF → [0-#19] (=-safeZ, the
+    // Option-B safe-Z travel — mirrors the #19 lift so scanDepth stays unused off-path). MANUAL drops only when probeZ ON (a
+    // real measured Z reference); probeZ-OFF the operator RE-JOGS Z, so NEVER auto-adjust after a human jog → no drop. Per-arm
     // scoping rides the existing zPairR fork below (repoArmR is called once per probeZ state → z is known here).
     const repoArmR = (z, sA) => taPair(
-        () => repoTraverse(repoLbl(z, sA), 'auto', sA, '#18'),
+        () => repoTraverse(repoLbl(z, sA), 'auto', sA, z ? '#18' : '[0-#19]'),
         () => repoTraverse(repoLbl(z, sA), 'manual', sA, z ? '#18' : undefined),
     );
     S.push(...csFork((c, s, ax) => [

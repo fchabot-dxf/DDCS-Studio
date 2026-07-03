@@ -5746,3 +5746,25 @@ Surgical: 2 files deleted + 3 edited (globalFunctions, index.html, app.js). COMM
 **⚠ SIM CONSEQUENCE FLAGGED (for the machine-faithful sim increment, NOT this one):** the corner's SIM `inferStart` returns `z: safeZ` (:354 — the OLD hover-above-and-plunge model). Under Z-trust the sim's wall probe now fires AT that Z, which is ABOVE the wall for probeZ-off (the old plunge reached z=-5, within the stock). So the LIVE preview would show the probeZ-off wall probe firing above the wall. I fixed the `disc-on-surface` test TEST-ONLY (drive from a within-stock jogged probe height z=-5 → discs land on the wall, 4 discs ~2mm off, mechanism intact) — but the PROD sim inferStart-z is a real Z-trust sim consequence: the operator-start Z should reflect the jogged probe height (probeZ-off), a co-item for the machine-faithful sim increment (alongside the dog-leg-from-END / marker2-at-END+delta / END-relative-drag).
 
 **Surgical:** 1 emit source (cornerWizard.js) + 1 new spec + 3 lockstep test updates (golden regen, manual-off assertion, disc-on-surface driver-Z). COMMITTED, NOT pushed. ⏸ PASS BACK the byte-diff for advisor+human confirm BEFORE final. Then: the machine-faithful sim.
+
+## 🔨 turn 105 (cycle 11) — Z-TRUST EMIT B-PART (Option B, on top of A/c2129d8). The probeZ-OFF travel now lifts to the DECLARED safe Z (#19), not safeZ+scanDepth (#17). REAL MACHINE MOTION, byte-parity-AFFECTING. Suite green (496 passed, 0 failed, 498 total). COMMITTED (not pushed). ⏸ PASS BACK the FINAL byte-diff for advisor+human review BEFORE final.
+
+**THE CHANGE (cornerWizard.js — 2 probeZ-conditional forks, on top of A's plunge-gating + manual-off no-drop, which STAY):**
+- **(B1) per-wall lift forked #17↔#19:** `mkMV('Z','#17')` (probeWallR, shared by both walls) → `...zPairR([mkMV('Z','#17')], [mkMV('Z','#19')])`. probeZ-ON lifts #17 (=safeZ+scanDepth, unchanged); probeZ-OFF lifts #19 (=safeZ ONLY). Forked via zPairR → the twin's superset carries both arms → byte-identical ON.
+- **(B2) auto reposition drop forked:** repoArmR's AUTO drop `'#18'` → `z ? '#18' : '[0-#19]'`. probeZ-ON drops #18 (=-#17); probeZ-OFF drops [0-#19] (=-safeZ, the NEGATIVE of the #19 lift → round-trip nets zero at safeZ). Inline `[0-#19]` expression (valid — middle already emits `G0 X[#22-#52-…]`); no new macro var.
+- **A KEPT:** wall-1 plunge gated on probeZ (zOnlyR); manual-off no-drop (per-arm zPairR). scanDepth (#20) is now TRULY UNUSED on the probeZ-off path.
+
+**FINAL BYTE-DIFF (the emitted .nc — for human review):**
+- **probeZ-OFF AUTO** (vs the original pre-A emit): wall-1 `G0 Z#18` plunge REMOVED (A); per-wall lift `G0 Z#17`→`G0 Z#19` ×2 (both walls, B); reposition drop `G0 Z#18`→`G0 Z[0-#19]` (B).
+- **probeZ-OFF MANUAL:** wall-1 plunge REMOVED (A); per-wall lift `#17`→`#19` (B); reposition drop REMOVED (A: operator re-jogs Z).
+- **probeZ-ON (auto + manual): BYTE-IDENTICAL** (all #17/#18 unchanged — anchored to the measured Z-surface).
+- **Footer/error-handler retract `G0 Z#17`: UNCHANGED** (out of the advisor's B scope — the final/error retract; higher=safer, benign, un-gated).
+- **probe-surface-block CORNER_GOLDEN (regen):** combos 0 (FL/XY/noZ) + 3 (BL/YX/noZ) each = 3 changed lines (#17→#19 ×2, #18→[0-#19] ×1), same line count; combos 1,2 (probeZ:true) BYTE-IDENTICAL. Old↔new diff proven = ONLY the lift/drop swaps on the noZ combos.
+
+**NET MACHINE MOTION (probeZ-off):** probe AT the jogged height (no plunge, both walls, auto); travel at jogged_Z + **safeZ** (#19), the DECLARED clearance — NOT safeZ+scanDepth. scanDepth meaningless without a measured surface → unused off-path. probeZ-ON: a real measured Z reference → keeps #17/#18 (byte-identical).
+
+**VERIFY (mutation-proven):** corner-z-trust.spec += (5) probeZ-off AUTO lift == #19 [Mut MB1 un-fork lift→#17 → RED] + drop == [0-#19] & NO #18 off-path [Mut MB2 off-auto drop→#18 → RED]; probeZ-ON keeps #17 lift + #18 drop. Retained A's (1) no-plunge-off / (2) plunge-on / (3) twin==built-in 2×2 / (4) manual-off-no-drop. Lockstep: CORNER_GOLDEN regen. **Full suite 496 passed, 0 failed.** disc-on-surface stays green (the probe still fires at the jogged Z; the #19 lift/[0-#19] drop still round-trips to it).
+
+**⚠ SIM inferStart-z consequence still stands** (flagged t102, unchanged by B): the corner SIM inferStart returns z=safeZ (old model) → the live probeZ-off preview shows the wall probe above the wall — a co-item for the machine-faithful sim increment.
+
+**Surgical:** 1 emit source + corner-z-trust spec + CORNER_GOLDEN regen (this turn; A's disc-on-surface/corner-travel-approach already committed in c2129d8). COMMITTED, NOT pushed. ⏸ PASS BACK the FINAL byte-diff. Then: the machine-faithful sim.
