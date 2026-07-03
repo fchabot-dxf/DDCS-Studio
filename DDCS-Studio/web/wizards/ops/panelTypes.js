@@ -52,9 +52,18 @@ function _writeParam(name, val) { const f = _field(name); if (f) { f.value = r3(
 // canvas drag-to-edit with no per-op code. The handles are DECLARED from the param-block roles and built by the SAME
 // reusable gesture registry the built-in views use (viz/canvasWidgets — point / rect / radial), not a parallel onDrag.
 // See ROADMAP "CANVAS-WIDGET consolidation" Stage 3 + the spatial-gui-form-vs-canvas memory.
-export function layoutSpecFromOp(def, params, simStart, sources, passEnds) {
+export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots) {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y, ox: 0, oy: 0 } : { w: 200, h: 150, ox: 0, oy: 0 };
+    // t120 — CORNER-MARKER INDEPENDENCE (Option A): the DATUM for the datum-relative marker spots = the CORNER position
+    // (cornerXY, per-corner) — so a stored spot re-anchors when the corner changes. Only the corner op has one; absent →
+    // no spot logic (other ops keep the incremental-socket behavior). `spots` = the persisted per-group datum-relative spot
+    // store (userOpView); `setSpots` re-renders after a drag captures/sets them. `repoGroups` stashes each relTo emitting
+    // group's live world + anchor so the drag can CAPTURE the un-dragged ones (freeze) → full independence after any drag.
+    const _cornerId = ({ 1: 'FL', 2: 'FR', 3: 'BL', 4: 'BR', FL: 'FL', FR: 'FR', BL: 'BL', BR: 'BR' }[params && params.corner]);
+    const cornerXY = _cornerId ? ({ FL: { x: 0, y: 0 }, FR: { x: stock.w, y: 0 }, BL: { x: 0, y: stock.h }, BR: { x: stock.w, y: stock.h } })[_cornerId] : null;
+    const spotStore = (cornerXY && spots && typeof setSpots === 'function') ? spots : null;   // active only for a corner op with the store wired
+    const repoGroups = [];   // { gid, fx, fy, ax, ay, worldX, worldY } per relTo emitting group (for the drag capture)
     // t81 — colour a handle by its pass's reposition SOURCE (auto=cyan / manual=amber), MATCHING the top panel. `sources` is the
     // per-pass array the panel exposes (getPassSources); absent → null → the FeatureCanvas keeps its CSS default (gold).
     const srcCol = (pass) => (!Array.isArray(sources)) ? null : (sources[pass] === 'manual' ? '#ffb300' : '#22d3ee');
@@ -155,9 +164,22 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds) {
                     if (destX != null) { destX += dxE; destY += dyE; }
                 }
             }
-            const offX = (destX != null) ? destX - ax : p('x');
-            const offY = (destY != null) ? destY - ay : p('y');
+            let offX = (destX != null) ? destX - ax : p('x');
+            let offY = (destY != null) ? destY - ay : p('y');
+            // t120 — Option A independence: if THIS group has a stored datum-relative spot, its WORLD is FIXED at cornerXY +
+            // spot; DERIVE the emitted G91 increment = world − the (current, possibly-moved) anchor + WRITE it to the form
+            // field (guarded — only when it actually changed, so no re-render loop; the derive is a fixpoint because the
+            // anchor is upstream + never depends on this field). So dragging an UPSTREAM marker (which moves this anchor) keeps
+            // THIS marker put (its increment re-derives). UNSET → the socket increment (byte-identical default) holds.
+            if (spotStore && spotStore[gid] && cornerXY) {
+                const worldX = cornerXY.x + spotStore[gid].dx, worldY = cornerXY.y + spotStore[gid].dy;
+                offX = worldX - ax; offY = worldY - ay;
+                if (wr('x') && r3(offX) !== r3(num(params[byRole.x.param]))) _writeParam(byRole.x.param, offX);
+                if (wr('y') && r3(offY) !== r3(num(params[byRole.y.param]))) _writeParam(byRole.y.param, offY);
+            }
             const x = ax + offX, y = ay + offY;
+            // stash this relTo emitting group's live world + anchor so a drag on ANY handle can CAPTURE (freeze) the others
+            if (spotStore && byRole.x.param && byRole.y.param) repoGroups.push({ gid, fx: byRole.x.param, fy: byRole.y.param, ax, ay, worldX: x, worldY: y });
             items.push({ kind: 'hole', x, y, n: 1, r: Math.max(1, stock.w * 0.012) });
             if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: offX, y: offY, ax, ay, label: 'pos', color: srcCol(destPass) });
         }
@@ -166,6 +188,20 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds) {
     // math (corner/radius) lives in the registry; here `setFields` just routes each {param: value} to its form field.
     const setFields = (m) => { for (const k in m) _writeParam(k, m[k]); };
     const { handles, onDrag } = buildCanvasWidgets(decls, setFields);
+    // t120 — Option A independence: wrap the emitting-handle drag. On dragging ANY relTo handle, CAPTURE (freeze) every OTHER
+    // relTo group's spot at its CURRENT displayed world (no jump), then SET the dragged group's spot to the drop world — all
+    // datum-relative to cornerXY. The re-render then derives each group's G91 increment off the current planned anchor, so
+    // dragging one marker leaves the others put (their increments re-derive off the moved chain). Non-corner/no-store → plain onDrag.
+    const spotOnDrag = (spotStore && repoGroups.length && cornerXY) ? (id, world) => {
+        const dragged = repoGroups.find((g) => id === g.gid + '_pos');
+        if (dragged) {
+            const next = { ...spotStore };
+            for (const g of repoGroups) { if (g !== dragged && !next[g.gid]) next[g.gid] = { dx: g.worldX - cornerXY.x, dy: g.worldY - cornerXY.y }; }
+            next[dragged.gid] = { dx: world.x - cornerXY.x, dy: world.y - cornerXY.y };
+            setSpots(next);
+        }
+        if (onDrag) onDrag(id, world);
+    } : onDrag;
     // t112 — GUI CORNER-SELECTOR: an op that declares a `corner` enum binding gets clickable stock-corner targets on the
     // canvas (FeatureCanvas._drawCornerPick). Clicking one SETS the corner <select> + dispatches change → update() re-emits
     // (already correct per corner) + re-derives the per-corner markers/sim (prefill t109) — reusing the dropdown's OWN change
@@ -189,20 +225,29 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds) {
         // t87 — the sim-only marker is DRAGGABLE: route its drag to the panel's onStartDrag (writes userStarts, NEVER emitted —
         // reuses the top panel's seam, no new mechanism); every other handle keeps its param-writing onDrag. (placement is {0,0}
         // for a probe op → the canvas world-delta IS the absolute start world point onStartDrag expects.)
+        // t120 — the sim-only ◇ is the CHAIN ROOT (the operator's MANUAL jog: probeZ-on zsurf / probeZ-off wall-1, never emitted).
+        // The emitting #-handles are G91 INCREMENTS relative to it, so its drag must stay a PURE preview move: undragged handles
+        // ride the root (the relative chain, emit byte-identical) and dragged handles hold their datum-relative spot (their derive
+        // re-computes off the moved planned anchor). It must NOT capture — freezing a handle against a PREVIEW root would bake that
+        // preview position into the emitted increment (machine-wrong; the real jog is wherever the operator goes). Emit-side coupling
+        // is only between emitting handles → handled by spotOnDrag. So SIM_ID → onStartDrag (userStarts), every other id → spotOnDrag.
         const wrappedOnDrag = (typeof simStart.onDrag === 'function')
-            ? (id, world) => { if (id === SIM_ID) simStart.onDrag({ x: world.x, y: world.y }); else if (onDrag) onDrag(id, world); }
-            : onDrag;
+            ? (id, world) => {
+                if (id === SIM_ID) simStart.onDrag({ x: world.x, y: world.y });
+                else if (spotOnDrag) spotOnDrag(id, world);
+            }
+            : spotOnDrag;
         return { stock, items, handles: allHandles, onDrag: wrappedOnDrag, ...cornerPick };
     }
-    return { stock, items, handles, onDrag, ...cornerPick };
+    return { stock, items, handles, onDrag: spotOnDrag, ...cornerPick };
 }
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).
 let _layout = null;
-export function renderLayout2D(container, def, params, simStart, sources, passEnds) {
+export function renderLayout2D(container, def, params, simStart, sources, passEnds, spots, setSpots) {
     if (!container) return;
     if (!_layout) _layout = new FeatureCanvas();
-    _layout.render(container, layoutSpecFromOp(def, params, simStart, sources, passEnds));
+    _layout.render(container, layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots));
 }
 
 export function renderDeclaredLayout(container, def, params) {

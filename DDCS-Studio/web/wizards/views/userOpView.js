@@ -36,6 +36,13 @@ let _def = null;          // the active custom-op def (template + bindings + pan
 let _seed = null;         // params to seed the widgets with (edit), or null (defaults)
 let _readers = [];        // [() → { param: value }] one per rendered widget unit
 let _mgr = null;
+// t120 — CORNER-MARKER INDEPENDENCE (Option A): each corner-datum canvas handle stores a DATUM-RELATIVE spot ({dx,dy} off
+// the corner) here, keyed by its binding GROUP (e.g. 'reposition' #23/#24, 'start' #21/#22). A drag sets the dragged
+// group's spot + CAPTURES the others (freeze) → after any drag all handles are independent (dragging one leaves the rest
+// put, its emitted G91 increment re-derived off the moved planned anchor). UNSET → the socket expression holds (byte-
+// identical default). Datum-relative → re-anchors on a corner change. Persists across renders; reset when the op changes.
+let _layoutSpots = {};    // { [groupId]: { dx, dy } } datum-relative, per the active op
+let _layoutSpotsOp = null;
 
 /** The manager sets the def before opening (resolved from the type). Also picks the panel layout. */
 export function setUserOpDef(def) {
@@ -135,10 +142,14 @@ export const userOpView = {
                     const pos0 = ps[0] || (Array.isArray(starts) && starts[0]) || null;   // dragged start, else the declared pass-0 hint
                     const sources = (panel && typeof panel.getPassSources === 'function') ? panel.getPassSources() : null;   // t81 — per-pass auto/manual, so the Layout matches the top panel
                     const passEnds = (panel && typeof panel.getPassEnds === 'function') ? panel.getPassEnds() : null;   // t107 — per-pass runtime ENDs, so the Layout ② relocates to the machine-faithful spot + the drag writes END-relative #23/#24
+                    // t120 — the datum-relative marker-spot store (Option A independence). Reset when the op changes (a fresh op
+                    // starts undragged → the socket expressions → byte-identical). setSpots re-renders so a drag's capture/derive shows.
+                    if (_layoutSpotsOp !== _def.opType) { _layoutSpots = {}; _layoutSpotsOp = _def.opType; }
+                    const setSpots = (next) => { _layoutSpots = next || {}; };
                     const simStart = (panel && pos0 && typeof panel.onStartDrag === 'function')
                         ? { pos: pos0, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } }
                         : (pos0 ? { pos: pos0 } : null);
-                    renderLayout2D(c, _def, params, simStart, sources, passEnds);
+                    renderLayout2D(c, _def, params, simStart, sources, passEnds, _layoutSpots, setSpots);
                 };
                 renderLayoutWithSim();
             }
