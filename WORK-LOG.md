@@ -5924,3 +5924,46 @@ Surgical: 2 files deleted + 3 edited (globalFunctions, index.html, app.js). COMM
 **NOTE — STRAY working-tree change (NOT mine, left unstaged):** `DDCS-Studio/package.json` version 10.50.0 → 10.51.0 (a version bump from another process/the release flow; the app chip shows V10.51). I did NOT touch it and did NOT stage it — flagging for the advisor.
 
 **PASSED BACK for advisor review. Corner remains release-ready pending the human's live-verify (disjoint). Next Blockly item = the REDIVIDE (mouth/block-def) — NOT started.**
+
+## 🔨 turn 128 (cycle 12) — BLOCKLY REDIVIDE SCOUT (verify-first gate, NO code). Finding + build plan for advisor+human review. Suite untouched.
+
+### (1) VERIFY-FIRST — **EXPANDED, not a leaf → the SMALLER-effort path.**
+`cornerDataDef()` → `userOpFromStack(..., cornerDataStack(CORNER_DEFAULTS), ...)` (cornerData.js:240); `userOpFromStack` sets `def.template = stripIds(stack)` (userOps.js:445). `makeOp('user_corner_data', params, def.template)` (devMode.js:432) wraps that WHOLE template. `def.template` = the fully-expanded `user_root` (cornerData.js:168-186): `uiChildren:[panel, sim, param_group, …simstarts]` + `children:cornerStack(params,{superset:true})`. The value-param atoms (`assign #1..#20`, the guarded `#21-#24`, probes, comments) are ALREADY individually-editable child blocks in the EXECUTION mouth (bindings derive over them by identity). So the value params do NOT need surfacing first — the redivide is a RE-GROUP of already-expanded atoms, not a leaf-expansion.
+
+### Current structure (authoring view):
+```
+⬡ Corner (data)                     [op container — makeOpDef, GCODE mouth]
+  └ ▸ Define Custom Wizard           [user_root; emit = [...uiChildren, ...children]]
+       ── Presentation (UI & Sim) ──  PRESENTATION mouth → uiChildren  (all emit ∅)
+          • panel(form3d+2d) • sim(machine) • param_group "Corner" • simstart×N
+       ── Execution (G-code) ──       EXECUTION mouth → children (cornerStack atoms, THE .nc)
+          • (comments) • assign #1..#20 (value+calc) • guard(probeZFirst){#21/#22}
+          • guard(corner×probeSeq){probes+moves} • syncBlocks • footer
+```
+So today = **2 content mouths** (+ the label = the "3 coarse sections"). The `param_group` block (userRoot.js:24-33) is ALREADY a labeled transparent-emit section c-block (`emit:(p,children)=>children`) — the MODEL for new section blocks.
+
+### Blast radius (byte-parity + all-wizards-render gate):
+The `user_root` rendering is SHARED by **6 seeded ops** (corner/drill/slot/surfacing/text/atcWarmup) + any user-authored wizard, at exactly 3 sites, all keyed `def.kind==='user_root'`: block-def mouths **bridge.js:203-209**; round-trip **stackBridge.js:108-112 (block→json) + :240-242 (json→block)**; emit **userRoot.js:21 / blockEmitter.js:111-116**. The generic `op`/field path (~93 block classes) is UNTOUCHED unless field-classification changes. So changing user_root's mouths hits all 6 ops → any redivide must keep them rendering.
+
+### (3) ONE-SOURCE — CONFIRMED airtight (do not disturb).
+`stack → emitMapped → proj.text (PROJECTED G-CODE)` → **ONE `traceToolpath`** → `parsed{segments, passEnds, stats}` → fed to BOTH the 2D (toolpath2d) AND 3D (GcodeViz3D) views (createPreviewPanel.js:419-484). Neither view re-derives geometry; both read the identical trace of the identical projected text; the block↔code glow reuses the same `proj.map`. **NUANCE:** corner's sim-marker XY comes from `cornerSimStartsProvider` (cornerData.js:130-163) which CHAINS off the emit's `cornerReposOffsets` (preview-only, byte-parity untouched) — a PARALLEL declared computation, not read from `parsed`. The redivide's PRESENTATION view blocks must stay RENDER RIGS reading the one trace — they must NOT each re-declare anchors (the exact Option A trap).
+
+### (2) 4-MOUTH MAPPING (target per t119) + declared-vs-baked + emit:
+| Mouth | Content (from today) | Declared/baked | Emits |
+|---|---|---|---|
+| **STRUCTURAL** | the 5 guard/prune drivers (probeZFirst/corner/probeSeq/wcs/syncA = CORNER_STRUCT_BINDINGS) as structural-knob DECLARATION blocks | declared (live toggles → prune at instantiate) | ∅ |
+| **VARIABLES** | the LEADING ungated `#var` assigns (#1..#20, value+calc) | declared value sockets (form knobs) | the `#=` lines |
+| **PRESENTATION** | 4 PEER c-blocks: FORM(panel+param_group) · LAYOUT-2D(featureCanvas rig) · 3D-SIM(sim/gcodeViz3d rig) · PROJECTED-GCODE(new .nc-text+glow view) | declared view rigs | ∅ |
+| **G-CODE** | the guards + probes + moves + syncBlocks + footer (everything after the leading declarations) | baked execution stack | the motion .nc |
+
+**EMIT ORDER / byte-parity CONSTRAINT (critical):** emit walks STRUCTURAL(∅)+VARIABLES(#-assigns)+PRESENTATION(∅)+G-CODE(motion). Since STRUCTURAL+PRESENTATION emit nothing, the emitting order = `VARIABLES ++ G-CODE`, which must reproduce today's `children` order EXACTLY. → the VARIABLES/G-CODE split MUST fall on the **contiguous seam** between the leading ungated #-assigns and the first guarded/motion block (NOT a semantic re-sort that would move the guarded `#21/#22` out of their inline position). Splitting there = byte-identical; re-sorting = a diff. This is the load-bearing gate.
+
+### THE DESIGN FORK (needs the human's call — subjective granularity/architecture):
+- **A — fixed 4 mouths in `user_root`'s block-def** (bridge.js:203-209 → 4 input_statements): migrate ALL 6 ops' templates + round-trip + emit; the non-corner ops get awkward empty STRUCTURAL/VARIABLES. Uniform but forces the shape on ops that don't need it.
+- **B — DATA-DRIVEN `section` blocks** (the settled line-283 SECTION-BLOCK model; RECOMMENDED): add ONE generic `section` c-block kind (labeled, header-row style, transparent emit — the `param_group` generalization). `user_root` holds N section blocks as DATA in the template. Corner declares 4 sections (STRUCTURAL/VARIABLES/PRESENTATION[4 peers]/G-CODE); the other 5 ops keep their current shape (corner is the PILOT per the corner-gated-pilot strategy) or take a trivial [Presentation,Execution] 2-section wrap. Valid-by-construction, per-op flexible, minimal block-def change, matches wizards-as-data + north-star. More building (new section kind + PROJECTED-GCODE view block + splitting today's `panel(form3d+2d)` into LAYOUT-2D + 3D-SIM peers), but the RIGHT end-state and it doesn't force-migrate the other 5.
+
+**Sub-decisions to confirm at build:** (i) STRUCTURAL mouth = real structural-knob blocks (folds in item (d) value-vs-structural, bigger) vs a thin documentation marker (smaller); (ii) whether to keep `user_root`'s 2 mouths and nest sections inside, or collapse to one SECTIONS mouth (touches all 6 ops' round-trip).
+
+### RECOMMENDATION: Option B (section-block model), CORNER-PILOTED. Effort: MODERATE (not the leaf/large path). Highest-risk = the byte-parity seam + the shared user_root round-trip → advisor fan-out on the build diff.
+
+**PASSED BACK the finding + plan for advisor+human review BEFORE building (SCOUT ONLY, no code). Corner is RELEASED (V10.51); this is disjoint Blocks-tab work.**
