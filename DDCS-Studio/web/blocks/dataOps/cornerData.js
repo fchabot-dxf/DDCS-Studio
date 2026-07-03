@@ -166,23 +166,46 @@ function cornerSimStartsProvider(params, stock) {
  *  are the value-sockets the bindings drive. The `simstart` rows declare the per-pass preview markers (canonical over
  *  def.sim.starts). Exported so the emit spec can build a probeZFirst=on variant to prove the derive helper re-finds #23/#24. */
 export function cornerDataStack(params = CORNER_DEFAULTS) {
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },   // B3d: BOTH the 3D probe sim (+ per-pass markers) AND the 2D reposition drag canvas (built-in probe pattern)
-            { type: 'sim', params: { rotary: false, machine: true, magazine: false } },
-            {
-                type: 'param_group',
-                params: { group: 'Corner' },
-                children: [],
-            },
-            ...simStartsToBlocks(CORNER_SIM_STARTS),   // per-pass preview start markers (canonical; SIM only, emit nothing)
-        ],
-        // ② B4 step 4a — the SUPERSET seed: cornerStack emits BOTH probeZFirst arms wrapped in `guard`s, so instantiate()
-        // prunes to either shape. The built-in still calls cornerStack CONCRETE (no opts) — the twin alone carries the forks.
-        children: cornerStack(params, { superset: true }),
-    }];
+    // t130 — REDIVIDE (Option B, corner-piloted): organise the wizard's blocks into labeled concern-SECTIONS (transparent
+    // `section` containers — emit their children in order, so this is byte-transparent). user_root keeps its 2 mouths (the
+    // 5 OTHER user ops are untouched); the sections nest inside. PRESENTATION mouth = FORM + one peer per VIEW; EXECUTION
+    // mouth = STRUCTURAL / VARIABLES / G-CODE.
+    const sec = (title, children) => ({ type: 'section', params: { title }, children });
+    const panel = { type: 'panel', params: { panel: 'form3d+2d' } };   // B3d: the 3D probe sim + per-pass markers AND the 2D reposition drag canvas
+    const sim = { type: 'sim', params: { rotary: false, machine: true, magazine: false } };
+    const paramGroup = { type: 'param_group', params: { group: 'Corner' }, children: [] };
+    const simstarts = simStartsToBlocks(CORNER_SIM_STARTS);   // per-pass preview markers (canonical; SIM only, emit nothing)
+
+    // PRESENTATION mouth — FORM (input) + one peer per VIEW of the program (t119). All emit ∅. The per-pass sim-start
+    // markers are the SHARED anchor source (fed to BOTH the 2D + 3D views by cornerSimStartsProvider — ONE source, never
+    // re-declared per view; the one-source guard); they ride 3D-SIM. LAYOUT-2D + PROJECTED-GCODE are LABELED PLACEHOLDERS
+    // this pass — their views are driven by the ONE trace + the form3d+2d panel; per-view rig blocks are a later follow-up.
+    const uiChildren = [
+        sec('FORM', [panel, paramGroup]),
+        sec('LAYOUT-2D', []),
+        sec('3D-SIM', [sim, ...simstarts]),
+        sec('PROJECTED-GCODE', []),
+    ];
+
+    // EXECUTION mouth. ② B4 step 4a — cornerStack emits the SUPERSET (both probeZFirst arms wrapped in `guard`s; instantiate()
+    // prunes to the chosen shape). STRUCTURAL = a ∅ LABELED GROUPING (the structural knobs are the deferred item-d follow-up).
+    // The VARIABLES/G-CODE split falls on the CONTIGUOUS SEAM = the first top-level guard/motion AFTER the first ungated
+    // assign → VARS ++ G-CODE reproduces the cornerStack order EXACTLY (byte-identical; STRUCTURAL emits nothing). Robust:
+    // no boundary found → everything lands in VARIABLES (still byte-exact, just coarser grouping).
+    const exec = cornerStack(params, { superset: true });
+    let seenAssign = false, seam = exec.length;
+    for (let i = 0; i < exec.length; i++) {
+        const b = exec[i];
+        if (b && b.type === 'assign') seenAssign = true;
+        else if (seenAssign && b && (b.type === 'guard' || b.type === 'distmode' || b.type === 'probe' || b.type === 'move')) { seam = i; break; }
+    }
+    const children = [
+        sec('STRUCTURAL', []),
+        sec('VARIABLES', exec.slice(0, seam)),
+        sec('G-CODE', exec.slice(seam)),
+    ];
+
+    return [{ type: 'user_root', params: {}, uiChildren, children }];
 }
 
 /** Bindings for the value sockets — DERIVED (not hand-counted). The corner×probeSeq 8-way guard DUPLICATES the bound reposition

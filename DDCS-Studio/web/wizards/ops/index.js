@@ -28,7 +28,7 @@ import { stepdownBlock } from './stepdown.js';
 import { placeOnStockBlock } from './placeOnStock.js';
 import { rotateBlock } from './rotate.js';
 import { probeBlock } from './probe.js';
-import { userRootBlock, paramGroupBlock } from './userRoot.js';
+import { userRootBlock, paramGroupBlock, sectionBlock } from './userRoot.js';
 import { arrayBlock, patternPoints } from './array.js';
 import { helixBlock, helixPoints } from './helix.js';
 import { countBlock } from './count.js';
@@ -83,7 +83,7 @@ export const PALETTE = [
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     mcodeBlock, rawBlock, outPinBlock, waitInputBlock,         // Signals (raw M-code/G-code escape + digital I/O M62-66)
-    paramBlock, regionPickBlock, coordListBlock, panelBlock, layoutBlock, simBlock, simStartBlock, userRootBlock, paramGroupBlock, // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig + per-pass sim-start declarations)
+    paramBlock, regionPickBlock, coordListBlock, panelBlock, layoutBlock, simBlock, simStartBlock, userRootBlock, paramGroupBlock, sectionBlock, // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig + per-pass sim-start declarations + titled concern-section)
     commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
 ];
 

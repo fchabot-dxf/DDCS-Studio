@@ -31,3 +31,17 @@ export const paramGroupBlock = {
     // Emits its DO children (e.g. Set Variable assignments)
     emit: (params, children) => children || [],
 };
+
+// `section`: a generic TITLED, transparent-emit container (the param_group generalization, t130). A custom wizard uses it
+// to organise its blocks into labeled concern-sections (STRUCTURAL / VARIABLES / the PRESENTATION view peers / G-CODE)
+// WITHOUT changing the emit — it emits its DO children in order, so wrapping atoms in sections is byte-transparent. Every
+// walker (flattenBlocks, pruneGuards, blockEmitter) already recurses generically through `.children`, so nesting is safe.
+export const sectionBlock = {
+    type: 'section',
+    label: 'Section',
+    category: 'Wizard UI',
+    kind: 'section',
+    defaults: { title: 'Section' },
+    fields: ['title'],
+    emit: (params, children) => children || [],   // transparent — the label is authoring-only; emit order = children order
+};

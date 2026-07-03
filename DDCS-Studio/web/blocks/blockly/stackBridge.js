@@ -110,7 +110,7 @@ function toRecord(b) {
         const eInp = b.getInput('EXECUTION'), eBlk = eInp && eInp.connection && eInp.connection.targetBlock();
         r.uiChildren = pBlk ? chain(pBlk) : [];
         r.children = eBlk ? chain(eBlk) : [];
-    } else if (def.kind === 'param_group') {
+    } else if (def.kind === 'param_group' || def.kind === 'section') {   // t130 — section round-trips its DO mouth → children, like param_group
         const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
         if (first) r.children = chain(first);
     } else if (isWrap(def)) {
@@ -240,7 +240,7 @@ function recToJson(rec) {
     if (def.kind === 'user_root') {
         if (rec.uiChildren && rec.uiChildren.length) inputs.PRESENTATION = { block: chainToJson(rec.uiChildren) };
         if (rec.children && rec.children.length) inputs.EXECUTION = { block: chainToJson(rec.children) };
-    } else if (def.kind === 'param_group') {
+    } else if (def.kind === 'param_group' || def.kind === 'section') {   // t130 — section writes its children into the DO mouth
         if (rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
     } else if (isWrap(def) && rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
     if (Object.keys(fields).length) node.fields = fields;

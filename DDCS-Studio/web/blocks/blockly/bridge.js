@@ -207,10 +207,10 @@ function jsonDef(def) {
         args.push({ type: 'input_statement', name: 'PRESENTATION' });
         message += ` Execution (G-code) %${++n}`;
         args.push({ type: 'input_statement', name: 'EXECUTION' });
-    } else if (def.kind === 'param_group') {
+    } else if (def.kind === 'param_group' || def.kind === 'section') {   // t130 — section = the titled transparent container (same DO mouth)
         message += ` %${++n}`;
         args.push({ type: 'input_statement', name: 'DO' });
-    } else if (isWrap(def)) { 
+    } else if (isWrap(def)) {
         message += ` %${++n}`; args.push({ type: 'input_statement', name: 'DO' }); 
     }
     const block = {

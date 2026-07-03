@@ -114,7 +114,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
         return out;
     }
-    if (block.type === 'param_group' || block.type === 'guard') {   // guard is normally pruned pre-emit; transparent-emit is a safety net
+    if (block.type === 'param_group' || block.type === 'guard' || block.type === 'section') {   // t130 — section is transparent (emit its children in order); guard is normally pruned pre-emit
         const out = [];
         (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
         return out;
