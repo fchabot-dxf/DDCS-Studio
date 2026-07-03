@@ -1884,7 +1884,6 @@
             });
         }
 
-        let cornerSvgLoaded = false;
         let middleSvgLoaded = false;
 
         // Load SVG from inlined assets (standalone bundle) or network fetch for dev server.
@@ -1904,63 +1903,6 @@
             }
             return null;
         }
-
-        window.drawCornerViz = async function(probeZ) {
-            const container = document.getElementById('cornerVizContainer');
-            if (!container) return;
-
-            // Load SVG once on first call
-            if (!cornerSvgLoaded) {
-                const svgText = await fetchSvg(
-                    ['./assets/svg/cornerViz.svg', './assets/cornerViz.svg'],
-                    ['svg/cornerViz.svg', 'cornerViz.svg']
-                );
-                if (!svgText) {
-                    console.error('drawCornerViz: failed to load cornerViz.svg');
-                    throw new Error('Unable to load cornerViz.svg');
-                }
-                container.innerHTML = svgText;
-                const svgRoot = container.querySelector('svg');
-                namespaceSvgDefs(svgRoot, 'cornerViz');
-                console.debug('drawCornerViz: SVG injected; svgExists=', !!container.querySelector('svg'));
-                cornerSvgLoaded = true;
-            }
-
-            // Get current form values
-            const corner = document.getElementById('c_corner')?.value || 'FL';
-            const probeSeq = document.getElementById('c_probe_seq')?.value || 'YX';
-
-            // Determine probeZ: if argument provided use it, otherwise read checkbox
-            probeZ = (typeof probeZ === 'boolean') ? probeZ : (document.getElementById('c_probe_z_first')?.checked || false);
-
-            // Hide all corner groups
-            ['corner_FL', 'corner_FR', 'corner_BL', 'corner_BR'].forEach(id => {
-                const elem = document.getElementById(id);
-                if (elem) elem.style.display = 'none';
-            });
-
-            // Show selected corner group
-            const cornerElem = document.getElementById('corner_' + corner);
-            if (cornerElem) cornerElem.style.display = 'block';
-
-            // Get sequence groups for active corner
-            const yxSeq = document.getElementById(`corner_${corner}_YX`);
-            const xySeq = document.getElementById(`corner_${corner}_XY`);
-
-            // Show only the selected sequence
-            if (probeSeq === 'YX') {
-                if (yxSeq) yxSeq.style.display = 'block';
-                if (xySeq) xySeq.style.display = 'none';
-            } else {
-                if (xySeq) xySeq.style.display = 'block';
-                if (yxSeq) yxSeq.style.display = 'none';
-            }
-
-            // Toggle Zfirst group within active corner+sequence
-            const zfirstElem = document.getElementById(`corner_${corner}_${probeSeq}_Zfirst`);
-            if (zfirstElem) zfirstElem.style.display = probeZ ? 'block' : 'none';
-
-        };
 
         window.drawMiddleViz = async function() {
             console.debug('drawMiddleViz: start');

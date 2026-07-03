@@ -5682,3 +5682,17 @@ wall1→wall2; Z→wall1 kept a byte-identical diagonal — above stock, no-op-a
 3. The VS Code EXTENSION has its OWN dangling cornerViz refs (drawCornerViz + a stale bundle) — a SEPARATE managed-fork cleanup (out of the DDCS-Studio scope). Flag to human / defer / include?
 
 **NO code changed this turn (gate).** Awaiting scope-confirm, then I execute the surgical deletion + verify the full suite green + byte-parity untouched.
+
+## 🔨 turn 98 (cycle 11) — SVG-CLEANUP EXECUTE (scope A+B+C+D, advisor-confirmed t97). Removed the DEAD old-2D-sim cornerViz reference. Full suite green (495 passed, 0 failed, 497 total) — byte-parity untouched (viz/UI-only). COMMITTED (not pushed). ⏸ PASS BACK.
+
+Executed the confirmed surgical deletion (the enumeration + gate were t96/6193364):
+- **(A) DELETED** `web/viz/cornerVizAnimator.js` + `web/assets/svg/cornerViz.svg` (git rm).
+- **(B)** `web/ui/globalFunctions.js` — removed the `import { CornerVizAnimator }` (:6) + the `window.CornerVizAnimator = …` assign (:31). MANDATORY (globalFunctions is in the live module graph via app.js:14 — leaving the import would 404 the deleted file).
+- **(C)** `web/index.html` — removed the orphaned `window.drawCornerViz` block (was :1908-1963) + the corner-only `let cornerSvgLoaded` (:1887). KEPT the SHARED helpers `fetchSvg` + `namespaceSvgDefs` (used by drawMiddleViz/Edge/Align) + `middleSvgLoaded` — verified intact.
+- **(D)** `web/app.js` — removed `initializeCornerVisualization()` (the method + its :131 call). It was called at startup but no-op'd (no `cornerVizCorner` DOM element).
+
+**LEFT surgically (E, per the advisor) — did NOT touch:** the index.html shared-helper COMMENTS (:1834/:1838 still name drawCornerViz) + the `cornerVizCorner` dead-branches inside the LIVE `addEdgeMarker` (guarded, with a fallback); `edgeVizAnimator.js:3` "Mirrors CornerVizAnimator pattern" comment; `iconEditor.js:12` comment; the dev-tools (`smoke_test_playwright.py`, `tmp_prefix_svg_ids`); the docs. **DEFERRED the VS Code EXTENSION** (its own dangling refs = a separate managed-fork pass; it's independent — doesn't build-import cornerVizAnimator, so this deletion doesn't break it).
+
+**VERIFY:** `node --check` on both edited JS (globalFunctions.js + app.js) → OK (no broken imports). Post-deletion grep: the ONLY remaining `CornerVizAnimator` in DDCS-Studio/web is the edgeVizAnimator.js:3 COMMENT (E — left); NO remaining runtime `cornerViz.svg` load; the 2 remaining `drawCornerViz` mentions are the E comments. **Full suite 495 passed, 0 failed, 2 skipped = 497** — IDENTICAL to the pre-deletion count (turn 94/turn 96 baseline), so the app still BOOTS (globalFunctions loads without the deleted import), every wizard preview works, and the byte-parity goldens (corner-data-emit / probe-surface-block CORNER_GOLDEN) pass → byte-parity untouched (this is a viz/UI-only deletion; the emit path was never involved).
+
+Surgical: 2 files deleted + 3 edited (globalFunctions, index.html, app.js). COMMITTED, NOT pushed. Next queued: ANCHOR-END scout.

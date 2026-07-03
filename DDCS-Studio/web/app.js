@@ -127,8 +127,6 @@ class DDCSStudio {
             _checkKeyboard();
         }
 
-        // Initialize corner visualization
-        this.initializeCornerVisualization();
         this.setupVisualizationListeners();
 
         // Log layout snapshot for debugging: sizes and visibility
@@ -210,23 +208,6 @@ class DDCSStudio {
 
     setupNumericInputGuards() {
         setupNumericInputGuardsImpl();
-    }
-
-    initializeCornerVisualization() {
-        document.addEventListener('DOMContentLoaded', () => {
-            const cornerVizCorner = document.getElementById('cornerVizCorner');
-            if (cornerVizCorner) {
-                ['cornerFL', 'cornerFR', 'cornerBL', 'cornerBR'].forEach(cornerId => {
-                    const corner = cornerVizCorner.querySelector('#' + cornerId);
-                    if (corner) {
-                        const yxSeq = corner.querySelector('[id^="probeYX"]');
-                        const xySeq = corner.querySelector('[id^="probeXY"]');
-                        if (yxSeq) yxSeq.style.display = 'none';
-                        if (xySeq) xySeq.style.display = 'none';
-                    }
-                });
-            }
-        });
     }
 
     setupVisualizationListeners() {

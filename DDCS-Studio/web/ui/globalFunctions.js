@@ -3,7 +3,6 @@
  * Extracted from app.js; `app` is the DDCSStudio instance.
  */
 import { el } from './uiUtils.js';
-import { CornerVizAnimator } from '../viz/cornerVizAnimator.js';
 import { resetVirtualIO, setVirtualOutput, getVirtualInput } from '../engine/virtualIO.js';
 import { rotateProgram, translateProgram } from '../data/rotateProgram.js';
 import { parseGcode } from '../gcodeParser.js';
@@ -28,7 +27,6 @@ export function setupGlobalFunctions(app) {
         window.openWiz = (type, variant, bypassPrereq) => { window.ddcsTrack?.('feature', 'wizard:' + type); return app.wizardManager.open(type, variant, bypassPrereq); };
         // openCornerWiz retired (④) — the built-in Corner is replaced by the "Corner (data)" twin (opens via openWiz('user_corner_data')).
         window.openMiddleWiz = () => { window.ddcsTrack?.('feature', 'wizard:middle'); return app.wizardManager.openMiddle(); };
-        window.CornerVizAnimator = CornerVizAnimator;
         window.openEdgeWiz = () => { window.ddcsTrack?.('feature', 'wizard:edge'); return app.wizardManager.openEdge(); };
         window.openAlignmentWiz = () => { window.ddcsTrack?.('feature', 'wizard:alignment'); return app.wizardManager.openAlignment(); };
         window.closeWiz = () => app.wizardManager.close();
