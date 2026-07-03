@@ -4801,9 +4801,23 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .rep .rep-num { width:30px; text-align:center; }   /* Region x/y/w/h pill fields */
 #blocks-app .blk.fill > .blk-body .f, #blocks-app .blk.depth > .blk-body .f { width:auto; }   /* room for the region socket */
 
-/* ── Blocks tab handles: hidden on desktop (the side-by-side grid already shows everything) ── */
-#blocks-app .blk-drawer-head, #blocks-app .blk-drawer-handle, #blocks-app .blk-tools-handle,
+/* ── Blocks tab handles: the PREVIEW-drawer handles stay hidden on desktop (the side-by-side grid already shows the
+   preview). The TOOLS handle is shown at ALL widths (t126) so the palette/toolbox can collapse+expand on DESKTOP too,
+   not just mobile — a left-edge vertical tab that parks at the toolbox's right edge when open (as ✕) and at left:0 when
+   collapsed (as "Blocks"). Collapse is via the toolbox's OWN setVisible() (blocksApp.js), so the canvas reclaims the width. */
+#blocks-app .blk-drawer-head, #blocks-app .blk-drawer-handle,
 #blocks-app .blk-drawer-resize { display:none; }
+#blocks-app .blk-tools-handle {
+    display:block; position:fixed; left:0; top:50%; transform:translateY(-50%);
+    transition:transform .28s cubic-bezier(.22,1,.36,1);
+    z-index:81; padding:16px 7px; cursor:pointer; writing-mode:vertical-rl; text-orientation:mixed;   /* z 81: above the mobile preview drawer (z 80) so the ✕ stays tappable when both overlap */
+    font:700 11px/1 inherit; letter-spacing:.08em; color:var(--screen-ink); background:var(--screen);
+    border:1px solid var(--line); border-left:none; border-radius:0 10px 10px 0; box-shadow:4px 0 14px #0007;
+}
+/* open: park as a close tab on the toolbox's right edge, vertically centred (matches the closed "Blocks" tab) */
+#blocks-app.tools-open .blk-tools-handle {
+    transform:translateY(-50%) translateX(var(--blk-tbx-w, 200px)); padding:12px 9px;
+}
 /* Desktop: drag the left edge of the preview column to resize it (width = --blk-pv-w on #blocks-app). */
 #blocks-app .blk-col-resize { position:absolute; left:-4px; top:0; bottom:0; width:8px; cursor:ew-resize; z-index:6; }
 #blocks-app .blk-col-resize:hover { background:linear-gradient(90deg, transparent, var(--accent), transparent); opacity:.6; }
@@ -4883,22 +4897,8 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
        class is .blocklyToolbox, z-index 70 — the preview drawer sits above it at z 80.) */
     #blocks-app.tools-open .blk-ws .blocklyToolbox { box-shadow:6px 0 18px #0008; animation:blkTbxIn .28s cubic-bezier(.22,1,.36,1); }
     @keyframes blkTbxIn { from { transform:translateX(-100%); } to { transform:translateX(0); } }
-
-    /* left-edge vertical handle opens the palette; slides to the toolbox edge when open (acts as close). It
-       TRANSITIONS its transform with the SAME timing as the toolbox slide, so the ✕ stays attached to the palette's
-       right edge throughout the animation instead of jumping to the open position. */
-    #blocks-app .blk-tools-handle {
-        display:block; position:fixed; left:0; top:50%; transform:translateY(-50%);
-        transition:transform .28s cubic-bezier(.22,1,.36,1);
-        z-index:81; padding:16px 7px; cursor:pointer; writing-mode:vertical-rl; text-orientation:mixed;   /* above the preview drawer (z 80) so the centred close ✕ stays tappable when both drawers overlap */
-        font:700 11px/1 inherit; letter-spacing:.08em; color:var(--screen-ink); background:var(--screen);
-        border:1px solid var(--line); border-left:none; border-radius:0 10px 10px 0; box-shadow:4px 0 14px #0007;
-    }
-    /* open: park as a close tab on the palette's right edge, vertically CENTERED (matches the closed "Blocks" tab) */
-    #blocks-app.tools-open .blk-tools-handle {
-        top:50%; transform:translateY(-50%) translateX(var(--blk-tbx-w, 200px));
-        padding:12px 9px; border-radius:0 10px 10px 0;
-    }
+    /* the .blk-tools-handle vertical tab (left-edge open / parks at the toolbox edge when open) is styled ONCE at all
+       widths in the desktop section above (t126) — it slides with the SAME .28s timing so the ✕ tracks the palette edge. */
 }
 
 /* ── Desktop exe: "update available" banner (ui/updateCheck.js; desktop-only) ── */

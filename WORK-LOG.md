@@ -5909,3 +5909,18 @@ Surgical: 2 files deleted + 3 edited (globalFunctions, index.html, app.js). COMM
 **corner-data-syncA-live.spec.js:** flipped the assertion — was `onHasSyncHeader && onHasA0 == true`; now asserts the header PRESENT + `G1 A0` ABSENT (`onHasA0move == false`) + keeps both independent WCS-write value pins (#74=[#70+3], #[#74]=#883). offEqual/onEqual twin==cornerStack byte-for-byte both hold (both emit from cornerStack). Updated the doc comment.
 
 **PASSED BACK. Corner release-ready pending the human's Option A live-verify. Blockly reorg is next (did NOT start it).**
+
+## 🔨 turn 126 (cycle 12) — BLOCKLY REORG ITEM 1: DESKTOP SIDEBAR-COLLAPSE (ungated-first). Suite 513 pass / 0 fail. Desktop palette now collapses+expands via the handle; mobile unchanged. 4 files (+ new spec).
+
+**The gap:** the `#blkToolsHandle` tools tab was CSS `display:none` on desktop (only shown ≤860px), so the desktop Blockly palette/toolbox couldn't be collapsed — only mobile could. The JS collapse mechanism (`setToolsOpen` → toolbox `setVisible()` so the canvas reclaims the width) already worked at any width; the block was (1) the handle being hidden on desktop and (2) desktop's `applyBreakpoint` leaving `tools-open` UNSET while the toolbox was visible → the handle's first click was a silent no-op.
+
+**FIX (small, surgical):**
+- **styles.css:** removed `.blk-tools-handle` from the desktop `display:none` hide-list; promoted its vertical-tab styling (position:fixed left-edge, the open-state park at `translateX(--blk-tbx-w)`) from the mobile-only media query to ALL widths (one source — removed the now-redundant mobile duplicate). `#blocks-app` is an `.app-shell` (`position:absolute; left:0`), so the fixed left:0 anchoring is correct on desktop too.
+- **blocksApp.js:** `applyBreakpoint(mobile)` now delegates to `setToolsOpen(!mobile)` so the `tools-open` class + handle text ('✕'/'Blocks') + the measured `--blk-tbx-w` stay CONSISTENT at both breakpoints. Desktop starts OPEN (toolbox shown, tools-open set, '✕') → the handle toggles from the FIRST click. Mobile starts COLLAPSED (unchanged).
+- **index.html:** updated the stale "Mobile-only" handle comment.
+
+**VERIFIED REAL SYMPTOM (live + eyeballed 2 screenshots):** DESKTOP 1400px — starts open (toolbox visible, ✕ tab parked at the toolbox's right edge, NOT overlapping categories); click → collapses (getWidth()→0, canvas reclaims the width, blocks shift left, "Blocks" tab at left:0); click → re-expands; the block→G-code round-trip still produces output. New `blocks-desktop-collapse.spec` (7 asserts incl. first-click-collapses + round-trip). MOBILE 390px unchanged — `blocks-mobile-drawers.spec` still green (handle shown, starts collapsed, drawers toggle). No Blocks-tab regression.
+
+**NOTE — STRAY working-tree change (NOT mine, left unstaged):** `DDCS-Studio/package.json` version 10.50.0 → 10.51.0 (a version bump from another process/the release flow; the app chip shows V10.51). I did NOT touch it and did NOT stage it — flagging for the advisor.
+
+**PASSED BACK for advisor review. Corner remains release-ready pending the human's live-verify (disjoint). Next Blockly item = the REDIVIDE (mouth/block-def) — NOT started.**

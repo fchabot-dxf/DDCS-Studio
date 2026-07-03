@@ -694,16 +694,12 @@ async function buildWorkspace() {
     };
     toolsHandle && toolsHandle.addEventListener('click', () => setToolsOpen(!root.classList.contains('tools-open')));
 
-    // Breakpoint behaviour: ≤860px → palette starts COLLAPSED (canvas full); desktop → toolbox always shown.
+    // Breakpoint behaviour: ≤860px (mobile) → palette starts COLLAPSED (canvas full); desktop → palette starts OPEN.
+    // Delegate to setToolsOpen so the tools-open class + handle state ('✕'/'Blocks') + the measured --blk-tbx-w stay
+    // CONSISTENT at both breakpoints — t126: this is what makes the DESKTOP collapse handle toggle from the FIRST click
+    // (before, desktop showed the toolbox but left tools-open unset, so the handle's first click was a silent no-op).
     const mq = window.matchMedia('(max-width: 860px)');
-    const applyBreakpoint = (mobile) => {
-      const tb = tbx(); if (!tb) return;
-      root.classList.remove('tools-open');
-      if (toolsHandle) { toolsHandle.setAttribute('aria-expanded', 'false'); toolsHandle.textContent = 'Blocks'; }
-      try { tb.clearSelection(); } catch (_) { /* */ }
-      try { tb.setVisible(!mobile); } catch (_) { /* mobile → collapsed (canvas full); desktop → shown */ }
-      try { B.svgResize(ws); } catch (_) { /* */ }
-    };
+    const applyBreakpoint = (mobile) => { setToolsOpen(!mobile); };
     applyBreakpoint(mq.matches);
     if (mq.addEventListener) mq.addEventListener('change', (e) => applyBreakpoint(e.matches));
     else if (mq.addListener) mq.addListener((e) => applyBreakpoint(e.matches));
