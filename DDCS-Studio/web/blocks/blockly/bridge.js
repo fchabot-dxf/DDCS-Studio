@@ -207,13 +207,21 @@ function jsonDef(def) {
         else args0.push({ type: 'input_value', name: FN(f), check: 'Number', tooltip: desc });
     }
     const block = {
-        type: def.type, message0: message0.trim() || def.label, args0, inputsInline: true,
+        // t152 — user_root uses EXTERNAL inputs (inputsInline:false) so its dummy mouth-LABEL rows each stay on their own
+        // row (the block label / Presentation / Execution don't merge into one cramped row); every other block stays inline.
+        type: def.type, message0: message0.trim() || def.label, args0, inputsInline: def.kind !== 'user_root',
         style: catSlug(def.category) + '_style', tooltip: `${def.label} (${def.category})`,
     };
     // t146 — each statement-input MOUTH on its OWN row below the header (message1, message2, …), with an optional
     // sub-label. Generalized: user_root's 2 mouths, param_group + section's DO, and every isWrap kind's DO.
     let row = 1;
-    const addMouth = (name, sub) => { block['message' + row] = (sub ? sub + ' ' : '') + '%1'; block['args' + row] = [{ type: 'input_statement', name }]; row++; };
+    // t152 — a sub-LABELED mouth (user_root's Presentation/Execution) puts its label on its OWN dummy row ABOVE the mouth
+    // (a full-height header row → the long label fits cleanly, not cramped beside the C-notch). Un-labeled mouths (section /
+    // param_group / isWrap — passed no `sub`) are UNCHANGED: just the statement-input row (the section blocks stay as-is).
+    const addMouth = (name, sub) => {
+        if (sub) { block['message' + row] = sub + ' %1'; block['args' + row] = [{ type: 'input_dummy' }]; row++; }
+        block['message' + row] = '%1'; block['args' + row] = [{ type: 'input_statement', name }]; row++;
+    };
     if (def.kind === 'user_root') { addMouth('PRESENTATION', 'Presentation (UI & Sim)'); addMouth('EXECUTION', 'Execution (G-code)'); }
     else if (def.kind === 'param_group' || isSection) addMouth('DO');
     else if (isWrap(def)) addMouth('DO');
@@ -231,10 +239,15 @@ const makeOpDef = (type, label, msgAdd = '', argsAdd = []) => ({
         { type: 'field_label_serializable', name: 'LABEL', text: label, tooltip: getDesc(type) },
         ...argsAdd.map(a => ({ ...a, tooltip: getDesc(a.name) }))
     ],
+    // t152 — each op-block mouth label (GCODE / SIM) on its OWN dummy row ABOVE the mouth, so the label row is taller + fits cleanly.
     message1: 'GCODE %1',
-    args1: [ { type: 'input_statement', name: 'GCODE' } ],
-    message2: 'SIM %1',
-    args2: [ { type: 'input_statement', name: 'SIM' } ],
+    args1: [ { type: 'input_dummy' } ],
+    message2: '%1',
+    args2: [ { type: 'input_statement', name: 'GCODE' } ],
+    message3: 'SIM %1',
+    args3: [ { type: 'input_dummy' } ],
+    message4: '%1',
+    args4: [ { type: 'input_statement', name: 'SIM' } ],
     previousStatement: null, nextStatement: null,
     colour: 210,
     tooltip: 'Recorded op — edit via its wizard.',

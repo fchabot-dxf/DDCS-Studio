@@ -6117,3 +6117,14 @@ The execution-line GLOW is on the unmerged local branch **`glow-gcode` (5d72c76*
 ### RECOMMENDATION: (A) per-param static blocks — delivers the real toggle/dropdown controls the dispatch wants with LOW Blockly risk + MODERATE effort; the drives-guards hookup (reverse-sync → replaceOp → reprune + structctl-value-sync) + the isAtom knob-exclude + byte-parity(emits-nothing) are identical across all 3. Ready to build (A) immediately on confirm.
 
 **GATED per worker step-5 (a large SHARED-change-listener diff whose shape now has NEW Blockly-constraint info the generic estimate missed). PASSED BACK the findings + shape options + recommendation for the advisor + human. This is the LAST queued Blockly follow-up; corner RELEASED, disjoint.**
+
+## 🔨 turn 152 (cycle 12) — MOUTH-SEPARATION HEIGHT (outer blocks only). Suite 522 pass / 0 fail. user_root + op-block mouth labels now each get their OWN row above the mouth; sections UNCHANGED. Block-def only (NO custom renderer — GATE not hit). 1 file (bridge.js).
+
+**FIX (block-def, per the dispatch's "extra dummy row" suggestion):** a sub-LABELED mouth now puts its label on its OWN dummy input row ABOVE the statement-input row (so the long label — "Presentation (UI & Sim)" / "Execution (G-code)" / "GCODE" / "SIM" — sits on a full-height header row, not cramped beside the C-notch). Applied in TWO shared builders, scoped to the outer blocks:
+- **jsonDef.addMouth** — only when a `sub` label is passed (user_root's 2 mouths). Un-labeled mouths (section / param_group / isWrap → no `sub`) are UNCHANGED → the section blocks stay exactly as-is (human-confirmed good).
+- **makeOpDef** — GCODE + SIM each on a dummy label row + a statement row (all op blocks).
+- **user_root inputsInline:false** — the KEY: with inputsInline TRUE its consecutive dummy label rows MERGED (the block label + "Presentation (UI & Sim)" collapsed onto one cramped row); external inputs keep each mouth label on its own row (the op block already rendered external → didn't merge). Every other block stays inputsInline:true.
+
+**VERIFIED REAL SYMPTOM (screenshots + specs):** corner — "Define Custom Wizard" / "Presentation (UI & Sim)" / "Execution (G-code)" and the op block's "Corner (data)" / "GCODE" / "SIM" each on their OWN clean row (no merge, labels fit); the 7 concern sections UNCHANGED (collapsed, same colors/titles). Drill (another wizard) — its op block "Drill" / "GCODE" / "SIM" render cleanly + emits correctly. BYTE-PARITY: block-def/render only → emit untouched; round-trip (studio-to-blocks, blocks-render, corner-redivide) green; full suite 522. Screenshots: scratchpad/mouth2.png (corner) + drill-op.png (drill). GATE: a block-def tweak sufficed — NO custom renderer needed.
+
+**PASSED BACK for advisor review + human eyes. STRUCTURAL-KNOBS shape decision (t150 gate: A per-param recommended) still with the human. Corner RELEASED, disjoint.**
