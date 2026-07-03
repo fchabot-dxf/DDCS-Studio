@@ -13,7 +13,7 @@
  * persist after that — we do NOT auto-recenter on every redraw, so live wizard edits don't yank the view.
  */
 import { traceToolpath } from '../engine/trace.js';
-import { drawAnchorFor } from '../engine/passAnchor.js';   // t94 — an AUTO reposition pass's ROUTE draws from the PREVIOUS start (re-park), not its own net-endpoint marker
+import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE draws from the RUNTIME END of the previous pass (t107 machine-faithful, via passEnds), else the static previous START (t94), not its own net-endpoint marker
 
 // Colours MATCH THE 3D LEGEND: rapid = yellow (dashed), retract = green, probe = blue (slow = light blue, dotted),
 // feed = a blue→teal gradient by DEPTH (Z) across the path — which also surfaces the Z you can't see top-down.
@@ -55,6 +55,7 @@ export function createToolpath2d(canvas, opts = {}) {
     let starts = [];                 // per-pass operator starts [{x,y,z}] → numbered DRAGGABLE handles (onStartDrag(pos, pass) on release)
     let startSources = [];           // per-pass reposition source ['auto'|'manual',…] → marker colour (auto=cyan, manual=amber)
     let startEmits = [];             // per-pass emitting flag [bool,…] → marker SHAPE (emitting=filled ◆, sim-only=hollow ◇) — orthogonal to the colour
+    let passEnds = null;             // t107 — per-pass RUNTIME world-ENDs (from the trace): an anchorsAtPrev pass anchors its route at passEnds[p-1] (machine-faithful) + relocates its marker to end+cross; null → t94 static-start
     let toolPos = null;              // LIVE tool/probe position from the sim (engine onPositionChange) → the moving head marker
     let drag = null, dragStart = null;   // dragStart = the per-pass start INDEX being dragged (null = none)
     const anim = { playing: false, k: 0, raf: null };
@@ -78,8 +79,18 @@ export function createToolpath2d(canvas, opts = {}) {
     // no pass → pass 0, so existing single-pass behaviour is unchanged.
     const passOff = (pass) => {
         const i = (pass != null && pass >= 0 && pass < starts.length) ? pass : 0;
-        const a = drawAnchorFor(starts, i);   // t94 — auto reposition passes anchor at the previous start (else self); marker sprite (sptx/spty) keeps starts[i].x/y
+        const a = passAnchorFor(starts, passEnds, i);   // t94/t107 — auto reposition passes anchor at the previous pass's RUNTIME END (machine-faithful), else the static previous start (else self); the marker sprite relocates to end+cross via markerWorld
         return (anchorToStart && a) ? { x: a.x, y: a.y } : stockPin();
+    };
+    // t107 — where a marker HANDLE renders: a reposition-DESTINATION marker (anchorsAtPrev) sits where its dog-leg ENDS —
+    // the previous pass's runtime END (passEnds) + the pass's reposition delta (its declared marker − the previous one =
+    // the emitted #23/#24). Display-only VIEW of the declared `starts` (the drag still writes starts); no runtime end / not
+    // flagged → the declared row. Matches the 3D's _markerWorld + the drawn route end + the probe fire (one source: passEnds).
+    const markerWorld = (i) => {
+        const row = starts[i]; if (!row) return { x: 0, y: 0 };
+        const prev = starts[i - 1], end = passEnds && passEnds[i - 1];
+        if (row.anchorsAtPrev && i > 0 && end && prev) return { x: end.x + (row.x - prev.x), y: end.y + (row.y - prev.y) };
+        return row;
     };
     const pathOff = () => passOff(0);   // pass-0 default (where no per-segment pass applies)
     const ptx = (x, pass) => tx(x + passOff(pass).x);
@@ -174,7 +185,7 @@ export function createToolpath2d(canvas, opts = {}) {
     // writes a macro var) = a FILLED diamond ◆. All draggable (distinct from the RED moving head). Multi-pass → one per pass.
     function drawStartHandles(ctx) {
         for (let i = 0; i < starts.length; i++) {
-            const s = starts[i], hx = sptx(s.x), hy = spty(s.y);
+            const s = markerWorld(i), hx = sptx(s.x), hy = spty(s.y);               // t107 — relocate a reposition-destination marker to its runtime dog-leg END (matches the route + probe fire)
             const manual = startSources[i] === 'manual';                            // colour by reposition source
             const col = manual ? '#ffb300' : '#22d3ee';                              // amber = manual jog, cyan = auto traverse
             const ringCol = manual ? 'rgba(255,179,0,0.45)' : 'rgba(34,211,238,0.45)';
@@ -306,6 +317,7 @@ export function createToolpath2d(canvas, opts = {}) {
     function setStart(p) { setStarts(p ? [p] : []); }   // back-compat: a single operator start = pass 0
     function setStartSources(arr) { startSources = Array.isArray(arr) ? arr.slice() : []; if (view) paint(); }   // per-pass marker colour (auto=cyan, manual=amber)
     function setStartEmits(arr) { startEmits = Array.isArray(arr) ? arr.slice() : []; if (view) paint(); }   // per-pass marker SHAPE: emitting (a drag edits the program) = filled ◆, sim-only = hollow ◇
+    function setPassEnds(arr) { passEnds = Array.isArray(arr) ? arr : null; if (view) paint(); }   // t107 — per-pass RUNTIME world-ENDs (from the trace): an anchorsAtPrev pass anchors its route at passEnds[p-1] + relocates its marker to end+cross
     function setAnchor(v) { anchorToStart = !!v; if (view) paint(); }   // mirror the 3D's _anchorToStart: anchored → path emanates from the start, not the stock pin
     function setToolPosition(p) { toolPos = p ? { x: +p.x || 0, y: +p.y || 0, pass: p.pass } : null; if (view && anim.playing) paint(); }   // live sim head (in sync with the 3D); pass → per-pass anchor (INC4)
     function setGcode(text) { setSegments(traceToolpath(text).segments); }
@@ -328,7 +340,7 @@ export function createToolpath2d(canvas, opts = {}) {
     const nearHandle = (e) => {   // → the per-pass start INDEX under the pointer (within 12px), or -1
         if (!starts.length || !view) return -1;
         const r = canvas.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
-        for (let i = starts.length - 1; i >= 0; i--) { if (Math.hypot(px - sptx(starts[i].x), py - spty(starts[i].y)) <= 12) return i; }   // reverse → topmost/highest pass wins on overlap
+        for (let i = starts.length - 1; i >= 0; i--) { const w = markerWorld(i); if (Math.hypot(px - sptx(w.x), py - spty(w.y)) <= 12) return i; }   // t107 — hit-test the DISPLAYED (relocated) marker; reverse → topmost/highest pass wins on overlap
         return -1;
     };
     canvas.addEventListener('pointerdown', (e) => {
@@ -339,7 +351,7 @@ export function createToolpath2d(canvas, opts = {}) {
     canvas.addEventListener('pointermove', (e) => {
         if (!view) return;
         const r = canvas.getBoundingClientRect();
-        if (dragStart != null) { const p = stockPin(), cur = starts[dragStart]; starts[dragStart] = { x: (e.clientX - r.left - view.ox) / view.scale - p.x, y: (view.oy - (e.clientY - r.top)) / view.scale - p.y, z: cur ? cur.z : 0, anchorsAtPrev: cur ? cur.anchorsAtPrev : false }; paint(); return; }   // un-pin: handle drawn at +pin → program start = drawn − pin; t94 keep anchorsAtPrev so the mid-drag route stays on the re-park frame (no flicker)
+        if (dragStart != null) { const p = stockPin(), cur = starts[dragStart], d = markerWorld(dragStart), drift = { x: d.x - (cur ? cur.x : 0), y: d.y - (cur ? cur.y : 0) }; starts[dragStart] = { x: (e.clientX - r.left - view.ox) / view.scale - p.x - drift.x, y: (view.oy - (e.clientY - r.top)) / view.scale - p.y - drift.y, z: cur ? cur.z : 0, anchorsAtPrev: cur ? cur.anchorsAtPrev : false }; paint(); return; }   // un-pin: handle drawn at +pin → program start = drawn − pin; t94 keep anchorsAtPrev; t107 subtract the passEnds relocation drift so the DISPLAYED (relocated) marker follows the cursor (pass-0 sim-only = drift 0, unchanged)
         if (drag) { view.ox = drag.ox + (e.clientX - drag.x); view.oy = drag.oy + (e.clientY - drag.y); paint(); return; }
         const px = e.clientX - r.left, py = e.clientY - r.top, snap = snapPoint(px, py);
         cursor = snap ? { x: snap.x, y: snap.y, snapped: true } : { x: (px - view.ox) / view.scale, y: (view.oy - py) / view.scale, snapped: false };
@@ -355,7 +367,7 @@ export function createToolpath2d(canvas, opts = {}) {
     canvas.addEventListener('mouseleave', () => { cursor = null; if (!anim.playing) paint(); });
 
     return {
-        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setStarts, setStartSources, setStartEmits, setAnchor, setToolPosition, redraw, fit, play, stop, toggle, seek,
+        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setStarts, setStartSources, setStartEmits, setPassEnds, setAnchor, setToolPosition, redraw, fit, play, stop, toggle, seek,
         get playing() { return anim.playing; },
         get count() { return segs.length; },
     };

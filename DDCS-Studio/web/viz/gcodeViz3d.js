@@ -17,7 +17,7 @@ import { toolHalfProfile } from './toolProfile.js';
 import { PartFrame } from './sceneFrame.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
 import { stockProbeStop, barRadius } from '../engine/probeGeometry.js';
-import { drawAnchorFor } from '../engine/passAnchor.js';   // t94 — an AUTO reposition pass's ROUTE (+ its probe-collision Aw/Bw) draws from the PREVIOUS start (re-park), not its own net-endpoint marker
+import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE (+ its probe-collision Aw/Bw) draws from the RUNTIME END of the previous pass (t107 machine-faithful, via _passEnds), else the static previous START (t94), not its own net-endpoint marker
 
 export class GcodeViz3D {
     constructor(container) {
@@ -72,6 +72,7 @@ export class GcodeViz3D {
         // One draggable start (ruby + X/Y/Z gizmo) per pass. Each manual REPOSITION in the
         // macro begins a new pass, placed relative to its own start so you can park it.
         this.starts = [{ x: 0, y: 0, z: 0 }];
+        this._passEnds = null;   // t107 — per-pass RUNTIME world-ENDs from the trace: an anchorsAtPrev pass anchors its route/tool-head/marker HERE (machine-faithful). null → passAnchorFor degrades to the t94 static previous-start.
         this.spindleMarkers = [];
         this.selectedStart = 0;   // which start the jog pendant drives
         // Whether the toolpath is anchored to the start MARKER. true = incremental/probe (the macro emanates from the
@@ -311,10 +312,25 @@ export class GcodeViz3D {
 
     _positionMarkers() {
         for (let p = 0; p < this.spindleMarkers.length; p++) {
-            const s = this.starts[p] || { x: 0, y: 0, z: 0 };
+            const s = this._markerWorld(p);
             this.spindleMarkers[p].position.set(s.x, s.y, s.z);
         }
         this._highlightSelectedStart();
+    }
+
+    // t107 — where a marker SPRITE actually renders. A reposition-DESTINATION marker (anchorsAtPrev) sits where its
+    // dog-leg ENDS: the previous pass's RUNTIME END (_passEnds, post probe+retract+lift) + the pass's reposition delta
+    // (its declared marker − the previous declared marker = the emitted #23/#24 cross). So the ruby lands on the
+    // machine-correct wall approach, matching the drawn route end + the probe fire. This is a display-only VIEW of the
+    // DECLARED `starts` (the drag + #21-#24 still derive from starts); no runtime end yet / not flagged → the declared row.
+    _markerWorld(p) {
+        const row = this.starts[p] || { x: 0, y: 0, z: 0 };
+        const prev = this.starts[p - 1];
+        const end = this._passEnds && this._passEnds[p - 1];
+        if (row.anchorsAtPrev && p > 0 && end && prev) {
+            return { x: end.x + (row.x - prev.x), y: end.y + (row.y - prev.y), z: end.z + (row.z - prev.z) };
+        }
+        return row;
     }
 
     // Choose which start the jog pendant drives (and which ruby is highlighted).
@@ -344,6 +360,9 @@ export class GcodeViz3D {
     setStartSources(sources) { this._startSources = Array.isArray(sources) ? sources : []; this._highlightSelectedStart(); this.render(); }
     // Per-pass emitting flags ([bool,…]) → start-marker SHAPE (emitting=filled ◆, sim-only=hollow ◇). Re-applies via highlight.
     setStartEmits(emits) { this._startEmits = Array.isArray(emits) ? emits : []; this._highlightSelectedStart(); this.render(); }
+    // t107 — per-pass RUNTIME world-ENDs (from the trace): an anchorsAtPrev pass anchors its route/tool-head at _passEnds[p-1]
+    // (machine-faithful) and relocates its marker sprite to end+cross. A full route rebuild reads it; null → t94 static-start.
+    setPassEnds(ends) { this._passEnds = Array.isArray(ends) ? ends : null; }
 
     // Ray-pick a start marker (ruby + numbered badge) under the pointer; returns pass index or -1.
     _pickMarker(e) {
@@ -547,10 +566,10 @@ export class GcodeViz3D {
         // not back to starts[0]=① — else a boss-manual probes the Y walls from ① and looks like a pocket). Single-pass /
         // no pass → starts[0]. ONLY when anchored (probe/incremental); absolute/mill sits at its own coords (no offset).
         const pass = (pos.pass != null && pos.pass >= 0 && pos.pass < this.starts.length) ? pos.pass : 0;
-        // t94 — the LIVE engine-driven tool head must ride the SAME re-park draw-anchor as its route (line ~757) + the
-        // engine collision/DRO, else on a corner AUTO reposition pass the head floats +cross off the drawn dog-leg it
-        // traces. drawAnchorFor → previous start for a flagged pass, else self (non-corner / manual / pass 0 unchanged).
-        const o = this._anchorToStart ? (drawAnchorFor(this.starts, pass) || this.starts[pass] || { x: 0, y: 0, z: 0 }) : { x: 0, y: 0, z: 0 };
+        // t94/t107 — the LIVE engine-driven tool head must ride the SAME re-park draw-anchor as its route (line ~757) +
+        // the engine collision/DRO, else on a corner AUTO reposition pass the head floats off the drawn dog-leg it traces.
+        // passAnchorFor → the previous pass's RUNTIME END for a flagged pass (t107), else self (non-corner / manual / pass 0).
+        const o = this._anchorToStart ? (passAnchorFor(this.starts, this._passEnds, pass) || this.starts[pass] || { x: 0, y: 0, z: 0 }) : { x: 0, y: 0, z: 0 };
         this._animTool.position.set((pos.x || 0) + o.x, (pos.y || 0) + o.y, (pos.z || 0) + o.z);
         // Engine-driven trail: bold the executed route up to the tool head (option B — what you see is the path
         // the engine actually ran). Enable trail mode lazily; setAnimate(false)/ddcsStopPreview restores it.
@@ -753,11 +772,11 @@ export class GcodeViz3D {
             const mk = this.starts[p] || { x: 0, y: 0, z: 0 };
             // Route anchor: probe ops draw from the start MARKER (the incremental macro emanates from the real tool
             // position); mill/absolute programs draw at their own coords so moving the start does NOT drag the path.
-            // t94 — an AUTO reposition pass (anchorsAtPrev) draws its dog-leg from the PREVIOUS start (re-park), NOT its
-            // own net-endpoint marker (else the incremental dog-leg double-counts +cross → route + probe-collision Aw/Bw
-            // + prevEnd + the manual-jog B all shift +cross beyond ②). drawAnchorFor resolves it LIVE (drag-consistent);
-            // MANUAL / pass-0 / non-corner fall back to self (mk). The marker SPRITE (_positionMarkers) still uses starts[p].
-            const off = this._anchorToStart ? (drawAnchorFor(this.starts, p) || mk) : { x: 0, y: 0, z: 0 };
+            // t94/t107 — an AUTO reposition pass (anchorsAtPrev) draws its dog-leg from the RUNTIME END of the previous
+            // pass (t107 machine-faithful, via _passEnds — post probe+retract+lift, incl the Z-trust lift), else the
+            // static previous start (t94 fallback). NOT its own net-endpoint marker (that double-counts +cross). MANUAL /
+            // pass-0 / non-corner fall back to self (mk). The marker SPRITE (_positionMarkers) relocates to the same end+cross.
+            const off = this._anchorToStart ? (passAnchorFor(this.starts, this._passEnds, p) || mk) : { x: 0, y: 0, z: 0 };
             // A MANUAL reposition draws a dashed jog from the previous pass's end to this pass's start (the operator
             // physically moves there). An AUTO traverse does NOT — its auto-traverse move (the diagonal) IS the connecting
             // travel, so a jog line here is a PHANTOM (the dashed line that "shouldn't be there" in auto). Gate by source.

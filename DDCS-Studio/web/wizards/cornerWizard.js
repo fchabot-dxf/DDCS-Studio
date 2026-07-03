@@ -343,6 +343,7 @@ export class CornerWizard {
         const zFirst = !!(params.probeZ || params.probeZFirst);
         const seq = params.probeSeq || 'YX';
         const safeZ = n(params.safeZ, 10), radius = n(params.radius, 2);
+        const scanDepth = n(params.scanDepth, 5);
         const travel = n(params.travelDist, 50), dist = n(params.dist, 500);
         // corner XY in the stock frame + the probe direction (matches FL=X+Y+ … BR=X−Y−)
         const cornerXY = { FL: [0, 0], FR: [sx, 0], BL: [0, sy], BR: [sx, sy] }[corner] || [0, 0];
@@ -355,6 +356,10 @@ export class CornerWizard {
         const nearEdge = Math.min(20, travel * 0.8);                       // perp axis: ~20 mm inside the edge (< travel for the reposition)
         const firstIsX = (seq !== 'YX');                                   // YX → Y first, else X first
         const kFor = (isX) => zFirst ? overMat : ((isX === firstIsX) ? -inFront : nearEdge);
-        return { x: cornerXY[0] + dir[0] * kFor(true), y: cornerXY[1] + dir[1] * kFor(false), z: safeZ };
+        // Z-TRUST (t107) — under probeZFirst OFF there's NO auto plunge (the operator's jog IS the probe height), so the
+        // sim start must sit AT wall height (−scanDepth, below the top-at-0), not hovering at safeZ ABOVE the top (where a
+        // horizontal wall probe would fire over the stock + miss). Z-first hovers OVER the material (safeZ) then measures Z down.
+        const z = zFirst ? safeZ : -scanDepth;
+        return { x: cornerXY[0] + dir[0] * kFor(true), y: cornerXY[1] + dir[1] * kFor(false), z };
     }
 }

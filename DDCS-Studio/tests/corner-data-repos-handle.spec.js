@@ -54,6 +54,55 @@ test('reposition handle renders at anchor+evaluated-offset (the destination), un
   expect(Math.hypot(r.fl.h.x - r.fl.wall1.x, r.fl.h.y - r.fl.wall1.y) > 10, 'handle is a full reposition away from its anchor').toBe(true);
 });
 
+// t107 MACHINE-FAITHFUL — when passEnds is threaded (the real app path via userOpView.getPassEnds), the Layout emitting
+// handle RELOCATES from the static wall-2 (start-based) to the machine-correct wall-2 = passEnds[wall1] + cross, matching
+// the relocated ② the top panel + 3D show. Without passEnds it degrades to the static start (the case above). One source.
+test('the Layout reposition handle relocates to the RUNTIME wall-1 END + cross when passEnds is threaded (matches the top panel)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+  await page.evaluate(async () => {
+    const U = await import('/blocks/userOps.js');
+    const CD = await import('/blocks/dataOps/cornerData.js');
+    localStorage.removeItem('ddcs_user_ops');
+    U.createUserOp(CD.cornerDataDef());
+  });
+  await page.evaluate(() => window.openWiz('user_corner_data'));
+  await page.waitForSelector('#wiz_user_form [data-param="cross1_x"]', { state: 'visible' });
+
+  const r = await page.evaluate(async () => {
+    const { layoutSpecFromOp } = await import('/wizards/ops/panelTypes.js');
+    const { cornerDataDef, CORNER_DEFAULTS, CORNER_DATA_OPTYPE } = await import('/blocks/dataOps/cornerData.js');
+    const { opSimStarts } = await import('/viz/opSimStarts.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { builderOf } = await import('/blocks/opBuilders.js');
+    const { traceToolpath } = await import('/engine/trace.js');
+    const def = cornerDataDef();
+    const s = window.ddcsGetSettings().stock;
+    const p = { ...CORNER_DEFAULTS, travelDist: 50 };
+    // INDEPENDENT passEnds via a fresh trace (the machine-faithful runtime wall-1 end)
+    const tstock = { x: s.x, y: s.y, z: s.z, shape: s.shape, show: true };
+    const declared = def.simStartsProvider(p, tstock).map((m) => ({ x: m.x, y: m.y, z: m.z || 0, source: m.source, anchorsAtPrev: !!m.anchorsAtPrev }));
+    const gcode = emitMapped(builderOf(CORNER_DATA_OPTYPE)(p)).text;
+    const passEnds = traceToolpath(gcode, { stock: tstock, start: declared[0], passStarts: declared }).passEnds || [];
+    const marks = opSimStarts(CORNER_DATA_OPTYPE, p, s);
+    const wall1 = marks[0], wall2Static = marks[marks.length - 1];   // static (start-based) chain
+    const cross = { x: wall2Static.x - wall1.x, y: wall2Static.y - wall1.y };
+    const hStatic = (layoutSpecFromOp(def, p).handles || []).find((h) => h.id === 'reposition_pos');
+    const hFaithful = (layoutSpecFromOp(def, p, null, null, passEnds).handles || []).find((h) => h.id === 'reposition_pos');
+    return { hStatic: { x: hStatic.x, y: hStatic.y }, hFaithful: { x: hFaithful.x, y: hFaithful.y }, end0: passEnds[0], cross, wall2Static: { x: wall2Static.x, y: wall2Static.y } };
+  });
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+
+  const near = (a, b, t = 0.05) => Math.abs(a - b) < t;
+  // machine-faithful handle == passEnds[0] + cross (the same relocation the 3D/2D markers use)
+  const expX = r.end0.x + r.cross.x, expY = r.end0.y + r.cross.y;
+  expect(near(r.hFaithful.x, expX) && near(r.hFaithful.y, expY), `faithful handle at passEnds[0]+cross (${expX},${expY}), got (${r.hFaithful.x},${r.hFaithful.y})`).toBe(true);
+  // and it is DISTINCT from the static (start-based) handle — the relocation actually moved it (Y by the probe drift)
+  expect(Math.hypot(r.hFaithful.x - r.hStatic.x, r.hFaithful.y - r.hStatic.y), 'the faithful handle is relocated away from the static start-based handle').toBeGreaterThan(20);
+  // no-passEnds still degrades to the static wall-2 (the graceful fallback the case above pins)
+  expect(near(r.hStatic.x, r.wall2Static.x) && near(r.hStatic.y, r.wall2Static.y), 'without passEnds → the static start-based wall-2 (unchanged)').toBe(true);
+});
+
 // PART 2 confirm — the hollow sim-only ◇ renders on the Layout AND (post-fix) is now DISTINCT from the emitting reposition
 // handle (they were coincident while the emitting handle was stuck at its anchor = pass-0, masking the ◇).
 test('the Layout sim-only ◇ renders and is distinct from the (now correctly-placed) emitting reposition handle', async ({ page }) => {

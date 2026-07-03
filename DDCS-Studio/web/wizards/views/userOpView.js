@@ -134,10 +134,11 @@ export const userOpView = {
                     const ps = (panel && typeof panel.getPassStarts === 'function') ? (panel.getPassStarts() || []) : [];
                     const pos0 = ps[0] || (Array.isArray(starts) && starts[0]) || null;   // dragged start, else the declared pass-0 hint
                     const sources = (panel && typeof panel.getPassSources === 'function') ? panel.getPassSources() : null;   // t81 — per-pass auto/manual, so the Layout matches the top panel
+                    const passEnds = (panel && typeof panel.getPassEnds === 'function') ? panel.getPassEnds() : null;   // t107 — per-pass runtime ENDs, so the Layout ② relocates to the machine-faithful spot + the drag writes END-relative #23/#24
                     const simStart = (panel && pos0 && typeof panel.onStartDrag === 'function')
                         ? { pos: pos0, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } }
                         : (pos0 ? { pos: pos0 } : null);
-                    renderLayout2D(c, _def, params, simStart, sources);
+                    renderLayout2D(c, _def, params, simStart, sources, passEnds);
                 };
                 renderLayoutWithSim();
             }

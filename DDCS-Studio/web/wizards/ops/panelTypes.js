@@ -52,7 +52,7 @@ function _writeParam(name, val) { const f = _field(name); if (f) { f.value = r3(
 // canvas drag-to-edit with no per-op code. The handles are DECLARED from the param-block roles and built by the SAME
 // reusable gesture registry the built-in views use (viz/canvasWidgets — point / rect / radial), not a parallel onDrag.
 // See ROADMAP "CANVAS-WIDGET consolidation" Stage 3 + the spatial-gui-form-vs-canvas memory.
-export function layoutSpecFromOp(def, params, simStart, sources) {
+export function layoutSpecFromOp(def, params, simStart, sources, passEnds) {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y, ox: 0, oy: 0 } : { w: 200, h: 150, ox: 0, oy: 0 };
     // t81 — colour a handle by its pass's reposition SOURCE (auto=cyan / manual=amber), MATCHING the top panel. `sources` is the
@@ -139,6 +139,21 @@ export function layoutSpecFromOp(def, params, simStart, sources) {
                 // fallback that stuck the handle AT its anchor (masking the sim ◇). No 2nd hand-rolled path — ONE source.
                 const dest = starts[ri + 1];
                 if (dest) { destX = num(dest.x, 0); destY = num(dest.y, 0); }
+                // t107 machine-faithful — shift the anchor (+ the destination) to the RUNTIME END of the anchor pass
+                // (passEnds[ri], post probe+retract+lift), so the Layout handle sits at the SAME machine-correct ② the top
+                // panel + 3D show, AND a drag writes #23/#24 = target − runtime-END (END-relative). The offset destX−ax stays
+                // the cross (both shift by the same drift), so an UNSET default is unchanged. passEnds absent (pre-trace) →
+                // the static start (graceful degradation, byte-identical to t94). The runtime END is stable while dragging the
+                // DESTINATION (the anchor pass is upstream), so the drag is coherent.
+                // GATED on the DESTINATION's anchorsAtPrev — EXACTLY like the 3D/2D _markerWorld: only an AUTO reposition
+                // has a programmed dog-leg to relocate. MANUAL travel (anchorsAtPrev false — the operator jogs) keeps the
+                // static wall marker on ALL surfaces, so the Layout handle can't diverge from the 3D/2D marker.
+                const end = (Array.isArray(passEnds) && ri != null) ? passEnds[ri] : null;
+                if (end && a && dest && dest.anchorsAtPrev) {
+                    const dxE = num(end.x, 0) - ax, dyE = num(end.y, 0) - ay;
+                    ax += dxE; ay += dyE;
+                    if (destX != null) { destX += dxE; destY += dyE; }
+                }
             }
             const offX = (destX != null) ? destX - ax : p('x');
             const offY = (destY != null) ? destY - ay : p('y');
@@ -171,10 +186,10 @@ export function layoutSpecFromOp(def, params, simStart, sources) {
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).
 let _layout = null;
-export function renderLayout2D(container, def, params, simStart, sources) {
+export function renderLayout2D(container, def, params, simStart, sources, passEnds) {
     if (!container) return;
     if (!_layout) _layout = new FeatureCanvas();
-    _layout.render(container, layoutSpecFromOp(def, params, simStart, sources));
+    _layout.render(container, layoutSpecFromOp(def, params, simStart, sources, passEnds));
 }
 
 export function renderDeclaredLayout(container, def, params) {

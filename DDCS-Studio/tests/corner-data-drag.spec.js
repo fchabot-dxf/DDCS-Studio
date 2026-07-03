@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * CORNER-PORT inc B3/B3b LAYOUT+DRAG — verify-real-symptom: a REAL "Corner (data)" opened in the real #wiz_user form2d panel
- * renders its FeatureCanvas layout with a draggable REPOSITION point handle, and a REAL pointer drag writes the CORRECT
- * INCREMENTAL DELTA (world − wall-1, the G91 wall-1→wall-2 reposition) into cross1_x/cross1_y → the EMITTED reposition #23/#24
- * flips from the signed-travelDist EXPRESSION (#15/#16) to that literal delta. B3b: the point is anchored to the op's first
- * sim-start (wall-1) so the drag writes a DELTA, not the absolute world coord (the B3 bug). Asserts the VALUE, with DISTINCT
- * x/y so an axis swap is caught, and rejects the buggy absolute-world write.
+ * CORNER-PORT inc B3/B3b LAYOUT+DRAG → t107 END-RELATIVE — verify-real-symptom: a REAL "Corner (data)" opened in the real
+ * #wiz_user form2d panel renders its FeatureCanvas layout with a draggable REPOSITION point handle, and a REAL pointer drag
+ * writes the CORRECT INCREMENTAL DELTA into cross1_x/cross1_y → the EMITTED reposition #23/#24 flips from the signed-travelDist
+ * EXPRESSION (#15/#16) to that literal delta. The point is anchored to wall-1 so the drag writes a DELTA, not the absolute
+ * world coord (the B3 bug). t107 MACHINE-FAITHFUL: the anchor is now the wall-1 RUNTIME END (passEnds[0], post probe+retract+
+ * lift), not the static wall-1 START — so the drag is END-relative (#23/#24 = world − runtime-END), matching the relocated ②
+ * the top panel + Layout show. Asserts the VALUE vs an INDEPENDENT trace, with DISTINCT x/y so an axis swap is caught.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
@@ -30,13 +31,25 @@ test('Corner (data): dragging the reposition handle writes the CORRECT increment
   });
   expect(hasFields, 'cross1_x + cross1_y render as writable form fields (the point role)').toBe(true);
 
-  // the KNOWN wall-1 anchor (pass 0) from the DECLARED sim-starts — computed at runtime, never hard-coded
-  const { wall1, stock } = await page.evaluate(async () => {
+  // the KNOWN wall-1 anchor — t107: the RUNTIME END (passEnds[0], from an INDEPENDENT trace), where the tool actually is
+  // after probe+retract+lift; the END-relative drag writes world − this. (staticWall1 = the old start-based anchor, kept as
+  // the contrast: X coincides — a Y-probe doesn't move X — but Y differs by ~a probe distance, catching a stale start-anchor.)
+  const { wall1, staticWall1, stock } = await page.evaluate(async () => {
     const CD = await import('/blocks/dataOps/cornerData.js');
     const { opSimStarts } = await import('/viz/opSimStarts.js');
+    const { registerUserOp } = await import('/blocks/userOps.js');
+    const { builderOf } = await import('/blocks/opBuilders.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { traceToolpath } = await import('/engine/trace.js');
     const s = window.ddcsGetSettings().stock;
-    return { wall1: opSimStarts(CD.CORNER_DATA_OPTYPE, CD.CORNER_DEFAULTS, s)[0], stock: s };
+    registerUserOp(CD.cornerDataDef());
+    const tstock = { x: s.x, y: s.y, z: s.z, shape: s.shape, show: true };
+    const declared = CD.cornerDataDef().simStartsProvider(CD.CORNER_DEFAULTS, tstock).map((m) => ({ x: m.x, y: m.y, z: m.z || 0, source: m.source, anchorsAtPrev: !!m.anchorsAtPrev }));
+    const gcode = emitMapped(builderOf(CD.CORNER_DATA_OPTYPE)(CD.CORNER_DEFAULTS)).text;
+    const parsed = traceToolpath(gcode, { stock: tstock, start: declared[0], passStarts: declared });
+    return { wall1: (parsed.passEnds || [])[0], staticWall1: opSimStarts(CD.CORNER_DATA_OPTYPE, CD.CORNER_DEFAULTS, s)[0], stock: s };
   });
+  expect(Math.abs(wall1.y - staticWall1.y), 'the runtime END sits a probe-distance from the static start (END-relative ≠ start-relative)').toBeGreaterThan(20);
 
   // PRE-DRAG (negative control): the unset reposition socket emits the #15/#16 expression, not a literal.
   const before = await page.evaluate(() => ({

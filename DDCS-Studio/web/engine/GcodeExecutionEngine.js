@@ -14,7 +14,7 @@ import { evaluateCondition, validateCondition } from './core/condition.js';
 import { loadProgram as loadProgramText, stripLine } from './core/program.js';
 import { arcPoints } from './core/arc.js';
 import { rayBox, rotaryAxisOf, stockProbeStop } from './probeGeometry.js';
-import { drawAnchorFor } from './passAnchor.js';   // t94 — the probe-collision + DRO origin O is a pass's re-park draw-anchor (auto reposition), not its net-endpoint marker
+import { passAnchorFor } from './passAnchor.js';   // t94/t107 — the probe-collision + DRO origin O is a pass's re-park draw-anchor (auto reposition): the RUNTIME END of the previous pass (t107 machine-faithful) via the published _passEnds, else the static previous START (t94)
 
 // Machine-DRO register bases per dialect (X=base, Y=+1, Z=+2, A=+3): Expert #880, V4.1 #1500, DM500 #864, rs274 #5420.
 // read-machine (RM) reads ITS dialect's base; the sim populates them ALL (cheap, dialect-agnostic) so RM returns the real
@@ -226,6 +226,7 @@ export class GcodeExecutionEngine {
         this._pass = 0;           // manual-REPOSITION pass index (mirrors gcodeParser): each reposition starts a new pass
         this._maxPass = 0;        // highest pass reached → stats.passes = _maxPass + 1
         this._passSources = ['auto'];   // per-pass reposition SOURCE: 'auto' (auto-traverse) / 'manual' (operator jog) → start-marker colour. Pass 0 = the start (auto/default).
+        this._passEnds = [];      // t107 — per-pass RUNTIME world-END (O + local pos at the reposition, post probe+retract+lift): an anchorsAtPrev pass anchors its dog-leg/probe HERE (machine-faithful), published in the trace result so the preview markers relocate to the same point.
         this.timer = null;
         this.stats = {
             feed: 0,
@@ -333,9 +334,15 @@ export class GcodeExecutionEngine {
             b.minZ = Math.min(b.minZ, s.z1, s.z2); b.maxZ = Math.max(b.maxZ, s.z1, s.z2);
             if (s.probe) probe += 1; else if (s.rapid) rapid += 1; else feed += 1;
         }
+        // t107 — the FINAL pass has no trailing reposition to record its end, so capture it here (O + local pos). Only
+        // an anchorsAtPrev pass READS _passEnds (via passAnchorFor), so this is inert for every non-corner op; publishing
+        // it lets the preview relocate the reposition-DESTINATION markers to the same runtime end the collision fired from.
+        const oFin = passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };
+        this._passEnds[this._pass] = { x: oFin.x + this.pos.x, y: oFin.y + this.pos.y, z: oFin.z + this.pos.z };
         return {
             segments,
             bounds: segments.length ? b : null,
+            passEnds: this._passEnds.slice(0, this._maxPass + 1),   // t107 — per-pass runtime world-ENDs (machine-faithful re-park anchors); preview-only
             stats: { feed, rapid, probe, retract: 0, passes: this._maxPass + 1, passSources: this._passSources.slice(0, this._maxPass + 1), skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped, absolute: this.stats.absolute },
         };
     }
@@ -499,7 +506,7 @@ export class GcodeExecutionEngine {
     // the SAME frame the probe trigger uses (#1925 = O + target). A=0 (no rotary axis tracked). Guarded to pure-sim.
     _updateDro() {
         if (!this._populateDro) return;
-        const O = drawAnchorFor(this._passStarts, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };   // t94 — same re-park anchor the collision uses, so the DRO frame matches #1925-1927
+        const O = passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };   // t94/t107 — same re-park anchor the collision uses (runtime END for an anchorsAtPrev pass), so the DRO frame matches #1925-1927
         const mx = (O.x || 0) + this.pos.x, my = (O.y || 0) + this.pos.y, mz = (O.z || 0) + this.pos.z;
         for (const base of DRO_BASES) {
             this.vars.set(base, mx); this.vars.set(base + 1, my); this.vars.set(base + 2, mz); this.vars.set(base + 3, 0);
@@ -597,6 +604,13 @@ export class GcodeExecutionEngine {
         // hand → start a new pass at the program origin, exactly as gcodeParser does, so each pass is start-anchored
         // and the preview gives it its own draggable start marker. Detected on the RAW line (it's a comment).
         if (/reposition:/i.test(step.raw)) {
+            // t107 machine-faithful — RECORD the finishing pass's RUNTIME world-END (its anchor O + local pos, so it
+            // includes probe+retract+lift, collision-clamped) BEFORE the reset. The NEXT pass's dog-leg + probe fire
+            // emanate from HERE when it's an anchorsAtPrev pass (passAnchorFor reads _passEnds), not from the static
+            // previous START marker — so the route, the relocated marker, and #1925-1927 all land on where the tool
+            // actually is. Preview/sim only (never emitted).
+            const oEnd = passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };
+            this._passEnds[this._pass] = { x: oEnd.x + this.pos.x, y: oEnd.y + this.pos.y, z: oEnd.z + this.pos.z };
             this._pass += 1;
             if (this._pass > this._maxPass) this._maxPass = this._pass;
             this._passSources[this._pass] = /auto-traverse/i.test(step.raw) ? 'auto' : 'manual';   // marker colour by source: auto-traverse vs operator jog
@@ -982,7 +996,7 @@ export class GcodeExecutionEngine {
                 // t94 — for an AUTO reposition pass, O is the RE-PARK draw-anchor (previous start), NOT its net-endpoint
                 // marker: the dog-leg is incremental (in local pos), so O(re-park) + local(dog-leg incl. +cross) lands the
                 // probe fire + #1925-1927 exactly on ② the marker. Net-endpoint O double-counts +cross (fires off-face).
-                const O = drawAnchorFor(this._passStarts, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };
+                const O = passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };
                 const aStart = { x: O.x + this.pos.x, y: O.y + this.pos.y, z: O.z + this.pos.z };
                 const bEnd = { x: O.x + target.x, y: O.y + target.y, z: O.z + target.z };
                 const dir = { x: target.x - this.pos.x, y: target.y - this.pos.y, z: target.z - this.pos.z };

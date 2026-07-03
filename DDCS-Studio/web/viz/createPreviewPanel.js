@@ -154,6 +154,7 @@ export function createPreviewPanel(container, opts = {}) {
     let passStarts = [];   // INC1: per-pass operator starts [{x,y,z}] — the shared source of truth for BOTH views' numbered markers
     let userStarts = [];   // INC2: per-pass USER overrides (a jog or a drag) — these BEAT the wizard's inferStarts HINT so an edited ② STICKS (the hint only positions an un-touched pass)
     let lastPassSources = [];   // t81 — the latest per-pass reposition sources (auto/manual), exposed (getPassSources) so the Layout canvas colours its handles to MATCH the top panel
+    let lastPassEnds = null;    // t107 — the latest per-pass runtime world-ENDs from the trace, exposed (getPassEnds) so the Layout canvas relocates its reposition marker + anchors the END-relative drag to the SAME runtime END
     // A per-pass start drag from ANY view — the 2D toolpath handle, the 3D marker, or the feature-canvas ②-aim handle —
     // records it as the USER override (a sim-only DECLARED value: it BEATS the inferStarts hint + persists), mirrors to the
     // 3D marker, then re-traces + replays from the new start. ONE seam, so every view edits the SAME userStarts (the
@@ -426,6 +427,11 @@ export function createPreviewPanel(container, opts = {}) {
             }
         } catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
         segs = parsed.segments || [];
+        // t107 — the per-pass RUNTIME world-ENDs from the trace (machine-faithful re-park anchors: post probe+retract+lift,
+        // collision-clamped). Fed to BOTH views so an anchorsAtPrev pass draws its dog-leg FROM where the tool actually is +
+        // relocates its marker to the same point; stashed for the Layout drag (relTo:'wall1' → the runtime END). Preview-only.
+        const passEnds = parsed.passEnds || null;
+        lastPassEnds = passEnds;
         // ONE anchor flag for BOTH views (mirrors the 3D's v._anchorToStart): an op with no established absolute
         // position (an incremental probe) is start-relative → the path emanates from the operator START; an absolute
         // (G90/G53 mill) op sits at its own coords. forceMachine (ATC) pins to the machine frame regardless.
@@ -441,6 +447,7 @@ export function createPreviewPanel(container, opts = {}) {
         lastPassSources = passSources;   // t81 — expose to the Layout canvas so its handles match the top panel's colours
         if (t2.setStartSources) t2.setStartSources(passSources);
         if (t2.setStartEmits) t2.setStartEmits(passStarts.map((s) => !!s.emits));   // sim-marker-distinguish (t69): the SHAPE axis (emitting=solid vs sim-only=hollow), orthogonal to the auto/manual COLOUR
+        if (t2.setPassEnds) t2.setPassEnds(passEnds);        // t107 — an anchorsAtPrev pass anchors its route + relocates its marker to the previous pass's runtime END (machine-faithful)
         t2.setAnchor(curAnchor);                              // 2D mirrors the 3D anchor: anchored → path emanates from the start, not the stock pin
         t2.setMachine(curAnchor ? null : machineForViz());   // anchored (probe) → LOCAL scene (no envelope), like the 3D's setMachine(null)
         if (mode === '3d') {
@@ -473,6 +480,7 @@ export function createPreviewPanel(container, opts = {}) {
                 }
                 if (v.setStartSources) v.setStartSources(passSources);   // colour each start marker by its reposition source (auto=cyan, manual=amber)
                 if (v.setStartEmits) v.setStartEmits(passStarts.map((s) => !!s.emits));   // sim-marker-distinguish (t69): SHAPE each marker (emitting=solid vs sim-only=hollow), orthogonal to the colour
+                if (v.setPassEnds) v.setPassEnds(passEnds);   // t107 — BEFORE setSegments: the route rebuild anchors an anchorsAtPrev pass at the previous pass's runtime END + relocates its marker sprite to end+cross
                 v.setSegments(parsed, !fitted); fitted = true;
                 if (v.setSimTool) v.setSimTool(simTool(code, parsed));   // per-op tool from the tool table (see simTool)
                 if (v.setSimMode) v.setSimMode(((parsed.stats && parsed.stats.probe) > 0) ? 'probe' : 'mill');   // probe = translucent stock, mill = solid
@@ -721,5 +729,5 @@ export function createPreviewPanel(container, opts = {}) {
         buildDro();   // DRO gains/loses the A/B rows with the rotary rig
     }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, get viz() { return viz; }, get engine() { return engine; }, el: container };
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds, get viz() { return viz; }, get engine() { return engine; }, el: container };
 }
