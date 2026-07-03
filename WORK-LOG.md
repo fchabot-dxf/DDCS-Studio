@@ -5641,3 +5641,44 @@ wall1→wall2; Z→wall1 kept a byte-identical diagonal — above stock, no-op-a
 **RESIDUAL (accepted, human t93):** the STATIC route + the sim fire are now correct, but the ANIMATED playback head still jumps ~36mm at the pass boundary (the declared anchor marker[N-1] is the pass START, not the tool's runtime-retracted end). Fully closing it needs a runtime-solved chain (wall_END+cross) — NOT statically declarable, OUT OF SCOPE. Not attempted.
 
 **Surgical:** 5 src + 1 new helper + 1 new spec. TOUCHES THE SHARED SIM ENGINE → ⏸ PASS BACK for the advisor's fan-out review (the fallback/all-ops surface is the highest risk — mutation-proven + full-suite-clean). COMMITTED, NOT pushed. Next (queued, one per turn): SVG cleanup + non-FL prefill.
+
+## 🔨 turn 96 (cycle 11) — SVG-CLEANUP: ENUMERATED the full reference graph (step 1). GATE HIT — the graph is BIGGER than the scout's "2 files + inert window export" framing + reveals a CROSS-APP dimension my own t91 scout MISSED. ⏸ STOP + FLAG for advisor scope-confirm before the irreversible deletion (no live USE found → deletion is SAFE, but scope grew into core files + the VS Code extension).
+
+**FULL REFERENCE GRAPH (grepped cornerVizAnimator / CornerVizAnimator / cornerViz.svg / the SVG element-ids / window exports across the WHOLE repo):**
+
+**DDCS-Studio (primary app + the test suite) — all INERT/ORPHANED, no live USE:**
+1. `web/viz/cornerVizAnimator.js` — the file (imports PathAnimator/flashWcs from middleVizAnimator.js which STAYS — edge/align use it; inert `window.CornerVizAnimator` export at :202).
+2. `web/ui/globalFunctions.js:6` — `import { CornerVizAnimator }`. globalFunctions IS loaded at runtime (`app.js:14 import { setupGlobalFunctions }`), so the module executes + :31 `window.CornerVizAnimator = …` runs — an INERT export (never `new`'d; `new CornerVizAnimator` = 0 hits in DDCS-Studio). **Deleting the file REQUIRES removing :6 + :31 (else the import 404s).**
+3. `web/assets/svg/cornerViz.svg` — loaded ONLY by `window.drawCornerViz` (index.html), which is NEVER CALLED by the app (its caller — the built-in Corner wizard view — was retired ④). So the SVG is NEVER fetched at runtime.
+4. `web/index.html:~1908` `window.drawCornerViz` (loads cornerViz.svg into `#cornerVizContainer`) — DEFINED, never called (+ comments :1834/:1838). `#cornerVizContainer` DOM element does NOT exist (grep `id="cornerVizContainer"` = 0).
+5. `web/app.js:131` calls `initializeCornerVisualization()` (:215-230) — CALLED at startup but `getElementById('cornerVizCorner')` → null (no such DOM element) → `if` false → NO-OP.
+6. `web/index.html:2197,2296` — `getElementById('cornerVizCorner')` inside LIVE edge-viz functions (addEdgeMarker) — guarded dead branches (`if(cornerRoot)` false → graceful fallback). ADJACENT (inside live functions).
+7. `web/ui/iconEditor.js:12` — a COMMENT ("the old probe-sequence viz files … are retired from the palette"); cornerViz is NOT in `TILESET_FILES=['tileset']`. Not a live ref.
+8. `web/viz/edgeVizAnimator.js:3` — a COMMENT ("Mirrors CornerVizAnimator pattern"). Live file, dangling name in a comment.
+
+**Dev tools (non-runtime):**
+9. `tools/smoke_test_playwright.py:56,184` — checks `#cornerVizContainer` + calls `window.drawCornerViz()` (guarded `window.drawCornerViz &&`). A PYTHON smoke tool, NOT the .spec.js suite.
+10. `tools/tmp_prefix_svg_ids_in_scopes.cjs:4` — lists `src/assets/cornerViz.svg`. A `tmp_` one-off dev script.
+
+**Docs:** `docs/archive/CAM-MENU-RESEARCH.md:154,284` — historical mentions (leave).
+
+**VS Code EXTENSION (a SEPARATE managed fork — my DDCS-Studio scope did NOT cover it; the t91 scout MISSED this):**
+11. `ddcs-vscode-extension/web/dist/bundle.js:15448-49` — `if (!window.__cornerAnimator && window.CornerVizAnimator) window.__cornerAnimator = new window.CornerVizAnimator()` — a STALE built artifact (from the retired cornerView). GUARDED-OFF + DEAD: the class body is NOT in the current bundle (grep `_buildSteps|class CornerVizAnimator` in bundle.js = 0) → `window.CornerVizAnimator` is undefined there → the `new` never runs.
+12. `ddcs-vscode-extension/web/extension_index.html:1639-56,1928,2027` — `drawCornerViz` (defined, NEVER called in the extension either) loads `./assets/svg/cornerViz.svg` — the extension has NO own cornerViz.svg (find = empty) → already 404s if ever called.
+13. **Extension build = `esbuild web/src/extensionApp.js`.** extensionApp.js imports MANY DDCS-Studio/web modules (`../../../DDCS-Studio/web/...`) BUT NOT globalFunctions.js (only mentions it in a comment :197) and NOT cornerVizAnimator.js. So cornerVizAnimator.js is NOT in the extension's build graph → **deleting DDCS-Studio's cornerVizAnimator.js / cornerViz.svg does NOT break the extension's build or runtime** (it's independent; its dangling refs are its OWN stale artifacts).
+
+**GATE VERDICT:** NO genuine LIVE/runtime USE (imports+USES) of cornerVizAnimator/cornerViz.svg anywhere — all references are inert imports / orphaned-never-called / no-op-called / guarded dead-branches / comments / stale-guarded-off artifacts / dev-tools / docs. So the deletion is SAFE (DDCS-Studio suite won't break; the extension is independent). Per the literal gate (no live use → step 3), I *could* proceed. I STOP anyway because the graph is materially bigger than the framing + touches CORE files + surfaces a cross-app cleanup item the scout missed — worth a one-round scope-confirm on an irreversible deletion.
+
+**PROPOSED SURGICAL PLAN (for advisor confirm) — DDCS-Studio only:**
+- (A) DELETE `web/viz/cornerVizAnimator.js` + `web/assets/svg/cornerViz.svg`.
+- (B) `web/ui/globalFunctions.js` — remove :6 import + :31 window assign (MANDATORY — the direct import; else DDCS-Studio breaks).
+- (C) `web/index.html` — remove the orphaned `window.drawCornerViz` block (+ its :1834/:1838 comments). [dedicated-to-cornerViz, not adjacent]
+- (D) `web/app.js` — remove `initializeCornerVisualization()` (:215-230) + its call (:131). [dedicated-to-cornerViz]
+- (E) LEAVE (adjacent/out-of-scope, flag): index.html:2197/2296 cornerVizCorner dead-branches (inside LIVE addEdgeMarker — has a fallback; editing = adjacent); edgeVizAnimator.js:3 + iconEditor.js:12 comments; the dev-tools (smoke_test/tmp_prefix); the docs; the VS Code EXTENSION's own dangling refs (separate managed fork — needs its OWN cleanup pass: bundle rebuild + extension_index.html drawCornerViz removal).
+
+**SCOPE QUESTIONS for the advisor:**
+1. Confirm A+B+C+D (delete the 2 files + globalFunctions + the orphaned index.html/app.js machinery).
+2. Include (E) the index.html edge-viz dead-branches + the comments + the dev-tools cleanup, or leave as "adjacent"?
+3. The VS Code EXTENSION has its OWN dangling cornerViz refs (drawCornerViz + a stale bundle) — a SEPARATE managed-fork cleanup (out of the DDCS-Studio scope). Flag to human / defer / include?
+
+**NO code changed this turn (gate).** Awaiting scope-confirm, then I execute the surgical deletion + verify the full suite green + byte-parity untouched.
