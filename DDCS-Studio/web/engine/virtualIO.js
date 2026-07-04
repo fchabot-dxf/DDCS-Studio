@@ -301,6 +301,11 @@ export function setVirtualOutput(pin, value) {
 
     if (prev !== value) {
         console.log(`[VIRTUAL IO] Output ${pin}: ${prev ?? 'undefined'} → ${value}`);
+        // Fire io_change for the OUTPUT itself, not just the paired sensor — so OPEN-LOOP outputs (the M350 pneumatics
+        // M156-161: locating pin / pusher / vacuum, which have NO sensor handshake) are still observable live (the
+        // device-model animation in P-C.2b subscribes to these). The engine's io_change listener only mirrors INPUT
+        // pins, so an OUT_* event is a harmless no-op there. (t177)
+        _dispatchIoChange(pin, value);
     }
 
     triggerVirtualHandshake(pin, value);

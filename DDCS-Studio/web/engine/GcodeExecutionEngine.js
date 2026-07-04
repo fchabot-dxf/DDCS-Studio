@@ -37,6 +37,18 @@ export const ATC_DIALECT = {
     163: { kind: 'output', pin: 'OUT_DUST_COVER', state: false, label: 'dust cover close' },        // → IN_DUST_COVER_OPEN clears
     150: { kind: 'output', pin: 'OUT_GRIPPER_OPEN', state: true, label: 'gripper open' },          // → IN_GRIPPER_OPEN (M305)
     151: { kind: 'output', pin: 'OUT_GRIPPER_CLOSE', state: true, label: 'gripper close' },        // → IN_GRIPPER_CLOSED (M306)
+    // FIXED-STATION PNEUMATICS (M350 firmware push, slib-m.nc O10102 + firmwareStack) — OPEN-LOOP outputs: the push is
+    // timed by G04 dwells, NOT sensor waits, so these have NO paired sensor handshake (they set the output + fire
+    // io_change, was a no-op). M19 spindle-orient is recognized here (was a no-op) so P-C.2b can animate the orient on
+    // its io_change; not otherwise modelled. M158 (vacuum on) is M159's pair-half — grounded in the WORKFLOW doc but NOT
+    // emitted by the current firmwareStack (completeness).
+    19: { kind: 'output', pin: 'OUT_SPINDLE_ORIENT', state: true, label: 'spindle orient' },
+    156: { kind: 'output', pin: 'OUT_LOCATING_PIN', state: true, label: 'locating pin open' },
+    157: { kind: 'output', pin: 'OUT_LOCATING_PIN', state: false, label: 'locating pin close' },
+    158: { kind: 'output', pin: 'OUT_VACUUM', state: true, label: 'vacuum on' },
+    159: { kind: 'output', pin: 'OUT_VACUUM', state: false, label: 'vacuum off' },
+    160: { kind: 'output', pin: 'OUT_PUSHER', state: true, label: 'pusher open' },
+    161: { kind: 'output', pin: 'OUT_PUSHER', state: false, label: 'pusher close' },
     // WAITS — park until the sensor reaches `state`
     300: { kind: 'wait', pin: 'IN_SPINDLE_STOPPED', state: true, label: 'spindle stopped' },
     301: { kind: 'wait', pin: 'IN_DRAWBAR_OPEN', state: true, label: 'drawbar released' },
