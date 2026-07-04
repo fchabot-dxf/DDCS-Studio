@@ -71,7 +71,7 @@ export function renderIoTable(container, kind, list, onChange) {
         name.type = 'text';
         name.value = (row.label != null && row.label !== '') ? row.label : typeLabel;
         name.title = 'Label — shown in the I/O panel (edit to rename this pin)';
-        name.style.cssText = INP + ' min-width:120px; font-weight:600; color:#3a3a3a;';
+        name.style.cssText = INP + ' min-width:120px; font-size:13px; font-weight:600; color:#3a3a3a;';   // legible (t187)
         name.addEventListener('change', () => { row.label = name.value; onChange(); });
         nameWrap.appendChild(name);
         if (row.group) {

@@ -59,6 +59,7 @@ class IOPanel {
                 <div class="io-panel-section">OUTPUTS</div>
                 <div class="io-led-grid io-outputs">${outputs}</div>
             </div>`;
+        const rgrip = document.createElement('div'); rgrip.className = 'io-resize'; rgrip.title = 'Drag to resize'; el.appendChild(rgrip);
         document.body.appendChild(el);
         this.el = el;
 
@@ -78,6 +79,7 @@ class IOPanel {
         });
 
         this._makeDraggable(el);
+        this._makeResizable(el);
         this._restorePos(el);
         // Resizable via CSS (resize: both); persist the chosen size with the position.
         this._sizeRo = new ResizeObserver(() => {
@@ -115,6 +117,30 @@ class IOPanel {
         };
         head.addEventListener('pointerup', end);
         head.addEventListener('pointercancel', end);
+    }
+
+    // Corner grip to drag-resize the floating panel — mirrors the .viz3d-resize grip (gcodePreviewTab): pointer-capture,
+    // track the start size, set width/height from the delta (clamped), persist on release. No-op when docked (embedded).
+    _makeResizable(el) {
+        const grip = el.querySelector('.io-resize');
+        if (!grip) return;
+        let sx = 0, sy = 0, sw = 0, sh = 0, pid = null;
+        grip.addEventListener('pointerdown', (e) => {
+            if (el.classList.contains('embedded')) return;
+            const r = el.getBoundingClientRect();
+            sx = e.clientX; sy = e.clientY; sw = r.width; sh = r.height; pid = e.pointerId;
+            try { grip.setPointerCapture(pid); } catch (_) { /* older browsers */ }
+            e.preventDefault(); e.stopPropagation();   // don't start a head-drag
+        });
+        grip.addEventListener('pointermove', (e) => {
+            if (pid === null || e.pointerId !== pid) return;
+            el.style.width = Math.max(220, Math.min(window.innerWidth * 0.92, sw + (e.clientX - sx))) + 'px';
+            el.style.height = Math.max(170, Math.min(window.innerHeight * 0.85, sh + (e.clientY - sy))) + 'px';
+            e.preventDefault();
+        });
+        const end = () => { if (pid === null) return; try { grip.releasePointerCapture(pid); } catch (_) { /* ignore */ } pid = null; this._savePos(); };
+        grip.addEventListener('pointerup', end);
+        grip.addEventListener('pointercancel', end);
     }
 
     _savePos() {
