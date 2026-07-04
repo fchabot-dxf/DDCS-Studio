@@ -6534,3 +6534,65 @@ Directly delivers "watch the handshake AS A SEQUENCE" + syncs to the 3D device t
 **VERIFIED REAL SYMPTOM (spec):** extended `atc-io-labeling.spec.js` (now 7): (5) RENAME-PROOF — a sensor with a RENAMED label ("My spindle drawbar", NO M-code in it) + waitCode='M301' STILL lights when IN_DRAWBAR_OPEN fires (the old label-parse would find nothing; the declared waitCode drives it); (6) migrateIO backfills waitCode='M301' on a legacy row (no waitCode) by its id; test (3) updated to the declared waitCode (the join no longer reads the label). All existing labeling/lighting tests green. BYTE-PARITY: no emit touched -> goldens green; FULL suite 552 (the one fail is the pre-existing blocks-live-form parallel flake, passes in isolation). BLAST: the io-tab input join + the seed + a one-time migration.
 
 **PASSED BACK for advisor review. NEXT: P-C.3 (generic/disk change — SCOUT; the human is deciding a multi-state-label design point for the collet/drawbar). SIM-FRAME axis; authoring axis stays done + disjoint.**
+
+## 🔨 turn 191 (cycle 13) — P-C.3 SCOUT: generic/disk pick-and-place + collet + the multi-state label (DESIGN-HEAVY, SCOUT ONLY, no code). On top of V10.56. Deliverable = the scoped design + mocks + forks for advisor + human BEFORE building. Emit stays FLAGGED-until-hardware (generic/disk are ASSUMED).
+
+### GROUNDING — the generic/disk choreography (from autoStack :76-156 / diskAutoStack :161-215)
+```
+ GENERIC (pick & place at PER-TOOL magazine pockets, settings.atc.magazine XYZ):
+   SPOFF+COOLOFF -> M300 wait spindle-stopped -> (M162 dust open) -> [Z-up #102]
+   PUT AWAY (if #1300 != 0 + in mag):  over OLD tool's pocket #110/111 -> [Z-down #112]
+       -> M154 collet OPEN -> M301 wait released (DROP) -> [Z-up]   (#1300 -> 0)
+   PICK UP (target's pocket):          over NEW tool's pocket -> M154 open -> M301 wait
+       -> [Z-down #112] -> M155 collet LOCK -> M302 wait clamped (PICK) -> [Z-up] (#1300 -> target)
+   -> (M163 dust close)
+
+ DISK (same plunge, but a FIXED pickup #103-105 + carousel rotate-to-pocket):
+   ... -> A(#106 = pocket index) -> ">> Rotate carousel to pocket #106  VERIFY" (a FLAGGED comment,
+   no real rotate emitted) -> move to the fixed pickup #103-105 -> M154/M301 (drop) ; then rotate the
+   NEW pocket -> pickup -> M154/M301 -> [Z-down #105] -> M155/M302 (pick).
+```
+KEY vs firmware (push): firmware = a planar G53 slide at a FIXED taught station (#1320-1326) + pneumatics, NO drawbar. Generic/disk = the spindle TRAVELS to per-tool magazine pockets (machine coords) + a DRAWBAR/COLLET (M154 release / M155 lock) + Z plunges. So the swap happens AT the pockets, not a fixed station.
+
+### (1) A NEW ATC_CHOREOGRAPHY KIND — `pick-place` (via the existing seam)
+```
+ generic: { kind:'pick-place', variant:'magazine' }               // per-tool pockets (setMagazine already draws them)
+ disk:    { kind:'pick-place', variant:'carousel',
+            pickupVars:[103,104,105], rotateVar:106 }              // fixed pickup + a rotate step
+```
+What the `pick-place` kind DRIVES (reusing prior pieces):
+- **Spindle TRAVEL** — already animated (the G53/machine moves to the pockets trace as the path, on the fixed frame post-P-A). REUSE, no new work.
+- **The SWAP** (keyed on the #1300 change, like P-C.1b) but AT THE POCKETS, not a station: the OLD tool RETURNS to its magazine pocket + the NEW tool is TAKEN from its pocket + the spindle tool becomes NEW. Old/new pockets resolve from settings.atc.magazine (tool -> pocket XYZ).
+- **The COLLET device** (see (2)) — opens/closes on the drawbar io_change.
+- **HIGHLIGHT the involved pockets** (the OLD + NEW tool's pockets) instead of a fixed station (reuse highlightStation at the pocket coords).
+- **Disk-only**: a carousel ROTATE animation of the ring to bring the pocket to the fixed pickup (the flagged #106; the ring geometry already exists in atcViews magazinePockets). Emit stays flagged.
+
+### (2) THE COLLET / DRAWBAR DEVICE (mirror P-C.2b, but on the SPINDLE)
+Model+animate a collet on the SPINDLE (the tool holder), OPENS on M154 (OUT_SPINDLE_UNCLAMP) / CLOSES on M155 (OUT_SPINDLE_CLAMP). Unlike the fixed-station pusher/pin (P-C.2b, on this.scene at the station), the collet rides the PART FRAME with the anim tool. REUSE: `_animParts.collet` already exists (a grey cylinder split OUT of the tool for exactly this — the header comment says "so ATC can move the tool independently of the collet"). Animate it opening (jaws spread / a short axial slide) via a new `setStationDevice('collet', on)` fed by the existing setAtcSwap io_change listener (add OUT_SPINDLE_UNCLAMP->open, OUT_SPINDLE_CLAMP->close). CROSS-FRAME: the collet is on the anim tool (part frame @ WCS, post-P-A/swap) — the same cross-frame the swap already handles.
+
+### (3) INPUT SENSOR live-lighting ACTIVATES (no new work — a consequence of P-C.2f)
+Generic/disk WAIT on M300 (spindle-stopped) / M301 (drawbar-released) / M302 (drawbar-clamped). So during a generic/disk PLAY these sensors fire (handshake/auto-answer) -> the io-tab INPUT pins configured with waitCode M300/301/302 (P-C.2f) LIGHT LIVE in order. Unlike the open-loop firmware push (which fires no sensors), pick-place gives the full input-sensor handshake to watch. Just VERIFY.
+
+### (4) THE MULTI-STATE LABEL (the human t186 question — the two-pin drawbar as ONE label)
+Today the drawbar is TWO binary pins (M154->OUT_SPINDLE_UNCLAMP release, M155->OUT_SPINDLE_CLAMP clamp — my t183 flag: the single-pin join only reflects the release). PROPOSE ONE MULTI-STATE label read from the PAIR:
+```
+ TODAY (two binary pins):   [4 ● Drawbar release] [5 ○ Drawbar clamp]
+
+ PROPOSED — one pin, 3-state from the M154/M155 pair:
+  (A) STATE-TEXT:   [4  Drawbar: CLAMPED ]    text = RELEASED | CLAMPED | MOVING; LED colour tracks it
+  (B) TWO-DOT:      [4 ◐ Drawbar ]            a split/2-colour dot (left=release, right=clamp); tooltip the state
+  (C) COLOUR-ONLY:  [4 ● Drawbar ]            one LED, colour = released(cyan)/clamped(amber)/moving(pulsing grey)
+   state rule: UNCLAMP on & CLAMP off -> RELEASED ; CLAMP on & UNCLAMP off -> CLAMPED ; else -> MOVING/idle
+```
+Config: a two-pin output row declares BOTH M-codes (onCode M154 + offCode M155 -> the two semantic pins); the io tab renders ONE label whose STATE is derived from the pair (fixes the t183 single-pin wrinkle too). RECOMMEND (A) STATE-TEXT — it directly answers "labels with multiple states" (you read RELEASED->MOVING->CLAMPED in order during the change), and it generalises to any paired actuator (pusher extend/retract, dust open/close). (C) is the compact fallback; (B) is a middle ground. This is a NEW io-tab concept (a paired/multi-state pin vs the single-pin toggle) -> a design fork for the human.
+
+### (5) EFFORT + FORKS
+- pick-place seam + spindle-travel reuse: SMALL (a new kind + the seam entry). Collet device: SMALL-MEDIUM (reuse _animParts.collet + the io_change listener). The pocket-swap (old returns / new taken): MEDIUM (per-pocket occupancy + old/new pocket resolve). Pocket highlight: SMALL. Disk carousel rotate anim: MEDIUM (ring rotation geometry; emit flagged). Multi-state label: MEDIUM (a new paired-pin io-tab concept + config).
+- **FORK 1 (pick-place swap richness):** (a) FULL — the OLD tool re-appears in its magazine pocket + the NEW tool disappears from its pocket (per-pocket occupancy) [richer, MEDIUM]; vs (b) MINIMAL — only the spindle tool swaps + the collet animates, pockets stay static [cheaper, reuses P-C.1b]. Recommend (a) if the pockets should read as truly emptied/filled; (b) for a first cut.
+- **FORK 2 (the multi-state label):** A / B / C above — the human's explicit call; recommend (A).
+- **FORK 3 (disk carousel):** animate the rotate now (geometry, emit stays flagged) vs defer to a later increment. Recommend building generic FIRST (no carousel) then disk (adds the rotate).
+- **FORK 4 (sequencing):** (a) the collet device + input-sensor verify FIRST (small, high-value, reuses P-C.2b/2f), then (b) the pick-place swap/pockets. Recommend this order.
+
+### CROSS-FRAME (note): the pick-place tool moves between the SPINDLE (part frame @ WCS) and per-tool MAGAZINE pockets (fixed frame, machine coords, post-P-A/t163). REUSE P-A (part-frame-at-WCS) + the swap's cross-frame (P-C.1b) + the magazine's raw-machine placement. No new frame work — the two frames + the reconciliation already exist.
+
+**GATED per worker step-5 (a substantial design-heavy increment; the advisor wants the plan + human eyes, esp. the multi-state-label fork). NO code. PASSED BACK the scope + kind design + collet + the multi-state-label mocks + forks. Ready to build the chosen path on confirm. SIM-FRAME axis; authoring axis stays done + disjoint.**
