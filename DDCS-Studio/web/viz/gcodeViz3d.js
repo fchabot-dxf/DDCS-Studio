@@ -1280,12 +1280,19 @@ export class GcodeViz3D {
     _partShift() {
         const m = this._machine, s = this._stock;
         if (!(m && m.show && m.x && m.y && m.z)) return { x: 0, y: 0, z: 0 };
-        // XY — always the stock's WCS (G54 XY): the persistent fixture position.
+        // XY — the stock's WCS (G54 XY): the persistent fixture position.
         let x = 0, y = 0, wcsZ = 0;
         const pin = s && s.pin, wt = m.wcs && m.wcs.table;
         if (pin && pin !== 'origin' && Array.isArray(wt)) {
             const t = wt[parseInt(String(pin).replace(/[^0-9]/g, ''), 10) - 54];   // 'g54' → table[0]
             if (t) { x = Number(t.x) || 0; y = Number(t.y) || 0; wcsZ = Number(t.z) || 0; }
+        } else if (Array.isArray(wt)) {
+            // No stock pinned to a WCS (e.g. an ATC/machine-frame preview: G53 tool changes, no real workpiece). Sit the
+            // part frame at the ACTIVE WCS so a G53/machine move — which the engine offsets by the active wcsOffset —
+            // CANCELS to raw machine coords on the FIXED envelope, aligned with the magazine (t163). XY only; Z stays
+            // per the datum (absolute-machine-Z is deferred to P-B). Zero-WCS / no table → 0, so the common case is unchanged.
+            const a = wt[(((m.wcs && m.wcs.active) || 1) - 1)];
+            if (a) { x = Number(a.x) || 0; y = Number(a.y) || 0; }
         }
         // Z — the stock rests on the FIXED machine table; Z0 floats at the datum height (you re-zero Z per part, so
         // the stored WCS-Z is ignored — it's volatile). Real Z control is per-path code (offZ + the datum-Z offset),
@@ -1331,8 +1338,10 @@ export class GcodeViz3D {
 
     /**
      * ATC magazine in 3D on the envelope: a tool stub + pocket ring + number at each pocket's MACHINE position.
-     * Scene coords = machine − origin(ox/oy/oz), same frame as the envelope box. pockets = [{x,y,z,dia,length,
-     * color,pocket,tool}] (machine coords). Pass [] / null to clear.
+     * The magazine is a FIXED machine object (pockets are absolute machine coords), so it rides the FIXED machine
+     * frame at RAW machine coords — exactly like the envelope box + home (added straight to this.scene), NOT the
+     * moving part frame / workOrigin (t163: dropping the old − workOrigin made the pockets drift off the envelope by
+     * the WCS offset once a real non-zero WCS was pulled). pockets = [{x,y,z,dia,length,color,pocket,tool}]. [] / null clears.
      */
     setMagazine(pockets) {
         const THREE = this.THREE;
@@ -1343,11 +1352,10 @@ export class GcodeViz3D {
         }
         this._magazine = (pockets && pockets.length) ? pockets : null;
         if (!this._magazine) { this.render(); return; }
-        const m = this._machine || {}, wo = m.workOrigin || {}, ox = wo.x || 0, oy = wo.y || 0, oz = wo.z || 0;
         const n = (v, d) => { const x = Number(v); return Number.isFinite(x) ? x : d; };
         const grp = new THREE.Group();
         this._magazine.forEach((p, i) => {
-            const px = n(p.x, 0) - ox, py = n(p.y, 0) - oy, pz = n(p.z, 0) - oz;
+            const px = n(p.x, 0), py = n(p.y, 0), pz = n(p.z, 0);   // RAW machine coords — fixed machine frame, like the envelope (t163)
             const td = p.tool || { type: 'endmill', dia: n(p.dia, 6), length: Math.max(15, n(p.length, 30)) };
             const dia = n(td.dia, 6), len = Math.max(15, n(td.length, 30));
             const col = (p.color != null) ? p.color : 0xffab40;   // amber — distinct from stock + the cyan toolpath
