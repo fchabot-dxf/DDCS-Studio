@@ -511,3 +511,21 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **FORK for the human/advisor:** (A) ENRICH now (add ctx.station + G53) → ship all-methods sim-decouple equivalently [REC — small, correct]; (B) ship generic/disk sim-decouple now, firmware after the enrichment; (C) reconsider (keep firmware on the played firmwareStack preview, interpreter for generic/disk + candidates only). The full interpreter path JSON is in scratchpad/sim-check.json.
 
 **⏸ GATE — PASSED BACK the equivalence diff + the proposed enrichment BEFORE shipping. Did NOT change the 3-preset emit/goldens (nothing shipped). Awaiting the enrich-or-reconsider decision.**
+
+## 🔨 turn 237 (cycle 13) — INC-A RETRY (Fork A / ENRICH): the SIM-DECOUPLE — the atc_change WIZARD preview animates via the INTERPRETER for ALL automatic methods (firmware/generic/disk). ADDITIVE — NO emit change, ALL goldens BYTE-IDENTICAL. Full suite 587 pass / 2 skip / 0 fail. Firmware degrade FIXED + equivalence VERIFIED. 3 files.
+
+**THE FIX (the t235 firmware degrade):**
+1. `interpCtxFromAtc` now reads `settings.atc.firmwareStation` → `ctx.station = { start:pushStart, end:pushEnd, retreat, z:safeZ }`, so the push motion's station.start/end/retreat/z refs RESOLVE (were undefined → no travel).
+2. The ATC interpreter moves now emit `G53` (machine frame) not `G0` — machine-frame-correct for the ATC positions (station/pockets/pickup all machine coords), robust to a WCS offset (workOrigin=0 unchanged; non-zero-WCS now MORE correct, not a regression).
+3. `atcViews`: `interpret = candidate OR method∈{firmware,generic,disk}` — the WIZARD preview plays motionToSimGcode for all automatic methods; the EMIT (gcode) STAYS atcChangeStack (ADDITIVE); m6/manual keep their played emit.
+
+**FIRMWARE EQUIVALENCE — VERIFIED (was the degrade; now walks the full station dance):**
+- interpreter sim = `M19 · M159 M157 · G53 G0 Z-10 · G53 G0 X<pushStart> · M160 · G53 G0 X<pushEnd> · M163 M156 · G53 G0 X<retreat> · M161 · [#1300 swap if magazine] · G53 G0 Z<safeZ>` — the tool now TRAVELS push-start → push-end → retreat with the pneumatic M-codes, matching firmwareStack's station sequence (G53 X#1320 → #1323 → #1325). Minor diffs (the release dwell #1322 + the F#563/#1327 feeds are timing, not the path/devices).
+- ALL 30 ATC sim/roundtrip specs GREEN (per the gate — the DEVICES + HIGHLIGHT + SWAP carry): atc-station-devices "(3) a real firmware push PLAY animates the devices via the engine io_change" GREEN → the interpreter path's M160/M161/M156/M157 fire the io_change → the pusher/pin animate; atc-station-highlight GREEN → the highlight (traced from gcode=firmwareStack + the var-seed) carries (independent of simGcode); atc-tool-swap "(3) isolated firmware shows NO swap" GREEN → firmware has no magazine → interpCtx has no cur/target → no demo swap (matches current). NEW INC-A test asserts the station travel (G53 to pushStart/end/retreat) + the pneumatics + NO bare part-frame G0.
+- SCREENSHOT scratchpad/firmware-interp.png: the tool TRAVELING the station (DRO X204→ heading to the station at Z-10, "G0 rapid 333mm") on the machine frame — the station dance the t235 degrade was missing. Opened in a VS Code tab.
+
+**GENERIC/DISK stay correct:** now G53 (machine frame) — the pocket/pickup travel + the drawbar codes + the demo swap; workOrigin=0 unchanged, WCS-offset now correct.
+
+**ADDITIVE — ZERO shipped-output change:** the CODE PREVIEW + the emitted G-code STAY atcChangeStack (only simGcode/the preview switched); goldens + atc-roundtrip BYTE-IDENTICAL (587 green). The I4/I5/I5b interpreter tests + the RapidChange sim (now G53) all still green.
+
+**GATE SATISFIED — the firmware interpreter preview is EQUIVALENT (station dance + travel + devices + highlight all carry); generic/disk correct. PASSED BACK the equivalence verification + screenshot. NEXT: INC-B (the emit flip — atc_change → T# M6, gated) + the 3 guardrails (note+checklist / gateway-verify / inline-fallback) the human chose. ATC-model axis.**

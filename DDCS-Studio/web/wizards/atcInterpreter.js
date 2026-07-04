@@ -62,10 +62,10 @@ export function motionToSimGcode(combo, ctx = {}) {
     for (const st of combo.motion.steps) {
         const p = st.ref ? resolveRef(st.ref, ctx) : null;
         switch (st.step) {
-            case 'safeZ': case 'retract': lines.push(`G0 Z${r(safeZ)}`); break;
-            case 'travelZ': lines.push(`G0 Z${r(p && p.z != null ? p.z : safeZ)}`); break;
-            case 'travelXY': if (p) lines.push(`G0 ${xy(p)}`); break;
-            case 'descend': if (p) lines.push(`G1 Z${r(p.z)} F800`); break;   // the plunge into the dock/pocket
+            case 'safeZ': case 'retract': lines.push(`G53 G0 Z${r(safeZ)}`); break;   // G53 — the ATC positions are MACHINE coords (robust to a WCS offset)
+            case 'travelZ': lines.push(`G53 G0 Z${r(p && p.z != null ? p.z : safeZ)}`); break;
+            case 'travelXY': if (p) lines.push(`G53 G0 ${xy(p)}`); break;
+            case 'descend': if (p) lines.push(`G53 G1 Z${r(p.z)} F800`); break;   // the plunge into the dock/pocket
             case 'orient': lines.push('M19'); break;
             case 'dwell': lines.push('G04 P0.3'); break;
             case 'grip.pre': emitActions(grip.pre, ctx.io, lines); break;
@@ -79,7 +79,7 @@ export function motionToSimGcode(combo, ctx = {}) {
             default: break;
         }
     }
-    lines.push(`G0 Z${r(safeZ)}`, 'M30');
+    lines.push(`G53 G0 Z${r(safeZ)}`, 'M30');
     return lines.join('\n');
 }
 
@@ -153,9 +153,13 @@ export function interpCtxFromAtc(atc, pockets, io) {
     const cur = pk[0] || null, target = pk[1] || pk[0] || null;
     const toolNum = (p) => (p && p.tool && p.tool.num != null ? p.tool.num : (p && p.tool)) || null;
     const pos = (p) => (p ? { x: p.x, y: p.y, z: p.z } : null);
+    // The firmware PUSH station (settings.atc.firmwareStation, GUI-1) → ctx.station, so the push motion's
+    // station.start/end/retreat/z refs resolve to the taught points (else no station travel — INC-A firmware degrade).
+    const fw = atc && atc.firmwareStation;
+    const station = fw ? { start: fw.pushStart || null, end: fw.pushEnd || null, retreat: fw.retreat || null, z: num(fw.safeZ, 0) } : null;
     return {
         safeZ: num(atc && atc.safeZ, 10),
-        cur: pos(cur), target: pos(target), pickup: atc && atc.pickup,
+        cur: pos(cur), target: pos(target), pickup: atc && atc.pickup, station,
         curTool: toolNum(cur), targetTool: toolNum(target),
         io: io || null,   // { outputs, inputs } → resolveAction reads the user's M-codes (INC1: drawbar)
     };

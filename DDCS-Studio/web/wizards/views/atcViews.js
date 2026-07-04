@@ -276,7 +276,10 @@ export const atcChangeView = {
         // proving a config-only changer sims. The 3 shipped presets (non-candidate motions) keep their played-inline
         // emit (byte + sim identical). The CODE PREVIEW stays the emit (the interpreter path is sim-only until I5).
         const cmb = atcCombo(params, s.atc);
-        const interpret = !!(cmb && cmb.motion && cmb.motion.candidate);
+        // INC-A (sim-decouple): the WIZARD preview animates via the INTERPRETER for a candidate combo OR any AUTOMATIC
+        // method (firmware/generic/disk) — the played motion, machine-frame (G53), station from settings.atc.firmwareStation.
+        // ADDITIVE: only the sim/preview switches; the EMIT (gcode) stays atcChangeStack (m6/manual keep their played emit).
+        const interpret = !!(cmb && cmb.motion && (cmb.motion.candidate || ['firmware', 'generic', 'disk'].includes(cmb.method)));
         const simGcode = interpret ? motionToSimGcode(cmb, interpCtxFromAtc(s.atc, magazinePockets(s.atc || {}), { outputs: s.outputs, inputs: s.inputs })) : gcode;
         if (mgr) mgr.preview3D(simGcode, 'atcChangeViz');
         if (mgr) mgr.previewMachine('atcChangeViz', true);   // ATC = machine-frame: always show the envelope

@@ -173,3 +173,22 @@ test('I5b-3 INC1: a custom drawbar code SOURCES from the I/O table in BOTH the s
   expect(r.tncDefault, 'default emit waits M301 then M302').toMatch(/M301[\s\S]*M302/);
   expect(r.tncDefault, 'default emit has no custom code').not.toContain('M158');
 });
+
+test('INC-A: the FIRMWARE interpreter preview walks the STATION dance (G53 machine frame, station from firmwareStation)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => !!window.ddcsGetSettings);
+  const sim = await page.evaluate(async () => {
+    const { atcCombo } = await import('/wizards/atcModel.js');
+    const { motionToSimGcode, interpCtxFromAtc } = await import('/wizards/atcInterpreter.js');
+    const { magazinePockets } = await import('/wizards/views/atcViews.js');
+    const atc = { safeZ: 10, firmwareStation: { safeZ: -10, pushStart: { x: 300, y: 200 }, pushEnd: { x: 340, y: 200 }, retreat: { x: 340, y: 160 } } };
+    return motionToSimGcode(atcCombo({ method: 'firmware' }, atc), interpCtxFromAtc(atc, magazinePockets(atc), { outputs: [], inputs: [] }));
+  });
+  // the station travel now RESOLVES (was undefined → no travel, the INC-A degrade) — push-start → push-end → retreat
+  expect(sim, 'travels to push-start (from firmwareStation.pushStart)').toContain('G53 G0 X300 Y200');
+  expect(sim, 'to push-end').toContain('G53 G0 X340 Y200');
+  expect(sim, 'to retreat').toContain('G53 G0 X340 Y160');
+  expect(sim, 'the pneumatic dance fires (pusher M160 … M161)').toMatch(/M160[\s\S]*M161/);
+  // MACHINE frame: G53, not the bare part-frame G0 (robust to a WCS offset — the ATC positions are machine coords)
+  expect(sim, 'machine-frame moves (G53), not part-frame G0').not.toMatch(/(^|\n)G0 [XZ]/);
+});
