@@ -4841,9 +4841,14 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     font:700 11px/1 inherit; letter-spacing:.08em; color:var(--text,#cbd5e1); background:var(--panel2,var(--panel,#161d28));
     border:1px solid var(--line); border-left:none; border-radius:0 10px 10px 0;   /* no drop shadow (human t211) — it blends flat with the sidebar */
 }
+/* Outline the toolbox/sidebar's canvas-facing edge with the SAME theme-aware token as the handle's border (--line),
+   so the sidebar reads as an outlined panel too (human t211). box-sizing keeps Blockly's measured width stable. */
+#blocks-app .blk-ws .blocklyToolbox { border-right:1px solid var(--line); box-sizing:border-box; }
 /* open: park as a close tab on the toolbox's right edge, vertically centred (matches the closed "Blocks" tab) */
 #blocks-app.tools-open .blk-tools-handle {
-    transform:translateY(-50%) translateX(var(--blk-tbx-w, 200px)); padding:12px 9px;
+    /* offset 1px LEFT so the handle (same --panel2 background) overlaps + HIDES the toolbox's right-edge outline where
+       the handle sits — its own border wraps that gap, so the outline reads as continuous around the handle (human t211). */
+    transform:translateY(-50%) translateX(calc(var(--blk-tbx-w, 200px) - 1px)); padding:12px 9px;
 }
 /* Desktop: drag the left edge of the preview column to resize it (width = --blk-pv-w on #blocks-app). */
 #blocks-app .blk-col-resize { position:absolute; left:-4px; top:0; bottom:0; width:8px; cursor:ew-resize; z-index:6; }
