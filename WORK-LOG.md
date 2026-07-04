@@ -6265,3 +6265,64 @@ The reframe moved op/stock/tool/markers into the PART frame, but the **ATC MAGAZ
 - BLAST RADIUS: gcodeViz3d is the SHARED sim core. Targeted regression (atc-magazine-frame / sim-machine-frame / atc-envelope / atc-wizards / grid-envelope / dro / toolpath2d-anchor / axis-labels-config) all green; FULL suite 530 pass / 0 fail (corner/drill/edge/middle + every preview unaffected). Zero-WCS render byte-identical (partShift 0, magazine at raw = the old machine-0 case). BYTE-PARITY: viz-only, no emit path -> the emitted .nc is untouched (all goldens green).
 
 **PASSED BACK for advisor FAN-OUT review (the shared sim-core diff + the _partShift design nuance above). NOTE: P-A done; next is P-C (ATC tool-change MOTION sim, emit flagged-until-hardware), then P-D (disk indexing). Corner/reorg AUTHORING axis stays done + disjoint.**
+
+## 🔨 turn 165 (cycle 13) — P-C SCOUT: ATC tool-change MOTION sim (design-heavy, SCOUT ONLY, no code). 2 read-only scouts (choreography + animation machinery). Suite untouched. Deliverable = scope + phased roadmap + forks for advisor + human BEFORE building. Backlog _partShift one-liner left for a build turn (scout-only now).
+
+### HEADLINE REFRAME: P-C is NOT "build a motion engine" — it's a VISUAL SWAP-OVERLAY on the EXISTING engine play.
+The spindle TRAVEL is already animated: the G53 change moves trace as path segments, and the engine drives the tool via `setToolPosition` — which ALREADY accepts ARBITRARY machine coords (not path-bound; gcodeViz3d:561-573). The handshake TIMING already exists: virtualIO fires `io_change` CustomEvents with realistic delays (drawbar 450/400ms, spindle-down 800ms, carousel 600ms) and the engine PARKS on the M300/302/303/304 waits (a real dwell at a fixed position; GcodeExecutionEngine:751-862). So the spindle-to-pocket motion + the dwell windows are DONE. What's MISSING is the SWAP VISUAL: the tool DETACHING from the spindle into the pocket + the new tool ATTACHING, the collet open/close, pocket highlight, carousel spin — all a VISUAL REACTION to events the engine already emits. That makes P-C far smaller than "simulate a tool change" sounds.
+
+### THE CHOREOGRAPHY (3 shapes, per ATC type + dialect)
+```
+ FIXED-STATION (M350, REAL/verified — firmwareStack, atcChangeWizard.js:245-266):
+   a PLANAR G53 SLIDE, no vertical pick, timed by a DWELL not sensors:
+   M19 orient -> pneumatics off/lock -> [Z-up #1306] -> [slide to push-start #1320/1321]
+   -> pusher open + G04 dwell #1322 -> [SLIDE THROUGH to #1323/1324 = THE SWAP STROKE]
+   -> dust off -> [retreat #1325/1326] -> unlock.   (# = machine-coord vars)
+
+ GENERIC pick-&-place (ASSUMED — autoStack :76-156): two XY-then-PLUNGE rectangles:
+   SPOFF + M300 wait -> [Z-up #102]
+   PUT: [over old pocket #110/111] -> [Z-down #112] -> M154 release (DROP) -> [Z-up]
+   PICK:[over new pocket] -> M154 open -> [Z-down] -> M155 lock (PICK) -> [Z-up] -> cover
+
+ DISK/CAROUSEL (ASSUMED template — diskAutoStack :161-215): same plunge, but the pocket
+   comes to a SINGLE fixed pickup #103-105; a >> ROTATE CAROUSEL to #106 spin precedes
+   each pickup (a FLAGGED comment placeholder — no real rotate G-code emitted).
+```
+Per-step categorization: [MOTION]=every G53/MM move (already animated by the path + setToolPosition); [I/O-HANDSHAKE]=M300/302/303/304 waits (already sim'd; io_change gives the exact instant); [STATE]=tool leaves/enters a pocket (watch the `A(cur,...)`/#1300 assignments for the swap frames). Pocket geometry is available as LITERAL numbers in the emitted `A('#110'..)`/`A('#103'..)` assigns.
+
+### REUSE (strong foundation — build directly on this)
+- The whole engine PLAY LOOP + `setToolPosition` (ARBITRARY coords, not path-bound) + `onWait` + `autoAnswer`.
+- The SEPARATED anim assembly `_animParts={spindle,collet,tool}` + `setPartVisible` — the header comment says it was split "so ATC can later move the tool independently of the collet" (gcodeViz3d:460-482). Purpose-built for this.
+- The FIXED magazine frame (t163) + the disk/ring pocket layout (atcViews.js:62-76).
+- virtualIO as the ANIMATION CLOCK: `io_change` (virtualIO.js:443) is a ready-made subscribe point NOTHING consumes for visuals today — drawbar/carousel/spindle outputs fire it with real delays; the engine parks on the paired waits.
+
+### MISSING (the new hooks P-C adds)
+- Per-pocket HANDLES + `highlightPocket(n)` — setMagazine stores NO pocket refs (throwaway meshes, gcodeViz3d:1346-1378).
+- A tool-in-pocket SWAP: hide a pocket's tool mesh on pickup / restore on return + a spindle-tool that detaches into the pocket. NOTE a CROSS-FRAME subtlety: the anim tool rides the PART frame (+WCS) while the magazine rides the FIXED machine frame — a swap crosses frames (P-A established the model, so this is tractable).
+- Collet/drawbar ARTICULATION (collet is one static cylinder, no open/close geometry; no drawbar/gripper/fork mesh) + a CAROUSEL rotate (magGroup is static; _applyPartRotation spins only the part frame).
+- (only if we choose segment-injection over event-overlay) a non-path timed-segment inject API — `pushSeg`/`_animSegs` are private, rebuilt from the traced path, and CAN'T express a stationary DWELL (pushSeg skips zero-length; gcodeViz3d:761).
+
+### ⚠ LOAD-BEARING FINDING — EMIT<->ENGINE M-CODE DIALECT MISMATCHES (a faithful sim EXPOSES real latent bugs)
+The wizard EMITS M-codes the engine sim does NOT honor (so the handshakes silently no-op today):
+1. **M301** (drawbar-released wait) is emitted by generic/disk (atcChangeWizard.js:132/144/196/208) but is ABSENT from the engine's ATC_WAITS (only 300/302/303/304; GcodeExecutionEngine:766-771) -> a NO-OP wait. The release the engine actually confirms is `IN_TOOL_OPEN` (M303), which the wizard never emits.
+2. **Dust-cover disagreement:** wizard emits M162/M163; the engine implements dust cover on M305/M306 (:794-795) — and per WORKFLOW.md:30 M305/306 are the GRIPPER. So the wizard's M162/M163 fire no OUT_DUST_COVER in the sim.
+3. **Carousel handshake ORPHANED:** OUT_CAROUSEL_ADVANCE/RETRACT exist in virtualIO (:146-159) but NO engine M-code triggers them; the rotate is a comment placeholder.
+4. Firmware path has NO OUT->IN wait at all — timed by the G04 P#1322 dwell.
+=> A faithful motion sim must FIRST reconcile this dialect (SIM-side preferred: make the engine honor the emitted M-codes) or it will animate the wrong/no handshake.
+
+### PROPOSED PHASING (each a shippable SIM/VISUAL increment; emit FLAGGED-until-hardware, byte-identical)
+- **P-C.0 — reconcile the ATC M-code dialect (SIM-side).** Make the engine's ATC_WAITS / M-code map honor what the wizard emits (add M301; align dust/gripper; wire the carousel OUT). SIM-only -> emit UNTOUCHED. Small, correctness, unblocks faithful timing.
+- **P-C.1 — the SWAP visual (MVP).** Per-pocket handles + `highlightPocket()`; on the tool-identity change (#1300 / `A(cur,...)`) at the swap instant, DROP the old tool into its pocket + PICK the new one (hide/show the pocket mesh + reparent/tween the spindle tool). Conveys the change. Medium.
+- **P-C.2 — mechanism articulation.** Collet open/close (and a drawbar/fork mesh) synced to the drawbar `io_change` (OUT_TOOL_RELEASE true->open). Small-medium.
+- **P-C.3 — carousel rotation (disk).** Animate the ring rotating the target pocket to the pickup, keyed off #106 + the carousel io. Medium.
+
+### EFFORT + BLAST RADIUS
+- P-C.0 small · P-C.1 medium · P-C.2 small-medium · P-C.3 medium. All SIM/VISUAL; emit flagged/untouched (byte-parity).
+- BLAST: the anim assembly + magGroup + engine play are the SHARED sim core, but P-C is ADDITIVE (new methods + an event-overlay reacting to existing io_change/tool-state) -> LOW blast if done event-driven (Fork 3). The one real subtlety = the cross-frame swap (part-frame tool <-> machine-frame pocket), tractable post-P-A. Corner/mill previews unaffected (they don't tool-change).
+
+### FORKS FOR THE HUMAN
+- **FORK 1 (fidelity):** (A) MINIMAL — pocket highlight + tool appears/disappears at the pocket at the swap instant (no articulation/carousel); (B) MODERATE — + collet open/close synced to the drawbar handshake + the tool visibly tweening spindle<->pocket + carousel spin; (C) FULL — + drawbar/gripper/fork/dust-cover meshes per-mechanism. RECOMMEND (B): reads clearly as a physical change, reuses the io_change clock, moderate effort. (Maps to P-C.1 = A-ish, +P-C.2/.3 = B, +more = C.)
+- **FORK 2 (dialect reconcile — where):** (a) SIM-side — make the engine honor the emitted (flagged) M-codes; EMIT UNTOUCHED (byte-identical). (b) EMIT-side — change the flagged generic/disk stacks to the engine's dialect (changes flagged-unverified emit). RECOMMEND (a): keeps emit flagged/byte-identical, fixes the sim to honor the macros; the emit stays honestly flagged-until-hardware.
+- **FORK 3 (how the swap is driven):** (A) EVENT-OVERLAY — subscribe to io_change + watch #1300; animate the swap as a pure visual reaction; NO engine/trace changes (reuses the existing tool-drive + dwell). (B) SEGMENT-INJECTION — add a non-path timed-segment/dwell API to the play loop. RECOMMEND (A): lower risk, reuses everything; the spindle motion is already path-driven, so only the swap-visual is new.
+
+**GATED per worker step-5 (a substantial design-heavy new sub-campaign; the advisor wants the plan + human eyes BEFORE building). NO code. PASSED BACK the scope + phasing + forks. NOTE: SIM-FRAME axis; authoring/reorg axis stays done + disjoint. The M-code dialect mismatch (P-C.0) is the key prerequisite finding.**
