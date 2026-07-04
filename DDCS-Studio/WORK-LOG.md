@@ -485,3 +485,29 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 - BYTE-CHANGING: INC-A changes the atc_change EMITTED G-code (dance → T# M6) → re-baseline the atc_change goldens/atc-roundtrip DELIBERATELY (like I5b-2a); the @DDCS round-trip + the wizard SIM are preserved/improved. The other wizards' goldens untouched.
 
 **GATED per worker step-5 (a model-level, emit-CHANGING reframe of the shipped ATC-change op; the advisor wants the plan + HUMAN eyes — esp. FORK 1 [install-safety, the crux] + FORK 2 [backward-compat] + FORK 3 [main-sim]). NO code. PASSED BACK the design + the install-safety OPTIONS + the decomposition (subsumes pusher/disk op-emit). Ready to build INC-A on the human's install-safety + scope decisions. ATC-model axis.**
+
+## 🔨 turn 235 (cycle 13) — INC-A SIM-DECOUPLE: ⚠️ GATE HELD — the interpreter preview MATERIALLY DEGRADES for FIRMWARE. Verified BEFORE shipping (per the dispatch's "if it degrades STOP + report"); NO code shipped (0 code files changed). Reporting the diff + the proposed enrichment for the advisor's enrich-or-reconsider call.
+
+**WHAT I VERIFIED (generated motionToSimGcode for firmware/generic/disk vs the current wizard-emit preview):**
+
+**🔴 FIRMWARE (push) — MATERIALLY DEGRADED (missing the entire station DANCE):**
+- interpreter sim = `( push sim )  #1300=1  M19  M159  M157  G0 Z10  M160  M163  M156  M161  #1300=2  G0 Z10  M30`
+- → the pneumatic M-codes fire IN PLACE; there is NO station XY travel — the tool does NOT move to push-start / push-end / retreat.
+- vs the CURRENT firmware preview (plays firmwareStack): `G53 Z#1306 · G53 X#1320 Y#1321 · G53 X#1323 Y#1324 · G53 X#1325 Y#1326` = the REAL station travel + the push stroke, on the machine frame, + the station highlight + the pusher/pin devices.
+- ROOT CAUSE: (1) `interpCtxFromAtc` provides only cur/target/pickup (from the magazine pockets) — NO `ctx.station`, so the push motion's `station.start/end/retreat/z` refs resolve to undefined → no moves; (2) firmware has no magazine, so even cur/target are null. SECONDARY: motionToSimGcode emits `G0` (part/WCS frame) but the station is MACHINE-frame (`G53`) — coincides only at workOrigin=0.
+
+**🟡 GENERIC (pick-place) — roughly equivalent / arguably richer:**
+- interpreter sim HAS the dance: `#1300=1 · G0 X100 Y50 · G1 Z-40 · M154 · G0 Z10 · G0 X150 Y50 · M154 · G1 Z-40 · M155 · #1300=2` (travel to the pockets + the drawbar codes + the demo swap). vs the current (plays autoStack, which without a program tool-change may show no swap motion). Frame caveat: `G0` (part) vs autoStack's `G53` (machine) — coincides at workOrigin=0.
+
+**🟡 DISK (rotate) — roughly equivalent:** `#1300=1 · G0 X150 Y100(pickup) · M154 · G0 Z10 · G0 X150 Y100 · G1 Z-30 · M155 · #1300=2` (pickup travel + drawbar + swap; the ring rotation rides the swap). Same frame caveat.
+
+**VERDICT (the gate):** shipping the all-methods sim-decouple NOW would DEGRADE the firmware preview (lose the station dance entirely) → per the dispatch I STOPPED, did not ship. generic/disk are acceptable; firmware is NOT.
+
+**PROPOSED ENRICHMENT (small, to make ALL methods equivalent — the advisor's "enrich motionToSimGcode" branch):**
+1. `interpCtxFromAtc` reads `settings.atc.firmwareStation` → `ctx.station = { start: pushStart, end: pushEnd, retreat: retreat, z: safeZ }`, so the push motion's station refs resolve to the taught points → the tool walks push-start → push-end → retreat.
+2. The ATC interpreter station moves emit `G53` (machine frame) — or all ATC moves do — so the station/pocket travel lands on the FIXED machine frame (robust to a WCS offset, matching firmwareStack). (Reuses GUI-1's firmwareStation + var-seed conventions.)
+→ With (1)+(2), firmware previews the full station dance equivalently; generic/disk gain the correct machine frame.
+
+**FORK for the human/advisor:** (A) ENRICH now (add ctx.station + G53) → ship all-methods sim-decouple equivalently [REC — small, correct]; (B) ship generic/disk sim-decouple now, firmware after the enrichment; (C) reconsider (keep firmware on the played firmwareStack preview, interpreter for generic/disk + candidates only). The full interpreter path JSON is in scratchpad/sim-check.json.
+
+**⏸ GATE — PASSED BACK the equivalence diff + the proposed enrichment BEFORE shipping. Did NOT change the 3-preset emit/goldens (nothing shipped). Awaiting the enrich-or-reconsider decision.**
