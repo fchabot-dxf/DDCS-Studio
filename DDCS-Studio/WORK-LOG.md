@@ -381,3 +381,42 @@ G53 G0 X#1 Y#2 · M154 · M301 (WAIT before descend) · G53 G0 Z#3 · M155 · G0
 **SCOPE HELD:** did NOT touch the disk/pusher route (stays on generateToolChangeNc), the 3-preset SIM, or any non-drawbar golden. atc-roundtrip + atc-wizards + ATC goldens BYTE-IDENTICAL (they test the wizard emit). full suite green (the 1 failure = the known blocks-live-form flake, passes isolated).
 
 **⏸ GATE — PASSED BACK the byte-DIFF for advisor + HUMAN review BEFORE it is final** (the shipped drawbar T.nc output now carries the O-header + the reworded comments). The two .nc files (drawbar-old.nc / drawbar-new.nc) + the unified diff are in scratchpad, opened for review. NEXT (on approval): I5b-2b = PUSHER converge (FIRST verify GRIPS.pusher declares the correct O10102 push M-codes vs the dump — pusher currently falls back to the WRONG drawbar M154/M155 if routed).
+
+## 🔨 turn 229 (cycle 13) — I5b-3 SCOUT: the config/method CODE-SOURCE unify (design + decomposition, NO code; GATED for advisor + HUMAN before build).
+
+### THE PROBLEM (why)
+I5b-2a's converge routes the drawbar emit through motionToTnc → atcCombo → **GRIPS' hardcoded M154/M155**. But the OLD generateToolChangeNc read the code from the USER's I/O table (`outputs.find(type==='drawbar').onCode || 'M154'`). So the converge DROPPED the user's custom drawbar code: a machine that uses M158/M159 for its drawbar now emits M154/M155 (wrong). SAME for the sensor WAITS (M301/M302 hardcoded vs the user's sensor rows). The SIM (motionToSimGcode) has the same hardcoded-code gap. → sim + emit must both SOURCE the codes from the user's ATC I/O function table.
+
+### THE ONE-SOURCE MODEL
+```
+  USER's ATC I/O function table            GRIPS (atcModel) — stays DUMB
+  (settings.outputs/inputs, editable)  ×   (STRUCTURE + a DEFAULT-code fallback)
+     onCode/offCode/waitCode                  release/clamp actions declare a fn-REFERENCE
+            │                                          │
+            └──────────►  a RESOLVER  ◄───────────────┘   (code = user's onCode ELSE the grip default)
+                              │
+                  ┌───────────┴───────────┐
+             SIM (motionToSimGcode)   EMIT (motionToTnc)     ← both call the resolver → CONSISTENT + machine-correct
+```
+The user's I/O table is the ONE SOURCE for the VALUE; GRIPS declares the STRUCTURE (which function each action drives, + a default so an un-configured machine still emits). One resolver, two consumers (sim + emit).
+
+### THE MECHANISM (a declared fn-reference + a resolver; keep the grip data dumb)
+- A grip ACTION gains a REFERENCE: `{ fn, edge, code (default), waitFn, wait (default), dwell, dev }` — `fn` = the I/O function key + `edge`='on'|'off' (release=on / clamp=off); `waitFn` = the sensor function; `code`/`wait` = the DEFAULT fallbacks (today's literals). The grip stays declarative data — NO lookup logic in it.
+- A pure resolver `resolveAction(action, io)` → `{ code: <the matched OUTPUT row's onCode(edge on)/offCode(edge off)> ?? action.code, wait: <the matched INPUT row's waitCode> ?? action.wait, dwell, dev }`. motionToSimGcode + motionToTnc replace `action.code`/`action.wait` with the resolver (ONE seam).
+- THE STABLE LINK (output row ↔ fn): the ATC I/O rows today are matched by onCode (fragile — editing the code breaks the link) and carry NO stable fn key. Two ways: match by row `type` (the drawbar row is type:'drawbar' — exactly how generateToolChangeNc links it, STABLE), or add a declared `fn` key to the rows. Sensors match by their seeded id / canonical waitCode.
+
+### DECOMPOSITION (minimal-first)
+- **INC1 — DRAWBAR code-source (unblocks the HELD drawbar release):** the drawbar release/clamp declare `fn:'drawbar'`+edge+`waitFn`; the resolver reads the drawbar OUTPUT row (matched by `type==='drawbar'` — REUSES generateToolChangeNc's proven link, NO new field) onCode/offCode + the drawbar sensor INPUT rows' waitCodes; defaults M154/M155/M301/M302. Wire both motionToSimGcode + motionToTnc through the resolver. SMALL. **Verify: a custom drawbar onCode (M154→M158) → BOTH sim + emit use M158; a default machine → M154/M155/M301/M302 byte-identical (goldens green).**
+- **INC2 — PUSHER code-source:** add the stable `fn` key to the ATC I/O rows (extend the GUI-3 ATC_IO_FUNCTIONS catalog + the seed + a back-fill for existing rows); the pusher's pre/release/post/clamp actions ref vacuum/pin/pusher/dust functions + edges.
+- **INC3 — DISK ROTATE code-source:** the rotate function resolution (see HARD CASE).
+
+### HARD CASES (flagged)
+- **PUSHER = a multi-code O10102 sequence:** "one action → one function" HOLDS — each actuator IS one function edge: vacuum-off (M159=off), pin-close (M157=off)/pin-open (M156=on), pusher-open (M160=on)/pusher-close (M161=off), dust-off (M163=off). So the actions map to function on/off edges cleanly. The COST: the pusher grip spans 4 functions, all needing I/O rows (else fall back to defaults) + they need the stable `fn` key (INC2). Not a blocker — a bigger surface.
+- **DISK ROTATE is NOT a grip release/clamp — it is a MOTION step:** "rotate the carousel to pocket #106" has no on/off actuator M-code; it is a rotate OUTPUT + an index SENSOR (M303/M304) tied to the `rotate` MOTION step, not the GRIP. So the grip-action-fn mechanism DOESN'T cover it — INC3 needs a parallel MOTION-STEP code-source (the rotate step resolves the rotate output + index sensor), or the rotate stays literal for now. FLAG for the design decision.
+
+### EFFORT + FORK
+- INC1 SMALL (a resolver + fn-refs on the drawbar grip + wire 2 emitters; type-match link, no schema change). INC2 MEDIUM (the `fn` key + catalog/seed + pusher's 4 functions). INC3 MEDIUM (the motion-step code-source for rotate).
+- **FORK (the stable link):** (A) INC1 matches the OUTPUT by `type` (drawbar) — minimal, no new field, unblocks drawbar fast; add the declared `fn` key at INC2 when pusher needs it [REC — incremental, lowest risk]. vs (B) add the `fn` key to ALL ATC I/O rows upfront (catalog + seed + migration) — one clean mechanism, but a bigger first step touching GUI-3 + existing configs.
+- BYTE-PARITY: INC1's default path (no user onCode edit / the seeded M154 etc.) resolves to the SAME literals → byte-identical (goldens green); only a machine with a CUSTOM code changes (correctly). SIM/emit only — the wizard emit (atcChangeStack goldens) untouched.
+
+**GATED per worker step-5 (this reworks how the grip codes source — the advisor wants the plan + HUMAN eyes, esp. FORK [type-match vs fn-key] + the disk-rotate HARD CASE). NO code. PASSED BACK the model + mechanism + decomposition (INC1 drawbar first, then pusher, then disk) + the hard cases. Ready to build INC1 on confirm. ATC-model axis; SIM-FRAME/authoring untouched.**
