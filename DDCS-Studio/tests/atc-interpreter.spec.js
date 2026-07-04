@@ -141,3 +141,35 @@ test('I5b-1: motionToTnc emits a SAFETY-COMPLETE drawbar T.nc from the DECLARATI
   expect(out.magnet, 'the magnet macro has no drawbar dwell/wait').not.toContain('M301');
   expect(out.magnet.includes('M300'), 'no spindle-stop wait for a magnet grip (no such sensor declared)').toBe(false);
 });
+
+test('I5b-3 INC1: a custom drawbar code SOURCES from the I/O table in BOTH the sim and the emit; default byte-identical', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => !!window.ddcsGetSettings);
+  const r = await page.evaluate(async () => {
+    const { atcCombo } = await import('/wizards/atcModel.js');
+    const { motionToTnc, motionToSimGcode, interpCtxFromAtc } = await import('/wizards/atcInterpreter.js');
+    const { magazinePockets } = await import('/wizards/views/atcViews.js');
+    const atc = { grip: 'drawbar', motion: 'pick-place', layout: 'linear', safeZ: 10, magazine: [{ pocket: 1, tool: 1, x: 100, y: 50, z: -40 }, { pocket: 2, tool: 2, x: 150, y: 50, z: -40 }], tools: [{ num: 1 }, { num: 2 }] };
+    const cmb = atcCombo({}, atc);
+    // a CUSTOM machine's I/O: drawbar output onCode M158 / offCode M159; a custom released-sensor waitCode M310
+    const io = { outputs: [{ type: 'drawbar', onCode: 'M158', offCode: 'M159' }], inputs: [{ id: 'drawbar_released_atc', group: 'atc', waitCode: 'M310' }] };
+    return {
+      simCustom: motionToSimGcode(cmb, interpCtxFromAtc(atc, magazinePockets(atc), io)),
+      tncCustom: motionToTnc(cmb, atc, { io }),
+      simDefault: motionToSimGcode(cmb, interpCtxFromAtc(atc, magazinePockets(atc), null)),
+      tncDefault: motionToTnc(cmb, atc, { io: null }),
+    };
+  });
+  // the CUSTOM drawbar codes flow to BOTH the sim AND the emit (one source, one seam)
+  expect(r.simCustom, 'the SIM uses the custom drawbar release M158').toContain('M158');
+  expect(r.simCustom, 'not the hardcoded M154').not.toContain('M154');
+  expect(r.tncCustom, 'the EMIT uses the custom drawbar release M158').toContain('M158');
+  expect(r.tncCustom, 'and the custom clamp M159').toContain('M159');
+  expect(r.tncCustom, 'a custom sensor waitCode (M310) flows too').toContain('M310');
+  // a DEFAULT machine (no custom I/O) → M154/M155/M301/M302, byte-identical to before
+  expect(r.simDefault, 'default sim = M154').toContain('M154');
+  expect(r.simDefault, 'default sim has no custom code').not.toContain('M158');
+  expect(r.tncDefault, 'default emit = M154 then M155').toMatch(/M154[\s\S]*M155/);
+  expect(r.tncDefault, 'default emit waits M301 then M302').toMatch(/M301[\s\S]*M302/);
+  expect(r.tncDefault, 'default emit has no custom code').not.toContain('M158');
+});

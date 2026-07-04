@@ -26,7 +26,29 @@ function resolveRef(ref, ctx) {
         default: return null;
     }
 }
-const emitActions = (list, lines) => (list || []).forEach((a) => { if (a && a.code) lines.push(a.code); });
+const _codeNum = (x) => parseInt(String(x || '').replace(/[^0-9]/g, ''), 10);
+
+// Resolve a grip action's M-code + sensor wait from the USER's ATC I/O table (io = { outputs, inputs } = settings.outputs /
+// settings.inputs, NOT settings.atc). ONE SOURCE for the machine's codes (I5b-3 INC1: the drawbar fn). Keeps GRIPS dumb:
+// the action declares fn+edge (→ the output row's on/offCode) + waitFn (→ the sensor's waitCode) + a canonical DEFAULT.
+// fork A: the drawbar output is matched by row TYPE (stable — survives a code edit, exactly generateToolChangeNc's link).
+export function resolveAction(action, io) {
+    if (!action) return action;
+    const outputs = (io && io.outputs) || [], inputs = (io && io.inputs) || [];
+    let code = action.code;
+    if (action.fn === 'drawbar') {
+        const row = outputs.find((o) => o && o.type === 'drawbar');
+        if (row) { const c = action.edge === 'off' ? row.offCode : row.onCode; if (c) code = c; }
+    }
+    let wait = action.wait;
+    if (action.waitFn) {   // the seeded ATC sensor (stable id `<waitFn>_atc`), else an atc input carrying the canonical waitCode
+        const row = inputs.find((i) => i && i.group === 'atc' && (i.id === action.waitFn + '_atc' || _codeNum(i.waitCode) === _codeNum(action.wait)));
+        if (row && row.waitCode) wait = row.waitCode;
+    }
+    return { ...action, code, wait };
+}
+
+const emitActions = (list, io, lines) => (list || []).forEach((a) => { const rr = resolveAction(a, io); if (rr && rr.code) lines.push(rr.code); });
 
 /** Walk combo.motion.steps → a SIM-ONLY G-code path (drives the played preview). ctx = the resolved LAYOUT positions
  *  (cur/target pockets · pickup · station) + a demo cur→target tool change (curTool/targetTool) + safeZ. */
@@ -46,11 +68,11 @@ export function motionToSimGcode(combo, ctx = {}) {
             case 'descend': if (p) lines.push(`G1 Z${r(p.z)} F800`); break;   // the plunge into the dock/pocket
             case 'orient': lines.push('M19'); break;
             case 'dwell': lines.push('G04 P0.3'); break;
-            case 'grip.pre': emitActions(grip.pre, lines); break;
-            case 'grip.release': emitActions(grip.release, lines); break;   // empty for a magnet grip (the plunge does it)
-            case 'grip.post': emitActions(grip.post, lines); break;
+            case 'grip.pre': emitActions(grip.pre, ctx.io, lines); break;
+            case 'grip.release': emitActions(grip.release, ctx.io, lines); break;   // empty for a magnet grip (the plunge does it)
+            case 'grip.post': emitActions(grip.post, ctx.io, lines); break;
             case 'grip.clamp':
-                emitActions(grip.clamp, lines);
+                emitActions(grip.clamp, ctx.io, lines);
                 if (ctx.targetTool != null) lines.push(`#1300=${ctx.targetTool}`);   // the pick grabs the new tool → the swap fires
                 break;
             case 'rotate': break;   // disk — the ring rotates in the sim; no XY move
@@ -63,7 +85,8 @@ export function motionToSimGcode(combo, ctx = {}) {
 
 // Grip actions → G-code lines (the M-code + its DECLARED settle dwell + its sensor wait, all optional). Generic — no
 // gripKind branch: a drawbar action declares {code,dwell,wait} → M154/G04 P500/M301; a magnet action list is empty.
-const gripLines = (list) => (list || []).flatMap((a) => {
+const gripLines = (list, io) => (list || []).flatMap((a0) => {
+    const a = resolveAction(a0, io);
     if (!a || !a.code) return [];
     const out = [a.code];
     if (a.dwell != null && a.dwell !== '') out.push(`G04 P${a.dwell}                          ; settle dwell`);
@@ -72,7 +95,7 @@ const gripLines = (list) => (list || []).flatMap((a) => {
 });
 // The OPEN-to-proceed form (fetch pre-open): actuate + wait, but NO settle dwell — you open the collet + wait for it,
 // then descend ONTO the tool (no dwell needed; the dwell is for actuate-and-hold: the return-release + the clamp).
-const gripOpen = (list) => (list || []).flatMap((a) => (a && a.code) ? (a.wait ? [a.code, `${a.wait}                              ; wait sensor`] : [a.code]) : []);
+const gripOpen = (list, io) => (list || []).flatMap((a0) => { const a = resolveAction(a0, io); return (a && a.code) ? (a.wait ? [a.code, `${a.wait}                              ; wait sensor`] : [a.code]) : []; });
 
 /**
  * The interpreter EMIT path (I5) — walk a combo's MOTION + GRIP → a T.nc O-PROGRAM (a STANDALONE tool-change macro),
@@ -86,7 +109,7 @@ export function motionToTnc(combo, atc = {}, opts = {}) {
     if (!combo || !combo.motion) return '';
     const grip = combo.grip || {};
     const mag = (Array.isArray(atc.magazine) ? atc.magazine : []).filter((p) => p && p.tool !== '' && p.tool != null);
-    const safeZ = num(atc.safeZ, 10), oNum = opts.oNumber || 1000, feed = num(opts.feed, 800);
+    const safeZ = num(atc.safeZ, 10), oNum = opts.oNumber || 1000, feed = num(opts.feed, 800), io = opts.io;   // io = { outputs, inputs } → resolveAction reads the user's codes
     const isPlunge = combo.motionKind === 'plunge';
     const descend = (z) => isPlunge ? `G53 G1 Z${z} F${feed}         ; plunge into the dock (magnet grabs/releases mechanically)` : `G53 G0 Z${z}`;
     const preOpen = (grip.release || []).length > 0 && !isPlunge;   // the FETCH opens the grip before descending (drawbar), not a magnet
@@ -107,7 +130,7 @@ export function motionToTnc(combo, atc = {}, opts = {}) {
     mag.forEach((p, i) => {
         w(`N${101 + i} (return T${num(p.tool, 0)} to dock ${num(p.pocket, i + 1)})`);
         w(`#1 = ${num(p.x, 0)}  #2 = ${num(p.y, 0)}  #3 = ${num(p.z, 0)}`);
-        w('G53 G0 X#1 Y#2'); w(descend('#3')); gripLines(grip.release).forEach(w); w('G53 G0 Z#4'); w('GOTO500');
+        w('G53 G0 X#1 Y#2'); w(descend('#3')); gripLines(grip.release, io).forEach(w); w('G53 G0 Z#4'); w('GOTO500');
     });
     w('N500 (===== fetch the requested tool =====)');
     mag.forEach((p, i) => w(`IF #1504==${num(p.tool, 0)} GOTO${201 + i}`));
@@ -116,7 +139,7 @@ export function motionToTnc(combo, atc = {}, opts = {}) {
     mag.forEach((p, i) => {
         w(`N${201 + i} (fetch T${num(p.tool, 0)} from dock ${num(p.pocket, i + 1)})`);
         w(`#1 = ${num(p.x, 0)}  #2 = ${num(p.y, 0)}  #3 = ${num(p.z, 0)}`);
-        w('G53 G0 X#1 Y#2'); if (preOpen) gripOpen(grip.release).forEach(w); w(descend('#3')); gripLines(grip.clamp).forEach(w);
+        w('G53 G0 X#1 Y#2'); if (preOpen) gripOpen(grip.release, io).forEach(w); w(descend('#3')); gripLines(grip.clamp, io).forEach(w);
         w('G53 G0 Z#4'); w('#1300 = #1504               ; record the new tool'); w('GOTO999');
     });
     w('N999'); w('M99');
@@ -125,7 +148,7 @@ export function motionToTnc(combo, atc = {}, opts = {}) {
 
 /** Build the interpreter context from settings.atc + the resolved pockets (magazinePockets): the first two occupied
  *  pockets become a demo cur→target change, so the wizard preview plays a full plunge + swap. */
-export function interpCtxFromAtc(atc, pockets) {
+export function interpCtxFromAtc(atc, pockets, io) {
     const pk = (Array.isArray(pockets) ? pockets : []).filter((p) => p && p.tool);
     const cur = pk[0] || null, target = pk[1] || pk[0] || null;
     const toolNum = (p) => (p && p.tool && p.tool.num != null ? p.tool.num : (p && p.tool)) || null;
@@ -134,5 +157,6 @@ export function interpCtxFromAtc(atc, pockets) {
         safeZ: num(atc && atc.safeZ, 10),
         cur: pos(cur), target: pos(target), pickup: atc && atc.pickup,
         curTool: toolNum(cur), targetTool: toolNum(target),
+        io: io || null,   // { outputs, inputs } → resolveAction reads the user's M-codes (INC1: drawbar)
     };
 }

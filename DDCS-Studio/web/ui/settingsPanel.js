@@ -2126,7 +2126,7 @@ function wireSettingsOverlay(ov) {
         // This collapses to UNCONDITIONAL motionToTnc (retiring generateToolChangeNc) once disk + pusher converge (I5b-2b/c).
         const cmb = atcCombo({}, atc);
         const useInterp = cmb && cmb.motion && (cmb.motion.candidate || cmb.gripKind === 'drawbar');
-        const nc = useInterp ? motionToTnc(cmb, atc) : generateToolChangeNc(atc, getOutputs());
+        const nc = useInterp ? motionToTnc(cmb, atc, { io: { outputs: getOutputs(), inputs: getInputs() } }) : generateToolChangeNc(atc, getOutputs());   // I5b-3: the interpreter reads the user's ATC I/O codes
         const out = q('atc_tnc_out'); if (out) { out.value = nc; out.style.display = 'block'; }
         const dl = q('atc_dl_tnc'); if (dl) dl.style.display = '';
     });

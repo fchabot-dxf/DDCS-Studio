@@ -277,7 +277,7 @@ export const atcChangeView = {
         // emit (byte + sim identical). The CODE PREVIEW stays the emit (the interpreter path is sim-only until I5).
         const cmb = atcCombo(params, s.atc);
         const interpret = !!(cmb && cmb.motion && cmb.motion.candidate);
-        const simGcode = interpret ? motionToSimGcode(cmb, interpCtxFromAtc(s.atc, magazinePockets(s.atc || {}))) : gcode;
+        const simGcode = interpret ? motionToSimGcode(cmb, interpCtxFromAtc(s.atc, magazinePockets(s.atc || {}), { outputs: s.outputs, inputs: s.inputs })) : gcode;
         if (mgr) mgr.preview3D(simGcode, 'atcChangeViz');
         if (mgr) mgr.previewMachine('atcChangeViz', true);   // ATC = machine-frame: always show the envelope
         if (mgr) mgr.previewMagazine('atcChangeViz', magazinePockets(s.atc || {}));   // pockets + tools in 3D on the envelope

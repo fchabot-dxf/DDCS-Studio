@@ -35,8 +35,11 @@ export const GRIPS = {
         label: 'Drawbar / collet',
         orient: false,
         stopWait: 'M300',   // wait: SPINDLE STOPPED after M5 M9, before any drawbar action (SAFETY — declared, not hand-rolled)
-        release: [{ code: 'M154', dwell: 500, wait: 'M301', dev: 'collet-open' }],   // unclamp + 500ms settle + drawbar-released sensor
-        clamp: [{ code: 'M155', dwell: 500, wait: 'M302', dev: 'collet-close' }],    // clamp + 500ms settle + tool-locked sensor
+        // The M-codes/waits are DECLARED as fn-REFERENCES into the user's ATC I/O table (fn+edge → the output row's
+        // on/offCode; waitFn → the sensor's waitCode) with the canonical DEFAULT as the fallback — resolveAction reads
+        // the user's machine values (INC1). The grip data stays DUMB (refs + defaults, no lookup logic here).
+        release: [{ fn: 'drawbar', edge: 'on', waitFn: 'drawbar_released', code: 'M154', dwell: 500, wait: 'M301', dev: 'collet-open' }],   // unclamp + settle + released sensor
+        clamp: [{ fn: 'drawbar', edge: 'off', waitFn: 'drawbar_clamped', code: 'M155', dwell: 500, wait: 'M302', dev: 'collet-close' }],    // clamp + settle + locked sensor
         device: 'collet',
     },
     // Named by MECHANISM (pusher), NOT actuation — most ATCs are pneumatic; air/hydraulic/electric is a separate/implied
