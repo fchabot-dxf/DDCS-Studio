@@ -1447,6 +1447,52 @@ export class GcodeViz3D {
         this.render();
     }
 
+    /**
+     * ATC FIXED-STATION DEVICES (P-C.2b, t179): model the M350 pneumatics at the push station on the FIXED machine
+     * frame (raw machine coords, like the highlight/magazine/retired-tool). A PUSHER (a steel-blue piston whose rod
+     * extends toward the push-END along the push direction) + a LOCATING PIN (an orange pin that rises to engage). Built
+     * in a local frame where +X = the push direction (start→end), then rotated into place. `setStationDevice` animates
+     * them on the pneumatic io_change (OUT_PUSHER / OUT_LOCATING_PIN). region = { z, start, end, retreat } or null clears.
+     */
+    setStationDevices(region) {
+        const THREE = this.THREE;
+        if (this._deviceGroup) {
+            this.scene.remove(this._deviceGroup);
+            this._deviceGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose && m.dispose()); });
+            this._deviceGroup = null; this._pusherRod = null; this._locatingPin = null;
+        }
+        if (!region || !region.start || !region.end) { this.render(); return; }
+        const z = Number(region.z) || 0, sx = Number(region.start.x) || 0, sy = Number(region.start.y) || 0, ex = Number(region.end.x) || 0, ey = Number(region.end.y) || 0;
+        const grp = new THREE.Group();
+        // PUSHER — a local frame at the push-start with +X = the push direction (start→end); the body sits behind the
+        // start, the rod extends toward the end. Rotate the whole group so local +X points down the push axis.
+        const theta = Math.atan2(ey - sy, ex - sx);
+        const pg = new THREE.Group(); pg.position.set(sx, sy, z); pg.rotation.z = theta;
+        const steel = new THREE.MeshBasicMaterial({ color: 0x5b8fc7, transparent: true, opacity: 0.8 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(26, 14, 14), steel); body.position.set(-13, 0, 0); pg.add(body);   // cylinder body, behind the start
+        const rod = new THREE.Mesh(new THREE.BoxGeometry(30, 6, 6), new THREE.MeshBasicMaterial({ color: 0x9ec7f0, transparent: true, opacity: 0.9 }));
+        rod.position.set(this._PUSH_IN = 6, 0, 0);   // retracted (just past the body); extended → this._PUSH_OUT
+        this._PUSH_OUT = 44; pg.add(rod); this._pusherRod = rod;
+        grp.add(pg);
+        // LOCATING PIN — an orange vertical pin near the push-end; rises (engage) / drops (release). Cylinder along Y →
+        // rotate to Z (scene up). Retracted low, engaged higher.
+        const pin = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 22, 14), new THREE.MeshBasicMaterial({ color: 0xffa733, transparent: true, opacity: 0.9 }));
+        pin.geometry.rotateX(Math.PI / 2);   // along scene Z (vertical)
+        this._PIN_DOWN = z - 14; this._PIN_UP = z + 2;
+        pin.position.set(ex, ey, this._PIN_DOWN); this._locatingPin = pin; grp.add(pin);
+        this._deviceGroup = grp; this.scene.add(grp);
+        this.render();
+    }
+
+    /** Animate a station device on its pneumatic io_change. name 'pusher' (OUT_PUSHER) / 'pin' (OUT_LOCATING_PIN);
+     *  on = true → extend/engage, false → retract/release. (P-C.2b) */
+    setStationDevice(name, on) {
+        if (name === 'pusher' && this._pusherRod) this._pusherRod.position.x = on ? this._PUSH_OUT : this._PUSH_IN;
+        else if (name === 'pin' && this._locatingPin) this._locatingPin.position.z = on ? this._PIN_UP : this._PIN_DOWN;
+        else return;
+        this.render();
+    }
+
     // Re-pivot the orbit on the point under the cursor (the stock surface if hovered,
     // otherwise the point at that screen location on the focus plane). Camera stays put.
     _setPivotFromCursor(e) {

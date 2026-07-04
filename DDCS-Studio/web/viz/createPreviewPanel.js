@@ -179,7 +179,7 @@ export function createPreviewPanel(container, opts = {}) {
     // by the atc_change firmware view; during play we watch #1300 and, on a REAL tool change (a program T#/M6), retire
     // the OLD tool to the station + put the NEW tool on the spindle. lastTool tracks the previous #1300 (the FIRST value
     // seen is the starting tool, NOT a swap). Isolated firmware op (no tool change) → #1300 never flips → no swap.
-    let atcChoreo = null, atcStation = null, lastTool = null;
+    let atcChoreo = null, atcStation = null, lastTool = null, deviceIoListener = null;
     let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null, lastStockKey = '', curAnchor = false;
     let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false, liveTimer = null;
 
@@ -593,6 +593,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (droWcsEl) droWcsEl.textContent = activeWcsName();   // refresh the label to the active WCS (catches a settings switch)
         if (viz) viz.setAnimate(false);                 // engine drives the tool/trail, not the geometric sweep
         lastTool = null; if (viz && viz.showRetiredTool) viz.showRetiredTool(null);   // P-C.1b: fresh run re-arms the tool-swap watch + clears any retired tool
+        if (viz && viz.setStationDevice) { viz.setStationDevice('pusher', false); viz.setStationDevice('pin', false); }   // P-C.2b: devices to their retracted rest before the firmware sequence re-animates them
         lastRunCode = get('getGcode') || '';
         eng.run(lastRunCode);
         updateRunBtn();
@@ -742,6 +743,18 @@ export function createPreviewPanel(container, opts = {}) {
         atcStation = region || null;
         lastTool = null;
         if (!atcChoreo && viz && viz.showRetiredTool) viz.showRetiredTool(null);
+        // P-C.2b: build the fixed-station DEVICES (pusher + locating pin) for a firmware push + subscribe to the
+        // pneumatic io_change so they animate as the firmwareStack M156-161 execute; non-firmware clears + unsubscribes.
+        if (viz && viz.setStationDevices) viz.setStationDevices(atcChoreo ? region : null);
+        if (deviceIoListener) { window.removeEventListener('io_change', deviceIoListener); deviceIoListener = null; }
+        if (atcChoreo && viz && viz.setStationDevice) {
+            deviceIoListener = (e) => {
+                const d = e && e.detail; if (!d || !d.pin || !viz) return;
+                if (d.pin === 'OUT_PUSHER') viz.setStationDevice('pusher', !!d.state);           // M160 extend / M161 retract
+                else if (d.pin === 'OUT_LOCATING_PIN') viz.setStationDevice('pin', !!d.state);   // M156 engage / M157 release
+            };
+            window.addEventListener('io_change', deviceIoListener);
+        }
     }
     // Watch #1300 during play — the FIRST value is the starting tool (no swap); a subsequent change old→new IS a real
     // tool change (a program T#/M6), so retire the OLD tool to the station + put the NEW tool on the spindle. Called
