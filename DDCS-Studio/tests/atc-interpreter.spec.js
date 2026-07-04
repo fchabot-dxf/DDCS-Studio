@@ -106,3 +106,33 @@ test('I5: Generate T.nc routes a new combo → the interpreter, a drawbar preset
   expect(drawbarNc, 'a drawbar changer → the existing generator (M154 drawbar dance)').toContain('M154');
   expect(drawbarNc, 'the drawbar generator is not the plunge interpreter').not.toContain('G53 G1 Z#3 F800');
 });
+
+test('I5b-1: motionToTnc emits a SAFETY-COMPLETE drawbar T.nc from the DECLARATION (matches the DDCS dance)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => !!window.ddcsGetSettings);
+  const out = await page.evaluate(async () => {
+    const { atcCombo } = await import('/wizards/atcModel.js');
+    const { motionToTnc } = await import('/wizards/atcInterpreter.js');
+    const atc = { grip: 'drawbar', motion: 'pick-place', layout: 'linear', safeZ: 10, magazine: [{ pocket: 1, tool: 1, x: 100, y: 50, z: -40 }, { pocket: 2, tool: 2, x: 150, y: 50, z: -40 }] };
+    const drawbar = motionToTnc(atcCombo({}, atc), atc);
+    const magnet = motionToTnc(atcCombo({}, { grip: 'magnet', motion: 'plunge', layout: 'linear', magazine: atc.magazine }), atc);
+    return { drawbar, magnet };
+  });
+  const lines = out.drawbar.split('\n').map((l) => l.trim());
+  const idx = (re) => lines.findIndex((l) => re.test(l));
+  // structure: O-header + M99 (a standalone subprogram, NOT inline)
+  expect(out.drawbar, 'O-number header').toMatch(/^O\d+/);
+  expect(out.drawbar.trim().endsWith('M99'), 'ends with M99').toBe(true);
+  expect(idx(/^IF #1504==#1300 GOTO999/), 'skip if already loaded').toBeGreaterThanOrEqual(0);
+  // SAFETY #1: the spindle-STOP wait (M300) comes AFTER M5 M9 — the element a naive route would DROP
+  expect(idx(/^M300\b/), 'M300 spindle-stop wait comes after M5 M9').toBeGreaterThan(idx(/^M5\s+M9/));
+  // in-order matcher over a block
+  const inOrder = (from, seq) => { const blk = lines.slice(idx(from)); let i = 0; for (const l of blk) { if (i < seq.length && l.startsWith(seq[i])) i++; if (i === seq.length) break; } return i; };
+  // RETURN: XY → descend → M154 → G04 P500 (settle) → M301 (wait) → lift
+  expect(inOrder(/^N101 /, ['G53 G0 X#1 Y#2', 'G53 G0 Z#3', 'M154', 'G04 P500', 'M301', 'G53 G0 Z#4']), 'RETURN drawbar dance in order (M154 + settle dwell + wait)').toBe(6);
+  // FETCH: XY → M154 (open) → M301 (WAIT before descend — safety) → descend → M155 → G04 P500 → M302 → lift → record
+  expect(inOrder(/^N201 /, ['G53 G0 X#1 Y#2', 'M154', 'M301', 'G53 G0 Z#3', 'M155', 'G04 P500', 'M302', 'G53 G0 Z#4', '#1300 = #1504']), 'FETCH dance: open+wait BEFORE descend, then clamp+settle+wait, record').toBe(9);
+  // the safety fields are DECLARATION-driven (per grip): a magnet grip declares no stopWait/dwell → its macro has NO M300
+  expect(out.magnet, 'the magnet macro has no drawbar dwell/wait').not.toContain('M301');
+  expect(out.magnet.includes('M300'), 'no spindle-stop wait for a magnet grip (no such sensor declared)').toBe(false);
+});

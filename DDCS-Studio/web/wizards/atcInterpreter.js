@@ -61,8 +61,18 @@ export function motionToSimGcode(combo, ctx = {}) {
     return lines.join('\n');
 }
 
-// Grip actions → G-code lines (the M-code + its sensor wait, if any). Empty for a magnet grip (no I/O).
-const gripLines = (list) => (list || []).flatMap((a) => (a && a.code) ? (a.wait ? [a.code, a.wait + '   ; wait sensor'] : [a.code]) : []);
+// Grip actions → G-code lines (the M-code + its DECLARED settle dwell + its sensor wait, all optional). Generic — no
+// gripKind branch: a drawbar action declares {code,dwell,wait} → M154/G04 P500/M301; a magnet action list is empty.
+const gripLines = (list) => (list || []).flatMap((a) => {
+    if (!a || !a.code) return [];
+    const out = [a.code];
+    if (a.dwell != null && a.dwell !== '') out.push(`G04 P${a.dwell}                          ; settle dwell`);
+    if (a.wait) out.push(`${a.wait}                              ; wait sensor`);
+    return out;
+});
+// The OPEN-to-proceed form (fetch pre-open): actuate + wait, but NO settle dwell — you open the collet + wait for it,
+// then descend ONTO the tool (no dwell needed; the dwell is for actuate-and-hold: the return-release + the clamp).
+const gripOpen = (list) => (list || []).flatMap((a) => (a && a.code) ? (a.wait ? [a.code, `${a.wait}                              ; wait sensor`] : [a.code]) : []);
 
 /**
  * The interpreter EMIT path (I5) — walk a combo's MOTION + GRIP → a T.nc O-PROGRAM (a STANDALONE tool-change macro),
@@ -87,6 +97,7 @@ export function motionToTnc(combo, atc = {}, opts = {}) {
     w(`(STANDALONE macro: the controller runs it on Tn M6. #1504=requested  #1300=spindle  ${mag.length} docks)`);
     w('IF #1504==#1300 GOTO999            ; requested tool already in spindle');
     w('M5  M9                             ; spindle + coolant OFF');
+    if (grip.stopWait) w(`${grip.stopWait}                              ; wait: spindle stopped (SAFETY)`);   // declared grip.stopWait — never dropped
     w(`#4 = ${safeZ}`);
     w('G53 G0 Z#4                         ; lift to safe Z');
     w('(===== return the current tool to its dock =====)');
@@ -105,7 +116,7 @@ export function motionToTnc(combo, atc = {}, opts = {}) {
     mag.forEach((p, i) => {
         w(`N${201 + i} (fetch T${num(p.tool, 0)} from dock ${num(p.pocket, i + 1)})`);
         w(`#1 = ${num(p.x, 0)}  #2 = ${num(p.y, 0)}  #3 = ${num(p.z, 0)}`);
-        w('G53 G0 X#1 Y#2'); if (preOpen) gripLines(grip.release).forEach(w); w(descend('#3')); gripLines(grip.clamp).forEach(w);
+        w('G53 G0 X#1 Y#2'); if (preOpen) gripOpen(grip.release).forEach(w); w(descend('#3')); gripLines(grip.clamp).forEach(w);
         w('G53 G0 Z#4'); w('#1300 = #1504               ; record the new tool'); w('GOTO999');
     });
     w('N999'); w('M99');

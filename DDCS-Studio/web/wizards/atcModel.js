@@ -34,8 +34,9 @@ export const GRIPS = {
     drawbar: {
         label: 'Drawbar / collet',
         orient: false,
-        release: [{ code: 'M154', wait: 'M301', dev: 'collet-open' }],   // unclamp + drawbar-released sensor
-        clamp: [{ code: 'M155', wait: 'M302', dev: 'collet-close' }],    // clamp + tool-locked sensor
+        stopWait: 'M300',   // wait: SPINDLE STOPPED after M5 M9, before any drawbar action (SAFETY — declared, not hand-rolled)
+        release: [{ code: 'M154', dwell: 500, wait: 'M301', dev: 'collet-open' }],   // unclamp + 500ms settle + drawbar-released sensor
+        clamp: [{ code: 'M155', dwell: 500, wait: 'M302', dev: 'collet-close' }],    // clamp + 500ms settle + tool-locked sensor
         device: 'collet',
     },
     // Named by MECHANISM (pusher), NOT actuation — most ATCs are pneumatic; air/hydraulic/electric is a separate/implied

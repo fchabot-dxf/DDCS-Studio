@@ -331,3 +331,37 @@ Config-only? **ALMOST — and the residue is small + declared:** LAYOUT linear E
 **FLAG (deferred, per the dispatch):** I5b = the config↔method unify (make the cutting-program op's emit follow the declared changer — today the ATC-change wizard emit is still the op's method; the T.nc is the standalone macro the config emits) + converging the 3 presets onto the interpreter (a byte-tested step). Not a gap — the intended split.
 
 **PASSED BACK for advisor review + human eyes on the RapidChange T.nc. NEXT per plan: the RELEASE (the complete composable ATC) + any I5b. ATC-model axis; SIM-FRAME/authoring untouched.**
+
+## 🔨 turn 225 (cycle 13) — I5b-1: teach the interpreter to emit a SAFETY-COMPLETE drawbar T.nc FROM THE DECLARATION (so it can LATER become the single emitter). ADDITIVE, ZERO shipped-output change (no routing/golden/generateToolChangeNc/3-preset-sim change). Full suite 585 pass / 2 skip / 1 known flake (middle-animator retry-passed; grew 587→588). Diff = atcModel.js + atcInterpreter.js + the test (exactly as specified).
+
+**THE TRAP (advisor):** routing drawbar to the interpreter NAIVELY would DROP the M300 spindle-stop wait + the G04 P500 drawbar settle dwell (SAFETY). FIX = DECLARE, not hand-roll.
+
+**DECLARE (atcModel GRIPS.drawbar):** added `stopWait: 'M300'` (wait spindle stopped after M5 M9), `dwell: 500` on the release (M154) + clamp (M155) actions (kept the waits M301/M302). All INERT except read by motionToTnc — the SIM (motionToSimGcode uses code-only), the choreo, the routing, the 3-preset emit are UNTOUCHED → zero shipped change.
+
+**EMIT GENERICALLY (atcInterpreter, NO gripKind branch):** `gripLines(list)` now emits code + `G04 P<dwell>` (declared) + wait; motionToTnc emits `grip.stopWait` after M5 M9 (never dropped). Added `gripOpen(list)` = code + wait, NO settle dwell — the FETCH pre-open (open collet + WAIT, then descend ONTO the tool; the dwell is for actuate-and-hold = the return-release + the clamp), matching the DDCS dance. A magnet grip declares none → its macro has no M300/dwell/wait (per-grip declaration).
+
+**THE DRAWBAR T.nc IT NOW PRODUCES (safety-complete, matches the DDCS drawbar dance = generateToolChangeNc; differs only by the O-header — the standalone-macro marker):**
+```
+O1000 (drawbar x pick-place tool-change macro - DDCS Studio)
+(GENERATED ... review + dry-run ...)
+(STANDALONE macro: the controller runs it on Tn M6. #1504=requested  #1300=spindle  3 docks)
+IF #1504==#1300 GOTO999            ; requested tool already in spindle
+M5  M9                             ; spindle + coolant OFF
+M300                              ; wait: spindle stopped (SAFETY)      <-- was DROPPED, now declared
+#4 = 10
+G53 G0 Z#4                         ; lift to safe Z
+... IF #1300==t GOTO10x dispatch ...
+N101 (return T1 to dock 1)
+G53 G0 X#1 Y#2 · G53 G0 Z#3 · M154 · G04 P500 (settle) · M301 (wait) · G53 G0 Z#4 · GOTO500   <-- RETURN dance
+... N500 fetch dispatch ...
+N201 (fetch T1 from dock 1)
+G53 G0 X#1 Y#2 · M154 · M301 (WAIT before descend) · G53 G0 Z#3 · M155 · G04 P500 (settle) · M302 (wait) · G53 G0 Z#4 · #1300 = #1504   <-- FETCH dance
+... N999 · M99
+```
+(the RETURN + FETCH sequences are byte-structure-identical to the DDCS drawbar dance; the O-header is the intended NOT-inline marker.)
+
+**VERIFIED (assert the VALUES + ordering vs the DDCS dance, not non-empty):** NEW test — O-header + M99; IF #1504==#1300 GOTO999; M300 AFTER M5 M9 (the dropped-safety element restored); RETURN in-order = XY,descend,M154,G04 P500,M301,lift; FETCH in-order = XY,M154,M301(WAIT before descend),descend,M155,G04 P500,M302,lift,#1300=#1504; a MAGNET grip's macro has NO M300/M301 (declaration-driven, per grip). atc-interpreter (all 5) + atc-roundtrip (8) + full suite GREEN; ATC goldens byte-identical (zero shipped change — the drawbar route still uses generateToolChangeNc).
+
+**NO SAFETY GAP (step 4):** every safety element (M300 stop-wait · the settle dwells · the released/clamped waits · the open+wait-before-descend) COMES FROM THE DECLARATION — none required hand-rolling; the interpreter is now capable of the safety-complete drawbar emit for the future single-emitter converge.
+
+**PASSED BACK for advisor review. NEXT per plan: the byte converge (route drawbar → motionToTnc, reconcile the O-header, retire generateToolChangeNc) + config↔method unify = the rest of I5b, then the RELEASE. ATC-model axis; SIM-FRAME/authoring untouched.**
