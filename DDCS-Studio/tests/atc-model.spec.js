@@ -72,3 +72,37 @@ test('BYTE-IDENTICAL: the emit still goes through the existing stacks (the model
   expect(em.generic, 'generic emit = the drawbar release (M154)').toContain('M154');
   expect(em.disk, 'disk emit = the carousel rotate template').toContain('Rotate carousel');
 });
+
+test('I2: the choreography descriptor is COMPUTED from the model, IDENTICAL to the old fixed table', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => !!window.ddcsGetSettings);
+  const r = await page.evaluate(async () => {
+    const { atcChoreography } = await import('/wizards/atcModel.js');
+    const vars = { 1306: -10, 1320: 100, 1321: 200, 1323: 150, 1324: 200, 1325: 150, 1326: 250 };
+    const fw = atcChoreography({ method: 'firmware' });
+    // re-export back-compat: atcViews imports atcChoreography FROM atcChangeWizard — must resolve to the same fn
+    const { atcChoreography: viaWizard } = await import('/wizards/atcChangeWizard.js');
+    const fwViaWizard = viaWizard({ method: 'firmware' });
+    return {
+      firmware: { kind: fw.kind, stationVars: fw.stationVars, region: fw.region(vars), device: fw.device, label: fw.label },
+      generic: atcChoreography({ method: 'generic' }),
+      disk: atcChoreography({ method: 'disk' }),
+      m6: atcChoreography({ method: 'm6' }),
+      manual: atcChoreography({ method: 'manual' }),
+      viaWizard: { kind: fwViaWizard.kind, device: fwViaWizard.device },
+    };
+  });
+  // firmware = the OLD fixed-table push descriptor (kind + stationVars + the region builder's OUTPUT), now grip-device-tagged
+  expect(r.firmware.kind, 'firmware kind = push (unchanged)').toBe('push');
+  expect(r.firmware.stationVars, 'firmware stationVars = the old #1306/#1320-1326').toEqual([1306, 1320, 1321, 1323, 1324, 1325, 1326]);
+  expect(r.firmware.region, 'the region builder produces the SAME station from the vars').toEqual({ z: -10, start: { x: 100, y: 200 }, end: { x: 150, y: 200 }, retreat: { x: 150, y: 250 } });
+  expect(r.firmware.label, 'firmware label unchanged').toBe('fixed-station push (O10102)');
+  expect(r.firmware.device, 'device sourced from the pneumatic GRIP (additive, unconsumed by the sim)').toBe('pusher');
+  // generic/disk = the OLD pick-place descriptors (magazine/carousel), device from the drawbar grip
+  expect(r.generic, 'generic = the old magazine pick-place descriptor').toMatchObject({ kind: 'pick-place', variant: 'magazine', label: 'magazine pick & place', device: 'collet' });
+  expect(r.disk, 'disk = the old carousel pick-place descriptor').toMatchObject({ kind: 'pick-place', variant: 'carousel', label: 'carousel pick & place', device: 'collet' });
+  expect(r.m6, 'm6 = the old macro-call descriptor').toMatchObject({ kind: 'macro-call', label: 'controller M6 (T.nc)' });
+  expect(r.manual, 'manual = null (no inline choreography), as before').toBeNull();
+  // the re-export path (atcChangeWizard → atcModel) yields the identical descriptor
+  expect(r.viaWizard, 'atcChoreography re-exported from atcChangeWizard = the same').toEqual({ kind: 'push', device: 'pusher' });
+});

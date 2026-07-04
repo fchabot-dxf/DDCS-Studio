@@ -26,6 +26,7 @@ import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { resolveMethod, atcChoreography } from './atcModel.js';   // I2: method resolution + choreo now source from the composable model
 
 const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
@@ -265,49 +266,13 @@ function firmwareStack(params) {
     return S;
 }
 
-// Map a saved op onto a change METHOD. New ops carry params.method directly; OLD saved ops (params.mode /
-// params.magType, no method) map on so existing blocks/files keep emitting the same stack.
-export function resolveMethod(params) {
-    if (params.method) return params.method;
-    if (params.mode === 'auto') return (params.magType === 'disk') ? 'disk' : 'generic';
-    return 'manual';   // legacy default (mode unset or 'manual')
-}
+// resolveMethod + the ATC CHOREOGRAPHY seam MOVED to the composable model (wizards/atcModel.js) at I2: the choreo is now
+// COMPUTED from atcCombo (the declared MOTION's seam projection + the GRIP's device) instead of a fixed per-method table,
+// so the seam reads the DECLARED MODEL (one source). Byte + sim identical for the 3 presets. Re-exported here (from the
+// top-of-file import) so existing importers (atcViews) are untouched; atcChangeStack's switch uses the imported resolveMethod.
+export { resolveMethod, atcChoreography };
 
-// The per-method ATC CHOREOGRAPHY seam (P-C.1a, t171) — a DECLARED registry (keyed on resolveMethod) that says HOW
-// each change method animates in the SIM, so the visual follows the op's DECLARED method (valid-by-construction) with
-// NO hard-coded animation. This increment fills the FIRMWARE entry — a real INLINE pneumatic PUSH at a taught fixed
-// station (highlight the push region, reuse the already-animated G53 push travel). `m6` is a macro CALL (the controller
-// runs T.nc — nothing to animate inline). generic/disk/manual are no-op for now (P-C.3). The tool-SWAP (trigger +
-// identity) is a separate open decision (P-C.1b) and is intentionally NOT here yet. SIM/VISUAL only — no emit impact.
-//   kind: 'push'       → a fixed-station push; `stationVars` = the taught G53 station params to read; `region(vars)`
-//                        builds the highlight from those resolved values (all MACHINE coords → the FIXED machine frame).
-//   kind: 'macro-call' → the controller performs the change (M6/T.nc); no inline choreography.
-export const ATC_CHOREOGRAPHY = {
-    firmware: {
-        kind: 'push',
-        label: 'fixed-station push (O10102)',
-        stationVars: [1306, 1320, 1321, 1323, 1324, 1325, 1326],
-        // push-start #1320/1321 → push-end #1323/1324 (the swap stroke) → retreat #1325/1326, all at safe-Z #1306.
-        region: (v) => ({
-            z: Number(v[1306]) || 0,
-            start: { x: Number(v[1320]) || 0, y: Number(v[1321]) || 0 },
-            end: { x: Number(v[1323]) || 0, y: Number(v[1324]) || 0 },
-            retreat: { x: Number(v[1325]) || 0, y: Number(v[1326]) || 0 },
-        }),
-    },
-    m6: { kind: 'macro-call', label: 'controller M6 (T.nc)' },
-    // pick-place (P-C.3a): a drawbar/collet magazine change — the spindle travels to the tool pockets, the COLLET opens
-    // (M154) / closes (M155) to release/grip. MINIMAL here (arms the collet + the swap); the per-pocket swap MOTION is
-    // P-C.3b. generic = per-tool magazine pockets; disk = a fixed pickup + a carousel rotate (deferred).
-    generic: { kind: 'pick-place', variant: 'magazine', label: 'magazine pick & place' },
-    disk: { kind: 'pick-place', variant: 'carousel', label: 'carousel pick & place' },
-    manual: null,
-};
-
-/** The ATC choreography descriptor for an op's params (via resolveMethod), or null (no inline choreography). */
-export const atcChoreography = (params = {}) => ATC_CHOREOGRAPHY[resolveMethod(params)] || null;
-
-// The INVERSE of ATC_CHOREOGRAPHY.firmware.region — map a Studio-authored firmwareStation store
+// Map a Studio-authored firmwareStation store (the INVERSE of the push seam's region — see atcModel MOTIONS.push.seam)
 // { safeZ, pushStart:{x,y}, pushEnd:{x,y}, retreat:{x,y} } back onto its controller vars (#1306 + #1320-1326) as
 // [var, value] pairs, so the SIM can be VAR-SEEDED from the store (GUI-1): author the station in Studio → the preview
 // renders it from the store instead of untaught-0 (the P-C.1a stuck-at-0 limitation). SIM-ONLY — never emitted: the

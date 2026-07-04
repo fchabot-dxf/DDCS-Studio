@@ -17,7 +17,14 @@
  * ONE-SOURCE: grip/motion live under settings.atc (a user override, added by the setup GUI in I3); until then atcCombo
  * derives the combo from the op's method (via resolveMethod), so existing ops/files are untouched.
  */
-import { resolveMethod } from './atcChangeWizard.js';
+// Map a saved op → a change METHOD — new ops carry params.method; OLD ops (mode/magType, no method) map on so existing
+// blocks/files resolve to the same combo. MOVED here from atcChangeWizard at I2 so the MODEL is the one source for
+// method → combo → choreo, and atcChangeWizard imports it back (no import cycle).
+export function resolveMethod(params = {}) {
+    if (params.method) return params.method;
+    if (params.mode === 'auto') return (params.magType === 'disk') ? 'disk' : 'generic';
+    return 'manual';   // legacy default (mode unset or 'manual')
+}
 
 // ── GRIP: the hold/release MECHANISM ────────────────────────────────────────────────────────────────────────
 // release[]/clamp[] are ACTION-LISTS (a multi-actuator grip declares cleanly). An action = { code (M-code), off
@@ -60,6 +67,7 @@ export const MOTIONS = {
     'pick-place': {
         label: 'Pick & place (per-pocket)',
         layout: 'linear',
+        seam: { kind: 'pick-place', variant: 'magazine', label: 'magazine pick & place' },   // sim projection (I2)
         steps: [
             { step: 'safeZ' },
             { step: 'travelXY', ref: 'cur.pocket' }, { step: 'descend', ref: 'cur.pocket' }, { step: 'grip.release' }, { step: 'retract' },
@@ -69,6 +77,18 @@ export const MOTIONS = {
     push: {
         label: 'Fixed-station push (O10102)',
         layout: 'station',
+        // sim projection (I2): the push seam carries the taught station vars + the region builder the highlight uses
+        // (moved verbatim from the old ATC_CHOREOGRAPHY.firmware → identical descriptor).
+        seam: {
+            kind: 'push', label: 'fixed-station push (O10102)',
+            stationVars: [1306, 1320, 1321, 1323, 1324, 1325, 1326],
+            region: (v) => ({
+                z: Number(v[1306]) || 0,
+                start: { x: Number(v[1320]) || 0, y: Number(v[1321]) || 0 },
+                end: { x: Number(v[1323]) || 0, y: Number(v[1324]) || 0 },
+                retreat: { x: Number(v[1325]) || 0, y: Number(v[1326]) || 0 },
+            }),
+        },
         steps: [
             { step: 'orient' }, { step: 'grip.pre' },
             { step: 'travelZ', ref: 'station.z' }, { step: 'travelXY', ref: 'station.start' },
@@ -80,6 +100,7 @@ export const MOTIONS = {
     rotate: {
         label: 'Carousel rotate (disk)',
         layout: 'disk',
+        seam: { kind: 'pick-place', variant: 'carousel', label: 'carousel pick & place' },   // sim projection (I2): a pick-place with a carousel variant
         steps: [
             { step: 'safeZ' },
             { step: 'rotate', ref: 'cur.pocket' }, { step: 'travelXY', ref: 'pickup' }, { step: 'grip.release' }, { step: 'retract' },
@@ -91,6 +112,7 @@ export const MOTIONS = {
     plunge: {
         label: 'Plunge dock (RapidChange)',
         layout: 'linear',
+        seam: { kind: 'pick-place', variant: 'plunge', label: 'plunge dock' },   // sim projection (candidate, I5)
         steps: [
             { step: 'safeZ' },
             { step: 'travelXY', ref: 'cur.pocket' }, { step: 'descend', ref: 'cur.pocket' }, { step: 'grip.release' }, { step: 'retract' },
@@ -98,8 +120,8 @@ export const MOTIONS = {
         ],
         candidate: true,
     },
-    'macro-call': { label: 'Controller M6 (T.nc)', layout: null, steps: [] },   // the controller performs the change
-    manual: { label: 'Manual park + swap', layout: 'park', steps: [] },         // operator swaps by hand
+    'macro-call': { label: 'Controller M6 (T.nc)', layout: null, seam: { kind: 'macro-call', label: 'controller M6 (T.nc)' }, steps: [] },   // the controller performs the change
+    manual: { label: 'Manual park + swap', layout: 'park', seam: null, steps: [] },         // operator swaps by hand — no inline choreography
 };
 
 // ── PRESETS: the shipped methods AS grip×motion combos (the migration map) ───────────────────────────────────
@@ -131,4 +153,20 @@ export function atcCombo(params = {}) {
         grip: preset.grip ? GRIPS[preset.grip] : null,
         motion: preset.motion ? MOTIONS[preset.motion] : null,
     };
+}
+
+/**
+ * The ATC CHOREOGRAPHY descriptor for an op — COMPUTED from the composable model (I2): the SEAM projection of the op's
+ * declared MOTION (via atcCombo) + the declared GRIP's device. REPLACES the old fixed ATC_CHOREOGRAPHY table so the
+ * seam reads the DECLARED MODEL (one source), not a hardcoded per-method table. BYTE + SIM IDENTICAL for the 3 presets:
+ * each returns the SAME { kind, label, stationVars, region | variant } the table did — the sim consumes kind / region /
+ * stationVars (createPreviewPanel.setAtcSwap + atcViews); the grip-sourced `device` is additive (unconsumed today).
+ * null = no inline choreography (manual).
+ */
+export function atcChoreography(params = {}) {
+    const combo = atcCombo(params);
+    const seam = combo && combo.motion && combo.motion.seam;
+    if (!seam) return null;
+    const device = combo.grip && combo.grip.device;
+    return device ? { ...seam, device } : { ...seam };
 }
