@@ -24,6 +24,8 @@ test('(1) the structural-control blocks reflect CORNER_STRUCT_BINDINGS (param, k
       if (JSON.stringify(blk._options) !== JSON.stringify(wantOpts)) mism.push(bind.param + ':options');
       if ((blk._options ? 'select' : 'toggle') !== (bind.type === 'bool' ? 'toggle' : 'select')) mism.push(bind.param + ':kind');
       if (blk.label !== bind.label) mism.push(bind.param + ':label');
+      const wantDflt = bind.type === 'bool' ? !!bind.default : bind.default;   // t156 (agent-2 residual) — the DEFAULT is one-source too
+      if (JSON.stringify(blk.defaults.value) !== JSON.stringify(wantDflt)) mism.push(bind.param + ':default');
     }
     return { count: STRUCT_CTL_BLOCKS.length, bindCount: CORNER_STRUCT_BINDINGS.length, mism };
   });
@@ -90,4 +92,31 @@ test('(4) the structural controls emit nothing (byte-parity preserved)', async (
   });
   expect(r.off, 'probeZ off: twin == cornerStack (controls emit nothing)').toBe(true);
   expect(r.on, 'probeZ on: twin == cornerStack (controls emit nothing)').toBe(true);
+});
+
+// (5) NO CLOBBER (t156) — editing a VALUE socket then toggling a structural control MERGES (preserves the edit) instead of
+//     replaceOp-ing from stale op.data. Without the isOpBlockEdited/mergeOpBlocks guard, the value edit reverts (spec RED).
+test('(5) a value-socket edit survives a structural toggle (merge, not clobber)', async ({ page }) => {
+  await openCornerBlocks(page);
+  const gcode = () => page.evaluate(() => (document.getElementById('blk-gcode') || {}).textContent || '');
+  // edit the #1 (Max probe distance) value socket: 500 → 250 (a live value edit that marks the op edited)
+  const edited = await page.evaluate(() => {
+    const ws = window.__blkws;
+    const asn = ws.getAllBlocks().find((b) => b.type === 'assign' && b.getFieldValue('VAR') === '#1');
+    if (!asn) return false;
+    asn.setFieldValue('250', 'VALUE');   // the assign's value is a FIELD (not a socket) → set it directly
+    return true;
+  });
+  expect(edited, 'found + edited the #1 value socket').toBe(true);
+  await page.waitForTimeout(500);
+  expect(/#1=250/.test(await gcode()), 'the value edit is live in the emit').toBeTruthy();
+  // now toggle a structural control (probeZFirst)
+  await page.evaluate(() => { const b = window.__blkws.getAllBlocks().find((x) => x.type === 'sc_probezfirst'); b.setFieldValue('TRUE', 'VALUE'); });
+  await page.waitForTimeout(800);
+  const after = await gcode();
+  // (a) the value edit is PRESERVED (merge, not clobbered back to 500) AND (b) the structural toggle still repruned
+  expect(/#1=250/.test(after), 'the #1=250 value edit is preserved after the structural toggle (merged, not clobbered)').toBeTruthy();
+  expect(/#1=500/.test(after), 'the value did NOT revert to the default').toBeFalsy();
+  expect(/Z Surface/i.test(after), 'the structural toggle still repruned (the Z arm changed)').toBeTruthy();
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 });

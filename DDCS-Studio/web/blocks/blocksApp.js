@@ -573,7 +573,11 @@ async function buildWorkspace() {
               const v = d.getFieldValue('VALUE');
               params[SC_PARAM[d.type]] = (v === 'TRUE' || v === 'FALSE') ? (v === 'TRUE') : v;   // checkbox → bool; dropdown → its value
             }
-            _ops.replaceOp(opBlk.id, params);
+            // t156 — mirror the op-header branch's guard: if the op has hand-edited children (a live value-socket edit
+            // marks it edited but doesn't refresh opBlk.data), MERGE (reconciles the structural reprune WITH those edits)
+            // instead of replaceOp (which rebuilds from the STALE data + would clobber the value edit — a data-loss defect).
+            if (isOpBlockEdited(opBlk.id) && _ops.mergeOpBlocks) _ops.mergeOpBlocks(opBlk.id, params);
+            else _ops.replaceOp(opBlk.id, params);
             return;
           }
         }
