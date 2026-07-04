@@ -6148,3 +6148,84 @@ The execution-line GLOW is on the unmerged local branch **`glow-gcode` (5d72c76*
 **VERIFIED (mutation + specs):** NEW corner-structctl test (5) — insert corner, edit #1 to 250, toggle probeZFirst → assert (a) `#1=250` PRESERVED (not reverted to 500) AND (b) the structural toggle STILL repruned (Z-Surface arm appears). MUTATION-verified: reverting to the unconditional replaceOp turns test (5) RED (the value reverts). The existing structctl tests (1-4) + plain live-reprune stay green (un-edited op → replaceOp). ALSO folded in the agent-2 residual (one-source): test (1) now asserts each sc_* def's `defaults.value` matches its CORNER_STRUCT_BINDINGS default too. BYTE-PARITY unaffected (nothing emits); full suite 525.
 
 **PASSED BACK for advisor review. After this the WHOLE BLOCKLY REORG THREAD IS COMPLETE + V10.53-ready. Corner RELEASED, disjoint.**
+
+## 🔨 turn 159 (cycle 13) — MACHINE-FRAME + ATC SCOUT (SCOUT ONLY, no code). 3 read-only scouts (sim-frame / ATC / machine-truth-profile) + first-hand frame-math verification. Suite untouched. Deliverable = the finding + a phased roadmap for advisor + human eyes BEFORE building.
+
+### HEADLINE — THE PREMISE HAS SHIFTED: the machine-frame "redesign" is ~85% DONE, not the big undone foundation the campaign assumes.
+The campaign framing was "FINISH the machine-frame side FIRST because it reshapes every wizard's 3D sim, then port probes on the good frame." Scouting the LIVE code (not the 9-16-day-old memories, which under-state it): the deep reframe already shipped. `viz/sceneFrame.js` (`PartFrame`) splits the scene into a FIXED machine frame (envelope + machine-home at scene 0 + floor/table, raw machine coords) and a MOVING part frame (op/stock/tool/markers/WCS-axes in a Group translated by +workOrigin). The old bug (`scene = machine - workOrigin` -> home MOVED with the WCS) is GONE. So the "foundation" the human wanted built first is mostly already under us — the honest campaign is **targeted frame refinements + the ATC-SIM halves**, not a redesign.
+
+### THE FRAME TODAY (verified first-hand — gcodeViz3d.js:1277-1372, sceneFrame.js):
+```
+  scene 0 = MACHINE HOME (fixed)                    FIXED machine frame (this.scene):
+      +------------------------------------+          envelope box @ machine 0..|travel|   (1307-1316)
+      |  [home]X/Y/Z axes @ 0  (1319-1326) |          machine-home AxesHelper @ 0 (only when
+      |                                    |             part rides a non-zero WCS)
+      |          +--------------+          |          floor/table @ min(0,m.z)  (_layoutGrid)
+      |          |  PART FRAME  |  <-- Group.position = +workOrigin  (PartFrame.update)
+      |          |  op/stock/   |          |         MOVING part frame (partFrame.add):
+      |          |  tool/marker |          |           op + stock + tool + start/probe gizmos
+      |          |  @ +workOrig |          |           + part-zero X/Y/Z axis lines  (124-137)
+      |          +--------------+          |           stock rests on the fixed table
+      +------------------------------------+            (shift.z = tableFloor - stockBottom, 1293)
+```
+
+### DONE vs LEFT — SIM MACHINE-FRAME
+| Item | State | Evidence |
+|---|---|---|
+| Home fixed @ scene 0; envelope fixed; part rides +workOrigin | **DONE** | sceneFrame.js `PartFrame`; gcodeViz3d.js:1300-1330 |
+| Fixed table floor @ min(0,m.z); stock rests on it | **DONE** | :958, :1156, :1293-1294 |
+| Dual-origin marker (machine-home + part-zero, drawn only when separate) | **DONE** | :1317-1326 |
+| Signed travel (abs(travel), sign = home dir) | **DONE** | :1308 |
+| G53 machine->part mapping + anchor/envelope flip | **DONE** | GcodeExecutionEngine.js:948,965; createPreviewPanel.js:438,464,470 |
+| Phase 0 param map + Phase 1 frame/work-origin (pull -> store -> render -> draw) | **DONE** | ops.py:379-462; settingsPanel.js:472,468,1416,1543 |
+| WCS G54-G59 table pulled + editable + drives workOrigin (syncWorkOrigin) | **DONE** | settingsPanel.js:1469-1552, renderWcsTable |
+| Phase 3 tool table/length (pull #1430-base -> atc.tools[].length -> sim tool geo) | **MOSTLY DONE** | settingsPanel.js:1494-1541; createPreviewPanel.js:369-381 |
+| **Absolute-machine-Z fidelity** (stored WCS-Z modeled — G53 Z / raised fixture / ATC park heights) | **LEFT** | `_partShift` IGNORES wcsZ, floats Z (1290-1294); worked around per-trace |
+| **Named / per-G54..G59 WCS marker** (labelled, not a tooltip-only stock datum) | **LEFT** | :152-153 (amber stock datum, hover 'stock' only) |
+| **Per-WCS engine offset** (engine `_wcsOffset` is ONE active offset; sim treats G54=G55=G59) | **LEFT** | GcodeExecutionEngine.js:58-59; createPreviewPanel.js:183 |
+| **Phase 2 soft-limit / out-of-envelope WARNINGS** (pulled coords are DISCARDED web-side) | **NOT STARTED** | no envelope-warn path; geometry.softLimits/machZero unused |
+| **Phase 4 fixtures + fence** model | **NOT STARTED** | no settings.machine.fixtures/fence; only the visual rotary rig |
+
+### CANDIDATE LATENT BUG (verified by code-reading, NOT yet driven in-app — confirm first in the ATC phase):
+The reframe moved op/stock/tool/markers into the PART frame, but the **ATC MAGAZINE was never carried across it.** `setMagazine` (gcodeViz3d.js:1346-1350) still draws pockets at `machine - workOrigin` and adds them straight to `this.scene`, with a now-STALE comment "same frame as the envelope box" (:1334). The envelope switched to raw-machine (home @ 0); the magazine did not. The sceneFrame.js docstring lists op/stock/tool/markers as part-frame members — the magazine is in NEITHER list (overlooked). Net: with a non-zero pulled WCS (real machine G54 ~ X48/Y-666/Z-102) the magazine + the G53 ATC toolpath (engine subtracts the same `_wcsOffset`) sit TOGETHER but drift from the FIXED envelope by ~workOrigin (~666 mm in Y). Default workOrigin={0,0,0} -> consistent (why it slipped). **Repro to confirm:** pull/set a non-zero machine.wcs active offset, open an ATC wizard preview (forces machine frame), observe the magazine pockets offset from the envelope box by the WCS amount. THIS is the concrete sense in which "the machine-frame must be finished before the ATC sim" is TRUE — the reframe happened but ATC wasn't reconciled onto it. It ties to the same root as the two LEFT items above (single engine `_wcsOffset` + Z floated): magazine + G53 are MACHINE-space and should render at raw machine coords, matching the fixed envelope.
+
+### ATC DEFERRED ITEMS — current state
+- **(b) DISK-MAGAZINE INDEXING** — only a FLAGGED TEMPLATE. `diskAutoStack` (atcChangeWizard.js:192-206) writes the pocket index to `#106` + emits `>> Rotate carousel to pocket #106 ... VERIFY on the machine`, then moves to the FIXED pickup XYZ. No angle is ever computed; `atcGenerator.js` has no disk branch. The 3D DISPLAY ring exists (atcViews.js:62-75: pocket 1 on the pickup, centre = pickup + R along diskAxis, pockets evenly spaced) but it is display-only, not motion. Real indexing needs: disk axis (have, display), angular spacing (360/N — never computed for motion), a current-pocket / carousel-home STATE, and a firmware rotate primitive (I/O stubs `OUT_CAROUSEL_ADVANCE/RETRACT`->`IN_CAROUSEL_AT_POS/AT_HOME` exist in virtualIO.js:145-159 but ALL `[HYPOTHESIS]`). **HARDWARE-GATED** (firmware-specific; unverifiable without the machine).
+- **(c) ATC SIM (tool-change motion)** — PARTIAL. The ELECTRICAL sensor handshake IS simulated: `GcodeExecutionEngine.js:766-799` waits M300/302/303/304 against a virtualIO truth-table (OUT->IN with delays + side-effects, virtualIO.js). But the PHYSICAL swap MOTION is NOT — `T#### M6` only sets `#1504`/`#1300` (:777-785); no drawbar/gripper animation, no spindle->pocket->drop->pickup choreography, no carousel-rotation motion; change stacks trace as plain G53 moves + the handshake. Ground-truth caveat: only the M350 fixed-station PNEUMATIC path (firmwareStack, verbatim from DDCS-ATC-WORKFLOW.md) is verified; the generic/disk drawbar pick-&-place stacks are explicitly ASSUMED/UNVERIFIED (atcChangeWizard.js:17-22).
+
+### DEPENDENCY GRAPH + PROPOSED PHASED SEQUENCE (each phase a shippable increment; do NOT build yet)
+```
+  P-A  Reconcile ATC/G53 onto the fixed machine frame   <-- FOUNDATION for ATC sim
+       (fix setMagazine + engine _wcsOffset so magazine + G53 render at raw machine
+        coords matching the fixed envelope; confirm the candidate bug first)
+          |
+          +--> P-B  Absolute-machine-Z fidelity (model stored WCS-Z: park/retract/raised-fixture heights)
+          |          (unblocks a CORRECT tool-change retract/park height in the sim)
+          |            |
+          |            v
+          +--> P-C  ATC MOTION SIM (choreograph the swap in-sim, tie to the already-sim'd handshake;
+          |          M350 fixed-station path = ground-truth; generic/disk = flagged ASSUMED)
+          |            |
+          |            v
+          +--> P-D  DISK-INDEXING geometry+animation (compute 360/N + shortest rotation, animate the ring;
+          |          KEEP the emit a flagged TEMPLATE until hardware — sim half only)
+          |
+       (independent, parallel — NOT ATC-blocking, can slot anytime or defer):
+          P-E  Named/per-WCS markers + labelled G54..G59
+          P-F  Phase 2 soft-limit / out-of-envelope WARNINGS (data already pulled, just discarded)
+          P-G  Phase 4 fixtures + fence model (least-specified — user hasn't pinned the flavour)
+```
+
+### BLAST RADIUS
+- P-A/P-B touch the SHARED sim core (gcodeViz3d + GcodeExecutionEngine + createPreviewPanel) -> cross-cutting: EVERY wizard's 3D preview re-renders through them. Risk surface = the corner machine-faithful sim + all the ATC previews + every mill/probe preview. Mitigation: corner + all ops already share ONE frame/engine (no corner-local sim), so a golden-image + trace-position sweep across the existing preview specs guards it; the default workOrigin=0 path must stay byte-identical (that's the common case).
+- P-C/P-D are ADDITIVE sim layers (animation on top of the trace) — lower blast radius; no G-code change (emits unchanged / flagged).
+- P-E/P-F/P-G are largely additive (new markers / a new warning overlay / a new settings model) — contained.
+- **Does corner's sim get redone?** No — corner is already on the shared frame; P-A/P-B REFINE the shared frame so corner inherits the fix for free (same as the authoring pilot pattern). corner-local = nothing; shared = everything.
+
+### EFFORT (rough) + FORKS FOR THE HUMAN
+- P-A small-MEDIUM (a frame reconciliation + the confirm-the-bug repro), P-B MEDIUM (Z model + the per-trace hack removal), P-C MEDIUM-LARGE (a new motion-sim layer), P-D MEDIUM (geometry+anim, emit stays flagged), P-E small-MEDIUM, P-F MEDIUM (consume pulled coords + overlay), P-G LARGE + under-specified.
+- **FORK 1 (the reframe):** the machine-frame is mostly built — do we (a) DROP the "redesign" framing and run a lean "frame-refinement + ATC-sim" campaign [P-A->P-D], or (b) still want the broader frame work (P-E/P-F/P-G) folded in? Recommend (a): finish what ATC actually needs, treat E/F/G as independent later slots.
+- **FORK 2 (hardware gating):** disk indexing (b) + the generic/disk change STACKS are UNVERIFIED firmware. Do we (a) build the SIM/VISUAL halves now (P-C choreography, P-D ring animation + computed rotation) and KEEP the emitted G-code a flagged TEMPLATE until the machine is available, or (b) defer all ATC-sim/indexing until hardware? Recommend (a): the sim halves are valuable + fully verifiable in-app; the emit stays honestly flagged.
+- **FORK 3 (start point):** recommend starting at **P-A** (confirm + fix the magazine/G53 frame reconciliation) — it is the true "machine-frame must come first" item, small, and unblocks P-C. Alternatively start at **P-C** if the human wants a visible ATC-motion demo sooner (accepting the magazine may sit off the envelope until P-A).
+
+**GATED per worker step-5 (a substantial NEW campaign — the advisor explicitly wants the plan + the human's eyes BEFORE committing). NO code. PASSED BACK the finding + phased roadmap. NOTE: this is the SIM-FRAME axis; the corner/reorg AUTHORING axis stays done + disjoint.**
