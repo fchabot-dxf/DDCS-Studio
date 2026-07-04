@@ -19,6 +19,8 @@ import { renderWizardLibrary } from './wizardManagerPanel.js';
 import { toolProfileSvg } from '../viz/toolProfile.js';
 import { THEMES } from './themes.js';
 import { generateToolChangeNc } from '../data/atcGenerator.js';
+import { atcCombo } from '../wizards/atcModel.js';
+import { motionToTnc } from '../wizards/atcInterpreter.js';
 import { renderCloudLogin } from './cloudAccount.js';
 import { popReturn, dropReturn, pushReturn } from './navReturn.js';   // central back-navigation: return to wherever we were deep-linked from
 import { FACTORY_MACROS } from '../data/factoryMacros.js';
@@ -2117,7 +2119,11 @@ function wireSettingsOverlay(ov) {
     // ATC: generate a T.nc tool-change macro from the magazine table (client-side; review before running).
     const genTnc = q('atc_gen_tnc');
     if (genTnc) genTnc.addEventListener('click', () => {
-        const nc = generateToolChangeNc(_ddcsSettings.atc, getOutputs());
+        const atc = _ddcsSettings.atc;
+        // A NEW / from-zero changer (a candidate motion — e.g. RapidChange magnet×plunge) → the INTERPRETER emits its
+        // T.nc O-program (I5); the shipped drawbar changer keeps the existing generator (byte-identical).
+        const cmb = atcCombo({}, atc);
+        const nc = (cmb && cmb.motion && cmb.motion.candidate) ? motionToTnc(cmb, atc) : generateToolChangeNc(atc, getOutputs());
         const out = q('atc_tnc_out'); if (out) { out.value = nc; out.style.display = 'block'; }
         const dl = q('atc_dl_tnc'); if (dl) dl.style.display = '';
     });

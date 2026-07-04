@@ -312,3 +312,22 @@ Config-only? **ALMOST — and the residue is small + declared:** LAYOUT linear E
 **FLAG:** none blocking. NOTE the I3 config↔method seam still stands: a from-zero combo drives the SIM (via settings.atc) but the EMIT is still the op's method (delegate/manual) — the CODE PREVIEW shows the emit while the sim shows the interpreter plunge; unifying them (the emit follows the declared changer) is I5. Also: the fork/dock renders at the magazine pockets (the docks) — a per-dock fork; refinements (a real ISO20/ER fork profile, a magnet glow) are polish if wanted.
 
 **PASSED BACK for advisor review + human eyes on the RapidChange plunge screenshot. NEXT per plan: I5 (the interpreter EMIT — emit the T.nc O-program + M6 call per the t214 no-inline conclusion, + unify config/method). ATC-model axis; SIM-FRAME/authoring untouched.**
+
+## 🔨 turn 223 (cycle 13) — I5: the interpreter EMITS a T.nc O-program for NEW combos (RE-PLAN #2 inc 5 — RapidChange now FULLY functional sim+emit). Emit BYTE-IDENTICAL for the 3 presets. Full suite 583 pass / 2 skip + 2 KNOWN flakes (blocks-live-form + project-drawer-smoke — both pass ISOLATED 7/7; parallel/init-race, untouched by me). Grew 585→587 with 2 new tests. 3 files.
+
+**t214 CONCLUSION HONORED:** a tool change is a STANDALONE SUBPROGRAM (an O-program with M99), auto-run by the controller on `Tn M6` — NOT inlined into the cutting program. 'Generate T.nc' is the O-program MAKER.
+
+**PIECES (3 files):**
+1. `wizards/atcInterpreter.js` — NEW `motionToTnc(combo, atc, opts)`: walks a combo's MOTION + GRIP → a T.nc O-PROGRAM: an `O<num>` header + the dispatch (IF #1504==tool / IF #1300==tool GOTO dock) + per-dock return/fetch sequences (G53 moves; the descend is a `G53 G1 Z F` PLUNGE for a plunge motion, else G0; the grip release/clamp M-codes + waits — EMPTY for a magnet grip) + `#1300=#1504` + `M99` (subprogram return). preOpen = the fetch opens the grip before descending (drawbar), not a magnet. `gripLines(list)` → the M-code + its sensor wait.
+2. `ui/settingsPanel.js` — 'Generate T.nc' (atc_gen_tnc) now ROUTES: a NEW / from-zero combo (a candidate motion — RapidChange magnet×plunge) → `motionToTnc` (the interpreter O-program); the shipped drawbar changer (non-candidate) → the EXISTING `generateToolChangeNc` (byte-identical). Imported atcCombo + motionToTnc.
+3. `tests/atc-interpreter.spec.js` — 2 new tests.
+
+**BYTE-IDENTICAL (Fork A):** I touched NEITHER the wizard emit (atcChangeStack — the goldens/atc-roundtrip subject) NOR generateToolChangeNc. The interpreter emit is a SEPARATE path used ONLY for a candidate combo. So the 3 presets' emit + 'Generate T.nc' for a drawbar changer are byte-identical. Converging the 3 presets onto the interpreter + unifying config↔method = I5b (deferred, as the dispatch specified).
+
+**VERIFIED REAL SYMPTOM (assert the VALUE + screenshot):** NEW atc-interpreter.spec — (a) motionToTnc for a RapidChange config = a valid O-program: an `O<num>` header (standalone, not inline), the plunge descend `G53 G1 Z#3 F800`, the #1504 dispatch (runs on Tn M6), `#1300 = #1504` (records the new tool), the linear docks ("return T2 to dock 1"), ends with `M99`; NO drawbar M154 / NO pneumatic M156-163 (magnet grip empty); (b) 'Generate T.nc' ROUTES — a RapidChange config → the interpreter O-program (plunge, no drawbar), switching to a drawbar changer → the existing generator (M154 dance, no plunge feed). Screenshot scratchpad/atc-rapidchange-tnc.png (the generated `O1000 (magnet x plunge tool-change macro)` — the STANDALONE-macro header "runs on Tn M6" + the dock dispatch) opened in a VS Code tab. Full suite: goldens + atc-roundtrip + all ATC specs GREEN (byte-parity; the 2 failures are the known flakes, pass isolated).
+
+**RAPIDCHANGE IS NOW FULLY FUNCTIONAL from CONFIG:** compose magnet×plunge×linear in the GUI (I3) → the sim walks it (I4) → 'Generate T.nc' emits its O-program (I5). The composable model's payoff: a new changer = a config, no new per-method code.
+
+**FLAG (deferred, per the dispatch):** I5b = the config↔method unify (make the cutting-program op's emit follow the declared changer — today the ATC-change wizard emit is still the op's method; the T.nc is the standalone macro the config emits) + converging the 3 presets onto the interpreter (a byte-tested step). Not a gap — the intended split.
+
+**PASSED BACK for advisor review + human eyes on the RapidChange T.nc. NEXT per plan: the RELEASE (the complete composable ATC) + any I5b. ATC-model axis; SIM-FRAME/authoring untouched.**

@@ -59,3 +59,50 @@ test('a RapidChange config (from-zero) SIMS via the interpreter — the tool plu
   const spindle = await page.evaluate(() => Number(document.getElementById('atcChangeViz').parentElement.querySelector('.wiz-viz3d').__panel.viz._simTool.num));
   expect(spindle, 'the tool swapped to the target (5) at the plunge — a config-only changer SIMS').toBe(5);
 });
+
+test('I5: the interpreter EMITS a T.nc O-program for a new combo (plunge macro + M99, a STANDALONE subprogram)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => !!window.ddcsGetSettings);
+  const nc = await page.evaluate(async (atc) => {
+    const { atcCombo } = await import('/wizards/atcModel.js');
+    const { motionToTnc } = await import('/wizards/atcInterpreter.js');
+    return motionToTnc(atcCombo({}, atc), atc);
+  }, RAPID);
+  expect(nc, 'an O-number header — a standalone macro, NOT inline').toMatch(/^O\d+/m);
+  expect(nc.trim().endsWith('M99'), 'ends with M99 (subprogram return)').toBe(true);
+  expect(nc, 'the plunge descend (G1 feed into the dock)').toContain('G53 G1 Z#3 F800');
+  expect(nc, 'dispatched by the requested tool (#1504) — runs on Tn M6').toContain('IF #1504==');
+  expect(nc, 'records the new tool (#1300 = #1504)').toContain('#1300 = #1504');
+  expect(nc, 'the linear docks come from the magazine (dock 1 = T2)').toContain('return T2 to dock 1');
+  expect(nc, 'the magnet grip emits NO drawbar M154 (empty release/clamp)').not.toContain('M154');
+  expect(nc, 'and no pneumatic M-codes').not.toMatch(/M15[6-9]|M16[0-3]/);
+});
+
+test('I5: Generate T.nc routes a new combo → the interpreter, a drawbar preset → the existing generator', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetSettings && window.openSettings);
+  await page.evaluate((atc) => {
+    const s = window.ddcsGetSettings();
+    s.hardwareTabs = s.hardwareTabs || {}; s.hardwareTabs.atc = true;
+    s.atc = Object.assign(s.atc || {}, atc);
+    window.ddcsSaveSettings && window.ddcsSaveSettings();
+    window.openSettings({ group: 'hardware', panel: 'set_tab_atc' });
+  }, RAPID);
+  await page.waitForSelector('#atc_gen_tnc', { timeout: 8000 });
+  // RapidChange (candidate motion) → the interpreter O-program
+  await page.click('#atc_gen_tnc');
+  const rapidNc = await page.evaluate(() => document.querySelector('#atc_tnc_out').value);
+  expect(rapidNc, 'RapidChange → the interpreter O-program (plunge)').toMatch(/^O\d+/m);
+  expect(rapidNc).toContain('G53 G1 Z#3 F800');
+  expect(rapidNc, 'no drawbar in a magnet changer').not.toContain('M154');
+  // switch to a DRAWBAR changer (non-candidate motion) → the existing generator (byte-identical, M154 dance)
+  await page.evaluate(() => {
+    const s = window.ddcsGetSettings();
+    s.atc.grip = 'drawbar'; s.atc.motion = 'pick-place'; s.atc.layout = 'linear';
+    s.outputs = s.outputs || []; if (!s.outputs.some((o) => o.type === 'drawbar')) s.outputs.push({ type: 'drawbar', onCode: 'M154', offCode: 'M155', pin: 5, group: 'atc' });
+  });
+  await page.click('#atc_gen_tnc');
+  const drawbarNc = await page.evaluate(() => document.querySelector('#atc_tnc_out').value);
+  expect(drawbarNc, 'a drawbar changer → the existing generator (M154 drawbar dance)').toContain('M154');
+  expect(drawbarNc, 'the drawbar generator is not the plunge interpreter').not.toContain('G53 G1 Z#3 F800');
+});

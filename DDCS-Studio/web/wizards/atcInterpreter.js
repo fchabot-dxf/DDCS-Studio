@@ -61,6 +61,57 @@ export function motionToSimGcode(combo, ctx = {}) {
     return lines.join('\n');
 }
 
+// Grip actions → G-code lines (the M-code + its sensor wait, if any). Empty for a magnet grip (no I/O).
+const gripLines = (list) => (list || []).flatMap((a) => (a && a.code) ? (a.wait ? [a.code, a.wait + '   ; wait sensor'] : [a.code]) : []);
+
+/**
+ * The interpreter EMIT path (I5) — walk a combo's MOTION + GRIP → a T.nc O-PROGRAM (a STANDALONE tool-change macro),
+ * NOT inline: an O-number header + the per-dock tool-change G-code (G53 moves; the descend is a G1 PLUNGE for a plunge
+ * motion, else a G0; the grip release/clamp M-codes + waits — empty for a magnet grip) + M99 (subprogram return). The
+ * controller runs it on `Tn M6` (#1504=requested, #1300=spindle); a cutting program CALLS it via `T# M6`, never inlines
+ * it. This makes a from-zero / RapidChange config FULLY functional (sim I4 + emit I5). The 3 shipped presets keep their
+ * own emit (generateToolChangeNc / the stacks) — converging them onto this is a separate byte-tested step (I5b).
+ */
+export function motionToTnc(combo, atc = {}, opts = {}) {
+    if (!combo || !combo.motion) return '';
+    const grip = combo.grip || {};
+    const mag = (Array.isArray(atc.magazine) ? atc.magazine : []).filter((p) => p && p.tool !== '' && p.tool != null);
+    const safeZ = num(atc.safeZ, 10), oNum = opts.oNumber || 1000, feed = num(opts.feed, 800);
+    const isPlunge = combo.motionKind === 'plunge';
+    const descend = (z) => isPlunge ? `G53 G1 Z${z} F${feed}         ; plunge into the dock (magnet grabs/releases mechanically)` : `G53 G0 Z${z}`;
+    const preOpen = (grip.release || []).length > 0 && !isPlunge;   // the FETCH opens the grip before descending (drawbar), not a magnet
+
+    const L = []; const w = (s) => L.push(s);
+    w(`O${oNum} (${combo.gripKind} x ${combo.motionKind} tool-change macro - DDCS Studio)`);
+    w('(GENERATED from the composable ATC config - review every line + dry-run before cutting. NOT validated on a live ATC.)');
+    w(`(STANDALONE macro: the controller runs it on Tn M6. #1504=requested  #1300=spindle  ${mag.length} docks)`);
+    w('IF #1504==#1300 GOTO999            ; requested tool already in spindle');
+    w('M5  M9                             ; spindle + coolant OFF');
+    w(`#4 = ${safeZ}`);
+    w('G53 G0 Z#4                         ; lift to safe Z');
+    w('(===== return the current tool to its dock =====)');
+    w('IF #1300==0 GOTO500               ; spindle empty - nothing to return');
+    mag.forEach((p, i) => w(`IF #1300==${num(p.tool, 0)} GOTO${101 + i}`));
+    w('GOTO500');
+    mag.forEach((p, i) => {
+        w(`N${101 + i} (return T${num(p.tool, 0)} to dock ${num(p.pocket, i + 1)})`);
+        w(`#1 = ${num(p.x, 0)}  #2 = ${num(p.y, 0)}  #3 = ${num(p.z, 0)}`);
+        w('G53 G0 X#1 Y#2'); w(descend('#3')); gripLines(grip.release).forEach(w); w('G53 G0 Z#4'); w('GOTO500');
+    });
+    w('N500 (===== fetch the requested tool =====)');
+    mag.forEach((p, i) => w(`IF #1504==${num(p.tool, 0)} GOTO${201 + i}`));
+    w('#1505 = 1(Tool not in magazine!) ; requested tool has no dock');
+    w('GOTO999');
+    mag.forEach((p, i) => {
+        w(`N${201 + i} (fetch T${num(p.tool, 0)} from dock ${num(p.pocket, i + 1)})`);
+        w(`#1 = ${num(p.x, 0)}  #2 = ${num(p.y, 0)}  #3 = ${num(p.z, 0)}`);
+        w('G53 G0 X#1 Y#2'); if (preOpen) gripLines(grip.release).forEach(w); w(descend('#3')); gripLines(grip.clamp).forEach(w);
+        w('G53 G0 Z#4'); w('#1300 = #1504               ; record the new tool'); w('GOTO999');
+    });
+    w('N999'); w('M99');
+    return L.join('\n');
+}
+
 /** Build the interpreter context from settings.atc + the resolved pockets (magazinePockets): the first two occupied
  *  pockets become a demo cur→target change, so the wizard preview plays a full plunge + swap. */
 export function interpCtxFromAtc(atc, pockets) {
