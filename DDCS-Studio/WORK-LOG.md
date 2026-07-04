@@ -162,3 +162,15 @@ The GUI writes only DECLARED stores — settings.atc.magazine (generic), .pickup
 **NOTE (honest, minor):** rotate + pocket-index have NO M-code (special disk I/O) so they're assignable but label-only in the io-tab (they don't join ATC_DIALECT) — included per the dispatch's function list, matched by type. The M-code functions (the meaningful lighting set) all join + light.
 
 **PASSED BACK for advisor review + human eyes on the pin-picker screenshot. SIM-FRAME axis; authoring disjoint. Zero controller write. NEXT per plan: GUI-4 (the GATED controller pull/push — FORK 2 [firmware pull-visualize vs author-push], to the human).**
+
+## 🔨 turn 211 (cycle 13) — EASY FIX (UI/CSS): the Blocks sidebar X-HANDLE color + drop-shadow (human t210 screenshot + t211 direct "remove drop shadow"). UI/CSS only, emit BYTE-IDENTICAL. Full suite 573 pass / 0 fail (color change); handle spec + tree clean after the shadow removal. 1 file (styles.css, one rule).
+
+**THE HANDLE** = `#blkToolsHandle` / `.blk-tools-handle` (blocksApp.js) — the vertical close tab that parks at the toolbox's right edge showing `✕` when the Blocks palette/sidebar is open (and "Blocks" when collapsed).
+
+**ROOT CAUSE:** it was `color:var(--screen-ink); background:var(--screen)`. `--screen` = `#000000` — a HARDCODED black ("the screen is black in every theme", styles.css:4566 — the on-screen-keyboard / editor-readout token, NOT the sidebar). So the handle was a BLACK box that didn't match the toolbox in ANY theme.
+
+**FIX:** use the SAME tokens the Blockly theme gives the sidebar (blocks/blockly/theme.js: toolboxBackgroundColour = `--panel2`/`--panel`, toolboxForegroundColour = `--text`): `color:var(--text,#cbd5e1); background:var(--panel2,var(--panel,#161d28))`. Now the handle blends with the toolbox in every theme (theme-aware — --panel2 varies per skin: organic #2f261c, futuristic #0e1626, steampunk #3d2817, …). Then per the human's follow-up, REMOVED the `box-shadow:4px 0 14px #0007` so it sits FLAT with the sidebar (no floating drop shadow). Kept the theme-aware `border:1px solid var(--line)`.
+
+**VERIFIED (screenshots, both themes):** the ✕ handle now matches the toolbox background + is flat (no shadow) in steampunk (dark) + organic — scratchpad/xhandle-dark.png, xhandle-light.png, xhandle-noshadow.png opened in VS Code tabs. blocks-desktop-collapse spec GREEN (the handle still toggles the palette — position/text/width unaffected by the color/shadow). Full suite 573 pass (the color change is a bigger visual delta than the shadow line; the shadow removal is a pure cosmetic subtraction on the same rule). BYTE-PARITY: no JS/emit touched.
+
+**PASSED BACK. NOTE (from the dispatch): the ATC setup GUI is DONE-FOR-NOW (the human moved off the FORK-2 pull/push decision → deferred; revisit only if they want the controller-PULL convenience).**

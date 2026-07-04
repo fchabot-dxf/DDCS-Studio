@@ -4835,8 +4835,11 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     display:block; position:fixed; left:0; top:50%; transform:translateY(-50%);
     transition:transform .28s cubic-bezier(.22,1,.36,1);
     z-index:81; padding:16px 7px; cursor:pointer; writing-mode:vertical-rl; text-orientation:mixed;   /* z 81: above the mobile preview drawer (z 80) so the ✕ stays tappable when both overlap */
-    font:700 11px/1 inherit; letter-spacing:.08em; color:var(--screen-ink); background:var(--screen);
-    border:1px solid var(--line); border-left:none; border-radius:0 10px 10px 0; box-shadow:4px 0 14px #0007;
+    /* Match the toolbox/flyout SIDEBAR: the same tokens the Blockly theme uses for it (theme.js — toolboxBackgroundColour
+       = --panel2/--panel, toolboxForegroundColour = --text), so the handle blends with the sidebar in every theme (was
+       hardcoded to --screen/--screen-ink — the on-screen-keyboard skin token, which didn't match the sidebar). */
+    font:700 11px/1 inherit; letter-spacing:.08em; color:var(--text,#cbd5e1); background:var(--panel2,var(--panel,#161d28));
+    border:1px solid var(--line); border-left:none; border-radius:0 10px 10px 0;   /* no drop shadow (human t211) — it blends flat with the sidebar */
 }
 /* open: park as a close tab on the toolbox's right edge, vertically centred (matches the closed "Blocks" tab) */
 #blocks-app.tools-open .blk-tools-handle {
