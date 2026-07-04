@@ -75,7 +75,7 @@ test('(3) ATC INPUT pins are LABELED from the config sensor rows + best-effort l
   await page.waitForFunction(() => window.ioPanel && window.ddcsGetSettings && window.virtualIO);
   const r = await page.evaluate(() => {
     const s = window.ddcsGetSettings();
-    s.inputs = [{ id: 'drawbar_released_atc', type: 'sensor', label: 'Drawbar released (M301)', pin: 3, level: 0, group: 'atc' }];
+    s.inputs = [{ id: 'drawbar_released_atc', type: 'sensor', label: 'Drawbar released (M301)', pin: 3, level: 0, group: 'atc', waitCode: 'M301' }];
     window.ioPanel.show();
     const lbl = (p) => { const e = document.querySelector(`.io-input[data-pin="${p}"] .io-atc-label`); return e ? e.textContent : null; };
     const lit = (p) => document.querySelector(`.io-input[data-pin="${p}"]`).classList.contains('active');
@@ -85,7 +85,7 @@ test('(3) ATC INPUT pins are LABELED from the config sensor rows + best-effort l
   });
   expect(r.label, 'input pin 3 labeled from the config sensor row (row.label)').toBe('Drawbar released (M301)');
   expect(r.before, 'not lit before the sensor fires').toBe(false);
-  expect(r.after, 'lights when IN_DRAWBAR_OPEN fires (best-effort join via the M301 in the label)').toBe(true);
+  expect(r.after, 'lights when IN_DRAWBAR_OPEN fires (join via the DECLARED waitCode M301)').toBe(true);
 });
 
 test('(4) the config label is EDITABLE (bound to row.label) + the io tab reflects the new label (t185)', async ({ page }) => {
@@ -112,4 +112,32 @@ test('(4) the config label is EDITABLE (bound to row.label) + the io tab reflect
   expect(r.rowLabel, 'editing the field writes row.label (ONE SOURCE)').toBe('Big Pusher');
   expect(r.saved, 'onChange persisted the edit').toBeGreaterThan(0);
   expect(r.ioLabel, 'the io tab reflects the NEW label').toBe('Big Pusher');
+});
+
+test('(5) RENAME-PROOF (t189 declare-fix): the input live-light joins on the DECLARED waitCode, NOT the label text', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ioPanel && window.ddcsGetSettings && window.virtualIO);
+  const r = await page.evaluate(() => {
+    const s = window.ddcsGetSettings();
+    // a RENAMED sensor: the label has NO M-code (the old label-parse would find nothing), but waitCode is declared
+    s.inputs = [{ id: 'drawbar_released_atc', type: 'sensor', label: 'My spindle drawbar', pin: 3, level: 0, group: 'atc', waitCode: 'M301' }];
+    window.ioPanel.show();
+    const lbl = (document.querySelector('.io-input[data-pin="3"] .io-atc-label') || {}).textContent;
+    const lit = () => document.querySelector('.io-input[data-pin="3"]').classList.contains('active');
+    window.virtualIO.reset(); window.virtualIO.injectInput('IN_DRAWBAR_OPEN', true); window.ioPanel.refresh();
+    return { lbl, lit: lit() };
+  });
+  expect(r.lbl, 'the RENAMED label shows (no M-code in it)').toBe('My spindle drawbar');
+  expect(r.lit, 'the sensor STILL lights the renamed pin — driven by the declared waitCode, not the label').toBe(true);
+});
+
+test('(6) migrateIO backfills the declared waitCode on legacy ATC sensor rows (no waitCode → M301 by id)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const wc = await page.evaluate(async () => {
+    const { migrateIO } = await import('/ui/settingsPanel.js');
+    const s = { inputs: [{ id: 'drawbar_released_atc', type: 'sensor', label: 'Drawbar released', pin: 3, level: 0, group: 'atc' }], outputs: [] };
+    migrateIO(s);
+    return s.inputs[0].waitCode;
+  });
+  expect(wc, 'legacy row (no waitCode) backfilled to M301 by its stable id').toBe('M301');
 });

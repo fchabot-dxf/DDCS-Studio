@@ -183,7 +183,7 @@ const LIMIT_AXES = [
     ['z_min', 'Limit Z−', 'zMinPin', 'zMinLevel'], ['z_max', 'Limit Z+', 'zMaxPin', 'zMaxLevel'],
 ];
 
-function migrateIO(s) {
+export function migrateIO(s) {
     if (!Array.isArray(s.inputs)) s.inputs = [];
     if (!Array.isArray(s.outputs)) s.outputs = [];
     if (s.inputs.length === 0) {
@@ -196,6 +196,11 @@ function migrateIO(s) {
             if (L[pinK] !== '' && L[pinK] != null) s.inputs.push({ id: 'limit_' + axis, type: 'limit', axis, label, pin: L[pinK], level: L[lvlK] || 0 });
         }
     }
+    // t189 (declare-fix): backfill the DECLARED waitCode on legacy ATC sensor rows. Before this, the io-tab live-light
+    // INFERRED the wait M-code by parsing the label text — which broke the moment the label was renamed (P-C.2d).
+    // One-time, keyed on the stable seeded id (not the label).
+    const ATC_SENSOR_WAIT = { drawbar_released_atc: 'M301', drawbar_clamped_atc: 'M302', spindle_stopped_atc: 'M300' };
+    for (const r of s.inputs) if (r && r.group === 'atc' && !r.waitCode && ATC_SENSOR_WAIT[r.id]) r.waitCode = ATC_SENSOR_WAIT[r.id];
     return s;
 }
 
@@ -2155,10 +2160,12 @@ function wireSettingsOverlay(ov) {
             // blank for the user to assign. (Disk/carousel adds rotate + index on top, via atcOnChange.)
             const outs = getOutputs(), ins = getInputs();
             if (!outs.some(o => o.type === 'drawbar')) outs.push({ id: 'drawbar_atc', type: 'drawbar', label: 'Drawbar (ATC)', pin: '', onCode: 'M154', offCode: 'M155', group: 'atc' });
-            const addIn = (id, label) => { if (!ins.some(i => i.id === id)) ins.push({ id, type: 'sensor', label, pin: '', level: 0, group: 'atc' }); };
-            addIn('drawbar_released_atc', 'Drawbar released (M301)');
-            addIn('drawbar_clamped_atc', 'Drawbar clamped (M302)');
-            addIn('spindle_stopped_atc', 'Spindle stopped (M300)');
+            // waitCode = the DECLARED wait M-code this sensor answers (io-tab joins on it -> ATC_DIALECT[waitCode].pin
+            // -> the live-light IN_ pin). Declared, not inferred from the label, so renaming the label can't break it.
+            const addIn = (id, label, waitCode) => { if (!ins.some(i => i.id === id)) ins.push({ id, type: 'sensor', label, pin: '', level: 0, group: 'atc', waitCode: waitCode || '' }); };
+            addIn('drawbar_released_atc', 'Drawbar released (M301)', 'M301');
+            addIn('drawbar_clamped_atc', 'Drawbar clamped (M302)', 'M302');
+            addIn('spindle_stopped_atc', 'Spindle stopped (M300)', 'M300');
             saveSettings();
             applyHardwareTabs();
             showPanel('set_tab_atc');

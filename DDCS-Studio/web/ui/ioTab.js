@@ -173,8 +173,8 @@ class IOPanel {
     /** Derive the ATC pin maps from the Settings IO config. ONE SOURCE — the config supplies the label + the assigned
      *  numbered pin; the engine ATC_DIALECT supplies the SEMANTIC pin the sim drives. OUTPUTS join on the row's onCode
      *  (an M-code → the ATC_DIALECT output pin), so a config Pusher pin (onCode M160) reflects OUT_PUSHER live. INPUTS
-     *  are the ATC sensor rows (group='atc') — labelled from row.label; live-lighting is BEST-EFFORT via a WAIT M-code
-     *  parsed from the label (M301→IN_DRAWBAR_OPEN etc.). Blank/unassigned pins → not mapped (labels appear once assigned). */
+     *  are the ATC sensor rows (group='atc') — labelled from row.label; live-lighting joins on the DECLARED waitCode
+     *  (→ ATC_DIALECT wait → IN_ pin), rename-proof (NOT parsed from the label). Unassigned pins / no waitCode → label-only. */
     _deriveAtcMap() {
         this._atcOutMap = {}; this._atcInMap = {};
         const s = (typeof window !== 'undefined' && window.ddcsGetSettings) ? (window.ddcsGetSettings() || {}) : {};
@@ -187,7 +187,8 @@ class IOPanel {
         for (const r of (Array.isArray(s.inputs) ? s.inputs : [])) {
             const pin = parseInt(r && r.pin, 10);
             if (!Number.isFinite(pin) || pin < 1 || (r && r.group) !== 'atc') continue;
-            const d = ATC_DIALECT[parseInt(((String((r && r.label) || '').match(/M(\d+)/)) || [])[1], 10)];   // best-effort: the wait M-code in the label
+            // join on the DECLARED waitCode (rename-proof), NOT parsed from the label: waitCode → ATC_DIALECT wait → IN_ pin.
+            const d = ATC_DIALECT[parseInt(String((r && r.waitCode) || '').replace(/[^0-9]/g, ''), 10)];
             this._atcInMap[pin] = { label: r.label || '', semanticPin: (d && d.kind === 'wait') ? d.pin : null };
         }
     }
