@@ -68,7 +68,7 @@ export const SCHEMA = {
     'probe-surface': { result: Str(), axis: Enum(), dir: Enum() },
     atc_change: {
         method: Enum(), x: N('X'), y: N('Y'), z: N('Z'), zClear: N('Z'), fixedT: N('T'), orient: Bool(),
-        waitSpindle: Bool(), dustCover: Bool(), confirm: Bool(), magazine: Struct(),
+        waitSpindle: Bool(), dustCover: Bool(), confirm: Bool(), magazine: Struct(), callMacro: Bool(),   // INC-B: call the installed T.nc (default) vs inline
     },
     homing: { axes: Struct(), config: Struct(), machine: Struct(), softLimits: Bool() },
     pocket: {

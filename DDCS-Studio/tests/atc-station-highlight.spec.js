@@ -61,7 +61,7 @@ test('(3) the traced FIRMWARE push reaches the taught station; the view wires th
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { traceToolpath } = await import('/engine/trace.js');
     const choreo = atcChoreography({ method: 'firmware' });
-    const code = '#1306=-10\n#1320=200\n#1321=150\n#1322=100\n#1323=250\n#1324=150\n#1325=300\n#1326=150\n#563=3000\n#1327=500\n' + emitMapped(atcChangeStack({ method: 'firmware' })).text;
+    const code = '#1306=-10\n#1320=200\n#1321=150\n#1322=100\n#1323=250\n#1324=150\n#1325=300\n#1326=150\n#563=3000\n#1327=500\n' + emitMapped(atcChangeStack({ method: 'firmware', callMacro: false })).text;   // INC-B: the inline push stations (default is now a T# M6 call)
     const r = traceToolpath(code, { captureVars: choreo.stationVars });
     const xy = r.segments.map((s) => ({ x: +(+s.x2).toFixed(0), y: +(+s.y2).toFixed(0) }));
     return { region: choreo.region(r.vars), reachesStart: xy.some((p) => p.x === 200 && p.y === 150), reachesEnd: xy.some((p) => p.x === 250 && p.y === 150), reachesRetreat: xy.some((p) => p.x === 300 && p.y === 150) };

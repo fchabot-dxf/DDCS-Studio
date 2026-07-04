@@ -60,7 +60,7 @@ test('(2) a REAL tool change (T# M6) during play retires the OLD tool to the sta
     host.__panel.setAtcSwap(atcChoreography({ method: 'firmware' }), region);
     const stationVars = '#1306=-10\n#1320=200\n#1321=150\n#1322=100\n#1323=250\n#1324=150\n#1325=300\n#1326=150\n#563=3000\n#1327=500\n';
     // #1300=2 (old), a MOVE (so lastTool=2 before the change), T5 M6 (2→5), then the firmware push (moves to the station)
-    host.__gcode = '#1300=2\n' + stationVars + 'G0 X100 Y100 Z10\nT5 M6\n' + emitMapped(atcChangeStack({ method: 'firmware' })).text;
+    host.__gcode = '#1300=2\n' + stationVars + 'G0 X100 Y100 Z10\nT5 M6\n' + emitMapped(atcChangeStack({ method: 'firmware', callMacro: false })).text;   // INC-B: the inline push (default is now a T# M6 call)
     host.querySelector('.pp-run').click();   // ▶ play
   });
   // wait for the swap to land (the retired tool appears during play)

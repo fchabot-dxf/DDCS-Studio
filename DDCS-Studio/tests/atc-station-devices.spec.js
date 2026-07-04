@@ -96,7 +96,7 @@ test('(3) end-to-end: a real firmware push PLAY animates the devices via the eng
     const host = document.getElementById('atcChangeViz').parentElement.querySelector('.wiz-viz3d');
     host.__panel.setAtcSwap(atcChoreography({ method: 'firmware' }), { z: -10, start: { x: 200, y: 150 }, end: { x: 250, y: 150 }, retreat: { x: 300, y: 150 } });
     const sv = '#1306=-10\n#1320=200\n#1321=150\n#1322=100\n#1323=250\n#1324=150\n#1325=300\n#1326=150\n#563=3000\n#1327=500\n';
-    host.__gcode = sv + emitMapped(atcChangeStack({ method: 'firmware' })).text;
+    host.__gcode = sv + emitMapped(atcChangeStack({ method: 'firmware', callMacro: false })).text;   // INC-B: the inline O10102 dance (default is now a T# M6 call)
     host.querySelector('.pp-run').click();
   });
   // the firmware sequence ends with M156 (locating OPEN → engage) + M161 (pusher CLOSE → retract): wait for the pin to engage

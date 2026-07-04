@@ -41,30 +41,40 @@ test('atc_change round-trips every change method', async ({ page }) => {
   const m6 = await roundTrip(page, 'atc_change', { method: 'm6', zClear: 5, fixedT: 2 });
   expect(m6.fields).toMatchObject({ atc_change_method: 'm6', atc_change_fixedt: 2, atc_change_zclear: 5 });
 
-  // Firmware: the O10102 push station + M19 orient toggle.
-  const fw = await roundTrip(page, 'atc_change', { method: 'firmware', orient: true });
+  // Firmware: the O10102 push station + M19 orient toggle. INC-B — the method identity round-trips through the INLINE
+  // dance (callMacro:false), where the method-specific G-code (O10102/Z#1306) exists to reverse-parse.
+  const fw = await roundTrip(page, 'atc_change', { method: 'firmware', orient: true, callMacro: false });
   expect(fw.fields).toMatchObject({ atc_change_method: 'firmware', atc_change_orient: true });
-  const fwNoOrient = await roundTrip(page, 'atc_change', { method: 'firmware', orient: false });
+  const fwNoOrient = await roundTrip(page, 'atc_change', { method: 'firmware', orient: false, callMacro: false });
   expect(fwNoOrient.fields).toMatchObject({ atc_change_method: 'firmware', atc_change_orient: false });
 
   // Manual park.
   const man = await roundTrip(page, 'atc_change', { method: 'manual', x: 123, y: 234, z: 12 });
   expect(man.fields).toMatchObject({ atc_change_method: 'manual', atc_change_x: 123, atc_change_y: 234, atc_change_z: 12 });
 
-  // Generic (ASSUMED) pick & place.
-  const gen = await roundTrip(page, 'atc_change', { method: 'generic', magazine: MAG, zClear: 7, fixedT: 2, waitSpindle: true, dustCover: true, confirm: true });
+  // Generic (ASSUMED) pick & place — inline dance (callMacro:false) so the drawbar/target blocks exist to reverse-parse.
+  const gen = await roundTrip(page, 'atc_change', { method: 'generic', magazine: MAG, zClear: 7, fixedT: 2, waitSpindle: true, dustCover: true, confirm: true, callMacro: false });
   expect(gen.fields).toMatchObject({ atc_change_method: 'generic', atc_change_fixedt: 2, atc_change_zclear: 7, atc_change_m300: true, atc_change_cover: true, atc_change_confirm: true });
 
-  // Backward-compat: an OLD saved op (mode/magType, no method) still emits + reconciles to the mapped method.
+  // INC-B — the DEFAULT automatic emit is a method-agnostic `T# M6` call to the installed T.nc. It carries no
+  // method-specific G-code, so the block reverse-sync is a benign NO-OP (reconcile → null → pullFromBlocks keeps the
+  // form as-is; the op's params stay intact via the op record). The method identity lives in the declared params, not
+  // the emit. (If we later want the T-word edited in Blocks to push back to the form, that's a small reconciler add.)
+  const call = await roundTrip(page, 'atc_change', { method: 'firmware' });
+  expect(call, 'a T# M6 call op reverse-syncs as a benign no-op (nothing method-specific in the emit to parse)').toBeNull();
+
+  // Backward-compat: an OLD saved op (mode/magType, no method) still emits + reconciles to the mapped method. The auto
+  // variants use callMacro:false so the mode→method mapping reverse-parses off the inline dance (the T# M6 default is
+  // method-agnostic — see the benign no-op above).
   const legacyManual = await roundTrip(page, 'atc_change', { mode: 'manual', x: 1, y: 2, z: 3 });
   expect(legacyManual.fields.atc_change_method).toBe('manual');
-  const legacyAuto = await roundTrip(page, 'atc_change', { mode: 'auto', magazine: MAG, fixedT: 2 });
+  const legacyAuto = await roundTrip(page, 'atc_change', { mode: 'auto', magazine: MAG, fixedT: 2, callMacro: false });
   expect(legacyAuto.fields.atc_change_method).toBe('generic');
-  const legacyDisk = await roundTrip(page, 'atc_change', { mode: 'auto', magType: 'disk', magazine: MAG, pickup: { x: 5, y: 6, z: -2 }, fixedT: 2 });
+  const legacyDisk = await roundTrip(page, 'atc_change', { mode: 'auto', magType: 'disk', magazine: MAG, pickup: { x: 5, y: 6, z: -2 }, fixedT: 2, callMacro: false });
   expect(legacyDisk.fields.atc_change_method).toBe('disk');
 });
 
-test('atc_change methods emit valid, firmware-accurate g-code', async ({ page }) => {
+test('atc_change automatic methods emit a T# M6 CALL by default; callMacro=false keeps the firmware-accurate inline dance', async ({ page }) => {
   const emit = (params) => page.evaluate(async (params) => {
     const w = await import('/wizards/atcChangeWizard.js');
     const bm = await import('/blocks/blockEmitter.js');
@@ -75,8 +85,22 @@ test('atc_change methods emit valid, firmware-accurate g-code', async ({ page })
   expect(m6).toMatch(/\bM6\b/);
   expect(m6).toMatch(/G53 X#103/);   // change-position move
 
-  const fw = await emit({ method: 'firmware', orient: true });
-  // The exact O10102 fixed-station push moves + dwell + the M19 orient.
+  // INC-B: the AUTOMATIC methods (firmware/generic/disk) DEFAULT to a T# M6 call to the installed T.nc.
+  const fwCall = await emit({ method: 'firmware', fixedT: 4 });
+  expect(fwCall).toMatch(/^T4 M6$/m);                              // T-word requested tool + M6 fires the installed macro
+  expect(fwCall).toContain('call the installed T.nc macro');       // the header note
+  expect(fwCall).not.toContain('G53 X#1320');                      // NOT the inline O10102 dance
+  const genCall = await emit({ method: 'generic', fixedT: 2, magazine: MAG });
+  expect(genCall).toMatch(/^T2 M6$/m);
+  const diskCall = await emit({ method: 'disk', fixedT: 5, magazine: MAG, pickup: { x: 5, y: 5, z: -3 } });
+  expect(diskCall).toMatch(/^T5 M6$/m);
+  // fixedT 0 → the tool comes from a preceding program M6 Txx → a bare M6 call.
+  const fromProg = await emit({ method: 'firmware', fixedT: 0 });
+  expect(fromProg).toMatch(/^M6$/m);
+  expect(fromProg).not.toMatch(/^T\d+ M6$/m);
+
+  // callMacro=false → the firmware-accurate O10102 fixed-station push dance (the inline fallback — byte-untouched).
+  const fw = await emit({ method: 'firmware', orient: true, callMacro: false });
   expect(fw).toContain('G53 Z#1306 F#563');
   expect(fw).toContain('G53 X#1320 Y#1321 F#563');
   expect(fw).toContain('G04 P#1322');

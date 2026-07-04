@@ -290,8 +290,34 @@ export function firmwareStationSeed(fw) {
     ];
 }
 
+// INC-B: the AUTOMATIC change as a CALL to the installed T.nc macro (NOT the inline dance) — the change routine lives in
+// the controller's installed T.nc, and the program just CALLS it: `T<n> M6` (fixedT>0 sets #1504 + fires the change) or a
+// bare `M6` (fixedT=0 = the tool from a preceding program Txx). A LOUD note flags the install-dependency (a bare T# M6
+// silently no-ops if the T.nc is not installed). The SIM still animates the real motion (INC-A interpreter, decoupled).
+function macroCallStack(params) {
+    const fixedT = num(params.fixedT, 0);
+    const S = []; const { C, RAW, MSG, END } = H(S);
+    C('ATC | Tool Change — call the installed T.nc macro');
+    C('T# M6 - runs YOUR installed T.nc; generate + install it via Settings -> ATC -> Generate T.nc — a bare T# M6 does NOTHING if it is not installed');
+    if (fixedT > 0) {
+        C(`Change to T${fixedT} — the controller runs its installed T.nc`);
+        RAW(`T${fixedT} M6`);                     // T-word sets #1504 (requested tool) + M6 fires the installed macro
+    } else {
+        C('Tool from the program (a preceding M6 Txx) — bare M6 calls the installed T.nc');
+        RAW('M6');
+    }
+    MSG('Tool change complete');
+    END();
+    return S;
+}
+
 export function atcChangeStack(params = {}) {
-    switch (resolveMethod(params)) {
+    const method = resolveMethod(params);
+    // INC-B: the AUTOMATIC methods (firmware/generic/disk) DEFAULT to a T# M6 CALL to the installed T.nc (callMacro !== false).
+    // callMacro === false keeps the INLINE dance (the fallback — untouched this increment; its converge is INC-B2). m6/manual
+    // are unchanged (m6 already delegates; manual is a hand-swap).
+    if ((method === 'firmware' || method === 'generic' || method === 'disk') && params.callMacro !== false) return macroCallStack(params);
+    switch (method) {
         case 'm6': return m6Stack(params);
         case 'firmware': return firmwareStack(params);
         case 'disk': return diskAutoStack(params);

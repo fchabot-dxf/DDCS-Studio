@@ -36,7 +36,7 @@ test('(1) assigned ATC pins are LABELED from the config + light LIVE on the sim 
     const { atcChangeStack } = await import('/wizards/atcChangeWizard.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     const sv = '#1306=-10\n#1320=200\n#1321=150\n#1322=100\n#1323=250\n#1324=150\n#1325=300\n#1326=150\n#563=3000\n#1327=500\n';
-    new GcodeExecutionEngine({ autoAnswer: true }).trace(sv + emitMapped(atcChangeStack({ method: 'firmware' })).text);
+    new GcodeExecutionEngine({ autoAnswer: true }).trace(sv + emitMapped(atcChangeStack({ method: 'firmware', callMacro: false })).text);   // INC-B: the inline O10102 dance (default is now a T# M6 call)
     window.ioPanel.refresh();
     const lit = (p) => document.querySelector(`.io-output[data-pin="${p}"]`).classList.contains('active');
     return { lblPusher: lbl(5), lblLocating: lbl(6), lblDust: lbl(7), locatingLit: lit(6), pusherLit: lit(5) };

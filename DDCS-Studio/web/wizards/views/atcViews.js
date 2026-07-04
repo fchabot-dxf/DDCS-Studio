@@ -268,6 +268,9 @@ export const atcChangeView = {
             magazine: (s.atc && s.atc.magazine) || [],   // pockets + park XYZ come from Settings → Tool table
             magType: s.atc && s.atc.magType,             // 'disk' → rotate-to-pocket change; else per-pocket moves
             pickup: s.atc && s.atc.pickup,               // disk: the fixed pickup XYZ
+            // INC-B: DEFAULT true — the automatic change emits a T# M6 CALL to the installed T.nc; the inline-fallback
+            // toggle (callMacro=false → the old inline dance) is a later guardrail. No form field yet → defaults true.
+            callMacro: el('atc_change_callmacro')?.checked !== false,
         };
         const gcode = changeWizard.generate(params);
         el('wiz_atc_change_code').innerHTML = UIUtils.formatGCode(gcode);

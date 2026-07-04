@@ -88,7 +88,7 @@ test('(4) input SENSOR live-lighting activates: a generic change trace lights th
     const { atcChangeStack } = await import('/wizards/atcChangeWizard.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     // a generic change with a tool preloaded so it runs the put-away + pick-up (fires M300/M301/M302 waits)
-    const code = '#1300=2\n' + emitMapped(atcChangeStack({ method: 'generic', fixedT: 5, magazine: s.atc.magazine, waitSpindle: true })).text;
+    const code = '#1300=2\n' + emitMapped(atcChangeStack({ method: 'generic', fixedT: 5, magazine: s.atc.magazine, waitSpindle: true, callMacro: false })).text;   // INC-B: the inline drawbar dance (default is now a T# M6 call)
     new GcodeExecutionEngine({ autoAnswer: true }).trace(code);   // trace injects each wait's sensor synchronously
     window.ioPanel.refresh();
     const lit = (p) => document.querySelector(`.io-input[data-pin="${p}"]`).classList.contains('active');

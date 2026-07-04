@@ -27,20 +27,19 @@ test('Tool Change wizard: method switching shows the right fields and dialect', 
   await expect(code).toContainText('M6');
   await expect(code).not.toContainText('M154');
 
-  // Firmware: the O10102-accurate fixed-station PUSH (G53 stations + M19 orient).
+  // Firmware: INC-B — the DEFAULT is a T# M6 CALL to the installed T.nc (the O10102 inline dance is the callMacro=false fallback).
   await page.locator('#atc_change_method').selectOption('firmware');
   await expect(page.locator('#atc_change_fw_params')).toBeVisible();
   await expect(page.locator('#atc_change_m6_params')).toBeHidden();
-  await expect(code).toContainText('G53 Z#1306');
-  await expect(code).toContainText('X#1320 Y#1321');
-  await expect(code).toContainText('M19');
+  await expect(code).toContainText('call the installed T.nc macro');
+  await expect(code).toContainText('M6');
+  await expect(code).not.toContainText('G53 Z#1306');   // NOT the inline O10102 dance by default
 
-  // Generic (ASSUMED): T.nc-style pick & place with drawbar + sensor waits.
+  // Generic (ASSUMED): INC-B — the DEFAULT is a T# M6 call (delegates to the installed T.nc); the inline drawbar dance is the fallback.
   await page.locator('#atc_change_method').selectOption('generic');
   await expect(page.locator('#atc_change_auto_params')).toBeVisible();
-  await expect(code).toContainText('M154');
-  await expect(code).toContainText('M302');
-  await expect(code).toContainText('#1504');
+  await expect(code).toContainText('M6');
+  await expect(code).not.toContainText('M154');         // NOT the inline drawbar codes by default
 
   // Manual: park prompt, no drawbar codes.
   await page.locator('#atc_change_method').selectOption('manual');

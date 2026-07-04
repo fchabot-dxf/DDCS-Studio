@@ -55,13 +55,15 @@ test('the 3 methods (and back-compat old ops) resolve to the correct grip × mot
   expect(combo.firmware.motion.steps.length, 'the push motion step-sequence is attached').toBeGreaterThan(0);
 });
 
-test('BYTE-IDENTICAL: the emit still goes through the existing stacks (the model is inert)', async ({ page }) => {
+test('BYTE-IDENTICAL: the inline fallback (callMacro:false) still goes through the existing stacks (the model is inert)', async ({ page }) => {
+  // INC-B: the automatic methods now DEFAULT to a T# M6 call; the inline dance is the callMacro:false fallback — and that
+  // fallback is byte-preserved through the original stacks (the atcModel remains inert; it never rewrote the emit).
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => !!window.ddcsGetSettings);
   const em = await page.evaluate(async () => {
     const { atcChangeStack } = await import('/wizards/atcChangeWizard.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
-    const gen = (p) => emitMapped(atcChangeStack(p)).text;
+    const gen = (p) => emitMapped(atcChangeStack({ ...p, callMacro: false })).text;
     return { firmware: gen({ method: 'firmware' }), generic: gen({ method: 'generic', magazine: [{ pocket: 1, tool: 1, x: 10, y: 0, z: -5 }] }), disk: gen({ method: 'disk', magazine: [{ pocket: 1, tool: 1 }], pickup: { x: 5, y: 5, z: -3 } }) };
   });
   // the firmware emit is still the raw O10102 (pneumatic push) — its signature lines are intact, unchanged by the model
