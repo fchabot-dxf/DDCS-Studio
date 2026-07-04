@@ -49,6 +49,42 @@ test('Tool Change wizard: method switching shows the right fields and dialect', 
   await expect(code).not.toContainText('M154');
 });
 
+test('Tool Change wizard: the callMacro toggle switches the preview between the T# M6 call and the inline dance (INC-C1)', async ({ page }) => {
+  await openWizard(page, 'atc_change');
+  const code = page.locator('#wiz_atc_change_code');
+  const toggle = page.locator('#atc_change_callmacro');
+  const row = page.locator('#atc_change_automatic_params');
+
+  // m6 (default method) is NOT automatic → the callMacro toggle is hidden.
+  await expect(row).toBeHidden();
+
+  // Firmware — automatic → the toggle shows, CHECKED by default → the preview is the T# M6 call (not the inline dance).
+  await page.locator('#atc_change_method').selectOption('firmware');
+  await expect(row).toBeVisible();
+  await expect(toggle).toBeChecked();
+  await expect(code).toContainText('call the installed T.nc macro');
+  await expect(code).not.toContainText('G53 Z#1306');
+
+  // Uncheck → the preview RE-RENDERS to the inline O10102 push dance (the real gesture, real symptom).
+  await toggle.uncheck();
+  await expect(code).toContainText('G53 Z#1306');
+  await expect(code).toContainText('M19');
+  await expect(code).not.toContainText('call the installed T.nc macro');
+
+  // Re-check → back to the T# M6 call.
+  await toggle.check();
+  await expect(code).toContainText('call the installed T.nc macro');
+  await expect(code).not.toContainText('G53 Z#1306');
+
+  // Generic + disk are also automatic (toggle shows); manual is not (hidden).
+  await page.locator('#atc_change_method').selectOption('generic');
+  await expect(row).toBeVisible();
+  await page.locator('#atc_change_method').selectOption('disk');
+  await expect(row).toBeVisible();
+  await page.locator('#atc_change_method').selectOption('manual');
+  await expect(row).toBeHidden();
+});
+
 test('Tool Change wizard: bold UNVERIFIED banner only for generic/disk auto change', async ({ page }) => {
   await openWizard(page, 'atc_change');
   const banner = page.locator('#atc_change_unverified');

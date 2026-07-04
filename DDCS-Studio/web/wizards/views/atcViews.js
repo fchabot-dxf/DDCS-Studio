@@ -225,6 +225,7 @@ export const atcChangeView = {
         'atc_change_x', 'atc_change_y', 'atc_change_z',
         'atc_change_zclear', 'atc_change_fixedt', 'atc_change_orient',
         'atc_change_m300', 'atc_change_cover', 'atc_change_confirm',
+        'atc_change_callmacro',   // INC-C1: toggling re-renders the preview (T# M6 call ↔ inline dance)
     ],
     update(mgr) {
         const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
@@ -248,6 +249,8 @@ export const atcChangeView = {
         if (m6Row) m6Row.style.display = method === 'm6' ? '' : 'none';
         if (autoRow) autoRow.style.display = (method === 'generic' || method === 'disk') ? '' : 'none';
         if (fwRow) fwRow.style.display = method === 'firmware' ? '' : 'none';
+        const macroRow = el('atc_change_automatic_params');   // INC-C1: the callMacro toggle (all AUTOMATIC methods)
+        if (macroRow) macroRow.style.display = (method === 'firmware' || method === 'generic' || method === 'disk') ? '' : 'none';
         syncChangeUnverifiedBanner(method);   // A2: bold UNVERIFIED warning for generic/disk auto change
 
         const params = {
@@ -268,8 +271,8 @@ export const atcChangeView = {
             magazine: (s.atc && s.atc.magazine) || [],   // pockets + park XYZ come from Settings → Tool table
             magType: s.atc && s.atc.magType,             // 'disk' → rotate-to-pocket change; else per-pocket moves
             pickup: s.atc && s.atc.pickup,               // disk: the fixed pickup XYZ
-            // INC-B: DEFAULT true — the automatic change emits a T# M6 CALL to the installed T.nc; the inline-fallback
-            // toggle (callMacro=false → the old inline dance) is a later guardrail. No form field yet → defaults true.
+            // INC-B/C1: DEFAULT true — the automatic change emits a T# M6 CALL to the installed T.nc; the #atc_change_callmacro
+            // checkbox (INC-C1, guardrail [C]) is the inline-fallback escape hatch — unchecked → the old inline dance.
             callMacro: el('atc_change_callmacro')?.checked !== false,
         };
         const gcode = changeWizard.generate(params);

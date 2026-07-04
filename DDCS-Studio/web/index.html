@@ -1432,6 +1432,11 @@
                         </select>
                     </label>
                 </div>
+                <div class="param-grid" id="atc_change_automatic_params" style="display:none">
+                    <label title="Recommended: emit a bare T# M6 that calls the T.nc macro you install via Settings → ATC → Generate T.nc (the codes live in the T.nc — one source). Uncheck to INLINE the full change sequence into the program, for a controller with no installed T.nc.">
+                        <input type="checkbox" id="atc_change_callmacro" checked> Call installed T.nc macro (recommended) — uncheck to inline the change
+                    </label>
+                </div>
                 <div class="param-grid" id="atc_change_manual_params" style="display:none">
                     <label>Park X (mm)<input type="number" id="atc_change_x" value="100" class="num-input"></label>
                     <label>Park Y (mm)<input type="number" id="atc_change_y" value="100" class="num-input"></label>
