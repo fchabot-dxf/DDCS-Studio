@@ -62,16 +62,25 @@ export function renderIoTable(container, kind, list, onChange) {
         const tr = document.createElement('div');
         tr.style.cssText = 'display:flex; align-items:flex-end; gap:8px 12px; flex-wrap:wrap; padding:10px 12px; margin-bottom:9px; border:1px solid rgba(90,75,40,0.2); border-radius:7px; background:rgba(255,255,255,0.72); box-shadow:0 1px 3px rgba(0,0,0,0.09);';
 
-        const name = document.createElement('span');
-        name.style.cssText = 'min-width:130px; font-weight:600; color:#3a3a3a; padding-bottom:4px;';
-        name.textContent = (TYPES.find(t => t.type === row.type) || {}).label || row.type;
+        // Editable label — bound to row.label (default = the type label). ONE SOURCE: row.label shows in BOTH this
+        // config UI and the I/O panel (ioTab reads r.label). Edit to rename a pin (e.g. "Pusher", "Locating pin").
+        const typeLabel = (TYPES.find(t => t.type === row.type) || {}).label || row.type;
+        const nameWrap = document.createElement('div');
+        nameWrap.style.cssText = 'display:flex; align-items:center; gap:6px; min-width:150px; padding-bottom:4px;';
+        const name = document.createElement('input');
+        name.type = 'text';
+        name.value = (row.label != null && row.label !== '') ? row.label : typeLabel;
+        name.title = 'Label — shown in the I/O panel (edit to rename this pin)';
+        name.style.cssText = INP + ' min-width:120px; font-weight:600; color:#3a3a3a;';
+        name.addEventListener('change', () => { row.label = name.value; onChange(); });
+        nameWrap.appendChild(name);
         if (row.group) {
             const badge = document.createElement('span');
             badge.textContent = row.group.toUpperCase();
-            badge.style.cssText = 'margin-left:6px; font-size:9px; font-weight:700; background:#6b7b3a; color:#fff; padding:1px 5px; border-radius:3px; vertical-align:middle;';
-            name.appendChild(badge);
+            badge.style.cssText = 'font-size:9px; font-weight:700; background:#6b7b3a; color:#fff; padding:1px 5px; border-radius:3px; flex:none;';
+            nameWrap.appendChild(badge);
         }
-        tr.appendChild(name);
+        tr.appendChild(nameWrap);
 
         if (isInput && row.type === 'limit') {
             const ax = document.createElement('select');

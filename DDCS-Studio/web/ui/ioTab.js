@@ -27,7 +27,8 @@ class IOPanel {
         this.el = null;
         this.intervalId = null;
         this.waitPin = null;     // numeric pin the engine is parked on (null = none)
-        this._atcMap = {};       // numbered ATC output pin → { label, semanticPin } (from the Settings IO config)
+        this._atcOutMap = {};    // numbered ATC OUTPUT pin → { label, semanticPin } (from the Settings IO config)
+        this._atcInMap = {};     // numbered ATC INPUT pin → { label, semanticPin? }
     }
 
     _build() {
@@ -143,58 +144,68 @@ class IOPanel {
         return !!map.get(resolveVirtualPin(pin, mode)) || !!map.get(pin) || !!map.get(String(pin));
     }
 
-    /** Derive the ATC pin map from the Settings IO config: numbered OUTPUT pin → { label, semanticPin }. ONE SOURCE —
-     *  the config supplies the label + assigned pin; the JOIN is the row's onCode (an M-code) → the engine ATC_DIALECT
-     *  entry → the sim's OUT_ semantic pin (what the sim actually drives when that M-code fires). So a config Pusher pin
-     *  (onCode M160) reflects OUT_PUSHER live. Blank/unassigned pins → not mapped (labels appear once a pin is assigned). */
+    /** Derive the ATC pin maps from the Settings IO config. ONE SOURCE — the config supplies the label + the assigned
+     *  numbered pin; the engine ATC_DIALECT supplies the SEMANTIC pin the sim drives. OUTPUTS join on the row's onCode
+     *  (an M-code → the ATC_DIALECT output pin), so a config Pusher pin (onCode M160) reflects OUT_PUSHER live. INPUTS
+     *  are the ATC sensor rows (group='atc') — labelled from row.label; live-lighting is BEST-EFFORT via a WAIT M-code
+     *  parsed from the label (M301→IN_DRAWBAR_OPEN etc.). Blank/unassigned pins → not mapped (labels appear once assigned). */
     _deriveAtcMap() {
-        this._atcMap = {};
+        this._atcOutMap = {}; this._atcInMap = {};
         const s = (typeof window !== 'undefined' && window.ddcsGetSettings) ? (window.ddcsGetSettings() || {}) : {};
-        const outs = Array.isArray(s.outputs) ? s.outputs : [];
-        for (const r of outs) {
+        for (const r of (Array.isArray(s.outputs) ? s.outputs : [])) {
             const pin = parseInt(r && r.pin, 10);
             if (!Number.isFinite(pin) || pin < 1) continue;
-            const m = parseInt(String((r && r.onCode) || '').replace(/[^0-9]/g, ''), 10);
-            const d = ATC_DIALECT[m];
-            if (d && d.kind === 'output') this._atcMap[pin] = { label: r.label || d.label, semanticPin: d.pin };
+            const d = ATC_DIALECT[parseInt(String((r && r.onCode) || '').replace(/[^0-9]/g, ''), 10)];
+            if (d && d.kind === 'output') this._atcOutMap[pin] = { label: r.label || d.label, semanticPin: d.pin };
+        }
+        for (const r of (Array.isArray(s.inputs) ? s.inputs : [])) {
+            const pin = parseInt(r && r.pin, 10);
+            if (!Number.isFinite(pin) || pin < 1 || (r && r.group) !== 'atc') continue;
+            const d = ATC_DIALECT[parseInt(((String((r && r.label) || '').match(/M(\d+)/)) || [])[1], 10)];   // best-effort: the wait M-code in the label
+            this._atcInMap[pin] = { label: r.label || '', semanticPin: (d && d.kind === 'wait') ? d.pin : null };
         }
     }
 
-    /** Label each ASSIGNED ATC output pin with its config function (+ the semantic pin in the title). Re-derives the
-     *  map (config can change), so call it on show / when the config may have changed. */
+    /** Label each ASSIGNED ATC pin (in + out) with its config function (+ the semantic pin in the title). Re-derives
+     *  the maps (config can change / a label was edited), so call it on show / when the config may have changed. */
     _applyAtcLabels() {
         if (!this.el) return;
         this._deriveAtcMap();
-        this.el.querySelectorAll('.io-output').forEach((div) => {
+        const apply = (sel, map, mode) => this.el.querySelectorAll(sel).forEach((div) => {
             const pin = parseInt(div.dataset.pin, 10);
-            const a = this._atcMap[pin];
+            const a = map[pin];
             let lbl = div.querySelector('.io-atc-label');
-            if (a) {
+            if (a && a.label) {
                 if (!lbl) { lbl = document.createElement('span'); lbl.className = 'io-atc-label'; div.appendChild(lbl); }
                 lbl.textContent = a.label;
                 div.classList.add('io-atc');
-                div.title = `OUT${pin} — ${a.label} (${a.semanticPin})`;
+                div.title = `${mode}${pin} — ${a.label}${a.semanticPin ? ' (' + a.semanticPin + ')' : ''}${mode === 'IN' ? ' — click to toggle' : ''}`;
             } else {
                 if (lbl) lbl.remove();
                 div.classList.remove('io-atc');
-                const outName = resolveVirtualPin(pin, 'OUT');
-                div.title = `OUT${pin}${outName !== 'OUT_' + pin ? ' — ' + outName : ''}`;
+                const nm = resolveVirtualPin(pin, mode);
+                div.title = `${mode}${pin}${nm !== mode + '_' + pin ? ' — ' + nm : ''}${mode === 'IN' ? ' (click to toggle)' : ''}`;
             }
         });
+        apply('.io-output', this._atcOutMap, 'OUT');
+        apply('.io-input', this._atcInMap, 'IN');
     }
 
     refresh() {
         if (!this.el) return;
         this.el.querySelectorAll('.io-input').forEach((btn) => {
             const pin = parseInt(btn.dataset.pin, 10);
-            btn.classList.toggle('active', this._pinState(ioState.inputs, pin, 'IN'));
+            const a = this._atcInMap && this._atcInMap[pin];
+            // an ATC input with a determinable sensor lights via that IN_ pin (best-effort); else the numbered state.
+            const on = (a && a.semanticPin) ? !!ioState.inputs.get(a.semanticPin) : this._pinState(ioState.inputs, pin, 'IN');
+            btn.classList.toggle('active', on);
             btn.classList.toggle('wait', this.waitPin != null && pin === this.waitPin);
         });
         this.el.querySelectorAll('.io-output').forEach((div) => {
             const pin = parseInt(div.dataset.pin, 10);
             // an ATC-config pin reflects its SEMANTIC output (via the M-code join) so it lights when the sim fires that
             // pneumatic; any other pin keeps the numbered/HARDWARE_PIN_MAP state.
-            const a = this._atcMap && this._atcMap[pin];
+            const a = this._atcOutMap && this._atcOutMap[pin];
             div.classList.toggle('active', a ? !!ioState.outputs.get(a.semanticPin) : this._pinState(ioState.outputs, pin, 'OUT'));
         });
     }

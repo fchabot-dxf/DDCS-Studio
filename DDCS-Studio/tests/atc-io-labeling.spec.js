@@ -69,3 +69,47 @@ test('(2) the dust pin reflects M162/M163 (OUT_DUST_COVER), NOT M305/M306 (which
   expect(r.onM162, 'dust pin lights on OUT_DUST_COVER (M162)').toBe(true);
   expect(r.onM305, 'dust pin does NOT light on M305 (that is the gripper, not the dust cover)').toBe(false);
 });
+
+test('(3) ATC INPUT pins are LABELED from the config sensor rows + best-effort live-light (t185)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ioPanel && window.ddcsGetSettings && window.virtualIO);
+  const r = await page.evaluate(() => {
+    const s = window.ddcsGetSettings();
+    s.inputs = [{ id: 'drawbar_released_atc', type: 'sensor', label: 'Drawbar released (M301)', pin: 3, level: 0, group: 'atc' }];
+    window.ioPanel.show();
+    const lbl = (p) => { const e = document.querySelector(`.io-input[data-pin="${p}"] .io-atc-label`); return e ? e.textContent : null; };
+    const lit = (p) => document.querySelector(`.io-input[data-pin="${p}"]`).classList.contains('active');
+    const before = lit(3);
+    window.virtualIO.reset(); window.virtualIO.injectInput('IN_DRAWBAR_OPEN', true); window.ioPanel.refresh();   // the M301 sensor fires (a generic/disk wait)
+    return { label: lbl(3), before, after: lit(3) };
+  });
+  expect(r.label, 'input pin 3 labeled from the config sensor row (row.label)').toBe('Drawbar released (M301)');
+  expect(r.before, 'not lit before the sensor fires').toBe(false);
+  expect(r.after, 'lights when IN_DRAWBAR_OPEN fires (best-effort join via the M301 in the label)').toBe(true);
+});
+
+test('(4) the config label is EDITABLE (bound to row.label) + the io tab reflects the new label (t185)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ioPanel && window.ddcsGetSettings);
+  const r = await page.evaluate(async () => {
+    const { renderIoTable } = await import('/ui/ioTable.js');
+    const s = window.ddcsGetSettings();
+    s.outputs = [{ id: 'o1', type: 'custom', label: 'Pusher', pin: 5, onCode: 'M160', offCode: 'M161' }];
+    const cont = document.createElement('div'); document.body.appendChild(cont);
+    let saved = 0;
+    renderIoTable(cont, 'output', s.outputs, () => { saved++; });
+    const labelInput = cont.querySelector('input[type="text"]');   // the editable label field (first text input in the row)
+    const before = labelInput.value;
+    labelInput.value = 'Big Pusher';
+    labelInput.dispatchEvent(new Event('change', { bubbles: true }));
+    const rowLabel = s.outputs[0].label;
+    window.ioPanel.show();   // re-derives labels from the (now edited) config
+    const ioLabel = (document.querySelector('.io-output[data-pin="5"] .io-atc-label') || {}).textContent;
+    cont.remove();
+    return { before, rowLabel, saved, ioLabel };
+  });
+  expect(r.before, 'the label field defaults to the config label').toBe('Pusher');
+  expect(r.rowLabel, 'editing the field writes row.label (ONE SOURCE)').toBe('Big Pusher');
+  expect(r.saved, 'onChange persisted the edit').toBeGreaterThan(0);
+  expect(r.ioLabel, 'the io tab reflects the NEW label').toBe('Big Pusher');
+});
