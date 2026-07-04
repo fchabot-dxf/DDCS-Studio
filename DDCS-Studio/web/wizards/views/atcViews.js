@@ -55,14 +55,15 @@ function magazineRackHtml(a, opts = {}) {
 
 /** Build the 3D-magazine pocket list (machine XYZ + the assigned tool's full shape) for viz.setMagazine. For a
  *  disk/carousel the pockets have no per-pocket XYZ, so lay them in a ring of the carousel Ø around the pickup. */
-function magazinePockets(a) {
+export function magazinePockets(a, theta) {
     const byNum = {};
     (a.tools || []).forEach((t) => { if (t && t.num != null && t.num !== '') byNum[Number(t.num)] = t; });
     const mag = Array.isArray(a.magazine) ? a.magazine : [];
-    const toolOf = (p) => { const t = byNum[Number(p.tool)] || {}; return { type: t.type || 'endmill', dia: num(t.dia, 6), angle: t.angle, length: num(t.length, 30) }; };
+    const toolOf = (p) => { const t = byNum[Number(p.tool)] || {}; return { type: t.type || 'endmill', dia: num(t.dia, 6), angle: t.angle, length: num(t.length, 30), num: Number(p.tool) }; };
     if (a.magType === 'disk') {
         // The pickup is a point ON the carousel rim (where the spindle picks up); the disk centre is offset from
-        // it by the radius. Pocket 1 sits at the pickup; the rest ring around the centre.
+        // it by the radius. Pocket 1 sits at the pickup; the rest ring around the centre. `theta` (t197) rotates the
+        // whole ring (the carousel indexing) so a target pocket comes to the pickup.
         const pk = a.pickup || {};
         const R = num(a.diskDia, 0) / 2;
         const dirs = { '+x': [1, 0], '-x': [-1, 0], '+y': [0, 1], '-y': [0, -1] };
@@ -71,7 +72,7 @@ function magazinePockets(a) {
         const ang0 = Math.atan2(-o[1], -o[0]);                // angle from centre back to the pickup = pocket 1
         const n = mag.length || 1;
         return mag.map((p, i) => {
-            const ang = ang0 + (i / n) * Math.PI * 2;
+            const ang = ang0 + (i / n) * Math.PI * 2 + (Number(theta) || 0);
             return { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang), z: cz, pocket: p.pocket != null ? p.pocket : i + 1, tool: toolOf(p) };
         });
     }

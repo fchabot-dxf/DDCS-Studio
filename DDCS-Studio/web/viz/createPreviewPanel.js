@@ -23,6 +23,7 @@ import { GcodeExecutionEngine } from '../engine/index.js';
 import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
 import { getLastOp } from '../blocks/opRecord.js';          // the active op (wizard PREVIEW) → its declared radius-comp surfaces
 import { builderOf } from '../blocks/opBuilders.js';        // rebuild the op stack to read its radiuscomp atoms (disc-on-surface, inc2)
+import { magazinePockets } from '../wizards/views/atcViews.js';   // shared ATC magazine layout (handles the disk RING + a rotation) — reused for the pick-place occupancy swap
 
 // DISC-ON-SURFACE (inc2): read the DECLARED radiuscomp atoms of the ops being previewed → { resultVar → { axis, sign } } for
 // ENABLED comps ONLY. The flat <name>Stack carries the probeSurfaceStack atoms; a radiuscomp's `raw` (trigger #1925/6/7) gives
@@ -768,30 +769,37 @@ export function createPreviewPanel(container, opts = {}) {
         const cur = engine.vars.get(1300);
         if (cur == null || cur === lastTool) return;
         if (lastTool == null) {
-            // the INITIAL spindle tool. For PICK-PLACE, empty ITS pocket (the tool is in the spindle, not the magazine).
-            if (atcChoreo.kind === 'pick-place' && viz && viz.setMagazine) viz.setMagazine(magPocketList(new Set(magToolNums().filter((t) => t !== cur))));
+            // the INITIAL spindle tool. For PICK-PLACE, empty ITS pocket (the tool is in the spindle, not the magazine);
+            // a DISK carousel rotates so that pocket sits at the fixed pickup (where it was last picked).
+            if (atcChoreo.kind === 'pick-place') renderPickPlaceMag(cur);
         } else doToolSwap(lastTool, cur);   // old → new (a real tool change)
         lastTool = cur;
     }
-    // ATC magazine helpers (pick-place occupancy). Read the config straight from settings.atc so the panel owns the
-    // occupancy render during play (the view draws the FULL magazine; the swap re-renders the OCCUPIED subset).
+    // ATC magazine helpers (pick-place occupancy + the disk carousel rotation). Read the config straight from
+    // settings.atc; reuse the shared magazinePockets layout (handles the disk RING + a rotation theta).
     const atcCfg = () => (window.ddcsGetSettings && window.ddcsGetSettings().atc) || {};
     const magToolNums = () => (Array.isArray(atcCfg().magazine) ? atcCfg().magazine : []).filter((p) => p && p.tool !== '' && p.tool != null).map((p) => Number(p.tool));
-    function magPocketList(occupied) {   // occupied = Set of tool numbers → the setMagazine pocket list for those pockets
-        const a = atcCfg(); const byNum = {}; (Array.isArray(a.tools) ? a.tools : []).forEach((t) => { if (t && t.num != null && t.num !== '') byNum[Number(t.num)] = t; });
-        return (Array.isArray(a.magazine) ? a.magazine : [])
-            .filter((p) => p && p.tool !== '' && p.tool != null && occupied.has(Number(p.tool)))
-            .map((p) => { const t = byNum[Number(p.tool)] || {}; return { x: p.x, y: p.y, z: p.z, pocket: p.pocket, tool: { type: t.type || 'endmill', dia: Number(t.dia) || 6, length: Number(t.length) || 30, num: Number(p.tool) } }; });
+    const isDiskMag = () => atcCfg().magType === 'disk';
+    const magPocketIndex = (toolN) => (Array.isArray(atcCfg().magazine) ? atcCfg().magazine : []).findIndex((p) => p && Number(p.tool) === Number(toolN));   // 0-based slot
+    // DISK: the ring angle (theta) that brings a tool's pocket to the fixed PICKUP (pocket 0's spot). -(i/n)·2π.
+    const diskTheta = (toolN) => { if (!isDiskMag()) return 0; const n = (Array.isArray(atcCfg().magazine) ? atcCfg().magazine : []).length || 1; const i = magPocketIndex(toolN); return i < 0 ? 0 : -(i / n) * Math.PI * 2; };
+    // the pocket list for the OCCUPIED tools, at the current ring rotation (theta); disk = ring-laid, else per-tool XY.
+    const magPocketList = (occupied, theta) => magazinePockets(atcCfg(), theta || 0).filter((p) => p.tool && occupied.has(Number(p.tool.num)));
+    const pocketPos = (toolN, theta) => { const p = magazinePockets(atcCfg(), theta || 0).find((q) => q.tool && Number(q.tool.num) === Number(toolN)); return p ? { x: Number(p.x) || 0, y: Number(p.y) || 0, z: Number(p.z) || 0 } : null; };
+    // Render the pick-place magazine with `spindleTool` REMOVED (it is on the spindle) + the disk ring ROTATED so
+    // spindleTool's pocket sits at the pickup (the carousel just indexed it there). theta stored on the viz for tests.
+    function renderPickPlaceMag(spindleTool) {
+        const theta = diskTheta(spindleTool);
+        if (viz) { viz._diskTheta = theta; if (viz.setMagazine) viz.setMagazine(magPocketList(new Set(magToolNums().filter((t) => t !== spindleTool)), theta)); }
     }
-    const pocketOf = (toolN) => { const p = (Array.isArray(atcCfg().magazine) ? atcCfg().magazine : []).find((q) => Number(q.tool) === Number(toolN)); return p ? { x: Number(p.x) || 0, y: Number(p.y) || 0, z: Number(p.z) || 0 } : null; };
     function doToolSwap(oldN, newN) {
         const tools = toolsForViz();
         const spec = (n) => tools.find((t) => t && Number(t.num) === Number(n)) || { type: 'endmill', dia: 6, length: 35 };
         if (atcChoreo && atcChoreo.kind === 'pick-place') {
-            // PICK-PLACE: the OLD tool RETURNS to its pocket + the NEW tool LEAVES its pocket → onto the spindle. So the
-            // magazine occupancy = all tools MINUS the new one (now on the spindle); the old is back in its pocket.
-            if (viz && viz.setMagazine) viz.setMagazine(magPocketList(new Set(magToolNums().filter((t) => t !== newN))));
-            if (viz && viz.highlightStation) { const o = pocketOf(oldN), n = pocketOf(newN); if (o || n) viz.highlightStation({ z: Math.max((o || n).z, (n || o).z), start: o || n, end: n || o, retreat: n || o }, 'TOOL CHANGE'); }
+            // PICK-PLACE: the OLD tool RETURNS to its pocket + the NEW tool LEAVES its pocket → onto the spindle. Occupancy
+            // = all tools MINUS the new one; the ring rotates so the new (just-picked) pocket is at the pickup (disk).
+            renderPickPlaceMag(newN);
+            if (viz && viz.highlightStation) { const th = diskTheta(newN), o = pocketPos(oldN, th), n = pocketPos(newN, th); if (o || n) viz.highlightStation({ z: Math.max((o || n).z, (n || o).z), start: o || n, end: n || o, retreat: n || o }, 'TOOL CHANGE'); }
             if (viz && viz.setSimTool) viz.setSimTool(spec(newN));   // NEW on the spindle (part frame — cross-frame)
         } else {
             // PUSH (firmware): retire the OLD tool to the push station (P-C.1b — UNCHANGED).
