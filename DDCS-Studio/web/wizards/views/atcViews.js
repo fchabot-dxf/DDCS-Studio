@@ -148,8 +148,10 @@ export const atcLengthView = {
         };
         const gcode = lengthWizard.generate(params);
         el('wiz_atc_length_code').innerHTML = UIUtils.formatGCode(gcode);
+        const setter = (p.setterW > 0 && p.setterH > 0) ? p : null;
         if (mgr) mgr.preview3D(gcode, 'atcLengthViz');
         if (mgr) mgr.previewMachine('atcLengthViz', true);   // ATC = machine-frame: always show the envelope
+        if (mgr && mgr.previewToolSetter) mgr.previewToolSetter('atcLengthViz', setter);   // the fixed touch-off block at its configured machine position
         setStatus('atcLengthVizStatus', 'Z touch on the tool setter · ▶ traces the fast approach, slow touch + retract');
     },
 };
@@ -180,8 +182,10 @@ export const atcCheckView = {
         };
         const gcode = toolCheckWizard.generate(params);
         el('wiz_atc_check_code').innerHTML = UIUtils.formatGCode(gcode);
+        const setter = (p.setterW > 0 && p.setterH > 0) ? p : null;
         if (mgr) mgr.preview3D(gcode, 'atcCheckViz');
         if (mgr) mgr.previewMachine('atcCheckViz', true);   // ATC = machine-frame: always show the envelope
+        if (mgr && mgr.previewToolSetter) mgr.previewToolSetter('atcCheckViz', setter);   // the fixed touch-off block at its configured machine position
         setStatus('atcCheckVizStatus', 'Z re-tap on the setter · ▶ traces the probe; aborts if broken / wrong length');
     },
 };

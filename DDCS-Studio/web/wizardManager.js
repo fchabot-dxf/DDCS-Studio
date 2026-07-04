@@ -535,6 +535,17 @@ export class WizardManager {
         if (host) host.__varSeed = Array.isArray(seed) && seed.length ? seed : null;
     }
 
+    // Draw the fixed TOOL SETTER (touch-off block) in the 3D preview at its configured machine position, on the fixed
+    // machine frame (raw machine coords, like the magazine/stations). Opt-in (the Tool Length + Tool Check wizards) —
+    // call AFTER preview3D. setter = settings.probes ({ setterX/Y/Z/W/H }) or null to clear. ONE-SOURCE: the same
+    // config the sim's probe collision already reads — no duplication. SIM/VISUAL only, no emit impact.
+    previewToolSetter(containerId, setter) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const viz = host && host.__panel && host.__panel.viz;
+        if (viz && viz.setProbes) viz.setProbes(setter || null);
+    }
+
     // Highlight the ATC FIRMWARE push station (the taught #1320-1326 region) in the 3D preview on the machine frame.
     // Opt-in (the atc_change firmware method only) — call AFTER preview3D. region = { z, start, end, retreat } (machine
     // coords) or null to clear. The view resolves it from the op's declared choreography (ATC_CHOREOGRAPHY.firmware).

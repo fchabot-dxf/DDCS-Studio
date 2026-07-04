@@ -117,3 +117,24 @@ The GUI writes only DECLARED stores — settings.atc.magazine (generic), .pickup
 **BLAST:** UI-only (Settings ATC tab + the store). Full suite 566 pass — goldens + atc-roundtrip GREEN (no emit path touched → BYTE-PARITY, incl. firmware byte-identical); the atc-setup-canvas (GUI-1/FRAME-FIX) 4 specs still green; project-drawer-smoke PASSED this run (the prior flake didn't recur). No FeatureCanvas change this turn.
 
 **PASSED BACK for advisor review + human eyes on the numeric screenshot. SIM-FRAME axis; authoring disjoint. Zero controller write. NEXT per plan: the TOOL-SETTER MODEL → GUI-3 (the pin-picker) → GUI-4 (the gated controller pull/push, FORK 2 to the human).**
+
+## 🔨 turn 207 (cycle 13) — TOOL-SETTER MODEL (human t202 "we can add a tool setter model"). SIM/VISUAL only, emit BYTE-IDENTICAL. Full suite 569 pass / 2 skip / 0 fail (grew 568→571 with 3 new tests; no flake). 3 files (a wizardManager hook + 2 view calls + new spec) — a WIRE-UP, not a build.
+
+**GROUNDED FIRST (per the dispatch's "ground the setter position, flag if a new field is needed"):** the setter POSITION is ALREADY configured — NO new field. The setter is a `setter`-type INPUT row carrying {x,y,z,w,h} (ioTable default {0,0,0,20,20}); settingsPanel syncs it into `settings.probes` {setterX/Y/Z/W/H} — the CANONICAL config the sim's probe COLLISION already reads (GcodeExecutionEngine ~1036). ONE-SOURCE confirmed. AND the MODEL already exists: `gcodeViz3d.setProbes(probes)` draws a magenta touch-off cylinder at (setterX, setterY, setterZ−H/2) on the FIXED scene frame (raw machine coords). The GAP: `setProbes` was only ever called from the DEAD `_svgPreview.bak.js` — the CURRENT shared preview panel never called it, so the setter never rendered in the Length/Check previews.
+
+**FIX (wire the existing model to the current previews):**
+1. `wizardManager.js` — new `previewToolSetter(containerId, setter)` hook (mirrors previewMagazine) → `viz.setProbes(setter || null)`.
+2. `wizards/views/atcViews.js` — atcLengthView + atcCheckView now call `previewToolSetter(vizId, p.setterW>0 && p.setterH>0 ? p : null)` with `p = settings.probes` (the one source). Only when a real setter is configured (W/H > 0).
+3. `tests/atc-tool-setter.spec.js` (NEW, 3 tests).
+
+**VERIFIED REAL SYMPTOM (assert the VALUE + screenshot):**
+- Tool LENGTH preview: the setter mesh renders at the CONFIGURED machine position — centre (300, 200, −57 = setterZ −40 − H/2 17), mesh + edges present. On the FIXED machine frame (raw coords).
+- Tool CHECK preview: same, at (120, 80, −60) — the SAME setter config drives both.
+- ONE-SOURCE: change settings.probes.setterX 100→250 + wizard update() → the mesh FOLLOWS to X=250 (the render tracks the config, no duplicated position).
+- Screenshot scratchpad/tool-setter.png (the magenta touch-off block at its machine position in the Tool Length preview, distinct look) opened in a VS Code tab.
+
+**BLAST:** additive (a new hook, called only by Length/Check) → every other preview UNAFFECTED. Full suite 569 pass; goldens + atc-roundtrip GREEN (no emit path touched → BYTE-PARITY); the ATC + setup-canvas + numeric specs still green. No engine/emit change.
+
+**FLAG (a coherence follow-up, honest):** the Length/Check wizards are OPERATOR-HOVER (the emit has NO XY move — the op confirms "Hover tool over the setter" then Z-probes), so the sim tool sits at the program start (origin), NOT over the setter. I TRIED seeding the preview start to the setter XY (preview3D 3rd arg) but for machine-frame ATC ops the tool marker didn't follow (the start→tool-position path is tangled with _stockOffset / the P-A part-frame) — reverted it rather than rabbit-hole/guess. So the setter renders at its real position (the dispatch's actual VERIFY ✓) but the tool doesn't auto-hover over it; the OPTIONAL touch cue is moot until then (the tool must be over the setter to contact it). Positioning the tool over the setter (a machine-frame start seed) + the contact flash = a coherence follow-up if the human wants it — flagged, not guessed. The MODEL + RENDER + one-source are done.
+
+**PASSED BACK for advisor review + human eyes on the setter screenshot. SIM-FRAME axis; authoring disjoint. Zero controller write. NEXT per plan: GUI-3 (the pin-picker) → GUI-4 (the gated controller pull/push).**
