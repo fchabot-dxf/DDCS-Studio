@@ -6,6 +6,8 @@ import { renderMagazineTable } from '../../ui/ioTable.js';
 import { AtcLengthWizard } from '../atcLengthWizard.js';
 import { AtcWarmupWizard } from '../atcWarmupWizard.js';
 import { AtcChangeWizard, atcChoreography, firmwareStationSeed } from '../atcChangeWizard.js';
+import { atcCombo } from '../atcModel.js';
+import { motionToSimGcode, interpCtxFromAtc } from '../atcInterpreter.js';
 import { traceToolpath } from '../../engine/trace.js';
 import { AtcTestWizard } from '../atcTestWizard.js';
 import { AtcToolCheckWizard } from '../atcToolCheckWizard.js';
@@ -269,9 +271,18 @@ export const atcChangeView = {
         };
         const gcode = changeWizard.generate(params);
         el('wiz_atc_change_code').innerHTML = UIUtils.formatGCode(gcode);
-        if (mgr) mgr.preview3D(gcode, 'atcChangeViz');
+        // I4: a from-zero / RapidChange combo (a CANDIDATE motion with no hand-written stack — e.g. magnet × plunge ×
+        // linear) has the choreography INTERPRETER walk its declared steps → a SIM-ONLY path that drives the preview,
+        // proving a config-only changer sims. The 3 shipped presets (non-candidate motions) keep their played-inline
+        // emit (byte + sim identical). The CODE PREVIEW stays the emit (the interpreter path is sim-only until I5).
+        const cmb = atcCombo(params, s.atc);
+        const interpret = !!(cmb && cmb.motion && cmb.motion.candidate);
+        const simGcode = interpret ? motionToSimGcode(cmb, interpCtxFromAtc(s.atc, magazinePockets(s.atc || {}))) : gcode;
+        if (mgr) mgr.preview3D(simGcode, 'atcChangeViz');
         if (mgr) mgr.previewMachine('atcChangeViz', true);   // ATC = machine-frame: always show the envelope
         if (mgr) mgr.previewMagazine('atcChangeViz', magazinePockets(s.atc || {}));   // pockets + tools in 3D on the envelope
+        // I4: a FORK/DOCK grip (magnet — RapidChange) renders the forks the tool plunges into at each dock; else clear.
+        if (mgr && mgr.previewForkDock) mgr.previewForkDock('atcChangeViz', (interpret && cmb.grip && cmb.grip.device === 'fork') ? magazinePockets(s.atc || {}).map((p) => ({ x: p.x, y: p.y, z: p.z })) : null);
         // P-C.1a: the op's DECLARED choreography (ATC_CHOREOGRAPHY, keyed on the method) drives the sim visual. FIRMWARE
         // = a fixed-station push → highlight the taught #1320-1326 station region (resolved from a trace of this op's
         // G53 code) on the fixed machine frame. Non-firmware (m6/generic/disk/manual) → clear (no inline push station).

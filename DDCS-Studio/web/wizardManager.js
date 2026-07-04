@@ -535,6 +535,15 @@ export class WizardManager {
         if (host) host.__varSeed = Array.isArray(seed) && seed.length ? seed : null;
     }
 
+    // Draw the FORK / DOCK stations (RapidChange, I4) in the 3D preview — the forks the tool plunges into at each dock.
+    // Opt-in (an interpreted magnet/plunge combo) — call AFTER preview3D. docks = [{x,y,z}] (machine coords) or null.
+    previewForkDock(containerId, docks) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const viz = host && host.__panel && host.__panel.viz;
+        if (viz && viz.setForkDock) viz.setForkDock(docks || null);
+    }
+
     // Draw the fixed TOOL SETTER (touch-off block) in the 3D preview at its configured machine position, on the fixed
     // machine frame (raw machine coords, like the magazine/stations). Opt-in (the Tool Length + Tool Check wizards) —
     // call AFTER preview3D. setter = settings.probes ({ setterX/Y/Z/W/H }) or null to clear. ONE-SOURCE: the same

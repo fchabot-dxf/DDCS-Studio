@@ -1496,6 +1496,28 @@ export class GcodeViz3D {
         this.render();
     }
 
+    /** FORK / DOCK stations (RapidChange, I4) — a fork the tool PLUNGES into at each dock position; the magnet grip has
+     *  no I/O, so the plunge into the fork mechanically does the grab/release. docks = [{x,y,z}] on the FIXED machine
+     *  frame (raw machine coords, like the magazine/station). Reuses the device-mesh pattern (setStationDevices). */
+    setForkDock(docks) {
+        const THREE = this.THREE;
+        if (this._forkGroup) {
+            this.scene.remove(this._forkGroup);
+            this._forkGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose && m.dispose()); });
+            this._forkGroup = null;
+        }
+        if (!Array.isArray(docks) || !docks.length) { this.render(); return; }
+        const grp = new THREE.Group();
+        const mat = new THREE.MeshBasicMaterial({ color: 0x2fb3a3, transparent: true, opacity: 0.72 });   // teal — distinct from magenta setter / orange pin
+        docks.forEach((d) => {
+            const x = Number(d.x) || 0, y = Number(d.y) || 0, z = Number(d.z) || 0;
+            const base = new THREE.Mesh(new THREE.BoxGeometry(26, 26, 4), mat); base.position.set(x, y, z - 2); grp.add(base);
+            [-10, 10].forEach((dx) => { const prong = new THREE.Mesh(new THREE.BoxGeometry(4, 26, 18), mat); prong.position.set(x + dx, y, z + 9); grp.add(prong); });   // two prongs — the tool plunges between them
+        });
+        this._forkGroup = grp; this.scene.add(grp);
+        this.render();
+    }
+
     /** The spindle COLLET open/close (P-C.3a): OPEN (M154 drawbar release) → retract a touch + a cyan "released" tint;
      *  CLOSE (M155 lock) → rest + grey (gripping the shank). Re-applied after _buildAnimTool so a tool-swap rebuild of
      *  the assembly keeps the collet's current state. The collet rides the PART frame with the anim tool (cross-frame). */
