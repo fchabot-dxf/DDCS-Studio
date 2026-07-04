@@ -498,6 +498,7 @@ export class GcodeViz3D {
         }
         grp.renderOrder = 25; grp.visible = !!this._animOn;
         this._animTool = grp; this._applyPartVis(); this.partFrame.add(grp);   // tool rides the part frame
+        this._applyColletState();   // P-C.3a: a tool-swap rebuild keeps the collet's open/close state
     }
     _applyPartVis() { const v = this._partVis || {}; if (this._animParts) { for (const k of ['tool', 'collet', 'spindle']) if (this._animParts[k]) this._animParts[k].visible = v[k] !== false; if (this._animParts.ruby) this._animParts.ruby.visible = v.tool !== false; } }   // the red ruby tip follows the tool
     // Show/hide spindle / collet / tool independently, e.g. setPartVisible({ spindle: false }).
@@ -1484,13 +1485,25 @@ export class GcodeViz3D {
         this.render();
     }
 
-    /** Animate a station device on its pneumatic io_change. name 'pusher' (OUT_PUSHER) / 'pin' (OUT_LOCATING_PIN);
-     *  on = true → extend/engage, false → retract/release. (P-C.2b) */
+    /** Animate a station/spindle device on its io_change. name 'pusher' (OUT_PUSHER) / 'pin' (OUT_LOCATING_PIN) — the
+     *  firmware-push station devices (P-C.2b); or 'collet' (OUT_SPINDLE_UNCLAMP/CLAMP) — the pick-place drawbar collet
+     *  on the SPINDLE (P-C.3a). on = true → extend/engage/OPEN, false → retract/release/CLOSE. */
     setStationDevice(name, on) {
         if (name === 'pusher' && this._pusherRod) this._pusherRod.position.x = on ? this._PUSH_OUT : this._PUSH_IN;
         else if (name === 'pin' && this._locatingPin) this._locatingPin.position.z = on ? this._PIN_UP : this._PIN_DOWN;
+        else if (name === 'collet') { this._colletOpen = !!on; this._applyColletState(); }
         else return;
         this.render();
+    }
+
+    /** The spindle COLLET open/close (P-C.3a): OPEN (M154 drawbar release) → retract a touch + a cyan "released" tint;
+     *  CLOSE (M155 lock) → rest + grey (gripping the shank). Re-applied after _buildAnimTool so a tool-swap rebuild of
+     *  the assembly keeps the collet's current state. The collet rides the PART frame with the anim tool (cross-frame). */
+    _applyColletState() {
+        const c = this._animParts && this._animParts.collet;
+        if (!c) return;
+        c.position.z = this._colletOpen ? 5 : 0;   // released → the collet retracts up a touch (drawbar back)
+        if (c.material && c.material.color) c.material.color.set(this._colletOpen ? 0x5fd3ff : 0x9aa6b2);   // cyan open / grey closed
     }
 
     // Re-pivot the orbit on the point under the cursor (the stock surface if hovered,

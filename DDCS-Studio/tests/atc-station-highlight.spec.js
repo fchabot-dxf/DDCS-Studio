@@ -26,8 +26,8 @@ test('(1) the choreography seam declares firmware=push, m6=macro-call, others no
   expect(c.fwVars, 'the taught station params it reads').toEqual([1306, 1320, 1321, 1323, 1324, 1325, 1326]);
   expect(c.fwRegion, 'region() builds start/end/retreat from the resolved vars').toEqual({ z: -10, start: { x: 200, y: 150 }, end: { x: 250, y: 150 }, retreat: { x: 300, y: 150 } });
   expect(c.m6.kind, 'm6 → a macro call (controller runs T.nc, nothing inline)').toBe('macro-call');
-  expect(c.generic, 'generic → no inline choreography yet (P-C.3)').toBeNull();
-  expect(c.disk, 'disk → no inline choreography yet').toBeNull();
+  expect(c.generic && c.generic.kind, 'generic → pick-place (P-C.3a)').toBe('pick-place');
+  expect(c.disk && c.disk.kind, 'disk → pick-place').toBe('pick-place');
   expect(c.manual, 'manual → no inline choreography').toBeNull();
 });
 

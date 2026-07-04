@@ -296,8 +296,11 @@ export const ATC_CHOREOGRAPHY = {
         }),
     },
     m6: { kind: 'macro-call', label: 'controller M6 (T.nc)' },
-    generic: null,
-    disk: null,
+    // pick-place (P-C.3a): a drawbar/collet magazine change — the spindle travels to the tool pockets, the COLLET opens
+    // (M154) / closes (M155) to release/grip. MINIMAL here (arms the collet + the swap); the per-pocket swap MOTION is
+    // P-C.3b. generic = per-tool magazine pockets; disk = a fixed pickup + a carousel rotate (deferred).
+    generic: { kind: 'pick-place', variant: 'magazine', label: 'magazine pick & place' },
+    disk: { kind: 'pick-place', variant: 'carousel', label: 'carousel pick & place' },
     manual: null,
 };
 
