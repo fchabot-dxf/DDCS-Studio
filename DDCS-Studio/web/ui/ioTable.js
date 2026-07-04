@@ -302,3 +302,94 @@ export function renderMagazineTable(container, atc, onChange) {
         container.appendChild(tr);
     });
 }
+
+const _code = (x) => parseInt(String(x || '').replace(/[^0-9]/g, ''), 10);
+
+// DECLARED ATC I/O function catalog for the pin-picker (GUI-3) — each function carries its canonical M-code(s) so the
+// io-tab labeling join (onCode / waitCode → ATC_DIALECT → the semantic pin) LIGHTS the assigned pin. rotate / pocket-
+// index have no M-code (special disk I/O) → matched by type; assignable but label-only in the io-tab. This is the ONE
+// place the picker's function set is declared; rows are found/created against the SAME settings.outputs/inputs the
+// general I/O table + the labeling use (no duplicated data).
+const ATC_IO_FUNCTIONS = {
+    output: [
+        { key: 'drawbar', label: 'Drawbar (unclamp / clamp)', onCode: 'M154', offCode: 'M155', type: 'drawbar' },
+        { key: 'dust', label: 'Dust cover', onCode: 'M162', offCode: 'M163', type: 'dustcover' },
+        { key: 'pusher', label: 'Pusher cylinder', onCode: 'M160', offCode: 'M161', type: 'custom' },
+        { key: 'pin', label: 'Locating pin', onCode: 'M156', offCode: 'M157', type: 'custom' },
+        { key: 'vacuum', label: 'Vacuum pump', onCode: 'M158', offCode: 'M159', type: 'custom' },
+        { key: 'gripper', label: 'Gripper (open / close)', onCode: 'M150', offCode: 'M151', type: 'custom' },
+        { key: 'rotate', label: 'Carousel rotate', onCode: '', offCode: '', type: 'rotate' },
+    ],
+    input: [
+        { key: 'spindle_stopped', label: 'Spindle stopped', waitCode: 'M300' },
+        { key: 'drawbar_released', label: 'Drawbar released', waitCode: 'M301' },
+        { key: 'drawbar_clamped', label: 'Drawbar clamped', waitCode: 'M302' },
+        { key: 'mag_open', label: 'Magazine open', waitCode: 'M303' },
+        { key: 'mag_closed', label: 'Magazine closed', waitCode: 'M304' },
+        { key: 'gripper_open', label: 'Gripper open', waitCode: 'M305' },
+        { key: 'gripper_closed', label: 'Gripper closed', waitCode: 'M306' },
+        { key: 'pocket_index', label: 'Pocket index', waitCode: '', type: 'sensor' },
+    ],
+};
+
+// Find the existing config row for an ATC function by its canonical M-code (the join key — relabel-proof), else by
+// type for the M-code-less rotate/index. null = not yet a row.
+function _findAtcRow(list, fn, kind) {
+    if (kind === 'output') return fn.onCode ? list.find((r) => _code(r.onCode) === _code(fn.onCode)) : list.find((r) => r.group === 'atc' && r.type === fn.type);
+    return fn.waitCode ? list.find((r) => r.group === 'atc' && _code(r.waitCode) === _code(fn.waitCode)) : list.find((r) => r.group === 'atc' && r.type === (fn.type || 'sensor') && !r.waitCode);
+}
+function _makeAtcRow(fn, kind) {
+    return kind === 'output'
+        ? { id: uid('out'), type: fn.type || 'custom', label: fn.label, pin: '', onCode: fn.onCode || '', offCode: fn.offCode || '', group: 'atc' }
+        : { id: uid('in'), type: fn.type || 'sensor', label: fn.label, pin: '', level: 0, group: 'atc', waitCode: fn.waitCode || '' };
+}
+
+/**
+ * A FOCUSED ATC I/O pin-picker (GUI-3) — assign the ATC I/O pins visually, a PEER editor of the general I/O tables.
+ * It writes the SAME settings.outputs / settings.inputs `.pin` the io-labeling reads, so assigning a pin here LIGHTS
+ * it in the I/O panel (the P-C.2c/d join). ONE SOURCE — no duplicated data. Free/taken aware: a pin already used by
+ * any row of that kind is DISABLED so a pin can't map to two functions (conflict prevented). Rows are matched by their
+ * canonical M-code (relabel-proof) and created on first assignment. SIM/UI only — emit byte-identical.
+ */
+export function renderAtcPinPicker(container, { outputs, inputs, onChange } = {}) {
+    if (!container) return;
+    const rerender = () => renderAtcPinPicker(container, { outputs, inputs, onChange });
+    container.innerHTML = '';
+    const section = (title, kind, list) => {
+        const pinMax = kind === 'input' ? 24 : 20;
+        const h = document.createElement('div'); h.textContent = title; h.style.cssText = 'font-size:11px; font-weight:700; color:#6b7280; margin:8px 0 5px;';
+        container.appendChild(h);
+        const grid = document.createElement('div'); grid.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:6px 16px;';
+        ATC_IO_FUNCTIONS[kind].forEach((fn) => {
+            const row = _findAtcRow(list, fn, kind);
+            const cur = row && row.pin !== '' && row.pin != null ? String(row.pin) : '';
+            const taken = new Set(list.filter((r) => r !== row).map((r) => r.pin).filter((p) => p !== '' && p != null).map(String));
+            const lab = document.createElement('label');
+            lab.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--text-main,#334155);';
+            lab.appendChild(document.createTextNode(fn.label));
+            const sel = document.createElement('select');
+            sel.setAttribute('data-atc-pin', fn.key);
+            sel.style.cssText = INP + ' width:88px;';
+            const none = document.createElement('option'); none.value = ''; none.textContent = '—'; sel.appendChild(none);
+            for (let p = 1; p <= pinMax; p++) {
+                const o = document.createElement('option'); o.value = String(p);
+                o.textContent = taken.has(String(p)) ? p + ' (taken)' : String(p);
+                if (taken.has(String(p))) o.disabled = true;
+                if (cur === String(p)) o.selected = true;
+                sel.appendChild(o);
+            }
+            sel.addEventListener('change', () => {
+                let r = _findAtcRow(list, fn, kind);
+                if (sel.value === '') { if (r) r.pin = ''; }
+                else { if (!r) { r = _makeAtcRow(fn, kind); list.push(r); } r.pin = Number(sel.value); }
+                if (onChange) onChange();
+                rerender();
+            });
+            lab.appendChild(sel);
+            grid.appendChild(lab);
+        });
+        container.appendChild(grid);
+    };
+    section('Outputs (pins 1–20)', 'output', outputs);
+    section('Inputs (pins 1–24)', 'input', inputs);
+}

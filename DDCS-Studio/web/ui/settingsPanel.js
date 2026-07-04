@@ -12,7 +12,7 @@ import { UIUtils } from './uiUtils.js';
 import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile, registerProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { listPosts, getActivePostId, setActivePostId, isPostVerified, getDialect } from '../wizards/dialects/index.js';
 import { makeClient } from '../shared/js/client.js';
-import { renderIoTable, renderMagazineTable } from './ioTable.js';
+import { renderIoTable, renderMagazineTable, renderAtcPinPicker } from './ioTable.js';
 import { renderAtcSetupCanvas, defaultFirmwareStation } from '../viz/atcSetupCanvas.js';
 import { renderWizardLibrary } from './wizardManagerPanel.js';
 import { toolProfileSvg } from '../viz/toolProfile.js';
@@ -1059,6 +1059,11 @@ function buildSettingsOverlay() {
                                 <label>Retreat Y<input type="number" id="atc_fw_ry" step="0.1" class="num-input"></label>
                                 <label>Safe-Z (#1306)<input type="number" id="atc_fw_safez" step="0.1" class="num-input"></label>
                             </div>
+                        </div>
+                        <div class="settings-section">
+                            <div class="settings-section-title">ATC I/O PINS</div>
+                            <div class="settings-hint">Assign each ATC function to a numbered pin — a visual peer of the Input / Output tables (it writes the <b>same</b> config, so a pin assigned here lights in the I/O panel during a sim). A taken pin is disabled so a pin maps to one function.</div>
+                            <div id="atc_pin_picker"></div>
                         </div>
                         <div class="settings-section">
                             <div class="settings-section-title">TOOL MAGAZINE</div>
@@ -2228,8 +2233,12 @@ function wireSettingsOverlay(ov) {
     function renderAtcSetup() {
         const table = ov.querySelector('#atc_magazine');
         const canvas = ov.querySelector('#atc_setup_canvas');
+        const pins = ov.querySelector('#atc_pin_picker');
         if (table) renderMagazineTable(table, _ddcsSettings.atc, atcOnChangeFull);
         if (canvas) renderAtcSetupCanvas(canvas, { atc: _ddcsSettings.atc, machine: _ddcsSettings.machine || {}, onChange: atcOnChangeFull });
+        // The ATC pin-picker writes settings.outputs/inputs .pin (the SAME config the I/O tables + the io-labeling read);
+        // syncIO persists + mirrors, and io_change relights the I/O panel if it's open. One source, no duplication.
+        if (pins) renderAtcPinPicker(pins, { outputs: getOutputs(), inputs: getInputs(), onChange: () => { syncIO(); window.dispatchEvent(new CustomEvent('io_change')); } });
         const fw = _ddcsSettings.atc && _ddcsSettings.atc.firmwareStation;
         const setF = (id, v) => { const e = ov.querySelector('#' + id); if (e) e.value = (v == null ? '' : v); };
         FW_XY.forEach(([id, grp, ax]) => setF(id, fw && fw[grp] ? fw[grp][ax] : null));

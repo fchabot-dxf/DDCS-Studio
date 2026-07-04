@@ -138,3 +138,27 @@ The GUI writes only DECLARED stores — settings.atc.magazine (generic), .pickup
 **FLAG (a coherence follow-up, honest):** the Length/Check wizards are OPERATOR-HOVER (the emit has NO XY move — the op confirms "Hover tool over the setter" then Z-probes), so the sim tool sits at the program start (origin), NOT over the setter. I TRIED seeding the preview start to the setter XY (preview3D 3rd arg) but for machine-frame ATC ops the tool marker didn't follow (the start→tool-position path is tangled with _stockOffset / the P-A part-frame) — reverted it rather than rabbit-hole/guess. So the setter renders at its real position (the dispatch's actual VERIFY ✓) but the tool doesn't auto-hover over it; the OPTIONAL touch cue is moot until then (the tool must be over the setter to contact it). Positioning the tool over the setter (a machine-frame start seed) + the contact flash = a coherence follow-up if the human wants it — flagged, not guessed. The MODEL + RENDER + one-source are done.
 
 **PASSED BACK for advisor review + human eyes on the setter screenshot. SIM-FRAME axis; authoring disjoint. Zero controller write. NEXT per plan: GUI-3 (the pin-picker) → GUI-4 (the gated controller pull/push).**
+
+## 🔨 turn 209 (cycle 13) — GUI-3: the ATC PIN-PICKER (assign the ATC I/O pins visually; scout fork-3 = a panel). SIM/UI only, emit BYTE-IDENTICAL. Full suite 573 pass / 2 skip / 0 fail (grew 571→575 with 4 new tests; no flake). 3 files.
+
+**WHAT** — a FOCUSED ATC I/O pin-assignment panel in the ATC Settings tab (near the setup canvas): every ATC function with a numbered-pin dropdown, so the user assigns pins visually WITHOUT hunting through the general Input/Output tables. A PEER editor — it writes the SAME settings.outputs/inputs `.pin` the io config table + the io-labeling read (ONE SOURCE, no duplicated data), so a pin assigned here LIGHTS in the I/O panel during a sim (the P-C.2c/d join).
+
+**PIECES (3 files):**
+1. `ui/ioTable.js` — DECLARED `ATC_IO_FUNCTIONS` catalog (7 outputs drawbar/dust/pusher/pin/vacuum/gripper/rotate · 8 inputs spindle-stopped/drawbar-released/clamped/mag-open/closed/gripper-open/closed/pocket-index), each carrying its canonical M-code(s) — the SAME onCode/waitCode the io-tab join (→ ATC_DIALECT → semantic pin) keys on. `renderAtcPinPicker(container,{outputs,inputs,onChange})`: per function a pin `<select>` (1–20 out / 1–24 in); a pin used by any row of that kind is DISABLED ("N (taken)") so a pin maps to ONE function (conflict prevented); the current pin reads the matched row (relabel-proof — matched by M-code, not label). Assign → find-or-CREATE the row (with the canonical codes + group='atc') → set `.pin`; clear (—) frees it (no dup row).
+2. `ui/settingsPanel.js` — a new "ATC I/O PINS" section (#atc_pin_picker) in the ATC tab; `renderAtcSetup` renders it with onChange = `syncIO()` (the SAME persist the io tables use) + dispatch `io_change` (relight the I/O panel if open). Import from ioTable.
+3. `tests/atc-pin-picker.spec.js` (NEW, 4 tests, real change-events + value-asserts).
+
+**ONE-SOURCE:** the picker + the general I/O table + the io-labeling all read/write settings.outputs/inputs `.pin` (+ onCode/waitCode) — the picker is a visual peer, not a second store.
+
+**VERIFIED REAL SYMPTOM (assert the VALUE via real change events + the LIVE IoTab):**
+- Assign OUTPUT drawbar→pin 5 (no row yet) → settings.outputs gets a row {onCode M154, pin 5, group atc}; `window.ioPanel._deriveAtcMap()` → `_atcOutMap[5]` has a semanticPin + label → it LIGHTS (the join, through the real io-tab).
+- Assign INPUT spindle-stopped→pin 3 → settings.inputs {waitCode M300, pin 3}; `_atcInMap[3]` derives the input semantic pin.
+- CONFLICT: after drawbar=5, another output's pin-5 option is DISABLED (no double-assign); pin 5 is STILL free for an INPUT (separate 1–20 vs 1–24 banks).
+- ONE-SOURCE: a pre-set config pin (7) shows in the picker (reads the existing row, no dup); clearing frees it and leaves exactly ONE drawbar row (matched by M-code, not duplicated).
+- Screenshot scratchpad/atc-pin-picker.png (the ATC I/O PINS grid — outputs + inputs with pin dropdowns, some assigned) opened in a VS Code tab.
+
+**BLAST:** additive (a new panel + a declared catalog) → the general I/O tables + the labeling UNAFFECTED (same source). Full suite 573 pass; io / io-labeling / ATC / setup specs green; goldens + atc-roundtrip GREEN (no emit path touched → BYTE-PARITY).
+
+**NOTE (honest, minor):** rotate + pocket-index have NO M-code (special disk I/O) so they're assignable but label-only in the io-tab (they don't join ATC_DIALECT) — included per the dispatch's function list, matched by type. The M-code functions (the meaningful lighting set) all join + light.
+
+**PASSED BACK for advisor review + human eyes on the pin-picker screenshot. SIM-FRAME axis; authoring disjoint. Zero controller write. NEXT per plan: GUI-4 (the GATED controller pull/push — FORK 2 [firmware pull-visualize vs author-push], to the human).**
