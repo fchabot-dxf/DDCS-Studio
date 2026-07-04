@@ -4,7 +4,7 @@
  * `param` block: together they're the visible "form" section of a custom wizard (the GUI-blocks authoring layer).
  */
 export const panelBlock = {
-    type: 'panel', label: 'panel', category: 'Wizard UI',
+    type: 'panel', label: 'panel', category: 'Wizard UI', kind: 'panel',   // t161 — an explicit metadata kind (like section/param_group/structctl) so devMode.isAtom excludes it from the knob kit
     defaults: { panel: 'form3d' },
     fields: ['panel'],
     emit: () => [],   // metadata only — produces no G-code

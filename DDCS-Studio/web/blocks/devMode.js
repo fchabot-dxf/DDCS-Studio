@@ -52,10 +52,11 @@ function getInlineFields(block) {
 function isAtom(blk) {
     if (!(blk && !blk.isShadow() && blk.type !== 'op' && !blk.type.endsWith('_op') && blk.type !== 'progstart' && blk.type !== 'progend')) return false;
     // t148 — a `section`'s title is AUTHORING METADATA (the section's name), NOT an exposable wizard value, so it must not
-    // get the "expose as knob" kit (it read as "? knob false title" noise on the concern headers). Value-bearing atoms
-    // (assign / param / move / …) are untouched → the value-knob expose path (deriveAuthoredDef / EXPOSE_) still works.
+    // get the "expose as knob" kit (it read as "? knob false title" noise on the concern headers). Same for the panel
+    // block's panel-type field and the param_group block's group-name field (t161 — both authoring labels, not values).
+    // Value-bearing atoms (assign / param / move / …) are untouched → the value-knob expose path (deriveAuthoredDef / EXPOSE_) still works.
     const def = BLOCKS[blk.type];
-    return !(def && (def.kind === 'section' || def.kind === 'structctl'));   // t148 section + t154 structural-control: authoring metadata / guard drivers, not exposable values
+    return !(def && (def.kind === 'section' || def.kind === 'structctl' || def.kind === 'panel' || def.kind === 'param_group'));   // t148 section + t154 structural-control + t161 panel/param_group: authoring metadata / guard drivers, not exposable values
 }
 
 // the widget a numeric exposure renders as in the form (the form-widget registry keys; numeric-compatible only).
