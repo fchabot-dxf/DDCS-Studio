@@ -34,7 +34,7 @@ async function model(page) {
 
 test('the composable GRIP × MOTION schema is declared and well-formed', async ({ page }) => {
   const m = await model(page);
-  expect(m.grips, 'the 3 shipped grips are declared').toEqual(expect.arrayContaining(['drawbar', 'pneumatic', 'magnetic']));
+  expect(m.grips, 'the grips are named by MECHANISM: drawbar/collet, pusher, magnet').toEqual(expect.arrayContaining(['drawbar', 'pusher', 'magnet']));
   expect(m.motions, 'the shipped motions are declared').toEqual(expect.arrayContaining(['pick-place', 'push', 'rotate']));
   expect(m.gripsWellFormed, 'every grip has release[] + clamp[] action-lists').toBe(true);
   expect(m.motionsWellFormed, 'every motion has a steps[] sequence').toBe(true);
@@ -43,7 +43,7 @@ test('the composable GRIP × MOTION schema is declared and well-formed', async (
 
 test('the 3 methods (and back-compat old ops) resolve to the correct grip × motion combo', async ({ page }) => {
   const { combo } = await model(page);
-  expect(combo.firmware, 'firmware = pneumatic push').toMatchObject({ gripKind: 'pneumatic', motionKind: 'push', layout: 'station' });
+  expect(combo.firmware, 'firmware = pusher push (named by mechanism)').toMatchObject({ gripKind: 'pusher', motionKind: 'push', layout: 'station' });
   expect(combo.generic, 'generic = drawbar pick-place').toMatchObject({ gripKind: 'drawbar', motionKind: 'pick-place', layout: 'linear' });
   expect(combo.disk, 'disk = drawbar rotate').toMatchObject({ gripKind: 'drawbar', motionKind: 'rotate', layout: 'disk' });
   // OLD ops (mode/magType, no `method`) back-fill to the same combos via resolveMethod

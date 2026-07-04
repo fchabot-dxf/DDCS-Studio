@@ -38,8 +38,10 @@ export const GRIPS = {
         clamp: [{ code: 'M155', wait: 'M302', dev: 'collet-close' }],    // clamp + tool-locked sensor
         device: 'collet',
     },
-    pneumatic: {
-        label: 'Pneumatic push',
+    // Named by MECHANISM (pusher), NOT actuation — most ATCs are pneumatic; air/hydraulic/electric is a separate/implied
+    // property, not the grip type (human t218).
+    pusher: {
+        label: 'Pusher',
         orient: true,   // M19 before the unclamp (O10102)
         // O10102's pneumatics interleave with the push travel; declared as the actuator actions the push MOTION drives.
         pre: [{ code: 'M159', dev: 'vacuum-off' }, { code: 'M157', dev: 'pin-close' }],   // vacuum pump off, locating pin close
@@ -49,8 +51,8 @@ export const GRIPS = {
         device: 'pusher',
     },
     // CANDIDATE (RapidChange, wired in I5): no actuator I/O — the plunge MOTION mechanically engages the fork/magnet.
-    magnetic: {
-        label: 'Magnetic (RapidChange)',
+    magnet: {
+        label: 'Magnet',
         orient: false,
         release: [], clamp: [],   // mechanical — see the `plunge` motion
         device: 'fork',
@@ -129,11 +131,13 @@ export const MOTIONS = {
 // to its combo. NOTE: "firmware" is a MISLABEL — it is the pneumatic-push installed macro (O10102), so its combo is
 // pneumatic × push; the GUI (I3) relabels it "Pneumatic push".
 export const PRESETS = {
-    firmware: { grip: 'pneumatic', motion: 'push', layout: 'station' },
-    generic: { grip: 'drawbar', motion: 'pick-place', layout: 'linear' },
-    disk: { grip: 'drawbar', motion: 'rotate', layout: 'disk' },
-    m6: { grip: null, motion: 'macro-call', layout: null },
-    manual: { grip: null, motion: 'manual', layout: 'park' },
+    firmware: { grip: 'pusher', motion: 'push', layout: 'station', label: 'Push station' },   // the O10102 pusher/push install ("firmware" was a mislabel)
+    generic: { grip: 'drawbar', motion: 'pick-place', layout: 'linear', label: 'Drawbar pick & place' },
+    disk: { grip: 'drawbar', motion: 'rotate', layout: 'disk', label: 'Disk carousel' },
+    m6: { grip: null, motion: 'macro-call', layout: null, label: 'Controller M6' },
+    manual: { grip: null, motion: 'manual', layout: 'park', label: 'Manual' },
+    // CANDIDATE (wired in I5): the composed RapidChange changer — linear docks + magnet grip + plunge motion.
+    rapidchange: { grip: 'magnet', motion: 'plunge', layout: 'linear', label: 'RapidChange', candidate: true },
 };
 
 /**
@@ -141,17 +145,20 @@ export const PRESETS = {
  * for an unknown method). Back-fills OLD ops (mode/magType, no method) via resolveMethod. INERT in I1 — nothing emits
  * from this yet; the seam consumes it in I2. A settings.atc grip/motion override (I3) is not read here yet.
  */
-export function atcCombo(params = {}) {
+export function atcCombo(params = {}, atc = null) {
     const method = resolveMethod(params);
-    const preset = PRESETS[method];
-    if (!preset) return null;
+    const preset = PRESETS[method] || null;
+    // A Studio-DECLARED changer (settings.atc.grip/motion/layout, written by the I3 setup GUI) WINS; else the method
+    // preset (back-compat). When atc is null/unset the result is exactly the I2 preset combo → byte + sim identical.
+    const gripKind = (atc && atc.grip) || (preset && preset.grip) || null;
+    const motionKind = (atc && atc.motion) || (preset && preset.motion) || null;
+    const layout = (atc && atc.layout) || (preset && preset.layout) || null;
+    if (!preset && !gripKind && !motionKind) return null;
     return {
         method,
-        gripKind: preset.grip || null,
-        motionKind: preset.motion || null,
-        layout: preset.layout || null,
-        grip: preset.grip ? GRIPS[preset.grip] : null,
-        motion: preset.motion ? MOTIONS[preset.motion] : null,
+        gripKind, motionKind, layout,
+        grip: gripKind ? (GRIPS[gripKind] || null) : null,
+        motion: motionKind ? (MOTIONS[motionKind] || null) : null,
     };
 }
 
@@ -163,8 +170,8 @@ export function atcCombo(params = {}) {
  * stationVars (createPreviewPanel.setAtcSwap + atcViews); the grip-sourced `device` is additive (unconsumed today).
  * null = no inline choreography (manual).
  */
-export function atcChoreography(params = {}) {
-    const combo = atcCombo(params);
+export function atcChoreography(params = {}, atc = null) {
+    const combo = atcCombo(params, atc);
     const seam = combo && combo.motion && combo.motion.seam;
     if (!seam) return null;
     const device = combo.grip && combo.grip.device;

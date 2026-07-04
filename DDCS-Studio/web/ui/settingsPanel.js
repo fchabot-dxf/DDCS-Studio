@@ -14,6 +14,7 @@ import { listPosts, getActivePostId, setActivePostId, isPostVerified, getDialect
 import { makeClient } from '../shared/js/client.js';
 import { renderIoTable, renderMagazineTable, renderAtcPinPicker } from './ioTable.js';
 import { renderAtcSetupCanvas, defaultFirmwareStation } from '../viz/atcSetupCanvas.js';
+import { renderAtcChanger } from './atcChangerGui.js';
 import { renderWizardLibrary } from './wizardManagerPanel.js';
 import { toolProfileSvg } from '../viz/toolProfile.js';
 import { THEMES } from './themes.js';
@@ -1042,6 +1043,11 @@ function buildSettingsOverlay() {
                         <button class="toolbar-btn settings-io" id="set_atc_add_btn">➕ Add tool changer (ATC)</button>
                     </div>
                     <div id="set_atc_magazine_wrap" style="display:none">
+                        <div class="settings-section">
+                            <div class="settings-section-title">TOOL CHANGER</div>
+                            <div class="settings-hint">Declare your changer from composable pieces — pick a ready-made <b>preset</b>, or compose <b>layout × grip × motion</b> yourself. Grip = the hold/release <b>mechanism</b> (drawbar/collet · pusher · magnet); the actuation (air / hydraulic / electric) is separate. This is the one source the sim reads.</div>
+                            <div id="atc_changer"></div>
+                        </div>
                         <div class="settings-section">
                             <div class="settings-section-title">MACHINE-FRAME LAYOUT</div>
                             <div class="settings-hint">A live top-down read-back of the machine frame — the numeric fields below (and the magazine table) are the <b>precise</b> editor; you can also <b>drag</b> a point here for a coarse adjust. Sim-side only — nothing is written to the controller.</div>
@@ -2234,6 +2240,8 @@ function wireSettingsOverlay(ov) {
         const table = ov.querySelector('#atc_magazine');
         const canvas = ov.querySelector('#atc_setup_canvas');
         const pins = ov.querySelector('#atc_pin_picker');
+        const changer = ov.querySelector('#atc_changer');
+        if (changer) renderAtcChanger(changer, { atc: _ddcsSettings.atc, onChange: atcOnChangeFull });   // I3: the composable changer (preset-lib + from-zero) → settings.atc.{grip,motion,layout}
         if (table) renderMagazineTable(table, _ddcsSettings.atc, atcOnChangeFull);
         if (canvas) renderAtcSetupCanvas(canvas, { atc: _ddcsSettings.atc, machine: _ddcsSettings.machine || {}, onChange: atcOnChangeFull });
         // The ATC pin-picker writes settings.outputs/inputs .pin (the SAME config the I/O tables + the io-labeling read);

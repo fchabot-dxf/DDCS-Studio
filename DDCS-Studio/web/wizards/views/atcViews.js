@@ -276,7 +276,7 @@ export const atcChangeView = {
         // = a fixed-station push → highlight the taught #1320-1326 station region (resolved from a trace of this op's
         // G53 code) on the fixed machine frame. Non-firmware (m6/generic/disk/manual) → clear (no inline push station).
         if (mgr && mgr.previewAtcStation) {
-            const choreo = atcChoreography(params);
+            const choreo = atcChoreography(params, s.atc);   // I3: a Studio-declared changer (settings.atc.grip/motion) drives the sim; else the method preset
             // GUI-1: VAR-SEED the firmware station from the Studio-authored store (settings.atc.firmwareStation) so the
             // taught points render from the store instead of untaught-0. One store → one seed → two consumers: the
             // station-highlight trace (below) AND the PLAYED preview engine (previewVarSeed) so the animated push travel
