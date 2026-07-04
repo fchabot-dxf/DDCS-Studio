@@ -433,3 +433,55 @@ The user's I/O table is the ONE SOURCE for the VALUE; GRIPS declares the STRUCTU
 **SCOPE HELD:** did NOT touch the pusher/disk grips (INC2/3), the wizard emit atcChangeStack, or the disk/pusher route. The only new machinery = the pure resolveAction + the io thread; GRIPS gained fn-refs (declarations).
 
 **PASSED BACK for advisor review — on bless the advisor RELEASES the drawbar converge (I5b-2a) + INC1 together. NEXT: INC2 pusher (add the stable fn key + the pusher's multi-function actions), then INC3 disk-rotate (the motion-step code-source). ATC-model axis; SIM-FRAME/authoring untouched.**
+
+## 🔨 turn 233 (cycle 13) — WIZARD-OP → T# M6 SCOUT: converge the ATC-change OP emit from the inline dance to a T# M6 CALL to the installed T.nc (design + decomposition + install-safety options, NO code; model-level + emit-changing; GATED for advisor + HUMAN).
+
+### THE CONVERGE
+```
+  BEFORE                                   AFTER
+  atc_change op ──► atcChangeStack         atc_change op ──► T<n> M6  ( calls your installed T.nc )
+    (firmware/generic/disk = the             + ( @DDCS:1 {op:atc_change, method, fixedT, …} )  ← round-trip marker
+     full INLINE dance in the program)      the DANCE lives in the T.nc (the interpreter's O-program), NOT the program.
+  wizard preview PLAYS the inline dance    wizard preview PLAYS the INTERPRETER motion (motionToSimGcode) — the T# M6
+                                             line has no motion, so the SIM animates the declared changer combo.
+```
+
+### (1) TOOL-NUMBER SOURCE
+`T<params.fixedT> M6` — the op's "change to tool" (fixedT). `fixedT>0` → `T<n> M6` (explicit standalone change). `fixedT=0` ("from program") → the op sits AFTER a program `Txx` that set #1504 → emit a bare `M6` (or require an explicit target). FLAG: a standalone change should carry an explicit tool; "from program" is only valid embedded after a Txx.
+
+### (2) RETIRE THE INLINE DANCE → THE CALL
+The AUTOMATIC methods (firmware/generic/disk) → emit `T<n> M6` + the "calls your installed T.nc" note; the code-preview shows `T# M6` (not the dance). m6 STAYS `M6` (already a delegate call); manual STAYS inline (a hand-swap, no T.nc). METHOD-AGNOSTIC: since the op emits `T# M6`, the METHOD only selects the T.nc content (the changer config) — the op emit is the SAME for all automatic methods.
+
+### (3) THE SIM (the key — decouple emit from preview)
+atcViews computes TWO things for the op: `gcode = T# M6` (the code-preview) + `simGcode = motionToSimGcode(the declared changer combo, ctx)` (the wizard preview). So the preview still shows the plunge/dance/swap by walking the machine's declared changer (settings.atc.grip/motion) via the INTERPRETER — a GENERALIZATION of I4 (which did this for candidate combos only) to ALL atc_change previews. (FLAG: the WIZARD preview animates via the interpreter cleanly; the MAIN-PROGRAM sim, with `T# M6` embedded, fires the swap on #1300 but won't inline the dance UNLESS the played engine EXPANDS T# M6 → the changer motion — a macro-aware-playback follow-up. Options: wizard-preview-only animation now, or macro-expansion later.)
+
+### (4) THE INSTALL-DEPENDENCY = THE SAFETY CRUX (a bare T# M6 SILENTLY NO-OPs if the T.nc isn't installed) — OPTIONS (human decides)
+- **OPT-A — NOTE + WARN (minimal, always-on) [REC baseline]:** the code-preview carries `( T# M6 — runs YOUR installed T.nc; generate + install it via ⚙ Generate T.nc )`; a UI banner on the atc_change op + a setup-checklist item "ATC change macro installed?". No controller needed. Doesn't PROVE installation, but makes the dependency loud + guides the fix.
+- **OPT-B — VERIFY-MACRO-EXISTS (gateway):** when the gateway/exe is connected, query the controller's file list for the installed T.nc / O-number; warn/BLOCK if absent, green-check if present. Strong, but only works connected; needs a controller file query.
+- **OPT-C — INLINE-FALLBACK toggle [REC escape hatch]:** an op/config toggle "call installed macro (T# M6)" vs "inline the change" (emit the interpreter's O-program BODY inline — no O-header/M99, the dance as program lines). For a machine that CAN'T install a macro (offline / no file access). This is the OLD behavior kept as a deliberate, labeled fallback.
+- REC: A (loud note + checklist) as the baseline + C (inline-fallback) as the escape hatch; add B (verify) when the gateway is connected. The human picks the mix.
+
+### (5) ROUND-TRIP (already solved by the marker)
+The op emits `T# M6` + `( @DDCS:1 {op:atc_change, method, fixedT, …} )` — the @DDCS marker (opSchema.js) carries the op params INDEPENDENTLY of the G-code lines, so the reconciler parses the op back from the MARKER (not the T# M6 line). Converging the emit line does NOT affect round-trip — the marker is unchanged. Just verify the marker rides with the T# M6 line.
+
+### (6) BACKWARD-COMPAT (existing placed inline atc_change ops)
+The op params live in the @DDCS marker, so a re-emit produces T# M6. Options: **(a) migrate-on-rebuild** [the op re-emits as T# M6 next time it's rebuilt — clean, one path, but changes existing programs' output on rebuild] vs **(b) stay-inline via a per-op flag** [old ops keep the inline dance; new ops emit T# M6]. REC (a) migrate-on-rebuild (the inline is retired; OPT-C covers machines needing inline). Human decides.
+
+### (7) SCOPE
+ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit becomes IDENTICAL (`T# M6`) regardless of method (the method → the T.nc, not the op). Drawbar-first would be an artificial split (the op emit is method-agnostic). m6/manual unchanged.
+
+### (8) DECOMPOSITION (+ it SUBSUMES the pusher/disk OP-emit)
+- **INC-A (op emit → T# M6):** atcChangeStack's automatic methods emit `T<n> M6` + the note + the marker; code-preview shows T# M6. EMIT-CHANGING → GATE + re-baseline the atc_change goldens/atc-roundtrip (the emitted G-code changes from the dance to T# M6; the @DDCS round-trip stays).
+- **INC-B (the sim):** atcViews drives the atc_change preview via motionToSimGcode(the declared changer) for ALL combos (generalize I4) — the preview shows the dance despite the T# M6 emit.
+- **INC-C (install-safety):** the chosen OPT (A note+checklist / B verify / C inline-fallback).
+- **INC-D (backward-compat + round-trip verify):** migrate-on-rebuild (or the stay-flag) + assert T# M6 + @DDCS parses back.
+- **→ SUBSUMES the pusher/disk OP-emit:** once the op emits `T# M6`, the pusher/disk DANCE is entirely in the T.nc (the interpreter's O-program), so the earlier INC2 (pusher) / INC3 (disk) reduce to JUST the T.nc CODES (the interpreter's pusher/disk emit + their I/O code-source) — the op-emit side is done.
+
+### EFFORT + THE FORKS
+- INC-A SMALL-MEDIUM (retire the automatic stacks → T# M6 + marker; re-baseline goldens). INC-B SMALL (generalize the I4 sim wiring). INC-C = the chosen option's size (A small / B medium+gateway / C medium). INC-D SMALL.
+- **FORK 1 (install-safety):** A note+checklist / B verify-gateway / C inline-fallback — REC A+C, B when connected. HUMAN decides (safety-critical).
+- **FORK 2 (backward-compat):** migrate-on-rebuild vs stay-inline-flag — REC migrate + OPT-C fallback.
+- **FORK 3 (main-program sim):** wizard-preview-only interpreter animation now, vs macro-aware-playback (expand T# M6 in the played engine) later — REC wizard-preview now, flag the expansion.
+- BYTE-CHANGING: INC-A changes the atc_change EMITTED G-code (dance → T# M6) → re-baseline the atc_change goldens/atc-roundtrip DELIBERATELY (like I5b-2a); the @DDCS round-trip + the wizard SIM are preserved/improved. The other wizards' goldens untouched.
+
+**GATED per worker step-5 (a model-level, emit-CHANGING reframe of the shipped ATC-change op; the advisor wants the plan + HUMAN eyes — esp. FORK 1 [install-safety, the crux] + FORK 2 [backward-compat] + FORK 3 [main-sim]). NO code. PASSED BACK the design + the install-safety OPTIONS + the decomposition (subsumes pusher/disk op-emit). Ready to build INC-A on the human's install-safety + scope decisions. ATC-model axis.**
