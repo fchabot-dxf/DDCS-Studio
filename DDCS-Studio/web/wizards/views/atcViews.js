@@ -5,7 +5,7 @@ import { toolProfileSvg } from '../../viz/toolProfile.js';
 import { renderMagazineTable } from '../../ui/ioTable.js';
 import { AtcLengthWizard } from '../atcLengthWizard.js';
 import { AtcWarmupWizard } from '../atcWarmupWizard.js';
-import { AtcChangeWizard, atcChoreography } from '../atcChangeWizard.js';
+import { AtcChangeWizard, atcChoreography, firmwareStationSeed } from '../atcChangeWizard.js';
 import { traceToolpath } from '../../engine/trace.js';
 import { AtcTestWizard } from '../atcTestWizard.js';
 import { AtcToolCheckWizard } from '../atcToolCheckWizard.js';
@@ -273,8 +273,14 @@ export const atcChangeView = {
         // G53 code) on the fixed machine frame. Non-firmware (m6/generic/disk/manual) → clear (no inline push station).
         if (mgr && mgr.previewAtcStation) {
             const choreo = atcChoreography(params);
-            const region = (choreo && choreo.kind === 'push') ? choreo.region(traceToolpath(gcode, { captureVars: choreo.stationVars }).vars || {}) : null;
+            // GUI-1: VAR-SEED the firmware station from the Studio-authored store (settings.atc.firmwareStation) so the
+            // taught points render from the store instead of untaught-0. One store → one seed → two consumers: the
+            // station-highlight trace (below) AND the PLAYED preview engine (previewVarSeed) so the animated push travel
+            // also reaches the taught station. SIM-ONLY — the emit still references the controller's own #1320-1326.
+            const seed = firmwareStationSeed(s.atc && s.atc.firmwareStation);
+            const region = (choreo && choreo.kind === 'push') ? choreo.region(traceToolpath(gcode, { captureVars: choreo.stationVars, createVarStore: seed ? () => new Map(seed) : undefined }).vars || {}) : null;
             mgr.previewAtcStation('atcChangeViz', region);
+            if (mgr.previewVarSeed) mgr.previewVarSeed('atcChangeViz', seed);
             // P-C.1b: arm the tool-swap too — a REAL tool change (T#/M6) in the played program retires the old tool to
             // this station + puts the new tool on the spindle. The isolated firmware op (no tool change) shows no swap.
             if (mgr.previewAtcSwap) mgr.previewAtcSwap('atcChangeViz', choreo, region);

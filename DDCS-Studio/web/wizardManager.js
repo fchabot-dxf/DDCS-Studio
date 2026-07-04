@@ -476,6 +476,10 @@ export class WizardManager {
             host.__panel = createPreviewPanel(host, {
                 getGcode: () => host.__gcode || '',
                 getStart: () => host.__start,
+                // Sim-only var seed (GUI-1): the ATC firmware station's #1306/#1320-1326, authored in Studio, so the
+                // played push travel reaches the taught station instead of untaught-0. Read fresh each resetState (play),
+                // so a later previewVarSeed takes effect without rebuilding the panel. Never emitted (SIM only).
+                createVarStore: () => (host.__varSeed ? new Map(host.__varSeed) : new Map()),
                 // Per-pass start hints (multi-point probe): one start per manual REPOSITION so 3-point/A-B probes
                 // land at DISTINCT points (else the degenerate single-start solve). Optional (most ops are 1-pass).
                 getStartHints: () => host.__startHints,
@@ -519,6 +523,16 @@ export class WizardManager {
         const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
         const viz = host && host.__panel && host.__panel.viz;
         if (viz && viz.setMagazine) viz.setMagazine(pockets || []);
+    }
+
+    // Seed the sim's controller vars for this op's preview (GUI-1) — e.g. the ATC firmware station #1306/#1320-1326
+    // authored in Studio (settings.atc.firmwareStation), so the played push travel reaches the TAUGHT station instead
+    // of untaught-0. seed = an array of [varNumber, value] pairs (or null to clear). SIM-ONLY — never emitted, never
+    // pushed to the controller. Call AFTER preview3D so the host exists.
+    previewVarSeed(containerId, seed) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        if (host) host.__varSeed = Array.isArray(seed) && seed.length ? seed : null;
     }
 
     // Highlight the ATC FIRMWARE push station (the taught #1320-1326 region) in the 3D preview on the machine frame.

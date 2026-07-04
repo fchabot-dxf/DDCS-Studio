@@ -307,6 +307,24 @@ export const ATC_CHOREOGRAPHY = {
 /** The ATC choreography descriptor for an op's params (via resolveMethod), or null (no inline choreography). */
 export const atcChoreography = (params = {}) => ATC_CHOREOGRAPHY[resolveMethod(params)] || null;
 
+// The INVERSE of ATC_CHOREOGRAPHY.firmware.region — map a Studio-authored firmwareStation store
+// { safeZ, pushStart:{x,y}, pushEnd:{x,y}, retreat:{x,y} } back onto its controller vars (#1306 + #1320-1326) as
+// [var, value] pairs, so the SIM can be VAR-SEEDED from the store (GUI-1): author the station in Studio → the preview
+// renders it from the store instead of untaught-0 (the P-C.1a stuck-at-0 limitation). SIM-ONLY — never emitted: the
+// firmware macro still REFERENCES the controller's own #1320-1326 (byte-identical O10102); this only feeds the preview
+// engine + the station-highlight trace, and is NEVER pushed to the controller (that gated write is a later step).
+export function firmwareStationSeed(fw) {
+    if (!fw) return null;
+    const n = (v) => Number(v) || 0;
+    const p = fw.pushStart || {}, e = fw.pushEnd || {}, r = fw.retreat || {};
+    return [
+        [1306, n(fw.safeZ)],
+        [1320, n(p.x)], [1321, n(p.y)],
+        [1323, n(e.x)], [1324, n(e.y)],
+        [1325, n(r.x)], [1326, n(r.y)],
+    ];
+}
+
 export function atcChangeStack(params = {}) {
     switch (resolveMethod(params)) {
         case 'm6': return m6Stack(params);

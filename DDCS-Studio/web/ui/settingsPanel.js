@@ -13,6 +13,7 @@ import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile, registerProfil
 import { listPosts, getActivePostId, setActivePostId, isPostVerified, getDialect } from '../wizards/dialects/index.js';
 import { makeClient } from '../shared/js/client.js';
 import { renderIoTable, renderMagazineTable } from './ioTable.js';
+import { renderAtcSetupCanvas, defaultFirmwareStation } from '../viz/atcSetupCanvas.js';
 import { renderWizardLibrary } from './wizardManagerPanel.js';
 import { toolProfileSvg } from '../viz/toolProfile.js';
 import { THEMES } from './themes.js';
@@ -1041,6 +1042,12 @@ function buildSettingsOverlay() {
                         <button class="toolbar-btn settings-io" id="set_atc_add_btn">➕ Add tool changer (ATC)</button>
                     </div>
                     <div id="set_atc_magazine_wrap" style="display:none">
+                        <div class="settings-section">
+                            <div class="settings-section-title">MACHINE-FRAME LAYOUT</div>
+                            <div class="settings-hint">Top-down of the machine envelope — <b>drag</b> the pockets, the disk pickup, and the firmware push-station points (start → end → retreat) into place instead of typing machine coords. Positions write to the magazine + station below. Sim-side only — nothing is written to the controller.</div>
+                            <div id="atc_setup_canvas" style="width:100%; height:300px; border:1px solid var(--border,#39424e); border-radius:6px; background:var(--panel-2,#12161c); touch-action:none;"></div>
+                            <label class="settings-row" style="margin-top:8px; gap:6px; align-items:center;">Firmware safe-Z (mm · #1306)<input type="number" id="atc_fw_safez" step="0.1" class="num-input" style="width:100px;"></label>
+                        </div>
                         <div class="settings-section">
                             <div class="settings-section-title">TOOL MAGAZINE</div>
                             <div class="settings-hint">Straight = each pocket has a park XYZ; disk = one pickup + rotate-to-pocket (auto-adds rotate / index I/O). The drawbar lives in Output.</div>
@@ -2116,7 +2123,7 @@ function wireSettingsOverlay(ov) {
         if (id === 'set_tab_machine') renderMachineGui();   // axis list tracks motors; re-render on open
         if (id === 'set_tab_input') renderIoTable(ov.querySelector('#io_input_table'), 'input', getInputs(), syncIO);
         if (id === 'set_tab_output') renderIoTable(ov.querySelector('#io_output_table'), 'output', getOutputs(), syncIO);
-        if (id === 'set_tab_atc') renderMagazineTable(ov.querySelector('#atc_magazine'), _ddcsSettings.atc, atcOnChange);
+        if (id === 'set_tab_atc') renderAtcSetup();
         if (id === 'set_tab_variables') renderVarList(q('set_var_search') ? q('set_var_search').value : '');   // build lazily on open
         if (id === 'set_tab_wizards') renderWizardLibrary(ov.querySelector('#wizard_library_manager'));   // the wizard-bar library manager
     }
@@ -2201,6 +2208,27 @@ function wireSettingsOverlay(ov) {
         }
         saveSettings();
     }
+
+    // Render BOTH ATC magazine views from the ONE source (settings.atc): the numeric magazine table + the machine-frame
+    // DRAG canvas (GUI-1). A drag on the canvas or an edit in the table persists (atcOnChangeFull) and refreshes both.
+    function renderAtcSetup() {
+        const table = ov.querySelector('#atc_magazine');
+        const canvas = ov.querySelector('#atc_setup_canvas');
+        if (table) renderMagazineTable(table, _ddcsSettings.atc, atcOnChangeFull);
+        if (canvas) renderAtcSetupCanvas(canvas, { atc: _ddcsSettings.atc, machine: _ddcsSettings.machine || {}, onChange: atcOnChangeFull });
+        const sz = ov.querySelector('#atc_fw_safez');
+        const fw = _ddcsSettings.atc && _ddcsSettings.atc.firmwareStation;
+        if (sz) sz.value = fw && fw.safeZ != null ? fw.safeZ : '';
+    }
+    function atcOnChangeFull() { atcOnChange(); renderAtcSetup(); }
+    // Firmware safe-Z (#1306) — a top-down drag can't set Z, so it's a plain field. Setting it materializes the station
+    // store (from the on-canvas defaults) so the store, the canvas points and the var-seed all agree.
+    { const sz = ov.querySelector('#atc_fw_safez'); if (sz) sz.addEventListener('change', () => {
+        const a = _ddcsSettings.atc; if (!a) return;
+        a.firmwareStation = a.firmwareStation || defaultFirmwareStation(_ddcsSettings.machine || {});
+        a.firmwareStation.safeZ = sz.value === '' ? null : Number(sz.value);
+        saveSettings(); renderAtcSetup();
+    }); }
 
 }
 

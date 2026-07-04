@@ -359,7 +359,9 @@ export class FeatureCanvas {
                 if (col) { el.style.fill = col; el.style.stroke = col; }   // inline beats .fc-handle-move (gold); no source → CSS default
                 handles.appendChild(el);
             } else {
-                handles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 6, class: 'fc-handle', ...hid }));
+                const el = svgEl('circle', { cx: c.x, cy: c.y, r: 6, class: 'fc-handle', ...hid });
+                if (col) { el.style.fill = col; el.style.stroke = col; }   // a GROUP-coloured point handle (e.g. the ATC setup canvas's blue pockets vs orange station); inline beats the .fc-handle CSS default. Uncoloured handles are unaffected.
+                handles.appendChild(el);
             }
             // Raw axis-delta readouts (the grid "dx"/"dy" labels) are unhelpful clutter — the handle stays
             // draggable (it still drives its field), we just drop its on-canvas text. Useful named dimensions
