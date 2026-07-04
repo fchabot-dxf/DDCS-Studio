@@ -685,7 +685,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     function setActive(on) {
         active = !!on;
-        if (!active) { stopPlay(); autoStarted = false; if (viz) viz.setActive(false); return; }
+        if (!active) { stopPlay(); autoStarted = false; if (viz) viz.setActive(false); if (deviceIoListener) { window.removeEventListener('io_change', deviceIoListener); deviceIoListener = null; } return; }   // t181 tidy: drop the ATC device io_change listener when the preview deactivates (the view re-arms via setAtcSwap on next update)
         if (mode === '3d') { const v = ensureViz(); if (v) v.setActive(true); }
         else if (mode === '2d' && cv2d) cv2d.style.display = '';   // 2D default: ensure the canvas is visible
         setGcode();

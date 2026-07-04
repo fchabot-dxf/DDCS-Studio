@@ -6434,3 +6434,52 @@ Distinct colors from the tool/magazine (amber), highlight (teal-green), retired 
 **NOTE:** the LOOK (box-piston + cylinder-pin, sizes/colors) is a first-cut design call — react to it; positions/transforms/arming are correct + asserted. The exact engage/release DIRECTION follows the io_change state (per the dispatch), not the physical sequence semantics.
 
 **PASSED BACK for advisor review. NEXT (same pattern): the dust cover + vacuum indicator + M19 spindle-orient devices, then P-C.2c (surface the live IO in the io tab). SIM-FRAME axis; authoring axis stays done + disjoint.**
+
+## 🔨 turn 181 (cycle 13) — P-C.2c: SURFACE the live ATC IO — VERIFY + FLAG THE DESIGN (non-trivial → mock for the human BEFORE building) + the low-pri listener tidy. Suite untouched (1-line tidy verified against 21 ATC/io/preview specs). SIM/UI only.
+
+### VERIFY (driven-confirmed, not just code-read): the io tab does NOT surface the ATC pneumatic IO today.
+The io panel (ui/ioTab.js) renders 24 NUMBERED inputs + 24 NUMBERED outputs. Each numbered pin reflects its state via `resolveVirtualPin(pin) → HARDWARE_PIN_MAP` — which maps ONLY pins 4/5 (OUT_SPINDLE_UNCLAMP/CLAMP, IN_PROBE/DRAWBAR). The ATC dialect's SEMANTIC pins — OUT_PUSHER, OUT_LOCATING_PIN, OUT_VACUUM, OUT_DUST_COVER, OUT_SPINDLE_ORIENT, OUT_GRIPPER_* + the sensor inputs IN_SPINDLE_STOPPED / IN_DRAWBAR_* / IN_MAG_* / IN_GRIPPER_* — are NOT in HARDWARE_PIN_MAP + NOT numbered, so NO numbered pin reflects them. DROVE IT: fired OUT_PUSHER/OUT_LOCATING_PIN/OUT_VACUUM/OUT_DUST_COVER/OUT_SPINDLE_ORIENT → the panel showed **lit output pins = [] · titles mentioning the pneumatics = []**. So during a firmware push the ATC IO is INVISIBLE in the panel (P-C.2a made them fire io_change + P-C.2b animates the 3D devices, but the IO TAB surfaces nothing). => surfacing them is a NON-TRIVIAL enhancement (a new UI section / sequence view) → FLAGGED for the human per the dispatch.
+
+### THE DESIGN OPTIONS (mock — the human's call; look-INDEPENDENT of the 3D device style):
+**(A) an "ATC" SECTION of semantic-pin LEDs (live STATE):**
+```
+┌ VIRTUAL I/O ────────────────────┐
+│ INPUTS   ①②③④⑤⑥ … ㉔            │
+│ OUTPUTS  ①②③④⑤⑥ … ㉔            │
+│ ── ATC · M350 change ─────────  │
+│ OUT ● pusher    ● locate-pin    │
+│     ○ vacuum    ● dust-cover    │
+│     ● spindle-orient  ○ gripper │
+│ IN  ○ spindle-stop ○ drawbar-op │
+│     ○ mag-open  ○ gripper-open  │
+└─────────────────────────────────┘   ● lit=ON, live via the existing io_change refresh
+```
+Surfaces + GROUPS the semantic pins, live. Reads as STATE, not order. Effort: small-MEDIUM (derive the pin list from ATC_DIALECT + reflect ioState in refresh()).
+
+**(B) an ATC CHANGE-SEQUENCE LOG (the handshake IN ORDER) — most on-target for "readable as a sequence":**
+```
+┌ VIRTUAL I/O ────────────────────┐
+│ INPUTS/OUTPUTS  ①②③ … ㉔         │
+│ ── ATC change log ────────────  │
+│  M19  spindle-orient   ▸ ON     │
+│  M159 vacuum           ▸ OFF    │
+│  M157 locating-pin     ▸ CLOSE  │
+│  M160 pusher           ▸ OPEN   │
+│  ⏱ G04 dwell                    │
+│  M163 dust-cover       ▸ OFF    │
+│  M156 locating-pin     ▸ OPEN   │
+│  M161 pusher           ▸ CLOSE  │  ← newest, auto-scroll
+└─────────────────────────────────┘   each io_change appended in order; clears on a fresh run
+```
+Directly delivers "watch the handshake AS A SEQUENCE" + syncs to the 3D device timing. Effort: MEDIUM (io_change subscribe + a pin→M-code/semantic label map + a scrolling log + clear-on-run-start).
+
+**(C) MINIMAL — a one-line "last ATC flip" strip that pulses:**
+```
+│ ── ATC ──  ▸ M156 locating-pin OPEN │   (just the last flip, pulses; smallest build)
+```
+
+### RECOMMENDATION: **(B) the sequence log** — the dispatch's core ask is "readable AS A SEQUENCE / watch the handshake, not just the arm," which (A)'s state-LEDs don't convey (they show WHAT is on, not the ORDER). Optionally (A)+(B): the semantic LEDs for live state + the log for the order. All are UI-additive to ioTab.js, SIM/UI-only (emit byte-identical), and reuse the io_change stream P-C.2a already fires. Ready to build on the human's pick.
+
+### DID (low-pri tidy, natural hook — NOT infra): the P-C.2b `deviceIoListener` now unsubscribes on `setActive(false)` (the preview deactivating) — a clean 1-line hook; the atc_change view re-arms via setAtcSwap on its next update. Was harmless (one per panel, non-accumulating); now it's dropped when you leave the preview. Verified against 21 ATC/io/preview specs (green).
+
+**GATED per worker step-5 (the advisor explicitly wants to bring the design to the human before a non-trivial UI build). NO big build. PASSED BACK the finding + mocked options + recommendation + the tidy. Ready to build the chosen option immediately. SIM-FRAME axis; authoring axis stays done + disjoint.**
