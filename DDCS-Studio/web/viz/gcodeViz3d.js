@@ -1390,7 +1390,7 @@ export class GcodeViz3D {
      * teal-green so it reads apart from the amber magazine / cyan path / yellow stock. region = { z, start{x,y},
      * end{x,y}, retreat{x,y} } (machine coords) or null to clear.
      */
-    highlightStation(region) {
+    highlightStation(region, label) {
         const THREE = this.THREE;
         if (this._stationGroup) {
             this.scene.remove(this._stationGroup);
@@ -1417,7 +1417,7 @@ export class GcodeViz3D {
         });
         // label above the swap-stroke midpoint (start ↔ end)
         const a = pts[0], b = pts[1] || pts[0];
-        const sp = this._makeTextSprite('PUSH STATION', '#35ff9e');
+        const sp = this._makeTextSprite(label || 'PUSH STATION', '#35ff9e');
         sp.position.set((Number(a.x) + Number(b.x)) / 2, (Number(a.y) + Number(b.y)) / 2, z + 22); sp.renderOrder = 18; grp.add(sp);
         this._stationGroup = grp; this.scene.add(grp);
         this.render();

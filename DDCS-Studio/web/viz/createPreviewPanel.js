@@ -767,14 +767,37 @@ export function createPreviewPanel(container, opts = {}) {
         if (!atcChoreo || !engine) return;
         const cur = engine.vars.get(1300);
         if (cur == null || cur === lastTool) return;
-        if (lastTool != null) doToolSwap(lastTool, cur);   // old → new (not the initial tool set: lastTool was null)
+        if (lastTool == null) {
+            // the INITIAL spindle tool. For PICK-PLACE, empty ITS pocket (the tool is in the spindle, not the magazine).
+            if (atcChoreo.kind === 'pick-place' && viz && viz.setMagazine) viz.setMagazine(magPocketList(new Set(magToolNums().filter((t) => t !== cur))));
+        } else doToolSwap(lastTool, cur);   // old → new (a real tool change)
         lastTool = cur;
     }
+    // ATC magazine helpers (pick-place occupancy). Read the config straight from settings.atc so the panel owns the
+    // occupancy render during play (the view draws the FULL magazine; the swap re-renders the OCCUPIED subset).
+    const atcCfg = () => (window.ddcsGetSettings && window.ddcsGetSettings().atc) || {};
+    const magToolNums = () => (Array.isArray(atcCfg().magazine) ? atcCfg().magazine : []).filter((p) => p && p.tool !== '' && p.tool != null).map((p) => Number(p.tool));
+    function magPocketList(occupied) {   // occupied = Set of tool numbers → the setMagazine pocket list for those pockets
+        const a = atcCfg(); const byNum = {}; (Array.isArray(a.tools) ? a.tools : []).forEach((t) => { if (t && t.num != null && t.num !== '') byNum[Number(t.num)] = t; });
+        return (Array.isArray(a.magazine) ? a.magazine : [])
+            .filter((p) => p && p.tool !== '' && p.tool != null && occupied.has(Number(p.tool)))
+            .map((p) => { const t = byNum[Number(p.tool)] || {}; return { x: p.x, y: p.y, z: p.z, pocket: p.pocket, tool: { type: t.type || 'endmill', dia: Number(t.dia) || 6, length: Number(t.length) || 30, num: Number(p.tool) } }; });
+    }
+    const pocketOf = (toolN) => { const p = (Array.isArray(atcCfg().magazine) ? atcCfg().magazine : []).find((q) => Number(q.tool) === Number(toolN)); return p ? { x: Number(p.x) || 0, y: Number(p.y) || 0, z: Number(p.z) || 0 } : null; };
     function doToolSwap(oldN, newN) {
         const tools = toolsForViz();
         const spec = (n) => tools.find((t) => t && Number(t.num) === Number(n)) || { type: 'endmill', dia: 6, length: 35 };
-        if (viz && viz.showRetiredTool) viz.showRetiredTool(spec(oldN), atcStation);   // OLD retired at the push station
-        if (viz && viz.setSimTool) viz.setSimTool(spec(newN));                          // NEW on the spindle (part frame)
+        if (atcChoreo && atcChoreo.kind === 'pick-place') {
+            // PICK-PLACE: the OLD tool RETURNS to its pocket + the NEW tool LEAVES its pocket → onto the spindle. So the
+            // magazine occupancy = all tools MINUS the new one (now on the spindle); the old is back in its pocket.
+            if (viz && viz.setMagazine) viz.setMagazine(magPocketList(new Set(magToolNums().filter((t) => t !== newN))));
+            if (viz && viz.highlightStation) { const o = pocketOf(oldN), n = pocketOf(newN); if (o || n) viz.highlightStation({ z: Math.max((o || n).z, (n || o).z), start: o || n, end: n || o, retreat: n || o }, 'TOOL CHANGE'); }
+            if (viz && viz.setSimTool) viz.setSimTool(spec(newN));   // NEW on the spindle (part frame — cross-frame)
+        } else {
+            // PUSH (firmware): retire the OLD tool to the push station (P-C.1b — UNCHANGED).
+            if (viz && viz.showRetiredTool) viz.showRetiredTool(spec(oldN), atcStation);
+            if (viz && viz.setSimTool) viz.setSimTool(spec(newN));
+        }
     }
 
     return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setAtcSwap, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds, get viz() { return viz; }, get engine() { return engine; }, el: container };
