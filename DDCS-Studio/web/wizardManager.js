@@ -521,6 +521,16 @@ export class WizardManager {
         if (viz && viz.setMagazine) viz.setMagazine(pockets || []);
     }
 
+    // Highlight the ATC FIRMWARE push station (the taught #1320-1326 region) in the 3D preview on the machine frame.
+    // Opt-in (the atc_change firmware method only) — call AFTER preview3D. region = { z, start, end, retreat } (machine
+    // coords) or null to clear. The view resolves it from the op's declared choreography (ATC_CHOREOGRAPHY.firmware).
+    previewAtcStation(containerId, region) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const viz = host && host.__panel && host.__panel.viz;
+        if (viz && viz.highlightStation) viz.highlightStation(region || null);
+    }
+
     // Show/hide the 4th-axis rig (chuck + tailstock) around a cylinder stock in the 3D preview. Opt-in (rotary
     // probe wizards only) — call AFTER preview3D so the panel/viz exists.
     previewRotaryFixture(containerId, on) {

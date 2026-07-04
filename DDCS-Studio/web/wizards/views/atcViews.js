@@ -5,7 +5,8 @@ import { toolProfileSvg } from '../../viz/toolProfile.js';
 import { renderMagazineTable } from '../../ui/ioTable.js';
 import { AtcLengthWizard } from '../atcLengthWizard.js';
 import { AtcWarmupWizard } from '../atcWarmupWizard.js';
-import { AtcChangeWizard } from '../atcChangeWizard.js';
+import { AtcChangeWizard, atcChoreography } from '../atcChangeWizard.js';
+import { traceToolpath } from '../../engine/trace.js';
 import { AtcTestWizard } from '../atcTestWizard.js';
 import { AtcToolCheckWizard } from '../atcToolCheckWizard.js';
 import { AtcTableWizard } from '../atcTableWizard.js';
@@ -266,6 +267,16 @@ export const atcChangeView = {
         if (mgr) mgr.preview3D(gcode, 'atcChangeViz');
         if (mgr) mgr.previewMachine('atcChangeViz', true);   // ATC = machine-frame: always show the envelope
         if (mgr) mgr.previewMagazine('atcChangeViz', magazinePockets(s.atc || {}));   // pockets + tools in 3D on the envelope
+        // P-C.1a: the op's DECLARED choreography (ATC_CHOREOGRAPHY, keyed on the method) drives the sim visual. FIRMWARE
+        // = a fixed-station push → highlight the taught #1320-1326 station region (resolved from a trace of this op's
+        // G53 code) on the fixed machine frame. Non-firmware (m6/generic/disk/manual) → clear (no inline push station).
+        if (mgr && mgr.previewAtcStation) {
+            const choreo = atcChoreography(params);
+            if (choreo && choreo.kind === 'push') {
+                const vars = traceToolpath(gcode, { captureVars: choreo.stationVars }).vars || {};
+                mgr.previewAtcStation('atcChangeViz', choreo.region(vars));
+            } else mgr.previewAtcStation('atcChangeViz', null);
+        }
         // Magazine strip: show the pockets + tools; highlight the fixed test tool being swapped to.
         const ft = Number(el('atc_change_fixedt')?.value || 0);
         const rack = el('atcChangeTools');

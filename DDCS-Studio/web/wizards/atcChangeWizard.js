@@ -267,11 +267,42 @@ function firmwareStack(params) {
 
 // Map a saved op onto a change METHOD. New ops carry params.method directly; OLD saved ops (params.mode /
 // params.magType, no method) map on so existing blocks/files keep emitting the same stack.
-function resolveMethod(params) {
+export function resolveMethod(params) {
     if (params.method) return params.method;
     if (params.mode === 'auto') return (params.magType === 'disk') ? 'disk' : 'generic';
     return 'manual';   // legacy default (mode unset or 'manual')
 }
+
+// The per-method ATC CHOREOGRAPHY seam (P-C.1a, t171) — a DECLARED registry (keyed on resolveMethod) that says HOW
+// each change method animates in the SIM, so the visual follows the op's DECLARED method (valid-by-construction) with
+// NO hard-coded animation. This increment fills the FIRMWARE entry — a real INLINE pneumatic PUSH at a taught fixed
+// station (highlight the push region, reuse the already-animated G53 push travel). `m6` is a macro CALL (the controller
+// runs T.nc — nothing to animate inline). generic/disk/manual are no-op for now (P-C.3). The tool-SWAP (trigger +
+// identity) is a separate open decision (P-C.1b) and is intentionally NOT here yet. SIM/VISUAL only — no emit impact.
+//   kind: 'push'       → a fixed-station push; `stationVars` = the taught G53 station params to read; `region(vars)`
+//                        builds the highlight from those resolved values (all MACHINE coords → the FIXED machine frame).
+//   kind: 'macro-call' → the controller performs the change (M6/T.nc); no inline choreography.
+export const ATC_CHOREOGRAPHY = {
+    firmware: {
+        kind: 'push',
+        label: 'fixed-station push (O10102)',
+        stationVars: [1306, 1320, 1321, 1323, 1324, 1325, 1326],
+        // push-start #1320/1321 → push-end #1323/1324 (the swap stroke) → retreat #1325/1326, all at safe-Z #1306.
+        region: (v) => ({
+            z: Number(v[1306]) || 0,
+            start: { x: Number(v[1320]) || 0, y: Number(v[1321]) || 0 },
+            end: { x: Number(v[1323]) || 0, y: Number(v[1324]) || 0 },
+            retreat: { x: Number(v[1325]) || 0, y: Number(v[1326]) || 0 },
+        }),
+    },
+    m6: { kind: 'macro-call', label: 'controller M6 (T.nc)' },
+    generic: null,
+    disk: null,
+    manual: null,
+};
+
+/** The ATC choreography descriptor for an op's params (via resolveMethod), or null (no inline choreography). */
+export const atcChoreography = (params = {}) => ATC_CHOREOGRAPHY[resolveMethod(params)] || null;
 
 export function atcChangeStack(params = {}) {
     switch (resolveMethod(params)) {

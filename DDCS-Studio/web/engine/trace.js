@@ -14,6 +14,8 @@
  *   opts.wcsOffset      work origin in MACHINE coords (machine coord of part-zero) → G53 machine-frame moves
  *                       draw in the part/WCS frame instead of raw machine coords. Default = origin (no-op).
  *   opts.createVarStore seed controller params (#632/#1078/…) so "read from controller" feeds resolve
+ *   opts.captureVars    array of #var numbers → the returned result gets `.vars = {n: value}` (RESOLVED after the
+ *                       trace). Used by the ATC station highlight to read the taught G53 station params (#1320-1326).
  */
 import { GcodeExecutionEngine } from './GcodeExecutionEngine.js';
 
@@ -27,6 +29,10 @@ export function traceToolpath(text, opts = {}) {
     });
     eng._passStarts = opts.passStarts || null;   // Part 1: per-pass starts → the probe collision fires from each pass's start ②
     const result = eng.trace(String(text || ''));
+    if (Array.isArray(opts.captureVars)) {   // opt-in: read resolved #vars (e.g. the ATC station #1320-1326) before disposing
+        result.vars = {};
+        for (const n of opts.captureVars) result.vars[n] = Number(eng.vars.get(n)) || 0;
+    }
     eng.dispose();   // transient per-call engine — detach its io_change bridge listener so it doesn't leak
     return result;
 }

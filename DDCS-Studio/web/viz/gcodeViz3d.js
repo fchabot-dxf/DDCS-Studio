@@ -1379,6 +1379,47 @@ export class GcodeViz3D {
         this.render();
     }
 
+    /**
+     * ATC FIRMWARE push-station highlight (P-C.1a, t171): mark the TAUGHT fixed-station push region — push-start →
+     * push-end (the swap stroke) → retreat — on the FIXED machine frame at RAW machine coords, exactly like the
+     * magazine + envelope (the station #1320-1326 are MACHINE/G53 coords). This is the firmware method's declared
+     * choreography (ATC_CHOREOGRAPHY.firmware); the already-animated G53 push travel lands here (post-P-A). Distinct
+     * teal-green so it reads apart from the amber magazine / cyan path / yellow stock. region = { z, start{x,y},
+     * end{x,y}, retreat{x,y} } (machine coords) or null to clear.
+     */
+    highlightStation(region) {
+        const THREE = this.THREE;
+        if (this._stationGroup) {
+            this.scene.remove(this._stationGroup);
+            this._stationGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose && m.dispose()); });
+            this._stationGroup = null;
+        }
+        this._station = region || null;
+        if (!region) { this.render(); return; }
+        const col = 0x35ff9e, z = Number(region.z) || 0;
+        const pts = ['start', 'end', 'retreat'].map((k) => region[k]).filter((p) => p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y)));
+        if (!pts.length) { this.render(); return; }
+        const grp = new THREE.Group();
+        // the push PATH (start → end → retreat) as a bold line at the station Z, on the fixed machine floor
+        const lp = [];
+        pts.forEach((p) => lp.push(Number(p.x), Number(p.y), z));
+        const lgeo = new THREE.BufferGeometry(); lgeo.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
+        const line = new THREE.Line(lgeo, new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthTest: false }));
+        line.renderOrder = 16; grp.add(line);
+        // a sphere marker at each taught point; the push-END (the swap stroke's end, index 1) is emphasised
+        pts.forEach((p, i) => {
+            const r = i === 1 ? 5 : 3.5;
+            const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 16), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: i === 1 ? 0.9 : 0.55, depthTest: false }));
+            m.position.set(Number(p.x), Number(p.y), z); m.renderOrder = 17; grp.add(m);
+        });
+        // label above the swap-stroke midpoint (start ↔ end)
+        const a = pts[0], b = pts[1] || pts[0];
+        const sp = this._makeTextSprite('PUSH STATION', '#35ff9e');
+        sp.position.set((Number(a.x) + Number(b.x)) / 2, (Number(a.y) + Number(b.y)) / 2, z + 22); sp.renderOrder = 18; grp.add(sp);
+        this._stationGroup = grp; this.scene.add(grp);
+        this.render();
+    }
+
     // Re-pivot the orbit on the point under the cursor (the stock surface if hovered,
     // otherwise the point at that screen location on the focus plane). Camera stays put.
     _setPivotFromCursor(e) {
