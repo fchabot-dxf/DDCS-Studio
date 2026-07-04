@@ -17,6 +17,7 @@
  * API: window.ioPanel = { show, hide, toggle, setWait, isAutoSensors }
  */
 import { injectVirtualInput, getVirtualInput, ioState, resolveVirtualPin } from '../engine/virtualIO.js';
+import { ATC_DIALECT } from '../engine/GcodeExecutionEngine.js';   // the M-code → semantic-pin dialect (the config↔sim JOIN key)
 
 const IO_PANEL_POS_KEY = 'ddcs_io_panel_pos';
 const PIN_COUNT = 24;
@@ -26,6 +27,7 @@ class IOPanel {
         this.el = null;
         this.intervalId = null;
         this.waitPin = null;     // numeric pin the engine is parked on (null = none)
+        this._atcMap = {};       // numbered ATC output pin → { label, semanticPin } (from the Settings IO config)
     }
 
     _build() {
@@ -141,6 +143,46 @@ class IOPanel {
         return !!map.get(resolveVirtualPin(pin, mode)) || !!map.get(pin) || !!map.get(String(pin));
     }
 
+    /** Derive the ATC pin map from the Settings IO config: numbered OUTPUT pin → { label, semanticPin }. ONE SOURCE —
+     *  the config supplies the label + assigned pin; the JOIN is the row's onCode (an M-code) → the engine ATC_DIALECT
+     *  entry → the sim's OUT_ semantic pin (what the sim actually drives when that M-code fires). So a config Pusher pin
+     *  (onCode M160) reflects OUT_PUSHER live. Blank/unassigned pins → not mapped (labels appear once a pin is assigned). */
+    _deriveAtcMap() {
+        this._atcMap = {};
+        const s = (typeof window !== 'undefined' && window.ddcsGetSettings) ? (window.ddcsGetSettings() || {}) : {};
+        const outs = Array.isArray(s.outputs) ? s.outputs : [];
+        for (const r of outs) {
+            const pin = parseInt(r && r.pin, 10);
+            if (!Number.isFinite(pin) || pin < 1) continue;
+            const m = parseInt(String((r && r.onCode) || '').replace(/[^0-9]/g, ''), 10);
+            const d = ATC_DIALECT[m];
+            if (d && d.kind === 'output') this._atcMap[pin] = { label: r.label || d.label, semanticPin: d.pin };
+        }
+    }
+
+    /** Label each ASSIGNED ATC output pin with its config function (+ the semantic pin in the title). Re-derives the
+     *  map (config can change), so call it on show / when the config may have changed. */
+    _applyAtcLabels() {
+        if (!this.el) return;
+        this._deriveAtcMap();
+        this.el.querySelectorAll('.io-output').forEach((div) => {
+            const pin = parseInt(div.dataset.pin, 10);
+            const a = this._atcMap[pin];
+            let lbl = div.querySelector('.io-atc-label');
+            if (a) {
+                if (!lbl) { lbl = document.createElement('span'); lbl.className = 'io-atc-label'; div.appendChild(lbl); }
+                lbl.textContent = a.label;
+                div.classList.add('io-atc');
+                div.title = `OUT${pin} — ${a.label} (${a.semanticPin})`;
+            } else {
+                if (lbl) lbl.remove();
+                div.classList.remove('io-atc');
+                const outName = resolveVirtualPin(pin, 'OUT');
+                div.title = `OUT${pin}${outName !== 'OUT_' + pin ? ' — ' + outName : ''}`;
+            }
+        });
+    }
+
     refresh() {
         if (!this.el) return;
         this.el.querySelectorAll('.io-input').forEach((btn) => {
@@ -150,7 +192,10 @@ class IOPanel {
         });
         this.el.querySelectorAll('.io-output').forEach((div) => {
             const pin = parseInt(div.dataset.pin, 10);
-            div.classList.toggle('active', this._pinState(ioState.outputs, pin, 'OUT'));
+            // an ATC-config pin reflects its SEMANTIC output (via the M-code join) so it lights when the sim fires that
+            // pneumatic; any other pin keeps the numbered/HARDWARE_PIN_MAP state.
+            const a = this._atcMap && this._atcMap[pin];
+            div.classList.toggle('active', a ? !!ioState.outputs.get(a.semanticPin) : this._pinState(ioState.outputs, pin, 'OUT'));
         });
     }
 
@@ -192,6 +237,7 @@ class IOPanel {
             this.el.classList.remove('embedded');
         }
         this.el.classList.add('visible');
+        this._applyAtcLabels();   // label the assigned ATC output pins from the current config (one-source)
         this.refresh();
         // Poll while visible: outputs change without an io_change event (M10/M11),
         // and the truth table flips inputs on timers.

@@ -18,10 +18,10 @@ const INPUT_TYPES = [
     { type: 'estop',  label: 'E-stop' },
     { type: 'sensor', label: 'Sensor' },
 ];
-const OUTPUT_TYPES = [
+export const OUTPUT_TYPES = [
     { type: 'coolant',   label: 'Coolant',              onCode: 'M8',   offCode: 'M9' },
     { type: 'drawbar',   label: 'Drawbar (ATC)',        onCode: 'M154', offCode: 'M155' },
-    { type: 'dustcover', label: 'Dust cover (ATC)',     onCode: 'M305', offCode: 'M306' },
+    { type: 'dustcover', label: 'Dust cover (ATC)',     onCode: 'M162', offCode: 'M163' },
     { type: 'rotate',    label: 'Carousel rotate (ATC)', onCode: '',    offCode: '' },
     { type: 'mist',      label: 'Mist',                 onCode: 'M7',   offCode: 'M9' },
     { type: 'custom',    label: 'Custom',               onCode: '',     offCode: '' },

@@ -4336,6 +4336,10 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .io-input.active .io-led-indicator { background: #4dff7a; box-shadow: 0 0 6px #4dff7a; border-color: #4dff7a; }
 .io-output.active .io-led-indicator { background: #ff9a0d; box-shadow: 0 0 6px #ff9a0d; border-color: #ff9a0d; }
 .io-led.wait { border-color: #ffd166; animation: ioWaitPulse 0.9s ease-in-out infinite; }
+/* ATC output pins labelled from the Settings IO config (P-C.2c) — the function name beside the pin number. */
+.io-output.io-atc { border-color: #4a6a8c; }
+.io-atc-label { font-size: 10px; color: #9fb4c9; letter-spacing: 0.2px; }
+.io-output.io-atc.active .io-atc-label { color: #ffcf9a; }
 @keyframes ioWaitPulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(255, 209, 102, 0); }
     50% { box-shadow: 0 0 8px 2px rgba(255, 209, 102, 0.7); }
