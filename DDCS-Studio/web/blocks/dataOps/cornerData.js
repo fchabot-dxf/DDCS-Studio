@@ -162,6 +162,22 @@ function cornerSimStartsProvider(params, stock) {
     });
 }
 
+/** The STRUCTURAL toggle bindings — params that drive the guard prune (NO value socket → no blockIndex/match). Each flips
+ *  the emit AND the preview between shapes: `probeZFirst` (bool, ② B4 step 4a) no-Z↔Z-first; `travelApproach` (enum, step 4b)
+ *  auto↔manual — the hands-free G0 seq move vs the #1505 jog-and-wait prompt, on BOTH the Z→wall1 and wall1→wall2 traverses.
+ *  (t154 — DEFINED HERE, above cornerDataStack, so cornerDataStack can DERIVE its STRUCTURAL-section controls from it at eval.) */
+export const CORNER_STRUCT_BINDINGS = [
+    { param: 'probeZFirst', type: 'bool', default: !!CORNER_DEFAULTS.probeZFirst, label: 'Probe Z First', section: 'GEOMETRY' },
+    { param: 'travelApproach', type: 'enum', default: CORNER_DEFAULTS.travelApproach, label: 'Travel', section: 'GEOMETRY', widgetConfig: { options: [['Auto', 'auto'], ['Manual', 'manual']] } },
+    // ② B4 step 4c — the 7-way WCS target: 'active' reads the controller's #578, or write a fixed G54..G59 slot directly.
+    { param: 'wcs', type: 'enum', default: CORNER_DEFAULTS.wcs, label: 'WCS', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
+    // ② B4 step 4d — dual-gantry sync: a bool block-ADD (appends G1 A0 + the slave-offset write #74=[#70+slave], #[#74]=#883).
+    { param: 'syncA', type: 'bool', default: !!CORNER_DEFAULTS.syncA, label: 'Dual-Gantry Sync A', section: 'GEOMETRY' },
+    // ③b — corner quadrant + probe order: value/order swaps driven by the 8-way corner×probeSeq guard (NOT prune-add/remove).
+    { param: 'corner', type: 'enum', default: CORNER_DEFAULTS.corner, label: 'Corner', section: 'GEOMETRY', widgetConfig: { options: [['Front-Left', 'FL'], ['Front-Right', 'FR'], ['Back-Left', 'BL'], ['Back-Right', 'BR']] } },
+    { param: 'probeSeq', type: 'enum', default: CORNER_DEFAULTS.probeSeq, label: 'Probe Order', section: 'GEOMETRY', widgetConfig: { options: [['Y then X', 'YX'], ['X then Y', 'XY']] } },
+];
+
 /** The wrapped `user_root` template for a given param set. Structural params bake the stack SHAPE; the 9 bound scalars
  *  are the value-sockets the bindings drive. The `simstart` rows declare the per-pass preview markers (canonical over
  *  def.sim.starts). Exported so the emit spec can build a probeZFirst=on variant to prove the derive helper re-finds #23/#24. */
@@ -202,8 +218,16 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
         if (b && b.type === 'assign') seenAssign = true;
         else if (seenAssign && b && (b.type === 'guard' || b.type === 'distmode' || b.type === 'probe' || b.type === 'move')) { seam = i; break; }
     }
+    // t154 — the STRUCTURAL controls are DERIVED from CORNER_STRUCT_BINDINGS (the SAME source the runtime form renders from) →
+    // the Blocks-tab controls REFLECT THE FORM by construction (one source, no drift). Each `sc_<param>` block drives its op
+    // param (pruneGuards branches on it) via the live-reprune hook (blocksApp); emits NOTHING. Value = the param default here;
+    // postInstantiate re-syncs it to op.params after a reprune so it keeps the SET value.
+    const structCtls = CORNER_STRUCT_BINDINGS.map((b) => ({
+        type: 'sc_' + String(b.param).toLowerCase(),
+        params: { value: b.type === 'bool' ? !!b.default : b.default },
+    }));
     const children = [
-        sec('STRUCTURAL', '#f59e0b', []),                      // structural drivers — amber
+        sec('STRUCTURAL', '#f59e0b', structCtls),              // the structural drivers, derived from CORNER_STRUCT_BINDINGS — amber
         sec('VARIABLES', '#06b6d4', exec.slice(0, seam)),      // #var defs — cyan
         sec('G-CODE', '#22c55e', exec.slice(seam)),            // the emit — green
     ];
@@ -218,21 +242,6 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
 const CANONICAL_BIND = { ...CORNER_DEFAULTS, probeZFirst: 1, corner: 'FL', probeSeq: 'YX' };
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(cornerDataStack(CORNER_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
 export const CORNER_BINDINGS = deriveBindingsFor(canonicalPrunedStack(), CORNER_BINDING_SPECS);
-
-/** The STRUCTURAL toggle bindings — params that drive the guard prune (NO value socket → no blockIndex/match). Each flips
- *  the emit AND the preview between shapes: `probeZFirst` (bool, ② B4 step 4a) no-Z↔Z-first; `travelApproach` (enum, step 4b)
- *  auto↔manual — the hands-free G0 seq move vs the #1505 jog-and-wait prompt, on BOTH the Z→wall1 and wall1→wall2 traverses. */
-export const CORNER_STRUCT_BINDINGS = [
-    { param: 'probeZFirst', type: 'bool', default: !!CORNER_DEFAULTS.probeZFirst, label: 'Probe Z First', section: 'GEOMETRY' },
-    { param: 'travelApproach', type: 'enum', default: CORNER_DEFAULTS.travelApproach, label: 'Travel', section: 'GEOMETRY', widgetConfig: { options: [['Auto', 'auto'], ['Manual', 'manual']] } },
-    // ② B4 step 4c — the 7-way WCS target: 'active' reads the controller's #578, or write a fixed G54..G59 slot directly.
-    { param: 'wcs', type: 'enum', default: CORNER_DEFAULTS.wcs, label: 'WCS', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
-    // ② B4 step 4d — dual-gantry sync: a bool block-ADD (appends G1 A0 + the slave-offset write #74=[#70+slave], #[#74]=#883).
-    { param: 'syncA', type: 'bool', default: !!CORNER_DEFAULTS.syncA, label: 'Dual-Gantry Sync A', section: 'GEOMETRY' },
-    // ③b — corner quadrant + probe order: value/order swaps driven by the 8-way corner×probeSeq guard (NOT prune-add/remove).
-    { param: 'corner', type: 'enum', default: CORNER_DEFAULTS.corner, label: 'Corner', section: 'GEOMETRY', widgetConfig: { options: [['Front-Left', 'FL'], ['Front-Right', 'FR'], ['Back-Left', 'BL'], ['Back-Right', 'BR']] } },
-    { param: 'probeSeq', type: 'enum', default: CORNER_DEFAULTS.probeSeq, label: 'Probe Order', section: 'GEOMETRY', widgetConfig: { options: [['Y then X', 'YX'], ['X then Y', 'XY']] } },
-];
 
 // t87 — SOURCE-CHIPS: when the user opts a probe field to 'ctrl' (on a profile that has a native register, e.g. Expert), emit the
 // CONTROLLER register (#5=#1078 &c.) instead of the literal — EXACT parity with the built-in's srcVal/srcNote. Applied POST-emit
@@ -272,6 +281,22 @@ function applyHeaderComments(stack, resolved) {
     return stack;
 }
 
+// t154 — STRUCTURAL-CONTROL value sync. instantiate() rebuilds the template at its DEFAULTS, so after a live reprune
+// (replaceOp re-instantiates from the edited op.params) each `sc_<param>` control would snap back to its default. Re-sync
+// each control's `value` FROM the resolved op param it drives, so the toggle/dropdown keeps the SET value. Emits nothing —
+// this only touches the authoring block's field (byte-parity untouched). SC maps derived from CORNER_STRUCT_BINDINGS (one source).
+const SC_PARAM = Object.fromEntries(CORNER_STRUCT_BINDINGS.map((b) => ['sc_' + String(b.param).toLowerCase(), b.param]));
+const SC_ISBOOL = Object.fromEntries(CORNER_STRUCT_BINDINGS.map((b) => ['sc_' + String(b.param).toLowerCase(), b.type === 'bool']));
+function applyStructCtl(stack, resolved) {
+    if (!resolved) return stack;
+    for (const b of flattenBlocks(stack)) {
+        if (!b || !b.type || !b.params) continue;
+        const param = SC_PARAM[b.type];
+        if (param && param in resolved) b.params.value = SC_ISBOOL[b.type] ? !!resolved[param] : resolved[param];
+    }
+    return stack;
+}
+
 /** Build the corner-as-data def — same userOpFromStack pattern as drill/surfacing/slot/text/atcWarmup, PLUS `bindingSpecs`
  *  (instantiate re-derives the value sockets by identity over the pruned superset) + the structural probeZFirst toggle. */
 export function cornerDataDef() {
@@ -283,6 +308,6 @@ export function cornerDataDef() {
         bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
     def.bindingSpecs = CORNER_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     def.simStartsProvider = cornerSimStartsProvider;   // t73 — sim markers CHAIN off their anchor via the emit's reposition geometry (preview-only)
-    def.postInstantiate = (stack, resolved) => applyHeaderComments(applyProbeSources(stack), resolved);   // t87 source-chips + t138 header-comment recompose (both rewrite from live/resolved state)
+    def.postInstantiate = (stack, resolved) => applyStructCtl(applyHeaderComments(applyProbeSources(stack), resolved), resolved);   // t87 source-chips + t138 header recompose + t154 struct-control value sync (all rewrite from resolved state)
     return def;
 }

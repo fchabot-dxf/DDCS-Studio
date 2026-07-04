@@ -29,6 +29,7 @@ import { placeOnStockBlock } from './placeOnStock.js';
 import { rotateBlock } from './rotate.js';
 import { probeBlock } from './probe.js';
 import { userRootBlock, paramGroupBlock, sectionBlock } from './userRoot.js';
+import { STRUCT_CTL_BLOCKS } from './structCtl.js';   // t154 — structural-control blocks, generated from CORNER_STRUCT_BINDINGS
 import { arrayBlock, patternPoints } from './array.js';
 import { helixBlock, helixPoints } from './helix.js';
 import { countBlock } from './count.js';
@@ -83,7 +84,7 @@ export const PALETTE = [
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     mcodeBlock, rawBlock, outPinBlock, waitInputBlock,         // Signals (raw M-code/G-code escape + digital I/O M62-66)
-    paramBlock, regionPickBlock, coordListBlock, panelBlock, layoutBlock, simBlock, simStartBlock, userRootBlock, paramGroupBlock, sectionBlock, // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig + per-pass sim-start declarations + titled concern-section)
+    paramBlock, regionPickBlock, coordListBlock, panelBlock, layoutBlock, simBlock, simStartBlock, userRootBlock, paramGroupBlock, sectionBlock, ...STRUCT_CTL_BLOCKS, // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig + per-pass sim-start declarations + titled concern-section + structural-control blocks)
     commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
 ];
 

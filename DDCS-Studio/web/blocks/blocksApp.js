@@ -15,6 +15,7 @@ import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { mountDevMode, deriveAuthoredDef, editingWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back
+import { isStructCtlType, SC_PARAM } from '../wizards/ops/structCtl.js';   // t154 — structural-control blocks drive the op's guards → live reprune
 import { renderOpForm } from '../ui/formWidgets.js';   // render the wizard's form from bindings (the live block→form view)
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
 import { isOpBlockEdited, valueTokenRanges, valueRangesForSubtree } from './opGlow.js';   // op-edit guard + word-level value-token spans (hover/select highlight)
@@ -557,6 +558,25 @@ async function buildWorkspace() {
     else if (e.element === 'field' && _ops) {
       try {
         const blk = ws.getBlockById(e.blockId);
+        // t154 — a STRUCTURAL-CONTROL edit drives the guards: find the enclosing user op, gather ALL its sc_* values into
+        // op.params, and replaceOp (re-instantiate → pruneGuards reprunes → reload → the preview updates live). Additive +
+        // SCOPED to sc_* blocks (isStructCtlType) — no other block's change handling is touched. (postInstantiate re-syncs
+        // the controls to op.params so they keep their set value after the rebuild.)
+        if (blk && isStructCtlType(blk.type)) {
+          let opBlk = blk.getSurroundParent && blk.getSurroundParent();
+          while (opBlk && opBlk.type !== 'op') opBlk = opBlk.getSurroundParent && opBlk.getSurroundParent();
+          if (opBlk && opBlk.type === 'op') {
+            let meta = {}; try { meta = JSON.parse(opBlk.data || '{}'); } catch (_) { /* keep {} */ }
+            const params = { ...(meta.params || {}) };
+            for (const d of opBlk.getDescendants(false)) {
+              if (!isStructCtlType(d.type)) continue;
+              const v = d.getFieldValue('VALUE');
+              params[SC_PARAM[d.type]] = (v === 'TRUE' || v === 'FALSE') ? (v === 'TRUE') : v;   // checkbox → bool; dropdown → its value
+            }
+            _ops.replaceOp(opBlk.id, params);
+            return;
+          }
+        }
         if (blk && (blk.type === 'op' || blk.type.endsWith('_op'))) {
           let meta = {}; try { meta = JSON.parse(blk.data || '{}'); } catch (_) {}
           const params = { ...(meta.params || {}) };

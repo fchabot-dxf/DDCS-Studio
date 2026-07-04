@@ -153,6 +153,7 @@ const optionsFor = (def, field) => {
     if (field === 'widget' && def.type === 'param') return ['number', 'slider', 'dropdown', 'toggle', ...CANVAS_ROLE_WIDGETS];
     if (field === 'panel' && def.type === 'panel') return ['form3d', 'form2d', 'form'];   // the GUI panel-type declaration
     if (field === 'kind' && def.type === 'layout') return ['none', 'corner'];
+    if (field === 'value' && def._options) return def._options;   // t154 — a structural-control (sc_*) enum: its dropdown options ride on the generated def (from CORNER_STRUCT_BINDINGS)
     return SELECTS[field] || null;
 };
 
@@ -185,6 +186,7 @@ export function inlineFields(def) {
 /** One Blockly JSON block def from an op def. */
 function jsonDef(def) {
     const isSection = def.kind === 'section';
+    const isStructctl = def.kind === 'structctl';   // t154 — keeps its label (e.g. "Probe Z First") but drops the field-name prefix ("value")
     const args0 = [];
     // t146 — HEADER ROW (message0): the block's label + its inline fields. Statement-input MOUTHS go on their OWN rows
     // BELOW (message1/message2 via addMouth) so the label never sits beside the mouth (which shoved nested blocks right
@@ -194,7 +196,7 @@ function jsonDef(def) {
     let message0 = isSection ? '' : def.label, n = 0;
     for (const f of fieldsOf(def)) {
         const k = fieldKind(def, f);
-        message0 += isSection ? ` %${++n}` : ` ${f} %${++n}`;
+        message0 += (isSection || isStructctl) ? ` %${++n}` : ` ${f} %${++n}`;
         const desc = getDesc(f);
         if (k === 'cornergrid') args0.push({ type: 'field_cornergrid', name: FN(f), value: String(def.defaults[f] ?? ''), colour: CORNER_COLOUR[f], tooltip: desc });
         else if (k === 'regionpick') args0.push({ type: 'field_regionpick', name: FN(f), value: String(def.defaults[f] ?? 0), tooltip: desc });

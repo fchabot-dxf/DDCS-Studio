@@ -55,7 +55,7 @@ function isAtom(blk) {
     // get the "expose as knob" kit (it read as "? knob false title" noise on the concern headers). Value-bearing atoms
     // (assign / param / move / …) are untouched → the value-knob expose path (deriveAuthoredDef / EXPOSE_) still works.
     const def = BLOCKS[blk.type];
-    return !(def && def.kind === 'section');
+    return !(def && (def.kind === 'section' || def.kind === 'structctl'));   // t148 section + t154 structural-control: authoring metadata / guard drivers, not exposable values
 }
 
 // the widget a numeric exposure renders as in the form (the form-widget registry keys; numeric-compatible only).
