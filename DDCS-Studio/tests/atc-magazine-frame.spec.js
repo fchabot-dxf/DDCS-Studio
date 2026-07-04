@@ -67,3 +67,23 @@ test('a STOCK pinned to its WCS is unaffected — the part still rides the stock
   });
   expect(part, 'part rides the STOCK pin (G54=100,60), not the active WCS (G55=250,240)').toEqual({ x: 100, y: 60 });
 });
+
+test('a PARTIAL profile (workOrigin set, NO wcs.table) — part rides workOrigin so G53 aligns with the raw-machine magazine (t173)', async ({ page }) => {
+  await viz(page);
+  const r = await page.evaluate(() => {
+    const v = window.ddcsStudio.wizardManager._activePanel.viz;
+    v.setStock({ show: false });   // no stock pin (ATC-like) → the fallback chain applies
+    // a partial/legacy profile: workOrigin set but wcs.table is null. wcsForViz falls back to m.workOrigin -> the engine
+    // offsets G53 by workOrigin; the part frame MUST match (else the G53 path drifts to machine-workOrigin while the
+    // magazine sits at raw machine → MISALIGN). Mirror the fallback.
+    v.setMachine({ x: 600, y: 400, z: -150, show: true, workOrigin: { x: 220, y: 130, z: -30 }, wcs: { active: 1, table: null } });
+    v.setMagazine([{ pocket: 1, tool: { type: 'endmill', dia: 6, length: 30 }, x: 100, y: 100, z: -50 }]);
+    const part = v.partFrame.group.position;
+    const mag = v._magGroup.children[0].position;   // magazine at RAW machine coords (workOrigin-independent)
+    return { partX: +part.x.toFixed(1), partY: +part.y.toFixed(1), magX: +mag.x.toFixed(1), magY: +mag.y.toFixed(1) };
+  });
+  // the part frame rides workOrigin (so the engine's G53 -wcsOffset cancels → the path lands at raw machine)
+  expect({ x: r.partX, y: r.partY }, 'table null → part frame falls back to workOrigin (mirrors wcsForViz)').toEqual({ x: 220, y: 130 });
+  // and the magazine stays at raw machine coords — so the two ALIGN (both resolve to raw machine), no drift
+  expect({ x: r.magX, y: r.magY }, 'magazine at raw machine coords (aligned with the G53 path, not drifted)').toEqual({ x: 100, y: 100 });
+});

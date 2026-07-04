@@ -1286,12 +1286,14 @@ export class GcodeViz3D {
         if (pin && pin !== 'origin' && Array.isArray(wt)) {
             const t = wt[parseInt(String(pin).replace(/[^0-9]/g, ''), 10) - 54];   // 'g54' → table[0]
             if (t) { x = Number(t.x) || 0; y = Number(t.y) || 0; wcsZ = Number(t.z) || 0; }
-        } else if (Array.isArray(wt)) {
+        } else {
             // No stock pinned to a WCS (e.g. an ATC/machine-frame preview: G53 tool changes, no real workpiece). Sit the
             // part frame at the ACTIVE WCS so a G53/machine move — which the engine offsets by the active wcsOffset —
-            // CANCELS to raw machine coords on the FIXED envelope, aligned with the magazine (t163). XY only; Z stays
-            // per the datum (absolute-machine-Z is deferred to P-B). Zero-WCS / no table → 0, so the common case is unchanged.
-            const a = wt[(((m.wcs && m.wcs.active) || 1) - 1)];
+            // CANCELS to raw machine coords on the FIXED envelope, aligned with the magazine (t163). XY only; Z stays per
+            // the datum (absolute-machine-Z is deferred to P-B). Mirror wcsForViz's fallback chain EXACTLY (t173): the
+            // active WCS TABLE row, else m.workOrigin (a partial/legacy profile — workOrigin set but no table — else the
+            // engine offsets G53 by workOrigin while this returns 0 → the path drifts off the raw-machine magazine), else 0.
+            const a = (Array.isArray(wt) && wt[(((m.wcs && m.wcs.active) || 1) - 1)]) || m.workOrigin;
             if (a) { x = Number(a.x) || 0; y = Number(a.y) || 0; }
         }
         // Z — the stock rests on the FIXED machine table; Z0 floats at the datum height (you re-zero Z per part, so
