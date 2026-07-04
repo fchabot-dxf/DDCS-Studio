@@ -180,3 +180,62 @@ The GUI writes only DECLARED stores — settings.atc.magazine (generic), .pickup
 2. "make the x handle hide the outline where it is positioned, maybe with an offset" → the open-state handle transform now `translateX(calc(var(--blk-tbx-w) - 1px))` (was `var(--blk-tbx-w)`): the 1px left overlap puts the handle's (--panel2, same as the sidebar) body over the toolbox's 1px border-right where the handle sits, HIDING it there; the handle's own top/right/bottom border wraps that gap so the outline reads as continuous AROUND the handle.
 
 VERIFIED (screenshots normal/light theme): the sidebar has a top-to-bottom right-edge outline; the ✕ handle sits on it with the outline hidden behind the handle + wrapping around it — scratchpad/sidebar-outline.png + sidebar-handle-zoom.png opened in VS Code tabs. blocks-desktop-collapse spec GREEN (handle still toggles the palette; the 1px offset + the border box-sizing don't shift the collapsed-handle position or the toolbox width the test asserts). BYTE-PARITY: no JS/emit touched.
+
+## 🔨 turn 213 (cycle 13) — RE-PLAN #2 SCOUT: declare GRIP + MOTION as composable ATC config (SCOUT ONLY, no code). Deliverable = the design + migration + RapidChange proof + forks for advisor + human BEFORE building. GATED (reframes the shipped ATC model).
+
+### FRAME — the reframe (grounded: DDCS ships a BLANK ATC = an M6 hook only; O10102 is an INSTALLED pneumatic-push package, #1320-1326-parameterized; "firmware" was a MISLABEL of one installed macro)
+Today the change is a FIXED METHOD (firmware / generic / disk / m6 / manual) — resolveMethod → a hand-written stack + a hard-coded ATC_CHOREOGRAPHY[method] {kind}. TARGET: the user DECLARES their ATC from composable pieces, so a new changer = a config, not a new method:
+
+```
+   LAYOUT  ×  GRIP  ×  MOTION  ×  I/O   ──►  the CHANGE
+  (where)   (hold/    (travel   (M-code
+            release)  sequence)  dialect)
+  positions  ↘         ↓          ↙
+             the CHOREOGRAPHY = MOTION's step-sequence, driving GRIP's release/clamp,
+             at LAYOUT's positions, speaking the I/O dialect
+                    │
+          ┌─────────┴─────────┐
+       EMIT (G-code)      SIM (P-C animation)      ← ONE declared sequence, two consumers
+```
+
+### (1) HOW TO DECLARE grip + motion — the config schema (additive under settings.atc; LAYOUT + I/O already exist)
+- **GRIP** = the hold/release MECHANISM: `settings.atc.grip = { kind, orient?, release:[actions], clamp:[actions], device? }`. An `action` = `{ code, off, wait, dev }` (an I/O M-code + its sensor wait + a device animation). GRIP is itself a mini-sequence so a MULTI-actuator grip (pneumatic) declares cleanly:
+  - `drawbar`: orient:false; release:[{code:M154, wait:M301, dev:collet-open}]; clamp:[{code:M155, wait:M302, dev:collet-close}].
+  - `pneumatic`: orient:true(M19); release:[M159 vacuum-off, M157 pin-close, M160 pusher-open+dwell]; clamp:[M156 pin-open, M161 pusher-close]; dev:pusher/pin.
+  - `magnetic` (RapidChange): orient:false; release:[]; clamp:[] (NO actuator — the MOTION's plunge engages the fork/magnet); dev:fork/dock.
+- **MOTION** = the travel SEQUENCE (a DECLARED step-list with grip-hooks + LAYOUT position refs): `settings.atc.motion = { kind, steps:[...] }`. Step primitives (the vocabulary): `safeZ · travelXY(ref) · descend(ref) · retract · grip.release · grip.clamp · rotate(pocket) · dwell(t) · orient`. A `ref` names a LAYOUT position ('cur.pocket' / 'target.pocket' / 'pickup' / 'station.start|end|retreat' / 'dock'):
+  - `pick-place`: [safeZ, travelXY(cur.pocket), descend, grip.release, retract, travelXY(target.pocket), grip.release, descend, grip.clamp, retract].
+  - `push`: [orient, travelZ(safeZ=#1306), travelXY(station.start), grip.release(pusher-out+dwell), travelXY(station.end), travelXY(station.retreat), grip.clamp(pin/pusher-close)].
+  - `rotate`: [safeZ, rotate(cur.pocket), travelXY(pickup), descend, grip.release, retract, rotate(target.pocket), descend, grip.clamp, retract].
+  - `plunge` (RapidChange): [safeZ, travelXY(cur.dock), descend(dock), grip.release(∅), retract, travelXY(target.dock), descend, grip.clamp(∅), retract].
+
+### (2) HOW THEY COMPOSE — the interpreter (ONE source → emit + sim)
+A small **choreography INTERPRETER** walks MOTION.steps and resolves each: a POSITION step ← LAYOUT (the pocket/dock/station coords, already numeric); a GRIP step (release/clamp) ← GRIP's action-list (the I/O + device); the M-codes ← the I/O dialect. It emits to TWO backends from the SAME walk: the EMIT backend → G-code atoms (the existing block-stack atoms: Move/MCode/Confirm…), the SIM backend → the P-C choreography (travel + device animations). This is the north-star **wizards-as-data** applied to the change motion: the sequence is DATA, the interpreter is the engine, emit + sim are views. Grip/motion are DECLARATIONS (near-free); the interpreter is the one engine (rule-of-three: push/pick-place/rotate/plunge = 4 motions justify it).
+
+### (3) HOW IT GENERALIZES THE SEAM (+ what REUSES, unchanged)
+- Today: `ATC_CHOREOGRAPHY[resolveMethod] = {kind:'push'|'pick-place'|'macro-call', variant}`. NEW: the descriptor is COMPUTED from the config — `kind = motion.kind`, `device = grip.device`, positions ← layout. The fixed per-method table becomes `atcChoreography(params) = { kind: motion.kind, device: grip.device, steps: motion.steps }`. The seam stays the SAME shape (createPreviewPanel.setAtcSwap still branches on choreo.kind), so P-C.1b/3 keep working.
+- **REUSE — do NOT rebuild:** the CHOREOGRAPHY SEAM (setAtcSwap), the DEVICES (pusher/pin/collet → add fork/dock), the #1300 SWAP (checkToolSwap/doToolSwap — already branch on choreo.kind), the MACHINE FRAME (P-A), the SETUP GUI (canvas + numeric + pin-picker), the I/O DIALECT (ATC_DIALECT), the var-seed. GRIP maps onto the EXISTING devices; MOTION.kind onto the EXISTING seam kinds.
+
+### (4) MIGRATION MAP (existing methods = grip×motion combos; KEEP byte-identical)
+| method (old) | LAYOUT | GRIP | MOTION |
+|---|---|---|---|
+| firmware | station #1320-1326 | pneumatic | push |
+| generic | linear pockets | drawbar | pick-place |
+| disk | disk ring + pickup | drawbar | rotate |
+| m6 | — | (controller) | macro-call |
+| manual | park | (hand) | manual |
+resolveMethod stays as the BACK-COMPAT map (old ops/files → the preset grip×motion×layout), so saved ops are untouched. **EMIT byte-parity (the crux):** the 3 stacks (firmwareStack/autoStack/diskAutoStack) are hand-written + firmware is byte-identical to O10102 — so for the KNOWN combos the emit DELEGATES to the existing stacks (byte-identical, guaranteed by the goldens/atc-roundtrip). The INTERPRETER's emit is used for NEW combos only (initially); converging the 3 stacks onto the interpreter is a SEPARATE, later, byte-parity-tested step (FORK A). "firmware" gets RELABELED "pneumatic push" in the GUI (a naming cleanup that falls out — the macro isn't firmware).
+
+### (5) SETUP GUI — add the selectors
+The ATC settings tab gains a **GRIP** selector + a **MOTION** selector (dropdowns) beside the existing LAYOUT (magType). Picking grip×motion writes settings.atc.grip/motion → the sim choreography + emit follow. The old method presets = named grip×motion combos the two selectors express (a "changer preset" dropdown can still offer firmware/generic/disk/RapidChange as one-click combos that set grip+motion+layout). Reuses the GUI-1/2/3 surfaces.
+
+### (6) RAPIDCHANGE — the PROOF (linear LAYOUT + magnetic GRIP + plunge MOTION)
+Config-only? **ALMOST — and the residue is small + declared:** LAYOUT linear EXISTS (the dock XY = pockets). MAGNETIC GRIP = a DECLARATION (release:[]/clamp:[] empty, dev:fork) — no new code, just data. PLUNGE MOTION = a DECLARED step-sequence (travel→descend→retract, grip-hooks empty) — data, IF the step vocabulary (descend/retract/travelXY) already exists in the interpreter. The ONE genuinely-new CODE piece = the FORK/DOCK DEVICE mesh (a viz addition, reusing the pusher/collet device pattern). So the composed model turns "support RapidChange" from *a whole new method + stack + sim path* into *declare a grip + a motion sequence + one device mesh* — the win. (CAVEAT to CONFIRM: RapidChange's real mechanism is a spindle-plunge into a fork that grips the ER nut, sometimes spindle-spin to loosen — so PLUNGE may need a `spin`/`dwell` sub-step; the magnetic framing is the advisor's simplification. Either way it's a declared grip+motion, not new machinery.)
+
+### (7) EFFORT + INCREMENTS + FORKS + BYTE-PARITY
+- **Effort:** config schema + grip/motion DEFS = SMALL (declarations). The choreography INTERPRETER (one walk → emit + sim) = MEDIUM-LARGE (the core engine — build once). The seam generalization (choreo from config) = SMALL. GUI selectors = SMALL-MEDIUM. Fork/dock device = SMALL. RapidChange combo = SMALL once the above exist.
+- **Increments:** (I1) declare the grip/motion schema + the migration map + resolveMethod→preset (config only, NO emit/sim change yet — byte-identical). (I2) generalize the seam (choreo computed from config; sim unchanged for the 3 presets). (I3) GUI grip+motion selectors + the preset dropdown. (I4) the choreography INTERPRETER for the SIM (drive the existing 3 from the declared sequences — a sim-only proof; verify the sim matches). (I5) the interpreter's EMIT for NEW combos + RapidChange (fork device + plunge) — the payoff. (I6, optional) converge the 3 stacks onto the interpreter's emit (byte-parity-tested) — retires the hand-written stacks.
+- **FORKS:** (A) EMIT — presets-delegate-to-existing-stacks [REC: byte-identical, safe] vs interpreter-generates-all [risk: must reproduce O10102 exactly]. (B) MOTION rep — declared STEP-SEQUENCE (data, interpreted) [REC: wizards-as-data] vs a per-motion JS builder (simpler, less declarative). (C) FIRST increment — full composition vs incremental I1→I5 [REC: incremental — I1-I3 are near-free + reversible, the interpreter I4/I5 is where the real design risk is, so prove the sim first]. (D) GRIP granularity — a single release[]/clamp[] action-list [REC] vs a richer per-actuator device graph (defer).
+- **BYTE-IDENTICAL vs CHANGES:** byte-identical = the 3 existing combos' EMIT (delegate to the existing stacks; goldens + atc-roundtrip guard it) + m6/manual. CHANGES (all ADDITIVE/back-compat): settings.atc gains grip/motion (resolveMethod back-fills for old ops), the seam is computed not tabled (SIM only), the GUI adds selectors, the label "firmware"→"pneumatic push". NEW (no byte-parity concern): RapidChange + any new grip×motion.
+
+**GATED per worker step-5 (a substantial reframe of the shipped ATC model; the advisor wants the plan + HUMAN eyes — esp. FORK A [emit delegate-vs-interpreter, the byte-parity crux] + FORK C [incremental sim-first]). NO code. PASSED BACK the schema + composition + interpreter + migration + RapidChange proof + increments/forks. Ready to build the chosen path on confirm. SIM-FRAME/authoring axes untouched; this is the ATC-model axis.**
