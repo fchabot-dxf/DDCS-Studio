@@ -70,7 +70,7 @@ export function renderAtcSetupCanvas(container, { atc, machine, onChange } = {})
         Object.keys(FW_KEYS).forEach((k) => handles.push({ id: 'fw:' + k, x: numOr(pts[k].x, 0), y: numOr(pts[k].y, 0), label: FW_KEYS[k], color: '#ffb454' }));
 
         return {
-            stock: { ox: 0, oy: 0, w: numOr(mach.x, 400), h: numOr(mach.y, 300) },
+            machine: { x: numOr(mach.x, 400), y: numOr(mach.y, 300), z: numOr(mach.z, -100) },   // machine-frame chrome (envelope + home + axes), coherent with the 3D sim
             items,
             handles,
             onDrag: (id, w) => { writePoint(id, w); fc.render(container, buildSpec()); },   // live: move the config + redraw the handle

@@ -196,6 +196,7 @@ export class FeatureCanvas {
         const sox = (spec.stock && spec.stock.ox) || 0, soy = (spec.stock && spec.stock.oy) || 0;
         acc(0, 0);
         if (spec.stock) { acc(sox, soy); acc(sox + spec.stock.w, soy + spec.stock.h); }
+        if (spec.machine) { const mx = Number(spec.machine.x) || 0, my = Number(spec.machine.y) || 0; acc(mx, my); acc(Math.min(0, mx), Math.min(0, my)); }
         (spec.items || []).forEach((it) => {
             if (it.kind === 'hole') acc(it.x + px, it.y + py);
             else if (it.kind === 'line') { acc(it.x1 + px, it.y1 + py); acc(it.x2 + px, it.y2 + py); }
@@ -284,10 +285,15 @@ export class FeatureCanvas {
             }));
         }
 
-        // --- work-origin crosshair ---------------------------------------
-        const og = this._S(0, 0);
-        grid.appendChild(svgEl('line', { x1: og.x - 9, y1: og.y, x2: og.x + 9, y2: og.y, class: 'fc-axis-x' }));
-        grid.appendChild(svgEl('line', { x1: og.x, y1: og.y - 9, x2: og.x, y2: og.y + 9, class: 'fc-axis-y' }));
+        // --- origin: the MACHINE frame (envelope + home + edge labels, machine-coherent — matches the 3D sim's
+        //     convention, one source) when spec.machine is set; else the part-zero crosshair (stock/wizard layout). ----
+        if (spec.machine) {
+            this._drawMachineFrame(spec.machine);
+        } else {
+            const og = this._S(0, 0);
+            grid.appendChild(svgEl('line', { x1: og.x - 9, y1: og.y, x2: og.x + 9, y2: og.y, class: 'fc-axis-x' }));
+            grid.appendChild(svgEl('line', { x1: og.x, y1: og.y - 9, x2: og.x, y2: og.y + 9, class: 'fc-axis-y' }));
+        }
 
         // --- paths (generic polylines, e.g. a parsed G-code toolpath outline) — each {pts,cls} drawn as one <path> --
         (spec.paths || []).forEach((pth) => {
@@ -394,6 +400,35 @@ export class FeatureCanvas {
             handles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 9, fill: 'none', stroke: '#5fd06a', 'stroke-width': 2, style: 'pointer-events:none' }));
             handles.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 2.6, fill: '#5fd06a', stroke: 'none', style: 'pointer-events:none' }));
         }
+    }
+
+    /** Machine-frame chrome (spec.machine = {x,y,z} travel extents) — the envelope rect, the machine HOME at coord 0
+     *  with +X (red) / +Y (green) axis arms, and the +X/-X/+Y/-Y edge labels at each edge centre. Deliberately mirrors
+     *  the 3D sim's machine frame (gcodeViz3d: home at scene 0, envelope [0..m], the same +X/+Y label text + red/green)
+     *  so the 2D top-down and the 3D read as ONE machine frame. Only used by the ATC setup canvas; part/stock wizards
+     *  don't set spec.machine, so their part-zero crosshair is untouched. */
+    _drawMachineFrame(m) {
+        const X = Number(m.x) || 0, Y = Number(m.y) || 0;
+        const x0 = Math.min(0, X), x1 = Math.max(0, X), y0 = Math.min(0, Y), y1 = Math.max(0, Y);
+        // envelope rect (min-XY corner → the top-left in screen space, since screen Y is flipped)
+        const tl = this._S(x0, y1);
+        this.gItems.appendChild(svgEl('rect', { x: tl.x, y: tl.y, width: Math.abs(X) * this._tf.scale, height: Math.abs(Y) * this._tf.scale, fill: 'rgba(90,140,190,0.05)', stroke: '#4a6a8a', 'stroke-width': 1.5, rx: 2, style: 'pointer-events:none' }));
+        const cxw = (x0 + x1) / 2, cyw = (y0 + y1) / 2, span = Math.max(Math.abs(X), Math.abs(Y), 10), off = span * 0.06;
+        const label = (wx, wy, text, color) => {
+            const s = this._S(wx, wy);
+            const t = svgEl('text', { x: s.x, y: s.y, fill: color, 'text-anchor': 'middle', style: 'dominant-baseline:middle; font:bold 12px system-ui,sans-serif; pointer-events:none;' });
+            t.textContent = text; this.gHandles.appendChild(t);
+        };
+        label(x1 + off, cyw, '+X', '#ff6b6b'); label(x0 - off, cyw, '-X', '#ff6b6b');
+        label(cxw, y1 + off, '+Y', '#5fd35f'); label(cxw, y0 - off, '-Y', '#5fd35f');
+        // machine HOME at coord 0 (a corner) — a dot + short +X/+Y axis arms so the frame's origin + directions read clearly.
+        const o = this._S(0, 0), arm = Math.max(16, span * 0.11 * this._tf.scale);
+        const axis = (dx, dy, color) => this.gHandles.appendChild(svgEl('line', { x1: o.x, y1: o.y, x2: o.x + dx, y2: o.y + dy, stroke: color, 'stroke-width': 2, style: 'pointer-events:none' }));
+        axis(arm, 0, '#ff6b6b');    // +X → (screen right)
+        axis(0, -arm, '#5fd35f');   // +Y ↑ (world +Y is screen up)
+        this.gHandles.appendChild(svgEl('circle', { cx: o.x, cy: o.y, r: 3.4, fill: '#e6edf5', stroke: '#0b0e13', 'stroke-width': 1, style: 'pointer-events:none' }));
+        const hl = svgEl('text', { x: o.x + 7, y: o.y + 15, fill: '#9fb0c3', style: 'font:600 10px system-ui,sans-serif; pointer-events:none;' });
+        hl.textContent = 'HOME 0,0'; this.gHandles.appendChild(hl);
     }
 
     /** Stock-attach markers — small squares on the stock's 9 points (corners/edges/centre). Click one to choose which

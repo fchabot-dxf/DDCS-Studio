@@ -114,3 +114,33 @@ test('the firmware sim station renders from the firmwareStation store (var-seed 
   expect(Math.round(st.z), 'station safe-Z (#1306) seeded from the store').toBe(-15);
   expect(st.start.x, 'NOT the untaught-0 origin').not.toBe(0);
 });
+
+test('the setup canvas is a coherent MACHINE frame — home + axes at machine 0, envelope = travel extents (not a part datum)', async ({ page }) => {
+  await openAtcTab(page);   // machine 600 × 400
+  const r = await page.evaluate(() => {
+    const c = document.querySelector('#atc_setup_canvas');
+    const fc = c.__atcFc, svg = c.querySelector('svg');
+    const texts = [...svg.querySelectorAll('text')].map((t) => t.textContent);
+    const env = [...svg.querySelectorAll('rect')].find((el) => (el.getAttribute('stroke') || '') === '#4a6a8a');
+    return {
+      hasPartCrosshair: !!svg.querySelector('.fc-axis-x'),
+      axisLabels: texts.filter((t) => ['+X', '-X', '+Y', '-Y'].includes(t)).sort(),
+      hasHome: texts.some((t) => /HOME/.test(t)),
+      machine: fc.spec.machine,
+      scale: fc._tf.scale,
+      env: env ? { x: +env.getAttribute('x'), y: +env.getAttribute('y'), w: +env.getAttribute('width'), h: +env.getAttribute('height') } : null,
+      sTopLeft: fc._S(0, 400),   // screen point of the envelope's world top-left corner (0, m.y)
+    };
+  });
+  // the frame SWITCHED from part-datum to machine: the part-zero crosshair is gone, the machine chrome is present
+  expect(r.hasPartCrosshair, 'no part-datum crosshair — this is the MACHINE frame').toBe(false);
+  expect(r.axisLabels, 'the +X/-X/+Y/-Y machine axis labels are drawn').toEqual(['+X', '+Y', '-X', '-Y'].sort());
+  expect(r.hasHome, 'a machine HOME marker sits at coord 0').toBe(true);
+  // the frame == the machine travel extents; the envelope rect corners map to machine 0..extents (independent truth via the live transform)
+  expect(r.machine, 'the canvas frame = the machine travel extents').toMatchObject({ x: 600, y: 400 });
+  expect(r.env, 'the envelope rect is drawn').not.toBeNull();
+  expect(Math.round(r.env.x), 'envelope left edge = world x0 (home column)').toBe(Math.round(r.sTopLeft.x));
+  expect(Math.round(r.env.y), 'envelope top edge = world (0, m.y)').toBe(Math.round(r.sTopLeft.y));
+  expect(Math.round(r.env.w), 'envelope width = m.x (600 mm) in screen px').toBe(Math.round(600 * r.scale));
+  expect(Math.round(r.env.h), 'envelope height = m.y (400 mm) in screen px').toBe(Math.round(400 * r.scale));
+});
