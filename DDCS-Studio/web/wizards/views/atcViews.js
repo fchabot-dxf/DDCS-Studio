@@ -272,10 +272,11 @@ export const atcChangeView = {
         // G53 code) on the fixed machine frame. Non-firmware (m6/generic/disk/manual) → clear (no inline push station).
         if (mgr && mgr.previewAtcStation) {
             const choreo = atcChoreography(params);
-            if (choreo && choreo.kind === 'push') {
-                const vars = traceToolpath(gcode, { captureVars: choreo.stationVars }).vars || {};
-                mgr.previewAtcStation('atcChangeViz', choreo.region(vars));
-            } else mgr.previewAtcStation('atcChangeViz', null);
+            const region = (choreo && choreo.kind === 'push') ? choreo.region(traceToolpath(gcode, { captureVars: choreo.stationVars }).vars || {}) : null;
+            mgr.previewAtcStation('atcChangeViz', region);
+            // P-C.1b: arm the tool-swap too — a REAL tool change (T#/M6) in the played program retires the old tool to
+            // this station + puts the new tool on the spindle. The isolated firmware op (no tool change) shows no swap.
+            if (mgr.previewAtcSwap) mgr.previewAtcSwap('atcChangeViz', choreo, region);
         }
         // Magazine strip: show the pockets + tools; highlight the fixed test tool being swapped to.
         const ft = Number(el('atc_change_fixedt')?.value || 0);

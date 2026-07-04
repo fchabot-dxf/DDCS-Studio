@@ -175,6 +175,11 @@ export function createPreviewPanel(container, opts = {}) {
     // loaded, warmup/drawbar with no motion, the parameter-write table). Set by the host via setForceMachine().
     let forceMachine = false;
     let rotaryFixture = false;   // host hint: show the 4th-axis rig (rotary probe ops). Applied to the lazy viz on create + on toggle.
+    // P-C.1b: the FIRMWARE ATC tool-swap context. atcChoreo (the push choreography) + atcStation (its region) are armed
+    // by the atc_change firmware view; during play we watch #1300 and, on a REAL tool change (a program T#/M6), retire
+    // the OLD tool to the station + put the NEW tool on the spindle. lastTool tracks the previous #1300 (the FIRST value
+    // seen is the starting tool, NOT a swap). Isolated firmware op (no tool change) → #1300 never flips → no swap.
+    let atcChoreo = null, atcStation = null, lastTool = null;
     let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null, lastStockKey = '', curAnchor = false;
     let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false, liveTimer = null;
 
@@ -335,7 +340,7 @@ export function createPreviewPanel(container, opts = {}) {
                     if (c) { const r = engine.vars.get(6); if (Number.isFinite(r)) viz.nudgeSurface(c.axis, r * c.sign); }
                 }
             },
-            onPositionChange: (pos) => { if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock)
+            onPositionChange: (pos) => { if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock)
             onStatus: ({ message }) => setStatus(message),
             onWait: (wait) => { if (!window.ioPanel) return; if (wait) window.ioPanel.show(); window.ioPanel.setWait(wait); },   // float the I/O panel during a probe/M-code wait
             onFinish: () => {
@@ -587,6 +592,7 @@ export function createPreviewPanel(container, opts = {}) {
         updateDro(getStartPos() || { x: 0, y: 0, z: 0 });   // DRO: reset to the start position for the fresh run
         if (droWcsEl) droWcsEl.textContent = activeWcsName();   // refresh the label to the active WCS (catches a settings switch)
         if (viz) viz.setAnimate(false);                 // engine drives the tool/trail, not the geometric sweep
+        lastTool = null; if (viz && viz.showRetiredTool) viz.showRetiredTool(null);   // P-C.1b: fresh run re-arms the tool-swap watch + clears any retired tool
         lastRunCode = get('getGcode') || '';
         eng.run(lastRunCode);
         updateRunBtn();
@@ -729,5 +735,30 @@ export function createPreviewPanel(container, opts = {}) {
         buildDro();   // DRO gains/loses the A/B rows with the rotary rig
     }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds, get viz() { return viz; }, get engine() { return engine; }, el: container };
+    // P-C.1b: arm the FIRMWARE tool-swap for this op. Only a 'push' choreography arms it; anything else clears the
+    // retired tool + disarms. The swap then fires from checkToolSwap (below) when #1300 flips during play.
+    function setAtcSwap(choreo, region) {
+        atcChoreo = (choreo && choreo.kind === 'push') ? choreo : null;
+        atcStation = region || null;
+        lastTool = null;
+        if (!atcChoreo && viz && viz.showRetiredTool) viz.showRetiredTool(null);
+    }
+    // Watch #1300 during play — the FIRST value is the starting tool (no swap); a subsequent change old→new IS a real
+    // tool change (a program T#/M6), so retire the OLD tool to the station + put the NEW tool on the spindle. Called
+    // from onPositionChange, so the swap lands as the push moves execute (≈ at the push stroke). Firmware-scoped.
+    function checkToolSwap() {
+        if (!atcChoreo || !engine) return;
+        const cur = engine.vars.get(1300);
+        if (cur == null || cur === lastTool) return;
+        if (lastTool != null) doToolSwap(lastTool, cur);   // old → new (not the initial tool set: lastTool was null)
+        lastTool = cur;
+    }
+    function doToolSwap(oldN, newN) {
+        const tools = toolsForViz();
+        const spec = (n) => tools.find((t) => t && Number(t.num) === Number(n)) || { type: 'endmill', dia: 6, length: 35 };
+        if (viz && viz.showRetiredTool) viz.showRetiredTool(spec(oldN), atcStation);   // OLD retired at the push station
+        if (viz && viz.setSimTool) viz.setSimTool(spec(newN));                          // NEW on the spindle (part frame)
+    }
+
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setAtcSwap, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds, get viz() { return viz; }, get engine() { return engine; }, el: container };
 }

@@ -1422,6 +1422,31 @@ export class GcodeViz3D {
         this.render();
     }
 
+    /**
+     * ATC firmware tool-SWAP (P-C.1b, t175): the OLD (retired) tool left at the push STATION after a real tool change
+     * (#1300 flipped) — a dimmed-grey copy of its real profile at the push-END (#1323/1324) on the FIXED machine frame
+     * (machine coords, like the station highlight). The NEW tool is put on the spindle via setSimTool (rides the part
+     * frame @ WCS — cross-frame, reusing P-A). Reuses the magazine tool builder. Pass null (tool or region) to clear.
+     */
+    showRetiredTool(tool, region) {
+        const THREE = this.THREE;
+        if (this._retiredTool) {
+            this.scene.remove(this._retiredTool);
+            this._retiredTool.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose && m.dispose()); });
+            this._retiredTool = null;
+        }
+        if (!tool || !region || !region.end) { this.render(); return; }
+        const td = { type: tool.type || 'endmill', dia: Number(tool.dia) || 6, length: Math.max(15, Number(tool.length) || 30) };
+        const z = Number(region.z) || 0, ex = Number(region.end.x) || 0, ey = Number(region.end.y) || 0;
+        const pts = toolHalfProfile(td).map((q) => new THREE.Vector2(Math.max(0.001, q[0]), q[1]));
+        const geo = new THREE.LatheGeometry(pts, 24); geo.rotateX(Math.PI / 2);
+        const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x9aa4b0, transparent: true, opacity: 0.5, depthWrite: false }));   // dimmed grey = retired
+        mesh.position.set(ex, ey, z - td.length);   // tool top at the station Z, tip hangs down (holder reference, like a pocket)
+        mesh.renderOrder = 16;
+        this._retiredTool = mesh; this.scene.add(mesh);
+        this.render();
+    }
+
     // Re-pivot the orbit on the point under the cursor (the stock surface if hovered,
     // otherwise the point at that screen location on the focus plane). Camera stays put.
     _setPivotFromCursor(e) {

@@ -531,6 +531,16 @@ export class WizardManager {
         if (viz && viz.highlightStation) viz.highlightStation(region || null);
     }
 
+    // Arm the FIRMWARE ATC tool-swap for this op's preview (P-C.1b): during play, a REAL #1300 change (a program T#/M6)
+    // retires the old tool to the station + puts the new tool on the spindle. Opt-in (atc_change firmware) — call AFTER
+    // preview3D. choreo = the ATC_CHOREOGRAPHY descriptor (or null → disarm), region = the station.
+    previewAtcSwap(containerId, choreo, region) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const panel = host && host.__panel;
+        if (panel && panel.setAtcSwap) panel.setAtcSwap(choreo || null, region || null);
+    }
+
     // Show/hide the 4th-axis rig (chuck + tailstock) around a cylinder stock in the 3D preview. Opt-in (rotary
     // probe wizards only) — call AFTER preview3D so the panel/viz exists.
     previewRotaryFixture(containerId, on) {
