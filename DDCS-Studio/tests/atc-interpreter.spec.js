@@ -78,7 +78,7 @@ test('I5: the interpreter EMITS a T.nc O-program for a new combo (plunge macro +
   expect(nc, 'and no pneumatic M-codes').not.toMatch(/M15[6-9]|M16[0-3]/);
 });
 
-test('I5: Generate T.nc routes a new combo → the interpreter, a drawbar preset → the existing generator', async ({ page }) => {
+test('I5b-2a: Generate T.nc routes a candidate combo AND the DRAWBAR changer through the interpreter (safety-complete shipped route)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetSettings && window.openSettings);
   await page.evaluate((atc) => {
@@ -95,16 +95,21 @@ test('I5: Generate T.nc routes a new combo → the interpreter, a drawbar preset
   expect(rapidNc, 'RapidChange → the interpreter O-program (plunge)').toMatch(/^O\d+/m);
   expect(rapidNc).toContain('G53 G1 Z#3 F800');
   expect(rapidNc, 'no drawbar in a magnet changer').not.toContain('M154');
-  // switch to a DRAWBAR changer (non-candidate motion) → the existing generator (byte-identical, M154 dance)
+  // I5b-2a CUTOVER: the DRAWBAR changer now ALSO routes through the INTERPRETER (the shipped route) — a safety-complete
+  // O-program whose executable program is byte-identical to generateToolChangeNc + the O-header. Assert the SHIPPED
+  // output (the button) is safety-complete (this is where the safety assertion now lives — the shipped route).
   await page.evaluate(() => {
     const s = window.ddcsGetSettings();
     s.atc.grip = 'drawbar'; s.atc.motion = 'pick-place'; s.atc.layout = 'linear';
-    s.outputs = s.outputs || []; if (!s.outputs.some((o) => o.type === 'drawbar')) s.outputs.push({ type: 'drawbar', onCode: 'M154', offCode: 'M155', pin: 5, group: 'atc' });
   });
   await page.click('#atc_gen_tnc');
   const drawbarNc = await page.evaluate(() => document.querySelector('#atc_tnc_out').value);
-  expect(drawbarNc, 'a drawbar changer → the existing generator (M154 drawbar dance)').toContain('M154');
-  expect(drawbarNc, 'the drawbar generator is not the plunge interpreter').not.toContain('G53 G1 Z#3 F800');
+  expect(drawbarNc, 'the shipped drawbar route now emits the interpreter O-program (O-header — a standalone macro)').toMatch(/^O\d+/);
+  expect(drawbarNc, 'SAFETY: the M300 spindle-stop wait (the element a naive route would have dropped)').toContain('M300');
+  expect(drawbarNc, 'the drawbar dance — release M154 then clamp M155').toMatch(/M154[\s\S]*M155/);
+  expect(drawbarNc, 'the settle dwells (G04 P500)').toContain('G04 P500');
+  expect(drawbarNc, 'the released + clamped sensor waits (M301 then M302)').toMatch(/M301[\s\S]*M302/);
+  expect(drawbarNc, 'a drawbar descend is a rapid G0, NOT the plunge G1 feed').not.toContain('G53 G1 Z#3 F800');
 });
 
 test('I5b-1: motionToTnc emits a SAFETY-COMPLETE drawbar T.nc from the DECLARATION (matches the DDCS dance)', async ({ page }) => {

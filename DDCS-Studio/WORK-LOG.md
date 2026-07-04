@@ -365,3 +365,19 @@ G53 G0 X#1 Y#2 · M154 · M301 (WAIT before descend) · G53 G0 Z#3 · M155 · G0
 **NO SAFETY GAP (step 4):** every safety element (M300 stop-wait · the settle dwells · the released/clamped waits · the open+wait-before-descend) COMES FROM THE DECLARATION — none required hand-rolling; the interpreter is now capable of the safety-complete drawbar emit for the future single-emitter converge.
 
 **PASSED BACK for advisor review. NEXT per plan: the byte converge (route drawbar → motionToTnc, reconcile the O-header, retire generateToolChangeNc) + config↔method unify = the rest of I5b, then the RELEASE. ATC-model axis; SIM-FRAME/authoring untouched.**
+
+## 🔨 turn 227 (cycle 13) — I5b-2a: CONVERGE the DRAWBAR emit onto the interpreter (the cutover; emit-CHANGING = GATED for advisor + HUMAN review BEFORE final). Full suite 585 pass / 2 skip / 1 KNOWN flake (blocks-live-form, passes isolated 6/6). 2 files (settingsPanel routing + the test).
+
+**THE CUTOVER (settingsPanel.js atc_gen_tnc):** TRANSITIONAL routing — `useInterp = candidate || gripKind==='drawbar'` → motionToTnc, else generateToolChangeNc. Commented clearly as transitional (collapses to UNCONDITIONAL motionToTnc + retires generateToolChangeNc once disk+pusher converge = I5b-2b/c). Only the EXPLICIT drawbar-declared changer routes to the interpreter now; legacy/disk/pusher stay on generateToolChangeNc.
+
+**VERIFIED THE DIFF MYSELF (verify-real-symptom, per the gate) — generated OLD (generateToolChangeNc) vs NEW (motionToTnc) for the SAME drawbar config + diffed:**
+- STRIPPING comments/parentheticals/blank-lines/O-header → the EXECUTABLE PROGRAM is **BYTE-IDENTICAL** (zero-line diff). Every M-code / G-code / #var / N-label / IF / GOTO / M99 matches. Confirms the advisor's line-by-line diff: ZERO executable/safety change.
+- The ONLY diffs: (1) +`O1000 (drawbar x pick-place tool-change macro - DDCS Studio)` header (the not-inline marker generateToolChangeNc lacked); (2) comment WORDING (`; ...` phrasing, `pocket`→`dock`, tool NAMES dropped from the N-labels); (3) blank lines (old had section blanks, new doesn't). All non-executable.
+
+**SAFETY-ASSERTION MOVED ONTO THE SHIPPED ROUTE:** the I5b-2a test now CLICKS Generate T.nc with a drawbar config → asserts the SHIPPED output has the O-header + M300 (spindle-stop wait) + the drawbar dance (M154→M155 + G04 P500 dwells + M301→M302 waits) + `dock` wording + NO plunge G1 feed. (The I5b-1 direct-motionToTnc ordering test stays as the interpreter unit test.)
+
+**GOLDEN RE-BASELINE:** there is NO byte-golden/.nc-fixture/snapshot for the T.nc button output (the ATC goldens = the WIZARD emit atcChangeStack — UNTOUCHED, still green; verification/atc-gen-test.mjs tests the wizard emit, not generateToolChangeNc). The "drawbar T.nc golden" = the routing TEST assertion, re-baselined from "drawbar → the existing generator" to "drawbar → the interpreter (safety-complete shipped route)".
+
+**SCOPE HELD:** did NOT touch the disk/pusher route (stays on generateToolChangeNc), the 3-preset SIM, or any non-drawbar golden. atc-roundtrip + atc-wizards + ATC goldens BYTE-IDENTICAL (they test the wizard emit). full suite green (the 1 failure = the known blocks-live-form flake, passes isolated).
+
+**⏸ GATE — PASSED BACK the byte-DIFF for advisor + HUMAN review BEFORE it is final** (the shipped drawbar T.nc output now carries the O-header + the reworded comments). The two .nc files (drawbar-old.nc / drawbar-new.nc) + the unified diff are in scratchpad, opened for review. NEXT (on approval): I5b-2b = PUSHER converge (FIRST verify GRIPS.pusher declares the correct O10102 push M-codes vs the dump — pusher currently falls back to the WRONG drawbar M154/M155 if routed).

@@ -2120,10 +2120,13 @@ function wireSettingsOverlay(ov) {
     const genTnc = q('atc_gen_tnc');
     if (genTnc) genTnc.addEventListener('click', () => {
         const atc = _ddcsSettings.atc;
-        // A NEW / from-zero changer (a candidate motion — e.g. RapidChange magnet×plunge) → the INTERPRETER emits its
-        // T.nc O-program (I5); the shipped drawbar changer keeps the existing generator (byte-identical).
+        // TRANSITIONAL routing (I5b-2a cutover): the INTERPRETER (motionToTnc) now emits the T.nc for a from-zero
+        // CANDIDATE combo AND for the DRAWBAR changer — a safety-complete O-program whose EXECUTABLE program is
+        // BYTE-IDENTICAL to generateToolChangeNc (verified line-by-line: the ONLY diff is the O-header + comment wording).
+        // This collapses to UNCONDITIONAL motionToTnc (retiring generateToolChangeNc) once disk + pusher converge (I5b-2b/c).
         const cmb = atcCombo({}, atc);
-        const nc = (cmb && cmb.motion && cmb.motion.candidate) ? motionToTnc(cmb, atc) : generateToolChangeNc(atc, getOutputs());
+        const useInterp = cmb && cmb.motion && (cmb.motion.candidate || cmb.gripKind === 'drawbar');
+        const nc = useInterp ? motionToTnc(cmb, atc) : generateToolChangeNc(atc, getOutputs());
         const out = q('atc_tnc_out'); if (out) { out.value = nc; out.style.display = 'block'; }
         const dl = q('atc_dl_tnc'); if (dl) dl.style.display = '';
     });
